@@ -2,8 +2,9 @@
 // docs/communication-poc-spec.md, work-order point 485).
 //
 // One label per speaking figure, riding on that figure's own object so it is
-// unmistakably attached to it, and gone again after a moment — the scene never
-// carries standing text. What each label SAYS is derived from the player's own
+// unmistakably attached to it, and gone again after a moment unless the
+// player is targeting it — speech never stands as permanent text (building
+// and name labels are separate). What each label SAYS is derived from the player's own
 // notes on every render, never copied onto the label, so a reading edited in
 // the journal changes over the speaker's head immediately: one source, two
 // views. The syllables stand beside the reading, so the label never replaces
@@ -106,7 +107,7 @@ export function SpeechLabels() {
   useEffect(() => clearSpeechLabels, [])
 
   // Which label a drawn label IS — the same gate the render below applies, so
-  // the use-key candidate and the highlighted note can never be two different
+  // the guess-key candidate and the highlighted note can never be two different
   // things.
   const visible = (label: SpeechLabel) => conceptLabels || isSpeechLabelVisible(memory, label.atoms)
   const visibleRef = useRef(visible)
@@ -115,8 +116,9 @@ export function SpeechLabels() {
   // The speaker candidate is picked first, then the sweep runs: the target is
   // what holds its label against expiry (point 588), so deciding it after the
   // sweep would drop the very note the player is reaching for. This picks WHICH
-  // speaker is the candidate; whether SPACE actually means him is decided in
-  // PlaceScene against every other thing the key could do (point 691).
+  // speaker is the candidate; E acts on him (point 1139), and only the pad
+  // weighs him against every other thing its use button could do in PlaceScene
+  // (point 691).
   useFrame(() => {
     updateSpeechTarget((label) => visibleRef.current(label))
     pruneSpeechLabels()

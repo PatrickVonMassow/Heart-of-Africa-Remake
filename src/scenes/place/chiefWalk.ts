@@ -1,8 +1,8 @@
 // The chief's way to his drummer and back (design.md §13.4,
 // docs/communication-poc-spec.md).
 //
-// He does not speak at his own door any more. The use key at the hut sends him
-// OUT and ACROSS: he walks to the drummer's side, faces the way the drummer
+// He speaks through his drummer, never at his own door. The use key at the hut
+// sends him OUT and ACROSS: he walks to the drummer's side, faces the way the drummer
 // faces, and from there the drums carry what he has to say. He stays a
 // calibratable minute, then walks home — and a traveller who calls after him on
 // that way home turns him round, with the message beaten again the moment he
@@ -52,11 +52,6 @@ export function chiefInHut(): ChiefWalk {
   return { phase: 'in-hut', progress: 0, at: 0, drumOnArrival: false }
 }
 
-/** Out in the open, on foot or standing: everything but the hut. */
-export function chiefIsOutside(walk: ChiefWalk): boolean {
-  return walk.phase !== 'in-hut'
-}
-
 /**
  * The use key at the hut. It works ONLY while he is inside it: pressed while he
  * is already out, it returns the walk unchanged, which is how "using the hut
@@ -99,7 +94,8 @@ export function chiefCalled(walk: ChiefWalk, now: number): ChiefStep {
  * The walk, one frame on. `now` is the wall clock in seconds; the state carries
  * the reading its own progress was written at, so the step is exact whatever
  * the frame rate — and a single call spanning the whole walk lands him at the
- * drummer just as sixty small ones do.
+ * drummer just as sixty small ones do. It takes at most one transition per
+ * call; the next call picks up the leftover time.
  */
 export function chiefTick(walk: ChiefWalk, now: number, timing: ChiefWalkTiming): ChiefStep {
   const span = Math.max(0, now - walk.at)
@@ -147,13 +143,11 @@ export function chiefTick(walk: ChiefWalk, now: number, timing: ChiefWalkTiming)
  *
  * A STRAIGHT line, deliberately: the ground between the chief's hut and the
  * drummer is the settlement's own open middle, and it is measured clear in the
- * village the mechanic plays in (chiefMeeting.test.ts).
- * // OPEN: swept 07.09.2026 over all 22 villages — only `maasai-village` has a
- * // scattered 0.78 m collider on the line (0.24 m into his footprint, at about
- * // a fifth of the way over). His path does not resolve static colliders, so
- * // there he brushes through it. Not routed around: routing him would need the
- * // nav grid and a path length that changes per frame, which the minute and
- * // the call-back are counted against.
+ * village the mechanic plays in (chiefMeeting.test.ts). Only that village's
+ * chief ever walks (chiefMeeting: elsewhere the hut key never sends him out),
+ * so the other villages' lines are never walked. His path does not resolve
+ * static colliders: routing him would need the nav grid and a path length that
+ * changes per frame, which the minute and the call-back are counted against.
  */
 export function chiefWalkPosition(
   walk: ChiefWalk,
@@ -167,8 +161,8 @@ export function chiefWalkPosition(
 /**
  * Which way he looks. Standing beside the drummer he faces exactly where the
  * drummer faces, so a traveller in front of the pair sees both men from the
- * front; on foot he looks the way he is going, and back at his own door he
- * faces the open ground again rather than his own wall.
+ * front; on foot he looks the way he is going. In his hut he is not drawn, and
+ * the standing yaw is returned only so the value stays defined.
  */
 export function chiefWalkFacing(
   walk: ChiefWalk,
@@ -185,11 +179,11 @@ export function chiefWalkFacing(
 }
 
 /**
- * The point the drummer's figure is turned toward (PlaceLife draws him with
- * exactly this yaw). Stated ONCE here so the man who beats the message and the
+ * The point the drummer's figure is turned toward (PlaceLife draws him with the
+ * yaw `drummerFacing` derives from it). Stated ONCE here so the man who beats the message and the
  * man who sends it cannot end up facing two different ways.
  */
-export const DRUMMER_LOOKS_AT: readonly [number, number] = [3.5, 2.5]
+const DRUMMER_LOOKS_AT: readonly [number, number] = [3.5, 2.5]
 
 /** The yaw the drummer is drawn at, in the scene's own convention. */
 export function drummerFacing(
@@ -203,7 +197,8 @@ export function drummerFacing(
  * LEFT (local +X, the small drum's side), abreast of him rather than behind or
  * in front. Abreast is the whole point — it is what lets the player stand in
  * front of the pair and see chief and drummer from the front at once — and the
- * offset clears both drum shells, which reach no further than 0.5 m out.
+ * offset clears the small drum on that side, whose head reaches 0.48 m out (the
+ * large drum stands on his right, away from the chief).
  */
 export function chiefBesideDrummerSpot(
   offset: number,

@@ -7,7 +7,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
-import { latLonToWorld, regionBorderLabelAnchors } from '../../world/geo'
+import { latLonToWorld, regionBorderLabelAnchors, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { useStrings } from '../../i18n'
 import { buildBorderGeometry, BORDER_INK } from './borderGeometry'
@@ -33,7 +33,7 @@ interface BorderLabel {
   x: number
   y: number
   z: number
-  region: 'north' | 'west' | 'central' | 'east' | 'south'
+  region: RegionId
   key: string
 }
 

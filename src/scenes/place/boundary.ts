@@ -10,8 +10,9 @@
 // module, and only this module.
 //
 // The boundary is NO LONGER A PLAIN CIRCLE (work-order 482): a village standing
-// on a river grows a lobe out to the water, so the bank is walkable ground of
-// the settlement instead of something past its edge. The lobe is still ONE
+// on a river grows a lobe out past the waterline to its wade edge, so the bank
+// is walkable ground of the settlement instead of something past its edge. The
+// lobe is still ONE
 // radius per bearing — both shapes it is built from contain the centre, so their
 // union is star-shaped about it — which is why the band's angular lookup
 // (`buildBoundaryLut`) needed no change at all to follow it.
@@ -20,10 +21,10 @@ import { BANK_FADE_ANGLE, BANK_PLATEAU_ANGLE, type PlaceRiverBank } from './rive
 
 /** How many angles the band's boundary lookup samples (see `buildBoundaryLut`).
  *  1024, not the historical 256: a plain circle needs one texel, but the bank
- *  lobe's edge climbs from the walkable radius out to the waterline across ~12°,
+ *  lobe's edge climbs from the walkable radius out to the wade edge across ~12°,
  *  and at 256 texels one step of the lookup already moved the painted edge by
  *  most of a metre — a band that misplaces itself by a stride is a band that
- *  lies. A kilobyte of lookup buys the angular resolution back. */
+ *  lies. Four kilobytes of lookup buy the angular resolution back. */
 export const BOUNDARY_LUT_SIZE = 1024
 
 /** What the boundary is read from: the plain walkable radius, and the river
@@ -70,8 +71,8 @@ export function placeBoundaryRadius(bounds: PlaceBounds, angle = 0): number {
   if (!bank) return bounds.radius
   const delta = Math.abs(bearingDelta(angle, Math.atan2(bank.nz, bank.nx)))
   if (delta >= BANK_FADE_ANGLE) return bounds.radius
+  // BANK_FADE_ANGLE < π/2, so cos stays well above zero past the early return.
   const cos = Math.cos(delta)
-  if (cos <= 1e-6) return bounds.radius
   // The wade limit at this bearing, and how much of the way out to it the lobe
   // reaches here (all of it across the plateau, none of it past the fade).
   const water = bank.wadeEdge / cos

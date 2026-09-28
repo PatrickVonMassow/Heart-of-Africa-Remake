@@ -111,7 +111,9 @@ export function touchedPoint(
  * with is the honest answer to "is the hand on the surface?" — positive when the
  * hand is short of it, negative when it would be through it.
  *
- * `null` means no elevation in the figure's range comes near at all.
+ * `null` means no elevation in the figure's range meets the surface at all (no
+ * positive flank radius at any hand height); otherwise the smallest gap wins,
+ * however large it is.
  */
 export function reachFrom(
   stand: number,

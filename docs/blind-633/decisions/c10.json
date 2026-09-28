@@ -1,0 +1,2447 @@
+[
+  {
+    "id": "U4860",
+    "decision": "rewritten",
+    "reason": "Header now names the walkable monument site (Giza) beside port and village."
+  },
+  {
+    "id": "U4861",
+    "decision": "rewritten",
+    "reason": "FIRE_SHADOW_MAP_SIZE comment now says the graphics level picks the resolution and this is only the fallback size."
+  },
+  {
+    "id": "U4862",
+    "decision": "removed",
+    "reason": "Dropped the two surplus blank lines before the shared-materials section."
+  },
+  {
+    "id": "U4863",
+    "decision": "kept",
+    "reason": "claim does not hold: groundDebugFlat is a live debug toggle, set from DebugMenu (t.debug.flatGround) via setGroundDebugFlat."
+  },
+  {
+    "id": "U4864",
+    "decision": "rewritten",
+    "reason": "Roof comment now limits the roofClearance contract to the roof shapes and names parapet and label heights as dressing literals."
+  },
+  {
+    "id": "U4865",
+    "decision": "rewritten",
+    "reason": "Comment now calls it the walk's only write of chiefOutside and notes the drum message writes its own state."
+  },
+  {
+    "id": "U4866",
+    "decision": "removed",
+    "reason": "Dropped Stall's unused plenty default; the prop is now required, as Dwelling always passes it."
+  },
+  {
+    "id": "U4867",
+    "decision": "rewritten",
+    "reason": "Mosque body comment now says a plain mud box."
+  },
+  {
+    "id": "U4868",
+    "decision": "rewritten",
+    "reason": "FirePit doc now says the cook-shelter stands only where sheltered, dome-dweller villages keep an open fire."
+  },
+  {
+    "id": "U4869",
+    "decision": "removed",
+    "reason": "Dropped FirePit's unused blaze default; the prop is required and the sole caller passes fireBlaze."
+  },
+  {
+    "id": "U4870",
+    "decision": "removed",
+    "reason": "rainRef is now required and the missing-ref branch is gone; the sole caller passes placeWetness."
+  },
+  {
+    "id": "U4871",
+    "decision": "removed",
+    "reason": "thatchMat is now required on FirePit and CookShelter and the unreachable fallback material is gone; createSurfaceMaterial always returns a material."
+  },
+  {
+    "id": "U4872",
+    "decision": "rewritten",
+    "reason": "Gait probe comment now speaks of the phase's rate, not the accumulated phase."
+  },
+  {
+    "id": "U4873",
+    "decision": "rewritten",
+    "reason": "Moved the landscape-backdrop annulus doc onto LandscapeBackdrop."
+  },
+  {
+    "id": "U4874",
+    "decision": "rewritten",
+    "reason": "Moved the Table Mountain doc onto TableMountainSkyline."
+  },
+  {
+    "id": "U4875",
+    "decision": "kept",
+    "reason": "claim does not hold: pickForKeyPress exists in useKeyTarget.ts and is what pressKey and advanceKeyPicks call; the doc now names its module."
+  },
+  {
+    "id": "U4876",
+    "decision": "rewritten",
+    "reason": "Candidate-list doc now names the drummer and standing chief it already includes and drops the dig-site/rebuild promise."
+  },
+  {
+    "id": "U4877",
+    "decision": "removed",
+    "reason": "Dropped the orphaned walls/play-ground comment above the place-kind flags."
+  },
+  {
+    "id": "U4878",
+    "decision": "rewritten",
+    "reason": "Comment now says the monument takes the port's sandy sky/light/flora/scatter treatment while keeping its own desert-sand ground material."
+  },
+  {
+    "id": "U4879",
+    "decision": "rewritten",
+    "reason": "Walk-state comment now says the eased velocity is what the movement integrates."
+  },
+  {
+    "id": "U4880",
+    "decision": "removed",
+    "reason": "Dropped the stale touch-preset shadow comment; the graphics-level comment below states the real driver."
+  },
+  {
+    "id": "U4881",
+    "decision": "rewritten",
+    "reason": "The dev-hook cleanup now also deletes __placeSpots and __chiefHome on unmount."
+  },
+  {
+    "id": "U4882",
+    "decision": "rewritten",
+    "reason": "Comment now says a dialog freezes looking as it cuts walking input."
+  },
+  {
+    "id": "U4883",
+    "decision": "rewritten",
+    "reason": "Speech-guess opener doc now names the E guess key and the pad's shared use button (point 1139)."
+  },
+  {
+    "id": "U4884",
+    "decision": "rewritten",
+    "reason": "Comment now speaks of the last rendered frame's pick instead of a non-existent nearRef."
+  },
+  {
+    "id": "U4885",
+    "decision": "rewritten",
+    "reason": "Touch-look comment now says the drag turns as far as the mouse, yaw only."
+  },
+  {
+    "id": "U4886",
+    "decision": "rewritten",
+    "reason": "Comment now says EYE_HEIGHT above its footing."
+  },
+  {
+    "id": "U4887",
+    "decision": "rewritten",
+    "reason": "Footstep comment now says the phase advances by the eased walk speed, not the resolved displacement."
+  },
+  {
+    "id": "U4888",
+    "decision": "rewritten",
+    "reason": "Prompt comment now says the hut leaves the list once he is out and the prompt names the action at him."
+  },
+  {
+    "id": "U4889",
+    "decision": "rewritten",
+    "reason": "Chief mount comment now describes the walk to the drummer, the stay and the return home."
+  },
+  {
+    "id": "U4890",
+    "decision": "rewritten",
+    "reason": "Marker comment now says every interactive, the chief's hut included."
+  },
+  {
+    "id": "U4891",
+    "decision": "removed",
+    "reason": "Dropped the teaching-stone JSX comment; no stone is rendered."
+  },
+  {
+    "id": "U4892",
+    "decision": "rewritten",
+    "reason": "Play-rocks comment no longer compares with the removed teaching stone."
+  },
+  {
+    "id": "U4893",
+    "decision": "rewritten",
+    "reason": "PlaceLife now receives firePos={VILLAGE_FIRE} (same value) instead of a copied literal."
+  },
+  {
+    "id": "U4894",
+    "decision": "rewritten",
+    "reason": "Header now says a label is gone after a moment unless the player is targeting it."
+  },
+  {
+    "id": "U4895",
+    "decision": "rewritten",
+    "reason": "Header now scopes the no-standing-text claim to speech and names building and name labels as separate."
+  },
+  {
+    "id": "U4896",
+    "decision": "rewritten",
+    "reason": "Targeting comments now name the guess-key candidate and say E acts on the speaker, only the pad arbitrating against other uses."
+  },
+  {
+    "id": "U4897",
+    "decision": "removed",
+    "reason": "Dropped ADULT_CONCEPTS; nothing read it but two tautological test assertions, which went with it."
+  },
+  {
+    "id": "U4898",
+    "decision": "rewritten",
+    "reason": "Dropped the export on AdultPhase, DigUtterance and AdultWorker; only local use remains."
+  },
+  {
+    "id": "U4899",
+    "decision": "rewritten",
+    "reason": "Dropped the export on AIM_CLEARANCE; only siteClear reads it."
+  },
+  {
+    "id": "U4900",
+    "decision": "rewritten",
+    "reason": "Header now says RIVER is the sender's order and the carrier's report, both at the water stand."
+  },
+  {
+    "id": "U4901",
+    "decision": "rewritten",
+    "reason": "Header now says the two digging situations start their site search one site apart and never share a held site, instead of promising distinct sites."
+  },
+  {
+    "id": "U4902",
+    "decision": "rewritten",
+    "reason": "orderedBy doc now says the sender walks only to his spot beside the stand."
+  },
+  {
+    "id": "U4903",
+    "decision": "rewritten",
+    "reason": "anotherFreeAdult doc now describes picking the carrier and why his ground needs no clearance."
+  },
+  {
+    "id": "U4904",
+    "decision": "removed",
+    "reason": "Dropped the superseded stacked comment that called the stand the carrier's spot."
+  },
+  {
+    "id": "U4905",
+    "decision": "rewritten",
+    "reason": "siteClear doc now says the partner is exempt when passed, as at the word itself."
+  },
+  {
+    "id": "U4906",
+    "decision": "rewritten",
+    "reason": "Frame-deferral comment now limits one word per frame to non-urgent requests."
+  },
+  {
+    "id": "U4907",
+    "decision": "backlog",
+    "reason": "src/scenes/place/adultWork.ts:682 — the final arrived-walk cleanup branch (owes nothing, no hold) looks unreachable through the module's own transitions and would bypass clearPair's floor release; needs a state-machine check before removal."
+  },
+  {
+    "id": "U4908",
+    "decision": "backlog",
+    "reason": "src/scenes/place/adultWork.ts:104 — AdultTask.role 'worker' is never assigned by the module (only a test fixture uses it); drop the variant together with that fixture."
+  },
+  {
+    "id": "U4909",
+    "decision": "backlog",
+    "reason": "src/scenes/place/adultWork.ts:140 — AdultTask.via is always null (every constructor and fixture), so goalOf's via fallback and the !t.via guard are dead; remove the field with its test fixtures."
+  },
+  {
+    "id": "U4910",
+    "decision": "kept",
+    "reason": "claim does not hold: PlaceLife reads geography.waterHead (PlaceLife.tsx:3030) for its adult destinations; the field is live."
+  },
+  {
+    "id": "U4911",
+    "decision": "backlog",
+    "reason": "src/config/balance.ts adultErrands.dwellSeconds — declared in AdultWorkConfig and debug-editable but read by no code (pace is live via PlaceLife); remove it with its debug row and language keys."
+  },
+  {
+    "id": "U4912",
+    "decision": "rewritten",
+    "reason": "Header now says the completed strokes are counted at most one per frame."
+  },
+  {
+    "id": "U4913",
+    "decision": "rewritten",
+    "reason": "Comment now says only say.at is read for the report and its aim is the sender's position in readyWord."
+  },
+  {
+    "id": "U4914",
+    "decision": "kept",
+    "reason": "claim does not hold: PlaceLife's dev hook reads task.hushed (PlaceLife.tsx:3536), which the verify suites inspect."
+  },
+  {
+    "id": "U4915",
+    "decision": "kept",
+    "reason": "AdultWorkState is the return type of createAdultWork and used across files; live."
+  },
+  {
+    "id": "U4916",
+    "decision": "rewritten",
+    "reason": "Dropped the export on AnimalAnchor, AnimalBody and AnimalPen; the local interfaces stay."
+  },
+  {
+    "id": "U4917",
+    "decision": "kept",
+    "reason": "ANIMAL_RADIUS drives nudgeToFree and resolveMove in-file; live."
+  },
+  {
+    "id": "U4918",
+    "decision": "rewritten",
+    "reason": "Comment now names WALKER_RADIUS (0.3) as the second term of the 0.48 m sum."
+  },
+  {
+    "id": "U4919",
+    "decision": "rewritten",
+    "reason": "animalAnchors doc now says the nudge does not re-check the pen, so a crowded pen can push an anchor past its fence."
+  },
+  {
+    "id": "U4920",
+    "decision": "rewritten",
+    "reason": "Dropped the export on BACKDROP_RIM_DROP; only backdropBase reads it."
+  },
+  {
+    "id": "U4921",
+    "decision": "backlog",
+    "reason": "src/scenes/place/backdrop.ts:144 — backdropSurfaceY adds tapered relief from r0 + BACKDROP_DISC_OVERLAP on, so the join at the disc edge is not exactly flush with the disc plane as the comment says; tiny step, unmeasured."
+  },
+  {
+    "id": "U4922",
+    "decision": "rewritten",
+    "reason": "discHorizonY doc now says the clamped backdrop past the edge meets or exceeds the line, which stays the lower bound of panoramaStandY."
+  },
+  {
+    "id": "U4923",
+    "decision": "rewritten",
+    "reason": "panoramaStandY doc now says the drawn ground line is the floor that the clamped backdrop already meets or exceeds."
+  },
+  {
+    "id": "U4924",
+    "decision": "kept",
+    "reason": "The panoramaGroundY mention is explicitly historical (\"the old ... clamp\") and explains why the current max() exists."
+  },
+  {
+    "id": "U4925",
+    "decision": "backlog",
+    "reason": "src/scenes/place/backdrop.ts:253 — panoramaStandY's max with discHorizonY is redundant outside the disc (backdrop height >= 0 >= line); keep until a camera-inside-disc case is ruled out."
+  },
+  {
+    "id": "U4926",
+    "decision": "rewritten",
+    "reason": "backdropTaper and backdropBase docs now say they are shared through backdropSurfaceY."
+  },
+  {
+    "id": "U4927",
+    "decision": "kept",
+    "reason": "backdropBase and PANORAMA_RING_CLEARANCE feed live functions in the file."
+  },
+  {
+    "id": "U4928",
+    "decision": "rewritten",
+    "reason": "Dropped the export on BackdropMaterialHandle; it stays the local return type."
+  },
+  {
+    "id": "U4929",
+    "decision": "rewritten",
+    "reason": "Header section number corrected to §7.1 pt. 11; backdrop.test.ts does test the smooth shading (describe 'backdrop material'), so that part of the claim does not hold."
+  },
+  {
+    "id": "U4930",
+    "decision": "rewritten",
+    "reason": "Dropped the export on BankConcept, BankPhase, BankRole, BankAim and BankRoundConfig; local types stay."
+  },
+  {
+    "id": "U4931",
+    "decision": "rewritten",
+    "reason": "Heading no longer counts THREE readings; it now names the wrong readings and says when the boulder naming gives way."
+  },
+  {
+    "id": "U4932",
+    "decision": "rewritten",
+    "reason": "Heading now states that the boulder naming gives way only when no child can reach the stone or the guard's overtime runs out."
+  },
+  {
+    "id": "U4933",
+    "decision": "rewritten",
+    "reason": "Header and openCycle doc now say RIVER is called once ROCK is known, the cycle opening silently before."
+  },
+  {
+    "id": "U4934",
+    "decision": "rewritten",
+    "reason": "Header now says the direction is announced once ROCK is known."
+  },
+  {
+    "id": "U4935",
+    "decision": "rewritten",
+    "reason": "Header now says the run opens silently where the catcher's hand cannot reach its stone."
+  },
+  {
+    "id": "U4936",
+    "decision": "rewritten",
+    "reason": "Header now says a runner who reaches the far rock and can touch it calls ROCK."
+  },
+  {
+    "id": "U4937",
+    "decision": "rewritten",
+    "reason": "quarry doc now says it is re-checked every frame and switched only beyond targetSwitchMargin."
+  },
+  {
+    "id": "U4938",
+    "decision": "rewritten",
+    "reason": "direction doc now says it holds the coming or current run's word, null until announced."
+  },
+  {
+    "id": "U4939",
+    "decision": "rewritten",
+    "reason": "pending doc now distinguishes omission without a speech floor from the floor's deferral."
+  },
+  {
+    "id": "U4940",
+    "decision": "rewritten",
+    "reason": "tapFor doc now says a silent opening starts no tap hold while the tapper's walk back (returnFor) still holds the group."
+  },
+  {
+    "id": "U4941",
+    "decision": "rewritten",
+    "reason": "abandonedBoulder doc now says a climber already on the stone may still name it."
+  },
+  {
+    "id": "U4942",
+    "decision": "rewritten",
+    "reason": "Cycle-hold comment now says the climb ends on its own clocks (descent capped at four sink lengths) and may wait at the top for the speech floor."
+  },
+  {
+    "id": "U4943",
+    "decision": "rewritten",
+    "reason": "openRoam doc now says the climber is left to stepRoam to pick."
+  },
+  {
+    "id": "U4944",
+    "decision": "rewritten",
+    "reason": "roamGoal doc now says a uniformly random heading."
+  },
+  {
+    "id": "U4945",
+    "decision": "rewritten",
+    "reason": "stationAt doc now says rows of three."
+  },
+  {
+    "id": "U4946",
+    "decision": "rewritten",
+    "reason": "Run-end comment now says reached the far rock, not touched."
+  },
+  {
+    "id": "U4947",
+    "decision": "rewritten",
+    "reason": "stepStations doc now says a tagged child stays down within a run and walks again here and in the parting walk."
+  },
+  {
+    "id": "U4948",
+    "decision": "rewritten",
+    "reason": "bankChildCanSeparate comment now speaks of the boulder's height instead of a fixed half metre."
+  },
+  {
+    "id": "U4949",
+    "decision": "kept",
+    "reason": "The quoted criterion names the watch that caught the ordering defect; the comment's point (phase decided before the children move) still holds."
+  },
+  {
+    "id": "U4950",
+    "decision": "backlog",
+    "reason": "src/scenes/place/bankGame.ts:424 — BankState.playing is set true at creation and never cleared, so every if (s.playing) is always taken; only the harness reads it (tagGame's playing does vary)."
+  },
+  {
+    "id": "U4951",
+    "decision": "rewritten",
+    "reason": "speech doc now names the catalogue point 686 deleted instead of a five-word rebuild."
+  },
+  {
+    "id": "U4952",
+    "decision": "rewritten",
+    "reason": "Header's utterance list now includes the boulder naming."
+  },
+  {
+    "id": "U4953",
+    "decision": "rewritten",
+    "reason": "Moved the stranded step doc onto advanceBankGame."
+  },
+  {
+    "id": "U4954",
+    "decision": "rewritten",
+    "reason": "stepBankGame doc now says the DEV gate sits here."
+  },
+  {
+    "id": "U4955",
+    "decision": "rewritten",
+    "reason": "stepRoam comment now says the climber is picked on the roaming steps, openRoam only resetting it."
+  },
+  {
+    "id": "U4956",
+    "decision": "rewritten",
+    "reason": "Comment now points at the roam overtime bound in advanceBankGame."
+  },
+  {
+    "id": "U4957",
+    "decision": "rewritten",
+    "reason": "landingFor comment now points at the per-frame re-read in stepClimb."
+  },
+  {
+    "id": "U4958",
+    "decision": "rewritten",
+    "reason": "tapReturnSeconds is now documented as a backstop time, catcherStationDistance as the settling radius."
+  },
+  {
+    "id": "U4959",
+    "decision": "rewritten",
+    "reason": "Flattened the bare block in the catcher loop and moved the ri < 0 check before the array read."
+  },
+  {
+    "id": "U4960",
+    "decision": "kept",
+    "reason": "claim does not hold: the 2.8 s stand at :122 is explicitly the old value the fix replaced; climbHoldSeconds is 7 in balance."
+  },
+  {
+    "id": "U4961",
+    "decision": "rewritten",
+    "reason": "Comment now names reachDistance instead of a hard-coded 1.3 m."
+  },
+  {
+    "id": "U4962",
+    "decision": "kept",
+    "reason": "claim does not hold: balance.ts at roamGuardSeconds carries the 92 % measurement the comment cites."
+  },
+  {
+    "id": "U4963",
+    "decision": "kept",
+    "reason": "claim does not hold: PlaceLife walks the adults with the same rule (navClearBetween, findPlaceRoute at most once a second, PlaceLife.tsx:3250-3262)."
+  },
+  {
+    "id": "U4964",
+    "decision": "kept",
+    "reason": "wordToward and ClimbStage are used live in the file."
+  },
+  {
+    "id": "U4965",
+    "decision": "rewritten",
+    "reason": "Header and LUT doc now say the lobe reaches past the waterline to the wade edge."
+  },
+  {
+    "id": "U4966",
+    "decision": "rewritten",
+    "reason": "LUT doc now says four kilobytes."
+  },
+  {
+    "id": "U4967",
+    "decision": "backlog",
+    "reason": "src/scenes/place/boundary.ts:95 — maxBoundaryRadius assumes the maximum lies on the plateau; inside the fade wadeEdge/cos still rises while the ramp falls, unmeasured whether the product can exceed it."
+  },
+  {
+    "id": "U4968",
+    "decision": "removed",
+    "reason": "Dropped the unreachable cos <= 1e-6 guard; BANK_FADE_ANGLE (0.593) is below pi/2, noted in a comment."
+  },
+  {
+    "id": "U4969",
+    "decision": "rewritten",
+    "reason": "nextChiefAction doc now scopes walking-out to the drum village, where alone he steps out."
+  },
+  {
+    "id": "U4970",
+    "decision": "rewritten",
+    "reason": "Header now says the drummer names the chief in every village while he is in his hut."
+  },
+  {
+    "id": "U4971",
+    "decision": "kept",
+    "reason": "ChiefWalkTiming and ChiefStep type exported functions' parameters/returns; harmless."
+  },
+  {
+    "id": "U4972",
+    "decision": "removed",
+    "reason": "Dropped the test-only chiefIsOutside; its test asserts now read walk.phase directly."
+  },
+  {
+    "id": "U4973",
+    "decision": "rewritten",
+    "reason": "Dropped the export on DRUMMER_LOOKS_AT; only drummerFacing reads it."
+  },
+  {
+    "id": "U4974",
+    "decision": "rewritten",
+    "reason": "Walk-line doc now says only the drum village's chief ever walks and his path does not resolve static colliders."
+  },
+  {
+    "id": "U4975",
+    "decision": "rewritten",
+    "reason": "chiefTick doc now says at most one transition per call, the next call picking up the leftover time."
+  },
+  {
+    "id": "U4976",
+    "decision": "rewritten",
+    "reason": "Comment now says PlaceLife draws the drummer with the yaw drummerFacing derives from the point."
+  },
+  {
+    "id": "U4977",
+    "decision": "rewritten",
+    "reason": "Comment now says the offset clears the small drum on the chief's side (head reaching 0.48 m out); the large drum stands on the other side."
+  },
+  {
+    "id": "U4978",
+    "decision": "rewritten",
+    "reason": "Facing doc now says he is not drawn in his hut and the yaw is only kept defined."
+  },
+  {
+    "id": "U4979",
+    "decision": "rewritten",
+    "reason": "Removed the dated OPEN sweep: only the drum village's chief walks (chiefMeeting), so the maasai-village line is never walked."
+  },
+  {
+    "id": "U4980",
+    "decision": "rewritten",
+    "reason": "Header now describes the behaviour (he speaks through his drummer) instead of the removal."
+  },
+  {
+    "id": "U4981",
+    "decision": "rewritten",
+    "reason": "CHIEF_SPEAKER_ID doc now says it names his figure for the speech dev hook and he speaks no word under it."
+  },
+  {
+    "id": "U4982",
+    "decision": "kept",
+    "reason": "CircleCollider, BoxCollider and SegmentCollider are the members of the exported Collider union."
+  },
+  {
+    "id": "U4983",
+    "decision": "rewritten",
+    "reason": "Comment now says just outside the surface (under 0.1 mm)."
+  },
+  {
+    "id": "U4984",
+    "decision": "rewritten",
+    "reason": "Dead-centre comment now says away from the place origin (+x at the origin)."
+  },
+  {
+    "id": "U4985",
+    "decision": "removed",
+    "reason": "Dropped the redundant || 1 fallback; the length is never zero by construction, as the comment states."
+  },
+  {
+    "id": "U4986",
+    "decision": "backlog",
+    "reason": "src/scenes/place/collision.ts:120 — a zero-length segment collider (ex = ez = 0) returns the point unchanged despite overlap; no generator is known to emit one."
+  },
+  {
+    "id": "U4987",
+    "decision": "rewritten",
+    "reason": "Sweep doc now says a near-tangent chord shorter than the spacing can be skipped, grazing an edge rather than crossing a wall."
+  },
+  {
+    "id": "U4988",
+    "decision": "rewritten",
+    "reason": "hasEscapeDirection doc now says only the step's endpoint is tested."
+  },
+  {
+    "id": "U4989",
+    "decision": "rewritten",
+    "reason": "tryNudgeToFree, nudgeWhere and nudgeToFree docs now say the first free sample on the nearest ring that has one."
+  },
+  {
+    "id": "U4990",
+    "decision": "rewritten",
+    "reason": "nudgeWhere doc now says found: false returns the original position unchanged."
+  },
+  {
+    "id": "U4991",
+    "decision": "rewritten",
+    "reason": "Header now names capsule segments (fences, the loom's warp)."
+  },
+  {
+    "id": "U4992",
+    "decision": "rewritten",
+    "reason": "nudgeToFree doc now lists the layout builder, animals, scene spawns and others."
+  },
+  {
+    "id": "U4993",
+    "decision": "rewritten",
+    "reason": "Section header now reads body radii and spawn freedom."
+  },
+  {
+    "id": "U4994",
+    "decision": "kept",
+    "reason": "DigSiteAppearance and DigSiteFurniture type exported functions' returns; harmless."
+  },
+  {
+    "id": "U4995",
+    "decision": "rewritten",
+    "reason": "Doc now says the heights are the mound term (spoilHeightAt) lifted 4 mm against z-fighting."
+  },
+  {
+    "id": "U4996",
+    "decision": "rewritten",
+    "reason": "\"this point\" replaced by \"the first village frame taken of it\"."
+  },
+  {
+    "id": "U4997",
+    "decision": "kept",
+    "reason": "DrumStroke and DrummerPoseFrame type exported functions; harmless."
+  },
+  {
+    "id": "U4998",
+    "decision": "kept",
+    "reason": "drumHandPoint is the test's hand-position oracle for the stroke geometry; a deliberate test-support export."
+  },
+  {
+    "id": "U4999",
+    "decision": "rewritten",
+    "reason": "Header and DRUMMER_LEAN doc now say the trunk tips about the ground (legless figure)."
+  },
+  {
+    "id": "U5000",
+    "decision": "rewritten",
+    "reason": "Stroke comments now say only drum.x is matched; forward the head's radius covers the contact."
+  },
+  {
+    "id": "U5001",
+    "decision": "rewritten",
+    "reason": "Dropped the hip-pivot lean figures; the header now says centimetres."
+  },
+  {
+    "id": "U5002",
+    "decision": "kept",
+    "reason": "The drum constants and helpers are used by drummerPoseAt in-file."
+  },
+  {
+    "id": "U5003",
+    "decision": "rewritten",
+    "reason": "Moved the per-frame behaviour doc onto drummerPoseAt; the interface keeps a one-line doc."
+  },
+  {
+    "id": "U5004",
+    "decision": "kept",
+    "reason": "The header's defect section explains why the stroke is derived; it is labelled as the replaced state."
+  },
+  {
+    "id": "U5005",
+    "decision": "kept",
+    "reason": "DrummerVoice types the exported setter's parameter; harmless."
+  },
+  {
+    "id": "U5006",
+    "decision": "kept",
+    "reason": "GizaAmbientAnchor types the exported GIZA_AMBIENT; harmless."
+  },
+  {
+    "id": "U5007",
+    "decision": "rewritten",
+    "reason": "playGround comment now says only ambient visitors stand there, no children."
+  },
+  {
+    "id": "U5008",
+    "decision": "rewritten",
+    "reason": "GIZA_SPAWN_Z doc now says design.md §2.3 spawns him in the south, no longer \"just inside the edge\"."
+  },
+  {
+    "id": "U5009",
+    "decision": "rewritten",
+    "reason": "Ambient comment now puts the cameleer and his camel on the approach and a lone camel by the Sphinx (20, 2)."
+  },
+  {
+    "id": "U5010",
+    "decision": "rewritten",
+    "reason": "Header now says edges at ~52° with height 1.28 × the cone's circumradius (the edge, not the face, is ~52°)."
+  },
+  {
+    "id": "U5011",
+    "decision": "kept",
+    "reason": "claim does not hold: gizaSite.test.ts carries the 720-azimuth sweep the doc cites."
+  },
+  {
+    "id": "U5012",
+    "decision": "kept",
+    "reason": "GIZA_SPAWN_Z and GIZA_SLOPE are used in-file."
+  },
+  {
+    "id": "U5013",
+    "decision": "kept",
+    "reason": "GrassTuft and GrassScatterInput type the exported scatter; harmless."
+  },
+  {
+    "id": "U5014",
+    "decision": "rewritten",
+    "reason": "Header now says the tufts cover the walkable ground and a few metres past its edge."
+  },
+  {
+    "id": "U5015",
+    "decision": "rewritten",
+    "reason": "isPort doc now says ports ask for fewer tufts; colour is not this module's."
+  },
+  {
+    "id": "U5016",
+    "decision": "kept",
+    "reason": "SeparationConfig and SeparationWorld type widely used exported functions."
+  },
+  {
+    "id": "U5017",
+    "decision": "removed",
+    "reason": "Dropped the test-only separateAll; its tests call separateGroup(set, set.bodies, ...) directly."
+  },
+  {
+    "id": "U5018",
+    "decision": "rewritten",
+    "reason": "nudges doc now says the escape is counted whether or not it found free ground."
+  },
+  {
+    "id": "U5019",
+    "decision": "rewritten",
+    "reason": "groundOccupied doc now names moverBodyRadius."
+  },
+  {
+    "id": "U5020",
+    "decision": "rewritten",
+    "reason": "Doc now says the contact line the separation corrects toward, acting only a slop inside it."
+  },
+  {
+    "id": "U5021",
+    "decision": "rewritten",
+    "reason": "stepRoundBodies doc now speaks of a step crossing a body and the closed-form crossing test."
+  },
+  {
+    "id": "U5022",
+    "decision": "rewritten",
+    "reason": "wedged doc now says a net-zero push (cancelling overlaps) resets it."
+  },
+  {
+    "id": "U5023",
+    "decision": "rewritten",
+    "reason": "separateBody doc now says an escape nudge is not reported, only counted in nudges/carried."
+  },
+  {
+    "id": "U5024",
+    "decision": "rewritten",
+    "reason": "separateBody doc now says the world's nudge, where given and successful, carries it."
+  },
+  {
+    "id": "U5025",
+    "decision": "rewritten",
+    "reason": "stiffness doc now limits no-overshoot to a single overlap; several neighbours are summed first."
+  },
+  {
+    "id": "U5026",
+    "decision": "kept",
+    "reason": "claim does not hold: balance ships stiffness 1, which is the whole-overlap push the header describes; the knob only scales it."
+  },
+  {
+    "id": "U5027",
+    "decision": "removed",
+    "reason": "Dropped pushBody's unused world and budget defaults; both callers pass them."
+  },
+  {
+    "id": "U5028",
+    "decision": "rewritten",
+    "reason": "separateBody doc no longer says damped."
+  },
+  {
+    "id": "U5029",
+    "decision": "rewritten",
+    "reason": "Comment now says \"rejected it afterwards\" instead of pointing below at a removed check."
+  },
+  {
+    "id": "U5030",
+    "decision": "kept",
+    "reason": "claim does not hold: deflectedStep returns the origin (moved: false) when every bearing fails (wildlifeBehavior.ts:2015)."
+  },
+  {
+    "id": "U5031",
+    "decision": "kept",
+    "reason": "The five behaviours are listed in the same sentence; the figures are a dated measurement record."
+  },
+  {
+    "id": "U5032",
+    "decision": "removed",
+    "reason": "Dropped the unused LanePoint interface."
+  },
+  {
+    "id": "U5033",
+    "decision": "rewritten",
+    "reason": "bendAround comment now says up to six bends within 5 cm, and that a later obstacle can move points back."
+  },
+  {
+    "id": "U5034",
+    "decision": "rewritten",
+    "reason": "LaneSlot.anchor doc now says the centreline sample the slot was offset from."
+  },
+  {
+    "id": "U5035",
+    "decision": "rewritten",
+    "reason": "PLACE_RADIUS doc now says it is the village radius, ports set their own, and literal plan distances do not scale."
+  },
+  {
+    "id": "U5036",
+    "decision": "rewritten",
+    "reason": "door doc now says standing near it arms the use key and the press enters."
+  },
+  {
+    "id": "U5037",
+    "decision": "rewritten",
+    "reason": "rocks doc now excepts the low stones walked over (looseRockIsGround)."
+  },
+  {
+    "id": "U5038",
+    "decision": "removed",
+    "reason": "Dropped the first, superseded waterPath doc block; the remaining block no longer places the words at the head."
+  },
+  {
+    "id": "U5039",
+    "decision": "removed",
+    "reason": "Merged the two stacked waterPath docs into one."
+  },
+  {
+    "id": "U5040",
+    "decision": "rewritten",
+    "reason": "waterPath doc now says the errand's words fall at the water stand, not the head."
+  },
+  {
+    "id": "U5041",
+    "decision": "rewritten",
+    "reason": "playGround doc now says null only at a monument site; ports get one too."
+  },
+  {
+    "id": "U5042",
+    "decision": "rewritten",
+    "reason": "Dig-site anchor docs now say a dwelling's body (centre less r), not a compound wall."
+  },
+  {
+    "id": "U5043",
+    "decision": "rewritten",
+    "reason": "WATER_STAND_WORK_RING now reads JOIN_STAND_OFF from adultWork (already imported), and the false no-dependency rationale is gone."
+  },
+  {
+    "id": "U5044",
+    "decision": "rewritten",
+    "reason": "The doc no longer claims a test pins the two constants; they are now one."
+  },
+  {
+    "id": "U5045",
+    "decision": "rewritten",
+    "reason": "WATER_PATH_HEAD_RADIUS doc now says swept round the foot's bearing, words not spoken there."
+  },
+  {
+    "id": "U5046",
+    "decision": "rewritten",
+    "reason": "Dropped the stale 7-14 m compound-ring figure from the head-radius doc."
+  },
+  {
+    "id": "U5047",
+    "decision": "rewritten",
+    "reason": "Dropped the export on WATER_PATH_HEAD_SWEEP."
+  },
+  {
+    "id": "U5048",
+    "decision": "kept",
+    "reason": "DWELLING_BODY is a Partial record, so the ?? fallback is the type's answer; dropping it needs a non-null assertion for no gain."
+  },
+  {
+    "id": "U5049",
+    "decision": "rewritten",
+    "reason": "Dropped the export on dwellingRoofStandOff."
+  },
+  {
+    "id": "U5050",
+    "decision": "kept",
+    "reason": "claim does not hold: the only production caller (PlaceScene.tsx:600) passes interactiveCircleRadius('chief', style); the default serves tests."
+  },
+  {
+    "id": "U5051",
+    "decision": "removed",
+    "reason": "Dropped nearestActionable from layout; its test keeps the same arbitration as a local helper over doorCandidates."
+  },
+  {
+    "id": "U5052",
+    "decision": "removed",
+    "reason": "The stale nearestActionable doc went with the function."
+  },
+  {
+    "id": "U5053",
+    "decision": "rewritten",
+    "reason": "Dropped the export on COMPOUND_WALL_GAP and COMPOUND_RING_CORRIDOR."
+  },
+  {
+    "id": "U5054",
+    "decision": "kept",
+    "reason": "FencePanel types the exported fencePanels' return; harmless."
+  },
+  {
+    "id": "U5055",
+    "decision": "rewritten",
+    "reason": "Moved the procedural-layout overview onto buildLayout."
+  },
+  {
+    "id": "U5056",
+    "decision": "kept",
+    "reason": "builtFabric is a thin test adapter over fabricOf; harmless."
+  },
+  {
+    "id": "U5057",
+    "decision": "removed",
+    "reason": "Dropped the stranded corridor doc; clearCorridor's own doc now carries the grazing-corner point."
+  },
+  {
+    "id": "U5058",
+    "decision": "rewritten",
+    "reason": "clearCorridor doc now says a wider stride errs toward rejecting instead of claiming strict nesting."
+  },
+  {
+    "id": "U5059",
+    "decision": "rewritten",
+    "reason": "Water-path intro now says the foot is fixed here and the head searched after the plan; no speech at the head."
+  },
+  {
+    "id": "U5060",
+    "decision": "rewritten",
+    "reason": "Comment now marks the initial head as a placeholder overwritten or dropped by the search."
+  },
+  {
+    "id": "U5061",
+    "decision": "rewritten",
+    "reason": "Comment now sends the reader to riverBank.ts for placement and to PLAY_ROCK_RADIUS/SCALE here for size."
+  },
+  {
+    "id": "U5062",
+    "decision": "rewritten",
+    "reason": "hutDoor comment now says 3.9 m out, beyond both hut bodies, and that a roof stand-off can widen the collider."
+  },
+  {
+    "id": "U5063",
+    "decision": "removed",
+    "reason": "Dropped the unreachable zero-distance fallbacks; the chief stands 4.5 m or more from every market band."
+  },
+  {
+    "id": "U5064",
+    "decision": "kept",
+    "reason": "The two discarded draws keep the seeded layouts unchanged, as the comment says."
+  },
+  {
+    "id": "U5065",
+    "decision": "rewritten",
+    "reason": "Spawn-corridor comment now says |x| < 4.5, z > 5, matching the guard."
+  },
+  {
+    "id": "U5066",
+    "decision": "backlog",
+    "reason": "src/scenes/place/layout.ts:1006 — isFree's fixed exclusion disc at (0, 18) r 6 predates pickWayOut (688) and may be legacy; the same literal recurs in the port slot filter."
+  },
+  {
+    "id": "U5067",
+    "decision": "backlog",
+    "reason": "src/scenes/place/layout.ts:1011 — isFree's window gap uses hard-coded 3.2/2.9/3.35 body radii while village colliders use interactiveCircleRadius, which a roof stand-off can widen (literals recur at the port filter)."
+  },
+  {
+    "id": "U5068",
+    "decision": "kept",
+    "reason": "Interactive.door is optional in the type; the guard is the type's answer, not a reachable branch."
+  },
+  {
+    "id": "U5069",
+    "decision": "rewritten",
+    "reason": "Door-seat comment now says stand-off less 0.3 m, leaving the door 0.2 m clear."
+  },
+  {
+    "id": "U5070",
+    "decision": "removed",
+    "reason": "Dropped the redundant alleys.length > 0 guard; size >= 3 already means two alleys."
+  },
+  {
+    "id": "U5071",
+    "decision": "kept",
+    "reason": "find() is typed possibly-undefined; the if (market) guard is the type's narrowing."
+  },
+  {
+    "id": "U5072",
+    "decision": "rewritten",
+    "reason": "The fire path now reads VILLAGE_FIRE instead of a copied literal (same value)."
+  },
+  {
+    "id": "U5073",
+    "decision": "kept",
+    "reason": "Same Partial-record fallback as U5048; harmless."
+  },
+  {
+    "id": "U5074",
+    "decision": "rewritten",
+    "reason": "Comment now says up to two sheds."
+  },
+  {
+    "id": "U5075",
+    "decision": "rewritten",
+    "reason": "Scatter comment now says no lanes of its own beyond the common paths."
+  },
+  {
+    "id": "U5076",
+    "decision": "rewritten",
+    "reason": "LOOSE DRESSING block now points at clearOfDressing where the rule lives."
+  },
+  {
+    "id": "U5077",
+    "decision": "rewritten",
+    "reason": "Comment now names the Tuareg camp's goat pen instead of a windbreak."
+  },
+  {
+    "id": "U5078",
+    "decision": "rewritten",
+    "reason": "Collision-set header now says circles, boxes or segments."
+  },
+  {
+    "id": "U5079",
+    "decision": "rewritten",
+    "reason": "Loom-clearance comment now says a dwelling moves only with its whole household (1191)."
+  },
+  {
+    "id": "U5080",
+    "decision": "rewritten",
+    "reason": "Comment now says only villageLifeFootprints carries the loom."
+  },
+  {
+    "id": "U5081",
+    "decision": "rewritten",
+    "reason": "Quarter comment now names the water stand, placed before, as the exception."
+  },
+  {
+    "id": "U5082",
+    "decision": "rewritten",
+    "reason": "Comment now says the dig sites instead of three work sites."
+  },
+  {
+    "id": "U5083",
+    "decision": "removed",
+    "reason": "Dropped the playGround null guards; childPlayGround always returns one inside buildLayout."
+  },
+  {
+    "id": "U5084",
+    "decision": "rewritten",
+    "reason": "toChildren doc now names the water head, the dig sites and the loom."
+  },
+  {
+    "id": "U5085",
+    "decision": "rewritten",
+    "reason": "Heading now says the water path is laid after the plan is built."
+  },
+  {
+    "id": "U5086",
+    "decision": "rewritten",
+    "reason": "Comment now says swept round the foot's bearing and the head held out of earshot of every place the children speak."
+  },
+  {
+    "id": "U5087",
+    "decision": "rewritten",
+    "reason": "Way-out comment now says it reads the fabric's colliders; lanes carry none."
+  },
+  {
+    "id": "U5088",
+    "decision": "kept",
+    "reason": "The standalone block records why no collider stands at the water; it names the current rule's home."
+  },
+  {
+    "id": "U5089",
+    "decision": "rewritten",
+    "reason": "Dropped the water wall from the bank-settling comment."
+  },
+  {
+    "id": "U5090",
+    "decision": "kept",
+    "reason": "playRockColliders and playRocks are typed nullable; the guards narrow them for the compiler."
+  },
+  {
+    "id": "U5091",
+    "decision": "rewritten",
+    "reason": "Comment now says the settling moved nothing on 29.08 and can since point 1173."
+  },
+  {
+    "id": "U5092",
+    "decision": "kept",
+    "reason": "clearRun and findHead are nullable closure variables; the guards narrow them for the compiler."
+  },
+  {
+    "id": "U5093",
+    "decision": "rewritten",
+    "reason": "Moved the loose station-ground comment onto standingSolids/standingLanes."
+  },
+  {
+    "id": "U5094",
+    "decision": "rewritten",
+    "reason": "Comment now names the DRESSING_MIN_* floor of work-order 1191."
+  },
+  {
+    "id": "U5095",
+    "decision": "kept",
+    "reason": "claim does not hold: PLAZA_SIGHT_HALF_WIDTH is 1 in loom.ts."
+  },
+  {
+    "id": "U5096",
+    "decision": "kept",
+    "reason": "loom and displaced.line are nullable to the compiler; the guard narrows them."
+  },
+  {
+    "id": "U5097",
+    "decision": "rewritten",
+    "reason": "Ground-work intro now says two patches: a store pit or a post hole, and a turned patch."
+  },
+  {
+    "id": "U5098",
+    "decision": "rewritten",
+    "reason": "DIG_SITE_FIELD_BAND doc and the patch rule comment now say at or past the band, not past the last compound."
+  },
+  {
+    "id": "U5099",
+    "decision": "rewritten",
+    "reason": "pen doc now names the Tuareg camp's goat pen beside the kraals."
+  },
+  {
+    "id": "U5100",
+    "decision": "kept",
+    "reason": "The listed constants drive shipped code in layout.ts."
+  },
+  {
+    "id": "U5101",
+    "decision": "kept",
+    "reason": "claim does not hold: only *.test.ts files import layoutHarness (grep over src, scripts, tests); the index hits are same-named symbols elsewhere."
+  },
+  {
+    "id": "U5102",
+    "decision": "rewritten",
+    "reason": "Cache rationale now says buildLayout is deterministic in its arguments and the module data it reads does not change within a test file."
+  },
+  {
+    "id": "U5103",
+    "decision": "backlog",
+    "reason": "src/scenes/place/layoutHarness.ts:94 — bodyR/interactiveR describe buildings with pre-roof radii while layout.ts collides with dwellingCircleRadius/boxes and interactiveCircleRadius; the harness's body test is looser than the shipped colliders."
+  },
+  {
+    "id": "U5104",
+    "decision": "removed",
+    "reason": "Dropped the always-true r > 0 guard in solidBodies."
+  },
+  {
+    "id": "U5105",
+    "decision": "rewritten",
+    "reason": "Header now names layout.ts as where the layout builder keeps colliders and keep-clear zones."
+  },
+  {
+    "id": "U5106",
+    "decision": "rewritten",
+    "reason": "Dropped the export on inwardStationBody."
+  },
+  {
+    "id": "U5107",
+    "decision": "rewritten",
+    "reason": "villageHasWell doc now says RIVER is taught at the water stand."
+  },
+  {
+    "id": "U5108",
+    "decision": "rewritten",
+    "reason": "Doc now says the carriers' fixed stops are listed and only their walks are left out."
+  },
+  {
+    "id": "U5109",
+    "decision": "rewritten",
+    "reason": "Footprint doc now says the weaver's entry is the nominal reservation, not where she is drawn."
+  },
+  {
+    "id": "U5110",
+    "decision": "rewritten",
+    "reason": "Fabric docs now say a building's centre within FABRIC_REACH, matching the computation."
+  },
+  {
+    "id": "U5111",
+    "decision": "rewritten",
+    "reason": "MIN_FABRIC doc now says it is the bar for ranking first, with the fallbacks below it."
+  },
+  {
+    "id": "U5112",
+    "decision": "rewritten",
+    "reason": "Dropped the misattributed \"scattered forest plans\" parenthetical."
+  },
+  {
+    "id": "U5113",
+    "decision": "rewritten",
+    "reason": "MIN_OPENNESS doc now says the openness floor is never paid for with separation; rank 2's fabric-for-separation trade stays described in childPlayGround."
+  },
+  {
+    "id": "U5114",
+    "decision": "rewritten",
+    "reason": "SEARCH_STEP doc now says it spaces sizes and distances; bearings are a fixed fan."
+  },
+  {
+    "id": "U5115",
+    "decision": "rewritten",
+    "reason": "Rationale now says fabric and free ground vary by plan and seed, not the vignettes."
+  },
+  {
+    "id": "U5116",
+    "decision": "rewritten",
+    "reason": "SPECTATOR_MARGIN and the placement doc now say the margin holds where the ground's size leaves room."
+  },
+  {
+    "id": "U5117",
+    "decision": "rewritten",
+    "reason": "Rank 1 now names MIN_OPENNESS and the best-separated fallback."
+  },
+  {
+    "id": "U5118",
+    "decision": "rewritten",
+    "reason": "Placement doc now says rank 2 orders by clearance first and scores only among equals."
+  },
+  {
+    "id": "U5119",
+    "decision": "rewritten",
+    "reason": "Rank-2 comment now says only the best-scoring separated ground was checked for fabric."
+  },
+  {
+    "id": "U5120",
+    "decision": "rewritten",
+    "reason": "Dropped the export on LoomGeometry."
+  },
+  {
+    "id": "U5121",
+    "decision": "kept",
+    "reason": "LoomPlacement types the exported placeLoom parameter; harmless."
+  },
+  {
+    "id": "U5122",
+    "decision": "rewritten",
+    "reason": "WEAVER_SIDE_OFFSET doc no longer equates 0.36 with WARP_REACH (0.28); it names WARP_REACH as the arm's part of the reach."
+  },
+  {
+    "id": "U5123",
+    "decision": "rewritten",
+    "reason": "onRiverAxis doc now says the helper stays at her side where nothing is named."
+  },
+  {
+    "id": "U5124",
+    "decision": "rewritten",
+    "reason": "Inland comment now names PLAZA_INLAND_SLACK."
+  },
+  {
+    "id": "U5125",
+    "decision": "rewritten",
+    "reason": "Separation comment now says the weaver and both stakes are held to it."
+  },
+  {
+    "id": "U5126",
+    "decision": "rewritten",
+    "reason": "Comment now says the helper's home stand is sight-tested, his tend stands and walk not."
+  },
+  {
+    "id": "U5127",
+    "decision": "rewritten",
+    "reason": "Plaza comment now says widest among what the coarse sweep and its viewed-seat cap measured."
+  },
+  {
+    "id": "U5128",
+    "decision": "rewritten",
+    "reason": "Comment now says only the first pass records the widest seat."
+  },
+  {
+    "id": "U5129",
+    "decision": "rewritten",
+    "reason": "Comment now states the sweep order (bearing by bearing, nearer radii first)."
+  },
+  {
+    "id": "U5130",
+    "decision": "backlog",
+    "reason": "src/scenes/place/loomVisual.ts:11 — stripWidth 0.12 m is about 4.7 in against the cited \"seldom wider than four inches\" (peoples-1890.md §8.1); reconcile or mark the enlargement."
+  },
+  {
+    "id": "U5131",
+    "decision": "removed",
+    "reason": "Dropped the unused LOOM_DIRECTIONS."
+  },
+  {
+    "id": "U5132",
+    "decision": "kept",
+    "reason": "LoomWorkConfig types exported functions' parameters; harmless."
+  },
+  {
+    "id": "U5133",
+    "decision": "rewritten",
+    "reason": "Dropped the export on LoomErrand."
+  },
+  {
+    "id": "U5134",
+    "decision": "removed",
+    "reason": "Dropped the unused tendWalkSeconds."
+  },
+  {
+    "id": "U5135",
+    "decision": "backlog",
+    "reason": "src/scenes/place/loomWork.ts:55 — LoomWorkConfig.helperCycleSeconds is never read by the stepper; loomPicture defaults straight from balance, so the config field and the default duplicate one knob."
+  },
+  {
+    "id": "U5136",
+    "decision": "rewritten",
+    "reason": "createLoomWork doc now says a strip already under way."
+  },
+  {
+    "id": "U5137",
+    "decision": "rewritten",
+    "reason": "pass doc now states the actual shuttle landmarks (centred at 0/0.5, far 0.25, near 0.75)."
+  },
+  {
+    "id": "U5138",
+    "decision": "rewritten",
+    "reason": "loomPicture comment now says the reed beats once as the pass turns with the shuttle centred."
+  },
+  {
+    "id": "U5139",
+    "decision": "rewritten",
+    "reason": "passes doc now says since the station was entered; a take-off does not reset it."
+  },
+  {
+    "id": "U5140",
+    "decision": "rewritten",
+    "reason": "Backstop doc now lists the stuck cases it can see and the time it does not count."
+  },
+  {
+    "id": "U5141",
+    "decision": "rewritten",
+    "reason": "Counter comment now says children in earshot still count."
+  },
+  {
+    "id": "U5142",
+    "decision": "rewritten",
+    "reason": "climbBoulder doc now says the tallest stone that is not walked over, null where every stone is ground."
+  },
+  {
+    "id": "U5143",
+    "decision": "rewritten",
+    "reason": "RINGS doc now says the offsets are past the drawn rim (quarter + stone collider + walker, about 1.2 m) and the measurement is from the quarter's edge."
+  },
+  {
+    "id": "U5144",
+    "decision": "rewritten",
+    "reason": "panoramaDriftVelocity doc now says it is the tests' independent statement of the motion panoramaDriftYaw must face."
+  },
+  {
+    "id": "U5145",
+    "decision": "rewritten",
+    "reason": "panoramaDriftDistance doc now says the gait reads it through panoramaGaitDistance's scale correction."
+  },
+  {
+    "id": "U5146",
+    "decision": "kept",
+    "reason": "The block explains why the silhouettes carry no bob or nod and where their vertical motion comes from; it sits in the gait section it concerns."
+  },
+  {
+    "id": "U5147",
+    "decision": "kept",
+    "reason": "DIG_WORK_CLEARANCE and the test-only exports feed clearOfSpoil in-file."
+  },
+  {
+    "id": "U5148",
+    "decision": "rewritten",
+    "reason": "atDigStand doc now says only the outer rim bound is checked; the stand search puts him on the rim."
+  },
+  {
+    "id": "U5149",
+    "decision": "rewritten",
+    "reason": "Comment now says 15 degrees."
+  },
+  {
+    "id": "U5150",
+    "decision": "kept",
+    "reason": "FigureTransform types an exported function's return; harmless."
+  },
+  {
+    "id": "U5151",
+    "decision": "rewritten",
+    "reason": "Cache comment now says one scratch vector and a per-seed triangle-plane cache, no per-query allocation claim."
+  },
+  {
+    "id": "U5152",
+    "decision": "rewritten",
+    "reason": "Header now says the counters run in every build and only the window hook is dev-only."
+  },
+  {
+    "id": "U5153",
+    "decision": "rewritten",
+    "reason": "restorePointerLockAfterDialogs doc now says whenever an open dialog closes."
+  },
+  {
+    "id": "U5154",
+    "decision": "kept",
+    "reason": "WallShape, FenceKind and VillagePlanKind type exported style data; harmless."
+  },
+  {
+    "id": "U5155",
+    "decision": "rewritten",
+    "reason": "Added a note that the regional arrangements describe style and the typical village; the plan is the people's (VILLAGE_PLANS)."
+  },
+  {
+    "id": "U5156",
+    "decision": "kept",
+    "reason": "The bank constants and bankStretchAngle are used in-file; harmless exports."
+  },
+  {
+    "id": "U5157",
+    "decision": "rewritten",
+    "reason": "BANK_SHORE_HALF doc now says where the flat plate ends short of the waterline and that shallows and bed run on past it."
+  },
+  {
+    "id": "U5158",
+    "decision": "rewritten",
+    "reason": "Dropped the \"stops at the top of the bank\" instruction; the doc now points at wading (584)."
+  },
+  {
+    "id": "U5159",
+    "decision": "rewritten",
+    "reason": "BANK_STAND_INSET doc no longer names the removed water wall."
+  },
+  {
+    "id": "U5160",
+    "decision": "rewritten",
+    "reason": "Doc now says at most this fraction; bankStretchAngle pulls the stretch in at the span cap."
+  },
+  {
+    "id": "U5161",
+    "decision": "rewritten",
+    "reason": "Span doc now says it is measured between the bank points; the inset rocks stand a little closer."
+  },
+  {
+    "id": "U5162",
+    "decision": "rewritten",
+    "reason": "Stage measurements are now dated before point 1173, with the cap named; the 19.7 m frame figure dropped."
+  },
+  {
+    "id": "U5163",
+    "decision": "rewritten",
+    "reason": "Heading now says five walker diameters, the spec's floor three."
+  },
+  {
+    "id": "U5164",
+    "decision": "rewritten",
+    "reason": "View doc now says out from the middle by the stretch length, perpendicular on the settlement's side."
+  },
+  {
+    "id": "U5165",
+    "decision": "kept",
+    "reason": "RockTouch and touchedPoint type and serve live in-file functions; harmless exports."
+  },
+  {
+    "id": "U5166",
+    "decision": "rewritten",
+    "reason": "reachFrom doc now says null only when no hand height meets the surface, otherwise the smallest gap however large."
+  },
+  {
+    "id": "U5167",
+    "decision": "kept",
+    "reason": "The listed roof exports are used in-file; harmless."
+  },
+  {
+    "id": "U5168",
+    "decision": "removed",
+    "reason": "Dropped the unused shedRoofStandOff; sheds get their stand-off through dwellingRoofProfile → dwellingRoofStandOff, so the header's extension is wired."
+  },
+  {
+    "id": "U5169",
+    "decision": "kept",
+    "reason": "The headroom helpers are the invariant's test query, used in-file and by the tests."
+  },
+  {
+    "id": "U5170",
+    "decision": "rewritten",
+    "reason": "Header now says the collider is extended out to the roof's rim where the rim hangs low, instead of only a low strip."
+  },
+  {
+    "id": "U5171",
+    "decision": "rewritten",
+    "reason": "roofHeadroomAt doc now says the eye and twelve points round the near plane's reach."
+  },
+  {
+    "id": "U5172",
+    "decision": "rewritten",
+    "reason": "Header now says only the route's last leg may end on forgiven ground at the true target."
+  },
+  {
+    "id": "U5173",
+    "decision": "rewritten",
+    "reason": "NAV_CELL doc now admits the collider clip the movement slides along."
+  },
+  {
+    "id": "U5174",
+    "decision": "rewritten",
+    "reason": "nearestFreeCell doc now says the first free cell on the smallest square ring, not the nearest by distance."
+  },
+  {
+    "id": "U5175",
+    "decision": "rewritten",
+    "reason": "Comment now says the bearing jumps between +π and −π straight behind the camera."
+  },
+  {
+    "id": "U5176",
+    "decision": "kept",
+    "reason": "loomAround's behaviour is live inside placeLoom."
+  },
+  {
+    "id": "U5177",
+    "decision": "kept",
+    "reason": "waterAhead is live inside stationHolds."
+  },
+  {
+    "id": "U5178",
+    "decision": "kept",
+    "reason": "The note is a dated calibration record explaining the cap; it names its date and plan."
+  },
+  {
+    "id": "U5179",
+    "decision": "rewritten",
+    "reason": "Warp-length comments now say 2 × warpHalf / a long wall instead of six metres."
+  },
+  {
+    "id": "U5180",
+    "decision": "rewritten",
+    "reason": "stationHolds doc now lists all its checks."
+  },
+  {
+    "id": "U5181",
+    "decision": "rewritten",
+    "reason": "Comment now says held `clearance` (talk.reach) away instead of 10 m."
+  },
+  {
+    "id": "U5182",
+    "decision": "rewritten",
+    "reason": "placeLoom doc now describes the plaza passes, the widest-view fallback and the fine sweep last."
+  },
+  {
+    "id": "U5183",
+    "decision": "rewritten",
+    "reason": "Comment now says a plan falls to the fine sweep only when the coarse passes record no seat."
+  },
+  {
+    "id": "U5184",
+    "decision": "rewritten",
+    "reason": "Comment now says both questions share each pass, not one pass overall."
+  },
+  {
+    "id": "U5185",
+    "decision": "rewritten",
+    "reason": "Comment now names the third plazaViewFar pass."
+  },
+  {
+    "id": "U5186",
+    "decision": "rewritten",
+    "reason": "The fine sweep's radii now come from radiiAt(SEAT_RADIUS_STEP), the identical sequence."
+  },
+  {
+    "id": "U5187",
+    "decision": "rewritten",
+    "reason": "WEAVER_BODY_RADIUS doc now says it is also the helper's body along his walk."
+  },
+  {
+    "id": "U5188",
+    "decision": "kept",
+    "reason": "The named plans are a dated record of why the widest-view fallback exists."
+  },
+  {
+    "id": "U5189",
+    "decision": "kept",
+    "reason": "warpSign, LoomWorkView and LoomWorkState carry live behaviour."
+  },
+  {
+    "id": "U5190",
+    "decision": "backlog",
+    "reason": "src/scenes/place/loomWork.ts:93 — LoomWorkState.clock is incremented every step but read by nothing (scene or tests); drop it or give it a reader."
+  },
+  {
+    "id": "U5191",
+    "decision": "rewritten",
+    "reason": "Header now says the reed beats once per pass as it turns."
+  },
+  {
+    "id": "U5192",
+    "decision": "rewritten",
+    "reason": "Comment now says its syllables instead of four."
+  },
+  {
+    "id": "U5193",
+    "decision": "rewritten",
+    "reason": "loom.ts and loomVisual.ts now say KNEELING, matching WARP_REACH's measurement and the drawn Figure (kneel)."
+  },
+  {
+    "id": "U5194",
+    "decision": "rewritten",
+    "reason": "LoomPicture doc now lists helper, fold and bundles too."
+  },
+  {
+    "id": "U5195",
+    "decision": "rewritten",
+    "reason": "looseRock now reads looseRockTop(s) instead of re-deriving it."
+  },
+  {
+    "id": "U5196",
+    "decision": "rewritten",
+    "reason": "Moved RINGS above deriveClimbRock's doc so the doc attaches to the function."
+  },
+  {
+    "id": "U5197",
+    "decision": "rewritten",
+    "reason": "Comments now say the bankless start is +z (south in place coordinates), not due north."
+  },
+  {
+    "id": "U5198",
+    "decision": "rewritten",
+    "reason": "Ring measurements now say they are taken from the quarter's edge, which matches RINGS plus the 1.2 m rim offset."
+  },
+  {
+    "id": "U5199",
+    "decision": "kept",
+    "reason": "The search fallback is the documented path for a settlement without a derived stone; tests pin it."
+  },
+  {
+    "id": "U5200",
+    "decision": "kept",
+    "reason": "CLIMB_ROCK_TOP states the derived stone's guarantee for the tests."
+  },
+  {
+    "id": "U5201",
+    "decision": "rewritten",
+    "reason": "panoramaDriftDistance doc now says the render wiring reads the scale-corrected distance."
+  },
+  {
+    "id": "U5202",
+    "decision": "rewritten",
+    "reason": "luminance doc no longer names the haze test as its only use."
+  },
+  {
+    "id": "U5203",
+    "decision": "rewritten",
+    "reason": "digEarthFlight doc now says the clods land on the spoil-mound term (spoilHeightAt)."
+  },
+  {
+    "id": "U5204",
+    "decision": "rewritten",
+    "reason": "Cache comment now says the triangle planes are cached per seed after the geometry is disposed."
+  },
+  {
+    "id": "U5205",
+    "decision": "kept",
+    "reason": "The comment explains why the recovery does not use the old exitPointerLock probe; it is labelled as the earlier approach."
+  },
+  {
+    "id": "U5206",
+    "decision": "rewritten",
+    "reason": "Comment now says a refusal can end the recovery when no retry is allowed."
+  },
+  {
+    "id": "U5207",
+    "decision": "rewritten",
+    "reason": "bankStretchAngle doc no longer claims the three river villages keep their old stage."
+  },
+  {
+    "id": "U5208",
+    "decision": "rewritten",
+    "reason": "Dropped the unverifiable ~35 m waterline example from BANK_PLATEAU_ANGLE."
+  },
+  {
+    "id": "U5209",
+    "decision": "kept",
+    "reason": "bankWaterDepth is the tests' statement of depth on the one shore profile (wade and fill are pinned with it)."
+  },
+  {
+    "id": "U5210",
+    "decision": "kept",
+    "reason": "BANK_STRETCH_MIN_SPAN is the documented test floor."
+  },
+  {
+    "id": "U5211",
+    "decision": "rewritten",
+    "reason": "Header now says only the hut, shed and cook-shelter constants are shared with PlaceScene; the other roofs' numbers follow their meshes by hand."
+  },
+  {
+    "id": "U5212",
+    "decision": "rewritten",
+    "reason": "Moved GOAL_RINGS above findPlaceRoute's doc and gave it its own line."
+  },
+  {
+    "id": "U5213",
+    "decision": "kept",
+    "reason": "NAV_CELL and navPointFree are live in-file."
+  },
+  {
+    "id": "U5214",
+    "decision": "rewritten",
+    "reason": "Split the doc: reaches and anchors each carry their own line."
+  },
+  {
+    "id": "U5215",
+    "decision": "rewritten",
+    "reason": "updateSpeechTarget doc now names the guess key instead of a left click."
+  },
+  {
+    "id": "U5216",
+    "decision": "rewritten",
+    "reason": "speechTargetLabel/speechUseCandidate docs now say the guess key takes the label and nearest-wins survives only on the pad."
+  },
+  {
+    "id": "U5217",
+    "decision": "rewritten",
+    "reason": "forgetSpeechLabel doc now says guess target."
+  },
+  {
+    "id": "U5218",
+    "decision": "removed",
+    "reason": "Dropped the unreachable ?? reach fallbacks and the dead reach parameters of updateSpeechTarget and speechUseCandidate; tests updated to the new signatures."
+  },
+  {
+    "id": "U5219",
+    "decision": "rewritten",
+    "reason": "pruneSpeechLabels now deletes the reach together with the anchor, so the maps stay in step."
+  },
+  {
+    "id": "U5220",
+    "decision": "kept",
+    "reason": "speechTargetLabel is live through speechUseCandidate."
+  },
+  {
+    "id": "U5221",
+    "decision": "rewritten",
+    "reason": "Header now describes one collected list split by key, nearest-wins only on the pad."
+  },
+  {
+    "id": "U5222",
+    "decision": "kept",
+    "reason": "UseKind, keyForUseKind and candidatesForKey are live inside pickForKeyPress."
+  },
+  {
+    "id": "U5223",
+    "decision": "rewritten",
+    "reason": "Header now says the wordless game of tag (the catcher's cry is wordless)."
+  },
+  {
+    "id": "U5224",
+    "decision": "rewritten",
+    "reason": "Header now says the module adds the round and the motion and figure helpers the rounds share."
+  },
+  {
+    "id": "U5225",
+    "decision": "rewritten",
+    "reason": "\"Freshly-tagged child\" (the immune tagger) now reads \"the child who just made the tag\" throughout; \"caught child\" keeps naming the new chaser."
+  },
+  {
+    "id": "U5226",
+    "decision": "rewritten",
+    "reason": "caughtPauseSeconds doc now says the pause is clamped to immunitySeconds, which protects its catcher."
+  },
+  {
+    "id": "U5227",
+    "decision": "rewritten",
+    "reason": "heading doc now says a blocked step or a turn on the spot sets it directly; no never-faces-away guarantee."
+  },
+  {
+    "id": "U5228",
+    "decision": "rewritten",
+    "reason": "held doc now names the catch sequence's beat and turn beside the outside claim."
+  },
+  {
+    "id": "U5229",
+    "decision": "rewritten",
+    "reason": "cries doc now says at most four wait and a catch beyond that cries nothing."
+  },
+  {
+    "id": "U5230",
+    "decision": "backlog",
+    "reason": "src/scenes/place/tagGame.ts:318 — TagWorld.occupied is documented to exclude only self and partner, while the tag harness wiring (said to mirror PlaceLife) excludes every playmate and ignores self/partner; reconcile the doc with PlaceLife's actual wiring."
+  },
+  {
+    "id": "U5231",
+    "decision": "rewritten",
+    "reason": "TagSteer doc now says the pace is the claim's own and the floor pace does not apply."
+  },
+  {
+    "id": "U5232",
+    "decision": "kept",
+    "reason": "TagSteer types the exported advanceTagGame's steer parameter."
+  },
+  {
+    "id": "U5233",
+    "decision": "kept",
+    "reason": "nearestCatchable and chooseTarget are live inside advanceTagGame."
+  },
+  {
+    "id": "U5234",
+    "decision": "rewritten",
+    "reason": "ageEdge doc now says every frame the round steps, the tenure-cap frame returning first."
+  },
+  {
+    "id": "U5235",
+    "decision": "kept",
+    "reason": "claim does not hold: deflectedStep steps 15° per probe (Math.PI / 12) whatever maxTurn is; 12 probes widen the swing, not the step."
+  },
+  {
+    "id": "U5236",
+    "decision": "rewritten",
+    "reason": "moveChild doc now names the distance parameter."
+  },
+  {
+    "id": "U5237",
+    "decision": "rewritten",
+    "reason": "pauseFor/turning docs and the step comment now say the turn opens in the beat's second half and finishes after it."
+  },
+  {
+    "id": "U5238",
+    "decision": "rewritten",
+    "reason": "Dropped the stale 1.29 m/s and 1.16 m/s floor-pace figures; both comments now say the floor pace."
+  },
+  {
+    "id": "U5239",
+    "decision": "rewritten",
+    "reason": "Comment now says walked stays and the stall watch clears pinned for a still child."
+  },
+  {
+    "id": "U5240",
+    "decision": "rewritten",
+    "reason": "Catch note now names targetSwitchMargin and catchDistance instead of stale 1.5/0.8 m (tag's catchDistance is 0.45) and dates the measurement."
+  },
+  {
+    "id": "U5241",
+    "decision": "rewritten",
+    "reason": "Comment now says the new chaser turns away from the child that just tagged it."
+  },
+  {
+    "id": "U5242",
+    "decision": "removed",
+    "reason": "Dropped the always-true s.target !== s.chaser guard."
+  },
+  {
+    "id": "U5243",
+    "decision": "backlog",
+    "reason": "src/scenes/place/tagGame.ts:1212 — the new chaser's turn-away heading predates the 1176 beat, which overwrites the heading with desired in the pause's second half; only the orbit side still reads it in the first half."
+  },
+  {
+    "id": "U5244",
+    "decision": "rewritten",
+    "reason": "Dropped the export on TagBody."
+  },
+  {
+    "id": "U5245",
+    "decision": "rewritten",
+    "reason": "Dropped the export on GRAB_HEIGHT."
+  },
+  {
+    "id": "U5246",
+    "decision": "rewritten",
+    "reason": "GRAB_SIDE_OFFSET doc now names grabAim's side held via prevSide instead of gestureArm."
+  },
+  {
+    "id": "U5247",
+    "decision": "rewritten",
+    "reason": "Dropped the export on GrabFigure."
+  },
+  {
+    "id": "U5248",
+    "decision": "rewritten",
+    "reason": "Dropped the export on GrabAim."
+  },
+  {
+    "id": "U5249",
+    "decision": "rewritten",
+    "reason": "grabAim doc now says it aims at the quarry's central axis at GRAB_HEIGHT, not its back."
+  },
+  {
+    "id": "U5250",
+    "decision": "rewritten",
+    "reason": "grabHandWorld doc now names only the tests."
+  },
+  {
+    "id": "U5251",
+    "decision": "rewritten",
+    "reason": "Dropped the export on trunkRadiusAt."
+  },
+  {
+    "id": "U5252",
+    "decision": "rewritten",
+    "reason": "steerGrab doc now says a gesture of another kind is replaced when an aim is given."
+  },
+  {
+    "id": "U5253",
+    "decision": "kept",
+    "reason": "CHASER_ARMS is live inside tagFigurePose."
+  },
+  {
+    "id": "U5254",
+    "decision": "kept",
+    "reason": "claim does not hold: only *.test.ts files import the harness (grep over src, scripts, tests); the index hits are same-named symbols elsewhere."
+  },
+  {
+    "id": "U5255",
+    "decision": "kept",
+    "reason": "claim does not hold: vitest.config.ts includes src/**/*.test.{ts,tsx}, which the harness file does not match."
+  },
+  {
+    "id": "U5256",
+    "decision": "rewritten",
+    "reason": "BANK_CFG doc now says it is the merged config used for both rounds and names where the round is chosen."
+  },
+  {
+    "id": "U5257",
+    "decision": "kept",
+    "reason": "Test-only exports are expected in a test harness."
+  },
+  {
+    "id": "U5258",
+    "decision": "rewritten",
+    "reason": "Comment now says \"the numbers\" for the three constants."
+  },
+  {
+    "id": "U5259",
+    "decision": "rewritten",
+    "reason": "Crowd doc now says the working adults are staged by stepAdultWork and stroll between tasks."
+  },
+  {
+    "id": "U5260",
+    "decision": "rewritten",
+    "reason": "Dropped the export on Crowd."
+  },
+  {
+    "id": "U5261",
+    "decision": "rewritten",
+    "reason": "\"this branch DELETED\" now reads \"since deleted\"."
+  },
+  {
+    "id": "U5262",
+    "decision": "rewritten",
+    "reason": "Comment now states the 55 % named-spot split and the focus exception."
+  },
+  {
+    "id": "U5263",
+    "decision": "rewritten",
+    "reason": "pen option doc now points at tagShuffle.wedgeGate.test.ts, where the wedge case lives."
+  },
+  {
+    "id": "U5264",
+    "decision": "rewritten",
+    "reason": "Comment now describes the missing fallback as a rule instead of narrating removed code."
+  },
+  {
+    "id": "U5265",
+    "decision": "rewritten",
+    "reason": "\"every case in this file\" now reads every replay case built on this harness."
+  },
+  {
+    "id": "U5266",
+    "decision": "removed",
+    "reason": "Dropped the older of the two stacked wedge-carve comments."
+  },
+  {
+    "id": "U5267",
+    "decision": "backlog",
+    "reason": "src/scenes/place/tagShuffleHarness.ts:527 — the harness applies the traveller berth (insideStrangerBerth) to the tag round's separation while tagGame keeps the player out of the chase's blocked; confirm the berth is inert for a tag world or drop it there."
+  },
+  {
+    "id": "U5268",
+    "decision": "rewritten",
+    "reason": "resample doc now says per-child cadences are harsher than a slower renderer, which drops the same frames for all."
+  },
+  {
+    "id": "U5269",
+    "decision": "rewritten",
+    "reason": "expectLively doc now names the replay gates and the RIVER_VILLAGES seeds instead of \"below\"."
+  },
+  {
+    "id": "U5270",
+    "decision": "rewritten",
+    "reason": "expectLively wording now speaks of the four seeds / each replayed seed."
+  },
+  {
+    "id": "U5271",
+    "decision": "rewritten",
+    "reason": "Comment now explains seed 2972259115 as the production report's seed."
+  },
+  {
+    "id": "U5272",
+    "decision": "rewritten",
+    "reason": "RIVER_VILLAGES now reads ROCK_VILLAGE_ID ('bambara-village', same value), matching the comment."
+  },
+  {
+    "id": "U5273",
+    "decision": "backlog",
+    "reason": "src/scenes/place/useColdCloaks.ts:21 — \"fifteen of twenty-two peoples\" in everyday dress leaves seven, but the next line says \"the six dressed peoples\"; recount against systems/dress.ts and fix one figure."
+  },
+  {
+    "id": "U5274",
+    "decision": "kept",
+    "reason": "The names are established API across the scene; renaming for framing is churn, and the doc already covers harmattan and karif."
+  },
+  {
+    "id": "U5275",
+    "decision": "rewritten",
+    "reason": "\"this branch measured five more\" now reads \"its implementation measured five more\"."
+  },
+  {
+    "id": "U5276",
+    "decision": "rewritten",
+    "reason": "WEDGE_PASSAGE doc now says nearer the passages (1.2 m sits 0.16 m below 1.36 m, 0.31 m above 0.89 m)."
+  },
+  {
+    "id": "U5277",
+    "decision": "kept",
+    "reason": "WEDGE_PASSAGE is live as the default parameter."
+  },
+  {
+    "id": "U5278",
+    "decision": "rewritten",
+    "reason": "OPPOSED_DOT doc now says more than ~101.5° apart, up to ~78.5° off anti-parallel."
+  },
+  {
+    "id": "U5279",
+    "decision": "rewritten",
+    "reason": "Comment now says zero distance with an arbitrary unit direction (+x)."
+  },
+  {
+    "id": "U5280",
+    "decision": "rewritten",
+    "reason": "pinchesPassage doc now says it covers collider pairs only; the carve's rim pairs are not asked."
+  },
+  {
+    "id": "U5281",
+    "decision": "rewritten",
+    "reason": "Header now names the thunder and the shared weather state the component writes."
+  },
+  {
+    "id": "U5282",
+    "decision": "rewritten",
+    "reason": "Hail comment now says the streaks whiten and keep their shape."
+  },
+  {
+    "id": "U5283",
+    "decision": "rewritten",
+    "reason": "TRAVEL_FOG comment now says flora sizes its spawn circle by FLORA_FOG.far; the unused export is dropped."
+  },
+  {
+    "id": "U5284",
+    "decision": "rewritten",
+    "reason": "Dropped the \"definitive visible limit, beyond which nothing renders\" claim with the stale rationale."
+  },
+  {
+    "id": "U5285",
+    "decision": "rewritten",
+    "reason": "Haze comment now says a square (Chebyshev) fade."
+  },
+  {
+    "id": "U5286",
+    "decision": "rewritten",
+    "reason": "Flash comments now say about half a second at 60 fps and a few updates at the clamped headless dt."
+  },
+  {
+    "id": "U5287",
+    "decision": "kept",
+    "reason": "The comment explains why the smoothed wetness replaced the stepped one; it names the replaced approach as such."
+  },
+  {
+    "id": "U5288",
+    "decision": "rewritten",
+    "reason": "Comment now says STRIKE_HOLD_SECONDS lives in systems/season.ts."
+  },
+  {
+    "id": "U5289",
+    "decision": "rewritten",
+    "reason": "BorderLabel.region is now typed RegionId instead of hand-copied literals."
+  },
+  {
+    "id": "U5290",
+    "decision": "rewritten",
+    "reason": "Header and report doc now say the ribbon breaks only where a lake sheet carries the water and strips counts ocean continuity."
+  },
+  {
+    "id": "U5291",
+    "decision": "rewritten",
+    "reason": "Report doc now documents interiorEdges."
+  },
+  {
+    "id": "U5292",
+    "decision": "rewritten",
+    "reason": "Header and buildLakeSurfaces doc now say just above the highest interior bed sample."
+  },
+  {
+    "id": "U5293",
+    "decision": "rewritten",
+    "reason": "Import comment now says the floater and the surface agree, the GPU ripple and the canoe's bed floor aside."
+  },
+  {
+    "id": "U5294",
+    "decision": "rewritten",
+    "reason": "Comment now says the ribbon draws without depth write; the lake material leaves depthWrite at its default."
+  },
+  {
+    "id": "U5295",
+    "decision": "rewritten",
+    "reason": "Dropped the lake-row comments inside the emitted-row loop; in-lake rows are never emitted."
+  },
+  {
+    "id": "U5296",
+    "decision": "removed",
+    "reason": "Dropped the two unreachable !rows[i].lake guards: planRibbonRows never emits an in-lake row (waterSurface.ts:105)."
+  },
+  {
+    "id": "U5297",
+    "decision": "rewritten",
+    "reason": "Interior-edge comment now says it counts any non-land-bank edge: junction band, lake or ocean."
+  },
+  {
+    "id": "U5298",
+    "decision": "rewritten",
+    "reason": "Cache rationale now says the ribbon and lake meshes opt out of disposal individually."
+  },
+  {
+    "id": "U5299",
+    "decision": "rewritten",
+    "reason": "Moved the river-material doc onto createRiverMaterial."
+  },
+  {
+    "id": "U5300",
+    "decision": "rewritten",
+    "reason": "Header no longer counts five waterfalls; it says the waterfall landmarks."
+  },
+  {
+    "id": "U5301",
+    "decision": "rewritten",
+    "reason": "Header now says a welling spring pool."
+  },
+  {
+    "id": "U5302",
+    "decision": "rewritten",
+    "reason": "Dropped the changelog clause from the Spring doc."
+  },
+  {
+    "id": "U5303",
+    "decision": "rewritten",
+    "reason": "Comment now says MOUTH_BRIDGE lives in waterSurface.ts."
+  },
+  {
+    "id": "U5304",
+    "decision": "kept",
+    "reason": "claim does not hold: render/water.ts:114 carries the same '#1c5c86' mid tone."
+  },
+  {
+    "id": "U5305",
+    "decision": "backlog",
+    "reason": "src/scenes/travel/TravelScene.tsx:230 — buildChunkGeometry's doc promises exact shared-edge normal agreement, but the LOD-dependent step and the position-only edge stitching can leave normals differing across a fine/coarse seam; measure and qualify."
+  },
+  {
+    "id": "U5306",
+    "decision": "rewritten",
+    "reason": "Export comment now names terrainQueue.ts beside the seam test."
+  },
+  {
+    "id": "U5307",
+    "decision": "kept",
+    "reason": "stitchedEdgeHeights is live in buildChunkGeometry; the test-only export is justified."
+  },
+  {
+    "id": "U5308",
+    "decision": "rewritten",
+    "reason": "Comment now says FLORA_RANGE_MAX lives in floraStreaming.ts."
+  },
+  {
+    "id": "U5309",
+    "decision": "rewritten",
+    "reason": "Moved the stray TalusSocket import below the header into the import block."
+  },
+  {
+    "id": "U5310",
+    "decision": "rewritten",
+    "reason": "Merged the two ./waterSurface imports into one."
+  },
+  {
+    "id": "U5311",
+    "decision": "rewritten",
+    "reason": "Moved the terrain-material doc onto createTerrainMaterial."
+  },
+  {
+    "id": "U5312",
+    "decision": "kept",
+    "reason": "claim does not hold: PlaceScene.tsx still references SEASON_TINT_U (render/seasonTint.ts)."
+  },
+  {
+    "id": "U5313",
+    "decision": "rewritten",
+    "reason": "Chunk-cache rationale now says the chunk meshes opt out of disposal individually."
+  },
+  {
+    "id": "U5314",
+    "decision": "rewritten",
+    "reason": "Far-terrain docs now say low land (<0.8) lifts the sheet above the detailed chunks through its 1.2 land floor."
+  },
+  {
+    "id": "U5315",
+    "decision": "rewritten",
+    "reason": "Moved the sun doc onto Sun()."
+  },
+  {
+    "id": "U5316",
+    "decision": "rewritten",
+    "reason": "Placement doc now lists the render-only thinning the collider skips: cap, spawn circle, paced fill, zoom hiding."
+  },
+  {
+    "id": "U5317",
+    "decision": "rewritten",
+    "reason": "Export comment now names world/communicationRock.ts beside the test."
+  },
+  {
+    "id": "U5318",
+    "decision": "removed",
+    "reason": "Dropped the always-true s.height > 0.05 guard in nearWater (heights at or below 0.05 already returned null)."
+  },
+  {
+    "id": "U5319",
+    "decision": "backlog",
+    "reason": "src/scenes/travel/TravelScene.tsx:1161 — the rescan cadence and chunk count (\"every-16-wu rescan of ~841 chunks\", also 1342) are floraStreaming's numbers restated in prose and can drift."
+  },
+  {
+    "id": "U5320",
+    "decision": "kept",
+    "reason": "The compute counter witnesses the live cache."
+  },
+  {
+    "id": "U5321",
+    "decision": "rewritten",
+    "reason": "Export comment now names the placement-cache and communication-rock tests (its only outside users)."
+  },
+  {
+    "id": "U5322",
+    "decision": "rewritten",
+    "reason": "Doc now says test witness."
+  },
+  {
+    "id": "U5323",
+    "decision": "kept",
+    "reason": "claim does not hold: collidableFloraNear is imported only by obstacleReach.test.ts and communicationRock.test.ts outside this file."
+  },
+  {
+    "id": "U5324",
+    "decision": "rewritten",
+    "reason": "Comment now points at createTerrainMaterial instead of a stale line number."
+  },
+  {
+    "id": "U5325",
+    "decision": "rewritten",
+    "reason": "renderedNear comment now says placed, before the render's thinning, and names drawnTranslations for the drawn buffers."
+  },
+  {
+    "id": "U5326",
+    "decision": "rewritten",
+    "reason": "Foliage comment now describes the per-position season field and names floraGreennessAt's module."
+  },
+  {
+    "id": "U5327",
+    "decision": "kept",
+    "reason": "FLORA_FOG and TRAVEL_FOG are real constants (floraStreaming.ts, Climate.tsx); the comment explains why the season-free one is read."
+  },
+  {
+    "id": "U5328",
+    "decision": "rewritten",
+    "reason": "Comment now says FLORA_SPAWN_MARGIN lives in floraStreaming.ts."
+  },
+  {
+    "id": "U5329",
+    "decision": "rewritten",
+    "reason": "Comment now says the plants of the farthest chunks are dropped."
+  },
+  {
+    "id": "U5330",
+    "decision": "backlog",
+    "reason": "src/scenes/travel/TravelScene.tsx:1788 — MonumentMarker exists so Giza reads as the pyramids on the map, but the point-338 landmark rule may hide that glyph because giza-pyramids is itself a cultural landmark; check in the picture."
+  },
+  {
+    "id": "U5331",
+    "decision": "rewritten",
+    "reason": "Comment now says a localized placeholder for its kind."
+  },
+  {
+    "id": "U5332",
+    "decision": "rewritten",
+    "reason": "Comment now says a localized placeholder for its kind."
+  },
+  {
+    "id": "U5333",
+    "decision": "rewritten",
+    "reason": "Added a note that tilt is drawn only by the tusks and the bones keep the draw for the seeded layout."
+  },
+  {
+    "id": "U5334",
+    "decision": "rewritten",
+    "reason": "Comment now says like the other cached travel-scene geometries."
+  },
+  {
+    "id": "U5335",
+    "decision": "rewritten",
+    "reason": "CulturalLandmarks doc now lists Giza and names the two unrotated sites."
+  },
+  {
+    "id": "U5336",
+    "decision": "rewritten",
+    "reason": "Yaw comment now explains Bandiagara's zero yaw too."
+  },
+  {
+    "id": "U5337",
+    "decision": "rewritten",
+    "reason": "NaturalSites doc now says the Sudd aims its yaw at its river."
+  },
+  {
+    "id": "U5338",
+    "decision": "rewritten",
+    "reason": "Moved the expedition-leader doc onto Player()."
+  },
+  {
+    "id": "U5339",
+    "decision": "rewritten",
+    "reason": "Swim comments now say legs submerged, torso and head clear."
+  },
+  {
+    "id": "U5340",
+    "decision": "rewritten",
+    "reason": "Hull-floor comment now names the river ribbon or sea plane."
+  },
+  {
+    "id": "U5341",
+    "decision": "rewritten",
+    "reason": "CanoePaddle doc now says the stowed canoe carries it and the ridden one draws its own."
+  },
+  {
+    "id": "U5342",
+    "decision": "rewritten",
+    "reason": "Canoe-height comment now says the ribbon rides its axis rows above the bed and the lake sits just above bedMax."
+  },
+  {
+    "id": "U5343",
+    "decision": "rewritten",
+    "reason": "Comment now says the query runs on water/ocean-typed ground and waterSurfaceY finds the ribbon by river proximity."
+  },
+  {
+    "id": "U5344",
+    "decision": "rewritten",
+    "reason": "settled comment now says it checks the ground plane only."
+  },
+  {
+    "id": "U5345",
+    "decision": "rewritten",
+    "reason": "Camera comment now says the wheel always zooms and only zooming out past the default needs the debug unlock."
+  },
+  {
+    "id": "U5346",
+    "decision": "backlog",
+    "reason": "src/scenes/travel/TravelScene.tsx:3138 — the disposal comment points to a leave-transition gate in scripts/verify/polish.mjs that the file does not name, and a ~270 per-mount geometry count; re-point or drop the reference."
+  },
+  {
+    "id": "U5347",
+    "decision": "backlog",
+    "reason": "src/scenes/travel/TravelScene.tsx:3155 — the panorama-exclusion comment includes markers, but PlaceMarker elements sit outside travel-dressing; check what capturePanorama hides."
+  },
+  {
+    "id": "U5348",
+    "decision": "kept",
+    "reason": "The visual claim is about the drawn socket at the fixed Bandiagara yaw; nothing in the code contradicts it."
+  }
+]

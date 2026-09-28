@@ -1,4 +1,4 @@
-// The silent game of tag in ports and bankless villages (design.md §19.10, work-order 480/351).
+// The wordless game of tag in ports and bankless villages (design.md §19.10, work-order 480/351).
 //
 // They run wild through the settlement, around the huts and past the fire. One
 // of them is IT and chases the others; whoever is caught becomes the new IT.
@@ -11,8 +11,9 @@
 //
 // STAMINA IS WHAT MAKES IT LEGIBLE. The reserve, the pace curve and the two
 // decisions live in `systems/pursuit.ts` (a chase with stamina is reusable — a
-// goat bolting from someone, a dog in a port); this module adds only the ROUND:
-// who is IT, who may be caught, and what happens when one of them is.
+// goat bolting from someone, a dog in a port); this module adds the ROUND —
+// who is IT, who may be caught, and what happens when one of them is — and the
+// motion and figure helpers the rounds share (below).
 //
 // THE MOTION IS SHARED WITH THE BANK ROUND (work-order 687). `moveChild`,
 // `trackProgress` and `ageEdge` are exported because the children's bank game
@@ -80,7 +81,7 @@ export interface TagConfig extends StaminaProfile {
   /** How much nearer a new candidate must be before the chaser switches to it —
    *  opportunistic, but not chattering between two children abreast. */
   targetSwitchMargin: number
-  /** The freshly-tagged child's immunity: without it the two swap the role every
+  /** The immunity of the child who just made the tag: without it the two swap the role every
    *  frame and stand jittering together, and with several players the game would
    *  stay a two-child affair while the others idle. */
   immunitySeconds: number
@@ -147,7 +148,8 @@ export interface TagConfig extends StaminaProfile {
    */
   turnRate: number
   /** Seconds the freshly caught child stands before it gives chase (work-order
-   *  1176). Only the caught child pauses; it stays under `immunitySeconds`. */
+   *  1176). Only the caught child pauses; the pause is clamped to
+   *  `immunitySeconds`, which protects its catcher. */
   caughtPauseSeconds: number
   /** Largest trunk turn (rad) the chaser's gaze takes toward its quarry. */
   gazeTurnMax: number
@@ -157,8 +159,8 @@ export interface TagConfig extends StaminaProfile {
 export interface TagChild {
   x: number
   z: number
-  /** Travel heading, `atan2(dx, dz)` — DERIVED from the deflected step, so a
-   *  child can never face away from where it is going. */
+  /** Travel heading, `atan2(dx, dz)` — normally the deflected step's own; a
+   *  blocked step or a turn on the spot sets it directly. */
   heading: number
   /** The heading the BODY is drawn on: `heading` eased at `turnRate`, so a
    *  change of direction is turned into rather than snapped to. */
@@ -234,8 +236,9 @@ export interface TagChild {
   lean: number
   /**
    * Standing because an outside claim ASKED it to (point 481's refusal, the
-   * held spot, an errand carried out), not because the chase stalled. It is the
-   * one case in which a playing child may be below the floor pace: what was said
+   * held spot, an errand carried out) or because the catch sequence stands it
+   * (the caught child's beat and turn), not because the chase stalled. Those are
+   * the cases in which a playing child may be below the floor pace: what was said
    * is being obeyed, and the stillness is the whole reading of it.
    */
   held: boolean
@@ -248,7 +251,7 @@ export interface TagState {
   chaser: number
   /** The chaser's current quarry, or −1. */
   target: number
-  /** The freshly-tagged child under immunity, or −1. */
+  /** The child who just made the tag, under immunity, or −1. */
   immune: number
   immuneFor: number
   /** Eased d(gap)/dt toward the current target; reset whenever the gap jumps. */
@@ -283,11 +286,13 @@ export interface TagState {
   /** Seconds left of the caught child's beat (work-order 1176): the CHASER
    *  stands, arms dropped, while the child that caught it runs off. */
   pauseFor: number
-  /** After the beat the chaser turns on the spot to its quarry before running;
-   *  true until its body faces the way it wants to go. */
+  /** After the beat the chaser finishes turning on the spot to its quarry
+   *  before running (the turn itself opens in the beat's second half); true
+   *  until its body faces the way it wants to go. */
   turning: boolean
   /** Children who made a catch since the scene last drained this: each owes one
-   *  wordless cry (work-order 1176). Never the caught child. */
+   *  wordless cry (work-order 1176). Never the caught child; at most four wait,
+   *  and a catch beyond that cries nothing. */
   cries: number[]
 }
 
@@ -336,9 +341,9 @@ export interface TagWorld {
  * pace it should move at because of something that was SAID (the situations of
  * point 481). It returns null for a child that is simply playing.
  *
- * The chase keeps everything else — the collisions, the deflection, the sprint
- * reserve and the floor pace — so a child carrying out an errand is still a
- * child in a game of tag. The CHASER is never steered: the round belongs to it.
+ * The chase keeps everything else — the collisions, the deflection and the
+ * sprint reserve — so a child carrying out an errand is still a child in a game
+ * of tag. The pace is the claim's own; the chase's floor pace does not apply. The CHASER is never steered: the round belongs to it.
  */
 export type TagSteer = (index: number, s: TagState) => { heading: number; pace: number } | null
 
@@ -531,7 +536,8 @@ function breakOffRound(s: TagState, cfg: TagConfig): void {
 
 /**
  * The commitment to one way round ages on the CLOCK, not on the walking, and
- * every child is aged every frame. Ageing it only where it is USED would freeze
+ * every child is aged every frame the round steps (the frame the tenure cap
+ * breaks the round off returns before it). Ageing it only where it is USED would freeze
  * it on a child that stands — a call obeyed, a spot held, a round break — and
  * that child would then set off again round an obstacle it is no longer at.
  */
@@ -594,7 +600,7 @@ const PROGRESS_AWAY = 3
  *  fifth of their path, while a fast shiver repeatedly spends the same ground. */
 const PROGRESS_RATIO = 5
 
-/** How far off the straight flee the freshly-tagged child breaks away while
+/** How far off the straight flee the child who just made the tag breaks away while
  *  its immunity runs — 60°: enough that the inbound and outbound legs of the
  *  tag U-turn no longer cancel inside a one-second window, small enough that
  *  it still reads as running from the new chaser. */
@@ -760,7 +766,7 @@ export function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: Ta
 }
 
 /**
- * Move one child `dist` along `desired`, substepped so nothing is stepped over,
+ * Move one child `distance` along `desired`, substepped so nothing is stepped over,
  * deflected around whatever is in the way, and nudged free if it is genuinely
  * pinned. The heading it ends on is the one it TRAVELLED — and that heading is
  * handed back to the deflection as the COURSE it is on, so a step round a hut
@@ -974,8 +980,9 @@ function advanceTagGame(
     s.immuneFor = Math.max(0, s.immuneFor - dt)
     if (s.immuneFor === 0) s.immune = -1
   }
-  // The caught child's beat runs on the round's clock; when it ends the child
-  // turns to its quarry on the spot before it runs (work-order 1176).
+  // The caught child's beat runs on the round's clock; its turn to the quarry
+  // opens in the beat's second half and, when the beat ends, finishes on the
+  // spot before it runs (work-order 1176).
   if (s.pauseFor > 0) {
     s.pauseFor = Math.max(0, s.pauseFor - dt)
     if (s.pauseFor === 0) s.turning = true
@@ -1046,8 +1053,8 @@ function advanceTagGame(
       // A CHASER THAT MAY NOT CATCH DOES NOT PRESS (point 657). While the
       // tag-back window runs, the catch is forbidden — but the chaser still
       // aimed at its quarry, so one that was already AT it walked into the
-      // body at the floor pace for the whole window: 1.4 s × 1.29 m/s of legs
-      // pumping against the separation with no ground covered, a guaranteed
+      // body at the floor pace for the whole window, legs pumping against the
+      // separation with no ground covered, a guaranteed
       // red window (measured at both reported seeds, every frozen pair in the
       // traces was this). Where it is that close it ORBITS the quarry instead
       // — real ground covered, visibly circling for the tag it is owed — and
@@ -1108,7 +1115,7 @@ function advanceTagGame(
         : Math.hypot(c.x - cx, c.z - cz) > cfg.pressureDistance
           ? headingToward(c.x, c.z, cx, cz, c.heading)
           : c.heading
-      // THE FRESHLY-TAGGED CHILD PEELS OFF SIDEWAYS (point 657). Its flee is
+      // THE CHILD WHO JUST MADE THE TAG PEELS OFF SIDEWAYS (point 657). Its flee is
       // the chase line reversed BY CONSTRUCTION — it walked toward the quarry,
       // now it walks away from the same child — and at the floor pace a spent
       // ex-chaser walks that knife-edge U-turn as a metre of legs for a
@@ -1134,8 +1141,8 @@ function advanceTagGame(
     // OWN, not a claim's: it forbids a child the chase is steering from standing
     // still mid-game, but a child that was TOLD to stand — the refusal, the held
     // spot, an errand target reached — is obeying, and the stillness is the
-    // reading. Forcing the floor on it walked a standing child forward at 1.16
-    // m/s into whatever was in front of it, where the blocked-step fallback then
+    // reading. Forcing the floor on it walked a standing child forward at the
+    // floor pace into whatever was in front of it, where the blocked-step fallback then
     // turned it a quarter every frame: the child spun on the spot instead of
     // standing (measured at the user's seed, 3930 of 3931 commanded-still frames).
     const claim = isChaser ? null : (steer?.(i, s) ?? null)
@@ -1152,9 +1159,9 @@ function advanceTagGame(
     // watch leave it alone and the legs settle to standing.
     c.held = standing || (!!claim && c.pace <= 0)
     ageEdge(c, dt)
-    // A commanded stillness moves nothing — and leaves `pinned` and `walked`
-    // alone, so a standing child is never mistaken for one stuck on geometry and
-    // its legs stay still.
+    // A commanded stillness moves nothing — `walked` stays, and the stall watch
+    // reads the child as still (clearing `pinned`) rather than stuck on
+    // geometry, so its legs stay still.
     if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, occAt)
     trackProgress(c, dt, cfg, world)
     // Whatever its legs did this frame, they did it while the round was on.
@@ -1174,9 +1181,10 @@ function advanceTagGame(
 
   // ONE catch per step, evaluated after the movement, so two can never resolve
   // in the same frame. Only the CURRENT quarry is tested, which is worth a note
-  // for whoever recalibrates next: with the switch margin (1.5 m) well above the
-  // catch distance (0.8 m) a non-target child could in principle sit inside the
-  // catch ring untagged. Measured over 8×600 s with five children that never
+  // for whoever recalibrates next: with the switch margin (`targetSwitchMargin`)
+  // well above the catch distance (`catchDistance`) a non-target child could in
+  // principle sit inside the catch ring untagged. Measured over 8×600 s with
+  // five children (at the calibration of the time) that never
   // once happened — evasion keeps the others out — but a much larger catch ring
   // or a much larger margin would reopen it.
   //
@@ -1185,12 +1193,12 @@ function advanceTagGame(
   // cluster of three, A tags B, B tags C and C tags A again, each catch clearing
   // the last one's protection — measured at the reported seed, the role changed
   // every two or three FRAMES, and since a new chaser turns away from the child
-  // it just tagged, all three stood trembling within 7 cm of one another for
+  // that just tagged it, all three stood trembling within 7 cm of one another for
   // seconds at a time. That is the user's "Kind zittert auf der Stelle herum" at
-  // its worst. The window is the same one the freshly-tagged child already had,
+  // its worst. The window is the same one the child who just made the tag already had,
   // so the round keeps its calibration: it is simply the whole group's now, and
   // the role can change at most once in it.
-  if (target && s.target !== s.chaser) {
+  if (target) {
     const caught = s.immuneFor <= 0 && catchReached(chaser, target, cfg, world)
     if (caught) {
       const old = s.chaser
@@ -1209,7 +1217,7 @@ function advanceTagGame(
       s.pauseFor = Math.max(0, Math.min(cfg.caughtPauseSeconds, cfg.immunitySeconds))
       s.turning = false
       if (s.cries.length < 4) s.cries.push(old)
-      // The new chaser owes the freshly-tagged child a turn away before it
+      // The new chaser owes the child that just tagged it a turn away before it
       // resumes — the same hysteresis that keeps the animals' dodge and guard
       // states from flapping.
       const now = s.children[s.chaser]
@@ -1230,7 +1238,7 @@ function advanceTagGame(
 // scene writes the result onto the figures (`PlaceLife.tsx`).
 
 /** How a child's body reads in the tag round. */
-export type TagBody = 'chaser' | 'caught' | 'runner'
+type TagBody = 'chaser' | 'caught' | 'runner'
 
 /** The chaser holds its arms forward; the freshly caught child stands out its
  *  beat with them dropped; everyone else runs as before. */
@@ -1267,17 +1275,18 @@ export function grabDue(s: TagState, cfg: TagConfig): boolean {
   return !!c && !!q && dist(c, q) <= cfg.commitDistance
 }
 
-/** Where on the quarry the grab aims, in its own body heights: the small of the
- *  back, just above the hip, where the trunk is widest. Shape, not balance. */
-export const GRAB_HEIGHT = 0.46
+/** How high on the quarry the grab aims, in its own body heights: just above
+ *  the hip, where the trunk is widest. Shape, not balance. */
+const GRAB_HEIGHT = 0.46
 
 /** How far outside the reaching shoulder the trunk turn puts the quarry, in
  *  shoulder half-separations, so the aim never crosses the chest and the arm
- *  choice (`gestureArm`) cannot flicker between the two sides. */
+ *  choice (`grabAim`'s side, held via `prevSide`) cannot flicker between the
+ *  two sides. */
 const GRAB_SIDE_OFFSET = 1.5
 
 /** A figure as the grab sees it: where it stands and which way its body faces. */
-export interface GrabFigure {
+interface GrabFigure {
   x: number
   z: number
   facing: number
@@ -1285,7 +1294,7 @@ export interface GrabFigure {
 
 /** The grab this frame: the reaching arm, the trunk turn and the arm's aim in
  *  the turned trunk's frame (what `startGesture('touch', …)` takes). */
-export interface GrabAim {
+interface GrabAim {
   side: ArmSide
   turn: number
   bearing: number
@@ -1339,7 +1348,8 @@ function shoulderIn(side: ArmSide): [number, number, number] {
 }
 
 /**
- * Aim the chaser's reaching hand at the quarry's back: solved through the SAME
+ * Aim the chaser's reaching hand at the quarry: at its central axis at
+ * `GRAB_HEIGHT` of its body (no surface offset), solved through the SAME
  * pivot chain the figure draws (hip-pivoted trunk with its lean and turn, then
  * the shoulder), so the hand the player sees is the hand this aims. The arm
  * points straight at the target point, which puts the hand as close to it as an
@@ -1388,7 +1398,7 @@ export function grabAim(
 
 /**
  * Where the drawn hand of `side` stands in the world for a pose — the figure's
- * own chain, for the tests and the dev read-back. `lift` is the body's height
+ * own chain, for the tests. `lift` is the body's height
  * above the ground it stands on.
  */
 export function grabHandWorld(
@@ -1419,7 +1429,7 @@ export function grabHandWorld(
 
 /** The drawn trunk's radius at a height above the feet, for a figure WITH legs:
  *  the tunic cone from the hip to the crown (see `Figure` in `PlaceLife.tsx`). */
-export function trunkRadiusAt(height: number, scale: number): number {
+function trunkRadiusAt(height: number, scale: number): number {
   const L = FIGURE_LIMBS
   const trunkH = 1 - L.hipY
   const base = L.bodyRadius * trunkH
@@ -1444,7 +1454,8 @@ export function handGapToBody(
  * The grab gesture steered for one frame: begun at its pose (the touch kind
  * has no fade-in), re-aimed and kept alive while `aim` is given, and let go the
  * moment it is not — the fade-out starts THIS frame, so a near miss reads as a
- * miss. A gesture of any other kind is left alone.
+ * miss. With an aim, a gesture of any other kind is replaced by the grab;
+ * without one it is left alone.
  */
 export function steerGrab(g: GestureState, aim: { bearing: number; elevation: number } | null): GestureState {
   if (aim) {

@@ -9,7 +9,8 @@
 // never engaged under browser automation (system-Chrome headless grabs the real
 // OS cursor and drags the user's mouse into a corner), so a headless check can
 // only observe what the game DECIDED — that it asked for the lock back, and that
-// it gave it up. Dev-only, like every other verification hook.
+// it gave it up. The counters run in every build; only the window hook that
+// exposes them is dev-only, like every other verification hook.
 
 import { useUi } from '../../state/ui'
 
@@ -94,7 +95,8 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
       if (pendingRefusal === onRefusal && !canRetry()) cancel()
     }
     // Arm before the native call: a synchronous grant must cancel this timer.
-    // Refusal signals are diagnostic only; a silent request must not strand it.
+    // A refusal signal ends the recovery once no retry is allowed any more; a
+    // silent request must not strand it either.
     if (canRetry()) {
       pendingRefusal = onRefusal
     }
@@ -169,7 +171,7 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
   }
 }
 
-/** Restore mouse-look on any dialog's closing activation; return scene cleanup. */
+/** Restore mouse-look whenever an open dialog closes; return scene cleanup. */
 export function restorePointerLockAfterDialogs(
   el: Element,
   request: () => void = () => requestPlacePointerLock(el),

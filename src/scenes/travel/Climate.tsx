@@ -1,7 +1,9 @@
 // Region-dependent climate optics for the travel view (design.md §19):
 // desert heat haze, humid jungle mist, clear highland air. Implemented as a
 // smoothly interpolated scene fog plus low ground haze layers whose color and
-// opacity follow the current region. Purely visual.
+// opacity follow the current region. Visual, apart from the thunder it
+// schedules and the shared weather state it writes (CURRENT_WEATHER, the flora
+// fog far, the ground soak).
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -88,7 +90,7 @@ function getRain() {
   const phase = hash(i.mul(3))
   const fall = phase.mul(RAIN_HEIGHT).sub(time.mul(RAIN_FALL_SPEED)).mod(RAIN_HEIGHT)
   m.positionNode = positionLocal.add(vec3(rx, fall, rz))
-  // Hail whitens the falling streaks into pellets (point 141b).
+  // Hail whitens the falling streaks (point 141b); their shape stays a streak.
   m.colorNode = mix(vec3(0.62, 0.68, 0.75), vec3(0.95, 0.96, 0.98), hailU)
   // Fade toward the column edge so no square silhouette shows, and thin the
   // streaks with the rain amount.
@@ -108,9 +110,9 @@ function getRainGeometry() {
 // MODULE singletons (point 96): scene.fog participates in every material's
 // pipeline cache key, so a fresh Fog instance per mount would invalidate and
 // re-link the whole travel program set on re-entry after a place visit.
-// Exported so the flora streaming can size its spawn circle to the fog far —
-// the definitive visible limit, beyond which nothing renders (point 171).
-export const TRAVEL_FOG = new THREE.Fog('#cfe0ea', 95, 260)
+// The flora streaming sizes its spawn circle by the season-free
+// `FLORA_FOG.far`, not by this lerped fog (point 171).
+const TRAVEL_FOG = new THREE.Fog('#cfe0ea', 95, 260)
 const TRAVEL_BACKGROUND = new THREE.Color('#cfe0ea')
 
 export function Climate() {
@@ -148,7 +150,7 @@ export function Climate() {
     )
       .mul(0.5)
       .add(0.5)
-    // Radial fade toward the quad edges, wide enough that no rotated-square
+    // Square (Chebyshev) fade toward the quad edges, wide enough that no rotated-square
     // silhouette of the layer quad ever shows.
     const edge = max(uv().x.sub(0.5).abs(), uv().y.sub(0.5).abs())
     const edgeFade = smoothstep(0.48, 0.2, edge)
@@ -180,7 +182,8 @@ export function Climate() {
   const flashRef = useRef(0)
   const strikeState = useRef<StrikeSchedulerState>({ nextAt: 0, count: 0, lastOpenAt: 0 })
   /** Peak flash since the last reset — the verify probe reads THIS (a flash lasts
-   *  ~1 frame at the headless clamped dt, so a per-frame poll races the decay). */
+   *  only a few updates at the headless clamped dt, so a per-frame poll races the
+   *  decay). */
   const flashPeakRef = useRef(0)
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
@@ -288,10 +291,12 @@ export function Climate() {
     // FLASHES fire on the render clock, each scheduling its THUNDER 1-4 s later so
     // the pair reads as weather, never a silent flash. The flash brightens the
     // scene via CURRENT_WEATHER.flash (read by the sun light and the sky dome) and
-    // decays in <300 ms. Hidden in the debug zoom-out like the rest of the weather.
+    // decays in about half a second at 60 fps. Hidden in the debug zoom-out like
+    // the rest of the weather.
     // The scheduler step is the shared pure strikeSchedulerStep: it re-arms after
     // every bolt and survives the gate's per-day/per-cell flicker while the
-    // traveller drives (the "thunder only once" fix — see STRIKE_HOLD_SECONDS).
+    // traveller drives (the "thunder only once" fix — see STRIKE_HOLD_SECONDS in
+    // systems/season.ts).
     const stormStrength =
       thunderstormAt(s.day, lat, lon, START_YEAR, elevationAt(lat, lon)) *
       Math.min(1, Math.max(0, balance.season.weatherStrength)) *
@@ -302,7 +307,7 @@ export function Climate() {
       if (stormStrength > flashPeakRef.current) flashPeakRef.current = stormStrength
       playThunder(boltDelay, stormStrength)
     }
-    flashRef.current *= Math.max(0, 1 - dt * 7) // fast decay (<~0.3 s)
+    flashRef.current *= Math.max(0, 1 - dt * 7) // fast decay (~0.6 s at 60 fps)
     if (flashRef.current < 0.01) flashRef.current = 0
     CURRENT_WEATHER.flash = flashRef.current
     // The low graphics level (point 276) thins the haze/rain pall so fewer

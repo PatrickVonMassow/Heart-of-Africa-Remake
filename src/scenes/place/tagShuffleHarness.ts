@@ -25,6 +25,7 @@ import {
 } from '../../../scripts/verify/childMotionMetric.mjs'
 import { balance } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
+import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 import {
   nudgeToFree,
   nudgeWhere,
@@ -73,11 +74,13 @@ import {
   type AdultWorkView,
 } from './adultWork'
 
-/** The children's round as `PlaceLife` composes it (work-order 687): the bank
- *  game where the settlement stands on a river, the tag round everywhere else. */
+/** The children's round config as `PlaceLife` composes it (work-order 687): the
+ *  tag knobs overlaid by the bank game's, used for both rounds. Which round a
+ *  settlement plays is decided in `village` (a bank, play rocks and a climbable
+ *  boulder make the bank round). */
 export const BANK_CFG: BankConfig = { ...balance.villageLife.tag, ...balance.villageLife.bankGame }
 
-// The two numbers `PlaceLife` holds for the children it draws.
+// The numbers `PlaceLife` holds for the children it draws.
 export const KID_SCALE = 0.55
 export const NPC_RADIUS = WALKER_RADIUS
 export const FIRE: [number, number] = [-3.5, 2.5]
@@ -100,10 +103,11 @@ export const BANK_ROUND_WINDOW = 2400
  * The steppers are the scene's own, kept to what MOVES a body: the vignette
  * adults stand fixed at the stations `childPlayGround` keeps the play ground
  * clear of, the porters ping-pong along their routes as `Porters` walks them,
- * and the errand villagers walk to the layout's own errand points and pause
- * there as `ErrandVillagers` does. Nothing here draws or speaks — only bodies.
+ * and the working adults are staged by `stepAdultWork` and stroll between
+ * tasks, as the scene's `ErrandVillagers` do. Nothing here draws or speaks —
+ * only bodies.
  */
-export interface Crowd {
+interface Crowd {
   standing: InhabitantBody[]
   porters: InhabitantBody[]
   walkers: InhabitantBody[]
@@ -168,7 +172,7 @@ export function crowd(
 
   // The WORKING adults, spawned on the ring `ErrandVillagers` spawns them on and
   // moved by the work module the scene actually runs. They used to stroll a
-  // catalogue this branch DELETED — the free errands, and among their targets
+  // catalogue since deleted — the free errands, and among their targets
   // the water's FOOT, which stands on the children's own stage and which the
   // shipped component pointedly leaves out of its stroll list. The replay was
   // therefore crowding the bank with adult bodies the game never sends there
@@ -176,9 +180,11 @@ export function crowd(
   //
   // What is replayed now is the shipped choreography: `stepAdultWork` stages the
   // situations, a man with a task walks to `goalOf` it, and a man without one
-  // strolls to the head of the water path or a work site — or, every other
-  // stroll, to a free point anywhere in the settlement, which is what takes an
-  // ADULT BODY straight across the children's ground.
+  // strolls to the head of the water path or a work site — or, on a little
+  // under half the strolls (55 % go to a named spot where there is one), to a
+  // free point anywhere in the settlement, which is what takes an ADULT BODY
+  // straight across the children's ground. A given `focus` ground takes every
+  // stroll instead.
   const errandCount = balance.villageLife.adultErrands.villagerCount
   const named: Array<[number, number]> = [
     ...(layout.waterPath ? ([[layout.waterPath.head.x, layout.waterPath.head.z]] as Array<[number, number]>) : []),
@@ -344,8 +350,9 @@ export function village(
   options: {
     /** Send the errand villagers into the children's own ground. */
     adultsAmongTheChildren?: boolean
-    /** A hostile pen round one child — see the wedge case at the foot of this
-     *  file. `blocked` refuses everything between `r` and `r + 1.5` of it. */
+    /** A hostile pen round one child — see the wedge case in
+     *  `tagShuffle.wedgeGate.test.ts`. `blocked` refuses everything between `r`
+     *  and `r + 1.5` of it. */
     pen?: { r: number; carry: number }
   } = {},
 ) {
@@ -356,11 +363,11 @@ export function village(
   const localSeed = (seed ^ hash) >>> 0
   // THE LAYOUT'S OWN GROUND (work-order 688): the scene reads `playGround` from
   // the layout now, so the rig reads the same one rather than deriving a second
-  // — and it INSISTS on it. The fallback that stood here fabricated a perfect
-  // quarter at the origin whenever the layout gave none, which is precisely the
-  // regression every case in this file exists to catch: a village whose children
-  // have no ground would have played happily on an invented one (GPT-5.6 Sol,
-  // first cross-vendor round, D9).
+  // — and it INSISTS on it. There is no fallback: one that fabricated a perfect
+  // quarter at the origin whenever the layout gave none would hide precisely the
+  // regression every replay case built on this harness exists to catch: a
+  // village whose children have no ground would play happily on an invented one
+  // (GPT-5.6 Sol, first cross-vendor round, D9).
   const ground = layout.playGround
   if (!ground) throw new Error(`${placeId}@${seed}: the layout carries no children's quarter to play in`)
   const rim = Math.max(1, layout.radius - NPC_RADIUS * 2)
@@ -383,8 +390,6 @@ export function village(
   const region = hasBank
     ? { x: 0, z: 0, radius: rim }
     : { x: ground.x, z: ground.z, radius: ground.radius }
-  // The sub-passage slots between pinching boundaries are not part of the
-  // ground, exactly as `PlaceLife` wires it (point 657).
   // Only the TAG round is kept out of the sub-passage wedges, exactly as
   // `PlaceLife` wires it — see the reasoning there.
   const carve = hasBank ? () => false : buildWedgeCarve(colliders, NPC_RADIUS, region)
@@ -575,8 +580,9 @@ export function sample(v: ReturnType<typeof village>, paths: Track[][]): void {
 
 /** THE SAME RECORDED TRACE, SEEN BY A SLOWER RENDERER (point 656). Positions,
  *  `walked` and `nudges` are all the game's own state AT that moment, so leaving
- *  samples out is exactly what a machine drawing fewer frames would have
- *  recorded of the same play. Every child gets its own cadence, as it would. */
+ *  samples out is what a machine drawing fewer frames would have recorded of
+ *  the same play. Every child gets its own cadence — harsher than a slower
+ *  renderer, which drops the same frames for the whole group. */
 export function resample(paths: Track[][], step: (rand: () => number) => number, seed: number): Track[][] {
   return paths.map((path, k) => {
     const rand = mulberry32((seed + k * 977) >>> 0)
@@ -619,13 +625,13 @@ export function play(placeId: string, seed: number, seconds: number, dt = 1 / 60
 }
 
 /**
- * AND THERE WAS A GAME IN THE TRACE (point 656). Every gate below is a bound on
+ * AND THERE WAS A GAME IN THE TRACE (point 656). Every replay gate is a bound on
  * something BAD, so a settlement standing perfectly still passes all of them: an
  * idle group walks nowhere, so no window is bad and the share is 0, and it is
  * never stuck, so nobody is carried. The live browser check asserts that the
  * group is playing before it judges anything; the pure proof of the user's own
  * bug had no such assertion at all, and would have gone green on a trace with no
- * game in it. The bars are measured on the four settlements replayed below —
+ * game in it. The bars are measured on the four `RIVER_VILLAGES` seeds —
  * five children, the whole minute played, 92-115 m walked per child-minute with
  * the bank round —
  * and set far below them: they separate a game from NOTHING, not a good game
@@ -644,7 +650,7 @@ export function expectLively(paths: Track[][]): void {
   // was played — one motionless child among four busy ones is invisible in a
   // sum, and walking counted over the whole trace would take a group's warm-up
   // for a game. Re-measured at five children (work-order 1047): the quietest
-  // child of each village walks 91-111 m per minute of play.
+  // child of each replayed seed walks 91-111 m per minute of play.
   expect(live.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
   expect(holdsAGame(live)).toBe(true)
 }
@@ -654,6 +660,7 @@ export function expectLively(paths: Track[][]): void {
 // layer had covered the bambara village at the child-motion report's seed
 // only, and the layout the picture check actually walks — a different one —
 // was the one whose route across the village could not be planned.
+// SEED 2972259115 is the one the production child-motion report names.
 // AND THE OTHER TWO ARE SEEDS, NOT VILLAGES (work-order 1094). They were the
 // nubian and the mandinka layout, on the reasoning that one settlement proves
 // nothing about the next — true, and beside the point: the round that TEACHES
@@ -665,8 +672,8 @@ export function expectLively(paths: Track[][]): void {
 // slowest that still gets there in the ordinary way (89.3 s), so the pair
 // spans the range the player is really dealt instead of two foreign corners.
 export const RIVER_VILLAGES: Array<[string, number]> = [
-  ['bambara-village', 42],
-  ['bambara-village', 2972259115],
-  ['bambara-village', 9],
-  ['bambara-village', 23],
+  [ROCK_VILLAGE_ID, 42],
+  [ROCK_VILLAGE_ID, 2972259115],
+  [ROCK_VILLAGE_ID, 9],
+  [ROCK_VILLAGE_ID, 23],
 ]

@@ -17,7 +17,9 @@
 //
 // The grid is built from THE SAME two sources the movement itself obeys — the
 // walkable boundary (`insidePlace`, bank lobe included) and the full collider
-// set — so a route can never lead where the mover will then be stopped. It is
+// set — so a route's inner legs never lead where the mover will then be
+// stopped; only its last leg ends at the true target, which `findPlaceRoute`
+// forgives a ring inside a collider or out on un-free ground. It is
 // pure data: no three.js, no scene, and every rule below is pinned in Vitest.
 
 import { standingClear, type Collider } from './collision'
@@ -26,7 +28,9 @@ import { insidePlace, maxBoundaryRadius, type PlaceBounds } from './boundary'
 /**
  * Edge length of one occupancy cell, in metres. A shade finer than a walker is
  * wide (0.6 m across), so two neighbouring free cells always overlap and the
- * straight leg between them is ground the figure genuinely fits through; finer
+ * straight leg between them is ground the figure fits through, give or take a
+ * clip of a collider the movement slides along (the colliders get no slack,
+ * see `buildPlaceNavGrid`); finer
  * still costs a settlement entry real milliseconds, because every cell is tested
  * against every collider in the place.
  */
@@ -171,7 +175,9 @@ export function navClearBetween(
   return true
 }
 
-/** The nearest free cell to a point, spiralling outward; −1 when none is near.
+/** A free cell near a point: the first found on the smallest square ring
+ *  around it that has one (not necessarily the nearest by distance); −1 when
+ *  none is near.
  *  A target may sit a hand's breadth inside a collider (or the mover may have
  *  been nudged into one), and a route that gives up there would strand it. */
 function nearestFreeCell(grid: PlaceNavGrid, x: number, z: number, rings: number): number {
@@ -206,6 +212,9 @@ export function advancePlaceRoute(grid: PlaceNavGrid, from: NavPoint, route: Nav
   }
 }
 
+/** Rings a goal inside a collider is forgiven (see `findPlaceRoute`). */
+const GOAL_RINGS = 1
+
 /**
  * The waypoints from `from` to `to` over free ground, or null when no route
  * exists (the target is walled off, or neither end is near open ground).
@@ -229,8 +238,6 @@ export function advancePlaceRoute(grid: PlaceNavGrid, from: NavPoint, route: Nav
  * — a mover walks into all of those, and what happens there is its caller's
  * business, not this function's. That is why the grid records the two apart.
  */
-const GOAL_RINGS = 1
-
 export function findPlaceRoute(
   grid: PlaceNavGrid,
   from: NavPoint,

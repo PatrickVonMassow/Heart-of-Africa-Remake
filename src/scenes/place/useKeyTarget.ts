@@ -1,13 +1,13 @@
 // What the settlement's two action keys mean where the player stands
 // (work-order points 691/1139).
 //
-// A settlement offers SPACE several things at once: the door of a functional
-// building, the utterance over a speaker's head, and — as the rebuild lands —
-// a dig site, the chief, a form socket. Before this there were two independent
-// keys for it, SPACE for the doors and a left click for the guess, and the
-// player could not tell what either would do. There is now ONE candidate list:
-// everything SPACE can mean is collected with its distance from the player and
-// a reach of its own, and the NEAREST candidate still in its own reach wins.
+// A settlement offers the player several things at once: the door of a
+// functional building, the chief, and the utterance over a speaker's head.
+// Everything is collected in ONE candidate list with its distance from the
+// player and a reach of its own; the list is then split by key (point 1139,
+// below): SPACE takes the doors and the chief, the guess key (E) the utterance,
+// and only the gamepad's one button still lets the NEAREST candidate in its own
+// reach win across both.
 //
 // Pure logic — no scene, no store, no clock. The caller measures the distances
 // on the ground plane, in place units, so the door and the voice are comparable

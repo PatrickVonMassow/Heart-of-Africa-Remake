@@ -8,7 +8,6 @@ import {
   chiefBesideDrummerSpot,
   chiefCalled,
   chiefInHut,
-  chiefIsOutside,
   chiefStepsOut,
   chiefTick,
   chiefWalkFacing,
@@ -32,14 +31,13 @@ function arrived(t = CROSSING): ChiefWalk {
 describe('the chief comes out of his hut', () => {
   it('starts every visit inside it', () => {
     expect(chiefInHut().phase).toBe('in-hut')
-    expect(chiefIsOutside(chiefInHut())).toBe(false)
   })
 
   it('sets out for the drummer when the hut is used', () => {
     const walk = chiefStepsOut(chiefInHut(), 12)
     expect(walk.phase).toBe('walking-out')
     expect(walk.progress).toBe(0)
-    expect(chiefIsOutside(walk)).toBe(true)
+    expect(walk.phase).not.toBe('in-hut')
   })
 
   it('leaves the hut key inert while he is outside — in every outside phase', () => {
@@ -161,7 +159,6 @@ describe('called back on his way home', () => {
     const home = chiefTick(goingHome(), 200, TIMING)
     expect(home.walk.phase).toBe('in-hut')
     expect(home.walk.progress).toBe(0)
-    expect(chiefIsOutside(home.walk)).toBe(false)
     expect(chiefStepsOut(home.walk, 201).phase).toBe('walking-out')
   })
 

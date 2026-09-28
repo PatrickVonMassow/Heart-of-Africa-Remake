@@ -1,5 +1,5 @@
-// First-person place view (design.md §2): walkable port/village with
-// enterable trade buildings and the chief met outside his hut.
+// First-person place view (design.md §2): walkable port, village or monument
+// site (Giza) with enterable trade buildings and the chief met outside his hut.
 // Building *positions and looks* are procedural per run (design.md §18);
 // which buildings exist is fixed per place kind. Visuals: TSL sky dome and
 // noise materials, sun shadows, detailed buildings, palms and scatter props.
@@ -194,10 +194,10 @@ const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
 // (design.md §19.13, point 120g).
 const PLACE_SUN_INTENSITY = 2.4
 const PLACE_HEMI_INTENSITY = 0.8
-// Campfire cube-shadow map (design.md §19.10, debug toggle, default OFF): a
-// low-resolution map suffices — the firelight shadow reads soft anyway, and
-// measured 128/256/512 cost the same (the price is the six cube-face render
-// passes, not map fill; docs/perf-276-findings.md), so 256 keeps the quality.
+// Campfire cube-shadow map (design.md §19.10): the graphics level picks the
+// resolution (FirePit); this is only the fallback size when the level supplies
+// none. Measured 128/256/512 cost the same (the price is the six cube-face
+// render passes, not map fill; docs/perf-276-findings.md).
 const FIRE_SHADOW_MAP_SIZE = 256
 // Point-light cube faces need a larger bias than the sun's 2D map: the low
 // resolution plus near-source geometry (stones centimetres from the flame)
@@ -211,8 +211,6 @@ const placeRainColor = new THREE.Color(RAIN_GRAY)
 function interactiveLabel(strings: ReturnType<typeof getStrings>, type: Interactive['type']): string {
   return strings.buildings[type]
 }
-
-
 
 // --- Shared procedural materials (created once per mount) --------------------
 
@@ -411,9 +409,10 @@ function VillageHut({
 }) {
   const facing = rot ?? Math.atan2(x, z) + Math.PI
   // Raised floor in the humid Congo basin (design.md §2 region-typical builds).
-  // Every roof number below comes from `roofClearance`, which the collider set
-  // reads too — reshaping a roof there moves the head-clearance stand-off with
-  // it (work-order 349).
+  // The roof shapes below take their dimensions from `roofClearance`, which the
+  // collider set reads too — reshaping a roof there moves the head-clearance
+  // stand-off with it (work-order 349). The parapet ring and label heights are
+  // dressing literals outside that contract.
   const base = style.stilts ? HUT_STILT_BASE : 0
   const wallH = hutWallHeight(style.roof, h)
   const coneKind = style.roof === 'tallCone' || style.roof === 'cone' ? style.roof : null
@@ -677,8 +676,9 @@ function Chief({
         drummer: [VILLAGE_SPOTS.drummer[0], VILLAGE_SPOTS.drummer[1]],
       }
     }
-    // Home again: the one store write of the whole trip, and it is what takes
-    // this figure off the scene until the hut is used afresh.
+    // Home again: the walk's only write of `chiefOutside`, and it is what takes
+    // this figure off the scene until the hut is used afresh (the drums he
+    // beats on the way write their own message state).
     if (step.walk.phase === 'in-hut') {
       const game = useGame.getState()
       if (game.placeId && game.chiefOutside[game.placeId]) useGame.setState({ chiefOutside: {} })
@@ -861,7 +861,7 @@ function Warehouse({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
 }
 
 /** Market stall: poles, cloth roof, counter with goods. */
-function Stall({ d, mats, plenty = 1 }: { d: DwellingDef; mats: PlaceMaterials; plenty?: number }) {
+function Stall({ d, mats, plenty }: { d: DwellingDef; mats: PlaceMaterials; plenty: number }) {
   return (
     <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
       {[
@@ -940,7 +940,7 @@ function Mosque({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
   const depth = d.r * 0.8
   return (
     <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
-      {/* Prayer-hall body with a slightly battered profile. */}
+      {/* Prayer-hall body: a plain mud box. */}
       <mesh position={[0, 1.4, 0]} castShadow receiveShadow material={mats.mud}>
         <boxGeometry args={[w * 2, 2.8, depth * 2]} />
       </mesh>
@@ -1154,8 +1154,9 @@ function PlaceFlora({
 }
 
 /**
- * Village campfire: stone ring, logs, emissive flame, flickering light — under
- * an open-sided thatched COOK-SHELTER (design.md §19.10, point 256). Period
+ * Village campfire: stone ring, logs, emissive flame, flickering light — where
+ * `sheltered`, under an open-sided thatched COOK-SHELTER (design.md §19.10,
+ * point 256); the dome-dweller villages keep an open fire. Period
  * ~1890 sub-Saharan settlements kept the cooking hearth alight through the rains
  * under a roofed cook-shelter / thatch canopy on posts (docs/peoples-1890.md
  * §10), so the fire's burning in rain reads plausibly: under the canopy it burns
@@ -1166,16 +1167,16 @@ function PlaceFlora({
 function FirePit({
   x,
   z,
-  blaze = 1,
+  blaze,
   rainRef,
   thatchMat,
   sheltered = false,
 }: {
   x: number
   z: number
-  blaze?: number
-  rainRef?: MutableRefObject<number>
-  thatchMat?: THREE.Material
+  blaze: number
+  rainRef: MutableRefObject<number>
+  thatchMat: THREE.Material
   sheltered?: boolean
 }) {
   const light = useRef<THREE.PointLight>(null)
@@ -1196,7 +1197,7 @@ function FirePit({
     // Under the cook-shelter the fire burns on through the rain — only a touch
     // lower/steamier; an unsheltered fire (the dome-dweller villages) is beaten
     // down by rain (point 256, the two branches of fireRainFactor).
-    const rain = rainRef ? rainAmount(rainRef.current, balance.season.weatherStrength) : 0
+    const rain = rainAmount(rainRef.current, balance.season.weatherStrength)
     const rainFactor = fireRainFactor(rain, sheltered, balance.fire.shelteredRainDamp, balance.fire.openRainDamp)
     if (light.current) {
       // The fire burns harder in the cold months (point 142, the §4.9 "fire
@@ -1287,7 +1288,7 @@ function PlayerShadowProxy({ player }: { player: MutableRefObject<{ x: number; z
  * flame. Cheap geometry in the settlement's own thatch/wood material style — it
  * lets the fire read as sheltered from the rain rather than blazing in the open.
  */
-function CookShelter({ thatchMat }: { thatchMat?: THREE.Material }) {
+function CookShelter({ thatchMat }: { thatchMat: THREE.Material }) {
   // Corner posts a comfortable margin around the 0.9 stone ring, and an eave
   // height clear of a standing figure and the flame — the same numbers the
   // head-clearance sweep reads (work-order 349).
@@ -1309,7 +1310,6 @@ function CookShelter({ thatchMat }: { thatchMat?: THREE.Material }) {
       {/* Low pyramidal thatch roof, eaves overhanging the posts a little. */}
       <mesh name="hut-roof" position={[0, postH + COOK_SHELTER.capCentre, 0]} rotation={[0, Math.PI / 4, 0]} castShadow material={thatchMat}>
         <coneGeometry args={[postR * COOK_SHELTER.capSpread, COOK_SHELTER.capHeight, 4]} />
-        {thatchMat ? null : <meshStandardMaterial color="#8a7248" roughness={1} />}
       </mesh>
     </group>
   )
@@ -1668,8 +1668,8 @@ function PanoramaWildlife({
         // the point-286 forward-only walk (displacement projects positively onto
         // the facing). `gait`/`gaitSpeed`/`cadence` prove the point-255/286/300
         // stride live: the phase advances in step with the SCALE-NORMALISED
-        // ground each silhouette covers, at its OWN leg's cadence — so
-        // phase ÷ (speed × cadence) is 1 for every one of them, whatever species
+        // ground each silhouette covers, at its OWN leg's cadence — so the
+        // phase's RATE ÷ (speed × cadence) is 1 for every one of them, whatever species
         // it is, while a wall-clock bob would advance them all alike regardless
         // of speed. `drop`/`pitch`/`frontY`/`backY` carry the point-300 footing:
         // how far the body dipped onto its stance leg and how it lies on the
@@ -1774,21 +1774,6 @@ function PanoramaWildlife({
 // --- Landscape backdrop --------------------------------------------------------
 
 /**
- * Panorama of the real surroundings (design.md §2): an annulus heightfield
- * sampled from the actual travel terrain around the place's map position, so
- * the first-person view shows the mountains, river courses, lakes and the
- * coast that lie there in the bird's-eye view. Rendered as distant scenery
- * in biome colors; heights are exaggerated to read at person scale.
- */
-
-
-/**
- * Table Mountain behind Cape Town (design.md §4.4 Part C): the flat-topped
- * massif with its flanking peaks as a fixed skyline feature north of the
- * town, in front of the generic DEM backdrop. Height and distance keep its
- * elevation angle well under the §2.5 looming bound (~11° from the centre).
- */
-/**
  * Giza behind Cairo (design.md §4.4, point 82): the great pyramids stand as
  * a fixed western-horizon silhouette — the real field lies ~13 km west of
  * the city across the Nile. Same pattern as Cape Town's Table Mountain.
@@ -1813,6 +1798,12 @@ function GizaSkyline({ placeId }: { placeId: string }) {
   return <mesh geometry={geometry} material={material} position={[-130, -1.2, 10]} rotation={[0, 0.35, 0]} scale={[13, 13, 13]} />
 }
 
+/**
+ * Table Mountain behind Cape Town (design.md §4.4 Part C): the flat-topped
+ * massif with its flanking peaks as a fixed skyline feature north of the
+ * town, in front of the generic DEM backdrop. Height and distance keep its
+ * elevation angle well under the §2.5 looming bound (~11° from the centre).
+ */
 function TableMountainSkyline({ placeId }: { placeId: string }) {
   const show = placeId === 'capetown'
   const geometry = useMemo(() => (show ? buildTableMountain() : null), [show])
@@ -1897,6 +1888,13 @@ function TravelPanorama({ placeId }: { placeId: string }) {
   return <mesh name="panorama-band" geometry={geometry} material={material} position={[0, EYE_HEIGHT, 0]} />
 }
 
+/**
+ * Panorama of the real surroundings (design.md §2): an annulus heightfield
+ * sampled from the actual travel terrain around the place's map position, so
+ * the first-person view shows the mountains, river courses, lakes and the
+ * coast that lie there in the bird's-eye view. Rendered as distant scenery
+ * in biome colors; heights are exaggerated to read at person scale.
+ */
 function LandscapeBackdrop({
   lat,
   lon,
@@ -2328,10 +2326,11 @@ type UseAction =
  * ONE candidate list for both settlement keys (work-order point 691): the
  * functional doors and the utterance over the nearest speaker's head, each with
  * its own reach, all measured on the ground plane in place units against the
- * LIVE player position. `pickForKeyPress` splits it along the key that acts on
- * each kind (point 1139) and decides which candidate THAT key means — so a key's highlight, its hint and what it does can never
- * describe three different things. A dig site, the chief's own socket and the
- * rest of the rebuild join this list here.
+ * LIVE player position, plus the drummer and the standing chief while the key
+ * means something at them. `pickForKeyPress` (useKeyTarget) splits it along the
+ * key that acts on each kind (point 1139) and decides which candidate THAT key
+ * means — so a key's highlight, its hint and what it does can never describe
+ * three different things.
  */
 function settlementUseCandidates(layout: PlaceLayout | null, x: number, z: number): UseCandidate<UseAction>[] {
   const game = useGame.getState()
@@ -2477,13 +2476,12 @@ export function PlaceScene() {
     if (!groundPlate) return
     return () => groundPlate.dispose()
   }, [groundPlate])
-  // Where the settlement's walls stand (point 524) — the children's play ground
-  // is kept against them.
   const isPort = place?.kind === 'port'
   const isMonument = place?.kind === 'monument'
   const isVillage = place?.kind === 'village'
-  // The monument plateau reads as desert sand, like a port's ground (design.md
-  // §4.4), not a village's soil.
+  // The monument plateau takes the port's sandy treatment — sky, light, flora
+  // and scatter (design.md §4.4) — not a village's; its ground material stays
+  // its own desert sand (usePlaceMaterials).
   const sandy = isPort || isMonument
   const style = REGION_PLACE_STYLES[place?.region ?? 'west']
   // The settlement's cold-weather dress (§19.13). Shared with PlaceLife so the
@@ -2534,13 +2532,13 @@ export function PlaceScene() {
   // yaw 0 faces -Z (toward the place center from the southern spawn point);
   // pitch 0 is the horizon (design.md §17.5, point 392: + looks up).
   const player = useRef({ x: 0, z: 18, yaw: 0, pitch: 0 })
-  // Walk feel (design.md §2, point 97): body-relative eased velocity, the
-  // step-phase accumulator and the smoothed camera roll — all camera/feel only.
+  // Walk feel (design.md §2, point 97): body-relative eased velocity (which
+  // the movement integrates), the step-phase accumulator and the smoothed
+  // camera roll.
   const walk = useRef({ velF: 0, velS: 0, phase: 0, roll: 0 })
   /** Stall watch (work-order 604): holding a movement key without getting
    *  anywhere raises the hint that names the escape key — it never frees him. */
   const stall = useRef(newStallState(0, 0))
-  // The touch quality preset (point 84) halves the shadow-map resolution.
   const sunRef = useRef<THREE.DirectionalLight>(null)
   const hemiRef = useRef<THREE.HemisphereLight>(null)
   /** This frame's season wetness at the settlement, for the dev hook. */
@@ -2650,6 +2648,8 @@ export function PlaceScene() {
       delete w.__placePlayer
       delete w.__placeLayout
       delete w.__bankStageView
+      delete w.__placeSpots
+      delete w.__chiefHome
       delete w.__placeColliders
       delete w.__placeCamera
       delete w.__placeScene
@@ -2685,7 +2685,7 @@ export function PlaceScene() {
     }
     document.addEventListener('pointerlockchange', onLockChange)
     const onMove = (e: MouseEvent) => {
-      // A modal dialog freezes looking as it freezes walking (design.md §16.1):
+      // A modal dialog freezes looking as it cuts walking input (design.md §16.1):
       // without the lock there is no look anyway, but under automation the raw
       // movement below would still turn the head.
       if (useUi.getState().dialog) return
@@ -2742,10 +2742,10 @@ export function PlaceScene() {
     }
   }
 
-  // The guess at what a speaker just said, opened by the SAME use key
-  // (work-order point 691). It replaced a left click on the canvas: a second
-  // key for a second kind of thing left the player unable to tell what either
-  // would do. The dialog keeps the utterance it was opened for, so it survives
+  // The guess at what a speaker just said, opened by the guess key E on the
+  // keyboard and by the pad's shared use button (work-order points 691/1139;
+  // it replaced a left click on the canvas). The dialog keeps the utterance it
+  // was opened for, so it survives
   // the label it came from, and the pointer goes back to the player or no key
   // reaches its field.
   const openSpeechGuess = (label: SpeechLabel) => {
@@ -2832,8 +2832,8 @@ export function PlaceScene() {
     const off = onKeyPress(USE_KEY_CODE, (e) => {
       if (useUi.getState().dialog) return
       // Select against the LIVE player position, not the last rendered frame's
-      // `nearRef`: a synchronous keydown after a teleport/fast step used to act
-      // on the frame-lagged candidate and open the previously-near building.
+      // pick: a synchronous keydown after a teleport/fast step used to act on
+      // the frame-lagged candidate and open the previously-near building.
       const p = player.current
       const all = settlementUseCandidates(layoutRef.current, p.x, p.z)
       // A real key press — and a tapped prompt, which names SPACE and must do
@@ -2965,8 +2965,9 @@ export function PlaceScene() {
         p.pitch = applyPitch(p.pitch, padPitchDelta(look.y, dt, useUi.getState().invertLook), balance.lookPitchLimitDeg)
       }
       // Touch look-drag turns the view through the same sensitivity as the
-      // mouse (design.md §17.5, point 84): the accumulated drag px maps 1:1 to
-      // mouse px, so touch and pointer-lock look identical.
+      // mouse (design.md §17.5, point 84): the accumulated horizontal drag px
+      // maps 1:1 to mouse px, so touch turns as far as the mouse does (yaw
+      // only; a touch drag does not pitch).
       const touchLook = consumeTouchLook()
       if (touchLook.dx !== 0) p.yaw -= touchLook.dx * balance.mouseSensitivity
       let forward = 0
@@ -2995,7 +2996,8 @@ export function PlaceScene() {
     w.velF = easeSpeed(w.velF, tf, wf.accelTau, wf.decelTau, dt)
     w.velS = easeSpeed(w.velS, ts, wf.accelTau, wf.decelTau, dt)
     // Snap the tail to a clean stop so a standing camera sits at exactly
-    // EYE_HEIGHT (no perpetual sub-millimetre bob from residual velocity).
+    // EYE_HEIGHT above its footing (no perpetual sub-millimetre bob from
+    // residual velocity).
     if (tf === 0 && Math.abs(w.velF) < 1e-3) w.velF = 0
     if (ts === 0 && Math.abs(w.velS) < 1e-3) w.velS = 0
     // Resolve even at rest: the chief can walk into a stationary traveller.
@@ -3046,7 +3048,8 @@ export function PlaceScene() {
       return
     }
 
-    // Step phase + footsteps (point 97b/c): advance by the actual speed; on each
+    // Step phase + footsteps (point 97b/c): advance by the eased walk speed
+    // (not the collision-resolved displacement); on each
     // half-stride crossing play a footstep whose timbre depends on the surface
     // underfoot (a lane reads as a firm path, off it as soft ground).
     const speed = Math.hypot(w.velF, w.velS)
@@ -3108,8 +3111,9 @@ export function PlaceScene() {
     keyPicks.current = frame.picks
     const winner = frame.use
     const strings = getStrings()
-    // At the chief's hut the key names the HUT while he is inside it, and the
-    // MAN once he stands in front of it (design.md §12).
+    // At the chief's hut the key names the HUT while he is inside it; once he
+    // is out, the hut leaves the list and the prompt names what the key would
+    // do at him (design.md §12, below).
     const near = winner?.payload.kind === 'interactive' ? winner.payload.interactive : null
     // Each key carries its OWN hint (point 1139): the bottom prompt names what
     // SPACE would use, the highlighted note invites E, and at the chief's hut
@@ -3199,15 +3203,16 @@ export function PlaceScene() {
       })}
 
       {/* The chief himself, once the use key has brought him out (design.md
-          §12): he stands beside his own door for the rest of the run. */}
+          §12): he walks across to his drummer, stays his minute and walks home;
+          back in the hut he leaves the scene until the hut is used afresh. */}
       {isVillage &&
         chiefOutside[place.id] &&
         layout.interactives
           .filter((it) => it.type === 'chief')
           .map((it, i) => <Chief key={`chief-${i}`} item={it} style={style} dress={dress} />)}
 
-      {/* Orientation after meeting the chief (design.md §17): the important,
-          enterable buildings carry a pulsing marker. */}
+      {/* Orientation after meeting the chief (design.md §17): every interactive
+          building, the chief's hut included, carries a pulsing marker. */}
       {orientationGiven[place.id] &&
         layout.interactives.map((it, i) => (
           <Html key={`hl-${i}`} center position={[it.pos[0], isPort ? 5.4 : 5.6, it.pos[1]]} distanceFactor={40}>
@@ -3251,15 +3256,8 @@ export function PlaceScene() {
 
       <GroundScatter placeId={place.id} seed={seed} isPort={sandy} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} bank={layout.bank} />
 
-      {/* The communication PoC's teaching stone (work-order 482): the boulder in
-          the open the adults teach the word for a rock at. Drawn from the same
-          rock dressing as the scatter, at its own bigger scale, exactly at the
-          layout position its collider comes from. */}
-
       {/* The two rocks the children's bank game runs between (work-order 687):
-          the same dressing at the same size as the teaching stone, because the
-          word they call at them is the same word — a class of thing, not the
-          name of one boulder. */}
+          one word calls at both — a class of thing, not the name of one boulder. */}
       <PlayRocks rocks={layout.playRocks} />
 
       {/* The ground work the adults teach DIG at (work-order point 483). */}
@@ -3280,7 +3278,7 @@ export function PlaceScene() {
           loom={layout.loom}
           rocks={layout.rocks}
           climbRock={layout.climbRock}
-          firePos={[-3.5, 2.5]}
+          firePos={VILLAGE_FIRE}
           homes={layout.dwellings
             .filter((d) => d.kind === 'hut' || d.kind === 'box')
             .map((d) => ({ x: d.x, z: d.z, door: d.door }))}

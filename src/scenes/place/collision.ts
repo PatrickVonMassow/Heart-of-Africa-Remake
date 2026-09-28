@@ -3,7 +3,8 @@
 // player and the inhabitants). Round objects are circles in the XZ plane;
 // rectangular buildings are oriented boxes (OBB) so that their corners are
 // covered exactly — the former circle approximation left gaps at the corners
-// through which the camera could clip into the walls. Resolution pushes the
+// through which the camera could clip into the walls — and thin wall panels
+// (fences, the loom's warp) are capsule segments. Resolution pushes the
 // mover out along the contact normal, which yields natural sliding.
 
 import { balance } from '../../config/balance'
@@ -90,7 +91,8 @@ function pushOut(c: Collider, px: number, pz: number, radius: number): [number, 
       const d = Math.hypot(ddx, ddz)
       if (d >= radius) return [px, pz]
       if (d < 1e-4) {
-        // Exactly on the surface: push along the dominant face normal.
+        // Just outside the surface (under 0.1 mm off it): push along the
+        // dominant face normal.
         if (Math.abs(qx) === c.hx && Math.abs(lx) >= Math.abs(lz)) ox = (lx >= 0 ? 1 : -1) * (c.hx + radius)
         else oz = (lz >= 0 ? 1 : -1) * (c.hz + radius)
       } else {
@@ -132,10 +134,11 @@ function pushOut(c: Collider, px: number, pz: number, radius: number): [number, 
   if (d2 >= min * min) return [px, pz]
   const d = Math.sqrt(d2)
   if (d < 1e-4) {
-    // Dead center: push toward the place origin to stay deterministic.
+    // Dead center: push away from the place origin to stay deterministic
+    // (+x at the origin itself), so the length below is never zero.
     const ox = px === 0 && pz === 0 ? 1 : px
     const oz = pz
-    const len = Math.hypot(ox, oz) || 1
+    const len = Math.hypot(ox, oz)
     return [c.x + (ox / len) * min, c.z + (oz / len) * min]
   }
   return [c.x + (dx / d) * min, c.z + (dz / d) * min]
@@ -183,8 +186,9 @@ const MAX_SWEEP_SUBSTEPS = 64
  * the mover's radius, each of them resolved against the colliders, so the mover
  * is caught at the near edge of the first collider it meets and then slides
  * along it. Every collider, inflated by the mover's own radius, is at least
- * 2·radius thick, so a sample spacing of radius/2 cannot step over one — the
- * position test alone landed a long step on the far side of a wall, overlapping
+ * 2·radius thick, so a sample spacing of radius/2 cannot step THROUGH one — at
+ * most a near-tangent chord shorter than the spacing is skipped, which grazes
+ * an edge rather than crossing a wall. The position test alone landed a long step on the far side of a wall, overlapping
  * nothing and pushed back by nothing (the goat through the fence).
  *
  * Without `from` the call stays a pure position test — an already-overlapping
@@ -224,7 +228,7 @@ export function resolveMove(
   return [px, pz]
 }
 
-// --- Spawn freedom (point 155) ----------------------------------------------
+// --- Body radii and spawn freedom (point 155) ---------------------------------
 // The default collision radius of a settlement inhabitant. Shared so the
 // layout builder and PlaceLife validate spawn/errand points against the SAME
 // footprint the walkers move with.
@@ -252,7 +256,8 @@ export function standingClear(colliders: Collider[], x: number, z: number, radiu
 }
 
 /** At least one step of length `step` off (x,z) lands on clear ground: the
- *  spot is not a fully enclosed pocket the mover cannot leave (point 155). */
+ *  spot is not a fully enclosed pocket the mover cannot leave (point 155). Only
+ *  the step's endpoint is tested, not the ground between. */
 export function hasEscapeDirection(
   colliders: Collider[],
   x: number,
@@ -280,9 +285,10 @@ export function spawnPointFree(
   return standingClear(colliders, x, z, radius) && hasEscapeDirection(colliders, x, z, radius, step)
 }
 
-/** Nearest usable spawn point to (x,z), with whether one was actually FOUND
+/** A usable spawn point near (x,z), with whether one was actually FOUND
  *  (point 198): if the point is already free, keep it; otherwise spiral outward
- *  over rings (deterministic ring/angle order) until one is free (point 155).
+ *  over rings (deterministic ring/angle order) and take the first free sample —
+ *  on the nearest ring that has one, not necessarily the nearest point (point 155).
  *  When none is found within `maxRings`, `found` is false and the position falls
  *  back to the original — so a caller can tell "relocated / already free" from
  *  "gave up" instead of resetting an unstuck counter over a walker that never
@@ -351,15 +357,16 @@ export function escapeToFree(
 }
 
 /**
- * Nearest point to (x, z) that `accept` allows, over the same widening rings and
- * the same deterministic ring/angle order as `tryNudgeToFree` — for a caller
+ * The first point near (x, z) that `accept` allows, over the same widening rings
+ * and the same deterministic ring/angle order as `tryNudgeToFree` — for a caller
  * whose free ground is more than the collider set (point 524).
  *
  * It exists because the collider-only nudge above cannot see those other bounds:
  * the children's play ground is a DISC, and a nudge that escaped the huts by
  * teleporting a child clean out of its own ground left the game's `tag-inside`
- * invariant firing every frame. `accept` is the caller's whole rule, so the spot
- * it returns is one the caller itself calls free.
+ * invariant firing every frame. `accept` is the caller's whole rule, so a FOUND
+ * spot is one the caller itself calls free; with `found: false` the original
+ * position comes back unchanged.
  */
 export function nudgeWhere(
   x: number,
@@ -382,9 +389,10 @@ export function nudgeWhere(
   return { pos: [x, z], found: false }
 }
 
-/** Nearest usable spawn point to (x,z), position only (point 155). Thin wrapper
+/** A usable spawn point near (x,z), position only (point 155). Thin wrapper
  *  over `tryNudgeToFree` for callers that only need the point (the layout
- *  builder). Falls back to the original point if none is found. */
+ *  builder, the animals, the scene spawns and others). Falls back to the
+ *  original point if none is found. */
 export function nudgeToFree(
   colliders: Collider[],
   x: number,

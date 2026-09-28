@@ -14,15 +14,17 @@
 //  - the stroke's bottom puts the hand's UNDERSIDE on the head at the depth the
 //    head dips to under the strike, so hand and skin meet;
 //  - its top lifts that underside a stated clearance ABOVE the resting head;
-//  - the bearing aims the hand at the drum's own axis at the moment of contact;
+//  - the bearing lines the hand up with the drum's axis sideways (x) at the
+//    moment of contact; forward (z) it lands within the head's radius;
 //  - and the SIDE is read off the drum's x — `+x` is the figure's left — so the
 //    placement, the hand and the head that dips cannot disagree again.
-// Change a drum's height or its position and the stroke follows.
+// Change a drum's height or its sideways position and the stroke follows.
 //
 // AND THE LEAN IS PART OF THE GEOMETRY. The drummer stands bowed over his drums
 // (`DRUMMER_LEAN`), and the Figure tips the whole trunk — shoulders, arms and
-// hands with it — about the hip. That carries a hand 0.05 m DOWN and 0.08 m
-// forward, which is the same order as the whole error being fixed here: a
+// hands with it — about the ground (he is drawn without legs). That carries a
+// hand centimetres down and forward, the same order as the whole error being
+// fixed here: a
 // stroke solved from the upright figure would still sink into the skin. So the
 // solve runs through the leaning trunk, the way the scene graph draws it.
 
@@ -42,7 +44,7 @@ export const DRUM_HEAD_DIP = 0.05
  *  village square, small enough that the arm never leaves the drum's radius. */
 export const DRUM_STROKE_CLEARANCE = 0.1
 
-/** How far the drummer bows over his drums (rad), about the hip. The Figure's
+/** How far the drummer bows over his drums (rad), about the ground. The Figure's
  *  `lean`, kept here because the stroke is solved through it. */
 export const DRUMMER_LEAN = 0.12
 
@@ -97,7 +99,8 @@ export interface DrumStroke {
   /** Which of the figure's arms plays it — read off the drum's own x, so the
    *  hand that falls is always the one standing over the drum that sounds. */
   side: 'left' | 'right'
-  /** Aim in the figure's frame; the hand sits on the drum's axis at contact. */
+  /** Aim in the figure's frame; the hand sits over the drum's axis in x at
+   *  contact. */
   bearing: number
   /** Arm elevation at the strike (the hand's underside on the dipped head). */
   strikeElevation: number
@@ -160,7 +163,8 @@ export function drumStroke(drum: DrumGeometry, lean = DRUMMER_LEAN): DrumStroke 
   let strikeElevation = 0
   for (let i = 0; i < 24; i++) {
     strikeElevation = elevationForUnderside(side, bearing, head - DRUM_HEAD_DIP, lean)
-    // The bearing that puts the hand on the drum's axis AT CONTACT, which is the
+    // The bearing that puts the hand over the drum's axis sideways AT CONTACT
+    // (only drum.x is matched; forward the head's radius covers it), which is the
     // moment the picture has to be right; the arm shortens its horizontal reach
     // as it lifts, and the drum's radius covers that (asserted in the test).
     const reach = FIGURE_LIMBS.armLength * Math.cos(strikeElevation)
@@ -199,16 +203,17 @@ function elevationAt(stroke: DrumStroke, swing: number): number {
   )
 }
 
-/** One animation frame for the drummer and both drum heads. With no message he
- *  uses the figure's genuine rest arms and both skins are undisturbed. During a
- *  message, the exact plan passed to WebAudio selects the falling hand and its
- *  progress; the other waits raised over its own drum. */
+/** One animation frame for the drummer and both drum heads. */
 export interface DrummerPoseFrame {
   pose: FigurePose
   lowSwing: number
   highSwing: number
 }
 
+/** The drummer's frame at `elapsed`. With no message he uses the figure's
+ *  genuine rest arms and both skins are undisturbed. During a message, the
+ *  exact plan passed to WebAudio selects the falling hand and its progress; the
+ *  other waits raised over its own drum. */
 export function drummerPoseAt(plan: DrumMessagePlan | null, elapsed: number): DrummerPoseFrame {
   if (!plan) {
     return {

@@ -45,21 +45,20 @@ export function hazeColor(
   ]
 }
 
-/** Relative luminance (0..1) of a linear-ish RGB triplet, for the haze test. */
+/** Relative luminance (0..1) of a linear-ish RGB triplet. */
 export function luminance(rgb: readonly [number, number, number]): number {
   return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
 }
 
 /**
  * Arc length a drifting silhouette has travelled along its panorama ring after
- * `elapsedSeconds` (point 255): radius × |angular drift rate| × time. Feeding
- * this distance into the shared distance-driven gait (fauna `gaitPhase` →
- * `legSwingAngle`, or a minimal body sway `sin(gaitPhase(dist))`) makes a far
- * silhouette read as WALKING along the horizon rather than gliding — the swing
- * rides the ground it covers, exactly as the settlement goats' does, so a
- * slower-drifting silhouette steps slower and a stalled one not at all. Kept
- * three-free (like the rest of this module) so the drift→walk coupling is pure-
- * testable; the render wiring in the panorama drift mover reads it each frame.
+ * `elapsedSeconds` (point 255): radius × |angular drift rate| × time — the RAW
+ * world arc. The gait does not read it directly: `panoramaGaitDistance` divides
+ * it by the silhouette's render scale first (the raw arc over-drove the legs),
+ * and that is what the panorama drift mover feeds the shared distance-driven
+ * gait each frame, so a slower-drifting silhouette steps slower and a stalled
+ * one not at all. Kept three-free (like the rest of this module) so the
+ * drift→walk coupling is pure-testable.
  */
 export function panoramaDriftDistance(radius: number, driftRate: number, elapsedSeconds: number): number {
   return Math.abs(radius * driftRate * elapsedSeconds)
@@ -71,8 +70,9 @@ export function panoramaDriftDistance(radius: number, driftRate: number, elapsed
  * is (cos a, sin a)·radius, so d/dt is (−sin a, cos a)·(radius·driftRate): the
  * animal MOVES along this tangent and its sign flips with the drift direction.
  * Returned unnormalised (magnitude radius·|driftRate|) — callers take the
- * direction. Exposed so the facing is derived FROM the motion (never the other
- * way round), which is what keeps a silhouette from ever walking backward.
+ * direction. `panoramaDriftYaw` derives the same tangent itself; this one is
+ * the tests' independent statement of the motion that the facing must match,
+ * which is what keeps a silhouette from ever walking backward.
  */
 export function panoramaDriftVelocity(a: number, radius: number, driftRate: number): [number, number] {
   return [-Math.sin(a) * radius * driftRate, Math.cos(a) * radius * driftRate]

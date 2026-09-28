@@ -108,6 +108,9 @@ export const PORT_GROUND: [string, string, string] = ['#dcc99c', '#c4ad7c', '#b5
  *  desert biome (point 273), drawn in the ground material's `sand` mode. */
 export const MONUMENT_GROUND: [string, string, string] = ['#e0c489', '#d3b578', '#c2a05e']
 
+// The arrangements named below describe each region's building STYLE and its
+// most typical village; which plan a village is laid out on is its people's
+// (`VILLAGE_PLANS` above), and several regions mix plans.
 export const REGION_PLACE_STYLES: Record<RegionId, RegionPlaceStyle> = {
   // Sahara/Nubia: tight adobe quarters with flat roofs along narrow lanes,
   // date palms, pale trodden sand paths.

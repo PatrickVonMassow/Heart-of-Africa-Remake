@@ -10,7 +10,6 @@ import {
   createInhabitantSet,
   groundOccupied,
   releaseBodies,
-  separateAll,
   separateBody,
   separateGroup,
   stepRoundBodies,
@@ -45,7 +44,7 @@ describe('inhabitant bodies', () => {
         ),
       )
     while (!clear() && seconds < 5) {
-      separateAll(set, dt, SEP)
+      separateGroup(set, set.bodies, dt, SEP)
       seconds += dt
     }
     expect(clear()).toBe(true)
@@ -54,7 +53,7 @@ describe('inhabitant bodies', () => {
     // AND IT SETTLES: once apart, nothing moves any more — the jitter of point
     // 578.3 would show up here as a per-frame correction that never stops.
     const before = bodies.map((b) => ({ x: b.x, z: b.z }))
-    for (let i = 0; i < 120; i++) separateAll(set, dt, SEP)
+    for (let i = 0; i < 120; i++) separateGroup(set, set.bodies, dt, SEP)
     bodies.forEach((b, i) => {
       expect(Math.hypot(b.x - before[i].x, b.z - before[i].z)).toBeLessThan(1e-4)
     })
@@ -230,7 +229,7 @@ describe('inhabitant bodies', () => {
     const set = createInhabitantSet()
     const [station] = claimBodies(set, 1, { x: 0, z: 0, fixed: true })
     const [walker] = claimBodies(set, 1, { x: 0.1, z: 0 })
-    for (let i = 0; i < 200; i++) separateAll(set, 1 / 60, SEP)
+    for (let i = 0; i < 200; i++) separateGroup(set, set.bodies, 1 / 60, SEP)
     expect(station.x).toBe(0)
     expect(station.z).toBe(0)
     expect(Math.hypot(walker.x, walker.z)).toBeGreaterThan(SEP.bodyRadius * 2 - SEP.slop - 1e-6)
@@ -239,7 +238,7 @@ describe('inhabitant bodies', () => {
     walker.active = false
     const parked = { x: walker.x, z: walker.z }
     const [other] = claimBodies(set, 1, { x: walker.x, z: walker.z })
-    separateAll(set, 1 / 60, SEP)
+    separateGroup(set, set.bodies, 1 / 60, SEP)
     expect(walker.x).toBe(parked.x)
     expect(other.x).toBe(parked.x)
 
@@ -314,13 +313,13 @@ describe('inhabitant bodies', () => {
     const set = createInhabitantSet()
     const [adult] = claimBodies(set, 1, { x: 0, z: 0, fixed: true })
     const [child] = claimBodies(set, 1, { x: 0.05, z: 0, scale: KID_SCALE })
-    for (let i = 0; i < 400; i++) separateAll(set, 1 / 60, SEP)
+    for (let i = 0; i < 400; i++) separateGroup(set, set.bodies, 1 / 60, SEP)
     const mixed = SEP.bodyRadius * (1 + KID_SCALE)
     expect(Math.hypot(child.x - adult.x, child.z - adult.z)).toBeGreaterThan(mixed - SEP.slop - 1e-6)
     // The radius is NOT stored on the body, so a debug edit of the calibratable
     // value governs the very next frame — a wider setting pushes the pair on.
     const wide = { ...SEP, bodyRadius: SEP.bodyRadius * 2 }
-    for (let i = 0; i < 400; i++) separateAll(set, 1 / 60, wide)
+    for (let i = 0; i < 400; i++) separateGroup(set, set.bodies, 1 / 60, wide)
     expect(Math.hypot(child.x - adult.x, child.z - adult.z)).toBeGreaterThan(mixed * 2 - wide.slop - 1e-6)
   })
 
