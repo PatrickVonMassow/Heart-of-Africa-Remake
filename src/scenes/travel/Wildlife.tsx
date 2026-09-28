@@ -2681,8 +2681,9 @@ function Herds() {
             const ll = worldToLatLon(a.x, a.z)
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
             if (ter.type === 'water') {
-              // Fell in: start to struggle. A play bout recorded the entry
-              // point; otherwise probe for the nearest bank.
+              // Fell in: start to struggle. A staged fall (the debug trigger)
+              // already carries its entry point; otherwise probe for the
+              // nearest bank.
               a.inWater = 0
               a.hop = undefined
               // Struggle AT the rendered sheet (point 196): the pose dips from
@@ -2874,7 +2875,8 @@ function Herds() {
     // loop takes the arriving parent, which is the whole point (one code path).
     // A SURRENDER, not an attack (point 125): the grief charge never rolls
     // the defence — it goes under the feet by choice (points 119/134).
-    // Every species but the elephant raises calves that can be trampled.
+    // Scans every non-elephant species; only a parent whose calf was
+    // trampled carries trampleTo.
     for (const sp of SPECIES) {
       if (sp === 'elephant') continue
       for (const a of herds[sp]) {
@@ -5053,9 +5055,10 @@ function Herds() {
           const engaged = a.dodgeHeading !== undefined
           const ring = engaged ? PREY_PANIC_RADIUS * PREY_PANIC_EXIT : PREY_PANIC_RADIUS
           const shyRing = engaged ? PLAYER_SHY_RADIUS * PREY_PANIC_EXIT : PLAYER_SHY_RADIUS
-          // THE arbitration point (point 252): resolveFleeTarget ranks every
-          // co-active threat — drama > predator flee (the block above, fed in
-          // as isHunted) > elephant dart > player-shy > idle. A prey actively
+          // THE arbitration point (point 252): family-held dramas never get
+          // here; resolveFleeTarget then ranks the elephant dart first, and a
+          // drama or predator flee (the block above, fed in as
+          // drama.isHunted) silences the player-shy flee. A prey actively
           // fleeing the lion or the hunt's designated victim keeps fleeing
           // the LION, not the traveller — so the hunt/drama always resolves
           // rather than stalling when the player wanders near — while the
@@ -5189,9 +5192,10 @@ function Herds() {
           }
         }
         // Steer the persistent facing toward this frame's desired heading —
-        // no behavior change can snap the body around (design.md §19). The
-        // deliberate fast wiggles (a caught calf's thrash, the in-water
-        // struggle) pass through unfiltered, and any directional behavior
+        // a behaviour change turns the body at FACE_TURN (design.md §19),
+        // except the branches that set a.face directly (the shield run, the
+        // clash pose). The deliberate fast wiggles (a caught calf's thrash, the
+        // in-water struggle) pass through unfiltered, and any directional behavior
         // updates the resting orientation so ending it never yanks the animal
         // back toward its spawn-time facing.
         const thrashing =
@@ -5224,14 +5228,15 @@ function Herds() {
         // ride the water rules instead and are skipped. Tolerances are generous
         // — this is a tripwire for the buried/floating CLASS (187/190/202/185),
         // not a pixel gate; a violation fails any suite via the assert channel.
-        // (Judged at the RENDERED spot px/pz: the drink/bathe slide renders
-        // away from the anchor and — since point 196 — carries the bank
-        // target's own height, so drinkers are asserted like everyone else;
-        // a bather mid-slide stands over a water cell, which is skipped. The
+        // (Judged at the logical render spot anchorX/anchorZ — px/pz before
+        // the cosmetic shuffle: the drink slide renders away from the anchor
+        // and — since point 196 — carries the bank target's own height, so
+        // drinkers are asserted like everyone else; bathers are excluded
+        // outright (!a.bathe). The
         // drama locks mirror the WATER-SWEEP's exemptions exactly: those
         // animals are never re-anchored there, so asserting them would flag
         // the dramas' own scripted poses, not a real burial.)
-        if ((aIdx + ASSERT_TICK) % 13 === 0 && !a.dead && a.grounded === true && sp !== 'crocodile' && sp !== 'flamingo' &&
+        if ((aIdx + ASSERT_TICK) % 13 === 0 && a.grounded === true && sp !== 'crocodile' && sp !== 'flamingo' &&
             a.crossing === undefined && a.inWater === undefined && a.caught === undefined && a.mired === undefined &&
             !a.bathe && !a.vigil && !a.rescued && !a.plungeTo && !a.trampleTo &&
             a.fireTrapped === undefined && LION_STATE.victim !== a) {
@@ -5343,15 +5348,18 @@ function Herds() {
 }
 
 /**
- * Purely decorative predator hunt (design.md §19): near grazing herds a
- * region-appropriate predator (lion, cheetah, leopard or hyena) occasionally
- * chases one grazer from its food web; after the catch it visibly feeds on the
- * carcass — lowered, tearing head movements while the prey shrinks away piece
- * by piece over a red, spreading stain. Once the carcass is gone the predator
- * leaves a small prey remnant for the scavenger, trots off away from the
- * traveller and despawns only beyond the zoom-aware view ring. The lion is
- * the apex and the only predator
- * that also attacks the player on contact (§14); the others are pure scenery.
+ * The predator hunt (design.md §19): near grazing herds a region-appropriate
+ * predator (lion, cheetah, leopard or hyena) occasionally chases one grazer
+ * from its food web — or a real herd calf (a victim hunt, incl. the hyena
+ * after a lion cub); after the catch it visibly feeds on the carcass —
+ * lowered, tearing head movements while the prey shrinks away over a red,
+ * spreading stain. Once the carcass is gone the predator leaves a small prey
+ * remnant for the scavenger and trots off away from the traveller; a hunt
+ * that is driven off, loses its catch or gives up walks off without feeding.
+ * The leaving predator despawns beyond the zoom-aware view ring, or after the
+ * leave overtime once it is off the rendered frame. Every active predator
+ * attacks the player on contact (§14); the lion is the apex (highest fatal
+ * risk).
  */
 function LionHunt() {
   const seed = useGame((s) => s.seed)
@@ -5433,7 +5441,8 @@ function LionHunt() {
       // draw is a scripted guarantee, not a hope on the ambient dice.
       // The hunted species (point 124): recorded with the victim pick so the
       // predator is drawn from the food web that actually takes it, and
-      // s.prey reports the truth for the region/web fit checks.
+      // s.prey reports the victim's kind for the region/web fit checks (a
+      // lion-cub hunt records no species; its s.prey is a cosmetic pick).
       let victimSpecies: PreyKind | null = null
       let vigilKeeper: Animal | null = null
       // The debug menu's forced hunt (design.md §21.3, point 258): consumed
@@ -5584,8 +5593,8 @@ function LionHunt() {
       const regionPrey = REGION_PREY[region] ?? REGION_PREY.east
       const preyPool = PREDATOR_PREY[s.predator].filter((p) => regionPrey.includes(p))
       const pool = preyPool.length > 0 ? preyPool : regionPrey
-      // The recorded prey species is the truth: the victim's own kind for a
-      // family hunt, a food-web pick for the generic hunt.
+      // The recorded prey species: the victim's own kind for a grazer family
+      // hunt, a food-web pick for the generic hunt and the lion-cub hunt.
       s.prey = vs ?? pool[Math.floor(Math.random() * pool.length)]
       // The lion-cub hunt is always a hyena's (point 145c): the lioness would
       // rout any lighter cat, so only the bold hyena makes the threat read —
@@ -5632,7 +5641,8 @@ function LionHunt() {
       const v = s.victim
       if (v) {
         // Calf hunt: chase the actual fleeing calf (drawn by the herds). If it
-        // died some other way before we reached it, just close out into feed.
+        // died or was seized before we reached it, close out into feed — or,
+        // for a crocodile's catch, into the walk-off.
         if (v.dead || v.caught !== undefined) {
           if (v.caughtBy === 'crocodile') {
             // The crocodile stole the chase victim (point 194): §19.16 keeps the
@@ -5794,10 +5804,10 @@ function LionHunt() {
       // never despawns in sight (design.md §19). The walk-off obeys the same
       // land constraint as every animal: at a coast it deflects along the
       // shoreline instead of trotting into the open ocean (point 83).
-      // The escape course re-aims AWAY FROM THE TRAVELLER every frame; the
-      // coast deflection applies per STEP only. A persisted deflected
-      // heading let a shoreline hold the predator tangentially inside the
-      // view ring forever — it must always strive outward.
+      // The escape course always strives AWAY FROM THE TRAVELLER; the coast
+      // deflection applies per STEP only. A persisted deflected heading let a
+      // shoreline hold the predator tangentially inside the view ring
+      // forever.
       const oceanAt = (nx: number, nz: number) => {
         const ll = worldToLatLon(nx, nz)
         return sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean'
@@ -5889,8 +5899,9 @@ function LionHunt() {
       }
     }
     if (prey.current) {
-      // The carcass shrinks away while the predator feeds; once it
-      // is gone (leave phase) nothing of it remains. In a calf hunt the victim is
+      // The carcass shrinks away while the predator feeds; once it is gone
+      // (leave phase) the scripted mesh hides and only the spawnRemnant scrap
+      // stays for the scavengers. In a calf hunt the victim is
       // a real herd animal drawn by <Herds>, so the scripted mesh stays hidden.
       prey.current.visible = (s.mode === 'chase' || feeding) && !s.victimHunt
       if (prey.current.visible) {
