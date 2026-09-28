@@ -201,7 +201,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium — routing of authoring work; a wrong ON silently burns plan quota locally.
   Test: unit tests of the switch core and routing; the off-machine probe recorded with its marker.
   Refs: scripts/fable-switch.mjs, scripts/astra-share.mjs, docs/harness-primitives-evaluation.md.
-  Bundle: not bundled (sequenced directly behind 174).
+  Bundle: Modell & Wächter (the authoring-lane routing; worked directly behind 174 by user order).
 
 - [ ] 1207. The stand-down fence refuses writes outside the checkout, so the documented request handoff cannot be used.
   FINAL STATE: a stood-down session can deposit a request with `finding.mjs --request` using files it writes itself, with no workaround.
