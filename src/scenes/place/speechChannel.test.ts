@@ -188,28 +188,28 @@ describe('the speaker the use key would take (design.md §13.4)', () => {
   it('highlights the nearest speaker and follows him as he moves', () => {
     speakOverhead('kid-1', [RIVER_UTTERANCE], standing(3, 0), { now: 0, seconds: 100 })
     speakOverhead('kid-2', [DIG], standing(8, 0), { now: 0, seconds: 100 })
-    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    updateSpeechTarget(anyLabel, player(0, 0))
     expect(speechLabelState().targetId).toBe('kid-1')
     expect(speechTargetLabel()?.atoms).toEqual([RIVER_UTTERANCE])
     // The player walks past kid-1 and up to kid-2.
-    updateSpeechTarget(anyLabel, 10, player(9, 0))
+    updateSpeechTarget(anyLabel, player(9, 0))
     expect(speechLabelState().targetId).toBe('kid-2')
   })
 
   it('never highlights a label the player cannot see drawn', () => {
     speakOverhead('kid-1', [RIVER_UTTERANCE], standing(1, 0), { now: 0, seconds: 100 })
     speakOverhead('kid-2', [DIG], standing(4, 0), { now: 0, seconds: 100 })
-    updateSpeechTarget((l) => l.speakerId !== 'kid-1', 10, player(0, 0))
+    updateSpeechTarget((l) => l.speakerId !== 'kid-1', player(0, 0))
     expect(speechLabelState().targetId).toBe('kid-2')
   })
 
   it('holds the highlighted note against the sweep, and drops it once the pick moves', () => {
     speakOverhead('kid-1', [RIVER_UTTERANCE], standing(2, 0), { now: 0, seconds: 1 })
-    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    updateSpeechTarget(anyLabel, player(0, 0))
     pruneSpeechLabels(60)
     expect(speechLabelState().labels.map((l) => l.speakerId)).toEqual(['kid-1'])
     // He walks out of earshot: nothing is highlighted, and the note goes.
-    updateSpeechTarget(anyLabel, 10, player(50, 0))
+    updateSpeechTarget(anyLabel, player(50, 0))
     pruneSpeechLabels(60)
     expect(speechLabelState().labels).toHaveLength(0)
     expect(speechTargetLabel()).toBeNull()
@@ -217,22 +217,22 @@ describe('the speaker the use key would take (design.md §13.4)', () => {
 
   it('highlights nobody while the player is not in a settlement', () => {
     speakOverhead('kid-1', [RIVER_UTTERANCE], standing(1, 0), { now: 0, seconds: 100 })
-    updateSpeechTarget(anyLabel, 10, { x: 0, z: 0, active: false })
+    updateSpeechTarget(anyLabel, { x: 0, z: 0, active: false })
     expect(speechLabelState().targetId).toBeNull()
   })
 
   it('offers the speaker as a use-key candidate, measured live (point 691)', () => {
     const kid = standing(3, 4)
     speakOverhead('kid-1', [RIVER_UTTERANCE], kid, { now: 0, seconds: 100 })
-    updateSpeechTarget(anyLabel, 10, player(0, 0))
-    const candidate = speechUseCandidate(player(0, 0), 10)
+    updateSpeechTarget(anyLabel, player(0, 0))
+    const candidate = speechUseCandidate(player(0, 0))
     expect(candidate?.key).toBe('speech:kid-1')
     expect(candidate?.distance).toBeCloseTo(5, 6)
     expect(candidate?.range).toBe(10)
     expect(candidate?.payload.speakerId).toBe('kid-1')
     // The distance is taken from where the speaker stands NOW, not from the
     // frame that picked him: a step after the pick moves the candidate with it.
-    expect(speechUseCandidate(player(3, 0), 10)?.distance).toBeCloseTo(4, 6)
+    expect(speechUseCandidate(player(3, 0))?.distance).toBeCloseTo(4, 6)
   })
 
   it('takes ONE note down at once, highlight and all (the chief arriving)', () => {
@@ -240,7 +240,7 @@ describe('the speaker the use key would take (design.md §13.4)', () => {
     // for it — which is exactly why the situation that ends it has to say so.
     speakOverhead('drummer', [RIVER_UTTERANCE], standing(1, 0), { now: 0, seconds: 1 })
     speakOverhead('kid-1', [DIG], standing(9, 0), { now: 0, seconds: 100 })
-    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    updateSpeechTarget(anyLabel, player(0, 0))
     expect(speechLabelState().targetId).toBe('drummer')
     // The same synthetic clock both labels were written on: `speechClock()` is
     // process uptime, and once it passes 40 seconds it prunes the child's label
@@ -250,20 +250,20 @@ describe('the speaker the use key would take (design.md §13.4)', () => {
     forgetSpeechLabel('drummer')
     expect(speechLabelState().labels.map((l) => l.speakerId)).toEqual(['kid-1'])
     expect(speechLabelState().targetId).toBeNull()
-    expect(speechUseCandidate(player(0, 0), 10)).toBeNull()
+    expect(speechUseCandidate(player(0, 0))).toBeNull()
   })
 
   it('offers no candidate without a highlighted speaker, or outside a settlement', () => {
-    expect(speechUseCandidate(player(0, 0), 10)).toBeNull()
+    expect(speechUseCandidate(player(0, 0))).toBeNull()
     speakOverhead('kid-1', [RIVER_UTTERANCE], standing(1, 0), { now: 0, seconds: 100 })
-    updateSpeechTarget(anyLabel, 10, player(0, 0))
-    expect(speechUseCandidate({ x: 0, z: 0, active: false }, 10)).toBeNull()
+    updateSpeechTarget(anyLabel, player(0, 0))
+    expect(speechUseCandidate({ x: 0, z: 0, active: false })).toBeNull()
   })
 
   it('takes the highlight with a figure that leaves the scene', () => {
     const kid = standing(1, 0)
     speakOverhead('kid-1', [RIVER_UTTERANCE], kid, { now: 0, seconds: 100 })
-    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    updateSpeechTarget(anyLabel, player(0, 0))
     ;(kid as unknown as { parent: unknown }).parent = null
     pruneSpeechLabels(1)
     expect(speechLabelState().targetId).toBeNull()
@@ -276,10 +276,10 @@ it('keeps a call label actionable from the distant spectator stand', () => {
   const anchor = { parent: {}, updateWorldMatrix() {}, matrixWorld: { elements: Array(16).fill(0) } } as unknown as Object3D
   speakOverhead('caller', [RIVER_UTTERANCE], anchor, { now: 0, reach: 34 })
   const player = { x: 22, z: 0, active: true }
-  updateSpeechTarget(() => true, undefined, player)
+  updateSpeechTarget(() => true, player)
   expect(speechTargetLabel()?.speakerId).toBe('caller')
   expect(speechUseCandidate(player)?.range).toBe(34)
-  updateSpeechTarget(() => true, undefined, { ...player, x: 34.01 })
+  updateSpeechTarget(() => true, { ...player, x: 34.01 })
   expect(speechTargetLabel()).toBeNull()
 })
 
