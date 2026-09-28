@@ -1,10 +1,10 @@
 // Structural frame-load probe (point 276): what the renderer actually SUBMITS
-// per frame at a fixed state — draw calls, triangles, compiled programs, scene
-// object count. Unlike a timing sample these are COUNTS, so they carry no
+// per frame at a fixed state — render calls, draw calls, triangles, and the
+// live geometry and texture counts. Unlike a timing sample these are COUNTS, so they carry no
 // run-to-run noise: comparing an old build against today's says WHERE the extra
 // frame cost comes from (more draws / more geometry / more JS objects).
 //
-// Usage: BASE_URL=http://localhost:5174/ VERIFY_GL=webgpu node scripts/perf-structure.mjs
+// Usage: BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-structure.mjs
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'

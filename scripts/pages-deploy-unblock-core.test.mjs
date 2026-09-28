@@ -55,12 +55,12 @@ describe('candidateDeployments', () => {
 
   it('keeps only github-pages entries, newest first, deduplicated', () => {
     const out = candidateDeployments([
-      dep({ id: 3, sha: 'b'.repeat(40) }),
+      dep({ id: 3, sha: 'b'.repeat(40), created_at: '2026-08-06T15:00:00Z' }),
       dep({ id: 2, sha: 'c'.repeat(40), environment: 'production' }),
       dep({ id: 1, sha: 'b'.repeat(40) }),
     ])
     expect(out.map((d) => d.sha)).toEqual(['b'.repeat(40)])
-    expect(out[0].id).toBe(3)
+    expect(out[0].createdAt).toBe('2026-08-06T15:00:00Z')
   })
 
   it('drops entries without a usable sha and caps the inspection', () => {

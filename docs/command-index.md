@@ -273,7 +273,7 @@
 | `pause-retry-drill.mjs` | THE RESTART-CLOCK DRILL (point 445). | — |
 | `perf-bench.mjs` | Bird's-eye framerate benchmark + CONFIG SWEEP (point 276). | Usage: start a dev server, then: |
 | `perf-breakdown.mjs` | Per-object triangle breakdown of the bird's-eye frame (point 276). | Usage: BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-breakdown.mjs |
-| `perf-structure.mjs` | Structural frame-load probe (point 276): what the renderer actually SUBMITS per frame at a fixed state — draw calls, triangles, compiled programs, scene object count. | Usage: BASE_URL=http://localhost:5174/ VERIFY_GL=webgpu node scripts/perf-structure.mjs |
+| `perf-structure.mjs` | Structural frame-load probe (point 276): what the renderer actually SUBMITS per frame at a fixed state — render calls, draw calls, triangles, and the live geometry and texture counts. | Usage: BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-structure.mjs |
 | `permission-autogrant-core.mjs` | Pure core of the permission auto-grant (see scripts/permission-autogrant.mjs). | — |
 | `permission-autogrant.mjs` | PermissionRequest hook: grants what the harness would otherwise ask the user about. | — |
 | `picture-stability-core.mjs` | Pure decision logic of the capture-stability probe (picture-stability.mjs is the I/O wrapper: it drives the suite, reads the PNGs and restores the tracked frames). | — |
@@ -285,7 +285,7 @@
 | `point-proof-guard.mjs` | POINT-PROOF gate (work-order point 437 C) — thin fail-OPEN I/O wrapper + CLI around the pure core (point-proof-core.mjs). | usage: node scripts/point-proof-guard.mjs --ran <point number> --evidence "<result> |
 | `pre-push-gate-core.mjs` | Pure decision logic of the pre-push gate (point 302): which checks a push must survive before it may reach the remote, and whether a set of results blocks it. | — |
 | `pre-push-gate.mjs` | Pre-push wrapper for the fast gate (point 302). | — |
-| `prep-arm-hook.mjs` | PostToolUse[Bash] hook (user mandate 21.07.2026): AUTO-ARM the waiting-time prep guard so the guarantee does not depend on the assistant remembering to arm it. | — |
+| `prep-arm-hook.mjs` | PostToolUse[Bash\|PowerShell] hook (user mandate 21.07.2026): AUTO-ARM the waiting-time prep guard so the guarantee does not depend on the assistant remembering to arm it. | — |
 | `prep-guard-core.mjs` | Pure decision core of the waiting-time prep guard (user mandate 21.07.2026; extracted 07.08.2026 for point 437 E). | — |
 | `prep-guard.mjs` | Stop hook (user mandate 21.07.2026): GUARANTEE waiting-time prep. | — |
 | `probe-label-fusion.mjs` | DOES THE DRAWN LABEL MATCH THE DECLUTTER'S MODEL? | — |
@@ -295,9 +295,9 @@
 | `queue-calibration-core.mjs` | WHAT A QUEUE CARD PROMISES, MEASURED AGAINST WHAT THE WORK TOOK (point 730). | — |
 | `queue-calibration.mjs` | THE QUEUE'S ESTIMATES, MEASURED AGAINST THE BATCH THAT LANDS THEM (point 730). | — |
 | `queue-order-guard-core.mjs` | Pure decision logic of the queue-order Stop-hook guard (queue-order-guard.mjs is the thin fail-open I/O wrapper). | — |
-| `queue-order-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch rules the assistant repeatedly broke despite reminders — (1) the dashboard Warteschlange works known-bug FIXES before the finder/QA tickets (memory queue-order-fixes-before-finders) and renders the work order's own sequence, (1c) an APPENDED point is ranked once, deliberately, before the turn ends (point 590), and (2) no dashboard card claims a point is done ("behoben"/"erledigt"/…) while it is still open in TASKS.md. | — |
-| `queue-rank-core.mjs` | THE APPEND GATE (point 590) — an appended point is ranked ONCE, deliberately. | — |
-| `queue-rank.mjs` | THE APPEND GATE (point 590) — an appended point is ranked ONCE, deliberately. | — |
+| `queue-order-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch rules the assistant repeatedly broke despite reminders — (1) the dashboard Warteschlange works known-bug FIXES before the finder/QA tickets (memory queue-order-fixes-before-finders) and renders the work order's own sequence, (1c) an APPENDED point is ranked, deliberately, before the turn ends (point 590), (1d) a machine-filed point stands before the release point only with stated high urgency and a recorded reason (point 789), and (2) no dashboard card claims a point is done ("behoben"/"erledigt"/…) while it is still open in TASKS.md. | — |
+| `queue-rank-core.mjs` | THE APPEND GATE (point 590) — an appended point is ranked deliberately — and THE RELEASE BOUNDARY (point 789) below it. | — |
+| `queue-rank.mjs` | THE APPEND GATE (point 590) AND THE RELEASE BOUNDARY (point 789) — the CLI. | — |
 | `quota-drill.mjs` | THE FAKE-SIGNATURE DRILL (point 444, 30.07.2026). | — |
 | `render-verify-charges.mjs` | THE RED CHARGE LEDGER — which currently-known red belongs to which OPEN work-order point (point 550). | — |
 | `render-verify-core.mjs` | Pure decision logic of the render-verify Stop-hook guard (render-verify-guard.mjs is the thin I/O wrapper). | — |
@@ -309,8 +309,8 @@
 | `resume-batch.mjs` | THE SUCCESSOR'S STARTUP — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M26-M29). | usage: node scripts/resume-batch.mjs --batch <id> [--repo <dir>] [--session <sid>] |
 | `retro-core.mjs` | Pure logic of the retrospective-currency toolchain: the sources fingerprint, the auto-generated doc section and the stale/fresh decision. | — |
 | `retro-currency-guard.mjs` | Stop hook: GUARANTEE the retrospective document (docs/analysis_de/retrospektive-zusammenarbeit.md) stays current — enforcement, not a reminder (the document's own lesson #1: only blocking mechanisms hold). | — |
-| `retro-refresh.mjs` | Refresh the retrospective's auto-generated section (docs/analysis_de/retrospektive-zusammenarbeit.md — git-ignored, German). | — |
-| `retro-sources.mjs` | Shared fs/git source collector for the retrospective-currency toolchain (retro-refresh.mjs + retro-currency-guard.mjs). | — |
+| `retro-refresh.mjs` | Refresh the retrospective's auto-generated section (docs/analysis_de/retrospektive-zusammenarbeit.md — tracked, German). | — |
+| `retro-sources.mjs` | Shared fs/git source collector for the retrospective-currency toolchain (retro-refresh.mjs + retro-currency-guard.mjs; rule-review-state.mjs borrows defaultMemoryDir). | — |
 | `review-astra-core.mjs` | Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624). | — |
 | `review-astra.mjs` | THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624). | usage: node scripts/review-astra.mjs [--reviewer astra\|fable\|opus\|opus48] --sha <sha> --brief "<what to judge>" \\ |
 | `review-material-core.mjs` | WHAT A REVIEW ROUND ACTUALLY CARRIED — the material budget, its accounting, and the passes a range too large is cut into (work-order point 714). | — |

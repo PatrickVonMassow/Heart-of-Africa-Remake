@@ -4,18 +4,22 @@
 //
 // It recomputes the fingerprint over the durable problem/solution-history
 // sources (retro-sources.mjs) and BLOCKS turn-end while the doc's recorded
-// fingerprint differs — a new/edited feedback memory, a new guard script, a
-// fresh revert or a process TASKS change then forces
+// fingerprint differs — a new/edited memory, a new guard script, a fresh
+// revert or a process TASKS change then forces
 // `node scripts/retro-refresh.mjs` plus a review for a new problem class
-// before the turn can end. The decision logic lives in retro-core.mjs (pure,
+// before the turn can end. In the same message it blocks on the
+// lesson-mechanism ledger (every retrospective lesson needs a recorded
+// decision) and on the beginner guide's review stamp. The decision logic lives in retro-core.mjs (pure,
 // Vitest-covered in retro-core.test.mjs).
 //
 // No-ops (exit 0, never block): the doc is absent (nothing to keep current —
-// e.g. a worktree or another machine), the batch is paused, or this session
-// does not own the live batch lock (ownership-aware like every guard since
-// the hard singleton). Fail-OPEN: any internal error — unreadable stdin, a
-// git failure, a broken memory dir — allows the stop; this guard must never
-// trap the session.
+// e.g. another machine), the batch is paused, or this session does not own
+// the live batch lock (ownership-aware like every guard since the hard
+// singleton). Where the sources cannot be collected — a git worktree, whose
+// memory dir resolves to nothing, a git failure — only the currency half
+// stands down and the ledger half still decides. Unreadable stdin only loses
+// the session id. Fail-OPEN: any other internal error allows the stop; this
+// guard must never trap the session.
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
@@ -38,8 +42,8 @@ const pathExists = (rel) =>
  * `currentFingerprint` is null when the sources could not be collected at all,
  * which is the NORMAL state in a git worktree (the memory dir is keyed on the
  * checkout path and `collectSources()` throws there). Null skips the currency
- * half and leaves the ledger half — the split the wrapper's two try blocks
- * already made, hoisted here so both callers get it.
+ * half and leaves the ledger half — the split decideRetroCurrency makes between
+ * the two halves, so both callers get it.
  */
 export function gatherRetroCurrencyInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }

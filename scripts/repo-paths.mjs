@@ -44,7 +44,7 @@ const GIT_LOCAL_ENV_FALLBACK = [
   'GIT_COMMON_DIR',
 ]
 
-export function gitLocalEnvironmentNames() {
+function gitLocalEnvironmentNames() {
   try {
     return execFileSync('git', ['rev-parse', '--local-env-vars'], {
       encoding: 'utf8',

@@ -2,7 +2,8 @@
 // is the thin fail-open I/O wrapper). Kept side-effect-free so the Vitest layer
 // can sweep every rule without fs/git (scripts/queue-order-guard-core.test.mjs).
 //
-// Three invariants the assistant repeatedly got wrong, now ENFORCED at turn end:
+// The invariants the assistant repeatedly got wrong, now ENFORCED at turn end
+// (rules 1, 1b, 1c, 1d and 2):
 //   (1) QUEUE ORDER — known-bug FIXES and user-requested extensions are worked
 //       BEFORE the big bug-FINDING / QA-framework tickets (memory
 //       queue-order-fixes-before-finders). A finder card queued ahead of open
@@ -53,11 +54,8 @@ import {
 } from './queue-rank-core.mjs'
 import { parsePointBlocks } from './criticality-review-guard-core.mjs'
 
-// The rank constants moved to board-queue-core with the ranking itself (point
-// 608) — this guard is now a CONSUMER of that order, and owning them here would
-// have closed an import cycle. Re-exported so every caller that named them here
-// still finds them.
-export { FINDER_POINTS, RELEASE_TAG_POINT }
+// The rank constants live in board-queue-core with the ranking itself (point
+// 608) — this guard is a CONSUMER of that order.
 
 /** Done-claim tokens (matched as whole words, case-insensitive). */
 export const DONE_CLAIM_TOKENS = ['behoben', 'erledigt', 'gelöst', 'fertig', 'done', 'fixed', 'solved']
@@ -67,7 +65,7 @@ export const DONE_CLAIM_TOKENS = ['behoben', 'erledigt', 'gelöst', 'fertig', 'd
  * negation/retraction, conditional/future phrasing, or a sub-work qualifier.
  * Substring-scanned (lowercase) in a ±60-char window around the token.
  */
-export const NON_CLAIM_CUES = [
+const NON_CLAIM_CUES = [
   // negation / retraction (German)
   'nicht', 'kein', 'falsch', 'unzureichend', 'offen', 'behauptung', 'angeblich', 'vermeintlich',
   // conditional / future (German)
@@ -141,7 +139,8 @@ function nowSection(html) {
 
 /**
  * EVERY card of the now-section, in document order: [{point, text}], the point
- * null where a title carries no leading number (non-point work).
+ * null where neither the card's chip nor its title carries a number (non-point
+ * work).
  *
  * The section holds ONE CARD PER POINT in active parallel work (user decision
  * 22.07.2026), and reading it as a single card is how the done-claim rule came
@@ -192,7 +191,7 @@ export function parseNowCard(html, options = {}) {
  * Rule 1: finder points that sit AHEAD of open fix work in the queue order.
  * Only OPEN finders count (a done-but-queued card is dashboard staleness,
  * another guard's job), and only an OPEN non-finder point after them trips it;
- * the release tag (174) is exempt on both sides.
+ * the release tag point (RELEASE_TAG_POINT) is exempt on both sides.
  */
 export function finderBeforeOpenFix(cardOrder, tasksOpenSet) {
   if (!Array.isArray(cardOrder)) return []
@@ -227,7 +226,8 @@ export function finderBeforeOpenFix(cardOrder, tasksOpenSet) {
  * since (staleness, and another guard's business). Judging either difference
  * here would block on something this rule cannot state a remedy for.
  *
- * A point carded TWICE inside the queue is reported HERE, as `{ duplicate }`,
+ * A point of the derived order carded TWICE inside the queue is reported HERE
+ * (a duplicate of an excluded or closed point is filtered out with it), as `{ duplicate }`,
  * rather than delegated: invariant 4b of dashboard-guard-core covers only a
  * now-card whose point is also queued, and `parseQueuePoints` returns a Set, so
  * a duplicate inside the Warteschlange was caught by nothing (four-eyes finding
@@ -281,8 +281,8 @@ function hasLiveClaim(text) {
 
 /**
  * Rule 2: points whose card text claims done while the point is still open in
- * TASKS. `cards` is [{point, text}]; cards without a leading point number are
- * skipped (nothing to hold the claim against).
+ * TASKS. `cards` is [{point, text}]; cards without a point (from the chip or
+ * the title) are skipped (nothing to hold the claim against).
  */
 export function falseDoneClaims(cards, tasksOpenSet) {
   if (!Array.isArray(cards)) return []
@@ -375,8 +375,9 @@ export function releaseBoundaryProblemFrom(tasksMd, record) {
 }
 
 /** Top-level decision on the raw file contents. Total: any bad input → allow. */
-export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
+export function evaluate(input) {
   try {
+    const { dashboardHtml, tasksMd, rankRecordJson } = input ?? {}
     const open = parseOpenPoints(tasksMd)
     if (open.size === 0) return { block: false, reason: '' }
 
@@ -407,8 +408,8 @@ export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
       problems.push(
         `QUEUE ORDER WRONG: finder/QA point(s) ${misordered.join(', ')} are queued AHEAD of open fix ` +
           `work. Known-bug fixes and user-requested extensions come BEFORE the finder/QA tickets ` +
-          `(${[...FINDER_POINTS].join(', ')}); ${RELEASE_TAG_POINT} keeps its work-order position. Reorder the ` +
-          `Warteschlange cards, then ${REPUBLISH}.`,
+          `(${[...FINDER_POINTS].join(', ')}); ${RELEASE_TAG_POINT} keeps its work-order position. Rebuild the ` +
+          `queue from the work order (${QUEUE_REBUILD_CMD}), then ${REPUBLISH}.`,
       )
     }
 
@@ -419,13 +420,13 @@ export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
     if (drift && drift.duplicate) {
       problems.push(
         `THE QUEUE LISTS ONE POINT TWICE: point ${drift.duplicate} has two cards in the Warteschlange. ` +
-          `A generated queue renders every open point exactly once, so this is a hand edit. ` +
+          `A generated queue renders each point at most once, so this is a hand edit. ` +
           `Rebuild the queue (${QUEUE_REBUILD_CMD}), then ${REPUBLISH}.`,
       )
     } else if (drift) {
       problems.push(
         `QUEUE ORDER DRIFTED FROM THE WORK ORDER: the board shows point ${drift.got} at position ` +
-          `${drift.at + 1} of the Warteschlange where the work order puts ${drift.want}. The queue's ` +
+          `${drift.at + 1} of the points both lists share, where the work order puts ${drift.want}. The queue's ` +
           `sequence is DERIVED from TASKS.md — the board renders it, it does not store it. ` +
           `Board there: ${around(drift.rendered, drift.at)} | work order there: ${around(drift.derived, drift.at)}. ` +
           `Rebuild the queue (${QUEUE_REBUILD_CMD}), then ${REPUBLISH}.`,

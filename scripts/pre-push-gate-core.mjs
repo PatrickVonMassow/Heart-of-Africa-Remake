@@ -61,7 +61,8 @@ export function isProseOnlyPath(path) {
  * A feature branch gets the LIGHT gate on purpose: agents commit and push per
  * step, and a full gate on every intermediate commit would cost more working
  * time than the branch's own red run costs. `main` — the deployed branch, and
- * the one whose failures mail the user — always gets what CI runs.
+ * the one whose failures mail the user — gets what CI runs, unless every path
+ * is board or screenshot material (isProseOnlyPath).
  */
 export function gatePlan({ remoteRef, files, deleting = false } = {}) {
   if (deleting) return { steps: [], reason: 'branch deletion — nothing to check' }
@@ -70,7 +71,7 @@ export function gatePlan({ remoteRef, files, deleting = false } = {}) {
     return { steps: LIGHT_GATE, reason: `not ${PROTECTED_REF} — lint and audit only` }
   }
   if (list.length && list.every(isProseOnlyPath)) {
-    return { steps: LIGHT_GATE, reason: 'prose and board only — no step can measure a difference' }
+    return { steps: LIGHT_GATE, reason: 'board and screenshots only — no step can measure a difference' }
   }
   return { steps: FULL_GATE, reason: 'push to the deployed branch' }
 }
@@ -106,7 +107,8 @@ export const QUIET = 'quiet'
  * Normalise whatever the injected load reader hands back — a bare level string,
  * a `{ level, reasons }` object, nothing at all — into `{ level, why }`.
  *
- * A reader that throws or answers nonsense yields `unknown`, which is NOT quiet:
+ * A reader that throws or answers no level yields `unknown`; an unrecognised
+ * level string passes through and ranks as `unknown` in worseLoad. Neither is quiet:
  * an unmeasured machine never certifies a red (the same rule machine-load-core
  * applies), and the cost of being wrong here is one extra run, never a waved-
  * through failure.
@@ -175,13 +177,13 @@ export function worseLoad(a, b) {
  * can hide inside, and there the same 2.6 s is noise. So the opening reading is
  * taken exactly where the blind spot exists.
  */
-export const LONG_STEPS = ['build', 'unit']
+const LONG_STEPS = ['build', 'unit']
 export function needsOpeningLoadReading(steps) {
   return (Array.isArray(steps) ? steps : []).some((s) => LONG_STEPS.includes(s))
 }
 
 /** The line that makes the retry visible — a silent retry hides a real flake. */
-export function retryNotice(step, { level, why } = {}) {
+function retryNotice(step, { level, why } = {}) {
   const state = level === 'unknown' ? 'a machine whose quiet could not be verified' : `a machine that is ${level}`
   return (
     `pre-push gate: RETRY — ${step} was red on ${state}${why ? ` (${why})` : ''}.` +
@@ -197,10 +199,10 @@ export function retryNotice(step, { level, why } = {}) {
  * re-measured, and saying "passed" there would assert something untrue in the
  * one place a reader looks for the truth (four-eyes finding).
  */
-export function retryOutcomeNotice(step, ok, { unavailable = false } = {}) {
+function retryOutcomeNotice(step, ok, { unavailable = false } = {}) {
   if (unavailable) return `pre-push gate: the re-run of ${step} could not RUN — it was neither confirmed nor cleared.`
   return ok
-    ? `pre-push gate: ${step} passed on the re-run — the first red was the machine, not the code.`
+    ? `pre-push gate: ${step} passed on the re-run — the first red is read as the machine's (an intermittent defect would look the same).`
     : `pre-push gate: ${step} failed AGAIN — this red is evidence, and it blocks.`
 }
 
@@ -214,10 +216,11 @@ export function retryOutcomeNotice(step, ok, { unavailable = false } = {}) {
  *
  * `readLoad` is the same seam for the machine. It is called with `{ when, step }`
  * — once as `start` where the plan contains a minute-long step (see
- * needsOpeningLoadReading), and again on every red — and the WORSE of the two
+ * needsOpeningLoadReading), and again on every first-attempt red — and the WORSE of the two
  * readings decides, so a lull after the storm cannot certify a red. On the light
  * gate no opening probe is paid at all, and no probe is ever taken on a green
- * push's short steps. `onNotice` prints — the retry must be visible.
+ * push's short steps. Without a `readLoad` seam no retry is paid: a red blocks
+ * at once. `onNotice` prints — the retry must be visible.
  */
 export function runGate(steps, run, { readLoad, onNotice } = {}) {
   const say = typeof onNotice === 'function' ? onNotice : () => {}
@@ -400,11 +403,8 @@ export function countTestFilesOnDisk(paths, patterns = TEST_FILE_PATTERNS) {
 const ANSI = new RegExp(String.fromCharCode(27) + '[[][0-9;]*[A-Za-z]', 'g')
 
 /**
- * One `Test Files` / `Tests` summary line, as a number.
- *
- * The parenthesised total is preferred (`1 failed | 152 passed (153)`) and the
- * named categories are summed where a line carries no total. The LAST occurrence
- * wins: a failure report can print the word earlier in the output.
+ * The rest of the LAST `Test Files` / `Tests` summary line, or null. The LAST
+ * occurrence wins: a failure report can print the word earlier in the output.
  */
 function summaryLine(text, label) {
   const re = new RegExp(String.raw`^[^\S\n]*${label}[^\S\n]+(.*)$`, 'gm')
@@ -413,6 +413,9 @@ function summaryLine(text, label) {
   return last
 }
 
+/** That line as a number: the parenthesised total is preferred
+ *  (`1 failed | 152 passed (153)`) and the named categories are summed where a
+ *  line carries no total. */
 function summaryCount(text, label) {
   const last = summaryLine(text, label)
   if (last === null) return null
@@ -630,7 +633,8 @@ export function evaluateTestFileCount({ totals, baseline, unitOk = true, onDisk 
     }
   }
 
-  // Past this point every test file present in the checkout ran.
+  // Past this point no counted test file is missing (the checkout may also be
+  // uncountable, with nothing below the baseline).
   if (base === null) {
     return {
       ...shared, status: 'first', blocked: false, nextBaseline: files,
@@ -691,7 +695,7 @@ export function formatVerdict({ blocked, failed, unavailable = [], retried = [],
   const note = gaps.length ? ` — ${gaps.join(', ')} could not run and was NOT checked` : ''
   // A retry stays in the verdict, not only in the scrollback: a green that only
   // came on a second run is a green with a question attached to it.
-  const redo = redone.length ? ` — ${redone.join(', ')} was re-run once after a red taken under load` : ''
+  const redo = redone.length ? ` — ${redone.join(', ')} was re-run once after a red on a machine not verified quiet` : ''
   // Both numbers lead the verdict whenever a count was taken (point 404), so the
   // size of the evidence base is visible even where it does not yet block.
   const lead = fileCount && typeof fileCount.line === 'string' && fileCount.line ? [fileCount.line] : []
@@ -699,9 +703,11 @@ export function formatVerdict({ blocked, failed, unavailable = [], retried = [],
   // Blocked by the count ALONE: its own line already carries the whole message,
   // and a second "the fast gate is red: " with nothing after it would be a lie.
   if (!red.length) return lead.join('\n') || 'PUSH BLOCKED — the fast gate refused this push.'
-  // The bypass is documented in the hook's own comment and NOT advertised here:
-  // most pushes in this repository are made by autonomous agents, and a failure
-  // message that names its escape hatch invites the escape.
+  // The fast-gate bypass is documented in the hook's own comment and NOT
+  // advertised here: most pushes in this repository are made by autonomous
+  // agents, and a failure message that names its escape hatch invites the
+  // escape. (The file-count verdict above names its acknowledgement on purpose:
+  // that one is recorded in the state file.)
   const twice = red.filter((f) => redone.includes(f))
   // NOT "the load was not the cause" — that was a false assertion, and it was
   // measured false on 28.07.2026: the load never went away BETWEEN the two runs,
@@ -714,7 +720,7 @@ export function formatVerdict({ blocked, failed, unavailable = [], retried = [],
     ...lead,
     `PUSH BLOCKED — the fast gate is red: ${red.join(', ')}`,
     ...(twice.length ? [twiceLine] : []),
-    'CI would fail on this state and mail the failure. Fix it, then push again.',
+    'CI runs these same steps, so this state risks a red CI run and its mail. Fix it, then push again.',
     `  ${red.map((f) => (GATE_COMMANDS[f] ?? []).join(' ')).join('\n  ')}`,
   ].join('\n')
 }

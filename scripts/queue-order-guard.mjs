@@ -2,12 +2,14 @@
 // repeatedly broke despite reminders — (1) the dashboard Warteschlange works
 // known-bug FIXES before the finder/QA tickets (memory
 // queue-order-fixes-before-finders) and renders the work order's own sequence,
-// (1c) an APPENDED point is ranked once, deliberately, before the turn ends
-// (point 590), and (2) no dashboard card claims a point is done
-// ("behoben"/"erledigt"/…) while it is still open in TASKS.md. The
-// decision logic lives in queue-order-guard-core.mjs (pure, Vitest-covered);
-// this wrapper only reads the two files and is fail-OPEN: any internal error →
-// allow, so a guard bug never traps the session.
+// (1c) an APPENDED point is ranked, deliberately, before the turn ends
+// (point 590), (1d) a machine-filed point stands before the release point only
+// with stated high urgency and a recorded reason (point 789), and (2) no
+// dashboard card claims a point is done ("behoben"/"erledigt"/…) while it is
+// still open in TASKS.md. The decision logic lives in queue-order-guard-core.mjs
+// (pure, Vitest-covered); this wrapper reads TASKS.md, the board, the rank
+// record and, where needed, the archive, writes only the rank baseline, and is
+// fail-OPEN: any internal error → allow, so a guard bug never traps the session.
 import { readFileSync, existsSync } from 'node:fs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluate, releaseBoundaryProblem } from './queue-order-guard-core.mjs'
@@ -17,6 +19,7 @@ import { RANK_RECORD_PATH, parseRankRecord, settleRecord } from './queue-rank-co
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
+import { CAUSE } from './guard-preflight-core.mjs'
 
 const TASKS = repoPath('TASKS.md')
 const DASHBOARD = repoPath('.batch-dashboard.html')
@@ -31,13 +34,12 @@ const readIfPresent = (path) => (existsSync(path) ? readFileSync(path, 'utf8') :
 export function gatherQueueOrderInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
   }
-  // A checkout without TASKS.md STANDS DOWN — deliberately, and not the same as
-  // reading it as empty: the core would then see every queue card as pointing at
-  // a point that does not exist and block on a broken checkout, which is a guard
-  // bug trapping the session. The pre-refactor code threw here and fell open;
-  // this keeps that outcome, but says so instead of relying on the throw.
+  // A checkout without TASKS.md STANDS DOWN — deliberately. Read as empty it
+  // would pass too (the core allows when no point is open), but silently; the
+  // pre-refactor code threw here and fell open, and this keeps that outcome
+  // while saying so.
   if (!existsSync(TASKS)) return { applicable: false, why: 'no TASKS.md in this checkout' }
   return {
     applicable: true,

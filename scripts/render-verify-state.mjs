@@ -4,13 +4,17 @@
 //
 //   render-verify-state.json — { clearedHead,              legacy scalar baseline (mirror)
 //                                clearedHeads: {branch:sha}, per-BRANCH verified baselines
-//                                clearedAt, runs: [...],   recorded verify-suite runs
-//                                deferral, lastDeferral }  the loud escape valve
+//                                clearedAt, clearedBy, clearedVia, accountedFor,
+//                                runs: [...],              recorded verify-suite runs
+//                                deferral, lastDeferral,   the loud escape valve
+//                                incompleteClosures,       signed-off broken recordings
+//                                crashClosures }           signed-off crashed runs
 //
 // A "run" record is written by the recorder from INSIDE a verify-suite process
 // (armed in scripts/verify/_browser.mjs), so it is ground truth — backend,
-// suite, exit code and the screenshots the run actually wrote — never a parsed
-// self-report. Writes are atomic (tmp + rename, via dashboard-state.mjs)
+// suite, exit code, head and dirty flag, the reds with their charges, the
+// crash/truncation and suspect/partial flags, and the screenshots the run
+// actually wrote — never a parsed self-report. Writes are atomic (tmp + rename, via dashboard-state.mjs)
 // because a suite's exit handler can race the Stop-hook in the same moment.
 import { readJson, writeJsonAtomic, REPO_ROOT } from './dashboard-state.mjs'
 import { commonRepoPath } from './repo-paths.mjs'

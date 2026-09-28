@@ -47,7 +47,7 @@ const SHUTTER = Number(flag('shutter', 0))
 const WINDOW_FRAMES = Number(flag('window', 45))
 process.env.VERIFY_GL = BACKEND
 
-/** The page-side sampler, as a source string: it reads the same rectangles the
+/** The page-side sampler, a function handed to page.evaluate: it reads the same rectangles the
  *  suite's own sampler reads, and additionally keeps each frame's geometry
  *  fingerprint, so a fusion can be told apart from the frame that moved. */
 const SAMPLER = (count) =>
@@ -84,8 +84,9 @@ const SAMPLER = (count) =>
           }
         }
       }
-      // The geometry fingerprint: identical from one frame to the next means the
-      // layer did NOT move a box \u2014 so any fusion in it was PLACED, not drifted into.
+      // The geometry fingerprint: identical from one frame to the next means no
+      // box's text or top-left corner moved between those two frames (sizes are
+      // not compared) — a frozen fusion, not one drifting in or out.
       const fingerprint = boxes.map((b) => `${b.text}@${b.left.toFixed(1)},${b.top.toFixed(1)}`).join('|')
       frames.push({ t: performance.now(), count: boxes.length, worst, fingerprint })
       if (++n >= count) return res(frames)
@@ -163,9 +164,10 @@ try {
     p.yaw = Math.atan2(-(0 - p.x), -(0 - p.z))
   })
   await page.keyboard.down('Control')
-  // THE CROWD MUST HAVE ARRIVED, not merely begun: the labels reach the DOM
+  // THE CROWD SHOULD HAVE ARRIVED, not merely begun: the labels reach the DOM
   // roughly one per frame, so a window opened at the first of them samples the
-  // ramp-up rather than the scene the check judges.
+  // ramp-up rather than the scene the check judges. Waited for up to 30 s; on
+  // timeout the probe samples anyway.
   await page
     .waitForFunction(
       () => {

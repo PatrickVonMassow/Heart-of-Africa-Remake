@@ -1,5 +1,5 @@
 // Pure decision logic for clearing a stuck GitHub Pages deployment
-// (pages-deploy-unblock.mjs). No I/O, never throws — Vitest-covered in
+// (pages-deploy-unblock.mjs). No I/O — Vitest-covered in
 // pages-deploy-unblock-core.test.mjs.
 //
 // WHY IT EXISTS (measured 06.08.2026 on `main`): a Pages deployment was
@@ -20,7 +20,7 @@
 
 /** Pages deployment statuses that are FINISHED — nothing to cancel.
  *  From actions/deploy-pages (src/internal/deployment.js). */
-export const TERMINAL_STATUSES = new Set([
+const TERMINAL_STATUSES = new Set([
   'succeed',
   'deployment_failed',
   'deployment_content_failed',
@@ -37,14 +37,15 @@ export const TERMINAL_STATUSES = new Set([
  *  the way was clear. `deployment_lost` says only that the status could not be
  *  read. Both are finished, so neither is a blocker — but neither ends the
  *  search for one either. */
-export const COMPLETED_STATUSES = new Set(['succeed', 'deployment_failed', 'deployment_content_failed'])
+const COMPLETED_STATUSES = new Set(['succeed', 'deployment_failed', 'deployment_content_failed'])
 
 /** Statuses that say nothing about the deployment; treated as not blocking, so
  *  a lookup that failed can never be reported as a stuck deployment. */
-export const UNKNOWN_STATUSES = new Set(['', 'unknown_status', 'not_found'])
+const UNKNOWN_STATUSES = new Set(['', 'unknown_status', 'not_found'])
 
-/** How many recent `github-pages` deployments are inspected. A blocker is by
- *  definition among the newest few; the listing is newest first. */
+/** How many recent `github-pages` deployments are inspected. A blocker is
+ *  normally among the newest few (the listing is newest first); a sha named
+ *  from the outside is inspected wherever it sits. */
 export const INSPECT_LIMIT = 10
 
 /**
@@ -68,7 +69,7 @@ export function isBlockingStatus(status) {
  * The shas to ask the Pages API about, newest first, deduplicated.
  * Input is the Deployments API listing (`GET /repos/{repo}/deployments`), which
  * is where a Pages deployment becomes visible by commit sha at all.
- * @returns {{sha:string, id:(number|null), createdAt:string}[]}
+ * @returns {{sha:string, createdAt:string}[]}
  */
 export function candidateDeployments(deployments, { limit = INSPECT_LIMIT, environment = 'github-pages' } = {}) {
   if (!Array.isArray(deployments)) return []
@@ -80,7 +81,7 @@ export function candidateDeployments(deployments, { limit = INSPECT_LIMIT, envir
     const sha = String(d.sha ?? '')
     if (!/^[0-9a-f]{7,40}$/i.test(sha) || seen.has(sha)) continue
     seen.add(sha)
-    out.push({ sha, id: d.id ?? null, createdAt: String(d.created_at ?? '') })
+    out.push({ sha, createdAt: String(d.created_at ?? '') })
   }
   // NEWEST FIRST is what the blocking rule below reads, so it is established
   // here rather than trusted: the listing arrives that way, an entry without a
@@ -159,7 +160,7 @@ export function shouldRetryDeploy({ deployFailed = false, cancelled = [] } = {})
   return {
     retry: true,
     reason: `cleared ${cleared.length} stuck Pages deployment(s) (${cleared
-      .map((c) => String(c.sha ?? c).slice(0, 7))
+      .map((c) => String(c.sha).slice(0, 7))
       .join(', ')}) — deploying again`,
   }
 }
@@ -180,7 +181,7 @@ export function stallReport({ repo = '', blocking = [], cancelled = [], failed =
   const list = Array.isArray(blocking) ? blocking : []
   if (list.length === 0) {
     lines.push(`No in-progress Pages deployment found for ${repo || 'this repository'}.`)
-    lines.push('The deploy did not fail on a queue stall — look at the deploy step itself.')
+    lines.push('No stuck deployment among those inspected — look at the deploy step itself.')
     return lines.join('\n')
   }
   lines.push(`Stuck Pages deployment(s) in ${repo || 'this repository'}:`)
@@ -199,7 +200,8 @@ export function stallReport({ repo = '', blocking = [], cancelled = [], failed =
     )
   }
   lines.push(
-    'Handle: node scripts/pages-deploy-unblock.mjs --cancel, then dispatch the deploy workflow again.',
+    'Handle by hand: node scripts/pages-deploy-unblock.mjs --cancel for anything left in place, then dispatch ' +
+      'the deploy workflow again (inside the workflow its retry step does that).',
   )
   return lines.join('\n')
 }

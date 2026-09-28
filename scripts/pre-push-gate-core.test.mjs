@@ -417,7 +417,7 @@ describe('the load reading is taken where a storm can hide (point 389)', () => {
 
   it('says in the verdict that a green only came on a re-run', () => {
     expect(formatVerdict({ blocked: false, failed: [], retried: ['unit'] }, { reason: 'x' })).toMatch(
-      /unit was re-run once after a red taken under load/,
+      /unit was re-run once after a red on a machine not verified quiet/,
     )
     const blocked = formatVerdict({ blocked: true, failed: ['unit'], retried: ['unit'] }, { reason: 'x' })
     expect(blocked).toMatch(/unit was red on BOTH runs/)

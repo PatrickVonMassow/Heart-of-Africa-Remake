@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   commitObjectParents,
-  commitsForFiles,
   endStateArtefacts,
   formatInvalidatedCoverage,
   newestReading,
@@ -11,7 +10,6 @@ import {
   REVIEW_END_STATE_EXCLUSIONS,
   reviewEndStateExclusion,
   reviewEndStateFiles,
-  summarizeReviewDebt,
   vendorOf,
 } from './mechanism-review-range-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
@@ -451,19 +449,6 @@ describe('per-file end-state review baseline', () => {
     expect(debt.outstanding.map((artefact) => artefact.file)).toEqual(['a', 'b'])
   })
 
-  it('rebuilds authorship history for only the still-owed files', () => {
-    const commits = [
-      commit('a', 'Claude Opus 5', ['shared', 'done']),
-      commit('b', 'Claude Opus 5', ['shared']),
-    ]
-    const debt = outstandingFiles({ commits, endStateFiles: ['shared', 'done'], records: [], recordUsable: usable })
-    const rebuilt = commitsForFiles(debt.outstanding.filter((artefact) => artefact.file === 'shared'))
-    expect(rebuilt.map((change) => [change.sha, change.files])).toEqual([
-      [sha('a'), ['shared']],
-      [sha('b'), ['shared']],
-    ])
-  })
-
   it('lets no file of a split clear until every recorded pass is complete', () => {
     const head = sha('a')
     const pending = {
@@ -545,57 +530,6 @@ describe('per-file end-state review baseline', () => {
       ],
       endStateFiles: [],
     }).block).toBe(false)
-  })
-})
-
-describe('visible review debt', () => {
-  it('reports the sized pass count and material, not the smaller authorship-group count', () => {
-    const passes = [{ index: 1 }, { index: 2 }, { index: 3 }]
-    expect(summarizeReviewDebt({
-      outstanding: [{ file: 'a' }],
-      sizedPlan: { passes, rawSize: 462_972 },
-    })).toEqual({ passCount: 3, materialChars: 462_972, groups: passes })
-  })
-
-  it('reports the material the owed passes carry, not the unsplit assembly', () => {
-    // The unsplit figure counts every group's whole-file assembly, so it stood
-    // at 466106 beside a one-round plan carrying 116875 — four times the budget
-    // beside a count of one, which reads as a count that cannot be true.
-    const passes = [{ index: 1, rawSize: 116_875 }]
-    expect(summarizeReviewDebt({
-      outstanding: [{ file: 'a' }],
-      sizedPlan: { passes, rawSize: 466_106 },
-    })).toEqual({ passCount: 1, materialChars: 116_875, groups: passes })
-  })
-
-  it('names a part-measured plan unavailable rather than reporting the passes it could size', () => {
-    // Treating an unsized pass as zero understates the debt by exactly the
-    // passes nobody measured — a smaller number that still reads as a fact.
-    const passes = [{ index: 1, rawSize: 100 }, { index: 2 }]
-    expect(summarizeReviewDebt({
-      outstanding: [{ file: 'a' }],
-      sizedPlan: { passes, rawSize: 1000 },
-    })).toEqual({ passCount: 2, materialChars: null, groups: passes })
-  })
-
-  it('names a non-numeric rawSize unavailable instead of coercing it to zero', () => {
-    // `Number(null)` and `Number('')` are 0, so an unmeasured assembly would
-    // have reported ZERO material for owed work — a cleared-looking figure.
-    for (const rawSize of [null, '', '466106', undefined]) {
-      expect(summarizeReviewDebt({
-        outstanding: [{ file: 'a' }],
-        sizedPlan: { passes: [{ index: 1 }], rawSize },
-      })).toEqual({ passCount: null, materialChars: null, groups: [] })
-    }
-  })
-
-  it('distinguishes cleared debt from an unavailable measurement', () => {
-    expect(summarizeReviewDebt({ outstanding: [] })).toEqual({ passCount: 0, materialChars: 0, groups: [] })
-    expect(summarizeReviewDebt({ outstanding: [{ file: 'a' }] })).toEqual({
-      passCount: null,
-      materialChars: null,
-      groups: [],
-    })
   })
 })
 
@@ -689,10 +623,10 @@ describe('commitObjectParents', () => {
 
   it('REFUSES a header that never ends, rather than trusting how far it read', () => {
     // A truncated or malformed object gives no evidence where the header stopped,
-    // so every line read may already be message. Empty output is that same case.
+    // so every line read may already be message. Empty output never opens on a tree.
     expect(() => commitObjectParents([`tree ${'0'.repeat(40)}`, `parent ${A}`].join('\n'))).toThrow(/header terminator/)
-    expect(() => commitObjectParents('')).toThrow(/header terminator/)
-    expect(() => commitObjectParents(null)).toThrow(/header terminator/)
+    expect(() => commitObjectParents('')).toThrow(/tree line/)
+    expect(() => commitObjectParents(null)).toThrow(/tree line/)
   })
 
   it('REFUSES a parent line that arrives after the parent block closed', () => {

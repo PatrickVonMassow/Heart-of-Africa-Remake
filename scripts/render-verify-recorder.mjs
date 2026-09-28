@@ -79,9 +79,8 @@ const CHECKOUT_DIR = (() => {
 const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
 
 /**
- * THE CAP ON RED LINES IS A STATED BUDGET, NOT A SILENT ONE (point 734; the
- * heading read "NO CAP ON RED LINES" until round 16, which is what the three
- * budgets below stopped being true of). The old 400-line cap existed
+ * THE CAP ON RED LINES IS A STATED BUDGET, NOT A SILENT ONE (point 734). The
+ * old 400-line cap existed
  * because a page error that repeats per frame prints one `ERR:` line per
  * OCCURRENCE — but a run that hit it was HALF-RECORDED: a fragment of its red
  * set plus a truncation marker, which no closing of point 640 can reach (all
@@ -91,9 +90,9 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
  * MEASURED 19.08.2026 (re-taken for this fix; scripts/verify/README.md carries
  * the full numbers): the red SET is small — the worst run on record printed 521
  * result lines but only 33 DISTINCT ones, every recorded run holds at most 19
- * parsed reds, and every non-cascade log carries ≤ 12 result lines. What runs
- * away is REPETITION, never the set: reds are bounded by the suite's checks and
- * its distinct console errors.
+ * parsed reds, and every non-cascade log carries ≤ 12 result lines. What ran
+ * away in every measured log was REPETITION, not the set (why that is no bound
+ * on logs not yet seen follows below).
  *
  * SO THE BUFFER IS BOUNDED BY THE RED'S IDENTITY, NOT BY THE LINE (review
  * finding, 28.08.2026). Keeping each distinct LINE was not a bound at all: a
@@ -127,7 +126,8 @@ const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
  * word: a run either records its reds completely, or FAILS LOUDLY as an
  * incomplete recording — never half-records itself. The class therefore stays
  * alive for new records too, which is what gives it a signed way out
- * (render-verify-core.mjs) instead of a hand-written deferral.
+ * (the sign-off CLI in render-verify-guard.mjs, judged by render-verify-core.mjs)
+ * instead of a hand-written deferral.
  */
 
 /**
@@ -183,7 +183,9 @@ const separatorFor = (kept) => (kept > 0 ? 1 : 0)
 
 /** How much of an OVERLONG line is copied to decide what it is. Both probes —
  *  `KEPT_LINE` and `CRASH_LINE` — are anchored at the line's start, so this
- *  prefix answers them and the rest of the line is never materialised. */
+ *  prefix answers them and the rest of the line is never materialised — except
+ *  a stack frame whose `:line:col` lies past it, which is undecidable and
+ *  refused (see the tap). */
 const LINE_PROBE_CHARS = 4096
 
 /** Stderr that says the process did not end on its own terms — a stack frame or
@@ -282,7 +284,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   //
   // KEYED BY THE IDENTITIES, NOT BY THEIR COMBINATION (review finding,
   // 28.08.2026, round 13). Keying a line by its parts JOINED bounded nothing:
-  // `[A,B]`, `[A,C]`, `[B,C]` are three distinct composites over two identities,
+  // `[A,B]`, `[A,C]`, `[B,C]` are three distinct composites over three identities,
   // so a suite whose summary lines vary their grouping minted new keys without
   // ever printing a new red — combinatorially many of them. A line now earns its
   // place only by carrying an identity nothing kept yet; a line whose reds are
@@ -471,9 +473,8 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
         //
         // Only that line, though (round 29, correcting round 24's wider reading).
         // A head that fully matches `CRASH_LINE` is DECIDED — the crash is
-        // marked, and nothing about the accounting was lost; that such a run can
-        // still exit 0 without its crash reaching the record is POINT 993, not
-        // this. And ordinary stderr chatter is decided too: it is neither a
+        // marked, whatever the exit code, and nothing about the accounting was
+        // lost. And ordinary stderr chatter is decided too: it is neither a
         // result line nor a crash frame, so cutting it costs the accounting
         // nothing, and calling a green run incomplete over it would be the false
         // truncation this point exists to end.
@@ -640,8 +641,9 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
  * suite on two different trees were indistinguishable in it, so the claim had
  * nothing behind it.
  *
- * EVIDENCE, DELIBERATELY NOT A GATE. Nothing judges these fields; they let a
- * reader (or a later mechanism) check the claim after the fact. A DIRTY tree is
+ * EVIDENCE, NOT A GATE HERE. The recorder refuses nothing on these fields; the
+ * guard reads `head` for ancestry and render-tree matching (coverageForHead),
+ * and a reader can check the claim after the fact. A DIRTY tree is
  * recorded as such rather than being refused, because a dirty checkout is
  * ordinary while repairing — what must not happen is a dirty run passing as a
  * proof of the committed tree, and naming it is what prevents that.
@@ -714,8 +716,9 @@ export function armRunRecorder(backend) {
       // The live gate's section for each retained red. Kept beside the text so
       // no durable reader ever has to infer provenance from a tag-shaped tail.
       sectionByRed: new Map(),
-      // Result lines the ceiling refused — each one carried a red nothing else
-      // in the buffer stands for, so a run with any is recorded INCOMPLETE.
+      // Result lines the recording refused — past a budget, overlong, with
+      // substituted characters, or an undecidable crash frame — so a run with
+      // any is recorded INCOMPLETE.
       droppedLines: 0,
       crashed: false,
       // Set only by the suite's own terminal reporter, never by stderr. This
@@ -762,8 +765,8 @@ export function armRunRecorder(backend) {
         } catch {
           /* never fail a suite over the bookkeeping */
         }
-        // A green run has nothing to account for; only a RED one is charged, and
-        // it is charged HERE, at record time, against the ledger as it stood
+        // A green run has nothing to account for; a red one — and one that
+        // crashed or lost output, whatever its exit — is charged HERE, at record time, against the ledger as it stood
         // when the run happened. A later ledger edit therefore cannot bless a
         // run after the fact — it takes a fresh run, which is the point.
         // PARSED FOR A RUN THAT LOST OUTPUT TOO, not only for a failing one
@@ -847,18 +850,20 @@ export function armRunRecorder(backend) {
               }
             : {}),
           // A RUN THAT HIT A BUDGET IS AN INCOMPLETE RECORDING, and says how
-          // much it refused — `runVerdict` then answers `incomplete` and the
-          // signed closure disposes of it, which is the whole way out a
-          // truncated run has.
+          // much it refused — `runVerdict` then answers `incomplete`, and a
+          // covering re-recording or the signed closure disposes of the lost
+          // part.
           //
           // WHATEVER ITS EXIT CODE (review finding, 28.08.2026, round 17,
           // overturning the round-16 carve-out). Round 16 exempted an exit-0 run
           // on the argument that "the lines it refused were never evidence the
           // accounting reads", and that argument is measurably false: `refuse()`
-          // is reached ONLY from a line matching `KEPT_LINE` — a suite's own
-          // `FAIL`, an `ERR:`, a `console errors:` summary. Chatter never
-          // reaches a budget at all, so a genuinely green run cannot be marked
-          // incomplete by this line: it prints no result line to drop. What the
+          // is reached from a line matching `KEPT_LINE` — a suite's own `FAIL`,
+          // an `ERR:`, a `console errors:` summary — or from an overlong stderr
+          // line that may be a crash frame. Ordinary chatter never reaches a
+          // budget, so an exit-0 run is marked incomplete only when it printed
+          // result lines (tolerated console output included) or an undecidable
+          // crash frame past the budgets. What the
           // carve-out really exempted was the opposite case — a process that
           // ended 0 while its output carried result lines nobody read — and
           // that run then counted as picture COVERAGE, which is the worst thing

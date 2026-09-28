@@ -4,14 +4,15 @@
 //   node scripts/queue-calibration.mjs --apply         # …and rewrite the stored estimates
 //   node scripts/queue-calibration.mjs --since 5d      # narrow the window
 //   node scripts/queue-calibration.mjs --limit 40      # …or cap it by landings
+//   node scripts/queue-calibration.mjs --state-dir <d> # read/write the git-ignored state there
 //
 // The arithmetic is in `queue-calibration-core.mjs` and covered by Vitest; this
 // file is the I/O around it — git, the board's data file, the printing — so a
 // rule can be tested without a repository.
 //
-// RE-RUN IT LATER AND IT ANSWERS THE SAME QUESTION AGAIN: after a rewrite the
-// class factors read near 1.0, and the next time the batch changes pace they do
-// not. Every run names the window it used, so two readings are comparable.
+// RE-RUN IT LATER AND IT ANSWERS THE SAME QUESTION AGAIN, measured against the
+// retained baselines, so a change of pace shows up in the next reading. Every
+// run names the window it used, so two readings are comparable.
 //
 // APPLY USES THE BOARD'S OWN SET COMMAND, one child per changed card. Each child
 // takes the cross-process board-edit lock and compares the stored estimate under
@@ -29,7 +30,6 @@ import {
   applyCorrections,
   AXES,
   attributeMerges,
-  CALIBRATION_PATH,
   calibrationReading,
   elapsedHoursToTick,
   estimateForLanding,
@@ -52,7 +52,6 @@ import {
   pictureVerifiedPoints,
   rewritePlan,
   SPAN_MEASURED,
-  SPAN_NO_BRANCH,
   SPAN_UNKNOWN,
   updateEstimateLedger,
 } from './queue-calibration-core.mjs'
@@ -143,7 +142,7 @@ function readStore() {
     const parsed = JSON.parse(readFileSync(storeFile, 'utf8'))
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch (e) {
-    throw new Error(`${CALIBRATION_PATH} exists but does not parse (${e.message}) — repair or remove it, then run again`)
+    throw new Error(`${storeFile} exists but does not parse (${e.message}) — repair or remove it, then run again`)
   }
 }
 
@@ -186,7 +185,7 @@ try {
       contextEstimateHours,
       estimateSource: source,
       criticality: criticality.get(l.point) ?? null,
-      pictureClass: picturePoints.has(l.point) ? 'picture-verified' : 'picture-unestablished',
+      pictureClass: picturePoints.has(l.point) ? PICTURE_VERIFIED : 'picture-unestablished',
       owesPicture: owedPicture.has(l.point),
     }
   })
@@ -197,8 +196,8 @@ try {
   console.log(`WINDOW  ${iso(window.from)} → ${iso(window.to)} UTC · ${window.landings} landed point(s)` + (limit ? ` (--limit ${limit})` : ` (--since ${window.since})`))
   console.log('')
   console.log('PER POINT — first branch commit to the TICK; cadence is TICK → TICK for the same reader-visible reason')
-  // "picture" is the RETAINED VERIFICATION class; "owed" is what actually holds a
-  // landing out of the correction. They are different facts, and printing only
+  // "picture" is the RETAINED VERIFICATION class; "owed" is the spec's demand.
+  // Either one holds a landing out of the correction. They are different facts, and printing only
   // the first left the exclusion unreadable per landing.
   console.log('  point  crit      lane                  picture                  owed  merge     src       context   actual   ratio')
   for (const r of rows) {
@@ -216,7 +215,6 @@ try {
   const provenance = estimateProvenance(rows)
   const spans = {
     measured: rows.filter((r) => r.spanBasis === SPAN_MEASURED).length,
-    noBranch: rows.filter((r) => r.spanBasis === SPAN_NO_BRANCH).length,
     unknown: rows.filter((r) => r.spanBasis === SPAN_UNKNOWN).length,
     inferred: rows.filter((r) => r.attribution === 'inferred').length,
     inferredMeasured: rows.filter((r) => r.attribution === 'inferred' && r.spanBasis === SPAN_MEASURED).length,
@@ -233,13 +231,13 @@ try {
   )
   if (provenance.snapshot === 0) {
     console.log(
-      '  NO RATIO CAN BE MEASURED YET: this window contains zero landing-time snapshots, so every estimate-versus-actual ' +
+      '  NO RATIO CAN BE MEASURED YET: this window contains zero compared landing-time snapshots, so every estimate-versus-actual ' +
         'figure above is empty. The correction below rests on MEASURED ELAPSED TIME instead, and says so per card.',
     )
   }
   console.log(
     `SPAN PROVENANCE         ${spans.measured} measured (${spans.inferredMeasured} via a merge inferred from the landing sequence) · ` +
-      `${spans.inferred} inferred attribution(s) total · ${spans.noBranch} explicitly no-branch · ` +
+      `${spans.inferred} inferred attribution(s) total · ` +
       `${spans.unknown} without a readable attributed span`,
   )
   console.log('CLASSIFICATION LIMIT — LANE: only a merge subject naming the point’s branch establishes delegated; every other row is lane-unestablished.')
@@ -250,7 +248,6 @@ try {
       `${reading.byAxis.picture.find((c) => c.name === PICTURE_VERIFIED)?.elapsed.n ?? 0} landing(s) survive in a store ` +
       'that is capped and pruned at branch end. It is a decision with its own measurement behind it, not a switch this command flips.',
   )
-  console.log('CONFOUNDER: point 713 still stands at 14 do-not-merge rounds, so the review loop is not universally healed.')
   console.log('')
   console.log(`ELAPSED PER POINT (h)   ${five(reading.overall.elapsed, ' h')}`)
   console.log(`ACTUAL ÷ ESTIMATE       ${five(reading.overall.ratio, '×')}`)
@@ -266,10 +263,12 @@ try {
           `median elapsed ${fmt(c.elapsed.median, ' h').padStart(8)}  median ratio ${fmt(c.ratio.median, '×').padStart(8)}` +
           (c.unknowable
             ? '  (missing-information class — excluded from comparison)'
-            : c.comparable
+            : c.name === PICTURE_VERIFIED && !c.comparable
+              ? '  (outside the correctable population — no further landing makes it comparable)'
+              : c.comparable
               ? ''
               : c.elapsedComparable
-                ? `  (no ratio yet — fewer than ${MIN_CLASS_SAMPLES} rated; its correction comes from the measured spans)`
+                ? `  (no ratio yet — fewer than ${MIN_CLASS_SAMPLES} rated; its correction can come from the measured spans, given a promise median of its open cards)`
                 : `  (PENDING: fewer than ${MIN_CLASS_SAMPLES} measured spans — nothing to correct from yet)`),
       )
     }
@@ -279,12 +278,15 @@ try {
   for (const s of reading.decision.spreads) {
     console.log(
       `  ${s.axis.padEnd(12)} comparable classes ${s.classes}  spread ${fmt(s.spread, '×')}` +
-        (s.unknowable.length ? `  (missing information: ${s.unknowable.join(', ')})` : '') +
+        (s.unknowable.some((n) => n !== PICTURE_VERIFIED)
+          ? `  (missing information: ${s.unknowable.filter((n) => n !== PICTURE_VERIFIED).join(', ')})`
+          : '') +
+        (s.unknowable.includes(PICTURE_VERIFIED) ? `  (outside correction: ${PICTURE_VERIFIED})` : '') +
         (s.pending.length ? `  (pending: ${s.pending.join(', ')})` : ''),
     )
   }
-  console.log('APPLIED FACTORS (criticality — the only axis a queued point already has):')
-  const pictureBearing = pictureBearingPoints(tasksAll)
+  console.log('FACTORS THE REWRITE APPLIES (criticality — the only axis a queued point already has):')
+  const pictureBearing = owedPicture
   // The SAME exclusion the plan uses, so the printed factor is the applied one.
   const promises = promiseMedians({ cards, open, criticality, ledger, exclude: pictureBearing })
   // ASKED OF THE SAME FUNCTION THE PLAN ASKS. Every earlier version of this block
@@ -308,7 +310,7 @@ try {
   // COUNTED FROM THE PLAN ITSELF, never from the marker set: the markers span the
   // whole work order, closed points included, and only an OPEN card can be held out.
   const held = heldOutForPicture(plan)
-  const withEstimate = held.filter((p) => p.from !== null && p.from !== undefined).length
+  const withEstimate = held.filter((p) => p.from !== null).length
   if (held.length) {
     console.log(
       `  ${held.length} open card(s) ask for a rendered proof and are held out of the correction AND of its denominator; ` +
@@ -328,7 +330,7 @@ try {
 
   const defaults = inheritanceDefaults(reading)
   console.log('')
-  console.log(`INHERITED BY A NEW CARD (median hours per class) → ${CALIBRATION_PATH}`)
+  console.log(`INHERITED BY A NEW CARD (median hours per class) → ${storeFile}`)
   for (const [name] of Object.entries(defaults)) console.log(`  ${name.padEnd(13)} ${inheritedEstimateForClass(name, defaults)}`)
 
   // THE STORE, MINUS THE ONE FIELD THAT MOVES WHILE THE APPLY RUNS.
@@ -385,7 +387,8 @@ try {
     })),
     // The denominator each class factor was measured against.
     promiseMedians: Object.fromEntries(promises),
-    // …and the factor each class received, with the basis that produced it.
+    // …and the factor each class's cards are corrected by, with its basis — the
+    // plan's factor, written whether or not --apply ran.
     applied: Object.fromEntries(
       reading.byAxis.criticality
         .map((c) => {
@@ -431,7 +434,8 @@ try {
     const { written, refused } = applied
     estimates = applied.estimates
     console.log('')
-    console.log(`APPLIED: ${written.length} estimate(s) written to ${QUEUE_DATA_PATH}. Render them: node scripts/board-queue.mjs`)
+    const render = options.stateDir ? `HOA_QUEUE_DATA_FILE=${dataFile} node scripts/board-queue.mjs` : 'node scripts/board-queue.mjs'
+    console.log(`APPLIED: ${written.length} estimate(s) written to ${dataFile}. Render them: ${render}`)
     for (const p of written) console.log(`  ${p.point} ${p.from} → ${p.to}`)
     for (const s of skipped) {
       console.log(`  SKIPPED ${s.point}: the card changed while this ran (${s.from} → ${s.now}); it keeps the newer value`)
@@ -444,8 +448,8 @@ try {
 
   // The baseline ledger — the promise each card carried before any correction,
   // and what the last apply wrote. Without it a re-run corrects a corrected card.
-  // An apply has persisted it after every card already; this covers the read-only
-  // run, where nothing moved and the store is written once.
+  // An apply has persisted it after every card already; this covers the run
+  // without --apply, which leaves the queue untouched and writes the store once.
   persist(estimates)
 } catch (e) {
   console.error(`queue-calibration: ${e.message}`)

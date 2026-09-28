@@ -1,8 +1,9 @@
 // Bird's-eye framerate benchmark + CONFIG SWEEP (point 276).
 //
 // Measures per-frame time at three reachable states (dense savanna, empty
-// desert, driving) for a series of render CONFIGS, so the GPU cost can be
-// attributed to each feature and every optimisation lever validated against a
+// desert, driving) for a series of render CONFIGS, so the frame-time cost
+// (whole animation-frame intervals; no separate GPU timer) can be attributed to
+// each feature and every optimisation lever validated against a
 // fixed baseline.
 //
 // MUST run SOLO — nothing else on the machine (a parallel task/session skews
@@ -11,7 +12,8 @@
 // Usage: start a dev server, then:
 //   BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-bench.mjs
 // Env: BENCH_SAMPLE_MS, BENCH_SETTLE_MS, BENCH_CONFIGS (comma list, default all),
-//      BENCH_POINTS (comma list of point names), BENCH_LABEL (tag for the output).
+//      BENCH_POINTS (comma list of point names), BENCH_LABEL (tag for the output),
+//      BENCH_SPIKE_MS (hitch threshold, default 25), BENCH_DPR (device pixel ratio, default 1).
 import { chromium } from 'playwright'
 
 // VSYNC DISABLED so the measured frame time is the TRUE per-frame cost, not a
@@ -202,7 +204,7 @@ async function main() {
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
   await page.waitForTimeout(1500)
 
-  // WARM-UP: a full discarded pass — the first run on a fresh server has
+  // WARM-UP: one discarded measurement of the first selected point — the first run on a fresh server has
   // multi-second compile/HMR stalls that would poison the first config.
   console.log('# warm-up pass (discarded)…')
   await measure(page, points[0])

@@ -4,8 +4,6 @@
 // input (the wrapper's fail-open depends on the core never throwing).
 import { describe, it, expect } from 'vitest'
 import {
-  FINDER_POINTS,
-  RELEASE_TAG_POINT,
   DONE_CLAIM_TOKENS,
   parseOpenPoints,
   parseQueueCards,
@@ -21,6 +19,7 @@ import {
   releaseBoundaryProblemFrom,
 } from './queue-order-guard-core.mjs'
 import { parseRankRecord } from './queue-rank-core.mjs'
+import { FINDER_POINTS, RELEASE_TAG_POINT } from './board-queue-core.mjs'
 
 /** Minimal dashboard in the real board's markup (queue cards + now-card + Erledigt). */
 function boardHtml({ nowTitle = '210 — Meereskante', nowBody = 'Status: in Arbeit.', queue = [], done = [209] } = {}) {
