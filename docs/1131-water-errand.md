@@ -77,10 +77,12 @@ frame.
 So the defect hits a share of the errands rather than all of them, which agrees
 with the user's own observation that water-fetching had worked before. Its
 VISIBILITY is far higher than its rate: only ONE water errand runs at a time, a
-blocked one holds until the 300-second expiry, and a successful round trip takes
-about 57.5 s (replay: order at 342.1 s, report at 399.6 s). At a one-in-three
-failure rate roughly 72 % of play time already carries no water errand at all.
+blocked one holds until the 300-second expiry, and a successful round trip took
+about 57.5 s in the baseline replay (a later pair: order at 342.1 s, report at
+399.6 s). At an ASSUMED one-in-three failure rate, roughly 72 % of play time
+would see no water delivered — the blocked errand still occupies the slot.
 
 The exact per-errand rate is not measured here; the replay harness of 72dc3907c
 can produce it from a seed and start-position sweep of the baseline. That
-measurement is recorded in `docs/backlog.md` and is not a condition of this fix.
+measurement is filed as a pending item in `docs/backlog.md` and is not a
+condition of this fix.
