@@ -7,6 +7,7 @@ export function speechBearing(camera: Camera, speaker: { x: number; z: number })
   const dx = speaker.x - eye.x
   const dz = speaker.z - eye.z
   // Ground-plane right and forward. No division by depth: going behind the
-  // camera keeps the same side and crossing the rear seam remains continuous.
+  // camera keeps the same side. The result is atan2's principal value, so it
+  // jumps between +π and −π straight behind the camera.
   return Math.atan2(-dx * forward.z + dz * forward.x, dx * forward.x + dz * forward.z)
 }

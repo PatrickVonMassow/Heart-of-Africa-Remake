@@ -11,16 +11,18 @@
 // The invariant here is the wall rule extended upward: over every spot the
 // player can stand, the lowest roof surface above him clears the eye height plus
 // the camera's near plane plus a margin. Where a roof's rim hangs lower than
-// that, the low strip is made non-standable by extending that building's
-// collider — NOT by fencing the eaves off wholesale. An eave one can stand under
-// keeps being one (the port awning and the cook-shelter at ~2.3 m, the tall
+// that, that building's collider is extended out to the roof's rim (for a roof
+// rising inward, a dome or a tent, that is its whole footprint) — NOT by
+// fencing every eave off wholesale. An eave one can stand under keeps being one (the port awning and the cook-shelter at ~2.3 m, the tall
 // Congo roofs); only the strip nobody could stand under in real life either —
 // thatch at chest height — stops being ground.
 //
-// Every profile is DERIVED from the numbers the renderer draws with: the
-// constants live here and `PlaceScene` builds its meshes from them, so a
-// reshaped roof cannot leave a stale clearance behind (the point-129/378 rule
-// for colliders, applied to the third dimension).
+// Every profile is DERIVED from the numbers the renderer draws with: the hut,
+// shed and cook-shelter constants live here and `PlaceScene` builds those meshes
+// from them, so a reshaped roof cannot leave a stale clearance behind (the
+// point-129/378 rule for colliders, applied to the third dimension). The other
+// roofs' numbers (granary, stall, box, warehouse, tower, mosque, port) are
+// module-private here and have to follow a reshape of their meshes by hand.
 
 import { PLAYER_RADIUS } from './collision'
 import type { HutRoof, RegionPlaceStyle } from './regionStyles'
@@ -235,11 +237,6 @@ export function shedRoofProfile(d: { x: number; z: number; rot: number; r: numbe
   )
 }
 
-/** Stand-off the shed's tilted roof demands around its circular collider. */
-export function shedRoofStandOff(d: { x: number; z: number; rot: number; r: number; h: number }): number {
-  return roofStandOff(shedRoofProfile(d))
-}
-
 /** Roof of one non-enterable dwelling, as drawn. */
 export function dwellingRoofProfile(d: DwellingDef, style: RegionPlaceStyle): PlaceRoof {
   switch (d.kind) {
@@ -338,7 +335,8 @@ export function placeRoofs(
 
 /**
  * The lowest roof surface over a camera standing at (x, z) — the minimum taken
- * over the near plane's reach, so a rim the near plane pokes into counts as
+ * at the eye and twelve points round the near plane's reach, so a rim the near
+ * plane pokes into counts as
  * overhead even when the eye itself is a hand's breadth outside it. Infinity
  * when the sky is open above.
  */
