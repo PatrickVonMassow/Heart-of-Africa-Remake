@@ -5,10 +5,11 @@
 // him OUT and ACROSS to the drummer's side; from there the press at either man
 // sends his message on the drums, repeats it while he stands, and calls him
 // back while he walks home. Used while he is outside, the hut itself does
-// nothing at all. And while he is inside it, the press at the drummer belongs
-// to the drummer: he points at the hut and names the man with the sixth word of
-// the language.
+// nothing at all.
 // Elsewhere the hut's head man acknowledges the traveller without stepping out.
+// In every village, while the chief is inside his hut, the press at the drummer
+// belongs to the drummer: he points at the hut and names the man with the sixth
+// word of the language.
 //
 // What the key no longer does is hand anything over. The find from the boulder
 // is an inventory item and is given by USING it before him (design.md §6), so
@@ -42,9 +43,10 @@ export type ChiefAction =
 
 /**
  * What the use key does at `target`, from the live game state and the phase of
- * the chief's walk. `walking-out` answers nothing anywhere: he is already
- * coming, and a key that hurried him would be a second way to do the one thing
- * the hut key just did.
+ * the chief's walk. In the drum village `walking-out` answers nothing anywhere
+ * (elsewhere the hut key never sends him out): he is already coming, and a key
+ * that hurried him would be a second way to do the one thing the hut key just
+ * did.
  */
 export function nextChiefAction(
   target: ChiefTarget,
