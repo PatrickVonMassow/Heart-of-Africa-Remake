@@ -27,7 +27,8 @@
 import { WALKER_RADIUS } from './collision'
 import type { BankPoint, PlaceRiverBank } from './riverBank'
 
-/** The weaver's own body radius at her seat under the heddles. */
+/** The weaver's own body radius at her seat under the heddles — and the
+ *  helper's body along his whole walk between his stands. */
 export const WEAVER_BODY_RADIUS = 0.3
 
 /**
@@ -37,7 +38,8 @@ export const WEAVER_BODY_RADIUS = 0.3
  * the water beyond the warp, so a player standing behind her sees the weaver,
  * her warp and the river in one look (item 10).
  *
- * The distance is the SEATED body's own reach (`loomWork`'s WARP_REACH): closer
+ * The distance is set by the KNEELING body's reach toward the threads
+ * (`loomWork`'s WARP_REACH is the arm's part of it, from the shoulders): closer
  * and she sits in her threads, further and her hands stop short of them.
  */
 export const WEAVER_SIDE_OFFSET = 0.36
@@ -86,7 +88,7 @@ const PLAZA_SWEEP_RADIUS_STRIDE = 1
  *  Bambara plan finds its full line at the 58th. */
 const PLAZA_SWEEP_VIEWED_SEATS = 120
 
-export interface LoomGeometry {
+interface LoomGeometry {
   /** Metres from the seat to each stake — half the stretched warp. */
   warpHalf: number
   /** Metres from the seat at which the helper works when a call sends him. */
@@ -136,7 +138,7 @@ export interface LoomPlacement {
    *  settlement runs no water errand. */
   waterPathHead: BankPoint | null
   /** Whether a body of this radius would stand on the carriers' drawn water
-   *  lane. The warp is a 6 m wall: laid across the lane it would put a solid
+   *  lane. The warp is a long wall: laid across the lane it would put a solid
    *  through the track the scene draws to the river. */
   onWaterLane: (x: number, z: number, r: number) => boolean
   /** The separation every one of those places is owed: `talk.reach`. */
@@ -170,8 +172,9 @@ export interface LoomStation {
   tend: { upstream: BankPoint; downstream: BankPoint }
   /**
    * Whether the warp's axis is the RIVER's. False in a settlement with no bank,
-   * where the two direction words do not exist: the weaver works and the helper
-   * tends, and nothing is named.
+   * where the two direction words do not exist: the weaver works, the helper
+   * stays at her side (his tending is sent only by a named direction), and
+   * nothing is named.
    */
   onRiverAxis: boolean
 }
@@ -236,7 +239,7 @@ export function stationGround(
     const on = at(station, -warpHalf + (warpHalf * 2 * k) / steps)
     ground.push({ ...on, r: WARP_BODY_RADIUS, kind: 'warp' })
   }
-  // A WAY ROUND EACH END. The warp is a wall six metres long between the
+  // A WAY ROUND EACH END. The warp is a wall 2 × warpHalf long between the
   // village and its water, and a walker must be able to pass it: the ground
   // just beyond each stake carries a walker's own body, clear of everything
   // else. Without this the station can seal the route to the bank against a
@@ -255,14 +258,16 @@ export function stationGround(
 }
 
 /**
- * Whether a laid-out station stands where it may: the whole warp on standable
- * ground, the seat's view of the water open, and the two teaching places it
- * must not be heard beside kept at their distance.
+ * Whether a laid-out station stands where it may: no farther inland than the
+ * plan meant (plus its slack), the two teaching places it must not be heard
+ * beside kept at their distance, the whole station ground inside the walkable
+ * radius, standable and off the carriers' water lane, and the water in view
+ * from the weaver's seat and the helper's home stand.
  */
 function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
   // The arithmetic tests first; the sampled ones below are what a sweep pays for.
-  // AND NO FARTHER FROM THE WATER THAN THE PLAN MEANT IT TO BE (work-order
-  // 1190). The water sight line below reads SOLIDS, not the ground: a dune
+  // AND NO FARTHER FROM THE WATER THAN THE PLAN MEANT IT TO BE, give or take
+  // `PLAZA_INLAND_SLACK` (work-order 1190). The water sight line below reads SOLIDS, not the ground: a dune
   // between the seat and the river passes it and still hides the water in the
   // picture, which is how a seat moved inland for the plaza's sake arrived with
   // the river at the horizon and nothing blue where the frame reads for it.
@@ -272,8 +277,8 @@ function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
   }
   // THE SEPARATION (item 9): the direction words spoken here must not arrive in
   // the same ear as the children's, and RIVER must not arrive in this one. The
-  // whole station is held to it, because the helper speaks from neither end
-  // but the weaver's word is heard wherever he is walking.
+  // weaver and both stakes are held to it, because the helper speaks from
+  // neither end but the weaver's word is heard wherever he is walking.
   for (const on of [station.weaver, station.upstream, station.downstream]) {
     if (p.toChildren(on.x, on.z) < p.clearance) return false
     if (p.waterPathHead && Math.hypot(on.x - p.waterPathHead.x, on.z - p.waterPathHead.z) < p.clearance) {
@@ -292,14 +297,15 @@ function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
   // player standing at the loom can see what it is an axis of. The line is
   // asked STRAIGHT OUT from the seat rather than to the villagers' own stand at
   // the water — that stand is one of the places the children speak from, so a
-  // sight line drawn to it would be a line the loom is already held 10 m away
-  // from, and it would answer about a stretch of water she is not looking at.
+  // sight line drawn to it would be a line the loom is already held
+  // `clearance` (talk.reach) away from, and it would answer about a stretch of water she is not looking at.
   //
-  // AND FROM WHERE THE HELPER WORKS, not only from her seat (work-order 1190).
+  // AND FROM THE HELPER'S HOME STAND, not only from her seat (work-order 1190).
   // The picture the water claim is judged on is taken over the HELPER's
-  // shoulder as he walks out along the warp, so a seat that keeps the river in
-  // her view and loses it in his is a seat that fails the frame — which is
-  // exactly what the first plaza-visible seat did.
+  // shoulder, so a seat that keeps the river in her view and loses it in his is
+  // a seat that fails the frame — which is exactly what the first
+  // plaza-visible seat did. His tend stands and the walk between are not
+  // sight-tested.
   if (p.bank) {
     for (const stand of [station.weaver, station.helperHome]) {
       if (!p.sightClear(stand, waterAhead(stand, p.bank), SIGHT_HALF_WIDTH)) return false
@@ -318,9 +324,11 @@ export function waterAhead(at: BankPoint, bank: PlaceRiverBank): BankPoint {
  * Where the loom stands in one settlement, or null where the plan leaves it no
  * room at all.
  *
- * The seat is swept out from the station's nominal bearing, nearest first, so
- * the loom stays where the rest of the village was built around it wherever it
- * can. When it cannot, THE LOOM MOVES AND THE CHILDREN DO NOT (work-order 1157
+ * The seat is searched in up to three coarse passes that demand a view from
+ * the plaza (below), then the widest-view seat the first pass found, and last a
+ * fine sweep out from the station's nominal bearing, bearing by bearing, so
+ * the loom stays near where the rest of the village was built around it
+ * wherever it can. When it cannot, THE LOOM MOVES AND THE CHILDREN DO NOT (work-order 1157
  * item 9): their ground is already settled when this runs, and it is the
  * teaching the whole communication slice is arranged around.
  */
@@ -336,12 +344,6 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
 
   const baseRadius = Math.hypot(p.nominal[0], p.nominal[1])
   const maxRadius = Math.max(0, p.walkRadius - p.geometry.warpHalf - WARP_BODY_RADIUS)
-  const radii: number[] = [baseRadius]
-  for (let d = SEAT_RADIUS_STEP; d <= maxRadius; d += SEAT_RADIUS_STEP) {
-    if (baseRadius - d >= 2) radii.push(baseRadius - d)
-    if (baseRadius + d <= maxRadius) radii.push(baseRadius + d)
-  }
-
   /** The candidate radii at a given stride, nearest the nominal one first.
    *  THE STRIDE IS TAKEN ON THE SEQUENCE, NOT ON THE ARRAY: skipping every nth
    *  entry of `radii` would drop only the INWARD ones (the list alternates in,
@@ -354,8 +356,10 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
     }
     return out
   }
+  const radii = radiiAt(SEAT_RADIUS_STEP)
 
-  /** The fine sweep out from the nominal bearing, nearest first. */
+  /** The fine sweep out from the nominal bearing: bearing by bearing, and at
+   *  each bearing the radii nearest the nominal one first. */
   const sweep = (): LoomStation | null => {
     for (let step = 0; step <= SEAT_SWEEP_DEGREES; step++) {
       for (const sign of step === 0 ? [1] : [-1, 1]) {
@@ -378,19 +382,22 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
 
   // THE PLAZA'S VIEW IS ASKED FIRST, AND WHERE IT CANNOT BE HAD IN FULL THE
   // WIDEST ONE GOING IS TAKEN (work-order 1190). The first seat the plaza sees
-  // through a full metre wins outright, nearest the nominal spot first. Where
-  // no plan holds one — and two shipped Mandinka plans do not — the answer is
-  // not "anywhere": it is the seat with the widest view of the ones that clear
-  // everything else, which is the user's criterion served as far as the plan
-  // allows. Only a plan with no valid seat at all falls to the fine sweep.
-  // Both questions are answered in ONE pass over the same seats in the same
-  // order, so the view of each seat is measured once.
+  // through a full metre wins outright, in the coarse sweep's order (bearing by
+  // bearing from the nominal one, nearer radii first at each). Where no plan
+  // holds one — and two shipped Mandinka plans do not — the answer is not
+  // "anywhere": it is the seat with the widest view the first pass measured
+  // among the ones that clear everything else, which is the user's criterion
+  // served as far as the coarse sweep and its `PLAZA_SWEEP_VIEWED_SEATS` cap
+  // allow. Within a pass both questions are answered over the same seats in
+  // the same order, so the view of each seat is measured once.
   //
   // THE PLAN'S OWN GROUND FIRST, THEN THE GROUND A HOUSEHOLD GIVES UP (work-order
   // 1191): a Sahel compound ring leaves no free ground near the plaza at all,
   // so where the first pass finds no seen seat the second asks again with the
-  // households that may give way taken out. Its widest seat is only a fallback
-  // for the first pass's: nothing is left unbuilt for a view that is not had.
+  // households that may give way taken out, and a third asks for the far plaza
+  // view (`plazaViewFar`). Only the first pass records the widest seat: nothing
+  // is left unbuilt for a view that is not had. A plan whose coarse passes
+  // record no seat at all falls to the fine sweep.
   let widest = null as { station: LoomStation; view: number } | null
   const plazaPass = (q: LoomPlacement): LoomStation | null => {
     let viewed = 0
