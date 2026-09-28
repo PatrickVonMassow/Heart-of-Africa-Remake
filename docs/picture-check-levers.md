@@ -33,17 +33,17 @@ Risk: the region must be known in advance, and the two clips already on disk
 ### A2 — Downscale before inspection
 Resize the frame before it enters a reviewing context. 1440×900 → 720×450 is
 26 × 17 = 442 tokens: **3.9×**. Half-size is not half-cost, because the patch
-grid is a ceiling on each axis, so the saving is slightly better than quadratic
-in the linear factor. Risk: a one-pixel-scale defect (a stepped coast, a hairline
+grid is a ceiling on each axis, so the saving is slightly worse than quadratic
+in the linear factor (3.9× against the ideal 4×). Risk: a one-pixel-scale defect (a stepped coast, a hairline
 horizon strip) may not survive the resample. This is exactly the lever the point
 says to prove rather than assume.
 
 ### A3 — Contact sheet (tile many frames into one image)
 Because cost is per *image* and grows with its area, N frames tiled into one
 sheet at 1/√N scale cost what ONE frame costs. A 37-shot `enrichments` run as a
-6×7 sheet at 1440×900 is 1,716 tokens instead of 63,492: **37×**. This is the
-single largest arithmetic lever available and it preserves the frame COUNT,
-which A2 and A4 do not. Risk: it is A2 with a brutal scale factor (each tile is
+6×7 sheet at 1440×900 is 1,716 tokens instead of the measured 60,687: **35×**.
+This is the single largest arithmetic lever available and it preserves the frame
+COUNT, which A4 and A5 do not. Risk: it is A2 with a brutal scale factor (each tile is
 240×128), so it inherits A2's fine-detail question in its worst form. Likely
 useful as a *triage* sheet that names which frame to open at full size, not as
 the inspection itself.
@@ -64,13 +64,13 @@ shot is a permanently lost control; indistinguishable from weakening.
 Keep a per-suite, per-backend baseline frame in the repository. After a run, diff
 each new frame against its baseline; only frames whose diff exceeds a threshold
 are put in front of a reader. On a change that moves three frames, the reviewing
-cost of a 37-shot run falls from 63,492 tokens to 5,148: **12×** on that run, and
+cost of a 37-shot run falls from 60,687 tokens to 5,148: **12×** on that run, and
 to ZERO on a run that moved nothing. Converges with point 207 (ii)'s open
 golden-image method — build one thing, not two.
-This is the lever with the best cost/risk shape, because it never *hides* a
-changed picture; it only skips unchanged ones. Its whole risk sits in the noise
-floor: if the renderer is not deterministic, everything is flagged and nothing is
-saved.
+This is the lever with the best cost/risk shape, because it skips only frames
+whose diff stays under its threshold. Its risk sits in that threshold and the
+noise floor: set too high it hides a small real change; if the renderer is not
+deterministic, everything is flagged and nothing is saved.
 
 ### A7 — Diff-derived crop
 A6 and A1 combined, with the machine choosing the rectangle: crop each flagged
@@ -91,7 +91,8 @@ one.
 ### A9 — Determinism as the enabling precondition
 A6/A7/A8 are worthless above a noisy floor. TRAA jitter, wildlife RAF motion, the
 in-game clock and `Math.random` all move pixels between two runs of identical
-code. `scripts/verify/benchmark.mjs` already installs a seeded PRNG over
+code. The in-game F8 benchmark (`src/systems/benchmarkRun.ts`, driven by
+`scripts/verify/benchmark.mjs`) already installs a seeded PRNG over
 `Math.random` and steps a fixed 1/60 s timestep for exactly this reason; the
 screenshot path should borrow it. Not a saving in itself — a prerequisite whose
 absence rejects three other levers.
@@ -104,7 +105,8 @@ reputation.
 
 ### A11 — Retarget the guard's default suite (no method change at all)
 `suggestSuite()` falls back to `'enrichments'` — the 37-frame suite. Its
-two-backend pair is 121,374 tokens, **11× the same check through `flow`**. Making
+two-backend pair is 121,374 tokens, **5.7× the same two-backend check through
+`flow`** (21,344). Making
 the fallback the cheapest suite that covers the changed paths is a pure routing
 change: no frame is cropped, downscaled or skipped, and the control is
 bit-identical. Cheapest lever on the list by implementation cost.
@@ -133,28 +135,29 @@ condensed, the content is not.
 
 | | Lever | Mechanism |
 | --- | --- | --- |
-| B-A | **Snap the viewport to 28-px multiples** | 1440×900 is billed as 52 × 33 patches = 1456×924 px, so 16 px of width and 24 px of height are paid for and not delivered. 1428×896 = 51 × 32 = 1,632 tokens, 4.9 % off every frame for an identical picture. |
+| B-A | **Snap the viewport to 28-px multiples** | 1440×900 is billed as 52 × 33 patches = 1456×924 px, so 16 px of width and 24 px of height are paid for and not delivered. 1428×896 = 51 × 32 = 1,632 tokens, 4.9 % off every frame for an essentially identical picture (layout coordinates shift, §4.4). |
 | B-B | Downscale before review | 720×450 = 442 tokens, 3.9×. |
 | B-C | Crop to the region of interest | The repo already ships two clips (462 and 165 tokens). |
 | B-D | Diff-gated review against the tracked baselines | Only changed frames reach a reader; 12× on a typical change, zero on an unchanged suite. |
 | B-E | Deterministic capture as D's precondition | Lift the F8 benchmark's seeded PRNG and fixed 1/60 s timestep into `_boot.mjs`. |
 | B-F | **Temporal-variance probe for flicker** | Capture N consecutive frames, assert per-pixel variance in still regions. Covers the one corpus row a still frame cannot cover in principle. |
 | B-G | Cross-backend machine diff instead of a second review | ~2×, and it targets the stepped coast directly. |
-| B-H | Path-aware suite routing | `suggestSuite()` parrots the last suite and otherwise defaults to the 37-frame one; a diff→suite map routes a HUD change to `flow`: 11×. |
+| B-H | Path-aware suite routing | `suggestSuite()` parrots the last suite and otherwise defaults to the 37-frame one; a diff→suite map routes a HUD change to `flow`: 5.7×. |
 | B-I | **Split `enrichments` into topic sub-suites** | A change owes only its covering sub-suite; ~7×. |
 | B-J | **Fail fast on the expensive suite** | Eight of ten recorded `enrichments` runs failed and still wrote all 37 frames at 951–1029 s — ≈ 2.1 h of failing wall clock in the two-day window. |
-| B-K | Thumbnail contact sheet, escalate on suspicion | 37 thumbnails at 448×280 = 5,920 tokens; 5.5×. |
+| B-K | Thumbnail contact sheet, escalate on suspicion | 37 thumbnails at 448×280 = 5,920 tokens; ~10× against the 60,687-token run. |
 | B-L | **PNG byte delta as a zero-token ranking signal** | Bytes are worthless as a cost measure but not as a *content* measure: at fixed dimensions a byte delta is a free anomaly signal. |
 | B-M | **Pixel probes that read the rendered frame** | The sunken sphinx passed because the assertion was `sphinxBuried === true`; a probe that projects the bounding box and reads real pixels costs zero review tokens. |
 | B-N | **Make WebGPU the headless-testable, even primary, lane** | 39 of 40 recorded runs were WebGL 2 while two of the eight corpus bugs are WebGPU-only — the practised split has the wrong primary. |
 | B-O | Instrument what a reader actually opened | Closes the measurement's largest gap and lets the guard demand *frames inspected* rather than *run passed*. |
 | B-P | **Prompt-cache the stable baselines** | Attacks the re-read multiple rather than the first read. |
-| B-Q | **Untrack `verification/` (LFS or ignore)** | 75.5 MiB in every clone, a new blob per re-baseline. Storage, not tokens; a history rewrite, so a user decision. |
+| B-Q | **Untrack `verification/` (LFS or ignore)** | 75.5 MiB in every clone, a new blob per re-baseline. Storage, not tokens. Untracking stops new blobs; removing the existing ones from clones is a history rewrite, so a user decision. |
 
 ### What the second list added, and what it corrected
 
 Independent convergence on eight levers — downscale, crop, contact sheet,
-golden diff, determinism, cross-backend diff, suite routing, fewer frames —
+golden diff, determinism, cross-backend diff, suite routing, recording what was
+reviewed —
 is itself evidence that the obvious search space was covered. The value sat in
 the divergence, and it was real:
 
@@ -172,9 +175,11 @@ the divergence, and it was real:
 - **B-N** reads the 39:1 backend split as a defect in the practice rather than
   as a neutral observation, which list A did not.
 
-List A's own divergence, kept for the union: **A7** (let the machine choose the
-crop from the diff bounding box rather than a human predicting it) and **A13**
-(the six byte-shrinking ideas recorded as rejected on arithmetic).
+List A's own divergence, kept for the union: **A4** (inspect one view per
+change), **A5** (emit fewer frames), **A7** (let the machine choose the crop from
+the diff bounding box rather than a human predicting it), **A10** (a perceptual
+metric) and **A13** (the six byte-shrinking ideas recorded as rejected on
+arithmetic).
 
 ---
 
@@ -190,8 +195,8 @@ The acceptance test the point demands: run each candidate against the state
 `verification/` is tracked in git, so the frames as they stood at each bug's
 parent commit can be extracted directly — no old checkout needs to build or run.
 That makes the replay cheap. It also makes its coverage checkable, and the
-check is unflattering. Of the eight rows, **three carry a usable before/after
-frame pair**:
+check is unflattering. Of the eight rows, **two carry a usable before/after
+frame pair, and a third only partly**:
 
 | Row | Usable pair? | Why not |
 | --- | --- | --- |
@@ -200,7 +205,7 @@ frame pair**:
 | 3 horizon strip | **no** | Its evidence frame `136-cairo-silhouette-footing.png` was `A`dded *by* the fix. The 16 pre-existing frames it re-baselined differ by 0.75–1.73 % of pixels, and the pair is not separable by eye even at full resolution. |
 | 4 doubled Giza label | **no** | Never fixed. |
 | 5 invisible season | partial | Buggy frames exist (`108`/`109`); no committed fixed counterpart of the same view. |
-| 6 haze at default zoom | **yes** | `e581415` → `0bd1262`. |
+| 6 haze at default zoom | **yes** | `e581415` → `0bd1262` (the first later commit to re-baseline the frames; the fix `d833863` wrote none). |
 | 7 sunken sphinx | **yes** | `de7717e` → `9d5fff7`, re-baselined by the fix itself. |
 | 8 texture dip | **no** | Numeric, not a frame. |
 
@@ -223,10 +228,10 @@ src/world/redSea.ts    render=false  dual=false
 ```
 
 So the point-210 stepped coast — the incident named in the header of
-`render-verify-core.mjs` as the reason the guard exists — **would not trip the
-guard today.** It is recorded here and not fixed: widening the render set
-*raises* the cost this point was opened to lower, so it is a decision, not a
-tidy-up.
+`render-verify-core.mjs` as the reason the guard exists — **would not have
+tripped the guard then.** It was recorded here and not fixed, because widening
+the render set *raises* the cost this point was opened to lower; §5.3 later
+decided it and added all of `src/world/` to the render set.
 
 ### 3.2 The noise floor — the result that decided the exercise
 
@@ -300,26 +305,27 @@ A lever must survive every case. A case that cannot be run is not a pass.
 
 | Lever | Verdict | The case that killed it |
 | --- | --- | --- |
-| A6 / B-D golden-image pre-filter | **REJECTED** | §3.2 noise floor (quietest frame 27.81 % vs 0.75 % signal) **and** row 5, whose buggy season diffs at 91.60 % and passes a "did it change?" gate. |
+| A6 / B-D golden-image pre-filter | **REJECTED** | §3.2 noise floor (quietest frame 27.81 % vs 0.75 % signal). (Row 5 refutes only a "did it change?" acceptance gate, §3.3, not a filter that sends changed frames to a reader.) |
 | A7 diff-derived crop | **REJECTED** | Derives its rectangle from A6's diff; inherits its death. |
-| A8 / B-G cross-backend diff | **REJECTED** | §3.2 a fortiori: same-backend, same-code noise already swamps the signal, and cross-backend noise is strictly larger. Would need §3.2 fixed first. |
+| A8 / B-G cross-backend diff | **REJECTED** | §3.2 a fortiori: same-backend, same-code noise already swamps the signal, and cross-backend noise was not measured at all. Would need §3.2 fixed first. |
 | A10 perceptual metric | **REJECTED** | §3.2: `12-worldmodel-lake-victoria` is two different views, not two noisy renderings of one. No metric repairs that. |
 | A2 / B-B downscale, A3 / B-K contact sheet | **REJECTED as a replacement** | Rows 1 and 3 cannot be run at all (§3.1), so the fine-detail class is untested — and it is exactly the class these levers are suspected on. Survives only as triage *over* frames that stay available at full size. |
 | A1 / B-C hand-picked crop | **REJECTED** | Row 6: the haze defect is whole-frame, no crop contains it. Row 3: the defect appeared where no crop would have been aimed — the frame had to be invented. |
 | A4 inspect one view per change | **REJECTED** | Row 1: the stepped coast came out of `src/world/redSea.ts`, which no coupling map would have pointed at a coastline frame. |
-| A5 / B-I emit or keep fewer frames | **REJECTED** | Row 3: the corpus's own history runs the other way — the bug was caught by *adding* a frame. Row 2 additionally shows cross-topic coupling (a season mechanism breaking flora rendering). |
+| A5 emit fewer frames | **REJECTED** | Row 3: the corpus's own history runs the other way — the bug was caught by *adding* a frame. |
+| B-I split `enrichments` into topic sub-suites | **REJECTED** | Row 2 shows cross-topic coupling (a season mechanism breaking flora rendering), so a change owes several sub-suites — the routing question of A11/B-H, rejected below. |
 | A11 / B-H path→suite map, general form | **REJECTED** | Rows 2 and 5 both turn on `src/scenes/travel/TravelScene.tsx`, whose frames live in `world` *and* `enrichments` *and* `polish`. A map that routes it correctly routes it everywhere and saves nothing. |
 | A11 / B-H, **narrowed to DOM-only changes** | **SURVIVES** | No corpus row is a `src/ui/`-only change, and the guard already proves that class needs one backend. See §4. |
 | A9 / B-E deterministic capture | **SURVIVES as a precondition, not a saving** | Nothing kills it; §3.2 shows it is not a tweak but the whole battle, and it is what would resurrect A6/A7/A8. |
 | A12 / B-O instrument what was reviewed | **SURVIVES, no saving on its own** | Nothing kills it. Without a trustworthy ranking (which needed A6) it can only record, not reduce. |
-| B-A snap the viewport to 28-px multiples | **SURVIVES, not implemented** | No case can kill it — no information is removed. See §4 for why it is not taken now. |
+| B-A snap the viewport to 28-px multiples | **SURVIVES, not implemented** | No case can kill it — no picture information is removed, though layout assertions need revalidation. See §4 for why it is not taken now. |
 | B-F temporal-variance probe | **SURVIVES, out of scope here** | Covers row 2, which nothing else covers. It is a *new control*, not a cheaper one; belongs with point 207 (ii). |
 | B-J fail fast on the expensive suite | **SURVIVES, out of scope here** | Nothing kills it (the guard credits only exit-0 runs). Saves wall clock, not tokens. |
 | B-L byte delta as a ranking signal | **REJECTED** | Row 5: the buggy season moved 92 % of the pixels, so byte-size ranking would have promoted it as "changed a lot" — the same false reassurance as A6. |
 | B-M pixel probes reading the frame | **SURVIVES as an addition, never a replacement** | Row 5 is the standing proof that a probe checks only what it was written for. |
-| B-N WebGPU as the primary lane | **SURVIVES, out of scope here** | Not a cost lever — it *raises* cost. A correctness finding about the practised 39:1 split. |
+| B-N WebGPU as the primary lane | **SURVIVES, out of scope here** | Not a cost lever — it *raises* cost. A correctness finding about the July practice (39:1); since adopted — WebGPU is the everyday lane (CLAUDE.md §7.2). |
 | B-P prompt-cache the baselines | **UNMEASURED** | Cannot be replayed from repository artefacts; its premise (frames re-billed per turn) is itself unmeasured. Recorded as a correction to the cost document, not as a lever taken. |
-| B-Q untrack `verification/` | **OUT OF SCOPE** | Storage, not reviewing tokens; a history rewrite needs a user decision. |
+| B-Q untrack `verification/` | **OUT OF SCOPE** | Storage, not reviewing tokens; removing the existing blobs is a history rewrite and needs a user decision. |
 | A13 the six byte-shrinking ideas | **REJECTED on arithmetic** | No replay needed: every 1440×900 frame costs 1,716 tokens across a 24× byte spread. |
 
 ---
@@ -374,8 +380,8 @@ diff frames yet?" from a belief into a command.
   already being paid.
 - **B-J, fail-fast on `enrichments`; B-F, the temporal-variance probe; B-M,
   frame-reading pixel probes; B-N, a WebGPU-primary lane.** All survive; none is
-  a cheaper *picture check*. Three of them add a control and one changes which
-  backend is primary. They belong to point 207 (ii) and to the routing question,
+  a cheaper *picture check*. Two of them (B-F, B-M) add a control, B-J saves
+  wall clock, and B-N changes which backend is primary. They belong to point 207 (ii) and to the routing question,
   not here.
 
 ### 4.5 The convergent review, and what it corrected
@@ -416,8 +422,8 @@ decides that: a case that cannot be run is not a pass.
 
 The one thing that would unlock the whole rejected family is **deterministic
 capture** (A9 / B-E). §3.2 gives it a measurable acceptance bar: two consecutive
-runs of a suite must agree to within a tolerance below the 0.75 % smallest
-observed real signal, on every frame. `scripts/picture-stability.mjs` measures
+runs of a suite must agree to within a tolerance below the 0.75 % horizon-strip
+figure (a soft signal, §4.5), on every frame. `scripts/picture-stability.mjs` measures
 exactly that. Until it reports a floor under that bar, no diff-gated review is
 worth building — and `12-worldmodel-lake-victoria` says the first work is not a
 tolerance knob but making the capture wait for the picture it names.
