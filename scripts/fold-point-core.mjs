@@ -31,11 +31,9 @@ import { CLAUDE_MODEL } from './fable-switch-core.mjs'
 import { LandingError, VERDICT, tickAndArchive } from './land-point-core.mjs'
 import { closeCard, nowCard, queueCard, toNow } from './board-core.mjs'
 
-export { LandingError }
-
 export const USAGE =
   'usage: node scripts/fold-point.mjs <point> (--into <survivor> | --delivered "<evidence>")\n' +
-  '                                   --model "<authoring model>"\n' +
+  '                                   --model "<authoring model>"   (not needed with --dry or --no-commit)\n' +
   '                                   [--text "<German card text>" | --text-stdin]\n' +
   '                                   [--next <m> "<status>" | --none "<reason>"]\n' +
   '                                   [--dry] [--no-commit]'
@@ -47,20 +45,17 @@ export const USAGE =
  *
  *   - the BOARD edit runs after the TICK, because the publish precondition reads
  *     the open work order off TASKS.md (see the header);
- *   - the COMMIT runs LAST, so it can carry the whole transition — the tick, the
- *     archive move and whatever tracked file the board edit moved — as one
- *     commit, and so a failed board edit never leaves a commit claiming a fold
+ *   - the COMMIT runs LAST, so it can carry the whole transition — the tick and
+ *     the archive move (the board file is git-ignored) — as one commit, and so a failed board edit never leaves a commit claiming a fold
  *     the board never got.
  */
 export const FOLD_STEPS = Object.freeze([
   { id: 'validate', label: 'check the point, the survivor and the board card' },
   { id: 'tick', label: 'tick the point in the work order' },
   { id: 'archive', label: 'move the block into docs/tasks-archive.md' },
-  { id: 'board', label: 'move the queue card into Erledigt and publish' },
+  { id: 'board', label: "move the point's queue or now card into Erledigt and publish" },
   { id: 'commit', label: 'commit the work-order transition' },
 ])
-
-export const FOLD_STEP_IDS = Object.freeze(FOLD_STEPS.map((s) => s.id))
 
 /** A step's human label, or the id for one this table does not know. */
 export const foldStepLabel = (id) => FOLD_STEPS.find((s) => s.id === id)?.label ?? String(id)
@@ -350,7 +345,7 @@ export function planFold({ number, into = null, delivered = '', cardText = '', c
     reason.kind === 'into' ? `point ${number} folds into point ${reason.into}` : `point ${number} is already delivered`
   at('tick').reason = `point ${number}`
   at('archive').reason = 'docs/tasks-archive.md'
-  at('board').reason = cardText ? `Erledigt: ${cardText}` : 'queue card → Erledigt'
+  at('board').reason = cardText ? `Erledigt: ${cardText}` : 'card → Erledigt'
   const c = at('commit')
   c.run = commit
   c.reason = commit ? 'TASKS.md + docs/tasks-archive.md (the board file is git-ignored)' : '--no-commit'
@@ -380,7 +375,7 @@ export function formatFoldVerdict({ number, into = null, delivered = '', results
     lines.push(`  ${mark} ${String(r.id).padEnd(8)} ${foldStepLabel(r.id)}${r.detail ? ` — ${r.detail}` : ''}`)
   }
   if (failed) {
-    lines.push(`FOLD FAILED at "${failed.id}" — nothing past it ran.`)
+    lines.push(`FOLD FAILED at "${failed.id}" — no later step was attempted; its repair names what may already be written.`)
     const repair = error?.repair ?? failed.repair
     if (repair) lines.push(`  repair: ${repair}`)
   } else if (rows.length && rows.every((r) => r.verdict === VERDICT.ok || r.verdict === VERDICT.skipped)) {
@@ -397,7 +392,9 @@ export function formatFoldVerdict({ number, into = null, delivered = '', results
  * naming its repair otherwise.
  *
  * NOTHING HAS BEEN WRITTEN when this runs, and that is the point: every refusal
- * a fold can produce is produced here, while a rollback is still free.
+ * that can be judged from the three texts is produced here, while a rollback is
+ * still free. The CLI's dirty-tree and archive-guard checks and closeCard's own
+ * refusals inside the board edit come later.
  */
 export function validateFold({ tasksText = '', archiveText = '', boardHtml = '', number, into = null, delivered = '', text = '' } = {}) {
   const n = Number(number)

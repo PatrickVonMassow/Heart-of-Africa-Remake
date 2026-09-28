@@ -48,7 +48,8 @@ export const SEALED_BOUNDARY_CAUSE = 'committed-boundary'
  * wrong reason.
  *
  * @param {string} source the guard's source text
- * @returns {string[]} the distinct command lines it prescribes
+ * @returns {string[]} the distinct script invocations (without their arguments)
+ *          and `sleep N` commands it prescribes
  */
 export function prescribedCommands(source = '') {
   const text = typeof source === 'string' ? source : ''
@@ -64,7 +65,8 @@ export function prescribedCommands(source = '') {
 }
 
 /**
- * HOW DOES ONE GUARD BEHAVE IN THE SEALED-BOUNDARY STATE? PURE, TOTAL.
+ * HOW DOES ONE GUARD BEHAVE IN THE SEALED-BOUNDARY STATE? PURE; total for any
+ * object or an omitted argument.
  *
  * @param {object} input
  * @param {boolean} input.standsDown does it return `applicable:false` there?

@@ -724,7 +724,7 @@ describe('verdict', () => {
     // the refusal is about ESCAPE, not about the pipes half being unreadable.
     const bothSurvive = verdict([outcome('pipes', true), outcome('files', true)])
     expect(bothSurvive.ok).toBe(false)
-    expect(bothSurvive.note).toMatch(/both shapes behaved alike/)
+    expect(bothSurvive.note).toMatch(/shapes did not diverge/)
   })
 
   it('refuses a pipes death that did not record EPIPE — an unexplained death names no cause', () => {

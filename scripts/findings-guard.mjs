@@ -1,9 +1,11 @@
 // Stop hook: a finding must not die with the session that made it.
 //
 // The decision logic is pure and Vitest-covered in findings-core.mjs; this
-// wrapper only reads the transcript and the carrier, and is FAIL-OPEN — an
-// unreadable transcript, a missing turn stamp or an internal error all allow
-// the stop, so a bug in here can never trap a session. That direction is
+// wrapper only reads — the transcript, the carrier, the dashboard state, the
+// in-flight declaration's mtime, batch ownership and the context fence — and is
+// FAIL-OPEN: an unreadable transcript or a missing turn stamp stands condition 1
+// down (the carrier and request conditions still apply), and an internal error
+// allows the stop, so a bug in here can never trap a session. That direction is
 // deliberate and differs from timestamp-guard: this guard asks for judgement
 // ("was there something worth keeping?"), and a guard that blocks on its own
 // blindness would train the reader to route around it.

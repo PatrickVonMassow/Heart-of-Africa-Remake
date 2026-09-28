@@ -1,9 +1,9 @@
 // THE LANDING CHAIN, as pure decisions (point 594).
 //
-// WHAT IT IS. Landing a finished point is always the same six steps — merge the
+// WHAT IT IS. Landing a finished point is always the same seven steps — merge the
 // feature branch, run the fast gate, tick the work order, move the block into the
-// archive, publish the board, delete the worktree — and today it is 8-12 turns of
-// the ONE serial session every point passes through, at a median context of 164k.
+// archive, commit the tick and push main, publish the board, clean up — and done
+// by hand it was 8-12 turns of the ONE serial session every point passes through, at a median context of 164k.
 // Measured over the last window, bookkeeping was 26.0 % of the weighted spend and
 // 37.5 % of the machine hours, and 62.3 % of the main session's own cost.
 //
@@ -14,13 +14,17 @@
 // with no I/O, pinned in scripts/land-point-core.test.mjs, and the wrapper
 // (scripts/land-point.mjs) only performs what these decide.
 //
-// FAIL LOUD, AND LEAVE NO HALF STATE. The chain stops at the FIRST red step and
-// never continues past it — `planFrom` below is what makes that structural rather
-// than remembered. Two consequences follow, and both are deliberate:
-//   - a step that was never reached is reported as `skipped: not reached`, never
-//     as green and never as absent;
+// FAIL LOUD. The chain stops at the FIRST red step and never continues past it —
+// `foldResult` below is what makes that structural rather than remembered. Two
+// consequences follow, and both are deliberate:
+//   - a step that was never reached is reported as not reached (`--`), never as
+//     green and never as absent;
 //   - the one step that writes two files (tick + archive move) computes BOTH
-//     texts before it writes EITHER, so a crash cannot land half of it.
+//     texts before it writes EITHER and writes the archive first, so a crash
+//     between the two leaves a duplicate the archive guard names, never a lost
+//     point.
+// A red step can still leave what came before it standing (a merged branch
+// behind a red gate); its repair names that.
 //
 // IT BYPASSES NO GUARD. Every step here is one the repository already governs,
 // and driving it from a script must not hide it from the mechanism that governs
@@ -30,7 +34,8 @@
 //     chain the same way it is refused a bare `git merge`;
 //   - the tick+archive transition is handed to `evaluateTasksArchive` (the same
 //     core the Stop-hook guard uses) BEFORE it is written, so the chain can never
-//     produce a state that guard would block.
+//     INTRODUCE a finding that guard would block on (pre-existing ones are
+//     tolerated — see transitionAccepted).
 
 import { CLAUDE_MODEL } from './fable-switch-core.mjs'
 
@@ -64,7 +69,7 @@ export class LandingError extends Error {
  */
 export const LANDING_STEPS = Object.freeze([
   { id: 'merge', label: 'merge the branch into main (--no-ff)' },
-  { id: 'gate', label: 'fast gate (build, lint, unit; audit on a lockfile change)' },
+  { id: 'gate', label: 'fast gate (build, lint, unit; audit on a package.json or lockfile change)' },
   { id: 'tick', label: 'tick the point in the work order' },
   { id: 'archive', label: 'move the block into docs/tasks-archive.md' },
   { id: 'push', label: 'commit the tick and push main' },
@@ -86,6 +91,9 @@ export const VERDICT = Object.freeze({
 })
 
 /**
+ * The `-c` pairs register, for this merge only, the append-only merge driver
+ * `.gitattributes` names for the mechanism review ledger.
+ *
  * NOT A FAST-FORWARD, and the reason is not the obvious one. A fast-forward
  * leaves no merge commit, and `git log --first-parent main` is the only calendar
  * measurement this project has — every fast-forwarded point would silently vanish
@@ -292,7 +300,8 @@ export async function runSteps({ ids = [], mode = 'serial', run } = {}) {
  * Parallel or serial, and why.
  *
  * SERIAL IS THE SAFE SIDE, so every uncertainty resolves to it: an unreadable
- * process table, a forced mode, an unknown machine. The gain here is machine
+ * process table, an unknown machine. An explicit --serial or --parallel is obeyed
+ * as given. The gain here is machine
  * hours (gates are 21.0 of them per window; 30-60 % of that is 2.9-5.8 % of all
  * machine hours), and the token effect is ~0.33 % — so this is worth nothing at
  * all if it costs one ambiguous red.
@@ -436,8 +445,8 @@ const findingKey = (f) => `${f?.rule ?? '?'}:${[...(f?.points ?? [])].sort((a, b
  * May this transition be written?
  *
  * Judged by the guard that GOVERNS the split (`evaluateTasksArchive`, the same
- * core the Stop hook uses), handed in rather than imported so this module stays
- * dependency-free and no caller can substitute a laxer judge by accident.
+ * core the Stop hook uses), handed in as verdicts rather than imported, so this
+ * module does not depend on the guard core.
  *
  * IT COMPARES BEFORE WITH AFTER, and that is not a softening. The guard judges the
  * whole work order, so it also reports things this landing did not cause — an
@@ -468,7 +477,8 @@ export function transitionAccepted({ before = null, after = null, verdict = null
  * The chain as a list of planned steps: { id, label, run, reason }.
  *
  * A step that will be SKIPPED says so here, before anything runs, so `--dry`
- * shows the reader the same plan the real run executes.
+ * shows the plan as known at that moment; the real run re-judges the board and
+ * cleanup decisions when it reaches them.
  */
 export function planLanding({ number, branch, audit, board, gate, worktrees = [] } = {}) {
   const steps = LANDING_STEPS.map((s) => ({ id: s.id, label: s.label, run: true, reason: '' }))
@@ -486,9 +496,7 @@ export function planLanding({ number, branch, audit, board, gate, worktrees = []
   b.run = board?.run !== false
   b.reason = board?.reason ?? ''
 
-  const c = at('cleanup')
-  c.run = true
-  c.reason = worktrees.length ? `branch + ${worktrees.length} worktree(s)` : 'branch (no worktree checked out)'
+  at('cleanup').reason = worktrees.length ? `branch + ${worktrees.length} worktree(s)` : 'branch (no worktree to remove)'
 
   return { number: Number(number), branch, steps, audit, gate, board }
 }
@@ -526,7 +534,7 @@ const MARK = {
  * verdict, then — on a failure — the repair.
  *
  * It is the whole point of the command that this is what the session reads
- * instead of eight tool outputs, so it says everything a reader needs and nothing
+ * instead of one tool output per step, so it says everything a reader needs and nothing
  * they would have to scroll: no command output, no timings, no diff.
  */
 export function formatLandingVerdict({ number, branch, results = [], error = null } = {}) {
@@ -538,11 +546,11 @@ export function formatLandingVerdict({ number, branch, results = [], error = nul
     lines.push(`  ${mark} ${r.id.padEnd(8)} ${stepLabel(r.id)}${r.detail ? ` — ${r.detail}` : ''}`)
   }
   if (failed) {
-    lines.push(`LANDING FAILED at "${failed.id}" — nothing past it ran, so no half state was left.`)
-    const repair = error?.repair ?? failed.repair
+    lines.push(`LANDING FAILED at "${failed.id}" — nothing past it ran; its repair names what it left behind.`)
+    const repair = error?.repair
     if (repair) lines.push(`  repair: ${repair}`)
   } else if (rows.length && rows.every((r) => r.verdict === VERDICT.ok || r.verdict === VERDICT.skipped)) {
-    lines.push(`LANDED. Point ${number} is on main, ticked, archived and cleaned up.`)
+    lines.push(`LANDED. Point ${number} is on main, ticked and archived; the cleanup line says what it removed.`)
   } else {
     lines.push('LANDING INCOMPLETE — see the marks above.')
   }
@@ -562,7 +570,7 @@ export function landingExit(results = []) {
  * MEASURED 10.09.2026, landing point 1088: the board step printed
  * `FAIL board    publish the board` with nothing after the label, while the
  * publisher had said exactly what was wrong. Two reasons, and both are fixed
- * here rather than at the three call sites that shared the bug:
+ * here rather than at each call site that shared the bug:
  *
  *   - `String(stream).split('\n').slice(-1)[0]` takes the LAST element, and a
  *     stream that ends in a newline — every well-behaved one does — makes that
@@ -576,7 +584,8 @@ export function landingExit(results = []) {
  * line carrying the cause; otherwise the first thing it said is closer to the
  * cause than the last (a stack trace's last line is a frame, its first is the
  * message). Nothing here is invented: every returned string is text the child
- * itself produced, or the error's own message when it produced none.
+ * itself produced, the error's own message when it produced none, or the fixed
+ * fallback when there is neither.
  */
 export function childWords(error, { fallback = 'no output from the failing command' } = {}) {
   const text = (stream) =>

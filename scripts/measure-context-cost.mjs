@@ -1,7 +1,8 @@
 // DID THE POINT BOUNDARY ACTUALLY BUY ANYTHING (point 373)? The IO half.
 //
 // Point 373's acceptance condition is a MEASUREMENT, not a mechanism: "report the %/h
-// rate for the first full day after the change against today's 1.25 %/h. The point
+// rate for the first full day after the change against today's 1.25 %/h" (today being
+// when point 373 was written; the default anchor below). The point
 // counts as delivered when the rate is measured, not when the mechanism runs." This is
 // the command that measures it, so the answer can be re-checked rather than remembered.
 //
@@ -20,7 +21,7 @@
 // as a measured one. WHICH folder that is, is DERIVED from the checkout (the harness
 // keys it by project path, so it differs per host) and a run that finds none FAILS —
 // the hard-coded slug used to make an empty container run look like a measurement.
-import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { createReadStream, readFileSync, readdirSync, statSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -38,7 +39,8 @@ import {
   SCOPE_NOTES,
 } from './measure-context-cost-core.mjs'
 
-/** The smallest file that can hold a real turn; anything under it is a stub. */
+/** Files under this size are treated as stubs — a heuristic, not the hard minimum of
+ *  a real turn. */
 const MIN_TRANSCRIPT_BYTES = 1000
 
 /**
@@ -99,8 +101,8 @@ export function transcriptDir({ repoRoot = REPO_ROOT, home = homedir(), env = pr
   return resolveTranscriptDir(transcriptCandidates({ repoRoot, projectsDir, join }), hasTranscripts)
 }
 
-/** The boundary log, which lives in the MAIN checkout — a worktree has its own
- *  `.claude/` and none of the batch's history in it. */
+/** The boundary log: this checkout's first, then the MAIN checkout's — a worktree has
+ *  its own `.claude/` and usually none of the batch's history in it. */
 const BOUNDARY_LOGS = [REPO_ROOT, mainCheckoutOf(REPO_ROOT)]
   .filter(Boolean)
   .map((root) => join(root, '.claude', 'boundary.log'))
@@ -108,7 +110,7 @@ const BOUNDARY_LOGS = [REPO_ROOT, mainCheckoutOf(REPO_ROOT)]
 /** WHEN the boundary mechanism first fired, read from the log that records it. Falls
  *  back to null, in which case the caller must name a moment — guessing a calendar day
  *  would make the whole comparison a coincidence. */
-export function firstHandoverAt(logPaths = BOUNDARY_LOGS) {
+function firstHandoverAt(logPaths = BOUNDARY_LOGS) {
   for (const logPath of [logPaths].flat()) {
     try {
       for (const line of readFileSync(logPath, 'utf8').split('\n')) {
@@ -136,7 +138,6 @@ export function firstHandoverAt(logPaths = BOUNDARY_LOGS) {
 export async function readTurns(dir = transcriptDir()) {
   const byId = new Map()
   const order = []
-  if (!existsSync(dir)) return []
   for (const { path, rel, scope } of listTranscripts(dir)) {
     const stream = createReadStream(path, { encoding: 'utf8' })
     const lines = createInterface({ input: stream, crlfDelay: Infinity })
@@ -188,7 +189,7 @@ if (isMain) {
   const boundaryAt = at >= 0 ? Date.parse(argv[at + 1] ?? '') : firstHandoverAt()
   if (!Number.isFinite(boundaryAt)) {
     console.error(
-      'no boundary moment: .claude/boundary.log holds no HANDOVER line and none was given.\n' +
+      'no boundary moment: no .claude/boundary.log (this checkout\'s or the main checkout\'s) holds a HANDOVER line and none was given.\n' +
         'Pass one explicitly: --boundary 2026-07-28T08:56:12Z',
     )
     process.exit(1)
@@ -242,7 +243,7 @@ if (isMain) {
       `  ${out.transcripts.topLevel} session transcripts + ${out.transcripts.subagent} delegated-agent ` +
         'transcripts under <session>/subagents/ — both bill against the same quota',
     )
-    console.log(`boundary first fired ${out.boundaryAt}; "large" context is ≥ ${LARGE_CONTEXT_TOKENS.toLocaleString('en-US')} tokens`)
+    console.log(`boundary ${at >= 0 ? 'given as' : 'first fired'} ${out.boundaryAt}; "large" context is ≥ ${LARGE_CONTEXT_TOKENS.toLocaleString('en-US')} tokens`)
     for (const scope of SCOPE_ORDER) {
       const s = scopes[scope]
       console.log('')

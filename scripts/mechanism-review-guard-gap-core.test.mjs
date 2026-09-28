@@ -16,7 +16,6 @@ import {
   formatCriticalityGap,
   formatReviewGap,
   guardOutcome,
-  reviewGapRange,
   REVIEW_GAP_BUDGET_CHARS,
   REVIEW_GAP_MAX_PASS_TOTAL,
 } from './mechanism-review-guard-gap-core.mjs'
@@ -126,24 +125,6 @@ it.skipIf(process.platform !== 'win32')('the production Git runner keeps a liter
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
-})
-
-describe('reviewGapRange — one range for detection, coverage and gap ruling', () => {
-  it('uses the computed merge-base as the assessment baseline', () => {
-    const head = 'h'.repeat(40)
-    const base = 'a'.repeat(40)
-    expect(reviewGapRange({ blocked: true, base, head })).toEqual({ baseline: base, head })
-  })
-
-  it('leaves the block standing when the common range cannot be established', () => {
-    const range = reviewGapRange({ blocked: true, base: null, head: 'h'.repeat(40) })
-    expect(range).toBe(null)
-    expect(guardOutcome({ blocked: true, gap: range })).toEqual({ action: 'block' })
-  })
-
-  it('does not ask for a measurement on an already-clear turn', () => {
-    expect(reviewGapRange({ blocked: false, base: 'a'.repeat(40), head: 'h'.repeat(40) })).toBe(null)
-  })
 })
 
 describe('decideReviewGap', () => {

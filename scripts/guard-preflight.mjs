@@ -12,11 +12,13 @@
 // loop on point 278 cost about thirty of them for one process mistake. One cheap
 // process run replaces that.
 //
-// HOW IT STAYS HONEST: each guard is wired from its WRAPPER's exported gather
-// step plus its pure core's decide step. The preflight never gathers inputs
-// itself — a second copy of that I/O would drift from the guard it claims to
-// predict and hand back a false "clean". A guard whose wrapper exposes no gather
-// step is simply not listed (said so in the report), never guessed at.
+// HOW IT STAYS HONEST: each guard is registered with its WRAPPER's exported
+// gather step and a decide step — usually its pure core, sometimes an inline
+// adapter or a constant for a guard the report only conditions. The preflight
+// never gathers inputs itself — a second copy of that I/O would drift from the
+// guard it claims to predict and hand back a false "clean". A wired Stop hook
+// without a registration is reported as DRIFT, and the commit-time registration
+// check keeps GUARDS complete.
 //
 // ADVISORY: the state can change between this report and the action, so the guard
 // itself remains the authority. Exit code is always 0 — this is a report, not a
@@ -106,7 +108,7 @@ import { readOwnerLock } from './batch-singleton.mjs'
 import { repoPath } from './repo-paths.mjs'
 
 /**
- * Whose session is asking. Four of the guards stand down for a session that does
+ * Whose session is asking. Several of the guards stand down for a session that does
  * not own the batch lock, and `heldByOtherLiveOwner('')` calls an EMPTY id a
  * stranger — so with no id the report used to read "not-applicable" for the very
  * session that owns the batch: a false all-clear.
@@ -137,8 +139,9 @@ export function resolveSessionId(args = [], env = process.env, readLock = readOw
 }
 
 /**
- * The registered guards: id, the WRAPPER's gather step, the CORE's decide step.
- * Only these two functions per guard — anything else here would be a
+ * The registered guards: id, the WRAPPER's gather step, a decide step (the
+ * core's, or an inline adapter/constant over it), and `turnEnd: false` for a
+ * guard outside the Stop chain. No I/O of its own here — that would be a
  * reimplementation of behaviour that already exists.
  */
 export const GUARDS = [
@@ -437,7 +440,7 @@ if (isMainModule(import.meta.url)) {
       // scope would read like the narrow one the caller asked for.
       console.log(
         `note: "${action}" is not a known action (${Object.keys(ACTIONS).join(', ')}) — ` +
-          'reporting every registered guard instead.\n',
+          'reporting every turn-end guard instead.\n',
       )
     }
     console.log(formatPreflightReport(results, { action, unregistered }))

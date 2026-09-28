@@ -8,9 +8,10 @@
 // wires them, the enforcer scripts as they really sit in `scripts/`, and the
 // memory files as they really sit on disk, each with its last-modified date.
 //
-// The two overlap on purpose in exactly ONE place: the definition of an
-// enforcer. It is IMPORTED from guard-health-core rather than restated, because
-// a second copy of that regex is precisely the drift this pass exists to find.
+// The two share code in both directions. The definition of an enforcer is
+// IMPORTED from guard-health-core rather than restated, because a second copy of
+// that regex is precisely the drift this pass exists to find; and
+// guard-health-guard reads the hook table through this module's parseHookTable.
 //
 // Three defect classes the audit cares about fall out of the same table:
 //   dangling      a hook line names a script that is not in the tree — the rule
@@ -29,13 +30,11 @@
 // without a filesystem. The CLI (`guard-inventory.mjs`) does the reading.
 import { ENFORCER_RE } from './guard-health-core.mjs'
 
-export { ENFORCER_RE }
-
 /** Hook events in the order the harness fires them, for a stable report. */
-export const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionEnd']
+const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionEnd']
 
 /** A memory untouched for this long is REPORTED (never auto-retired). */
-export const MEMORY_STALE_DAYS = 21
+const MEMORY_STALE_DAYS = 21
 
 const DAY_MS = 86_400_000
 
@@ -212,6 +211,7 @@ export function memoryReport(entries = [], { now = Date.now(), staleDays = MEMOR
     bytes: withAge.reduce((n, e) => n + Number(e.bytes ?? 0), 0),
     indexBytes: index ? Number(index.bytes ?? 0) : null,
     hasIndex: Boolean(index),
+    staleDays,
     stale: withAge.filter((e) => e.ageDays >= staleDays),
     largest: [...withAge].sort((a, b) => Number(b.bytes ?? 0) - Number(a.bytes ?? 0)).slice(0, 5),
     entries: withAge,
@@ -237,7 +237,7 @@ export function formatInventory(inv, memoryDirs = []) {
       `memory ${dir.exists ? '' : '(MISSING) '}${dir.path}`,
       `  ${r.count} memories, ${(r.bytes / 1024).toFixed(1)} KB` +
         `${r.hasIndex ? `, index ${(r.indexBytes / 1024).toFixed(1)} KB` : ', NO MEMORY.md index'}` +
-        `, ${r.stale.length} untouched ≥ ${MEMORY_STALE_DAYS} d`,
+        `, ${r.stale.length} untouched ≥ ${r.staleDays ?? MEMORY_STALE_DAYS} d`,
     )
   }
   if (memoryDirs.length > 1) {

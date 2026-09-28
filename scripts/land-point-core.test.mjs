@@ -632,7 +632,7 @@ describe('the one summary', () => {
       error: new LandingError('the fast gate is red', { step: 'gate', repair: 'fix unit, then re-run' }),
     }).join('\n')
     expect(text).toMatch(/LANDING FAILED at "gate"/)
-    expect(text).toMatch(/no half state was left/)
+    expect(text).toMatch(/nothing past it ran/)
     expect(text).toMatch(/repair: fix unit, then re-run/)
     expect(text).not.toMatch(/LANDED\./)
   })

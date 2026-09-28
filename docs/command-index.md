@@ -36,10 +36,10 @@
 | `batch-board.mjs` | Read-only projection of durable batch state for the progress board. | usage: node scripts/batch-board.mjs --batch <id> [--repo <dir>] [--json] |
 | `batch-boundary-core.mjs` | Pure core of the AUTONOMOUS SESSION BOUNDARY (user 27.07.2026). | — |
 | `batch-boundary-plane-core.mjs` | DURABLE TWO-PHASE BOUNDARY — ordered-work step 7. | — |
-| `batch-boundary-plane.mjs` | Tests and support for batch-boundary-plane. | — |
+| `batch-boundary-plane.mjs` | No leading description for batch-boundary-plane. | — |
 | `batch-boundary.mjs` | The autonomous session boundary (point 373, user 27.07.2026) — the IO half. | Usage: node scripts/batch-boundary.mjs --prepare <point>, then --commit <point><br>usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''), |
 | `batch-checkpoint-core.mjs` | CHECKPOINT BARRIER — ordered-work step 6. | — |
-| `batch-checkpoint.mjs` | Tests and support for batch-checkpoint. | — |
+| `batch-checkpoint.mjs` | No leading description for batch-checkpoint. | — |
 | `batch-claim-core.mjs` | TAKING THE BATCH BACK INTO THE WINDOW THE USER IS SITTING AT (point 395, user 28.07.2026) — the decision half, pure and dependency-injected. | — |
 | `batch-claim.mjs` | TAKING THE BATCH BACK INTO THE WINDOW THE USER IS SITTING AT (point 395, user 28.07.2026) — the IO half. | usage: node scripts/batch-claim.mjs --session <id> [--why "<text>"] \| --wait [--timeout <min>] \| |
 | `batch-context-samples.mjs` | Independent context measurements for the durable-lane trial. | — |
@@ -61,7 +61,7 @@
 | `batch-in-flight.mjs` | DECLARING WORK THAT IS IN FLIGHT (point 388, fifth live finding 28.07.2026) — the IO half. | usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--point N] [--pid N] [--branch REF] |
 | `batch-landing-core.mjs` | THE LANDING JOURNAL'S STAGES AND CRASH RULE — the slice of step 9 that step 8 needs (work-order point 834; union M33/M34/M35). | — |
 | `batch-landing-journal-core.mjs` | CRASH-RECOVERABLE SERIAL LANDING — the remainder of ordered-work step 9. | — |
-| `batch-landing-journal.mjs` | Tests and support for batch-landing-journal. | — |
+| `batch-landing-journal.mjs` | No leading description for batch-landing-journal. | — |
 | `batch-launcher-core.mjs` | Pure core of the LAUNCHER, on both hosts (point 474, user 03.08.2026). | — |
 | `batch-launcher.mjs` | THE LINUX LAUNCHER (point 474, user 03.08.2026) — a self-scheduling daemon. | Usage: --start \| --arm \| --stop \| --status |
 | `batch-lease-core.mjs` | THE LEASE AND THE FENCE — pure decision core (layer 1 of docs/batch-resilience.md §3). | — |
@@ -81,9 +81,9 @@
 | `batch-schema-core.mjs` | THE DURABLE LANE'S SCHEMAS AND INVARIANTS — step 1 of the "Ordered work" in docs/handover-architecture.md (work-order point 891, the front stage of 676). | — |
 | `batch-singleton-race-worker.mjs` | Test worker for the batch-singleton race tests: attempts one atomic acquire against the lock path in argv and prints the result. | — |
 | `batch-singleton.mjs` | HARD batch singleton (user mandate 24.07.2026, after the e9407cae incident: two live sessions drove the batch and committed to main concurrently). | usage: node scripts/batch-singleton.mjs [status\|release] |
-| `batch-standstill-core.mjs` | Tests and support for batch-standstill-core. | — |
-| `batch-standstill-inputs.mjs` | Tests and support for batch-standstill-inputs. | — |
-| `batch-standstill-report.mjs` | Tests and support for batch-standstill-report. | — |
+| `batch-standstill-core.mjs` | No leading description for batch-standstill-core. | — |
+| `batch-standstill-inputs.mjs` | No leading description for batch-standstill-inputs. | — |
+| `batch-standstill-report.mjs` | No leading description for batch-standstill-report. | — |
 | `batch-state-core.mjs` | THE DURABLE STATE STORE'S DECISION CORE — step 2 of the "Ordered work" in docs/handover-architecture.md (work-order point 892, the front stage of 676). | — |
 | `batch-state.mjs` | THE DURABLE STATE STORE'S I/O — step 2 of the "Ordered work" in docs/handover-architecture.md (work-order point 892, the front stage of 676). | — |
 | `batch-trial.mjs` | The measured verdict is the only path in this command that enables the lane. | usage: node scripts/batch-trial.mjs --batch <id> --baseline <baseline.json> --report <trial.json> [--repo <dir>] |
@@ -188,9 +188,9 @@
 | `doc-budget-core.mjs` | Pure decision core for the document-budget guard (user 26.07.2026). | — |
 | `doc-budget-guard.mjs` | Stop hook: the constantly-read documents stay within their budgets (user 26.07.2026). | — |
 | `doc-corpus.mjs` | The documents a work-order `§` may point at (point 365 A). | — |
-| `durable-lane-flag-core.mjs` | THE ACTIVATION FLAG OF THE DURABLE AUTHORING LANE, and the interlock that keeps it off (work-order point 891, step 1; docs/handover-architecture.md, mechanism 2 "Rollback: the REGIME IS THE DAEMON'S EXISTENCE"). | — |
+| `durable-lane-flag-core.mjs` | THE ACTIVATION FLAG OF THE DURABLE AUTHORING LANE, and the interlock that keeps it off until every required step is green (work-order point 891, step 1; docs/handover-architecture.md, mechanism 2 "Rollback: the REGIME IS THE DAEMON'S EXISTENCE"). | — |
 | `enable-hooks.mjs` | Wire the versioned git hooks (point 302). | — |
-| `fable-switch-core.mjs` | The one decision about whether Fable may be used at all. | — |
+| `fable-switch-core.mjs` | The one decision about whether Fable may be used at all, plus the model identities, the result-JSON parsing and the merger roster that decision is read against. | — |
 | `fable-switch.mjs` | The only writer for the shared Fable decision. | usage: node scripts/fable-switch.mjs --status \| --on --why "<user instruction>" \| --off --why "<user instruction>" |
 | `finding.mjs` | Record a finding so it outlives the session that made it. | Usage:<br>usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point\|bundle>] |
 | `findings-core.mjs` | Pure decision core of the findings-durability check. | — |
@@ -229,8 +229,8 @@
 | `handover-card-contract.mjs` | The one valid handover-card answer when the work order has no open point. | — |
 | `handover-repair-loop-core.mjs` | Pure decisions for the two feedback loops measured on 20.08.2026. | — |
 | `handover-repair-loop.mjs` | I/O half for the claim-survival and guard-repair observers. | — |
-| `help-core.mjs` | ONE INDEX OVER EVERY REPOSITORY COMMAND — the pure half of scripts/help.mjs. | usage:` strings. This module only harvests and<br>usage: |
-| `help.mjs` | FIND A REPOSITORY COMMAND WITHOUT LISTING 421 FILES — the I/O half. | usage: node scripts/help.mjs <topic> \| --write |
+| `help-core.mjs` | ONE INDEX OVER EVERY TOP-LEVEL scripts/*.mjs COMMAND — the pure half of scripts/help.mjs. | usage:` strings. This module only harvests and<br>usage: |
+| `help.mjs` | FIND A REPOSITORY COMMAND WITHOUT LISTING EVERY SCRIPT — the I/O half. | usage: node scripts/help.mjs <topic> \| --write |
 | `is-main.mjs` | Was this module started directly, or imported? | — |
 | `land-cleanup-core.mjs` | WHICH WORKTREE MAY THE LANDING DELETE? | — |
 | `land-point-core.mjs` | THE LANDING CHAIN, as pure decisions (point 594). | — |
@@ -305,7 +305,7 @@
 | `render-verify-recorder.mjs` | Mechanical evidence that a verify suite REALLY ran on a given renderer backend (point 210's lesson: the sea-coast fix was called done after a WebGL2-only check while the user's WebGPU picture was still broken). | — |
 | `render-verify-state.mjs` | Shared state I/O for the render-verify (both-backends) toolchain (render-verify-guard, render-verify-recorder). | — |
 | `repo-paths.mjs` | Repo paths that follow the checkout the process was GIVEN. | — |
-| `repository-integrity.mjs` | Tests and support for repository-integrity. | — |
+| `repository-integrity.mjs` | No leading description for repository-integrity. | — |
 | `resume-batch.mjs` | THE SUCCESSOR'S STARTUP — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M26-M29). | usage: node scripts/resume-batch.mjs --batch <id> [--repo <dir>] [--session <sid>] |
 | `retro-core.mjs` | Pure logic of the retrospective-currency toolchain: the sources fingerprint, the auto-generated doc section and the stale/fresh decision. | — |
 | `retro-currency-guard.mjs` | Stop hook: GUARANTEE the retrospective document (docs/analysis_de/retrospektive-zusammenarbeit.md) stays current — enforcement, not a reminder (the document's own lesson #1: only blocking mechanisms hold). | — |
@@ -326,7 +326,7 @@
 | `session-death-core.mjs` | Pure reading of "why did the interactive session die" out of the batch journal and the machine's own counters (user question, 05.09.2026 — the fourth time the same exit 143 was investigated by hand). | — |
 | `session-death.mjs` | "Why did the interactive session die?" — the recurring lookup as a command (user rule: script the recurring lookup, never dump raw data). | usage: node scripts/session-death.mjs [--limit <n>] |
 | `settled-owner-rulings.mjs` | The single tracked register of owner decisions that must not be put back to the owner. | — |
-| `settled-ruling-core.mjs` | Tests and support for settled-ruling-core. | — |
+| `settled-ruling-core.mjs` | No leading description for settled-ruling-core. | — |
 | `tasks-archive-guard-core.mjs` | Pure decision core for the tasks-archive guard (user 26.07.2026). | — |
 | `tasks-archive-guard.mjs` | Stop hook: the work order stays split — TASKS.md open, docs/tasks-archive.md finished (user 26.07.2026). | — |
 | `tasks-source.mjs` | One place that knows the work order is stored in TWO files (user 26.07.2026). | — |

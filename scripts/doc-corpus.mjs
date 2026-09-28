@@ -13,7 +13,7 @@ import { TASKS_PATH } from './tasks-source.mjs'
 export const REPO_ROOT = resolve(TASKS_PATH, '..')
 export const DESIGN_PATH = resolve(REPO_ROOT, 'design.md')
 export const CLAUDE_PATH = resolve(REPO_ROOT, 'CLAUDE.md')
-export const DOCS_DIR = resolve(REPO_ROOT, 'docs')
+const DOCS_DIR = resolve(REPO_ROOT, 'docs')
 
 /** Every markdown file under `dir`, recursively, keyed by its repo-relative path. */
 export function readDocCorpus(dir = DOCS_DIR, root = REPO_ROOT) {

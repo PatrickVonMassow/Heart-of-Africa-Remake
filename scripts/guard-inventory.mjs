@@ -55,7 +55,7 @@ function gitHookTexts() {
   return out
 }
 
-/** Every memory directory this repo could resolve to, existing or not. */
+/** Every memory directory this repo could resolve to that exists and holds files. */
 function memoryDirs(now) {
   const projects = resolve(homedir(), '.claude', 'projects')
   const out = []

@@ -2,7 +2,7 @@
 // pure decision half; `scripts/measure-task-cost.mjs` reads the transcripts and git.
 //
 // `scripts/measure-context-cost-core.mjs` answers "how much did we spend per hour, and
-// how much of it above 150k context". It does NOT answer "which PART of a task that
+// how much of it at or above LARGE_CONTEXT_TOKENS (150k) of context". It does NOT answer "which PART of a task that
 // spend belongs to" — brief, implementation, gates, verification, merge, bookkeeping.
 // This module adds exactly that attribution and REUSES the older module's weighting
 // (`turnCost`) and its idle-gap rule unchanged, so the two tools cannot disagree about
@@ -16,18 +16,20 @@
 // WHAT THIS CANNOT DO, stated up front because a measurement that hides its blind spot
 // is worse than none:
 //   - A turn is attributed from the TOOL CALLS it issued. A turn that only thinks and
-//     writes prose carries no such evidence and goes to `unattributed` — never guessed
-//     into a phase.
+//     writes prose carries no such evidence and goes to `unattributed` in the STRICT
+//     split; the carried split (phaseSplits' default) fills it from its session
+//     neighbours, and both are reported.
 //   - Shell plumbing (`grep`, `git status`, `cat`) appears in every phase and is
-//     deliberately given NO vote. It does not distort a turn that also did something
-//     identifiable; it leaves a turn that did nothing else unattributed.
+//     given no vote of its own: it votes only when its arguments match a phase rule
+//     (`cat scripts/verify/x.mjs` reads as verification). It does not distort a turn
+//     that also did something identifiable.
 //   - Transcript hours are MACHINE hours. Delegated agents run in parallel, so summing
 //     them across sessions is not calendar time. Calendar time per point comes from git
 //     (`mergeSpans`), and the two are reported as two different clocks.
 
 import { COST_WEIGHTS, IDLE_GAP_MS, foldUsage, turnCost } from './measure-context-cost-core.mjs'
 
-export { COST_WEIGHTS, IDLE_GAP_MS, foldUsage, turnCost }
+export { COST_WEIGHTS }
 
 /** The phases a task's cost is split into, in reporting order. `unattributed` is not a
  *  phase but the honest residue — evidence was missing, so nothing was assumed. */
@@ -50,7 +52,8 @@ export const PHASE_NOTES = {
  * Worktree paths (`…/.claude/worktrees/agent-<id>/src/x.ts`) must fold onto the same
  * key as the main checkout's, or half of every delegated agent's work would look like
  * a different file tree. `/tmp` and the scratchpad stay ABSOLUTE on purpose — they are
- * scratch, and the classifier gives them no vote.
+ * scratch, and the classifier gives them no vote (pictures excepted, see
+ * VERIFICATION_IMAGE).
  */
 export function normalisePath(p = '') {
   const s = String(p).replace(/\\/g, '/')
@@ -80,8 +83,9 @@ export function classifyBash(command = '') {
 }
 
 /**
- * A file that is a PICTURE — read with eyes, never routed, whatever its format and
- * WHEREVER it lies (third cross-vendor round).
+ * A file that is a PICTURE — read with eyes, never routed, whatever its format (third
+ * cross-vendor round). In SCRATCH it always counts as verification; inside the
+ * repository a picture follows the file rules like any other file (final round).
  *
  * It beats the scratch rule below: a frame saved to the scratchpad and then looked at is
  * still a frame being judged, and giving it no vote let the turn's other, textual call
@@ -203,8 +207,8 @@ const VERIFICATION_RUNNER =
 const VERIFICATION_READER = /(^|[|;&]\s*|\s)(cat|head|tail|grep|rg|wc|jq|ls|find|diff|sed|awk|node --check)\b/
 
 /**
- * The commands that only ever READ, whatever their arguments NAME (final cross-vendor
- * round): `rg playwright scripts/verify/x.mjs` searches for a word — it starts no suite —
+ * The commands treated as READERS, whatever their arguments NAME — their options
+ * (`sed -i`, `find -exec`) are not inspected (final cross-vendor round): `rg playwright scripts/verify/x.mjs` searches for a word — it starts no suite —
  * and reading the runner pattern off its arguments turned a search into a browser run.
  * So the first word of a segment, after its environment assignments, decides first.
  */
@@ -426,7 +430,8 @@ export function verificationBreakdown({ turns = [], idleGapMs = IDLE_GAP_MS, car
  * in the SAME session, looking backwards first (the prose that follows a `npm run build`
  * belongs to that gate episode) and forwards only when nothing precedes it. It never
  * crosses a gap longer than `idleGapMs` — across an idle night the next turn is a new
- * episode, not a continuation. What no neighbour reaches stays `unattributed`.
+ * episode, not a continuation (a gap of `idleGapMs` or more ends it). What no neighbour
+ * reaches stays `unattributed`.
  *
  * With `carry: false` the same function returns the STRICT attribution, which is a
  * floor per phase. Both are reported; the difference between them is the error bar.
@@ -553,7 +558,7 @@ export function dominantTaskPerFile(rows = []) {
  * Per-turn duration inside its session. PURE.
  *
  * A turn's wall-clock is the gap to the PREVIOUS turn of the same session, dropped when
- * it exceeds `idleGapMs` — the identical rule `activeMs` uses, so the two tools measure
+ * it reaches `idleGapMs` — the identical rule `activeMs` uses, so the two tools measure
  * the same "active hour". The first turn of a session spans nothing, which is the honest
  * answer and not a rounding choice.
  */
@@ -603,7 +608,7 @@ const roundBucket = (b) => ({
   output: Math.round(b.output),
 })
 
-/** Quantiles of a numeric list, as { median, p90, max, min, n }. PURE. */
+/** Quantiles of a numeric list, as { n, min, median, p90, max, sum, mean }. PURE. */
 export function quantiles(values = []) {
   const v = (Array.isArray(values) ? values : []).filter((x) => Number.isFinite(x)).sort((a, b) => a - b)
   if (!v.length) return { n: 0, min: null, median: null, p90: null, max: null, sum: 0, mean: null }
@@ -615,7 +620,7 @@ export function quantiles(values = []) {
 /**
  * THE ATTRIBUTION. PURE.
  *
- * `turns` is [{ at, usage, session, scope, branch, file, tools }]; `tools` is the turn's
+ * `turns` is [{ at, usage, session, scope, task, taskSource, file, tools }]; `tools` is the turn's
  * tool_use blocks as [{ name, input }].
  *
  * Returns:
@@ -710,12 +715,12 @@ export function taskSpread(tasks = [], { minWeighted = 0, pick = (t) => t.total.
 /**
  * THE OTHER CLOCK: calendar time per merged point, from git. PURE.
  *
- * `merges` is [{ sha, mergedAt, firstBranchCommitAt, branchCommits, subject }] as the
- * wrapper reads it. Calendar span is first branch commit → merge; it INCLUDES the waits
+ * `merges` is [{ sha, mergedAt, firstBranchCommitAt, branchCommits, mainCommitsAfter,
+ * subject, branch? }] as the wrapper reads it. Calendar span is first branch commit → merge; it INCLUDES the waits
  * a transcript's active-hour rule deliberately drops, and that difference is the point of
  * reporting both.
  *
- * `mainCommitsBetween` counts the main-only commits that followed each merge — the
+ * `mainCommitsAfter` counts the main-only commits that followed each merge — the
  * bookkeeping the branch never sees.
  */
 export function mergeSpans(merges = []) {

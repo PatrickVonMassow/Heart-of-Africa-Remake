@@ -15,10 +15,11 @@
 // that `branch-hygiene-guard` names and one command removes. A wrong REMOVAL
 // destroys work nothing can rebuild. So EVERY fact below must be POSITIVELY
 // established; a probe that could not answer means KEEP AND REPORT, never
-// "nothing was in the way". That rule has no exception, because the first
-// version of this file had one — an unreadable freshness probe fell through to
-// `remove` — and the cross-vendor review named it as the same failure class the
-// point exists to prevent.
+// "nothing was in the way". The first version of this file had an exception — an
+// unreadable freshness probe fell through to `remove` — and the cross-vendor
+// review named it as the same failure class the point exists to prevent. The
+// one removal without both proofs below is a directory that is already GONE:
+// only git's record of it is pruned.
 //
 // A worktree is removed only when BOTH halves are proven:
 //   OWNERSHIP — it is a DIRECT child of the isolation directory, named the way
@@ -32,16 +33,18 @@
 //     uncommitted changes, and nothing was written into it since the landing
 //     began.
 //
-// The liveness evidence is the same kind `scripts/batch-in-flight.mjs` already
-// collects for the batch; this module only decides on it, and takes it as plain
+// The liveness evidence is gathered by `scripts/land-point.mjs` (cleanupEvidence,
+// which borrows worktreeActiveAt from batch-in-flight.mjs); this module only
+// decides on it, and takes it as plain
 // data so the decision is testable without a filesystem.
 //
 // KEEPING A WORKTREE KEEPS ITS BRANCH. git refuses to delete a branch a worktree
 // has checked out, and a live agent still pushes to its remote branch. The rule
 // is deliberately wider than "a kept tree REPORTS that branch": a tree detached
 // mid-rebase reports no branch at all and would have had its branch deleted
-// underneath it (review finding 4). ANY tree the landing could not clear keeps
-// the branch — local and remote both.
+// underneath it (review finding 4). Every tree kept as live or unproven, and any
+// kept tree standing on this branch, keeps the branch — local and remote both. A
+// foreign tree on another branch does not.
 
 import { insideRoot, normPath } from './worktree-cleanup-core.mjs'
 
@@ -122,8 +125,8 @@ export function isLinkedWorktreeOf(linkedTo, mainRoot) {
  * JUDGE ONE WORKTREE. PURE.
  *
  * Inputs:
- *   worktree  { path, branch, locked }  as `git worktree list --porcelain` reports
- *             it — `branch` empty for a detached HEAD, `locked` the lock reason
+ *   worktree  { path, branch, head, locked }  as `git worktree list --porcelain`
+ *             reports it (`head` is carried into the selection's `expected`) — `branch` empty for a detached HEAD, `locked` the lock reason
  *             (git prints the holder there; the isolation harness writes
  *             "claude agent agent-<id> (pid … start …)") or null when unlocked.
  *   branch    the branch being landed
@@ -261,7 +264,8 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
  *
  * Returns:
  *   remove       [path]                         — what may be deleted, in list order
- *   expected     { [path]: { branch } }          — what the deletion step must
+ *   expected     { [path]: { branch, head, gitLink, ino, dev, gitMtime, gitBirth,
+ *                  notWrittenAfter } }          — what the deletion step must
  *                                                  RE-PROVE at the moment it deletes
  *   kept         [{ path, disposition, reason }] — everything else, `foreign` included
  *   reported     [{ path, disposition, reason }] — the subset the landing must print
@@ -307,8 +311,8 @@ export function selectCleanupTargets({ worktrees = [], branch, mainRoot, evidenc
       }),
   )
 
-  // ANY tree the landing could not clear keeps the branch — not only one that
-  // REPORTS that branch. A tree detached mid-rebase reports no branch at all, and
+  // A live or unproven tree keeps the branch — not only one that REPORTS that
+  // branch — and so does any kept tree that does report it. A tree detached mid-rebase reports no branch at all, and
   // requiring an exact report deleted the branch it was standing on (review
   // finding 4). Debris costs one command; that costs the rebase.
   const blocker =
@@ -370,8 +374,10 @@ export function branchDeletionBlocker({ selection = null, refused = 0, failed = 
  * The selection is a SNAPSHOT: minutes pass between it and the removal, and in
  * that window a worktree can be locked, written into, or replaced at the same
  * path (review finding 2). So the deletion step re-lists and re-probes that ONE
- * path and asks this function whether the tree in front of it is still the tree
- * that was selected. Anything that moved refuses the removal.
+ * path and asks this function whether the tree in front of it still qualifies
+ * for removal on the expected branch. The identity half of `expected` (head,
+ * gitLink, inode, freshness instant) is compared by worktree-cleanup-core when
+ * the removal itself runs with `--expect`.
  *
  * Returns { ok, reason } — `ok: false` means DO NOT DELETE, and the reason is
  * printed as debris rather than swallowed.
@@ -392,7 +398,8 @@ export function reproveRemoval({ path, expected, worktree, evidence, mainRoot, s
 }
 
 /** The lines the landing prints about what it did NOT remove. Empty when there is
- *  nothing to say — silence then means "everything was proven, nothing was left". */
+ *  nothing to say — silence then means nothing live or unproven was left and the
+ *  branch could go; foreign trees are never listed. */
 export function formatCleanupNotes(selection) {
   const reported = selection?.reported ?? []
   const lines = reported.map((r) => `  KEPT ${r.path} — ${r.reason}`)

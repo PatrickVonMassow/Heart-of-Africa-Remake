@@ -17,8 +17,7 @@
 //     whether the material fits says so and keeps the gate blocking, because
 //     waiving a review on an unmeasured claim is the unearned clearance this
 //     whole point exists to prevent;
-//   - where a pass-splitting tool is present and its plan COVERS the range,
-//     there is no gap — the material can be produced pass by pass, so the
+//   - where the pass-splitting tool's plan COVERS the range, there is no gap — the material can be produced pass by pass, so the
 //     demand stands.
 //
 // Pure on purpose: the guard wrapper (mechanism-review-guard-gap.mjs) feeds
@@ -26,10 +25,10 @@
 
 /**
  * The per-round material budget this ruling measures against. It MIRRORS
- * `MATERIAL_BUDGET_CHARS` in scripts/review-material-core.mjs — the test pins
- * them equal wherever that module exists — but is declared here on its own so
- * this ruling works in a tree that does not carry the splitting tool yet
- * (the clause is cherry-picked ahead of the tool to open the live trap).
+ * `MATERIAL_BUDGET_CHARS` in scripts/review-material-core.mjs and the test pins
+ * them equal. The mirror dates from a tree that did not yet carry the splitting
+ * tool; the splitter is required now, and the mirror merely keeps this core
+ * free of that import.
  */
 export const REVIEW_GAP_BUDGET_CHARS = 200_000
 
@@ -134,28 +133,15 @@ export function formatContributionReviewGap(decision = {}) {
 }
 
 /**
- * The one range the mechanism guard may submit for a gap ruling. `base` is the
- * merge-base already used to find pending commits and measure pass coverage;
- * the stored baseline is deliberately not an input here because it may sit on
- * main beyond a feature branch's fork. A missing base means that common range
- * was not established, so there is no gap assessment and the existing block
- * remains in force.
- */
-export function reviewGapRange({ blocked = false, base = '', head = '' } = {}) {
-  if (!blocked || typeof base !== 'string' || !base || typeof head !== 'string' || !head) return null
-  return { baseline: base, head }
-}
-
-/**
  * Rule on the gap for ONE range.
  *
  *   measuredChars     what the range's material assembles to (diffstat + patch
  *                     + every touched path's current content), in characters
  *   budget            the per-round ceiling (defaults to the mirror above)
- *   planner           what the pass-splitting tool said, or null where none
- *                     exists: { available, covers, uncoverable: [path…] } —
- *                     `covers` means every pass of its plan fits, so the
- *                     material CAN be produced
+ *   planner           what the pass-splitting tool said, or null when it gave no
+ *                     ruling: { available, fits, covers, uncoverable: [path…] } —
+ *                     `fits` means one round carries it, `covers` that every
+ *                     pass of its plan fits, so the material CAN be produced
  *   measurementError  why the measurement failed, when it did
  *
  * Returns { gap, reason, measuredChars?, budget, uncoverable? } with reason one
@@ -218,8 +204,8 @@ export function decideReviewGap({
   // THE SPLITTER'S OWN FIT RULING OUTRANKS THE RAW SIZE (final-round pass 3):
   // the raw sum omits what delivery adds — manifest, section headers, the
   // receipt — so material just over the budget once rendered read as fitting
-  // here. Where the tool measured, its answer is the answer; the bare size
-  // rules only in a tree without the tool.
+  // here. Where the tool measured, its answer is the answer; without a planner
+  // ruling the result below is 'unmeasured'.
   if (planner && planner.available === true) {
     if (planner.fits === true) return { gap: false, reason: 'fits', measuredChars: size, budget: cap }
     if (planner.covers === true) return { gap: false, reason: 'splits', measuredChars: size, budget: cap }
@@ -278,7 +264,7 @@ export function formatReviewGap({ baseline = '', head = '', decision = {}, stand
   ]
   if (decision.reason === 'beyond-any-split') {
     lines.push(
-      `  That floor exceeds the widest recordable split (${REVIEW_GAP_MAX_PASS_TOTAL} passes of ` +
+      `  That floor reaches the widest recordable split (${REVIEW_GAP_MAX_PASS_TOTAL} passes of ` +
         `${decision.budget} characters), so no pass plan can cover this range whatever it cuts.`,
     )
   }
@@ -371,7 +357,7 @@ export function formatCriticalityGap(entries = []) {
   ]
   for (const e of entries ?? []) {
     lines.push(
-      `  point ${e.point} — record ${String(e.sha).slice(0, 12)}: measured ${e.decision?.measuredChars} characters ` +
+      `  point ${e.point} — record ${String(e.sha).slice(0, 12)}: measured ${e.decision?.measuredChars}${e.decision?.floor ? '+' : ''} characters ` +
         `against the ${e.decision?.budget}-character round budget.`,
     )
   }

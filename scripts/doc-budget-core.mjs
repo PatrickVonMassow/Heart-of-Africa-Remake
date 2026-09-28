@@ -14,12 +14,14 @@
 // longer telling of something already there.
 //
 // WHAT IS AND IS NOT BUDGETED, because the distinction is the whole design:
-//   - Whole file, where every line is prose that accretes: CLAUDE.md, design.md.
+//   - Whole file, where every line is prose that accretes: CLAUDE.md, design.md,
+//     the project memory index MEMORY.md and the global-CLAUDE.md stub.
 //   - PREAMBLE ONLY for the work order: its POINTS are legitimate growth (a
 //     queue may be long), while its framing sections are where rules pile up.
 //     A line budget on the whole file would punish appending work.
 //   - docs/acceptance-criteria-detail.md, which point 555 turned from a two-
-//     criterion offcut into the home of all 32. It is read on demand like the
+//     criterion offcut into the home of 28 criteria and the 20.08.2026 cut into
+//     the home of all 32. It is read on demand like the
 //     evidence chains beside it, so its size costs nothing per turn — but it is
 //     now THE FILE THAT GROWS INSTEAD, and an uncapped destination is how a cut
 //     comes back: the §7.1 text would simply accrete over there and be dragged
@@ -37,8 +39,8 @@
 // up to the line the last cut was made at. That is exactly how CLAUDE.md grew back
 // between its cuts. So `slackWords` turns the ceiling into a floor as well: a document
 // measuring more than its stated slack BELOW its ceiling is refused too, with the
-// remedy "lower the ceiling to what you achieved". Headroom cannot be banked, and each
-// document can only ever ratchet DOWN.
+// remedy "lower the ceiling to what you achieved". Headroom cannot be banked: a cut
+// lowers the ceiling, and only a measured raise for genuinely new content lifts it.
 //
 // THE SLACK IS AN ABSOLUTE WORD COUNT PER DOCUMENT, never a fraction of its size. A
 // percentage gives the largest documents the largest licence — design.md would carry
@@ -54,8 +56,8 @@
 // offending line, one Stop-chain refusal.
 
 /**
- * The budgets. `headingRe` limits the measurement to the part of a file BEFORE
- * that heading — used for the work order's preamble.
+ * The budgets. `until` limits the measurement to the part of a file BEFORE the
+ * first line it matches — used for the work order's preamble.
  *
  * `slackWords` is the ratchet described above: the largest gap between the measured
  * size and the ceiling this document may carry. Declaring it is mandatory — an entry
@@ -124,7 +126,8 @@ export const DOC_BUDGETS = [
     // index line measures 18 words on this tokenizer, written at 26 words and
     // cut to the entry ceiling first. The word ceiling moves by exactly that
     // line to the 47 / 728 fit; the line ceiling already held the one-line
-    // headroom the 757 table records, which this line now spends.
+    // headroom the table in work-order point 757 (docs/tasks-archive.md)
+    // records, which this line now spends.
     // RAISED on 24.08.2026 by ONE genuinely new lesson, measured on a drill that
     // had been green for days while never calling the step it claimed to prove —
     // a class no surviving entry carried. Its hook measures 20 words on this
@@ -194,8 +197,9 @@ export const DOC_BUDGETS = [
     maxLines: 53,
     maxWords: 820,
     maxEntryWords: 22,
-    // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
-    // so the slack cannot hide one, and re-wording an existing hook is free.
+    // Fifteen words: an index of one-hook lines, where a new entry measures 13–21
+    // words — so the slack can hide at most a very short one, and re-wording an
+    // existing hook is free.
     slackWords: 15,
     why: 'loaded at every turn; the index is one hook line per surviving topic',
   },
@@ -220,12 +224,12 @@ export const DOC_BUDGETS = [
     // every one the §7.1 condition no longer states completely, which is
     // exactly why it gets a ceiling of its own. Cutting CLAUDE.md and leaving
     // the destination uncapped would only move the accretion one file over. The
-    // headroom is the same fraction CLAUDE.md carries (0.4 % / 0.3 %), so a
+    // headroom is the absolute slackWords below, as for every budget, so a
     // criterion that genuinely gains a rule raises this budget by that rule's
     // measured size with the reason written here — and a criterion that only
     // gets a longer telling does not.
     // Four formerly in-place criteria moved here in the 20.08.2026 cut. The
-    // destination is now 579 lines / 5599 words by this guard's tokenizer; this measured raise holds the
+    // destination was then 579 lines / 5599 words by this guard's tokenizer; this measured raise holds the
     // moved rules without giving their always-loaded source room to regrow.
     // RAISED by the 1 measured line criterion 9 owes the inventory answer: every
     // slot answers its press with a toast, never in the journal, and that toast
@@ -264,12 +268,11 @@ export const DOC_BUDGETS = [
     // its own. It bites exactly where the cost is: `point-brief.mjs` pays a point's
     // spec IN FULL at every delegation, so the largest points are paid again at
     // every hand-off, while the mean point costs a fraction of them.
-    // MEASURED FROM THE RESULT of the 20.08.2026 cut, the same way the CLAUDE.md
-    // ceiling was measured from the size point 555 reached — never chosen
-    // beforehand. A point that genuinely needs more raises this with its reason in
-    // the comment beside it; a longer retelling of what it already says does not.
-    // MEASURED 20.08.2026 from the result of the cut, over all 227 points the work
-    // order then held: 132,088 words in total, mean 582, median 459, p90 1,026,
+    // MEASURED FROM THE RESULT of the 20.08.2026 cut, the same way the
+    // acceptance-detail ceiling was measured from the size point 555 reached — never
+    // chosen beforehand. A point that genuinely needs more raises this with its reason
+    // in the comment beside it; a longer retelling of what it already says does not.
+    // Over all 227 points the work order then held: 132,088 words in total, mean 582, median 459, p90 1,026,
     // p95 1,300, and a maximum of 3,458 (the largest of the unbundled audits). The
     // ceiling is that maximum plus a sentence — the same shape the always-loaded
     // file's ceiling has, and the same ratchet: it HOLDS THE LINE the cut reached
@@ -453,8 +456,8 @@ export const DOC_BUDGETS = [
     // no labels, never no sound, and the catcher is told apart by his body — a
     // reading the old text did not give, so a new decision, not a longer telling.
     maxWords: 29563,
-    // A hundred words across 28k: design.md is edited section by section and a genuine
-    // new decision runs 40–215 measured words, so the slack absorbs the rewording that
+    // A hundred words across nearly 30k: design.md is edited section by section and a
+    // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
     // corresponding lowering.
     slackWords: 100,
@@ -553,7 +556,7 @@ export const RATIONALE_MARKERS = Object.freeze([
 
 /**
  * A CommonMark fence tracker: `next(line)` returns whether that line is fence FURNITURE
- * (an opener or a closer) and keeps the open/closed state.
+ * (an opener, a closer, or a fence-like line inside an open block) and keeps the open/closed state.
  *
  * It is the rule workOrderPoints above already learned across three cross-vendor rounds,
  * lifted out so both readers share one implementation: an opener is three or more
@@ -798,7 +801,7 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
 export function formatDocBudgetVerdict(verdict) {
   if (!verdict?.block) return ''
   const findings = verdict.findings ?? []
-  const lines = ['doc-budget-guard: a document that is read constantly is outside its budget.', '']
+  const lines = ['doc-budget-guard: a budgeted document is outside its budget.', '']
   for (const f of findings) {
     lines.push(`  ${f.path}: ${f.actual} ${f.kind} > ${f.budget}`)
     lines.push(`      ${f.why}`)
@@ -820,9 +823,9 @@ export function formatDocBudgetVerdict(verdict) {
       '',
       'HEADROOM — LOWER THE CEILING TO WHAT YOU ACHIEVED. A cut that leaves its ceiling',
       'standing hands the next writer the words it just bought, and the file walks back up',
-      'to the old line one honest addition at a time. Set maxLines and maxWords in',
-      'scripts/doc-budget-core.mjs to the size measured NOW, in the same commit as the cut,',
-      'with the reason beside them. The budgets only ratchet down.',
+      'to the old line one honest addition at a time. Set maxWords (and maxLines where the',
+      'cut freed lines) in scripts/doc-budget-core.mjs to the size measured NOW, in the',
+      'same commit as the cut, with the reason beside them.',
     )
   }
   if (findings.some((f) => String(f.kind).startsWith('prose rationale'))) {

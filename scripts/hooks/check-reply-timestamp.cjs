@@ -4,7 +4,8 @@
 // ("**Donnerstag, 23.07.2026, 07:04**"). If not, emit a systemMessage nudge.
 // NEVER blocks (no decision/continue fields) — a soft reminder only, so the
 // batch and subagent sessions are never stalled by this hook.
-// Fail-soft by design: any read/parse problem exits 0 with no output.
+// Fail-soft by design: an unreadable input or transcript exits 0 with no output,
+// and a malformed transcript row is skipped.
 // Live install: /home/node/.claude/hooks/check-reply-timestamp.cjs; C:\Users\Patri\.claude\hooks\check-reply-timestamp.cjs
 // Versioned copy: scripts/hooks/check-reply-timestamp.cjs in the hoa repo.
 'use strict';
@@ -38,8 +39,8 @@ async function main() {
 }
 
 function readLastText(transcriptPath) {
-  // The user-visible reply of the current turn is the LAST assistant text block
-  // AFTER the most recent real user prompt (tool results also arrive as type
+  // The user-visible reply of the current turn is the first text block of the
+  // LAST assistant message that carries text, AFTER the most recent real user prompt (tool results also arrive as type
   // "user" entries but carry tool_result blocks, not text/string). Earlier text
   // blocks of the same turn are progress notes written between tool calls; the
   // harness asks for them and they carry no timestamp, so checking the FIRST

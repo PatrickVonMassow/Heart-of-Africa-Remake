@@ -9,10 +9,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { DOC_BUDGETS, evaluateDocBudgets, formatDocBudgetVerdict } from './doc-budget-core.mjs'
-import { TASKS_PATH } from './tasks-source.mjs'
+import { REPO_ROOT } from './doc-corpus.mjs'
 import { isMainModule } from './is-main.mjs'
-
-const REPO_ROOT = resolve(TASKS_PATH, '..')
 
 export function docBudgetPath(budget, { repoRoot = REPO_ROOT, home = homedir() } = {}) {
   if (budget?.location === 'project-memory') {

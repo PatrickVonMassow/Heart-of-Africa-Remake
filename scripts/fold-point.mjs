@@ -14,9 +14,11 @@
 // only way past it. See scripts/fold-point-core.mjs for every decision this file
 // merely performs.
 //
-// IT STOPS AT THE FIRST RED, and it leaves no half state: every refusal a fold
-// can produce is produced in the VALIDATE step, before a byte is written, and a
-// board edit that fails afterwards ROLLS THE WORK ORDER BACK to what it was.
+// IT STOPS AT THE FIRST RED: every refusal it can judge in advance — VALIDATE,
+// the dirty-tree and archive-guard checks — comes before a byte is written, and a
+// board edit that fails afterwards ROLLS THE WORK ORDER BACK to what it was. The
+// one half state left is a write failing between the two work-order files:
+// the archive is written first, so it leaves a duplicate the archive guard names.
 //
 // IT BYPASSES NO GUARD. The tick+archive transition is handed to
 // `evaluateTasksArchive` — the same core the Stop-hook guard uses — before it is
@@ -60,7 +62,7 @@ const ARCHIVE = join(REPO_ROOT, 'docs', 'tasks-archive.md')
 const BOARD_FILE = join(REPO_ROOT, '.batch-dashboard.html')
 
 /** The tracked files a fold may commit. The board file and its queue data are
- *  git-ignored (`.gitignore` lines 51/55), so they never enter a commit — the
+ *  git-ignored (see `.gitignore`), so they never enter a commit — the
  *  live page is the board's durability, not git. */
 const COMMIT_PATHS = Object.freeze(['TASKS.md', 'docs/tasks-archive.md'])
 
@@ -341,7 +343,7 @@ function main(argv) {
       step('commit', VERDICT.failed, lastLine(e))
       error = new LandingError('the fold could not be committed', {
         step: 'commit',
-        repair: `git commit -- ${COMMIT_PATHS.join(' ')} — the tick and the board are DONE but not durable`,
+        repair: `git commit -- ${COMMIT_PATHS.join(' ')} — the tick and archive move are written but not committed; the board is already published`,
       })
     }
   } else if (!error) {
@@ -359,8 +361,8 @@ function main(argv) {
     return 1
   }
   console.log(
-    '\nDONE BY THIS COMMAND: the tick, the archive move, the Erledigt card, the board\n' +
-      'publish and the commit.\n' +
+    '\nDONE BY THIS COMMAND: the tick, the archive move, the Erledigt card and the board\n' +
+      `publish${willCommit ? ', and the commit' : ' (the commit was skipped: --no-commit)'}.\n` +
       'NOT DONE: the push — run: git push origin main',
   )
   return 0

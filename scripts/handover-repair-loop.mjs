@@ -1,7 +1,8 @@
 // I/O half for the claim-survival and guard-repair observers. It is called by
 // the already-wired all-tools PostToolUse heartbeat: the event the 20.08.2026
-// owner did produce on every tool-response turn, unlike Stop, which it never
-// reached during the two-hour loop.
+// owner did produce on every tool-response turn. Whether it ever reached Stop
+// during the two-hour loop is unconfirmed (see the core's header), and this
+// path works either way.
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
@@ -26,7 +27,7 @@ const git = (args) =>
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim()
 
-export function claimObservationKey(info) {
+function claimObservationKey(info) {
   const claim = info?.claim
   if (!info?.honour || !claim || typeof claim !== 'object') return ''
   const claimant = info.claimantSid ?? claim.claimantSid ?? claim.sessionId ?? ''
@@ -172,16 +173,17 @@ export function observeOwnerLoops(
         }
         claimContext = result.released && result.stamped
           ? `HAND-BACK BOUND REACHED: the standing claim survived ${advanced.count} clean tool-response ` +
-            'turns because this session kept ending responses with tools and never reached its Stop hook. ' +
+            'turns without being handed back at a Stop hook. ' +
             `The batch lock is now RELEASED to ${assessment.claimantSid}; do not start or repair anything else.`
           : result.released
             ? `HAND-BACK BOUND REACHED: the standing claim survived ${advanced.count} clean tool-response ` +
-              'turns because this session never reached its Stop hook. The lock was released, but the claim ' +
+              'turns without being handed back at a Stop hook. The lock was released, but the claim ' +
               'could not be stamped, so its pickup reservation is unproven. State that reason in the next ' +
               'response and stop batch work.'
           : `HAND-BACK BOUND REACHED: the standing claim survived ${advanced.count} clean tool-response ` +
-            'turns because this session never reached its Stop hook. The release was attempted but the lock ' +
-            'no longer named this session; state that reason in the next response and stop batch work.'
+            'turns without being handed back at a Stop hook. The release was attempted and did not complete ' +
+            '(the lock no longer named this session, or the release failed); state that reason in the next ' +
+            'response and stop batch work.'
       }
     } else {
       nextClaim = mayAct || !advanced.report ? advanced.state : state.claim

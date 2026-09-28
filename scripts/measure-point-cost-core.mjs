@@ -35,7 +35,7 @@ export const LEVER_LABELS = {
 
 // These observations are selected by the workload or by cost already incurred.
 // Fired-minus-absent would therefore encode reverse causality, not lever effect.
-export const LEVER_CONFOUNDS = {
+const LEVER_CONFOUNDS = {
   pointBoundary: 'UNMEASURABLE from these records: a missing boundary is missing instrumentation, not an untreated point',
   contextWatermark: 'UNMEASURABLE from these records: reverse causality; accumulated context cost triggers the watermark',
   boundedVerifyDigest: 'UNMEASURABLE from these records: reverse causality; running enough verification to need a digest is part of the cost',
@@ -56,7 +56,7 @@ const WHOLE_SPEC_PATH = /(?:^|[\\/\s"'=:])(?:TASKS\.md|design\.md|docs[\\/]tasks
 // this corpus. Match its commission, not incidental prose such as "a reviewer will
 // read every line" in an authoring brief. `ask-astra.mjs` has a different opening and
 // deliberately remains delegated agent work.
-const REVIEW_COMMISSION = /^You are the SECOND pair of eyes on a change in this repository, working under the\n(?:four-eyes rule|four[- ]eyes rule)/i
+const REVIEW_COMMISSION = /^You are the SECOND pair of eyes on a change in this repository, working under the\nfour[- ]eyes rule/i
 const REPORT_PATH = /(?:author|agent|sol|fable|opus|review)[^\s/\\]*\.log\b/i
 
 const positive = (value) => (Number.isFinite(value) && value > 0 ? value : 0)
@@ -98,7 +98,7 @@ function contentText(content) {
     .map((block) => {
       if (typeof block === 'string') return block
       const value = block?.text ?? block?.content ?? block?.output ?? ''
-      return typeof value === 'string' ? value : JSON.stringify(value ?? '')
+      return typeof value === 'string' ? value : JSON.stringify(value)
     })
     .join('\n')
 }
@@ -109,17 +109,17 @@ function toolText(tool = {}) {
 }
 
 /** The item whose RESULT a later model response will consume. */
-export function itemForTool(tool = {}) {
+function itemForTool(tool = {}) {
   const name = String(tool.name ?? '')
   const text = toolText(tool)
   const lower = name.toLowerCase()
-  if (lower.includes('view_image') || lower === 'image' || ((name === 'Read' || /read/i.test(name)) && IMAGE_PATH.test(text))) {
+  if (lower.includes('view_image') || lower === 'image' || (/read/i.test(name) && IMAGE_PATH.test(text))) {
     return 'pictureReads'
   }
   if (/TaskOutput|SendMessage|Agent|spawn_agent|wait_agent|send_message|followup_task/i.test(name)) return 'agentReports'
   if (/run-logged\.mjs|run-wait\.mjs/.test(text)) return 'suiteDigests'
   if (/npm (?:run )?test:(?:small|large)|npm test\b|scripts[\\/]verify[\\/].*\.mjs|playwright/i.test(text)) return 'rawSuiteLogs'
-  if (REPORT_PATH.test(text) && /(?:Read|Bash|exec|exec_command)/i.test(name)) return 'agentReports'
+  if (REPORT_PATH.test(text) && /(?:Read|Bash|exec)/i.test(name)) return 'agentReports'
   return null
 }
 
@@ -388,7 +388,7 @@ export function declaredPointFromEvidence({ branch = '', cwd = '', text = '' } =
     if (Number.isInteger(n)) scores.set(n, (scores.get(n) ?? 0) + weight)
   }
   for (const match of String(text).matchAll(/WORK-ORDER POINT(?: NUMBER)?[: ]+(\d+)\b/gi)) add(match[1], 12)
-  for (const match of String(text).matchAll(/(?:YOUR BRANCH:\s*)?feat\/(\d+)(?:[-/]|\b)/gi)) add(match[1], 10)
+  for (const match of String(text).matchAll(/feat\/(\d+)(?:[-/]|\b)/gi)) add(match[1], 10)
   for (const match of String(text).matchAll(/point-brief\.mjs\s+(\d+)\b/gi)) add(match[1], 8)
   const ranked = [...scores].sort((a, b) => b[1] - a[1] || a[0] - b[0])
   if (!ranked.length || ranked[0][1] === ranked[1]?.[1]) return null
@@ -408,8 +408,10 @@ function directPoint(turn, candidates) {
   return declaredPointFromEvidence(evidence) ?? pointFromEvidence(evidence, candidates)
 }
 
-/** Assign each response to one point, then carry evidence only within the same session
- * and active episode. Returns new objects and records the source of every decision. */
+/** Assign each response to one point, then carry evidence within the same session —
+ * across a whole delegated transcript (one job by construction), and only within an
+ * active episode for a top-level session. Returns new objects and records the source of
+ * every decision. */
 export function assignPoints(turns = [], candidates = [], { idleGapMs = IDLE_GAP_MS } = {}) {
   const rows = (Array.isArray(turns) ? turns : []).map((turn) => {
     const point = directPoint(turn, candidates)

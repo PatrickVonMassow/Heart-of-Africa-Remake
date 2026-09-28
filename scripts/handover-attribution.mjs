@@ -13,11 +13,11 @@ import {
   rampStageForCall,
 } from './handover-attribution-core.mjs'
 
-export const HANDOVER_ATTRIBUTION_STATE_PATH = repoPath('.claude/handover-attribution.json')
-export const HANDOVER_ATTRIBUTION_SERIES_PATH = repoPath('.claude/handover-attribution.jsonl')
-export const AUTOSTART_LAST_PATH = repoPath('.claude/autostart-last.json')
+const HANDOVER_ATTRIBUTION_STATE_PATH = repoPath('.claude/handover-attribution.json')
+const HANDOVER_ATTRIBUTION_SERIES_PATH = repoPath('.claude/handover-attribution.jsonl')
+const AUTOSTART_LAST_PATH = repoPath('.claude/autostart-last.json')
 
-export function readHandoverAttributionState(path = HANDOVER_ATTRIBUTION_STATE_PATH) {
+function readHandoverAttributionState(path = HANDOVER_ATTRIBUTION_STATE_PATH) {
   try {
     const value = JSON.parse(readFileSync(path, 'utf8'))
     return value?.v === HANDOVER_ATTRIBUTION_V ? value : null
@@ -190,9 +190,9 @@ export function noteHandoverAttributionSuccessorStart(input = {}, {
 }
 
 /**
- * Attribute one completed tool call. Before commit it is an exit checkpoint;
- * after commit another owning session begins the ramp and the first work call
- * seals it. All writes are evidence-only and fail open.
+ * Attribute one completed tool call. Between prepare and commit a predecessor
+ * call is an exit checkpoint; after commit another owning session begins the
+ * ramp and the first work call seals it. All writes are evidence-only and fail open.
  */
 export function observeHandoverAttributionCall(hookInput = {}, {
   ownsBatch = false,
