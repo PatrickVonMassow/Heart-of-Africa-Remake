@@ -1920,3 +1920,12 @@ Found 28.09.2026 on main `54bd6bb37` (CI run 36413079847, job fast (1)):
 pushed SHA" read `lastPushedSha` f067d28… against the tip 02fd536…. Local unit runs were green twice
 and the failed-job rerun was green. Second batch-daemon CI timing flake after M40 (26.09 above);
 promote to a point on a third sighting.
+
+## Chat responder holds the batch lock and loops in batch stop guards
+
+Found 28.09.2026 15:39 (finding 89f6e96d): a `claude -p` responder session (one chat message, lock
+forbidden) stood in `.claude/batch-lock.json` as owner; after `batch-singleton release` a hook
+re-took the lock on its next tool call. `batch-progress-guard`, `dashboard-guard` and
+`retro-currency-guard` then treat it as the batch worker and demand doctor/focus/retro work it may
+not do — a stop loop without an exit. None of the three guards has a responder exception. Backlog
+under the infrastructure freeze: it blocks no game work; promote when it blocks a landing.
