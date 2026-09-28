@@ -22,8 +22,9 @@
 //
 // AND THE LEAN IS PART OF THE GEOMETRY. The drummer stands bowed over his drums
 // (`DRUMMER_LEAN`), and the Figure tips the whole trunk — shoulders, arms and
-// hands with it — about the ground (he is drawn without legs). That carries a hand 0.05 m DOWN and 0.08 m
-// forward, which is the same order as the whole error being fixed here: a
+// hands with it — about the ground (he is drawn without legs). That carries a
+// hand centimetres down and forward, the same order as the whole error being
+// fixed here: a
 // stroke solved from the upright figure would still sink into the skin. So the
 // solve runs through the leaning trunk, the way the scene graph draws it.
 

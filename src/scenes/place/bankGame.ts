@@ -442,8 +442,8 @@ export interface BankState {
   /** The first arrival of this run has reached the speech output. */
   arrivalSpoken: boolean
   /** The point-589 long-run watch on the round's own SPEECH. It moved here with
-   *  the words: the alarm used to sit on the situation catalogue the five-word
-   *  rebuild deleted, and was left watching a producer that could no longer
+   *  the words: the alarm used to sit on the situation catalogue point 686
+   *  deleted, and was left watching a producer that could no longer
    *  produce anything at all. */
   speech: ProducerWatch
 }
