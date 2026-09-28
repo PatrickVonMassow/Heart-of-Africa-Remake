@@ -1,6 +1,7 @@
-// Naming what ACTS on screen (design.md §17.8): while Ctrl is held, every
-// animal, person and usable object on screen carries a small floating label
-// saying WHAT it is — and only those. Scenery answers nothing.
+// Naming what ACTS on screen (design.md §17.8): while the label modifier is
+// held (Ctrl by default, rebindable), the animals, people and usable objects on
+// screen carry a small floating label saying WHAT they are — within the
+// roster, the flags below and the nearest-first cap. Scenery answers nothing.
 //
 // The decision and the wording live here, pure, because the layer runs over
 // three unrelated rosters — the streamed bird's-eye fauna, the settlement's
@@ -12,7 +13,7 @@ import type { Gender, Strings } from '../i18n/types'
 import { SPECIES, type Species } from '../scenes/travel/animalBodies'
 
 /** The bird's-eye fauna: the herd species plus the scavenging vultures. */
-export type ActorFaunaKind = Species | 'vulture'
+type ActorFaunaKind = Species | 'vulture'
 /** Settlement people, read by their ROLE — never by a name (§17.8). The last
  *  four are the Giza site's own ~1890 crowd (design.md §4.4). */
 export type ActorRoleKind =
@@ -25,9 +26,9 @@ export type ActorRoleKind =
   | 'donkeyboy'
   | 'tourist'
 /** Animals kept by people: the village stock and the Giza mounts. */
-export type ActorTameKind = 'goat' | 'camel' | 'donkey'
+type ActorTameKind = 'goat' | 'camel' | 'donkey'
 /** Objects the player can use where they stand. */
-export type ActorObjectKind = 'camp' | 'canoe'
+type ActorObjectKind = 'camp' | 'canoe'
 
 export type ActorKind = ActorFaunaKind | ActorRoleKind | ActorTameKind | ActorObjectKind
 
@@ -58,7 +59,7 @@ const ACTOR_KIND_SET = new Set<string>(ACTOR_KINDS)
 
 /** What the scenes ask about — a species, a role, an object kind, or anything
  *  else they draw (a flora species, a map point, a wall). */
-export interface ActorCandidate {
+interface ActorCandidate {
   kind: string
   /**
    * Deliberately hidden right now: the submerged crocodile of §19.16 waiting to
@@ -107,7 +108,7 @@ export function qualifiesAsActor(c: ActorCandidate): boolean {
 
 /** What one label is about: its kind, its age where the game has one, and its
  *  state where that state changes what is being looked at. */
-export interface ActorDescriptor {
+interface ActorDescriptor {
   kind: ActorKind
   age?: ActorAge
   /** A carcass — named as dead, since that is what the player sees. */
@@ -122,9 +123,9 @@ function capitalizeFirst(s: string): string {
  * The label text, in the given language (§17.8): kind, then age where the game
  * distinguishes one, then state where it changes the picture.
  *
- * Never a concatenation of translated fragments: each language supplies the
- * noun WITH what it needs to inflect — for German the gender, and the young's
- * own word rather than a pasted-on prefix — so "Totes Giraffen-Jungtier" and
+ * Never a blind concatenation of translated fragments: each language supplies
+ * the noun WITH what it needs to inflect — for German the gender that picks the
+ * qualifier's form, and the young's own word rather than a pasted-on prefix — so "Totes Giraffen-Jungtier" and
  * "Tote Giraffe" come out right instead of reading as machine translation.
  * The adult qualifier appears only where the kind HAS a young form: a villager
  * is a villager, not an "adult villager".
@@ -144,7 +145,7 @@ export function actorLabelText(strings: Strings, d: ActorDescriptor): string {
 }
 
 /** Anything carrying a world position — the labels are ordered by distance. */
-export interface Positioned {
+interface Positioned {
   x: number
   y: number
   z: number
