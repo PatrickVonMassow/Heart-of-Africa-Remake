@@ -35,10 +35,10 @@ export const BANK_MIN_GAP = 8
 export const BANK_MAX_GAP = 18
 
 /**
- * Half-width of the shore strip: the ground slopes from the walkable edge down
- * across `2 × BANK_SHORE_HALF` into the water, and the waterline lands exactly
- * in its middle. The player therefore stops at the TOP of the bank and looks
- * down at the water rather than standing in it.
+ * How far short of the waterline the settlement's flat plate ends
+ * (`walkEdge = distance − BANK_SHORE_HALF`): the ground slopes from there down
+ * to the waterline, and the shallows and the bed (below) run on past it, where
+ * the player may wade (work-order 584).
  */
 export const BANK_SHORE_HALF = 1.2
 
@@ -85,8 +85,7 @@ export const BANK_BED_DEPTH = 1.6
 export const BANK_MAX_STEP = 0.05
 
 /** Angular half-width of the bank lobe's plateau: inside it the walkable
- *  region reaches all the way to the water. ~22°, which at a waterline ~35 m
- *  out is a stretch of roughly fourteen paces to each side. */
+ *  region reaches all the way to the water. ~22°. */
 export const BANK_PLATEAU_ANGLE = 0.384
 /** ... and where the lobe has faded back to the plain walkable radius. The
  *  region between the two tapers, so walking along the bank draws the player
@@ -95,16 +94,18 @@ export const BANK_PLATEAU_ANGLE = 0.384
 export const BANK_FADE_ANGLE = 0.593
 
 /** How far inside the walkable edge the three named bank points sit, so a
- *  villager sent to one stands clear of the edge and of the water wall. */
+ *  villager sent to one stands clear of the edge, on the flat plate. */
 export const BANK_STAND_INSET = 1.5
-/** The two stretches lie at this fraction of the plateau angle to each side —
+/** The two stretches lie at most at this fraction of the plateau angle to each
+ *  side (`bankStretchAngle` pulls them in where the span would pass its cap) —
  *  inside the plateau by construction, so they can never fall outside the
  *  walkable region however the calibratable river width moves the waterline. */
 export const BANK_STRETCH_ANGLE_FRAC = 0.8
 
 /**
- * THE LONGEST the rock-to-rock stretch may be, and the shortest it may be
- * (point 1173 item 4). The stretch used to be a pure ANGLE on the bank, so it
+ * THE LONGEST the stretch may be, and the shortest it may be (point 1173 item
+ * 4), measured between the two bank points the play rocks are set from; the
+ * rocks themselves, pulled inland, stand a little closer. The stretch used to be a pure ANGLE on the bank, so it
  * grew with the waterline: pushing the village off the water stretched the
  * children's run from 19.7 m to 26 m, which is a march rather than a game —
  * past the frame the start line sees both rocks in (point 687 §6) and past the
@@ -124,9 +125,7 @@ export const BANK_STRETCH_MIN_SPAN = 14
  * The bearing each play rock sits at, solved so the chord between the two stays
  * within `BANK_STRETCH_MAX_SPAN`. The chord grows monotonically with the angle,
  * so a bisection on (0, max] is exact to within its tolerance; a bank whose
- * widest permitted angle is already short enough keeps that angle unchanged,
- * which is why the three river villages below the grown waterline still lay
- * their stage exactly where they did.
+ * widest permitted angle is already short enough keeps that angle unchanged.
  */
 export function bankStretchAngle(walkEdge: number): number {
   const widest = BANK_PLATEAU_ANGLE * BANK_STRETCH_ANGLE_FRAC
@@ -160,19 +159,20 @@ export const BANK_DRESSING_CLEARANCE = 0.9
 // `upstream`/`downstream`, drawn `BANK_PLAY_ROCK_INSET` inland of those points
 // so the adults' bank stops stay free ground (a villager is SENT to them, point
 // 155). Measured on the three river villages that carry a bank — nubian,
-// bambara and mandinka — the rocks then stand 19.7 m apart (the bank points
-// themselves 21.2 m; `riverBank.test.ts` pins the pair).
+// bambara and mandinka — before point 1173 moved the waterline, the rocks stood
+// 19.7 m apart (the bank points 21.2 m); the bank-point span is now capped at
+// `BANK_STRETCH_MAX_SPAN`, and `riverBank.test.ts` pins the pair.
 //
 // BOTH ROCKS IN ONE FRAME. At the reference viewport of the verification
 // (1440x900) and the default field of view (50 deg vertical, App.tsx), a
 // spectator at the start line sees the near rock beside him and the far one
-// 19.7 m down the bank: the far rock is 2.4 m across and its detailed, lying
+// down the bank: the far rock is 2.4 m across and its detailed, lying
 // silhouette remains large enough to identify. The horizontal frame is
 // 2*atan(tan(25 deg)*1.6) = 73.4 deg, so the whole stretch fits with either rock
 // a good 20 deg inside the edge for a spectator standing back from the line.
 // `riverBank.test.ts` computes both angles rather than restating them.
 //
-// THE LANE IS THREE WALKER DIAMETERS. `BANK_PLAY_LANE_HALF` is kept clear of
+// THE LANE IS FIVE WALKER DIAMETERS (THE SPEC'S FLOOR IS THREE). `BANK_PLAY_LANE_HALF` is kept clear of
 // every scattered boulder, tuft and tree, which leaves 3.0 m of running ground
 // — five walker diameters (0.6 m each), and the spec's floor is three. The
 // margin is deliberate: the lane's own edges are the bank's shore on one side
@@ -200,9 +200,8 @@ export const BANK_PLAY_LANE_HALF = 1.5
 // a settlement draws its drinking water above the water it plays, washes and
 // wades in. The landing therefore sits beyond the upstream rock, at
 // `BANK_WATER_PATH_ANGLE_FRAC` of the plateau angle — still inside the plateau,
-// where the walkable ground reaches the water, and 3.9 m beyond the upstream
-// rock on the three river villages (`riverBank.test.ts` measures it rather than
-// restating it).
+// where the walkable ground reaches the water, and beyond the upstream rock
+// (`riverBank.test.ts` measures it).
 
 /** Angular offset of the water path's landing from the bank normal, as a
  *  fraction of the plateau angle. Below 1 so the landing stays inside the
@@ -230,7 +229,7 @@ export function bankWaterFoot(
  * `BANK_STAND_INSET` INLAND of the walkable edge, so a carrier who stopped there
  * halted `BANK_STAND_INSET + BANK_SHORE_HALF` — about 2.7 m — short of the water
  * and nothing about his errand read as fetching from the river (user 06.09.2026).
- * The WORD still falls at the foot; only the fill moved.
+ * The errand's words fall at the village water stand, not here.
  *
  * The spot is SOLVED on the shore profile rather than pinned to a distance, so
  * it follows the waterline wherever the calibratable river width puts it, and
@@ -263,8 +262,9 @@ export function bankPlayRocks(
  * A spectator on the stretch's own AXIS sees the near rock and the far one on
  * one line: the near one hides the far one, and a picture taken from there shows
  * a rock, singular, however honestly it is labelled. The stage is photographed —
- * and judged — from a three-quarter stand instead: back from the middle by the
- * stretch's own length, and off the axis by half of it, looking at the middle.
+ * and judged — from a stand off the axis instead: out from the middle by the
+ * stretch's own length, perpendicular to it on the settlement's side, looking
+ * at the middle.
  *
  * It lives here, beside the rocks themselves, because the browser suite that
  * takes that picture and the unit case that proves both rocks fall inside the
