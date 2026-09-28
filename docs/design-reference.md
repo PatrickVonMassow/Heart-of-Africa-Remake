@@ -3,8 +3,9 @@
 The communication balance reference below applies to work-order points 686–692
 and their follow-ups; the current mechanic is specified in `communication-poc-spec.md`.
 
-Three blocks of `design.md` live here, **verbatim and under their own original
-section numbers** (moved 27.07.2026, work-order point 367). They are reference
+Three blocks of `design.md` live here, **moved verbatim under their own original
+section numbers** (27.07.2026, work-order point 367) and kept current since like
+any design text. They are reference
 material a reader looks up when the work touches them, not target state read at a
 glance, and together they were a tenth of the design document every other section
 had to be read past. The split is the one that already worked for the acceptance
@@ -85,7 +86,7 @@ drivers) and `src/scenes/place/` (the figures); the live proof is
 | South — Okavango | Wayeyi Village | The light **caross** "which they accommodate to the body according to the state of the weather" | Shoulder cloaks following the cold season | `coldnessAt` · everyone · Andersson 1856 (period, verbatim — the only case needing no inference) |
 
 **What the table deliberately leaves out — and why that is a finding.** The
-other sixteen peoples change NOTHING with the season, however cold their
+other sixteen peoples change NOTHING in their dress with the season, however cold their
 ground gets: the research found no period evidence of a garment put on
 seasonally, and the two named traps stay resolved as researched — the Pedi
 highveld crosses the cold threshold but is NOT dressed (the famous blanket
@@ -137,14 +138,11 @@ antelope on ANY nearby land — not only savanna, so the rocky Maasailand
 (Kilimanjaro/Meru) shows it too — worked by the ordinary scavenger/vulture
 systems, and visible at the standard bird's-eye zoom (point 168) without
 travelling out to wider country.
-- **Rank as class experience:** the gate keys on the settlement palette's
-  first cloth, so about a third of the figures carry the plaid while the
-  rest stand bare at the fire — Barth's class split, not a uniform issue.
 
 **The open edge.** The one reading the research allows but the figures
-cannot yet show: a wrap worn DIFFERENTLY in the cold (drawn tight, closed
-under the chin) rather than in greater number — recorded as §19.13's open
-line. And the seasonal DRESS is only for peoples with period evidence;
+mostly cannot yet show: a wrap worn DIFFERENTLY in the cold (drawn tight, closed
+under the chin) rather than in greater number — only the Somali tobe drawn over
+the head (above) shows it so far; the rest stays §19.13's open line. And the seasonal DRESS is only for peoples with period evidence;
 everything else here (fire, presence, market) runs for every settlement from
 its own coordinates.
 
@@ -154,7 +152,8 @@ its own coordinates.
 
 Every estimated balance value is editable here as a number field — that is the
 binding contract of the calibration rule (all estimated values live centrally and
-are adjustable at runtime). The complete set, grouped as the menu presents it:
+are adjustable in the running game; the few BUILD-time values below take effect on
+the next reload). The complete set, grouped as the menu presents it:
 
 **Movement and controls**
 
@@ -221,6 +220,3 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.
 - The dig radius (§18): how close to the buried site a dig with the shovel must be to succeed.
-
----
-

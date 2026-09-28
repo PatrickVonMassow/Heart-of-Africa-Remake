@@ -9,15 +9,14 @@ change that **must always work** is **HIGH-criticality**: a guard or gate, the
 batch singleton and its lock, save/load, the deadline, anything load-bearing for
 the whole system or hard to reverse.
 
-A HIGH item gets a **model-diverse review** — either
+A HIGH item gets a **model-diverse review** under the model policy of CLAUDE.md
+§6: cross-vendor and never by an author of the range — the reviewing model judges
+the PLAN before and the RESULT after ("is it truly safe, does it work in ALL cases,
+are there negative side effects?").
 
-- the primary model (Opus 5.5) builds and **Fable 5 reviews the PLAN before and the
-  RESULT after** ("is it truly safe, does it work in ALL cases, are there
-  negative side effects?"), or
-- Fable builds and Opus cross-checks.
-
-The value of the second model is its *different* blind spots, so it is never the
-same model twice. Difficulty alone is not a reason to hand work to Fable — that
+The value of the second model is its *different* blind spots, so a convergent
+review is never by the same model; a second blind run by the same model is only
+a recorded, decorrelated fallback (`--framing`, below). Difficulty alone is not a reason to hand work to Fable — that
 is the separate model policy in CLAUDE.md §6.
 
 **Merge and tick only when the review is green.**
@@ -47,7 +46,8 @@ which is why the guard's refusal says *correct the point, not the ledger*.
 
 `scripts/criticality-review-guard.mjs` (Stop hook, pure core +
 `criticality-review-guard-core.test.mjs`, fail-open) blocks the turn end when a
-point tagged HIGH is ticked without an **answered** review by a different model.
+point tagged HIGH is ticked without an **answered** review by a different model
+(or, for files no vendor can review, the verified-unavailability receipt below).
 
 It stands down for a paused batch, for a session that does not own the batch
 lock, and on any branch other than `main` — TASKS.md is main-only and the tick
@@ -74,8 +74,9 @@ So this gate counts a review only where its findings were acted on:
 | record by the same model that authored the work               | BLOCK   |
 | lone `do-not-merge` **or** `merge-with-fixes`                 | BLOCK   |
 | refusal, then `merge` for a **later, descendant** commit      | allow   |
+| refusal, then a `review-findings-filed` receipt naming the filed points | allow |
 | refusal, then `merge` for the **same** commit                 | BLOCK   |
-| `merge` by a different model                                  | allow   |
+| `merge` by an eligible other vendor, covering every reviewable changed file | allow |
 
 The `merge-with-fixes` row is deliberately stricter than the MECHANISM gate
 beside it (`mechanism-review-core.mjs`), where that verdict clears: there the
@@ -88,7 +89,7 @@ One ledger and one command serve both four-eyes gates, so a guard change that
 also closes a high point is recorded **once**:
 
 ```sh
-node scripts/mechanism-review.mjs --record <sha> --point <N> --model "Fable 5" \
+node scripts/mechanism-review.mjs --record <sha> --point <N> --model "<reviewer model>" \
     --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
     --mode <review|blind-parallel> [--framing "<one line>"]
 ```
@@ -146,14 +147,12 @@ ask it before the action with
 
 ## Wiring
 
-The guard needs one line in `.claude/settings.json`'s `Stop` chain:
+The guard is wired by one line in `.claude/settings.json`'s `Stop` chain:
 
 ```json
 { "type": "command", "command": "node scripts/criticality-review-guard.mjs" }
 ```
 
-Until that line exists, the guard is recorded in `INTENTIONALLY_DORMANT`
-(`scripts/guard-health-core.mjs`) with its reason — the settings file is a
-protected path that always prompts, so the arming belongs to an attended session.
-**Remove that entry in the same commit that adds the hook line**, or the corpus
-keeps reporting a live guard as dormant.
+Before that line existed the guard was recorded in `INTENTIONALLY_DORMANT`
+(`scripts/guard-health-core.mjs`) with its reason; the entry left with the hook
+line, and the map is empty today.
