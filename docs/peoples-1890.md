@@ -5,8 +5,9 @@ Research basis for the settlement side of the seasons/weather model (TASKS point
 they wore, when they worked, and when a village stands empty. Companion to
 `docs/climate-1890.md`, which supplies the rainfall calendar this keys against.
 
-**Status: PARTIAL. Do not treat this as finished research.** Roughly half the
-roster is unresearched (see §6). Gaps are marked as gaps rather than filled with
+**Status: PARTIAL. Do not treat this as finished research.** Every people of the
+roster now has a §7 entry, but several answers are GAPs or inferences and §6
+lists what stays open. Gaps are marked as gaps rather than filled with
 plausible-sounding text, because the subject is real peoples and a confident
 invention here is worse than an admitted hole.
 
@@ -14,7 +15,7 @@ Evidence markers used throughout:
 
 | Marker | Meaning |
 | --- | --- |
-| **PERIOD** | pre-1910 eyewitness (explorer, missionary, early ethnography, photograph) |
+| **PERIOD** | pre-1910 eyewitness (explorer, missionary, early ethnography, photograph); a later publication of pre-1910 observation counts (Roscoe 1911, resident through the 1890s) |
 | **MODERN** | present-day scholarship *about* the period |
 | **RETRO-APPLIED** | mid-20th-century fieldwork projected back onto 1890 |
 | **CONTESTED** | sources genuinely disagree |
@@ -24,9 +25,14 @@ Evidence markers used throughout:
 
 ## 1. Naming and placement problems in the world model
 
-These are **design content** (design.md §3.2/§4.5 fixes the peoples), so they are
+These are **design content** (design.md §3.2/§4.5 fixes the peoples), so they were
 recorded here as findings for the user to rule on, not changed unilaterally
 (CLAUDE §2).
+
+> **STATUS: acted on.** `src/world/geo.ts` now carries `pedi-village`,
+> `baganda-village`, `mbuti-village`, `san-village`, `sidama-village` and
+> `wayeyi-village` (19.0S 22.5E); the Bambara village sits at Ségou
+> (13.45N 6.27W, see §7.2). The findings below are kept as the record of why.
 
 **Four labels are category errors, not merely dated spellings:**
 
@@ -62,7 +68,7 @@ invading generals** as psychological warfare to degrade the newly occupied land;
 "Sidamo" does not yet exist.** "Sidama" is both correct and period-correct.
 (The coordinate 6.7N 38.4E is good — Hawassa is ~7.05N 38.48E.)
 
-### 1.1 Two more villages sit in the wrong place — and the era is wrong too
+### 1.1 Three more villages sit in the wrong place — and the era is wrong too
 
 **Bambara at 17.2N 3.5W is wrong three times over.** The point is ~50 km
 north-west of **Timbuktu**, on the Saharan fringe, where annual rainfall is on
@@ -89,8 +95,8 @@ from here from 1896 ([Britannica](https://www.britannica.com/place/Wadi-Halfa);
 [Wadi Halfa](https://en.wikipedia.org/wiki/Wadi_Halfa);
 [Anglo-Egyptian conquest of Sudan](https://en.wikipedia.org/wiki/Anglo-Egyptian_conquest_of_Sudan))
 — PERIOD-RELEVANT. It is a garrison and customs station taxing Nile commerce in
-ivory, gum arabic and ostrich feathers. This compounds the earlier flag that the
-Sudan in 1890 is **the Mahdiyya**, not Egyptian-ruled.
+ivory, gum arabic and ostrich feathers. The Sudan south of it is in 1890
+**the Mahdiyya**, not Egyptian-ruled.
 
 **The Batwa village is on the wrong side of the continent.** `batwa-village` sits
 at **19.0S 22.5E — the Okavango Delta, Botswana**. The Batwa/Twa are Great Lakes
@@ -109,23 +115,19 @@ Two honest options: move the village to ~2S 29E, or rename it
 ([itravelto](https://www.itravelto.com/people-of-okavango.html)). The game
 already has a canoe, which makes the second option cheap and rewarding.
 
-Note the code already concedes a related fudge: the `VILLAGE_HEARTLANDS` comment
-says that where design region and historical heartland disagree (Bombara, Bemba,
-Fang) the position is shifted toward the design region. For **Bambara** that
-shift is large: the heartland is **Segou (~13.4N 6.2W)**, the village sits at
-17.2N 3.5W — at or beyond the northern limit of rain-fed millet, while its
-vignette says "millet fields run to the horizon". The vignette describes Segou.
-
 ---
 
 ## 2. Dress around 1890
 
 > **⏩ FORWARD-POINTER (added by the point-148 cleanup, 16.07.2026).** §7 (the
 > point-137 second pass) went deeper into the period sources and OVERTURNED
-> several of this section's findings. §2 is kept unedited as the record of what
-> was known when, but read it alongside §7: the §2.6 "Sahel harmattan: EVIDENCE
-> ABSENT" is answered for the Tuareg, Hausa and San in §7.2 (a bernus, a zenne,
-> a ‡nau — all period-sourced); the §2.3 kanzu, marked THIN here, is
+> several of this section's findings. §2 is kept as the record of what
+> was known when (only small corrections added since), but read it alongside §7:
+> the §2.6 "Sahel harmattan: EVIDENCE ABSENT" is answered for the Tuareg and
+> Hausa in §7.2 (a bernus, a zenne) and §2.6's San gap in §7.3 (a ‡nau) — all
+> period-sourced; the §2.7 Pankhurst snippet ("Verify before use") is replaced
+> by Parkyns' own sentence in §7.1; Baumann (1894, listed unread in §2.1) is
+> read in §5.1; §2.4's unread Duveyrier is quoted in §4.0.6; the §2.3b kanzu, marked THIN here, is
 > period-sourced in §7.1 (New 1873); and the §4.0.4 Okavango inversion, marked
 > MODERN, is period-confirmed twice in §7.3 (Andersson + Livingstone). What
 > shipped is §7's answer.
@@ -180,7 +182,7 @@ implausible — the identical practice is *documented* among the Zulu (§2.3) �
 
 ⚠️ Rinderpest is **not** an explanation for cloth adoption here: no period source
 links the hide-supply collapse to Maasai cloth. And the timing runs the wrong way
-for the game — rinderpest arrives *exactly at* 1890, so its dress consequences
+for the game — rinderpest arrives in *1890–91*, so its dress consequences
 are still in the future at the start date.
 
 **Still unread:** Baumann (1894) and Merker (1904); dated museum accessions
@@ -252,7 +254,7 @@ a colony since 1843 and the most cloth-saturated Zulu-speaking region. Pushing
 "isipuku has disappeared" back to 1890, or across to Zululand proper, is **not**
 warranted.
 
-### 2.3 The kanga is period-correct, and only just ✅
+### 2.3b The kanga is period-correct, and only just ✅
 
 Coastal women from the 1850s–60s bought uncut sheets of six printed handkerchief
 squares (*leso*) and sewed them into larger cloths; **by 1875 Zanzibar merchants
@@ -297,8 +299,8 @@ day sun, and assuming it is a **rite of passage into manhood**
 **The design note that matters:** the veil is **not seasonal gear that comes off
 in mild weather**. It is worn before others as a matter of propriety — men keep
 it up even while eating. Modelling it as "dust protection, equipped during dust
-storms" turns a cultural institution into a hat. Model it **always-on**, with the
-dust changing only how tightly it is drawn.
+storms" turns a cultural institution into a hat. Model it **always-on**; drawing it
+tighter against dust is inference only (§7.2 found no period source for it).
 
 ⚠️ **Why men veil is genuinely unknown** — Keenan: "the origin of the veil
 remains obscure and conjectural" despite "numerous hypotheses"
@@ -338,8 +340,8 @@ is mostly *ahead* of the game — Uganda becomes a British colony in **1894**, a
 the colonisers "favoured cotton"
 ([Smarthistory](https://smarthistory.org/olubugo-barkcloth/);
 [National Museums Scotland](https://www.nms.ac.uk/discover-catalogue/the-ancient-craft-of-barkcloth-across-the-world))
-— MODERN, and the decline is dated only vaguely. **Baganda in cotton is the
-anachronism here, not barkcloth.** Worden, "Tradition and Transition: The
+— MODERN, and the decline is dated only vaguely. **Baganda at large in cotton is the
+anachronism here, not barkcloth** (court and converts excepted). Worden, "Tradition and Transition: The
 changing fortunes of barkcloth in Uganda"
 ([TSA](https://digitalcommons.unl.edu/tsaconf/1012/)) is the scholarly treatment
 — located, not read.
@@ -363,8 +365,9 @@ Three things fall out of that one passage, all usable:
 **Elsewhere the evidence is thin or absent — do not extrapolate this to every
 people:**
 
-- **Ethiopian highlands:** the *principle* is supported by Parkyns (PERIOD) — the
-  poor wrapped in a single sheet "by day and by night" — and the shamma existed
+- **Ethiopian highlands:** the *principle* is supported by Pankhurst (PERIOD via
+  MODERN, an unverified snippet, §2.7) — the poor wrapped in a single sheet "by
+  day and by night" — and the shamma existed
   in "two heavier weights". But the *gabi*-for-cold-months detail is MODERN and
   THIN, and **no period account of kiremt-season dress was found**.
 - **Kalahari/San:** "a fur kaross was used as a covering in cold weather", and
@@ -445,7 +448,8 @@ And `climate-1890.md` finds the Sahel was climatically **wet** in 1870–95, so 
 **Hagaa** (Jul–Sep, dry, light coastal rains), **Deyr** (Oct–Nov, short, less
 reliable) ([FSNAU](https://fsnau.org/analytical-approach/methodologies/climate);
 [nomadilab](https://www.nomadilab.org/post/the-climate-of-somalia)) — MODERN
-(climatological, safe to retro-apply).
+(climatological). Swayne's period boundaries differ by about a month, and for an
+1890 game Swayne wins (§4.0.2).
 **The gameplay hook: Gu = milk; Jilaal = no milk and movement.**
 
 ### 3.3 Bemba citemene — real, but the record is 1930s
@@ -468,7 +472,9 @@ sequence could **not** be confirmed with month precision — **THIN**.
 The perennial banana economy plausibly means Buganda has no grain harvest season;
 the bark-cloth evidence corroborates a tree-crop ecology. But no clean source was
 found stating it. **Directionally right, formally unverified — GAP.** Roscoe
-(1911) is the right source and was not read.
+(1911) is the right source and was not read here; §7.1 has since read him for
+the Ganda year (six months, two seasons), but the banana-harvest question stays
+open.
 
 ### 3.5 GAP — not researched, do not assume
 
@@ -476,7 +482,9 @@ Hausa millet/sorghum and the dry-season craft/trade economy; Nubian Nile
 flood-recession farming and the saqia; Mandinka rice; Zulu/Pedi summer-rain maize
 and the first-fruits ceremony; Ethiopian meher/belg and the ox-plough; Sidama
 enset; **all fishing seasons (Nile, Congo, the lakes)**; Mongo, Banda, Bambundu,
-Lunda, Fang.
+Lunda, Fang. (Since answered in part: the Hausa market and caravan season in
+§4.9, Lunda sedentism and capitals in §4.0.5; §7 adds dress and season for the
+rest.)
 
 ---
 
@@ -493,7 +501,7 @@ reduced camp — he should find a **catastrophe**:
 
 - **1883–87** bovine pleuropneumonia sweeps Maasailand (so it is *already*
   damaged at the game's start);
-- **1890** rinderpest strikes East Africa — within two years **95 % of the
+- **1890–91** rinderpest strikes East Africa — within two years **95 % of the
   buffalo and wildebeest** are dead (Sinclair & Norton-Griffiths, *Serengeti*);
 - **1891** the triple disaster: "smallpox decimated the human population,
   rinderpest annihilated the cattle herds and a plague of locusts destroyed much
@@ -505,7 +513,8 @@ reduced camp — he should find a **catastrophe**:
 
 **And the answer to "who is not there" is: the Maasai, because they left.** "All
 Maasai cattle were wiped out and **the surviving people took refuge with the
-agricultural tribes of the edge of the steppe**"; some "forage on wild roots or
+agricultural tribes of the edge of the steppe**" (the "all" is the source's
+hyperbole: §5.1 gives 80–90 % as the defensible band); some "forage on wild roots or
 seek help from agricultural neighbors they once lorded over"; the disease
 "**removed the Masai and their cattle from the crater**" — Ngorongoro, which the
 game already carries as a natural landmark. Among those who stayed, "cattle
@@ -562,7 +571,7 @@ cattle. That is the shape to build.
 > rains."
 
 ⚠️ **This shifts jilal/gu about a month later than the modern FSNAU convention**
-(jilaal Jan–Mar, gu Apr–Jun) recorded in §3.2 and in `climate-1890.md`. **For an
+(jilaal Dec–Mar, gu Apr–Jun) recorded in §3.2 and in `climate-1890.md`. **For an
 1890 game, Swayne wins** — he was on the ground in the exact years.
 
 And the dispersal is quantified by the same period eyewitness:
@@ -603,7 +612,8 @@ Two corrections to the naive picture, both worth having:
   neighbourhoods centred on a permanent water point, each with "**a core of
   people who resided there permanently**". It is *reduced*, not abandoned.
   ([FAO, Maasai socio-historical context](https://openknowledge.fao.org/server/api/core/bitstreams/0ce87f59-bca8-48ad-aa67-51fed1898f1f/content/x5552e05.htm))
-  — MODERN/RETRO-APPLIED. ⚠️ **No source gives month boundaries** for Maasai
+  — MODERN/RETRO-APPLIED; the direction is PERIOD since §7.1 (Thomson). ⚠️
+  **No source gives month boundaries** for Maasai
   transhumance; keying it to the rift calendar is inference, not citation.
 
 ⚠️ **Do not encode "Il-Maasai pastoralists vs Il-Kwavi agriculturalists" as
@@ -618,9 +628,9 @@ grain
 pastoral–agricultural *continuum*. **This is the same failure the game's own
 language/direction mechanic is about: outsiders' names for insiders' realities.**
 
-### 4.0.4 ★ The Okavango flood pulse is inverted — and the game cannot express it yet
+### 4.0.4 ★ The Okavango flood pulse is inverted — now period-confirmed and shipped
 
-At **19.0S 22.5E** (the mis-assigned Batwa point, §1) the water arrives **when
+At **19.0S 22.5E** (the former Batwa point, now `wayeyi-village`, §1) the water arrives **when
 the sky is driest**: the Angolan summer rains (Nov–Mar) feed the Cubango and
 Cuito, the pulse becomes noticeable **March–April at the panhandle**, and reaches
 the distal area at Maun **June–August** — "while most river systems flood during
@@ -633,9 +643,11 @@ the surrounding Kalahari is at its most parched." The floodplains are inundated
 **physical geography, so retro-application to 1890 is far safer here than for any
 cultural claim in this document**.
 
-This is a genuinely surprising, verifiable, historically safe seasonal mechanic —
-and the game currently has no way to express it, because the people at that
-coordinate are the wrong ones (§1).
+This is a genuinely surprising, verifiable, historically safe seasonal mechanic.
+When written the game could not express it because the people at that
+coordinate were the wrong ones (§1); since then §7.3 confirms the inversion from
+period sources (Andersson's June–August months) and `okavangoFloodAt`
+(`src/systems/season.ts`) ships it.
 
 ### 4.0.5 Bemba and Lunda are sedentary — no month empties them
 
@@ -716,7 +728,12 @@ highest-value unread source for this village.
 **GAP:** Tuareg salt-caravan (azalai) months; Maasai transhumance months; Somali
 well-concentration geography; Fulani transhumance; Bemba/Lunda village-shifting
 cycles; **the Okavango flood-pulse timing** (the peoples were confirmed, the
-flood months were not).
+flood months not from a period source). Since answered in part: azalai
+departures (§4.0.6, THIN for 1890), Somali wet-season dispersal and the Haud
+(§4.0.2), the Bemba five-to-six-year cycle and permanent Lunda capitals
+(§4.0.5), the Maasai dry-season move to the highlands (§7.1, months still
+absent), Fulani transhumance (§4.0.1, MODERN only), and the Okavango flood
+months (§7.3, PERIOD).
 
 ---
 
@@ -742,8 +759,11 @@ Timbuktu coldest nights **~10 °C**; Agadez lows **11.7 °C** against 27.9 °C h
 ⚠️ **San night fires:** firelit night gathering is well documented (Wiessner,
 *Embers of society*, [PNAS](https://www.pnas.org/doi/10.1073/pnas.1404212111)) —
 **but that work is about talk and sociality, not warmth.** The night fire is
-real; the "for warmth" motive is **not sourced**. Kalahari winter nights do dip
-below freezing (MODERN); the −10 °C figure is tourism copy — do not use.
+real; the "for warmth" motive is **not sourced** here — §7.3 supplies it from
+Passarge (San huddled at a fire after a frost night). Kalahari winter nights do
+dip below freezing: typical winter nights near freezing, snaps to ~−5 °C
+(Passarge, PERIOD), extremes to ~−9 °C (Ghanzi station record, MODERN) — see
+§7.3.
 
 ### ★ The market has a season, and the caravans stop for a physical reason
 
@@ -771,8 +791,9 @@ and the Islamized savanna; the **4-/8-day** weeks belong to the **forest zone**
 
 ### ★ Indoor vs outdoor in the rains — the intuition is BACKWARDS
 
-People do **not** retreat indoors in the wet season; they move **out to field
-huts**:
+In Barth's Sahel, people do **not** retreat indoors in the wet season; they move
+**out to field huts** (the Ethiopian highlands, where the house is for cold or
+wet nights, are the exception — §7.1):
 
 - **Barth p. 400:** "Most of them have fixed villages, where they live **during
   the rainy season, attending the labours of the field**." — PERIOD.
@@ -781,8 +802,9 @@ huts**:
   the mountains." — PERIOD. A seasonal **residence shift**.
 
 **Game implication: in the rains a village looks EMPTIER, not more shuttered** —
-the people are out in field huts and the market is thin. That compounds with
-§4.0.1 ("the young men are gone") into one legible rule.
+the people are out in field huts and the market is thin. It sits beside §4.0.1
+("the young men are gone"), which thins a camp in the DRY season instead: two
+emptinesses, in different seasons and for different peoples.
 
 ### The rains destroy mud architecture — period-confirmed
 
@@ -838,15 +860,16 @@ dry-season water crisis, **conflict at the water point**, and dying stock.
 
 ## 5. The 1890 overlay: rinderpest, and it reshapes the start date
 
-An Italian force occupied **Massawa in 1885**; cattle imported from India to
-supply the troops introduced the virus, which swept coastal Eritrea in **1887**
+An Italian force occupied **Massawa in 1885**; cattle imported from India or
+the Arabian Peninsula to supply the troops introduced the virus, which swept
+coastal Eritrea in **1887–88** (§5.1: do not assert a single year)
 and "entered the continent in 1888" (sources are internally inconsistent by a
 year; the standard framing is **1888–1897**)
 ([1890s African rinderpest epizootic](https://en.wikipedia.org/wiki/1890s_African_rinderpest_epizootic);
 [Oxford Research Encyclopedia](https://oxfordre.com/africanhistory/display/10.1093/acrefore/9780190277734.001.0001/acrefore-9780190277734-e-375))
-— MODERN. Senegal River **by 1891**; East Africa after 1891; **halted at the
-Zambezi until 1896**, then Zimbabwe, Mozambique, Botswana, South Africa, Namibia
-and southern Angola. Mortality: **~90 %** of cattle (and, in Ethiopia, of buffalo
+— MODERN. Senegal River **by 1891**; East Africa **1890–91**; **stalled north of the
+Zambezi from July 1892 until March 1896** (§5.1), then Zimbabwe, Mozambique, Botswana, South Africa, Namibia
+and southern Angola. Mortality: **80–90 %** of cattle (the defensible band, §5.1) (and, in Ethiopia, of buffalo
 and antelope too); ~**5.2 million** cattle south of the Zambezi.
 
 **Maasai *emutai* ("to finish off completely") is a STACK, not one event:**
@@ -883,13 +906,13 @@ Pankhurst attributes it to a *combination* — rinderpest, harvest failure,
 drought, locusts, armyworm — not cattle plague alone
 ([Pankhurst & Johnson](https://www.taylorfrancis.com/chapters/edit/10.4324/9780429310249-4/great-drought-famine-1888%E2%80%9392-northeast-africa-richard-pankhurst-douglas-johnson);
 [Kaplan, *Paideuma* 36, 1990](https://journals.ub.uni-frankfurt.de/paideuma/index.php/paideuma/article/download/1185/1322/1919))
-— MODERN, high quality. **The Sidamo village sits inside this: a game starting in
+— MODERN, high quality. **The Sidama village sits inside this: a game starting in
 1890 in the Ethiopian highlands starts in the middle of a catastrophe.**
 
 **Who is NOT affected in 1890–95** — southern Africa is clean until **1896**: the
-**Zulu** (28.4S), **Pedi** (24.5S), **San** (22.5S) and the Okavango village
-(19.0S). Rinderpest arrives there in 1896 and would land *during* a long
-playthrough — a datable in-game event if the timeline reaches it.
+**Zulu** (28.4S), **Pedi** (24.5S), **San** (22.5S) and **Wayeyi** (19.0S).
+Rinderpest arrives there in 1896, just after the game's window (the calendar
+stops at 31.12.1895, design.md §5.1).
 
 ### 5.1 Corrections and closures from the deeper pass
 
@@ -937,8 +960,8 @@ as manure for the groves. What actually dominates Buganda in 1890–92 is the
 1890 by a Protestant–Catholic coalition allied with the IBEAC; **Lugard arrives
 1890**; in 1892 the Protestants and Catholics resume their war
 ([Protectorate of Uganda](https://en.wikipedia.org/wiki/Protectorate_of_Uganda))
-— MODERN. ⚠️ **Do not use sleeping sickness for 1890–95** — that epidemic is
-1895–1906.
+— MODERN. ⚠️ **Do not use sleeping sickness** — that epidemic is 1895–1906,
+at the very end of the game's window at the earliest.
 
 **★ The Sudan: rinderpest arrived BEFORE the game starts, on top of the worst
 famine in Sudanese memory.** ***Sanat Sitta***, "the Famine of the Year Six"
@@ -948,7 +971,7 @@ insecurity, the cost of feeding Mahdist armies, Kitchener's grain blockade, and
 "Between 1889 and 1892 the Sudan suffered its most devastating and terrible
 years" ([Springer](https://link.springer.com/chapter/10.1057/9781137383877_4)) —
 MODERN. **A traveller at the game's Nubian coordinate in 1890 stands on a
-militarised frontier, one year after that famine, in a region whose herds are
+militarised frontier, at the tail of that famine, in a region whose herds are
 already gone.** (The Khalifa's invasion of Egypt was crushed at **Toski, 3 August
 1889 — near Abu Simbel, right at that coordinate**.)
 
@@ -1011,8 +1034,9 @@ which they acquired by hunting"
 ([Google Arts & Culture](https://artsandculture.google.com/story/the-elongo-the-power-of-the-maasai-shield/VAISgEywZgThIQ);
 [Met Museum](https://www.metmuseum.org/art/collection/search/311103)) — and
 rinderpest killed **~95 % of East African buffalo in two years**, which Baumann
-himself recorded. **So the shield-hide supply demonstrably collapsed at the same
-moment as the cattle.** Both legs independently sourced.
+himself recorded. **So the shield-hide supply demonstrably collapsed in the same
+years as the cattle** — as a renewal failure over years, not overnight (§7.1's
+glut warning). Both legs independently sourced.
 ⚠️ **Still do not assert** a rinderpest→Maasai-cloth-adoption link: no scholarly
 source makes it. And the period account of famine diet says they ate "bones,
 skins and even horns **of slaughtered cattle**" — slaughter by-products, **not
@@ -1035,8 +1059,19 @@ catastrophe, and it lands just after the game's window. No source found.
 
 ## 6. What is still missing
 
-Unresearched or thin: **Mongo, Banda, Bambundu, Lunda, Fang, Mandinka, Bambara,
-Berbers, Nubians, Sidamo** (dress and calendar alike); all fishing seasons;
+> **STATUS (cleanup, 28.09.2026).** This list predates §7. Since then §7 gives
+> every people named below a dress-and-season entry (Sidama resolves to a
+> confirmed GAP); §4.9 covers market-stall seasonality, indoor/outdoor life in
+> the rains, dry-season water journeys the harmattan/Kalahari night
+> temperatures and the warmth fire (Barth's dawn fire; Passarge's San in §7.3), and gives Barth's period support for the market and caravan
+> parts of the hypothesis below; §1.1 and §7.2 (Ohrwalder) settle the Nubian
+> region's 1890 government; Thomson (§2.1), Baumann (§5.1), Passarge (§7.3),
+> Stanley (§7.4) and Roscoe (§7.1) have been read. Still open: Merker (1904),
+> fishing seasons, granary and re-thatching timing, and the building, craft and
+> marriage parts of the hypothesis.
+
+Unresearched or thin when written: **Mongo, Banda, Bambundu, Lunda, Fang, Mandinka, Bambara,
+Berbers, Nubians, Sidama** (dress and calendar alike); all fishing seasons;
 seasonal daily life at eye height almost entirely (market-stall seasonality,
 warming vs cooking fires, granary filling/emptying, pre-rains re-thatching and
 re-mudding, indoor/outdoor life in the rains, dry-season water journeys);
@@ -1152,11 +1187,11 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
 > the caravan terminus. The village now stands at **2.4S 40.6E — Lamu**, one
 > of the oldest and most characteristic Swahili towns, 4.2° clear of Zanzibar,
 > on land, in region East, in the same east-rift climate zone and clear of the
-> §4.2 river band. Nothing below changes: the New (1873) dress evidence and
+> design.md §4.2 village-river clearance. Nothing below changes: the New (1873) dress evidence and
 > Burton's season names are coastal-Swahili evidence and apply at Lamu as at
 > Bagamoyo.
 
-- **§2.3 UPGRADE: THIN → PERIOD.** §2.3 said the kanzu's dating "rests entirely
+- **§2.3b UPGRADE: THIN → PERIOD.** §2.3b said the kanzu's dating "rests entirely
   on tertiary sources — no period source found". There is one. **Charles New,
   *Life, Wanderings and Labours in Eastern Africa* (1873)**, PERIOD, gives the
   whole outfit with its in-world names: *"a loin cloth… called **kikoi**… Next
@@ -1178,7 +1213,7 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
   season names — **Kipupwe** (first winter, Jul–early Aug), Kaskazi, Masika Mku,
   Kausi/Kusi, Demani — and notes the Zanzibaris reckon **five** seasons.
   **In period understanding the rains ARE the cold season** in equatorial East
-  Africa. Useful for §13's in-world words.
+  Africa. Useful for design.md §13's in-world words.
 - **Seasonal dress change: GAP.** No period source states coast dress changes with
   the monsoon.
 - ⚠️ Burton's izar/kilemba/burka passages describe the **Omani-Arab elite of
@@ -1331,7 +1366,7 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
   regarded the year as consisting of **six months**, or moons, and they called it
   the **mwaka**."* PERIOD, in-world, and the season names are **gendered**
   (*mukazi* = woman, *musajja* = man — the thunder season is the male one). Exactly
-  the kind of in-world word §13 wants.
+  the kind of in-world word design.md §13 wants.
 - ⚠️⚠️ **NEW TRAP: a second barkcloth means SACRED, not cold.** The tempting
   inference was "two barkcloths in the cold". It is wrong. Every Roscoe occurrence
   of the second cloth is ritual status: twin-parents (*"the father wore two
@@ -1355,7 +1390,7 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
 | **Maasai** | **Nothing on the figure — the hides go on the HUT** (Thomson, PERIOD, twice). Compatible with the ochred-leather ruling. Bonus, now PERIOD: the camp moves **up to the highlands in the DRY season**. |
 | **Swahili** | **Nothing seasonal — the *joho* goes on for great occasions and FRIDAYS** (New, PERIOD). A weekly rhythm the calendar can already compute. |
 | **Somali** | **The one real seasonal dress change: in the karif (Jul–Sep) the tobe is muffled over the head** (Swayne, PERIOD, exact people and years). ✅ That cold is on the **Haud**, and the village was moved there (9.0N 45.0E, 964 m) so the finding applies to it; the game shows the muffle. The other three tobe states are location-free. |
-| **Sidama** | **Nothing — GAP.** No period source describes Hawassa dress; the one that seems to (Borelli) means the Omo basin. What CAN be shown: **sleeping outdoors normally, indoors in cold or wet** (Parkyns), and the day-cloth as night-blanket. **Never an Amhara shamma — in 1891 that is the invader's dress.** |
+| **Sidama** | **Nothing — GAP.** No period source describes Hawassa dress; the one that seems to (Borelli) means the Omo basin. What CAN be shown: **sleeping outdoors normally, indoors in cold or wet** (Parkyns, Tigray-observed), and the day-cloth as night-blanket. **Never an Amhara shamma — in 1891 that is the invader's dress.** |
 | **Baganda** | **Nothing — and the record rules out the obvious guess** (the second barkcloth is priesthood). Only the **work belt**. |
 
 **Bottom line for the east:** §2.6's verdict was broadly right — seasonal *dress*
@@ -1377,8 +1412,9 @@ post-normalisation and are therefore real, not artefacts.**
 **★★ THE CONVERGENCE.** Across **every** period source read, the recorded response
 to cold in this belt is **fire, shelter and architecture** — and where a garment
 answers, it is always a **cloak or wrap already on the body**, drawn closer or
-doubled as bedding. **Not one period source describes a person putting ON a
-seasonal garment.** Seven independent observers, one convergent answer: that is
+doubled as bedding. **Not one period source describes a person visibly putting ON a
+seasonal garment** (Thomson's Berber seasonal garments are worn underneath,
+below). Seven independent observers, one convergent answer: that is
 what makes §2.6's "worn differently, not worn more" reading *defensible* rather
 than merely convenient.
 
@@ -1418,9 +1454,9 @@ than merely convenient.
   cloak; (c) the gesture actually recorded is **drawing the existing wrap closer**,
   in the Sahara, in late December; (d) 2110 m freezes.
   → **Same tagelmust and tobe year-round; in the cold months a bernus/shawl about
-  the shoulders for those of rank who own one, and the wrap drawn closer. The
-  change is tightness and posture, not a new garment.**
-- ⚠️ **The dust-veil trap, TESTED AND NEGATIVE.** Searching all six normalised
+  the shoulders for those of rank who own one, and the wrap drawn closer. For
+  everyone else the change is tightness and posture, not a new garment.**
+- ⚠️ **The dust-veil trap, TESTED AND NEGATIVE.** Searching the normalised
   period texts for "over/across/round the face", "cover the face", "conceal the
   face", "muffled" yields **no source describing the tagelmust drawn differently
   against dust, sand or cold**; **"harmattan" occurs ZERO times in Barth vols 1–2.**
@@ -1574,9 +1610,9 @@ than merely convenient.
   season"*** — confirmed by normalised grep.
 - **★ The reading — INFERRED, and it is WEALTH-STRATIFIED.** The answer is neither
   "nothing" nor "they put on a coat":
-  (a) The cold season is **named in the language**: ***funturu*, "cold felt at
-      night"**, a dedicated period lexeme beside *dari* — night-cold is salient
-      enough to lexicalise, not a traveller's fancy.
+  (a) Night-cold is **named in the language**: ***funturu*, "cold felt at
+      night"**, a dedicated period lexeme beside *dari* — salient enough to
+      lexicalise, not a traveller's fancy (it names the cold, not a season).
   (b) A period **idiom** ties a garment to it: *"**mágani-n-dári**"*, "a remedy
       against the cold", whose real referent is a thick cloak (Barth).
   (c) **The objects exist and Kano makes them**: a thick-thread zenne (*gádo*), a
@@ -1593,8 +1629,8 @@ than merely convenient.
       sleeper suffering from cold**"*.
   → **In Kano's harmattan the rich man puts a *zenne* over his shoulder; the poor
   man sits at a pre-dawn fire in the same rag he wears in August.** Note too that
-  Hausa dress is **already voluminous year-round** (100 yards) — there is no "add a
-  layer" room in it.
+  Hausa dress is **already voluminous year-round** (100 yards) — beyond the rich
+  man's zenne there is no "add a layer" room in it.
 - ⚠️ **"harmattan" occurs ZERO times in Barth vols 1–2 and ZERO in Robinson's
   *Hausaland*** — the word is old in English, but these two period observers *in the
   exact region* do not use it; **do not put it in a Hausa mouth on their
@@ -1703,7 +1739,7 @@ rearranged by context** — §2.6's insight, period-attested.
 | **Berbers** | **Nothing changes on the figure** — Thomson's period statement puts the seasonal garments *underneath* the outer sheet, i.e. invisible. Put the season into the **settlement**: closed low doors, smoke, animals indoors, fodder in silos, people shut in for two or three months. The one people whose cold season is also its **wet** season. |
 | **Nubians** | **Nothing changes** — the Mahdist jibbeh is a religiously prescribed patched *damur* uniform with an explicit injunction against better clothes; the period cold-response on the Nubian Nile is **carried firewood and mud wind-shelters**. At most the standard shoulder-cloak drawn closer at night. **Never a "farwa coat".** |
 | **Hausa** | **A CLASS SPLIT AT DAWN** — the wealthy man wears his *zenne* plaid over the shoulder (*"only the wealthier can afford"* it), the poor sit round a small fire before sunrise in the same rag they wear in August. The cold has a name (*funturu*) and a proverbial remedy (*magani-n-dari*). The honest render is **fire at dawn plus one draped plaid on the rich** — not a village in coats. |
-| **Bambara** | The woman's upper cloth, *"thrown **negligently** over the bosom and shoulders"* in the heat, is **drawn close** in the harmattan, and the **dawn fire** is lit — nothing is added. In the rains the intuition inverts: garments come **off** to stay dry, and the village reads **emptier** (people out at the field huts, §4.9). |
+| **Bambara** | The woman's upper cloth, *"thrown **negligently** over the bosom and shoulders"* in the heat, is **drawn close** in the harmattan, and the **dawn fire** is lit — nothing is added. In the rains the intuition may invert: garments come **off** to stay dry (an indicium only — Caillié saw it among **Moors**), and the village reads **emptier** (people out at the field huts, §4.9). |
 | **Mandinka** | As Bambara — drawn-close upper cloth, dawn fire — plus the two period-attested bodily tells that cost no garment at all: **chapped lips and sore eyes** (Park), under a sun *"of a dull red colour"*, with the night horizon *"variegated with lines of fire"* from the burning grass. |
 
 **Sources:** Barth vols 1–3 (archive.org) · Park (Gutenberg 74976) · Caillié
@@ -1749,7 +1785,7 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
 
 #### Pedi (−24.5, 29.5 — village at 853 m): right answer, WRONG REASON
 
-- **Merensky (1899, in the Transvaal 1859–92) — the Mayr-equivalent, and his
+- **Merensky (1899, in the Transvaal 1859–82) — the Mayr-equivalent, and his
   dating is now pinned:** Gerlachshoop founded 14 Aug 1860, Pedi work from
   c. 1861, Botshabelo 1865 — so his *"at our arrival"* means **c. 1860, thirty
   years before the game**. Verbatim: men *"eine aus feinem, gut gegerbtem Fell
@@ -1769,10 +1805,10 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
   Steelpoort valley sits ~900 m with *"dry, mild winters"*. For contrast
   **Lydenburg at 1,430 m** (~60 km NE, the nearest real highveld station) has a
   July mean minimum of **4.4 °C and, on average, ZERO days below 0 °C** (MODERN).
-  **`dress.ts` currently carries the Pedi as a "crosses the coldness threshold,
-  wears nothing extra" trap case. The OUTCOME is right and the RATIONALE is
-  wrong:** the honest reason is not "they endure the frost" but **"there is no
-  frost at 853 m"**. Fix the comment, keep the answer.
+  **`dress.ts` carried the Pedi as a "crosses the coldness threshold, wears
+  nothing extra" trap case. The OUTCOME was right and the RATIONALE wrong:** the
+  honest reason is not "they endure the frost" but **"frost is rare to absent at
+  853 m"**. The comment has since been fixed; the answer is kept.
 - **Reading: almost nothing changes.** By 1890 the Pedi everyday outer garment is
   a **plain European trade blanket** (Merensky, PERIOD, ~30 years past the shift)
   which doubles as bedding. **This reaches the same destination as the Basotho
@@ -1807,7 +1843,7 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
   game's own region.** Corroborated at Ghanzi (~100 km): July mean min 3.8 °C,
   frost common Jun–Aug, ~9.5 frost days/yr, station extreme **−9.0 °C (Jul
   1926)** (MODERN).
-  > **CORRECTION to §4.9:** the doc says *"the −10 °C figure is tourism copy — do
+  > **CORRECTION to §4.9 (applied there):** the doc said *"the −10 °C figure is tourism copy — do
   > not use"*. Right for a *typical* night, wrong as a *magnitude*: −9.0 °C is a
   > real station record. Clean formulation: **typical winter nights near
   > freezing, snaps to ~−5 °C (Passarge, PERIOD), extremes to ~−9 °C.**
@@ -1823,13 +1859,14 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
   nicht einmal einen Mantel haben**, mit **Brandwunden auf Leib und Brust**, sind
   eine tagtägliche Erscheinung."* And in a storm: *"dann **kriecht man unter den
   Ledermantel**… **zitternd vor Frost liegen alle zusammengedrängt auf nasser
-  Erde unter nassem Mantel**."* **The ‡nau is what you sleep UNDER, not what you
-  put ON. "Worn in cold weather" misdescribes it.**
+  Erde unter nassem Mantel**."* **The ‡nau is everyday wear that doubles as what you
+  sleep UNDER — not a garment put ON for the cold. "Worn in cold weather"
+  misdescribes it.**
 - **The one positive seasonal reading — INFERRED, indicia named:** Passarge
   attests **two configurations** of the same garment (right shoulder, left free
   or covered; vs **over both shoulders, knotted under the chin**) but attributes
-  the choice to *"**Laune und Absicht**"* — **mood and intention, explicitly NOT
-  weather**. The weather link comes from an **independent period source on the
+  the choice to *"**Laune und Absicht**"* — **mood and intention; weather is not
+  named**. The weather link comes from an **independent period source on the
   same garment class ~350 km north**: Andersson's Wayeyi caross *"accommodated to
   the body according to the state of the weather"*. On those two indicia a winter
   San figure closing the ‡nau over both shoulders is defensible — **but it stays
@@ -1854,8 +1891,9 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
   weather — stated VERBATIM by a period eyewitness. For the Wayeyi it needs no
   inference at all.**
 - ★★ **AND IT CLOSES §4.0.4's OPEN GAP — the Okavango flood months are now
-  PERIOD, twice.** §4.0.4 marks the inversion MODERN and lists "the flood-pulse
-  timing" as GAP. Two independent eyewitnesses close it:
+  PERIOD (Andersson), and the dry-season rise is attested twice.** §4.0.4
+  marked the inversion MODERN and §4.1 listed "the flood-pulse timing" as GAP.
+  Two independent eyewitnesses close it:
   * **Andersson:** *"**Its annual overflow takes place in June, July, and August,
     and sometimes even later.**"* — and he **did not know the river's source**
     (*"The source of the Teoge is as yet unknown, but it is supposed to be very
@@ -1917,7 +1955,7 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
 - **Why they have no cloak — two independent lines, same conclusion.** No kaross,
   cloak or mantle is attested for the Bemba anywhere in Gouldsbury; and §5.1
   explains it independently — they settled in **tsetse country and were not a
-  cattle people**. **No herds → no hide-cloak economy. Do not give the Bemba a
+  cattle people**. **No herds → no cattle-hide cloak economy. Do not give the Bemba a
   cloak.**
 - **Climate:** Kasama (~1,380 m): July coldest, minima ~7 °C, Jun–Jul essentially
   rainless (MODERN). **Cool nights, no frost.** And the period-adjacent
@@ -1955,8 +1993,8 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
   **grease-and-ochre coat on the body**. ⚠️ **But Livingstone never says it is
   applied more heavily or more often in any season — a seasonal intensification
   is NOT supported. Mark the mechanic PERIOD; mark any seasonality GAP.**
-- ★ **INFERRED (indicia: Arnot, *Garenganze*, 1889 — dated on the game's exact
-  year): the transition here is VERTICAL, not horizontal.** Arnot's picture of
+- ★ **INFERRED (indicia: Arnot, *Garenganze*, 1889 — dated a year before the game's
+  start): the transition here is VERTICAL, not horizontal.** Arnot's picture of
   cloth is rank-skewed: an *"important personage, **bedecked with lots of
   calico**, and sitting in state"*; a **96-yard** calico present to a king;
   *"**The difficulties of obtaining calico and goods from the coast**"*; while a
@@ -2018,12 +2056,12 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
 
 | People | What changes with the season |
 | --- | --- |
-| **Pedi** | **Nothing seasonal — and fix the driver.** A plain European trade blanket as everyday outer wear (Merensky, PERIOD, the shift ~30 years old by 1890), doubling as bedding; **at 853 m there is no frost to dress against**. The `dress.ts` trap case reaches the right answer for the wrong reason. |
+| **Pedi** | **Nothing seasonal — and fix the driver.** A plain European trade blanket as everyday outer wear (Merensky, PERIOD, the shift ~30 years old by 1890), doubling as bedding; **at 853 m there is hardly any frost to dress against**. The `dress.ts` trap case reached the right answer for the wrong reason (its comment is since fixed). |
 | **San** | **The ‡nau closes** — from the right shoulder (left free) in summer to **over both shoulders, knotted under the chin** in the May–July cold (configurations PERIOD; the weather trigger INFERRED from Andersson) — **but the real mechanic is a pre-dawn fire with figures huddled at it**, some with no cloak at all, because Passarge's −5 °C mornings are met **naked at the embers**. |
 | **Wayeyi** | **The one people needing NO inference:** the light caross is *"accommodated to the body according to the state of the weather"* (Andersson, PERIOD, verbatim) — drawn tight and closed in the cool dry months, loose or off in the heat. |
-| **Bemba** | **Nothing — and they are the wrong side of the transition:** **bark-cloth, not calico** (calico arrives with the British, who arrive in 1890), reddened with camwood; **no cloak** (tsetse country, no cattle); the record says they **bear the cold well**, and their hard season is the **wet** one. |
+| **Bemba** | **Nothing — and they are the wrong side of the transition:** **bark-cloth, not calico** (INFERRED: calico arrives with the British administration, which arrives in 1890), reddened with camwood; **no cloak** (tsetse country, no cattle); the record says they **bear the cold well**, and their hard season is the **wet** one. |
 | **Lunda** | **Nothing worn changes:** small-animal skins at the loins year-round, with **fat and red ochre on the body "as a protection against the weather"** (Livingstone, PERIOD) — and if any figure shows cloth, make it **the chief** swathed in calico while commoners have a yard or none: the transition runs **by rank, not by date**. |
-| **Bambundu** | **Nothing — and a period source says so outright.** Show the **cacimbo morning** (Jun–Aug): figures crouched in circles of ten round a fire, shivering, in a settlement drowned in white mist under a sky where the sun is invisible for days — though blankets and coats sit unbought in the coastal trade goods. |
+| **Bambundu** | **Nothing — and a period source says so outright.** Show the **cacimbo morning** (Jun–Aug): figures crouched in circles of ten round a fire, shivering, in a settlement drowned in white mist under a sky where the sun is invisible for days — though blankets and coats are on offer in the coastal trade goods. |
 
 **Sources:** Merensky, *Erinnerungen aus dem Missionsleben in Transvaal 1859–1882*
 (1899) · Passarge, *Die Buschmänner der Kalahari* (1907, fieldwork 1896–98) ·
@@ -2037,7 +2075,7 @@ The starting position (the basin has no season, so expect nothing) was **half
 right, and the wrong half matters**: the basin proper genuinely has no seasonal
 dress signal, and this pass can now say *why with a number*. But **Fang country
 is not the basin** and has a hard dry season, and the **Banda** sit in a savanna
-that is set on fire once a year.
+that is set on fire once or twice a year.
 
 #### ★★ 7.4.1 The find that fixed the model: the Fang coordinate is not the basin
 
@@ -2058,8 +2096,8 @@ Corroborated by two independent period eyewitnesses on that ground:
   a few weeks the rains come on, and then it is too late**."*
 
 > **This finding uncovered a real bug and it is fixed** (commit deb4a4c): the
-> game classified the Fang village as **`sahara-north`** — 0.000 wetness in July,
-> the peak of its own rains — because the congo rule demands lon >= 12 and the
+> game classified the Fang village as **`sahara-north`** — 0.000 wetness all year,
+> its March–May and September–November rains included — because the congo rule demands lon >= 12 and the
 > guinea-coast rule demands lat >= 4, so every equatorial coordinate west of 12E
 > fell through into the desert fallback. There is now an `atlantic-equatorial`
 > zone, and a test that no tropical coordinate may ever reach the Saharan
@@ -2319,7 +2357,7 @@ Corroborated by two independent period eyewitnesses on that ground:
   supplies the window — burning needs cured grass, i.e. **Jan–Mar**, exactly
   congo-north's dry season and exactly the harmattan months.
   → **For the Banda the honest answer is: the PEOPLE do not visibly change with
-  the season — the COUNTRY does, catastrophically and on purpose, once a year.
+  the season — the COUNTRY does, catastrophically and on purpose, once or twice a year.
   That is a better seasonal mechanic than a cloak, it is period-sourced at the
   right latitude, and the game already has the systems (ground colour, flora) to
   show it.** (This is the direct evidence behind TASKS point 144.)
@@ -2341,7 +2379,7 @@ Corroborated by two independent period eyewitnesses on that ground:
 
 | People | What changes with the season |
 | --- | --- |
-| **Fang** | **The garment does not change; the NIGHT does.** In the Jun–Sep dry season: lightly-dressed figures close around fires after sundown (leaves and grass pulled over them as they sleep) and the village thinned out to the farms while the trees are felled and burnt — because Du Chaillu recorded that the equatorial dry-season nights are *"very bleak and cold"*, that the people are *"very lightly dressed"*, and that they answered that cold with **a fire and whatever leaves they could gather, never with a coat**. |
+| **Fang** | **The garment does not change; the NIGHT does.** In the Jun–Sep dry season: lightly-dressed figures close around fires after sundown (leaves and grass pulled over them as they sleep) and the village thinned out to the farms while the trees are felled and burnt (extrapolated from Du Chaillu's neighbouring Mpongwe) — because Du Chaillu recorded that the equatorial dry-season nights are *"very bleak and cold"*, that the people are *"very lightly dressed"*, and that they answered that cold with **a fire and whatever leaves they could gather, never with a coat**. |
 | **Mongo** | **Nothing — and there is no year to change with:** a **1.6 °C** seasonal swing against **~12 °C** day/night, rain in every month. The one added-wrap the basin's record gives (Johnston's Bayanzi) is triggered by *"days when it is cold and in the evenings"* and *"laid aside when the temperature rises"* — **if ever wired, wire it to DUSK, never to a month.** What the figure should show all year is the **camwood-red body ground and beadwork** the sources mislabel as nudity. |
 | **Mbuti** | **Nothing on the body; the answer to weather is the HUT.** A broad strip of bark cloth year-round (Stanley, Oct 1888), and the Ituri's rain — every other day, 10–12 hours at a time, *"the rainiest zone on the earth"* — met by the **phrynium-leaf hut and the fire**. If anything reads as seasonal it is **movement** (the Jul–Aug honey season; MODERN, Efe-sourced). And the camp should read as **entangled with its farming neighbours** — Stanley himself puts it two to three miles from them, trading. |
 | **Banda** | **The people don't change; the COUNTRY burns.** Keep the beaten-bark pagne on its buffalo-hide belt all year (Banziri-attested, marked), and put the season into the **land**: in the Jan–March dry season under a harmattan haze the standing grass goes and the savanna reads as Dybowski saw it at this latitude — **bark and twigs burnt black, many trees mere skeletons, others carrying scattered leaf-tufts, "the whole landscape with an aspect of mourning"** — with narrow paths beaten through the tall grass, and the settlement itself **wary rather than open**. |
@@ -2353,7 +2391,7 @@ Corroborated by two independent period eyewitnesses on that ground:
 | Fang | bark cloth + cat-skin overlay (PERIOD, 1855–59) | **none warranted**; fire + dry-season calendar instead | Medium-good — two period eyewitnesses, one in-window |
 | Mongo | raffia zone; camwood body ground; beads (PERIOD-adjacent, zone only) | **none — argued from a 1.6 °C swing**; the added wrap is diurnal | Climate: high. Dress: **GAP** |
 | Mbuti | broad strip of bark cloth, men (PERIOD, 1888) | **none**; rain answered by the leaf hut | Low-medium — one captive datum, hostile source |
-| Banda | *no period source found*; Banziri: beaten-bark pagne (PERIOD, 1891–92) | **none on the body; annual savanna burning** | Landscape: good. Dress: **GAP** |
+| Banda | *no period source found*; Banziri: beaten-bark pagne (PERIOD, 1891–92) | **none on the body; annual/biannual savanna burning** | Landscape: good. Dress: **GAP** |
 
 **Three unclosed, ranked:** (1) the **Congo Balolo Mission's period records (from
 1889)** — the only body of material written by people resident among the Mongo in
@@ -2367,15 +2405,14 @@ and the Congo* vol. 2 (1908) · Ward, *Five Years with the Congo Cannibals* (189
 · Stanley, *In Darkest Africa* vol. 2 (1890) · Junker, *Travels in Africa* vol. 3
 · Dybowski, *La route du Tchad* (1893).
 
-## 8. Research → game: what was implemented, and how (TASKS point 158)
+## 8. Research → game: where the implementation record lives, and the loom (TASKS point 158)
 
-This record moved to design.md §19.15 on the user's decision (17.07.2026):
-it documents the game design, not the research, so design.md is its home.
-The live dress table (six peoples, drivers, gates, sources) and its notes
-are kept current there; this document remains the underlying research.
-Since 27.07.2026 (point 367) the record itself sits one document further out,
-in `docs/design-reference.md` §19.15 — same number, same text, still design
-rather than research; design.md §19.15 is the pointer to it.
+The implementation record (the live dress table — six peoples, drivers, gates,
+sources — and its notes) is kept current in `docs/design-reference.md` §19.15;
+design.md §19.15 is the pointer to it. It left this document on the user's
+decision (17.07.2026), first for design.md and since 27.07.2026 (point 367) for
+design-reference.md: it documents the game design, not the research. This
+document remains the underlying research; only the loom subsection stays here.
 
 ### 8.1 The weaver's loom: what the sources carry, and what the game adapts
 
@@ -2503,9 +2540,11 @@ from the dwelling.
   Richards' Bemba fieldwork documents the men's shelter of every village
   ([Richards 1939](https://archive.org/details/landlabourdietin0000rich)) —
   MODERN naming / **RETRO-APPLIED** for 1890 (Richards is 1930s; no 1890s
-  attestation of the insaka was found). The Luapula/Lunda equivalent is the
-  central meeting shelter already noted in §4.0.5 ("circular clay houses round
-  a central meeting house") — MODERN.
+  attestation of the insaka was found). The Luapula Lunda (Mwata
+  Kazembe) have the central meeting shelter noted in §4.0.5 ("circular clay
+  houses round a central meeting house") — MODERN, and a different capital from
+  the game's Lunda point (§7.3: do not merge them), so for the game it is an
+  extrapolation.
 - **Hausa.** The standard descriptions of the Hausa compound include the
   **dakin girki** ("hut of cooking") and the **rumfa** (a shade shelter)
   as ordinary compound elements
@@ -2588,13 +2627,15 @@ vent: the smoke filters through the door and the thatch.
   everyday practice everywhere a hearth is described. **PERIOD for the
   keeping; the rekindling mechanics are nowhere described in what was read.**
 - **Windbreaks.** The San grass windscreen (*scherm*) with its open hearth is
-  the standard picture of Kalahari camps — but the period source that would
-  ground it (Passarge, 1896–98) remains unread (§4.1): **THIN**. No roof over
-  a San fire in any source consulted.
+  the standard picture of Kalahari camps. Passarge (1896–98, read in §7.3)
+  puts the San at an open fire and under the ‡nau in a storm, but the passages
+  quoted do not describe the windscreen itself: **THIN** for the windbreak. No
+  roof over a San fire in any source consulted.
 - **Where the problem is moot.** Cairo and the Nubian and Tuareg points get
   effectively no rain at all (`climate-1890.md`); the rain-vs-fire question
-  never arises there. The Berber village's problem is cold, not rain-flooded
-  hearths — its winter answer is the indoor hearth (MODERN, THIN).
+  never arises there. The Berber village's cold season is also its wet
+  season (§7.2), and its winter answer is the indoor hearth (MODERN, THIN), so
+  its fire is indoors when the rain comes.
 - ⚠️ **The "banked fire under the eaves" idea is NOT ATTESTED** in anything
   read for this pass — no source shows cooking moved under a dwelling's eaves
   in rain. If used, it is designer invention, not history. **Do not present it
@@ -2608,19 +2649,19 @@ vent: the smoke filters through the door and the thatch.
 | Hausa | compound kitchen (dakin girki) + shade roof (rumfa) | MODERN, + Barth's period courtyard kitchens nearby |
 | Bambara, Mandinka | savanna compound kitchen hut | **INFERRED** from the compound pattern (Denyer located, not read) |
 | Bemba | kitchen structure; the open-sided insaka form | RETRO-APPLIED (Richards) / MODERN |
-| Lunda | central meeting shelter (§4.0.5) + kitchen | MODERN |
+| Lunda | central meeting shelter (§4.0.5, Luapula — extrapolated) + kitchen | MODERN, extrapolated |
 | Swahili | interior kitchens of the coast houses | MODERN, THIN |
 | Fang | indoor hearth in a closed bark-walled house | PERIOD (Kingsley, construction) + Tessmann located |
 | Mbuti | hearth at the leaf-hut; embers carried | RETRO-APPLIED, partly CONTESTED |
 | Maasai | indoor hearth; hut re-proofed with hides for the rains | PERIOD (Thomson p. 242–3; Hollis) |
 | Zulu | indoor hearth, wet-weather life around it | PERIOD (Grout pp. 98–99) |
 | Pedi | indoor hearth + courtyard cooking | **INFERRED** from the Sotho-Tswana pattern; THIN |
-| San | open hearth, windbreak only — no roof | THIN (Passarge unread) |
+| San | open hearth, windbreak only — no roof | open fire PERIOD (Passarge, §7.3); windbreak THIN |
 | Somali | mat tent sheds rain; hearth placement | **GAP** |
 | Sidama | interior hearth of the domed house | MODERN, THIN |
 | Mongo, Banda, Bambundu, Wayeyi | — | **GAP — do not assume** |
 | Tuareg, Nubian (and Cairo) | no meaningful rain — moot | `climate-1890.md` |
-| Berber | cold-season indoor hearth; rain minor | MODERN, THIN |
+| Berber | cold-and-wet-season indoor hearth | MODERN, THIN |
 
 ### 9.5 Recommendation
 
@@ -2633,9 +2674,10 @@ exactly to keep rain off a fire); (b) it is the only option that keeps the fire
 renders as nothing at all; (c) it is one cheap primitive: four posts and a
 thatch plane over the existing fire, read at a glance.
 
-**Accuracy guard:** for the dome-dwellers — Zulu, Maasai, Mbuti, San — a
-cook-canopy is *not* attested and should not be shown. Their accurate picture
-is the fire indoors (invisible from outside, per §9.2) — and any fire they do
+**Accuracy guard:** for the dome-dwellers — Zulu, Maasai, Mbuti — and the San a
+cook-canopy is *not* attested and should not be shown. The dome-dwellers'
+accurate picture is the fire indoors (invisible from outside, per §9.2), the
+San's an open hearth behind a windbreak (§9.3) — and any fire they do
 keep in the open being visibly beaten down by rain, which is exactly what the
 period record says happens to an unprotected flame (§9.3).
 
