@@ -32,8 +32,9 @@ export const TEST_SEED = 42
  * DEFAULTS — events off, zero hunger/thirst, a full starting kit — but the
  * store tests exercise the survival MECHANICS, so a fresh test game restores
  * the non-zero rates and an empty pack. The start preset itself is pinned in
- * its own newGame test (store.saveload.test.ts). Tests that mutate further
- * `balance` fields must restore them themselves.
+ * its own newGame test (store.saveload.test.ts). It also clears the scene
+ * furniture (leaveTheChief). Tests that mutate further `balance` fields must
+ * restore them themselves.
  */
 export function freshGame(seed = TEST_SEED): void {
   localStorage.clear()

@@ -20,7 +20,8 @@ import { PLACES } from '../world/geo'
 
 /**
  * The enterable place a jump-to picker value names, or null when the target is
- * a bird's-eye one (a landmark, the graveyard `#graveyard`, the tomb `#grave`).
+ * a bird's-eye one (a landmark other than Giza's, the graveyard `#graveyard`,
+ * the tomb `#grave`).
  */
 export function jumpTargetPlaceId(value: string): string | null {
   return PLACES.some((p) => p.id === value) ? value : null

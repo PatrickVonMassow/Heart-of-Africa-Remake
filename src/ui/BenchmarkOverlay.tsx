@@ -1,10 +1,12 @@
-// In-game render benchmark (design.md §21.1, F8): the modal progress overlay
-// while the sweep runs, and the result panel with the download/copy controls
-// once it is done. All text comes from the language files (§17).
+// In-game render benchmark (design.md §21.1; started from the debug menu's
+// button or F8): the modal progress overlay while the sweep runs, and the
+// result panel with the download/copy controls once it is done. All text comes
+// from the language files (§17), bar an unknown phase id shown raw.
 //
-// The heavy runner (src/systems/benchmarkRun.ts) is imported lazily on the
-// keypress; this overlay only reads the progress/report the runner publishes
-// into the UI store, so it costs nothing while no benchmark runs.
+// The heavy runner (src/systems/benchmarkRun.ts) is imported lazily by
+// startBenchmarkSafely; this overlay only reads the progress/report the runner
+// publishes into the UI store, so while no benchmark runs it costs no more than
+// its two store subscriptions.
 
 import { useGame } from '../state/store'
 import { useUi } from '../state/ui'
@@ -78,7 +80,7 @@ export function BenchmarkOverlay() {
         ?.writeText(report.json)
         .then(() => useGame.getState().setToast(getStrings().benchmark.copied))
         .catch(() => {
-          // Clipboard unavailable (permissions) — the text stays selectable.
+          // Clipboard unavailable (permissions) — the download still delivers it.
         })
     }
     return (
