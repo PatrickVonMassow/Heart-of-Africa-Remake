@@ -53,19 +53,16 @@ describe('settlementEnterCandidate (design.md §2.3)', () => {
 })
 
 describe('shouldEnterSettlement (design.md §2.3)', () => {
-  it('enters only on a real Space press, never automatically on radius', () => {
-    // A candidate is present but no key was pressed → no entry (not auto-enter).
-    expect(shouldEnterSettlement('cairo', false, false)).toBe(false)
-    // The Space press confirms entry.
-    expect(shouldEnterSettlement('cairo', true, false)).toBe(true)
+  it('a Space press enters the candidate', () => {
+    expect(shouldEnterSettlement('cairo', false)).toBe(true)
   })
 
   it('never enters without a candidate', () => {
-    expect(shouldEnterSettlement(null, true, false)).toBe(false)
+    expect(shouldEnterSettlement(null, false)).toBe(false)
   })
 
   it('is blocked while a dialog is open or the run is over (checkpoint safety)', () => {
-    expect(shouldEnterSettlement('cairo', true, true)).toBe(false)
+    expect(shouldEnterSettlement('cairo', true)).toBe(false)
   })
 })
 

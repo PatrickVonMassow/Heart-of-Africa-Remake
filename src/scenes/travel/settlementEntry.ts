@@ -5,8 +5,8 @@
 // helpers decide the candidate, whether a Space press may enter it, and which
 // collider circles the move resolves against, so the logic is unit-testable
 // apart from the Three.js travel scene. The two radii are coupled: the collider
-// stays INSIDE the enter radius, so approaching a place always arms the prompt
-// before the footprint stops the traveller.
+// stays at or inside the enter radius, so approaching a place always arms the
+// prompt by the time the footprint stops the traveller.
 
 export interface EnterablePlace {
   id: string
@@ -108,12 +108,12 @@ export function enterHintName(discovered: boolean, placeName: string, unknownLab
 
 /**
  * Whether a Space press should enter a settlement: only when there is a
- * candidate, the key was actually pressed (never automatic on radius), and the
- * expedition is not blocked (an open dialog, or a finished defeat/victory run,
- * must not enter and overwrite the checkpoint).
+ * candidate and the expedition is not blocked (an open dialog, or a finished
+ * defeat/victory run, must not enter and overwrite the checkpoint). Only the
+ * Space handler asks (travelSpace.ts), so entry is never automatic on radius.
  */
-export function shouldEnterSettlement(candidateId: string | null, spacePressed: boolean, blocked: boolean): boolean {
-  return candidateId !== null && spacePressed && !blocked
+export function shouldEnterSettlement(candidateId: string | null, blocked: boolean): boolean {
+  return candidateId !== null && !blocked
 }
 
 /**
@@ -134,5 +134,5 @@ export function settlementToEnter(
   blocked: boolean,
 ): string | null {
   const id = settlementEnterCandidate(posX, posZ, places, enterRadius, onWater)
-  return shouldEnterSettlement(id, true, blocked) ? id : null
+  return shouldEnterSettlement(id, blocked) ? id : null
 }

@@ -13,7 +13,7 @@ export function bindTravelSpace(places: readonly EnterablePlace[]): () => void {
     const g = useGame.getState()
     const blocked = !!ui.dialog || !!g.defeat || g.victory
     // Re-derive from the live position: a teleport may precede the next frame's
-    // enter hint. Water and finished runs keep the same entry guards as before.
+    // enter hint. A water cell, an open dialog and a finished run never enter.
     const ll = worldToLatLon(g.pos.x, g.pos.z)
     const onWater = sampleTerrain(ll.lat, ll.lon, g.seed).type === 'water'
     const id = settlementToEnter(
@@ -25,6 +25,5 @@ export function bindTravelSpace(places: readonly EnterablePlace[]): () => void {
       blocked,
     )
     if (id !== null) g.enterPlace(id)
-    // No settlement means no action. Forms are used from the inventory bar.
   })
 }
