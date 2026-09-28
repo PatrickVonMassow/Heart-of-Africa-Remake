@@ -8,8 +8,8 @@
 // faster than he can swim out of it. That is the reported Nile-mouth softlock.
 //
 // This module answers the question purely, for any water field: from every
-// swimmable cell around a point, does an exit path exist on which the current
-// never exceeds the swim speed? It knows nothing about terrain or rivers — the
+// swimmable cell around a point, does an exit path exist on which every step
+// still makes real headway against the current (ESCAPE_HEADWAY)? It knows nothing about terrain or rivers — the
 // caller supplies the samples — so the same sweep runs over the real world in
 // the mouth sweep and over hand-built fields in its own unit tests.
 
@@ -24,7 +24,7 @@ export interface SwimCell {
   driftLon: number
 }
 
-export interface SwimEscapeOptions {
+interface SwimEscapeOptions {
   /** Lattice spacing in degrees. */
   stepDeg: number
   /** Half-width of the swept window in degrees. */
@@ -39,7 +39,7 @@ export interface SwimEscapeOptions {
   minNetSpeedDeg?: number
 }
 
-export interface SwimEscapeResult {
+interface SwimEscapeResult {
   /** Swimmable cells examined. */
   swimCells: number
   /** Swimmable cells with no exit path — every one of them is a softlock. */
