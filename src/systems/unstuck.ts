@@ -21,7 +21,7 @@ const RING_DIRECTIONS = 12
 export const UNSTUCK_KEY_CODE = 'KeyU'
 export const UNSTUCK_KEY_LABEL = 'U'
 
-export interface StallState {
+interface StallState {
   /** Where he stood when the current stall window opened. */
   anchorX: number
   anchorZ: number
@@ -31,7 +31,7 @@ export interface StallState {
   stuck: boolean
 }
 
-export interface StallConfig {
+interface StallConfig {
   /** How far he must get from the anchor for this to count as movement, in metres. */
   stallDistance: number
   /** Seconds of held movement without that progress before he counts as stuck. */
@@ -63,7 +63,7 @@ export function updateStall(
     return { anchorX: x, anchorZ: z, heldSeconds: 0, stuck: false }
   }
   if (!moving) {
-    // Not asking to move: the clock stops, but a hint already raised stays until
+    // Not asking to move: the clock resets, but a hint already raised stays until
     // he actually gets away — releasing the key is no proof of being free.
     return s.heldSeconds === 0 ? s : { ...s, heldSeconds: 0 }
   }
@@ -77,10 +77,11 @@ export function updateStall(
  *
  * On the stuck EDGE it is raised, as it always was. It is also raised again when
  * it has timed out while he is still holding an input and getting nowhere: the
- * hint is the only route to the escape for a player with no U key — on touch it
- * IS the button — and `stuck` only clears by real movement, so a man who missed
- * the one showing could never call it back. It never displaces another message:
- * a hint is only re-raised over an empty toast.
+ * hint is the only route to the escape for a player with neither a U key nor a
+ * pad's L3 — on touch it IS the button — and `stuck` only clears by real
+ * movement, so a man who missed the one showing could never call it back. A
+ * re-raise never displaces another message: it happens only over an empty
+ * toast (the edge raise does not wait).
  */
 export function stuckHintDue(
   stuck: boolean,
@@ -93,10 +94,10 @@ export function stuckHintDue(
   return moving && !toastShowing
 }
 
-export interface FreeSpotOptions {
+interface FreeSpotOptions {
   /** Ring spacing of the outward search, in metres. */
   step: number
-  /** How far out the search looks, in metres. */
+  /** How far out the search looks, in metres (at least one ring at `step`). */
   maxRadius: number
   /**
    * The spot is usable: free of every collider for the mover's own footprint,
@@ -110,8 +111,8 @@ export interface FreeSpotOptions {
    * never have walked through.
    */
   blocked?: (x: number, z: number) => boolean
-  /** Used when nothing within `maxRadius` passes: free by construction (the
-   *  place's entry point). */
+  /** Used when nothing within `maxRadius` passes: the place's entry point in a
+   *  settlement, the traveller's own position in bird's-eye (see escapeOutcome). */
   fallback: readonly [number, number]
 }
 
@@ -160,21 +161,22 @@ export function findFreeSpot(
  * bird's-eye search falls back to the traveller's own position, so it produced
  * `noRoom` while the game still announced a rescue.
  */
-export type EscapeOutcome = 'freed' | 'alreadyFree' | 'noRoom'
+type EscapeOutcome = 'freed' | 'alreadyFree' | 'noRoom'
 
 export function escapeOutcome(
   fromX: number,
   fromZ: number,
   result: { pos: readonly [number, number]; found: boolean },
 ): EscapeOutcome {
-  // A hair of floating-point drift is not a rescue; a real one moves him at
-  // least one search step.
+  // A hair of floating-point drift (up to 1e-6) is not a rescue; a real one
+  // moves him a whole search step, far past that.
   if (Math.hypot(result.pos[0] - fromX, result.pos[1] - fromZ) > 1e-6) return 'freed'
   return result.found ? 'alreadyFree' : 'noRoom'
 }
 
 /** No sampled point on the straight line from (x1,z1) to (x2,z2) lies inside a
- *  collider — the candidate is reachable without passing through a wall. */
+ *  collider — the candidate is reachable without passing through a wall thicker
+ *  than the sample spacing (at most 0.25 m). */
 function lineOfSightClear(
   x1: number,
   z1: number,

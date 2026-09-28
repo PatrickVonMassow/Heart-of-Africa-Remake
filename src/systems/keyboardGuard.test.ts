@@ -8,7 +8,6 @@ import {
   KEYBOARD_LOCK_CODES,
   createKeyboardLockController,
   installKeyboardLock,
-  isGameKeyCode,
   looksFullscreen,
   preventsBrowserChord,
   shouldLockKeyboard,
@@ -24,9 +23,9 @@ const chord = (code: string, mods: { ctrlKey?: boolean; altKey?: boolean } = { c
 describe('the bound-key set (design.md §17.5/§21.1)', () => {
   it('holds the movement, action and debug keys the game really binds', () => {
     for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'Space', 'Tab', 'KeyT', 'KeyU', 'F6']) {
-      expect(isGameKeyCode(code)).toBe(true)
+      expect(GAME_KEY_CODES).toContain(code)
     }
-    for (const code of MONTH_KEYS) expect(isGameKeyCode(code)).toBe(true)
+    for (const code of MONTH_KEYS) expect(GAME_KEY_CODES).toContain(code)
     for (let i = 1; i <= 9; i++) expect(GAME_KEY_CODES).toContain(`Digit${i}`)
     expect(new Set(GAME_KEY_CODES).size).toBe(GAME_KEY_CODES.length)
   })
@@ -34,7 +33,7 @@ describe('the bound-key set (design.md §17.5/§21.1)', () => {
   it('leaves the keys the game does not bind to the browser', () => {
     // F5 (reload) and the devtools/reload letters are deliberately unbound.
     for (const code of ['KeyR', 'KeyI', 'KeyJ', 'KeyN', 'F5', 'F12']) {
-      expect(isGameKeyCode(code)).toBe(false)
+      expect(GAME_KEY_CODES).not.toContain(code)
     }
   })
 
@@ -72,7 +71,7 @@ describe('preventsBrowserChord (work-order 601)', () => {
   // wants none of them.
   it('lets the browser keep the chords on the plain-bound calendar row', () => {
     for (const code of [...MONTH_KEYS, 'BracketRight', 'Slash', 'NumpadAdd', 'NumpadSubtract']) {
-      expect(isGameKeyCode(code)).toBe(true) // the game DOES bind it — plain
+      expect(GAME_KEY_CODES).toContain(code) // the game DOES bind it — plain
       expect(preventsBrowserChord(chord(code), { typing: false })).toBe(false)
       expect(preventsBrowserChord(chord(code, { altKey: true }), { typing: false })).toBe(false)
     }

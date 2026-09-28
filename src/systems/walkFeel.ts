@@ -54,8 +54,8 @@ export function advanceStepPhase(
 
 /**
  * Camera bob from the step phase, scaled by the current speed fraction so it
- * fades smoothly to nothing when stopping: a VERTICAL bob at twice the step
- * frequency and a LATERAL sway at the step frequency (half the vertical) — the
+ * fades smoothly to nothing when stopping: a VERTICAL bob once per footstep
+ * and a LATERAL sway once per stride of two footsteps (half the vertical) — the
  * two together trace the classic figure-eight. Returns metre offsets to add on
  * top of the eye height / the strafe axis.
  */

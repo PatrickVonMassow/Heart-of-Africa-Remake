@@ -13,9 +13,10 @@
 // config, never in which animals spawned or which dramas fired. Hence the
 // fixed seed, the fixed date, the fixed anchors and — above all — the FIXED
 // SIMULATION TIMESTEP with a FIXED FRAME COUNT below: the simulation always
-// sees dt = 1/60 s and always takes the same number of steps, so the path,
-// the streaming crossings and every roll repeat exactly while only the
-// measured wall-clock per frame varies.
+// sees dt = 1/60 s and always takes the same number of steps, so the path
+// and the streaming crossings repeat while only the measured wall-clock per
+// frame varies. Math.random is seeded once per sweep, so the rolls repeat run
+// to run, though not config to config within a sweep.
 
 import { QUALITY_PRESETS, type QualityPreset } from '../config/quality'
 
@@ -37,7 +38,7 @@ export const BENCH_TRAVEL_SPEED = 5.6
 export const BENCH_ZOOM = 0.5
 
 /** Debug render flags a config can override (src/state/ui.ts). */
-export interface BenchFlags {
+interface BenchFlags {
   traaEnabled?: boolean
   ssaoEnabled?: boolean
   shadowsEnabled?: boolean
@@ -52,7 +53,7 @@ export interface BenchFlags {
  * report claimed to have switched it off — caught by measuring the terrain
  * triangles, not by a green test).
  */
-export interface BenchTerrainOverride {
+interface BenchTerrainOverride {
   /** false switches point 209's near-ring refinement off entirely. */
   enabled?: boolean
   /** Caps the refined segment count (default 112). */
@@ -62,7 +63,8 @@ export interface BenchTerrainOverride {
 export interface BenchConfig {
   name: string
   flags: BenchFlags
-  /** Renderer pixel-ratio cap; undefined keeps the display's own ratio. */
+  /** Renderer pixel ratio for this config (set directly, so it may also raise
+   *  a lower native ratio); undefined keeps the display's own ratio. */
   pixelRatio?: number
   terrain?: BenchTerrainOverride
 }
@@ -123,11 +125,12 @@ export const BENCH_PHASES: readonly BenchPhase[] = [
   { name: 'savanna-driving', lat: -2.5, lon: 34.0, drive: true },
 ]
 
-export interface BenchFrameCounts {
+interface BenchFrameCounts {
   /** Frames run and DISCARDED after a jump/config change (pipeline rebuild,
    *  chunk and flora streaming settle here). */
   settle: number
-  /** Frames MEASURED after the settle — the fixed step count. */
+  /** Frames run after the settle — the fixed step count; the first has no
+   *  interval to measure, so sample − 1 frame times are collected. */
   sample: number
 }
 
@@ -136,7 +139,8 @@ export function benchShortMode(search: string): boolean {
   return /(^|[?&])bench=short(&|$)/.test(search)
 }
 
-/** Fixed frame budget per phase. Full run: 3 s of samples after 1.3 s settle. */
+/** Fixed frame budget per phase. Full run: 2.5 s of samples after a 1.3 s
+ *  settle. */
 export function benchFrameCounts(short: boolean): BenchFrameCounts {
   return short ? { settle: 8, sample: 16 } : { settle: 80, sample: 150 }
 }
@@ -152,7 +156,7 @@ export function benchTotalFrames(short: boolean, configs: number = BENCH_CONFIGS
   return (configs + 1) * BENCH_PHASES.length * (c.settle + c.sample)
 }
 
-export interface FrameStats {
+interface FrameStats {
   n: number
   median: number
   p95: number
@@ -224,6 +228,13 @@ export function headlineNote(headline: BenchHeadline, gpuReason: string): string
   return `HEADLINE: cpu — no GPU timestamps (${gpuReason}) and the wall clock is vsync-capped, so pure GPU cost is NOT measured here.`
 }
 
+/** The three clock members installFixedClock replaces. */
+interface FixedClockTarget {
+  elapsedTime: number
+  getDelta(): number
+  getElapsedTime(): number
+}
+
 /**
  * Fixed-timestep clock (the determinism device). R3F reads `clock.getDelta()`
  * exactly ONCE per frame and hands the result to every `useFrame`, and the
@@ -232,12 +243,6 @@ export function headlineNote(headline: BenchHeadline, gpuReason: string): string
  * `dt` per rendered frame, whatever the frame really took. Returns the restore
  * function; the runner calls it in a `finally`.
  */
-export interface FixedClockTarget {
-  elapsedTime: number
-  getDelta(): number
-  getElapsedTime(): number
-}
-
 export function installFixedClock(clock: FixedClockTarget, dt: number = BENCH_DT): () => void {
   const originalDelta = clock.getDelta
   const originalElapsed = clock.getElapsedTime
@@ -277,7 +282,7 @@ export interface BenchSceneNode {
   children?: readonly BenchSceneNode[]
 }
 
-export interface BenchTriGroup {
+interface BenchTriGroup {
   tris: number
   meshes: number
 }
@@ -300,7 +305,8 @@ function groupKey(name: string | null, node: BenchSceneNode): string {
 }
 
 /**
- * Rendered triangles per system, attributing every visible mesh to its nearest
+ * Triangles of the visible scene geometry per system (an inventory: no camera
+ * culling or draw ranges), attributing every visible mesh to its nearest
  * NAMED ancestor — the scene's own group names ARE the system boundaries
  * (the `scripts/perf-breakdown.mjs` rule, brought in-game). Invisible subtrees
  * are skipped: they cost nothing.
@@ -324,7 +330,7 @@ export function sceneTriangleBreakdown(root: BenchSceneNode): Record<string, Ben
 
 // --- Report -----------------------------------------------------------------
 
-export interface BenchEnvironment {
+interface BenchEnvironment {
   userAgent: string
   /** 'webgpu' or 'webgl2' — the backend the renderer actually got. */
   backend: string
@@ -380,14 +386,12 @@ export interface BenchReport {
   /** Wall-clock duration of the whole sweep (ms). */
   durationMs: number
   aborted: boolean
-  /** Human-readable digest, kept FIRST in the file (see `benchReportJson`). */
-  summary?: string[]
 }
 
 // --- LOW-preset cost profile (point 293) ------------------------------------
 
 /** One system's share of a phase's rendered triangles at the low preset. */
-export interface BenchRankEntry {
+interface BenchRankEntry {
   /** The scene-graph system name (the `sceneTriangleBreakdown` key). */
   system: string
   tris: number
@@ -397,7 +401,7 @@ export interface BenchRankEntry {
 }
 
 /** The low-preset cost picture for one route phase. */
-export interface BenchLowPhaseRanking {
+interface BenchLowPhaseRanking {
   phase: BenchPhaseName
   /** Sum of the ranked systems' triangles (the scene-graph total). */
   totalTris: number

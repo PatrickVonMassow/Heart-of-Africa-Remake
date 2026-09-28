@@ -4,20 +4,20 @@
 
 import type { RegionId } from '../../world/geo'
 
-/** Heading convention across the wildlife sim: a heading `h` points in the
- *  direction `(sin h, cos h)` in world (x, z), so `Math.atan2(dx, dz)` yields the
- *  heading toward an offset `(dx, dz)`. */
+// Heading convention across the wildlife sim: a heading `h` points in the
+// direction `(sin h, cos h)` in world (x, z), so `Math.atan2(dx, dz)` yields the
+// heading toward an offset `(dx, dz)`.
 
 /**
- * Escape heading away from every threat within `radius`, distance-weighted and
- * summed (closer threats pull harder). Returns `null` when no threat is in
- * range.
+ * Escape heading away from every threat within `radius` (a threat closer than
+ * 1e-4 has no direction and is skipped), distance-weighted and summed (closer
+ * threats pull harder). Returns `null` when no threat is in range.
  *
  * Summing over all nearby threats — rather than fleeing only the single nearest —
- * is what stops the facing from flip-flopping between two flanking herd members:
- * the nearest-threat pick is a discrete choice that swaps ~90° from frame to
- * frame when two elephants straddle the prey, whereas the summed field varies
- * continuously as the animal moves, so the heading stays stable (design.md §19).
+ * avoids the ~90° frame-to-frame swaps of a nearest-threat pick when two
+ * elephants straddle the prey: the summed field varies continuously as the
+ * animal moves (design.md §19). Near-symmetric fields can still flip, which
+ * committedFleeHeading damps.
  */
 export function fleeHeading(
   x: number,
@@ -53,10 +53,11 @@ export function fleeHeading(
   return Math.atan2(rx, rz)
 }
 
-/** Player shyness (design.md §19): the weapon-strength bar above which an
- *  ADULT stands its ground against the traveller. The giraffe's 1.5 sits
+/** Player shyness (design.md §19): the weapon-strength bar at or above which
+ *  an ADULT stands its ground against the traveller. The giraffe's 1.5 sits
  *  exactly on it — a lion-killing kick is nothing to flee a human over —
- *  and the lion's 2.0 is above it; everything weaker bolts. */
+ *  and the lioness's 2.0 (balance.parentDefense.preyWeapon) is above it;
+ *  everything weaker bolts. */
 export const PLAYER_SHY_STRONG_WEAPON = 1.5
 
 /**
@@ -65,9 +66,9 @@ export const PLAYER_SHY_STRONG_WEAPON = 1.5
  * table (balance.parentDefense.preyWeapon, the same ranking the defence
  * matrix uses) — and so does ANY juvenile (calf, foal, chick, cub),
  * vulnerable whatever its species' adult rank. Apex/strong adults never
- * flee: the §14.1 predators (cheetah/leopard/hyena/lion), the elephant and
- * the armoured crocodile have no weak-tier weapon entry, and the giraffe's
- * 1.5 reaches the strong bar. The adult plover keeps the broken-wing lure
+ * flee: cheetah, leopard, hyena, the elephant and the armoured crocodile have
+ * no weapon entry, and the lion's 2.0 and the giraffe's 1.5 reach the strong
+ * bar. The adult plover keeps the broken-wing lure
  * (point 145b) as its own answer to the approaching traveller, and the
  * flamingo — the one weak bird with no weapon entry — flies off. The flee is
  * cosmetic shyness only: the player-collision resolution stays
@@ -81,13 +82,14 @@ export function fleesFromPlayer(
   if (isJuvenile) return true
   if (species === 'flamingo') return true // the weak wader — it takes to the air
   const weapon = preyWeapon[species]
-  if (weapon === undefined) return false // predators/elephant/crocodile/plover: no weak-tier entry
+  if (weapon === undefined) return false // cheetah/leopard/hyena/elephant/crocodile/plover: no entry
   return weapon < PLAYER_SHY_STRONG_WEAPON
 }
 
-/** The set of scripted §19.8 drama / hunt states an animal can be in. A truthy
- *  flag means the animal is CLAIMED by that drama and its movement is owned by
- *  the drama's own logic — not free to be redirected. */
+/** The set of scripted §19.8 drama / hunt states an animal can be in. A set
+ *  flag (defined, or true for the boolean flags) means the animal is CLAIMED by
+ *  that drama and its movement is owned by the drama's own logic — not free to
+ *  be redirected. */
 export interface DramaState {
   caught?: number // seized by a predator (lion or crocodile grip) — thrashing
   fireTrapped?: number // pinned by the grass-fire line (point 145a)
@@ -113,8 +115,8 @@ export interface DramaState {
  *  shield). Only an idle/roaming/grazing animal — none of these flags set — is
  *  free to shy from the player. Broader than `claimedByAnotherDrama` (which
  *  gates the fresh-victim scans): it also covers the surrender/grief drives
- *  (vigil, kick, plunge, trample), the rescue/defence drives and the
- *  being-hunted flee, exactly the states that must beat the player-shy flee. */
+ *  (vigil, plunge, trample), the defence strike (kick), the rescue/defence
+ *  drives and the being-hunted flee, exactly the states that must beat the player-shy flee. */
 export function isInDrama(f: DramaState): boolean {
   return (
     f.caught !== undefined ||
@@ -161,8 +163,8 @@ export function fleesPlayerNow(
  *   shies, juvenile or adult (the mired/caught calves are already covered by
  *   the isInDrama gate);
  * - an ADULT keeps its whole bank errand (the walk-to-water/drink/walk-back
- *   cycle is its own deliberate behaviour, and the ambush needs standing
- *   adult drinkers as its pool);
+ *   cycle is its own deliberate behaviour, and a standing drinker stays the
+ *   ambush's surest catch beside the point-275 waterline trigger);
  * - a plain drinking JUVENILE is NOT exempt — it bolts from the close
  *   traveller like any calf.
  */
@@ -179,8 +181,9 @@ export function drinkExemptFromPlayerShy(
 /** Which threat source won the flee arbitration (point 252). The DRAMA and
  *  PREDATOR-flee cases yield no source here: a drama owns its animal's whole
  *  movement, and the predator flee runs its own urgency-scaled block — the
- *  resolver's job for those is to return null so the player-shy flee can
- *  never pre-empt them. */
+ *  resolver never returns the player source for them (a predator-fleeing prey
+ *  may still get the elephant dart), so the player-shy flee can never pre-empt
+ *  them. */
 export type FleeThreatSource = 'elephant' | 'player'
 
 /** The animal-side state the flee arbitration reads (point 252). */
@@ -228,8 +231,8 @@ export function resolveFleeTarget(
   playerRing: number,
 ): { source: FleeThreatSource; heading: number } | null {
   // The elephant dart: the top flee reflex — live even for a predator-fleeing
-  // prey (the caller passes [] for species that never dart, and no drama-held
-  // animal reaches this resolver at all).
+  // prey (the caller passes [] for species that never dart; familyHeld drama
+  // animals are handled before this resolver).
   if (elephants.length > 0) {
     const e = fleeHeading(x, z, elephants, elephantRing)
     if (e !== null) return { source: 'elephant', heading: e }
@@ -275,7 +278,7 @@ export function blockHeading(
 /**
  * Water-crossing target (point 192 — the user's water-rule revision: animals
  * may purposefully CROSS a river/lake, they just never spawn or idle in it;
- * the ocean stays absolute). Probes 1-unit steps along
+ * the ocean stays absolute). Probes `step`-unit strides (default 1) along
  * `heading`: every wet step must be RIVER/LAKE water ('water', never 'ocean'),
  * and the first LAND cell within `maxUnits` becomes the crossing target. Ocean
  * anywhere on the line, or no land within reach, returns null — no crossing.
@@ -375,8 +378,9 @@ export function chaseSwimEscaped(
   const here = terrainTypeAt(x, z)
   if (here === 'water' || here === 'ocean') return false
   // Probes at most 0.2 units apart find every channel at least a quarter unit
-  // wide (a line crossing a channel runs through at least its width); every
-  // river is RIVER_WIDTH_DEG wide, about 2.7 units, and lakes are wider still.
+  // wide (a line crossing a channel runs through at least its width); a river's
+  // half-width is RIVER_WIDTH_DEG (calibratable, about 2.7 units at the default
+  // widthFactor), and lakes are wider still.
   const n = Math.max(5, Math.ceil(Math.hypot(x - entry.x, z - entry.z) / 0.2))
   for (let i = 1; i < n; i++) {
     const f = i / n
@@ -407,8 +411,8 @@ export function roamCrossing(
 /**
  * The NEAREST bank for an animal left on river/lake water (point 312): rays in
  * `rays` directions advance together ring by ring in `step` strides, and the
- * first dry cell any of them reaches is the target — so it is the nearest one
- * the animal can swim to in a straight line. A ray that meets the ocean is
+ * first dry cell any of them reaches is the target — the nearest bank these
+ * discrete probes find, reached in a straight line. A ray that meets the ocean is
  * dropped (the sea is never swum). `null` when nothing is within `maxUnits`:
  * the caller grounds the animal instead (invariant I4).
  */
@@ -477,10 +481,10 @@ export const FLIGHT_GRACE_SECONDS = 0.5
 export type WaterExit = 'none' | 'swim-to-bank' | 'setback'
 
 /**
- * The §19.5 water backstop decision (point 312). The open ocean is the world's
- * edge: anyone on it is set back to land at once, exactly as before. River or
- * lake water is shy, not barred: a drama owner stays, an animal still in
- * flight keeps swimming, and anyone else — idle, resting, a flight just ended —
+ * The §19.5 water backstop decision (point 312). A drama owner is left alone
+ * everywhere. Otherwise the open ocean is the world's edge: anyone on it is
+ * set back to land at once. River or lake water is shy, not barred: an
+ * animal still in flight keeps swimming, and anyone else — idle, resting, a flight just ended —
  * swims for the nearest bank under its own power (never a snap onto land).
  */
 export function waterExit(terrainType: string, dramaOwned: boolean, inFlight: boolean): WaterExit {
@@ -561,7 +565,8 @@ export function frontInterceptTarget(
 /**
  * Deflect one animal's per-frame step so it SLIDES AROUND an elephant's body
  * instead of walking through it (design.md §19.5, point 261). An elephant is a
- * solid obstacle to every other animal's LOCOMOTION: a step from `(fromX,fromZ)`
+ * solid obstacle to every other animal's LOCOMOTION (except an animal it is
+ * about to trample — elephantWouldTrample's exemption): a step from `(fromX,fromZ)`
  * to `(toX,toZ)` whose straight path would enter the body circle
  * `(obstX,obstZ,radius)` is redirected to the circle's tangent — the returned
  * end point is never inside the circle and always keeps moving forward along the
@@ -632,8 +637,8 @@ export function deflectAroundCircle(
   const tz = useFirst ? t1z : -t1z
   let ex = obstX + rx * radius + tx * segLen
   let ez = obstZ + rz * radius + tz * segLen
-  // Guarantee the result rests outside the body (round-off / a long step's
-  // chord could dip in): push it back out to the edge radially if needed.
+  // Guarantee the result rests outside the body against round-off: push it
+  // back out to the edge radially if needed.
   const edx = ex - obstX
   const edz = ez - obstZ
   const ed = Math.hypot(edx, edz)
@@ -761,8 +766,9 @@ export function groundFollowY(
  * Body-separation push (design.md §19): given neighbours as `[x, z, minDist]`,
  * returns the `[dx, dz]` that moves the subject half-way out of every overlap
  * (each of an overlapping pair resolves its own half, so the pair parts
- * symmetrically). Coincident points get a small fixed +x nudge so two animals
- * on the same spot still part instead of dividing by zero.
+ * symmetrically). Coincident points get a fixed +x nudge instead of dividing
+ * by zero; two coincident animals both nudge +x, so they part only once the
+ * caller's other forces (or order of resolution) break the tie.
  */
 export function separationPush(
   x: number,
@@ -789,9 +795,10 @@ export function separationPush(
 
 /**
  * Body separation at a water/coast edge (design.md §19.5, point 222): a pair
- * pinned against impassable water cannot part along the straight centre-line,
- * because the water setback reverts the component pointing INTO the water every
- * frame — the two animals stay interpenetrating (the reported waterline bug).
+ * pinned against water should not part along the straight centre-line — the
+ * ocean setback reverts the component pointing INTO the water, and on river or
+ * lake water the idle animal would only swim back to the bank (waterExit), so
+ * the two stay interpenetrating (the reported waterline bug).
  * Given the inward water normal `waterDir` (unit, pointing into the forbidden
  * water), the push is resolved along the SHORE TANGENT instead: the into-water
  * component is removed, and when the raw push is (almost) purely into the water
@@ -835,18 +842,6 @@ export interface FlightState {
   z: number
 }
 
-/**
- * Advance a vulture flight one step (design.md §19): vultures never pop in or
- * out of the picture — they spawn beyond the view ring (zoom-aware `viewR`),
- * fly in to their target, and when done fly off and only despawn well outside
- * the view again.
- * - idle + want → spawn at the ring on the target's far side, turn inbound
- * - in → fly toward the target; on reach → active (want dropped → out)
- * - active + want → hold (the caller circles/lands it); want dropped → out
- * - out → fly straight away from the player; past the ring + margin → idle;
- *   a new want while still out turns it back inbound (retarget, no respawn)
- * Mutates and returns `s`.
- */
 /** Distance from point (px,pz) to the segment (ax,az)-(bx,bz). The SWEPT
  *  predator catch (point 179): a big clamped-dt step or a tangential pass must
  *  not carry a hunter THROUGH its target without registering the catch — the
@@ -868,6 +863,18 @@ export function segPointDist(
   return Math.hypot(px - (ax + tt * dx), pz - (az + tt * dz))
 }
 
+/**
+ * Advance a vulture flight one step (design.md §19): vultures never pop in or
+ * out of the picture — they spawn beyond the view ring (zoom-aware `viewR`),
+ * fly in to their target, and when done fly off and despawn off the view.
+ * - idle + want → spawn at the ring on the target's far side, turn inbound
+ * - in → fly toward the target; on reach → active (want dropped → out)
+ * - active + want → hold (the caller circles/lands it); want dropped → out
+ * - out → fly straight away from the player; → idle once off-screen AND past
+ *   `viewR` (with `isOffscreen`), else past the ring + FLIGHT_DESPAWN_OUT;
+ *   a new want while still out turns it back inbound (retarget, no respawn)
+ * Mutates and returns `s`.
+ */
 export function flightStep(
   s: FlightState,
   want: boolean,
@@ -896,8 +903,9 @@ export function flightStep(
     // Spawn beyond the view and fly IN — never pop into frame (point 178). The
     // assumed ring (viewR) underestimates the tilted bird's-eye frustum's ground
     // reach (the point-165/172/183 lesson), so with a frustum predicate push the
-    // spawn outward in ring steps until the point is genuinely OFF the rendered
-    // frame. Without one (no travel camera mounted) the ring alone is used.
+    // spawn outward in up to twelve ring steps until the point is OFF the
+    // rendered frame (after twelve it spawns where it is). Without one (no
+    // travel camera mounted) the ring alone is used.
     let out = viewR + FLIGHT_SPAWN_OUT
     s.x = px + dx * out
     s.z = pz + dz * out
@@ -970,8 +978,8 @@ export const FLEE_COMMIT_MARGIN = 0.9
  * user's oscillating-calf report). This keeps the committed heading and accepts
  * a fresh pick only once it diverges past `switchMargin` — the same "commit to
  * one corridor, re-pick only when it closes" discipline `escapeCorridorHeading`/
- * `calfFleeStep` use for the coast flight — so a transient flip can never flap
- * the escape. The caller still `turnToward`s the returned target under its own
+ * `calfFleeStep` use for the coast flight — so jitter within the margin never
+ * flaps the escape (a pick past it, even a ~180° flip, is accepted). The caller still `turnToward`s the returned target under its own
  * turn cap, which smooths a genuine switch. Divergence is measured across the
  * ±π seam.
  */
@@ -989,10 +997,11 @@ export function committedFleeHeading(
 
 /**
  * Crocodile ambush target preference (design.md §19.16/§19.8, point 245): a
- * drinking JUVENILE at the bank is the strongly-preferred lunge target so the
- * §19.8 sacrifice/rescue drama fires more often — its weight is `bias` (≫ 1),
- * an adult's is 1. The crocodile only ever lunges at a drinker genuinely
- * standing at the bank, so the sole discriminator here is young-vs-adult.
+ * JUVENILE at the bank is the strongly-preferred lunge target so the §19.8
+ * sacrifice/rescue drama fires more often — its weight is `bias` (≫ 1), an
+ * adult's is 1. Eligibility (a bank drinker, or any prey at the waterline —
+ * point 275) is decided by the caller, so the sole discriminator here is
+ * young-vs-adult.
  */
 export function crocodileTargetWeight(isJuvenile: boolean, bias: number): number {
   return isJuvenile ? bias : 1
@@ -1077,6 +1086,15 @@ export function killFlockMayDescend(
   return true
 }
 
+/** One scavenger slot as assignPerCarcassFlocks sees it. */
+export interface ScavengerSlotView<T> {
+  /** The carcass this slot currently owns, or null when free. */
+  target: T | null
+  /** The slot's flight has fully despawned (idle) — free to take a new carcass.
+   *  A slot still flying in/out is NOT available, so it can't hop mid-flight. */
+  available: boolean
+}
+
 /**
  * Per-carcass vulture-flock ownership (design.md §19.6, point 251). Each
  * eligible carcass draws and OWNS its own scavenger flock, so N carcasses draw
@@ -1098,14 +1116,6 @@ export function killFlockMayDescend(
  * carcass list; returns the next per-slot target. Carcass identity is by
  * reference (`===`), matching the herd-array Animal objects.
  */
-export interface ScavengerSlotView<T> {
-  /** The carcass this slot currently owns, or null when free. */
-  target: T | null
-  /** The slot's flight has fully despawned (idle) — free to take a new carcass.
-   *  A slot still flying in/out is NOT available, so it can't hop mid-flight. */
-  available: boolean
-}
-
 export function assignPerCarcassFlocks<T>(
   slots: ReadonlyArray<ScavengerSlotView<T>>,
   carcasses: ReadonlyArray<T>,
@@ -1122,7 +1132,6 @@ export function assignPerCarcassFlocks<T>(
   for (let i = 0; i < slots.length && ui < unowned.length; i++) {
     if (next[i] !== null || !slots[i].available) continue
     next[i] = unowned[ui++]
-    owned.add(next[i] as T)
   }
   return next
 }
@@ -1168,10 +1177,10 @@ export function shouldMourn(distToTarget: number, radius: number, mourned: boole
  *  its time) it "recovers" and flies back. The one sacrifice that is a lie
  *  rather than a leap — and it can genuinely fail: a predator close at the
  *  moment of recovery sometimes takes the actor. */
-export const PLOVER_LURE_TRIGGER = 10
-export const PLOVER_LURE_SAFE = 18
-export const PLOVER_LURE_SECONDS = 12
-export const PLOVER_TAKEN_CHANCE = 0.15
+const PLOVER_LURE_TRIGGER = 10
+const PLOVER_LURE_SAFE = 18
+const PLOVER_LURE_SECONDS = 12
+const PLOVER_TAKEN_CHANCE = 0.15
 
 /** Whether a threat this close to the nest starts the act. */
 export function ploverShouldLure(threatDistToNest: number, trigger: number = PLOVER_LURE_TRIGGER): boolean {
@@ -1211,7 +1220,7 @@ export function ploverTaken(roll: number, predatorNear: boolean, chance: number 
  *  fire it at the congo-north latitude, Park saw the same lines of fire from
  *  the Gambia (Sahel). The Congo proper never cures (rain every month) and a
  *  rainless zone grows no grass to burn — both stay out by construction. */
-export const GRASS_FIRE_ZONES = ['sahel', 'congo-north']
+const GRASS_FIRE_ZONES = ['sahel', 'congo-north']
 
 /**
  * Whether the grass fire may burn here and now (point 145a): a cured-grass
@@ -1228,8 +1237,9 @@ export function grassFireEligible(zone: string, wetness: number): boolean {
  * and lake — the Nile through Egypt and Sudan, the Niger and Senegal, the
  * Congo basin, the eastern lakes and the Zambezi south. Every region carries
  * such water, so the region list is complete; the REAL restriction is the
- * water itself — a crocodile exists only IN river/lake water, never on land
- * ground and never in the waterless desert (which has no water cells).
+ * water itself — a crocodile lives only IN river/lake water (leaving it only
+ * for the brief ambush burst onto the bank), never in the waterless desert
+ * (which has no water cells).
  */
 export const CROCODILE_REGIONS = ['north', 'west', 'central', 'east', 'south'] as const
 
@@ -1328,9 +1338,9 @@ export const CROCODILE_BODY_LENGTH_LOCAL = 3.7
 /** Turn rate (rad/s) while hauling a catch back to the water: the crocodile
  *  swings its prey around toward its channel; a facing never snaps (design.md
  *  §19). */
-export const CROCODILE_DRAG_TURN = 2.2
+const CROCODILE_DRAG_TURN = 2.2
 /** World units within which the haul counts its home water as reached. */
-export const CROCODILE_DRAG_ARRIVED = 0.2
+const CROCODILE_DRAG_ARRIVED = 0.2
 /** Headings scanned when the jaws must be turned onto water (see below). */
 const CROCODILE_JAW_HEADINGS = 12
 
@@ -1355,8 +1365,9 @@ export function crocodileFeedPairValid(
   return Math.hypot(vx - cx, vz - cz) <= CROCODILE_BODY_LENGTH_LOCAL * scale
 }
 
-/** Nearest heading (to `rot`) whose jaws anchor lies on water, or null when no
- *  heading does — the degenerate channel narrower than the crocodile's reach. */
+/** Nearest to `rot` of the CROCODILE_JAW_HEADINGS evenly spaced headings whose
+ *  jaws anchor lies on water, or null when none of them does — the degenerate
+ *  channel narrower than the crocodile's reach. */
 function jawHeadingOnWater(
   cx: number,
   cz: number,
@@ -1382,32 +1393,7 @@ function jawHeadingOnWater(
   return best
 }
 
-/**
- * THE DRAG-INTO-WATER LEG (design.md §19.16, point 383) — one step of it, and of
- * the feeding hold it settles into.
- *
- * §19.16's ambusher comes OUT of the water for the burst and takes its catch
- * BACK IN: "it drags the body under, and the river keeps it". That leg did not
- * exist. The seizure left both where the strike happened — on the bank — and the
- * grip then pulled the CROCODILE to its victim (the inverse coupling), so the
- * pair fed on dry land while the render drew the catch at the crocodile's stale
- * water height: the reported screenshot, crocodile on sand, carcass sunk at the
- * waterline.
- *
- * Called every frame from the seizure until the carcass is gone, so the pair can
- * never drift apart or out of the water — even if the water mask itself moves
- * under them (the calibratable river width factor is edited at runtime).
- *
- *  - NOT yet settled: step toward the home water it lunged from (a validated
- *    water cell) at `dragSpeed`, turning toward it at a capped rate — a visible
- *    haul, never a teleport. The catch rides the jaws throughout.
- *  - Home reached but the jaws still off the water (a channel narrower than the
- *    crocodile's own reach): turn the HEAD onto the water rather than haul
- *    further, so the catch still ends up in the river.
- *  - Settled (body centre AND jaws on water): hold — the feed happens here.
- *
- * Pure over an `isWater` probe so the whole placement is unit-testable.
- */
+/** One step of crocodileHaulStep: the pair's placement after it. */
 export interface CrocodileHold {
   /** The crocodile's body centre after this step. */
   x: number
@@ -1425,6 +1411,29 @@ export interface CrocodileHold {
    *  this case rather than accusing the world of a bug the placement cannot fix. */
   stranded: boolean
 }
+/**
+ * THE DRAG-INTO-WATER LEG (design.md §19.16, point 383) — one step of it, and of
+ * the feeding hold it settles into.
+ *
+ * §19.16's ambusher comes OUT of the water for the burst and takes its catch
+ * BACK IN: "it drags the body under, and the river keeps it" — the pair never
+ * feeds on the bank.
+ *
+ * Called every frame from the seizure until the carcass is gone, so the pair can
+ * never drift apart, and re-hauls if the water mask moves under them (the
+ * calibratable river width factor is edited at runtime); only a home that dried
+ * up or a channel too narrow for the jaws settles `stranded`.
+ *
+ *  - NOT yet settled: step toward the home water it lunged from (a validated
+ *    water cell) at `dragSpeed`, turning toward it at a capped rate — a visible
+ *    haul, never a teleport. The catch rides the jaws throughout.
+ *  - Home reached but the jaws still off the water (a channel narrower than the
+ *    crocodile's own reach): turn the HEAD onto the water rather than haul
+ *    further, so the catch still ends up in the river.
+ *  - Settled (body centre AND jaws on water): hold — the feed happens here.
+ *
+ * Pure over an `isWater` probe so the whole placement is unit-testable.
+ */
 export function crocodileHaulStep(
   cx: number,
   cz: number,
@@ -1456,7 +1465,7 @@ export function crocodileHaulStep(
     // reach past the far bank. Turn the HEAD onto the water rather than haul on.
     if (!isWater(cx, cz)) return hold(cx, cz, rot, false, true) // the home itself dried up
     const target = jawHeadingOnWater(cx, cz, rot, scale, mouthOffsetLocal, isWater)
-    if (target === null) return hold(cx, cz, rot, false, true) // nothing better exists
+    if (target === null) return hold(cx, cz, rot, false, true) // no probed heading reaches water
     const r2 = turnToward(rot, target, CROCODILE_DRAG_TURN * dt)
     return hold(cx, cz, r2, !settled(cx, cz, r2))
   }
@@ -1466,6 +1475,10 @@ export function crocodileHaulStep(
   const nrot = turnToward(rot, Math.atan2(dx, dz), CROCODILE_DRAG_TURN * dt)
   return hold(nx, nz, nrot, !settled(nx, nz, nrot))
 }
+
+export const CROCODILE_FEED_THRASH_AMP = 0.35
+export const CROCODILE_FEED_GULP_PITCH = 0.22
+const CROCODILE_FEED_BOB_AMP = 0.05
 
 /**
  * The feeding motion of a crocodile that has seized a victim (design.md §19.16,
@@ -1482,9 +1495,6 @@ export function crocodileHaulStep(
  * All amplitudes are small and bounded, so stripping the motion leaves the plain
  * gripping pose. Pure over (t, phase) so it is unit-testable.
  */
-export const CROCODILE_FEED_THRASH_AMP = 0.35
-export const CROCODILE_FEED_GULP_PITCH = 0.22
-export const CROCODILE_FEED_BOB_AMP = 0.05
 export function crocodileFeedPose(t: number, phase: number): { rollYaw: number; pitch: number; bobY: number } {
   const ph = phase * Math.PI * 2
   // The thrash: a brisk side-to-side wrench of the jaws (a fast sine).
@@ -1795,18 +1805,12 @@ export function mournDeadline(now: number, distToTarget: number, holdSeconds: nu
 }
 
 /**
- * Where the drawn predator of the vigil enters the stage (point 121 (f)).
- * The vulture standard applies: it spawns BEYOND the zoom-aware view ring and
- * WALKS in, never popping into sight — and it must also land INSIDE the
- * hunt's offstage abort ring around the player, or the chase would abort on
- * its very first frame. Both rings are player-centred while the spawn circle
- * (radius viewR + margin) is keeper-centred and the keeper may stand well off
- * the player, so the bearing is probed: from a random start angle, the first
- * probe whose player distance clears the view ring and stays inside the
- * offstage ring wins. The keeper-centred circle always cuts that annulus for
- * every keeper the draw can pick (seek range < both ring radii), so a valid
- * probe exists; the probe closest to the annulus middle backstops the
- * discrete sweep.
+ * Where a scripted predator enters the stage (the hunt, and the vigil's drawn
+ * predator of point 121 (f)): around the centre (cx, cz) it probes 16 bearings
+ * from a random start angle on rings from `minR` out to `maxR` and returns the
+ * first point OFF the rendered frame, so the predator walks in rather than
+ * popping into sight. Without an `offScreen` predicate the `minR` ring point is
+ * used; with every probe on screen, the `maxR` ring point.
  */
 export function offscreenRingSpawn(
   cx: number,
@@ -1823,7 +1827,7 @@ export function offscreenRingSpawn(
   // is as short as the frustum allows. `offScreen` projects a world point
   // through the LIVE camera (the true frustum, not an assumed radius — the
   // point-172 lesson). With no camera mounted (predicate omitted) the minR ring
-  // is used, as the old radius annulus did.
+  // is used.
   const ringPoint = (r: number, k: number, probes: number) => {
     const ang = rand01 * Math.PI * 2 + (k * Math.PI * 2) / probes
     return { x: cx + Math.cos(ang) * r, z: cz + Math.sin(ang) * r }
@@ -1838,8 +1842,8 @@ export function offscreenRingSpawn(
       if (offScreen(p.x, p.z)) return p
     }
   }
-  // Every probe on-screen (a very wide zoom past the abort ring): start as far
-  // out as allowed so the run-in is at least maximal.
+  // Every probe on-screen (a very wide zoom past the abort ring): the spawn is
+  // then visible — start as far out as allowed so the run-in is maximal.
   return ringPoint(maxR, 0, 1)
 }
 
@@ -1895,12 +1899,14 @@ export function keepStreamedAnimal(
  * trip: the instanced wildlife count (and its triangles) climbs without bound
  * at a fixed anchor, the point-276/278 regression.
  *
- * Root fix: a birth chunk's key is retained as long as ANY living animal still
- * originates there, so `spawnChunk` never re-seeds a chunk whose animals are
- * already alive. Distance still frees a chunk once its animals have genuinely
- * despawned. Returning to a fixed anchor therefore converges to a constant
- * count. Animals carry an immutable `origin` (their birth chunk); a legacy or
- * untagged animal falls back to its current `chunk`.
+ * Root fix: a birth chunk's key is retained as long as ANY animal still in the
+ * herd lists (alive, or a carcass not yet removed) originates there, so
+ * `spawnChunk` never re-seeds a chunk whose animals are still present; `dead`
+ * is not consulted. Distance still frees a chunk once its animals have
+ * genuinely despawned. Returning to a fixed anchor therefore converges to a
+ * constant count. A re-homed animal carries an immutable `origin` (its birth
+ * chunk); one never re-homed has none, and its current `chunk` is still its
+ * birth chunk.
  */
 export function retainedSpawnChunks(
   spawned: Iterable<string>,
@@ -1958,8 +1964,8 @@ export function retainedSpawnChunks(
  * `side` is the turn SENSE the caller has committed to — +1 for the turns that
  * add to the heading, −1 for the ones that subtract, 0 (the default) for the
  * symmetric search above. It is what lets a mover go ROUND something rather than
- * bounce off it: the committed sense is searched whole, in both course passes,
- * before the other sense is looked at at all, so the walker keeps hugging one
+ * bounce off it: within each course pass the committed sense is searched whole
+ * before the other sense is looked at, so the walker keeps hugging one
  * edge of an obstacle instead of taking whichever flank is momentarily nearer.
  * A caller with no commitment gets exactly the search this function always did.
  */
@@ -1979,8 +1985,8 @@ export function deflectedStep(
   // so the walker never enters a one-cell dead end it must bounce out of.
   const probe = Math.max(dist, lookahead)
   const clear = (h: number) =>
-    // Both the STEP TARGET and the far probe must be dry: the lookahead alone
-    // let a walker step into a narrow channel with land beyond it.
+    // Both the STEP TARGET and the far probe must pass `blocked`: the lookahead
+    // alone let a walker step into a narrow channel with land beyond it.
     !blocked(x + Math.sin(h) * dist, z + Math.cos(h) * dist) &&
     !blocked(x + Math.sin(h) * probe, z + Math.cos(h) * probe)
   const take = (h: number) => ({
@@ -1990,7 +1996,8 @@ export function deflectedStep(
     moved: true,
   })
   if (clear(heading)) return take(heading)
-  const keeps = (h: number) => !Number.isFinite(course) || Math.cos(h - course) >= 0
+  // Consulted only in the keeping pass, which runs only with a finite course.
+  const keeps = (h: number) => Math.cos(h - course) >= 0
   const swing = Math.max(0, maxTurn)
   // The committed sense is preferred over the other, but never over the COURSE:
   // giving the course up is a turn right round, and a walker that took one
@@ -2024,8 +2031,9 @@ export function deflectedStep(
  * the leave phase PICKS its heading by corridor: sample `candidates` directions,
  * probe each in `stepLen` strides until `blocked` (ocean) or `maxSteps`, and
  * score = clear land distance + outwardWeight·cos(delta to the radial). The
- * longest clear LAND corridor wins, ties broken toward outward — so an inland
- * detour beats a short seaward stub, while open country still leaves radially.
+ * highest score wins — clear land dominates and the outward term biases it —
+ * so an inland detour beats a short seaward stub, while open country still
+ * leaves radially.
  * The caller STICKS to the returned heading until its corridor closes (re-pick
  * on blocked-ahead only), so the choice cannot flip-flop between two flanking
  * corridors.
@@ -2061,20 +2069,22 @@ export function escapeCorridorHeading(
 /**
  * The flee step for a calf being run down by a land hunt (design.md §19.8,
  * point 157). It heads directly away from the hunter, then routes through
- * deflectedStep so a coast or river bank turns it aside instead of pinning it
- * (the old raw step ran straight into the water and stuck). At a CONCAVE sea
+ * deflectedStep so whatever the caller's `blocked` predicate forbids turns it
+ * aside instead of pinning it. At a CONCAVE sea
  * pocket the whole ±90° deflection fan lands in water and the direct step
  * dead-ends — the calf froze at the waterline while its parent was eaten
  * (point 226, the user's Cairo coast). That is not a genuine dead-end: land
  * runs along the shore beyond the fan, so the flight falls back to the
  * point-188 escape corridor — the longest clear-LAND heading over the full
- * circle, biased away from the hunter, STICKY across frames (`corridor` in →
- * `corridor` out; re-picked only when its way ahead closes) so the choice
+ * circle, biased away from the hunter, STICKY across frames while the direct
+ * flight stays blocked (`corridor` in → `corridor` out; re-picked only when its
+ * way ahead closes, cleared by any successful direct step) so the choice
  * cannot flip-flop between the two along-shore corridors. Only when even the
  * corridor step dead-ends (water on every side) does the calf stand
  * (moved:false) for the catch to resolve — the "always resolves" rule. `dist`
  * stays CALF_FLEE_SPEED*dt (slower than the hunter, so the chase still ends);
- * the caller passes the water/ocean `blocked` predicate.
+ * the caller passes `blocked`: ocean-only for the chase victim (chaseFleeStep,
+ * point 312), river/lake/ocean for the fighting quarry.
  */
 export function calfFleeStep(
   cx: number,
@@ -2291,8 +2301,8 @@ export function drinkCatchment(riverWidthDeg: number, dryness: number): number {
 // are unit-testable without a browser; Wildlife.tsx consumes them for the
 // live hunts.
 
-/** Decorative predators of ~1890 Africa (design.md §19). The lion is the apex
- *  (and the only one that attacks on contact, §14); the others are scenery. */
+/** Hunt predators of ~1890 Africa (design.md §19). Each attacks the traveller
+ *  on contact (§14); the lion is the apex. */
 export type PredatorKind = 'lion' | 'cheetah' | 'leopard' | 'hyena'
 /** Prey a predator hunts (design.md §19): grazers fitting its prey scheme. */
 export type PreyKind = 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'giraffe'
@@ -2329,9 +2339,9 @@ export const REGION_PREY: Record<RegionId, PreyKind[]> = {
  *  seam pattern)? A fresh-victim scan — the crocodile lunge, the grass fire —
  *  must never claim an animal a different system already holds, or two dramas
  *  fight over one actor. Shared so both scans exclude the same set: a caught /
- *  in-water / mired / crossing / fire-trapped animal, or the lion's chase
- *  victim. (The scan then adds its own extra gates: the croc needs an animal
- *  actually drinking at the bank; the fire needs a calf.) */
+ *  in-water / mired / crossing / fire-trapped / fighting animal, or the hunt's
+ *  chase victim. (The scan then adds its own extra gates: the croc needs a
+ *  bank drinker or prey at the waterline; the fire needs a calf.) */
 export function claimedByAnotherDrama(f: {
   caught?: number
   inWater?: number
@@ -2369,10 +2379,10 @@ export const REGION_PREDATORS: Record<RegionId, PredatorKind[]> = {
 }
 
 /** The decorative predators of ~1890 Africa as a species set (design.md §19):
- *  the four `PredatorKind`s plus the crocodile ambusher (§19.16). Shared so the
- *  orphan-adoption match can reject a predator as an adopter without importing
- *  the render module. */
-export const PREDATOR_SPECIES: readonly string[] = ['lion', 'cheetah', 'leopard', 'hyena', 'crocodile']
+ *  the four `PredatorKind`s plus the crocodile ambusher (§19.16). Read through
+ *  isPredatorSpecies, so the orphan-adoption match can reject a predator as an
+ *  adopter without importing the render module. */
+const PREDATOR_SPECIES: readonly string[] = ['lion', 'cheetah', 'leopard', 'hyena', 'crocodile']
 /** Is this species a predator (never an eligible adopter for an orphaned
  *  juvenile, design.md §19.8, point 262)? */
 export function isPredatorSpecies(species: string): boolean {
@@ -2586,8 +2596,9 @@ export function juvenileAnchor(young: {
  *  and NOT already raising a live calf (the 1:1 relation cap). Same-species,
  *  live and non-predator together make re-linking safe: a returned adopter can
  *  always parent the young and drive its §19.8 defence/rescue/grief roles. The
- *  species and predator gates only apply where `species` is known on both sides
- *  (the pure test); the live caller enforces them by passing a homogeneous,
+ *  predator gate applies wherever the adult's `species` is known, the
+ *  same-species gate where both sides carry one (the pure test); the live
+ *  caller carries no species and enforces both by passing a homogeneous,
  *  non-predator herd.
  *
  *  A young inside a running §19.8 ending — CAUGHT by a predator, or escaping
@@ -2683,7 +2694,7 @@ export interface DefenseWeights {
  * missing on either side never defends — the sacrifice stays the norm.
  *
  * THE LINE (point 125): only a parent that ATTACKS ever consults this — the
- * charge and shield rescues (and point 146's future revenge). A parent that
+ * charge and shield rescues (and point 146's revenge kill, killChance). A parent that
  * SURRENDERS never rolls: the vigil-keeper (121d), the trample-throw (119),
  * the waterfall plunge and the mired-calf charge (123) are chance-zero by
  * construction — they never call this helper.
@@ -2764,12 +2775,14 @@ export interface FightProfile {
   driver?: FightDriver
   /** Relative rate at which an eligible adult carries the "wants to fight"
    *  disposition — multiplied by the calibratable balance rate. Tier A (§4)
-   *  sits low and dramatic, the ritualised Tier B higher and harmless. */
+   *  sits low and dramatic, the ritualised Tier B higher and (bar the
+   *  giraffe's rare knock-down) harmless. */
   disposition: number
   /** Chance a CLASH kills the loser instead of ending in submission. Tier A
    *  species (§4) carry a real fatal branch; the ritualised Tier B ones
    *  resolve by one animal yielding — a fight the research says leaves no
-   *  wound must not leave a carcass. Scaled by the calibratable balance
+   *  wound must not leave a carcass (the giraffe's necking keeps a small
+   *  lethality for its rare knock-down death). Scaled by the calibratable balance
    *  lethality factor. */
   lethality: number
   /** Is the disposition SEEDED in the live world? A researched species whose
@@ -2930,8 +2943,9 @@ export interface FightWeights {
  * suggests. Whether the loss is fatal is the species' researched lethality
  * (docs/intraspecies-combat-1890.md §4) times the calibratable scale: the
  * lethal Tier A fight leaves a carcass, the ritualised Tier B clash ends with
- * the loser yielding and withdrawing unhurt. Deterministic — the caller passes
- * its own rolls, never Math.random.
+ * the loser yielding and withdrawing unhurt (bar the giraffe's rare fatal
+ * knock-down). Pure — the caller passes its own rolls; nothing here calls
+ * Math.random.
  */
 export function fightResolve(
   species: string,
@@ -2988,7 +3002,7 @@ export interface ClashPose {
  *  turned off the contact bearing about its own head, so the muzzles stay
  *  locked while the rumps open into a wedge), a WHEEL of the locked pair about
  *  that contact point, a SHOVE that travels through the pair (one drives, the
- *  other gives ground, so the contact neither gaps nor interpenetrates), and
+ *  other gives ground; a small `gap` term works the contact open and shut), and
  *  an alternating REAR — one up on its hind legs while the other bores in low.
  *  That standing asymmetry is what reads as interaction; two identical bodies
  *  read as scenery.
@@ -3012,8 +3026,8 @@ export function clashPose(
   const wheel = Math.sin(t * g.rate * 0.37 + ph) * g.wheel * k
   // Saturated, not a plain sine: the rear is HELD near its top for most of its
   // half-cycle and swaps quickly, so at ~4 instants in 5 one animal is plainly
-  // up while the other bores in low. A sine spends most of its time near zero,
-  // which left both bodies level at whatever moment the eye (or the shutter)
+  // up while the other bores in low. A plain sine rises and swaps slowly, which
+  // left both bodies near level at whatever moment the eye (or the shutter)
   // happened to catch them.
   const rear = Math.min(1, Math.max(0, Math.sin(t * g.rate * 0.5 + ph + (aggressor ? 0 : Math.PI)) * 3))
   const yaw = toFoe + side * g.splay * k + wheel
@@ -3068,7 +3082,8 @@ export interface FightSide {
 /**
  * Must this bout be broken off before anything is driven (point 264, the point-341
  * lesson applied to the fight)? A bout is only alive while BOTH sides are alive,
- * present, and still hold EACH OTHER. Checked from either side every frame, so a
+ * present, and still hold EACH OTHER — the caller passes `self.fight.foe` as
+ * `foe`, so only the foe's link back is tested here. Checked every frame, so a
  * fighter whose opponent died, was culled or was claimed by another drama is
  * released rather than left engaged with a body that is gone — which would keep
  * its drama flag, its fight pose and its no-flight standing forever.

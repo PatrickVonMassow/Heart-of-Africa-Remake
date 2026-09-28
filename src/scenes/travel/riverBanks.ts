@@ -25,8 +25,8 @@ export const SELF_ARC_EXCLUSION = 12
  *  ribbon build quadratic (~23 s at scene switch); with ±1-cell lookups it is
  *  back in the tens of milliseconds. The cell must be ≥ the band radius so a
  *  ±1 neighbourhood always covers a query. */
-export type BankIndex = Map<string, BankAxisSample[]>
-export const BANK_GRID_DEG = 0.25
+type BankIndex = Map<string, BankAxisSample[]>
+const BANK_GRID_DEG = 0.25
 
 const cellKey = (lat: number, lon: number) => `${Math.round(lat / BANK_GRID_DEG)},${Math.round(lon / BANK_GRID_DEG)}`
 
@@ -45,22 +45,22 @@ export function buildBankIndex(samples: ReadonlyArray<BankAxisSample>): BankInde
 // At a junction the two arms used to be drawn as two crossing semi-transparent
 // strips: the alpha doubled in the shared region (a dark wedge) and each arm's
 // geometric edge ran through the other's water. The junction now reads as ONE
-// water body: exactly one arm — the SENIOR one — draws the shared region,
-// while the JUNIOR arm's vertices fade out inside the senior's channel band
+// water body: the SENIOR arm draws the shared region at full opacity, while
+// the JUNIOR arm's vertices fade out inside the senior's channel band
 // (a per-vertex opacity factor, interpolated across the quads, so the
 // hand-over is a smooth crossfade rather than a seam).
 
 /** Merge fade edges, as fractions of the channel half-width: fully faded well
  *  inside the senior channel, fully opaque just inside its waterline. */
-export const MERGE_FADE_INNER = 0.35
-export const MERGE_FADE_OUTER = 0.95
+const MERGE_FADE_INNER = 0.35
+const MERGE_FADE_OUTER = 0.95
 
 /**
  * Which arm of each junction pair yields (pure, data-driven): a river whose
  * course ENDS on another's band is an arriving tributary, one whose course
  * STARTS on another's band is a distributary branch head — both yield to the
- * river that continues through. Where both rivers carry an indicator (the
- * three Nile arms share the Khartoum point), the later river in data order
+ * river that continues through. Where each river's endpoint lies on the
+ * other's band (the three Nile arms share the Khartoum point), the later river in data order
  * yields. Pairs with no junction carry no relation — two channels merely
  * passing near each other never fade. Returns "junior|senior" keys.
  */

@@ -3,8 +3,8 @@
 // builds the context, rolls here, and applies the returned outcome to the
 // game state and the journal (§16). Protection follows item *possession*
 // (design.md §7/§14): a rifle protects more than a machete; in water the rifle
-// only works from the canoe (otherwise it is wet), while the machete always
-// helps.
+// only works from the canoe (otherwise it is wet), and the machete helps
+// wherever the rifle does not.
 
 import { balance } from '../config/balance'
 import type { EquipmentId } from '../state/store'
@@ -105,10 +105,11 @@ export function eventChance(kind: EventKind, ctx: EventContext): number {
       return !ctx.inWater ? r.robberAttack * weaponProtection(ctx) : 0
     case 'crocodileAttack': {
       if (!ctx.inWater) return 0
-      // Crocodiles strike swimmers; a canoe keeps the traveller out of reach.
-      // The machete ALWAYS helps against a crocodile — including from the canoe
-      // (point 208 A5, design.md §14.2): machete-in-canoe is strictly safer than
-      // the canoe alone. The rifle only works from the canoe (otherwise wet).
+      // Crocodiles strike swimmers; a canoe cuts the risk sharply. The rifle
+      // only works from the canoe (otherwise wet) and is then the best guard;
+      // the machete helps wherever the rifle does not — including from the
+      // canoe (point 208 A5, design.md §11.3/§14.2): machete-in-canoe is safer
+      // than the canoe alone.
       const hasCanoe = (ctx.equipment.canoe ?? 0) > 0
       const hasMachete = (ctx.equipment.machete ?? 0) > 0
       if (hasCanoe) {
@@ -130,7 +131,8 @@ export function eventChance(kind: EventKind, ctx: EventContext): number {
   }
 }
 
-/** Severity of a resolved attack; better weapons shift it toward escape. */
+/** Severity of a resolved attack; better weapons shrink the fatal band (the
+ *  escaped/defended band is fixed). */
 function attackSeverity(
   ctx: EventContext,
   rand: () => number,

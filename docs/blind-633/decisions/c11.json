@@ -1,0 +1,3017 @@
+[
+ {
+  "id": "U5349",
+  "decision": "rewritten",
+  "reason": "Header now names crocodile/predator contact attacks and that drawn animal bodies block the traveller."
+ },
+ {
+  "id": "U5350",
+  "decision": "rewritten",
+  "reason": "Comment now names the lioness-and-cub families seeded into herds.lion as the only live predators spawned there."
+ },
+ {
+  "id": "U5351",
+  "decision": "rewritten",
+  "reason": "CALF_SPECIES doc now describes the calibratable calvesForGroup fraction instead of one calf per group."
+ },
+ {
+  "id": "U5352",
+  "decision": "rewritten",
+  "reason": "CALF_SPECIES doc now names the plover and its chicks."
+ },
+ {
+  "id": "U5353",
+  "decision": "rewritten",
+  "reason": "Family-life comment now points at calvesForGroup, whose n < 3 guard is the at-least-three threshold."
+ },
+ {
+  "id": "U5354",
+  "decision": "rewritten",
+  "reason": "dead doc now lists every death kind (trampled, taken, slain, drowned, plague carrion, fight loss)."
+ },
+ {
+  "id": "U5355",
+  "decision": "rewritten",
+  "reason": "dissolve doc now names both setters: a landing scavenger and takeAnimal/slayPredator at death."
+ },
+ {
+  "id": "U5356",
+  "decision": "rewritten",
+  "reason": "lionFed doc now describes the generic no-scavenger marker for drama deaths."
+ },
+ {
+  "id": "U5357",
+  "decision": "rewritten",
+  "reason": "LionHuntState doc and facing field now speak of any PredatorKind."
+ },
+ {
+  "id": "U5358",
+  "decision": "rewritten",
+  "reason": "FLEES_LION and hunt-constant docs now speak of any predator kind."
+ },
+ {
+  "id": "U5359",
+  "decision": "rewritten",
+  "reason": "victimHunt doc now says no hunt stain grows instead of naming a stain mesh."
+ },
+ {
+  "id": "U5360",
+  "decision": "rewritten",
+  "reason": "Giraffe PREY_SCALE doc now says the 0.95 factor stays close to the 0.9 spawn base."
+ },
+ {
+  "id": "U5361",
+  "decision": "removed",
+  "reason": "Removed the REGION_PREDATORS/food-web relocation breadcrumb; the imports already show where they live."
+ },
+ {
+  "id": "U5362",
+  "decision": "kept",
+  "reason": "The clash-pose pointer is accurate: clashPose/CLASH_POSE live in wildlifeBehavior.ts."
+ },
+ {
+  "id": "U5363",
+  "decision": "rewritten",
+  "reason": "Header now cites both §14 (the event) and §19.3 (the predator hunt), matching the PLAYER_SHY doc's §19.3 reference."
+ },
+ {
+  "id": "U5364",
+  "decision": "rewritten",
+  "reason": "Calf-predation doc now includes the defence roll (driven off, killed, or taken)."
+ },
+ {
+  "id": "U5365",
+  "decision": "rewritten",
+  "reason": "Calf-predation doc now names the real PARENT_BLOCK_OFFSET/PARENT_TAKE_DIST/PARENT_SACRIFICE_DIST/PARENT_TOO_LATE_DIST constants."
+ },
+ {
+  "id": "U5366",
+  "decision": "kept",
+  "reason": "The juvenilePreyBias pointer names a live calibratable value; nothing is stale."
+ },
+ {
+  "id": "U5367",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/Wildlife.tsx:825 — nearestVigilKeeperDist scans only CALF_HUNT_SPECIES, so a lioness holding a vigil (set via the FAMILY_DEFEND_SPECIES loop at 2400/2442) does not block vulture landings; iterate FAMILY_DEFEND_SPECIES."
+ },
+ {
+  "id": "U5368",
+  "decision": "rewritten",
+  "reason": "Dropped the historical \"(was 16 s period − 4 s bout)\" derivation."
+ },
+ {
+  "id": "U5369",
+  "decision": "kept",
+  "reason": "The OPEN note is still valid: tree-climbing flight and further species are not implemented."
+ },
+ {
+  "id": "U5370",
+  "decision": "rewritten",
+  "reason": "Scavenging doc now says each carcass draws its own flock (point 251)."
+ },
+ {
+  "id": "U5371",
+  "decision": "rewritten",
+  "reason": "Moved pushWildlifeActors above the collision-circle doc so the doc sits on nearAnimalObstacles."
+ },
+ {
+  "id": "U5372",
+  "decision": "rewritten",
+  "reason": "Moved the walk-off doc from regionPreyAt onto leaveHeading."
+ },
+ {
+  "id": "U5373",
+  "decision": "rewritten",
+  "reason": "Moved the chunk-population doc from MAASAI_VILLAGE onto spawnChunk."
+ },
+ {
+  "id": "U5374",
+  "decision": "rewritten",
+  "reason": "Merged the stacked rinderpest comments into one that says ANY land chunk within the struck radius."
+ },
+ {
+  "id": "U5375",
+  "decision": "rewritten",
+  "reason": "Spawn-spacing comment now limits the promise to animals of one group (the loop starts at placedStart)."
+ },
+ {
+  "id": "U5376",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/Wildlife.tsx:1293 — the shoreline (flamingo) placement gate accepts any water depth and any non-water cell at height ≤ 0.6, ocean included, while the comment promises shallow water or the bank."
+ },
+ {
+  "id": "U5377",
+  "decision": "rewritten",
+  "reason": "Moved the vicinitySeedAttempt counter above the seedSettlementVicinity doc so the doc sits on its function."
+ },
+ {
+  "id": "U5378",
+  "decision": "rewritten",
+  "reason": "Settlement-seeding comments now say the animals are tagged with the settlement chunk and then culled by where they stand."
+ },
+ {
+  "id": "U5379",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/Wildlife.tsx:1491 — the off-screen scatter check samples eight points on a radius-SPREAD circle, but members scatter within ±SPREAD per axis (corners at SPREAD·√2) plus separation pushes, so a member can still land on screen."
+ },
+ {
+  "id": "U5380",
+  "decision": "rewritten",
+  "reason": "Dry-shore doc now says the nearest OFF-screen bank within RANGE is topped up and that no bank means no seeding."
+ },
+ {
+  "id": "U5381",
+  "decision": "rewritten",
+  "reason": "Dry-shore doc now says the minimum counts drink-holders or seeder-tagged animals, not all of which hold a drink target."
+ },
+ {
+  "id": "U5382",
+  "decision": "rewritten",
+  "reason": "Dry-shore doc now says placement derives from the seed, the bank and the traveller's chunk."
+ },
+ {
+  "id": "U5383",
+  "decision": "rewritten",
+  "reason": "Replaced the hard-coded /10 with the imported UNITS_PER_DEGREE (= 10 in world/geo.ts); same value."
+ },
+ {
+  "id": "U5384",
+  "decision": "rewritten",
+  "reason": "Corrected the findLandNear lesson reference to point 136, matching findLandNear's own doc."
+ },
+ {
+  "id": "U5385",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/Wildlife.tsx:1562 — the dry-shore seeder checks only the anchor (bank +1,+1) for isOnScreen, while the group scatters at spread 2.5 plus separation pushes, so a member can appear on screen."
+ },
+ {
+  "id": "U5386",
+  "decision": "rewritten",
+  "reason": "The early-return comment now says no qualifying off-screen bank was in reach."
+ },
+ {
+  "id": "U5387",
+  "decision": "rewritten",
+  "reason": "Placement comment now describes the fixed (+1, +1) offset from the bank cell."
+ },
+ {
+  "id": "U5388",
+  "decision": "rewritten",
+  "reason": "Placement comment now says only members passing the water-distance gate get a drink target."
+ },
+ {
+  "id": "U5389",
+  "decision": "kept",
+  "reason": "Claim does not hold: CROCODILE_FADE_BAND is exported by src/render/fauna.ts:1168."
+ },
+ {
+  "id": "U5390",
+  "decision": "rewritten",
+  "reason": "Mesh-pool comment now names the live lioness-and-cub family as well as revenge carcasses."
+ },
+ {
+  "id": "U5391",
+  "decision": "rewritten",
+  "reason": "Herds doc now summarises streaming, the herd simulation and its instanced rendering."
+ },
+ {
+  "id": "U5392",
+  "decision": "rewritten",
+  "reason": "File header now covers crocodiles, plovers, the lioness family, fights, fire, rinderpest and mourning."
+ },
+ {
+  "id": "U5393",
+  "decision": "kept",
+  "reason": "Claim concerns the reviewer's truncated excerpt; the trigger registration and the imports are used in the full file (tsc/oxlint clean)."
+ },
+ {
+  "id": "U5394",
+  "decision": "rewritten",
+  "reason": "groundFollow comment now says it serves the grief charge and the other drives re-ground inline."
+ },
+ {
+  "id": "U5395",
+  "decision": "rewritten",
+  "reason": "Moved the flight-helper comment onto fleeMove and corrected it: settleFlight stamps fleeAt and sets the height, fleeMove returns the step."
+ },
+ {
+  "id": "U5396",
+  "decision": "kept",
+  "reason": "Claim does not hold: chaseFleeStep is calfFleeStep with an ocean-only predicate (wildlifeBehavior.ts:338-353), so the comment's calfFleeStep fan is right."
+ },
+ {
+  "id": "U5397",
+  "decision": "rewritten",
+  "reason": "Charge comment now includes the drive-off/kill outcomes and the held mired calf."
+ },
+ {
+  "id": "U5398",
+  "decision": "rewritten",
+  "reason": "Defence-roll comment now says the roll is hashed, unlike the hunt timer and the fight rolls that use Math.random."
+ },
+ {
+  "id": "U5399",
+  "decision": "rewritten",
+  "reason": "Shield comment now includes the drive-off/kill outcomes with the family intact."
+ },
+ {
+  "id": "U5400",
+  "decision": "rewritten",
+  "reason": "Fight comments now say fights refuse all water (wetOrSea) and contrast the quarry's calfFleeStep with the hunted calf's chaseFleeStep."
+ },
+ {
+  "id": "U5401",
+  "decision": "removed",
+  "reason": "Removed the second endFight call: endFight already releases the foe while it still holds the pair."
+ },
+ {
+  "id": "U5402",
+  "decision": "rewritten",
+  "reason": "Dropped the unreachable ?? 0 fallback on a.fightRollAt after the arithmetic assignment."
+ },
+ {
+  "id": "U5403",
+  "decision": "rewritten",
+  "reason": "Collision summary now states the SEPARATION_MAX_SPEED cap."
+ },
+ {
+  "id": "U5404",
+  "decision": "rewritten",
+  "reason": "Water-backstop comment now says a swimmer with no bank in reach is set back onto land."
+ },
+ {
+  "id": "U5405",
+  "decision": "rewritten",
+  "reason": "Invariant comment now names the skipped flamingos/crocodiles and the three checks actually asserted."
+ },
+ {
+  "id": "U5406",
+  "decision": "rewritten",
+  "reason": "Backstop comment now says inDrama covers the list and additionally exempts fire, fight and active-chase actors."
+ },
+ {
+  "id": "U5407",
+  "decision": "rewritten",
+  "reason": "Ground re-anchor comment now says the height is set directly."
+ },
+ {
+  "id": "U5408",
+  "decision": "rewritten",
+  "reason": "Target comment now describes the prey's own cell as not river/lake water rather than claiming land."
+ },
+ {
+  "id": "U5409",
+  "decision": "rewritten",
+  "reason": "Feed-entry comments now say a timed-out haul can start the feed stranded."
+ },
+ {
+  "id": "U5410",
+  "decision": "rewritten",
+  "reason": "Fire comment now says 45 units from the traveller at a position-hashed bearing."
+ },
+ {
+  "id": "U5411",
+  "decision": "kept",
+  "reason": "Claim does not hold: point 193 scopes 'leave' to the prey reaction; the plover lure and the ambience voice are separate consumers with their own rule."
+ },
+ {
+  "id": "U5412",
+  "decision": "kept",
+  "reason": "Claim does not hold: the elephant fight profile is live:false, and the trample, hunt, fire and plague paths exclude elephants, so \"no path kills an elephant today\" is right."
+ },
+ {
+  "id": "U5413",
+  "decision": "rewritten",
+  "reason": "Mourning comment no longer claims every drama timer runs on the sim clock; it names the dt-driven ones."
+ },
+ {
+  "id": "U5414",
+  "decision": "kept",
+  "reason": "Claim does not hold: groundFollowY, groundedBodyY and Math.max(0.02, h) all apply the same GROUND_BODY_MIN_Y = 0.02 clamp."
+ },
+ {
+  "id": "U5415",
+  "decision": "kept",
+  "reason": "Claim does not hold: fleeMove is called with wader = sp === 'flamingo' at Wildlife.tsx:5104."
+ },
+ {
+  "id": "U5416",
+  "decision": "rewritten",
+  "reason": "terrainTypeAtWorld comment now names its real users (fleeWaterStep/chaseFleeStep)."
+ },
+ {
+  "id": "U5417",
+  "decision": "rewritten",
+  "reason": "The water backstop now passes terrainTypeAtWorld instead of re-implementing it inline."
+ },
+ {
+  "id": "U5418",
+  "decision": "kept",
+  "reason": "Claim does not hold: RESCUE_SPEED has four drive users (Wildlife.tsx:2456, 2587, 2809, 4981)."
+ },
+ {
+  "id": "U5419",
+  "decision": "rewritten",
+  "reason": "Removed the duplicate FOLLOW_RADIUS re-read in the adoption pass (it now uses YOUNG_FOLLOW_RADIUS); GAMBOL_RANGE/GAMBOL_ACTIVE are used at 4866-4903."
+ },
+ {
+  "id": "U5420",
+  "decision": "rewritten",
+  "reason": "Cull comment now describes the current per-frame cull without the removed if (despawned) gate."
+ },
+ {
+  "id": "U5421",
+  "decision": "rewritten",
+  "reason": "Replaced the history paragraphs with the current origin-pinning rule (point 278)."
+ },
+ {
+  "id": "U5422",
+  "decision": "rewritten",
+  "reason": "Sacrifice-branch rest comment now speaks of the spared calf, not a freed victim."
+ },
+ {
+  "id": "U5423",
+  "decision": "rewritten",
+  "reason": "Inline label corrected to the mire (point 123)."
+ },
+ {
+  "id": "U5424",
+  "decision": "kept",
+  "reason": "Claim does not hold: balance.parentDefense.killFlight.crocodile is 0 (balance.ts:1247), which the comment quotes correctly."
+ },
+ {
+  "id": "U5425",
+  "decision": "rewritten",
+  "reason": "Fall-in comment now says a staged (debug) fall already carries its entry point instead of a play bout."
+ },
+ {
+  "id": "U5426",
+  "decision": "kept",
+  "reason": "Claim does not hold: Math.max(0.02, h) equals groundedBodyY (GROUND_BODY_MIN_Y 0.02), so the ground-follow label is accurate."
+ },
+ {
+  "id": "U5427",
+  "decision": "kept",
+  "reason": "Claim does not hold: the trample check in the render loop (elephantWouldTrample with par.trampleTo) exists in the same file."
+ },
+ {
+  "id": "U5428",
+  "decision": "rewritten",
+  "reason": "Grief-loop comment now says it scans every non-elephant species for parents carrying trampleTo."
+ },
+ {
+  "id": "U5429",
+  "decision": "rewritten",
+  "reason": "Dropped the '(as before)' history marker."
+ },
+ {
+  "id": "U5430",
+  "decision": "kept",
+  "reason": "Claim does not hold: FIGHTING_SPECIES is FIGHT_PROFILES filtered by fights && live, so the header is accurate."
+ },
+ {
+  "id": "U5431",
+  "decision": "kept",
+  "reason": "Claim does not hold: docs/intraspecies-combat-1890.md defines Tier B."
+ },
+ {
+  "id": "U5432",
+  "decision": "rewritten",
+  "reason": "Collision comment no longer narrates the old list."
+ },
+ {
+  "id": "U5433",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/Wildlife.tsx:3418 — waterExit gets a constant false dramaOwned at its only live call (drama ownership is decided earlier); the parameter branch is exercised only by tests."
+ },
+ {
+  "id": "U5434",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/Wildlife.tsx:3598 — crocodileHoldsCatch receives a constant true gripped argument at this call; its !gripped branch is live only in tests."
+ },
+ {
+  "id": "U5435",
+  "decision": "rewritten",
+  "reason": "The resting re-anchor now calls seatOnWater instead of duplicating its height derivation."
+ },
+ {
+  "id": "U5436",
+  "decision": "kept",
+  "reason": "The distance pre-check is a cheap filter that skips the terrain sample for prey outside the band; not dead code."
+ },
+ {
+  "id": "U5437",
+  "decision": "rewritten",
+  "reason": "Target comment now says a juvenile, drinking or not, is preferred."
+ },
+ {
+  "id": "U5438",
+  "decision": "rewritten",
+  "reason": "Removed the drag/feed history about the missing leg and the old inverse coupling."
+ },
+ {
+  "id": "U5439",
+  "decision": "kept",
+  "reason": "Claim does not hold: ASSERT_TICK is read by the anchoring assert (5234) and frameCountRef by the draw frame (4330) and the debug frames() hook (1873)."
+ },
+ {
+  "id": "U5440",
+  "decision": "kept",
+  "reason": "The 'below' pointers refer to the render loop in the same file; they are accurate."
+ },
+ {
+  "id": "U5441",
+  "decision": "rewritten",
+  "reason": "The weapon-rule summary now matches events.ts: the rifle only from the canoe, the machete wherever the rifle does not."
+ },
+ {
+  "id": "U5442",
+  "decision": "rewritten",
+  "reason": "stagedBankVictim comment now says adult drinkers keep their exemption too (drinkExemptFromPlayerShy)."
+ },
+ {
+  "id": "U5443",
+  "decision": "rewritten",
+  "reason": "Comment now says any live crocodile's strike radius."
+ },
+ {
+  "id": "U5444",
+  "decision": "rewritten",
+  "reason": "Obstacle comment now names deflectedStep first and the herd redirect as the fallback."
+ },
+ {
+  "id": "U5445",
+  "decision": "rewritten",
+  "reason": "Zero-heading comment now says heading 0 (+Z) instead of due north."
+ },
+ {
+  "id": "U5446",
+  "decision": "rewritten",
+  "reason": "Elephant-collider comment now says moves made later in the frame are not swept."
+ },
+ {
+  "id": "U5447",
+  "decision": "rewritten",
+  "reason": "Comment now bounds the trample margin by the 1.15 maximum elephant spawn scale."
+ },
+ {
+  "id": "U5448",
+  "decision": "rewritten",
+  "reason": "The piece-by-piece carcass wording is now \"shrinks away\" at all three places."
+ },
+ {
+  "id": "U5449",
+  "decision": "rewritten",
+  "reason": "Scavenging header now says each carcass draws its own flock."
+ },
+ {
+  "id": "U5450",
+  "decision": "rewritten",
+  "reason": "Scavenger/vulture comments now say spawns are gated by the rendered frame (isOnScreen)."
+ },
+ {
+  "id": "U5451",
+  "decision": "rewritten",
+  "reason": "Broken-wing comment now describes the pitched body with no roll."
+ },
+ {
+  "id": "U5452",
+  "decision": "rewritten",
+  "reason": "Comment now says an adult can be caught (vigil keeper or a crocodile's catch)."
+ },
+ {
+  "id": "U5453",
+  "decision": "kept",
+  "reason": "Claim does not hold: a.jawAnchor is read by scripts/verify/enrichments.mjs (dev observability)."
+ },
+ {
+  "id": "U5454",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/Wildlife.tsx:4640 — the rescued-calf render branch renders at a.x/a.z without the bodyY = a.y resync every other family branch applies (the kick-branch rule)."
+ },
+ {
+  "id": "U5455",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/Wildlife.tsx:4749 — pitch sign annotations disagree (-0.15 \"head down\", 0.2 \"head straining up\" vs the kick's \"front dips (positive pitch)\" and drinking +0.42); check against the model's facing."
+ },
+ {
+  "id": "U5456",
+  "decision": "rewritten",
+  "reason": "Mired-calf parent hold renamed the mire watch (point 123)."
+ },
+ {
+  "id": "U5457",
+  "decision": "rewritten",
+  "reason": "Dropped the bodyY write that the following bodyY = a.y always overwrote."
+ },
+ {
+  "id": "U5458",
+  "decision": "rewritten",
+  "reason": "Comment now limits the no-dart rule to a following calf in this branch."
+ },
+ {
+  "id": "U5459",
+  "decision": "rewritten",
+  "reason": "Parenthetical now says elephants are excluded from the whole block."
+ },
+ {
+  "id": "U5460",
+  "decision": "rewritten",
+  "reason": "Arbitration comment now ranks the elephant dart first and says drama/predator flight silences only the player-shy flee."
+ },
+ {
+  "id": "U5461",
+  "decision": "kept",
+  "reason": "Claim does not hold: isHunted is a DramaState field set by dramaStateOf and passed as drama."
+ },
+ {
+  "id": "U5462",
+  "decision": "rewritten",
+  "reason": "Removed the always-false wasDead/!a.dead trample guards and corrected the comment (dead animals continue at the loop head)."
+ },
+ {
+  "id": "U5463",
+  "decision": "rewritten",
+  "reason": "Facing comment now names the branches that set a.face directly (shield run, clash pose)."
+ },
+ {
+  "id": "U5464",
+  "decision": "rewritten",
+  "reason": "Assert comment now says it judges at anchorX/anchorZ, px/pz before the cosmetic shuffle."
+ },
+ {
+  "id": "U5465",
+  "decision": "rewritten",
+  "reason": "Assert comment now says bathers are excluded outright (!a.bathe)."
+ },
+ {
+  "id": "U5466",
+  "decision": "removed",
+  "reason": "Removed the !a.dead test from the anchoring assert; a trampled animal re-renders dead and continues before it."
+ },
+ {
+  "id": "U5467",
+  "decision": "rewritten",
+  "reason": "Carcass-cull rationale no longer assumes a single scavenger."
+ },
+ {
+  "id": "U5468",
+  "decision": "rewritten",
+  "reason": "LionHunt docblock now includes victim hunts and walk-offs without a feed."
+ },
+ {
+  "id": "U5469",
+  "decision": "rewritten",
+  "reason": "LionHunt docblock now says every active predator attacks on contact."
+ },
+ {
+  "id": "U5470",
+  "decision": "rewritten",
+  "reason": "LionHunt docblock now includes the off-screen overtime exit."
+ },
+ {
+  "id": "U5471",
+  "decision": "rewritten",
+  "reason": "Both s.prey comments now say the lion-cub hunt's prey is a cosmetic food-web pick."
+ },
+ {
+  "id": "U5472",
+  "decision": "kept",
+  "reason": "Claim does not hold: lion families spawn only where REGION_PREDATORS holds the hyena (Wildlife.tsx:1208), which is the region restriction the comment means."
+ },
+ {
+  "id": "U5473",
+  "decision": "rewritten",
+  "reason": "Chase-victim comment now includes the crocodile-steal walk-off."
+ },
+ {
+  "id": "U5474",
+  "decision": "point",
+  "reason": "Crocodile steals a predator's chase victim → the predator jumps: the croc-steal abort (Wildlife.tsx ~5645) sets s.lx/s.lz to the kill-site flank (s.px + 0.7) although the predator is still chasing elsewhere, so it visibly teleports; it should start the walk-off from where it stands, like the swim-escape give-up."
+ },
+ {
+  "id": "U5475",
+  "decision": "rewritten",
+  "reason": "Swim comment now says the hunter swims braked like a swimming calf and the scripted prey runs unbraked."
+ },
+ {
+  "id": "U5476",
+  "decision": "kept",
+  "reason": "The restated durations match the code (CAUGHT_DURATION 5 s and the named windows); nothing is stale."
+ },
+ {
+  "id": "U5477",
+  "decision": "rewritten",
+  "reason": "Leave comment no longer claims an every-frame re-aim; the course strives away from the traveller."
+ },
+ {
+  "id": "U5478",
+  "decision": "rewritten",
+  "reason": "Prey-render comment now says the spawnRemnant scrap stays for the scavengers."
+ },
+ {
+  "id": "U5479",
+  "decision": "rewritten",
+  "reason": "Species doc now names revenge carcasses, the live lioness-and-cub family, and the hunt drawing its own predator."
+ },
+ {
+  "id": "U5480",
+  "decision": "rewritten",
+  "reason": "BODY_RADIUS doc now adds that the separate elephant body collider uses the elephant radius alone."
+ },
+ {
+  "id": "U5481",
+  "decision": "rewritten",
+  "reason": "Predator-entry comment now excepts the live lioness-and-cub family in the lion list."
+ },
+ {
+  "id": "U5482",
+  "decision": "rewritten",
+  "reason": "drawnCollisionCircle doc now separates undrawn animals from drawn-but-dead carcasses."
+ },
+ {
+  "id": "U5483",
+  "decision": "kept",
+  "reason": "The region count and scale are cross-references to geo.ts; still accurate (five REGION_BORDERS regions, STEP_DEG 0.1 = 1 unit)."
+ },
+ {
+  "id": "U5484",
+  "decision": "rewritten",
+  "reason": "Header now says \"free of React\" instead of \"three-free\" (the module imports three/webgpu)."
+ },
+ {
+  "id": "U5485",
+  "decision": "kept",
+  "reason": "BORDER_LIFT is used by the live builder; the test-visible export is fine."
+ },
+ {
+  "id": "U5486",
+  "decision": "rewritten",
+  "reason": "Corner comment now says each corner sits the same BORDER_LIFT above its own ground instead of claiming a flush ribbon."
+ },
+ {
+  "id": "U5487",
+  "decision": "kept",
+  "reason": "The exported constants are consumed in-file by live code; the test-visible exports are fine."
+ },
+ {
+  "id": "U5488",
+  "decision": "rewritten",
+  "reason": "updateTrailPoint doc now names the third fallback (collapse onto the player)."
+ },
+ {
+  "id": "U5489",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/canoeDrag.ts:104 — collapsing the trail point onto the player does not rest the hull on the player's tile: canoeDragPose (yaw atan2(0,0) = 0) still offsets the centre CANOE_TRAIL_CENTRE along +Z, which may lie over water."
+ },
+ {
+  "id": "U5490",
+  "decision": "kept",
+  "reason": "DragPose export is harmless (conservative keep)."
+ },
+ {
+  "id": "U5491",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/canoeDrag.ts:154 — the \"~40-43° drop\" clamp threshold does not follow from CANOE_PITCH_MIN/MAX (-0.65/0.5 rad ≈ -37°/+29° hull pitch, ≈ 28°/32° ground slope over the 2.4 trail); re-derive the numbers."
+ },
+ {
+  "id": "U5492",
+  "decision": "kept",
+  "reason": "The references hold: createTerrainMaterial multiplies albedo by 2.6 (TravelScene.tsx:506) and the four *_a.png textures exist under public/geodata/tex."
+ },
+ {
+  "id": "U5493",
+  "decision": "kept",
+  "reason": "MEAN_ALBEDO and ALBEDO_BOOST are used by farTerrainColor; test-visible exports are fine."
+ },
+ {
+  "id": "U5494",
+  "decision": "rewritten",
+  "reason": "Header and margin/radius docs now bound the fogged-edge guarantee by FLORA_SPAWN_HARD_CAP (>90% fog at the cap)."
+ },
+ {
+  "id": "U5495",
+  "decision": "kept",
+  "reason": "FLORA_SPAWN_HARD_CAP is used by floraSpawnRadius; test-visible export is fine."
+ },
+ {
+  "id": "U5496",
+  "decision": "rewritten",
+  "reason": "floraSpawnRadius doc now says the fog far is extended by the zoom's clearView instead of calling the radius zoom-independent."
+ },
+ {
+  "id": "U5497",
+  "decision": "kept",
+  "reason": "\"~841 chunks\" is an approximate historical burst size in a rationale comment; not load-bearing."
+ },
+ {
+  "id": "U5498",
+  "decision": "kept",
+  "reason": "floraFillWorstDriftWu is used by floraAmortiseMaxStep; test-visible export is fine."
+ },
+ {
+  "id": "U5499",
+  "decision": "rewritten",
+  "reason": "Header now names all wildlife users of the frame test (seeders, scripted spawns, flights, cull)."
+ },
+ {
+  "id": "U5500",
+  "decision": "kept",
+  "reason": "The exported types are harmless (conservative keep)."
+ },
+ {
+  "id": "U5501",
+  "decision": "rewritten",
+  "reason": "Added a note that only the far plane is depth-tested (behind-lens points rejected via w ≤ 0; no ground point lies before the near plane)."
+ },
+ {
+  "id": "U5502",
+  "decision": "kept",
+  "reason": "\"Below\" refers to setFrameVisibilityTest/isOnScreen in the same file; FRAME_EDGE_MARGIN is exported for TravelScene's installed test."
+ },
+ {
+  "id": "U5503",
+  "decision": "rewritten",
+  "reason": "Header now says no new capture is taken and the freshness rule (panoramaBandShown) keeps an older capture off-screen."
+ },
+ {
+  "id": "U5504",
+  "decision": "rewritten",
+  "reason": "Header now says the targets are module-level, allocated once per session."
+ },
+ {
+  "id": "U5505",
+  "decision": "kept",
+  "reason": "PanoramaCapture export is harmless (conservative keep)."
+ },
+ {
+  "id": "U5506",
+  "decision": "rewritten",
+  "reason": "The stale far = 900 default is dropped; `far` is now required, and the only caller already passes panoramaCaptureFar."
+ },
+ {
+  "id": "U5507",
+  "decision": "rewritten",
+  "reason": "Near-plane comment now says the caller hides the dressing via hideNames."
+ },
+ {
+  "id": "U5508",
+  "decision": "kept",
+  "reason": "The exported types are harmless (conservative keep)."
+ },
+ {
+  "id": "U5509",
+  "decision": "rewritten",
+  "reason": "BAND CONVENTION block now keeps the convention and its point-545 verification and drops the dated history of the mirrored convention."
+ },
+ {
+  "id": "U5510",
+  "decision": "rewritten",
+  "reason": "CompassFractions doc now says per-slice water fractions keyed by compass point."
+ },
+ {
+  "id": "U5511",
+  "decision": "removed",
+  "reason": "Removed the test-only chunkIdAt and its test; panoramaCaptureReady builds the id inline."
+ },
+ {
+  "id": "U5512",
+  "decision": "kept",
+  "reason": "The rationale holds: TravelScene.tsx:171 has CHUNK_RADIUS = 6."
+ },
+ {
+  "id": "U5513",
+  "decision": "kept",
+  "reason": "The only live caller passes PANORAMA_CHUNK_RADIUS (TravelScene.tsx:1836); the default 0 serves the point-227 centre-chunk tests."
+ },
+ {
+  "id": "U5514",
+  "decision": "rewritten",
+  "reason": "panoramaCaptureFar doc now refers to the capture camera's far plane, not the retired 900-unit reach."
+ },
+ {
+  "id": "U5515",
+  "decision": "kept",
+  "reason": "The all-true kind map is documented as deliberate (a new kind must be entered)."
+ },
+ {
+  "id": "U5516",
+  "decision": "rewritten",
+  "reason": "Probe header now says the flora fill is amortised over up to FLORA_FILL_MAX_FRAMES frames."
+ },
+ {
+  "id": "U5517",
+  "decision": "kept",
+  "reason": "BurstStat export is harmless (conservative keep)."
+ },
+ {
+  "id": "U5518",
+  "decision": "kept",
+  "reason": "FRAME_RING_CAP is used by recordFrame; test-visible export is fine."
+ },
+ {
+  "id": "U5519",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from BankIndex (no importer anywhere; local uses kept)."
+ },
+ {
+  "id": "U5520",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from BANK_GRID_DEG (used only in this file)."
+ },
+ {
+  "id": "U5521",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from MERGE_FADE_INNER (used only by mergeFactorAt)."
+ },
+ {
+  "id": "U5522",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from MERGE_FADE_OUTER (used only by mergeFactorAt)."
+ },
+ {
+  "id": "U5523",
+  "decision": "rewritten",
+  "reason": "Merge comment now says the senior arm draws the shared region at full opacity while the junior crossfades out."
+ },
+ {
+  "id": "U5524",
+  "decision": "kept",
+  "reason": "SELF_ARC_EXCLUSION tunes live behaviour in edgeIsInterior; the test-visible export is fine."
+ },
+ {
+  "id": "U5525",
+  "decision": "rewritten",
+  "reason": "Replaced \"carry an indicator\" with the actual rule: each river's endpoint lies on the other's band."
+ },
+ {
+  "id": "U5526",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/riverBanks.ts:26 — the stated invariant \"cell ≥ band radius\" is violated: BANK_GRID_DEG 0.25 < RIVER_WIDTH_DEG ≈ 0.272 (widthFactor 1.6), which Rivers.tsx:211/256 pass as bandDeg, so samples 0.25–0.272° away can fall outside the ±1-cell lookup."
+ },
+ {
+  "id": "U5527",
+  "decision": "kept",
+  "reason": "The historical perf figure is the rationale for the spatial hash; not load-bearing."
+ },
+ {
+  "id": "U5528",
+  "decision": "rewritten",
+  "reason": "Header now says the collider stays at or inside the enter radius, matching settlementCollisionRadius's clamp."
+ },
+ {
+  "id": "U5529",
+  "decision": "rewritten",
+  "reason": "Dropped the always-true spacePressed parameter from shouldEnterSettlement (only the Space handler asks) and adapted its tests."
+ },
+ {
+  "id": "U5530",
+  "decision": "kept",
+  "reason": "shouldEnterSettlement is called internally by settlementToEnter; the test-visible export is fine."
+ },
+ {
+  "id": "U5531",
+  "decision": "kept",
+  "reason": "Claim does not hold: ui.enterPlaceId still exists (the per-frame hint; travelSpace.test.ts sets it), so the doc names a real, still-written field."
+ },
+ {
+  "id": "U5532",
+  "decision": "kept",
+  "reason": "The cited discovery flag (visitedPlaces) and the .map-label are the caller's; the doc correctly describes the contract."
+ },
+ {
+  "id": "U5533",
+  "decision": "rewritten",
+  "reason": "springRipple doc now says the ring restarts at the centre at full opacity at the loop boundary instead of \"seamless\"."
+ },
+ {
+  "id": "U5534",
+  "decision": "rewritten",
+  "reason": "springBubble doc now says it rises from the surface up to `rise`."
+ },
+ {
+  "id": "U5535",
+  "decision": "kept",
+  "reason": "Rivers.tsx's <Spring> component consumes these functions (Rivers.tsx:441); the pointer is accurate."
+ },
+ {
+  "id": "U5536",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from TerrainRefineOverride (callers pass literals)."
+ },
+ {
+  "id": "U5537",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from MOUNTAIN_CHUNK_PEAK_M; its mirror terrain.ts MOUNTAIN_M = 1600 is confirmed (terrain.ts:51)."
+ },
+ {
+  "id": "U5538",
+  "decision": "rewritten",
+  "reason": "Header now says the inner rings reach ~1 texel and rings 3–4 halve their spacing."
+ },
+ {
+  "id": "U5539",
+  "decision": "kept",
+  "reason": "REFINE_SEGMENT_CAP is the live default; the test-visible export is fine."
+ },
+ {
+  "id": "U5540",
+  "decision": "kept",
+  "reason": "Claim does not hold: terrainShading.test.ts imports terrainLod."
+ },
+ {
+  "id": "U5541",
+  "decision": "kept",
+  "reason": "The claim is about the caller's memo; planChunkWindow re-plans per window, and nothing here is stale."
+ },
+ {
+  "id": "U5542",
+  "decision": "kept",
+  "reason": "Measured percentages are the recorded rationale for the 400 m threshold; not load-bearing."
+ },
+ {
+  "id": "U5543",
+  "decision": "kept",
+  "reason": "Claim does not hold: CHUNK_SIZE = 24 is duplicated in TravelScene.tsx:170 and Wildlife.tsx:191 as stated."
+ },
+ {
+  "id": "U5544",
+  "decision": "kept",
+  "reason": "13×13 is the window of the one caller (CHUNK_RADIUS 6, TravelScene.tsx:171)."
+ },
+ {
+  "id": "U5545",
+  "decision": "rewritten",
+  "reason": "Comment now names the guards (water cell, open dialog, finished run) instead of \"as before\"."
+ },
+ {
+  "id": "U5546",
+  "decision": "removed",
+  "reason": "Removed the orphaned \"Forms are used from the inventory bar\" remark from the Space handler."
+ },
+ {
+  "id": "U5547",
+  "decision": "kept",
+  "reason": "CHANNEL_CLEARANCE_DEG is live in solidDressingAllowed; the test-visible export is fine."
+ },
+ {
+  "id": "U5548",
+  "decision": "kept",
+  "reason": "BANK_GAP_DEG is live in drinkWalkDistance; the test-visible export is fine."
+ },
+ {
+  "id": "U5549",
+  "decision": "kept",
+  "reason": "BATHE_WADE_DEG is live in drinkWalkDistance; the test-visible export is fine."
+ },
+ {
+  "id": "U5550",
+  "decision": "kept",
+  "reason": "Claim does not hold: crocodileAllowedAt still exists in wildlifeBehavior.ts (terrain === 'water')."
+ },
+ {
+  "id": "U5551",
+  "decision": "rewritten",
+  "reason": "SURFACE_LIFT doc now says river surfaces; lake sheets use LAKE_LIFT."
+ },
+ {
+  "id": "U5552",
+  "decision": "rewritten",
+  "reason": "Header now says the lake sheet sits LAKE_LIFT above bedMax."
+ },
+ {
+  "id": "U5553",
+  "decision": "rewritten",
+  "reason": "densifyRiver doc now says it is aliased for riverAxisRows and the tests."
+ },
+ {
+  "id": "U5554",
+  "decision": "rewritten",
+  "reason": "ribbonRowSurfaceAt doc now calls it the per-row base that riverAxisRows refines (sea/lake heights, smoothing)."
+ },
+ {
+  "id": "U5555",
+  "decision": "rewritten",
+  "reason": "ribbonRowSurfaceAt doc now says riverAxisRows sets ocean rows to SEA_MERGE_Y."
+ },
+ {
+  "id": "U5556",
+  "decision": "kept",
+  "reason": "The ocean branch is reached by direct callers (waterSurface/riverSmoothness tests); the doc now states that riverAxisRows overrides ocean rows."
+ },
+ {
+  "id": "U5557",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from AxisRow (no importer anywhere)."
+ },
+ {
+  "id": "U5558",
+  "decision": "rewritten",
+  "reason": "LAKE_UNDERLAP, AxisRow.lake and extendSourceIntoLake docs now say in-lake rows are not emitted (planRibbonRows) and serve the float index and the no-spring rule."
+ },
+ {
+  "id": "U5559",
+  "decision": "rewritten",
+  "reason": "March comment no longer relies on the lake sheet covering an emitted overlap."
+ },
+ {
+  "id": "U5560",
+  "decision": "rewritten",
+  "reason": "Float-index comment now says it holds every riverAxisRows row as Rivers.tsx registers them, incl. the in-lake rows the ribbon does not emit."
+ },
+ {
+  "id": "U5561",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from MOUTH_COAST_DEG (used only by riverIsSeaBound)."
+ },
+ {
+  "id": "U5562",
+  "decision": "kept",
+  "reason": "smoothRowsDownstream is live via riverAxisRows; the test-visible export is fine."
+ },
+ {
+  "id": "U5563",
+  "decision": "kept",
+  "reason": "SEA_MERGE_Y is live in riverAxisRows; the test-visible export is fine."
+ },
+ {
+  "id": "U5564",
+  "decision": "kept",
+  "reason": "MOUTH_FADE_ROWS is live as mouthSeaness's default; the test-visible export is fine."
+ },
+ {
+  "id": "U5565",
+  "decision": "rewritten",
+  "reason": "Comment now says up to 64 terrain samples."
+ },
+ {
+  "id": "U5566",
+  "decision": "kept",
+  "reason": "Claim does not hold: TASKS point 11 (docs/tasks-archive.md:541) is the blotchy-lake-water item the comment cites."
+ },
+ {
+  "id": "U5567",
+  "decision": "rewritten",
+  "reason": "lakeSurfaceY doc now says floored at -0.05 instead of \"never below the sea\"."
+ },
+ {
+  "id": "U5568",
+  "decision": "rewritten",
+  "reason": "waterSurfaceY doc now calls it the float height and points to renderedSheetY for the drawn sheet."
+ },
+ {
+  "id": "U5569",
+  "decision": "kept",
+  "reason": "\"~2500 samples\" is an order-of-magnitude note; not load-bearing."
+ },
+ {
+  "id": "U5570",
+  "decision": "kept",
+  "reason": "The writer and the Rivers.tsx mirror both exist (Rivers.tsx mirrors NILE_FLOOD into the ribbon uniform)."
+ },
+ {
+  "id": "U5571",
+  "decision": "kept",
+  "reason": "Claim does not hold: Rivers.tsx:133-137 registers every riverAxisRows row with the same nile flag the lazy build uses."
+ },
+ {
+  "id": "U5572",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from DrawnGroup (no importer anywhere)."
+ },
+ {
+  "id": "U5573",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from FlockGroup (no importer anywhere)."
+ },
+ {
+  "id": "U5574",
+  "decision": "kept",
+  "reason": "LabelledAnimal types the live pushHerdActors; the test-visible export is fine."
+ },
+ {
+  "id": "U5575",
+  "decision": "kept",
+  "reason": "labelRise is live at lines 66 and 100; the test-visible export is fine."
+ },
+ {
+  "id": "U5576",
+  "decision": "kept",
+  "reason": "actorConcealed is live in pushHerdActors; the test-visible export is fine."
+ },
+ {
+  "id": "U5577",
+  "decision": "kept",
+  "reason": "Claim does not hold: the hunt predator is a PredatorKind (lion/cheetah/leopard/hyena), never a crocodile, so pushHuntActor needs no concealment."
+ },
+ {
+  "id": "U5578",
+  "decision": "rewritten",
+  "reason": "fleeHeading doc now says a threat closer than 1e-4 is skipped."
+ },
+ {
+  "id": "U5579",
+  "decision": "rewritten",
+  "reason": "fleeHeading doc now says near-symmetric fields can still flip, which committedFleeHeading damps."
+ },
+ {
+  "id": "U5580",
+  "decision": "rewritten",
+  "reason": "DramaState doc now says a set (defined) flag claims the animal, not a truthy one."
+ },
+ {
+  "id": "U5581",
+  "decision": "kept",
+  "reason": "Each exported type types a live export's signature; dropping the modifiers buys nothing (conservative keep)."
+ },
+ {
+  "id": "U5582",
+  "decision": "rewritten",
+  "reason": "FleeThreatSource doc now says the resolver never returns the player source there, while the elephant dart stays live."
+ },
+ {
+  "id": "U5583",
+  "decision": "rewritten",
+  "reason": "crossingTarget doc now names the configurable `step` stride (default 1)."
+ },
+ {
+  "id": "U5584",
+  "decision": "rewritten",
+  "reason": "nearestBankTarget doc now says the nearest bank its discrete probes find."
+ },
+ {
+  "id": "U5585",
+  "decision": "rewritten",
+  "reason": "waterExit doc now puts the drama-owner exemption first, then the ocean setback."
+ },
+ {
+  "id": "U5586",
+  "decision": "rewritten",
+  "reason": "deflectAroundCircle doc now names elephantWouldTrample's exemption."
+ },
+ {
+  "id": "U5587",
+  "decision": "rewritten",
+  "reason": "The endpoint guard comment now cites only round-off, not a chord."
+ },
+ {
+  "id": "U5588",
+  "decision": "rewritten",
+  "reason": "separationPush doc now says two coincident animals both nudge +x and part only once other forces break the tie."
+ },
+ {
+  "id": "U5589",
+  "decision": "rewritten",
+  "reason": "edgeSeparationPush doc now separates the ocean setback from the river/lake swim-back rule."
+ },
+ {
+  "id": "U5590",
+  "decision": "rewritten",
+  "reason": "flightStep doc now states the off-screen-and-past-viewR despawn rule with a predicate."
+ },
+ {
+  "id": "U5591",
+  "decision": "rewritten",
+  "reason": "Moved the flight JSDoc from segPointDist onto flightStep."
+ },
+ {
+  "id": "U5592",
+  "decision": "rewritten",
+  "reason": "Spawn comment now says up to twelve ring steps, after which it spawns where it is."
+ },
+ {
+  "id": "U5593",
+  "decision": "rewritten",
+  "reason": "committedFleeHeading doc now says jitter within the margin never flaps and a pick past it is accepted."
+ },
+ {
+  "id": "U5594",
+  "decision": "removed",
+  "reason": "Removed the owned.add after assignment; owned is read only when building unowned."
+ },
+ {
+  "id": "U5595",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from PLOVER_LURE_TRIGGER/SAFE/SECONDS and PLOVER_TAKEN_CHANCE (no importer anywhere)."
+ },
+ {
+  "id": "U5596",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from GRASS_FIRE_ZONES (no importer anywhere)."
+ },
+ {
+  "id": "U5597",
+  "decision": "rewritten",
+  "reason": "crocodileTargetWeight doc now defers eligibility (bank drinker or waterline prey, point 275) to the caller."
+ },
+ {
+  "id": "U5598",
+  "decision": "rewritten",
+  "reason": "Crocodile habitat doc now says it leaves the water only for the brief ambush burst."
+ },
+ {
+  "id": "U5599",
+  "decision": "kept",
+  "reason": "Claim does not hold: the species exemption is real — the water sweep skips flamingos and crocodiles (Wildlife.tsx ~3357)."
+ },
+ {
+  "id": "U5600",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from CROCODILE_DRAG_TURN/CROCODILE_DRAG_ARRIVED (no importer anywhere)."
+ },
+ {
+  "id": "U5601",
+  "decision": "rewritten",
+  "reason": "jawHeadingOnWater doc and null comment now name the fixed CROCODILE_JAW_HEADINGS probes."
+ },
+ {
+  "id": "U5602",
+  "decision": "rewritten",
+  "reason": "Haul doc now names the stranded outcome (dried home, too-narrow channel) and drops the history paragraph."
+ },
+ {
+  "id": "U5603",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from CROCODILE_FEED_BOB_AMP (no importer anywhere)."
+ },
+ {
+  "id": "U5604",
+  "decision": "kept",
+  "reason": "Claim does not hold: the caller applies crocodileGripExpired only while caught is counting (Wildlife.tsx:3691-3696), so it never cuts the post-kill sink."
+ },
+ {
+  "id": "U5605",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/wildlifeBehavior.ts:1479 — crocodileFeedPose documents positive pitch as nose-up while ClashPose.pitch treats positive as nose-down; check the renderers' sign use and unify the convention."
+ },
+ {
+  "id": "U5606",
+  "decision": "backlog",
+  "reason": "src/scenes/travel/wildlifeBehavior.ts:1560 — the flat-hover landing doc still claims complete pecking clearance and ONE shared landing rule while the posed path (landedBirdYPosed/landedBirdClearancePosed) exists beside it; find which callers still use the flat path."
+ },
+ {
+  "id": "U5607",
+  "decision": "rewritten",
+  "reason": "offscreenRingSpawn doc now describes the centre-based ring probes and both fallbacks."
+ },
+ {
+  "id": "U5608",
+  "decision": "rewritten",
+  "reason": "The fallback comment now admits the spawn is visible when every probe is on screen."
+ },
+ {
+  "id": "U5609",
+  "decision": "rewritten",
+  "reason": "retainedSpawnChunks doc now says every animal still in the lists retains its chunk and `dead` is not consulted."
+ },
+ {
+  "id": "U5610",
+  "decision": "rewritten",
+  "reason": "Side-preference doc now says the committed sense is searched first within each course pass."
+ },
+ {
+  "id": "U5611",
+  "decision": "rewritten",
+  "reason": "Probe comment now says both probes must pass `blocked`, not be dry."
+ },
+ {
+  "id": "U5612",
+  "decision": "removed",
+  "reason": "Removed the unreachable !Number.isFinite(course) alternative from keeps (only evaluated in the finite-course pass)."
+ },
+ {
+  "id": "U5613",
+  "decision": "rewritten",
+  "reason": "escapeCorridorHeading doc now says the highest combined score wins."
+ },
+ {
+  "id": "U5614",
+  "decision": "rewritten",
+  "reason": "calfFleeStep doc now says the caller's `blocked` predicate decides (ocean-only for chaseFleeStep, all water for the fighting quarry)."
+ },
+ {
+  "id": "U5615",
+  "decision": "rewritten",
+  "reason": "calfFleeStep doc now says any successful direct step clears the held corridor."
+ },
+ {
+  "id": "U5616",
+  "decision": "rewritten",
+  "reason": "claimedByAnotherDrama doc now lists the fight state and the broadened waterline trigger."
+ },
+ {
+  "id": "U5617",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from PREDATOR_SPECIES and corrected its doc to name isPredatorSpecies."
+ },
+ {
+  "id": "U5618",
+  "decision": "kept",
+  "reason": "The tagged-species branch is the documented pure-test path; the live caller carries no species and passes a homogeneous non-predator herd."
+ },
+ {
+  "id": "U5619",
+  "decision": "rewritten",
+  "reason": "Adoption doc now says the predator gate applies wherever the adult's species is known."
+ },
+ {
+  "id": "U5620",
+  "decision": "kept",
+  "reason": "The ?? REGION_PREY.east fallback is unreachable under the types but is a harmless guard (conservative keep)."
+ },
+ {
+  "id": "U5621",
+  "decision": "rewritten",
+  "reason": "defendChance doc now names point 146's revenge kill (killChance) instead of calling it future."
+ },
+ {
+  "id": "U5622",
+  "decision": "rewritten",
+  "reason": "FightProfile and fightResolve docs now name the giraffe's rare fatal knock-down in Tier B."
+ },
+ {
+  "id": "U5623",
+  "decision": "rewritten",
+  "reason": "clashPose doc now says the gap term works the contact open and shut."
+ },
+ {
+  "id": "U5624",
+  "decision": "rewritten",
+  "reason": "The rear rationale now says a plain sine rises and swaps slowly rather than sitting near zero."
+ },
+ {
+  "id": "U5625",
+  "decision": "rewritten",
+  "reason": "fightPairBroken doc now states the caller's precondition (foe = self.fight.foe) behind the one-sided link test."
+ },
+ {
+  "id": "U5626",
+  "decision": "kept",
+  "reason": "AnimalCollider export is harmless (conservative keep)."
+ },
+ {
+  "id": "U5627",
+  "decision": "rewritten",
+  "reason": "Header and summary/dumpGameState docs no longer call the module pure; they name the balance, build-mode and wildlife-runtime inputs."
+ },
+ {
+  "id": "U5628",
+  "decision": "rewritten",
+  "reason": "DumpSummary doc now excepts the graphics level, which comes from the caller."
+ },
+ {
+  "id": "U5629",
+  "decision": "kept",
+  "reason": "DumpOptions export is harmless (conservative keep)."
+ },
+ {
+  "id": "U5630",
+  "decision": "rewritten",
+  "reason": "The free-floating heading-convention JSDoc is now a plain module comment."
+ },
+ {
+  "id": "U5631",
+  "decision": "rewritten",
+  "reason": "Docs now give the lioness's preyWeapon 2.0 (balance.ts:1226) and name only cheetah/leopard/hyena/elephant/crocodile/plover as entry-less."
+ },
+ {
+  "id": "U5632",
+  "decision": "rewritten",
+  "reason": "isInDrama doc now files the kick under the defence strike, not the surrender/grief drives."
+ },
+ {
+  "id": "U5633",
+  "decision": "rewritten",
+  "reason": "Inline comment now says familyHeld drama animals are handled before the resolver."
+ },
+ {
+  "id": "U5634",
+  "decision": "rewritten",
+  "reason": "Drink-exemption rationale now names the point-275 waterline trigger beside the standing drinker."
+ },
+ {
+  "id": "U5635",
+  "decision": "rewritten",
+  "reason": "Comment now calls RIVER_WIDTH_DEG the calibratable half-width (about 2.7 units at the default factor)."
+ },
+ {
+  "id": "U5636",
+  "decision": "rewritten",
+  "reason": "PredatorKind doc now says every hunt predator attacks on contact."
+ },
+ {
+  "id": "U5637",
+  "decision": "kept",
+  "reason": "Claim does not hold: no ambient same-species predator population exists — the hunt draws one predator at a time from REGION_PREDATORS."
+ },
+ {
+  "id": "U5638",
+  "decision": "kept",
+  "reason": "Each export is also consumed in-file by live code; test-only outside use is fine."
+ },
+ {
+  "id": "U5639",
+  "decision": "kept",
+  "reason": "The forceOutcome flags are the documented debug/test hooks; the branches they reach are live outcomes."
+ },
+ {
+  "id": "U5640",
+  "decision": "rewritten",
+  "reason": "Claim of a legacy fallback does not hold (origin is set only at the first re-home, so `chunk` is the birth chunk before that); the doc now says so."
+ },
+ {
+  "id": "U5641",
+  "decision": "rewritten",
+  "reason": "Moved the assignPerCarcassFlocks, crocodileHaulStep and crocodileFeedPose docs onto their functions."
+ },
+ {
+  "id": "U5642",
+  "decision": "rewritten",
+  "reason": "File header now lists the summary, env and wildlife sections too."
+ },
+ {
+  "id": "U5643",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from RockArtefactState (no importer anywhere)."
+ },
+ {
+  "id": "U5644",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from FreeCamp (no importer anywhere)."
+ },
+ {
+  "id": "U5645",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from GameMode (no importer anywhere)."
+ },
+ {
+  "id": "U5646",
+  "decision": "rewritten",
+  "reason": "Header moved above the first import and no longer mentions an audience state."
+ },
+ {
+  "id": "U5647",
+  "decision": "rewritten",
+  "reason": "bagItemCount's reducer now sums with a typed initial value; the unreachable accumulator/result fallbacks are gone."
+ },
+ {
+  "id": "U5648",
+  "decision": "rewritten",
+  "reason": "orientationGiven doc now says the buildings are marked once the chief is called out (callChiefOut)."
+ },
+ {
+  "id": "U5649",
+  "decision": "kept",
+  "reason": "Known and documented: the honoredFriend OPEN (store.ts:240-243) records that nothing produces it and its consumers wait for the observation model."
+ },
+ {
+  "id": "U5650",
+  "decision": "rewritten",
+  "reason": "predatorContact doc now includes the crocodile."
+ },
+ {
+  "id": "U5651",
+  "decision": "rewritten",
+  "reason": "callChiefOut doc now limits the walk-out to the drum-message village and says what other chiefs do."
+ },
+ {
+  "id": "U5652",
+  "decision": "rewritten",
+  "reason": "generateGrave doc now says desert or savanna."
+ },
+ {
+  "id": "U5653",
+  "decision": "kept",
+  "reason": "Claim does not hold: the only other importer is store.startPlace.test.ts, so \"exported for the fast layer alone\" is accurate."
+ },
+ {
+  "id": "U5654",
+  "decision": "rewritten",
+  "reason": "Opening-state comments now say \"its start place\" and \"the default start\" instead of assuming Cairo."
+ },
+ {
+  "id": "U5655",
+  "decision": "kept",
+  "reason": "The ?? {} narrows withExplored's nullable return type for the state literal; unreachable, but removing it needs a non-null assertion that buys nothing."
+ },
+ {
+  "id": "U5656",
+  "decision": "kept",
+  "reason": "Claim does not hold: \"never a dead end\" means the form is not lost and a revisit gets an answer (formNoFit); it does not promise a second fit."
+ },
+ {
+  "id": "U5657",
+  "decision": "rewritten",
+  "reason": "Dehydration speed comment now says it applies on any terrain."
+ },
+ {
+  "id": "U5658",
+  "decision": "rewritten",
+  "reason": "Movement-warning comment now includes the carried canoe dragging on land."
+ },
+ {
+  "id": "U5659",
+  "decision": "rewritten",
+  "reason": "Drift comment now says thirst resets on fresh water only (the sea never quenches)."
+ },
+ {
+  "id": "U5660",
+  "decision": "kept",
+  "reason": "The ?? 1 narrows number|undefined for TypeScript (no narrowing across the filter); unreachable, but a non-null assertion buys nothing."
+ },
+ {
+  "id": "U5661",
+  "decision": "kept",
+  "reason": "The ?? 1 narrows number|undefined for TypeScript (no narrowing across the filter); unreachable, but a non-null assertion buys nothing."
+ },
+ {
+  "id": "U5662",
+  "decision": "rewritten",
+  "reason": "tickHealth doc and the dryDays field doc now describe thirst away from fresh water once the canteen reserve is empty."
+ },
+ {
+  "id": "U5663",
+  "decision": "rewritten",
+  "reason": "Near-death aid comment now says food plus curing fever and wounds."
+ },
+ {
+  "id": "U5664",
+  "decision": "rewritten",
+  "reason": "Honored-friend supplies comment now says food and medicine."
+ },
+ {
+  "id": "U5665",
+  "decision": "rewritten",
+  "reason": "Checkpoint comment now says the successor finds the arrival in his journal instead of opening it."
+ },
+ {
+  "id": "U5666",
+  "decision": "rewritten",
+  "reason": "presentValuable doc now says an indifferent reaction is a toast, not a journal entry."
+ },
+ {
+  "id": "U5667",
+  "decision": "removed",
+  "reason": "Removed the resolved OPEN note; the monument already answers with valuableNobodyAtMonument."
+ },
+ {
+  "id": "U5668",
+  "decision": "kept",
+  "reason": "The ?? 0 narrows number|undefined for TypeScript after the guard; unreachable, but a non-null assertion buys nothing."
+ },
+ {
+  "id": "U5669",
+  "decision": "kept",
+  "reason": "The ?? 0 narrows number|undefined for TypeScript after the guard; unreachable, but a non-null assertion buys nothing."
+ },
+ {
+  "id": "U5670",
+  "decision": "rewritten",
+  "reason": "loadCheckpoint comment no longer says saving is off; it keeps the user decision that old saves are irrelevant in the PoC."
+ },
+ {
+  "id": "U5671",
+  "decision": "backlog",
+  "reason": "src/state/store.ts:393/2142-2202 — the retained legacy-save compatibility (LEGACY_CHECKPOINT_KEY migration, map-item strip, villagePhases/enteredPlaces/visitedPlaces/landmarksSeen derivations, per-field fallbacks) contradicts \"old saves are irrelevant\"; decide once whether to delete it."
+ },
+ {
+  "id": "U5672",
+  "decision": "rewritten",
+  "reason": "Debug place-jump comment no longer claims the entry grants the orientation markers."
+ },
+ {
+  "id": "U5673",
+  "decision": "rewritten",
+  "reason": "Moved the price-lookup doc from VILLAGE_TRADE_GOODS onto priceOfGood."
+ },
+ {
+  "id": "U5674",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from BenchProgress and BenchReportFile (no importer anywhere)."
+ },
+ {
+  "id": "U5675",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from UiState (no importer anywhere)."
+ },
+ {
+  "id": "U5676",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from currentQuality (used only by the effective selectors)."
+ },
+ {
+  "id": "U5677",
+  "decision": "rewritten",
+  "reason": "speechGuess comment now says the guess key (E) opens it."
+ },
+ {
+  "id": "U5678",
+  "decision": "rewritten",
+  "reason": "debugGroupsOpen doc now says a group stays open until toggled shut."
+ },
+ {
+  "id": "U5679",
+  "decision": "kept",
+  "reason": "Claim does not hold: DrumMessageWatcher (src/ui/DrumMessage.tsx:102-116) opens the display at endsAt unless another dialog is open."
+ },
+ {
+  "id": "U5680",
+  "decision": "rewritten",
+  "reason": "activateTouch comment now lists campfire shadows off too."
+ },
+ {
+  "id": "U5681",
+  "decision": "rewritten",
+  "reason": "effectiveFireShadowResolution doc now says 0 on a level without campfire shadows and that the flag gates effectiveFireShadows instead."
+ },
+ {
+  "id": "U5682",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from ActorFaunaKind, ActorTameKind and ActorObjectKind (they still form ActorKind)."
+ },
+ {
+  "id": "U5683",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from ActorCandidate, ActorDescriptor and Positioned (local parameter types kept)."
+ },
+ {
+  "id": "U5684",
+  "decision": "rewritten",
+  "reason": "Header now names the rebindable label modifier (Ctrl by default)."
+ },
+ {
+  "id": "U5685",
+  "decision": "rewritten",
+  "reason": "Header now bounds the promise by the roster, the flags and the nearest-first cap."
+ },
+ {
+  "id": "U5686",
+  "decision": "rewritten",
+  "reason": "Composition doc now says no BLIND concatenation: the noun's gender picks the qualifier's form."
+ },
+ {
+  "id": "U5687",
+  "decision": "kept",
+  "reason": "CheckpointMeta is the return type of listCheckpoints, used by non-test code."
+ },
+ {
+  "id": "U5688",
+  "decision": "kept",
+  "reason": "CHIEF_REWARD_FORM is used internally by handArtefactToChief."
+ },
+ {
+  "id": "U5689",
+  "decision": "kept",
+  "reason": "usedInventory is called throughout the store."
+ },
+ {
+  "id": "U5690",
+  "decision": "kept",
+  "reason": "Known and documented: honoredFriend's OPEN — nearestFriendVillage and protectedByFriends wait for the observation model that is to bestow it."
+ },
+ {
+  "id": "U5691",
+  "decision": "kept",
+  "reason": "Known and documented: the rescue branches wait for an honoredFriend producer (store.ts OPEN at 240-243)."
+ },
+ {
+  "id": "U5692",
+  "decision": "kept",
+  "reason": "Known and documented: the near-death friend aid waits for an honoredFriend producer (store.ts OPEN at 240-243)."
+ },
+ {
+  "id": "U5693",
+  "decision": "kept",
+  "reason": "Known and documented: the friend supplies wait for an honoredFriend producer (store.ts OPEN at 240-243)."
+ },
+ {
+  "id": "U5694",
+  "decision": "kept",
+  "reason": "Known and documented: village camps wait for an honoredFriend producer (store.ts OPEN at 240-243)."
+ },
+ {
+  "id": "U5695",
+  "decision": "rewritten",
+  "reason": "canCampHere doc now says nothing grants Honored Friend yet and points to the OPEN."
+ },
+ {
+  "id": "U5696",
+  "decision": "rewritten",
+  "reason": "drumMessageHeard doc now says it holds one flag per drum message (errand, answer)."
+ },
+ {
+  "id": "U5697",
+  "decision": "backlog",
+  "reason": "src/state/store.ts:179-180/337-338 — comments say handing the artefact to the chief solves the communication puzzle, while the pocSolved toast fires only when the reward form is fitted (store.ts ~2082); align the wording with the intended solve moment."
+ },
+ {
+  "id": "U5698",
+  "decision": "backlog",
+  "reason": "src/state/store.ts:387-400 — the single-slot LEGACY_CHECKPOINT_KEY migration is still kept although old saves are irrelevant (same decision as U5671)."
+ },
+ {
+  "id": "U5699",
+  "decision": "backlog",
+  "reason": "src/state/store.ts:2153 — the loader still strips the removed 'map' equipment item from legacy saves (same decision as U5671)."
+ },
+ {
+  "id": "U5700",
+  "decision": "backlog",
+  "reason": "src/state/store.ts:2155 — the villagePhases fallback migrates a pre-point-394 save generation (same decision as U5671)."
+ },
+ {
+  "id": "U5701",
+  "decision": "backlog",
+  "reason": "src/state/store.ts:2161 — enteredPlaces/visitedPlaces/landmarksSeen are still derived for legacy saves (same decision as U5671)."
+ },
+ {
+  "id": "U5702",
+  "decision": "backlog",
+  "reason": "src/state/store.ts:2139+ — per-field ?? fallbacks for snapshots from before a system existed remain throughout loadCheckpoint (same decision as U5671)."
+ },
+ {
+  "id": "U5703",
+  "decision": "rewritten",
+  "reason": "Dropped the leftover cast on snap.woundHealDays (the field is part of Partial<GameState>)."
+ },
+ {
+  "id": "U5704",
+  "decision": "rewritten",
+  "reason": "Arrival comment now says a port writes its arrival entry."
+ },
+ {
+  "id": "U5705",
+  "decision": "rewritten",
+  "reason": "The startState comment now names the Giza monument beside the ten ports (KNOWN_FROM_START_PLACES includes kind 'monument')."
+ },
+ {
+  "id": "U5706",
+  "decision": "rewritten",
+  "reason": "Equipment comment now says the canoe comes from a port, shovel and medicine from a port or a village."
+ },
+ {
+  "id": "U5707",
+  "decision": "kept",
+  "reason": "Claim does not hold: DRUM_MESSAGE_VILLAGE = ROCK_VILLAGE_ID = 'bambara-village' (communicationRock.ts:21)."
+ },
+ {
+  "id": "U5708",
+  "decision": "rewritten",
+  "reason": "Added a note that the 'wetland' warning covers the fever-prone jungle."
+ },
+ {
+  "id": "U5709",
+  "decision": "kept",
+  "reason": "The suspension is TEMPORARY (design.md §5.1); the successor's stage bookkeeping stays right for when the deadline is re-enabled."
+ },
+ {
+  "id": "U5710",
+  "decision": "kept",
+  "reason": "The debounce remark explains why only an exit offset is needed; it describes current behaviour."
+ },
+ {
+  "id": "U5711",
+  "decision": "kept",
+  "reason": "The ~5 average is an explanatory note beside the config value; not load-bearing."
+ },
+ {
+  "id": "U5712",
+  "decision": "rewritten",
+  "reason": "totalGifts doc now names its wider use (status bar, trading, checkpoints)."
+ },
+ {
+  "id": "U5713",
+  "decision": "rewritten",
+  "reason": "Replaced the German date form with \"1 January of START_YEAR\"."
+ },
+ {
+  "id": "U5714",
+  "decision": "rewritten",
+  "reason": "Header now lists the graphics level and render flags, preferences, benchmark and drum state."
+ },
+ {
+  "id": "U5715",
+  "decision": "kept",
+  "reason": "Claim does not hold: 'chief' is a live building type — the chief's hut interactive in scenes/place/layout.ts (chiefPresence.test.ts reads it)."
+ },
+ {
+  "id": "U5716",
+  "decision": "rewritten",
+  "reason": "Prompt doc no longer carries a German example; it says a localized key hint."
+ },
+ {
+  "id": "U5717",
+  "decision": "rewritten",
+  "reason": "Touch comments now say the touch render overrides (activateTouch), not a quality preset; the level is unchanged."
+ },
+ {
+  "id": "U5718",
+  "decision": "kept",
+  "reason": "The point-111/175 switches are live debug diagnosis flags with default-on/off behaviour; whether the investigations are closed is not a code defect."
+ },
+ {
+  "id": "U5719",
+  "decision": "kept",
+  "reason": "ACTOR_KINDS feeds ACTOR_KIND_SET, used by qualifiesAsActor."
+ },
+ {
+  "id": "U5720",
+  "decision": "kept",
+  "reason": "Documented: permanentLabel keeps a pitched camp in the roster for other readers while the layer skips it; a camp without a permanent label still qualifies."
+ },
+ {
+  "id": "U5721",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from AmbienceScene, DrumBedHit, DrumBedPhrasePlan, CrunchCrackle, TrampleCrunchPlan, ThunderPlan and SyllableForm (no importer anywhere)."
+ },
+ {
+  "id": "U5722",
+  "decision": "rewritten",
+  "reason": "SURF_BASE doc no longer carries the stale \"old 0.22\" history."
+ },
+ {
+  "id": "U5723",
+  "decision": "rewritten",
+  "reason": "Sub-bus comment now routes speech to speechBus alongside footstepBus and ambientBus."
+ },
+ {
+  "id": "U5724",
+  "decision": "rewritten",
+  "reason": "emitBird doc now says one chirp, usually followed by a second."
+ },
+ {
+  "id": "U5725",
+  "decision": "kept",
+  "reason": "restShare is the sparse-rhythm observable the unit test asserts (ambience.test.ts:74); documented now."
+ },
+ {
+  "id": "U5726",
+  "decision": "removed",
+  "reason": "Removed the unread tempoScale/pitchScale fields from the drum phrase plan (tests read them from drumBedVillageSpread)."
+ },
+ {
+  "id": "U5727",
+  "decision": "rewritten",
+  "reason": "emitDrumPhrase doc now says no new phrase starts once the switch is off; already scheduled hits play out."
+ },
+ {
+  "id": "U5728",
+  "decision": "rewritten",
+  "reason": "Volume comment now says wind, murmur and surf scale with the ambience volume, birdsong has its own, insects/drums/music their own gains."
+ },
+ {
+  "id": "U5729",
+  "decision": "kept",
+  "reason": "Claim does not hold: balance.ambienceVolume defaults to 0.1 (balance.ts:1061)."
+ },
+ {
+  "id": "U5730",
+  "decision": "rewritten",
+  "reason": "CRUNCH_PEAK comment now calls it a fixed constant (volume and distance are the calibratable inputs)."
+ },
+ {
+  "id": "U5731",
+  "decision": "rewritten",
+  "reason": "speechProbe doc now says `spoken` counts plans and drum messages, while syllables/lastPeak move only on scheduled audio."
+ },
+ {
+  "id": "U5732",
+  "decision": "rewritten",
+  "reason": "Cry doc now says it enters no heard memory, record or label (it is audible)."
+ },
+ {
+  "id": "U5733",
+  "decision": "rewritten",
+  "reason": "playSpeech doc no longer calls the fixed master gain the §21 volume."
+ },
+ {
+  "id": "U5734",
+  "decision": "rewritten",
+  "reason": "Assertion comment now names both legitimate silences (speech slider at zero, running drum message)."
+ },
+ {
+  "id": "U5735",
+  "decision": "rewritten",
+  "reason": "Drum doc now says the two drums differ in pitch and ring length."
+ },
+ {
+  "id": "U5736",
+  "decision": "rewritten",
+  "reason": "Moved the refresh doc from throughDeployedLimiter onto refreshAmbienceVolume."
+ },
+ {
+  "id": "U5737",
+  "decision": "removed",
+  "reason": "Removed the always-false !ctx alternative in refreshAmbienceVolume (it returns earlier when ctx is null)."
+ },
+ {
+  "id": "U5738",
+  "decision": "rewritten",
+  "reason": "coastSurfGain doc now says the caller hands it to setAmbienceCoast and applySurfTarget multiplies it in."
+ },
+ {
+  "id": "U5739",
+  "decision": "rewritten",
+  "reason": "coastProx comment now says the clamp lives in setAmbienceCoast."
+ },
+ {
+  "id": "U5740",
+  "decision": "rewritten",
+  "reason": "emitFootstep doc now says it routes through the footstep bus (master as fallback)."
+ },
+ {
+  "id": "U5741",
+  "decision": "kept",
+  "reason": "Claim does not hold: Wildlife.tsx:3937 calls proximityGain, whose default is PROXIMITY_AUDIBLE, so the looped calls share it."
+ },
+ {
+  "id": "U5742",
+  "decision": "kept",
+  "reason": "PROXIMITY_AUDIBLE is proximityGain's live default; the test-visible export is fine."
+ },
+ {
+  "id": "U5743",
+  "decision": "kept",
+  "reason": "The 0.5 is balance.ambientVolume's default (balance.ts:1063); the crunch comment now says \"by default\"."
+ },
+ {
+  "id": "U5744",
+  "decision": "rewritten",
+  "reason": "clapVoice doc now lists the loom beat and says it outputs to `dest`."
+ },
+ {
+  "id": "U5745",
+  "decision": "rewritten",
+  "reason": "speechRoute doc now says one route per voiced sound (utterance, tag cry, loom beat)."
+ },
+ {
+  "id": "U5746",
+  "decision": "kept",
+  "reason": "These exports are live internally; test-visible exports are fine."
+ },
+ {
+  "id": "U5747",
+  "decision": "kept",
+  "reason": "The webkitAudioContext fallback is a one-line guard for older WebKit; harmless."
+ },
+ {
+  "id": "U5748",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from BenchFlags, BenchTerrainOverride, BenchFrameCounts, FrameStats, FixedClockTarget, BenchTriGroup, BenchEnvironment, BenchRankEntry and BenchLowPhaseRanking (no importer anywhere)."
+ },
+ {
+  "id": "U5749",
+  "decision": "rewritten",
+  "reason": "pixelRatio doc now says it is set directly and may raise a lower native ratio."
+ },
+ {
+  "id": "U5750",
+  "decision": "rewritten",
+  "reason": "benchFrameCounts doc now says 2.5 s of samples (150 × 1/60 s)."
+ },
+ {
+  "id": "U5751",
+  "decision": "rewritten",
+  "reason": "BenchFrameCounts.sample doc now says sample − 1 frame times are collected (the first frame has no interval)."
+ },
+ {
+  "id": "U5752",
+  "decision": "rewritten",
+  "reason": "sceneTriangleBreakdown doc now calls it an inventory of visible scene geometry without culling or draw ranges."
+ },
+ {
+  "id": "U5753",
+  "decision": "rewritten",
+  "reason": "Determinism header now says Math.random is seeded once per sweep, so rolls repeat run to run but not config to config."
+ },
+ {
+  "id": "U5754",
+  "decision": "rewritten",
+  "reason": "Moved the installFixedClock doc from the FixedClockTarget interface onto the function."
+ },
+ {
+  "id": "U5755",
+  "decision": "removed",
+  "reason": "Removed the optional BenchReport.summary field; nothing sets it and benchReportJson injects the digest itself."
+ },
+ {
+  "id": "U5756",
+  "decision": "kept",
+  "reason": "The only live caller passes measuredConfigs, which includes the low pass (benchmarkRun.ts:328); the default serves the tests."
+ },
+ {
+  "id": "U5757",
+  "decision": "kept",
+  "reason": "Claim does not hold: the report rows name the wall-clock series `frame` (benchmark.ts:340/454), so \"HEADLINE: frame\" names the series the reader finds in the rows."
+ },
+ {
+  "id": "U5758",
+  "decision": "kept",
+  "reason": "These exports are used internally on the live report path; test-visible exports are fine."
+ },
+ {
+  "id": "U5759",
+  "decision": "kept",
+  "reason": "The terrain-override docs match terrainLod.ts (REFINE_SEGMENT_CAP 112; setTerrainRefine takes enabled/segmentCap)."
+ },
+ {
+  "id": "U5760",
+  "decision": "kept",
+  "reason": "The cited files exist: docs/perf-276-findings.md, scripts/perf-bench.mjs, scripts/perf-breakdown.mjs."
+ },
+ {
+  "id": "U5761",
+  "decision": "rewritten",
+  "reason": "Runner determinism note now says the clock's elapsed time carries over between phases and configs."
+ },
+ {
+  "id": "U5762",
+  "decision": "rewritten",
+  "reason": "Runner determinism note now says frames rendered during the final GPU-timer flush can also advance the fixed clock."
+ },
+ {
+  "id": "U5763",
+  "decision": "backlog",
+  "reason": "src/systems/benchmarkRun.ts:159 — resolveTimestampsAsync is called before .catch is attached with no try, so a synchronous throw would escape instead of marking GPU timing unavailable as the doc promises."
+ },
+ {
+  "id": "U5764",
+  "decision": "kept",
+  "reason": "Claim does not hold: fireShadowsEnabled is no config lever (no config writes it), the low pass runs after the sweep (benchmarkRun.ts:437) and the UI snapshot is restored at the end (455)."
+ },
+ {
+  "id": "U5765",
+  "decision": "kept",
+  "reason": "The listed low-preset values match QUALITY_PRESETS.low (no campfire shadows, tighter flora radius, dpr cap, terrain refinement)."
+ },
+ {
+  "id": "U5766",
+  "decision": "kept",
+  "reason": "The three version note matches package.json (three ^0.185.1)."
+ },
+ {
+  "id": "U5767",
+  "decision": "kept",
+  "reason": "The cited references exist: fireRainFactor (season.ts:754), docs/peoples-1890.md and docs/climate-1890.md."
+ },
+ {
+  "id": "U5768",
+  "decision": "kept",
+  "reason": "The store moves with waterTravelCost and currentDriftDegPerSecond (store.ts:1105); swimSpeedDegPerSecond only converts that same cost for the sweep, so the one-formula claim holds."
+ },
+ {
+  "id": "U5769",
+  "decision": "kept",
+  "reason": "Claim does not hold: riverFlow applies the point-316 sea-mouth slack (geoIndex.ts:55-61), so strength ≤ 0 is the slack-water guard."
+ },
+ {
+  "id": "U5770",
+  "decision": "kept",
+  "reason": "waterfallBoostAt is used by currentDriftDegPerSecond; the test-visible export is fine."
+ },
+ {
+  "id": "U5771",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from TravellerHazardKind, DebugSelectOption, DebugSelectGroup, StagingSpot, StagingSearch, WildlifeDramaTrigger and DebugEventActions (no importer anywhere)."
+ },
+ {
+  "id": "U5772",
+  "decision": "kept",
+  "reason": "The \"never a silent no-op\" promise is about DebugEventFailure; an unrecognised value cannot come from the menu's own entry list."
+ },
+ {
+  "id": "U5773",
+  "decision": "kept",
+  "reason": "TRAVELLER_HAZARD_KINDS holds only 'mountainFall', so firing mountainFall for the hazard prefix is exact."
+ },
+ {
+  "id": "U5774",
+  "decision": "rewritten",
+  "reason": "Header and WildlifeDramaKind doc now cite §19.17 for the fight drama too."
+ },
+ {
+  "id": "U5775",
+  "decision": "kept",
+  "reason": "These exports are used internally by debugEventGroups and fireDebugEvent; test-visible exports are fine."
+ },
+ {
+  "id": "U5776",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from LONG_RUN_SUSPENDED_ABOVE_SECONDS (used only by watchProducer)."
+ },
+ {
+  "id": "U5777",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from ProducerStep (local parameter type kept)."
+ },
+ {
+  "id": "U5778",
+  "decision": "rewritten",
+  "reason": "resetDevAsserts doc now names the window.__longRun probe it also clears."
+ },
+ {
+  "id": "U5779",
+  "decision": "kept",
+  "reason": "The 30 s rationale cites the known onnxruntime cold load documented in CLAUDE.md §3 / tts-architecture; accurate context."
+ },
+ {
+  "id": "U5780",
+  "decision": "kept",
+  "reason": "LONG_RUN_SUSPEND_SECONDS is used internally and resetDevAsserts is the explicit test hook."
+ },
+ {
+  "id": "U5781",
+  "decision": "rewritten",
+  "reason": "Header now describes the six researched peoples and the coldness/harmattan/karif drivers instead of a Zulu-only cloak system."
+ },
+ {
+  "id": "U5782",
+  "decision": "rewritten",
+  "reason": "Header no longer says the Tuareg and Hausa get nothing (both have period-sourced rules)."
+ },
+ {
+  "id": "U5783",
+  "decision": "rewritten",
+  "reason": "Header no longer calls the San evidence tertiary; SEASONAL_DRESS cites Passarge."
+ },
+ {
+  "id": "U5784",
+  "decision": "rewritten",
+  "reason": "Header now says some rules change HOW a garment is worn (`wear`)."
+ },
+ {
+  "id": "U5785",
+  "decision": "rewritten",
+  "reason": "SAN_NAU doc now says two close tanned-hide tones."
+ },
+ {
+  "id": "U5786",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifiers from DressDriver, DressWear and DressDrivers (no importer anywhere)."
+ },
+ {
+  "id": "U5787",
+  "decision": "rewritten",
+  "reason": "The Zulu rule is now called the clearest cold-weather cloak, which no longer clashes with the Wayeyi \"no inference\" note."
+ },
+ {
+  "id": "U5788",
+  "decision": "rewritten",
+  "reason": "seasonalDressFor doc no longer repeats the retired harmattan/Tuareg exclusions."
+ },
+ {
+  "id": "U5789",
+  "decision": "kept",
+  "reason": "The three-cloth figure is the rationale's approximate proportion; wearsByRank itself works for any palette size."
+ },
+ {
+  "id": "U5790",
+  "decision": "backlog",
+  "reason": "src/systems/dress.ts:168 — COLD_DRESS_THRESHOLD (season.ts:266) is named for coldness but also gates the harmattan and karif drivers; a neutral name (e.g. SEASONAL_DRESS_THRESHOLD) would fit."
+ },
+ {
+  "id": "U5791",
+  "decision": "kept",
+  "reason": "harmattanAt and karifAt exist in season.ts (341, 402)."
+ },
+ {
+  "id": "U5792",
+  "decision": "rewritten",
+  "reason": "Dropped the export modifier from LandmarkPoint (local type of LANDMARK_POINTS kept)."
+ },
+ {
+  "id": "U5793",
+  "decision": "rewritten",
+  "reason": "Comment now says the region reveres the material, matching REGION_VALUES[region].revered."
+ },
+ {
+  "id": "U5794",
+  "decision": "kept",
+  "reason": "The hint-text rationale is the design intent (design.md §18 buried treasures); rounding and margin are harmless without hints."
+ },
+ {
+  "id": "U5795",
+  "decision": "rewritten",
+  "reason": "Header now says the module provides the landmark positions and the store computes and pays the bounty."
+ },
+ {
+  "id": "U5796",
+  "decision": "kept",
+  "reason": "regionalFactor is used internally by treasureBid, treasureBuyPrice and the dev hook."
+ },
+ {
+  "id": "U5797",
+  "decision": "kept",
+  "reason": "landmarkLabelHiddenByMapPoint exists (TravelScene.tsx imports it; jumpTargets.ts:17 cites it)."
+ },
+ {
+  "id": "U5798",
+  "decision": "rewritten",
+  "reason": "Crocodile comment now says a canoe cuts the risk instead of keeping the traveller out of reach."
+ },
+ {
+  "id": "U5799",
+  "decision": "rewritten",
+  "reason": "Crocodile comment now says the machete helps wherever the rifle does not; the rifle is the best guard in the canoe."
+ },
+ {
+  "id": "U5800",
+  "decision": "rewritten",
+  "reason": "Header now says the machete helps wherever the rifle does not."
+ },
+ {
+  "id": "U5801",
+  "decision": "rewritten",
+  "reason": "attackSeverity doc now says better weapons shrink the fatal band while the escaped/defended band is fixed."
+ },
+ {
+  "id": "U5802",
+  "decision": "rewritten",
+  "reason": "The fuzz header now cites CLAUDE.md §7.2."
+ },
+ {
+  "id": "U5803",
+  "decision": "kept",
+  "reason": "A test-support PRNG under src/systems is a location choice with no defect; moving it gains nothing."
+ },
+ {
+  "id": "U5804",
+  "decision": "kept",
+  "reason": "The dedicated FuzzRng API (range/int/pick/angle) justifies its own module; the duplicated mulberry32 is a few lines."
+ },
+ {
+  "id": "U5805",
+  "decision": "rewritten",
+  "reason": "Unexported KeyPressSource; no other file imports it."
+ },
+ {
+  "id": "U5806",
+  "decision": "rewritten",
+  "reason": "Unexported SCROLLABLE_OVERLAY_SELECTOR; only wheelTargetsScene reads it."
+ },
+ {
+  "id": "U5807",
+  "decision": "rewritten",
+  "reason": "Unexported KeyPressOptions; only onKeyPress uses it."
+ },
+ {
+  "id": "U5808",
+  "decision": "removed",
+  "reason": "Removed isGameKeyCode and GAME_KEY_SET; the test now checks GAME_KEY_CODES directly."
+ },
+ {
+  "id": "U5809",
+  "decision": "rewritten",
+  "reason": "Unexported KeyboardLockApi; no other file imports it."
+ },
+ {
+  "id": "U5810",
+  "decision": "rewritten",
+  "reason": "Header, KEYBOARD_LOCK_CODES doc and input.ts now say the lock covers Ctrl+W/T only; KeyN is unbound so Ctrl+N stays reserved."
+ },
+ {
+  "id": "U5811",
+  "decision": "rewritten",
+  "reason": "installKeyboardLock doc no longer claims idempotence; it says each call adds listeners and input.ts calls it once."
+ },
+ {
+  "id": "U5812",
+  "decision": "rewritten",
+  "reason": "RESIZE is now called one of the five triggers."
+ },
+ {
+  "id": "U5813",
+  "decision": "rewritten",
+  "reason": "Header now says the table holds the identity to float32 precision, rounded one step inward, instead of bit for bit."
+ },
+ {
+  "id": "U5814",
+  "decision": "rewritten",
+  "reason": "limitMixSample doc now says the knee never passes the ceiling and can land on it (threshold at ceiling, tanh rounding)."
+ },
+ {
+  "id": "U5815",
+  "decision": "backlog",
+  "reason": "src/systems/mixLimiter.ts:53 — limitBounds clamps the ceiling only below at 0, so a debug-typed ceiling above 1 lets the mix leave full scale despite the header's promise; clamp it to 1."
+ },
+ {
+  "id": "U5816",
+  "decision": "rewritten",
+  "reason": "mixLimiterCurve doc now names the float32 interpolation overshoot that tableBound leaves room for."
+ },
+ {
+  "id": "U5817",
+  "decision": "kept",
+  "reason": "The 1.336 figure is stated as a measured worst case justifying the domain of 2; nothing in the code contradicts it."
+ },
+ {
+  "id": "U5818",
+  "decision": "rewritten",
+  "reason": "De-penetration comment now says the eight passes are a bound, not a proof that no overlap remains."
+ },
+ {
+  "id": "U5819",
+  "decision": "rewritten",
+  "reason": "pushOutOfCircles doc now calls it the de-penetration step resolveTravelMove runs after its slide."
+ },
+ {
+  "id": "U5820",
+  "decision": "rewritten",
+  "reason": "resolveTravelMove doc now says the leftover move slides along the surface after the clamp."
+ },
+ {
+  "id": "U5821",
+  "decision": "rewritten",
+  "reason": "slideAlongBlocked doc now credits point 113 to the tree/animal slide of resolveTravelMove, not to settlement collision."
+ },
+ {
+  "id": "U5822",
+  "decision": "rewritten",
+  "reason": "slideAlongBlocked doc now says the fan runs a little past ±90° (about 105°)."
+ },
+ {
+  "id": "U5823",
+  "decision": "rewritten",
+  "reason": "slideAlongBlocked doc now names the near-zero step as the second null case."
+ },
+ {
+  "id": "U5824",
+  "decision": "rewritten",
+  "reason": "Unexported GIZA_FLOOD_THRESHOLD; only this module uses it."
+ },
+ {
+  "id": "U5825",
+  "decision": "rewritten",
+  "reason": "Unexported monthOfDay; only the Berbera handler calls it."
+ },
+ {
+  "id": "U5826",
+  "decision": "rewritten",
+  "reason": "monthOfDay doc now says rinderpest exports no month helper instead of claiming dependency-lightness."
+ },
+ {
+  "id": "U5827",
+  "decision": "rewritten",
+  "reason": "Unexported berberaFairActive; only this module calls it."
+ },
+ {
+  "id": "U5828",
+  "decision": "rewritten",
+  "reason": "Unexported ChaseRole; no other file imports it."
+ },
+ {
+  "id": "U5829",
+  "decision": "removed",
+  "reason": "Removed blendHeading and its test; it had no production caller."
+ },
+ {
+  "id": "U5830",
+  "decision": "rewritten",
+  "reason": "Intro now says a child always at its current maximum would hover where its cap meets the trot, matching the reserve rule."
+ },
+ {
+  "id": "U5831",
+  "decision": "rewritten",
+  "reason": "CURVE_MAX_SLOPE doc now bounds the smoothstep and says paceCap's slope is that times the pace span."
+ },
+ {
+  "id": "U5832",
+  "decision": "kept",
+  "reason": "CURVE_MAX_SLOPE is a documented test contract for paceCap; keeping it named beside the curve is the point."
+ },
+ {
+  "id": "U5833",
+  "decision": "rewritten",
+  "reason": "pressState doc now says reversed thresholds collapse the hysteresis to one boundary instead of promising no oscillation."
+ },
+ {
+  "id": "U5834",
+  "decision": "rewritten",
+  "reason": "chaserPresses doc now names the commit-distance exception."
+ },
+ {
+  "id": "U5835",
+  "decision": "rewritten",
+  "reason": "turnToward doc now says NaN/non-positive steps hold the facing and an infinite step turns straight to the target."
+ },
+ {
+  "id": "U5836",
+  "decision": "rewritten",
+  "reason": "evadeHeading overview now names the 30° OPPOSED band and the linear fade to the short way at 60° (RELEASE)."
+ },
+ {
+  "id": "U5837",
+  "decision": "rewritten",
+  "reason": "Ramp comment now points to the sign-boundary one-frame jump documented below it."
+ },
+ {
+  "id": "U5838",
+  "decision": "kept",
+  "reason": "The rejected-cure record guards against re-trying cures that were measured and degraded villages; it explains why the known jump is left in place."
+ },
+ {
+  "id": "U5839",
+  "decision": "rewritten",
+  "reason": "Unexported RinderpestPhase; no other file imports it."
+ },
+ {
+  "id": "U5840",
+  "decision": "rewritten",
+  "reason": "Header now calls 1890-1895 the window inside the panzootic and says the southern peoples stay clean for the whole shipped window."
+ },
+ {
+  "id": "U5841",
+  "decision": "backlog",
+  "reason": "src/systems/rinderpest.ts:44 — the maasai case strikes from January 1891 though the documented onset (Kedong valley) is March 1891; add a month check."
+ },
+ {
+  "id": "U5842",
+  "decision": "rewritten",
+  "reason": "SOUTHERN_PEOPLES doc now says clean for the whole shipped window."
+ },
+ {
+  "id": "U5843",
+  "decision": "rewritten",
+  "reason": "rinderpestPhase doc now names the village situation via placeSituation instead of vignette choice."
+ },
+ {
+  "id": "U5844",
+  "decision": "kept",
+  "reason": "The southern 'struck' branch is deliberately modelled for an extended window, as its comment states."
+ },
+ {
+  "id": "U5845",
+  "decision": "removed",
+  "reason": "Removed the tombstone comment for the predicate that moved to placeSituation."
+ },
+ {
+  "id": "U5846",
+  "decision": "rewritten",
+  "reason": "Header now says the Sahel's wetness scale (ZONE_WETNESS) is lifted, not a dry-season floor."
+ },
+ {
+  "id": "U5847",
+  "decision": "rewritten",
+  "reason": "Profile doc now names ZONE_WETNESS instead of the nonexistent zoneWetness."
+ },
+ {
+  "id": "U5848",
+  "decision": "rewritten",
+  "reason": "sahara-south comment now says mainly Jul-Sep with traces in May-Jun and October."
+ },
+ {
+  "id": "U5849",
+  "decision": "rewritten",
+  "reason": "isHyperArid doc (and the Namibe note) now say the southern zones are chosen by latitude alone, not that the model has no longitudinal term."
+ },
+ {
+  "id": "U5850",
+  "decision": "rewritten",
+  "reason": "Unexported HIGHLAND_ELEVATION_M; only climateZoneAt uses it."
+ },
+ {
+  "id": "U5851",
+  "decision": "rewritten",
+  "reason": "Dropped the always-true lat >= -12 and lat > -25 predicates after the lat <= -12 return; zones are unchanged."
+ },
+ {
+  "id": "U5852",
+  "decision": "rewritten",
+  "reason": "Fang example no longer calls July the peak of its rains."
+ },
+ {
+  "id": "U5853",
+  "decision": "kept",
+  "reason": "design.md §5.1 still marks the suspended deadline and the calendar stop TEMPORARY; the comment matches it."
+ },
+ {
+  "id": "U5854",
+  "decision": "rewritten",
+  "reason": "Unexported LAST_YEAR; only this module uses it."
+ },
+ {
+  "id": "U5855",
+  "decision": "rewritten",
+  "reason": "dayOfYearJump doc now says 29 February rolls to 1 March in a common year."
+ },
+ {
+  "id": "U5856",
+  "decision": "rewritten",
+  "reason": "dayOfYearJump doc now names the startYear..LAST_YEAR bound instead of a fixed 1890..1895."
+ },
+ {
+  "id": "U5857",
+  "decision": "rewritten",
+  "reason": "dayOfMonthJump doc now says the 15th lies within a day of the equal-twelfths sample point."
+ },
+ {
+  "id": "U5858",
+  "decision": "rewritten",
+  "reason": "dayOfYear doc now includes the leap-year range up to 366."
+ },
+ {
+  "id": "U5859",
+  "decision": "rewritten",
+  "reason": "Harmattan comment now gives both the research band and the modelled ~6N-22N reach."
+ },
+ {
+  "id": "U5860",
+  "decision": "rewritten",
+  "reason": "harmattanAt doc now says most of the Sahel reads barely cold, if at all, instead of never cold."
+ },
+ {
+  "id": "U5861",
+  "decision": "rewritten",
+  "reason": "zoneShapeAt doc no longer claims each zone's driest month is 0."
+ },
+ {
+  "id": "U5862",
+  "decision": "rewritten",
+  "reason": "Moved the wetnessAt doc from above effectiveWetness onto wetnessAt."
+ },
+ {
+  "id": "U5863",
+  "decision": "rewritten",
+  "reason": "Snow comment now states the modelled ramp reaches mid-Nov..mid-May and late May..early Sep."
+ },
+ {
+  "id": "U5864",
+  "decision": "rewritten",
+  "reason": "Unexported SnowMassif; no other file imports it."
+ },
+ {
+  "id": "U5865",
+  "decision": "rewritten",
+  "reason": "strikeSchedulerStep doc now says deterministic and mutating only its state argument, not pure."
+ },
+ {
+  "id": "U5866",
+  "decision": "rewritten",
+  "reason": "fireRainFactor @returns now gives [0..1]."
+ },
+ {
+  "id": "U5867",
+  "decision": "rewritten",
+  "reason": "Sahel comment now says the whole curve is scaled down northward rather than the shoulders narrowed."
+ },
+ {
+  "id": "U5868",
+  "decision": "backlog",
+  "reason": "src/systems/season.ts:806 — lagged belg rain puts nileFloodAt at ~0.16-0.48 in March-June although the flood should rise from early June; raise NILE_FLOOD_FLOOR or shape the source."
+ },
+ {
+  "id": "U5869",
+  "decision": "rewritten",
+  "reason": "Nile header now states the modelled crest lands late September to early October."
+ },
+ {
+  "id": "U5870",
+  "decision": "rewritten",
+  "reason": "Nile normalisation note now says the highland zone tops out at 0.7 with the 0.6 peak saturating the crest."
+ },
+ {
+  "id": "U5871",
+  "decision": "rewritten",
+  "reason": "GREENING_ZONE_FLOOR doc now describes the proportional scale-down instead of a cut-off."
+ },
+ {
+  "id": "U5872",
+  "decision": "rewritten",
+  "reason": "seasonSlotAt returns indexOf directly; the unreachable missing-zone fallback is gone."
+ },
+ {
+  "id": "U5873",
+  "decision": "rewritten",
+  "reason": "slotGreenness doc now names effectiveGreenness as the override's model and floraGreennessAt for the hyper-arid case."
+ },
+ {
+  "id": "U5874",
+  "decision": "backlog",
+  "reason": "src/systems/seasonalLife.ts:37 — the away windows use zero-based dayOfYear, so 152/274 start on 2 June/2 October and 273/59 end at 1 October/1 March, one day off the documented months."
+ },
+ {
+  "id": "U5875",
+  "decision": "rewritten",
+  "reason": "Header criterion now describes the per-step headway test (ESCAPE_HEADWAY)."
+ },
+ {
+  "id": "U5876",
+  "decision": "rewritten",
+  "reason": "Unexported SwimEscapeOptions and SwimEscapeResult; no other file imports them."
+ },
+ {
+  "id": "U5877",
+  "decision": "kept",
+  "reason": "findSwimTraps is verification code for the mouth sweep and its tests; that is its stated purpose."
+ },
+ {
+  "id": "U5878",
+  "decision": "rewritten",
+  "reason": "Unexported Axes and EngageLatch; no other file imports them."
+ },
+ {
+  "id": "U5879",
+  "decision": "rewritten",
+  "reason": "stickVector doc no longer claims to match the keyboard clamp; it notes moveAxes clamps per axis."
+ },
+ {
+  "id": "U5880",
+  "decision": "rewritten",
+  "reason": "Unexported StallState, StallConfig, FreeSpotOptions and EscapeOutcome."
+ },
+ {
+  "id": "U5881",
+  "decision": "rewritten",
+  "reason": "updateStall comment now says releasing movement resets the clock."
+ },
+ {
+  "id": "U5882",
+  "decision": "rewritten",
+  "reason": "stuckHintDue doc now names the pad's L3 as a second route."
+ },
+ {
+  "id": "U5883",
+  "decision": "rewritten",
+  "reason": "stuckHintDue doc now limits the no-displacement promise to the re-raise."
+ },
+ {
+  "id": "U5884",
+  "decision": "rewritten",
+  "reason": "maxRadius doc now says at least one ring at step is searched."
+ },
+ {
+  "id": "U5885",
+  "decision": "rewritten",
+  "reason": "fallback doc now names both fallbacks (entry point in a settlement, own position in bird's-eye)."
+ },
+ {
+  "id": "U5886",
+  "decision": "rewritten",
+  "reason": "escapeOutcome comment now names the 1e-6 threshold instead of implying a search-step test."
+ },
+ {
+  "id": "U5887",
+  "decision": "rewritten",
+  "reason": "lineOfSightClear doc now limits the guarantee to walls thicker than the 0.25 m sample spacing."
+ },
+ {
+  "id": "U5888",
+  "decision": "rewritten",
+  "reason": "headBob doc now says vertical once per footstep, lateral once per two-step stride."
+ },
+ {
+  "id": "U5889",
+  "decision": "rewritten",
+  "reason": "Header and bounds.note now say animals and carcasses are sorted nearest first and flocks keep pool-index order."
+ },
+ {
+  "id": "U5890",
+  "decision": "rewritten",
+  "reason": "WILDLIFE_DUMP_CAP doc now limits the omitted counts to the animal and carcass lists."
+ },
+ {
+  "id": "U5891",
+  "decision": "rewritten",
+  "reason": "Dropped the unread gone, crossing.time and vigil.time fields from WildlifeAnimalLike."
+ },
+ {
+  "id": "U5892",
+  "decision": "rewritten",
+  "reason": "Unexported the seven entry/hunt/target types no other file imports."
+ },
+ {
+  "id": "U5893",
+  "decision": "rewritten",
+  "reason": "feeders doc now says bound (owning flock, hunt predator, gripping crocodile), not necessarily feeding now."
+ },
+ {
+  "id": "U5894",
+  "decision": "rewritten",
+  "reason": "Unexported readWildlifeDumpSource; only wildlifeSection calls it."
+ },
+ {
+  "id": "U5895",
+  "decision": "rewritten",
+  "reason": "byDistance doc now says entries equal on all four rounded keys keep herd order."
+ },
+ {
+  "id": "U5896",
+  "decision": "rewritten",
+  "reason": "Unexported collectWildlife; only wildlifeSection calls it."
+ },
+ {
+  "id": "U5897",
+  "decision": "kept",
+  "reason": "claim does not hold in play: only crocodiles are ever given a lunge (Wildlife.tsx:2008, 3585), so every gripping lunge is a crocodile."
+ },
+ {
+  "id": "U5898",
+  "decision": "rewritten",
+  "reason": "input.ts header now names keyboard, gamepad poll, touch layer, wheel routing and keyboard-lock install."
+ },
+ {
+  "id": "U5899",
+  "decision": "rewritten",
+  "reason": "isTypingTarget doc now names debug fields, bug-report description and guess field."
+ },
+ {
+  "id": "U5900",
+  "decision": "kept",
+  "reason": "claim does not hold: GAMEPAD_BUTTON_KEYS is imported only by gamepadMap.test.ts and Hud.test.tsx, no production file."
+ },
+ {
+  "id": "U5901",
+  "decision": "removed",
+  "reason": "Removed isTouchEngaged; the latch tests now observe the engage callbacks instead."
+ },
+ {
+  "id": "U5902",
+  "decision": "kept",
+  "reason": "claim does not hold: moveAxes (bird's-eye) and touchMove (PlaceScene) are separate merge points for separate scenes; PlaceScene never calls moveAxes, so nothing is counted twice."
+ },
+ {
+  "id": "U5903",
+  "decision": "rewritten",
+  "reason": "Header now limits preventDefault to PREVENTED_CHORD_CODES, excluding the plain-bound calendar/inventory row."
+ },
+ {
+  "id": "U5904",
+  "decision": "rewritten",
+  "reason": "installKeyboardLock doc now says the returned uninstall serves the tests."
+ },
+ {
+  "id": "U5905",
+  "decision": "rewritten",
+  "reason": "\"the settings\" replaced by the state shouldLockKeyboard asks for."
+ },
+ {
+  "id": "U5906",
+  "decision": "rewritten",
+  "reason": "jumpTargetPlaceId doc now says a landmark other than Giza's stays bird's-eye."
+ },
+ {
+  "id": "U5907",
+  "decision": "rewritten",
+  "reason": "Dropped the outdated \"~130 controls\" count from the header."
+ },
+ {
+  "id": "U5908",
+  "decision": "rewritten",
+  "reason": "Header and render comment now say collapsed rows stay in the DOM for external drivers; the filter works on row data."
+ },
+ {
+  "id": "U5909",
+  "decision": "rewritten",
+  "reason": "TAG_FIELDS doc now says \"dozens\" instead of \"twenty\" hand-written fields."
+ },
+ {
+  "id": "U5910",
+  "decision": "rewritten",
+  "reason": "Graphics-group comment now says the detail dropdown is the single graphics-quality control, followed by debug rows and volumes; the stale duplicate at 341 is gone."
+ },
+ {
+  "id": "U5911",
+  "decision": "rewritten",
+  "reason": "Moved the reading-duration comment onto the labelSeconds row and labelled the talk/call rows by what they are."
+ },
+ {
+  "id": "U5912",
+  "decision": "rewritten",
+  "reason": "Pitch-block comment now covers the child pitch and the interposed stereo width."
+ },
+ {
+  "id": "U5913",
+  "decision": "rewritten",
+  "reason": "BenchmarkOverlay header now names the debug-menu button and startBenchmarkSafely as the lazy loader."
+ },
+ {
+  "id": "U5914",
+  "decision": "rewritten",
+  "reason": "Header now says the idle overlay costs its two store subscriptions, not nothing."
+ },
+ {
+  "id": "U5915",
+  "decision": "rewritten",
+  "reason": "setup.ts comment now names the single scrollIntoView shim."
+ },
+ {
+  "id": "U5916",
+  "decision": "rewritten",
+  "reason": "setup.ts now says the ResizeObserver stub is guarded on the global and also installs in node files."
+ },
+ {
+  "id": "U5917",
+  "decision": "rewritten",
+  "reason": "setup.ts header now lists the two browser shims."
+ },
+ {
+  "id": "U5918",
+  "decision": "kept",
+  "reason": "The nativeSetTimeout fallback is a stated guard for an environment without setImmediate; it costs one line."
+ },
+ {
+  "id": "U5919",
+  "decision": "rewritten",
+  "reason": "Replaced the dated correction narrative with the measured cost and the reason the cap stays."
+ },
+ {
+  "id": "U5920",
+  "decision": "rewritten",
+  "reason": "Dropped the \"the two files now say the same thing\" cross-file claim; the pointer to vitest.config.ts remains."
+ },
+ {
+  "id": "U5921",
+  "decision": "rewritten",
+  "reason": "Yield reference now names tagShuffle.bankTraveller.test.ts, where the quoted yield actually lives."
+ },
+ {
+  "id": "U5922",
+  "decision": "kept",
+  "reason": "claim does not hold: the useGame re-export is imported by chiefMeeting, travelSpace and store.communication tests."
+ },
+ {
+  "id": "U5923",
+  "decision": "kept",
+  "reason": "claim does not hold: no non-test file imports src/test/store.ts (stateDump.ts imports src/state/store.ts)."
+ },
+ {
+  "id": "U5924",
+  "decision": "rewritten",
+  "reason": "freshGame doc now names the leaveTheChief scene-furniture reset."
+ },
+ {
+  "id": "U5925",
+  "decision": "kept",
+  "reason": "The pointer holds: store.saveload.test.ts carries the 'demo start preset (point 104)' block."
+ },
+ {
+  "id": "U5926",
+  "decision": "kept",
+  "reason": "leaveTheChief is a shared test helper used by freshGame and a test file; exporting it is correct."
+ },
+ {
+  "id": "U5927",
+  "decision": "kept",
+  "reason": "TEST_SEED is a shared test constant; its export is correct."
+ },
+ {
+  "id": "U5928",
+  "decision": "rewritten",
+  "reason": "AmbienceController header now names the coastal-surf gain it also drives."
+ },
+ {
+  "id": "U5929",
+  "decision": "kept",
+  "reason": "design.md §19 (Atmosphere and Immersion) holds the soundscape at §19.1 and the dramas in other subsections; both citations are right."
+ },
+ {
+  "id": "U5930",
+  "decision": "backlog",
+  "reason": "src/ui/AmbienceController.tsx:12 — DRUM_RADIUS = 18 is a hard-coded calibratable value outside balance.ts and not debug-editable; move it to balance and the debug menu."
+ },
+ {
+  "id": "U5931",
+  "decision": "rewritten",
+  "reason": "Header now names the debug-menu button beside F8 as the start."
+ },
+ {
+  "id": "U5932",
+  "decision": "rewritten",
+  "reason": "Clipboard-failure comment now points to the download instead of selectable text."
+ },
+ {
+  "id": "U5933",
+  "decision": "rewritten",
+  "reason": "Header now notes the raw phase id fallback."
+ },
+ {
+  "id": "U5934",
+  "decision": "kept",
+  "reason": "The ?? phase fallback guards a string-typed phase from the runner; one defensive expression."
+ },
+ {
+  "id": "U5935",
+  "decision": "kept",
+  "reason": "claim holds as written: benchmark.ts:558 serialises { summary, ...report }, so summary is the first key."
+ },
+ {
+  "id": "U5936",
+  "decision": "rewritten",
+  "reason": "ClayImpression doc now says the relief comes from ROCK_RELIEF_SVG and the tablet outline is its own."
+ },
+ {
+  "id": "U5937",
+  "decision": "rewritten",
+  "reason": "DebugMenu header now lists what the menu spans and drops the POC-scope sentence citing a nonexistent CLAUDE.md §8."
+ },
+ {
+  "id": "U5938",
+  "decision": "rewritten",
+  "reason": "BANK_GAME_FIELDS doc now includes roaming/dodging and the call gaps."
+ },
+ {
+  "id": "U5939",
+  "decision": "rewritten",
+  "reason": "ADULT_ERRAND_FIELDS doc now covers spread, errand life/stall and pace."
+ },
+ {
+  "id": "U5940",
+  "decision": "rewritten",
+  "reason": "Graphics-group comment now limits \"single dropdown\" to graphics quality and names the rows that follow."
+ },
+ {
+  "id": "U5941",
+  "decision": "rewritten",
+  "reason": "With the 341 comment gone and 772 naming the graphics-and-sound group, all references agree."
+ },
+ {
+  "id": "U5942",
+  "decision": "removed",
+  "reason": "Removed the stranded allow-flags comment above the detailLevel subscription."
+ },
+ {
+  "id": "U5943",
+  "decision": "removed",
+  "reason": "Removed the redundant balanceVersion subscription; useGame() on the next line already re-renders on every store change."
+ },
+ {
+  "id": "U5944",
+  "decision": "rewritten",
+  "reason": "Vertical-look comment now says the inversion row follows the unstuck rows."
+ },
+ {
+  "id": "U5945",
+  "decision": "rewritten",
+  "reason": "Headroom comment now says the reading floats over the speaker's head."
+ },
+ {
+  "id": "U5946",
+  "decision": "rewritten",
+  "reason": "Settlement-group comment now lists all the levers it holds."
+ },
+ {
+  "id": "U5947",
+  "decision": "kept",
+  "reason": "claim does not hold as a contradiction: dramas are staged only there, and the §14 events appearing in both dropdowns is the point-258 design."
+ },
+ {
+  "id": "U5948",
+  "decision": "rewritten",
+  "reason": "Settlement-collision comment now cites design.md §2.6, where settlement collision lives; §11 stays with the traveller hazards."
+ },
+ {
+  "id": "U5949",
+  "decision": "kept",
+  "reason": "design.md §17.5 covers both vertical look and the touch quality preset."
+ },
+ {
+  "id": "U5950",
+  "decision": "kept",
+  "reason": "claim does not hold: bump() only increments balanceVersion; the comment's \"persists in balance, applies on next reload\" matches the handlers."
+ },
+ {
+  "id": "U5951",
+  "decision": "kept",
+  "reason": "The comment holds: Giza is the only monument in PLACES, so the only enterable non-settlement."
+ }
+]

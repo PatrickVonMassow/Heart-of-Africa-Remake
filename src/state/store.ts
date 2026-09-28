@@ -1,7 +1,7 @@
-import type { DigSiteProgress } from '../scenes/place/adultWork'
 // Central game state (zustand). Holds the run seed, player resources, journal,
-// travel position, place/audience state and win condition.
+// travel position, place state and win condition.
 
+import type { DigSiteProgress } from '../scenes/place/adultWork'
 import { create } from 'zustand'
 import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY, START_YEAR } from '../config/balance'
 import { startPlaceFromUrl } from '../config/startPlace'
@@ -49,7 +49,7 @@ import { useUi } from './ui'
  * The three stages of the thing buried at the landmark boulder (point 487).
  * A one-way sequence: buried → carried → given.
  */
-export type RockArtefactState = 'buried' | 'carried' | 'given'
+type RockArtefactState = 'buried' | 'carried' | 'given'
 
 export type EquipmentId =
   | 'shovel'
@@ -77,12 +77,12 @@ export function emptyBag(): ItemBag {
 }
 
 export function bagItemCount(bag: ItemBag): number {
-  const sum = (r: Partial<Record<string, number>>) => Object.values(r).reduce((a, b) => (a ?? 0) + (b ?? 0), 0) ?? 0
+  const sum = (r: Partial<Record<string, number>>) => Object.values(r).reduce<number>((a, b) => a + (b ?? 0), 0)
   return sum(bag.equipment) + sum(bag.gifts) + sum(bag.treasures)
 }
 
 /** A free camp pitched in the open (design.md §6): X on the map, lootable. */
-export interface FreeCamp {
+interface FreeCamp {
   id: number
   lat: number
   lon: number
@@ -104,7 +104,7 @@ export interface JournalEntry {
   wounds?: 0 | 1 | 2
 }
 
-export type GameMode = 'travel' | 'place'
+type GameMode = 'travel' | 'place'
 
 /** Afflictions (design.md §6): alter controls/vision and drain health. */
 export interface Afflictions {
@@ -139,7 +139,7 @@ export interface GameState {
   enteredFromTravel: boolean
   /** Travel position in world units. */
   pos: { x: number; z: number }
-  /** In-game days since 1. Januar 1890 (fractional). */
+  /** In-game days since 1 January of START_YEAR (fractional). */
   day: number
   money: number
   /** Provisions in days. */
@@ -160,7 +160,8 @@ export interface GameState {
   landmarksSeen: string[]
   /** Villages that already reacted to a visibly carried valuable (§8). */
   valuableShown: Record<string, boolean>
-  /** Settlements whose buildings are highlighted after a gift (§17). */
+  /** Settlements whose buildings are highlighted once the chief has been
+   *  called out (callChiefOut, §17). */
   orientationGiven: Record<string, boolean>
   journal: JournalEntry[]
   journalOpen: boolean
@@ -170,9 +171,10 @@ export interface GameState {
    *  for it (design.md §13.4, docs/communication-poc-spec.md). The journal's
    *  observation section renders it; the game never interprets a note. */
   communication: CommunicationMemory
-  /** True once the chief's drums have beaten his message out in full (design.md
-   *  §13.4, point 486). It never goes back: the message display stays
-   *  reopenable for the rest of the run, so forgetting it locks nobody out. */
+  /** Per drum message (the errand and the answer): true once the chief's drums
+   *  have beaten it out in full (design.md §13.4, point 486). It never goes
+   *  back: the message display stays reopenable for the rest of the run, so
+   *  forgetting it locks nobody out. */
   drumMessageHeard: Record<DrumMessageId, boolean>
   /** The buried thing at the foot of the landmark boulder (point 487): it lies
    *  BURIED until the shovel reaches it at the spot the renderer draws, is
@@ -193,7 +195,8 @@ export interface GameState {
   afflictions: Afflictions
   /** Days of desert-free travel left until sun blindness heals. */
   sunblindRecovery: number
-  /** Accumulated days of thirst (empty canteen) until dehydration (§6). */
+  /** Accumulated days of thirst (no canteen reserve, away from fresh water)
+   *  until dehydration (§6). */
   dryDays: number
   /** Days accumulated toward the current wound stage healing on its own
    *  (design.md §6): while fed, a severe wound subsides to a light one and a
@@ -310,7 +313,8 @@ export interface GameState {
   applyMountainFall: () => void
   debugTriggerMountainFall: () => void
   /** Walking into a wandering predator triggers its attack (design.md §14/§19):
-   *  every bird's-eye predator (lion, cheetah, leopard, hyena), not only the lion. */
+   *  every bird's-eye predator (lion, cheetah, leopard, hyena) and the
+   *  crocodile, not only the lion. */
   predatorContact: (predator: 'lion' | 'cheetah' | 'leopard' | 'hyena' | 'crocodile') => void
   useMedicine: () => void
   /** A successor continues from the last checkpoint (design.md §18). */
@@ -342,8 +346,10 @@ export interface GameState {
    *  own tongue, which enters the heard memory like any other phrase he
    *  speaks. */
   handArtefactToChief: () => void
-  /** The use key at the chief's hut: the chief leaves it and walks over to his
-   *  drummer (design.md §12/§13.4). Everything he has to say is said out there,
+  /** The use key at the chief's hut: in the drum-message village the chief
+   *  leaves it and walks over to his drummer (design.md §12/§13.4); any other
+   *  village's chief only marks the buildings and says he has no message.
+   *  Everything he has to say is said out there,
    *  on the drums — there is no audience indoors, and the hut answers nothing
    *  while he is already outside. */
   callChiefOut: () => void
@@ -475,7 +481,8 @@ function pickKnowingVillages(seed: number): Record<RegionId, string> {
   return out
 }
 
-/** Place the grave procedurally per run: desert north of the Nubian village. */
+/** Place the grave procedurally per run: desert or savanna north of the
+ *  Nubian village. */
 function generateGrave(seed: number): LatLon {
   const rand = mulberry32(seed ^ 0x9e3779b9)
   for (let i = 0; i < 200; i++) {
@@ -508,8 +515,8 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     seed,
     mode: 'place' as GameMode,
     placeId,
-    // The run opens inside Cairo without a travel scene ever having captured
-    // its horizon — the geometry backdrop stands (design.md §2.5).
+    // The run opens inside its start place without a travel scene ever having
+    // captured its horizon — the geometry backdrop stands (design.md §2.5).
     enteredFromTravel: false,
     pos,
     day: 0,
@@ -519,8 +526,8 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     // villages trade in gifts only, so a giftless start locked every village buy.
     gifts: { gold: 0, silver: 0, emerald: 0, copper: START_GIFTS, ivory: 0 } as Record<Material, number>,
     // The expedition sets out with a rifle, a full canteen, a rope and a machete
-    // (user decisions 18.09.2026 and 25.09.2026); shovel, medicine and canoe are
-    // bought in the port. Money/start place stay the design.md fixed values.
+    // (user decisions 18.09.2026 and 25.09.2026); the canoe is bought in a port,
+    // shovel and medicine in a port or a village. Money/start place stay the design.md fixed values.
     equipment: { shovel: 0, rope: 1, machete: 1, rifle: 1, medicine: 0, canteen: 1 } as Partial<Record<EquipmentId, number>>,
     treasures: { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 } as Record<TreasureId, number>,
     treasureSites: generateTreasureSites(seed),
@@ -555,10 +562,10 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     deathCause: null as DeathCause | null,
     region: start.region,
     visitedRegions: [start.region],
-    // The ten port cities are famous ~1890 places known from the start
-    // (design.md §3.2/§17.2, point 288): they begin DISCOVERED, so their map
-    // labels name them at once and returning to them earns no bounty. Cairo (the
-    // start) is one of them; ordinary villages stay discovery-gated. The place
+    // The ten port cities and the Giza monument are famous ~1890 places known
+    // from the start (KNOWN_FROM_START_PLACES, design.md §3.2/§17.2, point 288):
+    // they begin DISCOVERED, so their map labels name them at once and returning
+    // to them earns no bounty. Cairo (the default start) is one of them; ordinary villages stay discovery-gated. The place
     // the run OPENS in is always discovered, whichever it is — standing in a
     // settlement whose own name is still hidden is a state no play can produce.
     visitedPlaces: [...new Set([...KNOWN_FROM_START_PLACES, placeId])],
@@ -908,7 +915,7 @@ export const useGame = create<GameState>()((set, get) => ({
     if (hasCanoe && here.type !== 'water' && here.type !== 'ocean') cost *= balance.canoeLandPenalty
 
     let speed = balance.travelSpeed / Math.max(0.25, cost)
-    if (s.afflictions.dehydration) speed *= 0.7 // §11: speed loss in the desert
+    if (s.afflictions.dehydration) speed *= 0.7 // §11: dehydration slows the traveller on any terrain
     const step = speed * dt
     const nx = s.pos.x + (dirX / len) * step
     const nz = s.pos.z + (dirZ / len) * step
@@ -959,7 +966,8 @@ export const useGame = create<GameState>()((set, get) => ({
     }
     // Movement-penalty warning (design.md §11): the first time a missing item
     // slows the traveller — a machete in the jungle, a canoe in water, a rope
-    // in the mountains — announce it once in the journal (with a toast); after
+    // in the mountains — or a carried canoe drags on land, announce it once in
+    // the journal (with a toast); after
     // that the standing status-bar hint carries it silently.
     const penalty = movementPenalty(nextT.type, s.equipment)
     if (penalty && !s.penaltyJournaled[penalty]) {
@@ -992,6 +1000,7 @@ export const useGame = create<GameState>()((set, get) => ({
         warn('water')
       }
     }
+    // The 'wetland' warning covers the fever-prone jungle.
     if (!s.dangerWarned.wetland && nextT.type === 'jungle') warn('wetland')
 
     const dayDelta = step * balance.daysPerUnit * cost
@@ -1131,7 +1140,8 @@ export const useGame = create<GameState>()((set, get) => ({
       foodDays: Math.max(0, s.foodDays - dayDelta * balance.foodPerDay),
     })
     // Passing time still drains/regenerates health and counts toward the
-    // deadline while drifting (thirst resets since the traveller is on water).
+    // deadline while drifting (thirst resets on fresh water only — tickHealth's
+    // canDrink; the sea never quenches).
     get().tickHealth(dayDelta, nt.type, nlat, nlon)
     get().tickDeadline(newDay)
   },
@@ -1365,7 +1375,8 @@ export const useGame = create<GameState>()((set, get) => ({
 
   /**
    * Health per travelled day (design.md §6): dehydration follows from
-   * desert travel without a canteen, afflictions and starvation drain
+   * sustained travel away from fresh water once the canteen (if any) is
+   * empty, afflictions and starvation drain
    * health, sun blindness heals only outside the desert, and at zero
    * health the expedition is lost (§15).
    */
@@ -1465,7 +1476,8 @@ export const useGame = create<GameState>()((set, get) => ({
     }
 
     // Close to death near a friend region's villages (design.md §12): the
-    // inhabitants hurry over with food, water and medicine.
+    // inhabitants hurry over with food and tend the traveller (fever and
+    // wounds cured).
     if (health > 0 && healthState(health) === 'poor') {
       const rep = balance.reputation
       if (s.day - s.lastFriendAidDay >= rep.friendAidCooldownDays) {
@@ -1605,7 +1617,7 @@ export const useGame = create<GameState>()((set, get) => ({
     // situation earns an entry: the rinderpest phase of a village (point 170),
     // the Nile flood at Giza, Berbera's fair season. A place whose situation is
     // unchanged (or was never journaled, as in a legacy save) stays silent, so
-    // the entry never spams; a port still reports its checkpoint.
+    // the entry never spams; a port still writes its arrival entry.
     if (firstEntry) {
       const entry = firstArrivalEntry(place, situation)
       get().addEntry(entry.title, entry.text, 'event', entry.sketch)
@@ -1621,11 +1633,11 @@ export const useGame = create<GameState>()((set, get) => ({
       )
     }
     // The port checkpoint is taken AFTER the arrival entry (design.md §18), so
-    // a successor resuming from it opens the journal on the arrival he was
-    // written — saving first left the entry outside its own snapshot.
+    // a successor resuming from it finds that arrival in his journal — saving
+    // first left the entry outside its own snapshot.
     if (place.kind === 'port') get().saveCheckpoint()
-    // Honored Friend (design.md §12): food, water and medicine free of
-    // charge in every village of the region — granted when needed.
+    // Honored Friend (design.md §12): food and medicine free of charge in
+    // every village of the region — granted when needed.
     if (place.kind === 'village' && s.honoredFriend[place.region]) {
       const rep = balance.reputation
       const st = get()
@@ -1645,7 +1657,8 @@ export const useGame = create<GameState>()((set, get) => ({
   },
 
   /** Present a carried valuable to the villagers (design.md §8): once per
-   *  village, and the reaction goes into the journal. */
+   *  village; a revered or rejected valuable's reaction goes into the journal,
+   *  an indifferent one is a toast. */
   presentValuable: (treasure) => {
     const s = get()
     if ((s.treasures[treasure] ?? 0) <= 0) return
@@ -1654,8 +1667,6 @@ export const useGame = create<GameState>()((set, get) => ({
     // Showing a treasure needs somebody who looks at it: nobody is out on the
     // map, a bazaar only puts a price on it, and the monument site is as empty
     // of onlookers as the open country around it.
-    // OPEN: the work order enumerates the open, the port and the village; the
-    // monument is the third place kind and needs an answer of its own.
     if (!place) {
       set({ toast: strings.toasts.valuableNobodyHere })
       return
@@ -2174,7 +2185,7 @@ export const useGame = create<GameState>()((set, get) => ({
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
         dryDays: snap.dryDays ?? 0,
-        woundHealDays: (snap as { woundHealDays?: number }).woundHealDays ?? 0,
+        woundHealDays: snap.woundHealDays ?? 0,
         canteenFill: snap.canteenFill ?? 1,
         treasures: snap.treasures ?? { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 },
         treasureSites: snap.treasureSites ?? generateTreasureSites(snap.seed ?? 0),
@@ -2208,8 +2219,8 @@ export const useGame = create<GameState>()((set, get) => ({
         // A save written before the forms existed carried neither, and a
         // traveller in it has opened nothing and holds nothing. One such save
         // with the artefact already GIVEN can never receive the impression —
-        // accepted, not migrated: saving is off in the PoC and old saves are
-        // irrelevant (user decision), so the dead end is named here, not built around.
+        // accepted, not migrated: old saves are irrelevant in the PoC (user
+        // decision), so the dead end is named here, not built around.
         carriedForms: snap.carriedForms ?? [],
         spentSockets: snap.spentSockets ?? [],
         defeat: null,
@@ -2336,8 +2347,8 @@ export const useGame = create<GameState>()((set, get) => ({
     // The bird's-eye position is set FIRST (so leaving the place puts the
     // traveller where the jump landed him, and the arrival is not read as a
     // place→place move), then the ordinary entry runs: discovery, the arrival
-    // journal, the port checkpoint and the orientation markers all happen as
-    // they do on a walked-in entry. A jump to the centre would otherwise strand
+    // journal and the port checkpoint all happen as they do on a walked-in
+    // entry. A jump to the centre would otherwise strand
     // him inside the settlement collider with no automatic entry left to fire
     // (point 244) — the one-way collider lets him walk out, entering is what
     // the jump is FOR.
@@ -2356,7 +2367,6 @@ export const useGame = create<GameState>()((set, get) => ({
   },
 }))
 
-/** Price lookup against the central config (config/balance.ts). */
 /** Baseline goods every settlement offers for sale (design.md §9). */
 export const VILLAGE_TRADE_GOODS: Array<EquipmentId | 'food'> = [
   'food', 'medicine', 'machete', 'shovel', 'rope', 'canteen',
@@ -2384,7 +2394,8 @@ function spendGifts(gifts: Record<Material, number>, n: number): Record<Material
 /**
  * Whether a camp can be pitched here (design.md §6.3, point 93): always in the
  * open bird's-eye world, in a settlement only inside a village whose region
- * holds "Honored Friend", never in a port. One predicate for BOTH the camp
+ * holds "Honored Friend" (nothing grants it yet — see honoredFriend's OPEN),
+ * never in a port. One predicate for BOTH the camp
  * button's visibility and the C-shortcut, so they agree.
  */
 export function canCampHere(
@@ -2398,6 +2409,7 @@ export function canCampHere(
   return false
 }
 
+/** Price lookup against the central config (config/balance.ts). */
 export function priceOfGood(good: EquipmentId | 'food' | Material): number {
   switch (good) {
     case 'food': return prices.food
@@ -2429,7 +2441,7 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 }
 
 
-/** Total gift count for the status bar. */
+/** Total gift count across all materials (status bar, trading, checkpoints). */
 export function totalGifts(gifts: Record<Material, number>): number {
   return Object.values(gifts).reduce((a, b) => a + b, 0)
 }

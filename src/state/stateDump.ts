@@ -1,10 +1,12 @@
 // State dump for bug reports (design.md §21.1, F6): serialises the COMPLETE
-// game state to pretty-printed JSON — every data field of the useGame store
-// (unlike the §18 port snapshot, which captures only the checkpoint fields),
-// the full balance object (so every debug override is visible), the transient
-// UI state, and a self-describing header (app/build marker + generation date).
-// Pure: deterministic given a state and an injected date; store actions and
-// any other function fields are stripped by the JSON replacer.
+// game state to pretty-printed JSON — a self-describing header (app/build
+// marker + generation date), the reproduction summary, the environment, every
+// data field of the useGame store (unlike the §18 port snapshot, which
+// captures only the checkpoint fields), the live wildlife section, the full
+// balance object (so every debug override is visible) and the transient UI
+// state. Deterministic given a state, an injected date and the same balance,
+// build mode and wildlife runtime; store actions and any other function fields
+// are stripped by the JSON replacer.
 
 import { balance, START_YEAR } from '../config/balance'
 import { wildlifeSection, type WildlifeDump } from '../systems/wildlifeDump'
@@ -18,8 +20,9 @@ export const DUMP_APP = 'The Heart of Africa (POC remake)'
  * The handful of fields that turn a vague report into a reproducible one: the
  * world seed plus the traveller's position, region, in-game date, pace and
  * graphics level re-stream the same scene and walk into the same animal
- * again. They all live in the full `game`/`balance` sections too — this is a
- * copy at the TOP of the dump, because a reader should not have to hunt for
+ * again. Apart from the graphics level (the caller's `detailLevel`) they all
+ * live in the full `game`/`balance` sections too — this is a copy at the TOP
+ * of the dump, because a reader should not have to hunt for
  * them (user 27.07.2026, from a real bug report).
  */
 export interface DumpSummary {
@@ -74,7 +77,8 @@ export function inGameDate(day: number, startYear: number = START_YEAR): string 
   return `${dd}.${mm}.${d.getUTCFullYear()}`
 }
 
-/** The reproduction fields, lifted to the top of the dump. Pure. */
+/** The reproduction fields, lifted to the top of the dump. Reads the global
+ *  balance for the travel speed. */
 export function dumpSummary(game: GameState, detailLevel = 'unknown'): DumpSummary {
   const ll = worldToLatLon(game.pos.x, game.pos.z)
   return {
@@ -106,7 +110,7 @@ function dataOnly(_key: string, value: unknown): unknown {
  *
  * The `wildlife` section (point 454) reads the live wildlife runtime through
  * its registered read-only source: bounded by a radius and a cap that the
- * section itself names, deterministic like the rest of this serialiser, and
+ * section itself names, deterministic for a given runtime state, and
  * empty (`active: false`) wherever no travel scene is mounted.
  */
 export function dumpGameState(game: GameState, opts: DumpOptions = {}): string {

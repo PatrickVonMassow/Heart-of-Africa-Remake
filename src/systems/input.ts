@@ -1,4 +1,5 @@
-// Global keyboard state: polled by scenes each frame, plus one-shot key events.
+// The game's one input path: polled keyboard state and one-shot key events,
+// the gamepad poll, the touch layer, wheel routing, and the keyboard-lock install.
 
 import { installKeyboardLock, preventsBrowserChord } from './keyboardGuard'
 import { createEngageLatch } from './touchInput'
@@ -7,7 +8,8 @@ import { UNSTUCK_KEY_CODE } from './unstuck'
 const pressed = new Set<string>()
 
 /**
- * True while the event targets a form control (debug menu fields), so game keys
+ * True while the event targets a form control (debug-menu fields, the
+ * bug-report description, the guess field), so game keys
  * don't fire and Tab still navigates between fields — matching the journal
  * toggle guard in the HUD (design.md §17/§21).
  */
@@ -21,8 +23,8 @@ if (typeof window !== 'undefined') {
     const typing = isTypingTarget(e)
     // A modifier chord on a key the game binds belongs to the game, not to the
     // browser (work-order 601): holding the label modifier while walking must
-    // not bookmark, print or save the page. The three RESERVED chords
-    // (Ctrl+W/T/N) ignore this — the keyboard lock below is what covers them.
+    // not bookmark, print or save the page. The RESERVED chords ignore this —
+    // the keyboard lock below covers Ctrl+W and Ctrl+T.
     if (preventsBrowserChord(e, { typing })) e.preventDefault()
     if (typing) return
     // Synthetic pad/touch presses are actions, not held physical keys. They
@@ -46,7 +48,7 @@ export function isKeyDown(code: string): boolean {
  * the pad's A button carries BOTH meanings of the settlement keys, because the
  * §17.5 button map has no free face button for the guess (point 1139).
  */
-export type KeyPressSource = 'keyboard' | 'gamepad' | 'touch'
+type KeyPressSource = 'keyboard' | 'gamepad' | 'touch'
 
 // WeakMap, not a flag on the event: the mark dies with the event object, and a
 // handler can never read it off a LATER press.
@@ -76,7 +78,7 @@ export function keyPressSource(e: KeyboardEvent): KeyPressSource {
  * journal, §18 load table). The wheel belongs to whichever of these the pointer
  * sits over — see wheelTargetsScene.
  */
-export const SCROLLABLE_OVERLAY_SELECTOR = '.debug-menu, .journal, .load-menu'
+const SCROLLABLE_OVERLAY_SELECTOR = '.debug-menu, .journal, .load-menu'
 
 /**
  * True when a wheel event should drive the SCENE (the bird's-eye zoom of §21.4)
@@ -93,7 +95,7 @@ export function wheelTargetsScene(target: EventTarget | null): boolean {
   return el.closest(SCROLLABLE_OVERLAY_SELECTOR) === null
 }
 
-export interface KeyPressOptions {
+interface KeyPressOptions {
   /** Match exactly these modifiers; omitted flags must be false. {} means plain. */
   exactModifiers?: Partial<Pick<KeyboardEvent, 'ctrlKey' | 'altKey' | 'metaKey' | 'shiftKey'>>
   /**
@@ -278,10 +280,6 @@ export function onTouchEngage(cb: () => void): () => void {
   }
   touchEngageCbs.add(cb)
   return () => touchEngageCbs.delete(cb)
-}
-
-export function isTouchEngaged(): boolean {
-  return touchLatch.engaged()
 }
 
 /** Overlay writes the normalised virtual-stick axes (x = strafe, y = forward). */

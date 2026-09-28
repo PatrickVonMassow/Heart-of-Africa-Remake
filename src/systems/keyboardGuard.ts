@@ -8,12 +8,14 @@
 // Two mechanisms, because neither alone is enough:
 //   - `preventDefault` takes away every Ctrl (or Alt) chord the platform lets a
 //     page take away — Ctrl+S, Ctrl+P, Ctrl+D, Ctrl+A, Ctrl+F … — but only for
-//     the codes the game itself binds, and only while the game surface, not a
-//     form control, has the keyboard.
+//     the codes of PREVENTED_CHORD_CODES (the game's keys minus the plain-bound
+//     calendar and inventory row), and only while the game surface, not a form
+//     control, has the keyboard.
 //   - Ctrl+W, Ctrl+T and Ctrl+N are RESERVED: no keydown handler reaches them.
 //     The one mechanism that does is the Keyboard Lock API
 //     (`navigator.keyboard.lock`), which captures them only while the document
-//     is FULLSCREEN, and only on Chromium. The game therefore holds the lock
+//     is FULLSCREEN, and only on Chromium. The game locks only its own keys, so
+//     it covers Ctrl+W and Ctrl+T; KeyN is unbound and Ctrl+N stays reserved. The game therefore holds the lock
 //     exactly while it is fullscreen AND holds the pointer, and its absence is
 //     never an error — a browser without it simply does not get this
 //     protection, which is why the label modifier is rebindable as well
@@ -62,13 +64,6 @@ export const GAME_KEY_CODES: readonly string[] = [
   ...CALENDAR_KEY_CODES.filter((code) => !/^Digit[1-9]$/.test(code)),
 ]
 
-const GAME_KEY_SET = new Set(GAME_KEY_CODES)
-
-/** Is this physical code one the game itself binds? */
-export function isGameKeyCode(code: string): boolean {
-  return GAME_KEY_SET.has(code)
-}
-
 /**
  * The codes whose modifier chord is taken from the browser. Prevention is for
  * keys the game acts on under Ctrl/Alt. Inventory digits require no modifiers,
@@ -86,7 +81,7 @@ const PREVENTED_CHORD_SET = new Set(PREVENTED_CHORD_CODES)
  * The codes handed to the keyboard lock: the game's keys WITHOUT Escape.
  * Escape stays the browser's, because a locked Escape turns leaving fullscreen
  * and pointer lock into a hold gesture the player never asked for — and the
- * chords that need capturing are the letter ones (Ctrl+W/T/N), not Escape.
+ * chords that need capturing are the letter ones (Ctrl+W/T), not Escape.
  */
 export const KEYBOARD_LOCK_CODES: readonly string[] = GAME_KEY_CODES.filter((c) => c !== 'Escape')
 
@@ -121,7 +116,7 @@ export function preventsBrowserChord(
 }
 
 /** The slice of the Keyboard Lock API this module uses (not in lib.dom). */
-export interface KeyboardLockApi {
+interface KeyboardLockApi {
   lock(codes?: readonly string[]): Promise<void> | undefined
   unlock(): void
 }
@@ -207,13 +202,14 @@ function documentLockState(): { fullscreen: boolean; pointerLocked: boolean } {
 
 /**
  * Wire the lock to the document: it follows the pointer lock and fullscreen,
- * and it lets go the moment the tab goes away. Idempotent; returns the
- * uninstall for symmetry with the other input installers.
+ * and it lets go the moment the tab goes away. Not idempotent: every call adds
+ * its own listeners, so input.ts calls it once; the returned uninstall is for
+ * the tests.
  *
- * RESIZE is one of the four, and it is the one that carries F11: that
+ * RESIZE is one of the five triggers, and it is the one that carries F11: that
  * fullscreen fires no `fullscreenchange` (it sets no `fullscreenElement`
  * either), so a player who is ALREADY pointer-locked and only then presses F11
- * would never be sampled — in exactly the state the settings call safe.
+ * would never be sampled — in exactly the state shouldLockKeyboard asks for.
  */
 export function installKeyboardLock(): () => void {
   if (typeof document === 'undefined') return () => {}

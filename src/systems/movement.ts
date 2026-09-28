@@ -53,8 +53,8 @@ export function placeWalkVelocity(
 /**
  * Push a point clear of every overlapping obstacle circle (design.md §19): given
  * obstacles as `[x, z, radius]`, returns the `[x, z]` moved just outside each
- * overlap with a body of `selfR`. Used so the bird's-eye traveller collides with
- * trees and animals — sliding along them instead of walking through. Coincident
+ * overlap with a body of `selfR`. The de-penetration step `resolveTravelMove`
+ * runs after its swept clamp and slide; it slides nothing itself. Coincident
  * points get a fixed +x nudge so the divide-by-zero case still parts.
  */
 export function pushOutOfCircles(
@@ -87,9 +87,9 @@ export function pushOutOfCircles(
  * `[x, z, radius]` for a body of `selfR` (design.md §19): the traveller collides
  * with trees and animals instead of walking through them. For an obstacle the
  * path *enters* this frame the move is clamped to the near boundary (a swept
- * test, so a fast step cannot tunnel through and pop out the far side); an
- * obstacle already overlapped at the start is pushed straight out. Returns the
- * resolved `[x, z]`.
+ * test, so a fast step cannot tunnel through and pop out the far side) and the
+ * leftover move slides along the surface; an obstacle already overlapped at the
+ * start is pushed straight out. Returns the resolved `[x, z]`.
  */
 export function resolveTravelMove(
   ox: number,
@@ -170,29 +170,29 @@ export function resolveTravelMove(
     }
   }
   // The per-obstacle slide can leave the point a hair inside a DIFFERENT
-  // obstacle it slid toward; a final radial de-penetration guarantees the
-  // resolved position never rests inside any body (point 113), without undoing
-  // the tangential progress that frees an overlapping-obstacle pin. A few
-  // iterations settle the point at the mouth of two overlapping bodies (each
-  // single pass pushing out of one nudges toward the other).
+  // obstacle it slid toward; a final radial de-penetration pushes the resolved
+  // position back out (point 113) without undoing the tangential progress that
+  // frees an overlapping-obstacle pin. Eight passes settle the point at the mouth
+  // of two overlapping bodies (each single pass pushing out of one nudges toward
+  // the other); they are a bound, not a proof that no overlap remains.
   for (let i = 0; i < 8; i++) [cx, cz] = pushOutOfCircles(cx, cz, obstacles, selfR)
   return [cx, cz]
 }
 
 /**
  * Slide along a blocked BOUNDARY instead of stopping dead (design.md §11.2).
- * Settlement collision has slid since point 113, and `resolveTravelMove` slides
- * around trees and animals — but the overland move treated blocked terrain (the
+ * Settlement collision slides, and `resolveTravelMove` has slid around trees and
+ * animals since point 113 — but the overland move treated blocked terrain (the
  * open ocean) as a hard stop, so a swimmer pressed against the boundary by the
  * river current had no lateral escape at all: the reported softlock in the Nile
  * delta's mouth notch, where the current outruns the swim speed upstream and the
  * coast refuses every step (point 316).
  *
  * Tries the intended heading first, then swings alternately outward in `stepDeg`
- * increments up to ±90°, and returns the first free target — the same shape the
- * wildlife's coast deflection uses. Returns null only when EVERY direction in
- * that fan is blocked (a genuine dead end), which is what the blocked notice is
- * for. Pure: `blockedAt` decides what is impassable.
+ * increments to a little past ±90° (about 105°), and returns the first free
+ * target — the same shape the wildlife's coast deflection uses. Returns null
+ * when EVERY direction in that fan is blocked (a genuine dead end), which is what
+ * the blocked notice is for, and for a near-zero step, which has nowhere to go. Pure: `blockedAt` decides what is impassable.
  */
 export function slideAlongBlocked(
   x: number,

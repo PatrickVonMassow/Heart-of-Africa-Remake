@@ -1,6 +1,6 @@
 // Bridges the game state to the procedural ambience engine (design.md §19):
-// starts audio on the first user gesture and keeps region/perspective and
-// village proximity in sync so the soundscape switches with them.
+// starts audio on the first user gesture and keeps region/perspective, village
+// proximity and the coastal-surf gain in sync so the soundscape follows them.
 
 import { useEffect } from 'react'
 import { useGame } from '../state/store'

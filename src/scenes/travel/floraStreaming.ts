@@ -10,15 +10,15 @@
 //     165-330), far beyond 100×zoom — so at a wide zoom plants still streamed
 //     in WITHIN the view (faintly fogged, but visible). The circle now follows
 //     the fog far (the definitive visible limit — nothing renders past it), so
-//     its edge is always fully fogged out at ANY zoom, without trusting a
-//     frustum estimate. And the per-chunk fill runs NEAREST-FIRST, so a full
+//     its edge is fogged out at ANY zoom (up to FLORA_SPAWN_HARD_CAP, where the
+//     ring already sits in >90% fog), without trusting a frustum estimate. And the per-chunk fill runs NEAREST-FIRST, so a full
 //     instance buffer drops the FARTHEST plants (the drawn edge stays a fogged
 //     circle) instead of fraying a ragged, chunk-order boundary into view.
 // Kept separate from the three.js render loop so the rules are unit-testable.
 
-/** Plants are drawn out to fog.far + this reserve, so the streaming edge is a
- *  circle strictly BEYOND everything the fog lets the player see; its pop on a
- *  rebuild is always in dense fog and therefore invisible. */
+/** Plants are drawn out to fog.far + this reserve (up to FLORA_SPAWN_HARD_CAP),
+ *  so the streaming edge is a circle beyond what the fog lets the player see;
+ *  its pop on a rebuild is in dense fog and therefore invisible. */
 export const FLORA_SPAWN_MARGIN = 30
 /** Bounds the rebuild cost in the widest-fog regions (east fog far 330). Beyond
  *  this the outer ring already sits in >90% fog, so capping the radius there
@@ -64,9 +64,10 @@ export function floraFogFar(fogFactor: number): number {
 }
 
 /** The radius (world units) out to which flora is drawn — the fog-limited
- *  visible extent plus a reserve, so the circular streaming edge is always
- *  beyond the visible ground and its pop stays in the fog. Zoom-independent:
- *  the fog far, not the camera height, sets what the player can see. */
+ *  visible extent plus a reserve, capped at FLORA_SPAWN_HARD_CAP, so the
+ *  circular streaming edge sits beyond the visible ground and its pop stays in
+ *  the fog. The fog far (which the zoom's clearView extends), not the camera
+ *  height, sets what the player can see. */
 export function floraSpawnRadius(fogFar: number): number {
   return Math.min(FLORA_SPAWN_HARD_CAP, fogFar + FLORA_SPAWN_MARGIN)
 }

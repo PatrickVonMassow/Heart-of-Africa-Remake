@@ -71,30 +71,16 @@ export function directionToU(dx: number, dz: number): number {
  * BAND CONVENTION: the buffer is DIRECTION-TRUE. `directionToU` gives the
  * column that photographed a world direction, and slice k holds the compass
  * point its own camera looked at (`sectorYaw(k)`), so a consumer samples the
- * band with `directionToU` and nothing else.
- *
- * It was read as MIRRORED between 14.07.2026 and point 545 — content at the
- * negated bearing, slice k as [N, W, S, E][k], and the horizon cylinder
- * sampling the mirrored column to match. That convention was calibrated against
- * a band that was drawn but WRONGLY CUT: the per-sector viewport was read off
- * the render target rather than the renderer, so every sector covered the full
- * width and only the LAST camera — k=3, looking west — survived, stretched 4:1.
- * The July landmark measurement (Giza at u 0.405) is what that band predicts:
- * Giza stands 10.7° south of due west, and (1 − tan 10.7°)/2 = 0.4055, closer
- * than the mirrored convention's own 0.399. So the basis was invalid, though
- * not for the reason first recorded here — the band only went EMPTY on
- * 25.07.2026, when pipeline creation became asynchronous and the one-shot shot
- * began skipping every object (point 545). With the capture drawing again and
- * cut per sector, a magenta pillar injected
- * DUE WEST of the capture point lands at u 0.875 — dead centre of slice 3,
- * whose camera looks west — measured on the WebGL 2 path, and the rendered
+ * band with `directionToU` and nothing else. Verified (point 545): a magenta
+ * pillar injected DUE WEST of the capture point lands at u 0.875 — dead centre
+ * of slice 3, whose camera looks west — on the WebGL 2 path, and the rendered
  * horizon shows it in the west.
  */
 
 /** Compass point slice k holds, straight from `sectorYaw`. */
 export const SECTOR_COMPASS = ['N', 'E', 'S', 'W'] as const
 
-/** The compass point each slice holds, keyed by direction. */
+/** Per-slice water fractions, keyed by the compass point each slice holds. */
 export type CompassFractions = Record<'n' | 'e' | 's' | 'w', number>
 
 /**
@@ -117,11 +103,6 @@ export function compassFractions(fractions: readonly number[]): CompassFractions
  */
 export function bandHeightAt(radius: number): number {
   return 2 * radius * Math.tan(((BAND_V_FOV_DEG / 2) * Math.PI) / 180)
-}
-
-/** Terrain-chunk grid id `cx,cz` for a world point (the travel chunk grid). */
-export function chunkIdAt(x: number, z: number, chunkSize: number): string {
-  return `${Math.floor(x / chunkSize)},${Math.floor(z / chunkSize)}`
 }
 
 /**
@@ -181,7 +162,7 @@ export function panoramaCaptureReady(
  * The travel scene streams terrain only within a bounded chunk window; the
  * global sea plane, the river ribbons and the lake sheets carry no such bound
  * and keep drawing far past it (the sea plane is sized against the travel
- * camera's fog, not against this one's 900-unit reach). A capture camera that
+ * camera's fog, not against the capture camera's far plane). A capture camera that
  * looks beyond the committed window therefore bakes those sheets FLOATING with
  * no ground behind them, and the place scene draws the result as a hard, flat
  * grey/silver strip ABOVE the band's own horizon, with the geometry backdrop's

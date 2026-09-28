@@ -1,4 +1,6 @@
-// Transient UI state (dialogs, interaction prompt, debug menu visibility).
+// Transient UI state: dialogs, the interaction prompt and debug menu, plus the
+// graphics level and render flags, look and label preferences, the benchmark
+// state and the running drum performance.
 
 import { create } from 'zustand'
 import type { UtteranceId } from '../communication/lexicon'
@@ -23,7 +25,7 @@ export type LabelModifier = 'ctrl' | 'shift' | 'alt'
 export const LABEL_MODIFIERS: readonly LabelModifier[] = ['ctrl', 'shift', 'alt']
 
 /** Progress of the running in-game benchmark (design.md §21.1, F8). */
-export interface BenchProgress {
+interface BenchProgress {
   /** Config name, or null while the discarded warm-up pass runs. */
   config: string | null
   configIndex: number
@@ -36,7 +38,7 @@ export interface BenchProgress {
 }
 
 /** A finished benchmark report, ready to download or copy. */
-export interface BenchReportFile {
+interface BenchReportFile {
   filename: string
   json: string
   aborted: boolean
@@ -52,7 +54,7 @@ export type Dialog =
   // The chief's drum message, shown after the drums and reopenable at any time
   // from the journal (design.md §13.4, point 486).
   | { kind: 'drumMessage'; message: DrumMessageId }
-  // A guess at what a speaker just said, opened with the use key on him
+  // A guess at what a speaker just said, opened with the guess key (E) on him
   // (design.md §13.4, points 588/691). It carries the atoms it was opened FOR,
   // so it outlives the label over the speaker's head.
   | { kind: 'speechGuess'; speakerId: string; atoms: readonly UtteranceId[] }
@@ -61,9 +63,10 @@ export type Dialog =
   | { kind: 'camp'; scope: 'village'; placeId: string }
   | null
 
-export interface UiState {
+interface UiState {
   dialog: Dialog
-  /** Interaction prompt shown at the bottom of the screen, e.g. "Space — Laden". */
+  /** Interaction prompt shown at the bottom of the screen (a localized
+   *  key hint). */
   prompt: string | null
   /**
    * True while the guess key (E) has a word to act on where the player stands
@@ -80,8 +83,9 @@ export interface UiState {
   debugOpen: boolean
   /**
    * The ids of the OPEN debug-menu groups (design.md §21.3). Every group starts
-   * collapsed; an opened one stays open for the rest of the session, so a
-   * calibration pass does not re-open the same group after every F1.
+   * collapsed; an opened one stays open across closing and reopening the menu
+   * until toggled shut, so a calibration pass does not re-open the same group
+   * after every F1.
    */
   debugGroupsOpen: string[]
   /** Self-drawing exploration map (design.md §19). */
@@ -140,7 +144,8 @@ export interface UiState {
    * Touch/tablet layer active (design.md §17.5, point 84): armed once by the
    * first real touch (deliberate-input guard in input.ts) — never by user-agent
    * sniffing — so a desktop with no touch events stays pixel-identical. Mounts
-   * the on-screen controls and applies the mobile quality preset.
+   * the on-screen controls and applies the touch render overrides
+   * (activateTouch).
    */
   touchActive: boolean
   /**
@@ -329,8 +334,9 @@ export const useUi = create<UiState>()((set) => ({
   setTravelZoom: (travelZoom) =>
     set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 16 : DEFAULT_TRAVEL_ZOOM, Math.max(0.125, travelZoom)) })),
   setJournalDnd: (journalDnd) => set({ journalDnd }),
-  // First touch arms the layer and drops to the mobile quality preset: TRAA off
-  // (back to the render pass' MSAA), SSAO off, half-size shadow maps. Each stays
+  // First touch arms the layer and applies the touch render overrides: TRAA off
+  // (back to the render pass' MSAA), SSAO off, half-size shadow maps, campfire
+  // shadows off. The graphics level itself is unchanged. Each stays
   // individually re-enablable in the debug menu. Idempotent — later touches are
   // a no-op so a debug re-enable is not clobbered.
   activateTouch: () =>
@@ -368,7 +374,7 @@ export const useUi = create<UiState>()((set) => ({
 // 'high' shift every lever together.
 
 /** The quality preset for the current graphics level. */
-export const currentQuality = (s: UiState) => QUALITY_PRESETS[s.detailLevel]
+const currentQuality = (s: UiState) => QUALITY_PRESETS[s.detailLevel]
 
 /** Device-pixel-ratio cap for the current level; null keeps the native ratio. */
 export const effectiveDprCap = (s: UiState): number | null => currentQuality(s).dprCap
@@ -387,7 +393,9 @@ export const effectiveShadowResolution = (s: UiState): number =>
 /** Campfire shadows (point 289) cast when the level allows it AND the player has
  *  not tuned them off. */
 export const effectiveFireShadows = (s: UiState): boolean => currentQuality(s).fireShadows && s.fireShadowsEnabled
-/** Campfire cube-shadow map resolution for the current level (0 when off). */
+/** Campfire cube-shadow map resolution for the current level (0 on a level
+ *  without campfire shadows; the fireShadowsEnabled flag gates
+ *  effectiveFireShadows, not this). */
 export const effectiveFireShadowResolution = (s: UiState): number => currentQuality(s).fireShadowResolution
 /** Soft (PCF) campfire shadows — the costlier high-only variant. */
 export const effectiveFireShadowSoft = (s: UiState): boolean => currentQuality(s).fireShadowSoft

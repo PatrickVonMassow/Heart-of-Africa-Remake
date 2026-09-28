@@ -21,9 +21,10 @@
 //     dodge and guard states already use.
 //
 // THE SPRINT IS SPENT DELIBERATELY, NEVER CONTINUOUSLY. A child that always ran
-// at whatever its current maximum is could never recover, and a chaser that
-// emptied its reserve once would stay a hopeless trotter for the rest of the
-// round — the game would be over without ending.
+// at whatever its current maximum is would hover where its cap meets the trot
+// and never refill to a real sprint, and a chaser that emptied its reserve once
+// would stay a hopeless trotter for the rest of the round — the game would be
+// over without ending.
 
 /** What a mover is doing with its reserve this instant. */
 export type Effort = 'sprint' | 'cruise' | 'recover'
@@ -33,7 +34,7 @@ export type Press = 'press' | 'recover'
 
 /** Which side of the chase a mover is on. The runner is the FASTER of the two
  *  while fresh — see `topPace`. */
-export type ChaseRole = 'chaser' | 'runner'
+type ChaseRole = 'chaser' | 'runner'
 
 /** The paces and rates of a chase, all calibratable (`balance.villageLife.tag`). */
 export interface StaminaProfile {
@@ -76,8 +77,9 @@ export function smoothstep(t: number): number {
   return x * x * (3 - 2 * x)
 }
 
-/** The steepest the curve ever is, in cap units per reserve unit — the bound a
- *  test can hold `paceCap` to so a step function cannot be slipped back in. */
+/** The steepest the smoothstep ever is, per reserve unit; `paceCap`'s own slope
+ *  is this times the pace span (top − floor) — the bound a test can hold it to
+ *  so a step function cannot be slipped back in. */
 export const CURVE_MAX_SLOPE = 1.5
 
 /** The pace floor of a chase (shared by both roles, so a spent runner and a
@@ -170,9 +172,9 @@ export function advanceReserve(
  * cannot flap the state frame by frame.
  *
  * A debug edit can put the two thresholds in the wrong order at runtime; the
- * comparison is written so that even then no oscillation is possible (the low
- * test wins, and the mover simply stays in recovery until the reserve clears the
- * higher of the two).
+ * comparison is written so that even then the state stays defined (the low test
+ * wins, and the high one is lifted to it) — though the hysteresis then collapses
+ * to that single boundary.
  */
 export function pressState(prev: Press, reserve: number, p: StaminaProfile): Press {
   const low = p.breakOff
@@ -209,7 +211,8 @@ export function easeTrend(prev: number, sample: number, dt: number, tau: number)
  * hysteresis pair so the decision cannot flap: it starts sprinting when the gap
  * has stopped growing (`enter`, at or a little above zero — at a steady chase
  * the trend sits at zero and the burst must still be allowed to open) and stops
- * when the gap is clearly running away from it (`leave`).
+ * when the gap is clearly running away from it (`leave`). Within `commit` of the
+ * target it presses whatever the trend.
  */
 export function chaserPresses(
   prevSprinting: boolean,
@@ -249,18 +252,12 @@ export function headingToward(x: number, z: number, tx: number, tz: number, fall
   return Math.atan2(dx, dz)
 }
 
-/** Blend two headings the short way round, `t` from 0 (a) to 1 (b). */
-export function blendHeading(a: number, b: number, t: number): number {
-  const delta = Math.atan2(Math.sin(b - a), Math.cos(b - a))
-  return a + delta * clamp(t, 0, 1)
-}
-
 /**
  * Turn `from` toward `to` by at most `maxDelta` radians, the short way round.
  * The rendered body uses this while the TRAVEL heading is free to jump: a
  * deflection round a corner is a real change of direction, but a figure that
- * snapped to it spun about-face inside one frame. A non-positive or non-finite
- * step leaves the facing exactly where it was rather than teleporting it.
+ * snapped to it spun about-face inside one frame. A non-positive or NaN step
+ * leaves the facing exactly where it was; an infinite one turns straight to `to`.
  */
 export function turnToward(from: number, to: number, maxDelta: number): number {
   const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from))
@@ -289,11 +286,11 @@ export function turnToward(from: number, to: number, maxDelta: number): number {
  * geometry passes through opposition, which is an about-face: measured at the
  * reported seed, a runner ran 1.2 m along the rim, turned right round, ran the
  * same 1.2 m back and turned again — 3.25 m walked for 0 cm gained. So where
- * the two pulls are within 30° of opposing, the way round is decided by the way
- * the runner is ALREADY running (`current`) rather than by the geometry, and it
- * therefore holds across frames: the runner breaks along the rim and stays on
- * that break. Further from opposition there is only one sensible way round and
- * the short one is always taken.
+ * the two pulls are within 30° of opposing (`OPPOSED`), the way round is decided
+ * wholly by the way the runner is ALREADY running (`current`) rather than by the
+ * geometry, and it therefore holds across frames: the runner breaks along the
+ * rim and stays on that break. Between 30° and 60° from opposition (`RELEASE`)
+ * that commitment fades linearly to the short way, which alone is taken beyond.
  */
 export function evadeHeading(
   x: number,
@@ -331,7 +328,7 @@ export function evadeHeading(
       // the 30° below the band turns that snap into a walked curve: the
       // heading rotates only as fast as the geometry moves the delta through
       // the ramp, and every value between the two ways round is passed
-      // through instead of jumped over. Two downstream cures were measured
+      // through instead of jumped over (bar the sign-boundary jump below). Two downstream cures were measured
       // first and rejected for degrading healthy villages (the wedgeCarve.ts
       // record): a rate-limited bank (a third hover rescue in the
       // adult-in-ground minute — its sweep hugs the progress anchor) and a
