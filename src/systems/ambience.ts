@@ -11,7 +11,7 @@ import type { Tone } from '../communication/lexicon'
 import { hearingGain, speechPan, phrasePlan, utterancePlan, type CryPlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
 
-export interface AmbienceScene {
+interface AmbienceScene {
   region: RegionId
   mode: 'travel' | 'place'
   /** null in travel; a monument uses the region's ambient bed (no bustle). */
@@ -33,7 +33,8 @@ const FADE = 1.6 // seconds
 /** Coastal surf fade (point 153, design.md §19.1): the surf bed's gain by the
  *  distance (in degrees) to the nearest coast — full (1) within `nearRadius`,
  *  silent (0) at/beyond `cutoff`, a smooth monotone fall between. Pure, so the
- *  curve is unit-tested; the caller multiplies it into the surf layer target. */
+ *  curve is unit-tested; the caller hands it to setAmbienceCoast, and
+ *  applySurfTarget multiplies it into the surf layer target. */
 export function coastSurfGain(coastDist: number, nearRadius: number, cutoff: number): number {
   if (coastDist <= nearRadius) return 1
   if (coastDist >= cutoff) return 0
@@ -42,7 +43,7 @@ export function coastSurfGain(coastDist: number, nearRadius: number, cutoff: num
   return 1 - s
 }
 /** Base surf loudness at the shore (before the coast fade and the ambience
- *  volume) — the old port-only 0.22 is now the near-coast value. */
+ *  volume). */
 const SURF_BASE = 0.26
 
 let ctx: AudioContext | null = null
@@ -60,9 +61,9 @@ let limiterIn: GainNode | null = null
 let limiterCalibration: { threshold: number; ceiling: number } | null = null
 // THREE sub-buses under the master so footsteps, the village speech and every
 // other ambient sound can be balanced against each other (design.md §19.1/§20;
-// user request): footsteps ×2, all else ×0.5. Every layer/emitter routes through
-// ambientBus, footsteps through footstepBus, so the split needs no per-emit
-// change.
+// user request). Footsteps route through footstepBus, the speech (playSpeech,
+// playTagCry) through speechBus below, and every other layer/emitter through
+// ambientBus, so the split needs no per-emit change.
 let footstepBus: GainNode | null = null
 let ambientBus: GainNode | null = null
 // The speech bus is the third (point 577). The syllables are the one sound the
@@ -200,7 +201,7 @@ function emitInsects(dest: GainNode) {
   }
 }
 
-/** Jungle bird: two falling chirps. */
+/** Jungle bird: one falling chirp, usually followed by a second. */
 function emitBird(dest: GainNode) {
   if (!ctx) return
   const t0 = ctx.currentTime
@@ -236,19 +237,18 @@ export const DRUM_BED_PATTERNS: ReadonlyArray<ReadonlyArray<number>> = [
   [1, 0, 0.36, 0.58, 0, 0, 0.68, 0],
 ]
 
-export interface DrumBedHit {
+interface DrumBedHit {
   startOffset: number
   peak: number
   pitchStartHz: number
   pitchEndHz: number
 }
 
-export interface DrumBedPhrasePlan {
+interface DrumBedPhrasePlan {
   patternIndices: number[]
   hits: DrumBedHit[]
+  /** Share of silent steps in the phrase (the sparse-rhythm invariant). */
   restShare: number
-  tempoScale: number
-  pitchScale: number
   /** From this phrase's first hit to the next phrase's first hit. */
   nextDelaySeconds: number
 }
@@ -338,8 +338,6 @@ export function drumBedPhrasePlan(
     patternIndices,
     hits,
     restShare: restCount / stepCount,
-    tempoScale,
-    pitchScale,
     nextDelaySeconds: phraseSeconds + baseGap * gapFactor,
   }
 }
@@ -347,8 +345,9 @@ export function drumBedPhrasePlan(
 /** Render one planned phrase with the bed's deliberately plain low sine voice.
  *  Message drums use two distinct heads, a longer ring and a stick click below;
  *  keeping all three out of this bed preserves that semantic boundary. The
- *  live switch is checked here as well as by the emitter, so a phrase already
- *  queued when the switch is turned off cannot leak through. */
+ *  live switch is checked here as well as by the emitter, so no new phrase
+ *  starts once the switch is off (hits already scheduled for a started phrase
+ *  still play out). */
 export function emitDrumPhrase(dest: GainNode): number {
   if (!balance.drumBed.enabled) return 1
   if (!ctx) return 1
@@ -453,7 +452,8 @@ function emitFlock(dest: GainNode) {
 // Coast proximity (point 153): 0 = far inland (no surf), 1 = at the shore, set
 // by the ambience controller from the distance to the nearest coast. Re-applied
 // on a move and on a volume change so the surf fades as the traveller leaves the
-// sea. Its curve (coastSurfGain) is computed by the caller and clamped here.
+// sea. Its curve (coastSurfGain) is computed by the caller and clamped in
+// setAmbienceCoast.
 let coastProx = 0
 
 // Nearby-animal proximity (0 = none/far, 1 = right beside the player), set each
@@ -570,8 +570,9 @@ function applyScene() {
     east: 0.2,
     south: 0.18,
   }
-  // Every ambience layer is scaled by the single configurable ambience volume
-  // (design.md §21; default 0.1).
+  // Wind, murmur and surf are scaled by the configurable ambience volume
+  // (design.md §21; default 0.1); birdsong has its own volume, and insects,
+  // drums and music run at their own gains.
   const noise = balance.ambienceVolume
   setTarget('wind', (inPlace ? 0.1 : windByRegion[region]) * noise)
   // Surf is coastal (point 153): the coast fade drives it in both travel and
@@ -594,8 +595,8 @@ function applyScene() {
 
 /**
  * A single footstep (point 97): a short filtered-noise impulse through the
- * master bus, so it respects the single ambience volume like every other
- * sound. Duller and softer on open ground/sand, harder and brighter on a
+ * footstep bus (the master when none), its peak scaled by the ambience
+ * volume. Duller and softer on open ground/sand, harder and brighter on a
  * stone/clay path. One-shot — no layer, no scheduling.
  */
 export function emitFootstep(surface: 'ground' | 'stone') {
@@ -640,8 +641,9 @@ export function proximityGain(distance: number, audible = PROXIMITY_AUDIBLE): nu
 }
 
 // Peak envelope of the trample crunch (pre-bus). Like the thunder peaks it
-// compensates the ambient-bus (0.5) x master (0.5) attenuation so a near
-// trample reads clearly over the beds; calibratable (design.md §21).
+// compensates the ambient-bus (0.5 by default) x master (0.5) attenuation so a
+// near trample reads clearly over the beds; a fixed constant (the volume and
+// the distance are the calibratable inputs).
 const CRUNCH_PEAK = 2.2
 
 /** Peak gain of the trample crunch (design.md §19.1/§19.5, point 260): the
@@ -663,7 +665,7 @@ export function trampleCrunchFires(prevDead: boolean, nowDead: boolean): boolean
 /** One micro-crackle of the crunch's bone layer: a short, bright, hard-attack
  *  band-passed noise snap. Several of these a few ms apart read as bones
  *  crunching rather than one thud. */
-export interface CrunchCrackle {
+interface CrunchCrackle {
   /** Seconds after the impact this snap starts. */
   startOffset: number
   /** Attack time — hard (a couple of ms): the snap edge. */
@@ -682,7 +684,7 @@ export interface CrunchCrackle {
  *  and (b) a wet soft-tissue SQUELCH — with every level scaled by the
  *  UNCHANGED trampleCrunchGain curve. Pure (rand injectable), so the layers'
  *  presence and envelope shapes are unit-testable without WebAudio. */
-export interface TrampleCrunchPlan {
+interface TrampleCrunchPlan {
   /** The §19.1 distance + ambience-volume peak (trampleCrunchGain, unchanged). */
   peak: number
   /** (a) The bone layer: a loud lead crack plus fast decaying micro-crackles. */
@@ -805,7 +807,7 @@ export function playTrampleCrunch(distance: number): void {
  * strength and the single ambience volume (0 => silent). Pure, so the
  * flash->thunder pairing is unit-testable without WebAudio.
  */
-export interface ThunderPlan {
+interface ThunderPlan {
   /** Seconds after "now" the clap starts — the flash->thunder lag, >= 0. */
   startOffset: number
   /** Envelope peak of the sharp mid-band onset (pre-bus gain). */
@@ -856,8 +858,8 @@ function noiseBuffer(ac: AudioContext, dur: number, brown: boolean): AudioBuffer
   return buffer
 }
 
-/** One noise voice (thunder claps, the trample crunch): normalized noise ->
- *  filter -> envelope -> the ambient bus. `shapeFilter` optionally schedules a
+/** One noise voice (thunder claps, the trample crunch, the loom beat):
+ *  normalized noise -> filter -> envelope -> `dest`. `shapeFilter` optionally schedules a
  *  frequency sweep on top of the static `freq` (the squelch's falling formant). */
 function clapVoice(
   ac: AudioContext,
@@ -974,7 +976,9 @@ const VOWEL_ONSET_SECONDS = 0.035
 /** The small pitch fall of a spoken beat — far too small to blur the two tones. */
 const SPEECH_PITCH_FALL = 0.96
 
-/** Dev/verify probe: proves a spoken utterance really SCHEDULED audio. */
+/** Dev/verify probe: `spoken` counts audible speech plans and sent drum
+ *  messages (even without a started engine); `syllables` and `lastPeak` move
+ *  only when audio was really SCHEDULED (drum strikes count as syllables). */
 const speechProbe =
   import.meta.env.DEV && typeof window !== 'undefined'
     ? ((window as unknown as { __villageSpeech?: { spoken: number; syllables: number; lastPeak: number } }).__villageSpeech ??= {
@@ -991,7 +995,7 @@ const speechProbe =
  * voice and vowel, but breathed in with no plosive and no formant transition,
  * on a pitch that leaps up and falls away — a whoop, never a tone of the lect.
  */
-export type SyllableForm = 'ba' | 'ha'
+type SyllableForm = 'ba' | 'ha'
 
 /** The `ha` cry's pitch contour, as factors on its carrier: it rises to its
  *  top a third of the way in and falls below its start by the end. Shape. */
@@ -1091,8 +1095,8 @@ const cryProbe =
 /**
  * The tag catcher's wordless cry (work-order 1176): one `ha` in the child
  * register through the SPEECH bus — so it obeys the voice volume the settlement
- * voices obey, and the §21 volume already sits in the plan's peak. Nothing is
- * heard, recorded or shown: this is sound only.
+ * voices obey, and the §21 volume already sits in the plan's peak. It enters
+ * no heard memory, no record and no label: this is sound only.
  */
 export function playTagCry(plan: CryPlan | null): void {
   if (!plan) return
@@ -1111,7 +1115,7 @@ export function playTagCry(plan: CryPlan | null): void {
   }
 }
 
-/** One route per utterance. The equal-power panner is compensated to keep
+/** One route per voiced sound (an utterance, a tag cry, a loom beat). The equal-power panner is compensated to keep
  * (L + R) / 2 at unity: mono downmix loses direction, never level. Stereo power
  * can rise toward the side; the headroom check includes that louder channel.
  * Width zero and engines without a panner retain the original mono route. */
@@ -1170,7 +1174,7 @@ export function playLoomBeat(distance: number, bearing = 0): void {
  * constant pace, a phrase's atoms with the constant pause between them, all on
  * the AudioContext clock — so a re-render or a scene change mid-phrase can never
  * cancel what is already scheduled. Every voice goes through the SPEECH bus
- * (point 577): under the master §21 ambience volume, but beside — never behind —
+ * (point 577): under the master, but beside — never behind —
  * the ambient bus that carries the drums and the rest of the village bed. A plan
  * that carries no audible syllable (out of range, muted) schedules nothing.
  */
@@ -1192,8 +1196,9 @@ export function playSpeech(plan: SpeechPlan): void {
   // of the chain — the level that actually LEAVES the graph — not at the level
   // the plan asked for. Point 577's defect had an intact plan with a positive
   // peak whose tone was multiplied by ZERO further down the bus, and every
-  // measurement that stopped at the plan reported it healthy. The one legitimate
-  // silence is the player's own speech slider at zero.
+  // measurement that stopped at the plan reported it healthy. The legitimate
+  // silences are the player's own speech slider at zero and a running drum
+  // message (below).
   //
   // The PLAN's peak is what is read, deliberately, not the 0.0001 floor the
   // scheduling passes to the envelope: that floor exists because an exponential
@@ -1233,8 +1238,8 @@ export function playSpeech(plan: SpeechPlan): void {
 
 /**
  * The two message drums (design.md §13.4, point 486): the LARGE low one speaks
- * `ba`, the SMALL high one `BA`, and they differ in pitch alone — exactly as the
- * two spoken syllables do. A hit is a struck membrane: a fast fall in pitch with
+ * `ba`, the SMALL high one `BA`, and they differ in pitch (and ring length) —
+ * as the two spoken syllables differ in tone. A hit is a struck membrane: a fast fall in pitch with
  * a short body, so a beat is unmistakably a drum and never a voice.
  */
 const DRUM_TONE: Record<DrumId, { head: number; body: number; ring: number }> = {
@@ -1308,7 +1313,6 @@ export function startAmbience() {
   applyScene()
 }
 
-/** Re-apply the gain targets after a volume change in the debug menu. */
 /** What the DEPLOYED last stage makes of a level (point 1156). It reads the
  *  table the shaper really carries and the gains really set, never the balance
  *  values beside them: a calibration that has not reached the graph yet must
@@ -1330,6 +1334,7 @@ function applyLimiterCalibration() {
   limiterCalibration = { threshold, ceiling }
 }
 
+/** Re-apply the gain targets after a volume change in the debug menu. */
 export function refreshAmbienceVolume() {
   if (!ctx) return
   applyLimiterCalibration()
@@ -1337,7 +1342,7 @@ export function refreshAmbienceVolume() {
   for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume * wobbleExtra(w.name)
   if (ambientBus) ambientBus.gain.value = balance.ambientVolume
   if (footstepBus) footstepBus.gain.value = balance.footstepVolume
-  if (speechBus && (!ctx || ctx.currentTime >= speechQuietUntil)) speechBus.gain.value = Math.max(0, balance.communication.speechVolume)
+  if (speechBus && ctx.currentTime >= speechQuietUntil) speechBus.gain.value = Math.max(0, balance.communication.speechVolume)
 }
 
 /** Update the ambience to the current game situation. */
