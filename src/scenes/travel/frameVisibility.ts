@@ -1,6 +1,7 @@
 // Shared "is this ground point inside the rendered frame" test (point 165).
-// The wildlife guarantee-seeders run inside the Wildlife frame and have no
-// camera; they must place animals OUTSIDE the frame so nothing pops into view
+// The wildlife code (the guarantee-seeders, the scripted spawns, the flights and
+// the streaming cull) runs inside the Wildlife frame and has no camera; it must
+// place animals OUTSIDE the frame so nothing pops into view
 // (design.md §19.5/§19.6 — the user report: "sie sollen nur außerhalb des
 // Sichtfeldes spawnen"). TravelScene installs the real test each frame from the
 // bird's-eye camera (projecting to NDC); the point-172 lesson is that the true
@@ -86,6 +87,8 @@ export function projectPoint(
   const nz = (p[2] * vx + p[6] * vy + p[10] * vz + p[14]) / cw
   out.x = nx
   out.y = ny
+  // Only the far plane is depth-tested; a point behind the lens is already
+  // rejected above (w ≤ 0), and no ground point lies before the near plane.
   out.onScreen = nz < 1 && Math.abs(nx) <= 1 + margin && Math.abs(ny) <= 1 + margin
   return out
 }

@@ -12,7 +12,8 @@
 import type { PredatorKind } from './wildlifeBehavior'
 
 /** Every species the herds render (design.md §19); the four predators appear as
- *  carcasses and the scripted hunt's live lion. */
+ *  revenge carcasses, and the lion also as the live lioness-and-cub family (the
+ *  scripted hunt draws its live predator itself). */
 export type Species =
   | 'elephant'
   | 'giraffe'
@@ -34,7 +35,8 @@ export const SPECIES: Species[] = [
  *  keep — at least the sum of two bodies' radii between their centres, so they
  *  neither spawn inside one another nor walk through each other (design.md
  *  §19). The elephant×smaller-prey pair is exempt at runtime: trampling is a
- *  designed interaction (the herd walks OVER a too-slow animal). The SAME radius
+ *  designed interaction (the herd walks OVER a too-slow animal); the separate
+ *  elephant body collider uses the elephant's radius alone. The SAME radius
  *  scales with the DRAWN instance for the traveller's collision circle below. */
 export const BODY_RADIUS: Record<Species, number> = {
   elephant: 1.3,
@@ -47,7 +49,8 @@ export const BODY_RADIUS: Record<Species, number> = {
   crocodile: 0.55,
   plover: 0.12,
   // Predator entries complete the record (point 146); their list members are
-  // always dead, and every proximity pass skips carcasses.
+  // carcasses — bar the live lioness-and-cub family in the lion list — and
+  // every proximity pass skips carcasses.
   lion: 0.8,
   cheetah: 0.55,
   leopard: 0.55,
@@ -92,8 +95,8 @@ export function recordDrawnBody(a: DrawnBodyCarrier, m: ArrayLike<number>, frame
 
 /**
  * Collision circle `[x, z, radius]` of an animal AS DRAWN, or `null` when the
- * given render pass did not draw it (never drawn, capped out, or dead — a
- * carcass stays passable, design.md §19).
+ * given render pass did not draw it (never drawn, capped out) or it is dead
+ * (drawn, but a carcass stays passable, design.md §19).
  */
 export function drawnCollisionCircle(
   a: DrawnBodyCarrier,

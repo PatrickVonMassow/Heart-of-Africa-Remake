@@ -4,9 +4,11 @@
 // first-person view then shows the REAL surroundings — the mountains, water
 // courses and dressing that lie there in the bird's-eye view, direction-true
 // — instead of a genericized relief. The capture survives the scene switch
-// (the render target lives on the renderer); entering without a live travel
-// scene (loading a snapshot, a ferry passage) leaves no capture and the
-// place scene falls back to the geometry backdrop.
+// (its targets are module-level, allocated once per session); entering without
+// a live travel scene (loading a snapshot, a ferry passage) takes no new
+// capture, and the freshness rule (panoramaBandShown in panoramaMath.ts) then
+// keeps any older capture off-screen so the place scene falls back to the
+// geometry backdrop.
 
 import * as THREE from 'three/webgpu'
 import {
@@ -106,7 +108,7 @@ export function capturePanorama(
   /** Far plane (point 335): must not reach past the streamed terrain window,
    *  or the unbounded water sheets bake a floating grey horizon strip. The
    *  caller derives it with `panoramaCaptureFar`. */
-  far = 900,
+  far: number,
 ): void {
   // The traveller figure and the entered place's own marker stand AT the
   // capture point — hide them for the shot, restore afterwards.
@@ -121,7 +123,7 @@ export function capturePanorama(
   const { band: target, sector, width } = captureTargets(renderer)
   // Near plane 3: close terrain belongs to the settlement's own scene, but
   // nearby landmarks must stay in (Giza stands ~4 units west of Cairo); the
-  // oversized symbolic dressing is hidden anyway. The FAR plane is bounded by
+  // oversized symbolic dressing is hidden by the caller (hideNames). The FAR plane is bounded by
   // the streamed terrain window (point 335, panoramaCaptureFar): past it only
   // the unbounded water sheets would draw, floating with no ground behind them.
   const cam = new THREE.PerspectiveCamera(BAND_V_FOV_DEG, Math.tan((SECTOR_H_FOV_DEG / 2) * (Math.PI / 180)) / Math.tan((BAND_V_FOV_DEG / 2) * (Math.PI / 180)), 3, far)

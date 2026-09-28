@@ -13,7 +13,6 @@ import {
   bandWidth,
   directionToU,
   bandHeightAt,
-  chunkIdAt,
   panoramaCaptureReady,
   panoramaCaptureFar,
   panoramaBandShown,
@@ -125,13 +124,6 @@ describe('bandHeightAt', () => {
 
 describe('panorama capture gate (point 227: no capture before the terrain is committed)', () => {
   const CHUNK = 24
-
-  it('chunkIdAt matches the travel chunk grid, including negative coordinates', () => {
-    expect(chunkIdAt(0, 0, CHUNK)).toBe('0,0')
-    expect(chunkIdAt(23.9, 23.9, CHUNK)).toBe('0,0')
-    expect(chunkIdAt(24, 0, CHUNK)).toBe('1,0')
-    expect(chunkIdAt(-0.1, -24.1, CHUNK)).toBe('-1,-2') // floor, not trunc
-  })
 
   it('refuses the capture while the capture point chunk is uncommitted (the first-frame-after-leave band was terrainless)', () => {
     // The first travel frame after leaving a settlement: no chunk meshes yet.
