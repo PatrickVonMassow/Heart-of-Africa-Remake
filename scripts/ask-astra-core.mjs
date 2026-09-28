@@ -1,9 +1,10 @@
 // THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1).
+// It also addresses the Claude-family lanes (fable, opus, opus48; see ASK_MODELS).
 //
 // `scripts/review-astra.mjs` proved one shape of this: `codex exec` in a READ-ONLY sandbox
 // with the artefact on stdin, because this container cannot create user namespaces and a
-// shell command of the reviewer's would die before it ran. The last twelve recorded
-// mechanism reviews all carry "GPT-6 Astra" with no silent fallback, so the path works.
+// shell command of the reviewer's would die before it ran. When point 654 was written, the
+// last twelve recorded mechanism reviews all carried "GPT-6 Astra", so the path worked.
 //
 // What it did NOT do is carry any other kind of pure text work — and text work is where
 // the volume is: measured 12.08.2026, verification is 41.5 % of the whole spend and
@@ -11,9 +12,9 @@
 // no browser and no picture involved (docs/astra-routing.md carries the whole table).
 //
 // THE RULE THIS FILE IS SHAPED AROUND is the review path's, unchanged: an answer nobody
-// gave must never be reported as an answer. Every path out of a failed run says so in
-// ONE line, names the cause and hands the work back to the Claude chain — never silently,
-// never recorded as Astra's.
+// gave must never be reported as an answer. Every path out of a failed run says so
+// (formatUnavailable), names the cause and hands the work back — to the Claude chain for
+// Astra, to another eligible lane otherwise — never silently, never recorded as the model's.
 //
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-astra.mjs. Pinned by ask-astra-core.test.mjs.
@@ -94,7 +95,7 @@ export function entryPrefix(kind) {
 }
 
 /**
- * The prompt Astra is given for one kind.
+ * The prompt the addressed model is given for one kind.
  *
  * Two facts every kind carries, both learned the hard way on the review path: the
  * material is ATTACHED (a shell command of Astra's cannot run in this container, so it must
@@ -318,7 +319,7 @@ function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
 }
 
 /**
- * Pull the answer out of Astra's final message. PURE.
+ * Pull the answer out of the model's final message. PURE.
  *
  * Tolerant on the way in — markdown emphasis, a leading bullet, a code fence — and strict
  * on the way out: an answer that does not carry its shape is NOT an answer, and the caller
@@ -351,7 +352,7 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   // and a whole message swallowed for one such phrase is work discarded
   // (measured 18.08.2026, point 714 pass 2, on the review path).
   //
-  // SCANNED TWICE, RAW AND STRIPPED — either hit is an admission (final
+  // SCANNED RAW, STRIPPED AND CHAR-STRIPPED — any hit is an admission (final
   // convergence, structural by construction): four rounds chased Markdown
   // shapes that shielded an admission from the stripped scan alone (flat,
   // nested, quote-adjacent emphasis), and each fix invited the next shape.
@@ -397,11 +398,11 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
 }
 
 /**
- * WHAT THE COMMAND SAYS WHEN ASTRA DID NOT DELIVER: one line, the cause named, and the work
- * handed back. PURE.
+ * WHAT THE COMMAND SAYS WHEN THE MODEL DID NOT DELIVER: the cause named and the work
+ * handed back, in two lines (a third for Astra under the claude-only switch). PURE.
  *
- * The exit code beside it (3, as on the review path) is what lets a script tell "Astra
- * answered" from "Astra did not" without reading prose.
+ * The exit code beside it (3, as on the review path) is what lets a script tell "the model
+ * answered" from "it did not" without reading prose.
  */
 export function formatUnavailable({ kind = '', cause = '', setting = '', modelName = ASTRA_MODEL_NAME } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
@@ -409,11 +410,12 @@ export function formatUnavailable({ kind = '', cause = '', setting = '', modelNa
   return [
     `ask-astra: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
     `  The ${k} is NOT done. ${handoff} — nothing here may be recorded as ${modelName}'s work.`,
-    ...(setting === 'claude-only' ? ['  (The share switch is at `claude-only`; `node scripts/astra-share.mjs --more` sends this kind to Astra again.)'] : []),
+    ...(setting === 'claude-only' && modelName === ASTRA_MODEL_NAME ? ['  (The share switch is at `claude-only`; `node scripts/astra-share.mjs --more` steps toward Astra; at `default` only review and enumerate go there.)'] : []),
   ].join('\n')
 }
 
-/** The whole answer as the command prints it: the shape first, the reader's summary last. */
+/** The whole answer as the command prints it: a head line carrying the summary, then the
+ *  diagnose fields or the list entries (explain: the head alone). */
 export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0, modelName = ASTRA_MODEL_NAME, effort = ASTRA_REASONING_EFFORT } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
   const seconds = Number.isFinite(Number(elapsedMs)) ? Math.round(Number(elapsedMs) / 1000) : 0

@@ -14,7 +14,7 @@ const read = (path) => {
   try { return readFileSync(path, 'utf8') } catch { return '' }
 }
 
-export function firstParentLandingHistory({ repoDir, ref = 'main', start, end } = {}) {
+function firstParentLandingHistory({ repoDir, ref = 'main', start, end } = {}) {
   const text = execFileSync('git', [
     '-C', repoDir, 'log', ref, '--first-parent', '--merges',
     '--format=%H%x09%ct%x09%s', `--since=${new Date(start).toISOString()}`, `--until=${new Date(end).toISOString()}`,
@@ -25,7 +25,7 @@ export function firstParentLandingHistory({ repoDir, ref = 'main', start, end } 
   })
 }
 
-export async function gatherBaselineDay({ repoDir = REPO_ROOT, ref = 'main', day } = {}) {
+async function gatherBaselineDay({ repoDir = REPO_ROOT, ref = 'main', day } = {}) {
   const window = utcDayWindow(day)
   if (!window.ok) return window
   const mainRoot = mainCheckoutOf(repoDir) ?? repoDir
@@ -51,7 +51,7 @@ export async function gatherBaselineDay({ repoDir = REPO_ROOT, ref = 'main', day
   })
 }
 
-export async function recordBaselineDay({ repoDir = REPO_ROOT, ref = 'main', day, output } = {}) {
+async function recordBaselineDay({ repoDir = REPO_ROOT, ref = 'main', day, output } = {}) {
   const outputPath = resolve(repoDir, output ?? '')
   if (!output) return { ok: false, reason: 'baseline recording requires an output path' }
   if (existsSync(outputPath)) return { ok: false, reason: `baseline report already exists and is not replaced: ${outputPath}` }

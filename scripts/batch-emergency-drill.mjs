@@ -8,10 +8,13 @@
 // aged, a finished verification whose record still claimed a generous lease,
 // ten stacked eternal waits, and no queue movement until 00:52. It drives the
 // real emergency lane — `runEmergency` — with a real wedged process as the
-// owner and real wait leases behind real pids, and asserts the ladder the union
-// promises: ONE soft recovery at the threshold, a hard recovery inside the U5
-// two-hour bound, the owner's own waits retired and nobody else's, a successor
-// launched, and the episode ending the moment the queue moves again.
+// owner and real wait leases behind real pids; command execution, fence
+// revocation, lock release and the session-process table are stubbed, so the
+// successor launch is counted from the recorded commands. It asserts the ladder
+// the union promises: ONE soft recovery at the threshold, a hard recovery inside
+// the U5 two-hour bound, the owner's own waits retired and nobody else's, a
+// restart attempted per strike, and the episode ending the moment the queue
+// moves again.
 //
 // Fixture two is 04.09., 17:45–17:47: after `batch-boundary --commit` the
 // boundary refused every tool call while `ci-status-guard` refused every turn
@@ -62,7 +65,8 @@ async function wedgeFixture(dir) {
   // the threshold therefore lands exactly one threshold later.
   const progressAt = now - EMERGENCY_THRESHOLD_MS
   const sleeper = spawnSleeper()
-  // The finished verification whose record still claimed the batch was working.
+  // A live verification process, used only to prove `verificationProcessAlive`;
+  // the report's lease below is a separate synthetic record.
   const verificationScript = join(dir, 'run-logged.mjs')
   const verificationLog = join(dir, 'probe.log')
   writeFileSync(verificationScript, 'setInterval(() => {}, 1000)\n')
@@ -161,8 +165,9 @@ async function wedgeFixture(dir) {
       inputs: { workablePoints: [1048], paused: false, veto: null, state: {}, report: reportAt(now) },
     })
     const persisted = JSON.parse(readFileSync(statePath, 'utf8'))
-    // The next tick the cooldown allows — 00:50 in the measured night, still
-    // fifteen minutes inside the two-hour deadline.
+    // The earliest strike the cooldown allows — 00:50 in the measured night,
+    // still fifteen minutes inside the two-hour deadline (the hourly lane's
+    // real next tick would come at +60 min).
     const hardAt = now + EMERGENCY_COOLDOWN_MS + 1
     const hard = runEmergency({
       ...common,

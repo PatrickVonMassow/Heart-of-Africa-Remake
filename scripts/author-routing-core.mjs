@@ -10,6 +10,7 @@
 // quota reading, which then outlived it). An UNREACHABLE lane is different from
 // a full one: where the OpenAI volume is spent, authoring goes to Opus 5.5 rather
 // than waiting for the vendor (user 23.09.2026; point 1194 measures and lifts it).
+// That fallback is decided in astra-share-core.mjs (`effectiveRoute`), not here.
 //
 //   astra  GPT-6 Astra authors the points, and Claude then reviews, runs the
 //          suites, judges the picture and lands. Since 18.08.2026 that includes
@@ -30,14 +31,14 @@
 // holds the batch; this is pure, tested, and answers the same way twice — and
 // where it answers wrongly, the fix is a case in its test file, not a habit.
 //
-// It is ADVISORY, not a gate. Nothing blocks on it: the reasons travel with the
-// verdict so a dispatcher can see WHY and override with a tag in the point
-// itself. Side-effect free; the work-order reading belongs to
+// The reasons travel with the verdict so a dispatcher can see WHY and override
+// with a tag in the point itself; author-astra.mjs refuses a run whose point
+// routes to another lane unless `--anyway` is given. Side-effect free; the work-order reading belongs to
 // scripts/author-astra.mjs. Pinned by author-routing-core.test.mjs.
 
 import { ASTRA_MODEL, FABLE_MODEL, OPUS_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
 
-/** The authoring lanes, in the order this file describes them. */
+/** The authoring lanes, in report order. */
 export const LANES = Object.freeze(['astra', 'fable', 'opus'])
 
 /** Who each lane is, for the report a dispatcher reads. The Fable name is DERIVED
@@ -49,14 +50,14 @@ export const LANE_MODEL = Object.freeze({
 })
 
 /**
- * User decision 31.08.2026: Fable escalation begins at this many unsuccessful
- * review rounds, and TEN IS THE STANDING DEFAULT — not a shortage measure.
+ * User decision 31.08.2026: Fable escalation begins at this many FRESH
+ * unsuccessful review rounds (repeats excluded, `authorRoundHistory().freshRounds`), and TEN IS THE STANDING DEFAULT — not a shortage measure.
  *
  * It was raised once before and fell back to five when the volume shortage that
  * happened to be running at the time was declared over; the raise was read as
  * part of that emergency and taken back with it. It is not. The reason to spend
  * ten rounds before reaching for the scarcest lane holds in a full week exactly
- * as in an empty one: a point that four reviews have rejected is far more often
+ * as in an empty one: a point that repeated reviews have rejected is far more often
  * badly cut than badly authored, and switching vendor buys less than re-cutting
  * it. An emergency may raise this FURTHER for a while; when it ends the value
  * returns here, to ten, and never to five.
@@ -137,8 +138,9 @@ export function authorRoundHistory(records = [], point = '') {
     return { unsuccessfulRounds: 0, freshRounds: 0, rounds: [], examination: null }
   }
   const rows = Array.isArray(records) ? records : []
-  // This is also the number of the NEXT commission: the first review row is
-  // the outcome of round zero, the second the outcome of round one, and so on.
+  // freshRounds is escalation credit only. The NEXT commission's number is
+  // rounds.length: the first review row is the outcome of round zero, the
+  // second the outcome of round one, and so on.
   let freshRounds = 0
   let previousFraming = ''
   const rounds = []
@@ -204,9 +206,9 @@ export function authorRoundHistory(records = [], point = '') {
 }
 
 /** Pick a known hostile-tester stance that is not the preceding one. */
-export function nextAuthoringFraming(previous = '') {
+function nextAuthoringFraming(previous = '') {
   const before = String(previous ?? '').trim()
-  return AUTHORING_FRAMINGS.find((framing) => framing !== before) ?? AUTHORING_FRAMINGS[0]
+  return AUTHORING_FRAMINGS.find((framing) => framing !== before)
 }
 
 /**
@@ -222,8 +224,7 @@ export function nextAuthoringStep({
   escalationRounds = FABLE_ESCALATION_ROUNDS,
 } = {}) {
   const history = authorRoundHistory(records, point)
-  const examinationRound =
-    escalationRounds === FABLE_ESCALATION_ROUNDS ? SPEC_EXAMINATION_ROUND : escalationRounds - 1
+  const examinationRound = escalationRounds - 1
   const overridden = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : null
   const freshRounds = overridden ?? history.freshRounds
   const round = overridden ?? history.unsuccessfulRounds
@@ -446,11 +447,12 @@ function hits(markers, text) {
 /**
  * THE DECISION. PURE.
  *
- * Inputs — all optional, because a caller rarely has all of them:
+ * Inputs — optional except `fableState`, which `requireState` demands:
  *   body         the point's text out of the work order
  *   criticality  its tag, as `criticalityOf` reads it ('low' | 'med' | 'high')
- *   reworkRounds completed reviews of this point whose verdict was not a pass
+ *   reworkRounds fresh unsuccessful review rounds (`authorRoundHistory().freshRounds`)
  *   override     a lane the caller insists on, beating even the tag
+ *   fableState   the Fable switch state
  *
  * Returns { lane, model, refused, why, signals } — `why` is the ordered list of
  * reasons, first the deciding one. An unknown switch throws rather than choosing

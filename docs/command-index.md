@@ -10,14 +10,14 @@
 | `alert-escalation.mjs` | THE ESCALATION LADDER (point 434, remainder of part 1) — the I/O half. | — |
 | `ask-astra-core.mjs` | THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1). | — |
 | `ask-astra.mjs` | ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). | usage: node scripts/ask-astra.mjs [--model astra\|fable\|opus\|opus48] --kind <' + KINDS.join('\|') + '> --brief "<the question>" \\ |
-| `assertionHealth.mjs` | Pure detector for assertions that CANNOT FAIL. | — |
+| `assertionHealth.mjs` | Pure detector for assertions whose outcome is FIXED (mostly: that cannot fail). | — |
 | `astra-share-core.mjs` | THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667). | — |
 | `astra-share.mjs` | THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667). | usage: node scripts/astra-share.mjs --status \| --more \| --less \| --set <setting> [--json] |
 | `atomic-write.mjs` | Atomic JSON writes that survive a Windows moment (point 388, first live finding 28.07.2026). | — |
 | `attended-context-notice.mjs` | Durable once-per-session state for the attended context-ceiling notice. | — |
 | `audit-check.mjs` | Dependency audit gate (CLAUDE.md §7.1 pt.18). | — |
-| `author-astra-core.mjs` | THE OPENAI AUTHORING LANE, decided (point 667). | — |
-| `author-astra.mjs` | THE COMMAND THAT LETS THE OPENAI LANE AUTHOR A POINT (work-order point 667). | usage: node scripts/author-astra.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
+| `author-astra-core.mjs` | THE AUTHORING LANES' WRAPPER, decided (point 667). | — |
+| `author-astra.mjs` | THE COMMAND THAT LETS AN OUTSIDE LANE AUTHOR A POINT (work-order point 667): the OpenAI lane by default, the Fable lane through author-fable.mjs. | usage: node scripts/author-astra.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `author-fable-core.mjs` | Pure decisions for the Fable authoring command. | — |
 | `author-fable.mjs` | Commission the Fable authoring lane through the same durable worktree, ledger, push, gate-report and no-merge contract as author-astra.mjs. | usage: node scripts/author-fable.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `author-routing-core.mjs` | WHICH AUTHORING LANE A POINT GOES TO (point 667). | — |
@@ -37,7 +37,7 @@
 | `batch-boundary-core.mjs` | Pure core of the AUTONOMOUS SESSION BOUNDARY (user 27.07.2026). | — |
 | `batch-boundary-plane-core.mjs` | DURABLE TWO-PHASE BOUNDARY — ordered-work step 7. | — |
 | `batch-boundary-plane.mjs` | Tests and support for batch-boundary-plane. | — |
-| `batch-boundary.mjs` | The autonomous session boundary (point 373, user 27.07.2026) — the IO half. | Usage: node scripts/batch-boundary.mjs <point><br>usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''), |
+| `batch-boundary.mjs` | The autonomous session boundary (point 373, user 27.07.2026) — the IO half. | Usage: node scripts/batch-boundary.mjs --prepare <point>, then --commit <point><br>usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''), |
 | `batch-checkpoint-core.mjs` | CHECKPOINT BARRIER — ordered-work step 6. | — |
 | `batch-checkpoint.mjs` | Tests and support for batch-checkpoint. | — |
 | `batch-claim-core.mjs` | TAKING THE BATCH BACK INTO THE WINDOW THE USER IS SITTING AT (point 395, user 28.07.2026) — the decision half, pure and dependency-injected. | — |
@@ -46,7 +46,7 @@
 | `batch-daemon-core.mjs` | THE DAEMON'S DECISION CORE — step 3 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676). | — |
 | `batch-daemon-drill.mjs` | THE DRILL THAT REPRODUCES THE REAL REGRESSION — docs/handover-architecture.md, "The drill that reproduces the real regression" (work-order point 834; Sol A19). | — |
 | `batch-daemon-failure-drills.mjs` | The bounded failure matrix for ordered-work step 12. | — |
-| `batch-daemon.mjs` | THE OS LAUNCHER DAEMON — step 3 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M7). | usage: node scripts/batch-daemon.mjs start\|status\|stop\|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep] [--neuter-epoch] |
+| `batch-daemon.mjs` | THE OS LAUNCHER DAEMON — step 3 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M7). | usage: node scripts/batch-daemon.mjs start\|status\|stop\|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep] [--neuter-epoch] [--inject-failure] |
 | `batch-dispatch-core.mjs` | BOUNDED DISPATCH AND BACKPRESSURE — ordered-work step 5 in docs/handover-architecture.md. | — |
 | `batch-dispatch.mjs` | Thin dispatcher: read the main-session-authorized queue, decide from daemon state, and submit only the already-authorized start-attempt mutations. | — |
 | `batch-doctor-core.mjs` | Decision logic for the batch doctor (scripts/batch-doctor.mjs): after a parallel-session incident the OWNER must prove the repo was not corrupted by concurrent writes — and if it was, prefer THROWING AWAY suspect work (recoverably: rescue branch + stash, everything logged) over leaving a corrupted tree. | — |

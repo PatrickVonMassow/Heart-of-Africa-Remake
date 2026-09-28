@@ -4,13 +4,19 @@
 // union M7). The daemon, not a session, is the parent and lifecycle owner of
 // every handover-capable worker, so session exit cannot kill one; a session asks
 // it over the control socket, presents (sessionId, fence), and the daemon
-// re-reads the batch lock for every mutation (mechanism 2). All decisions live
-// in the pure cores; this file is process, socket and file work.
+// re-reads the batch lock for every mutation (mechanism 2). The reusable
+// decisions live in the pure cores; this file is process, socket and file work
+// plus the inline checks tied to its state (sealed fence, adoption evidence,
+// metric shape).
 //
-//   node scripts/batch-daemon.mjs start  --repo <dir> --batch <id> --session <sid> [--drill]
+//   node scripts/batch-daemon.mjs start  --repo <dir> --batch <id> [--session <sid>] [--drill] [--neuter-epoch]
 //   node scripts/batch-daemon.mjs status --repo <dir> --batch <id>
-//   node scripts/batch-daemon.mjs stop   --repo <dir> --batch <id> [--drain]
-//   node scripts/batch-daemon.mjs drill  --scenario parent-death [--keep] [--neuter-epoch]
+//   node scripts/batch-daemon.mjs stop   --repo <dir> --batch <id> --session <sid> --fence <n> [--drain]
+//   node scripts/batch-daemon.mjs drill  [--scenario <name>] [--keep] [--neuter-epoch] [--inject-failure]
+//
+// `serve` is the internal verb startDaemon spawns. `drill` defaults to
+// parent-death; the other scenarios are the failure matrix of
+// batch-daemon-failure-drills.mjs.
 //
 // `drill --neuter-epoch` is the drill's NEGATIVE CONTROL: the same scenario
 // against a daemon whose epoch enforcement is switched off, which must end red
@@ -18,9 +24,9 @@
 // startDaemon and the serving process both refuse it outside --drill.
 //
 // PRODUCTION START IS INTERLOCKED: `start` without --drill consults the
-// activation flag AND the step manifest, and both refuse while steps 8 and 9
-// are not green (scripts/durable-lane-flag-core.mjs) — so today's authoring
-// path is the path that runs. --drill starts a daemon ONLY against a sandbox
+// activation flag AND the step manifest, and refuses unless the flag is on and
+// every step required for activation is green (scripts/durable-lane-flag-core.mjs).
+// --drill starts a daemon ONLY against a sandbox
 // repository outside this checkout; the refusal of a drill against the real
 // repository is pinned by a test.
 //
@@ -66,13 +72,13 @@ import { grantAttemptLease, claimWorktree, releaseWorktree } from './batch-attem
 import { DURABLE_LANE_STEPS, mayStartDaemon } from './durable-lane-flag-core.mjs'
 import { attemptPaths, readJsonIfAny, spawnDetached, writeFileNoFollow } from './detached-agent.mjs'
 
-export const DAEMON_HEARTBEAT_MS = 1000
-export const START_WAIT_MS = 10_000
-export const CHECKPOINT_WAIT_MS = 60_000
+const DAEMON_HEARTBEAT_MS = 1000
+const START_WAIT_MS = 10_000
+const CHECKPOINT_WAIT_MS = 60_000
 /** How long adoption watches the worker's heartbeat for MOVEMENT (the worker
  *  ticks every few hundred ms; ten times that is observation, not luck). */
-export const ADOPTION_PULSE_WAIT_MS = 5000
-export const FLAG_PATH_SUFFIX = join('.claude', 'durable-lane-flag.json')
+const ADOPTION_PULSE_WAIT_MS = 5000
+const FLAG_PATH_SUFFIX = join('.claude', 'durable-lane-flag.json')
 
 const nowMs = () => Date.now()
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
@@ -151,7 +157,8 @@ function mtimeOf(path) {
 }
 
 /** Durable exclusive create: 'wx' so a second daemon cannot claim the record,
- *  fsynced so the readiness wait never reads a name with no bytes behind it. */
+ *  fsynced so its bytes are durable. A reader that sees the name before the
+ *  bytes reads no usable record and keeps waiting. */
 function writeRecordExclusive(path, record) {
   const fd = openSync(path, 'wx', 0o600)
   try {
@@ -243,7 +250,8 @@ async function serve(args) {
   // evidence is exactly what the store exists to prevent, so a refused append
   // is STICKY — the daemon refuses every further mutation like it does for a
   // corrupt journal, and the caller of the failing mutation gets a refusal,
-  // never a sequence number over missing bytes.
+  // never a sequence number over missing bytes. Shutdown still runs, but keeps
+  // the identity record when the journal failed.
   let journalFailed = null
   const journalEntry = (entry, underFence = currentFence) => {
     if (journalFailed) return { ok: false, reason: journalFailed }
@@ -315,22 +323,23 @@ async function serve(args) {
 
   let daemonRecord = built.record
 
-  const workers = new Map() // attemptId -> { attempt, pid, worktree, leaseId, dir }
+  const workers = new Map() // attemptId -> { pointId, pid, pidStartedAt, worktree, leaseId, dir }
   let leases = new Map() // attemptId -> lease
   let worktreeClaims = {}
   const attemptsState = new Map() // attemptId -> last attempt snapshot row
   let admission = admissionFromJournal(journal.entries)
   // A committed boundary fences that coordinator epoch without minting a new
   // one. A successor arrives under a strictly higher lock fence; the sealed
-  // epoch can inspect status but every further mutation is refused.
+  // epoch can inspect status, and every further mutate() but seal-boundary is
+  // refused (shutdown is validated against the lock only).
   let sealedFence = journal.entries.reduce(
     (highest, entry) => entry.kind === 'command' && entry.name === 'seal-boundary' && !entry.quarantine
       ? Math.max(highest, entry.fence ?? 0) : highest,
     0,
   )
   let draining = false
-  // Drill-only (refused above outside --drill): with epoch enforcement OFF the
-  // daemon accepts any (sessionId, fence) — the broken daemon the drill's stale
+  // Drill-only (refused above outside --drill): with epoch enforcement OFF
+  // mutate() accepts any (sessionId, fence) — shutdown still validates — the broken daemon the drill's stale
   // probes exist to catch, run for real so the whole drill must go red on it.
   const neutered = args['neuter-epoch'] === true
 
@@ -651,8 +660,8 @@ async function serve(args) {
         if (!known) return { ok: false, reason: `no such attempt: ${attemptId}` }
         // Adoption is an OPERATION against verified evidence, never a reading
         // of the in-memory map (M17/M18): the successor takes over supervision
-        // only of a worker whose lease stands on disk AND in memory and is
-        // UNEXPIRED, whose recorded process identity probes live, and whose
+        // only of a worker whose in-memory lease is UNEXPIRED and whose leaseId
+        // still stands on disk, whose recorded process identity probes live, and whose
         // heartbeat is observed to ADVANCE — one fresh timestamp is a
         // snapshot, not a pulse, and a worker frozen just before it would
         // pass. Everything else — dead holder, revoked or expired lease,
@@ -772,25 +781,13 @@ async function serve(args) {
     }
   }
 
-  /** Stops a worker FAIL-CLOSED. The on-disk lease is revoked FIRST — durably,
-   *  by the store's own atomic write (random exclusive tmp, fsync, rename,
-   *  DIRECTORY fsync — without the last one the rename itself can be lost in a
-   *  crash, and a revocation that can be lost is no fence) — so every later
-   *  push is fenced even if the process resists its signals; then the process
-   *  group gets SIGTERM, a bounded grace, SIGKILL.
-   *  Every signal is IDENTITY-CHECKED at send time: once the worker's recorded
-   *  pid start time no longer matches, the number belongs to a stranger and is
-   *  never signalled (group ids included — the group id is the leader's pid).
-   *  The verdict is the identity probe, never the status file alone; and a
-   *  revocation that could not be persisted is reported, because a caller that
-   *  releases state over it would leave a live worker holding a valid lease. */
   /**
    * What a STOPPED worker really pushed. Its own `status.json` is a note it
    * writes after the push, so a worker killed between the two leaves a sha one
    * commit behind the branch — and the cancel record then names a tip that does
    * not stand (CI run 35453901104, 19.09.2026). Its remote-tracking ref is moved
    * by the push ITSELF, so it cannot lag that way; the status sha remains the
-   * fallback for a worker that never pushed or has no upstream.
+   * fallback when HEAD is detached or refs/remotes/origin/<branch> is missing.
    */
   function pushedShaOf(worker, statusSha) {
     const inWorktree = (args) => execFileSync('git', ['-c', 'core.hooksPath=', ...args], {
@@ -810,6 +807,18 @@ async function serve(args) {
     }
   }
 
+  /** Stops a worker FAIL-CLOSED. The on-disk lease is revoked FIRST — durably,
+   *  by the store's own atomic write (random exclusive tmp, fsync, rename,
+   *  DIRECTORY fsync — without the last one the rename itself can be lost in a
+   *  crash, and a revocation that can be lost is no fence) — so every later
+   *  push is fenced even if the process resists its signals; then the process
+   *  group gets SIGTERM, a bounded grace, SIGKILL.
+   *  Every signal is IDENTITY-CHECKED at send time: once the worker's recorded
+   *  pid start time no longer matches, the number belongs to a stranger and is
+   *  never signalled (group ids included — the group id is the leader's pid).
+   *  The verdict is the identity probe, never the status file alone; and a
+   *  revocation that could not be persisted is reported, because a caller that
+   *  releases state over it would leave a live worker holding a valid lease. */
   async function stopWorker(worker, why) {
     const paths = attemptPaths(worker.dir)
     let revoked = true
@@ -1010,7 +1019,7 @@ async function serve(args) {
   })
   server.listen(socketPath, () => {
     chmodSync(socketPath, 0o600)
-    // START'S SECOND DURABLE WRITE: the exclusive create above publishes
+    // THE RECORD'S SECOND WRITE: the exclusive create above publishes
     // `starting`, which is never adoptable and never satisfies readiness. Only
     // once the control socket is actually listening does the daemon atomically
     // become `running`; a crash on either side leaves a named schema state.
@@ -1140,16 +1149,13 @@ export async function startDaemon({ repoDir, batchId, drill = false, neuterEpoch
  *  therefore runs under the same reap mutex takeover uses, and the ownership
  *  check is REPEATED inside it: only what the lock says at the instant of
  *  the swap decides, and a stale writer installs nothing. */
-export function writeLockCopy({ repoDir, record, sessionId, fence = null, mutexWaitMs = 2000 }) {
+export function writeLockCopy({ repoDir, record, sessionId, mutexWaitMs = 2000 }) {
   const path = lockPathFor(repoDir)
   const held = withLockWriteMutex(
     path,
     () => {
       const lock = readJsonIfAny(path)
       if (!lock || lock.sessionId !== sessionId) return { ok: false, reason: 'only the lock owner writes the daemon copy' }
-      if (fence !== null && lock.fence !== fence) {
-        return { ok: false, reason: `the lock carries fence ${lock.fence}, not the writer's ${fence}; a superseded owner writes nothing` }
-      }
       const next = { ...lock, daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } }
       // The store's atomic write, not a pid-named tmp: a predictable name beside
       // the lock is plantable as a symlink, and 'w' would write through it.
@@ -1165,7 +1171,7 @@ export function writeLockCopy({ repoDir, record, sessionId, fence = null, mutexW
   return held.ok ? held.result : { ok: false, reason: held.reason }
 }
 
-/** STOP'S SECOND DURABLE WRITE, serialized with takeover and every other lock
+/** STOP'S LOCK-COPY CLEAR, serialized with takeover and every other lock
  * update. The daemon removes only a copy of its own exact identity; a copy that
  * names anything else is evidence it must not rewrite. Credential checks are
  * repeated inside the mutex when shutdown came through the control socket.
@@ -1293,7 +1299,7 @@ async function main() {
     console.log(JSON.stringify(result, null, 2))
     process.exit(result.ok ? 0 : 1)
   }
-  console.error('usage: node scripts/batch-daemon.mjs start|status|stop|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep] [--neuter-epoch]')
+  console.error('usage: node scripts/batch-daemon.mjs start|status|stop|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep] [--neuter-epoch] [--inject-failure]')
   process.exit(2)
 }
 

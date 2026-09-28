@@ -9,9 +9,9 @@ import { writeJsonAtomic } from './atomic-write.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { attendedCeilingNoticeDecision } from './session-context-ceiling-core.mjs'
 
-export const ATTENDED_CONTEXT_NOTICE_DIR = repoPath('.claude/context-ceiling-notices')
+const ATTENDED_CONTEXT_NOTICE_DIR = repoPath('.claude/context-ceiling-notices')
 
-export function attendedContextNoticePath(sessionId, dir = ATTENDED_CONTEXT_NOTICE_DIR) {
+function attendedContextNoticePath(sessionId, dir = ATTENDED_CONTEXT_NOTICE_DIR) {
   const key = createHash('sha256').update(String(sessionId ?? '')).digest('hex').slice(0, 24)
   return resolve(dir, `${key}.json`)
 }

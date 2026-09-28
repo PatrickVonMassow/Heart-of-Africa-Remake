@@ -15,10 +15,11 @@
 //   5. WORK      the successor's first turn produces a commit
 //
 // Each link reports pass / pending / broken. "Pending" is the honest answer
-// while the chain is simply not that far yet; "broken" is only ever returned
-// against POSITIVE evidence that the link failed — for link 3 that evidence is
-// the launcher logging `skip: owner alive` after the handover was recorded,
-// which is exactly the line that repeated 21 times that night.
+// while the chain is simply not that far yet; "broken" needs a failure line in
+// the logs or an elapsed grace. For link 3 that is `skip: owner alive` or a
+// wedged-owner skip past the handover grace (the line that repeated 21 times
+// that night), a takeover of an expired lock, or an acceptance with no spawn;
+// for link 4 it is no conversion once the takeover grace has run out.
 
 /** A handover as batch-progress-guard records it in .claude/boundary.log. */
 export function parseHandoverLog(text) {
@@ -40,11 +41,12 @@ export const OBSERVE_GRACE_MS = 15 * 60 * 1000
 export const TAKEOVER_GRACE_MS = 10 * 60 * 1000
 
 /**
- * What the launcher did, from .claude/autostart.log. Four shapes matter: an
- * accepted handover, the spawn it leads to, the takeover of an already-free lock
- * (the headless path — a `claude -p` exits and SessionEnd releases the lock, so
- * there is no handover left for the launcher to accept), and the skip that means
- * it still saw a live owner.
+ * What the launcher did, from .claude/autostart.log. The chain reads an accepted
+ * handover, the spawn it leads to, the takeover of an already-free lock (the
+ * headless path — a `claude -p` exits and SessionEnd releases the lock, so there
+ * is no handover left for the launcher to accept), the takeover of a dead or
+ * expired lock, and the skips (grace, live owner, wedged owner). The remaining
+ * kinds are classified for the record only.
  */
 export function parseLauncherLog(text) {
   const out = []
@@ -85,7 +87,7 @@ export function parseLauncherLog(text) {
     // because it was handed over — and since point 434 it is the line the launcher
     // actually writes. Without this the chain analysis below would stop seeing the
     // broken-handover case entirely, which is the quiet kind of blindness this file
-    // exists to prevent. The two lines above stay: old logs still hold them.
+    // exists to prevent. The two patterns below stay: old logs still hold them.
     else if (/^LEASE EXPIRED/.test(body)) kind = 'took-dead-lock'
     else if (/^owner provably dead/.test(body) || /^owner process measured inactive/.test(body)) kind = 'took-dead-lock'
     else if (/^skip: a spawn /.test(body)) kind = 'skip-debounce'
@@ -97,12 +99,13 @@ export function parseLauncherLog(text) {
 const link = (id, title, status, evidence, broken) => ({ id, title, status, evidence, broken })
 
 const CLOSE_TITLE = 'a point is closed on main'
-const CLOSE_BROKEN = 'no tick, or the tick is only an archive move'
+const CLOSE_BROKEN = 'the handed-over point is never closed in the work order'
 const TAKE_TITLE = 'the boundary is taken and the lock handed over'
 const iso = (at) => new Date(at).toISOString()
 
-/** The closure of a point as the caller read it, keyed either way round. */
-const closureFor = (closures, point) => closures?.[point] ?? closures?.[String(point)] ?? 'unknown'
+/** The closure of a point as the caller read it (object keys are strings, so a
+ *  numeric point finds a string key too). */
+const closureFor = (closures, point) => closures?.[point] ?? 'unknown'
 
 /**
  * Judge the whole chain. Every input is plain data:
@@ -278,7 +281,7 @@ export function assessChain({
         'pending',
         waiting
           ? `the launcher is waiting out the handover grace (${mins} min in, ${Math.round(graceMs / 60000)} min wide)`
-          : `no launcher tick logged in the ${mins} min since the handover (it runs every 15 min)`,
+          : `no spawn logged in the ${mins} min since the handover (the launcher runs every 15 min)`,
         'nothing at all appears in .claude/autostart.log → the scheduled task is not armed',
       ),
     )

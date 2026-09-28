@@ -1,8 +1,10 @@
-// CHECKPOINT BARRIER — ordered-work step 6. A checkpoint is transferable only
-// when the worker binds its acknowledgment to the request and affirmatively
-// reports a clean committed SHA that reached the remote.
+// CHECKPOINT BARRIER — ordered-work step 6. A persisted barrier counts a
+// checkpoint transferable only when the worker binds its acknowledgment to the
+// request and affirmatively reports a clean committed SHA that reached the
+// remote; the daemon path (`daemonCheckpointVerdict`) relies on the daemon's own
+// per-answer verdict instead.
 
-export const CHECKPOINT_RECOVERY_CHOICES = Object.freeze(['wait', 'cancel', 'drain'])
+const CHECKPOINT_RECOVERY_CHOICES = Object.freeze(['wait', 'cancel', 'drain'])
 export const DEFAULT_CHECKPOINT_TIMEOUT_MS = 3 * 60 * 1000
 
 const present = (value) => typeof value === 'string' && value.length > 0
@@ -79,8 +81,10 @@ export function checkpointBarrierVerdict(barrier, { now } = {}) {
   return { ok: true, verdict: 'ready', requestId: barrier.requestId, acknowledgments: barrier.acknowledgments }
 }
 
-/** Translate the daemon's worker acknowledgments into the same fail-closed
- * verdict used by persisted barriers. */
+/** Translate the daemon's worker answers into a fail-closed verdict: every
+ * answer must be acknowledged, marked transferable by the daemon, and carry a
+ * full commit SHA. Unlike a persisted barrier it has no waiting state and does
+ * not re-check lateness, cleanliness or the push itself. */
 export function daemonCheckpointVerdict({ requestId, answers = [] } = {}) {
   if (!present(requestId) || !Array.isArray(answers)) return { ok: false, verdict: 'invalid', reason: 'the daemon checkpoint reply is unusable' }
   const blocked = answers.filter((answer) => answer?.acknowledged !== true || answer?.transferable !== true || !oid(answer?.sha)).map((answer) => ({

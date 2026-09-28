@@ -2,18 +2,19 @@
 //
 // A sample never takes `tokens` from an operator. It derives context size from
 // one provider transcript response, using the same folding and context-token
-// definition as measure-context-cost. `scope: handover` has one precise meaning:
-// the last fully recorded coordinator response immediately BEFORE the caller
-// initiates a handover. `ordinary` is a response selected by the sealed plan's
-// non-handover schedule. The metric journal is not an input to either reading.
+// definition as measure-context-cost. Both scopes read the newest response with
+// usage in the transcript as passed; `scope` only labels the sample (`handover`:
+// taken by the caller right before initiating a handover; `ordinary`: any other
+// reading). Choosing the moment is the caller's job. The metric journal is not
+// an input to either reading.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { checksumOf } from './batch-schema-core.mjs'
 import { foldUsage, turnCost } from './measure-context-cost-core.mjs'
 import { openStateStore, writeFileAtomic } from './batch-state.mjs'
 
-export const CONTEXT_SAMPLE_SCOPES = Object.freeze(['handover', 'ordinary'])
-export const CONTEXT_SAMPLE_DEFINITION = 'provider transcript context tokens; handover is the final complete coordinator response before initiating handover'
+const CONTEXT_SAMPLE_SCOPES = Object.freeze(['handover', 'ordinary'])
+const CONTEXT_SAMPLE_DEFINITION = 'provider transcript context tokens; handover is the final complete coordinator response before initiating handover'
 
 export function contextSampleFromTranscript({ text = '', source, scope, recordedAt = Date.now() } = {}) {
   if (!CONTEXT_SAMPLE_SCOPES.includes(scope)) return { ok: false, reason: 'context sample scope is handover or ordinary' }

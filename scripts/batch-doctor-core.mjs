@@ -8,7 +8,7 @@
 /**
  * Plan the remediation for the observed repo state.
  * state = {
- *   branch,                 // current branch of the main checkout
+ *   branch,                 // current branch (passed through; the planner does not read it)
  *   mergeInProgress,        // MERGE_HEAD exists (half-done merge)
  *   dirtyFiles: [..],       // uncommitted paths (porcelain)
  *   conflictMarkers,        // tracked files contain <<<<<<< markers
@@ -32,7 +32,8 @@
  * Returns an ordered list of actions:
  *   { action, level: 'auto' | 'repair' | 'alert', reason, targets? }
  * 'auto'   — safe, run on every doctor invocation
- * 'repair' — destructive-looking (still fully recoverable), runs only with --repair
+ * 'repair' — destructive, runs only with --repair (the git actions keep a rescue
+ *            branch, stash or backup; lock removal and process kills do not)
  * 'alert'  — cannot be fixed mechanically; report loudly
  */
 export function planRemediation(state) {
@@ -50,7 +51,7 @@ export function planRemediation(state) {
       targets: locks.map((l) => l.path),
       reason:
         `${locks.length} stale git lock file(s) survive a killed commit or push (${locks.map((l) => l.path).join(', ')}). ` +
-        'No git process can be holding them any more, and while they lie there every write git is asked for is refused.',
+        'They are older than any honest git hold, and while they lie there every write git is asked for is refused.',
     })
   }
 
@@ -111,8 +112,9 @@ export function planRemediation(state) {
 
   // (d) A TRUNCATED WORK ORDER IS VERSIONED, so it is repairable rather than
   // merely reportable. The alert stays for the case that is genuinely beyond a
-  // mechanism — HEAD's own copy does not parse either, i.e. the damage was
-  // committed — because restoring one broken file over another is not a repair.
+  // mechanism — HEAD's own copy does not parse either (the damage was committed)
+  // or git could not show it — because restoring one broken file over another is
+  // not a repair.
   if (!state.tasksParses) {
     plan.push(
       state.tasksRecoverable
@@ -127,8 +129,8 @@ export function planRemediation(state) {
             action: 'alert-tasks-format',
             level: 'alert',
             reason:
-              'TASKS.md checkboxes no longer parse and HEAD holds no parseable copy either — a concurrent edit may have mangled ' +
-              'the work order and the damage is committed. Fix by hand; never read this as "batch complete".',
+              'TASKS.md checkboxes no longer parse and no parseable HEAD copy could be read — a concurrent edit may have mangled ' +
+              'the work order and the damage may be committed. Fix by hand; never read this as "batch complete".',
           },
     )
   }
@@ -169,7 +171,8 @@ export function planRemediation(state) {
   // (c) An aborted verification leaves a headless browser and a dev server
   // running, and they eat CPU for the rest of an unattended fortnight. Matched
   // by COMMAND LINE and by this checkout's path — never by process name — and
-  // only while no live session could own them.
+  // only while the batch owner is not alive (parallel sessions are not consulted;
+  // the two-hour age floor in batch-doctor-states.mjs spares a running verify).
   const strays = state.strayProcesses ?? []
   if (strays.length > 0 && !state.ownerAlive) {
     plan.push({
@@ -178,21 +181,22 @@ export function planRemediation(state) {
       targets: strays.map((s) => s.pid),
       reason:
         `${strays.length} leftover process(es) of an aborted verification in THIS checkout ` +
-        `(${strays.map((s) => `${s.pid} ${s.kind}`).join(', ')}), with no live session that could own them. ` +
+        `(${strays.map((s) => `${s.pid} ${s.kind}`).join(', ')}), with no live batch owner. ` +
         'They hold ports the next verify run needs and burn CPU until somebody notices.',
     })
   }
 
   // (e) A pending-spawn lock is a launcher's reservation that the spawned
   // session converts to itself. One that nobody converted, past its own stale
-  // window and with a dead pid, reserves the batch against every future tick.
+  // window and with no recorded pid still alive, reserves the batch against every
+  // future tick.
   if (state.stalePendingSpawn) {
     plan.push({
       action: 'clear-stale-pending-lock',
       level: 'repair',
       reason:
         `A pending-spawn lock (${state.stalePendingSpawn.sessionId}) has stood for ` +
-        `${Math.round((state.stalePendingSpawn.ageMs ?? 0) / 60000)} min without a session converting it, and its process is gone. ` +
+        `${Math.round((state.stalePendingSpawn.ageMs ?? 0) / 60000)} min without a session converting it, and no recorded process of it is alive. ` +
         'Until it is cleared, every launcher tick reads the batch as reserved and spawns nothing.',
     })
   }
@@ -332,7 +336,7 @@ export function repoRepairDecision({ ran = true, code = 0, repaired = false } = 
   if (n === 0) return { spawn: true, mandate: false, reason: 'consistent', standing: false, alert: null }
   const how = repaired
     ? 'The launcher ran batch-doctor --repair before spawning and findings REMAIN afterwards'
-    : 'The launcher checked the repo before spawning (read-only — the previous owner is alive but silent, so nothing was mended for it) and found it unclean'
+    : 'The launcher checked the repo before spawning (without --repair — the lock of the previous owner did not license a repair, so nothing was mended for it) and found it unclean'
   return {
     spawn: true,
     mandate: true,
@@ -368,9 +372,10 @@ export function resumeRepairMandate({ ran = true, code = 0 } = {}) {
 // session it spawns seconds later need not re-run the check. Three mechanics
 // keep that shortcut honest, and until 30.07.2026 all three lived in untested
 // wiring inside scripts/batch-resume-hook.mjs:
-//   ONE-SHOT   the marker is consumed by the first reader, readable or not — a
-//              corrupt one used to throw past the deletion and be re-parsed at
-//              every session start for ever.
+//   ONE-SHOT   the marker is deleted by the first reader that can read it,
+//              parseable or not — a corrupt one used to throw past the deletion
+//              and be re-parsed at every session start for ever. A failed
+//              deletion is tolerated; the expiry is the backstop.
 //   EXPIRY     a marker older than the window describes a tree that has since
 //              been worked in; it mandates nothing.
 //   FALSE      a CLEAN tick deletes any marker a failed earlier tick left, so a
@@ -454,14 +459,15 @@ export function describeLoad({ level, reasons = [], agentWorktrees = [] } = {}) 
  *
  * `results` is one entry per command actually run:
  *   { cmd, failed, level, reasons, agentWorktrees }
- * where `level`/`reasons`/`agentWorktrees` describe the machine DURING that
- * command, so a run that went quiet halfway is judged per command rather than
- * as a lump.
+ * where `level`/`reasons`/`agentWorktrees` describe the machine as read just
+ * BEFORE that command, so a run that went quiet halfway is judged per command
+ * rather than as a lump.
  *
  * Returns { broken, inconclusive, ordered, lines }:
  *   broken       — at least one failure on a quiet machine. Today's wording, and
  *                  today's stop order.
- *   inconclusive — a failure that only load can explain. NOT a stop order.
+ *   inconclusive — failures, none on a measured-quiet machine (busy, unknown
+ *                  reading or live agent worktree). NOT a stop order.
  *   ordered      — the failures, EVIDENCE FIRST. A reader must see which verdict
  *                  is evidence before the one that is not; the noisy line first
  *                  is how three afternoons were spent on the wrong suspect.

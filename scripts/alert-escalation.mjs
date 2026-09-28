@@ -1,7 +1,7 @@
 // THE ESCALATION LADDER (point 434, remainder of part 1) — the I/O half.
 // Every decision is in scripts/alert-escalation-core.mjs; this file keeps the
-// ladder state, applies the last-rung decision, writes its board card and logs
-// the reason.
+// ladder state, applies the last-rung decision, books its record on the ladder
+// (the board derives its card from it) and logs the reason.
 //
 // It is called from `scripts/notify.mjs`, i.e. from EVERY local alert: the
 // launcher, the board watchdog, the model guard, the deferral command and the
@@ -18,14 +18,15 @@
 //  1. FAIL-OPEN MEANS DELIVER. Everywhere else in this repository fail-open
 //     means "let the session act". On an alerting path it means SEND: an
 //     unreadable ladder file, a locked state, a throw anywhere in here — all of
-//     them end in the message going out at the caller's own priority. An alert
+//     them end in the message going out (a throw at the caller's own priority;
+//     an unreadable file reads as empty, so rung 0's floor applies). An alert
 //     silently swallowed by its own throttle is worse than a duplicate buzz.
 //  2. THE LADDER DOES NOT STAND DOWN FOR A NON-OWNER. The other guards do,
 //     because they gate what a SESSION may do. This one governs a CHANNEL, and
 //     its principal caller — the OS launcher — owns no lock and never will; a
 //     lock-keyed stand-down would switch the ladder off precisely in the
-//     unattended case it exists for. What it DOES stand down for is a batch that
-//     is already paused: the pause is a state, not an action to repeat. The
+//     unattended case it exists for. A batch that is already paused only makes a
+//     corruption alert's last rung skip its repair; the alert still goes out. The
 //     off-switch for everything else is the environment variable
 //     HOA_ALERT_ESCALATION=off, which delivers every alert unthrottled.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
@@ -45,8 +46,8 @@ import {
   ladderEntry,
 } from './alert-escalation-core.mjs'
 
-// Re-exported: the priority helpers are PURE and belong to the core, but callers
-// and tests reach for them through this module.
+// Re-exported: the priority helpers are PURE and belong to the core, but tests
+// reach for them through this module.
 export { PRIORITY_ORDER, higherPriority }
 
 // One gitignored directory for both resilience layers' runtime state — see the
@@ -181,8 +182,12 @@ async function pauseApi() {
 /**
  * ASK THE LADDER whether this alert goes out, and act on the last rung.
  *
- * @returns {Promise<{deliver: boolean, priority: string|null, decision: object|null}>}
- *          `priority` is the ladder's own — the caller raises its own with it.
+ * @returns {Promise<{deliver: boolean, priority: string|null, decision: object|null,
+ *          record?: object|null, repairResult?: object|null, commit?: () => boolean,
+ *          disabled?: true, error?: string}>}
+ *          `priority` is already the higher of the caller's and the ladder's (null:
+ *          keep the caller's own). The caller calls `commit()` after a confirmed
+ *          delivery to book the rung.
  */
 export async function escalate({
   title,
@@ -273,9 +278,9 @@ export async function escalate({
     // re-decides at the same rung next time, so the alert keeps trying.
     const commit = () => {
       try {
-        // The DECISION's clock, not a fresh one: delivery follows the decision by
-        // milliseconds, and re-reading the wall clock here would make the rung's
-        // own timestamp disagree with the gap that was just measured against it.
+        // The DECISION's clock, not a fresh one: re-reading the wall clock here,
+        // after any repair and the POST, would make the rung's own timestamp
+        // disagree with the gap that was just measured against it.
         //
         // The record goes in HERE, with the rung (point 749). It replaced a
         // separate board write that could fail on its own and used to hold the

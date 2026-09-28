@@ -1,6 +1,7 @@
 // The bounded failure matrix for ordered-work step 12. Each scenario exercises
-// the production decision that must fail closed; the parent-death scenario in
-// batch-daemon-drill.mjs remains the full real-process takeover drill.
+// the production decision that must fail closed. batch-daemon-drill.mjs runs
+// this matrix first and, for its REAL_FAILURE_SCENARIOS, also against a real
+// daemon; parent-death there is the full real-process takeover drill.
 import { classifyLane, registryVerdict, successorBoundaryVerdict } from './batch-reconcile-core.mjs'
 import { daemonCheckpointVerdict, checkpointBarrierVerdict, createCheckpointBarrier } from './batch-checkpoint-core.mjs'
 import { validateMutation } from './batch-schema-core.mjs'
