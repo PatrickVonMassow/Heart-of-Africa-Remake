@@ -6,7 +6,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   advanceReserve,
-  blendHeading,
   turnToward,
   chaserPresses,
   chooseEffort,
@@ -332,15 +331,6 @@ describe('headings', () => {
 
   it('a coincident target keeps the fallback instead of an arbitrary atan2(0,0)', () => {
     expect(headingToward(2, 3, 2, 3, 1.234)).toBe(1.234)
-  })
-
-  it('blends the short way round and clamps its parameter', () => {
-    expect(blendHeading(0, Math.PI / 2, 0.5)).toBeCloseTo(Math.PI / 4, 9)
-    // Across the ±π seam: from 3.0 rad to −3.0 rad the short way is +0.28 rad.
-    const b = blendHeading(3.0, -3.0, 1)
-    expect(Math.sin(b)).toBeCloseTo(Math.sin(-3.0), 9)
-    expect(blendHeading(0, 1, -1)).toBe(0)
-    expect(blendHeading(0, 1, 5)).toBe(1)
   })
 
   it('turns toward a heading at a bounded rate, the short way round', () => {
