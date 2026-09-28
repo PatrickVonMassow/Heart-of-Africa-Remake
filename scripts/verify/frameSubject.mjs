@@ -60,8 +60,8 @@ const DEFAULT_TIMEOUT = 15000
 // subject budget above, because it measures something else: that one waits for
 // the subject to be in the picture (a judgment), this one waits for the browser
 // to hand the pixels over (I/O). Passing nothing let either inherit Playwright's
-// silent 30 s default, and on a host that renders through SwiftShader with no
-// GPU a capture under suite load exceeds that — `enrichments` died on the
+// silent 30 s default, and on a host that rendered through SwiftShader with no
+// GPU (the Linux lane before point 493) a capture under suite load exceeded that — `enrichments` died on the
 // map-overlay write 4700 lines before its own subject, on main as much as on any
 // branch, and the timeout named neither the harness nor the machine; its seven
 // pixel probes carried the same undeclared deadline. A slow capture is not a
@@ -82,17 +82,13 @@ export function probeFrameSubject(d) {
   const probe = { ok: false, available: true, mode: g ? g.mode : null, placeId: g ? g.placeId : null }
   const done = () => (d.report ? probe : probe.ok ? probe : null)
 
-  if (d.scene && probe.mode && probe.mode !== d.scene) {
-    probe.reason = 'the game was in ' + probe.mode + ' mode, not ' + d.scene
-    return done()
-  }
+  if (d.scene && probe.mode && probe.mode !== d.scene) return done()
   if (d.kind === 'general') {
     probe.ok = true
     return done()
   }
   if (d.kind === 'place') {
     probe.ok = probe.placeId === d.place
-    if (!probe.ok) probe.reason = 'the game stood in ' + (probe.placeId || 'no settlement') + ', not in ' + d.place
     return done()
   }
   if (d.kind === 'element') {
@@ -154,7 +150,6 @@ export function probeFrameSubject(d) {
     probe.settled = cam.settled ? !!cam.settled() : null
     if (g && g.pos) probe.player = { x: g.pos.x, z: g.pos.z }
     probe.ok = probe.onScreen && !(d.settle && probe.settled === false)
-    if (!probe.ok && probe.onScreen) probe.reason = 'the camera was still travelling to its target'
     return done()
   }
   // 'local' — a subject inside a settlement, projected through the place camera
@@ -172,7 +167,6 @@ export function probeFrameSubject(d) {
   const behind = !(cw > 0)
   probe.ndc = behind ? { x: 0, y: 0, z: 2 } : { x: clip[0] / cw, y: clip[1] / cw, z: clip[2] / cw }
   probe.onScreen = !behind && Math.abs(probe.ndc.x) <= 1 && Math.abs(probe.ndc.y) <= 1 && probe.ndc.z < 1
-  if (w.__placePlayer) probe.player = { x: w.__placePlayer.x, z: w.__placePlayer.z }
   probe.ok = probe.onScreen
   return done()
 }
@@ -263,7 +257,8 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
   // The AIM is judged first and the picture second, in that order on purpose: a
   // mis-aimed frame is refused in seconds instead of after the (deliberately
   // generous) readiness wait, and the aim cannot go stale while the world
-  // streams in — nothing moves the camera during the wait.
+  // streams in — a settled camera stays put during the wait (a `settle: false`
+  // frame is shot in motion by choice).
   let sceneVerdict = null
   const mode = sceneReadyMode(d)
   if (mode !== 'none') {

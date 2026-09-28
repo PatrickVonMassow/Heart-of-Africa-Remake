@@ -80,6 +80,6 @@ export function gpuBackendVerdict(results) {
     results: lanes,
     summary:
       'GPU BACKENDS PRESENT: WebGL 2 context and WebGPU adapter are ready on hardware; ' +
-      'a later window.__renderer timeout is an app startup failure, not host GPU loss.',
+      'a window.__renderer timeout right after this is an app startup failure, not a missing host GPU.',
   }
 }

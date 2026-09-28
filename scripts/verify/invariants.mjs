@@ -1,6 +1,7 @@
 // Pillar 1 of point 184: a CONTINUOUS global-invariant harness. Where enrichments
-// SPOT-checks one region, this DRIVES a long route across regions/biomes and, every
-// frame, checks global invariants over ALL wildlife via frustum projection
+// SPOT-checks one region, this DRIVES a long route across regions/biomes and checks
+// global invariants — every frame for each NEWLY joined animal (I1), every tenth
+// frame over all living wildlife (I5) — via frustum projection
 // (window.__camera.onScreen — the point-172 picture standard, never an assumed
 // radius) and the sim clock (point 177). It runs at the ACHIEVABLE zoom 0.5 (the
 // hardest reachable view, point 172) on whichever backend VERIFY_GL selects, so the
@@ -175,10 +176,11 @@ for (const stop of ROUTE) {
       // The sustained multi-region drive can lose the graphics context under headless
       // (a page-level "execution context was destroyed"); recover by reloading and
       // re-running just this region rather than failing the whole suite on a transient.
-      // Two retries keep the per-region miss rate negligible across the 6-stop route.
+      // Two retries keep the per-region miss rate negligible across the route (six
+      // stops when no --section narrows it).
       if (attempt === 3) throw e
       recovered = true
-      console.log(`  route ${stop.name}: recovering from a lost context — reloading and retrying`)
+      console.log(`  route ${stop.name}: recovering from a failed drive (${e?.message ?? e}) — reloading and retrying`)
       await page.goto(BASE)
       await prepPage()
     }

@@ -11,10 +11,10 @@ import { installTtsCache } from './ttsCache.mjs'
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 
-// SECTIONS (points 566/595). Each block adds the journal entry it needs and puts
-// the wound level and the do-not-disturb switch back where it found them, so one
-// of them repairs alone: `--section=autoscroll` costs one boot instead of four
-// reveal animations, each of which waits out a stroke-by-stroke run. The names
+// SECTIONS (points 566/595). Each block adds the journal entry it needs and resets
+// the wound level and the do-not-disturb switch to their defaults (0 / off), so
+// one of them repairs alone: `--section=autoscroll` costs one boot instead of the
+// whole pass, whose reveal animations each wait out a stroke-by-stroke run. The names
 // are read out of THIS FILE by scripts/verify/sections.mjs, so an unknown one is
 // refused with the list of the real ones — and the run is stamped PARTIAL, never
 // suite coverage.
@@ -38,7 +38,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const shot = frameShutter(page, OUT)
 // TTS assets from the local point-88 cache: adding an entry auto-narrates,
 // and a cold CDN model download stalls the reveal start past the check's
-// timing (observed ~14 s under today's CDN throttling). The cache is owned
+// timing (observed ~14 s under CDN throttling). The cache is owned
 // and marked complete by voice.mjs; here it is only consumed.
 await installTtsCache(page)
 const errors = []
@@ -47,8 +47,8 @@ page.on('console', (m) => {
 })
 page.on('pageerror', (e) => errors.push(String(e)))
 
-// Force the WASM TTS path headless (no WebGPU adapter; keeps rendering through
-// the cold load) — point 117.
+// Force the WASM TTS path headless, whatever WebGPU adapter the lane offers
+// (keeps rendering through the cold load) — point 117.
 await page.addInitScript(() => {
   window.__ttsForceWasm = true
 })
@@ -105,8 +105,8 @@ if (section('entry-written')) {
     `${early.len} → ${laterLen} chars`,
   )
   await shot('81-handwriting', { element: '.journal .entry.writing', label: 'the entry being written' })
-  // Wait for the stroke animation to END (a fixed sleep undershoots when the
-  // throttled headless RAF slows the reveal under full-regression load).
+  // Wait for the stroke animation to END (a fixed sleep undershoots when a loaded
+  // headless main thread slows the reveal's timer under full-regression load).
   await page.waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 25000 }).catch(() => {})
   await page.waitForTimeout(300)
   const finished = await page.evaluate(() => ({
@@ -139,13 +139,13 @@ if (section('wounded-hand')) {
   // click: it is the page's first user gesture and would otherwise start the
   // deferred initial narration (TTS model download).
   await page.evaluate(() => window.__ui.getState().setJournalDnd(true))
-  // Wait for the RAF-driven writing entry to appear, then force-click it to finish —
+  // Wait for the timer-driven writing entry to appear, then force-click it to finish —
   // on the WebGPU backend's slower headless cadence it starts later and keeps animating,
   // so a bare .click() hangs on the actionability/stability wait until the default
   // timeout (point 184). force skips stability, the timeout+catch prevent the hang.
   await page.locator('.journal .entry.writing').click({ force: true, timeout: 15000 }).catch(() => {})
   // Poll for the click-to-finish to clear the writing state rather than a fixed wait —
-  // the finish is applied in the render loop and lags on the slower WebGPU headless
+  // the finish is applied through React state and lags on the slower WebGPU headless
   // cadence (point 184, the same timing class); a real failure exhausts the window.
   await page
     .waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 15000 })
@@ -178,12 +178,12 @@ if (section('do-not-disturb')) {
 
 // --- The view follows new content down while it is written (design.md §15/§16) ---
 if (section('autoscroll')) {
-  // Fill the journal so it overflows, reopen it, then add an animated entry: the
+  // Fill the journal so it overflows, (re)open it, then add an animated entry: the
   // scroll container must follow the growing text to the bottom so the newly
   // appearing strokes stay visible.
   await page.evaluate(() => {
     const g = window.__game.getState()
-    window.__ui.getState().setJournalDnd(true) // silent fillers while closed
+    window.__ui.getState().setJournalDnd(true) // silent fillers (DND on)
     for (let i = 0; i < 24; i++) g.addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
     window.__ui.getState().setJournalDnd(false)
     g.setJournalOpen(true)

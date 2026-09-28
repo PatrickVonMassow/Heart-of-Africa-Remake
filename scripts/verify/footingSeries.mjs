@@ -77,8 +77,9 @@ export function judgeFootingSeries(samples, opts = {}) {
       reason: 'no-slope',
       detail:
         `MEASURED THE WRONG THING — only ${sloped.length} of ${rows.length} stance samples stood on ` +
-        `sloped ground (needs ${minSloped}); steepest rise over a wheelbase ${maxSlope.toFixed(3)}, ` +
-        `below the ${minSlope} floor. The seating under test never ran; sample where relief rises.`,
+        `sloped ground (needs ${minSloped}); steepest rise over a wheelbase ${maxSlope.toFixed(3)}` +
+        (sloped.length === 0 ? `, below the ${minSlope} floor. The seating under test never ran` : '. The seating under test ran too rarely') +
+        '; sample where relief rises.',
       total: rows.length,
       sloped: sloped.length,
       worstSloped,
@@ -100,9 +101,11 @@ export function judgeFootingSeries(samples, opts = {}) {
 }
 
 /**
- * Judge the companion body-pitch rule over the same series: no body leans past a
- * stand-able incline. Judged on the SLOPED samples for the same reason — a flat
- * stance has no pitch to be wrong about.
+ * Judge the companion body-pitch rule over the same kind of series: no body
+ * leans past a stand-able incline (`maxPitch`, default 0.3 rad). Judged on the
+ * SLOPED samples for the same reason — a flat stance has no pitch to be wrong
+ * about. Returns `{ ok, detail, sloped, worst }`; an empty series fails as too
+ * few sloped samples.
  */
 export function judgePitchSeries(samples, opts = {}) {
   const minSlope = opts.minSlope ?? MIN_WHEELBASE_SLOPE
@@ -115,7 +118,7 @@ export function judgePitchSeries(samples, opts = {}) {
       ok: false,
       detail:
         `MEASURED THE WRONG THING — only ${sloped.length} of ${rows.length} stance samples stood on ` +
-        `sloped ground (needs ${minSloped}): a flat stance cannot lean.`,
+        `sloped ground (needs ${minSloped}): too few sloped stances to judge a lean.`,
       sloped: sloped.length,
       worst: null,
     }

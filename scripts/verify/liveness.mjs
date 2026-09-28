@@ -75,7 +75,7 @@ export function maxGap(times) {
  *   blockMs      the largest stall NOT covered by animation-frame callbacks —
  *                the number a liveness gate binds
  *   blockAtMs    where that stall began
- *   frameBlockMs the largest single stall's frame-covered part, i.e. the biggest
+ *   frameBlockMs the largest frame-covered part of any single tick gap, i.e. the biggest
  *                synchronous cost the page's own rendering imposed (reported)
  *   tickGapMs    the largest raw stall, unattributed (reported)
  */

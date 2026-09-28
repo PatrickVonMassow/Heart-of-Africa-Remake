@@ -31,7 +31,7 @@
 export const UNITS_PER_DEGREE = 10
 
 /** The subject kinds a frame may declare. */
-export const SUBJECT_KINDS = ['world', 'local', 'place', 'element', 'general']
+const SUBJECT_KINDS = ['world', 'local', 'place', 'element', 'general']
 
 /** Ground point of a lat/lon subject, in world units (equirectangular, §3.1). */
 export function worldPointOf(lat, lon) {
@@ -48,6 +48,8 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v)
  *
  * Shapes:
  *   { world: { lat, lon, y? }, label? }  a place/landmark in the bird's-eye view
+ *   { world: { x, z, y? }, label? }      a live thing, in world units, in that view
+ *                                         (world only: `settle: false` shoots mid-lerp)
  *   { local: { x, z, y? }, label? }      a building/prop inside a settlement
  *   { place: '<place id>', label? }      the interior of that settlement
  *   { element: '<css selector>', label? } a HUD/overlay/modal subject
@@ -62,7 +64,7 @@ export function normaliseDeclaration(frame, decl) {
   if (!decl || typeof decl !== 'object') {
     throw new Error(
       `captureFrame: frame "${name}" carries no subject declaration. State what the picture must show — ` +
-        `{ world: { lat, lon } }, { local: { x, z } }, { element: '<selector>' } — or declare the general view ` +
+        `{ world: { lat, lon } }, { local: { x, z } }, { place: '<id>' }, { element: '<selector>' } — or declare the general view ` +
         `explicitly: { general: 'why this frame is a general view' }.`,
     )
   }
@@ -157,8 +159,8 @@ export function offScreenReason(ndc) {
   if (ndc.y > 1) past.push('top')
   else if (ndc.y < -1) past.push('bottom')
   const edges = past.length ? `off the ${past.join(' and ')} edge of the frame` : ''
-  // NDC z outside [0, 1] is the depth verdict: the subject sits behind the
-  // camera or past the far plane. Both mean it is not in the picture, and the
+  // NDC z of 1 or more is the depth verdict: the subject sits past the far
+  // plane, or behind the camera (which the probe encodes as z = 2). Both mean it is not in the picture, and the
   // two cannot be told apart from the projection alone — so say both rather
   // than assert the wrong one.
   const depth = ndc.z < 1 ? '' : 'outside the depth range (behind the camera or beyond the far plane)'
@@ -258,7 +260,7 @@ export function formatFramePass(d, probe) {
  * because it is a measurement, and `findUnbudgetedCaptures` below is what holds
  * it to the harness' capture budget.
  */
-export const RAW_FRAME_RE = /\.screenshot\(\s*\{(?:[^{}]|\{[^{}]*\})*?\bpath\s*:/g
+const RAW_FRAME_RE = /\.screenshot\(\s*\{(?:[^{}]|\{[^{}]*\})*?\bpath\s*:/g
 
 /** How many undeclared frame writes a source text contains. */
 export function findRawFrames(source) {
@@ -284,7 +286,7 @@ export function formatRawFrameFindings(findings) {
  * THE SECOND GATE (point 492). The gate above matches `path:` WRITES only, so a
  * pathless pixel PROBE — `page.screenshot({ clip })` returning a buffer a check
  * measures on — passes it by design and kept inheriting Playwright's silent 30 s
- * default. Under suite load on a GPU-less host that deadline is exceeded exactly
+ * default. Under suite load on a slow host (then a software-rendered lane) that deadline is exceeded exactly
  * as the writes' was, and the suite then dies far from the check it was running.
  * So every probe goes through `capturePixels` (frameSubject.mjs), which carries
  * the one named budget and names the site — and a raw `.screenshot(` left in a

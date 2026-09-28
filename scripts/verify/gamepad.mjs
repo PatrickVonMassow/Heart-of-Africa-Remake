@@ -8,7 +8,7 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 
 // SECTIONS (points 566/595). One block per control, each owning the scene it
 // needs — the first-person blocks stay in the start port, the travel block leaves
-// it, and the two village blocks enter the village themselves through the shared
+// it, and the three village blocks enter the village themselves through the shared
 // helper below rather than inheriting it from the block before. The names are
 // read out of THIS FILE by scripts/verify/sections.mjs, so an unknown one is
 // refused with the list of the real ones — and the run is stamped PARTIAL, never
@@ -99,13 +99,13 @@ const nextFrames = (n) =>
     n,
   )
 
-// SHARED STAGING (point 566). The two village blocks both need to be standing in
-// the NORTHERN village — one to address its elder, one to have the position query
-// answer "North" — so entering it is a helper each of them calls, not something
-// the second inherits from the first. A no-op once the traveller is already
-// standing there (so a whole run still enters exactly once), and it steps out of
-// any OTHER settlement first: going out and in is the path the player takes and
-// the one the §2.5 panorama capture expects.
+// SHARED STAGING (point 566). The three village blocks all need to be standing in
+// the NORTHERN village — to address its elder, to have the position query answer
+// "North", to hear a villager's word — so entering it is a helper each of them
+// calls, not something a later one inherits from an earlier one. A no-op once the
+// traveller is already standing there (so a whole run still enters exactly once),
+// and it steps out of any OTHER settlement first: going out and in is the path the
+// player takes.
 const enterNubianVillage = async () => {
   const alreadyThere = await page.evaluate(
     () => window.__game.getState().placeId === 'nubian-village' && !!window.__placeLayout,
@@ -210,9 +210,9 @@ if (section('interact-chief')) {
 // --- Position query (P / Select) in both languages -------------------------------------------
 if (section('position-query')) {
   await enterNubianVillage()
-  // Hold the button until the toast appears (like a real press): right after
-  // a place entry the scene build can stall frames longer than a short tap,
-  // so a fixed 150 ms window may fall between two rAF ticks of the poller.
+  // Hold the button until the toast appears (like a real press): a slow frame
+  // can outlast a short tap, so a fixed 150 ms window may fall between two rAF
+  // ticks of the poller.
   const queryToast = async () => {
     await page.evaluate(() => window.__game.getState().setToast(null))
     await page.evaluate(() => (window.__pad.buttons[8] = { pressed: true, touched: true, value: 1 }))
@@ -301,10 +301,11 @@ if (section('guess-key')) {
   // what followed from it, so two drawn frames are the whole window in which a
   // dialog it opened could appear.
   await nextFrames(2)
+  const openedBySpace = await page.evaluate(guessOpen)
   check(
     'SPACE leaves the word alone now (point 1139)',
-    (await page.evaluate(guessOpen)) === false,
-    'the use key opened the guess',
+    openedBySpace === false,
+    openedBySpace ? 'the use key opened the guess' : '',
   )
   // 2. E is what places the guess.
   await page.keyboard.press('KeyE')
