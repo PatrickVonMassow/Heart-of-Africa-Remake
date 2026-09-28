@@ -1,26 +1,29 @@
 #!/usr/bin/env node
 // THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624).
 //
-//   node scripts/review-astra.mjs --sha <sha> --brief "<what to judge>" \
-//        [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>]
+//   node scripts/review-astra.mjs [--reviewer astra|fable|opus|opus48] --sha <sha> --brief "<what to judge>" \
+//        [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \
+//        [--pass <k>] [--file <end-state path>]…
 //   node scripts/review-astra.mjs --probe          # is the -m flag honoured at all?
 //   node scripts/review-astra.mjs --save-login     # keep the login across a rebuild
 //   node scripts/review-astra.mjs --restore-login
 //
-// It runs the review through `codex exec` non-interactively in a READ-ONLY
-// sandbox and prints the verdict and the evidence in the shape
+// It runs the review non-interactively — through `codex exec` in a READ-ONLY
+// sandbox for Astra, or a tool-free `claude` run for a --reviewer Claude model —
+// and prints the verdict and the evidence in the shape
 // `mechanism-review.mjs --record` expects. No session types a codex line by
 // hand: the model id, the reasoning effort and the sandbox are decisions of the
 // rule (CLAUDE.md §6), not of whoever is at the keyboard.
 //
 // The ARTEFACT TRAVELS WITH THE REQUEST — the diffstat, the patch and the
-// current content of every touched file go in on stdin — because this container
+// current content of the touched files the pass carries (review-material-core.mjs
+// decides the delivery level) go in on stdin — because this container
 // cannot create user namespaces and codex's sandbox launcher therefore kills
 // every command the reviewer would run (see formatReviewMaterial).
 //
 // WHEN ASTRA IS NOT AVAILABLE the command says so in ONE line, names the cause,
-// and hands the review to the first eligible Claude reviewer — and the record it
-// prints then carries that model's name with an EMPTY verdict, so nothing can be recorded as reviewed
+// and hands the review to the first eligible Claude reviewer — printing the command
+// that starts that reviewer, never a verdict, so nothing can be recorded as reviewed
 // that nobody reviewed. The decision logic is pure (review-astra-core.mjs); this
 // half does the process work and fails LOUD. It is a command, not a hook.
 //
@@ -111,9 +114,9 @@ import {
   reviewEndStateFiles,
 } from './mechanism-review-range-core.mjs'
 
-/** Where codex keeps the ChatGPT login, and where we park a copy of it. */
+/** Where codex keeps the ChatGPT login (the parked copy is SAVED_AUTH_FILE below). */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
-export const AUTH_FILE = join(CODEX_HOME, 'auth.json')
+const AUTH_FILE = join(CODEX_HOME, 'auth.json')
 
 /**
  * Where this command keeps its own state: the saved login and the probe receipt.
@@ -134,17 +137,17 @@ export const STATE_DIR =
       { sep: sep_ },
     ),
   )
-export const SAVED_AUTH_FILE = join(STATE_DIR, 'codex-auth.json')
+const SAVED_AUTH_FILE = join(STATE_DIR, 'codex-auth.json')
+
+/** Decodes strictly or throws — the lossy default writes U+FFFD and moves on. */
+const utf8Strict = new TextDecoder('utf-8', { fatal: true })
 
 /**
  * One git read. `required` reads FAIL LOUD: an ignored exit status would send a
  * reviewer an empty patch and call the silence a review (four-eyes finding,
- * 10.08.2026). The optional reads are the per-file ones, where "not in this
- * commit" is an ordinary answer.
+ * 10.08.2026). The optional reads are the per-file blob reads and the quiet
+ * queries (rev-parse --verify, merge-base), where absence is an ordinary answer.
  */
-/** Decodes strictly or throws — the lossy default writes U+FFFD and moves on. */
-const utf8Strict = new TextDecoder('utf-8', { fatal: true })
-
 function git(args, { required = true, raw = false } = {}) {
   const res = spawnSync('git', args, {
     cwd: REPO_ROOT,
@@ -212,9 +215,10 @@ function git(args, { required = true, raw = false } = {}) {
 }
 
 /**
- * The material one review is given: the diffstat, the patch, and the content of
- * every file the change touched (see formatReviewMaterial for why it is fed
- * rather than fetched).
+ * The raw parts one review's material is assembled from: the diffstat, the
+ * patch, and the committed content of the touched files, limited to `onlyPaths`
+ * when given (assembleMaterial decides what of it travels; see
+ * formatReviewMaterial for why it is fed rather than fetched).
  *
  * THE CONTENT COMES FROM THE COMMIT, NOT FROM THE WORKING TREE (four-eyes
  * finding, 10.08.2026). Reading the live tree would follow a symlink — a link
@@ -248,9 +252,10 @@ function gatherRange(sha, base, onlyPaths = null) {
   const pathspec = Array.isArray(onlyPaths) && onlyPaths.length ? ['--', ...onlyPaths] : []
   const paths = git(['diff', '--name-only', '-z', '--no-renames', range, ...pathspec], { raw: true }).split('\0').filter(Boolean)
   // A PATH NODE'S STRINGS CANNOT CARRY IS REFUSED, NOT COLLAPSED (fourth
-  // cross-vendor round; named residual — see unquoteGitPath). Bytes that are
-  // not valid UTF-8 decode to U+FFFD here, distinct real paths can then fall
-  // together, `git show` misses the real file, and the coverage accounting
+  // cross-vendor round; named residual — see unquoteGitPath). The strict
+  // decode in git({ raw: true }) already throws on bytes that are not valid
+  // UTF-8; this check is the backstop should a lossy U+FFFD path ever reach
+  // here — distinct real paths would then fall together, `git show` misses the real file, and the coverage accounting
   // would clear a file nobody could even name. Refusing loses the round; the
   // alternative loses the record's meaning.
   const unspeakable = undecodablePaths(paths)
@@ -373,7 +378,7 @@ export function gatherAuthorshipCommits(sha, base) {
 /** Historical scoped rows on this exact range, with ancestry re-measured from
  *  Git. Only these measured facts may explain why an old reading is reusable or
  *  why a later file state invalidated it. */
-export function gatherHistoricalCoverageRecords(sha, base, allRecords = readRecords()) {
+function gatherHistoricalCoverageRecords(sha, base, allRecords = readRecords()) {
   const branchShas = new Set(git(['rev-list', sha, '--not', base]).split(/\r?\n/).filter(Boolean))
   const records = (allRecords ?? []).filter(
     (record) => branchShas.has(String(record?.sha ?? '')) && Array.isArray(record?.pass?.files),
@@ -585,11 +590,11 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   for (const pass of plan.passes ?? []) {
     const reviewer = reviewerDescriptor(pass.reviewer)
     lines.push(
-      `  pass ${pass.index}/${pass.total} → ${pass.reviewer ? `${pass.reviewerVendor} reviewer ${pass.reviewer}` : 'UNREVIEWABLE'}; ` +
+      `  pass ${pass.index}/${pass.total} → ${pass.reviewerVendor} reviewer ${pass.reviewer}; ` +
         `${pass.size} characters; end state ${String(pass.endState).slice(0, 7)}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
       `    node scripts/review-astra.mjs --sha ${sha} --since ${pass.rangeBase} ` +
-        `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>" --pass ${pass.index}`,
+        `${reviewer ? `--reviewer ${reviewer.key} ` : ''}--brief "<what to judge>"${plan.fits ? '' : ` --pass ${pass.index}`}`,
     )
   }
   for (const group of plan.unreviewable ?? []) {
@@ -661,14 +666,6 @@ function assemblePass(range, pass, plan = null) {
   })
 }
 
-/**
- * The pass plan for a range, or null when it could not be measured.
- *
- * For the paths that spend NO round and still print a record command for the
- * whole range — the share switch at `claude-only`, and a range Astra authored. A
- * measurement that fails is reported as a measurement that failed: `null` yields
- * the `unplanned` refusal, never a silent "it fits".
- */
 /**
  * The commit the review's range starts at: where `ref` and `sha` diverged.
  *
@@ -771,9 +768,9 @@ export function runCodex({ prompt, input = '', modelId = ASTRA_MODEL_ID, timeout
     // the OS in one write, so a child that exits 0 without ever reading it
     // raises nothing — no spawn error, no signal — and a parseable verdict
     // over unread material would pass this layer. spawnSync exposes no
-    // read-side evidence that could close it; the admission check in
-    // parseVerdict (a reviewer saying it could not see) is the only, partial,
-    // mitigation. What the process layer DOES report is still honoured …
+    // read-side evidence that could close it; the partial mitigations are the
+    // material RECEIPT parseVerdict demands back and its admission check (a
+    // reviewer saying it could not see). What the process layer DOES report is still honoured …
     sentInput: input,
     // … and where the spawn layer reported an error, or the run was killed on
     // its budget mid-stream, whether the material arrived is UNKNOWN — the
@@ -789,7 +786,7 @@ export function runCodex({ prompt, input = '', modelId = ASTRA_MODEL_ID, timeout
 /** Run one explicitly selected Claude reviewer with no tools, no persistence
  *  and no fallback substitution. Its raw result JSON is retained outside Git
  *  so the recorder can verify the top-level model before granting credit. */
-export function runClaudeReviewer({ prompt, input = '', reviewer, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
+function runClaudeReviewer({ prompt, input = '', reviewer, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
   const args = authoringClaudeArgs({ modelId: reviewer.id, prompt })
   const dangerous = args.indexOf('--dangerously-skip-permissions')
   if (dangerous >= 0) args.splice(dangerous, 1)
@@ -847,7 +844,7 @@ export function runClaudeReviewer({ prompt, input = '', reviewer, timeoutMs = RE
 }
 
 /** The receipt of the last passed model-id probe (see probeFreshness). */
-export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-astra-probe.json')
+const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-astra-probe.json')
 
 /**
  * What the model-id proof is TIED TO: the codex binary, its version and the
@@ -856,7 +853,7 @@ export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-astra-probe.json')
  * (fifth cross-vendor round). Hashed, because the account id is not ours to
  * scatter through a repository's state files.
  */
-export function codexFingerprint() {
+function codexFingerprint() {
   const version = spawnSync(CODEX_BIN, ['--version'], { encoding: 'utf8', windowsHide: true }).stdout ?? ''
   const which = spawnSync('sh', ['-c', `command -v ${CODEX_BIN}`], { encoding: 'utf8', windowsHide: true }).stdout ?? ''
   let account = ''
@@ -868,7 +865,7 @@ export function codexFingerprint() {
   return createHash('sha256').update(`${version.trim()}|${which.trim()}|${account}`).digest('hex').slice(0, 16)
 }
 
-export function readProbeReceipt() {
+function readProbeReceipt() {
   try {
     return JSON.parse(readFileSync(PROBE_RECEIPT_FILE, 'utf8'))
   } catch {
@@ -1046,10 +1043,12 @@ export const usage = () =>
     'Files with no independent reviewer stay outside runnable pass indices instead of blocking',
     'them. With --point <N>, the plan prints the Git-verified unavailable-receipt command for',
     'that exact remainder; the receipt never claims that a review occurred.',
-    `Reviews run on ${ASTRA_MODEL_NAME} at reasoning effort ${ASTRA_REASONING_EFFORT} (CLAUDE.md §6). When it`,
-    'cannot be reached the review is HANDED OVER to the first eligible Claude model',
-    'allowed by the shared Fable switch (`node scripts/fable-switch.mjs --status`)',
-    'that authored no part of the reviewed range — the recorded review always names the',
+    `Without --reviewer, reviews run on ${ASTRA_MODEL_NAME} at reasoning effort ${ASTRA_REASONING_EFFORT} (CLAUDE.md §6). When it`,
+    'cannot be reached, or the share switch routes reviews away from it, the review is',
+    'HANDED OVER to the first eligible Claude model allowed by the shared Fable switch',
+    '(`node scripts/fable-switch.mjs --status`) that authored no part of the reviewed',
+    `range; a range ${ASTRA_MODEL_NAME} authored goes by role swap to the Opus-first Claude chain.`,
+    '--reviewer runs exactly that handover reader. The recorded review always names the',
     'model that ACTUALLY ran, and none of them may review its own work.',
   ].join('\n')
 
@@ -1098,10 +1097,12 @@ if (isMainModule(import.meta.url)) {
     }
     const full = (resolved.stdout ?? '').trim()
 
-    // THE SHARE SWITCH IS ASKED FIRST (point 654). At `claude-only` the operator has
-    // moved the load off OpenAI, so no request is sent at all — and the review lands
-    // exactly where every unavailable Astra lands: with a Claude reviewer that authored
-    // none of the range, and with NO verdict, because nobody has reviewed it yet.
+    // THE SHARE SWITCH IS READ HERE (point 654); its route is decided below, once
+    // the plan and the reviewer checks stand. At `claude-only` the operator has moved
+    // the load off OpenAI, so without an explicit --reviewer no request is sent — the
+    // review lands exactly where every unavailable Astra lands: with a Claude reviewer
+    // that authored none of the range, and with NO verdict, because nobody has
+    // reviewed it yet.
     const share = currentSetting()
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
@@ -1110,8 +1111,9 @@ if (isMainModule(import.meta.url)) {
     // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
     // (escalation round): the early routes hard-coded `partial: null`, so an
     // explicit narrowed `--since` on a fitting range printed a whole-SHA record
-    // template although only the narrowed range was measured — bypassing the
-    // refusal the normal route makes. The same three lines answer it everywhere.
+    // template although only the narrowed range was measured. The same three
+    // lines answer it everywhere (the normal route below turns a fitting narrowed
+    // range into one scoped pass).
     const sinceFlag = flag('--since')
     const partialFor = (base) => {
       const coverageBase = sinceFlag ? git(['merge-base', 'main', full], { required: false }) : base
@@ -1133,27 +1135,9 @@ if (isMainModule(import.meta.url)) {
     }
     const passFor = (plan) => {
       if (!passFlag) return { pass: null }
-      if (!plan) return { error: `--pass ${passFlag}: the range could not be measured, so no pass can be selected.` }
       if (plan.fits) {
         return {
           error: `--pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
-        }
-      }
-      if (plan.passes.length < 2 && !(plan.unreviewable?.length > 0)) {
-        return {
-          error:
-            `--pass ${passFlag}: this range packs into one coverable pass beside files beyond ` +
-            'reach, and a split of one cannot be recorded — narrow the range or split the change.',
-        }
-      }
-      // A split past the recorder's ceiling can never be recorded either
-      // (landing-round pass 5): every pass of it would be a paid round whose
-      // record parsePassSpec refuses.
-      if (plan.passes.length > MAX_PASS_TOTAL) {
-        return {
-          error:
-            `--pass ${passFlag}: this range splits into ${plan.passes.length} passes — more than the ` +
-            `${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
         }
       }
       const pass = passByIndex(plan, passFlag)
@@ -1201,13 +1185,11 @@ if (isMainModule(import.meta.url)) {
     // sha are the exact end-state boundary the old pass-less row could not express.
     // A full branch-range review stays pass-less for ledger compatibility.
     const pass = plan.fits ? (selectedFiles.length || partialFor(base) ? selected : null) : selected
-    const rangeAuthors = selected
-      ? selected.authors
-      : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
     if (!selected) {
       console.error('review-astra: REFUSING to spend a round on the whole range — run one of the authored passes above.')
       process.exit(4)
     }
+    const rangeAuthors = selected.authors
     const commandFor = (decision) => formatReviewerCommand({
       model: decision?.model,
       sha: full,
@@ -1258,9 +1240,9 @@ if (isMainModule(import.meta.url)) {
         fableState,
       })
       // THE FIT IS MEASURED ON THIS PATH TOO (cross-vendor review, second
-      // round). No round is spent here, but the record command printed for the
-      // hand-over covers the WHOLE range — and printing that template while
-      // nobody has measured whether the range is reviewable in one round is the
+      // round). No round is spent here, but the command printed for the
+      // hand-over covers the range or its selected pass — and printing it while
+      // nobody has measured whether that is reviewable in one round is the
       // assumption this point removes. The measurement costs git, not an
       // allowance.
       console.log(
@@ -1294,8 +1276,8 @@ if (isMainModule(import.meta.url)) {
         authorModel: rangeAuthors,
         fableState,
       })
-      // Same measurement, same reason: the role swap hands the WHOLE range on,
-      // and a range no single round can hold must be handed on as its passes.
+      // Same measurement, same reason: the role swap hands the range (or its
+      // selected pass) on, and a range no single round can hold goes as its passes.
       console.log(
         formatReviewReport({
           decision,
@@ -1373,8 +1355,8 @@ if (isMainModule(import.meta.url)) {
     // parseable verdict is not delivery evidence.
     const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
     // WHO AUTHORED IT decides who may review it if Astra is unavailable: no model
-    // can review its own commit (see fallbackReviewerFor), and the record
-    // covers the whole range, so every author in it counts.
+    // can review its own commit (see decideReview), and every author of the
+    // selected pass's files counts.
     const decision = targetReviewer.runtime === 'codex'
       ? decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
       : outcome.ok && parsed.ok

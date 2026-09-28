@@ -55,7 +55,7 @@ export function readTasksAll(tasksPath = TASKS_PATH, archivePath = ARCHIVE_PATH)
  * lets a missing TASKS.md throw and bails on it).
  *
  * `alarm` is the FORMAT ALARM: checkbox lines exist but not one of them parses
- * as a point, and the archive holds no tick either. That combination means a
+ * as an open, non-DEFERRED point, and the archive holds no tick either. That combination means a
  * reformat, never a finished batch, and everything that could spawn a session
  * off this reading must stop instead of concluding "nothing left to do". The
  * escape hatch reads the ARCHIVE rather than TASKS.md, because since the split

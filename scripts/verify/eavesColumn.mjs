@@ -20,8 +20,9 @@
 // all in those frames — it was reading a passer-by, and whether a porter
 // happened to be in the column when the single probe fired decided the verdict.
 //
-// THE RULE. A frame SATISFIES the criterion when its own reading does; the
-// criterion is judged on whether ANY frame of the window satisfies it. That is
+// THE RULE. A frame SATISFIES a half of the criterion when its own reading
+// does; each half (below, over) is judged on whether ANY frame of the window
+// satisfies it — the two halves may be satisfied by different frames. That is
 // not a bar being lowered — it is the same bar, read off the standing scene:
 // the player stands still, so static geometry gives an IDENTICAL reading in
 // every frame, and the only thing that varies is traffic. Traffic can only ever
@@ -86,9 +87,11 @@ const spanOf = (c) =>
  * @param frames   in order; each `{ camY, drop, below, roofY, roofName }`, as
  *                 `probeOverhead` reads them — `drop`/`roofY` null when the ray
  *                 found nothing, `below`/`roofName` the surface it did find
- * @param slack    how far under the eye the first surface may sit before it
- *                 counts as hanging there (the unchanged 0.5 m of point 349)
- * @param headroom the roof clearance a hanging surface must keep (ROOF_HEADROOM)
+ * @param slack    how high above the ground (y = 0) the first surface under
+ *                 the eye may sit before it counts as hanging there — the frame
+ *                 passes when drop >= camY - slack (the unchanged 0.5 m of point 349)
+ * @param headroom the roof clearance a hanging surface must keep (polish.mjs's
+ *                 ROOF_HEADROOM, 1.85)
  */
 export function judgeEavesColumn(frames, { slack = 0.5, headroom = 1.85 } = {}) {
   const list = (frames ?? []).filter((f) => f && typeof f.camY === 'number')
@@ -129,9 +132,11 @@ export function judgeEavesColumn(frames, { slack = 0.5, headroom = 1.85 } = {}) 
     ? `; crossed by [${roofCrossings.map((c) => `${c.name}×${c.frames}${spanOf(c)}`).join(', ')}]`
     : ''
 
-  // The drop the STANDING scene gives is the farthest one recorded: traffic can
-  // only put something nearer. Reported even when the criterion fails, because
-  // it is the number a reader needs to tell a roof from a passer-by.
+  // The drop the STANDING scene gives is the farthest one recorded — traffic can
+  // only put something nearer — unless a body held the column for the whole
+  // window, when the farthest drop is that body's (the crossings name it).
+  // Reported even when the criterion fails, because it is the number a reader
+  // needs to tell a roof from a passer-by.
   const drops = list.map((f) => f.drop).filter((d) => typeof d === 'number')
   const farthest = drops.length ? Math.max(...drops) : null
 
@@ -146,7 +151,7 @@ export function judgeEavesColumn(frames, { slack = 0.5, headroom = 1.85 } = {}) 
     roofCrossings,
     belowDetail: standingBelow
       ? `${sayBelow(standingBelow)} ${at}${alsoBelow}`
-      : `NOTHING CLEAR in any frame — nearest standing reading ${sayBelow(list[0])} ${at}${alsoBelow}`,
+      : `NOTHING CLEAR in any frame — first reading ${sayBelow(list[0])} ${at}${alsoBelow}`,
     roofDetail: standingRoof
       ? `${standingRoof.roofY == null ? 'open sky' : standingRoof.roofY.toFixed(2) + ' m of ' + standingRoof.roofName} ${at}${alsoRoof}`
       : `NOTHING CLEAR in any frame — ${list[0].roofY == null ? 'open sky' : list[0].roofY.toFixed(2) + ' m of ' + list[0].roofName} ${at}${alsoRoof}`,

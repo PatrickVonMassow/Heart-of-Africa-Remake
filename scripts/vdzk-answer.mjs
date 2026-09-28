@@ -1,7 +1,8 @@
 // Carrier for an answer written into a session that may not edit the board.
-// Recording is local and owner-independent; applying removes exactly the named
-// VDZK card. Past the shared core deadline, batch-autostart invokes
-// `--redeem-due`, so a long owner wait cannot leave the answered card standing.
+// Recording is local and owner-independent; `--applied` clears the carried
+// answer of the named card once the owner has acted on it. Past the shared core
+// deadline, batch-autostart invokes `--redeem-due`, which removes exactly the
+// named VDZK card, so a long owner wait cannot leave the answered card standing.
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'

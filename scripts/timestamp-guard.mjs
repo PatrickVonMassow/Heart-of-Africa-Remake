@@ -1,21 +1,25 @@
 // Stop hook (user mandate 23.07.2026, ninth escalation of the chat-timestamp
 // rule): GUARANTEE every chat reply begins with the bold Europe/Berlin
-// timestamp ("**Donnerstag, 23.07.2026, 09:55**"). Reminders, memory entries
-// and the soft user-global nudge hook all failed repeatedly, so this guard
-// BLOCKS turn-end while the last assistant reply lacks a current stamp — the
-// block reason hands the exact line to copy verbatim, so compliance is one
-// paste away. The decision logic lives in timestamp-guard-core.mjs (pure,
+// timestamp ("**Donnerstag, 23.07.2026, 09:55**") and its " · Kontext: …
+// Tokens" reading. Reminders, memory entries and the soft user-global nudge
+// hook all failed repeatedly, so this guard BLOCKS turn-end while the last
+// assistant reply lacks a current stamp, or lacks the reading where one was
+// measured (headerReading) — the block reason hands the exact whole header to
+// copy verbatim, so compliance is one paste away. The decision logic lives in timestamp-guard-core.mjs (pure,
 // Vitest-covered, same ICU formatting as the UserPromptSubmit injection hook
 // scripts/hooks/berlin-timestamp.cjs).
 //
 // Fail-direction (explicit user requirement): err toward BLOCKING, not toward
-// letting a missing stamp slip. A missing or stale stamp blocks every time,
-// including repeats — the assistant must fix the reply, never wait the guard
-// out. The ONE bounded escape exists only for a transcript the guard cannot
-// read/parse at all (the assistant cannot fix that by complying): after
-// MAX_UNVERIFIABLE_BLOCKS consecutive unverifiable blocks in the same session
-// it allows LOUDLY (stderr + systemMessage), so a broken harness path cannot
-// trap the session in an infinite block loop.
+// letting a missing stamp slip. A missing or stale stamp in a reply it can see
+// blocks every time, including repeats — the assistant must fix the reply,
+// never wait the guard out. Two exits are not blocks: a tool result with no
+// assistant text after it yet (the final reply row is not flushed — nothing to
+// judge) allows quietly, and the bounded escape covers what the assistant
+// cannot fix by complying — a missing or unreadable transcript, no assistant
+// text at all, or an internal guard error: after MAX_UNVERIFIABLE_BLOCKS
+// consecutive unverifiable blocks in the same session it allows LOUDLY
+// (stderr + systemMessage), so a broken harness path cannot trap the session
+// in an endless block loop (as long as its counter can be stored).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -75,7 +79,8 @@ function writeState(state) {
 }
 
 /** Block turn-end because the transcript could not be verified — bounded per
- *  session so an unreadable transcript can never loop forever. */
+ *  session through the stored counter, so an unreadable transcript does not
+ *  loop forever (a state file that cannot be written means blocking again). */
 function blockUnverifiable(sessionId, detail, suffix = '') {
   const state = readState()
   const failures = state.sessionId === sessionId ? Number(state.failures) || 0 : 0
@@ -156,7 +161,7 @@ try {
   // once through the bounded path (so a persistent bug still cannot trap
   // the session past the escape counter).
   try {
-    blockUnverifiable('', `internal guard error: ${e && e.message}`)
+    blockUnverifiable('', `internal guard error: ${e && e.message}`, contextLevelSuffix(null))
   } catch {
     process.stdout.write(
       JSON.stringify({

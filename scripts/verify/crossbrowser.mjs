@@ -1,18 +1,21 @@
 // Cross-browser & mobile functional smoke (user request 21.07.2026). The
 // regression runs on Chromium desktop; this adds a SHORT check on the OTHER
-// engines and on mobile/tablet, so a Gecko/WebKit-only or touch-only break is
+// engines and on phone-sized mobile viewports, so a Gecko/WebKit-only or touch-only break is
 // caught WITHOUT re-running the whole suite per engine (that would multiply the
 // runtime by the engine count). Its DEPTH scales with the regression tier:
 //
-//   minimal  (SMALL gate): desktop boots, renderer initialises, no console errors.
-//   standard (LARGE gate): + the actual backend, a sized canvas, a bird's-eye move,
-//                          AND a mobile/tablet pass (touch layer arms on first touch).
-//   thorough (maximum QA): + core flows (enter a settlement, open the map & journal).
+//   minimal  (SMALL gate): desktop boots, renderer initialises (its actual backend
+//                          reported), no console errors.
+//   standard (LARGE gate): + a sized canvas, a bird's-eye move, AND a mobile pass
+//                          (touch layer arms on first touch).
+//   thorough (maximum QA): + core flows (enter a settlement, open the map & journal)
+//                          and the mobile quality preset (TRAA/SSAO off, half shadows).
 //
 // Desktop: Firefox (Gecko) + WebKit (Safari's engine). Mobile: WebKit ~ iOS Safari
 // and Chromium ~ Android Chrome (Firefox has no Playwright touch/mobile emulation).
-// It exercises the WebGL2 fallback (these engines' headless WebGPU is unreliable) —
-// Firefox ships WebGPU (FF 141+), so the backend is reported. Graceful: an engine
+// It mostly exercises the WebGL2 fallback (these engines' headless WebGPU is
+// unreliable), but Firefox ships WebGPU (FF 141+), so the backend that actually
+// initialised is reported rather than assumed. Graceful: an engine
 // that is not installed (`npx playwright install firefox webkit`) is SKIPPED, so a
 // runner without them never breaks the gate.
 //
@@ -73,10 +76,7 @@ for (const [label, engine] of [['firefox', firefox], ['webkit', webkit]]) {
   try {
     const booted = await boot(page)
     check(label, 'the app boots (game/ui stores ready)', booted)
-    if (!booted) {
-      await browser.close()
-      continue
-    }
+    if (!booted) continue
     const rendered = await page.waitForFunction(() => !!window.__renderer, null, { timeout: 45000 }).then(() => true).catch(() => false)
     const backend = rendered ? await page.evaluate(() => (window.__ui?.getState?.().webglFallback ? 'WebGL2 (fallback)' : 'WebGPU')) : 'none'
     check(label, `the renderer initialises [backend: ${backend}]`, rendered)
@@ -88,7 +88,7 @@ for (const [label, engine] of [['firefox', firefox], ['webkit', webkit]]) {
         const r = c.getBoundingClientRect()
         return { w: Math.round(r.width), h: Math.round(r.height) }
       })
-      check(label, 'a sized WebGL canvas is on screen', !!canvas && canvas.w > 100 && canvas.h > 100, JSON.stringify(canvas))
+      check(label, 'a sized canvas is on screen', !!canvas && canvas.w > 100 && canvas.h > 100, JSON.stringify(canvas))
       const moved = await page.evaluate(async () => {
         const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
         // The game boots inside the starting port (mode 'place'), where
@@ -135,7 +135,7 @@ for (const [label, engine] of [['firefox', firefox], ['webkit', webkit]]) {
   }
 }
 
-// --- MOBILE / TABLET: WebKit ~ iOS Safari, Chromium ~ Android Chrome ----------
+// --- MOBILE: WebKit ~ iOS Safari, Chromium ~ Android Chrome --------------------
 // (standard+ only; Firefox has no Playwright touch/mobile emulation.) The core
 // check: the game boots on a touch/mobile viewport and the touch layer (point 84)
 // ARMS on the first real touch — a virtual stick + look surface appear.
@@ -147,18 +147,14 @@ if (at('standard')) {
     const browser = await launchOrSkip(label, engine)
     if (!browser) continue
     const errors = []
-    let context
     try {
-      context = await browser.newContext({ viewport, hasTouch: true, isMobile: true, deviceScaleFactor: 2 })
+      const context = await browser.newContext({ viewport, hasTouch: true, isMobile: true, deviceScaleFactor: 2 })
       const page = await context.newPage()
       page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
       page.on('pageerror', (e) => errors.push(String(e)))
       const booted = await boot(page)
       check(label, 'the app boots on a mobile viewport', booted)
-      if (!booted) {
-        await browser.close()
-        continue
-      }
+      if (!booted) continue
       const rendered = await page.waitForFunction(() => !!window.__renderer, null, { timeout: 45000 }).then(() => true).catch(() => false)
       check(label, 'the renderer initialises on mobile', rendered)
       // Before any touch, the layer is absent (armed only on a real touch, point 84).

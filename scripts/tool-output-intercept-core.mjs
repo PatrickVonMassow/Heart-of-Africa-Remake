@@ -12,7 +12,7 @@ export const GREP_RESULT_BUDGET = 100
 
 /** The named shell producer in parsed command segments, or null. Quoted prose
  * is safe because the parser keeps it as an operand of its real command. */
-export function shellProducer(command, { expandSegments, headAndArgs } = {}) {
+function shellProducer(command, { expandSegments, headAndArgs } = {}) {
   if (typeof expandSegments !== 'function' || typeof headAndArgs !== 'function') return null
   for (const segment of expandSegments(String(command ?? ''))) {
     const split = headAndArgs(segment)
@@ -41,8 +41,7 @@ export function shellProducer(command, { expandSegments, headAndArgs } = {}) {
 }
 
 function scriptBesideHook(name, hookUrl) {
-  const path = fileURLToPath(new URL(name, hookUrl))
-  return isAbsolute(path) ? path : resolve(path)
+  return fileURLToPath(new URL(name, hookUrl))
 }
 
 const posixQuote = (value) => `'${String(value).replaceAll("'", `'"'"'`)}'`

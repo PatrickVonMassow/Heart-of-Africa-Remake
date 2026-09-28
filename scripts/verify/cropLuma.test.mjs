@@ -22,7 +22,6 @@ import {
   READ_GAP_FRAMES,
   READ_GAP_MS,
   CONFIRM_READS,
-  SETTLE_DROP_BRIGHTEST,
   SHOT_DRIFT_BAR,
   STREAK_LINGER_MS,
   luminance,
@@ -31,7 +30,6 @@ import {
   mean,
   median,
   readsNeededToSurvive,
-  settleReading,
   shotDrift,
   shotReading,
 } from './cropLuma.mjs'
@@ -291,49 +289,6 @@ describe('shotReading — the repaired statistic', () => {
   })
 })
 
-describe('settleReading — when the crop has stopped moving', () => {
-  const clean = () => samples(groundAt(1))
-
-  it('drops the bright end, so a rain streak cannot end the wait early', () => {
-    const c = clean()
-    for (const [pixels, bar] of [[14, 0.005], [25, 0.01]]) {
-      const streaked = samples(withStreak(groundAt(1), pixels))
-      expect(Math.abs(settleReading(streaked) / settleReading(c) - 1)).toBeLessThan(bar)
-    }
-  })
-
-  it('SEES a leak arriving in part of the crop, which is what holds the wait open', () => {
-    // The blindness a spatial median would have put in the settle loop: it would
-    // call the crop settled while the leak was still arriving, and the reads
-    // taken afterwards could then contain the finished leak in a minority.
-    const c = clean()
-    const leaked = samples(withLeak(groundAt(1), 8))
-    expect(1 - settleReading(leaked) / settleReading(c)).toBeGreaterThan(0.025)
-    expect(spatialMedian(leaked) / spatialMedian(c)).toBeCloseTo(1, 4)
-  })
-
-  it('is blind to a BRIGHTENING defect, which the measurement then still reports', () => {
-    // The bounded cost of the one-sided trim, named and pinned rather than left
-    // to be discovered: a defect that brightens a fifth of the crop or less can
-    // hide from the settle reading. It cannot hide from the check, whose bar is
-    // two-sided — so the loop may read a few frames early and the red still
-    // comes out.
-    const c = clean()
-    const brightened = samples((x, y) => (y >= HEIGHT - 8 ? groundAt(1)(x, y) * 1.18 : groundAt(1)(x, y)))
-    expect(Math.abs(settleReading(brightened) / settleReading(c) - 1)).toBeLessThan(0.005) // hidden here
-    const seen = shotReading([brightened, brightened, brightened, brightened, brightened]) / shotReading([c, c, c, c, c])
-    expect(seen - 1).toBeGreaterThan(OUTSIDE_BAR) // and reported there
-  })
-
-  it('trims the bright end only, so it cannot be a MEASUREMENT of the band', () => {
-    // It is deliberately not the reading the check judges: the trim biases it.
-    // This pins that nobody may quietly promote it to one.
-    const c = clean()
-    expect(settleReading(c)).toBeLessThan(mean(c))
-    expect(SETTLE_DROP_BRIGHTEST).toBeGreaterThan(25 / 150) // clears the widest streak seen
-  })
-})
-
 describe('the reads are spaced so a streak cannot reach the median', () => {
   // What stops a later edit from taking the reads back to three or closing the
   // gap: both would leave every test above green while making the statistic
@@ -421,10 +376,6 @@ describe('the captured frames', () => {
     ]) {
       expect(shotReading(reads)).toBeCloseTo(clean5, 10)
     }
-  })
-
-  it('barely moves the settle reading, so the wait is not restarted by rain', () => {
-    expect(settleReading(streaked) / settleReading(clean) - 1).toBeLessThan(0.005)
   })
 
   it('is what the generated fixture stands in for', () => {

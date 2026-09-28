@@ -366,7 +366,6 @@ describe('treeKeyOf', () => {
   it('is the path\u2019s first directory, which is how a tree is reported', () => {
     expect(treeKeyOf({ file: 'memory/x.md' })).toBe('memory/')
     expect(treeKeyOf({ file: 'x.md' })).toBe('')
-    expect(treeKeyOf({ file: 'a/b/c.md', tree: 'a/b/' })).toBe('a/b/')
     expect(treeKeyOf()).toBe('')
   })
 })

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Generic spill-to-log runner used by the path-scope PreToolUse hook. The hook
-// rewrites a named large producer to this command before the shell executes it;
+// rewrites a named large producer to tool-output-budget-launch.mjs, which runs
+// this script as its worker;
 // the producer's complete stdout/stderr goes to local/tool-output-logs, and
 // only tool-output-budget-core's bounded digest reaches the session.
 import { createWriteStream, mkdirSync } from 'node:fs'
@@ -104,7 +105,8 @@ async function run() {
 
 run().catch((error) => {
   // Even the runner's own failure channel is bounded and contains no raw,
-  // input-dependent stack. There may be no log only when argv decoding failed.
+  // input-dependent stack. There may be no log when anything failed before the
+  // capture stream opened (argv decoding, the log directory, pruning, the shell).
   const result = budgetToolOutput({
     text: `ERROR: tool-output-budget failed: ${error?.message ?? String(error)}`,
     exitCode: 1,

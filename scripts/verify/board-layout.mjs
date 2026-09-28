@@ -12,9 +12,10 @@
 //
 // POINT 969 — the FOURTH round of the same complaint — moved the verdict from
 // "nothing is cut off" to "the header is three columns": the title shares its
-// line with the number group and the time group at every width, it is wider
-// than both of them together, and a header whose every part is short occupies a
-// single row. Those three are what a full-width title row cannot satisfy, and
+// line with the number group and the time group at every portrait width
+// (WIDTHS; narrower ones only need containment), it is wider than both of them
+// together unless it already fits on one line, and a header whose every part is
+// short occupies a single row. Those three are what a full-width title row cannot satisfy, and
 // each of them is proved against a restored control below.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -54,7 +55,7 @@ const STRESS_QUEUE_POINT = '9632'
 const STRESS_SHORT_POINT = '9633'
 // Coverage the review demanded (finding 5): a state card WITHOUT the number
 // wrapper — its title must stay above the right group — and a card with no
-// right group at all, which keeps the summary's native marker.
+// right group at all, which keeps the summary's disclosure arrow (::after).
 const STRESS_BARE_POINT = '9634'
 const STRESS_CARDS = `
 <details class="now"><summary><span class="num">${STRESS_POINT}</span><span class="t">Ein absichtlich langer Kartentitel, der im Hochformat mehrere Zeilen braucht und trotzdem vollständig lesbar bleiben muss</span><span class="right"><span class="pill">laufend</span><span class="meta">06:30 · ~08:30</span></span></summary>
@@ -77,7 +78,7 @@ const STRESS_TASKS = `- [ ] ${STRESS_POINT}. A deliberately long current-card ti
   Criticality: high — reviewed.
 - [ ] ${STRESS_QUEUE_POINT}. A queued card with a deliberately long meta
   Criticality: medium — visible.
-- [ ] ${STRESS_SHORT_POINT}. A short done-card header that must stay compact
+- [ ] ${STRESS_SHORT_POINT}. A short card header that must stay compact
   Criticality: medium — visible.
 - [ ] ${STRESS_BARE_POINT}. A card without a right group keeps its native marker
   Criticality: low — reversible.`
@@ -113,7 +114,7 @@ details:not(.sect)>summary>.right{min-width:min(100%,9rem);max-width:70%}
 </style>`
 
 // The base stylesheet of the published page. `.batch-dashboard.html` is a local
-// artefact (git-ignores it), so CI has no board to read: this fixture carries
+// artefact (git ignores it), so CI has no board to read: this fixture carries
 // the page's own header declarations, and the live board below is measured too
 // wherever it exists, which is what keeps a drift between the two visible.
 const BOARD_STYLE = `<style>
@@ -208,7 +209,6 @@ const measureBoard = async (page, html) => {
       const titles = []
       const overflow = []
       const clipped = []
-      const split = []
       // THE REJECTED RENDERING, MEASURED AS GEOMETRY (point 969): the title on a
       // row of its own beneath the two side groups. Four rounds of this
       // complaint were closed on suites that could not see it, because every
@@ -269,7 +269,7 @@ const measureBoard = async (page, html) => {
         }
 
         // THE THREE COLUMNS STAY COLUMNS. The title shares a line with the
-        // number group and with the time group at every width — their vertical
+        // number group and with the time group at every portrait width — their vertical
         // intervals overlap. A column that stacks its OWN content is exactly
         // what the point asks for and is not measured here; a title pushed onto
         // a row below its neighbours is the rendering the user rejected four
@@ -318,9 +318,9 @@ const measureBoard = async (page, html) => {
         const lineHeight = title ? Number.parseFloat(getComputedStyle(title).lineHeight) : 0
         const meta = summary.querySelector(':scope > .right .meta')
         const metaLine = meta ? Number.parseFloat(getComputedStyle(meta).lineHeight) : 0
-        // Rows are counted over the summary's CONTENT box: its padding is
+        // `contentRows` counts over the summary's CONTENT box: its padding is
         // constant per width and would otherwise blur the row arithmetic the
-        // compactness bounds below depend on.
+        // compactness bounds below depend on. `rows` keeps the padded height.
         const summaryStyle = getComputedStyle(summary)
         const padding =
           Number.parseFloat(summaryStyle.paddingTop) + Number.parseFloat(summaryStyle.paddingBottom)
@@ -358,7 +358,8 @@ const measureBoard = async (page, html) => {
         }
       }
 
-      // The card with no right group keeps the summary's NATIVE marker — read
+      // The card with no right group keeps the summary's disclosure arrow (the
+      // authored ::after; the browser's own marker is hidden) — read
       // the computed pseudo-element, not the stylesheet text, so a broader
       // suppression rule cannot pass unseen (confirming review, finding 2).
       const bareSummary = summaries.find((summary) => pointOf(summary) === stressBarePoint)
@@ -376,7 +377,6 @@ const measureBoard = async (page, html) => {
         titles,
         overflow,
         clipped,
-        split,
         stacked,
         notDominant,
         outOfOrder,
@@ -419,7 +419,7 @@ try {
         measured.bareTitleBelowRight.slice(0, 3).join(', '),
       )
       check(
-        `${at}: a card without a right group keeps its native disclosure marker`,
+        `${at}: a card without a right group keeps its disclosure arrow`,
         measured.nativeMarker.includes('▸') || measured.nativeMarker.includes('▾'),
         `computed content ${measured.nativeMarker || '(empty)'}`,
       )
@@ -476,7 +476,7 @@ try {
           .map((item) => `#${item.point} ${item.title}px vs ${item.sides}px`)
           .join(', '),
       )
-      // The complaint itself: a long title beside a long meta must resolve to
+      // The complaint itself: a long title beside its meta must resolve to
       // several lines rather than one squeezed row.
       const stressed = measured.lines[STRESS_POINT]
       check(
@@ -678,7 +678,7 @@ try {
         check(`${name} at ${width}px: the standstill verdict is on the page`, m.state === 'standing' && live.text.startsWith('BATCH STEHT seit 1 h 15 min'), live.text.slice(0, 60))
         check(`${name} at ${width}px: the progress line is on the page`, progress.text.includes('Fortschritt Punkt 1195') && progress.text.includes('ROT'), progress.text.slice(0, 60))
         check(
-          `${name} at ${width}px: both lines read in portrait (laid out, >= 11px, inside the viewport)`,
+          `${name} at ${width}px: all three lines read in portrait (laid out, >= 11px, inside the viewport)`,
           m.lines.every((l) => l.height > 0 && l.fontPx >= 11 && l.right <= m.viewport + 1) && m.right <= m.viewport + 1 && m.scrollWidth <= m.viewport + 1,
           m.lines.map((l) => `${l.sel} ${Math.round(l.height)}px/${l.fontPx}px/r${Math.round(l.right)}`).join(', ') + ` page ${m.scrollWidth}/${m.viewport}`,
         )

@@ -43,7 +43,7 @@ export function explainDeath({ death = null, containerStartedAtMs = 0, oomKills 
   }
   if (Number(oomKills) > 0) reasons.push(`the cgroup counted ${oomKills} OOM kill(s) — the machine ran out`)
   else reasons.push('the cgroup counted no OOM kill — the machine did not run out')
-  if (freeMb != null) reasons.push(`${freeMb} MB were still available`)
+  if (freeMb != null) reasons.push(`${freeMb} MB are available now (measured at this report, not at the exit)`)
   const verdict = restarted
     ? 'container-restart'
     : Number(oomKills) > 0

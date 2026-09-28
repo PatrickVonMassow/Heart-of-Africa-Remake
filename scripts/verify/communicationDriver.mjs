@@ -99,7 +99,9 @@ export async function observeBankCall({ budgetMs, prepare, sample, pause, reject
 
 /** Decide one sample of a followed dig initiator. The initiator's own label
  * counts for `labelSeconds` after he leaves the owed invite, whatever became
- * `last` meanwhile; only then is he recorded as lapsed. */
+ * `last` meanwhile; only then is he recorded as lapsed. A word spoken and
+ * expired inside one sampling gap is `missed` (with `spokeAt` and
+ * `gapSeconds`), never a lapse. */
 export function inviteOutcome(s, watch, labelSeconds) {
   if (s.labelled) return { seen: s.labelled }
   const sampledBefore = watch.sampledAt
@@ -125,7 +127,8 @@ export function inviteOutcome(s, watch, labelSeconds) {
   return { lapsed: true, spokeUnseen: watch.spokeAt !== undefined, atSpeak: watch.atSpeak ?? null, last: watch.villager ?? null, now: s.task ?? null }
 }
 
-/** Follow one dig initiator until his invitation is seen or he lapses. */
+/** Follow one dig initiator until his invitation is seen, missed inside a
+ *  sampling gap, or he lapses (see inviteOutcome). */
 export async function followInvitation({ budgetMs, sample, pause, labelSeconds, now = Date.now }) {
   const deadline = now() + budgetMs, watch = {}
   while (now() < deadline) {
@@ -164,7 +167,7 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
       delta = turnDelta(p.yaw, p, target)
       distance = Math.hypot(target.x - p.x, target.z - p.z)
       pitchChange = target.y === undefined ? null
-        : Math.atan2(target.y - (p.eyeY ?? 1.7), Math.max(0.1, distance)) - (p.pitch ?? 0)
+        : Math.atan2(target.y - p.eyeY, Math.max(0.1, distance)) - (p.pitch ?? 0)
       if (Math.abs(delta) < 0.065 && (pitchChange === null || Math.abs(pitchChange) <= 0.025)) return
       // Read once after the final input so failures report the remaining error.
       if (i === 80) break
@@ -190,7 +193,7 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
         continue
       }
       if (Math.abs(delta) < 0.35 && page.mouse) {
-        const at = await read(() => window.__driverCursor ?? { x: 0, y: 0 })
+        const at = await read(() => window.__driverCursor ?? { x: 720, y: 450 })
         const x = at.x + Math.round(-delta / 0.0011)
         // Near an edge the cursor first slides back to the middle of its row;
         // that turns the view too, so the pose is read again before the nudge.

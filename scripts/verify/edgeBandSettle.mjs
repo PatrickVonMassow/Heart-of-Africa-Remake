@@ -12,8 +12,9 @@ export const SETTLE_READ_LIMIT = 40
  * that the shot's 1% drift guard rejected seconds later. A full window uses
  * READ_COUNT + CONFIRM_READS and the shot's actual gap (READ_GAP_MS AND
  * READ_GAP_FRAMES), including cold rendering that stretches the wall time.
- * edgeShotReading applies the unchanged SHOT_DRIFT_BAR to the same per-pixel,
- * rain-robust halves that will be measured; there is no independent epsilon.
+ * edgeShotReading applies the unchanged SHOT_DRIFT_BAR to two per-pixel,
+ * rain-robust halves of the same six-read window whose first READ_COUNT reads
+ * are then measured; there is no independent epsilon.
  *
  * Reuse those reads. No past settle can certify an arbitrarily slower FUTURE
  * shot, so starting another window would reintroduce the timing mismatch.

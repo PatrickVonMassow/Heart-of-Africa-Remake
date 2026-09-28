@@ -335,15 +335,15 @@
 | `textureFields.mjs` | Shared texture-baking core: periodic (tileable) noise fields, the material height/colorize definitions and the albedo+normal bake loop. | — |
 | `throttle-probe-core.mjs` | IS THIS CHECK LOAD-DEPENDENT? | — |
 | `throttle-probe.mjs` | THE THROTTLE PROBE (point 640) — answer "was that red just load?" with a measurement instead of an argument. | — |
-| `timestamp-guard-core.mjs` | Pure decision logic of the timestamp Stop-hook guard (timestamp-guard.mjs): every chat reply must BEGIN with the bold Europe/Berlin timestamp in the canonical form "**Donnerstag, 23.07.2026, 09:55**" (chat-timestamp rule). | — |
-| `timestamp-guard.mjs` | Stop hook (user mandate 23.07.2026, ninth escalation of the chat-timestamp rule): GUARANTEE every chat reply begins with the bold Europe/Berlin timestamp ("**Donnerstag, 23.07.2026, 09:55**"). | — |
+| `timestamp-guard-core.mjs` | Pure decision logic of the timestamp Stop-hook guard (timestamp-guard.mjs): every chat reply must BEGIN with the bold Europe/Berlin timestamp in the canonical form "**Donnerstag, 23.07.2026, 09:55**" (chat-timestamp rule), followed by the " · Kontext: … Tokens" reading (HEADER_SUFFIX_RE), which is enforced wherever a real reading exists. | — |
+| `timestamp-guard.mjs` | Stop hook (user mandate 23.07.2026, ninth escalation of the chat-timestamp rule): GUARANTEE every chat reply begins with the bold Europe/Berlin timestamp ("**Donnerstag, 23.07.2026, 09:55**") and its " · Kontext: … Tokens" reading. | — |
 | `timestamp-race-fixture.mjs` | Builder for scripts/fixtures/timestamp-guard-302ms-race.json — the replay of the measured 302 ms Stop-hook race (point 769). | — |
 | `tool-output-budget-core.mjs` | Pure output-budget logic for the PreToolUse interception in path-scope-guard.mjs. | — |
 | `tool-output-budget-launch.mjs` | Launch boundary for tool-output-budget.mjs. | — |
 | `tool-output-budget.mjs` | Generic spill-to-log runner used by the path-scope PreToolUse hook. | — |
 | `tool-output-intercept-core.mjs` | Pure PreToolUse input rewriting for the large producers named by the output budget. | — |
 | `tool-output-log-retention.mjs` | Retention for the tool-output budget's spill logs. | — |
-| `tool-output-shell.mjs` | Re-run the intercepted command in the caller's configured shell without turning it into a login session. | — |
+| `tool-output-shell.mjs` | Re-run the intercepted command in the caller's configured shell ($SHELL; always PowerShell on win32) without turning it into a login session. | — |
 | `user-gate-core.mjs` | THE TYPED USER GATE — advice continues; only a real confirmation waits. | — |
 | `user-said-core.mjs` | WHAT THE USER SAID, AND WHEN — the pure half of scripts/user-said.mjs. | — |
 | `user-said.mjs` | WHAT THE USER SAID, AND WHEN — the CLI half. | usage: node scripts/user-said.mjs [--grep <regex>] [--since <iso\|90m\|6h\|2d\|07:31>] |

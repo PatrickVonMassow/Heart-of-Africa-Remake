@@ -1,8 +1,10 @@
 // The collider geometry the SUITES read with — installed into the page so a
 // check can ask how far a point lies from a collider and how big that collider
-// is. Shared by every suite that needs it (collision measures ejections with it,
-// polish stages the reported wedge with it); a shape this helper does not know
-// reads every point as NaN-blocked, so it must track collision.ts.
+// is. Shared by every suite that needs it (collision measures ejections, door
+// standpoints, access points, the chief's stand-off, the water-track camera and
+// unstuck clearances with it; polish stages the reported wedge with it); any kind
+// other than box or segment is read as a circle from its x, z and r (and yields
+// NaN without them), so it must track collision.ts.
 export const installColliderProbe = (page) =>
   page.addInitScript(() => {
     window.__clearanceTo = (c, x, z) => {

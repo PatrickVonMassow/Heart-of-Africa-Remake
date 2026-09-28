@@ -35,7 +35,8 @@ export function laneRenderers(systemChrome, platform = process.platform, baseEnv
 }
 
 /** Is this renderer string a software rasteriser? The picture it draws is CORRECT — that is
- *  the trap. Only the clock betrays it, so the check has to name it rather than pass it. */
+ *  the trap. Only the clock betrays it, so the check has to NAME it: a software lane still
+ *  passes, labelled as such, never silently. */
 export function softwareRendererVerdict(renderer, hints) {
   if (typeof renderer !== 'string' || renderer.length === 0) {
     return { software: false, reason: 'no renderer string' }

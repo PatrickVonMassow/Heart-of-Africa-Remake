@@ -2,13 +2,13 @@
 // THE COMMAND BESIDE THE RULE-ECHO GUARD (user 17.08.2026).
 //
 //   node scripts/rule-echo.mjs --status
-//   node scripts/rule-echo.mjs --stamp <file> --quote "<a phrase from that file>"
+//   node scripts/rule-echo.mjs --stamp <file> [--rule <id>] --quote "<a phrase from that file>"
 //   node scripts/rule-echo.mjs --list              # the rules and their echoes
 //
 // STAMPING IS PER FILE ON PURPOSE. A `--stamp-all` would turn the check into a
 // formality: the guard's whole value is that somebody opened each restatement
 // and compared it with the rule. One command per file is the friction that buys
-// that, and it is small — the list is under a dozen files.
+// that, and it is small — the list is about a dozen files.
 //
 // AND IT NEEDS A QUOTE FROM THE FILE (cross-vendor review, P0). Without one, the
 // commands could be generated straight from the guard's own output without any
@@ -35,7 +35,7 @@ import { isMainModule } from './is-main.mjs'
 
 const USAGE = [
   'usage: node scripts/rule-echo.mjs --status',
-  '       node scripts/rule-echo.mjs --stamp <file> --quote "<a phrase from that file>"',
+  '       node scripts/rule-echo.mjs --stamp <file> [--rule <id>] --quote "<a phrase from that file>"',
   '       node scripts/rule-echo.mjs --list',
 ].join('\n')
 

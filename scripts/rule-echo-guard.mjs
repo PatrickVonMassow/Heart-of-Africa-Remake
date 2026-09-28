@@ -5,8 +5,8 @@
 // NOT stand down while the batch is paused, because rules are rewritten during
 // pauses, which is exactly when a sleeping check would miss the drift.
 //
-// FAIL-OPEN, and deliberately so against the cross-vendor review's P0: CLAUDE.md
-// §7.2 makes every guard here fail open, "a guard bug cannot trap the session".
+// FAIL-OPEN, and deliberately so against the cross-vendor review's P0: a guard
+// bug must not trap the session.
 // The failure is not silent — it goes to stderr, where the session sees it — but
 // it does not block. A guard that blocked on its own bug would be the one defect
 // this project has decided it will not accept.
@@ -113,7 +113,7 @@ export function gatherStampedFiles() {
  * searched by neither path (cross-vendor review round 2, P1). The directories
  * are small, so a plain read of their Markdown files is cheap.
  */
-export function memoryStampedFiles() {
+function memoryStampedFiles() {
   const out = {}
   // ONE KEY PER PHYSICAL COPY (round 3, P1): both directories used the same
   // `memory/<name>` key, so the second copy overwrote the first and a stray

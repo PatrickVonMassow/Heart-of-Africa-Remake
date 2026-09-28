@@ -56,14 +56,16 @@ const DAY_MS = 86_400_000
 /**
  * Decide whether a rule-corpus review is owed.
  *
- * All inputs optional; anything missing or unparseable errs toward ALLOW, since
- * the wrapper's fail-open contract must not turn a bookkeeping hiccup into a
- * trapped session.
+ * All inputs optional. A missing `now` or a paused batch answers null (allow);
+ * a missing `lastReviewedAt` means no review was ever attested and owes one;
+ * missing counts only switch the growth trigger off.
  *   now              epoch ms
  *   lastReviewedAt   epoch ms of the last attested review (null: never)
  *   entryCount       corpus entries now
  *   reviewedCount    corpus entries at the last review
  *   paused           .claude/batch-paused exists
+ *   fence            the session fence, for scoping the owed duty
+ *   sessionId        the session the duty is scoped to
  */
 export function evaluateRuleReview(input) {
   const {

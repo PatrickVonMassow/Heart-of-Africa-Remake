@@ -190,11 +190,10 @@ export function throttlePlan(input) {
 
 /**
  * How many of these processes are STILL RUNNING — asked of the OPERATING SYSTEM,
- * never of the child objects. The probe blocks Node's event loop inside
- * `spawnSync` for the whole measured run, so a spinner that died during it
- * cannot have had its `exitCode` updated by the time anybody looks: reading the
- * child object would count a dead squeeze as a live one and let the report claim
- * a contention it stopped applying. `alive` reads /proc/<pid>/stat in the
+ * never of the child objects. A spinner that died during the measured run is
+ * an unreaped child whose object need not know of its exit by the time anybody
+ * looks: reading the child object could count a dead squeeze as a live one and
+ * let the report claim a contention it stopped applying. `alive` reads /proc/<pid>/stat in the
  * wrapper — signal 0 would not do, because an unreaped ZOMBIE answers it while
  * burning nothing. Total: an unreadable pid counts as not running, which
  * understates the squeeze rather than overstating it.
@@ -312,8 +311,8 @@ export function summarise(results) {
 /**
  * THE VERDICT IN WORDS, and none of them closes a red — that is the whole point
  * of the mechanism this serves: a measurement says WHERE to look, it is not
- * itself a cause. A sample with runs that reached no verdict is called out
- * first: a rate over three of eight runs is not a rate over eight.
+ * itself a cause. A sample with runs that reached no verdict says so on every
+ * verdict: a rate over three of eight runs is not a rate over eight.
  */
 export function verdictOf(summary, options) {
   const { throttled = true } = options ?? {}
@@ -335,7 +334,7 @@ export function verdictOf(summary, options) {
   if (reds > 0) {
     return `SKEWED — ${of} runs red under the throttle. Load moves this check, so it is timing-shaped; raise --rate to reproduce it harder, then hunt the mechanism.${lostNote}`
   }
-  return `NOT REPRODUCED — ${of} runs red under the throttle. Load at this rate does not explain the red, and these greens do NOT close it: name its cause, charge it to the open point that owns it, or file it as a point of its own (raise --rate before concluding).${lostNote}`
+  return `NOT REPRODUCED — ${of} runs red under the throttle. Load at this rate did not reproduce the red, and these greens do NOT close it: name its cause, charge it to the open point that owns it, or file it as a point of its own (raise --rate before concluding).${lostNote}`
 }
 
 /** The whole report, line by line — the wrapper only prints what it is handed. */
@@ -361,13 +360,12 @@ export function formatProbeReport(input) {
             : ` — ${named ?? '(no check named — read the run output)'}`
     lines.push(`run ${String(i + 1).padStart(2)}  ${label[kind] ?? 'RED   '}${detail}`)
   }
-  const s_ = s ?? {}
   lines.push(
-    `SKEW RATE ${Number(s_.reds) || 0}/${Number(s_.judged) || 0} (${Math.round((Number(s_.rate) || 0) * 100)} %)` +
-      (s_.killed ? `, ${s_.killed} killed` : '') +
-      (s_.broken ? `, ${s_.broken} without a verdict` : ''),
+    `SKEW RATE ${Number(s.reds) || 0}/${Number(s.judged) || 0} (${Math.round((Number(s.rate) || 0) * 100)} %)` +
+      (s.killed ? `, ${s.killed} killed` : '') +
+      (s.broken ? `, ${s.broken} without a verdict` : ''),
   )
-  for (const c of Array.isArray(s_.byCheck) ? s_.byCheck : []) lines.push(`  ${String(c.count).padStart(2)}×  ${c.name}`)
-  lines.push(verdictOf(s_, { throttled: plan?.available === true }))
+  for (const c of Array.isArray(s.byCheck) ? s.byCheck : []) lines.push(`  ${String(c.count).padStart(2)}×  ${c.name}`)
+  lines.push(verdictOf(s, { throttled: plan?.available === true }))
   return lines
 }

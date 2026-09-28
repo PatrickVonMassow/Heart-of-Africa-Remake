@@ -7,7 +7,6 @@ import {
   SELF_DECIDED_MARKER,
   advisoryDecisionCard,
   CONFIRMATION_ACTS,
-  answeredPoints,
   clearMarkers,
   classifyConfirmationReason,
   classifyLegacyReason,
@@ -360,7 +359,7 @@ describe('typed work-order rewrites', () => {
     const r = markAnswered(gatedText, 21, { at: '2026-08-07' })
     expect(r).toMatchObject({ ok: true, wasGated: true })
     expect(gatedPoints(r.text).has(21)).toBe(false)
-    expect(answeredPoints(r.text).has(21)).toBe(true)
+    expect(gateSets(r.text).answered.has(21)).toBe(true)
     expect(r.text).toContain(`${ANSWERED_MARKER}(2026-08-07)`)
     expect(r.text).not.toContain(CONFIRMATION_MARKER)
   })
@@ -471,7 +470,7 @@ describe('advisory decision record and legacy migration', () => {
     expect(migrated.text).not.toContain('AWAITING-USER')
     // The answer is still the LAST marker, so point 1 stays at the queue head.
     expect(migrated.text.split('\n')[0]).toBe('- [ ] 1. A SELF-DECIDED(2026-08-23; choose a colour) USER-ANSWERED(2026-08-07)')
-    expect(answeredPoints(migrated.text).has(1)).toBe(true)
+    expect(gateSets(migrated.text).answered.has(1)).toBe(true)
     expect(migrated.text.split('\n')[2]).toBe('- [x] 3. C')
   })
 })

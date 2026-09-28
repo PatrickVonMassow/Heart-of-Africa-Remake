@@ -67,7 +67,7 @@ if (isMainModule(import.meta.url)) {
 
   console.log(`MOST RECENT EXIT: ${verdict}`)
   for (const reason of reasons) console.log(`  · ${reason}`)
-  console.log(`\nMEASURED NOW: container up since ${new Date(measured.containerStartedAtMs).toISOString()}, ` +
+  console.log(`\nMEASURED NOW: container up since ${measured.containerStartedAtMs > 0 ? new Date(measured.containerStartedAtMs).toISOString() : 'unknown'}, ` +
     `oom_kill ${measured.oomKills}, ${measured.freeMb} MB available`)
   console.log(`\nLAST ${exits.length} EXIT ROW(S) — newest first:`)
   for (const row of exits) {

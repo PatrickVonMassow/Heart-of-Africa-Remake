@@ -9,7 +9,7 @@
 //
 // So this boots the REAL GAME on each lane and reads the RENDERED PIXELS back out of the
 // canvas. A lane passes only when the backend that initialised is the one asked for, the
-// frame counter advances, the page threw nothing, and the picture has content. It also
+// renderer's draw-call count advances, the page threw nothing, and the picture has content. It also
 // NAMES the device it drew with, so a software rasteriser can never be reported as if it
 // were the GPU.
 //
@@ -48,7 +48,6 @@ function readLane() {
         compatibilityMode: renderer?.backend?.compatibilityMode === true,
         coreFeatures: device?.features ? device.features.has('core-features-and-limits') : null,
         calls: renderer?.info?.render?.calls ?? 0,
-        renderTargets: renderer?.info?.memory?.renderTargets ?? 0,
         colours: 0,
         renderer: null,
       }
@@ -70,15 +69,16 @@ function readLane() {
         const seen = new Set()
         for (let i = 0; i < data.length; i += 4) seen.add(`${data[i]},${data[i + 1]},${data[i + 2]}`)
         out.colours = seen.size
-      } catch (e) {
-        out.pixelError = String(e).slice(0, 160)
+      } catch {
+        // An unreadable canvas leaves colours at 0, which the NO PICTURE fault names.
       }
       resolve(out)
     })
   })
 }
 
-/** The adapter behind a WebGPU lane, by name, so the report can say WHICH device drew.
+/** An adapter of this WebGPU lane (a fresh requestAdapter in the same page — the
+ *  renderer's own is not exposed), by name, so the report can say WHICH device drew.
  *  The fields are read one by one on purpose: GPUAdapterInfo carries them on its
  *  PROTOTYPE, so a spread yields `{}` and a report that names nothing. */
 function readAdapter() {
@@ -162,7 +162,7 @@ function laneFaults(got, wantWebGPU) {
     faults.push(`the renderer initialised on ${got.isWebGPU ? 'WebGPU' : 'WebGL 2'} — not this lane's backend`)
   }
   if (wantWebGPU && !got.adapter) faults.push('navigator.gpu returned no adapter')
-  if (!got.advanced) faults.push('the frame counter did not advance — the render loop is stalled')
+  if (!got.advanced) faults.push('the renderer\'s draw calls did not advance — the render loop is stalled')
   if (got.colours < MIN_COLOURS) {
     faults.push(`the canvas painted ${got.colours} distinct colour(s) — NO PICTURE (${MIN_COLOURS} is the floor)`)
   }

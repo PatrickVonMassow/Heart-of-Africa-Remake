@@ -7,15 +7,16 @@
 // tick left in place, and the file starts growing back. So the discipline gets a
 // check rather than a habit (the project's "enforce, don't remind" rule).
 //
-// Three things can go wrong, and each has a distinct repair, so each gets its
+// Several things can go wrong, and each has a distinct repair, so each gets its
 // own finding rather than one vague complaint.
 
 /**
  * Numbers that legitimately exist in neither file: a point folded into another
- * during specification, so its spec lives inside the surviving one. Recorded
+ * during specification (its spec lives inside the surviving one), or deleted
+ * unimplemented. Recorded
  * here rather than inferred, so a REAL loss cannot hide behind "probably folded".
  */
-export const KNOWN_GAPS = new Set([
+const KNOWN_GAPS = new Set([
   301, // folded during specification
   324, // folded into 312 (the water rule) on 25.07.2026
   1107, // deleted unimplemented on 11.09.2026 — the user never commissioned it
@@ -41,6 +42,10 @@ export function parsePoints(text) {
  *   - `duplicate-point`: the same number exists in both files, i.e. a move that
  *     copied. Two specs for one point drift apart, and the guards that look up a
  *     point by number would find whichever comes first.
+ *   - `duplicate-within-file`: the same number twice inside one file.
+ *   - `point-vanished`: a number in neither file and not a KNOWN_GAPS entry.
+ *   - `malformed-point-line`: a line that resembles a point heading but does
+ *     not parse, so it counts nowhere.
  */
 export function evaluateTasksArchive({ tasksText = '', archiveText = '' } = {}) {
   const findings = []
@@ -96,7 +101,7 @@ export function evaluateTasksArchive({ tasksText = '', archiveText = '' } = {}) 
 
   // A point that is in NEITHER file. Moving blocks by hand can drop one, and
   // nothing else would ever notice: the number simply stops existing. Known
-  // gaps are points folded into another during specification.
+  // gaps are the recorded folds and deletions in KNOWN_GAPS.
   const all = new Set([...tasks, ...archive].map((p) => p.n))
   if (all.size) {
     const max = Math.max(...all)
@@ -111,8 +116,8 @@ export function evaluateTasksArchive({ tasksText = '', archiveText = '' } = {}) 
     }
   }
 
-  // A line that WANTS to be a point but does not parse (a missing space, a
-  // lower-case marker). Both parsers skip it, so the point silently disappears
+  // A line that WANTS to be a point but does not parse (a missing space, an
+  // upper-case or empty marker). Both parsers skip it, so the point silently disappears
   // from every check rather than failing loudly.
   for (const [label, text] of [
     ['TASKS.md', tasksText],

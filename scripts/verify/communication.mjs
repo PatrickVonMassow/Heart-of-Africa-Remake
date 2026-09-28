@@ -614,7 +614,7 @@ async function riverTrip(from, to, prefix) {
   for (let i = 0; i < route.length; i++) {
     const world = worlds[i]
     // The current may already have carried the swimmer past this waypoint; a
-    // player goes on downstream rather than fighting back against the flow.
+    // player goes on along the route rather than fighting back to it.
     const [a, b] = i + 1 < worlds.length ? [world, worlds[i + 1]] : [worlds[i - 1] ?? world, world]
     const past = async () => {
       const pos = await d.read(() => window.__game.getState().pos)
