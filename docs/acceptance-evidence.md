@@ -1932,6 +1932,15 @@ releasing it settles), a right-half drag turns the first-person yaw,
 tapping the prompt calls the chief out of his hut, and a two-finger pinch changes
 the bird's-eye zoom — all without console errors.
 
+Status in the v0.3 closing (LARGE on 53b168c14, 28.09.2026, both backends):
+NOT fulfilled in full. The gamepad A-button interaction ("A interacts: the
+chief comes out of his hut") and the touch prompt tap ("tapping the prompt
+fires the interaction") are RED on WebGL 2 and WebGPU, charged to open point
+1217; the keyboard SPACE path to the chief passes (`flow`). Stick, turning,
+Y-button journal, d-pad inventory and the position-query toast in English
+and German pass on both lanes — the German query red of point 1062 did not
+reproduce in that run.
+
 ## 31. Settlement orientation and panorama wildlife.
 
 Verifiable: `scripts/verify/polish.mjs`

@@ -1746,12 +1746,14 @@ export const RED_CHARGES = [
     point: 200,
     suite: 'communication',
     kind: 'check',
-    backend: 'webgl',
+    // Both backends since 28.09.2026: the same signature reddened webgpu under load.
     match: /^continuous route at [^:]+: Three dig initiators lapsed without their invitation\b/i,
     why:
       'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl, under load): the dig '
       + 'invitation was emitted unheard and three initiators lapsed. The same section alone on a quiet '
-      + 'machine at 487ad8d4f was 14 pass / 0 fail — a load flake of point 200\'s class. The charge dies with 200.',
+      + 'machine at 487ad8d4f was 14 pass / 0 fail — a load flake of point 200\'s class. MEASURED AGAIN '
+      + '28.09.2026 on webgpu in the closing LARGE on 53b168c14 (under load), identical signature; '
+      + 'continuous-route alone on webgpu at 53b168c14 on a quiet machine was GREEN. The charge dies with 200.',
   },
   {
     point: 200,
