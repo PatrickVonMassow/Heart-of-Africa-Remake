@@ -1912,3 +1912,11 @@ impact, no risk, no blockade). They stay in their tracked decision records rathe
 here; list them with
 `node -e 'for(const f of require("fs").readdirSync("docs/blind-633/decisions"))for(const e of require("./docs/blind-633/decisions/"+f))if(e.decision==="backlog")console.log(f,e.id,e.reason)'`.
 The four entries decided `point` became points 1226-1229.
+
+## CI flake: batch-daemon cancel-attempt journals a stale pushed SHA
+
+Found 28.09.2026 on main `54bd6bb37` (CI run 36413079847, job fast (1)):
+`scripts/batch-daemon.test.mjs` › "cancels the attempt, preserves the branch, and journals the last
+pushed SHA" read `lastPushedSha` f067d28… against the tip 02fd536…. Local unit runs were green twice
+and the failed-job rerun was green. Second batch-daemon CI timing flake after M40 (26.09 above);
+promote to a point on a third sighting.
