@@ -560,6 +560,10 @@ if (section('fresh-start-window')) {
   await page2.bringToFront()
   page2.on('console', (m) => m.type() === 'error' && errors.push('page2: ' + m.text()))
   page2.on('pageerror', (e) => errors.push('page2 PAGEERROR: ' + e.message))
+  // An unrequested main-frame navigation replaces the game document; record it so
+  // a later check names it instead of dying on an undefined window.__game.
+  const navigations = []
+  page2.on('framenavigated', (f) => f === page2.mainFrame() && navigations.push(new Date().toISOString()))
   await page2.goto(BASE)
   await page2.evaluate(() => localStorage.clear())
   await page2.reload()
@@ -603,6 +607,7 @@ if (section('fresh-start-window')) {
   await page2.waitForTimeout(200)
   await page2.reload()
   await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
+  const navigationsBeforeGiza = navigations.length
   await page2.waitForTimeout(700)
   const withCp = await page2.evaluate(() => ({
     overlay: !!document.querySelector('.overlay'),
@@ -635,7 +640,7 @@ if (section('fresh-start-window')) {
   const giza = await page2.evaluate(() => {
     const last = [...document.querySelectorAll('.journal .entry')].at(-1)
     return {
-      storedKey: window.__game.getState().journal.at(-1)?.text?.key ?? '',
+      storedKey: window.__game?.getState().journal.at(-1)?.text?.key ?? '',
       title: last?.querySelector('h4')?.textContent ?? '',
       text: last?.querySelector('p')?.textContent ?? '',
     }
@@ -646,7 +651,10 @@ if (section('fresh-start-window')) {
       giza.text.length > 80 &&
       !giza.text.includes('[') && // the voice markup is stripped before display (§15.2)
       !giza.text.includes('journal.'), // a raw key would mean the text is missing
-    `"${giza.title}" — ${giza.text.length} chars`,
+    `"${giza.title}" — ${giza.text.length} chars` +
+      (navigations.length > navigationsBeforeGiza
+        ? ` — the page navigated unrequested at ${navigations.slice(navigationsBeforeGiza).join(', ')}`
+        : ''),
   )
   await page2.close()
 }
