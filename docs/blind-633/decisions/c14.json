@@ -1,0 +1,1402 @@
+[
+ {
+  "id": "U6879",
+  "decision": "rewritten",
+  "reason": "§1.1 heading now says three villages (Bambara, Nubian, Batwa)"
+ },
+ {
+  "id": "U6880",
+  "decision": "removed",
+  "reason": "duplicate Bambara paragraph (17.2N, VILLAGE_HEARTLANDS fudge) deleted; §1 status box records the Ségou move"
+ },
+ {
+  "id": "U6881",
+  "decision": "rewritten",
+  "reason": "kanga section renumbered §2.3b; the two kanzu references follow, Zulu §2.3 references unchanged"
+ },
+ {
+  "id": "U6882",
+  "decision": "rewritten",
+  "reason": "§2 forward-pointer now notes Baumann (listed unread in §2.1) is read in §5.1; §6 status box says the same"
+ },
+ {
+  "id": "U6883",
+  "decision": "kept",
+  "reason": "archived §2.3b kanzu gap is covered by the §2 forward-pointer to §7.1 (New 1873); §2 is kept as history"
+ },
+ {
+  "id": "U6884",
+  "decision": "rewritten",
+  "reason": "§2.5 cotton verdict qualified: Baganda at large, court and converts excepted"
+ },
+ {
+  "id": "U6885",
+  "decision": "rewritten",
+  "reason": "§2.6 now attributes the day-and-night sheet to the unverified Pankhurst snippet (§2.7), not Parkyns"
+ },
+ {
+  "id": "U6886",
+  "decision": "kept",
+  "reason": "archived San gap is covered by the forward-pointer, now correctly pointing to §7.3's ‡nau"
+ },
+ {
+  "id": "U6887",
+  "decision": "kept",
+  "reason": "§2.6 Sahel gap is expressly history; the forward-pointer names its §7.2 answer"
+ },
+ {
+  "id": "U6888",
+  "decision": "kept",
+  "reason": "archived Tuareg finding is covered by the forward-pointer to §7.2's bernus"
+ },
+ {
+  "id": "U6889",
+  "decision": "rewritten",
+  "reason": "§2.4 now says tightening the veil against dust is inference only, per §7.2's negative search"
+ },
+ {
+  "id": "U6890",
+  "decision": "rewritten",
+  "reason": "§3.2 now notes Swayne's period boundaries differ and win for 1890 (§4.0.2)"
+ },
+ {
+  "id": "U6891",
+  "decision": "rewritten",
+  "reason": "§4.0.2 now quotes §3.2's FSNAU jilaal as Dec–Mar"
+ },
+ {
+  "id": "U6892",
+  "decision": "rewritten",
+  "reason": "Somali STATUS box now states the horn table's actual months (rain from April, May peak) and that they run a month ahead of Swayne; season.ts:75-80 checked"
+ },
+ {
+  "id": "U6893",
+  "decision": "rewritten",
+  "reason": "§3.4 now notes Roscoe was since read in §7.1 (six-month year) and the banana-harvest question stays open"
+ },
+ {
+  "id": "U6894",
+  "decision": "rewritten",
+  "reason": "§3.5 notes the Hausa market and caravan season is answered in §4.9"
+ },
+ {
+  "id": "U6895",
+  "decision": "rewritten",
+  "reason": "§4.0.3 notes the dry-season highland direction is PERIOD since §7.1 (Thomson); months still absent"
+ },
+ {
+  "id": "U6896",
+  "decision": "rewritten",
+  "reason": "§4.0.4 heading and closing paragraph updated: period-confirmed in §7.3 and shipped as okavangoFloodAt (season.ts:825)"
+ },
+ {
+  "id": "U6897",
+  "decision": "rewritten",
+  "reason": "§4.1 GAP list now records the partial answers in §4.0.2, §4.0.5, §4.0.6"
+ },
+ {
+  "id": "U6898",
+  "decision": "rewritten",
+  "reason": "§4.1 GAP list now marks Fulani transhumance as MODERN only (§4.0.1)"
+ },
+ {
+  "id": "U6899",
+  "decision": "rewritten",
+  "reason": "§4.1 GAP list now says the flood months lacked a period source and points to §7.3"
+ },
+ {
+  "id": "U6900",
+  "decision": "rewritten",
+  "reason": "§4.9 no longer merges wet-season field-hut dispersal with §4.0.1's dry-season absence"
+ },
+ {
+  "id": "U6901",
+  "decision": "rewritten",
+  "reason": "§4.9 indoor/outdoor claim scoped to Barth's Sahel with the highland exception"
+ },
+ {
+  "id": "U6902",
+  "decision": "rewritten",
+  "reason": "rinderpest East Africa dated 1890–91 consistently in §2.1, §4.0 and §5"
+ },
+ {
+  "id": "U6903",
+  "decision": "rewritten",
+  "reason": "'All Maasai cattle' quotation marked as hyperbole against §5.1's 80–90 % band"
+ },
+ {
+  "id": "U6904",
+  "decision": "rewritten",
+  "reason": "§5 now says 1896 lies after the game window (calendar stops 31.12.1895, design.md §5.1)"
+ },
+ {
+  "id": "U6905",
+  "decision": "rewritten",
+  "reason": "§5 opening now says India or the Arabian Peninsula"
+ },
+ {
+  "id": "U6906",
+  "decision": "rewritten",
+  "reason": "sleeping-sickness warning no longer excludes an overlapping year range"
+ },
+ {
+  "id": "U6907",
+  "decision": "rewritten",
+  "reason": "'one year after that famine' changed to 'at the tail of that famine' (1889–90)"
+ },
+ {
+  "id": "U6908",
+  "decision": "rewritten",
+  "reason": "shield-hide collapse now a renewal failure over years, per the §7.1 glut warning"
+ },
+ {
+  "id": "U6909",
+  "decision": "rewritten",
+  "reason": "§6 status box records that §7 covers every listed people (Sidama as confirmed GAP)"
+ },
+ {
+  "id": "U6910",
+  "decision": "rewritten",
+  "reason": "§6 status box lists what §4.9 answers and what stays open"
+ },
+ {
+  "id": "U6911",
+  "decision": "rewritten",
+  "reason": "§6 status box and §4.9 now distinguish the answered warmth fire (Barth, Passarge) from what stays open"
+ },
+ {
+  "id": "U6912",
+  "decision": "rewritten",
+  "reason": "§6 status box credits Barth's market/caravan support; building, craft, marriage stay open"
+ },
+ {
+  "id": "U6913",
+  "decision": "rewritten",
+  "reason": "§6 status box records Thomson, Baumann, Passarge, Stanley, Roscoe as read; Merker stays unread"
+ },
+ {
+  "id": "U6914",
+  "decision": "rewritten",
+  "reason": "§5 and §6 now say Sidama (code id sidama-village)"
+ },
+ {
+  "id": "U6915",
+  "decision": "rewritten",
+  "reason": "PERIOD marker definition now admits later publication of pre-1910 observation (Roscoe 1911)"
+ },
+ {
+  "id": "U6916",
+  "decision": "rewritten",
+  "reason": "Sidama summary row now marks Parkyns as Tigray-observed"
+ },
+ {
+  "id": "U6917",
+  "decision": "rewritten",
+  "reason": "convergence sentence now says 'visibly' and names Thomson's underneath Berber garments"
+ },
+ {
+  "id": "U6918",
+  "decision": "rewritten",
+  "reason": "Tuareg instruction now separates the rank-holder's cloak from everyone else's tightness and posture"
+ },
+ {
+  "id": "U6919",
+  "decision": "rewritten",
+  "reason": "funturu now named as night-cold, not a season"
+ },
+ {
+  "id": "U6920",
+  "decision": "rewritten",
+  "reason": "Hausa 'no add a layer room' now excepts the rich man's zenne"
+ },
+ {
+  "id": "U6921",
+  "decision": "rewritten",
+  "reason": "status banner no longer says half the roster is unresearched"
+ },
+ {
+  "id": "U6922",
+  "decision": "rewritten",
+  "reason": "§1 status box records the Bambara move to Ségou (geo.ts:231)"
+ },
+ {
+  "id": "U6923",
+  "decision": "rewritten",
+  "reason": "orphaned 'earlier flag' reference replaced by a plain statement"
+ },
+ {
+  "id": "U6924",
+  "decision": "rewritten",
+  "reason": "§1 status box records all label and placement findings as acted on (geo.ts:228-253)"
+ },
+ {
+  "id": "U6925",
+  "decision": "rewritten",
+  "reason": "forward-pointer now says small corrections were added to §2"
+ },
+ {
+  "id": "U6926",
+  "decision": "rewritten",
+  "reason": "forward-pointer now points the San ‡nau to §7.3, where it lives"
+ },
+ {
+  "id": "U6927",
+  "decision": "rewritten",
+  "reason": "forward-pointer now names the §2.7 Pankhurst snippet superseded by Parkyns in §7.1"
+ },
+ {
+  "id": "U6928",
+  "decision": "rewritten",
+  "reason": "forward-pointer now notes §2.4's unread Duveyrier is quoted in §4.0.6"
+ },
+ {
+  "id": "U6929",
+  "decision": "rewritten",
+  "reason": "§3.5 notes Lunda sedentism and capitals are answered in §4.0.5"
+ },
+ {
+  "id": "U6930",
+  "decision": "rewritten",
+  "reason": "the dangling §4.2 reference now names design.md §4.2's village-river clearance; the 4.9 heading level is left as is"
+ },
+ {
+  "id": "U6931",
+  "decision": "rewritten",
+  "reason": "'§4.2 river band' now points at design.md §4.2's village-river clearance"
+ },
+ {
+  "id": "U6932",
+  "decision": "rewritten",
+  "reason": "§5 opening now gives 1887–88 and the 80–90 % band per §5.1"
+ },
+ {
+  "id": "U6933",
+  "decision": "rewritten",
+  "reason": "§5 now says stalled north of the Zambezi July 1892–March 1896"
+ },
+ {
+  "id": "U6934",
+  "decision": "rewritten",
+  "reason": "§6 status box records the Nubian 1890 government as settled (§1.1, §7.2)"
+ },
+ {
+  "id": "U6935",
+  "decision": "rewritten",
+  "reason": "unverifiable 'all six' count dropped; the method note lists the texts"
+ },
+ {
+  "id": "U6936",
+  "decision": "kept",
+  "reason": "claim does not hold: the header names the point the research began under; later sections name their own points"
+ },
+ {
+  "id": "U6937",
+  "decision": "kept",
+  "reason": "claim does not hold: coldnessAt and harmattanAt exist in season.ts:291/341 and match (harmattan band fades to 0 by 22N)"
+ },
+ {
+  "id": "U6938",
+  "decision": "rewritten",
+  "reason": "§13 references now name design.md §13 (Language and Hint System)"
+ },
+ {
+  "id": "U6939",
+  "decision": "rewritten",
+  "reason": "§5 now names the Wayeyi at 19.0S"
+ },
+ {
+  "id": "U6940",
+  "decision": "rewritten",
+  "reason": "Bambara row now marks garments-off-in-rain as a Moor indicium"
+ },
+ {
+  "id": "U6941",
+  "decision": "rewritten",
+  "reason": "dress.ts:158-163 already gives the no-frost reason; the doc now says the comment was fixed"
+ },
+ {
+  "id": "U6942",
+  "decision": "rewritten",
+  "reason": "'no frost at 853 m' softened to 'rare to absent' / 'hardly any'"
+ },
+ {
+  "id": "U6943",
+  "decision": "rewritten",
+  "reason": "correction applied in §4.9; the §7.3 box now says so"
+ },
+ {
+  "id": "U6944",
+  "decision": "rewritten",
+  "reason": "‡nau now described as everyday wear that doubles as bedding"
+ },
+ {
+  "id": "U6945",
+  "decision": "rewritten",
+  "reason": "'explicitly NOT weather' changed to 'weather is not named'"
+ },
+ {
+  "id": "U6946",
+  "decision": "rewritten",
+  "reason": "§4.0.4 and §4.1 now carry the §7.3 upgrade; §7.3 wording in past tense"
+ },
+ {
+  "id": "U6947",
+  "decision": "rewritten",
+  "reason": "now 'months PERIOD (Andersson), dry-season rise attested twice'"
+ },
+ {
+  "id": "U6948",
+  "decision": "rewritten",
+  "reason": "Bemba row marks the calico chronology INFERRED"
+ },
+ {
+  "id": "U6949",
+  "decision": "rewritten",
+  "reason": "now 'no cattle-hide cloak economy'"
+ },
+ {
+  "id": "U6950",
+  "decision": "rewritten",
+  "reason": "Arnot 1889 now 'a year before the game's start'"
+ },
+ {
+  "id": "U6951",
+  "decision": "rewritten",
+  "reason": "'sit unbought' changed to 'are on offer'"
+ },
+ {
+  "id": "U6952",
+  "decision": "rewritten",
+  "reason": "fix note no longer calls July the Fang rains' peak (it is the big dry season)"
+ },
+ {
+  "id": "U6953",
+  "decision": "rewritten",
+  "reason": "Fang row marks farm-season desertion as extrapolated from the Mpongwe"
+ },
+ {
+  "id": "U6954",
+  "decision": "rewritten",
+  "reason": "Banda burning now 'once or twice a year' / 'annual/biannual'"
+ },
+ {
+  "id": "U6955",
+  "decision": "rewritten",
+  "reason": "§8 intro now names design-reference.md §19.15 as where the record is kept current"
+ },
+ {
+  "id": "U6956",
+  "decision": "rewritten",
+  "reason": "§9.1 and §9.4 mark the Luapula meeting shelter as an extrapolation for the game's Lunda"
+ },
+ {
+  "id": "U6957",
+  "decision": "rewritten",
+  "reason": "§9.3/§9.4 now credit Passarge as read; only the windbreak stays THIN"
+ },
+ {
+  "id": "U6958",
+  "decision": "rewritten",
+  "reason": "accuracy guard now gives the San an open hearth behind a windbreak, not an indoor fire"
+ },
+ {
+  "id": "U6959",
+  "decision": "rewritten",
+  "reason": "Merensky's Transvaal years now 1859–82, matching the book title in Sources"
+ },
+ {
+  "id": "U6960",
+  "decision": "rewritten",
+  "reason": "§9.3/§9.4 Berber now cold-and-wet season, matching §7.2"
+ },
+ {
+  "id": "U6961",
+  "decision": "kept",
+  "reason": "claim does not hold: climate-1890.md still has no Angola row (checked its zone table), so the statement is current"
+ },
+ {
+  "id": "U6962",
+  "decision": "backlog",
+  "reason": "docs/climate-1890.md:133 — the Congo 5N–5S 'rain every month' row does not note the atlantic-equatorial exception (Fang, 11.5E) the code now has"
+ },
+ {
+  "id": "U6963",
+  "decision": "backlog",
+  "reason": "docs/peoples-1890.md:2230 — the Met raffia-belt follow-up (acc. 319423) is recorded only as a transient HTTP 429; re-fetch or drop it"
+ },
+ {
+  "id": "U6964",
+  "decision": "rewritten",
+  "reason": "§8 heading and intro now say where the record lives and that only the loom subsection stays"
+ },
+ {
+  "id": "U6965",
+  "decision": "rewritten",
+  "reason": "§9 intro now past tense and names the shipped src/systems/cookShelter.ts"
+ },
+ {
+  "id": "U6966",
+  "decision": "rewritten",
+  "reason": "§9.5 recommendation marks Bemba and Lunda as RETRO-APPLIED/MODERN evidence only"
+ },
+ {
+  "id": "U6967",
+  "decision": "kept",
+  "reason": "claim does not hold: loom.ts, loomWork.ts, LOOM_BUILD.stripWidth, gaveWayToLoom, the 17 m test and COMPOUND_MIN 3 / VILLAGE_MIN_DWELLINGS 6 / KSAR_MIN_HOUSES 8 all exist as described"
+ },
+ {
+  "id": "U6968",
+  "decision": "rewritten",
+  "reason": "wildlife growth now '~+4 per round trip' (7→22 over four intervals)"
+ },
+ {
+  "id": "U6969",
+  "decision": "rewritten",
+  "reason": "blob-shadow sentence now says it was neither built nor measured"
+ },
+ {
+  "id": "U6970",
+  "decision": "rewritten",
+  "reason": "campfire cost now ~17 % of the 8.70 ms driving frame"
+ },
+ {
+  "id": "U6971",
+  "decision": "rewritten",
+  "reason": "dpr-2 verdict now says only the empty desert pays (+2.5 ms)"
+ },
+ {
+  "id": "U6972",
+  "decision": "rewritten",
+  "reason": "live 847 074 → 425 058 now tied to the scene-graph terrain rows (847 076 → 425 114), not the histogram"
+ },
+ {
+  "id": "U6973",
+  "decision": "rewritten",
+  "reason": "'render features are not the problem' now scoped to the headless machine with a pointer to perf-277"
+ },
+ {
+  "id": "U6974",
+  "decision": "backlog",
+  "reason": "docs/perf-276-findings.md:80 — the wildlife-LOD row's '9.4 vs 9.1' driving baseline matches no baseline in the table (8.70); its source run is not recorded"
+ },
+ {
+  "id": "U6975",
+  "decision": "removed",
+  "reason": "the feat/278-dressing-growth verdict paragraph (a deleted branch, exact duplicate of main, nothing to salvage) deleted"
+ },
+ {
+  "id": "U6976",
+  "decision": "kept",
+  "reason": "claim does not hold: the 'known pre-existing property' comment is gone from src (grep), and the doc quotes it in past tense ('had flagged')"
+ },
+ {
+  "id": "U6977",
+  "decision": "kept",
+  "reason": "claim does not hold: terrainLod.ts:102 still says '400 m marks 60 %'"
+ },
+ {
+  "id": "U6978",
+  "decision": "rewritten",
+  "reason": "references checked (design.md §19.4/§19.10/§21.1, setTerrainRefine in terrainLod.ts:48 exist); the stale 'OFF by default / one-flag change' campfire text now records the level-driven default"
+ },
+ {
+  "id": "U6979",
+  "decision": "rewritten",
+  "reason": "intro now says the frame column is vsync-capped and the CPU column cannot see GPU cost"
+ },
+ {
+  "id": "U6980",
+  "decision": "rewritten",
+  "reason": "shadow-map-half delta now '~0 / ~0 / −1.2'"
+ },
+ {
+  "id": "U6981",
+  "decision": "rewritten",
+  "reason": "determinism note now excepts the terrain levers' own triangle drop"
+ },
+ {
+  "id": "U6982",
+  "decision": "rewritten",
+  "reason": "terrain-cap-84 delta now '−1.4 (~22 %)' driving, and finding 1 names it as the unexplained exception"
+ },
+ {
+  "id": "U6983",
+  "decision": "rewritten",
+  "reason": "finding 4 now says 'most wall-clock frames' are vsync-limited"
+ },
+ {
+  "id": "U6984",
+  "decision": "rewritten",
+  "reason": "unsupported 'a third of the triangles' replaced by 'despite being empty'"
+ },
+ {
+  "id": "U6985",
+  "decision": "rewritten",
+  "reason": "Low-Details section now carries a STATUS: shipped as F9 quality levels (quality.ts), SSAO only in high; load-modal follow-up marked as having no recorded status"
+ },
+ {
+  "id": "U6986",
+  "decision": "rewritten",
+  "reason": "intervals now in threshold order: 4.3 s / 2.9 s, 0.96 s / 0.64 s"
+ },
+ {
+  "id": "U6987",
+  "decision": "rewritten",
+  "reason": "symptom text now says only the terrain burst is cached; the flora scan re-decided every step"
+ },
+ {
+  "id": "U6988",
+  "decision": "rewritten",
+  "reason": "header no longer says 'no code was changed'; STATUS box marks the analysis as historical and points to Implementation status"
+ },
+ {
+  "id": "U6989",
+  "decision": "rewritten",
+  "reason": "STATUS box states the terrain diagnosis describes pre-fix code; Implementation status holds the landed queue/memo/Uint32Array"
+ },
+ {
+  "id": "U6990",
+  "decision": "rewritten",
+  "reason": "STATUS box states the flora diagnosis describes pre-fix code; Implementation status holds the landed cache and amortised fill"
+ },
+ {
+  "id": "U6991",
+  "decision": "rewritten",
+  "reason": "landed gate now says its bounds replaced the proposed 8 ms budgets and perf.mjs; STATUS box marks the prescriptions historical"
+ },
+ {
+  "id": "U6992",
+  "decision": "rewritten",
+  "reason": "'Zero-cost when not read' replaced by 'Cheap enough to leave on in DEV'"
+ },
+ {
+  "id": "U6993",
+  "decision": "rewritten",
+  "reason": "STATUS box marks the ranking a hypothesis, citing perf-276's artifact finding and 0.3/0.6 ms bursts"
+ },
+ {
+  "id": "U6994",
+  "decision": "rewritten",
+  "reason": "Implementation status now notes wildlife was left out of the landed probe (perfProbe.ts, enrichments.mjs:2171)"
+ },
+ {
+  "id": "U6995",
+  "decision": "rewritten",
+  "reason": "worker deferral now marks ~20-40 ms as an unmeasured estimate against perf-276's 0.3 ms measurement"
+ },
+ {
+  "id": "U6996",
+  "decision": "rewritten",
+  "reason": "STATUS box states all file:line references describe the pre-fix code"
+ },
+ {
+  "id": "U6997",
+  "decision": "rewritten",
+  "reason": "camera lerp is still a fixed 0.12/frame (TravelScene.tsx:3077); the stale line reference is replaced and the status dated"
+ },
+ {
+  "id": "U6998",
+  "decision": "rewritten",
+  "reason": "heading now 'Three runtime observations from the log' and its §5 anchor link follows"
+ },
+ {
+  "id": "U6999",
+  "decision": "backlog",
+  "reason": "docs/picture-check-cost.md:108 — 'ten enrichments runs, eight non-zero' implies two passing runs against n = 1 in the table; the July run log has since been overwritten, so the true count cannot be re-derived"
+ },
+ {
+  "id": "U7000",
+  "decision": "rewritten",
+  "reason": "§5.4 now says twelve of sixteen suites have n = 1"
+ },
+ {
+  "id": "U7001",
+  "decision": "rewritten",
+  "reason": "cost doc §2 and §6.3 and levers A11/B-H now give 5.7× against the same two-backend flow check"
+ },
+ {
+  "id": "U7002",
+  "decision": "rewritten",
+  "reason": "§3 intro now counts frames written, the most a reader can be shown, with a pointer to §5.1"
+ },
+ {
+  "id": "U7003",
+  "decision": "rewritten",
+  "reason": "backend-split paragraph now says the log does not record which changes were backend-sensitive, so it is no proof of a violation"
+ },
+ {
+  "id": "U7004",
+  "decision": "rewritten",
+  "reason": "suggestSuite() description now names the DOM-only routing to flow (render-verify-core.mjs:1727)"
+ },
+ {
+  "id": "U7005",
+  "decision": "rewritten",
+  "reason": "tier table corrected against tiers.mjs as of the doc's commit bf0a1aa50: SMALL 7, LARGE 16 + preview; membership dated"
+ },
+ {
+  "id": "U7006",
+  "decision": "rewritten",
+  "reason": "row 2 no longer claims headless has no WebGPU adapter; it cites the WebGL-2-heavy window instead"
+ },
+ {
+  "id": "U7007",
+  "decision": "rewritten",
+  "reason": "now states rows 1, 2, 5, 6 and 8's fix commits touched no screenshot (checked with git show --stat)"
+ },
+ {
+  "id": "U7008",
+  "decision": "rewritten",
+  "reason": "row 1 now names verification/sweep/ and the standalone visualsweep.mjs, outside the tier table and tracked frames"
+ },
+ {
+  "id": "U7009",
+  "decision": "rewritten",
+  "reason": "gap 3 now scoped to §1–§6 and points to §7's measured two-backend runs"
+ },
+ {
+  "id": "U7010",
+  "decision": "rewritten",
+  "reason": "§5.1 now says the figure is an upper bound only for the first read and cites the B-P re-read correction"
+ },
+ {
+  "id": "U7011",
+  "decision": "kept",
+  "reason": "claim does not hold: §8 measures September runs of a different suite set; §1's July WebGL 2 medians are not the same quantity"
+ },
+ {
+  "id": "U7012",
+  "decision": "rewritten",
+  "reason": "header now dates the counts (27.07.2026) and marks §1–§6 as a snapshot; row 4 notes point 338 has since closed"
+ },
+ {
+  "id": "U7013",
+  "decision": "kept",
+  "reason": "the four season frames are still on disk (verification/106–109) and are corpus row 5's accepted-state evidence; the doc says so"
+ },
+ {
+  "id": "U7014",
+  "decision": "rewritten",
+  "reason": "A2 now 'slightly worse than quadratic (3.9× against 4×)'"
+ },
+ {
+  "id": "U7015",
+  "decision": "rewritten",
+  "reason": "A3 now says A4 and A5 (not A2) lose the frame count"
+ },
+ {
+  "id": "U7016",
+  "decision": "rewritten",
+  "reason": "A3 and A6 now price the run at the measured 60,687 tokens (A3 35×, A6 12×)"
+ },
+ {
+  "id": "U7017",
+  "decision": "rewritten",
+  "reason": "A6 now says it skips frames under its threshold and that a high threshold can hide a small real change"
+ },
+ {
+  "id": "U7018",
+  "decision": "rewritten",
+  "reason": "B-A now 'essentially identical picture (layout coordinates shift, §4.4)'; verdict row notes the revalidation"
+ },
+ {
+  "id": "U7019",
+  "decision": "rewritten",
+  "reason": "B-K now ~10× against the 60,687-token run"
+ },
+ {
+  "id": "U7020",
+  "decision": "rewritten",
+  "reason": "B-Q row and verdict now separate untracking (stops new blobs) from the history rewrite (removes old ones)"
+ },
+ {
+  "id": "U7021",
+  "decision": "rewritten",
+  "reason": "§3.1 now 'two carry a usable pair, and a third only partly'"
+ },
+ {
+  "id": "U7022",
+  "decision": "rewritten",
+  "reason": "§3.1b now past tense and notes §5.3 added src/world/ (isRenderPath('src/world/redSea.ts') is true)"
+ },
+ {
+  "id": "U7023",
+  "decision": "rewritten",
+  "reason": "A6 verdict now rests on the noise floor alone; row 5 is noted to refute only a 'did it change?' acceptance gate"
+ },
+ {
+  "id": "U7024",
+  "decision": "backlog",
+  "reason": "docs/picture-check-levers.md:318 — the B-L rejection treats promoting row 5's changed frame as false reassurance, but ranking only sets inspection priority; the verdict needs re-arguing"
+ },
+ {
+  "id": "U7025",
+  "decision": "rewritten",
+  "reason": "A8 verdict now says cross-backend noise was not measured, instead of 'strictly larger'"
+ },
+ {
+  "id": "U7026",
+  "decision": "rewritten",
+  "reason": "B-I split out of the A5 row with its own coupling-based rejection"
+ },
+ {
+  "id": "U7027",
+  "decision": "rewritten",
+  "reason": "acceptance bar now calls 0.75 % the horizon-strip figure, a soft signal (§4.5)"
+ },
+ {
+  "id": "U7028",
+  "decision": "rewritten",
+  "reason": "§4.4 now: B-F and B-M add a control, B-J saves wall clock, B-N changes the primary backend"
+ },
+ {
+  "id": "U7029",
+  "decision": "kept",
+  "reason": "claim does not hold: §5 widens which changes owe a picture, not which frame a coupling map points at; A4's rejection is untouched by it"
+ },
+ {
+  "id": "U7030",
+  "decision": "backlog",
+  "reason": "docs/picture-check-levers.md:462 — §5.2 reports −8 removals in the last 100 commits but −2 over the whole containing history; the replay needs re-running"
+ },
+ {
+  "id": "U7031",
+  "decision": "rewritten",
+  "reason": "row 6 now explains 0bd1262 as the first later commit that re-baselined the frames after the fix d833863 (ancestor, 3 commits)"
+ },
+ {
+  "id": "U7032",
+  "decision": "rewritten",
+  "reason": "levers' 16 is right (git show --stat c2dcb0a: 16 re-baselined + new 136); the cost doc's row 3 now says 16"
+ },
+ {
+  "id": "U7033",
+  "decision": "rewritten",
+  "reason": "A9 now attributes the seeded PRNG and fixed step to the in-game benchmark (benchmarkRun.ts), driven by scripts/verify/benchmark.mjs"
+ },
+ {
+  "id": "U7034",
+  "decision": "rewritten",
+  "reason": "convergence list now names recording-what-was-reviewed (A12/B-O) instead of fewer frames, so 8 shared + 5 A-only + 9 B-only = 22 holds"
+ },
+ {
+  "id": "U7035",
+  "decision": "rewritten",
+  "reason": "List A's divergence now names A4, A5, A7, A10 and A13"
+ },
+ {
+  "id": "U7036",
+  "decision": "rewritten",
+  "reason": "B-N verdict now marks the 39:1 split as July practice and notes WebGPU is now the everyday lane (CLAUDE.md §7.2)"
+ },
+ {
+  "id": "U7037",
+  "decision": "kept",
+  "reason": "claim does not hold: CLAUDE.md §6 still carries 'Four eyes has two modes'; the point-355 citation is historical"
+ },
+ {
+  "id": "U7038",
+  "decision": "rewritten",
+  "reason": "title and intro no longer say 'every rule' / 'Full review'; the header dates the cut and names later additions"
+ },
+ {
+  "id": "U7039",
+  "decision": "rewritten",
+  "reason": "scope paragraph now says the retrospective is not recorded as judged"
+ },
+ {
+  "id": "U7040",
+  "decision": "rewritten",
+  "reason": "A68 now 'SECOND copy of 67 rules', matching the 67 memories of section A"
+ },
+ {
+  "id": "U7041",
+  "decision": "rewritten",
+  "reason": "section C intro now excepts the seven KNOWN_UNTESTED enforcers of C6"
+ },
+ {
+  "id": "U7042",
+  "decision": "rewritten",
+  "reason": "D-c now names both gaps, C1 and C3"
+ },
+ {
+  "id": "U7043",
+  "decision": "rewritten",
+  "reason": "section E now 'seven of the eight upheld, one partly', matching its table"
+ },
+ {
+  "id": "U7044",
+  "decision": "rewritten",
+  "reason": "'Section E is rewritten below' replaced by 'Section E states only what is verifiable'"
+ },
+ {
+  "id": "U7045",
+  "decision": "rewritten",
+  "reason": "index rot now cited as A68"
+ },
+ {
+  "id": "U7046",
+  "decision": "rewritten",
+  "reason": "§F's A52 line now records the user's 24.08 authorisation (A67) and that the execution is not recorded here"
+ },
+ {
+  "id": "U7047",
+  "decision": "rewritten",
+  "reason": "§F now separates the in-scope-but-unjudged carriers (design.md, TASKS preamble) from the out-of-scope ones"
+ },
+ {
+  "id": "U7048",
+  "decision": "rewritten",
+  "reason": "manual deploy paragraph now points to the Deploy step's five files (deploy-container-recovery.ps1:88) instead of three"
+ },
+ {
+  "id": "U7049",
+  "decision": "rewritten",
+  "reason": "scripts/README.md now lists test:small and test:large (package.json:18-19) and points to verify/README.md and tiers.mjs"
+ },
+ {
+  "id": "U7050",
+  "decision": "kept",
+  "reason": "claim does not hold as a defect: the file is a generated, dated snapshot (header names command, ref and time); regenerate with scripts/measure-point-cost.mjs"
+ },
+ {
+  "id": "U7051",
+  "decision": "backlog",
+  "reason": "scripts/measure-point-cost.mjs:183 — the report text hard-codes COST_WEIGHTS values (cache reads 0.1, output 5) instead of reading them from measure-context-cost-core.mjs, so docs/point-cost-report.md drifts when the weights change"
+ },
+ {
+  "id": "U7052",
+  "decision": "backlog",
+  "reason": "scripts/measure-point-cost.mjs:219 — the review-rounds proposal omits 'inclusively' unlike its three siblings; docs/point-cost-report.md:63 is generated from it"
+ },
+ {
+  "id": "U7053",
+  "decision": "rewritten",
+  "reason": "sceneFrame paragraph now states the current design and its reason in the present conditional, not the bug's history"
+ },
+ {
+  "id": "U7054",
+  "decision": "kept",
+  "reason": "claim does not hold: package.json pins @react-three/fiber ^9.6.1 and CLAUDE.md §3 carries the renderer rule"
+ },
+ {
+  "id": "U7055",
+  "decision": "removed",
+  "reason": "docs/traa-toggle-review.md deleted: an unreferenced, closed point handoff whose durable content is in render-architecture.md"
+ },
+ {
+  "id": "U7056",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of docs/traa-toggle-review.md"
+ },
+ {
+  "id": "U7057",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of docs/traa-toggle-review.md"
+ },
+ {
+  "id": "U7058",
+  "decision": "removed",
+  "reason": "docs/settlement-edge-settle-review.md deleted: an unreferenced reviewer/author exchange for a landed change; its evidence is a git-ignored log"
+ },
+ {
+  "id": "U7059",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of docs/settlement-edge-settle-review.md"
+ },
+ {
+  "id": "U7060",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of docs/settlement-edge-settle-review.md"
+ },
+ {
+  "id": "U7061",
+  "decision": "rewritten",
+  "reason": "baseline now dated 21.08.2026 and the 811/812/813 sizing written in the past tense"
+ },
+ {
+  "id": "U7062",
+  "decision": "kept",
+  "reason": "claim does not hold: the 15-minute launcher tick is still the code's value (batch-emergency-core.mjs:18, batch-handover-observe-core.mjs:281)"
+ },
+ {
+  "id": "U7063",
+  "decision": "kept",
+  "reason": "the Chromium gate is a localized capability branch (speech.ts:34-40) with a WASM fallback for every other browser, so behaviour is not Chrome-only"
+ },
+ {
+  "id": "U7064",
+  "decision": "kept",
+  "reason": "matches CLAUDE.md §3 ('currently English-only'); the present tense is the current state"
+ },
+ {
+  "id": "U7065",
+  "decision": "rewritten",
+  "reason": "edit-history phrase removed; the paragraph now lists the five files the deploy step copies"
+ },
+ {
+  "id": "U7066",
+  "decision": "rewritten",
+  "reason": "banner still true (point 1071 open, not deployed); the stale 'First land the repository change' instruction now says point 1069 landed it"
+ },
+ {
+  "id": "U7067",
+  "decision": "rewritten",
+  "reason": "host drill now names restart-drill.ps1 as authoritative and the steps as the procedure it implements"
+ },
+ {
+  "id": "U7068",
+  "decision": "rewritten",
+  "reason": "'the incident brief' now names point 1069's record in docs/tasks-archive.md (measured 07.09.2026)"
+ },
+ {
+  "id": "U7069",
+  "decision": "rewritten",
+  "reason": "'the perf tools here' now names perf-bench.mjs, perf-breakdown.mjs and perf-structure.mjs (each hard-codes --use-angle=d3d11)"
+ },
+ {
+  "id": "U7070",
+  "decision": "kept",
+  "reason": "claim does not hold: CLAUDE.md §7.2 is Self-Verification and names the browser tiers and scripts/verify/README.md, so the mapping is right"
+ },
+ {
+  "id": "U7071",
+  "decision": "removed",
+  "reason": "hand-kept DEV hook list removed; the README now says the window.__* hooks are defined next to the code they expose"
+ },
+ {
+  "id": "U7072",
+  "decision": "removed",
+  "reason": "hand-kept suite list (already missing startup, communication, report) removed in favour of tiers.mjs DEV_SUITES"
+ },
+ {
+  "id": "U7073",
+  "decision": "rewritten",
+  "reason": "header now says sections A–F state the 27.07 cut and names the later dated additions"
+ },
+ {
+  "id": "U7074",
+  "decision": "rewritten",
+  "reason": "section A title now '(67 + index)'"
+ },
+ {
+  "id": "U7075",
+  "decision": "rewritten",
+  "reason": "A68 now 'six more wrong lines', matching its enumeration and §F"
+ },
+ {
+  "id": "U7076",
+  "decision": "rewritten",
+  "reason": "§E now says 8 disputes, several spanning more than one row, which is why ≠ marks more rows"
+ },
+ {
+  "id": "U7077",
+  "decision": "rewritten",
+  "reason": "§F now says C9's tightening has landed (point 527)"
+ },
+ {
+  "id": "U7078",
+  "decision": "rewritten",
+  "reason": "C9 now says 'the model allowlist'; the header notes later passes (§H) are the current reading on model policy"
+ },
+ {
+  "id": "U7079",
+  "decision": "rewritten",
+  "reason": "A27 row now notes it is superseded by the 18.08 Sol-author rule (§H row A2)"
+ },
+ {
+  "id": "U7080",
+  "decision": "rewritten",
+  "reason": "§H now states its row ids are its own; ids kept because open TASKS.md point 981 cites them"
+ },
+ {
+  "id": "U7081",
+  "decision": "rewritten",
+  "reason": "header now says a later pass (§H) is the current reading where it disagrees with section A"
+ },
+ {
+  "id": "U7082",
+  "decision": "rewritten",
+  "reason": "'the 19.08.2026 review' now names the rule-review attestation of 19.08 in .claude/rule-review-state.json"
+ },
+ {
+  "id": "U7083",
+  "decision": "kept",
+  "reason": "rows A39/A40 record the 27.07 state by design; the header now dates sections A–F as that cut"
+ },
+ {
+  "id": "U7084",
+  "decision": "kept",
+  "reason": "pinned code lines are part of the dated 27.07 evidence; the header now dates the cut"
+ },
+ {
+  "id": "U7085",
+  "decision": "kept",
+  "reason": "B3/B4 are dated 27.07 measurements; the header now dates the cut"
+ },
+ {
+  "id": "U7086",
+  "decision": "rewritten",
+  "reason": "verdict key now defines RESOLVED"
+ },
+ {
+  "id": "U7087",
+  "decision": "rewritten",
+  "reason": "header now states §H's corpus size (137 entries, 96 memory files) against the scope table's 27.07 sizes"
+ },
+ {
+  "id": "U7088",
+  "decision": "rewritten",
+  "reason": "Vitest row now names both include roots, src/**/*.test.ts[x] and scripts/**/*.test.mjs (vitest.config.ts:26/34)"
+ },
+ {
+  "id": "U7089",
+  "decision": "rewritten",
+  "reason": "Playwright row and the coverage map now name docs as the pure-Node exception"
+ },
+ {
+  "id": "U7090",
+  "decision": "kept",
+  "reason": "claim does not hold: CLAUDE.md §7.2 carries the screenshot-subject rule and §7.1/§9 the criteria; citing §7.2 for the screenshots is correct"
+ },
+ {
+  "id": "U7091",
+  "decision": "rewritten",
+  "reason": "stage order now includes test-types between lint and vitest (run-all.mjs build → lint → test-types → unit)"
+ },
+ {
+  "id": "U7092",
+  "decision": "rewritten",
+  "reason": "'the three npm commands above' now names npm test, test:small and test:large"
+ },
+ {
+  "id": "U7093",
+  "decision": "rewritten",
+  "reason": "worktree-removal warning now scoped to Windows, where the link is a junction"
+ },
+ {
+  "id": "U7094",
+  "decision": "removed",
+  "reason": "orphaned parenthetical about the no-longer-cited 42-minute figure deleted"
+ },
+ {
+  "id": "U7095",
+  "decision": "rewritten",
+  "reason": "the 2.5× retirement now told once (at the incident) and the spliced 'That silence…' sentence starts its own paragraph"
+ },
+ {
+  "id": "U7096",
+  "decision": "kept",
+  "reason": "claim does not hold: the infrastructure freeze is defined in CLAUDE.md §2 and still in force"
+ },
+ {
+  "id": "U7097",
+  "decision": "rewritten",
+  "reason": "'the same 93 names' now 'the same names', so it no longer conflicts with the 94-frame floor"
+ },
+ {
+  "id": "U7098",
+  "decision": "rewritten",
+  "reason": "'fifty minutes' now 'forty minutes … up to the 45-minute ceiling' (run-all.mjs:248)"
+ },
+ {
+  "id": "U7099",
+  "decision": "backlog",
+  "reason": "scripts/wait-marker-core.mjs:104 — the wait marker treats a quiet LOG as a wedge (log-quiet), while run-logged's progress mark tracks frames through healthy silent suite intervals; a silent-but-working suite can lose its in-flight declaration"
+ },
+ {
+  "id": "U7100",
+  "decision": "rewritten",
+  "reason": "bring-up now 'installs what it can and reports the rest'"
+ },
+ {
+  "id": "U7101",
+  "decision": "rewritten",
+  "reason": "heading now 'generous, not tight' and the text notes parallel Vitest runs have still pushed single cases past 20 s"
+ },
+ {
+  "id": "U7102",
+  "decision": "rewritten",
+  "reason": "'Choose the covering suites for the bundle run' removed; the bundle gate is the full LARGE"
+ },
+ {
+  "id": "U7103",
+  "decision": "rewritten",
+  "reason": "SMALL backend cell now 'WebGPU (voice routed to WebGL 2)'"
+ },
+ {
+  "id": "U7104",
+  "decision": "rewritten",
+  "reason": "brief summary now names the cheapest covering rung as the proof, matching point-brief-core VERIFICATION_LADDER"
+ },
+ {
+  "id": "U7105",
+  "decision": "rewritten",
+  "reason": "gate table now names startup and benchmark as unsectioned and docs as browserless"
+ },
+ {
+  "id": "U7106",
+  "decision": "rewritten",
+  "reason": "dangling 'rule point 1126 already wrote down above' reference removed"
+ },
+ {
+  "id": "U7107",
+  "decision": "rewritten",
+  "reason": "pointer now names 'Triaging a RED run' and drops the shared-vocabulary claim that did not resolve"
+ },
+ {
+  "id": "U7108",
+  "decision": "rewritten",
+  "reason": "push-gate example now quotes the current line 'was red on BOTH runs' (pre-push-gate-core.mjs:710)"
+ },
+ {
+  "id": "U7109",
+  "decision": "rewritten",
+  "reason": "gate state now 'each worktree keeps its own baseline' instead of claiming its own dependency tree"
+ },
+ {
+  "id": "U7110",
+  "decision": "rewritten",
+  "reason": "commit-msg heading and rule now say a rescue must not start CI (branch runs mail nobody since point 513)"
+ },
+ {
+  "id": "U7111",
+  "decision": "rewritten",
+  "reason": "CI intro now says the unit suite matches CI on main, and branch pushes run only lint and audit"
+ },
+ {
+  "id": "U7112",
+  "decision": "rewritten",
+  "reason": "pushed-ref bullet now says a branch run concludes green, so the guard waits but cannot see a failed branch gate"
+ },
+ {
+  "id": "U7113",
+  "decision": "kept",
+  "reason": "the NTFY_TOPIC statement is explicitly dated ('Measured 08.08.2026'); the secret's current state is not readable from the repository"
+ },
+ {
+  "id": "U7114",
+  "decision": "rewritten",
+  "reason": "'rescue convention below' now 'above'"
+ },
+ {
+  "id": "U7115",
+  "decision": "rewritten",
+  "reason": "triage intro now names the three items and where each is decided (charge ledger, hand retry, baseline-classify-core)"
+ },
+ {
+  "id": "U7116",
+  "decision": "rewritten",
+  "reason": "now 'exactly once per backend pass'"
+ },
+ {
+  "id": "U7117",
+  "decision": "rewritten",
+  "reason": "baseline section now says it re-runs the failing checks' blocks, the whole suite only where narrowDiagnosis refuses"
+ },
+ {
+  "id": "U7118",
+  "decision": "rewritten",
+  "reason": "SUSPECT label now says baseline and candidate are measured in separate runs"
+ },
+ {
+  "id": "U7119",
+  "decision": "rewritten",
+  "reason": "--strict now described as exiting on a SUSPECT check or a died/resultless baseline"
+ },
+ {
+  "id": "U7120",
+  "decision": "backlog",
+  "reason": "scripts/verify/README.md:1472 — says errands-silent went with the situation catalogues, yet adult-errands (README:620) still casts errand situations; restore a watch or state why that producer needs none"
+ },
+ {
+  "id": "U7121",
+  "decision": "rewritten",
+  "reason": "migration summary now excepts the two italicised gaps (X-marker drawing, rendered in-world word)"
+ },
+ {
+  "id": "U7122",
+  "decision": "rewritten",
+  "reason": "'Two of its checks' now 'Four', matching the four-item list"
+ },
+ {
+  "id": "U7123",
+  "decision": "rewritten",
+  "reason": "coverage map now notes the suites added since were written in Playwright and points to tiers.mjs"
+ },
+ {
+  "id": "U7124",
+  "decision": "rewritten",
+  "reason": "LARGE row now 'all 20' with communication, and communication added to the assertBackend list (communication.mjs calls assertBackend)"
+ },
+ {
+  "id": "U7125",
+  "decision": "rewritten",
+  "reason": "assertBackend list now excepts docs and board-layout, with preview in the exemption table"
+ },
+ {
+  "id": "U7126",
+  "decision": "rewritten",
+  "reason": "cost note now says the WebGPU lane was still software then (point 505 moved it to hardware)"
+ },
+ {
+  "id": "U7127",
+  "decision": "kept",
+  "reason": "claim does not hold: the merge gate's two-backend picture judgement is what render-verify-guard's per-backend recorded run clears; the section gate is the other rung"
+ },
+ {
+  "id": "U7128",
+  "decision": "rewritten",
+  "reason": "goat-stance red now attributed to the then-software WebGPU lane"
+ },
+ {
+  "id": "U7129",
+  "decision": "rewritten",
+  "reason": "repetition paragraph now says the set bound holds for checks only and points to the explicit ceiling"
+ },
+ {
+  "id": "U7130",
+  "decision": "backlog",
+  "reason": "scripts/verify/README.md:1722-2033 — review-round changelog prose ('round 13', 'no longer says', 'used to') is woven through the point-734 reference text; rewrite as current behaviour"
+ },
+ {
+  "id": "U7131",
+  "decision": "rewritten",
+  "reason": "example now 'three keys over the same three reds, and every further grouping mints another'"
+ },
+ {
+  "id": "U7132",
+  "decision": "kept",
+  "reason": "claim does not hold: the 'longer' branch covers the unbounded parse, not a stored detail, which the same sentence says"
+ },
+ {
+  "id": "U7133",
+  "decision": "rewritten",
+  "reason": "heading and opening now say new records that refused a line reach the incomplete class too"
+ },
+ {
+  "id": "U7134",
+  "decision": "kept",
+  "reason": "claim does not hold: suspectOf still exists (render-verify-core.mjs:719, render-verify-recorder.mjs:702) and applies to records that carry it"
+ },
+ {
+  "id": "U7135",
+  "decision": "rewritten",
+  "reason": "closure now 'for every run recorded since the fix that refused no result line'"
+ },
+ {
+  "id": "U7136",
+  "decision": "rewritten",
+  "reason": "wording-change sentence replaced by the behaviour it describes"
+ },
+ {
+  "id": "U7137",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/verify/crossbrowser.mjs exists"
+ },
+ {
+  "id": "U7138",
+  "decision": "rewritten",
+  "reason": "'for years' now 'for weeks' (collision.mjs added 07.07.2026)"
+ },
+ {
+  "id": "U7139",
+  "decision": "rewritten",
+  "reason": "seed sweep now runs with the bundle's LARGE when the bundle changed settlement layout code"
+ },
+ {
+  "id": "U7140",
+  "decision": "removed",
+  "reason": "authoring-session disclaimer removed; the link anchor still resolves (docs/communication-playthrough.md:83)"
+ },
+ {
+  "id": "U7141",
+  "decision": "rewritten",
+  "reason": "extracted rule now says 'element' for an interface target, matching the shutter table"
+ },
+ {
+  "id": "U7142",
+  "decision": "kept",
+  "reason": "the extracted short form is the pointer the per-turn policy relies on; the long sections remain the reference"
+ },
+ {
+  "id": "U7143",
+  "decision": "rewritten",
+  "reason": "headless limitations now name the Linux executablePath launch and distro Chromium"
+ },
+ {
+  "id": "U7144",
+  "decision": "rewritten",
+  "reason": "heading now 'Two documented backend differences' instead of filing a fixed WebGPU bug under WebGL 2 fallback artifacts"
+ },
+ {
+  "id": "U7145",
+  "decision": "rewritten",
+  "reason": "claim holds (no script writes verification/README.md); the intro now calls it a hand-maintained index"
+ },
+ {
+  "id": "U7146",
+  "decision": "rewritten",
+  "reason": "stale suite counts replaced by a pointer to scripts/verify/tiers.mjs"
+ },
+ {
+  "id": "U7147",
+  "decision": "rewritten",
+  "reason": "stage list now build → lint → test-types → Vitest, matching run-all.mjs; audit is not a runner stage"
+ },
+ {
+  "id": "U7148",
+  "decision": "rewritten",
+  "reason": "'all green, 0 console errors' replaced: a run's green is its receipt's verdict, known reds stay charged"
+ },
+ {
+  "id": "U7149",
+  "decision": "rewritten",
+  "reason": "intro now says the table is a curated selection of the frames the suites write, not a complete list"
+ },
+ {
+  "id": "U7150",
+  "decision": "kept",
+  "reason": "both items are current: CLAUDE.md §3 says read-aloud is English-only, and the gift OPEN marker is at balance.ts:1865"
+ },
+ {
+  "id": "U7151",
+  "decision": "removed",
+  "reason": "the closed screen-space-reflection decision removed from Open items"
+ },
+ {
+  "id": "U7152",
+  "decision": "rewritten",
+  "reason": "98, 99 and 100 moved from Open items into the evidence table"
+ },
+ {
+  "id": "U7153",
+  "decision": "removed",
+  "reason": "verification/wedged-adults-authoring.md deleted: an unreferenced authoring record of closed point 1138"
+ },
+ {
+  "id": "U7154",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of verification/wedged-adults-authoring.md"
+ },
+ {
+  "id": "U7155",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of verification/wedged-adults-authoring.md"
+ },
+ {
+  "id": "U7156",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of verification/wedged-adults-authoring.md"
+ },
+ {
+  "id": "U7157",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of verification/wedged-adults-authoring.md"
+ },
+ {
+  "id": "U7158",
+  "decision": "removed",
+  "reason": "obsolete with the deletion of verification/wedged-adults-authoring.md"
+ }
+]
