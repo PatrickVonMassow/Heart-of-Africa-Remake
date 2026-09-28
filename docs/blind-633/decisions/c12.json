@@ -1,0 +1,2287 @@
+[
+ {
+  "id": "U5952",
+  "decision": "kept",
+  "reason": "claim does not hold: drafts are component-local useState that live only while the dialog is mounted and are shown only in the field being edited; every keystroke writes the store, so nothing persistent overrides it"
+ },
+ {
+  "id": "U5953",
+  "decision": "rewritten",
+  "reason": "drumClock comment now names the millisecond clock (performance.now, Date.now fallback) instead of a nonexistent seconds conversion"
+ },
+ {
+  "id": "U5954",
+  "decision": "rewritten",
+  "reason": "inventory-order comment now states the actual slot order gear, forms, finds, treasures"
+ },
+ {
+  "id": "U5955",
+  "decision": "rewritten",
+  "reason": "forms comment no longer denies item pictures; names the rock relief's clay impression"
+ },
+ {
+  "id": "U5956",
+  "decision": "kept",
+  "reason": "SAVE_LOAD_ENABLED=false is a recorded user decision (24.07.2026) kept as a one-value revert; saves are out of PoC scope"
+ },
+ {
+  "id": "U5957",
+  "decision": "rewritten",
+  "reason": "Tab comment now names exactly the exempted INPUT/TEXTAREA/SELECT"
+ },
+ {
+  "id": "U5958",
+  "decision": "rewritten",
+  "reason": "P-key comment now says the status bar shows no coordinates"
+ },
+ {
+  "id": "U5959",
+  "decision": "rewritten",
+  "reason": "JSX comment now says the health bar lives inside the status bar's right end"
+ },
+ {
+  "id": "U5960",
+  "decision": "rewritten",
+  "reason": "handwriting description now says a few characters per 60 ms tick instead of stroke by stroke"
+ },
+ {
+  "id": "U5961",
+  "decision": "rewritten",
+  "reason": "initial-narration comment now says the gesture reads whichever entry is newest by then"
+ },
+ {
+  "id": "U5962",
+  "decision": "rewritten",
+  "reason": "header now says hachures for explored mountains, named once sighted"
+ },
+ {
+  "id": "U5963",
+  "decision": "rewritten",
+  "reason": "header now places the worn-paper effects over everything at low alpha, fog of war listed separately"
+ },
+ {
+  "id": "U5964",
+  "decision": "rewritten",
+  "reason": "segment comment now names start point or midpoint area"
+ },
+ {
+  "id": "U5965",
+  "decision": "rewritten",
+  "reason": "unused pos removed from the atlas canvas effect's dependency list (the marker is DOM); output unchanged, no redraw per move"
+ },
+ {
+  "id": "U5966",
+  "decision": "rewritten",
+  "reason": "header now describes the snapshot-then-Save behaviour (Cancel leaves the note untouched)"
+ },
+ {
+  "id": "U5967",
+  "decision": "rewritten",
+  "reason": "F6 header now says the keypress opens the report editor and the download button produces the zip"
+ },
+ {
+  "id": "U5968",
+  "decision": "backlog",
+  "reason": "src/ui/StateDump.tsx:108 — the bug report pairs an open-time state JSON with a download-time dumpSummary, so the two parts can describe different moments"
+ },
+ {
+  "id": "U5969",
+  "decision": "rewritten",
+  "reason": "TouchControls header now says a mouse-and-keyboard session never sees it, instead of 'a desktop'"
+ },
+ {
+  "id": "U5970",
+  "decision": "rewritten",
+  "reason": "fallback comment now describes the ±14° 1° grid scan keeping the nearest match"
+ },
+ {
+  "id": "U5971",
+  "decision": "kept",
+  "reason": "CommunicationRockSite is the return type of the exported communicationRockSite and belongs in its public signature"
+ },
+ {
+  "id": "U5972",
+  "decision": "removed",
+  "reason": "test-only communicationRockDigSpot removed (dig goes through isAtCommunicationRock); its tautological test dropped, dig-reach test remains"
+ },
+ {
+  "id": "U5973",
+  "decision": "removed",
+  "reason": "test-only communicationRockWorldPos and its sole-use latLonToWorld import removed; the test's tautological assertions dropped"
+ },
+ {
+  "id": "U5974",
+  "decision": "rewritten",
+  "reason": "FOOTPRINT_RING doc now names the three staggered rings (0.4, 0.72, 1) the probes actually use"
+ },
+ {
+  "id": "U5975",
+  "decision": "rewritten",
+  "reason": "search comment now says the loop returns only probe-dry candidates and the last resort is marked unvouched"
+ },
+ {
+  "id": "U5976",
+  "decision": "rewritten",
+  "reason": "header now mentions the village-centre last resort marked unvouched"
+ },
+ {
+  "id": "U5977",
+  "decision": "rewritten",
+  "reason": "standsDry doc now promises all footprint probes dry, pointing to footprintProbes' stated limits"
+ },
+ {
+  "id": "U5978",
+  "decision": "rewritten",
+  "reason": "groundHeight and groundY docs now say lowest among the footprint probes, 'does not visibly hover'"
+ },
+ {
+  "id": "U5979",
+  "decision": "kept",
+  "reason": "the unvouched branch is deliberately retained for synthetic worlds and documented as such"
+ },
+ {
+  "id": "U5980",
+  "decision": "rewritten",
+  "reason": "unused export modifier dropped from LandPolygon (module-local type); its unread name field left as data"
+ },
+ {
+  "id": "U5981",
+  "decision": "rewritten",
+  "reason": "winding comment corrected to counter-clockwise in (lon, lat)"
+ },
+ {
+  "id": "U5982",
+  "decision": "rewritten",
+  "reason": "LakeDef made module-local and its center doc corrected from label anchor to interior anchor (jump target, lake-level sample, landmark position)"
+ },
+ {
+  "id": "U5983",
+  "decision": "rewritten",
+  "reason": "Dialogs header now names the drum-message and speech-guess routing"
+ },
+ {
+  "id": "U5984",
+  "decision": "kept",
+  "reason": "claim does not hold: offering a rejected treasure yields no bid (treasureBid returns null in offerTreasure), so it is not traded even though it is listed"
+ },
+ {
+  "id": "U5985",
+  "decision": "rewritten",
+  "reason": "header now names the 'answer' message alongside the errand"
+ },
+ {
+  "id": "U5986",
+  "decision": "kept",
+  "reason": "claim does not hold: the default is exercised by DrumMessage.test.tsx and rolledVocabulary.consumers.test.tsx, which render the dialog without a message"
+ },
+ {
+  "id": "U5987",
+  "decision": "rewritten",
+  "reason": "HUD header now lists the actual composition without the removed hand bar"
+ },
+ {
+  "id": "U5988",
+  "decision": "removed",
+  "reason": "stale parenthetical about the map no longer being an item removed from passiveAnswer comment"
+ },
+ {
+  "id": "U5989",
+  "decision": "kept",
+  "reason": "an OPEN: marker is the project's sanctioned way to record an unresolved design/evidence gap (CLAUDE.md §6) and is reported at run end"
+ },
+ {
+  "id": "U5990",
+  "decision": "rewritten",
+  "reason": "DefeatOverlay doc now includes the expired-deadline case"
+ },
+ {
+  "id": "U5991",
+  "decision": "kept",
+  "reason": "claim does not hold: LoadMenu's only importers besides Hud.tsx are Hud.test.tsx and store.saveload.test.ts, both tests"
+ },
+ {
+  "id": "U5992",
+  "decision": "rewritten",
+  "reason": "F9 comment now says it sets detailLevel alone instead of naming effective* selectors"
+ },
+ {
+  "id": "U5993",
+  "decision": "rewritten",
+  "reason": "month-jump comment now says Shift + number row, plain digits belong to the inventory"
+ },
+ {
+  "id": "U5994",
+  "decision": "rewritten",
+  "reason": "stacking comment now attributes the clickability to the renderer warning, not the veil"
+ },
+ {
+  "id": "U5995",
+  "decision": "rewritten",
+  "reason": "StateDump header now states its real stacking (dialog-backdrop z-index shared with later-mounted overlays) instead of top-most"
+ },
+ {
+  "id": "U5996",
+  "decision": "rewritten",
+  "reason": "change-history remark 'unchanged from before' removed from the JSON download doc"
+ },
+ {
+  "id": "U5997",
+  "decision": "kept",
+  "reason": "claim does not hold: store.ts:706 opens the journal for every new entry unless do-not-disturb is on, so the journal stays closed only under DND, which the auto-narration effect checks"
+ },
+ {
+  "id": "U5998",
+  "decision": "rewritten",
+  "reason": "hachure comment now says names of sighted mountains are lettered further down"
+ },
+ {
+  "id": "U5999",
+  "decision": "rewritten",
+  "reason": "header now lists title cartouche and scale bar separately (bottom left vs bottom right)"
+ },
+ {
+  "id": "U6000",
+  "decision": "rewritten",
+  "reason": "place-symbol comment now says villages filled triangle, monuments outlined pyramid"
+ },
+ {
+  "id": "U6001",
+  "decision": "rewritten",
+  "reason": "orphaned settlement-plan JSDoc moved back onto PlacePlan below riverPath"
+ },
+ {
+  "id": "U6002",
+  "decision": "backlog",
+  "reason": "src/ui/MapOverlay.tsx:798 — the southern-entrance marker is placed at layout.radius although the walkable region is no longer a circle (plan extent uses maxBoundaryRadius); should use placeBoundaryRadius at the south bearing"
+ },
+ {
+  "id": "U6003",
+  "decision": "kept",
+  "reason": "claim does not hold: the opener PlaceScene.openSpeechGuess calls releasePointerLock() before setDialog, so the lock is released while the dialog stands"
+ },
+ {
+  "id": "U6004",
+  "decision": "backlog",
+  "reason": "src/ui/ctrlHold.ts:1 — file and exports (ctrlHold, ctrlHeld, subscribeCtrlHold, useCtrlHeld) still named Ctrl although the label modifier is player-chosen (ctrl/shift/alt); comments already say so"
+ },
+ {
+  "id": "U6005",
+  "decision": "kept",
+  "reason": "modifierHeld is used internally by syncFromEvent; the export only additionally serves tests"
+ },
+ {
+  "id": "U6006",
+  "decision": "kept",
+  "reason": "subscribeCtrlHold and ctrlHeld are used by useCtrlHeld, which has non-test importers"
+ },
+ {
+  "id": "U6007",
+  "decision": "kept",
+  "reason": "HINT_GAP and HintMeasures are used by planCursorHint, which Hud calls"
+ },
+ {
+  "id": "U6008",
+  "decision": "kept",
+  "reason": "the order narrative is explicitly 'roughly' and the DEBUG_GROUP_ORDER array right below is the authority"
+ },
+ {
+  "id": "U6009",
+  "decision": "kept",
+  "reason": "coastLineDistance and landInsideVector are used internally by coastSignedDistance (lines 67–68); the export only additionally serves tests"
+ },
+ {
+  "id": "U6010",
+  "decision": "kept",
+  "reason": "ROCK_RIVER_ID and ROCK_HEIGHT_UNITS are used internally by buildSite/onBank; the export only additionally serves tests"
+ },
+ {
+  "id": "U6011",
+  "decision": "rewritten",
+  "reason": "fallback comment now states current behaviour without revision history or reviewer attribution"
+ },
+ {
+  "id": "U6012",
+  "decision": "backlog",
+  "reason": "src/world/data/coastline.ts:111 — Socotra (lon 53.3–54.5) lies wholly east of the atlas plate (mapLayout LON_MAX = 53), so the map never shows it"
+ },
+ {
+  "id": "U6013",
+  "decision": "rewritten",
+  "reason": "Giza raw-anchor doc now says it lies ~0.5° west of the real plateau because the field radius plus river width must clear the Nile axis"
+ },
+ {
+  "id": "U6014",
+  "decision": "rewritten",
+  "reason": "landmarks header now lists the cultural landmarks and natural sites"
+ },
+ {
+  "id": "U6015",
+  "decision": "rewritten",
+  "reason": "RIVER_WIDTH_DEG now imported from its owner ../riverWidth instead of the terrain re-export"
+ },
+ {
+  "id": "U6016",
+  "decision": "rewritten",
+  "reason": "unused export modifier dropped from MountainDef"
+ },
+ {
+  "id": "U6017",
+  "decision": "rewritten",
+  "reason": "elevationM/radiusDeg docs now say reference data unread by terrain (heights come from the elevation dataset)"
+ },
+ {
+  "id": "U6018",
+  "decision": "rewritten",
+  "reason": "unused export modifier dropped from WaterfallDef"
+ },
+ {
+  "id": "U6019",
+  "decision": "rewritten",
+  "reason": "cultural-landmark roster comment now names the Giza pyramids and Sphinx"
+ },
+ {
+  "id": "U6020",
+  "decision": "rewritten",
+  "reason": "Meroë-only rationale over the list generalized into the river-shift rule it introduces"
+ },
+ {
+  "id": "U6021",
+  "decision": "rewritten",
+  "reason": "shift comment now exempts the Okavango"
+ },
+ {
+  "id": "U6022",
+  "decision": "rewritten",
+  "reason": "both Giza footprint figures replaced by GIZA_FIELD_RADIUS_DEG (~0.35°), the actual constant"
+ },
+ {
+  "id": "U6023",
+  "decision": "rewritten",
+  "reason": "Meroë radius note now states the ~0.64° spread is cleared at 0.73"
+ },
+ {
+  "id": "U6024",
+  "decision": "kept",
+  "reason": "claim does not hold as a defect: world.test.ts asserts the landmark, the map point and GIZA_PLATEAU are bit-identical; geo's range-2 village pass finds the already-cleared plateau clear"
+ },
+ {
+  "id": "U6025",
+  "decision": "rewritten",
+  "reason": "Vaal mouthName translated to 'Confluence with the Orange' (field has no consumers)"
+ },
+ {
+  "id": "U6026",
+  "decision": "rewritten",
+  "reason": "Timbuktu annotation now names the port latitude 16.95"
+ },
+ {
+  "id": "U6027",
+  "decision": "kept",
+  "reason": "FIND_IDS is a roster whose FindId type has production consumers; test-only value use is acceptable"
+ },
+ {
+  "id": "U6028",
+  "decision": "rewritten",
+  "reason": "FormId now derived from the FORM_IDS roster (as FindId from FIND_IDS), removing the hand duplication; the roster feeds the i18n parity test"
+ },
+ {
+  "id": "U6029",
+  "decision": "kept",
+  "reason": "FormSocket is the element type of the exported FORM_SOCKETS and part of FormUse, so it belongs to the public surface"
+ },
+ {
+  "id": "U6030",
+  "decision": "kept",
+  "reason": "FormUse and FormUseQuery are the return and parameter types of the exported resolveFormUse; keeping them exported keeps the signature nameable"
+ },
+ {
+  "id": "U6031",
+  "decision": "rewritten",
+  "reason": "geo header now includes the Giza monument site and describes geoIndex as the query layer, not a landmark index"
+ },
+ {
+  "id": "U6032",
+  "decision": "backlog",
+  "reason": "src/world/geo.ts:29 — RIVERS is a pure alias of RIVERS_DATA; both are imported widely, one name should go"
+ },
+ {
+  "id": "U6033",
+  "decision": "rewritten",
+  "reason": "truncated clearance sentence rewritten to RIVER_WIDTH_DEG = 0.17° × balance.river.widthFactor from riverWidth.ts"
+ },
+ {
+  "id": "U6034",
+  "decision": "rewritten",
+  "reason": "both range comments now describe range-1 reliability (~0.45°) and the maxDist = 1 cap instead of a 0.45 × range clamp"
+ },
+ {
+  "id": "U6035",
+  "decision": "backlog",
+  "reason": "src/world/geo.ts:195 — clearedOfRivers is a private variant of riverClearance.clearedOfRiversBy (24 iters/range 2/north nudge vs 40 iters/range 1/east nudge); unifying moves places, so it needs a picture check"
+ },
+ {
+  "id": "U6036",
+  "decision": "rewritten",
+  "reason": "heartland comment drops the misspelt Bambara (it moved to Ségou and the river moved instead)"
+ },
+ {
+  "id": "U6037",
+  "decision": "rewritten",
+  "reason": "comment now says VILLAGES is module-local and VILLAGE_HEARTLANDS is the export for the world test"
+ },
+ {
+  "id": "U6038",
+  "decision": "rewritten",
+  "reason": "bambara-village entry moved under the West heading"
+ },
+ {
+  "id": "U6039",
+  "decision": "rewritten",
+  "reason": "region headings now use the entry names Mbuti, Maasai, Sidama, Baganda (as design.md §4.5)"
+ },
+ {
+  "id": "U6040",
+  "decision": "rewritten",
+  "reason": "known-from-start comment now says ports plus Giza from its first sentence"
+ },
+ {
+  "id": "U6041",
+  "decision": "rewritten",
+  "reason": "SETTLEMENT_IDS made module-local; the dev hook keeps it live"
+ },
+ {
+  "id": "U6042",
+  "decision": "rewritten",
+  "reason": "geoIndex overview now says bicubic elevation, bilinear land mask and coast distance"
+ },
+ {
+  "id": "U6043",
+  "decision": "kept",
+  "reason": "CELL_LAND/CELL_LAKE are part of the deliberately kept public classification API returned by cellAt"
+ },
+ {
+  "id": "U6044",
+  "decision": "rewritten",
+  "reason": "hydro.ts range-2 reach aligned to ~0.9° (geoIndex's 0.45 × range clamp)"
+ },
+ {
+  "id": "U6045",
+  "decision": "rewritten",
+  "reason": "geodata header now says bicubic elevation and bilinear land mask/coast distance"
+ },
+ {
+  "id": "U6046",
+  "decision": "rewritten",
+  "reason": "design.md §3 German title citations in geodata.ts, hydro.ts, terrain.ts replaced by §3.3 \"Real geodata and terrain rendering\""
+ },
+ {
+  "id": "U6047",
+  "decision": "rewritten",
+  "reason": "'northeast-trimmed' replaced by game-world-trimmed (trimToGameWorld)"
+ },
+ {
+  "id": "U6048",
+  "decision": "rewritten",
+  "reason": "elevationAt doc now names the 0.5° edge-clamped margin before the deep-ocean fallback"
+ },
+ {
+  "id": "U6049",
+  "decision": "rewritten",
+  "reason": "coastDistanceAt/coastDistance docs now say 0 on ocean texels, rising across the shoreline texel"
+ },
+ {
+  "id": "U6050",
+  "decision": "rewritten",
+  "reason": "MAX_QUERY comment now says default cap (range-1 reach); wider callers pass their own"
+ },
+ {
+  "id": "U6051",
+  "decision": "rewritten",
+  "reason": "mouth-slack comment now names dramaCurrent as a second caller turning it off"
+ },
+ {
+  "id": "U6052",
+  "decision": "removed",
+  "reason": "src/world/lore.ts (DIRECTION_WORDS, GLOSSARY) had no production importer; module and its test deleted — the words live in the language templates"
+ },
+ {
+  "id": "U6053",
+  "decision": "removed",
+  "reason": "the contradictory header went with the deleted dead lore.ts module"
+ },
+ {
+  "id": "U6054",
+  "decision": "rewritten",
+  "reason": "noise.ts header now says its mulberry32 PRNG seeds per-run random choices across the whole game, not the landscape only"
+ },
+ {
+  "id": "U6055",
+  "decision": "rewritten",
+  "reason": "redSea header now also names the offshore deep stamp and the swim margin"
+ },
+ {
+  "id": "U6056",
+  "decision": "rewritten",
+  "reason": "header now says the boundary hugs the gulf's west shore through the Suez head, leaving Suez trimmed"
+ },
+ {
+  "id": "U6057",
+  "decision": "rewritten",
+  "reason": "boundarySignedDistance doc now limits the sign equivalence to points outside both bounding-box shortcuts (the boxes differ by 0.5°)"
+ },
+ {
+  "id": "U6058",
+  "decision": "backlog",
+  "reason": "src/world/redSea.ts:112 — the Mediterranean gate (lat > 30.2, lon > -6.5) also blocks Atlantic water between lon -6.5 and the Strait (e.g. off Larache/Asilah/Tangier), contradicting 'no legitimate swim water is caught'"
+ },
+ {
+  "id": "U6059",
+  "decision": "kept",
+  "reason": "Mediterranean gate constants are used by oceanSwimBlocked; the export additionally serves its tests"
+ },
+ {
+  "id": "U6060",
+  "decision": "kept",
+  "reason": "SWIM_MARGIN_DEG_DEFAULT pins the calibrated target band in redSea.test.ts independently of the debug-editable balance value; its doc says so"
+ },
+ {
+  "id": "U6061",
+  "decision": "rewritten",
+  "reason": "unused export dropped from GAME_LAND_SEEDS; StampMeta stays exported as the parameter type of the exported trimToGameWorld"
+ },
+ {
+  "id": "U6062",
+  "decision": "rewritten",
+  "reason": "trimToGameWorld doc now says sea texels keep bathymetry only on the kept near-shore shelf or below the deep floor"
+ },
+ {
+  "id": "U6063",
+  "decision": "rewritten",
+  "reason": "redSea offshore-stamp comment now says the terrain.ts stamp clamp acts in the band straddling the whole trim boundary where it is not a coast (aimed at the Gulf-of-Suez head)"
+ },
+ {
+  "id": "U6064",
+  "decision": "rewritten",
+  "reason": "riverClearance header no longer claims dependency-free; names its hydro.ts dependency"
+ },
+ {
+  "id": "U6065",
+  "decision": "rewritten",
+  "reason": "riverClearance header now names its two real consumers (landmarks, gizaPlateau) and notes geo.ts keeps its own variant"
+ },
+ {
+  "id": "U6066",
+  "decision": "backlog",
+  "reason": "src/world/riverClearance.ts:21 — clearedOfRiversBy queries range 1 (reliable to ~0.45°) with maxDist = 1 while Meroë's target is ~0.9°; world.test pins Meroë dry, but the walk can misread distances past the range-1 reach"
+ },
+ {
+  "id": "U6067",
+  "decision": "rewritten",
+  "reason": "riverMouths dependency note now includes balance"
+ },
+ {
+  "id": "U6068",
+  "decision": "rewritten",
+  "reason": "unused export dropped from isSeaMouthEnd"
+ },
+ {
+  "id": "U6069",
+  "decision": "kept",
+  "reason": "SEA_MOUTH_COAST_DEG is used by isSeaMouthEnd in production; seaMouths() is a small roster helper the escapability tests rely on"
+ },
+ {
+  "id": "U6070",
+  "decision": "kept",
+  "reason": "claim does not hold: waterSurface.ts:31 re-exports it as densifyRiver = densifyRiverAxis, as the comment says"
+ },
+ {
+  "id": "U6071",
+  "decision": "rewritten",
+  "reason": "unused export modifiers dropped from lowPass, runningMin, smoothBedProfile and chainJunctions; BedProfile and BedSample stay exported as return types of the exported bedProfiles and riverBedProfileAt"
+ },
+ {
+  "id": "U6072",
+  "decision": "kept",
+  "reason": "the raw array is documented as kept for the regression witness and costs one small array per river per seed"
+ },
+ {
+  "id": "U6073",
+  "decision": "kept",
+  "reason": "rawSampleTerrain is a documented regression-witness entry point used by two test suites"
+ },
+ {
+  "id": "U6074",
+  "decision": "rewritten",
+  "reason": "riverWidth header no longer claims dependency-free (it imports balance)"
+ },
+ {
+  "id": "U6075",
+  "decision": "rewritten",
+  "reason": "riverWidth header now says geo shifts places and names many consumers, not two"
+ },
+ {
+  "id": "U6076",
+  "decision": "rewritten",
+  "reason": "terrain overview now says the mask shoreline is rebuilt from the vector coast and the boundary distance"
+ },
+ {
+  "id": "U6077",
+  "decision": "rewritten",
+  "reason": "terrain overview now says the noise also warps biome/region borders and so picks the type near them"
+ },
+ {
+  "id": "U6078",
+  "decision": "rewritten",
+  "reason": "misplaced JSDoc on the RIVER_WIDTH_DEG import/re-export shim turned into a line comment naming the owner"
+ },
+ {
+  "id": "U6079",
+  "decision": "rewritten",
+  "reason": "MOUNTAIN_M doc no longer mentions snow; ice uses ICE_MASSIFS lines"
+ },
+ {
+  "id": "U6080",
+  "decision": "rewritten",
+  "reason": "shelf comment now names the ~-3000 m stamp plunge and the full blend back to the stamped floor"
+ },
+ {
+  "id": "U6081",
+  "decision": "rewritten",
+  "reason": "landward-band comments now say the full clamp holds across KEPT_LANDWARD_BAND (t = 0 for bsd >= 0) with no easing"
+ },
+ {
+  "id": "U6082",
+  "decision": "rewritten",
+  "reason": "STAMP_FLOOR_M comment now admits natural bathymetry that deep near the boundary is clamped too"
+ },
+ {
+  "id": "U6083",
+  "decision": "rewritten",
+  "reason": "near-miss note corrected: Elgon's 4,018 m and Ras Dashen's 4,114 m DEM maxima would clear the lower lines; the gate excludes them"
+ },
+ {
+  "id": "U6084",
+  "decision": "backlog",
+  "reason": "src/world/terrain.ts:91 — ICE_MASSIFS hand-duplicates the kilimanjaro, mount-kenya and rwenzori coordinates/radii of MOUNTAINS (landmarks.ts)"
+ },
+ {
+  "id": "U6085",
+  "decision": "kept",
+  "reason": "PALETTE.ocean is required by the Record<TerrainType, …> type; removing it needs a partial type for no gain"
+ },
+ {
+  "id": "U6086",
+  "decision": "kept",
+  "reason": "PALETTE_ALT.water is required by the Record<TerrainType, …> type; removing it needs a partial type for no gain"
+ },
+ {
+  "id": "U6087",
+  "decision": "removed",
+  "reason": "unreachable nonpositive-sum fallback removed from normalizeSplat (splat[0] >= 0.12, all weights nonnegative)"
+ },
+ {
+  "id": "U6088",
+  "decision": "rewritten",
+  "reason": "stranded sampleTerrain JSDoc moved from nearestLakeIndex onto sampleTerrain"
+ },
+ {
+  "id": "U6089",
+  "decision": "rewritten",
+  "reason": "basin-level doc now says the ring normally avoids the blend and the sentinel covers the rest"
+ },
+ {
+  "id": "U6090",
+  "decision": "rewritten",
+  "reason": "shoreline-blend comment now names the vector-rebuilt land fraction instead of bilinear"
+ },
+ {
+  "id": "U6091",
+  "decision": "backlog",
+  "reason": "src/world/terrain.ts:267 — 'no per-vertex land/ocean steps' is unmeasured against the ocean-only Math.min(-0.02, …) clamp at line 305"
+ },
+ {
+  "id": "U6092",
+  "decision": "backlog",
+  "reason": "src/world/terrain.ts:285 — the Gulf-of-Suez comment says the trim stamp alternates cell-by-cell with shallow real texels, while redSea.ts:19–28 says the head is now uniformly deep on the trimmed side; needs a DEM check to settle"
+ },
+ {
+  "id": "U6093",
+  "decision": "rewritten",
+  "reason": "stamp-clamp comment now says the gate checks only elevation and boundary distance, so natural bathymetry that deep is lifted too"
+ },
+ {
+  "id": "U6094",
+  "decision": "removed",
+  "reason": "unreachable default label removed from the region switch (regionAt returns only the five cased regions; the west body stays)"
+ },
+ {
+  "id": "U6095",
+  "decision": "rewritten",
+  "reason": "fertile-strip comment now says it changes type and colour, not visual only"
+ },
+ {
+  "id": "U6096",
+  "decision": "rewritten",
+  "reason": "lush-bank comment now says rivers only"
+ },
+ {
+  "id": "U6097",
+  "decision": "rewritten",
+  "reason": "always-true bankT > 0 test dropped (riverD capped at 0.45) with a comment saying so; mountain predicate kept"
+ },
+ {
+  "id": "U6098",
+  "decision": "rewritten",
+  "reason": "water-carving intro no longer claims a signed-distance 0-contour carve; describes the eased channel weight"
+ },
+ {
+  "id": "U6099",
+  "decision": "rewritten",
+  "reason": "lake comment now says the height blends down to the basin level and spots already below stay"
+ },
+ {
+  "id": "U6100",
+  "decision": "rewritten",
+  "reason": "redundant Math.max(carve, …) replaced by direct assignment (carve is 0 there)"
+ },
+ {
+  "id": "U6101",
+  "decision": "kept",
+  "reason": "CLAUDE.md section numbers are preserved by rule (order rule 3); the §8 gap is intentional numbering stability"
+ },
+ {
+  "id": "U6102",
+  "decision": "rewritten",
+  "reason": "trivial-task author trailer now names Claude Opus 5.5 (1M context), a model in the authoring policy"
+ },
+ {
+  "id": "U6103",
+  "decision": "rewritten",
+  "reason": "'at this effort level' replaced by 'inside a trivial point', matching the Medium-everywhere front matter"
+ },
+ {
+  "id": "U6104",
+  "decision": "rewritten",
+  "reason": "README landmark line now mentions river-cleared positions and the fictional elephant graveyard"
+ },
+ {
+  "id": "U6105",
+  "decision": "rewritten",
+  "reason": "README bullet renamed 'Saving' and now states port checkpoints, successor takeover and the suspended load overview"
+ },
+ {
+  "id": "U6106",
+  "decision": "rewritten",
+  "reason": "README review section now states both review directions (Claude reviews Astra, Astra reviews Claude via review-astra.mjs)"
+ },
+ {
+  "id": "U6107",
+  "decision": "rewritten",
+  "reason": "README structure line no longer says 'do not modify'; design changes land with the code (CLAUDE.md §4)"
+ },
+ {
+  "id": "U6108",
+  "decision": "rewritten",
+  "reason": "README open-items line now includes docs/backlog.md"
+ },
+ {
+  "id": "U6109",
+  "decision": "rewritten",
+  "reason": "README legal line now excepts the third-party data and libraries named under Data and libraries"
+ },
+ {
+  "id": "U6110",
+  "decision": "backlog",
+  "reason": "design.md:39 — the reference to §4.2 promises width-scaled village, port and landmark clearances that §4.2 does not itself specify (only a village minimum and the port exemption)"
+ },
+ {
+  "id": "U6111",
+  "decision": "backlog",
+  "reason": "design.md:62 — the universal settlement path-network requirement conflicts with the explicitly pathless village layouts at lines 63 and 168"
+ },
+ {
+  "id": "U6112",
+  "decision": "backlog",
+  "reason": "design.md:85 — the SSR-removal rationale says first-person scenes have no water or gloss, despite the wet-ground sheen specified at line 744"
+ },
+ {
+  "id": "U6113",
+  "decision": "kept",
+  "reason": "the SSR history note is a deliberate revisit marker for a removed feature"
+ },
+ {
+  "id": "U6114",
+  "decision": "rewritten",
+  "reason": "§3.2 now puts border-side region names in the bird's-eye view only and names the map's once-per-heartland lettering (as MapOverlay/RegionBorders render)"
+ },
+ {
+  "id": "U6115",
+  "decision": "backlog",
+  "reason": "design.md:106 — lines 106 and 553 cite the ten port cities to §3.1, but the list is in §4.1 (lines 122–124); line 106 also repeats the §17.2 exemption"
+ },
+ {
+  "id": "U6116",
+  "decision": "backlog",
+  "reason": "design.md:127 — the port-city character description prescribes 'street grids' while §2.6 (line 63) explicitly rejects a rectangular grid"
+ },
+ {
+  "id": "U6117",
+  "decision": "backlog",
+  "reason": "design.md:374 — §12 and the core loop (line 790) have the chief speak his tomb hint automatically on call-out, while §13.4 (lines 426–428) has him speak only through the drum errand and its answer"
+ },
+ {
+  "id": "U6118",
+  "decision": "backlog",
+  "reason": "design.md:380 — Honored Friend keeps its award narrative and consumers (lines 233, 384, 442, 547) while line 382 records that nothing bestows the status (already an OPEN item)"
+ },
+ {
+  "id": "U6119",
+  "decision": "backlog",
+  "reason": "design.md:405 — §13.2 says a deciphered entry follows the chief's raw hint, while §13.4 (line 428) says the game never supplies or judges a translation"
+ },
+ {
+  "id": "U6120",
+  "decision": "backlog",
+  "reason": "design.md:407 — the '§13.3 Cascade and Time Limit' heading advertises time-limit content the section does not contain (deadline lives in §5)"
+ },
+ {
+  "id": "U6121",
+  "decision": "rewritten",
+  "reason": "§13.4 now says loading is suspended (§18) instead of saving disabled; the code still writes port checkpoints (store.ts saveCheckpoint)"
+ },
+ {
+  "id": "U6122",
+  "decision": "backlog",
+  "reason": "design.md:466 — the first-water warning and line 468 promise crocodile immunity from a canoe, while line 443 keeps risk aboard it (machete-in-canoe strictly safer)"
+ },
+ {
+  "id": "U6123",
+  "decision": "backlog",
+  "reason": "design.md:514 — the panzootic paragraph calls 1888–1897 the game's own window, contradicting the 1890 start and 1895 ceiling (lines 182/192/816)"
+ },
+ {
+  "id": "U6124",
+  "decision": "backlog",
+  "reason": "design.md:516 — the return-visit text has the Nile flood make the Giza plateau an island, while §19.13 (line 764) says the rise is vertical only and never reaches new ground"
+ },
+ {
+  "id": "U6125",
+  "decision": "rewritten",
+  "reason": "§17 text-selection rule now also names the read-only bug-report text, which index.css keeps selectable"
+ },
+ {
+  "id": "U6126",
+  "decision": "backlog",
+  "reason": "design.md:628 — §19.2/§19.3 (lines 628, 637) keep a single lone scavenger while §19.6 (line 664) gives every carcass its own concurrent flock"
+ },
+ {
+  "id": "U6127",
+  "decision": "backlog",
+  "reason": "design.md:680 — the calf-rescue text makes an arriving parent's death unconditional, ignoring the defence roll at lines 687–688"
+ },
+ {
+  "id": "U6128",
+  "decision": "backlog",
+  "reason": "design.md:683 — the seasonal-current description keys wetness only on the local factor, without the remote-flood contribution required at line 694"
+ },
+ {
+  "id": "U6129",
+  "decision": "backlog",
+  "reason": "design.md:694 — the flood paragraph says a crest shortens the self-rescue, while line 683 says self-rescue never comes in a swollen current"
+ },
+ {
+  "id": "U6130",
+  "decision": "backlog",
+  "reason": "design.md:686 — 'NOTHING kills a lion' should distinguish the predator role from the killable defending lioness at line 698"
+ },
+ {
+  "id": "U6131",
+  "decision": "backlog",
+  "reason": "design.md:687 — successful defence is said always to end in a walk-off with no carcass, omitting the lioness's sometimes-lethal defence at line 698"
+ },
+ {
+  "id": "U6132",
+  "decision": "backlog",
+  "reason": "design.md:688 — the giraffe bullet claims only the giraffe carries a non-default defence value, while line 687 grades every species' weapon and line 698 gives the lioness the strongest"
+ },
+ {
+  "id": "U6133",
+  "decision": "backlog",
+  "reason": "design.md:694 — the remote-fed flood-model cross-reference points to §19.9 instead of the flood specification in §19.13 (lines 762–764)"
+ },
+ {
+  "id": "U6134",
+  "decision": "backlog",
+  "reason": "design.md:699 — §19.8 calls grief 'THE ONE DELIBERATE INACCURACY' while §19.13 (752), §8 (279) and §11.3 (359) name further deliberate carve-outs"
+ },
+ {
+  "id": "U6135",
+  "decision": "backlog",
+  "reason": "design.md:705 — the crocodile section frames trigger and struggle as waterline events, not incorporating the mid-channel ambush on the swimming calf at line 692"
+ },
+ {
+  "id": "U6136",
+  "decision": "backlog",
+  "reason": "design.md:713 — combat-chase movers deflect around water, while line 657 has fleeing animals enter rivers and lakes and reserves deflection for the ocean edge"
+ },
+ {
+  "id": "U6137",
+  "decision": "backlog",
+  "reason": "design.md:723 — §19.10 has water drawn at a village well and carried home, while §13.4 (line 416) has the jar filled at the river and returned to the fire-side stand"
+ },
+ {
+  "id": "U6138",
+  "decision": "backlog",
+  "reason": "design.md:723 — village activities are called 'Pure animation' although lines 412 and 426–428 make them the teaching settings and the drummer a carrier of actionable messages"
+ },
+ {
+  "id": "U6139",
+  "decision": "backlog",
+  "reason": "design.md:746 — seasonal wildlife gathering is attributed to shrinking rivers and lakes, unreconciled with the fixed-width flood model at lines 694/764"
+ },
+ {
+  "id": "U6140",
+  "decision": "backlog",
+  "reason": "design.md:754 — the seasonal-presence text still refers to 'the elder' after the teaching elder's retirement at line 405"
+ },
+ {
+  "id": "U6141",
+  "decision": "rewritten",
+  "reason": "F9 text now says the effective selectors never overwrite the internal render allow-flags (set by touch preset and F8), matching the menu that no longer exposes them"
+ },
+ {
+  "id": "U6142",
+  "decision": "backlog",
+  "reason": "design.md:815 — F8 is called unique among debug tools in shipping, while line 840 says the drama triggers also fire in the shipped build"
+ },
+ {
+  "id": "U6143",
+  "decision": "rewritten",
+  "reason": "§21.3 picker now called the only graphics-quality control, with the two diagnosis checkboxes the DebugMenu does show named as no quality levers"
+ },
+ {
+  "id": "U6144",
+  "decision": "backlog",
+  "reason": "design.md:844 — the render-backend display cites the WebGPU→WebGL 2 fallback to §1, which never mentions it; the fallback is §17.6 (line 573)"
+ },
+ {
+  "id": "U6145",
+  "decision": "backlog",
+  "reason": "design.md:3 — the opening names a companion document 'The Heart of Africa — Complete Game Mechanics' without saying where it lives"
+ },
+ {
+  "id": "U6146",
+  "decision": "backlog",
+  "reason": "design.md:7 — contents entry '§1 Technical framework' does not match the heading '1. Technical Framework Architecture'"
+ },
+ {
+  "id": "U6147",
+  "decision": "backlog",
+  "reason": "design.md:30 — walk speed 10 m/s is cited to §21, which now only points to docs/design-reference.md §21.2"
+ },
+ {
+  "id": "U6148",
+  "decision": "backlog",
+  "reason": "design.md:40 — target-state prose carries change-log wording ('no longer opens the building')"
+ },
+ {
+  "id": "U6149",
+  "decision": "backlog",
+  "reason": "design.md:124 — the same port is spelled 'St. Louis' at lines 124/127 and 'Saint-Louis' at line 553"
+ },
+ {
+  "id": "U6150",
+  "decision": "backlog",
+  "reason": "design.md:146 — §4.4 cross-references itself ('§4.4/point 82') from inside §4.4"
+ },
+ {
+  "id": "U6151",
+  "decision": "kept",
+  "reason": "the deadline flag ships false by recorded decision; the mechanism is deliberately kept"
+ },
+ {
+  "id": "U6152",
+  "decision": "backlog",
+  "reason": "design.md:252 — the village excavation vignette sits in §7 Equipment, cut off from its subject in §13.4 and repeating line 414"
+ },
+ {
+  "id": "U6153",
+  "decision": "backlog",
+  "reason": "design.md:272 — §8 calls its homage the third deliberate carve-out while §19.8 calls grief the single one and §19.13 the second; the §11.3 river widening is in no count"
+ },
+ {
+  "id": "U6154",
+  "decision": "backlog",
+  "reason": "design.md:289 — the file cites itself by name ('design.md §6') from inside design.md"
+ },
+ {
+  "id": "U6155",
+  "decision": "backlog",
+  "reason": "design.md:405 — target-state prose carries dated history about the retired village elder (05.09.2026 / 03.09.2026)"
+ },
+ {
+  "id": "U6156",
+  "decision": "backlog",
+  "reason": "design.md:408 — dated history about the dropped murmured pointer (07.09.2026) stays in the spec"
+ },
+ {
+  "id": "U6157",
+  "decision": "backlog",
+  "reason": "design.md:428 — the slice's puzzle concludes at the Bandiagara socket, while §18 (598) and §20 (796) still make recovering the tomb the victory (store.dig still wins at the grave)"
+ },
+ {
+  "id": "U6158",
+  "decision": "kept",
+  "reason": "the 'no rifle' warning is reachable after selling or losing the rifle; the text describes that state correctly"
+ },
+ {
+  "id": "U6159",
+  "decision": "backlog",
+  "reason": "design.md:553 — §17.2 describes a migration on load while loading is suspended (line 603) and §13.4 says no migration is owed"
+ },
+ {
+  "id": "U6160",
+  "decision": "kept",
+  "reason": "claim does not hold as a defect: §17.4 lists the stacking of overlays that exist in code (StartOverlay is gated, not deleted)"
+ },
+ {
+  "id": "U6161",
+  "decision": "backlog",
+  "reason": "design.md:567 — the mobile preset is called a subset of the low level yet keeps half-resolution sun shadows, which low does not cast"
+ },
+ {
+  "id": "U6162",
+  "decision": "backlog",
+  "reason": "design.md:589 — the rebindable hold key is cited to §21, which no longer mentions rebinding (moved to docs/design-reference.md)"
+ },
+ {
+  "id": "U6163",
+  "decision": "backlog",
+  "reason": "design.md:599 — §18 presents deadline expiry as a live defeat with recall, while §5.1 (line 190) switches the deadline off"
+ },
+ {
+  "id": "U6164",
+  "decision": "kept",
+  "reason": "the load code sits behind SAVE_LOAD_ENABLED = false by recorded user decision, a one-value revert"
+ },
+ {
+  "id": "U6165",
+  "decision": "backlog",
+  "reason": "design.md:607 — the example load-table row shows 2 gifts, but an expedition now starts with 10 copper gifts (line 214)"
+ },
+ {
+  "id": "U6166",
+  "decision": "backlog",
+  "reason": "design.md:613 — the giraffe is listed among strong animals that stand their ground while §19.5 (line 651) lists it as prey"
+ },
+ {
+  "id": "U6167",
+  "decision": "backlog",
+  "reason": "design.md:613 — the §19 intro names walking into a predator as the single exception, but the §19.16 crocodile (line 708) also attacks the traveller"
+ },
+ {
+  "id": "U6168",
+  "decision": "backlog",
+  "reason": "design.md:654 — §21.2 is said to refer back to this rule, but §21.2 is now only a pointer to docs/design-reference.md"
+ },
+ {
+  "id": "U6169",
+  "decision": "backlog",
+  "reason": "design.md:686 — revenge (point 146) rolls 'on the same rule' before that rescue-roll rule (point 125, line 687) is introduced"
+ },
+ {
+  "id": "U6170",
+  "decision": "backlog",
+  "reason": "design.md:693 — the straggler is called the only slow drama with nothing scripted to kill, but the mired calf (690) and elephant vigil (685) are too"
+ },
+ {
+  "id": "U6171",
+  "decision": "backlog",
+  "reason": "design.md:696 — the grass-fire parent is called a surrender of the grief family, but that family is closed at three drives (lines 699, 687)"
+ },
+ {
+  "id": "U6172",
+  "decision": "backlog",
+  "reason": "design.md:701 — §19 subsections run out of order: §19.16 and §19.17 sit between §19.8 and §19.9"
+ },
+ {
+  "id": "U6173",
+  "decision": "rewritten",
+  "reason": "campfire-shadow text now calls the tuning switch an internal allow-flag not exposed in the menu (set by the touch preset and F8)"
+ },
+ {
+  "id": "U6174",
+  "decision": "backlog",
+  "reason": "design.md:738 — a stray horizontal rule splits §19 between 19.12 and 19.13, while the rule separating §19 from §20 is missing"
+ },
+ {
+  "id": "U6175",
+  "decision": "backlog",
+  "reason": "design.md:744 — wet-season exactness is cited to §19.14, which now only points to docs/design-reference.md (line 770)"
+ },
+ {
+  "id": "U6176",
+  "decision": "backlog",
+  "reason": "design.md:750 — the per-people dress table is said to live in §19.15, which now only points to docs/design-reference.md (line 779)"
+ },
+ {
+  "id": "U6177",
+  "decision": "backlog",
+  "reason": "design.md:754 — an OPEN item waits on a day/night cycle that lines 77 and 736 rule out"
+ },
+ {
+  "id": "U6178",
+  "decision": "backlog",
+  "reason": "design.md:760 — the Harmattan describes a noon sun and muted sunsets, but the clock is pinned at 16:00 (line 77)"
+ },
+ {
+  "id": "U6179",
+  "decision": "backlog",
+  "reason": "design.md:773 — the standing rule says the research documents point 'here', but the record has moved to docs/design-reference.md"
+ },
+ {
+  "id": "U6180",
+  "decision": "backlog",
+  "reason": "design.md:787 — core-loop step 1 has the traveller buy gear the expedition already starts with (line 214); its port autosave matches the code"
+ },
+ {
+  "id": "U6181",
+  "decision": "backlog",
+  "reason": "design.md:804 — the '~130 controls' debug-menu count is unverified against the current menu"
+ },
+ {
+  "id": "U6182",
+  "decision": "backlog",
+  "reason": "design.md:813 — time-relative wording 'today's default on high' has no referent now that defaults are per level"
+ },
+ {
+  "id": "U6183",
+  "decision": "backlog",
+  "reason": "design.md:817 — the month-jump rationale guards against ending the expedition, which cannot happen while the deadline is switched off (line 190)"
+ },
+ {
+  "id": "U6184",
+  "decision": "backlog",
+  "reason": "design.md:840 — the debug trigger stages elephants mourning a dead herd-mate, a scene the game cannot otherwise produce since elephants have no death path (line 685)"
+ },
+ {
+  "id": "U6185",
+  "decision": "rewritten",
+  "reason": "the 72 % figure now describes time with no water delivered (the blocked errand still occupies the slot), not time without an errand"
+ },
+ {
+  "id": "U6186",
+  "decision": "rewritten",
+  "reason": "the pending rate measurement is now described as filed in docs/backlog.md, not as recorded"
+ },
+ {
+  "id": "U6187",
+  "decision": "rewritten",
+  "reason": "the introduction now says the game built the Sphinx fully exposed, since resolved (A1)"
+ },
+ {
+  "id": "U6188",
+  "decision": "kept",
+  "reason": "the doc's convention (lines 7–9) keeps each finding's original 'What the game does' text beside its RESOLVED note"
+ },
+ {
+  "id": "U6189",
+  "decision": "kept",
+  "reason": "the point-273 ownership note is part of the original A1 finding text, which the doc's convention (lines 7–9) keeps as written"
+ },
+ {
+  "id": "U6190",
+  "decision": "kept",
+  "reason": "A2 keeps its superseded description as the intentional historical baseline (lines 7–9)"
+ },
+ {
+  "id": "U6191",
+  "decision": "rewritten",
+  "reason": "Meroë ratio at line 95 corrected to 2.6–3.2 × half-base, the only reading that yields ~69° (as line 688)"
+ },
+ {
+  "id": "U6192",
+  "decision": "kept",
+  "reason": "A3 keeps its superseded description as the intentional historical baseline (lines 7–9)"
+ },
+ {
+  "id": "U6193",
+  "decision": "kept",
+  "reason": "A4 keeps its superseded description as the intentional historical baseline (lines 7–9)"
+ },
+ {
+  "id": "U6194",
+  "decision": "kept",
+  "reason": "A5 keeps its superseded description as the intentional historical baseline (lines 7–9)"
+ },
+ {
+  "id": "U6195",
+  "decision": "kept",
+  "reason": "A6 keeps its superseded description as the intentional historical baseline (lines 7–9)"
+ },
+ {
+  "id": "U6196",
+  "decision": "rewritten",
+  "reason": "Khafre's cap now called the only surviving LIMESTONE casing, consistent with Menkaure's granite casing on the next line"
+ },
+ {
+  "id": "U6197",
+  "decision": "kept",
+  "reason": "the Berbera proposal is original finding text kept as written by the doc's convention (lines 7–9)"
+ },
+ {
+  "id": "U6198",
+  "decision": "kept",
+  "reason": "the §B check is original finding text; A5's resolution is recorded in its own RESOLVED note (lines 272–282) by the doc's convention"
+ },
+ {
+  "id": "U6199",
+  "decision": "kept",
+  "reason": "the closing shortlist is the original recommendation; each listed finding carries its own RESOLVED note by the doc's convention (lines 7–9)"
+ },
+ {
+  "id": "U6200",
+  "decision": "kept",
+  "reason": "claim does not hold: the code saves a checkpoint on entering a port (store.ts:1626 saveCheckpoint); the contradicting 'saving is disabled' at line 111 is corrected under U6206"
+ },
+ {
+  "id": "U6201",
+  "decision": "backlog",
+  "reason": "docs/acceptance-criteria-detail.md:136 — goal scaffolding still prescribes the shovel-dug tomb victory and the §13.3 cascade without reconciling them with the slice ending at Bandiagara's clay-impression socket (lines 95–112)"
+ },
+ {
+  "id": "U6202",
+  "decision": "kept",
+  "reason": "claim does not hold: DebugMenu.tsx registers both '#graveyard' (line 376/390) and the tomb placeholder resolved at pick time (line 362) in the jump-to roster"
+ },
+ {
+  "id": "U6203",
+  "decision": "rewritten",
+  "reason": "F8 is now 'a debug tool that ships like the F6 report' — Hud.tsx binds F6 without a dev gate, so both ship"
+ },
+ {
+  "id": "U6204",
+  "decision": "kept",
+  "reason": "the retained Honored Friend consumers are disclosed as NOT MET at lines 502–504 and deliberately wait for a producer"
+ },
+ {
+  "id": "U6205",
+  "decision": "kept",
+  "reason": "the village-cache gate on Honored Friend is part of the disclosed NOT MET standing (§26); the consumers deliberately wait for a producer"
+ },
+ {
+  "id": "U6206",
+  "decision": "rewritten",
+  "reason": "line 111 now says loading is suspended (pt. 28) instead of saving disabled, matching §28 and the code"
+ },
+ {
+  "id": "U6207",
+  "decision": "rewritten",
+  "reason": "§32 lead now says the three steps were planned, each to be confirmed, instead of all rebuilt and confirmed"
+ },
+ {
+  "id": "U6208",
+  "decision": "rewritten",
+  "reason": "§32 now names TRAA's internal allow-flag instead of a debug checkbox (the menu exposes only the level, pt. 20)"
+ },
+ {
+  "id": "U6209",
+  "decision": "kept",
+  "reason": "claim does not hold: WORK_ARRIVE_RADIUS is still 1.1 in src/scenes/place/adultWork.ts:173, so the 2.2 m spacing rule derives from the live constant; only task arrival uses the 0.3 m tolerance"
+ },
+ {
+  "id": "U6210",
+  "decision": "rewritten",
+  "reason": "the 57.5 s round trip is now attributed to the baseline replay of a later pair instead of presented as the general duration"
+ },
+ {
+  "id": "U6211",
+  "decision": "rewritten",
+  "reason": "the 72 % figure is now marked as resting on an ASSUMED one-in-three rate ('would see')"
+ },
+ {
+  "id": "U6212",
+  "decision": "backlog",
+  "reason": "docs/1131-water-errand.md:62 — hand-off note leaves browser rendering and full scene verification to 'the reviewing session' without recording whether it happened"
+ },
+ {
+  "id": "U6213",
+  "decision": "kept",
+  "reason": "the pointer to the replay harness of 72dc3907c and the backlog item is a correct provenance note; the measurement stays pending"
+ },
+ {
+  "id": "U6214",
+  "decision": "kept",
+  "reason": "the input archives live in the ignored local/ directory by project convention (bug reports land in local/); the citation is provenance, not a link"
+ },
+ {
+  "id": "U6215",
+  "decision": "kept",
+  "reason": "the A6 effort note is original finding text kept as written by the doc's convention (lines 7–9)"
+ },
+ {
+  "id": "U6216",
+  "decision": "backlog",
+  "reason": "docs/205-world-accuracy-findings.md:220 — A4 (Aksum) and A6 (Giza, line 310) both claim 'RESOLVED (point 279e)'; one sub-point label may be wrong"
+ },
+ {
+  "id": "U6217",
+  "decision": "kept",
+  "reason": "the §4.5 plan-table update did land: design.md §4.5 no longer lists Bemba under `ring` (ring: Zulu, Pedi, Maasai, Somali)"
+ },
+ {
+  "id": "U6218",
+  "decision": "backlog",
+  "reason": "docs/205-world-accuracy-findings.md:483 — line ranges for the still-unresolved src/render/landmarks.ts builders (buildCoastalRuins, buildStoneCity, buildCliffDwellings; also lines 627, 653) predate the 279a–e rewrites and need re-locating"
+ },
+ {
+  "id": "U6219",
+  "decision": "kept",
+  "reason": "the file:line anchors are original finding text describing the code at finding time, kept as written by the doc's convention (lines 7–9)"
+ },
+ {
+  "id": "U6220",
+  "decision": "backlog",
+  "reason": "docs/205-world-accuracy-findings.md:796 — the §13.2 direction/glossary words are called separately provisional under design.md §13.4, while the slice fixes a six-word set and the lore module holding those words is gone"
+ },
+ {
+  "id": "U6221",
+  "decision": "kept",
+  "reason": "claim does not hold for this file: design.md §19.13 is the climate section (design.md:752 'the §19.13 exaggeration'); the divergent citation lives in acceptance-criteria-detail.md"
+ },
+ {
+  "id": "U6222",
+  "decision": "kept",
+  "reason": "claim does not hold: both docs/communication-1890.md and docs/communication-poc-spec.md exist, as research and slice spec respectively"
+ },
+ {
+  "id": "U6223",
+  "decision": "kept",
+  "reason": "the cross-reference is original A2 text; truncation's resolution is recorded at line 126 by the doc's convention"
+ },
+ {
+  "id": "U6224",
+  "decision": "rewritten",
+  "reason": "the fauna roster no longer lists the plover twice"
+ },
+ {
+  "id": "U6225",
+  "decision": "backlog",
+  "reason": "docs/acceptance-criteria-detail.md:160 — the tree-climbing-to-flee open item cites '§9', which is not the wildlife-flight section in either this file or design.md"
+ },
+ {
+  "id": "U6226",
+  "decision": "kept",
+  "reason": "§26 states the status and its consumers, and its own NOT MET paragraph discloses that nothing grants it — an accurate disclosure"
+ },
+ {
+  "id": "U6227",
+  "decision": "kept",
+  "reason": "the startup load prompt is gated by the recorded, temporary SAVE_LOAD_ENABLED = false (one-value revert)"
+ },
+ {
+  "id": "U6228",
+  "decision": "kept",
+  "reason": "the deadline mechanism is deliberately switched off in balance and protected from deletion by recorded decision"
+ },
+ {
+  "id": "U6229",
+  "decision": "rewritten",
+  "reason": "§2 now states the current rule ('does not enter', 'there is no accidental-entry debounce') instead of removal history"
+ },
+ {
+  "id": "U6230",
+  "decision": "kept",
+  "reason": "claim does not hold: 'pt. 29' is the criterion number of animated handwriting, a correct cross-reference, not a future point"
+ },
+ {
+  "id": "U6231",
+  "decision": "rewritten",
+  "reason": "§11 now states the requirement (smooth continent and river geometry without visible steps) instead of narrating the former look"
+ },
+ {
+  "id": "U6232",
+  "decision": "rewritten",
+  "reason": "the aside now names F7 as Chrome's Caret-Browsing key left to the browser, instead of 'the lower F-key'"
+ },
+ {
+  "id": "U6233",
+  "decision": "rewritten",
+  "reason": "§9 now says holding the §17.8 hold key instead of fixing it to Ctrl (it is rebindable)"
+ },
+ {
+  "id": "U6234",
+  "decision": "kept",
+  "reason": "Giza belongs in the landmark roster; lines 485–486 only exempt it from the bounty, which is compatible"
+ },
+ {
+  "id": "U6235",
+  "decision": "kept",
+  "reason": "claim does not hold: docs/acceptance-evidence.md exists and holds the evidence chains"
+ },
+ {
+  "id": "U6236",
+  "decision": "rewritten",
+  "reason": "the audit allowance line now names both live ALLOW entries of scripts/audit-check.mjs (GHSA-f88m-g3jw-g9cj and GHSA-82fw-gwwq-j7x9)"
+ },
+ {
+  "id": "U6237",
+  "decision": "kept",
+  "reason": "the debug-menu counts are pinned by src/ui/DebugMenu.test.tsx, which the text cites"
+ },
+ {
+  "id": "U6238",
+  "decision": "kept",
+  "reason": "the waterfall sweep is one of the traveller-hazard event kinds of design.md §14 that pt. 23 covers by reference"
+ },
+ {
+  "id": "U6239",
+  "decision": "backlog",
+  "reason": "docs/acceptance-criteria-detail.md:108 — the puzzle ends at a talus-foot socket at Bandiagara while open A18 (205-world-accuracy-findings.md lines 661, 670) says the render shows nothing at the talus foot"
+ },
+ {
+  "id": "U6240",
+  "decision": "rewritten",
+  "reason": "preamble now says the wording was moved verbatim and the sections have grown since"
+ },
+ {
+  "id": "U6241",
+  "decision": "kept",
+  "reason": "claim does not hold: gifts remain the village trade currency (design.md §10, line 289); only the goodwill/standing ladder retired"
+ },
+ {
+  "id": "U6242",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:184 — the elder-retirement notice sits in the §13 hint layer while the adjacent hint tests still claim recorded and deciphered hints in every region; the deciphering path after the retirement needs checking"
+ },
+ {
+  "id": "U6243",
+  "decision": "rewritten",
+  "reason": "speech now described at its own level (balance.communication.speechVolume) under the master volume, matching ambience.ts's speechBus"
+ },
+ {
+  "id": "U6244",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:318 — the drummer's CHIEF word is claimed 'in any village' while drums, drummer and outdoor chief are described as Bambara's alone; the chiefMeeting test scope needs checking"
+ },
+ {
+  "id": "U6245",
+  "decision": "kept",
+  "reason": "claim does not hold: src/systems/rinderpest.test.ts imports situationChanged from placeSituation.ts, so the pairing is a real test reference"
+ },
+ {
+  "id": "U6246",
+  "decision": "rewritten",
+  "reason": "inventory-digit evidence now cites the actual polish.mjs frame `149-artefact-in-the-bar` instead of the ambiguous number"
+ },
+ {
+  "id": "U6247",
+  "decision": "kept",
+  "reason": "the friend-village camp branch's missing producer is the disclosed NOT MET standing of §26 (line 1868); the consumer deliberately waits"
+ },
+ {
+  "id": "U6248",
+  "decision": "rewritten",
+  "reason": "hold-layer chain now mounts on 'hold-key down (Ctrl by default)' instead of fixing it to Ctrl"
+ },
+ {
+  "id": "U6249",
+  "decision": "kept",
+  "reason": "polish.mjs does use frame number 148 for both shots, and the doc cites each by its distinct filename, so the references resolve"
+ },
+ {
+  "id": "U6250",
+  "decision": "rewritten",
+  "reason": "now says no ATTACKING predator is concealed, consistent with the concealed submerged crocodile in the same sentence"
+ },
+ {
+  "id": "U6251",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:522 — the goal-scaffolding chain calls flow.mjs's hint loop 'inherited' and runs it through the chief and the East leg although the elder behind the direction system has retired"
+ },
+ {
+  "id": "U6252",
+  "decision": "rewritten",
+  "reason": "time-relative 'today's sacrifice' replaced by 'the sacrifice'"
+ },
+ {
+  "id": "U6253",
+  "decision": "rewritten",
+  "reason": "channel prohibition now excepts the animals' documented water roles"
+ },
+ {
+  "id": "U6254",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:927 — seasonal population evidence says children and elder remain although the teaching elder retired (lines 185, 478–479); whether an elder figure still stands needs checking"
+ },
+ {
+  "id": "U6255",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1013 — the replaced crocodile metric is narrated twice in one paragraph with different figures (37.5–45.7 vs 44.2 and 44.6)"
+ },
+ {
+  "id": "U6256",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1034 — the tree-climbing-to-flee open item cites '§9 open item', but §9 of this document is the status bar"
+ },
+ {
+  "id": "U6257",
+  "decision": "removed",
+  "reason": "closed 'additional new species/birds' parenthesis removed from the evidence chain"
+ },
+ {
+  "id": "U6258",
+  "decision": "rewritten",
+  "reason": "geodata-preprocessing evidence now names scripts/build-geodata.mjs"
+ },
+ {
+  "id": "U6259",
+  "decision": "kept",
+  "reason": "'pt. 32' is criterion 32, whose condition text (acceptance-criteria-detail.md §32) names true water refraction OPEN and SSR removed"
+ },
+ {
+  "id": "U6260",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1061 — prose startup figures (21 s blocked, 12.4 s unpainted, 8.5→1.8 s gap) disagree with the before/after table (17 532/2 682 ms, 6 747/1 354 ms)"
+ },
+ {
+  "id": "U6261",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1100 — the selftest's attributed block of 0.3–0.5 s on both backends is not reconciled with the 21 s WebGL 2 and 542 ms WebGPU blocks reported in the same section"
+ },
+ {
+  "id": "U6262",
+  "decision": "kept",
+  "reason": "the two 142 frames belong to different suites (startup.mjs and enrichments.mjs) with distinct filenames, which the doc cites"
+ },
+ {
+  "id": "U6263",
+  "decision": "kept",
+  "reason": "claim does not hold: the THREE are the two gates plus the kind rule, which line 1190 names together ('Both gates and the kind rule')"
+ },
+ {
+  "id": "U6264",
+  "decision": "kept",
+  "reason": "both citations are the same `141-giza-horizon-*` frames taken at the Giza site, where the floating-strip check runs"
+ },
+ {
+  "id": "U6265",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1271 — campfire-shadow evidence (lines 1271, 1280–1281) still describes a debug allow-flag with a tested debug-menu toggle, while §30 says the allow-flags are no longer menu checkboxes"
+ },
+ {
+  "id": "U6266",
+  "decision": "rewritten",
+  "reason": "gesture paragraph now says four body-language gestures, the teaching TOUCH being a fifth kind"
+ },
+ {
+  "id": "U6267",
+  "decision": "rewritten",
+  "reason": "'when it arrives' dropped; the speaking layer (§7) is present"
+ },
+ {
+  "id": "U6268",
+  "decision": "rewritten",
+  "reason": "tag heading now says everywhere but in a riverside village (ports on the Nile play classic tag)"
+ },
+ {
+  "id": "U6269",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1374 — tag value count (27) and case count (118) may predate later additions such as tag.silenceSeconds and the single cry"
+ },
+ {
+  "id": "U6270",
+  "decision": "rewritten",
+  "reason": "'CLASSIC TAG IS SILENT' now 'CARRIES NO WORDS … (only a wordless catch cry)'"
+ },
+ {
+  "id": "U6271",
+  "decision": "removed",
+  "reason": "orphaned clause about the deleted situation catalogues' alarms removed"
+ },
+ {
+  "id": "U6272",
+  "decision": "rewritten",
+  "reason": "'The separation rule' now named (adult stations kept from the children's play ground); the old-anchor-radius phrase in the tag test description left as the test's own wording"
+ },
+ {
+  "id": "U6273",
+  "decision": "removed",
+  "reason": "design-editing process note removed from the acceptance chain"
+ },
+ {
+  "id": "U6274",
+  "decision": "rewritten",
+  "reason": "audit paragraph now names both live ALLOW entries instead of 'the single current entry'"
+ },
+ {
+  "id": "U6275",
+  "decision": "rewritten",
+  "reason": "keyboard-guard evidence now calls it the digit row (plain digits the inventory, Shift the calendar)"
+ },
+ {
+  "id": "U6276",
+  "decision": "kept",
+  "reason": "the two bullets tell which suites §20 also relies on; they are pointers, not duplicated evidence"
+ },
+ {
+  "id": "U6277",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1699 — debug-menu counts (165 controls, eleven groups) may be stale after later rows; DebugMenu.test.tsx's completeness pin is the authority"
+ },
+ {
+  "id": "U6278",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1724 — a 'dormant debug drum mix' is still measured after the ambient drum bed shipped silent; whether anything still sets that mix needs checking"
+ },
+ {
+  "id": "U6279",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1858 — 'all eight landmarks … reveal their label on sighting' omits Giza's known-from-start map-point label exception (lines 1215–1222)"
+ },
+ {
+  "id": "U6280",
+  "decision": "kept",
+  "reason": "the standing tests set the status directly because the standing's producer is the disclosed NOT MET item of §26; the consumers are deliberately kept covered"
+ },
+ {
+  "id": "U6281",
+  "decision": "kept",
+  "reason": "the standing-acquisition criterion is accurately disclosed as NOT MET"
+ },
+ {
+  "id": "U6282",
+  "decision": "kept",
+  "reason": "the friend gate on village caches is part of the disclosed NOT MET standing; the consumer deliberately waits for a producer"
+ },
+ {
+  "id": "U6283",
+  "decision": "removed",
+  "reason": "duplicate allow-flag note removed from the DebugMenu test sentence (stated at line 1919)"
+ },
+ {
+  "id": "U6284",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1938 — touch suite 'calls the chief out of his hut', but only Bambara's chief walks out (line 328); which village touch.mjs uses needs checking"
+ },
+ {
+  "id": "U6285",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1944 — orientation-marker evidence is tied to 'the chief comes out', which happens only in Bambara"
+ },
+ {
+  "id": "U6286",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:1989 — the seam section still gives Giza's disc as 74 m and the 48-gon chord as 9.7 m (lines 1989, 2009, 2010), while point 390 widened the Giza disc to 98 m (line 1249)"
+ },
+ {
+  "id": "U6287",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:2004 — the backdrop-clamp sweep range (disc radii 28–96) stops below the current 98 m Giza disc radius"
+ },
+ {
+  "id": "U6288",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:2009 — present-tense seam summary describes a fixed GROUND_DISC_SEGS count instead of the later radius-dependent tessellation (lines 1252–1259)"
+ },
+ {
+  "id": "U6289",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:2013 — the rendered-frame sweep 'from the centre' of the Giza disc conflicts with the warning that a camera at (0,0) is inside Khafre (lines 1264–1265)"
+ },
+ {
+  "id": "U6290",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:2022 — the fragment continuing §31's point-181 list was separated by the 412/381 paragraphs and its 'the same file' now points at the wrong test file"
+ },
+ {
+  "id": "U6291",
+  "decision": "backlog",
+  "reason": "docs/acceptance-evidence.md:2031 — settings.mjs is said to toggle TRAA at runtime although the TRAA checkbox left the debug menu (line 2052)"
+ },
+ {
+  "id": "U6292",
+  "decision": "rewritten",
+  "reason": "effective-selector cross-reference now cites point 276 only (§20 does not mention them)"
+ },
+ {
+  "id": "U6293",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:4 — axis A's wall-clock starts 'vom Brief' in the introduction but at the first branch commit in the measurements and handoff prompt (lines 228, 1131)"
+ },
+ {
+  "id": "U6294",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:53 — the folding description ('je Zähler unabhängig auf das Maximum') omits the documented exception at lines 475–480 that sums the iterations block for the fallback response"
+ },
+ {
+  "id": "U6295",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:111 — the corrected median brief cost per point is 105 k at line 111 but 103 k at line 1063, without distinguishing snapshots"
+ },
+ {
+  "id": "U6296",
+  "decision": "rewritten",
+  "reason": "window/transcript-retention cross-reference corrected from §1.8 to §1.9"
+ },
+ {
+  "id": "U6297",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:157 — the `unattributed` definition says such responses stay open, while lines 450–452 say they inherit the nearest evidence turn's phase"
+ },
+ {
+  "id": "U6298",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:178 — §1.2 calls the weighting the exact price relation ('die Rechnung', also line 555) while lines 174–175 and §2f (555–558) give no bill and an up-to-+10 % error bar"
+ },
+ {
+  "id": "U6299",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:183 — responses without tool calls are equated with all prose although lines 37–39 allow text and tool_use in one response; the claimed prose ceiling lacks a block-level breakdown"
+ },
+ {
+  "id": "U6300",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:373 — 238 × 64 responses × 1 k × 0,1 yields 1,52 M, not the stated 1,2 M permanent-context figure"
+ },
+ {
+  "id": "U6301",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:374 — 238 is a median (line 355) yet 238 × 64 is presented as the measured total of point-assigned responses"
+ },
+ {
+  "id": "U6302",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:380 — the tool taxonomy states 33.567 calls but its thirteen listed counts sum to 33.566"
+ },
+ {
+  "id": "U6303",
+  "decision": "rewritten",
+  "reason": "'halbiert' replaced by the actual shrink of the uncovered share (77,2 → 56,2 %)"
+ },
+ {
+  "id": "U6304",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:467 — cache counters are said to repeat identically, contradicted at line 472 ('cache_read_input_tokens variiert in einer Antwort')"
+ },
+ {
+  "id": "U6305",
+  "decision": "kept",
+  "reason": "the 30-response drift bound is a stated snapshot tolerance; the larger population differences come from different recuts, recorded as such"
+ },
+ {
+  "id": "U6306",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:586 — the §3.1 table's axis-A sign convention is inconsistent (row 1 'neutral bis +' vs lines 641–642; '+' for sooner in rows 1/5, '−' in row 8, '+' for a later merge at line 606)"
+ },
+ {
+  "id": "U6307",
+  "decision": "rewritten",
+  "reason": "measure 1 now quotes the corrected §1.8 poll-chain figures (13 chains ≥ 10, 4,9 %)"
+ },
+ {
+  "id": "U6308",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:662 — measure 2 still promises '−5 bis −6 % auf beiden Achsen' and differs from the table (line 587 '−4 bis −7 %') though lines 617–625 correct it to machine time; repeated at lines 1166–1168"
+ },
+ {
+  "id": "U6309",
+  "decision": "rewritten",
+  "reason": "measure 6 now quotes the recut bookkeeping count of the table (4.951 = 12,6 %)"
+ },
+ {
+  "id": "U6310",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:728 — measure 6's '10–15 M ≈ 1,3–1,9 %' implies an older ~770 M denominator; against 884,8 M it is ≈ 1,1–1,7 % (also table row 6, line 591)"
+ },
+ {
+  "id": "U6311",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:742 — the tail-cap illustration uses an obsolete 619 M point-assigned base; against ~650 M a p90 cap gives ~538 M (≈ −17,4 %)"
+ },
+ {
+  "id": "U6312",
+  "decision": "rewritten",
+  "reason": "measure 9 now restates Regel 2 as 3,27 M je Fenster (0,37 %), matching lines 367 and 1168"
+ },
+ {
+  "id": "U6313",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:793 — the 85 % follow-up-query break-even rate has no reproducible derivation from 218 k saved and 22,9 k per follow-up (repeated at line 1379)"
+ },
+ {
+  "id": "U6314",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:840 — the worktree-bootstrap estimate labels summed agent durations (1–3 min × ~64 points) as 1–3 h calendar time, against the two-clock distinction of lines 617–625"
+ },
+ {
+  "id": "U6315",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:865 — measure 15's '50:1' does not follow from Regel 2 (0,5 k × 0,1 × 238 = 11,9 k vs 5 × 22,9 k = 114,5 k ≈ 10:1)"
+ },
+ {
+  "id": "U6316",
+  "decision": "rewritten",
+  "reason": "measure 18 main-session bookkeeping share corrected to 62,3 % as at lines 263, 1159 and 1328"
+ },
+ {
+  "id": "U6317",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:925 — measure 20's '~4 min je Punkt ≈ −3 % der Maschinenzeit' does not follow (≈ 5 % of the 1,39 h median point, ≈ 2 % of 218,2 h over 64 points); repeated at line 605"
+ },
+ {
+  "id": "U6318",
+  "decision": "rewritten",
+  "reason": "measure 21 now uses the corrected p25 of 3,05 M from the §1.7 table"
+ },
+ {
+  "id": "U6319",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:958 — the calendar-tail recommendation asserts 'ist Warten, nicht Arbeit' right after lines 952–955 admit the decomposition is unavailable"
+ },
+ {
+  "id": "U6320",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:975 — the capture-noise rationale gives '10,9–98,6 %' (also line 1201) while line 1055 says the quietest capture moves 27,8 %, without naming different samples"
+ },
+ {
+  "id": "U6321",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1018 — measure 30 sizes the main session's frames at 10–20 k tokens, an order below §2e's frame-inspection cost (150.289 / 294.096 tokens, lines 542–544)"
+ },
+ {
+  "id": "U6322",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1019 — measure 30 prices the 42-min/30-s poll loop at ~1,85 M versus measure 1's ~84 × 22,9 k = 1,93 M (lines 634–635)"
+ },
+ {
+  "id": "U6323",
+  "decision": "rewritten",
+  "reason": "the brief-rejection row now uses the corrected ~5,0 M socket"
+ },
+ {
+  "id": "U6324",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1063 — 'Median 103 k je Punkt = 1,4 % eines Punktes' equates an absolute median with the median share (103 k / 5,82 M ≈ 1,77 %; lines 337–339 define 1,4 % differently)"
+ },
+ {
+  "id": "U6325",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1065 — the visible-prose estimate (≈ 0,23 %) does not reconcile with the 0,43 points assigned to prose at line 1064"
+ },
+ {
+  "id": "U6326",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1071 — the rejected summarizer calls the session cut 'verlustfrei' despite lines 698–702 and 1426–1428 warning it loses unwritten learning"
+ },
+ {
+  "id": "U6327",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1074 — the caching conclusion leaves only prefix stability open, dropping measure 16's separately unresolved TTL question (line 558)"
+ },
+ {
+  "id": "U6328",
+  "decision": "kept",
+  "reason": "the pool-cap dispute is explicitly left unresolved and deferred to measurement 23 (lines 1082–1085), which is its correct status"
+ },
+ {
+  "id": "U6329",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1136 — 'Ein breiterer Fan-out kauft Zeit mit Tokens' (also lines 6–7) is not scoped against line 1066 ('pro fertigem Punkt bleibt es gleich')"
+ },
+ {
+  "id": "U6330",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1161 — the handoff presents the branch-assigned 5,82 M median as the unqualified per-point cost, omitting §1.6's 3,65 M amortized unassigned cost per merge"
+ },
+ {
+  "id": "U6331",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1163 — the handoff drops the point-assigned denominators of the 48,8 % and 64,4 % tail statistics (lines 315–318; same at 737–738)"
+ },
+ {
+  "id": "U6332",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1324 — stopping at the first failed landing step is said to prevent partial state, but merge → gate → tick → archive → publish → cleanup leaves earlier mutations on a post-merge gate failure"
+ },
+ {
+  "id": "U6333",
+  "decision": "rewritten",
+  "reason": "§6 item 8's search/read share corrected to 25,1 %"
+ },
+ {
+  "id": "U6334",
+  "decision": "rewritten",
+  "reason": "closing snapshot timestamp corrected to 11:55 UTC as at lines 141 and 484–486"
+ },
+ {
+  "id": "U6335",
+  "decision": "rewritten",
+  "reason": "measure 14 now quotes 4.036 repeated-command responses as §1.8"
+ },
+ {
+  "id": "U6336",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:872 — measure 16's weighted cache-write figure (140 M) does not match §1.2 (115,0 M × 1,25 = 143,8 M; 16,2 % × 884,8 M = 143,3 M)"
+ },
+ {
+  "id": "U6337",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:611 — 'Agent sieht seinen eigenen Verbrauch' is still ranked as measure 26 in §3.1/§3.2 while the §4 addendum (lines 1093–1096) rejects it"
+ },
+ {
+  "id": "U6338",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1065 — the 'Reasoning-Effort senken' row cites Retrospektive §3.33, the degraded-Haiku incident the addendum (lines 1098–1102) forbids citing for this rejection"
+ },
+ {
+  "id": "U6339",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1249 — the handover prompt lists 'Reasoning-Effort senken' as rejected for being too small, while §4 line 1065 says the arithmetic no longer carries that (≈ 2,8 %)"
+ },
+ {
+  "id": "U6340",
+  "decision": "rewritten",
+  "reason": "the intro no longer claims the raw halves survive in git history (no file of that name was ever committed); their IDs are declared provenance marks only"
+ },
+ {
+  "id": "U6341",
+  "decision": "rewritten",
+  "reason": "§2f's pointer to 'Quellen in §5 der jeweiligen Rohfassung' now says the sources stood in the unpreserved raw halves"
+ },
+ {
+  "id": "U6342",
+  "decision": "rewritten",
+  "reason": "raw-half IDs (A-V12, B-R10, B-R15) are now declared unresolvable provenance marks in the introduction"
+ },
+ {
+  "id": "U6343",
+  "decision": "rewritten",
+  "reason": "raw-half IDs cited in review-decision paragraphs (A-F2, B-V8) are covered by the introduction's provenance-mark note"
+ },
+ {
+  "id": "U6344",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:622 — §3.1 treats calendar decomposition as existing point 599 b while §6 item 9 (lines 1394–1403) proposes it as new without mentioning 599"
+ },
+ {
+  "id": "U6345",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:687 — measure 4 and table row 4 call the in-point window boundary new and '[nur A]', ignoring the review finding (lines 1419–1425) that point 553 already delivers it"
+ },
+ {
+  "id": "U6346",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:836 — measure 13 (worktree bootstrap) does not carry the overlap with point 569 recorded at lines 1339–1343"
+ },
+ {
+  "id": "U6347",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:974 — measure 25 (deterministic capture) does not carry the overlap with open point 521 recorded at lines 1439–1443"
+ },
+ {
+  "id": "U6348",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1407 — 'Measures 10' points to the wrong measure; the calendar decomposition gates the axis-A claims (lines 622–625) and the pool cap (1083–1084)"
+ },
+ {
+  "id": "U6349",
+  "decision": "kept",
+  "reason": "§6's order is the recommended execution order, deliberately distinct from the §3.1 effect ranking"
+ },
+ {
+  "id": "U6350",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:712 — point 342's verification spend is 91,1 M here while the §1.7 table (102,6 M × 89,0 %, line 324) implies 91,3 M"
+ },
+ {
+  "id": "U6351",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/durchsatz-analyse.md:1255 — the prompt lists 'ein Workflow-Resume' as probed and unavailable, but §3.3 (lines 1033–1043) lists only budget, remote and defer_loading"
+ },
+ {
+  "id": "U6352",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:65 — lesson 3.8 treats the same failure set twice as a reliable signal without the load qualification 3.48 (line 105) requires (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6353",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:142 — row 3.67 says the review guard ignores verdict polarity, while 3.19 (line 76) says a do-not-merge verdict already blocks (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6354",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:142 — row 3.67 claims the commit-per-step line lives in the generated brief, while lines 96, 171 and 192 say the brief carries no such line (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6355",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:103 — row 3.46 still books the executed-test-file count as unbuilt (order 404) although row 3.76 (line 127) reports it built (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6356",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:106 — row 3.49 opens with a LÜCKE marker ledgerGaps counts, then says order 429 closed the gap with worktree-cleanup.mjs (ledger gate state changes on edit: owner edit)"
+ },
+ {
+  "id": "U6357",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:110 — row 3.53 is coded outcome 3 (no mechanism) but reports an enforced QUEUE_STUB_META import with regression tests (ledger gate state changes on edit: owner edit)"
+ },
+ {
+  "id": "U6358",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:125 — row 3.74 books board-first-guard as a NEW enforcer while row 3.32 (line 89) already names it (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6359",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:138 — guard-health is said to answer 'correctly and completely' while line 139 says the executable-permission check is missing (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6360",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:140 — row 3.78 says no enforcer reads the ANSWER, while lines 138 and 172 say timestamp-guard does (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6361",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:179 — row 3.99 presents point-proof-guard as a biting enforcer while row 3.102 (line 184) says it is not wired until armed (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6362",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:196 — render-verify-core is called the only place binding evidence to relevant changes, conflicting with the current-HEAD point-proof requirement at line 179 (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6363",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:93 — worktree isolation is described as refusing writes outside the delegated tree, which does not cover the Astra authoring environment (astra-routing.md: 'hygiene, not containment') (owner edit)"
+ },
+ {
+  "id": "U6364",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:18 — outcome 1 is defined as a completed extension but applied to prospective ones (3.63, 3.70, 3.75, 3.77, 3.85, 3.94, 3.99, 3.103–3.110, 3.179, 3.273) (ledger gate state changes on edit: owner edit)"
+ },
+ {
+  "id": "U6365",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:152 — lines 49–50 promise every LÜCKE row in the open-gaps list, but it names only 3.20, 3.35, 3.8 and 3.39 of the many marked rows (owner edit)"
+ },
+ {
+  "id": "U6366",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:172 — register rows 3.92–3.306 sit after the gap list, outside the register table and split by blank lines, so they do not render as table rows (the parser still reads them) (owner edit)"
+ },
+ {
+  "id": "U6367",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:152 — the open-gaps section is headed 'Stand 27.07.2026' but holds entries dated 08.08. and 23.09.2026 (owner edit)"
+ },
+ {
+  "id": "U6368",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:96 — row 3.39 says 'Siehe Teil-Deckungen unten' but its gap sits in the numbered list at 167–171, not the partial-coverage list (owner edit)"
+ },
+ {
+  "id": "U6369",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:144 — row 3.61 narrates wedgeTakeover/takeWedged/WEDGED_MS as the built mechanism, then says they no longer exist (point 434) (ledger parsed by the retro-core gate: owner edit)"
+ },
+ {
+  "id": "U6370",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:64 — the row implies a pre-push enforcer closes 'fast gate after every merge' without a merge trigger (owner edit)"
+ },
+ {
+  "id": "U6371",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:25 — the intro says every prompt requests a mechanism or marks where none is possible, but the communication (237–239) and root-cause (673–677) prompts prescribe judgment only (file has uncommitted user edits in the main checkout and a GUIDE-FINGERPRINT: edit after they land)"
+ },
+ {
+  "id": "U6372",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:36 — a third model is 'optional, better' in the role description but mandatory in the copyable prompt at lines 42–43 (uncommitted user edits pending: edit after they land)"
+ },
+ {
+  "id": "U6373",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:47 — the blanket exclusion of quick-test-detectable changes from cross-model review conflicts with lines 96–105 requiring four eyes on every mechanism change (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6374",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:71 — 'every change request is queued as its own point' omits the exception at lines 450–451 that prose only for the user is done, not queued (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6375",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:88 — the unconditional ban on uploading a state the pipeline would reject conflicts with red work branches being normal by user decision (lesson-mechanisms.md:175) (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6376",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:136 — release guidance demands several flake-free full regressions while lines 616–617 run the full proof exactly once on the merged state (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6377",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:214 — 'Laufzeiten und Kosten nur gemessen' conflicts with the estimated surcharge at line 688 and the ≈2x/1,5x/1,3x figures at lines 26/109/144/200/294 (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6378",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:232 — 'never stop on a question, assume and continue' conflicts with the start prompt at line 700 ('ask when the goal is unclear') (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6379",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:273 — a repeated identical refusal is declared proof the reader is wrong, not the guard, despite documented guards measuring the wrong tree (lesson-mechanisms.md:201) (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6380",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:603 — the intermittent-failure advice blames the measurement and orders a test repair before the product-or-measurement experiment of lines 278–281 (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6381",
+  "decision": "rewritten",
+  "reason": "switch summary now says authoring is not on the switch but decided by the routing function of the Authoring section"
+ },
+ {
+  "id": "U6382",
+  "decision": "rewritten",
+  "reason": "two-vendor guarantee now excepts claude-only and the outage fallback; 'neither model reviews its own work' stays universal"
+ },
+ {
+  "id": "U6383",
+  "decision": "rewritten",
+  "reason": "authoring instruction now forbids setsid/tee and redirection onto the script's own log only, consistent with line 140"
+ },
+ {
+  "id": "U6384",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:105 — row 3.48 books the pre-push-gate rebuild as unbuilt (order 404) although 3.76 reports 404 live, and codes outcome 2 while stating LÜCKE (ledger gate state changes on edit: owner edit)"
+ },
+ {
+  "id": "U6385",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:128 — order 440 is an injected-text inventory in 3.64 (line 117) and queue-order enforcement in 3.77; 3.103 (line 186) gives that divergence to point 590 (owner edit)"
+ },
+ {
+  "id": "U6386",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:115 — row 3.59 is coded outcome 1 but its text says BEWUSST KEIN WÄCHTER (ledger gate state changes on edit: owner edit)"
+ },
+ {
+  "id": "U6387",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:147 — row 3.90 is coded outcome 3 yet reports an existing enforcer broadened (--mode mandatory), i.e. outcome 1 (ledger gate state changes on edit: owner edit)"
+ },
+ {
+  "id": "U6388",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:111 — row 3.54 is coded outcome 2 (new enforcer) but names the pre-existing model-guard (booked for 3.17) and an unbuilt order 397 (owner edit)"
+ },
+ {
+  "id": "U6389",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:101 — row 3.44 writes 'LÜCKE bleiben' without the countable 'LÜCKE:' marker, so ledgerGaps misses it (ledger gate state changes on edit: owner edit)"
+ },
+ {
+  "id": "U6390",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:4 — 'every section-3 lesson has a row' does not match the register (3.110 → 3.179 jump, 3.3/3.58/3.84 out of order, §3.227 and §3.301 cited without rows) (owner edit)"
+ },
+ {
+  "id": "U6391",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:209 — the partial-coverage list omits later rows declaring partial coverage (3.44, 3.54, 3.55, 3.101) (owner edit)"
+ },
+ {
+  "id": "U6392",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:215 — 'Wie diese Liste entstanden ist' describes only the 27.07 back-capture, not how rows after 3.36 were produced (owner edit)"
+ },
+ {
+  "id": "U6393",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:93 — row 3.36 cites 'Kopfkommentar Zeile 12' of worktree-reminder-core.mjs, a drift-prone line anchor (owner edit)"
+ },
+ {
+  "id": "U6394",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:104 — row 3.47 freezes the fixed-wait baseline at 34→32 while 3.83 (line 135) says the stock keeps shrinking (owner edit)"
+ },
+ {
+  "id": "U6395",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/lesson-mechanisms.md:172 — row 3.92 is written in first person and names a follow-up without a point number, unlike its siblings (owner edit)"
+ },
+ {
+  "id": "U6396",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:704 — the GUIDE-FINGERPRINT hash may not match the edited guide text; recompute after the pending user edits land"
+ },
+ {
+  "id": "U6397",
+  "decision": "backlog",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md:144 — 'Zwei Mechanismen halten das Netz ehrlich' while the following prompt (146–148) demands three (uncommitted user edits pending)"
+ },
+ {
+  "id": "U6398",
+  "decision": "rewritten",
+  "reason": "measurement-table receipt path now says then .claude/author-<N>.log, now local/<point>-<lane>-author.log"
+ },
+ {
+  "id": "U6399",
+  "decision": "rewritten",
+  "reason": "undefined 'part A'/'part B' replaced by the read-only lever (point 654) and the authoring half (point 667)"
+ },
+ {
+  "id": "U6400",
+  "decision": "rewritten",
+  "reason": "'That last share' now names the landing and bookkeeping share"
+ },
+ {
+  "id": "U6401",
+  "decision": "rewritten",
+  "reason": "heading now 'What no setting routes', matching the bullet that lets the routing function and explicit overrides decide"
+ },
+ {
+  "id": "U6402",
+  "decision": "rewritten",
+  "reason": "the 18.08 cut measurement is now called the cut's baseline and pointed at the later 09.09 re-measurement"
+ },
+ {
+  "id": "U6403",
+  "decision": "rewritten",
+  "reason": "opening scope now also names the later sections of points 1077 and 1194"
+ },
+ {
+  "id": "U6404",
+  "decision": "rewritten",
+  "reason": "'this very branch' now names the point-654 branch"
+ },
+ {
+  "id": "U6405",
+  "decision": "rewritten",
+  "reason": "first-run rename mapping now includes review-sol-cli.test.mjs → review-astra-cli.test.mjs (which exists)"
+ },
+ {
+  "id": "U6406",
+  "decision": "backlog",
+  "reason": "docs/astra-routing.md:150 — the legacy 'sol' lane spelling is still read as 'astra' (author-routing-core); no open point in TASKS.md carries 'Author lane: sol', so the compatibility path can be deleted"
+ },
+ {
+  "id": "U6407",
+  "decision": "backlog",
+  "reason": "docs/astra-routing.md:247 — the proof owed by point 1072 and the reopen condition are frozen at 09.09.2026 while the lane has since gained the outage fallback (23.09.2026); record whether 1072 delivered it"
+ },
+ {
+  "id": "U6408",
+  "decision": "kept",
+  "reason": "scripts/rule-echo-core.test.mjs passes against the current CLAUDE.md, so the rule:model-policy anchor hash is current"
+ }
+]
