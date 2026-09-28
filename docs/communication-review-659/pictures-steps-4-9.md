@@ -1,7 +1,7 @@
 # Point 659 picture review: steps 4–9 (Claude reviewer)
 
 Runs: WebGPU `communication-webgpu-1790297789751-*` (words-first), WebGL 2 `communication-webgl-1790296797094-*` (message-first).
-Worktree: /workspace/hoa/.claude/worktrees/point-659/verification. Every step 4–9 frame was viewed at full resolution on WebGPU. On WebGL 2, every frame except revised-paper, chief-indoors-reading, upstream-river-0/27, excavated-find, return-river-*, answer-reopened, old-errand, impression-description, downstream-river-0/34 was viewed. The skipped ones matched their WebGPU twins in label and step. Journal PNG sample: WebGPU en-9, de-9, de-11; WebGL en-0, de-11. Both journal-*.txt files were read in full.
+Frames from the worktree's `verification/` directory (/workspace/hoa/.claude/worktrees/point-659, not retained in the repository). Every step 4–9 frame was viewed at full resolution on WebGPU. On WebGL 2, every frame except revised-paper, chief-indoors-reading, upstream-river-0/27, excavated-find, return-river-*, answer-reopened, old-errand, impression-description, downstream-river-0/34 was viewed. The skipped ones matched their WebGPU twins in label and step. Journal PNG sample: WebGPU en-9, de-9, de-11; WebGL en-0, de-11. Both journal-*.txt files were read in full.
 I judged each picture first and only afterwards used the receipt, to locate frames and check the strike timing.
 
 ## Subjects that ARE shown (both backends unless noted)

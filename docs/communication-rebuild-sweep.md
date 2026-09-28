@@ -1,7 +1,8 @@
 # Communication rebuild documentation sweep
 
 Work-order 690, including archived 692's checklist. Audited against the source
-at 7218da434 and the landed changes named in the brief. Archived work orders
+at 7218da434 and the landed changes named in the brief (the weaver's loom,
+work-order 1157, the spec's fourth teaching place, came later). Archived work orders
 remain historical records; the active requirements below describe the rebuild.
 
 - Checklist 2–11, 13–19: `communication-poc-spec.md` uses six four-syllable words,

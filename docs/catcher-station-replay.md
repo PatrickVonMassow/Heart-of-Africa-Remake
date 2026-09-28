@@ -46,7 +46,7 @@ Nubian@42 is clean at BOTH roam settings. Its earlier 62.05 s regroups were the
 same occupied-stone queue defect, not a separate runner walking blockage; the
 previous diagnosis was incorrect. It now completes six shipped-roam regroups
 and eight shortened-roam regroups without a backstop expiry. Follow-up 1166
-can be closed for this defect.
+was closed for this defect.
 
 The one-tag rule, ROCK-only-on-contact guarantee, 0.6 m catcher station radius,
 `reachDistance * 0.6` (1.32 m) charge-frame bar, 60 s regroup backstop and 205 s

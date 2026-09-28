@@ -1,6 +1,6 @@
 # Point 659 — review findings, round 6 (Opus 5.5, 25.09.2026)
 
-Reviewed: `b9cffdc7b` (Astra's answer to R5-B1). Then `VERIFY_GL=webgpu npm test
+Reviewed: `b9cffdc7b` (Astra's answer to R5-B1; R5-B1's chief-walks-out frame is carried on as R6-B1 below, closed in round 7). Then `VERIFY_GL=webgpu npm test
 -- communication --section=continuous-route`: RED after 16m 25s at `5-errand`,
 21 of 48 frames, "Chief walk frame was late". Log:
 `local/verify-logs/2026-09-25T11-00-29-016-communication.log` (main checkout);

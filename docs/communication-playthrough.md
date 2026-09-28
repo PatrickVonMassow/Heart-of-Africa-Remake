@@ -1,9 +1,11 @@
 # Communication play-through — reviewer handoff
 
-Work-order 659. This is the route and evidence checklist for the continuous
-browser review, not a record of a completed browser run. The author runs the
-unit, build and lint gates; the reviewing session owns browser execution,
-audio measurement and picture judgment.
+Work-order 659. This began as the route and evidence checklist for the continuous
+browser review. The author runs the unit, build and lint gates; the reviewing
+session owns browser execution, audio measurement and picture judgment. The
+green browser runs of 24./25.09.2026 are recorded below, and the review rounds in
+`communication-review-659/` end with round 7, which finds no blocking defect at
+`26319ba3b` (`findings-round-7.md`).
 
 ## Endpoint clarification answered
 
@@ -17,7 +19,8 @@ The tomb and `victory` belong to a separate goal chain. The dummy toast wording
 and `src/state/store.mould.test.ts` are unchanged. U82 in the
 [counted enumeration](blind-659/union.json) is therefore **not a defect merely
 because `victory` remains false**. Its separate concern about whether the fit
-actually reaches the player's attention still needs picture/text judgment.
+actually reaches the player's attention needed picture/text judgment (given in
+round 7: socket and fit frames, `communication-review-659/findings-round-7.md`).
 The enumeration remains intact as the historical input; this clarification
 does not close its other entries.
 
@@ -63,7 +66,7 @@ failed continuous run; an isolated diagnostic does not repair its record.
 | Step | Player action | Evidence to retain and judge |
 | --- | --- | --- |
 | 1. Entry and speech | Enter Bambara and approach an audible exchange with audio unlocked by a normal gesture. | Entry frame, seed/vocabulary/settings, audio at the final output, speaker and note in the same picture. Do not equate a heard-memory entry with sound. |
-| 2. Children's bank game | Follow the RIVER call to the water; observe both run directions, a stationary rock touch and the off-game boulder climb. | Frames or a clip containing the current, both bank rocks, the pointing/running bodies, hand contact and climbed rock. Judge what each word could mean from those pictures. |
+| 2. Children's bank game | Until ROCK is heard, watch the rock-only lessons; then follow the RIVER call to the water; observe both run directions, a stationary rock touch and the off-game boulder climb. | Frames or a clip containing the current, both bank rocks, the pointing/running bodies, hand contact and climbed rock. Judge what each word could mean from those pictures. |
 | 3. Adult work and loom | Watch the water carrier complete the trip, a paired DIG bout complete, and the loom helper move in both directions. | Empty jar, dipping, full jar set down; invitation, tools and finished pit/post/planting; loom, helper and river axis. Capture each word followed by its consequence, including competing exchanges. |
 | 4. Guesses | Target a live note, press E, write a provisional reading, then revise and clear it from the journal and message paper. | Actual invitation, selected syllables, saved note in the glossary, the reopened paper picking up the changes. Include CHIEF at the drummer while the chief is indoors. |
 | 5. Errand | Use the chief's hut, follow him to the drummer, request the message and wait for its last beat. In the message-first run do this before entering readings, then return to steps 2–4. | Chief and drummer together while sounding, sixteen strikes, paper only after completion, four atoms with unknown/own readings, journal reopen. No trust or cultural-gift prerequisite. |
@@ -80,7 +83,7 @@ override the rebuilt spec. Also judge direction visibility and whether the
 work reads as a purposeless fixed loop. Do not mark any of these closed from a
 store assertion alone.
 
-## Runnable continuous harness (authored, not browser-executed)
+## Runnable continuous harness (authored; browser runs recorded below)
 
 With verification browsers already provisioned, run **one command per backend**
 from this worktree. The runner starts and stops the dev server:
@@ -166,10 +169,9 @@ blocked walk, missing word, missed work phase or interrupted journey exits
 nonzero and retains the failed route receipt and evidence already written.
 Interrupted audio windows are saved when possible and listed as incomplete.
 A later diagnostic or a fresh attempt does not replace that failed record.
-The suite's runtime is explicitly unmeasured until the reviewing session runs
-it; its registered frame count is a conservative authored floor, not a measured
-claim. No browser execution, new picture judgment or recorded sound is claimed
-by this authoring handoff.
+At authoring time the suite's runtime was unmeasured and its registered frame
+count a conservative authored floor; this authoring handoff claimed no browser
+execution, picture judgment or recorded sound. The measured runs follow below.
 
 ## Audio and failure record
 
@@ -190,7 +192,8 @@ capture a word as missing evidence. Judge syllable discrimination against the
 recording, not a nonzero mixed-output peak or a `speechProbe` call count.
 
 Keep step/time/frame/audio references and the journal produced by each run.
-Use the union's U identifiers when recording a finding; distinguish an observed
+Use the union's U identifiers where a finding matches one (the review documents
+number their own findings D, B and R); distinguish an observed
 blocker, a nonblocking defect, an expected behavior with its spec reason, and
 an untested risk. Each defect needs severity, reproduction and a fix or owning
 point. Do not count the list of risks as 82 reproduced defects or declare it
@@ -238,14 +241,13 @@ files and all four `CommunicationPlaythrough.test.tsx` cases passed in that run.
 This section records the results after verification; it changes no executable
 code and does not claim a gate on a merge candidate.
 
-That earlier stop is historical. For this leg the reviewing session supplied
-an already merged branch; the author performed no merge. The continuous harness
-above now replaces the missing implementation. Browser execution on both
-backends, sound discrimination, rendered-picture judgment and landing remain
-with the Claude reviewer. Pushes remain the wrapper's responsibility under the
+For this leg the reviewing session supplied an already merged branch; the
+author performed no merge. Browser execution on both backends, sound
+discrimination, rendered-picture judgment and landing remained with the Claude
+reviewer (recorded below and in `communication-review-659/`). Pushes remain the wrapper's responsibility under the
 house rule “Do NOT push”; no author-issued push was made.
 
-## Harness authoring gates (this leg)
+## Harness authoring gates (first harness leg)
 
 The full rerun passed: **543 files, 16,441 tests passed, seven skipped**
 (558.36 seconds, exit 0). The first run's four harness-integration failures
@@ -281,7 +283,9 @@ entry to fit and both-language journal, as one expedition per backend on
 All five audio windows (ambient baseline, adult talk, child call, drum errand,
 drum answer) are complete in both receipts. A green run proves the chain is
 walkable with the normal controls; the per-frame picture judgment, the sound
-judgment and the three named causes below it remain open.
+judgment and the three named causes (listed under the route table above) were
+still open at that revision; round 7 closes them at `26319ba3b`
+(`communication-review-659/findings-round-7.md`).
 
 Earlier reds of this leg and what they were — every one was a driver that
 did not play like a player, except where marked:
@@ -346,4 +350,5 @@ failure is missing evidence, not a successful replacement run.
 
 Author gate logs for this revision are retained under
 `local/verify-logs/communication-round2-{unit,build,lint}.log` (git-ignored).
-The final gate outcome is reported after the fixed-revision run completes.
+The fixed-revision runs and their outcome are recorded in
+`communication-review-659/findings-round-7.md` (`26319ba3b`, green on both backends).

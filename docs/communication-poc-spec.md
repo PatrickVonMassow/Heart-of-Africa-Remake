@@ -15,8 +15,7 @@ and the player works out their meanings from visible situations. The new
 teaching is divided between four places: the children's bank game, including
 the village's play rocks, the adults' water and digging work, the weaver's loom
 ("The weaver's loom" below), and the drummer. Those situations are built in
-their own work-order points; the removed catalogues are not substitutes for
-them.
+their own work-order points.
 
 Later the chief sends a message on two drums in the same language. The player
 must read it well enough to follow the river upstream, find a rock outside the
@@ -82,11 +81,11 @@ errand, so a reversal would form an eight-strike palindrome across the constant
 pause, an audible symmetry with no meaning. No other message adjacency can
 form it because the directions consume their whole reversal pair.
 
-These counts (96, 24, 20, 8) hold for four syllables and six concepts only. Both
+These counts (24, 20, 8) hold for four syllables and six concepts only. Both
 rules are predicates over a vocabulary and its errand, and the word set is
 derived from `SEQUENCE_LENGTH`, so another length is a new constant plus a new
 pinned table. The game was run at five syllables on 23.09.2026: 15 words,
-17,160 mappings, and roll, drum message, villager speech, journal and overhead
+17,160 mappings before rule (b)'s reversal exclusion, and roll, drum message, villager speech, journal and overhead
 labels all carried five-syllable words. Enumerating that set takes about three
 seconds per new game, so a length bump should replace "enumerate all" with
 "draw from the seed and reject what fails the predicates".
@@ -138,7 +137,9 @@ scaling back the requested levels.
 
 ## The speech floor
 
-One situation speaks at a time within the player's earshot. Its word and visible
+One situation speaks at a time within the player's earshot, and speech yields to
+the whole drum performance: scheduled speech gain is cut before the first strike
+and restored afterward. Its word and visible
 consequence finish before another situation speaks, and a ready continuation
 keeps precedence. A silent walk, a child's ear or an occupied dig site yields
 after the consequence window. Work can continue in several places; a pair's
@@ -215,7 +216,8 @@ The children play ONE game, at the river bank, and it teaches four of the six
 words without a staged lesson (work-order 687). They roam their own quarter out
 of earshot of the adults; at the end of that phase one of them calls `RIVER`,
 points at the water and the group runs to the bank, and that caller is the first
-catcher. Two rocks stand at the ends of a stretch of bank, one upstream and one
+catcher. Until ROCK has been heard, a round omits the RIVER call and the
+direction announcement and offers rock-only contact and climb lessons instead. Two rocks stand at the ends of a stretch of bank, one upstream and one
 downstream, in the play rocks' own size. The runners gather at one, the
 catcher waits at the other, the direction is announced before each run, the
 catcher steps to his stone, LAYS HIS HAND ON IT and names `ROCK` while everybody
@@ -251,8 +253,9 @@ to reach it from.)
 The river visibly flows, so `UPSTREAM`/`DOWNSTREAM` correlate with the current
 for a player who watches the water.
 
-Every utterance falls at a fixed point of the round — the opening call, the
-direction announcement, the catcher's tap and the arrival. Each is one atom from the
+Every game utterance falls at a fixed point of the round — the opening call, the
+direction announcement, the catcher's tap and the arrival (the boulder climb's
+ROCK, spoken while the group roams, is outside the game). Each is one atom from the
 same lexicon, heard through the same range rule as any other village speech. The
 phase lengths, the stage's distances and the extra berth the children give the
 traveller are calibratable under `balance.villageLife.bankGame`.
@@ -304,9 +307,10 @@ it again before they dig together with tools in hand. A bout with no second
 adult free is retried later, never performed alone. Both DIG utterances wait
 while a child is in earshot, preserving the separation between the two teaching
 groups. Each stroke changes the site by deepening the pit, growing the spoil
-and throwing earth. The work has a visible purpose: a grain-storage pit with
-baskets and a cover, a post hole with its timber, or a planted patch with a
-seedling tray. Completion leaves a covered store, a set post or planted rows.
+and throwing earth. The work has a visible purpose: a grain-storage pit, a post
+hole with its timber, or a planted patch with a seedling tray. Completion leaves
+an open storage pit with a dark mouth, fresh earth rim and spoil heap, a set post
+or planted rows.
 The spoil is walkable ground with matching height and collision; the pit and
 its furniture leave the workers reachable. The water path reaches the bank
 through the settlement's actual huts and fence gates, across world seeds.
