@@ -25,7 +25,7 @@ Timeline (times UTC; local = UTC+2):
 | 04:51–06:21 | Both sessions work: duplicate "Record … as complete" commits, an un-tick cherry-pick ("Reopen the 1890-picture point"), competing TASKS.md ticks. | reflog 04:56–06:28Z |
 | 06:21:37 | e9407cae's last heartbeat (`claimedAt: 1784874097318`). | `batch-lock.json` |
 | 06:25 | Containment: scheduled task disabled, `.claude/batch-paused` written. | `batch-paused` content |
-| analysis time | **pid 25848 is STILL ALIVE** (claude, StartTime 24.07 06:51:16 local) — the `-p` run never exited. It must be killed in the apply steps. | `Get-Process -Id 25848` |
+| analysis time | **pid 25848 is STILL ALIVE** (claude, StartTime 24.07 06:51:16 local) — the `-p` run never exited. (It exited on its own by 09:12 local; apply step 1.) | `Get-Process -Id 25848` |
 
 So the trigger was **not** the reboot heuristic: it was the **12-minute
 claimedAt-age liveness window** meeting the reality that a heartbeat is written
@@ -55,7 +55,15 @@ hook and progress guard, and the ownership-blindness of the whole guard chain.
 
 ## B. The hard singleton (implemented)
 
-One module — `scripts/batch-singleton.mjs` — is now the sole authority.
+> State of 24.07.2026. Since points 434, 556 and 612 ownership is a LEASE with a
+> corroborated takeover and an idle window (`docs/batch-resilience.md` §3): the
+> `DEAD_CONFIRM_MS` ladder, the "alive pid ⇒ alive owner" rule and the `wedged`
+> flag below are superseded, and the verdict itself (`ownershipVerdict`,
+> `effectiveLeaseUntil`) lives in `scripts/batch-ownership-core.mjs` and
+> `scripts/batch-lease-core.mjs`.
+
+One module — `scripts/batch-singleton.mjs` — became the lock's sole I/O
+authority (its verdict arithmetic now sits in the two cores named above).
 `scripts/batch-lock.mjs` keeps only the pause API and a read-only lock view;
 `lockStatus`/`claimLock`/`releaseLock` are gone.
 
@@ -65,10 +73,13 @@ One module — `scripts/batch-singleton.mjs` — is now the sole authority.
 `sessionId`, `claimedAt` (heartbeat), `pid` + `pidStartedAt` (the owning
 **claude.exe** process, resolved once at acquisition by walking the hook's
 parent chain via CIM — verified live on this machine), `kind`
-(`session`/`pending-spawn`), `acquiredAt`. The PostToolUse hook refreshes the
+(`session`/`pending-spawn`), `acquiredAt` — and since point 434/556 `leaseUntil`
+and `declaredWait`. The PostToolUse hook refreshes the
 heartbeat **only for the owner**.
 
-`assessOwner()` decides liveness conservatively — dead means *provably* dead:
+`assessOwner()` decided liveness conservatively — dead meant *provably* dead
+(the 24.07 rules; superseded as noted above, and an explicit handover has since
+freed the lock at once, ahead of any heartbeat):
 
 - heartbeat < 5 min (`DEAD_CONFIRM_MS`) → **alive**, no probe needed. A fresh
   heartbeat always wins — **reboot alone is never sufficient** when a
@@ -122,7 +133,9 @@ prep-guard, batch-progress-guard, render-verify-guard, queue-order-guard,
 tasks-spec-guard, ci-status-guard, dashboard-conciseness/card-topic/integrity
 guards, and the UserPromptSubmit dashboard-reminder (which instead prints an
 explicit STAND-DOWN notice). A session that does not hold the live lock is
-treated as paused — no block, no push, no dashboard/prep duty. The
+treated as paused — no block, no push, no dashboard/prep duty (the one later
+exception: the fence chokepoint still refuses a dispossessed session's four guarded
+call families, `docs/batch-resilience.md` §3). The
 progress-guard is the only Stop-time acquirer, and only via the atomic
 `acquire`; a missing session id now errs toward stand-down (the OS launcher
 guarantees progress, so idling a ghost is safe; conscripting one is not).
@@ -132,8 +145,9 @@ override commands for the user.
 
 ### 4. The launcher spawns only through the same lock
 
-`batch-autostart.mjs` now: assesses the owner with the full pid probe → skips
-while alive (or wedged) → on provable death performs the **atomic acquire of a
+`batch-autostart.mjs` then: assessed the owner with the full pid probe → skipped
+while alive (or wedged) → on provable death performed (since point 434/556: skips
+while the lease runs or its expiry is not corroborated, and takes over otherwise) the **atomic acquire of a
 `pending-spawn` lock BEFORE spawning** (acquire loses ⇒ no spawn — the race
 window is closed); after spawning it rebinds the pending lock to the child pid.
 The spawned session's SessionStart **converts** the pending lock to itself only
@@ -189,7 +203,9 @@ Remediation, automatic and logged:
 3. Provably dead owner (stale + dead pid / pre-boot heartbeat / pid reuse) →
    takeover allowed.
 4. The reboot case with a fresh re-claimed heartbeat → NO spawn; plus the true
-   incident root cause pinned: stale heartbeat + LIVE pid → NO spawn.
+   incident root cause pinned: stale heartbeat + LIVE pid → NO spawn (the 24.07
+   invariant; since point 556 an expired lease plus stale declared work is taken
+   over even with a live pid).
 5. Non-owner at the progress guard → stands down (never conscripted; missing
    sid also stands down); owner + unhandled alert → block-remediate; owner
    normal → block-continue.
@@ -201,7 +217,7 @@ Remediation, automatic and logged:
    retry is bounded; the sweep takes a dead pid's settled orphan and spares a
    live one and a just-written one; `acquire` sweeps exactly the dead orphan.
 
-## Apply steps (for the main session — in this order)
+## Apply steps (24.07.2026 — done; kept as the record of that rollout)
 
 1. **Confirm the rogue session is gone.** pid 25848 (e9407cae's claude) was
    still alive during the analysis but exited on its own by 09:12 local.
@@ -230,7 +246,9 @@ Remediation, automatic and logged:
    there, so the launcher is a detached node daemon). On the WINDOWS host,
    elevated: `Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`
    Optional, WINDOWS only (elevated shell, per the task's ACL): tighten the tick
-   from 15 to 5 min — the launcher is cheap and now spawn-safe:
+   from 15 to 5 min — the launcher is cheap and now spawn-safe (the ladder
+   arithmetic in `docs/batch-resilience.md` assumes the 15-minute tick; a shorter
+   one only tightens those bounds):
    ```powershell
    $t = Get-ScheduledTask -TaskName 'HoA-Batch-Autostart'
    $t.Triggers[0].Repetition.Interval = 'PT5M'
