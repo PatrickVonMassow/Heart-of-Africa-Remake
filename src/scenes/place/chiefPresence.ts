@@ -17,7 +17,9 @@ import { chiefInHut, type ChiefWalk } from './chiefWalk'
 import { placePlayerPosition } from './playerPosition'
 import { CHIEF_BODY_RADIUS, type Collider } from './collision'
 
-/** The speaker id the chief's labels ride under — one chief per settlement. */
+/** The chief's speaker id, which also names his figure in the scene so the
+ *  §13.4 speech dev hook can find his anchor — one chief per settlement. He
+ *  speaks no word under it himself; his answer is the drummer's. */
 export const CHIEF_SPEAKER_ID = 'chief'
 
 /** The speaker id the drummer's own word rides under. */

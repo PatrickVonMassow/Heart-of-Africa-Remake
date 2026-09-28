@@ -1,19 +1,21 @@
 // The adults teach by DOING THEIR OWN WORK (work-order 688). Two words, two
 // situations each, and no translation among them.
 //
-// RIVER is shown once by an empty-jar carrier setting out and once by a full-
-// jar carrier returning. DIG is different: it is an invitation, not a running
-// commentary. An initiator walks to another free adult and says DIG to him;
-// both walk to one of the village's work sites; the initiator says DIG again at
-// the hole; only then do they work it together. Each of the two digging
-// situations uses a different site, so neither the person nor one particular
-// hole can become the word's accidental meaning.
+// RIVER is spoken twice at the village water stand: once by a sender ordering
+// a carrier out with an empty jar, once by that carrier reporting back to him
+// with the full one. DIG is an invitation, not a running commentary. An
+// initiator walks to another free adult and says DIG to him; both walk to one
+// of the village's work sites; the initiator says DIG again at the hole; only
+// then do they work it together. The two digging situations start their site
+// search one site apart, rotate with every bout and never share a site another
+// pair holds, so neither the person nor one particular hole can become the
+// word's accidental meaning.
 //
 // Both utterances yield while a child can hear, and an invitation is staged
 // only beside a partner who stands clear of the children's fixed grounds. A
 // bout that cannot cast two such adults is not staged at all and returns on a
-// later catalogue pass. The module also records every worker-second and every
-// completed stroke at the site, giving the scene one durable source for the
+// later catalogue pass. The module also records every worker-second and the
+// completed strokes (at most one per frame) at the site, giving the scene one durable source for the
 // deepening pit, growing spoil and thrown earth.
 //
 // The module is pure: no three, no scene. `PlaceLife` gives it the live village
@@ -37,11 +39,9 @@ export const ADULT_SITUATIONS: readonly AdultSituationId[] = [
   'dig-second',
 ] as const
 
-export const ADULT_CONCEPTS: readonly ConceptId[] = ['RIVER', 'DIG']
-
 export type AdultCarry = 'none' | 'emptyJar' | 'fullJar' | 'digTool'
-export type AdultPhase = 'walk' | 'fetch' | 'fill' | 'send' | 'wait' | 'invite' | 'site' | 'dig'
-export type DigUtterance = 'invitation' | 'site'
+type AdultPhase = 'walk' | 'fetch' | 'fill' | 'send' | 'wait' | 'invite' | 'site' | 'dig'
+type DigUtterance = 'invitation' | 'site'
 
 export interface ErrandPoint { x: number; z: number }
 
@@ -64,7 +64,7 @@ export interface AdultWorkGeography {
   digSites: readonly DigSite[]
 }
 
-export interface AdultWorker extends ErrandPoint { free: boolean }
+interface AdultWorker extends ErrandPoint { free: boolean }
 
 export interface AdultWorkView {
   vocabulary: Vocabulary
@@ -124,7 +124,8 @@ export interface AdultTask extends ErrandPoint {
    *  (work-order 1087). He stands at the water stand for the whole round trip,
    *  because the point's own rule is that no villager speaks to nobody: the
    *  first word is his order to the carrier, the second is the carrier's report
-   *  back to him. He is NOT an escort — he walks nowhere. */
+   *  back to him. He is NOT an escort — he walks only to his own spot beside
+   *  the stand and stays there. */
   orderedBy: number | null
   /** The spot BESIDE the water stand this errand's carrier works from
    *  (work-order 1087). He is never sent to the stand's own centre: it is a
@@ -171,7 +172,7 @@ export interface AdultWorkState {
 }
 
 export const WORK_ARRIVE_RADIUS = 1.1
-export const AIM_CLEARANCE = 1.2
+const AIM_CLEARANCE = 1.2
 export const JOIN_STAND_OFF = 2.4
 const JOIN_BEARINGS = 12
 
@@ -330,9 +331,10 @@ function facingSpot(view: AdultWorkView, site: ErrandPoint, taken: ErrandPoint):
   return null
 }
 
-/** Another free adult, with none of DIG's invitation clearance: the water
- *  errand's second man STAYS at the stand and walks nowhere, so the ground he is
- *  standing on has nothing to clear (work-order 1087). */
+/** Another free adult to carry the water, with none of DIG's invitation
+ *  clearance: both of the errand's words fall at the stand, never where the
+ *  carrier is picked up, so the ground he stands on has nothing to clear
+ *  (work-order 1087). */
 function anotherFreeAdult(view: AdultWorkView, first: number): number {
   for (let i = 0; i < view.villagers.length; i++) if (i !== first && view.villagers[i].free) return i
   return -1
@@ -348,8 +350,10 @@ function castable(id: AdultSituationId, view: AdultWorkView): boolean {
   return g.digSites.length >= 1
 }
 
-/** The partner and every bystander must be clear of the future hole. The
- * initiator may already be there: he still has to go away to make the invite. */
+/** Every villager but the initiator — and the partner, when one is passed, as
+ * at the word itself where he already stands at the hole — must be clear of
+ * the future hole. The initiator may already be there: he still has to go away
+ * to make the invite. */
 function siteClear(view: AdultWorkView, site: ErrandPoint, initiator: number, partner = -1): boolean {
   for (let i = 0; i < view.villagers.length; i++) {
     if (i === initiator || i === partner) continue
@@ -596,8 +600,9 @@ export function stepAdultWork(
         t.hushed = false
         continue
       }
-      // DEFERRED BY THE FRAME, NOT BY THE FLOOR — and still deferred. The
-      // village says at most one word a frame, so a task whose moment HAS come
+      // DEFERRED BY THE FRAME, NOT BY THE FLOOR — and still deferred. Outside
+      // urgent (deadline) requests the village says at most one word a frame,
+      // so a task whose moment HAS come
       // can be passed over because somebody else spoke first. That never
       // reaches the floor, so without this the word carries no record of having
       // been held back, and a speaker who then steps out of his own radius
@@ -667,8 +672,9 @@ export function stepAdultWork(
         t.phase = 'walk'
         t.x = t.standSpot.x
         t.z = t.standSpot.z
-        // The aim is replaced by the SENDER's own position when the word falls:
-        // the report is addressed to the man, not to the ground he stands on.
+        // Only `say.at` is read for the report; its aim is always the SENDER's
+        // own position when the word falls (readyWord): the report is addressed
+        // to the man, not to the ground he stands on.
         t.say = { at: { ...t.standSpot }, aim: { ...t.standSpot } }
         t.owes = true
         const sender = t.orderedBy === null ? null : view.villagers[t.orderedBy]
@@ -714,11 +720,6 @@ export function stepAdultWork(
       // given at all, and the errand simply does not cast this round.
       if (carrier < 0) continue
       const stand = { ...g.waterStand }
-      // TWO MEN, TWO PLACES. The stand itself is the CARRIER's spot: it is where
-      // he is handed the errand and where he sets the jar down again. The sender
-      // waits a body's width off it — sent to the same point, the two of them
-      // simply blocked each other, neither ever counted as arrived, and the word
-      // was never spoken.
       // TWO MEN, TWO SPOTS, AND NEITHER OF THEM IS THE STAND ITSELF. The stand
       // is a solid body: a man sent to its centre stalls a walker's width off it
       // and never counts as arrived. Both stand BESIDE it, far enough apart not

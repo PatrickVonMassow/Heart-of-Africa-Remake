@@ -1,6 +1,6 @@
 // The emergency context permit, pure validation and record shaping.
 
-export const CONTEXT_FENCE_PERMIT_VERSION = 1
+const CONTEXT_FENCE_PERMIT_VERSION = 1
 
 const positiveInt = (value) => {
   const n = Number(value)

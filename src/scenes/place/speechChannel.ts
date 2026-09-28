@@ -37,8 +37,9 @@ import { placePlayerPosition } from './playerPosition'
 
 let state: SpeechLabelState = noSpeechLabels()
 
-/** The object each speaker is drawn as — the label rides on its world position. */
+/** How far each speaker's voice carries; set and cleared with its anchor. */
 const reaches = new Map<string, number>()
+/** The object each speaker is drawn as — the label rides on its world position. */
 const anchors = new Map<string, Object3D>()
 
 const listeners = new Set<() => void>()
@@ -115,8 +116,8 @@ export function speechAnchor(speakerId: string): Object3D | null {
 }
 
 /**
- * Names the speaker a LEFT CLICK would take (point 588): the nearest one whose
- * label is actually drawn, within the reach a voice carries. Called once per
+ * Names the speaker the guess key would take (points 588, 1139): the nearest
+ * one whose label is actually drawn, within the reach its voice carries. Called once per
  * frame by the label layer, which alone knows which labels the player's own
  * memory lets it draw — an utterance he has never heard shows nothing, and
  * nothing is not clickable.
@@ -126,7 +127,6 @@ export function speechAnchor(speakerId: string): Object3D | null {
  */
 export function updateSpeechTarget(
   isVisible: (label: SpeechLabel) => boolean,
-  reach: number = balance.communication.hearingRadius,
   player: { x: number; z: number; active: boolean } = placePlayerPosition,
 ): void {
   if (!player.active) {
@@ -143,23 +143,25 @@ export function updateSpeechTarget(
     anchor.updateWorldMatrix(true, false)
     const e = anchor.matrixWorld.elements
     const distance = Math.hypot(e[12] - player.x, e[14] - player.z)
-    if (distance <= (reaches.get(label.speakerId) ?? reach)) candidates.push({ speakerId: label.speakerId, distance })
+    // Every anchored speaker carries a reach: the two maps are set and cleared together.
+    if (distance <= reaches.get(label.speakerId)!) candidates.push({ speakerId: label.speakerId, distance })
   }
   publish(withSpeechTarget(state, pickSpeechTarget(candidates, state.targetId, Infinity)))
 }
 
-/** The label SPACE would take right now, or null while none is highlighted. */
+/** The label the guess key would take right now, or null while none is highlighted. */
 export function speechTargetLabel(): SpeechLabel | null {
   const { labels, targetId } = state
   return targetId === null ? null : (labels.find((l) => l.speakerId === targetId) ?? null)
 }
 
 /**
- * The speech target as a USE-KEY candidate (work-order point 691): SPACE means
- * several things in a settlement, and the nearest of them wins. WHICH speaker is
- * the speaker candidate is still decided by speechTarget.ts above; this only
- * measures how far he stands and how far a voice carries, so the door and the
- * utterance are comparable at all.
+ * The speech target as a key candidate (work-order points 691, 1139): the guess
+ * key takes it, and on the gamepad, where one button means everything, the
+ * nearest of all candidates wins (`pickForKeyPress`). WHICH speaker is the
+ * speaker candidate is still decided by speechTarget.ts above; this only
+ * measures how far he stands and how far his voice carries, so the door and the
+ * utterance are comparable on the pad at all.
  *
  * The distance is taken from the speaker's LIVE world position rather than from
  * the frame that picked him, so a key press after a teleport or a fast step
@@ -167,7 +169,6 @@ export function speechTargetLabel(): SpeechLabel | null {
  */
 export function speechUseCandidate(
   player: { x: number; z: number; active: boolean } = placePlayerPosition,
-  reach: number = balance.communication.hearingRadius,
 ): UseCandidate<SpeechLabel> | null {
   const label = speechTargetLabel()
   if (!label || !player.active) return null
@@ -178,7 +179,7 @@ export function speechUseCandidate(
   return {
     key: `speech:${label.speakerId}`,
     distance: Math.hypot(e[12] - player.x, e[14] - player.z),
-    range: reaches.get(label.speakerId) ?? reach,
+    range: reaches.get(label.speakerId)!,
     payload: label,
   }
 }
@@ -195,7 +196,10 @@ export function pruneSpeechLabels(now: number = speechClock()): void {
     if (!anchor || anchor.parent === null) next = dropSpeechLabel(next, label.speakerId)
   }
   for (const id of [...anchors.keys()]) {
-    if (!next.labels.some((l) => l.speakerId === id)) anchors.delete(id)
+    if (!next.labels.some((l) => l.speakerId === id)) {
+      anchors.delete(id)
+      reaches.delete(id)
+    }
   }
   publish(next)
 }
@@ -203,7 +207,7 @@ export function pruneSpeechLabels(now: number = speechClock()): void {
 /**
  * Takes ONE speaker's note down at once, without waiting for its own seconds.
  *
- * A note is normally held against expiry for as long as it is the click target
+ * A note is normally held against expiry for as long as it is the guess target
  * (point 588), which is what lets the player reach for it — and that hold is
  * also what makes a note go stale when the world moves on around it. The one
  * case in the settlement is the drummer: his own word is about the chief, and

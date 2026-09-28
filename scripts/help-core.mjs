@@ -1,4 +1,4 @@
-// ONE INDEX OVER EVERY REPOSITORY COMMAND — the pure half of scripts/help.mjs.
+// ONE INDEX OVER EVERY TOP-LEVEL scripts/*.mjs COMMAND — the pure half of scripts/help.mjs.
 //
 // Descriptions and usage stay where they are already maintained: in each
 // script's leading comment and `usage:` strings. This module only harvests and
@@ -11,7 +11,7 @@ const cleanCommentLine = (line) => line
   .trim()
 
 /** One sentence from the script's leading comment block. */
-export function leadingPurpose(source, name = '') {
+function leadingPurpose(source, name = '') {
   const lines = String(source).replace(/^#![^\n]*\n/, '').split(/\r?\n/)
   const paragraph = []
   let began = false
@@ -29,7 +29,7 @@ export function leadingPurpose(source, name = '') {
   }
   const text = paragraph.join(' ').replace(/\s+/g, ' ').trim()
   const sentence = /^(.+?[.!?])(?:\s|$)/.exec(text)?.[1] ?? text
-  return sentence || `Tests and support for ${name.replace(/\.mjs$/, '')}.`
+  return sentence || `No leading description for ${name.replace(/\.mjs$/, '')}.`
 }
 
 /** Every greppable usage line, kept in source order. */

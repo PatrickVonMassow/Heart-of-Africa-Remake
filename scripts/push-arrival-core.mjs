@@ -15,8 +15,8 @@
 // and is fail-open.
 
 /**
- * Decide whether the turn may end, given how many commits sit ahead of the
- * remote and whether the working tree still has changes.
+ * Decide whether the turn may end, given how many commits on HEAD sit in no
+ * remote ref.
  *
  * Inputs (all optional; missing data errs toward ALLOW, since the wrapper's
  * fail-open contract must not turn a git hiccup into a trapped session):
@@ -24,8 +24,8 @@
  *   ahead       commits on HEAD not contained in ANY remote ref (null: unknown)
  *   hasUpstream whether the branch tracks a remote branch at all
  *   paused      .claude/batch-paused exists → no batch duty in flight
- *   inFlight    a declared verification is running on this machine (or null when
- *               that could not be measured) — see THE CONFLICT below
+ *   inFlight    a verification declared on this machine within the maximum age
+ *               (its liveness is not checked), or null — see THE CONFLICT below
  */
 export function evaluatePushArrival(input) {
   // `= {}` would only cover undefined; the wrapper can hand us null on a git
@@ -43,7 +43,7 @@ export function evaluatePushArrival(input) {
       `UNPUSHED WORK: ${ahead} commit(s) on ${where} exist in NO remote ref` +
       (hasUpstream ? '' : ' (the branch tracks no remote at all)') +
       '. The project rule is to push after EVERY commit, so nothing is lost when a session dies. ' +
-      `Run: ${push} — then PROVE it arrived with \`git rev-list --count @{u}..HEAD\` (must be 0). ` +
+      `Run: ${push} — then PROVE it arrived with \`git rev-list --count HEAD --not --remotes\` (must be 0). ` +
       'A push that prints "Everything up-to-date" is NOT proof: on 24.07.2026 thirteen commits sat ' +
       'local for a whole night because the session pushed a different branch than the one it had ' +
       'committed to, and git called that a success.' +
@@ -53,7 +53,7 @@ export function evaluatePushArrival(input) {
 
 /** The branch whose push runs the FULL gate — build, lint, audit and unit. Any
  *  other branch runs lint and audit only, which is seconds and no conflict. */
-export const FULL_GATE_BRANCH = 'main'
+const FULL_GATE_BRANCH = 'main'
 
 /**
  * THE CONFLICT, stated where the demand arrives (08.09.2026). A push to `main`

@@ -16,15 +16,16 @@
 //
 // The comparison itself is NOT re-implemented here: `wiredStopHookIds` and
 // `unregisteredStopHooks` are the authoritative pair and are imported. What is
-// new is only WHERE the two inputs come from — the staged blobs rather than the
-// working tree, so the check judges the commit being made and not whatever the
-// tree happens to hold beside it.
+// new is WHERE the inputs come from — the staged blobs rather than the working
+// tree, so the check judges the commit being made and not whatever the tree
+// happens to hold beside it — plus two checks of its own: the registry against
+// EXPECTED_GUARD_IDS, and duplicate registrations.
 import { unregisteredStopHooks, wiredStopHookIds } from './guard-preflight-core.mjs'
 import ts from 'typescript'
 
-/** Paths whose staging makes the wiring worth re-checking. */
-const SETTINGS_PATH = '.claude/settings.json'
-const PREFLIGHT_PATH = 'scripts/guard-preflight.mjs'
+/** Paths whose staging makes the wiring worth re-checking; the wrapper reads them. */
+export const SETTINGS_PATH = '.claude/settings.json'
+export const PREFLIGHT_PATH = 'scripts/guard-preflight.mjs'
 export const EXPECTED_PATH = 'scripts/guard-preflight-expected.mjs'
 const GUARD_SCRIPT = /^scripts\/[\w.-]*guard[\w.-]*\.mjs$/
 
@@ -47,7 +48,8 @@ export function touchesGuardWiring(paths = []) {
 }
 
 /**
- * The guard ids a `guard-preflight.mjs` SOURCE registers, read as text.
+ * The initializer of `export const <name>` in a SOURCE read as text — how the
+ * registered guard ids and the expected list are read.
  *
  * Text rather than an import on purpose: the source being judged is a staged
  * blob, which has no path to import from, and importing it would also run its
@@ -121,6 +123,7 @@ function readExpected(source = '') {
   return { found: true, ids }
 }
 
+/** The guard ids a `guard-preflight.mjs` SOURCE registers. */
 export function registeredIdsFromSource(source = '') {
   return readRegistry(source).ids
 }

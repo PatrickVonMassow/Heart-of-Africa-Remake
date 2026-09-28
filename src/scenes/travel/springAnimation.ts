@@ -18,8 +18,9 @@ export const SPRING_BUBBLE_COUNT = 5
 
 /** Ripple ring i's surface radius and opacity at render time t (seconds): each
  *  ring wells up near the centre and expands to the pool rim on its own
- *  phase-offset loop, fading as it grows. Pure, seamless (period-looped) and
- *  cheap — a unit ring mesh is uniformly scaled to `radius`. */
+ *  phase-offset loop, fading as it grows. Pure, period-looped (at the loop
+ *  boundary a ring restarts at the centre at full opacity as it fades out at
+ *  the rim) and cheap — a unit ring mesh is uniformly scaled to `radius`. */
 export function springRipple(i: number, t: number): { radius: number; opacity: number } {
   const period = 2.8
   const phase = (((t / period + i / SPRING_RIPPLE_COUNT) % 1) + 1) % 1
@@ -30,7 +31,7 @@ export function springRipple(i: number, t: number): { radius: number; opacity: n
 }
 
 /** Bubble i's height above the pool surface and scale at render time t: it
- *  rises from the bed to the surface then resets, swelling in mid-climb and
+ *  rises from the surface up to `rise` then resets, swelling in mid-climb and
  *  vanishing at the ends. Pure and period-looped. */
 export function springBubble(i: number, t: number): { y: number; scale: number } {
   const period = 1.6

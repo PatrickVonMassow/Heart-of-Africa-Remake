@@ -1,9 +1,7 @@
 // The record half of the four-eyes gate on mechanisms (point 377).
 //
-//   node scripts/mechanism-review.mjs --record <sha> --model <name> \
-//       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
-//       --mode <review|blind-parallel> [--framing "<one line>"] [--point <N>] \
-//       [--author-framing "<one line>" | --spec-examination <sound|amended>]
+//   node scripts/mechanism-review.mjs --record <sha> --model <name> ... (full
+//   flag surface: usage() below, printed by every refusal)
 //   node scripts/mechanism-review.mjs --list
 //
 // `--mode` names which half of the four-eyes principle the verdict covers
@@ -33,8 +31,9 @@
 // One JSON object per line so two branches appending never conflict beyond the
 // last line.
 //
-// The decision logic is pure (mechanism-review-core.mjs); this file does I/O and
-// fails LOUD — it is a command, not a hook.
+// The pure decisions live in mechanism-review-core.mjs; this file does the I/O
+// and the repository-backed checks (reviewer identity, half authorship,
+// carries), and fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -83,7 +82,7 @@ export { KNOWN_FLAGS }
 export const reviewFileSetKey = (files = []) => JSON.stringify([...(files ?? [])].map(String).sort())
 
 /** The git toplevel of a working directory, or '' outside a checkout. Its own
- *  spawn rather than `git()` above: that one is pinned to REPO_ROOT, which is
+ *  spawn rather than `git()` below: that one is pinned to REPO_ROOT, which is
  *  the very assumption this lookup exists to replace, and a missing checkout is
  *  an answer here, not a failure.
  *
@@ -213,8 +212,8 @@ export function reviewerVendorProblems(model, authorship = {}) {
   if (vendor === 'anthropic' && status !== 'agreement') {
     return [
       `the claimed reviewer "${model}" is one whose session transcript the harness holds, so its identity ` +
-        'must be VERIFIED: pass --model-at <ISO> and --model-transcript <session.jsonl> so the claim can be ' +
-        'checked against message.model — an unverified claim from this vendor no longer clears the gate',
+        'must be VERIFIED: pass --model-at <ISO> with --model-transcript <session.jsonl> or --model-result ' +
+        '<result.json> so the claim can be checked against the recorded model — an unverified claim from this vendor no longer clears the gate',
     ]
   }
   if (vendor === 'openai') {
@@ -239,12 +238,12 @@ export function reviewerVendorProblems(model, authorship = {}) {
  *  classifier calls neither grant nor spoil reviewer credit. */
 export function checkClaudeResultFile({ claimedModel = '', artefactAt = '', resultPath = '' } = {}) {
   const descriptor = [
-    { key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude' },
-    { key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude' },
-    { key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude' },
+    { key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID },
+    { key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID },
+    { key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID },
   ].find((entry) => sameModel(entry.name, claimedModel))
   const at = Date.parse(String(artefactAt ?? '')) || Number(artefactAt) || null
-  if (!descriptor || descriptor.runtime !== 'claude') {
+  if (!descriptor) {
     return { status: 'unverified', claimedModel, actualModel: '', artefactAt: at, reason: 'the claimed model is not a Claude reviewer' }
   }
   let raw
@@ -293,7 +292,7 @@ export function junkSpelling(path) {
  *  path OUTSIDE the checkout keeps the caller's spelling (and so stays
  *  refusable); a legal repository name that merely BEGINS with two dots —
  *  `..half.json` — is not "outside" (re-review round 4). */
-export function repoRelative(path) {
+function repoRelative(path) {
   // The caller's spelling survives — trimming rewrote a legal whitespace-bearing
   // filename into a different pathname (re-review round 6). Only an argument
   // that is nothing but whitespace is empty.
@@ -308,7 +307,7 @@ export function repoRelative(path) {
 }
 
 /** The committed blob oid at a path, or '' when the commit carries none. */
-export function committedOid(path, { at = 'HEAD' } = {}) {
+function committedOid(path, { at = 'HEAD' } = {}) {
   try {
     const rel = repoRelative(path)
     if (!rel || isAbsolute(rel)) return ''
@@ -324,7 +323,7 @@ export function committedOid(path, { at = 'HEAD' } = {}) {
  *  EOL normalisation a commit applies, so a clean, fully committed artefact
  *  hashes to its committed oid instead of being falsely refused on raw bytes
  *  (re-review round 9). */
-export function workingBlobOid(path) {
+function workingBlobOid(path) {
   try {
     const bytes = readFileSync(path)
     const rel = repoRelative(path)
@@ -342,7 +341,7 @@ export function workingBlobOid(path) {
 /** Recompute a fold's receipt from three committed blobs — the halves and the
  *  union — so the receipt a row carries is derived from exactly the bytes the
  *  row binds. */
-export function recountFromBlobs(oids, blobText = committedBlobText) {
+function recountFromBlobs(oids, blobText = committedBlobText) {
   const texts = oids.map((oid) => blobText(oid))
   const missing = oids.filter((_, i) => texts[i] === null)
   if (missing.length) {
@@ -363,9 +362,10 @@ export function recountFromBlobs(oids, blobText = committedBlobText) {
   return { ok: true, summary: summaryLine(result), errors: [] }
 }
 
-/** The bytes of one committed blob, by oid — content-addressed, so the answer
- *  is the same from every checkout that has the object. Null when absent. */
-export function committedBlobText(oid) {
+/** The trimmed UTF-8 text of one committed blob, by oid — content-addressed,
+ *  so the answer is the same from every checkout that has the object. Null
+ *  when absent. */
+function committedBlobText(oid) {
   try {
     const id = String(oid ?? '').trim()
     if (!/^[0-9a-f]{40}$/i.test(id)) return null
@@ -411,7 +411,7 @@ export function verifyHalfAuthors(record, { committedHalf = committedHalfModel, 
   if (!anchored) return false
   // The fold itself, recomputed from the committed bytes the row names. The
   // union is anchored exactly like the halves: the row names its PATH and its
-  // BLOB, and the blob must be the one HEAD carries at that path — an oid that
+  // BLOB, and the blob must be the one the row's commit carries at that path — an oid that
   // merely exists somewhere in the object store is not repository provenance
   // (re-review round 3).
   const unionBlob = String(record?.unionBlob ?? '').trim()
@@ -441,19 +441,14 @@ export function verifyHalfAuthors(record, { committedHalf = committedHalfModel, 
   return summaryLine(result) === String(record?.accounting ?? '').trim()
 }
 
-/** Every recorded review. A malformed line is skipped, never fatal — the ledger
- *  outlives the code that writes it, and one bad line must not blind the gate.
- *  A row claiming half authors is STAMPED with whether the repository confirms
- *  the claim (`halfAuthorsVerified`), because the merge gate must never trust
- *  two hand-editable strings to bypass the self-merge fence. */
 /** Re-check a recorded AGREEMENT against the transcript it names, where that
  *  transcript still exists. The two model strings in a ledger row are
  *  hand-editable; the transcript is the evidence they quote. A contradiction
  *  DOWNGRADES the row to disagreement, which the gate refuses; a transcript
  *  that has expired keeps the recorded reading — the ledger outlives the
  *  transcripts, and rotting every old review into a refusal would punish age,
- *  not forgery. The remaining gap — a claim naming a transcript that never
- *  existed — is work-order point 880's. */
+ *  not forgery. The remaining gap: a hand-written claim naming a transcript
+ *  that never existed keeps its recorded reading here too. */
 export function reverifyReviewerAgreement(
   record,
   { check = checkAuthorshipFile, checkResult = checkClaudeResultFile } = {},
@@ -468,6 +463,11 @@ export function reverifyReviewerAgreement(
   return { ...claim, status: 'disagreement', actualModel: fresh.actualModel, reason: fresh.reason }
 }
 
+/** Every recorded review. A malformed line is skipped, never fatal — the ledger
+ *  outlives the code that writes it, and one bad line must not blind the gate.
+ *  A row claiming half authors is STAMPED with whether the repository confirms
+ *  the claim (`halfAuthorsVerified`), because the merge gate must never trust
+ *  two hand-editable strings to bypass the self-merge fence. */
 export function readRecords(path = RECORDS_PATH, { verifyHalves = verifyHalfAuthors, reverifyReviewer = reverifyReviewerAgreement } = {}) {
   // No checkout, no ledger — an empty history, not another tree's file.
   if (!path) return []
@@ -531,7 +531,7 @@ export function appendRecord(record, path = RECORDS_PATH) {
  * lists and the union are read here, and a union that does not account for every
  * entry cannot be recorded as a merge at all. Returns { ok, summary, errors }.
  */
-export function countUnionFiles({ unionPath, listAPath, listBPath }) {
+function countUnionFiles({ unionPath, listAPath, listBPath }) {
   const read = (p) => {
     try {
       return readFileSync(p, 'utf8')
@@ -740,9 +740,10 @@ export function buildRecord({
     // ONLY FROM TRACKED HALVES, AND ONLY FROM THEIR COMMITTED BYTES: an
     // untracked path is caller-written, and even a tracked one may have been
     // read from a working tree that changed between the count and this check.
-    // The authors stored here are re-read from HEAD's blobs and must agree
-    // with what the count saw — anything less binds the record to bytes no
-    // commit carries. Where that fails the trailer proxy stands.
+    // The authors stored here are re-read from the recorded commit's blobs and
+    // must agree with what the count saw — anything less binds the record to
+    // bytes no commit carries. Where that fails, review mode falls back to the
+    // trailer proxy; blind-parallel refuses (below).
     // The caller's spellings are canonicalized DELIBERATELY here — the tracked
     // check refuses non-canonical input by contract (re-review round 9). What
     // the conversion accepts is exactly an absolute path inside the checkout
@@ -967,7 +968,8 @@ export function buildRecord({
     )
   }
   // WHAT THE GATE WILL NOT COMPOSE, THE RECORDER DOES NOT WRITE (cross-vendor
-  // review of point 889, pass 3): from VERIFIED_REVIEWER_SINCE an unverified
+  // review of point 889, pass 3): from the gate's VERIFIED_REVIEWER_SINCE
+  // (mechanism-review-core.mjs), which every new row postdates, an unverified
   // claim only clears for a reviewer no harness transcript can cover. Writing
   // the row anyway would report "recorded" for a review the gate then ignores —
   // silent debt the recording session believes settled.
@@ -1079,7 +1081,7 @@ export function buildRecord({
  * beside it). The gates re-verify the blob identity on every read
  * (verifyCarried), so a hand-edited carried row clears nothing.
  */
-export function buildCarriedRecord({
+function buildCarriedRecord({
   sha = '',
   carriedFrom = '',
   pass = '',
@@ -1443,8 +1445,10 @@ export const usage = () =>
   `           [--handover <${REVIEW_HANDOVERS.join('|')}>] \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
   `           [--author-framing "<one line>" | --spec-examination <sound|amended>]\n` +
-  `           [--merged-by "<switch-selected model>"] --accounting "<the blind-merge summary line>" \\\n` +
+  `           [--merged-by "<switch-selected model>"] \\\n` +
+  `           (--accounting "<the blind-merge summary line>" | --union <U.json> --list-a <A> --list-b <B>) \\\n` +
   `           [--merge-fallback "<switch-generated reason>"]                (blind-parallel)\n` +
+  `           [--pass <k>/<n> --pass-files "<a,b,c>"] [--carried-from <sha>]\n` +
   `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
   `\n--mode names which half of the four-eyes principle this verdict covers ` +
   `(CLAUDE.md §6):\n` +
@@ -1454,9 +1458,10 @@ export const usage = () =>
   `                       same inputs without seeing each other's result\n` +
   `--framing records how a second blind run by the SAME model was decorrelated, and\n` +
   `       belongs to blind-parallel alone.\n` +
-  `--model-at and --model-transcript check that claimed model against message.model\n` +
-  `       at the review artefact timestamp. A disagreement refuses permission; a missing\n` +
-  `       transcript is recorded as unverified rather than silently trusted.\n` +
+  `--model-at with --model-transcript (or --model-result for a Claude CLI result) checks\n` +
+  `       that claimed model at the review artefact timestamp. A disagreement refuses\n` +
+  `       permission; a Claude reviewer without an agreement is refused, and only a\n` +
+  `       reviewer no harness transcript can hold is recorded as unverified, with a reason.\n` +
   `--author-framing records the hostile-tester stance of a re-authoring commission\n` +
   `       beside the review that followed it. Rounds zero and one have none.\n` +
   `--spec-examination records the one cross-vendor reading before Fable escalation:\n` +
@@ -1470,8 +1475,8 @@ export const usage = () =>
   `       it prints as --accounting "<summary>".\n` +
   `--pass <k>/<n> --pass-files "<a,b,c>" records ONE bounded end-state file scope, or one\n` +
   `       pass of a range whose material no single review round can hold. The passes cut\n` +
-  `       through the FILE SET. A recorded pass clears the files it names at the reviewed\n` +
-  `       end state; the rest of the range stays owed. review-astra.mjs prints the plan.\n` +
+  `       through the FILE SET. Once every pass of the split is recorded, each clears the\n` +
+  `       files it names at the reviewed end state; the rest of the range stays owed. review-astra.mjs prints the plan.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
   `       The record stores the reviewed head as the files' end-state sha. A later commit to\n` +
@@ -1479,8 +1484,9 @@ export const usage = () =>
   `       files leaves this clearance intact.\n` +
   `--carried-from <sha> carries an EARLIER round's pass to this head where every file it\n` +
   `       read is byte-identical there: the recorder verifies the blob identity and the\n` +
-  `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +
-  `       gates re-verify the blobs on every read; a changed file refuses the carry.\n` +
+  `       source reading, and COPIES its verdict/model/evidence/mode — do not pass them\n` +
+  `       or --framing. The gates re-verify the blobs and the copied fields on every read;\n` +
+  `       a changed file refuses the carry.\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): the first eligible model in the required chain, never\n` +
   `       an author of the range. Claude authored it → GPT-6 Astra at reasoning effort\n` +
   `       high, and when Astra is unavailable or ineligible the first of Fable 5 / Opus 5 /\n` +

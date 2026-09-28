@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // Deliberate writer for an allowed batch stop.
 //
-//   node scripts/batch-pause.mjs --user-stop "<reason>"
+//   node scripts/batch-pause.mjs --user-stop '<reason quoting "the user's words">'
 //   node scripts/batch-pause.mjs --awaiting-user "<reason>"
 //
 // These cases must not be collapsed into a hand-written `.claude/batch-paused`:
 // only the first is proof that the user stopped the batch and may therefore omit
 // a restart clock. The second is an automatic park and inherits the retry ladder.
 //
-// The user stop is writable only by the session that OWNS the batch, and its
-// reason quotes the user's words (point 1193). A stood-down or chat-reply session
+// The user stop is writable only by a process running under the claude process
+// the batch lock names (pid plus start time, `holdsBatchLock`), and its reason
+// quotes the user's words (point 1193). A stood-down or chat-reply session
 // is not held by the batch guards: it simply ends its turn and records nothing.
 
 import { isMainModule } from './is-main.mjs'
@@ -17,7 +18,7 @@ import { setPaused } from './batch-lock.mjs'
 import { PID_START_TOLERANCE_MS, findClaudeAncestor, readOwnerLock } from './batch-singleton.mjs'
 import { namesUserUtterance } from './batch-pause-core.mjs'
 
-export const pauseUsage = () =>
+const pauseUsage = () =>
   'usage: node scripts/batch-pause.mjs --user-stop "<quoted user words>" | --awaiting-user "<reason>"'
 
 export function parsePauseCommand(argv = []) {
@@ -41,8 +42,9 @@ export function holdsBatchLock({ lock, ancestor } = {}) {
   return Math.abs(ancestor.startedAt - lock.pidStartedAt) <= PID_START_TOLERANCE_MS
 }
 
-/** Why a user stop may not be written, or null. `owner` is injectable for Vitest. */
-export function userStopRefusal(reason, { owner, lockPath } = {}) {
+/** Why a user stop may not be written, or null. `owner` is injectable (through
+ *  `recordUserStop` options) for Vitest. */
+function userStopRefusal(reason, { owner, lockPath } = {}) {
   const probe = owner ?? { lock: readOwnerLock(lockPath), ancestor: findClaudeAncestor() }
   if (!holdsBatchLock(probe)) {
     return 'not-lock-holder: only the session holding the batch lock may stop the batch; a stood-down or chat-reply session ends its turn and records nothing'
@@ -53,7 +55,8 @@ export function userStopRefusal(reason, { owner, lockPath } = {}) {
   return null
 }
 
-/** The one reachable writer of the proof that permits a clockless pause. A
+/** The CLI writer of the proof that permits a clockless pause; it checks
+ *  ownership and the quoted utterance, which `setPaused` itself does not. A
  *  refusal writes nothing and returns `{ refused: true, why }`. */
 export function recordUserStop(reason, options = {}) {
   const why = userStopRefusal(reason, options)
@@ -63,7 +66,7 @@ export function recordUserStop(reason, options = {}) {
 }
 
 /** Awaiting a decision is deliberately retried; it is not proof of a user stop. */
-export function recordAwaitingUser(reason, options = {}) {
+function recordAwaitingUser(reason, options = {}) {
   return recorded(reason, 'awaiting-user', setPaused(reason, { ...options, cause: 'awaiting-user' }))
 }
 

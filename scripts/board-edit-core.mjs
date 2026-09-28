@@ -1,5 +1,5 @@
 // Dependency-injected controller for a board edit. The core owns no direct I/O,
-// so Vitest can drive the exact write -> publish -> retry sequence without
+// so Vitest can drive the exact write -> state -> rotate -> publish sequence without
 // touching the real board or its live branch.
 import { boardMissingPoints } from './board-currency-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
@@ -21,7 +21,8 @@ const publishPreconditionError = (missing) =>
   )
 
 /**
- * Apply one pure card transform, then rotate and publish it.
+ * Apply one pure card transform, then record the active-work state, rotate
+ * and publish it.
  *
  * A known publish refusal is checked against the transformed bytes before
  * `write` runs. Failures that can only be discovered later report the durable
@@ -39,9 +40,10 @@ export function runBoardEdit({
   // THE DERIVED STATE CARD, refreshed on every edit (point 749). Injected, so
   // the controller stays free of the three state stores it would otherwise have
   // to read; identity by default, which is what the unit layer wants. It runs
-  // AFTER the transform and the sweep: the card is a rendering of state, so the
-  // last word on it belongs to the state, not to the command that happened to
-  // touch the board.
+  // AFTER the transform and the first sweep (the criticality render and the
+  // second sweep that follow leave the derived card alone): the card is a
+  // rendering of state, so the last word on it belongs to the state, not to the
+  // command that happened to touch the board.
   derive = (document) => document,
   stdout = () => {},
   stderr = () => {},
@@ -60,7 +62,7 @@ export function runBoardEdit({
 
   const reportDropped = () => {
     for (const { title, text } of swept.dropped) {
-      stderr(`board: dropped the current-work card "${title}" — it named neither a point nor a state.`)
+      stderr(`board: dropped the current-work card "${title}" — it named neither a point nor a state, or stood outside the current-work section.`)
       stderr(`  its text, so nothing is lost unsaid: ${text}`)
     }
   }

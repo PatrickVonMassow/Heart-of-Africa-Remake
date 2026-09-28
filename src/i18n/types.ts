@@ -1,7 +1,8 @@
 // Contract for the game's language files (design.md §17: English default,
-// German, easily extensible). Every player-visible string lives here; both
-// dictionaries must implement this interface, so adding or changing a text
-// in only one language fails the build.
+// German, easily extensible). Every player-visible string after boot lives
+// here (the two bilingual boot/failure lines in main.tsx come before any
+// dictionary loads); every dictionary must implement this interface, so adding
+// or changing a text in only one language fails the build.
 
 import type { DeathCause, EquipmentId } from '../state/store'
 import type { TreasureId } from '../systems/economy'
@@ -13,7 +14,7 @@ import type { FindId } from '../world/finds'
 import type { ActorKind } from '../systems/actorLabels'
 
 /**
- * Grammatical gender of a noun. German inflects the Ctrl layer's qualifier by
+ * Grammatical gender of a noun. German inflects the hold-key layer's qualifier by
  * it — "Toter Elefant", "Tote Giraffe", "Totes Zebra" — which is why every
  * actor noun carries its gender instead of the label being pasted together at
  * the render site (design.md §17.8). English ignores it.
@@ -21,7 +22,7 @@ import type { ActorKind } from '../systems/actorLabels'
 export type Gender = 'm' | 'f' | 'n'
 
 /** One actor noun with what its language needs in order to inflect it. */
-export interface ActorNoun {
+interface ActorNoun {
   /** Nominative singular, as the label shows it alone. */
   noun: string
   gender: Gender
@@ -34,7 +35,7 @@ export interface ActorNoun {
 export type TextParams = Record<string, string | number>
 
 /** Map-point kinds an undiscovered label can name (point 318). */
-export type UnknownPlaceKind =
+type UnknownPlaceKind =
   | 'port'
   | 'monument'
   | 'village'
@@ -65,7 +66,8 @@ export interface Strings {
   /** Animal names used in event entries (design.md §14). */
   animals: { lion: string; cheetah: string; leopard: string; hyena: string; snake: string; crocodile: string }
   /**
-   * The "hold Ctrl and see what acts" layer (design.md §17.8). The composition
+   * The "hold the label key and see what acts" layer (design.md §17.8; the key
+   * is rebindable, Ctrl by default). The composition
    * is a pure function of (kind, age, state, language) in
    * `systems/actorLabels.ts` — these are its parts, never a finished string.
    */
@@ -133,7 +135,7 @@ export interface Strings {
     journalToggle: string
     campToggle: string
     mapToggle: string
-    /** Tooltip for a click-to-use item (medicine/map/shovel). */
+    /** Tooltip for a click-to-use item (medicine/shovel, and a carried form while travelling). */
     useTooltip: string
     /** Tooltip for a passive item whose effect follows possession. */
     passiveTooltip: string
@@ -214,11 +216,11 @@ export interface Strings {
   }
 
   /** Guessing a meaning where it is spoken (design.md §13.4, points 588/691):
-   *  the invitation under the highlighted speaker's note, and the dialog the use
-   *  key opens on it. */
+   *  the invitation under the highlighted speaker's note, and the dialog the
+   *  guess key opens on it. */
   speechGuess: {
-    /** Invitation under the note of the speaker the use key would take. It names
-     *  SPACE, never a click — there is no click path. Never in upper case — it is
+    /** Invitation under the note of the speaker the guess key would take. It
+     *  names the guess key (E), never a click — there is no click path. Never in upper case — it is
      *  spoken to the player, not shouted at him. */
     invite: string
     title: string
@@ -310,7 +312,7 @@ export interface Strings {
   /** In-game render benchmark (design.md §21.1, F8). */
   benchmark: {
     title: string
-    /** Line naming the running config, e.g. "Config 3/10: ssao-off". */
+    /** Line naming the running config, e.g. "Setting 3/10: ssao-off". */
     config: (name: string, index: number, count: number) => string
     /** The discarded warm-up pass ahead of the sweep. */
     warmup: string
@@ -755,7 +757,7 @@ export interface Strings {
     stageFailures: Record<string, string>
     showHidden: string
     fpsCounter: string
-    /** TRAA toggle (design.md §2.7/§21), default on. */
+    /** TRAA toggle (design.md §2.7/§21), default on; the low level disables TRAA regardless. */
     traa: string
     /** SSAO toggle (design.md §2.7); off in the touch quality preset (point 84). */
     ssao: string
@@ -873,7 +875,7 @@ export interface Strings {
     }
     start: string
     regionEntry(p: TextParams): string
-    /** Every re-entry into a port: the checkpoint notice (design.md §18). */
+    /** A port re-entry whose situation has not changed: the checkpoint notice (design.md §18). */
     portArrival(p: TextParams): string
     /**
      * Arrival texts of the walkable places (design.md §16, point 394). Each
@@ -934,7 +936,8 @@ export interface Strings {
     mountainFall: string
     mountainFallItem: string
     /** First sighting of a landmark (design.md §10/§16): the journal announces
-     *  the discovery, flavored by its kind (mountain/falls/lake/grave). */
+     *  the discovery, flavored by its kind (mountain, falls, lake, grave,
+     *  pyramids and the other monument kinds). */
     landmarkDiscovered(p: TextParams): string
     findRemains(p: TextParams): string
     deadline1: string

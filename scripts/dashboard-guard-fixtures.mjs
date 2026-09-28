@@ -8,7 +8,8 @@
 /** Minimal dashboard HTML in the real board's markup (incl. an Erledigt section
  *  that also uses `.num`, which the queue parser must NOT pick up). `nowCards`
  *  renders SEVERAL now-cards for the parallel-work workflow (numbers become
- *  `N — Task N` titles, strings stay literal non-point titles) and overrides
+ *  `N — Task N`; every `N — …` title, a string included, renders as a numeric
+ *  chip plus the rest as title; other strings stay literal non-point titles) and overrides
  *  the single `nowPoint`/`nowTitle` pair. `klaerung` renders point-tied
  *  "Von dir zu klären" cards (leading number in the title); `klaerungExtra`
  *  adds no-number cards like the real ntfy one. */
@@ -22,8 +23,9 @@ export function boardHtml({
   klaerungExtra = [],
 } = {}) {
   // Cards carry the shapes the point-313 audit requires (duration meta in the
-  // queue, a time meta on the now-card, a non-empty body, no `open`), so the
-  // pre-313 invariant tests keep reading a fully consistent board.
+  // queue, a time meta on the now-card, a non-empty body with a status time, no
+  // `open`, the section wrappers and the archive link), so the pre-313
+  // invariant tests keep reading a fully consistent board.
   const body = '<div class="body"><p>Kurzstand.</p></div>'
   const q = queue
     .map(
@@ -92,7 +94,7 @@ export function green(overrides = {}) {
     marker: {
       dashboardPath: '.batch-dashboard.html',
       head: 'abc1234',
-      publishedHash: 'hash-1',
+      pagesPublishedHash: 'hash-1',
     },
     markerFileExists: true,
     head: 'abc1234',

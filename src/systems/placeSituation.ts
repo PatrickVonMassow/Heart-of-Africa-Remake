@@ -28,17 +28,17 @@ export const STEADY = 'steady'
 /** Nile flood level from which Giza reads as standing above the inundation.
  *  Mid-scale: the flood curve crosses it on the way up and down, so the two
  *  readings each hold for months rather than flickering around a peak. */
-export const GIZA_FLOOD_THRESHOLD = 0.5
+const GIZA_FLOOD_THRESHOLD = 0.5
 
-/** Calendar month (1..12) of an in-game day — the same date glue rinderpest
- *  uses, kept local so this module stays pure and dependency-light. */
-export function monthOfDay(day: number, startYear: number): number {
+/** Calendar month (1..12) of an in-game day — the same date glue
+ *  rinderpestPhaseAtDay uses inline; rinderpest exports no month helper. */
+function monthOfDay(day: number, startYear: number): number {
   return new Date(Date.UTC(startYear, 0, 1) + Math.floor(day) * 86400000).getUTCMonth() + 1
 }
 
 /** Burton's Berbera year: the caravan fair fills the town from October and it
  *  empties in April (docs/peoples-1890.md §4.0.2, PERIOD source). */
-export function berberaFairActive(month: number): boolean {
+function berberaFairActive(month: number): boolean {
   return month >= 10 || month <= 3
 }
 

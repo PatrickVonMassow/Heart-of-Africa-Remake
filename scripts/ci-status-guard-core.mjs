@@ -1,8 +1,10 @@
 // Pure decision logic for the CI-status Stop hook (ci-status-guard.mjs).
-// Classifies the GitHub Actions runs for the pushed HEAD sha and decides
-// block/notify. WHERE a red's cause lies — this repository or GitHub's side —
-// is decided next door in ci-failure-cause-core.mjs and shapes the message
-// blockReason writes. No I/O, never throws — Vitest-covered in
+// Classifies the GitHub Actions runs for every pushed ref (`refTargets`,
+// `sweepTargets`) and decides block/notify. WHERE a red's cause lies — this
+// repository or GitHub's side — is decided next door in ci-failure-cause-core.mjs
+// and shapes the message blockReason writes. No I/O; the synchronous helpers never
+// throw, while `sweepTargets` rejects only when an injected callback does —
+// Vitest-covered in
 // ci-status-guard-core.test.mjs. Accepts both the `gh run list --json` field
 // names (databaseId/headSha/workflowName/url) and the REST API's
 // (id/head_sha/name/html_url), since the wrapper feeds the REST shape today
@@ -79,9 +81,11 @@ function newestPerWorkflowFrom(runs) {
 /**
  * Classify the CI state for `headSha` from a list of workflow runs.
  * Per workflow only the NEWEST run counts (a green re-run supersedes its red
- * predecessor). Across workflows: any red → 'failed'; else any unfinished →
- * 'pending'; else any green → 'success'; else 'none' (fail-open).
- * @returns {{state:'failed'|'pending'|'success'|'none', runId?, workflowName?, conclusion?, url?}}
+ * predecessor), after `verdictRuns` has dropped superseded cancellations — the
+ * same reduction `failedRuns` and `recoveredWorkflows` use. Across workflows:
+ * any red → 'failed'; else any unfinished → 'pending'; else any green →
+ * 'success'; else 'none' (fail-open).
+ * @returns {{state:'failed'|'pending'|'success'|'none', runId?, workflowName?, conclusion?, runAttempt?, url?}}
  */
 export function classifyRuns(runs, headSha) {
   try {
@@ -151,10 +155,11 @@ export function failedRuns(runs, headSha) {
 }
 
 /**
- * The workflows whose NEWEST run on this head reached a verdict that is not a
- * failure — i.e. the ones that demonstrably recovered.
+ * The workflows whose NEWEST run on this head completed with a conclusion that
+ * is not a failure (an unknown conclusion counts too) — i.e. the ones whose
+ * waiver clock no longer applies.
  *
- * WHY (four-eyes review, 06.08.2026, finding 1): the outage waiver's clock is
+ * WHY (four-eyes review 06.08.2026, finding 1): the outage waiver's clock is
  * kept per workflow, and the guard returns early on a head that is not red —
  * so without this the clock would survive the recovery. The next genuine famine
  * for that workflow would then read as an already-expired waiver and escalate at
@@ -170,11 +175,6 @@ export function recoveredWorkflows(runs, headSha) {
   } catch {
     return []
   }
-}
-
-/** Only a confirmed red blocks; pending/success/none/unknown all allow. */
-export function shouldBlock(state) {
-  return state === 'failed'
 }
 
 // ---------------------------------------------------------------------------
@@ -193,16 +193,17 @@ export function shouldBlock(state) {
 // merely noticing red closes only the cases someone happens to look at.
 //
 // CHEAPNESS IS PART OF THE SPEC: the overwhelmingly common turn pushes nothing
-// and must cost nothing. The ref list therefore comes from the local reflog of
-// pushes (four local git calls in the wrapper, no network, no per-branch API
-// sweep), and every answer that can never change again is cached per sha, so a
-// repeat turn asks GitHub nothing at all.
+// and must cost next to nothing. The ref list therefore comes from the local
+// reflog of pushes (a handful of local git calls in the wrapper, no per-branch
+// API sweep), and every answer that can never change again is cached per sha
+// for the push window, so a repeat turn asks GitHub nothing at all.
 // ---------------------------------------------------------------------------
 
 /** How far back a push still counts as this session's outstanding work. */
 export const PUSH_WINDOW_MS = 24 * 60 * 60 * 1000
 /** How long a pushed sha may show NO run before we accept that none will come
- *  (a branch no workflow covers — `board`, a worktree branch). */
+ *  (a commit no workflow covers — a `board` push, a worktree branch, a
+ *  `[skip ci]` commit). */
 export const RUN_GRACE_MS = 3 * 60 * 1000
 /** How long an unfinished run is waited for before the wait fails OPEN. A wait
  *  without a ceiling would trap a session behind a queue that never drains. */
@@ -212,11 +213,12 @@ export const WAIT_BUDGET_MS = 30 * 60 * 1000
 export const RECHECK_MS = 60 * 1000
 /** The durable observer starts quickly, then backs off to a bounded interval.
  *  The 900-second launcher tick is recovery only; it is never this clock. */
-export const CI_WAIT_BACKOFF_MIN_MS = 15 * 1000
-export const CI_WAIT_BACKOFF_MAX_MS = 90 * 1000
+const CI_WAIT_BACKOFF_MIN_MS = 15 * 1000
+const CI_WAIT_BACKOFF_MAX_MS = 90 * 1000
 /** Schema version for the renewable wait stored beside the sha cache. */
-export const CI_WAIT_VERSION = 1
-/** How long an outage-waiver clock may sit unrefreshed before it is forgotten. */
+const CI_WAIT_VERSION = 1
+/** How old an outage-waiver clock (its first sighting) may grow before it is
+ *  forgotten — the clock is never refreshed while the famine lasts. */
 export const FAMINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /** Stable identity of one workflow run. GitHub keeps the run id across a
@@ -423,8 +425,9 @@ export function pushedRefsFromReflog(text, { now = Date.now(), windowMs = PUSH_W
 }
 
 /**
- * The shas to ask GitHub about, in the order they matter: HEAD's own first, then
- * the remaining pushes newest first.
+ * The shas to ask GitHub about, in the order they matter: HEAD's own first when
+ * it has a push reflog entry, then the remaining pushes newest first; a HEAD
+ * pushed only from elsewhere is appended last.
  *
  * A ref that no longer exists is DROPPED — a branch deleted after its merge must
  * not be reported forever. A sha reached under two names is asked about once.
@@ -487,7 +490,8 @@ export function selectCiTargets({ targets = [], liveAuthorBranches = [] } = {}) 
 /**
  * The cached answer for a sha, or null when GitHub must be asked again.
  * `success`/`nocheck` are terminal — the run for a sha concluded once and for
- * all, so they are never re-asked. `pending`/`failed` are NOT: a re-run turns a
+ * all, so they are not re-asked while cached (`pruneShaCache` drops them past
+ * the push window). `pending`/`failed` are NOT: a re-run turns a
  * red green and an unfinished run finishes, so they only mute the API for
  * RECHECK_MS, which is what keeps a blocked session from hammering it.
  */
@@ -524,7 +528,8 @@ export function refVerdict({ state, at = 0, now = Date.now(), graceMs = RUN_GRAC
 }
 
 /** Drop cache entries older than the push window — a sha that far back is no
- *  longer a target, so keeping it only grows the file. */
+ *  longer a reflog target (a still-pushed HEAD is simply asked again), so
+ *  keeping it only grows the file. */
 export function pruneShaCache(cache, now = Date.now(), windowMs = PUSH_WINDOW_MS) {
   const out = {}
   try {
@@ -601,7 +606,7 @@ export function notifiedFromState(state) {
  * and what fails open — is decided here and covered by Vitest without a network
  * or a repository. The wrapper only supplies the GitHub API and ntfy.
  *
- * @returns {{decision: string|null, cache, notified, famine, failedOpen: string[], dirty: boolean}}
+ * @returns {{decision: string|null, cache, notified, famine, failedOpen: string[], observations: object[], dirty: boolean}}
  */
 export async function sweepTargets({
   targets = [],
@@ -630,8 +635,8 @@ export async function sweepTargets({
     const gates = target?.disposition !== 'report'
     const entry = nextCache[target.sha]
     const cached = cachedAnswer(entry, now)
-    // A sha whose run CONCLUDED green (or that no workflow covers) is never
-    // asked about again — this is what keeps the repeat turn free.
+    // A sha whose run CONCLUDED green (or that no workflow covers) is not asked
+    // about again while cached — this is what keeps the repeat turn free.
     if (cached === 'success' || cached === 'nocheck') continue
     if (cached === 'failed') {
       if (gates && entry.reason) block ??= entry.reason
@@ -640,7 +645,7 @@ export async function sweepTargets({
     if (cached === 'pending') {
       // The BUDGET outranks the cache: a wait recorded a minute ago must not
       // keep blocking once the ceiling has passed in the meantime (four-eyes
-      // residual (b)). Past it the entry still mutes the API, it just no longer
+      // residual (b), 07.08.2026). Past it the entry still mutes the API, it just no longer
       // holds the turn.
       const waitStartedAt = Number(entry.budgetStartedAt) || Number(entry.firstSeenAt) || now
       if (refVerdict({ state: 'pending', at: waitStartedAt, now }) === 'wait') {
@@ -697,7 +702,8 @@ export async function sweepTargets({
       // a `board` push, a worktree branch, or a rescue commit marked `[skip ci]`.
       // Remembered per SHA and never per ref: a ref written off for a week would
       // silently pass the red of the very next commit on it, and a `[skip ci]`
-      // rescue push is the routine way onto that path (four-eyes finding 1).
+      // rescue push is the routine way onto that path (four-eyes 07.08.2026,
+      // finding 1).
       nextCache[target.sha] = { state: 'nocheck', firstSeenAt: at, checkedAt: now }
       continue
     }
@@ -788,7 +794,7 @@ export async function sweepTargets({
 }
 
 /** The wait message: honest about what is missing and what clears it. */
-export function waitReason(target, classification) {
+function waitReason(target, classification) {
   const t = target ?? {}
   const c = classification ?? {}
   return (
@@ -803,8 +809,9 @@ export function waitReason(target, classification) {
 }
 
 /** The ntfy text for a red pushed ref. Unactionable reds normally stay terse;
- * one carrying `alertDetail` has a time-bound condition the alert itself must
- * name, because the turn is deliberately allowed to continue. */
+ * one carrying `alertDetail` (a time-bound condition the alert itself must name,
+ * because the turn is deliberately allowed to continue) or `escalate` also gets
+ * its detail and remedy. */
 export function ciRedAlertMessage({ target = {}, classification = {}, standDown = false } = {}) {
   const c = classification
   return (
@@ -815,9 +822,11 @@ export function ciRedAlertMessage({ target = {}, classification = {}, standDown 
   )
 }
 
-/** Push exactly once per failing sha (the state file remembers the last one). */
-export function shouldNotify(state, alreadyNotifiedSha, headSha) {
-  return state === 'failed' && Boolean(headSha) && alreadyNotifiedSha !== headSha
+/** Push once per alert key and ref (the state file remembers the last key per
+ *  ref). The caller's key is the sha, or sha:run:hour for a stood-down red,
+ *  which re-alerts hourly by design. */
+export function shouldNotify(state, alreadyNotifiedKey, alertKey) {
+  return state === 'failed' && Boolean(alertKey) && alreadyNotifiedKey !== alertKey
 }
 
 /** The Stop-block reason: name the run, WHERE the fault lies, and the way out.
@@ -856,7 +865,7 @@ export function blockReason(classification, headSha, refName = 'HEAD') {
     `Reproduce the fast gate locally (npm run build && npm run lint && ` +
     `node scripts/audit-check.mjs && npm run test:unit), fix the cause, commit and push — ` +
     `CI green is part of done. ${trail}` +
-    `Only a fixing push (or an explicit user stop recorded with ` +
+    `Only a fixing push, a green re-run (or an explicit user stop recorded with ` +
     `\`node scripts/batch-pause.mjs --user-stop "<reason>"\`) clears this.`
   )
 }

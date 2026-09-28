@@ -8,8 +8,8 @@
 // of the sample: whatever arrives, what leaves is bounded by the curve's own
 // range, with no state and nothing to outrun.
 //
-// WHAT IT COSTS. Below the threshold the curve is the identity, bit for bit, so
-// the player's ambience volume, the village speech factor and the chief's drum
+// WHAT IT COSTS. Below the threshold the curve is the identity (the table holds
+// it to float32 precision, rounded one step inward), so the player's ambience volume, the village speech factor and the chief's drum
 // peak pass untouched. Above it the excess is bent towards the ceiling, which
 // rounds the very top of a transient that lands on an already loud moment.
 
@@ -27,8 +27,8 @@ export const MIX_LIMITER_DOMAIN = 2
 export const MIX_LIMITER_CURVE_POINTS = 2049
 
 /** The stage's transfer function, for one sample: the identity below the
- *  threshold, and above it a knee that approaches the ceiling without ever
- *  reaching it. `tanh` is used for its unit slope at zero, which makes the two
+ *  threshold, and above it a knee that approaches the ceiling and never passes
+ *  it (a threshold at the ceiling, or tanh rounding to 1, lands on it exactly). `tanh` is used for its unit slope at zero, which makes the two
  *  halves meet with the same gradient — the knee opens smoothly out of the
  *  identity rather than cornering into it. */
 export function limitMixSample(x: number): number {
@@ -62,8 +62,8 @@ const DEFAULT_CEILING = 0.95
 
 /** The table the `WaveShaper` carries: `limitMixSample` over the scaled domain.
  *  The browser reads it with linear interpolation, and the knee is concave, so
- *  an interpolated value can only fall SHORT of the curve — never past the
- *  ceiling. */
+ *  an interpolated value falls SHORT of the curve; the few float32 ulps the
+ *  interpolation itself can overshoot are what tableBound leaves room for. */
 export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Float32Array<ArrayBuffer> {
   const curve = new Float32Array(points)
   const bound = tableBound()

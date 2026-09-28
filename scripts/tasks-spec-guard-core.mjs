@@ -120,9 +120,9 @@ export const TRAIL_MARKERS = [
 
 /**
  * TASKS.md checklist blocks: [{point, open, text}]. A block starts at a
- * top-level `- [ ] N.` / `- [x] N.` line and runs until the next such line;
- * indented continuation lines belong to the block. Non-checklist prose between
- * blocks is ignored. Total on malformed input.
+ * top-level `- [ ] N.` / `- [x] N.` (or `[X]`) line and runs until the next
+ * checklist line; every line in between belongs to the block. Total on
+ * malformed input.
  */
 export function parsePointBlocks(text) {
   const blocks = []
@@ -232,8 +232,9 @@ export function titleCaseOffenders(tasksMd, baselineTasksMd = '') {
 }
 
 /** Top-level decision on the raw TASKS.md content. Total: any bad input → allow. */
-export function evaluate({ tasksMd, baselineTasksMd } = {}) {
+export function evaluate(input) {
   try {
+    const { tasksMd, baselineTasksMd } = input ?? {}
     const trails = specTrailOffenders(tasksMd)
     const titles = titleCaseOffenders(tasksMd, baselineTasksMd)
     if (trails.length === 0 && titles.length === 0) return { block: false, reason: '' }
@@ -250,8 +251,8 @@ export function evaluate({ tasksMd, baselineTasksMd } = {}) {
     if (titles.length) {
       const list = titles.map((o) => `${o.point}: "${o.expected}"`).join('; ')
       reasons.push(
-        `TASK TITLE SHOUTS: point(s) ${list}. Titles with at least eight letters must use sentence ` +
-          'case (at least five percent lowercase). Replace each title with the copy-ready form shown.',
+        `TASK TITLE SHOUTS: point(s) ${list}. Titles with at least eight letters may not be all ` +
+          'uppercase (at least five percent lowercase). Replace each title with the copy-ready sentence-case form shown.',
       )
     }
     return { block: true, reason: reasons.join('\n\n') }

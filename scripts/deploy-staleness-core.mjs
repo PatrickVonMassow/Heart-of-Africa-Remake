@@ -1,5 +1,6 @@
 // IS THE DEPLOYED SITE STILL THE COMMIT `main` STANDS AT? — pure decision logic
-// for scripts/deploy-staleness.mjs. No I/O, never throws, Vitest-covered in
+// for scripts/deploy-staleness.mjs. No I/O; the verdict functions never throw
+// (`nextAttempts` expects the plain state it wrote). Vitest-covered in
 // deploy-staleness-core.test.mjs.
 //
 // WHY IT EXISTS (measured 06.08.2026, point 528): every alarm this project has
@@ -13,8 +14,9 @@
 //
 // So the comparison is made against the site itself: the build emits
 // `build-info.json` at the site root (scripts/build-info.mjs), the watchdog
-// fetches it, and this module decides. It NAMES BOTH REVISIONS in every verdict,
-// because "the site is stale" without the two shas is not actionable.
+// fetches it, and this module decides. It NAMES BOTH REVISIONS wherever it has
+// them (an `unknown` verdict has no served sha, a site without a marker names
+// only `main`), because "the site is stale" without the shas is not actionable.
 //
 // FAIL-OPEN THROUGHOUT: anything unclear — an unreachable site, an unreadable
 // marker, a missing sha — is `unknown`, never an alarm. A watchdog that cries
@@ -42,8 +44,9 @@ export const IN_FLIGHT_GRACE_MS = 30 * 60 * 1000
 export const RETRY_COOLDOWN_MS = 30 * 60 * 1000
 
 /** How many times one commit is re-dispatched before the watchdog stops trying
- *  and starts insisting. Three attempts over 90 minutes is generous for an
- *  outage; past that the fault needs a human, not another dispatch. */
+ *  and starts insisting. Three attempts a cooldown apart (0/30/60 min) are
+ *  generous for an outage; past that the fault needs a human, not another
+ *  dispatch. */
 export const MAX_DISPATCHES = 3
 
 const SHA_RE = /^[0-9a-f]{7,40}$/i
@@ -51,8 +54,8 @@ const short = (sha) => (typeof sha === 'string' && sha ? sha.slice(0, 7) : '?')
 
 /**
  * Read a served `build-info.json`. Returns null for anything that is not one —
- * a Pages 404 page, a truncated body, a marker without a usable commit — so a
- * garbled answer can never be mistaken for a revision.
+ * an HTML page served with 200, a truncated body, a marker without a usable
+ * commit — so a garbled answer can never be mistaken for a revision.
  */
 export function parseBuildInfo(text) {
   try {
@@ -82,8 +85,10 @@ export function parseBuildInfo(text) {
  * @param {boolean|null} [input.servedContainsMain] does the served commit CONTAIN
  *   `main`? true means our clone is behind the site, not the other way round.
  *   null when it cannot be decided (a sha this clone does not have).
- * @param {{createdAt?:number, status?:string, conclusion?:string}|null} [input.latestRun]
+ * @param {{createdAt?:number, status?:string}|null} [input.latestRun]
  *   the newest deploy run for `mainSha`, or null when none exists.
+ * @param {number} [input.now] the clock; [input.graceMs] / [input.inFlightGraceMs]
+ *   override DEPLOY_GRACE_MS / IN_FLIGHT_GRACE_MS.
  * @returns {{verdict:'current'|'pending'|'stale'|'unknown', servedSha:string|null,
  *   mainSha:string, reason:string, servedBuiltAt?:string}}
  */
@@ -192,7 +197,7 @@ export function retryDecision(input) {
 
     if (count >= maxDispatches) {
       return no(
-        `${count} dispatches for ${short(main)} did not land it — this needs a human, not a fourth run`,
+        `${count} dispatches for ${short(main)} did not land it — this needs a human, not another run`,
         { exhausted: true },
       )
     }

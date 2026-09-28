@@ -1,9 +1,9 @@
-// Debug menu (design.md §21, F1): runtime tuning of the balance values used
-// by the POC plus the game-language selector (design.md §17.7: English is the
-// default game language, German the alternative). Implemented only as far as
-// the POC systems require (CLAUDE.md §8).
+// Debug menu (design.md §21, F1): runtime tuning of the balance values, the
+// village-life tables, drama and event staging, jump-to, the benchmark and the
+// other tools, plus the game-language selector (design.md §17.7: English is the
+// default game language, German the alternative).
 //
-// STRUCTURE (design.md §21.3, point 393). The ~130 controls are not one flat
+// STRUCTURE (design.md §21.3, point 393). The controls are not one flat
 // run: each sits in a named, collapsible GROUP chosen by what a person is doing
 // when he opens the menu — not by which balance object the value happens to
 // live in. Every group starts collapsed; an opened one is remembered in the UI
@@ -11,9 +11,9 @@
 // the WHOLE menu to the controls whose label matches what is typed, across all
 // groups at once, and clearing it restores the remembered collapse state.
 //
-// A collapsed group keeps its controls in the DOM (hidden), so the filter can
-// search every label and an external driver (the verify suites) can still reach
-// a control without first opening its group.
+// A collapsed group keeps its controls in the DOM (hidden), so an external
+// driver (the verify suites) can still reach a control without first opening
+// its group; the filter itself works on the row data.
 
 import { Fragment, useState, type ReactNode } from 'react'
 import { balance } from '../config/balance'
@@ -128,7 +128,7 @@ function GroupedActionSelect({
  * Every calibratable value of the children's game of tag (design.md §19.10,
  * point 480/351), in the order the mechanic reads: how many play, the paces, the
  * reserve rates and its two thresholds, the distances the decisions turn on, and
- * the shaping values. A table rather than twenty hand-written fields — the
+ * the shaping values. A table rather than dozens of hand-written fields — the
  * completeness is then visible at a glance, which is the point of the rule that
  * every balance value is debug-editable.
  */
@@ -178,7 +178,8 @@ const TAG_FIELDS: ReadonlyArray<{
 /**
  * Every calibratable value of the children's game at the river bank (work-order
  * 687): the length of each phase of a cycle, the stage's own distances, the
- * walking pace between runs and the extra berth the group gives the traveller.
+ * roaming and dodging, the walking pace between runs, the extra berth the group
+ * gives the traveller and the gaps in its calls.
  * Same table shape as the chase's above — the completeness is visible at a
  * glance, which is the point of the rule that every balance value is editable.
  */
@@ -215,9 +216,10 @@ const BANK_GAME_FIELDS: ReadonlyArray<{
 
 /**
  * Every calibratable value of what the ADULTS do at their errands (work-order
- * point 483): how often one is staged, how long a villager stays where it was
- * sent, how long a bout of digging lasts, and how many villagers are out on
- * errands at all. Same table shape as the two above, for the same reason.
+ * point 483): how often and how irregularly one is staged, how long a villager
+ * stays where it was sent, how long a bout of digging lasts, how long an errand
+ * may run or stall, the walking pace, and how many villagers are out on errands
+ * at all. Same table shape as the two above, for the same reason.
  */
 const ADULT_ERRAND_FIELDS: ReadonlyArray<{
   key: keyof typeof balance.villageLife.adultErrands
@@ -338,9 +340,6 @@ export function DebugMenu() {
   const seasonWetnessOverride = useUi((s) => s.seasonWetnessOverride)
   const speechConceptLabels = useUi((s) => s.speechConceptLabels)
   const setSpeechConceptLabels = useUi((s) => s.setSpeechConceptLabels)
-  // The graphics allow-flags (traa/ssao/shadowMapHalf/shadows/fireShadows) live
-  // in the store but are no longer exposed in this menu (design.md §21.3, point
-  // 276 correction) — the graphics section is a single detail-level dropdown.
   const detailLevel = useUi((s) => s.detailLevel)
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
   const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
@@ -350,7 +349,6 @@ export function DebugMenu() {
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
   const bump = useGame((s) => s.bumpBalance)
-  useGame((s) => s.balanceVersion)
   const game = useGame()
   const [filter, setFilter] = useState('')
 
@@ -443,14 +441,15 @@ export function DebugMenu() {
     movement: [
       num(t.debug.walkSpeed, balance.placeWalkSpeed, (v) => set('placeWalkSpeed', v), 0.5),
       num(t.debug.strafeFactor, balance.placeStrafeFactor, (v) => set('placeStrafeFactor', Math.max(0, v)), 0.05),
-      // Settlement collision (design.md §11): a SHARE of the enter radius, so
+      // Settlement collision (design.md §2.6): a SHARE of the enter radius, so
       // the "Space to enter" prompt can never arm inside the collider — 1 is
       // the ceiling the resolver clamps to anyway.
       num(t.debug.placeCollisionFactor, balance.placeCollisionFactor,
         (v) => set('placeCollisionFactor', Math.max(0, Math.min(1, v))), 0.05),
       num(t.debug.mouseSensitivity, balance.mouseSensitivity, (v) => set('mouseSensitivity', Math.max(0, v)), 0.0002),
       // Vertical look (design.md §17.5/§21.2, point 392): the clamp in degrees
-      // from the horizon, and the inversion — checked by default.
+      // from the horizon; its inversion (checked by default) follows the
+      // unstuck rows.
       num(t.debug.lookPitchLimit, balance.lookPitchLimitDeg, (v) => set('lookPitchLimitDeg', Math.max(0, v)), 5),
       // The player's own escape from a wedge (work-order 604): when the game
       // calls him stuck, and how far out it looks for free ground.
@@ -620,8 +619,9 @@ export function DebugMenu() {
       num(t.debug.bloodStainIrregularity, balance.bloodStain.irregularity,
         (v) => { balance.bloodStain.irregularity = clampIrregularity(v); bump() }, 0.05),
     ],
-    // The village-life levers (chase, children's speech, adult errands) have
-    // no home among the §21.3 categories, and they are neither wildlife nor
+    // The village-life levers (walker unstuck, edge band, wade depth, village
+    // speech, tag, the bank game, adult errands, separation) have no home
+    // among the §21.3 categories, and they are neither wildlife nor
     // movement — a person tuning them is watching a SETTLEMENT.
     settlement: [
       num(t.debug.walkerUnstuck, balance.walkerUnstuckSeconds,
@@ -649,7 +649,7 @@ export function DebugMenu() {
         (v) => { balance.communication.hearingRadius = Math.max(0, v); bump() }, 1),
       num(t.debug.speechHearingFalloff, balance.communication.talk.falloff,
         (v) => { balance.communication.talk.falloff = Math.max(0, v); bump() }, 2),
-      // How long the player's reading stands over the speaker's head (point 485).
+      // The reach and loudness of the two registers, talk and call.
       ...(['talk', 'call'] as const).flatMap((register) => [
         num(t.debug[register === 'talk' ? 'talkReach' : 'callReach'], balance.communication[register].reach,
           (v) => { balance.communication[register].reach = Math.max(0, v); bump() }, 1),
@@ -664,10 +664,12 @@ export function DebugMenu() {
         (v) => { balance.communication.consequenceSeconds = Math.max(0, v); bump() }, 0.5),
       num(t.debug.speechHold, balance.communication.speechHoldSeconds,
         (v) => { balance.communication.speechHoldSeconds = Math.max(0, v); bump() }, 5),
+      // How long the player's reading stands over the speaker's head (point 485).
       num(t.debug.speechLabelSeconds, balance.communication.labelSeconds,
         (v) => { balance.communication.labelSeconds = Math.max(0, v); bump() }, 0.2),
-      // The two pitches themselves (point 587): the low tone and the interval
-      // the high one sits above it — the only difference the language carries.
+      // The pitches themselves (point 587): the adult and child low tones and the
+      // interval the high tone sits above them — the only difference the
+      // language carries — with the stereo width between them.
       num(t.debug.speechPitch, balance.communication.speechPitchHz,
         (v) => { balance.communication.speechPitchHz = Math.max(20, v); bump() }, 5),
       num(t.debug.speechChildPitch, balance.communication.speechChildPitchHz,
@@ -678,7 +680,7 @@ export function DebugMenu() {
         (v) => { balance.communication.speechPitchInterval = Math.max(1, v); bump() }, 0.02),
       // The speech's own LEVEL is a volume, so it lives with the other volumes
       // in the graphics-and-sound group, not here (point 605).
-      // How close over that speaker's own head it floats (point 582).
+      // How close over the speaker's own head the reading floats (point 582).
       num(t.debug.speechLabelHeadroom, balance.communication.labelHeadroom,
         (v) => { balance.communication.labelHeadroom = Math.max(0, v); bump() }, 0.05),
       // DEBUG VIEW (user 09.08.2026): the concept behind each utterance instead
@@ -769,11 +771,13 @@ export function DebugMenu() {
       )),
     ],
     graphics: [
-      // The graphics section is a SINGLE detail-level dropdown (design.md
-      // §21.3, point 276 correction). The per-setting graphics allow-flags
-      // (TRAA, SSAO, half/full shadows, campfire shadows) are no longer
-      // exposed here — they stay internal, set by the touch quality preset
-      // (§17.5) and the F8 benchmark, and combined by the effective* selectors.
+      // Graphics quality is a SINGLE detail-level dropdown (design.md §21.3,
+      // point 276 correction); the rows after it are the ground and budget
+      // debug values and the sound volumes of this graphics-and-sound group.
+      // The per-setting graphics allow-flags (TRAA, SSAO, half/full shadows,
+      // campfire shadows) are not exposed — they stay internal, set by the
+      // touch quality preset (§17.5) and the F8 benchmark, and combined by the
+      // effective* selectors.
       custom(t.debug.detailLevel, (
         <label>
           <span>{t.debug.detailLevel}</span>
@@ -922,7 +926,7 @@ export function DebugMenu() {
 
       {shown.map((g) => {
         // A filter shows what it found; otherwise the remembered collapse state
-        // decides. Collapsed rows stay in the DOM so the filter can search them.
+        // decides. Collapsed rows stay in the DOM so an external driver can reach them.
         const isOpen = filtering || groupsOpen.includes(g.id)
         return (
           <div className="debug-group" key={g.id}>

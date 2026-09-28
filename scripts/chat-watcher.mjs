@@ -7,12 +7,12 @@
 //   node scripts/chat-watcher.mjs --stop      # stop the running watcher
 //
 // WHAT IT COSTS WHILE NOTHING HAPPENS: one open HTTPS connection. No model, no
-// tokens, no timer that wakes anything. That is the whole reason it is a
-// subscription and not a poll — and the second reason is ntfy's free-tier rate
+// tokens; its one timer (the deferral sweep) only re-reads the local spool.
+// That is the whole reason it is a subscription and not a poll — and the second reason is ntfy's free-tier rate
 // limit, which a process polling every few seconds walks straight into.
 //
-// THE DRY RUN IS NOT A TOY. The live path can only ever be observed from a
-// machine with NO session running, which is precisely the machine nobody is
+// THE DRY RUN IS NOT A TOY. The live path is mostly observed from a machine
+// with NO session running (a deferral sweep can spawn beside a live owner), which is precisely the machine nobody is
 // sitting at. `--dry-run` opens the real subscription, verifies every arriving
 // envelope through the same scripts/chat-core.mjs path, prints one JSON line per
 // event saying what it WOULD do and why — and spawns nothing, claims nothing,
@@ -72,7 +72,7 @@ import {
   wakeDecision,
 } from './chat-watcher-core.mjs'
 
-export const PID_PATH = repoPath('.claude', WATCHER_PID_FILE)
+const PID_PATH = repoPath('.claude', WATCHER_PID_FILE)
 const LOG_PATH = repoPath('.claude', 'chat-watcher.log')
 const RUN_LOG_PATH = repoPath('.claude', 'chat-responder-run.log')
 
@@ -158,11 +158,11 @@ function formatAlarm() {
 /**
  * Everything `wakeDecision` needs, gathered from disk. The owner assessment is
  * the launcher's own (`assessOwner`) with the same probes — nothing about
- * liveness is re-invented here. It is deliberately asked WITHOUT the in-flight
- * work declaration — CORRECTED by point 556's four-eyes review (finding 2): since
- * an expired lease may now be OUTVOTED by the owner's advancing work, omitting the
- * declaration makes an owner read LESS alive, not more, and this watcher would
- * wake a responder into a live working session. It is gathered here, through the
+ * liveness is re-invented here. It is asked WITH the in-flight work declaration
+ * (point 556's four-eyes review, finding 2): since an expired lease may be
+ * OUTVOTED by the owner's advancing work, omitting the declaration would make an
+ * owner read LESS alive, not more, and this watcher would wake a responder into
+ * a live working session. It is gathered here, through the
  * one shared gatherer, and costs a single file read unless the lock is actually in
  * a state where it could change the answer.
  */
@@ -230,9 +230,10 @@ function releaseClaim(why) {
 }
 
 /**
- * Mark the handed messages consumed — ONLY against EVIDENCE that this responder
- * actually answered: a reply the transport accepted, recorded after the spawn by
- * `recordReplyReceipt` in scripts/chat-reply.mjs. The exit code proves nothing —
+ * Mark the handed messages consumed — ONLY against EVIDENCE of an answer: a
+ * reply the transport accepted, recorded at or after the spawn by
+ * `recordReplyReceipt` in scripts/chat-reply.mjs (the receipt does not name its
+ * sender, so any reply in that window counts). The exit code proves nothing —
  * a responder that stands down and ends its turn exits 0 as well, and acking on
  * that took the user's instruction off the spool with nobody having answered it.
  */
@@ -465,7 +466,7 @@ async function handleLine(secret, maxAgeMs, line) {
     // inside the window in which the transport could replay it.
     seen: [...state.seen, ...envelopeKeys(state.envelopes)],
   })
-  // `keepalive` and `open` frames arrive every few seconds; reporting them would
+  // `keepalive` and `open` frames arrive regularly; reporting them would
   // drown the dry run's output in noise and say nothing.
   if (verdict.reason === 'not-a-message') return
 
@@ -473,7 +474,7 @@ async function handleLine(secret, maxAgeMs, line) {
   // from the cursor with one second of overlap, and ntfy replays whatever it
   // still holds — so the same message arrives again and MUST decide nothing.
   // Every event that got this far is remembered, accepted or not: a mis-signed
-  // one re-read from the cache is not re-reported either.
+  // one re-read from the cache is logged as a duplicate, never judged again.
   if (verdict.accept) {
     state.seen.push(...seenKeys({ ntfyId: verdict.message.ntfyId, envelopeId: verdict.message.id }))
     state.envelopes.push({ id: verdict.message.id, at: verdict.message.ts })
@@ -514,12 +515,12 @@ async function handleLine(secret, maxAgeMs, line) {
 // again with the owner gate lifted. Every other stand-down still binds, and the
 // responder runs under the same bounded claim as any other wake.
 
-/** How often the pending spool is re-examined. A third of the window, so an
- *  overdue message waits at most a third of it longer than the deadline. */
+/** How often the pending spool is re-examined. A third of the window (at least
+ *  15 s), so an overdue message waits at most that much longer than the deadline. */
 const sweepIntervalMs = () => Math.max(15_000, Math.round(deferralMs() / 3))
 
-/** The deadline, calibratable — the env var is read once per call so a test can
- *  set it, and a nonsense value falls back to the default rather than to zero
+/** The deadline, calibratable — the env var is read on every call (the sweep
+ *  interval itself is fixed at startup), and a nonsense value falls back to the default rather than to zero
  *  (which would spawn beside every live owner). */
 function deferralMs() {
   const raw = Number(process.env.HOA_CHAT_DEFER_MS)

@@ -12,8 +12,8 @@ need a real browser stay in Playwright.
 
 | Layer | Where | Runner | What it covers |
 |---|---|---|---|
-| **Vitest (jsdom)** | `src/**/*.test.ts[x]` | `npm run test:unit` | Pure logic, store transitions, and HTML-HUD component classes/text. No browser, no dev server; the whole layer runs in seconds. |
-| **Playwright** | `scripts/verify/*.mjs` | `npm test -- <suite>` | Only browser-dependent checks: the R3F/three scene + RAF wildlife, real layout geometry, canvas/WebGL init, pointer-lock, TTS audio, the CLAUDE.md §7.2 acceptance screenshots, and one end-to-end core flow. |
+| **Vitest (jsdom)** | `src/**/*.test.ts[x]`, `scripts/**/*.test.mjs` | `npm run test:unit` | Pure logic, store transitions, and HTML-HUD component classes/text. No browser, no dev server; the whole layer runs in seconds. |
+| **Playwright** | `scripts/verify/*.mjs` | `npm test -- <suite>` | Only browser-dependent checks (plus the pure-Node `docs` check that rides along): the R3F/three scene + RAF wildlife, real layout geometry, canvas/WebGL init, pointer-lock, TTS audio, the CLAUDE.md §7.2 acceptance screenshots, and one end-to-end core flow. |
 
 ```
 npm run test:unit     # fast Vitest layer only (jsdom)
@@ -26,10 +26,11 @@ npm test -- unit      # just the vitest stage, via the full runner
 npm test -- flow      # just one named browser suite (dev server managed for you)
 ```
 
-`npm test` runs, in order: type-check + build → lint → **vitest (fail-fast)** →
-the Playwright browser suites against the dev server → the production-preview
-smoke test. The runner itself is `scripts/verify/run-all.mjs`; the three npm
-commands above reach it through the LOGGED wrapper described next.
+`npm test` runs, in order: type-check + build → lint → test-types → **vitest
+(fail-fast)** → the Playwright browser suites against the dev server → the
+production-preview smoke test. The runner itself is `scripts/verify/run-all.mjs`;
+`npm test`, `npm run test:small` and `npm run test:large` reach it through the
+LOGGED wrapper described next.
 
 ### In a WORKTREE, bootstrap the dependencies FIRST (points 569/573/606)
 
@@ -49,8 +50,8 @@ against the wrong dependency tree. The decision table is pure in
 `scripts/worktree-bootstrap-core.mjs`.
 
 Remove such a worktree only with `scripts/worktree-cleanup.mjs`: it DETACHES the
-link first, where `git worktree remove` and `rm -rf` follow it and delete the
-main tree's dependencies.
+link first. On Windows the link is a junction, which `git worktree remove` and
+`rm -rf` follow, deleting the main tree's dependencies.
 
 **Anything a test SPAWNS resolves through `scripts/local-bin.mjs`, never through
 `process.cwd()`.** That is the fix behind those points and the rule that keeps
@@ -110,10 +111,6 @@ and a real both-backend LARGE runs **115–121 minutes** (docs/picture-check-cos
 §7, five runs measured 09.09.2026) — ~5.4 M weighted spent on watching. So the
 loop is gone, and three things replace it.
 
-(The 42-minute figure this passage used to argue from is the ONE-backend sum of
-§1's per-suite medians. It is not what `npm test` costs, and reading it as such
-is how a two-hour run came to look normal.)
-
 **1. Ask what the run costs before you start it.**
 
 ```
@@ -157,20 +154,19 @@ the transcript rather than remembered.
 *overdue*. It is *hung* only past its **wall-clock ceiling** — its own plan plus
 the 45-minute suite ceiling `run-all.mjs` already enforces by KILLING a suite
 (`VERIFY_SUITE_TIMEOUT_MS`) — and only when it is ALSO silent, nothing produced
-for a whole 15-minute progress lease. Point 1135 replaced the old **2.5 ×
-expectation** mark with that ceiling, because the expectation is the thing that
-was wrong: below the ceiling a silent run is STILL RUNNING and ending it is a
+for a whole 15-minute progress lease. Below the ceiling a silent run is STILL RUNNING and ending it is a
 HAND decision, never the tool's. The two-hour lease cap remains the absolute
 backstop above both. **The ceiling is read from the environment of whoever is
 LOOKING**, because the run does not record the timeout it was launched with and
 adding that field is the ledger growth the infrastructure freeze forbids — so a
 run launched with a raised `VERIFY_SUITE_TIMEOUT_MS` must be inspected from a
 shell exporting the same value, or the wait holds it to the house default. Both
-readers take it the same way, so the poll and the lease can never disagree. That silence is judged on the **writer's own
-mark**: `run-logged.mjs` opens a zero-byte `<log>.progress` once, holds the
+readers take it the same way, so the poll and the lease can never disagree.
+
+That silence is judged on the **writer's own mark**: `run-logged.mjs` opens a zero-byte `<log>.progress` once, holds the
 descriptor for the run, and moves its mtime from what its child really emitted
 and from sampling the newest frame's mtime — by mtime, because a
-both-backends run overwrites the same 93 names and a count would stop rising
+both-backends run overwrites the same names and a count would stop rising
 while the pictures kept coming. The mark is a file of its own so that neither a
 reader's bookkeeping can pass for the run's progress nor a reader's
 read-modify-write can drop a fresh mark, and the verdict takes the **newest** of
@@ -191,8 +187,9 @@ permission checks, so a marker whose ownership changes under a running run can
 still refuse the stamp. Then the run is judged by its log alone, which is where
 it stood before this point, and the residual is collected in
 `docs/backlog.md`. `--await` and `--status` ask the same question and give the same
-answer: a run that is still writing is `SLOW`, never `HUNG`. A MULTIPLE of the
-plan could never say it either: the §1 plan is measured to be a third to two
+answer: a run that is still writing is `SLOW`, never `HUNG`. Point 1135 replaced
+the old **2.5 × expectation** mark with the ceiling, because a multiple of the
+plan could never say it: the §1 plan is measured to be a third to two
 thirds of the real cost, so the old 2.5 × mark for a whole `polish` pass fell at
 14 minutes against a measured 9.9–61.5, and on 15.09.2026 a run that had already
 written 34 of its 21 expected frames was reported hung and ended — with it the
@@ -200,7 +197,8 @@ only covering picture run the release was waiting for. That is the measurement
 the wall-clock ceiling of point 1135 answers. The frames are the heartbeat that matters here:
 `run-all.mjs` captures a suite's output and prints its `PASS`/`FAIL` line only
 when the suite ENDS, so it now also prints a `# → <suite>` line before it starts
-one. A log standing still at `# → polish` for fifty minutes is the suite working.
+one. A log standing still at `# → polish` for forty minutes is the suite working —
+up to the 45-minute ceiling.
 
 **The receipt.** `run-logged.mjs` writes a RUN RECORD beside the log
 (`<log>.run.json`) before it spawns anything and closes it with a structured
@@ -232,7 +230,7 @@ gone quiet (that is a wedge, not a wait).
 ### Host bring-up and fast GPU preflight (points 475/732)
 
 The browser suites need a browser, and `npm install` does not put one there. One
-documented command does, on every platform:
+documented command installs what it can and reports the rest, on every platform:
 
 ```
 npm run verify:bringup          # install what is missing, then report
@@ -323,7 +321,7 @@ because nothing launches, no run record is written, so `render-verify-guard` can
 mistake the attempt for WebGPU coverage: a WebGL 2 picture says nothing about the
 WebGPU one (point 210).
 
-### The fast layer's timeout is load-proof, not tight (point 398)
+### The fast layer's timeout is generous, not tight (point 398)
 
 `vitest.config.ts` sets `testTimeout: 20_000` (and the same for `hookTimeout`).
 Vitest's default is 5000 ms, and that bar could not survive this project's own
@@ -340,7 +338,9 @@ the step, when the machine already read quiet again (that half is fixed too —
 see the push-gate section below, where the opening reading and `worseLoad`
 live). These are deterministic pure-logic and jsdom tests: a case that passes in
 2 s and one that HANGS are orders of magnitude apart, so the generous ceiling
-costs nothing on a green run and still fails a real hang.
+costs nothing on a green run and still fails a real hang. It is not proof against
+every load: under several parallel Vitest runs single cases have still crossed
+20 s.
 
 It is not a licence to get slow. `slowTestThreshold` is pinned at 1000 ms, so
 every case over a second is still printed with its duration and a test growing
@@ -388,13 +388,12 @@ unit, `audit-check.mjs` on a lockfile change, its own cheapest covering rung
 the two-backend picture judgement — and nothing else blocks that merge. The
 **both-backend LARGE runs once per bundle and at closing**, on `main`, after the
 last merge; "The full regression is the BUNDLE's gate" below is the whole rule,
-its measurement and its falsification criterion. Choose the covering suites for
-the bundle run from the tier map below:
+its measurement and its falsification criterion. The tiers:
 
 | Tier | Command | Backend | Browser suites | Preview | What it really costs |
 |------|---------|---------|----------------|---------|----------------------|
-| **SMALL** (everyday gate) | `npm run test:small` | WebGPU | `docs, board-layout, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/board/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no | planned 7m 49s; not separately re-measured in September |
-| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 19** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes | planned 80m 48s, **measured 115–121 min** (n=5, 09.09.2026) |
+| **SMALL** (everyday gate) | `npm run test:small` | WebGPU (`voice` routed to WebGL 2) | `docs, board-layout, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/board/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no | planned 7m 49s; not separately re-measured in September |
+| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 20** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, communication, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes | planned 80m 48s, **measured 115–121 min** (n=5, 09.09.2026) |
 
 **Read the price before you start one.** `node scripts/verify/run-wait.mjs --plan
 large` prints the planned expectation AND the observed band under it. The plan
@@ -721,8 +720,8 @@ CI free.
   text — and not one recorded render-verify run was partial. So
   `scripts/point-brief-core.mjs` carries the VERIFICATION LADDER in the brief of
   every point whose spec can move a picture: section → suite → whole set while
-  repairing, the full fast gate and the whole suite as the proof, the both-backend
-  picture proof once, on `main`-merged-into-the-branch, with the verified
+  repairing, the full fast gate and the cheapest covering rung as the proof
+  ("What finishes a `feat/` point" below), the both-backend picture proof once, on `main`-merged-into-the-branch, with the verified
   `git HEAD` reported. It is a building block of the brief, not a paragraph
   somebody has to remember.
 - **And the brief NAMES the check set, with its sections (point 598).** The same
@@ -808,7 +807,7 @@ list is exhaustive, so that nobody has to guess what blocks a merge:
 | `npm run build` | always |
 | `npm run test:unit` | always |
 | `node scripts/audit-check.mjs` | only when the lockfile changed |
-| the point's own CHEAPEST COVERING rung | always — its `--section` block, or the whole suite where that suite declares no sections (`startup`, `benchmark`, `docs` and the other unsectioned ones refuse `--section`, so the suite itself IS their cheapest rung) |
+| the point's own CHEAPEST COVERING rung | always — its `--section` block, or the whole suite where that suite declares no sections (`startup` and `benchmark` refuse `--section`, and `docs` drives no browser, so the suite itself IS their cheapest rung) |
 | the two-backend PICTURE judgement | always for a change that can move the picture |
 
 **Only that gate blocks the merge.** The both-backend LARGE is not part of it.
@@ -847,8 +846,7 @@ closing run, and no finished branch waits for an unfinished large bundle.
 - **Core touches** — the tick loop, the scheduler, the save format, the
   renderer/backend binding. This is a prose list, and it grows only after an
   actual core red, never on suspicion.
-- **Branches touching the same suite or subsystem**, which is the rule point 1126
-  already wrote down above: where one branch's red would make the other's result
+- **Branches touching the same suite or subsystem**: where one branch's red would make the other's result
   unreadable, the shared run buys a cheaper answer nobody can attribute. Run them
   separately and say why. A diff argument may add a single further case.
 
@@ -990,9 +988,8 @@ VERIFY_ON_LOAD=off npm test                  # switch the check off entirely
 VERIFY_LOAD_FORCE=loaded npm test -- docs    # self-test the wiring on a quiet machine
 ```
 
-This is the half that acts BEFORE a run; the section below is the half that reads
-a red AFTER it, and they share their vocabulary (`load signature`, "judge a red
-only on a quiet machine") because they describe one phenomenon from two ends.
+This is the half that acts BEFORE a run; "Triaging a RED run" further down reads
+a red AFTER it — one phenomenon from two ends.
 
 ### The PUSH GATE asks the same question (point 389)
 
@@ -1008,7 +1005,8 @@ second result. Nothing else moves — a red on a quiet machine still blocks
 immediately, a step that fails twice blocks whatever the machine says, and there
 is no skip, no warn-instead-of-block and no bypass. Every retry PRINTS what is
 being re-run and why, and the verdict line carries it too (`unit was re-run once
-after a red taken under load` / `unit failed TWICE — the load was not the cause`),
+after a red taken under load` / `unit was red on BOTH runs — the re-run did not
+clear it, so it blocks.`),
 because a silent retry would hide a real intermittent defect. The decision is pure
 in `pre-push-gate-core.mjs` and pinned in `pre-push-gate-core.test.mjs`.
 
@@ -1049,7 +1047,7 @@ So the gate now captures the unit step's output as well as printing it, reads it
 `Test Files` / `Tests` summary, and compares the file count with the **last green
 run's own count** — never a hard-coded number, which would rot with every added
 suite. The baseline lives in `.claude/pre-push-gate-state.json` (git-ignored, per
-CHECKOUT: each worktree has its own dependency tree). Both numbers appear in the
+CHECKOUT: each worktree keeps its own baseline). Both numbers appear in the
 gate's own line — `unit ran 153 files / 4214 tests` — so the size of the evidence
 base is visible on a green push too, not only when it blocks.
 
@@ -1107,7 +1105,7 @@ but the verdict now names what was *observed* instead of asserting a cause. The
 old line "failed TWICE — the load was not the cause" was simply false: the load
 never went away between the two runs.
 
-### The COMMIT-MSG hook: a rescue must not mail the user (point 408)
+### The COMMIT-MSG hook: a rescue must not start CI (point 408)
 
 The third versioned hook (`scripts/git-hooks/commit-msg`, wired by the same
 `npm install` as the other two) runs `commit-scope-guard.mjs --message` — the
@@ -1130,7 +1128,8 @@ Rescue: agent killed mid-build; the next commit finishes and runs CI.
 ```
 
 **Both halves or neither** — that is the whole design. A rescue trailer without
-the marker still mails the user, so it is refused naming the marker; a bare
+the marker still starts a CI run on a half-finished state, so it is refused
+naming the marker; a bare
 `[skip ci]` silently skips a real gate, so it is refused naming the trailer —
 and with it every other spelling GitHub honours, anywhere in the message:
 `[ci skip]`, `[no ci]`, `[skip actions]`, `[actions skip]`, and the unbracketed
@@ -1162,8 +1161,9 @@ are still refused without each other.
 
 ### CONFIRM GREEN, not "notice red" (`ci-status-guard`, point 387)
 
-The pre-push gate runs the same unit suite CI runs, so it catches everything
-**except what differs by platform** — and that is exactly what went wrong on
+On `main` the pre-push gate runs the same unit suite CI runs (a branch push runs
+only lint and audit locally, see "Where a CI failure is announced"), so it
+catches everything **except what differs by platform** — and that is exactly what went wrong on
 30.07.2026. A negative control reproduced a Windows incident (git's removal
 following a junction into its target) and asserted it on every platform, so it
 failed every hosted Ubuntu run and passed on the machine that wrote it. A second
@@ -1199,7 +1199,8 @@ happens to look at. Concretely (`ci-status-guard-core.mjs`, pure and pinned in
 
 - **Every ref this repository pushed** is observed, not just HEAD. `main` always
   gates, and a feature branch gates once its author hands it back as a landing
-  candidate. While that exact branch has a live in-flight declaration it is
+  candidate — though a branch run concludes green since point 513, so there the
+  guard waits for the run but cannot see a failed gate (next section). While that exact branch has a live in-flight declaration it is
   reported without blocking the supervisor; removal of the declaration restores
   the gate immediately, including from a fresh cached verdict.
 - **The list comes from the local push reflog** (`update by push` entries only —
@@ -1259,7 +1260,7 @@ found in them:
 
 What stays exactly as it was: `main` (hard steps, red run, mail — it is the branch
 the deploy builds from), a manual `workflow_dispatch` and a pull request on any
-branch (a deliberate ask keeps its honest red), and the rescue convention below —
+branch (a deliberate ask keeps its honest red), and the rescue convention above —
 a `[skip ci]` commit still produces no run at all.
 
 One consequence to know: `ci-status-guard` judges the run CONCLUSION, so it no
@@ -1269,11 +1270,13 @@ gate.
 
 ## Triaging a RED run (point 294)
 
-A red is now read, not asserted. Two signals, both decided in the pure module
-`baseline-classify-core.mjs` (pinned by `baseline-classify.test.mjs`):
+A red is now read, not asserted, against three things below: the charge ledger
+(`scripts/render-verify-charges.mjs`), a hand retry, and the by-hand baseline
+classification (pure in `baseline-classify-core.mjs`, pinned by
+`baseline-classify.test.mjs`).
 
 **ONE PASS PER SUITE (point 1135, user order 15.09.2026).** A LARGE runs each
-suite exactly once. There is no automatic flake retry and no automatic baseline
+suite exactly once per backend pass. There is no automatic flake retry and no automatic baseline
 pass. Measured inside one LARGE of 14.09.2026: the 28-minute `polish` ran four
 times — first pass, flake retry, two baseline passes — and this deletes three of
 the four. The saving is paid whatever cadence the regression settles on, which is
@@ -1340,13 +1343,14 @@ node scripts/verify/baseline-classify.mjs enrichments          # one suite, on d
 node scripts/verify/baseline-classify.mjs polish --ref HEAD~1  # against a named commit
 ```
 
-It re-runs the failing suite against the pre-change baseline (the merge-base with
+It re-runs the failing checks' blocks — the whole suite where `narrowDiagnosis`
+refuses the narrowing (above) — against the pre-change baseline (the merge-base with
 `main` by default) in a REUSED detached worktree under the git-ignored
 `local/verify-baseline/<sha>` — no second `npm install`: Node resolves
 `node_modules` up the ancestor directories, and the checkout lives inside the
 repo. At most two baselines are kept. Each currently failing check comes back as
 **SUSPECT — green on baseline, red now; UNCONFIRMED** (point 1135: a suspicion,
-never a finding — the baseline is measured standalone and the candidate in-pass,
+never a finding — the baseline and the candidate are measured in separate runs,
 so the two readings are not of the same thing, and the label says so. It is
 settled by three narrow `--section` rungs of the affected block on a QUIET
 machine under equal starting conditions — three runs of the whole affected suite
@@ -1396,7 +1400,7 @@ comparison ran on (`VERIFY_GL` is honoured; a WebGPU red must be classified on
 WebGPU). It refuses when the baseline resolves to the current commit, and it
 fails soft: a triage aid must never turn a readable red into a crashed run. The
 suite result stays the gate — `--strict` is there for a caller that wants a
-non-zero exit on a real regression.
+non-zero exit on a SUSPECT check or a died or resultless baseline.
 
 `docs` is a pure-Node suite and `board-layout` renders self-contained board HTML
 in bundled Chromium, so neither needs the game server on either side
@@ -1486,7 +1490,7 @@ to be looking at the right second.
 ## Old → new coverage map
 
 Every assert removed from Playwright has an equivalent (or stricter) Vitest
-check that is green. The seven scripts below were **deleted** because every one
+check that is green, except the two marked in italics below. The seven scripts below were **deleted** because every one
 of their asserts moved to Vitest.
 
 | Deleted script | New home (Vitest) |
@@ -1516,7 +1520,7 @@ ported asserts now live in Vitest:
 
 ### `polish.mjs`: the checks that need a POPULATION, not an instant
 
-Two of its checks measure something that only happens SOMETIMES, so each is a
+Four of its checks measure something that only happens SOMETIMES, so each is a
 SERIES over the walk rather than one sampled frame, and each fails loudly when
 its own subject never occurred:
 
@@ -1567,7 +1571,10 @@ buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,
 `handwriting.mjs` (the writing animation is timing/DOM-sensitive and stays
 here; consumes the `.cache/tts/` replay cache because adding an entry
 auto-narrates — voice.mjs owns and primes that cache), `docs.mjs` (pure Node
-doc-structure check), `preview.mjs` (production build acceptance).
+doc-structure check, the one exception to browser-only), `preview.mjs`
+(production build acceptance). The suites added since (`startup`,
+`board-layout`, `communication`, `invariants`, `benchmark`, `report`, …) were
+written in Playwright from the start; `tiers.mjs` lists them all.
 
 ## Backend assertion coverage (point 204)
 
@@ -1576,8 +1583,9 @@ Every browser suite launches through `launchVerifyBrowser()` and calls
 a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
 `webgl` run that came up on WebGPU) fails LOUD instead of giving false
 confidence. Covered: benchmark, collision, enrichments, events, flow, gamepad,
-handwriting, health, i18n, invariants, polish, report, settings, startup, touch,
-voice, world — every suite in the tier map except the three below. `visualsweep`
+communication, handwriting, health, i18n, invariants, polish, report, settings,
+startup, touch, voice, world — every suite in the tier map except `docs` and
+`board-layout`, which the table below exempts together with `preview`. `visualsweep`
 asserts the backend too, but it rides in no tier: it is the on-demand capture
 sweep (point 203 C), it renders no pass/fail verdict, and it runs only when
 somebody asks for it.
@@ -1616,7 +1624,8 @@ WebGL 2), point 506 (the goat-stance check, red in both WebGPU runs, green on
 WebGL 2) and point 210, where a coast fix read "done" on WebGL 2 while the WebGPU
 picture was still stepped. Cost does not argue against it either: measured
 09.08.2026 on this host, `polish` took 14.5 / 14.2 min on WebGL 2 and 13.1 /
-14.4 min on WebGPU — the software WebGPU lane is not the slower one.
+14.4 min on WebGPU — the WebGPU lane, then still software (point 505 later moved it onto the
+hardware GLES chain), was not the slower one.
 
 Two things the swap deliberately does **not** change:
 
@@ -1655,7 +1664,7 @@ The gate used to count an exit-0 run and nothing else, and on 07.08.2026
 `polish` could not exit 0 for reasons belonging to OTHER points: the
 render-target assert of point 546 fired as a console error on both backends
 (fixed and ticked 08.08.2026 — its entry left the ledger with the tick, which is
-the expiry working as designed), and the goat-stance check reds on the software
+the expiry working as designed), and the goat-stance check reds on the then-software
 WebGPU lane (point 506). Every change
 under `scripts/verify/` — a pure comment diff included — could then be cleared
 only by a hand-written `--defer`, and a gate overridden by hand routinely stops
@@ -1701,9 +1710,10 @@ full 40-run state window): a real red SET is small. The worst run on record, a
 WebGPU validation cascade in `webgpu/settings`, printed **521 result lines but
 only 33 distinct ones** and parsed to **18/19 recorded reds**; no record has
 ever held more than 19 reds, and every non-cascade log carries **≤ 12 result
-lines**. What is unbounded is REPETITION — one page error printed once per
-frame — never the set: reds are bounded by the suite's checks and its distinct
-console errors. (The earlier reading, "red lines are exactly the unbounded
+lines**. What was unbounded in every measured run is REPETITION — one page
+error printed once per frame — never the set. (That the set is bounded holds for
+the checks only; console-error identities are not bounded by themselves — see
+the explicit ceiling below.) (The earlier reading, "red lines are exactly the unbounded
 ones, so they cannot go uncapped", conflated occurrences with identities.)
 
 So the spec's option "the cap stops applying to RED lines" was chosen — for the
@@ -1740,7 +1750,7 @@ flood onto one red.
 
 **And a line's parts are never a key of their own** (round 13). The identity was
 briefly the parts JOINED, which is a key over COMBINATIONS: `[A,B]`, `[A,C]`,
-`[B,C]` are three keys over two reds, so a suite that varies how it groups its
+`[B,C]` are three keys over the same three reds, and every further grouping mints another, so a suite that varies how it groups its
 `console errors:` summary lines mints combinatorially many keys without printing
 a new red. A line now earns its slot by carrying an identity nothing kept yet;
 one whose reds are all already represented is dropped as the repetition it is,
@@ -1884,11 +1894,11 @@ The second rule now holds for every caller. `unexplainedRuns` used to hand
 became owned after it was recorded neither covers a backend nor re-records a
 truncation, while its reds stop blocking through the first rule.
 
-### The records written before that fix (the legacy `incomplete` class)
+### The records written before that fix, and the `incomplete` class
 
 Records already on file (the two truncated `webgpu/settings` runs of
-13.08.2026) still carry the truncation marker, and for THEM the incomplete-
-recording class remains: `runVerdict` answers `incomplete` — a class of its
+13.08.2026) still carry the truncation marker, and for THEM — as for a new record that
+refused a result line (above) — the incomplete-recording class applies: `runVerdict` answers `incomplete` — a class of its
 own, covering nothing — and the guard names it apart from an unexplained red
 in EVERY branch of its block message, so nobody hunts a defect that was never
 captured. Two things CLOSE it, and neither is the ledger (a charge needs the
@@ -1924,7 +1934,7 @@ claiming otherwise):
    the FIRST attempt's, held in `suspectOf`. Stated residual, unchanged: the
    closure cannot tell an unavoidable overflow from output flooded on purpose
    — but it can never bury a red that reached the record, and for every run
-   recorded since the fix, ALL of them did.
+   recorded since the fix that refused no result line, ALL of them did.
 
 ### A crashed run has the same named way out (point 734, sixth round)
 
@@ -2036,10 +2046,8 @@ red" — the crash and lost-recording sentences included, the two classes this
 point exists to tell apart — and it consulted no signature, so a record already
 signed off was still reported as an open red for as long as it stayed the last
 run. Both readings come from `unexplainedRuns`, which is what actually blocks.
-The open-crash paragraph no longer says nothing in the run can be explained or
-charged either: the CRASH carries no red anybody can own, and a red the run
-printed before it died still closes the three ordinary ways — which is what the
-sign-off message had been saying all along.
+An open crash carries no red anybody can own, and a red the run printed before
+it died still closes the three ordinary ways.
 
 **And a flag is not a value.** `--evidence --run <id>` used to yield the literal
 `--run` as the written evidence, which the draft — handed a non-empty string —
@@ -2065,7 +2073,7 @@ therefore inherits the pin by opening a browser and cannot fall out of it.
 That shape is the point-557 repair: the pin used to sit at a call site.
 `collision.mjs` wrote `?seed=42` into its DEFAULT url, which
 `process.env.BASE_URL ?? …` discards the moment `run-all` passes a port — so it
-had been running unseeded for years while its comment claimed determinism. **A
+had been running unseeded for weeks while its comment claimed determinism. **A
 dead pin is worse than no pin**: when such a suite rotates, the log says the
 layout was fixed and the reader rules the layout out first. `verify-seed.test.mjs`
 now fails on that wiring — on a `seed=` literal in a suite, on a suite that opens
@@ -2095,7 +2103,8 @@ VERIFY_SEED=1234567 npm run test:large    # reproduce exactly what the sweep fou
 
 The seed is drawn in Node, not left to the game, precisely so the run can name
 it: a red from a sweep is reproduced by pinning the number it printed. Run the
-sweep at each closing cycle (§7.2) and whenever settlement layout code changes;
+sweep at each closing cycle (§7.2) and with the bundle's LARGE whenever the
+bundle changed settlement layout code;
 an unrecognised `VERIFY_SEED` value throws rather than quietly running pinned.
 **Accepted residual:** between two sweeps a seed-specific layout defect can sit
 unnoticed. That is deliberate — the alternative, a rotating seed on the daily
@@ -2244,7 +2253,6 @@ The suite asserts its actual backend and uses ordinary input after its recorded
 pre-entry setup. Its named frames, stereo WAV windows, audio JSON receipts,
 route video and English/German journal text share a unique run prefix under
 `verification/`. See [the route and artifact guide](../../docs/communication-playthrough.md#runnable-continuous-harness-authored-not-browser-executed).
-This authoring adds no measured runtime or browser acceptance claim.
 
 ## Verification rules extracted from the per-turn policy
 
@@ -2255,7 +2263,7 @@ frame (`__camera.onScreen`/`ndc`), never from a guessed radius, fog distance, or
 other proxy. A proxy can pass while the pixels remain wrong.
 
 Every frame declares its subject at the shutter: `world` for a place or
-landmark, `local`/`place` for settlement content, `hud` for an interface target,
+landmark, `local`/`place` for settlement content, `element` for an interface target,
 or `general` with a reason. `frameSubject.mjs` refuses a frame that does not show
 the named subject, and the unit layer refuses screenshot writes outside the
 shutter.
@@ -2277,9 +2285,10 @@ it from a later green.
 
 ## Headless limitations
 
-WebGPU IS drivable headless — but only through **system Chrome**
-(`channel: 'chrome'` + `--headless=new` on a localhost page, which `_browser.mjs`
-selects for `VERIFY_GL=webgpu`); Playwright's *bundled* Chromium has no WebGPU
+WebGPU IS drivable headless — but only through a **system Chrome/Chromium**
+(on Linux the probed binary via `executablePath`, elsewhere `channel: 'chrome'`,
+with `--headless=new` on a localhost page, which `_browser.mjs` selects for
+`VERIFY_GL=webgpu`); Playwright's *bundled* Chromium has no WebGPU
 adapter and silently falls back, which is exactly what `assertBackend` now makes
 loud. Two suites stay WebGL2-only (`touch`, `voice`): headless WebGPU under
 system Chrome drives neither the CDP touch events nor the TTS speak state, and
@@ -2287,7 +2296,8 @@ both were verified to render correctly on the WebGL 2 path. They are ROUTED to
 that lane wherever a run picks them (point 571 above), so making WebGPU the
 everyday lane did not take them out of the everyday gate.
 
-Two documented artifacts of the WebGL 2 fallback path (not real-hardware bugs):
+Two documented backend differences (the first a fixed WebGPU shader bug, the
+second a headless-only artifact):
 
 - **Ground black-patch class (point 111).** `pow(negative, y)` is `NaN` on
   WGSL/WebGPU but returns a value on GLSL/WebGL 2, so a shader that fed a

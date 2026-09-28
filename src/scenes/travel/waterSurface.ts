@@ -1,6 +1,6 @@
 // Water-surface height for objects floating on rivers and lakes (design.md
 // §7/§11.3). The river RIBBON is flat across its width at the height of its
-// axis samples, and the lake sheet sits at the lake-wide bedMax — while the
+// axis samples, and the lake sheet sits LAKE_LIFT above the lake-wide bedMax — while the
 // local bed under a floating object can lie far lower where the relief slopes
 // across the channel (a river hugging a hillside, a cataract cliff). Floating
 // on the local bed alone sank the canoe hull under the rendered surface on
@@ -15,7 +15,8 @@ import { AXIS_STEP_DEG, densifyRiverAxis } from '../../world/riverProfile'
 import { coastDistance } from '../../world/geoIndex'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 
-/** River/lake surfaces sit this far above their carved bed (ribbon lift). */
+/** River surfaces (and a floater's local-bed floor) sit this far above the
+ *  carved bed (ribbon lift); lake sheets use LAKE_LIFT. */
 export const SURFACE_LIFT = 0.3
 /** Lake sheets sit this far above their highest interior bed sample. */
 export const LAKE_LIFT = 0.12
@@ -26,7 +27,7 @@ const STEP_DEG = AXIS_STEP_DEG
  * Densify a river polyline at STEP_DEG — the exact ribbon sampling (point
  * 136: a centripetal Catmull-Rom through every control point, shared with
  * the terrain carve). The implementation lives with the bed profile in
- * world/riverProfile.ts; re-exported here for the ribbon build and tests.
+ * world/riverProfile.ts; aliased here for riverAxisRows and the tests.
  */
 export const densifyRiver = densifyRiverAxis
 
@@ -125,12 +126,12 @@ const NOTCH_CLEARANCE = 0.08
 const NOTCH_FRACTIONS = [-0.9, -0.7, -0.5, -0.3, 0.3, 0.5, 0.7, 0.9]
 
 /**
- * The rendered ribbon surface height of axis row `i` (shared by the ribbon
- * build in Rivers.tsx and the lazy float index below — one formula, so the
- * canoe float and the rendered surface can never diverge). Base: just above
- * the carved bed at the axis; lifted per the point-211(b) cross-band rule.
- * Ocean rows (the mouth bridge) keep the plain base so they merge under the
- * sea sheet instead of standing proud of it.
+ * The per-row base surface height of land axis row `i`: just above the carved
+ * bed at the axis, lifted per the point-211(b) cross-band rule. riverAxisRows
+ * (shared by the ribbon build and the float index) calls it for land rows and
+ * then applies the sea/lake heights and the downstream smoothing. An ocean row
+ * returns the plain base without the cross-band lift (riverAxisRows sets those
+ * rows to SEA_MERGE_Y instead).
  */
 export function ribbonRowSurfaceAt(
   pts: Array<{ lat: number; lon: number }>,
@@ -182,7 +183,7 @@ export function smoothRowsDownstream(surfs: number[], skip: boolean[]): number[]
   return out
 }
 
-export interface AxisRow {
+interface AxisRow {
   lat: number
   lon: number
   /** Rendered ribbon surface height of this row. */
@@ -191,15 +192,16 @@ export interface AxisRow {
   bed: number
   /** The axis sample lies in the sea (mouth-bridge candidates). */
   ocean: boolean
-  /** The axis sample lies inside a lake polygon — the row hugs the lake
-   *  sheet just beneath it (point 234: outflow heads, inflow tails and
-   *  lake crossings all read as one water body with the lake). */
+  /** The axis sample lies inside a lake polygon — its height is pinned just
+   *  beneath the lake sheet (point 234) for the float index; the ribbon does
+   *  not emit it (planRibbonRows, point 254). */
   lake: boolean
 }
 
-// Point 234 — smooth river↔water-body transitions. A ribbon row that lies
-// inside a lake sits this far BELOW the lake sheet (the sheet draws on top,
-// the ribbon slides underneath — no seam, no double surface) …
+// Point 234 — smooth river↔water-body transitions. An axis row that lies
+// inside a lake is pinned this far BELOW the lake sheet (the ribbon no longer
+// emits such rows — planRibbonRows, point 254 — but the float index and the
+// downstream smoothing's chain reset still read them) …
 const LAKE_UNDERLAP = 0.02
 // … and the sea-mouth bridge rows dive to this height, safely under the sea
 // plane at y = 0, so the tail merges beneath the sea sheet instead of
@@ -212,8 +214,9 @@ const LAKE_OVERLAP_STEPS = 2
 /**
  * A river SOURCE that coincides with a lake is an outflow, not a spring
  * (point 234: the White Nile leaves Lake Victoria at the Ripon Falls, the
- * Blue Nile Lake Tana): extend the course head INTO the lake so the ribbon
- * overlaps under the lake sheet with no shore gap. The head is marched
+ * Blue Nile Lake Tana): extend the course head INTO the lake so the source
+ * row lies in the lake (no spring) and the ribbon resumes at the shore with no
+ * gap (its in-lake rows are suppressed, planRibbonRows). The head is marched
  * upstream along the course's own backward direction first; where that runs
  * parallel to the shore (Lake Tana), it aims at the nearest lake centre
  * instead. A source near no lake is returned unchanged. Injectable lake
@@ -228,8 +231,7 @@ export function extendSourceIntoLake(
   const src = pts[0]
   // A march succeeds only when it ends DEEP inside the lake — several
   // consecutive inside steps, so the head cannot come to rest just past a
-  // rounded shore lobe it already exited again, and the raw-polygon lake
-  // sheet reliably covers the overlap.
+  // rounded shore lobe it already exited again.
   const march = (dLat: number, dLon: number, maxSteps: number) => {
     const len = Math.hypot(dLat, dLon)
     if (len < 1e-9) return null
@@ -304,7 +306,7 @@ export const MOUTH_FADE_ROWS = 10
 /** A river whose course ends this close to the sea coast is sea-bound even
  *  when its final DEM texels still classify as land (most mouths do: only
  *  the Nile's course carries on into ocean-typed water). */
-export const MOUTH_COAST_DEG = 0.25
+const MOUTH_COAST_DEG = 0.25
 
 /**
  * Whether a river's course ends at the sea — the trailing row lies in the
@@ -417,7 +419,8 @@ function axisIndex(seed: number): AxisIndex {
   if (hit) return hit
   const grid: AxisIndex = new Map()
   for (const river of RIVERS_DATA) {
-    // The SAME rows the ribbon renders (211b lift + downstream smoothing).
+    // The SAME rows Rivers.tsx registers — every riverAxisRows row (211b lift
+    // + downstream smoothing), incl. the in-lake rows the ribbon does not emit.
     // Sea rows never ride the flood: the mouth bridge stays under the sea
     // sheet at flood peak (the rendered ribbon zeroes floodK there too).
     for (const row of riverAxisRows(river, seed)) {
@@ -479,7 +482,7 @@ function nearestRiverRowSurfaceAt(lat: number, lon: number, seed: number): numbe
   return best
 }
 
-// The lake bedMax scan is 64 terrain samples — too hot for a per-frame float
+// The lake bedMax scan is up to 64 terrain samples — too hot for a per-frame float
 // query, so cache it per lake and seed (lakes are static per run).
 const bedMaxCache = new Map<string, number>()
 
@@ -524,14 +527,15 @@ export function lakeBedMax(lakeIndex: number, seed: number): number {
   return bedMax
 }
 
-/** The lake sheet height for a lake index (bed + lift, never below the sea). */
+/** The lake sheet height for a lake index (bed + lift, floored at -0.05). */
 export function lakeSurfaceY(lakeIndex: number, seed: number): number {
   return Math.max(-0.05, lakeBedMax(lakeIndex, seed) + LAKE_LIFT)
 }
 
 /**
- * The rendered water-surface height at a point, or null when the point is on
- * neither a river nor a lake (the sea plane at ~0 covers the rest). Pass the
+ * The FLOAT height for an object on the water at a point (see renderedSheetY
+ * for the drawn sheet), or null when the point is on neither a river nor a
+ * lake (the sea plane at ~0 covers the rest). Pass the
  * already-sampled local terrain height; the result is never below it +
  * SURFACE_LIFT, so a floater also clears any local rise between axis samples.
  */

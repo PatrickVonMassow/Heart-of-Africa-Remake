@@ -19,8 +19,8 @@ export const DEV_SUITES = [
 
 /**
  * The SMALL everyday gate (point 173): fast, low-flake core coverage — doc/i18n
- * consistency, the one E2E core loop, health/events/collision and TTS. A strict
- * subset of DEV_SUITES.
+ * consistency, the board layout, the one E2E core loop, health/events/collision
+ * and TTS. A strict subset of DEV_SUITES.
  */
 export const SMALL_SUITES = ['docs', 'board-layout', 'i18n', 'flow', 'health', 'events', 'collision', 'voice']
 
@@ -44,7 +44,8 @@ export const WEBGL_ONLY_SUITES = ['touch', 'voice']
  * PLAYER's backend, and every one-backend defect on record showed there while
  * WebGL 2 stayed green (points 210/334/506) — never the other way round. So the
  * everyday lane (the SMALL tier, a bare suite filter) is WebGPU, and WebGL 2 is
- * the REGRESSION lane, run by every LARGE. Measured on this host, WebGPU is not
+ * the REGRESSION lane, run by every unpinned LARGE (a LARGE with VERIFY_GL set
+ * runs that one lane only). Measured on this host, WebGPU is not
  * the slower lane, so the swap costs no run time.
  */
 export const DEFAULT_BACKEND = 'webgpu'
@@ -63,9 +64,10 @@ export function needsDevServer(suites) {
   return (suites ?? []).some((s) => !SERVERLESS_SUITES.includes(s))
 }
 
-/** Does this selection need the fast GPU-backend preflight? Pure Node suites and
- *  build/lint/unit selections do not; every Chromium suite and the production preview
- *  do. Kept pure so the runner cannot silently move the probe onto every command. */
+/** Does this selection need the fast GPU-backend preflight? Pure Node suites,
+ *  the serverless board-layout check (bundled Chromium, no dev server) and
+ *  build/lint/unit selections do not; every dev-server suite and the production
+ *  preview do. Kept pure so the runner cannot silently move the probe onto every command. */
 export function needsGpuBackendProbe(suites, { preview = false } = {}) {
   return preview || needsDevServer(suites)
 }
@@ -91,14 +93,16 @@ export function laneFor(suite, backend) {
 
 /**
  * Split the CLI args into the tier token, the suite-name filter and the flags,
- * and derive the two run shapes that follow from them:
+ * and derive the run-shape fields that follow from them:
  *   fullRun          — do the preflight (build + lint + unit): the bare default
  *                      or an explicit tier; a bare suite filter skips it.
- *   isLargeEquivalent — this command runs the WHOLE LARGE set (+ preview), so
- *                      it is the one that covers BOTH backends.
- *   baseline         — `--baseline` (or VERIFY_BASELINE=1): classify a suite
- *                      that failed twice against the pre-change baseline
- *                      (point 294). Flags are VALUE-LESS on purpose: a
+ *   isLargeEquivalent — the LARGE tier was named, or nothing at all: the shape
+ *                      that covers BOTH backends. A suite filter beside
+ *                      `large` still narrows the suites that run.
+ *   baseline         — `--baseline` (run-all also honours VERIFY_BASELINE=1,
+ *                      through wantsBaseline): the HAND baseline diagnosis;
+ *                      since point 1135 the runner only prints the command
+ *                      for it. Flags are VALUE-LESS on purpose: a
  *                      `--flag <value>` pair would leave the value looking like
  *                      a suite filter and silently turn a LARGE run into a
  *                      single-suite, single-backend one.

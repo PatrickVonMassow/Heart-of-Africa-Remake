@@ -24,7 +24,6 @@ import {
   refVerdict,
   reconcileCiWait,
   renewCiWait,
-  shouldBlock,
   shouldNotify,
   observeCiWait,
   sweepTargets,
@@ -84,7 +83,7 @@ describe('failedRuns', () => {
 
   it('agrees with classifyRuns on whether the head is red at all', () => {
     const runs = [run({ conclusion: 'failure', databaseId: 3 })]
-    expect(failedRuns(runs, HEAD).length > 0).toBe(shouldBlock(classifyRuns(runs, HEAD).state))
+    expect(failedRuns(runs, HEAD).length > 0).toBe(classifyRuns(runs, HEAD).state === 'failed')
   })
 })
 
@@ -194,14 +193,7 @@ describe('classifyRuns', () => {
   })
 })
 
-describe('shouldBlock / shouldNotify', () => {
-  it('blocks only a confirmed red', () => {
-    expect(shouldBlock('failed')).toBe(true)
-    expect(shouldBlock('pending')).toBe(false)
-    expect(shouldBlock('success')).toBe(false)
-    expect(shouldBlock('none')).toBe(false)
-  })
-
+describe('shouldNotify', () => {
   it('notifies a red once per sha — a second turn on the same sha stays silent', () => {
     expect(shouldNotify('failed', undefined, HEAD)).toBe(true)
     expect(shouldNotify('failed', HEAD, HEAD)).toBe(false) // already pinged this sha

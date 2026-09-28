@@ -11,7 +11,7 @@ import { defaultMemoryDir, REPO_ROOT } from './retro-sources.mjs'
 // to the working directory otherwise. Under Vitest `import.meta.url` is not
 // always a file: URL, and the bare fileURLToPath threw AT IMPORT TIME — which
 // took the whole module down and is the reason this file had no test at all
-// while carrying real decision logic. Same fallback as tasks-source.mjs.
+// while carrying real decision logic.
 export const STATE_PATH = (() => {
   try {
     return fileURLToPath(new URL('../.claude/rule-review-state.json', import.meta.url))
@@ -21,7 +21,8 @@ export const STATE_PATH = (() => {
 })()
 
 /**
- * Size of the rule corpus: every memory file plus every guard/hook script. Both
+ * Size of the rule corpus: every memory entry (`*.md`, MEMORY.md excluded)
+ * plus every guard/hook script. Both
  * are RULE CARRIERS — a guard's message teaches as surely as a memory does — and
  * both grow by accretion, which is the growth this mechanism watches.
  *

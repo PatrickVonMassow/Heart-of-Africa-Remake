@@ -43,7 +43,7 @@ async function recordingFetch(url) {
   return { status: () => res.status, headers: () => headers, body }
 }
 
-export function ttsCacheComplete() {
+function ttsCacheComplete() {
   return existsSync(COMPLETE_MARKER)
 }
 

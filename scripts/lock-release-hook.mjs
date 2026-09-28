@@ -3,7 +3,8 @@
 // closed owner's lock would otherwise look alive until its pid check fails,
 // delaying the successor. Also clears this session's entry from the
 // parallel-session activity map so a cleanly ended session can never be
-// flagged as a live parallel session. Never errors.
+// flagged as a live parallel session, and retires its own boundary marker.
+// Never errors.
 import { readFileSync } from 'node:fs'
 import { release, clearActivity, clearOwnBoundary } from './batch-singleton.mjs'
 

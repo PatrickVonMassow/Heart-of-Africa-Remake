@@ -12,8 +12,9 @@
 // unreachable by hand, and the two safe routes must be the only ones open.
 //
 // WHAT IT DENIES: a command that MUTATES the packet filter — an iptables flush,
-// policy, chain or rule change, an ipset add/destroy/flush, an nft/ufw change,
-// a route or link change, and init-firewall.sh in execution position.
+// policy, chain or rule change, an iptables-restore/-apply ruleset load, an ipset
+// add/destroy/flush, an nft/ufw/firewall-cmd change, an `ip` route, rule, link,
+// addr, netns or neigh change, and init-firewall.sh in execution position.
 //
 // WHAT IT LETS THROUGH, deliberately:
 //   * every READ: `iptables -L -n`, `iptables -S`, `iptables-save`, `ipset list`,
@@ -22,7 +23,8 @@
 //   * every MENTION: a quoted command inside an echo, a commit message, a grep
 //     pattern, a `cat` of the container script. Blocking prose would make this
 //     guard unusable in the very session that has to write about the incident.
-//   * the two SANCTIONED routes: `node scripts/firewall-allow.mjs` (additive
+//     A heredoc is the exception: it is judged line by line, as it executes.
+//   * the two SANCTIONED routes (plus this guard's own `--check` self-test): `node scripts/firewall-allow.mjs` (additive
 //     top-up, cannot seal) and `node scripts/firewall-rebuild.mjs` (detached,
 //     watchdogged). A guard that offered no way through would only teach the
 //     session to phrase the same command differently.
@@ -44,7 +46,7 @@
 export const EXCERPT_CHARS = 160
 
 /** The container's rebuild script, by basename — any path form counts. */
-export const FIREWALL_SCRIPT_NAME = 'init-firewall.sh'
+const FIREWALL_SCRIPT_NAME = 'init-firewall.sh'
 
 /** Prefix words that wrap a command without being one. `sudo` is the big one. */
 const WRAPPERS = new Set([
@@ -80,7 +82,7 @@ const IPTABLES_RE = /^(?:ip6?tables)(?:-(?:legacy|nft|translate))?(?:-(?:save|re
  * iptables options that CHANGE something. `-L`, `-S`, `-n`, `-v`, `-t` and
  * friends are absent on purpose: a listing is a read.
  */
-export const IPTABLES_MUTATING_RE =
+const IPTABLES_MUTATING_RE =
   /(?:^|\s)-(?:[AIDRNXFZEP]|-append|-insert|-delete|-replace|-new-chain|-delete-chain|-flush|-zero|-policy|-rename-chain)(?=\s|$)/
 
 /** ipset verbs that change the set (long form and short flag). */
@@ -111,24 +113,9 @@ export const IPSET_MUTATING = new Set([
   '--restore',
 ])
 
-/** ipset verbs that only read. */
-export const IPSET_READONLY = new Set([
-  'list',
-  'save',
-  'test',
-  'help',
-  'version',
-  '-L',
-  '-S',
-  '-T',
-  '-h',
-  '-v',
-  '--list',
-  '--save',
-  '--test',
-  '--help',
-  '--version',
-])
+/** ipset verbs that only read. Only word verbs: the lookup takes the first
+ *  non-flag argument, so a flag form could never match here. */
+export const IPSET_READONLY = new Set(['list', 'save', 'test', 'help', 'version'])
 
 /** `ip` sub-objects whose verbs can cut the container off. */
 const IP_OBJECTS = new Set(['route', 'rule', 'link', 'addr', 'address', 'netns', 'neigh'])
@@ -149,7 +136,7 @@ const IP_MUTATING = new Set(['add', 'del', 'delete', 'change', 'replace', 'appen
  * command it is ASKED about is an argument, never an execution, and without
  * this the guard denied the one call the four-eyes review is told to make.
  */
-export const SANCTIONED_RE = /scripts[/\\]firewall-(?:allow|rebuild|guard)\.mjs/
+const SANCTIONED_RE = /scripts[/\\]firewall-(?:allow|rebuild|guard)\.mjs/
 
 /**
  * Everything that takes a QUOTED command line and runs it: `bash -c '…'` and
@@ -162,7 +149,7 @@ export const SANCTIONED_RE = /scripts[/\\]firewall-(?:allow|rebuild|guard)\.mjs/
  * quoting in general: a `$'…'` after any other command is just a string, and
  * `echo $'iptables -F'` must stay allowed.
  */
-export const SHELL_RUNNER_RE =
+const SHELL_RUNNER_RE =
   /\b(?:(?:bash|sh|zsh|dash|ksh)\s+-[a-z]*c|su(?:\s+(?:-[a-z]+|[\w.-]+))*?\s+-[a-z]*c|eval)\s+\$?(['"])([\s\S]*?)\1/
 
 /**
@@ -170,8 +157,9 @@ export const SHELL_RUNNER_RE =
  * is still scanned. Done BEFORE quotes are blanked, because blanking would
  * otherwise erase exactly this payload.
  *
- * Bounded, so a pathological nesting cannot spin: five levels is far past
- * anything a human writes, and the sixth simply falls through to allow.
+ * Bounded, so a pathological input cannot spin: five unwraps across the whole
+ * command (nested or side by side) is far past anything a human writes, and a
+ * sixth runner simply falls through to allow.
  */
 export function unwrapShellRunners(command, maxDepth = 5) {
   let text = String(command ?? '')
@@ -246,7 +234,7 @@ export function segmentsOf(command) {
 
 /** The last path component, whichever separator was used. */
 export function baseNameOf(token) {
-  return String(token ?? '').split(/[/\\]/).pop() ?? ''
+  return String(token ?? '').split(/[/\\]/).pop()
 }
 
 /**
@@ -323,7 +311,8 @@ export function offenceIn(segment) {
   const { name, args } = commandOf(text)
   if (!name) return null
 
-  // The container's rebuild script, run directly or through a shell.
+  // The container's rebuild script, run directly or through a shell (any shell
+  // argument naming it counts — a deliberate over-match in the deny direction).
   if (name === FIREWALL_SCRIPT_NAME) return { id: 'init-firewall', what: 'the container firewall rebuild' }
   if (SHELLS.has(name) && args.some((a) => baseNameOf(a) === FIREWALL_SCRIPT_NAME)) {
     return { id: 'init-firewall', what: 'the container firewall rebuild' }
@@ -401,14 +390,14 @@ export function formatReason(offence) {
     'destroys the ipset at the top while the default policies stay DROP (a flush clears rules, never\n' +
     'policies), so the container is unreachable from its first line to its last — and the Bash tool\n' +
     'killed it at its two-minute default timeout, mid-flush. No network, no way to ask for help, the\n' +
-    'session died with ConnectionRefused. A hand-typed iptables/ipset change has the same failure\n' +
-    'mode with less warning.\n\n' +
-    'Take one of the two routes instead:\n' +
+    'session died with ConnectionRefused. A hand-typed flush, policy or ruleset change has the same\n' +
+    'failure mode with less warning.\n\n' +
+    'Take one of these routes instead:\n' +
     '  • one more host has to be reachable →\n' +
     '      node scripts/firewall-allow.mjs <domain|ip|cidr> [--net24]\n' +
     '      node scripts/firewall-allow.mjs             # tops up this project’s own set\n' +
-    '    Additive only: it never flushes, so it cannot seal anything, and it verifies\n' +
-    '    afterwards that the host actually answers.\n' +
+    '    Additive only: it never flushes, so it cannot seal anything, and for a domain it\n' +
+    '    verifies afterwards that the host actually answers.\n' +
     '  • the firewall really has to be rebuilt →\n' +
     '      node scripts/firewall-rebuild.mjs          # the plan, changes nothing\n' +
     '      node scripts/firewall-rebuild.mjs --run    # opens the gate, arms a watchdog, detaches\n' +

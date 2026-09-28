@@ -23,7 +23,8 @@
 //
 // Everything here is data-in / verdict-out so the Vitest layer can pin it
 // (scripts/verify/machine-load.test.mjs). All process work — sampling the CPU,
-// listing processes — lives in the wrapper scripts/verify/machine-load.mjs.
+// listing processes, reading the GPU utilisation — lives in the wrapper
+// scripts/verify/machine-load.mjs.
 //
 // FAIL-OPEN throughout: a probe that cannot answer must never stop a run. An
 // unknown machine proceeds, loudly labelled unknown; it never blocks and never
@@ -50,15 +51,15 @@ export const isTimingSensitive = (suite) => TIMING_SENSITIVE_SUITES.includes(Str
 /**
  * Thresholds, as fractions of total CPU capacity. They are deliberately coarse:
  * the question is "is anything else working on this machine", not a benchmark.
- * ELEVATED is roughly "one core of an eight-core box is saturated by someone
- * else"; HEAVY is "the machine has no headroom left", which is where a suite
+ * ELEVATED is roughly "a third of the machine is busy with someone else's
+ * work"; HEAVY is "the machine has no headroom left", which is where a suite
  * that polls for a staged frame starts missing its window.
  */
 export const ELEVATED_CPU = 0.35
 export const HEAVY_CPU = 0.7
 /** Same question via the POSIX run queue (Windows reports 0 and is skipped). */
-export const ELEVATED_LOADAVG = 0.7
-export const HEAVY_LOADAVG = 1.0
+const ELEVATED_LOADAVG = 0.7
+const HEAVY_LOADAVG = 1.0
 
 /**
  * The same question asked of the GPU (point 386). The CPU thresholds do not
@@ -72,8 +73,9 @@ export const HEAVY_LOADAVG = 1.0
  * steady fifth of it held by another client is queue time our frames wait behind,
  * and hardware video decode plus compositing reads well under a third of a modern
  * adapter while still moving every frame time we measure. The asymmetry of point
- * 296 makes an eager bar cheap — this LABELS, it never blocks, and a green under
- * GPU load still counts.
+ * 296 makes an eager bar cheap — under the default `flag` mode this LABELS, it
+ * never blocks (only an opt-in `--on-load=defer` skips the run), and a green
+ * under GPU load still counts.
  */
 export const ELEVATED_GPU = 0.2
 export const HEAVY_GPU = 0.55
@@ -105,10 +107,10 @@ export function onLoadMode({ flags = [], env = '' } = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * The kinds of leftover/competitor this recognises. The first four are THIS
- * project's own tooling still holding CPU after (or during) another run — the
- * class that cost the four unit timeouts; `foreign-load` is anything else heavy
- * enough to matter but not ours to shut down.
+ * The kinds of leftover/competitor this recognises: all five are this project's
+ * own tooling (the automation browser is a verify run's leftover) still holding
+ * CPU after (or during) another run — the class that cost the four unit
+ * timeouts.
  */
 export const STRAY_KIND = {
   verifyRun: 'verify-run',
@@ -127,25 +129,26 @@ const KIND_LABEL = {
 }
 
 /** A stray kind's human label, for the report. */
-export const strayLabel = (kind) => KIND_LABEL[kind] ?? String(kind)
+const strayLabel = (kind) => KIND_LABEL[kind] ?? String(kind)
 
 /**
  * An agent CLI session rather than anything it runs: the `claude` binary invoked
  * with a prompt (`-p` / `--print`). Its command line carries the whole prompt,
  * so any command the prompt mentions appears in it verbatim — which is why it
  * must be recognised before every pattern that reads a command line for a tool
- * name. Matched on the executable, not on the prompt, so a suite that merely
- * happens to mention `claude` is unaffected.
+ * name. Matched on a standalone `claude` token plus a `-p`/`--print` flag
+ * anywhere in the whole command line, so a suite that merely mentions `claude`
+ * inside a path or word is unaffected.
  */
-export function isAgentSession(cmd) {
+function isAgentSession(cmd) {
   const text = String(cmd ?? '').toLowerCase()
   return /(^|\/|\s)claude(\s|$)/.test(text) && /\s(-p|--print)(\s|$)/.test(text)
 }
 
 /**
- * What ONE process is, or null for "not interesting". Order matters: `vitest`
- * contains `vite`, and `vite build` is a build rather than a server, so the
- * narrow patterns are tested first.
+ * What ONE process is, or null for "not interesting". Order matters: `vite
+ * build` is a build rather than a server, so the build pattern is tested before
+ * the server pattern.
  *
  * A person's ordinary browser is deliberately NOT a stray — it is neither ours
  * to kill nor usually the cause. Only an AUTOMATION browser (headless, remote
@@ -181,16 +184,17 @@ export function classifyProcess(proc) {
  * (the npm wrapper, the shell, the session that started it). Excluded from the
  * stray list — a run must not report itself as the load.
  *
- * SIBLINGS ARE NOT EXCLUDED, and that is the point: a second agent started by
- * the same session is a child of an ANCESTOR, not of us, and it is exactly the
- * load the probe exists to see.
+ * SIBLINGS ARE NOT EXCLUDED, and that is the point: the runs of a second agent
+ * started by the same session are children of an ANCESTOR, not of us, and they
+ * are exactly the load the probe exists to see (the agent session itself
+ * classifies as nothing).
  */
 export function ownTree({ processes = [], pid }) {
   const byPid = new Map(processes.map((p) => [Number(p.pid), p]))
   // Descendants FIRST, seeded with self alone. Seeding with the ancestors too
-  // would sweep in every sibling subtree — the second agent under the same
-  // session would vanish from the stray list, which is the one process we most
-  // need to see.
+  // would sweep in every sibling subtree — the second agent's runs under the
+  // same session would vanish from the stray list, which are the processes we
+  // most need to see.
   const own = new Set([Number(pid)])
   for (let pass = 0; pass < processes.length + 1; pass++) {
     let grew = false
@@ -216,7 +220,8 @@ export function ownTree({ processes = [], pid }) {
 }
 
 /**
- * The interesting processes that are NOT ours, newest classification first.
+ * The interesting processes that are NOT ours, one entry per stray tree, in
+ * process-table order.
  * `repoMarker` (a lowercased path fragment) decides `fromThisRepo`: a leftover
  * of THIS checkout is one we may shut down, a stranger's build is only load.
  */
@@ -429,10 +434,11 @@ export function parsePercentUtilisation(readings) {
 }
 
 /**
- * The verdict on the machine. `ok: false` (a probe that threw or timed out)
- * yields `unknown` — reported, never silently treated as quiet.
+ * The verdict on the machine. `ok: false` (the probe threw, or read nothing at
+ * all) yields `unknown` — reported, never silently treated as quiet.
  *
- * A stray of ours is enough for BUSY on its own even at low CPU, because the
+ * Any stray is enough for BUSY on its own even at low CPU (another verify or
+ * unit run raises to LOADED), because the
  * leftover dev server that produced the four 5000 ms unit timeouts was idle by
  * every CPU measure: it holds ports, file watchers and a node heap, and the
  * damage it does is not visible as load.
@@ -473,11 +479,10 @@ export function classifyLoad({
   } else {
     reasons.push('no CPU reading available')
   }
-  // The GPU, in the same two steps. The wording names a number and what follows
-  // from it — never the application, and never a list of the person's windows.
-  // One wording for both thresholds: the level above it already says how bad it
-  // is, and a second sentence would be an invitation to speculate about WHAT is
-  // drawing. The number and its consequence, nothing else.
+  // The GPU, in the same two steps. The wording names a number and a generic
+  // cause — never a specific application, and never a list of the person's
+  // windows. One wording for both thresholds: the level above it already says
+  // how bad it is.
   if (typeof gpu === 'number' && gpu >= ELEVATED_GPU) {
     reasons.push(`GPU ${pct(gpu)} — a video or another 3-D application is using the device`)
     raise(gpu >= HEAVY_GPU ? LEVEL.loaded : LEVEL.busy)
@@ -526,7 +531,7 @@ export const DEFERRED_EXIT = 3
  * What this invocation should do. `suites` is the pick that is about to run.
  *
  *   proceed — quiet, or nothing timing-sensitive is in the pick, or the mode is
- *             off/unknown. The load is still REPORTED.
+ *             off, or the level is unknown. The load is still REPORTED.
  *   flag    — run, but label the result: a red from these suites is not
  *             evidence (see annotateResult).
  *   defer   — do not run at all (opt-in `--on-load=defer` / VERIFY_ON_LOAD=defer):
@@ -631,8 +636,9 @@ export function annotateResult({ level = LEVEL.unknown, redSuites = [], green = 
   }
   const timing = redSuites.filter(isTimingSensitive)
   const other = redSuites.filter((s) => !isTimingSensitive(s))
-  // A failure with no red SUITE is a deterministic stage — a broken build, a
-  // lint finding. Load does not cause those, and labelling them "not
+  // A failure with no red SUITE here is a deterministic stage — a broken build,
+  // a lint finding (a unit stage that dies earlier is labelled by
+  // annotateStageFailure instead). Load does not cause those, and labelling them "not
   // authoritative" would teach the reader to skip the label where it matters.
   if (timing.length === 0 && other.length === 0) return []
   lines.push(`# UNDER LOAD — NOT AUTHORITATIVE: this red was taken on ${state}.`)

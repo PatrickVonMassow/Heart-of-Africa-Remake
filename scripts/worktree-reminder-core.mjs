@@ -9,8 +9,9 @@
 // `isolation: 'worktree'` on parallel implementation agents — each gets its own
 // git worktree and can commit independently. This hook is the event-triggered
 // reminder at the exact decision point (a memory note proved insufficient): it
-// NEVER blocks a spawn, it only injects the rule into the model's context when
-// a background Agent is spawned without worktree isolation.
+// NEVER blocks a spawn. When a background Agent is spawned without worktree
+// isolation it answers `allow` — which also approves the call — with the rule
+// as the reason, so the rule reaches the model's context.
 
 /** The reminder injected as the PreToolUse permissionDecisionReason. */
 export const REMINDER =
@@ -22,10 +23,11 @@ export const REMINDER =
 /**
  * Decide on a PreToolUse call: {toolName, toolInput}. Fires (non-blocking
  * allow + reminder) only for a BACKGROUND Agent spawn (`run_in_background`
- * absent or true — foreground spawns are serial and safe) that does not
+ * anything but `false` — foreground spawns are serial and safe) that does not
  * already set `isolation: 'worktree'`. Everything else — other tools,
- * foreground agents, already-isolated agents, malformed input — is a silent
- * no-op ({}). Total: never throws.
+ * foreground agents, already-isolated agents, a missing or non-object
+ * `toolInput` (an array counts as an object) — is a silent no-op ({}). Total:
+ * never throws.
  */
 export function worktreeReminder(input) {
   try {

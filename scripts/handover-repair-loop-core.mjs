@@ -119,9 +119,10 @@ function leadingRun(commits, mechanism) {
 /**
  * Find an extraordinary leading run and report it once as it grows.
  *
- * `commits` contains only heads observed after this owner session's tool calls,
- * newest first. Remembering a SHA already inside the live run suppresses the
- * sixth, seventh, ... reports without suppressing a later, separate run of the
+ * `commits` holds the commits observed since this owner session's earlier tool
+ * calls, intermediate ones included, newest first. Remembering a SHA already
+ * inside the live run suppresses the repeat reports as it grows (the first comes
+ * at commit ordinaryMax + 1) without suppressing a later, separate run of the
  * same mechanism.
  */
 export function detectRepairLoop({

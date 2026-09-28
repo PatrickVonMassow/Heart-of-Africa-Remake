@@ -3,9 +3,10 @@
 Research basis for the intraspecies-combat mechanic: which of the game's rendered
 animals realistically fight **members of their own species**, what triggers it,
 what the fight physically looks like, and how often it kills. Written before any
-code so the mechanic is built from a researched per-species table rather than
-applied to every animal alike. Sibling of `docs/climate-1890.md` and
-`docs/peoples-1890.md`.
+code (the mechanic has since been built under point 264) so it is built from a
+researched per-species table rather than applied to every animal alike. Sibling
+of `docs/climate-1890.md`, `docs/peoples-1890.md` and
+`docs/fauna-behaviour-1890.md`.
 
 The point is discrimination, not spectacle: hippos and rutting/musth megafauna
 have genuinely lethal same-species fights; most antelope rut-clashes are
@@ -14,7 +15,7 @@ solitary cats, and the birds each fight in their own register and at their own
 lethality. A mechanic that made every zebra duel to the death, or made two
 gazelles gore each other, would be as wrong as one that let none of them fight.
 
-The animals covered are exactly those the game renders (`src/render/fauna.ts`
+The animals covered are those the game renders (`src/render/fauna.ts`
 build functions, keyed to `src/scenes/travel/wildlifeBehavior.ts` `PreyKind` /
 `PredatorKind`): **elephant, giraffe, zebra, antelope/gazelle, wildebeest,
 warthog, lion, cheetah, leopard, hyena, crocodile, flamingo, vulture, plover**,
@@ -32,8 +33,6 @@ Evidence markers, as in the sibling docs:
 | Marker | Meaning |
 | --- | --- |
 | **FIELD** | direct field observation / behavioural ethology of the wild species |
-| **REVIEW** | secondary synthesis (species accounts, wildlife references) |
-| **CAPTIVE** | documented in captivity; wild pattern inferred |
 | **GAP** | not well documented — do not over-assert |
 
 The zoology below is stable on a century scale (the mechanisms — territoriality,
@@ -46,10 +45,10 @@ and every species named here was present in sub-Saharan Africa then.
 ## 1. The four drivers, in brief
 
 Intraspecific fighting across African fauna resolves to a small set of drivers.
-Each game species is mapped to one (or none) in §2.
+Each game species is mapped to one or more (or none) in §2.
 
 - **Territorial.** Defence of a fixed space and the resources/mates in it.
-  Common in solitary cats (leopard, male cheetah coalitions), male crocodiles at
+  Common in the solitary leopard and in male cheetah coalitions, male crocodiles at
   breeding grounds, and the *lekking* antelope bulls (wildebeest, gazelle) that
   hold a patch of ground. Ranges from pure ritual (gazelle border display) to
   lethal (leopard).
@@ -86,7 +85,7 @@ whole reproductive payoff rides on one contest, escalate hardest.
 | **Warthog** | **Yes** | Dominance (mating) | Boars rush and ram heads/upper tusks; facial warts pad the blows | **Rare** — blunt upper-tusk shoving; serious wounds from the lower tusks are uncommon | Boars in mating contests |
 | **Lion** | **Yes** | Territorial / pride takeover | Coalition-vs-coalition clashes: posturing, roaring, swatting, biting; takeover of a pride | **Often** — resident males mortally wounded in takeovers; associated cub-killing by incoming males | Adult males (coalitions); females mainly defending cubs |
 | **Cheetah** | **Yes** | Territorial (male coalitions) | Coalition defends a territory; intruding males attacked, bites to the anogenital area | **Sometimes** — rare but real deaths of intruders / even a coalition's own leader | Male coalition members vs intruder males |
-| **Leopard** | **Yes** | Territorial | Solitary males clash where ranges overlap; often bluff (baring teeth, growling), sometimes full grappling | **Sometimes** — an estimated notable fraction (~15–20% by some accounts) of serious male fights prove fatal | Adult males |
+| **Leopard** | **Yes** | Territorial | Solitary males clash where ranges overlap; often bluff (baring teeth, growling), sometimes full grappling | **Sometimes** — an estimated notable fraction (~15–20% by some accounts — **GAP**, not a measured rate, §6) of serious male fights prove fatal | Adult males |
 | **Hyena** | **Yes** | Dominance (clan) / den | Clan rank aggression; fatal neonatal sibling aggression; occasional infanticide at communal dens | **Sometimes** — rank fights rarely kill adults, but sibling aggression and cub-killing are lethal | Both sexes (female-dominant clans); cubs at birth |
 | **Crocodile** | **Yes** | Territorial (breeding) | Males defend breeding grounds; biting, pushing, wrestling in shallow water | **Sometimes** — combat between equals is relatively rare but can seriously wound | Dominant / rival males in the dry-season breeding period |
 | **Ostrich** *(not rendered)* | **Yes** | Territorial / mate (breeding) | Aggressive display and posturing, then powerful kicks, pecking and pushing to hold a territory and harem | **Rare (intraspecific)** — the kick is lethal to predators/humans, but same-species fights usually resolve by display/drive-off; fatal duels not well documented (**GAP**) | Dominant / rival cocks in the breeding season |
@@ -234,7 +233,7 @@ contest that resolves with one animal yielding and moving off; **no** carcass.
   system** (dead, not owned by a hunt), worked by the existing vultures/scavengers
   — not a bespoke body path.
 - Keep base rates **low** (rare, like the random-event and hunt rates) and all of
-  them **debug-editable** per CLAUDE §2 / §21.
+  them **debug-editable** per CLAUDE.md §2 / design.md §21.
 
 ### 4.1 Collisions with the existing §19 dramas — one drama per actor
 
@@ -263,11 +262,11 @@ drama mid-fight**. Concrete collision points to guard, by species:
   matrix resolves parent-vs-*predator*; the fight resolver is same-species
   winner/loser. Overloading one function would entangle the two dramas.
 - **Elephant.** A musth duel collides with (a) the §19.8 **trample-grief** (a
-  grieving parent closes on an elephant's feet and is trampled) and (b) the §126
+  grieving parent closes on an elephant's feet and is trampled) and (b) the point-126
   **graveyard mourning** vigil. An elephant standing a mourning vigil, or being
   closed-on by a grief-charging parent, must not simultaneously start a musth
   fight. Gate on idle bulls not currently a trample target or in mourning.
-- **Lion.** Seed the takeover/coalition fight on adult **males**; the §145c
+- **Lion.** Seed the takeover/coalition fight on adult **males**; the point-145c
   **lioness-defends-cub** drama is the *female's* and must stay a distinct actor,
   and the §146 revenge path (a slain predator enters the ordinary carcass system)
   is the template for a killed male lion — reuse it, don't fork it.
@@ -281,7 +280,7 @@ drama mid-fight**. Concrete collision points to guard, by species:
   correctly). No bespoke body path; the fight ends, the loser dies, the carcass
   system takes over.
 
-**Net:** no species' fight *cannot* be built, but every one must go through the
+**Net:** no rendered species' fight *cannot* be built, but every one must go through the
 same claim-from-idle + hard-deadline discipline as the crocodile ambush and the
 family dramas, and the two predator-side systems (global hunt, lioness cub-defence)
 plus the elephant grief/mourning drama are where an un-gated fight would most
@@ -316,8 +315,8 @@ of the sibling docs — species accounts plus behavioural studies):
 ## 6. Known unknowns — do not invent these
 
 - Exact per-species **fatal-fight frequencies** in the wild: most are reported
-  qualitatively ("rare", "sometimes", "can be fatal"), not as rates. The rates in
-  §4 are game-calibration guidance, not measured field values — keep them
+  qualitatively ("rare", "sometimes", "can be fatal"), not as rates. The relative frequencies in
+  §4 (and any rate the build picks) are game-calibration guidance, not measured field values — keep them
   debug-editable and do not present them as data.
 - Whether the game's generic **"antelope/gazelle"** should follow the ritualised
   *Thomson's gazelle* register or a more escalated one (some larger bovids fight
@@ -330,8 +329,8 @@ of the sibling docs — species accounts plus behavioural studies):
   documented as a *predator/human* defence; whether same-species cock fights
   regularly turn fatal is not clearly reported. Do not assert a kill outcome —
   drive-off only if ever built.
-- **Ostrich and baboon are not in the game.** They are researched at the task's
-  request but absent from `src/render/fauna.ts`; treat their rows as reference, not
+- **Hippo, buffalo, ostrich and baboon are not in the game.** They are researched
+  at the task's request but absent from `src/render/fauna.ts`; treat their rows as reference, not
   as species to seed. Building a fight for them requires first adding the animal.
 - Whether the game's generic **baboon** (were one added) should follow the
   mostly-ritualised anubis register or the harsher hamadryas pattern is

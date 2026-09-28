@@ -32,9 +32,11 @@
 // still settling is reported as 'settling', not as an alarm. Only a page that is
 // still behind past the grace — or one that cannot be read at all — is a fault.
 //
-// FAIL LOUD, NOT SILENT. A failed publish is PERSISTED (`publishFailed`), which
-// is what the watchdog in scripts/batch-autostart.mjs reports when the session
-// itself is wedged and no Stop hook will ever run again.
+// FAIL LOUD, NOT SILENT. A publish that fails at the fingerprint, the commit or
+// the push is PERSISTED (`publishFailed`), which is what the watchdog in
+// scripts/batch-autostart.mjs reports when the session itself is wedged and no
+// Stop hook will ever run again. The earlier refusals (missing board, broken
+// structure, missing cards) exit non-zero without that record.
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
@@ -77,7 +79,7 @@ import {
   stampFingerprint,
 } from './board-currency-core.mjs'
 
-/** SHA-256 of the exact bytes published — the same digest dashboard-state uses. */
+/** SHA-256 of the repo board bytes a publish attests — the same digest dashboard-state uses. */
 const sha256 = (text) => createHash('sha256').update(Buffer.from(text)).digest('hex')
 
 /** No fetch in this repository waits for ever; a hung socket must not hang a CLI. */
@@ -109,7 +111,7 @@ const lockedByCaller = args.length === 1 && args[0] === '--locked'
 /**
  * `--locked` says "my parent already holds the board-edit lock, do not take it
  * again". That was taken on the caller's word (ninth cross-vendor round), so
- * anyone could publish straight past the serialization this branch introduced.
+ * anyone could publish straight past the board-edit-lock serialization.
  * The claim is CHECKED now, and the check is one nobody outside can satisfy:
  * the live lock's recorded pid has to be this process's PARENT. A shell that
  * types the flag has a shell for a parent and is refused.
@@ -221,9 +223,9 @@ if (args.includes('--check')) {
 }
 
 // ---- publish --------------------------------------------------------------
-// A function, not top-level code, so `--check` above can end the run by setting
-// an exit CODE rather than calling process.exit — see the note there. Nothing in
-// here awaits, so hoisting it costs the straight-line reading nothing.
+// A function, not top-level code, so the `--locked` child path above can call it
+// under the parent's lock while `--check` ends by setting an exit CODE. Nothing
+// in here awaits, so hoisting it costs the straight-line reading nothing.
 function publish() {
 if (!existsSync(boardFile)) {
   console.error(`board-publish: repo board not found: ${boardFile}`)
@@ -253,7 +255,10 @@ const fail = (reason) => {
   }
 
 // The footer's date and open-point count are derived, not typed — same parse as
-// the audit, so the two cannot disagree.
+// the audit, so the two cannot disagree. The same block applies the Sol note,
+// the chip upgrade, the derived state and the criticalities; a failure in any
+// of them is logged as "footer not refreshed".
+let footerRefreshed = false
 try {
   // LF-NORMALISED HERE TOO (point 439). This is the last write before the bytes
   // go out, so whatever wrote the file before — a hand edit in Windows text mode
@@ -265,7 +270,7 @@ try {
   // standing — `refreshFooter` keeps every segment it does not own, this one included.
   const share = currentSetting()
   if (share.problem) console.error(settingProblemLine(share, 'board-publish'))
-  // UPGRADED LAST (point 655). The naming gate below demands the numbered chip
+  // UPGRADED HERE TOO (point 655). The naming gate below demands the numbered chip
   // strictly, and the board is one living file whose cards may still carry their
   // number inside the title. `board.mjs` lifts them on every edit; doing it here
   // too means a board that was last written by an older version can still be
@@ -285,6 +290,7 @@ try {
     ),
   )
   repoBytes = refreshed
+  footerRefreshed = true
 } catch (e) {
   // A publish must never be blocked by the footer; the audit still catches a
   // stale one, and saying why beats failing silently.
@@ -295,10 +301,10 @@ if (repoBytes !== original) {
   // Atomic (point 443, four-eyes F3) — and this one writes the very file the
   // next lines read, hash and push to the public page.
   writeTextAtomic(boardFile, repoBytes)
-  if (repoBytes !== original && repoBytes.includes('data-state="stub"') && !original.includes('data-state="stub"')) {
+  if (repoBytes.includes('data-state="stub"') && !original.includes('data-state="stub"')) {
     console.log('current-work section reconciled to the active-work record')
   }
-  if (repoBytes !== original) console.log(`footer refreshed: ${open.length} open point(s)`)
+  if (footerRefreshed) console.log(`footer refreshed: ${open.length} open point(s)`)
   if (upgradeNowCards(original) !== original) console.log('current-work card(s) lifted into the numbered chip')
 }
 
@@ -329,9 +335,7 @@ if (!fingerprint) fail('the work order could not be read, so the page would carr
 // publishable either, the same reasoning the structure gate above rests on. No
 // deadlock: editing the board is never blocked by any gate, and the deny that
 // asks for a publish fires at most once per turn.
-let openPoints = []
-try { openPoints = open } catch { /* judged unreadable above */ }
-const uncovered = boardMissingPoints(repoBytes, openPoints)
+const uncovered = boardMissingPoints(repoBytes, open)
 if (uncovered.length) {
   console.error(`board-publish REFUSED — the board does not show open point(s) ${uncovered.join(', ')}.`)
   console.error('Publishing it would stamp a fingerprint claiming it does, and the watchdog would')
@@ -387,9 +391,9 @@ const archive = existsSync(archiveFile)
   ? renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll())
   : null
 
-// A tree built with plumbing: no checkout, no index, no branch switch. The
-// working tree this runs in is left completely untouched — the publisher must be
-// safe to call in the middle of any other work, including from a worktree.
+// A tree built with plumbing: no checkout, no index, no branch switch. This
+// step leaves the working tree untouched — the publisher must be safe to call in
+// the middle of any other work, including from a worktree.
 let commit = null
 try {
   // `hash-object --stdin -w` writes the object straight from memory: no temp
@@ -398,9 +402,9 @@ try {
   const entries = [`100644 blob ${hashBlob(published)}\t${BOARD_FILE}`]
   if (archive !== null) entries.push(`100644 blob ${hashBlob(archive)}\t${ARCHIVE_FILE}`)
   const tree = git(['mktree'], { input: `${entries.join('\n')}\n` })
-  // NO PARENT — one orphan commit, force-pushed. The branch never grows, so a
-  // publish every few minutes costs the repository a single replaced object
-  // instead of a history nobody reads.
+  // NO PARENT — one orphan commit, force-pushed. The branch never grows: each
+  // publish replaces its one reachable commit (the superseded objects are left
+  // to the object store's own gc) instead of a history nobody reads.
   const who = {
     GIT_AUTHOR_NAME: 'hoa-board',
     GIT_AUTHOR_EMAIL: 'board@localhost',
@@ -420,11 +424,12 @@ try {
   fail(`the push to ${BOARD_REF} was rejected: ${(e && (e.stderr || e.message)) || e}`)
 }
 
-// Hash the bytes that were actually published, not a fourth read of the file:
-// an edit landing during the push would otherwise be attested as live while the
-// OLD bytes went out (four-eyes finding 5).
+// Hash the repo bytes this publish sent out (before the outbound fingerprint and
+// liveness stamps), not a fourth read of the file: an edit landing during the
+// push would otherwise be attested as live while the OLD bytes went out
+// (four-eyes finding 5).
 mergeState(pagesPublishPatch({ fileHash: sha256(repoBytes), fingerprint, focusHead }))
 console.log(`board PUBLISHED (${fingerprint}) — commit ${commit.slice(0, 12)} on ${BOARD_REF}`)
 console.log(`  live in seconds, cached up to ${Math.round(LIVE_GRACE_MS / 60000)} min: ${BOARD_PAGE_URL}`)
-console.log('  verify against the PAGE: node scripts/board-publish.mjs --check')
+console.log('  verify the live content: node scripts/board-publish.mjs --check')
 }

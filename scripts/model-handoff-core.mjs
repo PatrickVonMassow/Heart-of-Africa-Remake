@@ -9,7 +9,7 @@
 
 import { sameModel } from './mechanism-review-core.mjs'
 
-export const MODEL_HANDOFF_VERSION = 1
+const MODEL_HANDOFF_VERSION = 1
 export const MODEL_HANDOFF_PROBE_MS = 20 * 60 * 1000
 
 const cleanRoute = (route) =>
@@ -51,7 +51,7 @@ export function readModelHandoff(value) {
   }
 }
 
-export function modelHandoffDecisionRecord({ route, targetIndex, now, hits, probeAfter = null } = {}) {
+function modelHandoffDecisionRecord({ route, targetIndex, now, hits, probeAfter = null } = {}) {
   const lanes = cleanRoute(route)
   const target = lanes[targetIndex]?.model ?? 'recorded allowed serving lane'
   const offending = cleanHits(hits).map((hit) => hit.sha.slice(0, 12)).join(', ') || 'unknown commit'
@@ -105,7 +105,7 @@ export function modelHandoffDecision({
   if (!recorded) {
     if (!sid || initialRoute.length < 2) {
       const delay = Number.isFinite(probeMs) && probeMs > 0 ? probeMs : MODEL_HANDOFF_PROBE_MS
-      const probeRoute = initialRoute.length ? initialRoute : cleanRoute(route)
+      const probeRoute = initialRoute
       if (!probeRoute.length) return { action: 'block', reason: 'no recorded serving route can carry the breach' }
       const requester = sid || 'model-guard-clocked-probe'
       const next = {
@@ -154,7 +154,7 @@ export function modelHandoffDecision({
       return { ...next, decisionRecord: next.state.decisionRecord }
     }
     const verifiedThrough = Math.max(...found.map((hit) => hit.when))
-    if (!Number.isFinite(verifiedThrough) || verifiedThrough <= Number(baselineMs)) {
+    if (verifiedThrough <= Number(baselineMs)) {
       return { action: 'block', reason: 'the offending trailer range has no advanceable timestamp' }
     }
     return {
@@ -202,6 +202,6 @@ export function modelHandoffSpawn(value, now = Date.now()) {
       `Do no batch work and author no commit. Read the Co-Authored-By trailers named by ` +
       `.claude/model-guard-handoff.json, compare them with the repository log, report what you found, ` +
       `then end this response. The Stop hook advances the baseline only if transcript metadata proves ` +
-      `this recorded lane actually answered.`,
+      `this recorded lane, or a later lane of the recorded route, actually answered.`,
   }
 }

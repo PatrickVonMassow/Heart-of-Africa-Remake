@@ -10,7 +10,8 @@
 //   2. the fail counter is UNTOUCHED (so the runaway brake is never approached);
 //   3. no pause is due, and none was written;
 //   4. the next probe is scheduled at the ordinary interval, not a doubled one;
-//   5. a segment WITHOUT the signature still climbs the ladder.
+//   5. the probe is logged with its signature, not pushed as an announcement;
+//   6. a segment WITHOUT the signature still climbs the ladder.
 //
 // It spawns no session and writes nothing outside the git-ignored local/. The
 // `--quota-report` path exits before the tick's first side effect, so running this
@@ -58,7 +59,7 @@ try {
   check(blocked.state === 'quota', "state is 'quota', not 'failed'")
   check(blocked.failCount === blocked.failCountBefore, 'the fail counter is untouched')
   check(blocked.pause === false, 'no pause is due')
-  check(existsSync(PAUSE_FILE) === pausedBefore, 'the pause file is unchanged (a quota block never writes one)')
+  check(existsSync(PAUSE_FILE) === pausedBefore, 'the pause file is present exactly when it was before (a quota block creates none)')
   check(blocked.nextProbeMs === 10 * 60 * 1000, 'the next probe is at the ordinary interval (10 min floor, 15 min tick)')
   check(blocked.announce === false, 'the probe is logged, not pushed')
   check(typeof blocked.note === 'string' && blocked.note.includes('QUOTA BLOCK'), 'the probe is logged with its signature')

@@ -11,7 +11,8 @@
 //
 // Enforced rules, on the now-cards ("Woran ich gerade arbeite") and the open
 // queue cards ("Warteschlange") only — "Von dir zu klären" and "Erledigt" are
-// exempt (questions are the user's text; history may be detailed):
+// exempt (questions are the user's text; history may be detailed), and so is
+// the derived state card (`data-state="derived"`, the machine's own record):
 //   (1) VERBOSITY  — body over WORD_BUDGET words is too long for a glance.
 //   (2) TECH DENSITY — more than TECH_TOKEN_BUDGET technical tokens (<code>
 //       spans, commit SHAs, file paths, §-refs) reads as a changelog, not a
@@ -54,9 +55,11 @@ function sectionSlice(html, marker) {
 }
 
 /**
- * The `<details>` cards of one section as [{where, point, title, bodyHtml}].
- * The point comes from `<span class="num">N</span>` (queue) or a leading
- * number in `<span class="t">` (now-cards); null for non-point work. Cards
+ * The `<details>` cards of one section as [{where, point, title, kind, bodyHtml}].
+ * The point comes from `<span class="num">…</span>` (queue; `pointNumbersFromChip`)
+ * or the title's ownership grammar (now-cards; `pointOwnershipFromTitle`); null
+ * for non-point work or a card owning several points. `kind` is the card's
+ * `data-state`. Cards
  * without a body block are skipped (nothing to measure).
  */
 export function parseCards(sectionHtml, where, options = {}) {

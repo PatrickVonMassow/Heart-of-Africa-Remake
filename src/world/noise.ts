@@ -1,5 +1,6 @@
-// Small seeded 2D value-noise implementation with fBm, dependency-free.
-// Used for the procedural per-run appearance of the landscape (design.md §18).
+// Small seeded 2D value-noise implementation with fBm, dependency-free, used
+// for the procedural per-run appearance of the landscape (design.md §18); its
+// mulberry32 PRNG seeds per-run random choices across the whole game.
 
 /** Mulberry32 PRNG — deterministic per seed. */
 export function mulberry32(seed: number): () => number {

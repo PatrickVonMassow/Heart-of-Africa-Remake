@@ -23,7 +23,8 @@
 //     overwrites a person's declaration, only its own.
 //
 // And the mirror duty, which is what keeps the guard sharp: when the run the
-// hook's own marker names has FINISHED, the hook CLEARS it. The wait is over,
+// hook's own marker names has FINISHED, the hook CLEARS it (unless another
+// verify run is live, which the marker then names instead). The wait is over,
 // the result is now the session's next action, and the guard should block a stop
 // again — exactly as it does when a hand-declared wait ends.
 //
@@ -67,8 +68,10 @@ export const MARKER_REFRESH_MS = 15 * 60 * 1000
  *   'clear'   — the hook's OWN marker names a run that is over; withdraw it
  *   'none'    — do nothing, and `reason` says why
  *
- * Every uncertain case answers 'none'. A hook that guesses "probably still
- * running" is the blind guard this must not become.
+ * Every uncertain case answers 'none' — except that the hook withdraws its OWN
+ * marker when the run's record is gone or unreadable, which fails closed (the
+ * guard blocks a stop again). A hook that guesses "probably still running" is
+ * the blind guard this must not become.
  */
 export function waitMarkerDecision({
   sid = '',
@@ -139,7 +142,7 @@ export function describeRun(record) {
  * writes it (v:1, the lock's process identity, the evidence list) plus the two
  * fields that make it identifiable as the hook's: `source` and `runLog`. The
  * guard reads it through the same `assessInFlight` either way, which is the
- * point — it accepts the hook's marker exactly as it accepts today's turn.
+ * point — it accepts the hook's marker exactly as it accepts a hand-written one.
  */
 export function markerDeclaration({ sid, lock = null, decision, now = Date.now() }) {
   return {

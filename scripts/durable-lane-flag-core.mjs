@@ -1,5 +1,5 @@
 // THE ACTIVATION FLAG OF THE DURABLE AUTHORING LANE, and the interlock that keeps
-// it off (work-order point 891, step 1; docs/handover-architecture.md, mechanism 2
+// it off until every required step is green (work-order point 891, step 1; docs/handover-architecture.md, mechanism 2
 // "Rollback: the REGIME IS THE DAEMON'S EXISTENCE").
 //
 // WHAT THE FLAG IS. It decides ONE thing: whether a daemon may be STARTED. It is
@@ -15,7 +15,8 @@
 // today's path, because a surviving worker whose work no successor can prove or
 // land is work that looks alive and cannot be finished. So the refusal is CODE, not
 // a habit: controlling what the board advertises does not control what somebody
-// switches on.
+// switches on. Every required step is green today; the interlock stays so that a
+// step turned back red closes the door again.
 //
 // WHY THE MANIFEST IS A CONSTANT AND NOT A PROBE. A step is green when its
 // mechanism review and its suites say so, and neither is readable at the moment a
@@ -23,10 +24,10 @@
 // its evidence — which is exactly the gate this project already uses for a claim
 // nobody can measure at runtime.
 
-// The remainder of point 676 adds the checkpoint barrier and planned handover;
-// their reviewed manifest evidence changes the allowed boundary mode below.
+// Point 676 added the checkpoint barrier and planned handover; their reviewed
+// evidence is DURABLE_LANE_BOUNDARY_MECHANISM below.
 
-/** Every step of the ordered work, and what actually stands today. `evidence` is
+/** The steps of the ordered work that gate activation, and what stands today. `evidence` is
  *  the commit-visible reason a step is green; a green step without one is a claim,
  *  and `activationDecision` refuses to count it. */
 export const DURABLE_LANE_STEPS = Object.freeze({

@@ -15,8 +15,10 @@ import { PLACES } from '../../world/geo'
  * ONE BUILD PER (PLACE, SEED) IN A FILE, for the suites that ask for the same
  * one over and over.
  *
- * `buildLayout` is a pure function of its two arguments — it seeds `mulberry32`
- * from `seed ^ hash(placeId)` and reads nothing else — and it costs about
+ * `buildLayout` is deterministic in its two arguments — it seeds `mulberry32`
+ * from `seed ^ hash(placeId)`, and the module data it also reads (balance,
+ * world geography, region styles, village plans) does not change within a
+ * test file — and it costs about
  * 111 ms a call. Measured 22.09.2026 with the function counted from inside, the
  * place suites spend nearly all their time in it: `layout.test.ts` 90.4 s of its
  * 94.5 s, `layout.wayOut.test.ts` 75.5 s of 78.7 s, `layout.fabric.test.ts`
@@ -105,8 +107,7 @@ export interface Body {
 export function solidBodies(layout: PlaceLayout, port: boolean): Body[] {
   const bodies: Body[] = layout.dwellings.map((d) => ({ x: d.x, z: d.z, r: bodyR(d) }))
   for (const it of layout.interactives) {
-    const r = interactiveR(it, port)
-    if (r > 0) bodies.push({ x: it.pos[0], z: it.pos[1], r })
+    bodies.push({ x: it.pos[0], z: it.pos[1], r: interactiveR(it, port) })
   }
   return bodies
 }

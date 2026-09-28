@@ -4,8 +4,10 @@ import { join } from 'node:path'
 import { readRecord } from './run-record.mjs'
 import { parseArgs, selectBackend } from './tiers.mjs'
 
-// These wrapper controls do not change the tested behavior. All other VERIFY_
-// settings (seed, retry policy, load policy, etc.) must agree with the receipt.
+// These controls stay out of the environment key: VERIFY_GL is matched on its
+// own as the receipt's backend, and the other two do not change the tested
+// behavior. All other VERIFY_ settings (seed, retry marker, load policy, etc.)
+// must agree with the receipt.
 export function cacheEnvironment(env = process.env) {
   const controls = new Set(['VERIFY_GL', 'VERIFY_LOG_DIR', 'VERIFY_NO_WAIT'])
   return JSON.stringify(Object.entries(env).filter(([key]) => key.startsWith('VERIFY_') && !controls.has(key))

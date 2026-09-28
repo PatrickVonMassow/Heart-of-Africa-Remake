@@ -4,13 +4,17 @@
 // peninsula up to the dataset edge — is open, impassable ocean, exactly like
 // the sea around the rest of the continent. The boundary runs slightly
 // seaward of the ~1890 African coast (data/coastline.ts, "Red Sea coast
-// north to Suez" / "Gulf of Aden"): from the eastern Mediterranean across
+// north to Suez" / "Gulf of Aden") — except through the Gulf-of-Suez head,
+// where it hugs the west shore and leaves Suez on the trimmed side — from
+// the eastern Mediterranean across
 // the Suez isthmus, down the Red Sea to Bab-el-Mandeb and out along the
 // Gulf of Aden past the Horn. Used by the movement boundary (terrain.ts)
 // and by the geodata load (geodata.ts), whose trimming pass keeps only the
 // land connected to the game's own land masses — the boundary acts as the
 // gate at the Suez isthmus, and all other real-data land (Sinai, the
-// Levant, Arabia, southern Europe, foreign islands) is stamped to ocean.
+// Levant, Arabia, southern Europe, foreign islands) is stamped to ocean, as is
+// every offshore sea texel beyond the kept coast's near-shore shelf. The swim
+// margin (oceanSwimBlocked) lives here too.
 
 /** Boundary polyline as [lon, lat], northwest (Mediterranean) → southeast. */
 export const NORTHEAST_BOUNDARY: Array<[number, number]> = [
@@ -76,7 +80,8 @@ export function isNortheastOfBoundary(lat: number, lon: number): boolean {
  * POSITIVE on the southwest (kept-land) side, NEGATIVE on the northeast
  * (trimmed-ocean) side, growing with distance. Same closest-segment geometry
  * as `isNortheastOfBoundary` (its boolean is `≥ 0` on the NE side, i.e. this
- * value `≤ 0`). Used by the travel terrain (terrain.ts, point 210) to rebuild
+ * value `≤ 0`) wherever neither function's bounding-box shortcut applies; the
+ * two boxes differ by 0.5°, so the equivalence does not hold in that strip. Used by the travel terrain (terrain.ts, point 210) to rebuild
  * the near-boundary land fraction as a smooth diagonal — the trim's hard
  * per-texel land/sea stamp otherwise staircases the Red-Sea/Suez coast, which
  * point 209's vector-coast smoothing does not cover (it is an artificial cut,
@@ -172,7 +177,7 @@ export interface StampMeta {
 /** Seed points [lon, lat] on the game's own land masses (design.md §3.1):
  *  the mainland and its ~1890 islands. Everything not land-connected to a
  *  seed is trimmed from the map. */
-export const GAME_LAND_SEEDS: Array<[number, number]> = [
+const GAME_LAND_SEEDS: Array<[number, number]> = [
   [15, 24], // mainland (central Sahara)
   [39.3, -6.1], // Zanzibar
   [39.72, -5.15], // Pemba
@@ -192,7 +197,9 @@ const GATE = { lonMin: 31.9, lonMax: 34.7, latMin: 29.0 }
  * other land texel (Sinai, the Levant, Arabia, southern Europe, foreign
  * islands) is stamped to ocean: B channel 0 (ocean in the dataset's
  * land/coast-distance encoding) and the R/G elevation set below sea level.
- * Sea texels keep their real bathymetry, so the trimmed areas blend
+ * Sea texels keep their real bathymetry only on the kept side's near-shore
+ * shelf or where already at/below the deep floor; every other sea texel is
+ * forced to the same deep stamp (point 235, below), so the trimmed areas blend
  * seamlessly into the surrounding ocean. Pure over the RGBA pixel array —
  * no browser dependency (unit-tested in redSea.test.ts).
  */
@@ -341,8 +348,8 @@ export function trimToGameWorld(
   // alone, never raised). The deep value is the same as the trimmed-land stamp
   // (offset − 3000 m, ~−1.9 in world height): well past the deep-tone
   // threshold, and terrain.ts's point-210b stamp clamp only re-shallows it in
-  // the narrow band straddling the trim boundary (the intended Gulf-of-Suez
-  // head), never far offshore.
+  // the narrow band straddling the trim boundary where the boundary is not a
+  // coast (aimed at the Gulf-of-Suez head), never far offshore.
   for (let idx = 0; idx < total; idx++) {
     if (pixels[idx * 4 + 2] > 0) continue // kept land
     if (encAt(idx) <= stampedElevation) continue // already at/below the deep floor

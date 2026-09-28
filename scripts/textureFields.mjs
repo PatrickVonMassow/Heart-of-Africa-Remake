@@ -102,8 +102,8 @@ function strawFlecks(u, v, seed) {
 
 // --- Terrain materials (bird's-eye splatting, design.md §3) ---------------------
 // Each material is a height function h(u,v) in [0,1] plus a colorize(h, u, v)
-// returning [r,g,b] 0..255. Albedo stays mid-brightness: at runtime it is
-// multiplied with the biome vertex tint.
+// returning [r,g,b] 0..255. These are base albedos (sand the brightest): at
+// runtime they are multiplied with the biome vertex tint.
 
 export const TERRAIN_MATERIALS = {
   // Fine grain with soft wind ripples.
@@ -132,7 +132,7 @@ export const TERRAIN_MATERIALS = {
     },
     normalStrength: 2.2,
   },
-  // Cracked rock: inverted Worley ridges over fbm.
+  // Cracked rock: Worley cell distance (^0.7) over fbm.
   rock: {
     height(u, v) {
       const cracks = Math.pow(worley(u, v, 10, 31), 0.7)

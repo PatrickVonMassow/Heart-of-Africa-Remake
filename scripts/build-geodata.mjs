@@ -12,8 +12,9 @@
 //      barrier islands below the grid resolution).
 //   4. Computes a chamfer distance-to-coast transform for shoreline ramps.
 //   5. Encodes everything into one opaque RGB PNG:
-//        R,G  = (elevation_m + OFFSET) as 16-bit big-endian
-//        B    = 0 for ocean; 1 + round(coastDistanceDeg / 0.02) for land
+//        R,G  = (elevation_m + OFFSET) as 16-bit big-endian, elevation
+//               quantised to 4 m on land, 8 m in shallow water, 50 m deep
+//        B    = 0 for ocean; 1 + min(254, round(coastDistanceDeg / 0.02)) for land
 //
 // Reproducible via:  node scripts/build-geodata.mjs
 // (~224 tile downloads, ≈10 MB; runtime a few minutes on first run. Tiles

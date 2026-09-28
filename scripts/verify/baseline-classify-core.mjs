@@ -1,30 +1,21 @@
-// Triage of a RED verify run, as pure functions (point 294).
+// Triage of a RED verify run against its pre-change baseline, as pure
+// functions (point 294).
 //
-// Two independent signals, neither of which the runner could read before:
+// A check that is already red on the pre-change baseline is PRE-EXISTING or a
+// stale check assumption (the 24.07. SSAO ground-edge and proximity-call-fade
+// cases); one that is green on the baseline and red now is SUSPECT — a
+// suspicion, never a proof. Running a browser suite against a baseline checkout
+// is expensive, so the wrapper (baseline-classify.mjs) runs only when asked for
+// by hand (since point 1135 nothing calls it automatically), and only for the
+// checks that failed — this module only decides what the two outputs MEAN.
 //
-//   1. THE REPEAT SIGNATURE. run-all retries a failed browser suite once and
-//      used to conclude "FAIL (twice) — a real failure, not a flake" from the
-//      bare fact that both runs failed. That is wrong reasoning, and it cost a
-//      real triage on 27.07.2026: `enrichments` failed two staging checks on
-//      run 1 and a completely different one (the crocodile eye knobs) on the
-//      retry, on a machine carrying a unit run plus two agents. Two failures at
-//      DIFFERENT places are the signature of LOAD; a defect fails the SAME
-//      check twice. So the verdict is drawn from the failing check NAMES, not
-//      from the failure count.
-//   2. THE BASELINE COMPARISON (point 294 proper). A check that is already red
-//      on the pre-change baseline is PRE-EXISTING or a stale check assumption
-//      (the 24.07. SSAO ground-edge and proximity-call-fade cases); one that is
-//      green on the baseline and red now is SUSPECT — a suspicion, never a
-//      browser suite against a baseline checkout is expensive, so the wrapper
-//      (baseline-classify.mjs) runs automatically for LARGE reds, opt-in for
-//      smaller runs, and only for the checks that
-//      failed — this module only decides what the two outputs MEAN.
+// Verdicts are drawn from the failing check NAMES, never from a failure count:
+// on 27.07.2026 `enrichments` failed two staging checks on one run and a
+// completely different one on the next, on a loaded machine. Two failures at
+// DIFFERENT places are the signature of load; a defect fails the SAME check.
 //
-// A third, deliberately WEAK signal corroborates: whether the failing check's
-// name has anything to do with the files the change touched. It never decides a
-// verdict — it is a hint printed beside one.
-//
-// Everything here is string-in / verdict-out so the Vitest layer can pin it
+// Everything here is string-in / verdict-out — except clearInheritedBaselineLane,
+// which scrubs the env object it is handed — so the Vitest layer can pin it
 // (scripts/verify/baseline-classify.test.mjs); all process work — git, the
 // baseline worktree, the dev server, the suite spawn — lives in the wrapper.
 
@@ -104,7 +95,8 @@ export function consoleErrorChecks(output) {
   return out
 }
 
-/** An error text reduced to its identity: no URL, no port, no counter. */
+/** An error text reduced to its identity: URLs and `:line:col` pairs folded
+ *  away, whitespace collapsed (checkKey folds the remaining digits). */
 export function normaliseErrorText(text) {
   return String(text ?? '')
     .replace(/https?:\/\/\S+/g, '<url>')
@@ -120,8 +112,8 @@ export function checkKey(name) {
 }
 
 /** The prefix a console pseudo-check carries — the one thing that survives when
- *  a check travels between processes as a bare NAME (run-all hands the failing
- *  names to the classifier wrapper on its command line). */
+ *  a check travels between processes as a bare NAME (a `--failed` list hands
+ *  the failing names to the classifier wrapper on its command line). */
 const CONSOLE_PREFIX = 'console error:'
 
 /** A check rebuilt from its NAME alone, keeping its kind. Used wherever a name
@@ -138,7 +130,7 @@ const CONSOLE_PREFIX = 'console error:'
  *  its identity from the WHOLE normalised error text and never splits at a dash.
  *  `src/systems/devAssert.ts` prints `[ASSERT] <code> — <detail>`, so cutting
  *  here would key every dev-assert error differently from its own baseline form
- *  — and run-all hands console names through `--failed`, so a PRE-EXISTING
+ *  — and a `--failed` list carries console names too, so a PRE-EXISTING
  *  assert would be reported as SUSPECT. Each side splits the way its
  *  own producer does; that is what makes the keys meet. */
 export function checkFromName(name) {
@@ -166,7 +158,8 @@ export function checkFromName(name) {
 }
 
 /** The failing checks of one output (console errors included as pseudo-checks),
- *  de-duplicated, in first-seen order. */
+ *  de-duplicated: the check lines in first-seen order, then the console
+ *  pseudo-checks in theirs. */
 export function failedChecks(output, { includeConsoleErrors = true } = {}) {
   const seen = new Set()
   const out = []
@@ -237,14 +230,15 @@ export function allChecks(output) {
  *                     (point 418). Distinct from inconclusive on purpose: one
  *                     says "this check is newer than the baseline", the other
  *                     says "the lane broke and answered nothing".
- *   inconclusive    — the check never appeared in a baseline run that reached
- *                     the end: it is newer than the baseline.
+ *   inconclusive    — the check never appeared in a baseline run that did not
+ *                     die: most likely it is newer than the baseline.
  *
  * `baselineChecks` is every check the baseline run reached (see allChecks); it
  * is what separates "passed there" from "never ran there" — without it a
  * baseline suite that crashed early would read as a clean bill of health.
  * A console-error pseudo-check is different in kind: it cannot be "reached", so
- * its ABSENCE on a baseline that ran at all means the error did not occur there.
+ * its ABSENCE on a baseline that ran at all and did not die means the error did
+ * not occur there.
  */
 export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselineChecks, baselineFlaky = [], baselineDied = false }) {
   const failedNow = (currentFailed ?? []).map((c) => (typeof c === 'string' ? checkFromName(c) : c))
@@ -290,7 +284,8 @@ export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselin
  * suite's last statement, so reaching it means reaching the end. Some checks are
  * conditional on what the app produced, so a healthy baseline may legitimately
  * count a few short — and calling that a death would cry wolf on every run.
- * A killed run (no exit code at all) counts as non-zero.
+ * A run with no exit code (killed, or none handed in) is NOT counted silent —
+ * only the `short` signature can make it a death.
  *
  * The shortfall alone must NOT annul a run that failed properly: the serverless
  * suites run the BASELINE's own copy of the script, so a change that ADDS checks
@@ -398,7 +393,7 @@ const VERDICT_LABEL = {
   'pre-existing': 'PRE-EXISTING / STALE ASSUMPTION (already red on baseline)',
   'baseline-flaky': 'UNSTABLE ON BASELINE (it flakes there too — the baseline decides nothing)',
   'baseline-died': 'NOT CLASSIFIED — the BASELINE RUN DIED before reaching this check (the lane broke; this is NOT "newer than the baseline")',
-  inconclusive: 'INCONCLUSIVE (the check did not run on a baseline that reached the end — it is newer than the baseline)',
+  inconclusive: 'INCONCLUSIVE (the check did not run on a baseline that did not die — most likely it is newer than the baseline)',
 }
 
 /** The baseline classification as printable lines. */
@@ -443,9 +438,9 @@ export function formatBaselineReport({
       // suite is top-level-await, so a check reaching for a dev hook the OLDER
       // app does not expose rejects and kills the process — exit 1, no FAIL line.
       lines.push(
-        `      FIRST SUSPECT: scripts/verify/${suite}.mjs changed since the baseline. The CURRENT check runs against the`,
+        `      FIRST SUSPECT: scripts/verify/${suite}.mjs changed since the baseline. A browser suite runs the CURRENT check`,
       )
-      lines.push('      BASELINE app, so a new check reaching for a dev hook that app has not got throws and takes the run with it.')
+      lines.push('      against the BASELINE app, so a new check reaching for a dev hook that app has not got throws and takes the run with it.')
     }
     lines.push('      Read the kept output below at the last check named above — the throw is the line after it.')
   }
@@ -463,13 +458,13 @@ export function formatBaselineReport({
   if (logs.length) lines.push(`      the baseline run output was kept: ${logs.join(', ')}`)
   if (suiteFileChanged) {
     lines.push(
-      `      NOTE: scripts/verify/${suite}.mjs itself differs from ${ref} — the CURRENT check was run against the BASELINE code,`,
+      `      NOTE: scripts/verify/${suite}.mjs itself differs from ${ref} — a browser suite ran the CURRENT check against the`,
     )
-    lines.push('      so a "real regression" here can also mean the check is new or was tightened, not that the product broke.')
+    lines.push('      BASELINE code, so a SUSPECT here can also mean the check is new or was tightened, not that the product broke.')
   }
   if (infraChanged.length) {
     lines.push(`      NOTE: the harness/dependencies moved since ${ref} (${infraChanged.join(', ')}) — the baseline checkout runs`)
-    lines.push('      against the CURRENT node_modules and the current shared boot helpers; treat the verdict as advisory.')
+    lines.push('      against the CURRENT node_modules (and, for a browser suite, the current shared boot helpers); treat the verdict as advisory.')
   }
   if (note) lines.push(`      ${note}`)
   lines.push('      The baseline run is EVIDENCE, not a verdict: read the failing check before acting on it.')

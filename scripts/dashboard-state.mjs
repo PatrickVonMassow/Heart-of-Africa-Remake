@@ -1,15 +1,16 @@
-// Shared state I/O for the dashboard-currency toolchain (dashboard-guard,
-// focus, dashboard-publish, lock-heartbeat-hook). One merged JSON state file
-// plus three tiny markers under .claude/, all git-ignored:
+// Shared state I/O for the dashboard-currency toolchain (the dashboard guards,
+// focus, the board scripts, the prompt and heartbeat hooks, among others). One
+// merged JSON state file plus three tiny markers under .claude/, all git-ignored:
 //
 //   dashboard-state.json      — registered dashboard path, reviewed HEAD,
-//                               published-content hash
+//                               publish records (hashes, deferral) and the
+//                               guards' bookkeeping (doneSeen, snapshots, …)
 //   current-focus.json        — the DECLARED current work focus (point + note)
 //   focus-check-pending.json  — armed by every user prompt; cleared by an
 //                               explicit focus confirm/set or a --synced review
 //   tool-activity.json        — last tool-call timestamp (focus freshness)
 //
-// All five resolve against the SHARED checkout, never the worktree a process was
+// All four, and the board file itself (`boardFilePath`), resolve against the SHARED checkout, never the worktree a process was
 // started in: one host runs one batch, so its board, focus and activity are
 // singletons. Resolving them per checkout gave a session whose cwd had moved
 // into a point's worktree a second, empty state file beside the live one — the

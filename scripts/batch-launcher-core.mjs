@@ -14,9 +14,10 @@
 // the same interval the task used. Only the TRIGGER changes; the tick path — and
 // with it the hard singleton — is untouched.
 //
-// This module holds the two decisions that must be provable without a machine:
-// which launcher a host has (and how it is armed), and whether a daemon RECORD
-// found on disk means the launcher is armed. Everything impure — the pid probe,
+// This module holds the decisions that must be provable without a machine:
+// which launcher a host has (and how it is armed), whether a daemon RECORD found
+// on disk means the launcher is armed, when an ownership change wakes an early
+// tick, and whether a session start re-arms the launcher. Everything impure — the pid probe,
 // the file, the spawn — lives in `scripts/batch-launcher.mjs`.
 
 /** The Windows launcher: a Scheduled Task, armed and disarmed by the user. */
@@ -27,7 +28,8 @@ export const LAUNCHER_DAEMON_NAME = 'hoa-batch-launcher'
 
 /** The daemon record's schema version. A record written by another version is
  *  not interpreted — see `classifyDaemonRecord`, where that reads as 'unknown'
- *  (not armed), which is the safe direction: it costs a restart, never the batch. */
+ *  (not armed), which is the safe direction: it costs a restart, never the batch.
+ *  Only a `stopped` mark is read first, whatever the version ('disabled'). */
 export const LAUNCHER_RECORD_VERSION = 1
 
 /** How many missed ticks make a daemon record STALE. The daemon writes the
@@ -180,10 +182,11 @@ export function launcherRemedy(platform = process.platform) {
  *   staleTicks — how many silent intervals disarm it
  *
  * AN ARMED VERDICT IS NEVER GRANTED BY THE MERE PRESENCE OF A FILE. A record whose
- * pid is dead, whose pid was recycled, whose pid carries no start time to check that
- * against, whose last tick is older than the margin, or
+ * pid is dead, whose pid was recycled, that records no start time for its pid,
+ * whose last tick is older than the margin, or
  * whose schema this code does not know all read 'unknown' — which the guard treats
- * as not armed. The asymmetry is the boundary's own: erring toward "keep working"
+ * as not armed. A probe that cannot read the live start time skips the recycle
+ * check rather than failing it. The asymmetry is the boundary's own: erring toward "keep working"
  * costs context, erring toward "stop" can cost the whole batch.
  */
 export function classifyDaemonRecord({

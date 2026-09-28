@@ -1,11 +1,12 @@
-// The one decision about whether Fable may be used at all.
+// The one decision about whether Fable may be used at all, plus the model identities,
+// the result-JSON parsing and the merger roster that decision is read against.
 //
 // This module is deliberately pure. The state file belongs to the main checkout and
 // scripts/fable-switch.mjs owns its I/O; every policy consumer receives the decoded
 // state and derives its answer here instead of carrying a second switch.
 
-export const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
-export const STATE_FILE_NAME = 'fable-switch.json'
+const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
+const STATE_FILE_NAME = 'fable-switch.json'
 export const FABLE_MODEL = 'Fable 5.1'
 // The OpenAI lane, stated ONCE here beside the other model identities and imported
 // everywhere else (point 1061). GPT-5.6 Sol held this lane until 05.09.2026.
@@ -176,7 +177,6 @@ export function servingPolicyLine(value) {
   )
 }
 
-/** The model that folds a blind-parallel union. */
 /** The named authors of the two halves, blanks dropped. */
 function authorList(authors) {
   return (Array.isArray(authors) ? authors : [authors]).map((a) => String(a ?? '').trim()).filter(Boolean)
@@ -194,11 +194,6 @@ function sameModelName(a, b) {
     if (!family.length) return null
     // "GPT-6 Astra" and "Claude Opus 5" both name a vendor word and a model word; the
     // LAST recognised word is the model, which is what the roster entries are keyed on.
-    // A name carrying MODEL WORDS OF BOTH VENDORS — "Fable / GPT-6 Astra" — is not
-    // resolved to either: first-match made it the OpenAI lane, and mergerModel then offered
-    // Fable as untainted although the marker names Fable (re-review round 6). Such
-    // a name matches EVERY model it actually MENTIONS — and only those (round 7:
-    // a wildcard also disqualified models the name never named).
     // A name mentioning MORE THAN ONE model word — cross-vendor OR same-vendor
     // ("Fable 5 / Claude Opus 5") — matches every model it actually mentions,
     // each with its own version. Reducing a compound to one key let a forged
@@ -250,6 +245,7 @@ function sameModelName(a, b) {
   )
 }
 
+/** The model that folds a blind-parallel union. */
 export function mergerModel(value, authors = []) {
   const on = fableIsOn(value)
   // THE RULE IS "THE MODEL THAT WROTE NEITHER HALF" (CLAUDE.md §6), and for a long
@@ -263,7 +259,8 @@ export function mergerModel(value, authors = []) {
   const roster = on ? [FABLE_MODEL, ASTRA_MODEL, CLAUDE_MODEL] : [ASTRA_MODEL, CLAUDE_MODEL]
   const wrote = (model) => authorList(authors).some((author) => sameModelName(model, author))
   const untainted = roster.find((model) => !wrote(model))
-  // None left means only two models existed for three roles — the caller then owes the
+  // None left means every roster model is named as an author — two models for three
+  // roles while Fable is OFF, or compound author names. The caller then owes the
   // recorded two-model fallback, so the previous answer is kept for it to judge.
   return untainted ?? (on ? FABLE_MODEL : ASTRA_MODEL)
 }

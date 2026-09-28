@@ -16,7 +16,7 @@ import type { TextRef } from '../i18n'
 import type { PlaceDef, PlaceKind } from '../world/geo'
 import type { SketchId } from './sketches'
 
-export interface ArrivalEntry {
+interface ArrivalEntry {
   title: TextRef
   text: TextRef
   sketch: SketchId

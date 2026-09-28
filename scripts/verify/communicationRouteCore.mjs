@@ -1,5 +1,6 @@
 /** Ordered river stations, source-to-mouth in the source data. Navigation uses
- * coordinates; the named route frames are still owed as evidence of the clue. */
+ * coordinates; the route frames taken on the way (routeFrameProgress) are the
+ * evidence of the clue. */
 export function riverBankRoute(axis, from, to, offset = 0.2) {
   if (axis.length < 2) throw new Error('River axis needs two stations')
   const nearest = (p) => axis.reduce((best, q, i) =>

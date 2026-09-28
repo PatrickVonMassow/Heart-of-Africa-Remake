@@ -62,8 +62,8 @@ of it.
 ## What the cut actually saved
 
 Against the pre-cut owner baseline of 57,970 the measured owner floor of 43,615
-is a saving of 14,355 tokens per turn, and the comparison is finally like for
-like: owner against owner. Point 757 estimated a yield of 4-6k and a resulting
+is a measured difference of 14,355 tokens (of which about 11.4k recurs per turn,
+below), and the comparison is finally like for like: owner against owner. Point 757 estimated a yield of 4-6k and a resulting
 floor near 55-57k, so the executed cut beat its own estimate roughly threefold.
 The estimate was low because it assumed a quarter of the documents could go; the
 cut removed 45,682 of 68,748 bytes, two thirds of them.
@@ -125,8 +125,8 @@ guard still enforces the configured ceilings when those files are present.
 The original confirmation found two documents with nothing to spare. The ceilings were set from figures taken BEFORE the
 merge — the code comments in `scripts/doc-budget-core.mjs` still said MEMORY.md
 had landed at 45 lines / 700 words and the global stub at five lines, where the
-landed files measure 46 / 710 and six. Those comments are corrected in the same
-commit as this table. The ceilings themselves were NOT raised in THAT commit:
+landed files measure 46 / 710 and six. Those comments were corrected in the
+commit that first introduced this table. The ceilings themselves were NOT raised in THAT commit:
 `MEMORY.md` is designed to gain one index line per new memory, and at zero word
 headroom the next one blocks the guard, so the budget needed a decision rather
 than a quiet widening. That was filed as its own work-order point. The decision
@@ -168,9 +168,11 @@ The cost of the missing entry was measured the same morning: a finished,
 CI-green point was rebuilt from scratch, unit suite included, because no source
 the batch resumption reads names an existing branch.
 
-The 10.09.2026 reading showed zero word headroom for a file designed to gain
-a line per memory. The next raise should cut a retired
-entry rather than widen again.
+On 23.09.2026 the ceilings moved to 53 / 820 for one new entry, the user's
+standing order that exactly one session is attended ("Only one head session").
+The 10.09.2026 reading had shown zero word headroom for a file designed to gain
+a line per memory; its advice — cut a retired entry rather than widen again —
+was tried first on 21.09.2026 (above) and did not pay.
 On 22.08.2026 `CLAUDE.md` moved for the first time since the merge: the
 four-eyes cut of point 768 rewrote the file, and the cross-vendor review of that
 cut put one rule back that had left the file without an enforcer ("Keep branches
@@ -179,8 +181,9 @@ that followed the restored rule by exactly the four words it costs. On
 23.08.2026 §6 gained the 13-word rule permitting a second model trailer for the
 cross-vendor reviewer. On 24.08.2026 the stated-recommendation authorization
 added 31 words because its grant and boundary must stand in one sentence. Its
-word ceiling rose by exactly those words, preserving 18 words of headroom; its
-unchanged line ceiling is now exact.
+word ceiling rose by exactly those words, preserving the one word of headroom; its
+unchanged line ceiling is now exact. Later rewrites brought the file to the
+table's 205 / 1,468 with no headroom.
 The global stub is GONE: the user released it in the same ruling and it was
 deleted on 20.08.2026 (backup `local/global-CLAUDE-before-deletion-20-08-2026.md`),
 and `doc-budget-guard` simply skips a budget whose file no longer exists. The

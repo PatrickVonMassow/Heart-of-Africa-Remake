@@ -8,8 +8,8 @@
 // batch-singleton's acquire, and nothing may "refresh" a lock it does not own.
 //
 // What remains here:
-//   batch-paused    — user PAUSE marker; while present no session auto-resumes,
-//                     regardless of the lock (the batch waits for an explicit go).
+//   batch-paused    — PAUSE marker; while present no session auto-resumes,
+//                     regardless of the lock.
 //                     Since point 445 the marker is a RECORD: it carries the reason
 //                     and a RETRY-AFTER, and the launcher tick resumes the batch
 //                     when that clock runs out. The format and every decision about
@@ -47,13 +47,14 @@ export function readLock() {
   return null
 }
 
-/** The user PAUSE marker: while present, no session auto-resumes the batch. */
+/** The PAUSE marker: while present, no session auto-resumes the batch (a clocked
+ *  park is cleared by the launcher tick when its clock runs out). */
 export function isPaused({ path = PAUSE_PATH } = {}) {
   return existsSync(path)
 }
 
 /** The raw record text, or null when the batch is not parked. */
-export function readPauseRecord({ path = PAUSE_PATH } = {}) {
+function readPauseRecord({ path = PAUSE_PATH } = {}) {
   try {
     return readFileSync(path, 'utf8')
   } catch {
@@ -67,7 +68,8 @@ export function pauseReason(opts = {}) {
   return text == null ? '' : parsePauseRecord(text).reason
 }
 
-/** What the record says right now: 'none' | 'hold' | 'wait' | 'retry' (+ details). */
+/** What the record says right now: 'none' | 'hold' | 'wait' | 'retry' | 'recover'
+ *  (+ details). */
 export function pauseState(now = Date.now(), opts = {}) {
   return classifyPause({ text: readPauseRecord(opts), now })
 }

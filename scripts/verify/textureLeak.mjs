@@ -44,7 +44,8 @@ export function tallyByKind(list) {
 
 /** Per-kind difference between two live-texture snapshots, biggest change
  *  first, only the kinds that actually moved. This is the answer to "which
- *  resources survive" — with no leak it is empty. */
+ *  resources survive" — with no change of any kind it is empty (a substitution
+ *  of one kind for another still shows, even at an equal total). */
 export function survivorBreakdown(before, after, limit = 6) {
   const a = tallyByKind(before)
   const b = tallyByKind(after)
@@ -66,7 +67,7 @@ export function formatBreakdown(rows) {
 /**
  * The gate itself. `before`/`after` are SETTLED texture counts around the
  * toggle stress; `liveBefore`/`liveAfter` the matching live-texture snapshots
- * (may be empty — the verdict then just omits the breakdown).
+ * (may be empty — a failed verdict then prints "no per-kind change").
  *
  * Two-sided by design: the count must RETURN to where it started. A rise is a
  * leak; a fall means a sample was taken mid-rebuild and the measurement cannot

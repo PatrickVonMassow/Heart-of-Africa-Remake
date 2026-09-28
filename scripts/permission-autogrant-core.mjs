@@ -11,14 +11,16 @@
 // stored mode, so the grant has to happen at the moment the prompt would be raised.
 //
 // WHERE IT SITS. On the `PermissionRequest` event, which fires only once a prompt is
-// ABOUT to be shown. The PreToolUse guard chain (board-first, closing, firewall) runs
+// ABOUT to be shown. The PreToolUse guard chain (board-first, path-scope, closing,
+// firewall and the others registered in .claude/settings.json) runs
 // BEFORE that and denies on its own; a denied call never reaches a permission request,
 // so this cannot overrule a guard. It grants only what the harness would otherwise have
 // asked the user about.
 //
 // FAIL-OPEN. Anything unexpected — unparsable input, a shape we do not recognise —
-// returns no decision, and the harness falls back to asking. A bug here can therefore
-// cost a prompt, never an unreviewed grant.
+// returns no decision, and the harness falls back to asking — or, in a
+// non-interactive `-p` session, to denying (see ALWAYS_ASK). A bug here can
+// therefore cost a prompt or a denial, never an unreviewed grant.
 
 // WHAT THIS DELIBERATELY DOES NOT DO (11.08.2026). Both reviewers proposed going
 // further and having the hook flip the SESSION's permission mode, so the auto-mode
@@ -49,7 +51,8 @@ const ALWAYS_ASK = ['AskUserQuestion']
  * Decide a PermissionRequest.
  *
  * @param {unknown} input parsed hook stdin
- * @returns {{decision: 'allow', reason: string} | null} null = no opinion, harness asks
+ * @returns {{decision: 'allow', reason: string} | null} null = no opinion: the
+ *   harness asks, or denies in a non-interactive `-p` session
  */
 export function decide(input) {
   if (!input || typeof input !== 'object') return null

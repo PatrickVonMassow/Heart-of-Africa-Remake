@@ -1,5 +1,5 @@
 // Surroundings-panorama backdrop material (design.md §2.5, CLAUDE.md §7.1
-// pt. 15). Extracted from PlaceScene so the smooth-shading contract is
+// pt. 11). Extracted from PlaceScene so the smooth-shading contract is
 // unit-testable (backdrop.test.ts): the backdrop mountains must shade as a
 // continuous ridge from the heightfield's interpolated vertex normals —
 // never hard per-face facets.
@@ -23,7 +23,7 @@ import { detailFade, proceduralBump } from '../../render/materials'
 import { WATER_METALNESS, riverWaterSurface } from '../../render/waterAppearance'
 
 /** The backdrop material and the handles the scene keeps writing to. */
-export interface BackdropMaterialHandle {
+interface BackdropMaterialHandle {
   material: THREE.MeshStandardNodeMaterial
   /** The settlement river's bank frame — (downstream x, z, outward x, z) — so
    *  the panorama's water can be measured in the SAME metres along and across

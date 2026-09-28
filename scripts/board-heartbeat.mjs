@@ -1,7 +1,8 @@
 // The I/O half of the IN-TURN BOARD HEARTBEAT (point 848). The rules live in
-// scripts/board-heartbeat-core.mjs; this reads the declared focus and the board's
-// last live publish, and where the core says so, restamps the now-card through
-// the ordinary board command and republishes.
+// scripts/board-heartbeat-core.mjs; this reads the declared focus, the now-card's
+// content digest and its own record of when that content was last seen, and
+// where the core says so, restamps the now-card through the ordinary board
+// command, which republishes.
 //
 // CALLED BY THE RECORDING STEPS, NEVER BY A CLOCK: review-astra.mjs when a round
 // comes back, mechanism-review.mjs when a verdict is recorded, batch-in-flight.mjs
@@ -54,15 +55,16 @@ function gitCommonDir(root) {
 }
 
 /**
- * The now-card as the board actually shows it: its title point, and how long its
- * own `Stand HH:MM` status stamp has stood.
+ * The now-card as the board actually shows it: `{ok, point, digest}` — its
+ * title point and a SHA-256 digest of the whole card, which `cardAge` ages
+ * against this module's record.
  *
  * READ FROM THE CARD, NEVER FROM A PUBLISH TIMESTAMP. A transport-wide stamp
  * such as `pagesPublishedAt` moves whenever ANY board write publishes — a queue
  * render, a done-card rotation, an open question — so an untouched now-card
  * would read as current and the restamp this exists for would be suppressed
- * (cross-vendor review, 24.08.2026). The card's own stamp answers the only
- * question that matters: when was THIS status written.
+ * (cross-vendor review, 24.08.2026). The card's own content answers the only
+ * question that matters: when did THIS card last change.
  */
 export function readCard(state, root) {
   try {
@@ -91,7 +93,7 @@ export function readCard(state, root) {
 /**
  * How long the board write may take before it is abandoned.
  *
- * CALIBRATABLE. A publish is a git push and an HTTPS read-back, so seconds are
+ * CALIBRATABLE. A publish is a local commit build and a git push, so seconds are
  * normal and a minute is already pathological — and the whole point of the cap
  * is that the recording step it hangs off never waits longer than that.
  */
@@ -141,7 +143,8 @@ export function runBoardStatus(
  * @param {object}   a
  * @param {string}   a.trigger  one of TRIGGERS
  * @param {string}   a.detail   one line: what this step just recorded
- * @returns {{refreshed: boolean, reason: string, status?: string, error?: string}}
+ * @returns {{refreshed: boolean, reason: string, status?: string, reread?: boolean, error?: string}}
+ *   `reason` is one of REASONS, or 'board-unreadable', 'no-target' or 'failed'.
  */
 export function heartbeat({
   trigger,
@@ -171,12 +174,12 @@ export function heartbeat({
         write(value)
       } catch (error) {
         // Never worth failing a recorded review — but never silent either. A
-        // record that cannot be written leaves every later look with no memory
-        // of this card, so each one finds its age unknown, calls it stale and
-        // publishes again: a refresh loop nothing would otherwise explain
-        // (eighth cross-vendor round).
+        // record that cannot be written leaves later looks without this card's
+        // record, so they may find its age unknown or bounded by an old record,
+        // call it stale and publish again: a refresh loop nothing would
+        // otherwise explain (eighth cross-vendor round).
         stderr(
-          'board heartbeat: the card record could not be written — every trigger will republish ' +
+          'board heartbeat: the card record could not be written — later triggers may republish ' +
             `until this is fixed (${String(error?.message ?? error)})`,
         )
       }
@@ -192,8 +195,8 @@ export function heartbeat({
     }
     const record = memory === undefined ? readJson(memoryPath(owner)) : memory
     const aged = cardAge({ record, digest: seen.digest, now })
-    // Remembered BEFORE the decision, so a refusal further down still leaves the
-    // reader able to age this card next time instead of answering UNKNOWN forever.
+    // The observation is persisted only after the decision: a bound on the
+    // no-write paths below, the written card's digest after a refresh.
     const decision = decideHeartbeat({
       focus: seenFocus,
       cardPoint: seen.point,
@@ -233,8 +236,9 @@ export function heartbeat({
     if (written && !written.ok) {
       // The write went through, but what it produced cannot be read back. The
       // record is left ALONE rather than filled with an empty digest: the next
-      // observation then finds content it has no record of and treats the age as
-      // unknown, which is the stale-and-safe direction. Saying so is the point —
+      // observation then finds content that differs from the record and ages it
+      // from the old `seenAt` (an upper bound), or as unknown when there is no
+      // record — both the stale-and-safe direction. Saying so is the point —
       // a silent success here would claim a reread that did not happen.
       stderr('board heartbeat: the now-card was written but could not be read back — its age is unknown again')
       return { refreshed: true, reason: decision.reason, status: decision.status, reread: false }

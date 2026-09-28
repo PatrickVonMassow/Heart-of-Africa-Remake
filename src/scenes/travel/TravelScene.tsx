@@ -1,4 +1,3 @@
-import { TalusSocket } from './TalusSocket'
 // Bird's-eye travel view (design.md §2): 3D terrain around the player,
 // top-down oriented movement, camera following from above. Visuals: TSL sky
 // dome, sun with soft shadows, animated ocean, instanced biome vegetation.
@@ -6,6 +5,7 @@ import { TalusSocket } from './TalusSocket'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
+import { TalusSocket } from './TalusSocket'
 import * as THREE from 'three/webgpu'
 import {
   attribute,
@@ -61,9 +61,8 @@ import { CURRENT_WEATHER, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFa
 import { crownCollapse, drynessFromTint, FLORA_COLOR_LIFT, groundSprout, seasonTintNode, wetGroundColor, wetGroundRoughness } from '../../render/seasonTint'
 import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { bloodGroundColor, bloodGroundRoughness, groundStainMask } from '../../render/groundStains'
-import { NILE_FLOOD } from './waterSurface'
 import { RiversAndLakes } from './Rivers'
-import { waterSurfaceY } from './waterSurface'
+import { NILE_FLOOD, waterSurfaceY } from './waterSurface'
 import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
 import {
@@ -181,7 +180,8 @@ const PLACE_WORLD_POSITIONS = PLACES.map((p) => {
 // Beyond this debug-zoom factor the chunk-bound dressing (trees, rocks …)
 // hides: it only ever covers a bounded radius, which would read as a dark
 // dressed island on the far-terrain sheet (design.md §21.4). Kept at/below
-// what FLORA_RANGE_MAX covers so the streaming edge never enters view.
+// what FLORA_RANGE_MAX (floraStreaming.ts) covers so the streaming edge never
+// enters view.
 const VEGETATION_HIDE_ZOOM = 2.5
 const CAMERA_OFFSET = { y: 42, z: 24 }
 const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
@@ -235,7 +235,8 @@ export function stitchedEdgeHeights(anchorH: ArrayLike<number>, segments: number
  * point 220) so a fine chunk meeting a coarse one has no T-junction gap; a
  * dropped skirt still backs the seam against any residual hairline.
  */
-// Exported for the seam-agreement unit test (terrainShading.test.ts); not a component.
+// Exported for the terrain build queue (terrainQueue.ts) and the seam-agreement
+// unit test (terrainShading.test.ts); not a component.
 // eslint-disable-next-line react/only-export-components
 export function buildChunkGeometry(
   cx: number,
@@ -423,11 +424,6 @@ export function buildChunkGeometry(
   return geo
 }
 
-/**
- * Terrain material (design.md §3): biome vertex tint over splatted tileable
- * PBR ground textures (scripts/generate-terrain-textures.mjs), with detail
- * normal maps and bi-planar rock on steep slopes.
- */
 // The season tint curves live in render/seasonTint.ts so the settlement
 // scene shares them (point 143). THIS scene samples the per-position season
 // FIELD (render/seasonField.ts, point 151) through baked seasonUV
@@ -460,6 +456,11 @@ function getGraveyardGeos() {
   graveyardGeoCache = { elephantGeo: buildElephant(), tuskGeo, ribGeo }
   return graveyardGeoCache
 }
+/**
+ * Terrain material (design.md §3): biome vertex tint over splatted tileable
+ * PBR ground textures (scripts/generate-terrain-textures.mjs), with detail
+ * normal maps and bi-planar rock on steep slopes.
+ */
 function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
   if (terrainMaterialCache) return terrainMaterialCache
   const base = import.meta.env.BASE_URL
@@ -534,8 +535,8 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
   return mat
 }
 
-// The chunk-geometry cache is MODULE state (point 96): under the travel
-// scene's dispose={null} a per-mount cache would leak every visited chunk's
+// The chunk-geometry cache is MODULE state (point 96): the chunk meshes opt out
+// of disposal (`dispose={null}` on each), so a per-mount cache would leak every visited chunk's
 // GPU buffers on each place visit; the module cache instead REUSES them on
 // re-entry (no rebuild either). Seed-keyed — a new run disposes and restarts.
 const chunkGeometryCache = new Map<string, THREE.BufferGeometry>()
@@ -805,7 +806,8 @@ function WaterPlane() {
  * single coarse vertex-colored sheet over Africa's bounding box, built lazily
  * the first time the view zooms past the default distance and shown only
  * there. It sits slightly below the detailed chunks, which keep drawing on
- * top around the traveller; at that camera height the coarse relief and the
+ * top around the traveller — except on land lower than 0.8, where the sheet's
+ * 1.2 land floor lifts it above them; at that camera height the coarse relief and the
  * biome colors read as a map of the whole continent.
  */
 const FAR_TERRAIN = { x0: -220, x1: 560, z0: -400, z1: 390, step: 2.5 }
@@ -894,15 +896,11 @@ function FarTerrain() {
 
   if (!geo || zoom <= 1) return null
   // Sunk a little below the detailed chunks so they stay on top around the
-  // traveller without z-fighting; at continent distance the offset (and the
+  // traveller without z-fighting (low land aside, see the land floor above); at continent distance the offset (and the
   // slightly fattened coastline it causes) is imperceptible.
   return <mesh geometry={geo} material={material} position={[0, -0.4, 0]} frustumCulled={false} dispose={null} />
 }
 
-/**
- * Sun light tracking the player, with cascaded shadow maps (design.md §2):
- * high resolution near the camera, softer/coarser further out.
- */
 // The sun light, its target and the CSM shadow node are MODULE singletons
 // (point 96): a fresh CSMShadowNode per mount sits in every material's lights
 // graph, changes every pipeline cache key and forces the renderer to re-link
@@ -946,6 +944,10 @@ function getSun() {
   return sunSingleton
 }
 
+/**
+ * Sun light tracking the player, with cascaded shadow maps (design.md §2):
+ * high resolution near the camera, softer/coarser further out.
+ */
 function Sun() {
   const { light, target, csm } = getSun()
 
@@ -1108,11 +1110,12 @@ interface PlacedFlora {
  * that is not drawn (suppressed near water by `solidDressingAllowed`, above the
  * snow line, or beside a settlement) can never leave a phantom collider —
  * the invisible-wall bug of point 129, where the collision used different
- * placement logic than the render. The instance-cap overflow is the only
- * render-only concern the collider skips.
+ * placement logic than the render. What the collider skips is render-only
+ * thinning of placed plants: the instance cap, the spawn circle, the paced
+ * fill and the zoom hiding.
  */
-// Exported for the placement-cache equality test (floraPlacementCache.test.ts);
-// not a component.
+// Exported for the communication rock (world/communicationRock.ts) and the
+// placement-cache equality test (floraPlacementCache.test.ts); not a component.
 // eslint-disable-next-line react/only-export-components
 export function placedFloraAt(ccx: number, ccz: number, i: number, seed: number): PlacedFlora | null {
   const rx = hashChunk(ccx, ccz, i * 4, seed)
@@ -1134,7 +1137,7 @@ export function placedFloraAt(ccx: number, ccz: number, i: number, seed: number)
   // internal cap and clears both bands with headroom.
   const rd = riverDistance(ll.lat, ll.lon, 0.45)
   const lsd = lakeDistance(ll.lat, ll.lon, 0.1)
-  const nearWater = s.height > 0.05 && inReedBelt(rd, lsd)
+  const nearWater = inReedBelt(rd, lsd)
   const species = pickSpecies(s.type, roll, nearWater)
   if (!species) return null
   // The renderer's exact suppression rules, kept in lockstep (point 129):
@@ -1170,7 +1173,7 @@ const FLORA_CHUNK_CACHE_MAX = 4096
 
 /** Every placed plant of one chunk, in candidate order (the fill's insertion
  *  order — the buffer-cap drop order must not change), cached per chunk. */
-// Exported for the placement-cache tests (floraPlacementCache.test.ts).
+// Exported for the placement-cache and communication-rock tests.
 // eslint-disable-next-line react/only-export-components
 export function placedFloraChunk(ccx: number, ccz: number, seed: number): ReadonlyArray<PlacedFlora> {
   if (floraChunkCacheSeed !== seed) {
@@ -1191,7 +1194,7 @@ export function placedFloraChunk(ccx: number, ccz: number, seed: number): Readon
 }
 
 /** How many chunk placement scans have actually computed (cache misses) — the
- *  test/probe witness that a rescan recomputes only the genuinely new chunks. */
+ *  test witness that a rescan recomputes only the genuinely new chunks. */
 // eslint-disable-next-line react/only-export-components
 export function floraPlacementComputes(): number {
   return floraPlacementComputeCount
@@ -1300,7 +1303,8 @@ function getVegetationMeshes(): VegetationMeshes {
   // on the WebGPU backend and jittered the crowns. The collapse now rides the
   // crown mesh's INSTANCE MATRIX (the stable transform path); only the colour,
   // whose per-instance re-upload race is imperceptible, still keys on the attribute.
-  // Brightness lift (point 206): the GROUND multiplies its albedo by 2.6 (line
+  // Brightness lift (point 206): the GROUND multiplies its albedo by 2.6 (in
+  // createTerrainMaterial;
   // ~329) but the flora never got the matching lift, and the crown greens are
   // intrinsically dark (~6-18% luminance) — under the filmic tone mapping the
   // trees read as NEAR-BLACK silhouettes even on their sunlit tops (the first
@@ -1515,9 +1519,11 @@ function Vegetation() {
       // The collidable dressing the traveller is actually tested against, so a
       // blocked step can be traced to the circle that blocks it.
       obstaclesNear: (x: number, z: number) => collidableFloraNear(x, z, useGame.getState().seed),
-      // Every flora instance the RENDERER draws near a point (point 129): the
-      // phantom-collider invariant asserts collidableFloraNear is a subset of
-      // this, so a suppressed/unrendered plant can never block.
+      // Every flora instance PLACED near a point (point 129), before the
+      // render's spawn circle, cap and fill thin it: the phantom-collider
+      // invariant asserts collidableFloraNear is a subset of this, so a
+      // suppressed plant can never block. The drawn buffers are read by
+      // drawnTranslations.
       renderedNear: (x: number, z: number) => {
         const seed = useGame.getState().seed
         const pcx = Math.floor(x / CHUNK_SIZE)
@@ -1580,17 +1586,18 @@ function Vegetation() {
   }, [meshes])
 
   useFrame(() => {
-    // The foliage follows the season (design.md §19.13): neutral at the
-    // half-way point, straw when dry, deepened green in the rains. Strength 0
-    // pins it to neutral. Blended slowly like the fog, so a forced season
-    // fades in rather than snapping.
+    // The foliage follows the season (design.md §19.13) through the per-position
+    // season field: neutral at the half-way point, straw when dry, deepened
+    // green in the rains. Strength 0 pins it to neutral. The field's greenness
+    // is lerped toward the calendar, so a forced season fades in rather than
+    // snapping.
     //
     // Driven by the RELATIVE greenness, not by CURRENT_WEATHER's absolute
     // wetness. The absolute reading is capped at each zone's own peak, so
     // outside the Congo it never approached 1 and the ground stayed straw all
     // year — the East African plains reached 8% green at the height of their
     // long rains. The Serengeti greens completely on less water than the Congo;
-    // vegetation asks "how wet for HERE". See floraGreennessAt.
+    // vegetation asks "how wet for HERE". See floraGreennessAt (systems/season.ts).
     {
       const s = useGame.getState()
       // The season field (point 151): every slot's greenness follows the
@@ -1664,12 +1671,12 @@ function Vegetation() {
         Math.abs(floraSpawnRadius(fogFar) - floraSpawnRadius(last.fogFar)) < 1 &&
         Math.hypot(pos.x - last.x, pos.z - last.z) <= floraAmortiseMaxStep()
       // Anchor at fill START (the hysteresis anchor too): movement during the
-      // fill counts against FLORA_SPAWN_MARGIN, not against a stale origin.
+      // fill counts against FLORA_SPAWN_MARGIN (floraStreaming.ts), not against a stale origin.
       lastBuild.current = { x: pos.x, z: pos.z, fogFar }
       rebuildCountRef.current++
       const rC = floraChunkRange(fogFar, CHUNK_SIZE)
       // Nearest-chunk-first (point 171): when a species' instance buffer
-      // fills, the plants dropped are the FARTHEST ones, so the drawn edge
+      // fills, the plants dropped are those of the FARTHEST chunks, so the drawn edge
       // stays a fogged circle, not a ragged chunk-order boundary.
       const offsets = chunkOffsetsByDistance(rC)
       const fill: FloraFill = {
@@ -1876,7 +1883,7 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   const t = useStrings()
   const seed = useGame((s) => s.seed)
   // A place's name is revealed only once it has been visited (design.md §17);
-  // until then it shows a question mark.
+  // until then it shows a localized placeholder for its kind.
   const discovered = useGame((s) => s.visitedPlaces.includes(place.id))
   // While the traveller stands within this settlement's enter radius, the
   // "Space to enter" hint takes over and the name-label is hidden (design.md §2.3).
@@ -1908,7 +1915,8 @@ function LandmarkLabels() {
   const t = useStrings()
   const seed = useGame((s) => s.seed)
   // A landmark's name is revealed only once it has been sighted (design.md §17,
-  // the same "seen" set that earns its discovery bounty); until then: "?".
+  // the same "seen" set that earns its discovery bounty); until then a
+  // localized placeholder for its kind.
   const seen = useGame((s) => s.landmarksSeen)
   const items = useMemo(() => {
     const lakes = LAKES.map((l) => ({
@@ -2079,6 +2087,8 @@ function ElephantGraveyard() {
       Array.from({ length: n }, () => {
         const a = rand() * Math.PI * 2
         const r = rand() * 6.5
+        // `tilt` is drawn only by the tusks; the bones keep the draw so the
+        // seeded layout stays as it is.
         return { x: Math.cos(a) * r, z: Math.sin(a) * r, rot: rand() * Math.PI * 2, tilt: (rand() - 0.5) * 0.5, s: 0.6 + rand() * 0.7 }
       })
     return { center, groundY, carcasses, tusks: scatter(22), bones: scatter(16) }
@@ -2142,8 +2152,8 @@ function ElephantGraveyard() {
   )
 }
 
-// The erratic's geometry, a module singleton like every other travel-scene
-// geometry (point 96): a fresh one per mount would re-link its shader program
+// The erratic's geometry, a module singleton like the other cached travel-scene
+// geometries (point 96): a fresh one per mount would re-link its shader program
 // on every return from a settlement.
 let erraticGeoCache: THREE.BufferGeometry | null = null
 function getErraticGeo(): THREE.BufferGeometry {
@@ -2219,9 +2229,9 @@ function CommunicationRock() {
 /**
  * Built cultural landmarks (design.md §4.4): the pyramids of Meroë, Great
  * Zimbabwe, the rock-hewn churches of Lalibela, the coastal ruins of Kilwa,
- * the stelae of Aksum, the Gondarine castles and the Bandiagara cliff
- * dwellings, each placed at its real ~1890 position with a per-run yaw
- * jitter. Achievements of African civilisations — the discovery journal
+ * the stelae of Aksum, the Gondarine castles, the Bandiagara cliff dwellings
+ * and the pyramids of Giza, each placed at its real ~1890 position with a
+ * per-run yaw jitter (Giza and Bandiagara excepted). Achievements of African civilisations — the discovery journal
  * (§16) carries that framing.
  */
 function CulturalLandmarks() {
@@ -2249,7 +2259,9 @@ function CulturalLandmarks() {
         // Seeded per-run, per-site yaw so orientation varies between
         // playthroughs — except Giza: its row diagonal (Khufu NE) and the
         // east-facing Sphinx are real geography the geometry encodes, and the
-        // west-bank footprint clearance assumes the unrotated extent.
+        // west-bank footprint clearance assumes the unrotated extent. The
+        // Bandiagara cliff is held unrotated too; its talus socket is built for
+        // that orientation.
         const yaw = (c.kind === 'giza-pyramids' || c.id === 'bandiagara') ? 0 : mulberry32((seed ^ (0x9e3779b1 * (i + 1))) >>> 0)() * Math.PI * 2
         return { id: c.id, kind: c.kind, x: w.x, z: w.z, y, yaw }
       }),
@@ -2292,9 +2304,9 @@ function CulturalLandmarks() {
 
 /**
  * Natural point-landmarks (design.md §4.4): the Ngorongoro crater, the
- * smoking Ol Doinyo Lengai, the Okavango delta and the Sudd — mirroring
- * CulturalLandmarks exactly (shared vertex-color material, per-run yaw,
- * disposal, DEV hook).
+ * smoking Ol Doinyo Lengai, the Okavango delta and the Sudd — built like
+ * CulturalLandmarks (shared vertex-color material, per-run yaw, disposal, DEV
+ * hook), except that the Sudd aims its yaw at its nearest river channel.
  */
 function NaturalSites() {
   const seed = useGame((s) => s.seed)
@@ -2412,7 +2424,6 @@ function GraveMarker() {
   )
 }
 
-/** The expedition leader: khaki outfit, pith helmet, backpack. */
 // The explorer sits this much lower when seated in the canoe, so torso and
 // head clear the gunwale while the (hidden) legs would fold into the hull.
 const CANOE_SEAT_DROP = 0.28
@@ -2421,7 +2432,7 @@ const CANOE_SEAT_DROP = 0.28
 // shows up through the open hull and floods the canoe (design.md §7).
 const CANOE_HULL_CLEARANCE = 0.29
 // How far the swimming figure hangs under the rendered water surface
-// (point 152, design.md §11.3) — chest-deep: legs submerged, head clear.
+// (point 152, design.md §11.3): legs submerged, torso and head clear.
 const SWIM_IMMERSION = 0.35
 
 /** The dugout hull + gunwale rim, reused by the ridden and the dragged canoe. */
@@ -2434,8 +2445,8 @@ function CanoeHull() {
         <meshStandardMaterial color="#5a3f28" roughness={0.85} side={THREE.DoubleSide} />
       </mesh>
       {/* Solid floor across the hull interior: reads as the canoe's bottom and
-          keeps the ground (on land) or the water plane (on rivers) from showing
-          up through the open hull. */}
+          keeps the ground (on land) or the water — river ribbon or sea plane —
+          from showing up through the open hull. */}
       <mesh position={[0, -0.08, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.68, 2.0, 1]} receiveShadow>
         <circleGeometry args={[0.5, 24]} />
         <meshStandardMaterial color="#4a3420" roughness={0.9} side={THREE.DoubleSide} />
@@ -2449,8 +2460,8 @@ function CanoeHull() {
   )
 }
 
-/** A canoe paddle: a shaft with a flat blade, reused by the ridden and the
- *  stowed (dragged) canoe. */
+/** A canoe paddle: a shaft with a flat blade, carried with the stowed (dragged)
+ *  canoe; the ridden canoe draws its own paddle inline. */
 function CanoePaddle() {
   return (
     <>
@@ -2466,6 +2477,7 @@ function CanoePaddle() {
   )
 }
 
+/** The expedition leader: khaki outfit, pith helmet, backpack. */
 function Player() {
   const ref = useRef<THREE.Group>(null)
   const inner = useRef<THREE.Group>(null)
@@ -2525,14 +2537,14 @@ function Player() {
     }
 
     // Float the canoe on the rendered water surface (waterSurface.ts): the
-    // river ribbon is flat across its width at the AXIS bed height and the
-    // lake sheet at the lake-wide bedMax, so the float height comes from that
+    // river ribbon rides its axis rows above the bed and the lake sheet sits
+    // just above the lake-wide bedMax, and the float height comes from that
     // same construction — the local bed under the hull can lie far lower
     // where the relief slopes across the channel, and floating on it sank
     // the hull under the ribbon (design.md §7/§11.3). The sea plane sits at
-    // ~0 and covers everything else; river proximity (not terrain type)
-    // detects the ribbon, so a mouth cell misclassified as ocean keeps the
-    // lift.
+    // ~0 and covers everything else. The query runs on water- and
+    // ocean-typed ground, and waterSurfaceY finds the ribbon by river
+    // proximity, so a mouth cell misclassified as ocean keeps the lift.
     const refY = Math.max(0, t.height)
     // Query the surface whenever the traveller is ON water — riding or
     // swimming (point 152): the swimmer floats on the SAME rendered surface
@@ -2541,7 +2553,7 @@ function Player() {
     // so the figure walked the bottom, readable through the water.
     const surfaceY = onWater ? (waterSurfaceY(ll.lat, ll.lon, s.seed, t.height) ?? 0) : 0
     const boatBaseY = surfaceY - refY + CANOE_HULL_CLEARANCE
-    // Chest-deep: the figure hangs this far under the surface while swimming.
+    // The swimming figure hangs this far under the surface, legs under.
     const swimBaseY = surfaceY - refY - SWIM_IMMERSION
 
     if (inner.current) {
@@ -2851,8 +2863,9 @@ export function TravelScene() {
         proj.set(x, y, z).project(camera)
         return proj.z < 1 && Math.abs(proj.x) <= 1 && Math.abs(proj.y) <= 1
       },
-      // True once the bird's-eye camera has caught up to its lerp target (point
-      // 177/165): the camera eases toward (pos.x, .y*zoom, pos.z + .z*zoom) at a
+      // True once the bird's-eye camera has caught up to its lerp target in the
+      // ground plane (point 177/165; the height eases on the same lerp and is
+      // not checked): the camera eases toward (pos.x, .y*zoom, pos.z + .z*zoom) at a
       // fixed 0.12/frame — NOT dt-scaled — so its settle is frame-count-bound. A
       // teleport-then-fixed-sleep verification revealed just-seeded off-screen
       // animals purely by the still-moving camera under load; polling this before
@@ -3071,7 +3084,8 @@ export function TravelScene() {
     consumeTouchLook()
 
     // Camera follows from above with a slight tilt; the zoom factor scales
-    // the offset while the wheel zoom is unlocked (debug menu).
+    // the offset (the wheel always zooms; past the default distance only with
+    // the debug unlock).
     const pos = useGame.getState().pos
     const zoom = useUi.getState().travelZoom
     camera.position.lerp(new THREE.Vector3(pos.x, CAMERA_OFFSET.y * zoom, pos.z + CAMERA_OFFSET.z * zoom), 0.12)

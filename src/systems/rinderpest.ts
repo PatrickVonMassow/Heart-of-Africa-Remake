@@ -1,28 +1,30 @@
 // The rinderpest years as the date-dependent state they were (design.md §16/
 // §19.13, point 133; research: docs/peoples-1890.md §5). The great African
-// panzootic 1888-1897 IS the game's window: Maasailand enters 1890 already
-// damaged by the 1883-87 bovine pleuropneumonia and is struck by rinderpest in
-// 1891 (Kedong valley, March); Ethiopia sits inside the Kifu Qen famine
-// 1888-92; the Sudan is one year past Sanat Sitta (1889-90) with its herds
-// gone; southern Africa stays clean until the disease crosses the Zambezi
-// (Bulawayo, 3 March 1896) and reaches the Zulu, Pedi and San inside a long
-// playthrough. Camel peoples (Somali, Tuareg) are never struck — camels are
-// immune (FAO) — and the Bemba kept no cattle at all (tsetse belt), so for
-// them the plague is game depletion, a texture, not a phase.
+// panzootic 1888-1897 spans the game's window (1890-1895): Maasailand enters
+// 1890 already damaged by the 1883-87 bovine pleuropneumonia and is struck by
+// rinderpest in 1891 (Kedong valley, March); Ethiopia sits inside the Kifu Qen
+// famine 1888-92; the Sudan is one year past Sanat Sitta (1889-90) with its
+// herds gone; southern Africa stays clean until the disease crosses the
+// Zambezi (Bulawayo, 3 March 1896) — after the calendar's 31.12.1895 clamp, so
+// the Zulu, Pedi and San stay clean for the whole shipped window. Camel peoples
+// (Somali, Tuareg) are never struck — camels are immune (FAO) — and the Bemba
+// kept no cattle at all (tsetse belt), so for them the plague is game
+// depletion, a texture, not a phase.
 
 /** Per-people plague state at a given in-game date. */
-export type RinderpestPhase = 'clean' | 'preDamaged' | 'struck' | 'aftermath'
+type RinderpestPhase = 'clean' | 'preDamaged' | 'struck' | 'aftermath'
 
 /** Peoples whose herds are camel-based — never infected, never a phase. */
 const CAMEL_PEOPLES = ['somali', 'tuareg']
 
 /** Southern peoples the plague reaches only with the Zambezi crossing of
- *  March 1896 (Bulawayo 3 March) — clean for almost the whole window. */
+ *  March 1896 (Bulawayo 3 March) — clean for the whole shipped window. */
 const SOUTHERN_PEOPLES = ['zulu', 'pedi', 'san']
 
 /**
  * The plague phase for a people at an in-game date (month 1..12). Pure — the
- * single source for vignette choice, carrion dressing and the dev hook.
+ * single source for the village situation (via placeSituation), carrion
+ * dressing and the dev hook.
  */
 export function rinderpestPhase(peopleId: string, year: number, month: number): RinderpestPhase {
   if (CAMEL_PEOPLES.includes(peopleId)) return 'clean'
@@ -77,10 +79,6 @@ export function rinderpestPhaseAtDay(peopleId: string, day: number, startYear: n
   const d = new Date(Date.UTC(startYear, 0, 1) + Math.floor(day) * 86400000)
   return rinderpestPhase(peopleId, d.getUTCFullYear(), d.getUTCMonth() + 1)
 }
-
-// The return-vignette predicate that used to live here is now the generic
-// `situationChanged` of ./placeSituation (point 394): a village's phase is one
-// place situation among several, and the rule is the same for all of them.
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

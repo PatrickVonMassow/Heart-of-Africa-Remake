@@ -1,5 +1,5 @@
 // Minimal dependency-free PNG codec for the geodata preprocessing scripts.
-// Decode: 8-bit, color types 0 (gray), 2 (RGB), 6 (RGBA), non-interlaced.
+// Decode: 8-bit, color types 0 (gray), 2 (RGB), 4 (gray+alpha), 6 (RGBA), non-interlaced.
 // Encode: 8-bit RGB with per-scanline "Up" filter (good for smooth data).
 // Uses node:zlib for DEFLATE.
 

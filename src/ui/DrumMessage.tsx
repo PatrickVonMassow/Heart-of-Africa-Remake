@@ -1,5 +1,6 @@
 // The chief's drum message on paper (design.md §13.4,
-// docs/communication-poc-spec.md, work-order point 486): after the drums have
+// docs/communication-poc-spec.md, work-order point 486) — the errand message,
+// or the 'answer' message with its own title and hint: after the drums have
 // beaten it out, its concepts stand in order with the player's OWN
 // reading above each, every one clickable to change.
 //
@@ -117,7 +118,7 @@ export function DrumMessageWatcher() {
   return null
 }
 
-/** Seconds→ms wall clock, the one the performance was started on. */
+/** Millisecond clock (performance.now, Date.now as fallback) the performance was started on. */
 function drumClock(): number {
   return typeof performance === 'undefined' ? Date.now() : performance.now()
 }

@@ -4,11 +4,6 @@
 // fronting them with their door side — instead of on independent offsets.
 // Pure math, shared by the generator and the layout tests.
 
-export interface LanePoint {
-  x: number
-  z: number
-}
-
 /** Squared distance from a point to a segment, plus the closest point. */
 function closestOnSegment(
   ax: number,
@@ -67,7 +62,8 @@ export function bendAround(
       return [o.x + nx * limit, o.z + nz * limit] as [number, number]
     })
     // Inserting a bent point creates two new chords that may still cut the
-    // circle — iterate until the whole polyline clears it.
+    // circle — insert up to six bends, until the polyline clears it within
+    // 5 cm. A later obstacle's pass can move points back into an earlier one.
     for (let guard = 0; guard < 6; guard++) {
       const c = closestOnPolyline(pts, o.x, o.z)
       if (c.dist >= limit - 0.05) break
@@ -114,7 +110,7 @@ export interface LaneSlot {
   z: number
   /** Yaw so a door on local +Z faces the lane's centreline. */
   faceRot: number
-  /** Closest point on the lane centreline (the door's lane anchor). */
+  /** The centreline sample this slot was offset from (the door's lane anchor). */
   anchor: [number, number]
 }
 

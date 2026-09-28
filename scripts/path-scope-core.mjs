@@ -22,8 +22,9 @@
 // happens and `~` is its home token, whichever host is running.
 //
 // FAIL DIRECTION: allow, at three levels.
-//   1. A command whose paths cannot be READ OFF it — an unbalanced quote, a
-//      `$(…)` or a backtick that computes the path — is UNPARSEABLE and allows.
+//   1. A command whose paths cannot be READ OFF it — an unbalanced quote, or
+//      any `$` or backtick (`$(…)`, `${HOME}`, `$PID` stand for text this
+//      guard cannot see) — is UNPARSEABLE and allows.
 //   2. QUOTED TEXT NEVER DECIDES beyond a path-shaped word: a regex, a here-doc
 //      body or a `node -e` one-liner mentioning a path is prose, not access
 //      (the lesson of point 473 — the fence that judged the command STRING
@@ -106,7 +107,7 @@ export const ALLOW_ROOTS = [
  * Extra sentences for the two gaps this guard exists to close, so a deny names
  * the RULE and not only the fact. Matched against the canonical path.
  */
-export const DENY_NOTES = [
+const DENY_NOTES = [
   {
     re: /^~\/documents(\/|$)/i,
     note: 'this is the Documents folder minus the project — only ~/Documents/Developing/hoa is in scope, which is exactly the shape a deny-rule cannot express',
@@ -260,7 +261,7 @@ export function isUnparseable(command) {
  * the characters an UNQUOTED path on either host is built from, and nothing a
  * regex, a shell expression or a sentence would carry.
  */
-export const PATH_SHAPE = /^(?:~(?:\/|$)|\/|[A-Za-z]:[\\/])[A-Za-z0-9_\-./\\~:@+%*?[\],]*$/
+const PATH_SHAPE = /^(?:~(?:\/|$)|\/|[A-Za-z]:[\\/])[A-Za-z0-9_\-./\\~:@+%*?[\],]*$/
 
 /** Candidate path strings inside one word: the word, and the value of `--flag=<value>`. */
 export function candidatesOf(text) {
@@ -296,7 +297,8 @@ export function heredocDelimitersIn(line) {
  * Remove every heredoc BODY from a command, delimiter line included.
  *
  * A heredoc body is prose — a note, a commit message, a board card — and this
- * project writes them daily. `lexCommand` has no heredoc mode, so without this
+ * project writes them daily. The injected parser (command-classify-core's
+ * `lexCommand`) has no heredoc mode, so without this
  * the body's lines arrive as UNQUOTED words and a note mentioning an
  * out-of-scope path would be denied with advice ("add the root to ALLOW_ROOTS")
  * that is simply wrong for it: the point-473 defect in a rarer shape, and
@@ -369,7 +371,7 @@ export function pathsInCommand(command, ctx, parseSegments) {
 const excerpt = (s) => (s.length > EXCERPT_CHARS ? `${s.slice(0, EXCERPT_CHARS)}…` : s)
 
 /** The deny text: what was reached for, why it is out of scope, and the way on. */
-export function formatDeny(offenders) {
+function formatDeny(offenders) {
   const lines = offenders.map((o) => {
     const note = o.note ? ` — ${o.note}` : ''
     return `  ${excerpt(o.raw)}  →  ${excerpt(o.canonical)}${note}`
@@ -379,7 +381,9 @@ export function formatDeny(offenders) {
     `${lines.join('\n')}\n\n` +
     'In scope are the repository and its worktrees (/workspace, ~/Documents/Developing/hoa), the ' +
     'scratchpads (/tmp, ~/AppData/Local/Temp), the Claude config (~/.claude, ~/.claude.json), the ' +
-    'browser cache (~/.cache/ms-playwright) and the toolchain. Non-versioned artefacts belong in the ' +
+    'tool configuration (~/.config), the caches and browser installs (~/.cache, ~/.pw-browsers), the ' +
+    'backup mount (/backup) and the toolchain and system directories — ALLOW_ROOTS holds the full ' +
+    'list. Non-versioned artefacts belong in the ' +
     "repository's git-ignored local/ (memory stay-within-project-dir).\n" +
     'If this access is genuinely part of the work, add the root to ALLOW_ROOTS in ' +
     'scripts/path-scope-core.mjs with its reason — the allow-list is meant to be extended on the ' +

@@ -50,7 +50,7 @@ await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game && window.__balance && window.__ui, null, { timeout: 60000 })
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
-await assertBackend(page) // point 204: this suite is WebGL2-only — prove the lane really is WebGL 2
+await assertBackend(page) // point 204's guardrail: this suite is WebGL2-only (tiers.mjs) — prove the lane really is WebGL 2
 await page.waitForTimeout(4000)
 await page.evaluate(() => {
   window.__balance.randomEventsEnabled = false
@@ -61,7 +61,8 @@ await page.evaluate(() => {
 // needs the overlay mounted, and the FIRST touch is what mounts it — so a block
 // that opened with its own gesture would spend that gesture on the arming and
 // measure nothing. A no-op once the layer is up, so a whole run still arms once
-// (and the deliberate-input block above still sees a page nobody has touched).
+// (and the deliberate-input block, `before-first-touch` below, runs before any
+// arming and still sees a page nobody has touched).
 const armTouchLayer = async () => {
   if (await page.evaluate(() => window.__ui.getState().touchActive)) return
   await touch('touchStart', [{ x: 215, y: 120 }])
@@ -115,8 +116,9 @@ if (section('virtual-stick')) {
   const walked = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
   check('virtual stick walks the character', walked > 1, `moved ${walked.toFixed(1)} m`)
   // The stick releases to neutral: the walk-feel inertia (point 97) coasts a
-  // fraction of a metre, then the position must be fully settled — poll until the
-  // coast stops (point 200) rather than a fixed wait, then confirm no drift.
+  // fraction of a metre, then the position must settle — poll until the x
+  // coordinate stops (point 200) rather than a fixed wait, then confirm no drift
+  // on both axes.
   await waitForStable(page, () => window.__placePlayer.x, { settleMs: 150, timeout: 4000 })
   const pos2 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
   await page.waitForTimeout(200)

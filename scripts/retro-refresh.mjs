@@ -1,7 +1,7 @@
 // Refresh the retrospective's auto-generated section
-// (docs/analysis_de/retrospektive-zusammenarbeit.md — git-ignored, German).
+// (docs/analysis_de/retrospektive-zusammenarbeit.md — tracked, German).
 //
-// Scans the durable problem/solution-history sources (feedback/project
+// Scans the durable problem/solution-history sources (feedback/project/user
 // memories, guard scripts, git revert trail, process/meta TASKS points — see
 // retro-sources.mjs), regenerates the marker-delimited AUTO-GENERATED table
 // and records the sources fingerprint + a "last refreshed" timestamp inside
@@ -12,8 +12,9 @@
 // script — the never-estimate rule targets the workflow engine, not Node).
 // The companion Stop-hook (retro-currency-guard.mjs) blocks turn-end while
 // the recorded fingerprint no longer matches the sources, so running this
-// script — and reviewing whether a NEW problem class needs its own prose —
-// is enforced, not remembered.
+// script is enforced, not remembered; the review for a NEW problem class is
+// demanded in the block message (only the beginner guide's review carries a
+// stamp, set with --guide-reviewed).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { computeFingerprint, refreshedDoc, GUIDE_FINGERPRINT_RE } from './retro-core.mjs'

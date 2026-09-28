@@ -11,7 +11,7 @@ import { dispatchDecision, dispatchMetricEvents } from './batch-dispatch-core.mj
 import { metricEventsFromJournal } from './batch-metrics-core.mjs'
 import { recordMetricEvents } from './batch-metric-events.mjs'
 
-export function readAuthorizedQueue(path) {
+function readAuthorizedQueue(path) {
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     return { ok: true, queue: Array.isArray(parsed) ? parsed : parsed?.queue }

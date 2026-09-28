@@ -28,10 +28,10 @@ export function evaluatePrep({ marker = null } = {}) {
   return {
     block: true,
     reason:
-      `WAITING-TIME PREP REQUIRED. A background task ("${task}") is in flight and you are about ` +
-      `to yield without having done prep. Standing rule (enforced, not reminded): use the wait to ` +
-      `do READ-ONLY prep for the NEXT queue ticket — investigate the relevant code, sharpen the ` +
-      `plan/estimate, update the dashboard queue card. Then record it: node scripts/prep-guard.mjs ` +
+      `WAITING-TIME PREP REQUIRED. A background task ("${task}") was launched and not yet cleared, ` +
+      `and you are about to yield without having done prep. Standing rule (enforced, not reminded): ` +
+      `use the wait to prep the NEXT queue ticket, read-only on the code — investigate the relevant ` +
+      `code, sharpen the plan/estimate, update the dashboard queue card. Then record it: node scripts/prep-guard.mjs ` +
       `--prepped (or --clear once you have consumed the task result). If there is genuinely nothing ` +
       `to prep, run --prepped to acknowledge.`,
   }

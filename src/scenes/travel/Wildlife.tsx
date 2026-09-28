@@ -1,17 +1,20 @@
-// Ambient wildlife for the travel view (design.md §19): non-threatening
-// herds as scenery (elephants, giraffes, zebra, wildebeest, antelope, warthog,
-// flamingos at the lakes), a purely decorative predator hunt (lion, cheetah,
-// leopard or hyena taking prey from its food web), and vultures circling the
-// player when the expedition is in poor condition. The animals interact with
-// one another: wandering elephants trample smaller animals underfoot (dead
-// over a red stain), prey flee an active predator, and vultures gather above a
-// kill. Herds raise young: calves gambol, get hunted (with the parent's rescue
-// sacrifice) and fall into water (with the parent's rescue and the waterfalls'
-// toll); kills leave remnants that the circling flock descends on and
-// finishes (the ground scavenger serves only carcasses without a flock,
-// e.g. trampled ones), animals keep body spacing and never stray into the
-// open ocean. Only walking into the lion attacks the player (§14);
-// otherwise no gameplay effect.
+// Ambient wildlife for the travel view (design.md §19): herds as scenery
+// (elephants, giraffes, zebra, wildebeest, antelope, warthog, flamingos at the
+// lakes, plovers, bank crocodiles, a lioness with her cub), a predator hunt
+// (lion, cheetah, leopard or hyena taking prey from its food web), and
+// vultures circling the player when the expedition is in poor condition. The
+// animals interact with one another: wandering elephants trample smaller
+// animals underfoot (dead over a red stain) and herds mourn their dead, prey
+// flee an active predator, crocodiles ambush at the waterline, same-species
+// rivals fight, grass fires and rinderpest take their toll, and vultures
+// gather above a kill. Herds raise young: calves gambol, get hunted (with the
+// parent's defence or sacrifice) and fall into water (with the parent's rescue
+// and the waterfalls' toll); kills leave remnants that the circling flock
+// descends on and finishes (the ground scavenger serves only carcasses without
+// a flock, e.g. trampled ones), animals keep body spacing and never stray into
+// the open ocean. Gameplay effects: walking into an active hunt predator or a
+// crocodile attacks the player (§14, §19.3), and drawn animal bodies block the
+// traveller's movement.
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -190,8 +193,9 @@ const CHUNK_SIZE = 24
 // The predator kinds are herd species too (point 146): a predator KILLED by
 // an avenging parent becomes an ordinary carcass in the herd lists, so the
 // existing scavenger/cull/render machinery works a dead hyena exactly like a
-// dead zebra. Live predators never spawn here — spawnChunk picks species
-// explicitly, and the one live hunter stays the scripted <LionHunt>.
+// dead zebra. The only live predators spawned here are the lioness-and-cub
+// families (point 145c, seeded into herds.lion by spawnChunk); the one live
+// hunter stays the scripted <LionHunt>.
 const MAX_INSTANCES: Record<Species, number> = {
   elephant: 60,
   giraffe: 60,
@@ -211,8 +215,9 @@ const MAX_INSTANCES: Record<Species, number> = {
   hyena: 6,
 }
 /** Juveniles render through their own baby-schema geometry (design.md §19) in
- *  a separate instanced mesh per species; one calf per herd group keeps the
- *  counts small. Flamingos raise no young; the lion joins for its cub (the
+ *  a separate instanced mesh per species; a calibratable fraction of each herd
+ *  group (calvesForGroup, point 169) keeps the counts small. Flamingos raise no
+ *  young; the plover joins for its chicks, the lion for its cub (the
  *  lioness-vs-hyena drama, point 145c), the other predators hold carcasses only. */
 const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'plover', 'lion'] as const
 // Per-species calf render budget. Raised for point 169 (a fraction of each herd
@@ -228,7 +233,8 @@ interface Animal {
   scale: number
   /** Per-animal phase for the grazing shuffle. */
   phase: number
-  /** Trampled by an elephant: lies dead at (x,z) (design.md §19). */
+  /** Dead at (x,z) by any cause — trampled, taken, slain, drowned, plague
+   *  carrion or a fight loss (design.md §19). */
   dead?: boolean
   /** Shore point this animal periodically walks to and drinks at. */
   drink?: { tx: number; tz: number }
@@ -243,7 +249,8 @@ interface Animal {
    *  the streaming keeps the birth chunk's key alive while the animal lives and
    *  a returning respawn cannot duplicate it. */
   origin?: string
-  /** Seconds of carcass left once a scavenger has landed; removed at 0 (design.md §19). */
+  /** Seconds of carcass left, removed at 0 (design.md §19): set when a
+   *  scavenger lands, or directly at death by takeAnimal/slayPredator. */
   dissolve?: number
   /** A juvenile that keeps close to its parent and nurses (design.md §19). */
   young?: boolean
@@ -287,9 +294,9 @@ interface Animal {
    *  during the window the calf is alive and wriggling (no stain/shrink yet), and
    *  a parent may still save it. */
   caught?: number
-  /** This carcass is being consumed by the on-scene predator (the lion hunt),
-   *  not the ground scavenger — keeps the vulture from double-feeding on it.
-   *  Waterfall victims set it too: the river takes them, no scavenger lands. */
+  /** No-scavenger marker: this carcass is disposed of by its own drama (the
+   *  hunt predator eats it, the river takes a waterfall victim, any takeAnimal
+   *  death), so the ground scavenger never double-feeds on it. */
   lionFed?: boolean
   /** Seconds this calf has been struggling in open water (design.md §19). */
   inWater?: number
@@ -496,8 +503,9 @@ interface Animal {
 }
 
 /**
- * Shared lion-hunt state (module scope): the herds react to it — prey
- * animals flee from an active lion, vultures gather over the kill.
+ * Shared hunt state (module scope; the predator is any PredatorKind): the herds
+ * react to it — prey animals flee from an active predator, vultures gather
+ * over the kill.
  */
 interface LionHuntState {
   mode: 'idle' | 'chase' | 'feed' | 'leave'
@@ -508,7 +516,7 @@ interface LionHuntState {
   timer: number
   /** Per-hunt weave phase (chase) / walk-off direction (leave). */
   heading: number
-  /** Lion's current facing while pursuing (turn-rate limited). */
+  /** Predator's current facing while pursuing (turn-rate limited). */
   lionHeading: number
   /** Prey's current flee heading (weaving). */
   preyHeading: number
@@ -521,7 +529,8 @@ interface LionHuntState {
    *  this real herd animal is the visible victim and the scripted prey mesh hides. */
   victim: Animal | null
   /** True for the whole lifetime of a calf hunt (chase→feed→leave), so the
-   *  scripted prey/stain meshes stay hidden — the herds draw the victim instead. */
+   *  scripted prey mesh stays hidden and no hunt stain grows — the herds draw
+   *  the victim instead. */
   victimHunt: boolean
   /** Sticky escape-corridor course of the leave phase (point 188); undefined
    *  until picked, re-derived only when the held corridor closes. */
@@ -596,22 +605,17 @@ let ACTIVE_DRAW_FRAME = 0
 
 /** Base render scale per prey species (warthog small, wildebeest sturdy). The
  *  giraffe geometry is already giraffe-sized (~3.6 units tall, fauna.ts), so
- *  its factor matches the ambient herds' 0.9 spawn base — it reads much larger
+ *  its factor stays close to the ambient herds' 0.9 spawn base — it reads much larger
  *  than a zebra through the build, not the scale. */
 const PREY_SCALE: Record<PreyKind, number> = { zebra: 1, wildebeest: 1.05, antelope: 0.85, warthog: 0.62, giraffe: 0.95 }
 
-// REGION_PREDATORS now lives in wildlifeBehavior.ts (point 208 A3) so the
-// random-event system shares the same roster; imported above.
-// The food web itself (PREDATOR_PREY, REGION_PREY and the Predator/PreyKind
-// types) lives in wildlifeBehavior.ts so the fit rules — incl. the lion-only
-// giraffe of point 124 — are pure-testable.
 /** Render scale per predator (cheetah/leopard lithe, hyena mid, lion large). */
 const PREDATOR_SCALE: Record<PredatorKind, number> = { lion: 1, cheetah: 0.9, leopard: 0.92, hyena: 0.88 }
 
-/** Distance (world units) at which walking into a lion triggers an attack. */
+/** Distance (world units) at which walking into the hunt predator triggers an attack. */
 const LION_CONTACT_RADIUS = 2
 
-/** Lion hunt (design.md §19): speeds, the prey's evasive weave, lion turn rate. */
+/** Predator hunt (design.md §19): speeds, the prey's evasive weave, predator turn rate. */
 const HUNT_PREY_SPEED = 4.6
 const HUNT_LION_SPEED = 5.6
 const HUNT_LION_TURN = 3.0
@@ -624,7 +628,7 @@ const HUNT_LION_APPROACH = 15
 const HUNT_LEAVE_SPEED = 4.5
 const HUNT_OFFSTAGE_MARGIN = 30
 
-/** Species that flee from a hunting or feeding lion. */
+/** Species that flee from a hunting or feeding predator (any kind). */
 const FLEES_LION: Record<Species, boolean> = {
   elephant: false, giraffe: true, zebra: true, wildebeest: true, antelope: true, warthog: true, flamingo: false,
   crocodile: false, // the ambusher fears nothing on its water (point 130)
@@ -757,15 +761,16 @@ const YOUNG_FOLLOW_SPEED = 4.5
 const GUARD_RADIUS = 12
 const GUARD_STANDOFF = 2.2
 /** Calf predation (design.md §19): while the hunt runs, the parent does not
- *  flee — it holds itself between hunter and calf (BLOCK_*), a living shield
- *  on the escape line; a hunter that reaches the blocking parent (TAKE_DIST)
- *  takes it in the calf's place and the calf escapes uncaught. If the parent
+ *  flee — it holds itself between hunter and calf (PARENT_BLOCK_OFFSET), a
+ *  living shield on the escape line; a hunter that reaches the blocking parent
+ *  (PARENT_TAKE_DIST) meets the defence roll — driven off, killed, or it takes
+ *  the parent in the calf's place and the calf escapes uncaught. If the parent
  *  cannot reach its station in time and the calf is caught, it does not die at
  *  once — it struggles for CAUGHT_DURATION seconds first (no stain/shrink
- *  yet). Only then does the parent charge the predator; reaching it
- *  (SACRIFICE_DIST) it is taken instead and the calf escapes, while a parent
- *  that only got close (TOO_LATE_DIST) by the time the window ends is eaten
- *  alongside the calf. */
+ *  yet), while the parent charges the predator; reaching it
+ *  (PARENT_SACRIFICE_DIST) it rolls the same defence, and if taken the calf
+ *  escapes, while a parent that only got close (PARENT_TOO_LATE_DIST) by the
+ *  time the window ends is eaten alongside the calf. */
 const CAUGHT_DURATION = 5
 // Rotating throttle for the 203(A) anchoring asserts (~1/13 of animals per frame).
 let ASSERT_TICK = 0
@@ -836,7 +841,7 @@ function nearestVigilKeeperDist(herds: Record<Species, Animal[]>, x: number, z: 
 // Bout length and play range are calibratable (balance.family.gambolBoutSeconds
 // / .gambolRange, read fresh per frame); only the idle gap between bouts and
 // the hop speed stay fixed here.
-const GAMBOL_IDLE_SECONDS = 12 // gap between play bouts (was 16 s period − 4 s bout)
+const GAMBOL_IDLE_SECONDS = 12 // gap between play bouts
 const GAMBOL_SPEED = 2.2
 const CALF_DRIFT_DEG = 0.06 // deg/s downstream drift of a struggling calf
 const RESCUE_REACH = 1.2 // parent this close pulls the calf out
@@ -883,8 +888,9 @@ const SPAWN_RANGE_MIN = 4
 // wildlife). Beyond this cap animals are sub-pixel and the far sheet takes over.
 const SPAWN_COVER_RADIUS_MAX = 288
 const SPAWN_RANGE_MAX = Math.ceil(SPAWN_COVER_RADIUS_MAX / CHUNK_SIZE)
-/** Scavenging (design.md §19): a trampled/other-death carcass draws a vulture
- *  that flies in, lands and consumes it, dissolving it like a lion kill. */
+/** Scavenging (design.md §19): a trampled/other-death carcass draws its own
+ *  vulture flock (point 251) that flies in, lands and consumes it, dissolving
+ *  it like a lion kill. */
 const CARCASS_DISSOLVE_SECONDS = 9
 /** Fast glide: the flights start beyond the view ring (design.md §19), so the
  *  birds must cover real distance to arrive while their reason still holds. */
@@ -903,6 +909,18 @@ const SEPARATION_CELL = 4
 const SEPARATION_MAX_SPEED = 2.2
 
 /**
+ * The hold-Ctrl label layer's view of the herds (design.md §17.8): the streamed
+ * animals this scene currently holds, handed to the pure source rule
+ * (wildlifeActorSource.ts), which decides what the frame really drew and which
+ * of them is concealed.
+ */
+function pushWildlifeActors(out: LabelledActor[]): void {
+  const herds = ACTIVE_HERDS
+  if (herds === null) return
+  pushHerdActors(herds, ACTIVE_DRAW_FRAME, out)
+}
+
+/**
  * Live animals near a point as collision circles `[x, z, radius]` (design.md
  * §19): the bird's-eye traveller collides with animals instead of walking
  * through them. Reads the streamed herds shared each frame via ACTIVE_HERDS;
@@ -919,18 +937,6 @@ const SEPARATION_MAX_SPEED = 2.2
  * report). An animal the last pass did not draw contributes nothing, so an
  * unrendered body leaves no phantom collider either (the point-129 rule).
  */
-/**
- * The hold-Ctrl label layer's view of the herds (design.md §17.8): the streamed
- * animals this scene currently holds, handed to the pure source rule
- * (wildlifeActorSource.ts), which decides what the frame really drew and which
- * of them is concealed.
- */
-function pushWildlifeActors(out: LabelledActor[]): void {
-  const herds = ACTIVE_HERDS
-  if (herds === null) return
-  pushHerdActors(herds, ACTIVE_DRAW_FRAME, out)
-}
-
 function nearAnimalObstacles(px: number, pz: number, radius: number): Array<[number, number, number]> {
   const herds = ACTIVE_HERDS
   if (!herds) return []
@@ -1028,8 +1034,6 @@ function findWaterNear(x: number, z: number, seed: number): { x: number; z: numb
   return null
 }
 
-/** Walk-off direction after a kill: straight away from the traveller, so the
- *  leave never crosses the view; random when standing on the traveller. */
 /** Region prey pool at a world point (point 124): a victim hunt may only
  *  target a species the region's own pool holds — the region-fit gate for the
  *  calf pick, matching the fit the generic hunt applies via REGION_PREY. */
@@ -1038,6 +1042,8 @@ function regionPreyAt(x: number, z: number): PreyKind[] {
   return REGION_PREY[regionAt(ll.lat, ll.lon)] ?? REGION_PREY.east
 }
 
+/** Walk-off direction after a kill: straight away from the traveller, so the
+ *  leave never crosses the view; random when standing on the traveller. */
 function leaveHeading(x: number, z: number, px: number, pz: number): number {
   const dx = x - px
   const dz = z - pz
@@ -1074,10 +1080,10 @@ function emptyHerds(): Record<Species, Animal[]> {
   }
 }
 
-/** Populate one chunk's deterministic herd/flock into the shared herd arrays,
- *  tagging each animal with its chunk key so it can be streamed out later. */
 const MAASAI_VILLAGE = PLACES.find((p) => p.id === 'maasai-village')
 
+/** Populate one chunk's deterministic herd/flock into the shared herd arrays,
+ *  tagging each animal with its chunk key so it can be streamed out later. */
 function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, seed: number, day: number): void {
   const key = `${ccx},${ccz}`
   const roll = hash(ccx, ccz, 0, seed)
@@ -1128,12 +1134,10 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
 
   // The rinderpest carrion (design.md §16/§19.15, point 133): while
   // Maasailand stands STRUCK (1891-92), the plague's wildlife toll lies on
-  // the plains — dead wildebeest and antelope the vultures and scavengers
-  // then work like any carcass. Date-dependent by design: the same chunk in
-  // 1890 spawns living herds instead.
-  // Rinderpest carrion near a STRUCK village on ANY land (point 133, widened
-  // for point 168): the toll fires for any land chunk within the struck
-  // radius — not only savanna. The Maasai village sits by Kilimanjaro/Meru,
+  // ANY land chunk within the struck radius (widened for point 168) — not only
+  // savanna: dead wildebeest and antelope the vultures and scavengers then
+  // work like any carcass. Date-dependent by design: the same chunk in 1890
+  // spawns living herds instead. The Maasai village sits by Kilimanjaro/Meru,
   // so gating on a savanna ANCHOR left the standard-zoom player at the rocky
   // village with nothing (few savanna chunks stream in the small view ring);
   // the wide-zoom check saw plenty only because it streamed far-out savanna.
@@ -1269,8 +1273,8 @@ function placeGroup(
     let z = az + (r2 - 0.5) * spread * 2
     const sc = baseScale * (0.85 + r3 * 0.3)
     // Spawn spacing (design.md §19): part the newcomer from already-placed
-    // herd-mates before the terrain check, so no two animals spawn inside one
-    // another. Deterministic — only hash-derived positions feed in.
+    // herd-mates before the terrain check, so no two animals of one group spawn
+    // inside one another. Deterministic — only hash-derived positions feed in.
     for (let iter = 0; iter < 4; iter++) {
       const neighbors: Array<[number, number, number]> = []
       for (let j = placedStart; j < list.length; j++) {
@@ -1357,7 +1361,7 @@ function placeGroup(
     }
     list.push(animal)
   }
-  // Family life (design.md §19): a herd of at least three raises juveniles that
+  // Family life (design.md §19): a herd of at least three (calvesForGroup) raises juveniles that
   // keep close to a parent and nurse; the parent guards them against predators.
   // A calibratable fraction of the group are calves now (point 169), each linked
   // to its OWN distinct parent — the LAST k placed become calves of the FIRST k
@@ -1382,6 +1386,11 @@ function placeGroup(
   }
 }
 
+// Per-place seeding-attempt counter (point 102): advances once per frame in
+// which that place's vicinity needed a top-up, so every attempt draws a fresh
+// candidate set via vicinityAttemptSeed — a deferring frame (all bearings
+// on-screen or wet) never re-tests the same frozen candidates forever.
+const vicinitySeedAttempt = new Map<string, number>()
 /**
  * Keep the bird's-eye vicinity of every settlement from reading empty (point
  * 102, design.md §2.5): after the normal chunk spawn, guarantee a minimum
@@ -1389,16 +1398,12 @@ function placeGroup(
  * settlement by seeding ONE deterministic herd — but ONLY when the normal spawn
  * produced fewer than the minimum (never additive on an already-populated
  * vicinity). Seeded animals are ordinary herd animals: seed-deterministic
- * placement, the region's own species pool, normal chunk membership (so they
- * stream out with the settlement's chunk) and the existing spacing/capacity
+ * placement, the region's own species pool, normal chunk membership (tagged
+ * with the settlement's chunk, then culled by where they stand like every
+ * streamed animal) and the existing spacing/capacity
  * rules. A clearance keeps them off the leave point so the player never
  * materialises inside a herd.
  */
-// Per-place seeding-attempt counter (point 102): advances once per frame in
-// which that place's vicinity needed a top-up, so every attempt draws a fresh
-// candidate set via vicinityAttemptSeed — a deferring frame (all bearings
-// on-screen or wet) never re-tests the same frozen candidates forever.
-const vicinitySeedAttempt = new Map<string, number>()
 function seedSettlementVicinity(
   herds: Record<Species, Animal[]>,
   pos: { x: number; z: number },
@@ -1416,8 +1421,8 @@ function seedSettlementVicinity(
   for (const place of PLACES) {
     const w = latLonToWorld(place.lat, place.lon)
     if (Math.hypot(w.x - pos.x, w.z - pos.z) > radius + SPAWN_MARGIN) continue
-    // Tag seeded animals with the settlement's own chunk so they stream out with
-    // it; only seed once that chunk is live (else they'd be culled at once).
+    // Tag seeded animals with the settlement's own chunk; only seed once that
+    // chunk is live (else they'd be culled at once).
     const scx = Math.floor(w.x / CHUNK_SIZE)
     const scz = Math.floor(w.z / CHUNK_SIZE)
     const chunkKey = `${scx},${scz}`
@@ -1500,13 +1505,15 @@ function seedSettlementVicinity(
 }
 
 /**
- * The dry season gathers life at the remaining water — GUARANTEED (point
- * 120e, hardened by 135c): once the traveller's local land has dried, the
- * nearest water in the view ring holds at least `dryShoreMinDrinkers`
- * drinking animals. The chunk spawn provides them where its hashes happen
- * to fall near a bank; where they fall short, this tops the shore up —
- * deterministic per (seed, water cell), tagged to the traveller's chunk so
- * the group streams out normally.
+ * The dry season gathers life at the remaining water (point 120e, hardened by
+ * 135c): once the traveller's local land has dried, the nearest OFF-screen
+ * bank within RANGE is topped up to `dryShoreMinDrinkers` shore animals —
+ * counted as drink-holders or seeder-tagged animals, not all of which hold a
+ * drink target. The chunk spawn provides them where its hashes happen to fall
+ * near a bank; where they fall short, this tops the shore up. Placement
+ * derives from the seed, the bank and the traveller's chunk; the group is
+ * tagged to that chunk so it streams out normally. Finds no bank → seeds
+ * nothing.
  */
 let shoreSeedClock = 999 // seconds since the last upkeep; start due
 function seedDryShoreDrinkers(
@@ -1535,12 +1542,12 @@ function seedDryShoreDrinkers(
   for (let r = 4; r <= RANGE && !bank; r += 4) {
     for (let k = 0; k < 12; k++) {
       const ang = (k / 12) * Math.PI * 2
-      const lat = pll.lat + (Math.cos(ang) * r) / 10
-      const lon = pll.lon + (Math.sin(ang) * r) / 10
+      const lat = pll.lat + (Math.cos(ang) * r) / UNITS_PER_DEGREE
+      const lon = pll.lon + (Math.sin(ang) * r) / UNITS_PER_DEGREE
       const wd = Math.min(riverDistance(lat, lon, 0.5), lakeDistance(lat, lon, 0.5))
       if (wd < RIVER_WIDTH_DEG + 0.1 && wd > RIVER_WIDTH_DEG + 0.01) {
         const t = sampleTerrain(lat, lon, seed)
-        // No dry-height bar (the findLandNear lesson, point 122): the widened
+        // No dry-height bar (the findLandNear lesson, point 136): the widened
         // rivers carve low aprons where nothing clears 0.05 for units around
         // the bank — a LOW bank is still a bank the animals can stand on.
         if (t.type !== 'water' && t.type !== 'ocean') {
@@ -1562,7 +1569,7 @@ function seedDryShoreDrinkers(
       }
     }
   }
-  if (!bank) return // no water in reach — nothing to gather at
+  if (!bank) return // no qualifying off-screen bank in reach — nothing to gather at
   // Count at the BANK, and count the seeder's own animals by tag whether or
   // not their spawn roll handed them a drink walk: counting player-centred
   // drink-holders re-seeded EVERY frame while the placed group wandered or
@@ -1600,11 +1607,11 @@ function seedDryShoreDrinkers(
   const cz = Math.floor(pos.z / CHUNK_SIZE)
   const key = `${cx},${cz}`
   if (!spawnedChunks.has(key)) return
-  // Place the group a short walk inland of the bank: the spawn path then
-  // hands each animal its own drink target at this shore.
-  // 1 unit inland at spread 2.5: inside the dry catchment (each member gets
-  // its drink walk) with body spacing intact at spawn. Tag the seeded so the
-  // count above sees them even after they wander or shed the drink target.
+  // Place the group at a fixed (+1, +1) offset from the bank cell, spread 2.5:
+  // the spawn path then hands each member that passes its water-distance
+  // gate a drink target at this shore, with body spacing intact at spawn.
+  // Tag the seeded so the count above sees them even after they wander or
+  // never received a drink target.
   const before = herds[species].length
   placeGroup(herds[species], cx, cz, bank.x + 1, bank.z + 1, deficit, 2.5, seed, 0.9, BODY_RADIUS[species], false, undefined, key)
   for (let i = before; i < herds[species].length; i++) herds[species][i].shoreSeed = true
@@ -1639,7 +1646,8 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     flamingo: buildFlamingo(),
     crocodile: buildCrocodile(),
     plover: buildPlover(),
-    // Predator meshes draw only revenge carcasses (point 146).
+    // Predator meshes draw revenge carcasses (point 146) and the live
+    // lioness-and-cub family (point 145c).
     lion: buildLion(),
     cheetah: buildCheetah(),
     leopard: buildLeopard(),
@@ -1719,7 +1727,8 @@ function getHuntGeos(): HuntGeos {
   return huntGeoCache
 }
 
-/** Instanced herds, softly shuffling in place. */
+/** Instanced herds: streaming, the herd simulation (roaming, drinking,
+ *  family life, dramas, fights, scavenging) and its instanced rendering. */
 function Herds() {
   const seed = useGame((s) => s.seed)
   const pool = getWildlifeMeshes()
@@ -1745,7 +1754,7 @@ function Herds() {
   const waterSweep = useRef(0)
   // Scavenger vultures that fly to and consume non-lion carcasses. Each flock's
   // x/z and mode live in a FlightState so it flies in from — and departs to —
-  // beyond the zoom-aware view ring instead of popping (design.md §19). A POOL
+  // off the rendered frame instead of popping (design.md §19, point 178). A POOL
   // of independent flocks (point 251): each eligible carcass draws and OWNS its
   // own flock, so several carcasses draw several concurrent flocks rather than
   // one global set of vultures hopping from the finished carcass to the next.
@@ -2186,8 +2195,8 @@ function Herds() {
     // animal's CURRENT position through the SAME clamp the renderer draws, so a
     // drive that moves a.x/a.z can never leave the body sunk under fresh, higher
     // ground (the buried-warthog assert). Water cells are left untouched — those
-    // occupants ride their own drama/sheet rules. Every pre-pass drive that moves
-    // a parent/adult calls this right after the step.
+    // occupants ride their own drama/sheet rules. Used by the grief charge; the
+    // other drives re-ground inline.
     const groundFollow = (a: Animal) => {
       const y = groundFollowY(
         a.x,
@@ -2199,18 +2208,12 @@ function Herds() {
       )
       if (y !== null) a.y = y
     }
-    // Raw terrain type at a world point — the shape fleeCrossing/crossingTarget
-    // probe the channel with (point 192).
+    // Raw terrain type at a world point — the water probe the flight steps
+    // (fleeWaterStep/chaseFleeStep) test each step with (point 192).
     const terrainTypeAtWorld = (nx: number, nz: number) => {
       const ll = worldToLatLon(nx, nz)
       return sampleTerrain(ll.lat, ll.lon, seed).type
     }
-    // One flight step for every flight source (design.md §19.5, point 312):
-    // deflected at the OCEAN edge only, so a flight meeting a river or lake
-    // goes in and swims — chest-deep, at the braked swim pace — instead of
-    // pressing against the waterline or skating along the bank. Stamps fleeAt
-    // so the backstop leaves the swimmer alone until its flight ends; returns
-    // the step and the body height for this spot. A wader stands on the sheet.
     const swimPace = wadeSpeed(
       CROSS_SWIM_SPEED,
       seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor),
@@ -2227,6 +2230,13 @@ function Herds() {
       } else if (gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
       return gft.type
     }
+    // One flight step for every flight source (design.md §19.5, point 312):
+    // deflected at the OCEAN edge only, so a flight meeting a river or lake
+    // goes in and swims — chest-deep, at the braked swim pace — instead of
+    // pressing against the waterline or skating along the bank. settleFlight
+    // stamps fleeAt (so the backstop leaves the swimmer alone until its flight
+    // ends) and sets the body height; returns the step. A wader stands on the
+    // sheet.
     const fleeMove = (a: Animal, heading: number, speed: number, wader = false) => {
       const pace = wader ? speed : swimBrakedPace(speed, terrainTypeAtWorld(a.x, a.z), swimPace)
       const step = fleeWaterStep(a.x, a.z, heading, pace * dt, terrainTypeAtWorld, 0.8)
@@ -2307,32 +2317,24 @@ function Herds() {
     // Cull the herds EVERY frame, not only on a frame that deleted a chunk
     // (point 282): the cull decision depends on `isOnScreen`, which changes
     // over frames as the camera EASES to its target (0.12/frame, TravelScene)
-    // — independent of chunk deletions. A large jump removes all the old
-    // chunks in one burst while the camera still looks at the old spot, so the
-    // stranded animals are kept by the on-screen backstop that frame; with no
-    // further chunk deletions the old `if (despawned)` gate never re-ran the
-    // filter, and they were never re-evaluated once the camera caught up
-    // (goneWhenFar:false on WebGL 2). Running each frame re-evaluates them the
-    // frame they fall off-screen. The pass is cheap: the in-live-chunk common
-    // case early-returns keep:true on a Set lookup.
+    // — independent of chunk deletions. After a large jump the stranded
+    // animals are kept by the on-screen backstop while the camera still looks
+    // at the old spot, and re-evaluated the frame they fall off-screen. The
+    // pass is cheap: the in-live-chunk common case early-returns keep:true on
+    // a Set lookup.
     //
-    // Cull each animal by where it STANDS, never only by its birth chunk:
-    // roamers/fleers drift chunks away from their spawn, so the old
-    // birth-chunk filter deleted animals still in sight (a zoom-in collapses
-    // despawnR in one frame and mass-culled them). keepStreamedAnimal
+    // Cull each animal by where it STANDS, never only by its birth chunk
+    // (roamers/fleers drift chunks away from their spawn): keepStreamedAnimal
     // re-homes a drifted animal into the live chunk under its feet and
     // backstops with the rendered frame.
     //
-    // The re-home used to duplicate the animal on return (point 278, the
-    // point-276/278 "dressing grows over a session" leak): re-homing moved
-    // `chunk` off the birth chunk, whose key then despawned by distance while
-    // the animal lived on — so a later return re-seeded that birth chunk and
-    // added a SECOND deterministic copy. Fix: pin the immutable birth chunk in
-    // `origin` at the first re-home, and retain any chunk key whose animals are
-    // still alive so the respawn never duplicates (retainedSpawnChunks).
+    // The immutable birth chunk is pinned in `origin` at the first re-home, and
+    // any chunk key whose animals are still alive is retained, so a return
+    // never re-seeds a second deterministic copy (point 278,
+    // retainedSpawnChunks).
     //
     // The animal cull uses the IN-RANGE set (a spawned key still within the
-    // despawn ring), exactly as before — a chunk RETAINED only for its origin
+    // despawn ring) — a chunk RETAINED only for its origin
     // (point 278) is beyond the ring and must NOT keep an animal alive here, or
     // a legitimate despawn would stall. The retention lives only in the rebuilt
     // spawned-chunk set below, which the RESPAWN reads.
@@ -2443,8 +2445,10 @@ function Herds() {
             }
           }
         } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
-          // A calf of ours is being eaten: charge the predator (at the calf) and
-          // sacrifice ourselves on contact so the calf gets up and escapes (§19).
+          // A calf of ours is being eaten: charge the predator (at the calf). On
+          // contact the defence roll decides — drive the predator off or kill it
+          // and live, or be taken in the calf's place so it rises and escapes
+          // (§19); a mired calf stays held.
           const calf = a.child
           const toX = calf.x - a.x
           const toZ = calf.z - a.z
@@ -2466,8 +2470,8 @@ function Herds() {
             // roll resolves the charging parent's attack three ways — its
             // weapon against THIS hunter's readiness to yield (driveOff) or
             // fragility (kill). Deterministic per event (hashed from phase
-            // and position, like the mire roll — never Math.random in the
-            // sim). A MIRED calf never rolls (point 123): the charge into
+            // and position, like the mire roll — not Math.random, unlike the
+            // hunt timer and the fight rolls). A MIRED calf never rolls (point 123): the charge into
             // the mud is a SURRENDER, not an attack — the point-125 line —
             // so it stays chance-zero by construction.
             const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
@@ -2546,9 +2550,9 @@ function Herds() {
                 const cc = herds.crocodile.find((k) => k.lunge && k.lunge.victim === calf)
                 if (cc && cc.lunge) {
                   cc.lunge.retreat = true
-                  // And it stays off the bank for a while: the freed victim is
-                  // standing right there, so without this rest the broadened
-                  // waterline trigger would hand it straight back.
+                  // And it stays off the bank for a while: the spared calf
+                  // still stands right there, so without this rest the
+                  // broadened waterline trigger would hand it straight back.
                   cc.ambushRestUntil = clock.elapsedTime + balance.crocodile.driveOffRestSeconds
                 }
                 calf.caughtBy = undefined
@@ -2562,7 +2566,7 @@ function Herds() {
           a.child &&
           !a.child.dead &&
           a.child.caught === undefined &&
-          a.child.mired === undefined && // the vigil (point 123) never shields:
+          a.child.mired === undefined && // the mire (point 123) never shields:
           // the mud holds the calf, the hunt reaches it, and the parent's
           // charge after the catch costs its life beside it.
           LION_STATE.mode === 'chase' &&
@@ -2571,7 +2575,9 @@ function Herds() {
           // Our calf is being run down (design.md §19): the parent does not flee
           // with it — it holds itself between the hunter and its young, a living
           // shield on the escape line. A hunter that reaches the blocking parent
-          // takes it in the calf's place, and the calf escapes uncaught.
+          // meets the defence roll: it is driven off or killed with the family
+          // intact, or it takes the parent in the calf's place and the calf
+          // escapes uncaught.
           const calf = a.child
           const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, PARENT_BLOCK_OFFSET)
           if (h !== null) {
@@ -2675,8 +2681,9 @@ function Herds() {
             const ll = worldToLatLon(a.x, a.z)
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
             if (ter.type === 'water') {
-              // Fell in: start to struggle. A play bout recorded the entry
-              // point; otherwise probe for the nearest bank.
+              // Fell in: start to struggle. A staged fall (the debug trigger)
+              // already carries its entry point; otherwise probe for the
+              // nearest bank.
               a.inWater = 0
               a.hop = undefined
               // Struggle AT the rendered sheet (point 196): the pose dips from
@@ -2868,7 +2875,8 @@ function Herds() {
     // loop takes the arriving parent, which is the whole point (one code path).
     // A SURRENDER, not an attack (point 125): the grief charge never rolls
     // the defence — it goes under the feet by choice (points 119/134).
-    // Every species but the elephant raises calves that can be trampled.
+    // Scans every non-elephant species; only a parent whose calf was
+    // trampled carries trampleTo.
     for (const sp of SPECIES) {
       if (sp === 'elephant') continue
       for (const a of herds[sp]) {
@@ -2965,13 +2973,12 @@ function Herds() {
     // frame's adoption, so the calf is not handed back to the very adult it
     // spent the whole window failing to reach — from the NEXT frame on it is an
     // ordinary candidate again, so a pair that merely drifted apart re-forms.
-    // Predator cubs stay out of BOTH passes (as before): they can never be
+    // Predator cubs stay out of BOTH passes: they can never be
     // adopted, so releasing a cub from a living lioness — one long hunt away
     // from its side — would end that pairing for good. Their phantom case is
     // already covered by the cull severing the pair above.
     {
       const ADOPTION_RADIUS = balance.family.adoptionRadius
-      const FOLLOW_RADIUS = balance.family.followRadius
       const REUNION_SECONDS = balance.family.reunionSeconds
       for (const sp of SPECIES) {
         // Predators never adopt (a lion cub whose lioness died stays orphaned);
@@ -2996,7 +3003,7 @@ function Herds() {
             const sep = tickFamilySeparation(
               a.separated,
               Math.hypot(a.parent.x - a.x, a.parent.z - a.z),
-              FOLLOW_RADIUS,
+              YOUNG_FOLLOW_RADIUS,
               dt,
               REUNION_SECONDS,
               adoptionHeld(a),
@@ -3033,8 +3040,8 @@ function Herds() {
     // Intraspecies combat (design.md §19.17, point 264), over the FULL herd
     // lists like the dramas above so a bout that straddles the instance cap
     // still resolves. A NEW drama state on the shared core, not a second
-    // chase: it reuses the same claim-from-idle rule, the same water-refusing
-    // deflected steps, the same carcass system and the same hard-deadline
+    // chase: it reuses the same claim-from-idle rule, deflected steps that
+    // refuse all water (wetOrSea — fights never swim), the same carcass system and the same hard-deadline
     // discipline as the §19.8 dramas and the §19.16 ambush.
     //
     // WHICH species fight is the research's answer, not the code's
@@ -3118,8 +3125,7 @@ function Herds() {
           // quarry left holding a body that is gone would keep the drama flag,
           // and with it the fight pose and the no-flight, for good.
           if (fightPairBroken(a, foe)) {
-            endFight(a)
-            if (foe.fight?.foe === a) endFight(foe)
+            endFight(a) // releases the foe too while it still holds this pair
             continue
           }
           // Only the AGGRESSOR drives the pair from here — the quarry's flight is
@@ -3171,7 +3177,7 @@ function Herds() {
             continue
           }
           // Still approaching: the aggressor charges its opponent, deflecting
-          // around water like every other mover.
+          // around river, lake and ocean water alike (wetOrSea).
           const toFoe = Math.atan2(foe.x - a.x, foe.z - a.z)
           const step = deflectedStep(a.x, a.z, toFoe, fightSpeed * dt, wetOrSea, 0.9)
           if (step.moved) fightStep(sp, a, step.x, step.z)
@@ -3183,8 +3189,9 @@ function Herds() {
             if (fs.moved) fightStep(sp, foe, fs.x, fs.z)
             foe.face = toSelf
           } else {
-            // One-sided: the quarry flees, slower, on the same water-refusing
-            // corridor flight a hunted calf uses (point 226).
+            // One-sided: the quarry flees, slower, on the corridor flight
+            // (calfFleeStep, point 226) with the water-refusing wetOrSea
+            // predicate — unlike a hunted calf's chaseFleeStep, it never swims.
             const fl = calfFleeStep(
               foe.x, foe.z, a.x, a.z,
               fightSpeed * fb.quarryFleeFactor * dt, wetOrSea, 0.8, foe.fleeCorridor,
@@ -3213,7 +3220,7 @@ function Herds() {
         // frame, so the rate reads as "per dispositionInterval seconds".
         for (const a of list) {
           a.fightRollAt = (a.fightRollAt ?? fb.dispositionInterval) - dt
-          if ((a.fightRollAt ?? 0) > 0) continue
+          if (a.fightRollAt > 0) continue
           a.fightRollAt = fb.dispositionInterval
           if (!fightEligible(a)) continue
           if (!wantsToFight(sp, Math.random(), fb.dispositionRate)) continue
@@ -3234,9 +3241,9 @@ function Herds() {
     }
 
     // Animal-animal collision (design.md §19): live animals never stand in or
-    // walk through one another — each frame every overlapping pair parts, each
-    // member resolving its own half of the overlap (a spatial grid keeps the
-    // pass O(n·k)). Exempt are the scripted dramas that need contact (a caught
+    // walk through one another — every overlapping pair parts, each member
+    // moving toward its own half of the overlap at most SEPARATION_MAX_SPEED
+    // per second (a spatial grid keeps the pass O(n·k)). Exempt are the scripted dramas that need contact (a caught
     // or in-water calf, a charging/plunging parent) and the elephant×smaller-
     // prey pair, where walking over a too-slow animal IS the designed trample.
     {
@@ -3256,7 +3263,7 @@ function Herds() {
         b.fight !== undefined ||
         // A parent wading to a calf in the water is mid-drama too (point 197):
         // the backstop already exempts a child-inWater/mired parent, so the
-        // collision push must match — the old list dropped the inWater case.
+        // collision push matches it.
         (b.child !== undefined && !b.child.dead &&
           (b.child.caught !== undefined || b.child.mired !== undefined || b.child.inWater !== undefined)) ||
         // The active chase victim and its blocking parent sprint on exact
@@ -3344,7 +3351,8 @@ function Herds() {
     // frame (full coverage every few frames). Anyone on an OCEAN cell is set
     // back to the nearest land at once — the sea is the world's edge. Anyone
     // resting on river/lake water (not in a drama, not in flight) swims for
-    // the NEAREST bank under its own power (point 312) — never a snap.
+    // the NEAREST bank under its own power (point 312); only with no bank in
+    // swim reach is it set back onto land.
     {
       const phase = waterSweep.current++ % 7
       for (const sp of SPECIES) {
@@ -3355,9 +3363,10 @@ function Herds() {
         for (let i = phase; i < list.length; i += 7) {
           const a = list[i]
           // In-game invariants (point 207(i)) — piggyback on the sweep slice so
-          // the whole herd is asserted every few frames at no extra pass:
-          // positions stay finite, and every timed drama respects its deadline
-          // (the I4 rule made loud — a silent violation now fails ANY suite).
+          // the swept herds (flamingos and crocodiles are skipped above) are
+          // asserted every few frames at no extra pass: positions stay finite,
+          // and crossings and caught windows respect their deadlines (the I4
+          // rule made loud — a silent violation now fails ANY suite).
           devAssert(
             Number.isFinite(a.x) && Number.isFinite(a.z) && Number.isFinite(a.y),
             'animal-position-finite',
@@ -3376,7 +3385,8 @@ function Herds() {
           // swim-out, a caught victim at the waterline (point 197), and a
           // parent wading to or charging for its calf (point 383) — no
           // leave-the-water rule may pull any of them out. The collision
-          // push's `inDrama` mirrors this list.
+          // push's `inDrama` covers this list and additionally exempts fire,
+          // fight and active-chase actors.
           const owned = waterDramaOwns({
             dead: a.dead,
             inWater: a.inWater,
@@ -3398,9 +3408,8 @@ function Herds() {
           // Ground re-anchor (the first catch of the 203(A) tripwire): drifting
           // movers (separation pushes, cohesion, dodges) kept their SPAWN
           // height while the ground under them changed — on a slope they stood
-          // up to half a body in the earth. Ease the standing height onto the
-          // current ground (the sweep already sampled it); the eased step over
-          // a few sweep visits avoids a visible snap.
+          // up to half a body in the earth. Set the standing height onto the
+          // current ground (the sweep already sampled it).
           if (ter !== 'ocean' && ter !== 'water') {
             a.y = groundedBodyY(terSample.height)
             a.grounded = true // seen by the sweep at least once (203(A) gate)
@@ -3412,10 +3421,7 @@ function Herds() {
               ? nearestBankTarget(
                   a.x,
                   a.z,
-                  (nx, nz) => {
-                    const w = worldToLatLon(nx, nz)
-                    return sampleTerrain(w.lat, w.lon, seed).type
-                  },
+                  terrainTypeAtWorld,
                   CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds,
                 )
               : null
@@ -3502,12 +3508,10 @@ function Herds() {
             if (w) {
               c.x = w.x
               c.z = w.z
-              const wll = worldToLatLon(w.x, w.z)
-              const wt = sampleTerrain(wll.lat, wll.lon, seed)
               // The drawn sheet, never the canoe-float height (point 274 — see
               // the spawn anchor): the float's local-bed floor can stand proud
               // of the visible ribbon and expose the hidden body.
-              c.y = renderedSheetY(wll.lat, wll.lon, seed) ?? waterSurfaceY(wll.lat, wll.lon, seed, wt.height) ?? wt.height + 0.3
+              seatOnWater(c)
             }
           }
         }
@@ -3521,10 +3525,10 @@ function Herds() {
           // was in its narrow window):
           //  (1) a bank DRINKER genuinely standing in its drink cycle — the
           //      original, still the surest catch;
-          //  (2) ANY prey that has come to the WATERLINE — its rendered feet on
-          //      LAND (not on the water itself, so it is at the bank, not
-          //      crossing) — within the calibratable ambush band of the croc.
-          // A drinking JUVENILE stays the strongly-preferred target (point 245),
+          //  (2) ANY prey that has come to the WATERLINE — its own cell not
+          //      river/lake water (so it is at the bank, not crossing) — within
+          //      the calibratable ambush band of the croc.
+          // A JUVENILE, drinking or not, stays the strongly-preferred target (point 245),
           // so the §19.8 sacrifice/rescue drama fires more often — score every
           // eligible prey by crocodileTargetWeight (young ≫ adult) and take the
           // best (nearer breaks a same-weight tie), rather than the first found.
@@ -3637,9 +3641,8 @@ function Herds() {
           }
         } else if (c.lunge.dragging) {
           // THE DRAG INTO THE WATER (design.md §19.16, point 383): the ambusher
-          // hauls its catch off the bank and back into its channel — the leg that
-          // did not exist, which is why the pair used to feed where the strike
-          // happened. The catch rides the jaws the whole way; the parent's rescue
+          // hauls its catch off the bank and back into its channel before it
+          // feeds. The catch rides the jaws the whole way; the parent's rescue
           // window runs on unchanged (its charge simply follows the calf to the
           // water). Bounded by dragSeconds (I4): a haul that cannot reach water
           // settles rather than pinning the drama.
@@ -3649,9 +3652,9 @@ function Herds() {
           const hauled = haulCatch(c, v)
           crocByVictim.set(v, c)
           if (!hauled.dragging || c.lunge.timer > bc.dragSeconds) {
-            // In the water: seat the body on the sheet it now lies in, hand the
-            // catch its waterline, and start the feeding grip (and its own
-            // point-186 deadline) here.
+            // In the water — or the haul timed out, possibly still stranded: seat
+            // the body on the sheet, hand the catch its waterline, and start the
+            // feeding grip (and its own point-186 deadline) here.
             seatOnWater(c)
             v.y = c.y
             c.lunge.dragging = false
@@ -3659,7 +3662,8 @@ function Herds() {
             c.lunge.timer = 0
           }
         } else {
-          // Feeding IN THE WATER (design.md §19.16, points 250/383) — two coupled
+          // Feeding, normally in the water (design.md §19.16, points 250/383; a
+          // timed-out haul can start it stranded) — two coupled
           // phases, the croc holding its victim throughout, so the prey's removal
           // is the croc's own feed:
           //  (1) STRUGGLE (caught still counting): hold the thrashing victim at
@@ -3675,9 +3679,8 @@ function Herds() {
           //      the grip deadline is not applied here (it would cut the croc loose
           //      mid-sink and re-decouple the carcass — the point-250 bug).
           // The PAIR's placement is the croc's, in BOTH phases (point 383): the
-          // catch is carried at its jaws on the water beside it — never the old
-          // inverse coupling, which pulled the CROCODILE to a victim standing on
-          // the bank and fed it there. Re-run every frame, so a water mask that
+          // catch is carried at its jaws on the water beside it, never the
+          // crocodile pulled to the victim. Re-run every frame, so a water mask that
           // moves under them (the calibratable river width is debug-editable)
           // simply resumes the haul instead of stranding the meal on land.
           const v = c.lunge.victim
@@ -3718,7 +3721,8 @@ function Herds() {
         f.timer -= dt
         if (f.timer <= 0) {
           f.timer = FIRE_COOLDOWN_SECONDS
-          // Ignite ahead of the traveller where the pure gate allows: cured
+          // Ignite 45 units from the traveller at a position-hashed bearing
+          // (any direction) where the pure gate allows: cured
           // savanna grass in a fire zone, dry season only.
           const ang = hash(Math.round(pos.x), Math.round(pos.z), 5, seed) * Math.PI * 2
           const ix = pos.x + Math.sin(ang) * 45
@@ -3912,7 +3916,7 @@ function Herds() {
     }
 
     // Walking into a crocodile routes through the EXISTING §14.2 event
-    // (machete always protects, rifle only from the canoe) exactly like the
+    // (rifle only from the canoe, machete wherever the rifle does not) exactly like the
     // wandering-predator contact — no new attack path (point 130 (e)).
     {
       for (const c of herds.crocodile) {
@@ -3997,8 +4001,8 @@ function Herds() {
             tgZ = m.z
           }
         }
-        // The vigil window runs on the SIM clock, like every other drama timer
-        // (grief, keeper vigil, caught countdowns — all `dt`-driven): the herd
+        // The vigil window runs on the SIM clock, like the `dt`-driven drama
+        // timers (grief, keeper vigil, caught countdowns): the herd
         // WALKS at sim speed, so a wall-clock deadline expires mid-walk-in
         // whenever frames run long (the dt clamp lets sim time fall behind wall
         // time) and the herd would release before it ever held at the bones —
@@ -4043,9 +4047,10 @@ function Herds() {
     // elephant dodge — never a second oscillation-prone path.
     const playerThreat: Array<readonly [number, number]> = [[pos.x, pos.z]]
     // Staged §19.16 bank victim (point 247): a crocodile's current lunge
-    // target, or a drinker whose bank spot lies inside a lurking crocodile's
-    // strike radius (the same distance the lunge trigger measures) — the only
-    // drinkers the narrowed player-shy exemption still holds at their stand.
+    // target, or a drinker whose bank spot lies inside any live crocodile's
+    // strike radius (the same distance the lunge trigger measures) — drinkers
+    // the narrowed player-shy exemption holds at their stand whatever their age
+    // (adult drinkers keep theirs too, drinkExemptFromPlayerShy).
     const stagedBankVictim = (a: Animal): boolean => {
       if (a.drink === undefined) return false
       const strike = balance.crocodile.strikeRadius
@@ -4096,8 +4101,9 @@ function Herds() {
         } else {
           desired = a.heading + Math.sin(t * 0.1 + a.phase * 5) * 0.4
         }
-        // If the ground just ahead cannot be crossed, redirect the desired
-        // heading toward the herd (or away) — but still turn only gently.
+        // If the ground just ahead cannot be crossed, deflect along it
+        // (deflectedStep), falling back to a redirect toward the herd (or a
+        // turn) when boxed in — but still turn only gently.
         // The ground the elephant itself stands on: standing on foreign land
         // (e.g. the graveyard's dry ground after a vigil) unlocks any land
         // step, so the herd can always walk free (point 126).
@@ -4122,8 +4128,8 @@ function Herds() {
             desired = def.heading
           } else {
             // Fully boxed in — keep the herd redirect / turn until a way opens.
-            // (info being this animal itself: atan2(0,0) would pin `desired` due
-            // north forever, freezing it at a border, so keep turning instead.)
+            // (info being this animal itself: atan2(0,0) would pin `desired` at
+            // heading 0 (+Z) forever, freezing it at a border, so keep turning instead.)
             const dcx = info ? info.cx - a.x : 0
             const dcz = info ? info.cz - a.z : 0
             desired = info && Math.hypot(dcx, dcz) > 0.5 ? Math.atan2(dcx, dcz) : a.heading + Math.PI * 0.6
@@ -4156,13 +4162,14 @@ function Herds() {
 
     // Elephant body collider (design.md §19.5, point 261): an elephant is a
     // SOLID obstacle to every OTHER animal's locomotion. Each non-elephant
-    // animal's whole step this frame (frame-start → now) is swept around every
+    // animal's step so far this frame (frame-start → now; moves made later in
+    // the frame — crossing, gambol, follow, flight — are not swept) is swept around every
     // live elephant body so it slides AROUND the body instead of walking through
     // it — the grief parent must ROUTE AROUND the body to reach the front
     // (points 259/261), and no animal clips an elephant in general. The collider
     // radius is the elephant body radius alone (no self radius added), so a
     // deflected animal rests AT the body edge — still inside the wider
-    // TRAMPLE_RADIUS (1.5 > 1.3), so the designed §19.5 trample and the
+    // TRAMPLE_RADIUS (1.5 > 1.3 × the spawn scale's 1.15 maximum), so the designed §19.5 trample and the
     // grief-crush at the front are never blocked. The elephant's own movement
     // (its trample step) is never deflected here — only the other animals'.
     // A trample the elephant is ABOUT to make is EXEMPT (point 263): an animal
@@ -4211,13 +4218,12 @@ function Herds() {
       }
     }
 
-    // Scavenging (design.md §19): a carcass that was not eaten by the lion
-    // (e.g. trampled) draws a vulture that flies in, lands and consumes it —
-    // the carcass dissolves piece by piece as a lion kill does, then is
-    // removed. One scavenger works the nearest carcass at a time. The bird
-    // never pops in or out of the picture: it spawns beyond the zoom-aware
-    // view ring, flies in, and after the meal flies off and despawns only
-    // well outside the view again (design.md §19).
+    // Scavenging (design.md §19): a carcass that was not eaten by the hunt
+    // predator (e.g. trampled) draws its own vulture flock (point 251) that
+    // flies in, lands and consumes it — the carcass shrinks away as a hunt
+    // kill does, then is removed. The birds never pop in or out of the
+    // picture: they spawn off the rendered frame (isOnScreen), fly in, and
+    // after the meal fly off and despawn off-frame again (design.md §19).
     {
       // Every eligible carcass (not a lion's own kill, not a hunt remnant, not
       // vigil-guarded) is a candidate — collected once, then handed out to the
@@ -4441,8 +4447,9 @@ function Herds() {
             }
           }
         }
-        // The broken-wing act (point 145b): the luring plover tilts hard onto
-        // one wing and flutters; the return flight lifts it in a low arc.
+        // The broken-wing act (point 145b): the luring plover drops low with a
+        // pitched body (no roll) and drags along; the return flight lifts it in
+        // a low arc.
         if (sp === 'plover' && a.lure) {
           wobTarget = 0
           yaw = a.rot
@@ -4530,8 +4537,9 @@ function Herds() {
             // — or by the grass-fire line (point 145a), same thrash:
             // thrash in place — no stain or shrink yet — while a parent may
             // still reach the predator and save it (§19). Not young-gated:
-            // the seized vigil-keeper (point 121 (f)) is the one ADULT that
-            // can be caught, and it thrashes like any taken prey.
+            // an ADULT can be caught too — the seized vigil-keeper (point 121
+            // (f)) or a crocodile's waterline catch — and thrashes like any
+            // taken prey.
             // Point 268: a crocodile's catch lies AT ITS JAWS. The SIM places it
             // there — at the jaws of the crocodile that holds it, on the water it
             // hauled the catch into (point 383) — so the render simply thrashes
@@ -4720,7 +4728,7 @@ function Herds() {
             pitch = 0.2 // head straining up out of the mud
             familyHeld = true
           } else if (a.child && !a.child.dead && a.child.mired !== undefined) {
-            // The vigil (point 123): the parent walks to its mired calf and
+            // The mire watch (point 123): the parent walks to its mired calf and
             // STANDS beside it while the herd moves on — and does not flee
             // the predator the last water draws (familyHeld suppresses the
             // dodge below, like the trample grief).
@@ -4733,7 +4741,7 @@ function Herds() {
               { // ground-follow (point 203(A))
                 const gfl = worldToLatLon(a.x, a.z)
                 const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-                if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
+                if (gft.type !== 'water' && gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
               }
             }
             px = a.x
@@ -4810,9 +4818,9 @@ function Herds() {
             // a hunted calf takes its chase-victim branch above, so this
             // follow branch is reached only by a free calf, but the resolver's
             // gate keeps the invariant explicit and ordering-independent.
-            // Calves never dart from elephants (the herd is their shield, and
-            // the §19.8 trample drama needs them catchable), so the elephant
-            // threat list stays empty here. The drink exemption is NARROWED
+            // A following calf never darts from elephants here (the herd is its
+            // shield, and the §19.8 trample drama needs it catchable), so the
+            // elephant threat list stays empty in this branch. The drink exemption is NARROWED
             // (point 247): only the staged §19.16 bank victims keep their
             // stand — a plain drinking juvenile bolts like any calf.
             const shyRing = a.dodgeHeading === undefined ? PLAYER_SHY_RADIUS : PLAYER_SHY_RADIUS * PREY_PANIC_EXIT
@@ -5031,8 +5039,8 @@ function Herds() {
         // The SAME block also carries the player shyness (design.md §19): a
         // weak/prey adult — or an orphaned juvenile that fell out of the family
         // branch — flees the traveller through the identical held heading
-        // (fleesFromPlayer gates who; elephant calves stay with their herd,
-        // whose cohesion is their shield). Both threats feed ONE dodgeHeading;
+        // (fleesFromPlayer gates who; elephants are excluded from the whole
+        // block). Both threats feed ONE dodgeHeading;
         // the close-range elephant dart takes strict priority (an equal-weight
         // blend of two opposing headings would have a cancellation point — the
         // exact degeneracy the leash damping teaches to avoid), and the
@@ -5047,9 +5055,10 @@ function Herds() {
           const engaged = a.dodgeHeading !== undefined
           const ring = engaged ? PREY_PANIC_RADIUS * PREY_PANIC_EXIT : PREY_PANIC_RADIUS
           const shyRing = engaged ? PLAYER_SHY_RADIUS * PREY_PANIC_EXIT : PLAYER_SHY_RADIUS
-          // THE arbitration point (point 252): resolveFleeTarget ranks every
-          // co-active threat — drama > predator flee (the block above, fed in
-          // as isHunted) > elephant dart > player-shy > idle. A prey actively
+          // THE arbitration point (point 252): family-held dramas never get
+          // here; resolveFleeTarget then ranks the elephant dart first, and a
+          // drama or predator flee (the block above, fed in as
+          // drama.isHunted) silences the player-shy flee. A prey actively
           // fleeing the lion or the hunt's designated victim keeps fleeing
           // the LION, not the traveller — so the hunt/drama always resolves
           // rather than stalling when the player wanders near — while the
@@ -5137,35 +5146,32 @@ function Herds() {
         }
         // Under an elephant: trampled, stays dead on the ground. Checked on
         // the SIM position — the idle-shuffle render offset is cosmetic and
-        // must never carry an animal under a trample. (A calf killed by a
-        // predator above is already dead; skip the scan and just re-render.)
+        // must never carry an animal under a trample. (Dead animals never reach
+        // here: the loop head renders them and continues.)
         if (sp !== 'elephant') {
-          const wasDead = a.dead
-          if (!a.dead) {
-            for (let ei = 0; ei < elephantPos.length; ei++) {
-              const [ex, ez] = elephantPos[ei]
-              const [evx, evz] = elephantVel[ei]
-              // A trample kills only when the elephant is MOVING toward the
-              // animal (point 259): a standing elephant a grazer bumps into, or
-              // a hit from behind its heading of travel, leaves it unharmed —
-              // the §19.5 body-separation parts that overlap instead. Only an
-              // elephant driving into/over the animal crushes it.
-              if (elephantWouldTrample(evx, evz, ex, ez, a.x, a.z, TRAMPLE_RADIUS)) {
-                a.dead = true
-                pushStain(a.x, a.z)
-                // A trampled CALF takes its parent with it (design.md §19): the
-                // parent throws itself before the elephant's feet and is
-                // trampled by this same check on arrival. Grief, not a rescue —
-                // mirrors the waterfall plunge, where nobody is saved either.
-                const par = a.parent
-                if (a.young && par && !par.dead) {
-                  par.trampleTo = { x: ex, z: ez }
-                  par.grief = TRAMPLE_GRIEF_SECONDS
-                  par.child = undefined
-                  a.parent = undefined
-                }
-                break
+          for (let ei = 0; ei < elephantPos.length; ei++) {
+            const [ex, ez] = elephantPos[ei]
+            const [evx, evz] = elephantVel[ei]
+            // A trample kills only when the elephant is MOVING toward the
+            // animal (point 259): a standing elephant a grazer bumps into, or
+            // a hit from behind its heading of travel, leaves it unharmed —
+            // the §19.5 body-separation parts that overlap instead. Only an
+            // elephant driving into/over the animal crushes it.
+            if (elephantWouldTrample(evx, evz, ex, ez, a.x, a.z, TRAMPLE_RADIUS)) {
+              a.dead = true
+              pushStain(a.x, a.z)
+              // A trampled CALF takes its parent with it (design.md §19): the
+              // parent throws itself before the elephant's feet and is
+              // trampled by this same check on arrival. Grief, not a rescue —
+              // mirrors the waterfall plunge, where nobody is saved either.
+              const par = a.parent
+              if (a.young && par && !par.dead) {
+                par.trampleTo = { x: ex, z: ez }
+                par.grief = TRAMPLE_GRIEF_SECONDS
+                par.child = undefined
+                a.parent = undefined
               }
+              break
             }
           }
           // The trample crunch (design.md §19.1/§19.5, point 260): one short
@@ -5173,11 +5179,11 @@ function Herds() {
           // — the ordinary trample above AND the parent grief-trample (the
           // charging parent is trampled by this same check on arrival). An EDGE,
           // not a level: gated on the alive->dead transition so it fires exactly
-          // once per kill and never per frame while the carcass lies here; a
-          // predator kill (already dead on entry) draws no crunch. Positional —
+          // once per kill and never per frame while the carcass lies here (a
+          // carcass never re-enters this scan). Positional —
           // the shared §19.1 proximity fade makes a near trample loud, a far one
           // faint (via the single ambience volume, one audio path).
-          if (trampleCrunchFires(!!wasDead, !!a.dead)) {
+          if (trampleCrunchFires(false, !!a.dead)) {
             playTrampleCrunch(Math.hypot(a.x - pos.x, a.z - pos.z))
           }
           if (a.dead) {
@@ -5186,9 +5192,10 @@ function Herds() {
           }
         }
         // Steer the persistent facing toward this frame's desired heading —
-        // no behavior change can snap the body around (design.md §19). The
-        // deliberate fast wiggles (a caught calf's thrash, the in-water
-        // struggle) pass through unfiltered, and any directional behavior
+        // a behaviour change turns the body at FACE_TURN (design.md §19),
+        // except the branches that set a.face directly (the shield run, the
+        // clash pose). The deliberate fast wiggles (a caught calf's thrash, the
+        // in-water struggle) pass through unfiltered, and any directional behavior
         // updates the resting orientation so ending it never yanks the animal
         // back toward its spawn-time facing.
         const thrashing =
@@ -5221,14 +5228,15 @@ function Herds() {
         // ride the water rules instead and are skipped. Tolerances are generous
         // — this is a tripwire for the buried/floating CLASS (187/190/202/185),
         // not a pixel gate; a violation fails any suite via the assert channel.
-        // (Judged at the RENDERED spot px/pz: the drink/bathe slide renders
-        // away from the anchor and — since point 196 — carries the bank
-        // target's own height, so drinkers are asserted like everyone else;
-        // a bather mid-slide stands over a water cell, which is skipped. The
+        // (Judged at the logical render spot anchorX/anchorZ — px/pz before
+        // the cosmetic shuffle: the drink slide renders away from the anchor
+        // and — since point 196 — carries the bank target's own height, so
+        // drinkers are asserted like everyone else; bathers are excluded
+        // outright (!a.bathe). The
         // drama locks mirror the WATER-SWEEP's exemptions exactly: those
         // animals are never re-anchored there, so asserting them would flag
         // the dramas' own scripted poses, not a real burial.)
-        if ((aIdx + ASSERT_TICK) % 13 === 0 && !a.dead && a.grounded === true && sp !== 'crocodile' && sp !== 'flamingo' &&
+        if ((aIdx + ASSERT_TICK) % 13 === 0 && a.grounded === true && sp !== 'crocodile' && sp !== 'flamingo' &&
             a.crossing === undefined && a.inWater === undefined && a.caught === undefined && a.mired === undefined &&
             !a.bathe && !a.vigil && !a.rescued && !a.plungeTo && !a.trampleTo &&
             a.fireTrapped === undefined && LION_STATE.victim !== a) {
@@ -5290,11 +5298,11 @@ function Herds() {
     // 323), so a debug edit reshapes the patches already on the ground.
     setGroundStains(patches, pos.x, pos.z, balance.bloodStain)
 
-    // Remove carcasses a scavenger has fully consumed, and cull any left far
-    // off-screen: a single scavenger cannot keep up with every kill, so an
-    // unseen carcass is dropped silently rather than lingering forever (this
-    // bounds the herd arrays — otherwise trample kills accumulate without limit
-    // and eventually stall the frame loop).
+    // Remove carcasses a scavenger has fully consumed, and cull any left beyond
+    // the despawn ring: an unseen carcass the flocks have not finished is
+    // dropped silently rather than lingering forever (this bounds the herd
+    // arrays — otherwise trample kills accumulate without limit and eventually
+    // stall the frame loop).
     for (const sp of SPECIES) {
       const list = herds[sp]
       for (let i = list.length - 1; i >= 0; i--) {
@@ -5340,15 +5348,18 @@ function Herds() {
 }
 
 /**
- * Purely decorative predator hunt (design.md §19): near grazing herds a
- * region-appropriate predator (lion, cheetah, leopard or hyena) occasionally
- * chases one grazer from its food web; after the catch it visibly feeds on the
- * carcass — lowered, tearing head movements while the prey shrinks away piece
- * by piece over a red, spreading stain. Once the carcass is gone the predator
- * leaves a small prey remnant for the scavenger, trots off away from the
- * traveller and despawns only beyond the zoom-aware view ring. The lion is
- * the apex and the only predator
- * that also attacks the player on contact (§14); the others are pure scenery.
+ * The predator hunt (design.md §19): near grazing herds a region-appropriate
+ * predator (lion, cheetah, leopard or hyena) occasionally chases one grazer
+ * from its food web — or a real herd calf (a victim hunt, incl. the hyena
+ * after a lion cub); after the catch it visibly feeds on the carcass —
+ * lowered, tearing head movements while the prey shrinks away over a red,
+ * spreading stain. Once the carcass is gone the predator leaves a small prey
+ * remnant for the scavenger and trots off away from the traveller; a hunt
+ * that is driven off, loses its catch or gives up walks off without feeding.
+ * The leaving predator despawns beyond the zoom-aware view ring, or after the
+ * leave overtime once it is off the rendered frame. Every active predator
+ * attacks the player on contact (§14); the lion is the apex (highest fatal
+ * risk).
  */
 function LionHunt() {
   const seed = useGame((s) => s.seed)
@@ -5430,7 +5441,8 @@ function LionHunt() {
       // draw is a scripted guarantee, not a hope on the ambient dice.
       // The hunted species (point 124): recorded with the victim pick so the
       // predator is drawn from the food web that actually takes it, and
-      // s.prey reports the truth for the region/web fit checks.
+      // s.prey reports the victim's kind for the region/web fit checks (a
+      // lion-cub hunt records no species; its s.prey is a cosmetic pick).
       let victimSpecies: PreyKind | null = null
       let vigilKeeper: Animal | null = null
       // The debug menu's forced hunt (design.md §21.3, point 258): consumed
@@ -5581,8 +5593,8 @@ function LionHunt() {
       const regionPrey = REGION_PREY[region] ?? REGION_PREY.east
       const preyPool = PREDATOR_PREY[s.predator].filter((p) => regionPrey.includes(p))
       const pool = preyPool.length > 0 ? preyPool : regionPrey
-      // The recorded prey species is the truth: the victim's own kind for a
-      // family hunt, a food-web pick for the generic hunt.
+      // The recorded prey species: the victim's own kind for a grazer family
+      // hunt, a food-web pick for the generic hunt and the lion-cub hunt.
       s.prey = vs ?? pool[Math.floor(Math.random() * pool.length)]
       // The lion-cub hunt is always a hyena's (point 145c): the lioness would
       // rout any lighter cat, so only the bold hyena makes the threat read —
@@ -5629,7 +5641,8 @@ function LionHunt() {
       const v = s.victim
       if (v) {
         // Calf hunt: chase the actual fleeing calf (drawn by the herds). If it
-        // died some other way before we reached it, just close out into feed.
+        // died or was seized before we reached it, close out into feed — or,
+        // for a crocodile's catch, into the walk-off.
         if (v.dead || v.caught !== undefined) {
           if (v.caughtBy === 'crocodile') {
             // The crocodile stole the chase victim (point 194): §19.16 keeps the
@@ -5695,8 +5708,9 @@ function LionHunt() {
         }
         const lx0 = s.lx
         const lz0 = s.lz
-        // The hunter follows into a river/lake at the same braked swim pace as
-        // its quarry (design.md §19.5), so the water is a real escape: a close
+        // The hunter follows into a river/lake at the braked swim pace, as a
+        // swimming calf quarry does (design.md §19.5; the generic scripted prey
+        // runs unbraked), so the water is a real escape: a close
         // pursuer still catches, a distant one sees it reach the far bank.
         const lionPace = swimBrakedPace(HUNT_LION_SPEED, terrainAt(s.lx, s.lz), huntSwimPace())
         s.lx += Math.sin(s.lionHeading) * lionPace * dt
@@ -5790,10 +5804,10 @@ function LionHunt() {
       // never despawns in sight (design.md §19). The walk-off obeys the same
       // land constraint as every animal: at a coast it deflects along the
       // shoreline instead of trotting into the open ocean (point 83).
-      // The escape course re-aims AWAY FROM THE TRAVELLER every frame; the
-      // coast deflection applies per STEP only. A persisted deflected
-      // heading let a shoreline hold the predator tangentially inside the
-      // view ring forever — it must always strive outward.
+      // The escape course always strives AWAY FROM THE TRAVELLER; the coast
+      // deflection applies per STEP only. A persisted deflected heading let a
+      // shoreline hold the predator tangentially inside the view ring
+      // forever.
       const oceanAt = (nx: number, nz: number) => {
         const ll = worldToLatLon(nx, nz)
         return sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean'
@@ -5885,8 +5899,9 @@ function LionHunt() {
       }
     }
     if (prey.current) {
-      // The carcass disappears piece by piece while the lion feeds; once it
-      // is gone (leave phase) nothing of it remains. In a calf hunt the victim is
+      // The carcass shrinks away while the predator feeds; once it is gone
+      // (leave phase) the scripted mesh hides and only the spawnRemnant scrap
+      // stays for the scavengers. In a calf hunt the victim is
       // a real herd animal drawn by <Herds>, so the scripted mesh stays hidden.
       prey.current.visible = (s.mode === 'chase' || feeding) && !s.victimHunt
       if (prey.current.visible) {
@@ -5933,8 +5948,8 @@ function Vultures() {
   const group = useRef<THREE.Group>(null)
   const killGroup = useRef<THREE.Group>(null)
   // Flight states so neither flock ever pops in or out of the picture: they
-  // spawn beyond the zoom-aware view ring, fly in, and when their reason
-  // passes fly off and despawn only well outside the view (design.md §19).
+  // spawn off the rendered frame, fly in, and when their reason passes fly off
+  // and despawn only off-frame beyond the view ring (design.md §19).
   const playerFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
   const killFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
   /** 0 = circling overhead, 1 = landed on the remnant and feeding. */

@@ -1,12 +1,12 @@
 // THE DAEMON'S DECISION CORE — step 3 of the "Ordered work" in
 // docs/handover-architecture.md (work-order point 834, the front stage of 676).
 //
-// Pure: the daemon process (scripts/batch-daemon.mjs) owns sockets, spawns and
-// files, and every decision it enforces is decided here from arguments. The
-// mutation gate itself — (sessionId, fence) against the live lock — is step 1's
+// Pure except mintLaunchNonce (randomBytes): the daemon process
+// (scripts/batch-daemon.mjs) owns sockets, spawns and files. The mutation gate
+// itself — (sessionId, fence) against the live lock — is step 1's
 // validateMutation and is not repeated; this module owns what step 3 adds:
-// the global cap, the worker spawn plans, retention, drain, authorization and
-// the daemon's own identity record.
+// admission, the global cap, the worker spawn plans, retention (not yet called
+// by the daemon), drain, authorization and the daemon's own identity record.
 import { randomBytes } from 'node:crypto'
 import {
   DAEMON_LIFECYCLE_STATES,
@@ -76,7 +76,7 @@ export const DAEMON_POOL_CAP = 3
  *  does ANY state this module does not recognise: a corrupt or unknown state
  *  is uncertain evidence, and uncertain evidence occupying a slot is what
  *  keeps a fourth authoring process out. */
-export const SLOT_FREEING_STATES = Object.freeze(['queued', 'ready-for-review', 'landing', 'landed', 'failed', 'cancelled'])
+const SLOT_FREEING_STATES = Object.freeze(['queued', 'ready-for-review', 'landing', 'landed', 'failed', 'cancelled'])
 export const SLOT_OCCUPYING_STATES = Object.freeze(['running', 'checkpointing', 'stalled'])
 
 export function activeAttemptCount(attempts = []) {
@@ -84,7 +84,7 @@ export function activeAttemptCount(attempts = []) {
 }
 
 /** The unknowns are surfaced beside the count, never silently absorbed into
- *  it: an operator must see WHICH records occupy slots as quarantined
+ *  it: mayStartAttempt's refusal names how many occupy slots as quarantined
  *  evidence rather than as workers. */
 export function unknownStateAttempts(attempts = []) {
   return attempts.filter((a) => {
@@ -155,9 +155,10 @@ export function workerSpawnPlan({ adapter, pointId, branch, worktree, attemptDir
 // 3. RETENTION ("Additional omissions": preserve audit, eventually prune bulk)
 // ---------------------------------------------------------------------------
 
-/** Records are audit and are never pruned; logs and worktrees are bulk and are
- *  pruned once a TERMINAL landed or cancelled attempt has aged past retention.
- *  Failed attempts keep everything: they are evidence someone has not read yet. */
+/** Records are audit and are never pruned; logs and worktrees are bulk and may
+ *  be pruned once a TERMINAL landed or cancelled attempt has aged past retention.
+ *  Failed attempts keep everything: they are evidence someone has not read yet.
+ *  Decision only: no production code calls this or prunes anything yet. */
 export const RETAIN_BULK_MS = 14 * 24 * 60 * 60 * 1000
 
 export function retentionDecision({ attempt = {}, now, retainMs = RETAIN_BULK_MS } = {}) {
@@ -261,10 +262,11 @@ export function readinessSatisfied({ record = null, expectedNonce = null } = {})
 // 6. DRAIN — rollback is a single operation with nothing to interleave
 // ---------------------------------------------------------------------------
 
-/** The ordered drain of mechanism 2: refuse new mutations, finish the at most one
- *  in flight, cancel workers preserving branches and pushed SHAs, seal the
- *  snapshot, release the identity record, exit. Returned as data so the process
- *  half executes exactly this and the test asserts exactly this. */
+/** The ordered drain of mechanism 2 as named steps, returned to the shutdown
+ *  caller as data. performShutdown does not read this list: it implements its
+ *  own sequence (stopping transition, cancellation and sealing only when
+ *  draining, stop journal entry, lock-copy clear, record release), and it does
+ *  not await an in-flight mutation — draining only refuses new ones. */
 export const DRAIN_STEPS = Object.freeze([
   'refuse-new-mutations',
   'finish-in-flight-mutation',

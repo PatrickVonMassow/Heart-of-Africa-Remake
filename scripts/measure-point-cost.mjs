@@ -5,6 +5,7 @@
 //   node scripts/measure-point-cost.mjs --points 10 --json
 //   node scripts/measure-point-cost.mjs --points 10 \
 //     --write docs/point-cost-ledger.json --report docs/point-cost-report.md
+//   … [--ref <branch>] [--until <ISO date>]   another first-parent ref; an earlier window end
 //
 // The command reads the harness's existing Claude transcripts, Codex rollouts, git
 // merges and boundary log. The JSON/Markdown files are generated views, not another
@@ -84,6 +85,8 @@ export function readProviderTurns({ claudeDir, codexDir, since = 0, until = Infi
     ? new RegExp(points.map((point) => `(?:point[- ]|feat/)${point}(?:\\b|-)`).join('|'), 'i')
     : null
   const codexFiles = listCodexRollouts(codexDir, { since })
+  // codexCandidates counts every rollout read in the window (the report's
+  // "discovered"); codexRead counts those that matched the point pre-filter.
   let codexRead = 0
   let codexCandidates = 0
   for (const path of codexFiles) {
@@ -350,7 +353,7 @@ if (isMainModule(import.meta.url)) {
   const generatedAt = new Date().toISOString()
   const until = dateMs(flag('--until', generatedAt))
   if (!Number.isFinite(until)) {
-    console.error('measure-point-cost: --until must be an ISO date or millisecond timestamp.')
+    console.error('measure-point-cost: --until must be an ISO date.')
     process.exit(2)
   }
   const rawMerges = readMerges({ ref })
@@ -360,7 +363,7 @@ if (isMainModule(import.meta.url)) {
     process.exit(1)
   }
   const oldest = Math.min(...landed.map((row) => dateMs(row.startedAt) ?? dateMs(row.landedAt)).filter(Number.isFinite))
-  // The first authoring turn precedes the first commit. Three days is deliberately
+  // The first authoring turn precedes the first commit. Twelve hours is deliberately
   // conservative and remains bounded for the last-N command.
   const since = oldest - 12 * HOUR
   const claudeDir = transcriptDir()

@@ -10,14 +10,14 @@
 | `alert-escalation.mjs` | THE ESCALATION LADDER (point 434, remainder of part 1) — the I/O half. | — |
 | `ask-astra-core.mjs` | THE READ-ONLY PATH TO THE OTHER VENDOR, GENERALISED BEYOND REVIEWS (point 654, A1). | — |
 | `ask-astra.mjs` | ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). | usage: node scripts/ask-astra.mjs [--model astra\|fable\|opus\|opus48] --kind <' + KINDS.join('\|') + '> --brief "<the question>" \\ |
-| `assertionHealth.mjs` | Pure detector for assertions that CANNOT FAIL. | — |
+| `assertionHealth.mjs` | Pure detector for assertions whose outcome is FIXED (mostly: that cannot fail). | — |
 | `astra-share-core.mjs` | THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667). | — |
 | `astra-share.mjs` | THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667). | usage: node scripts/astra-share.mjs --status \| --more \| --less \| --set <setting> [--json] |
 | `atomic-write.mjs` | Atomic JSON writes that survive a Windows moment (point 388, first live finding 28.07.2026). | — |
 | `attended-context-notice.mjs` | Durable once-per-session state for the attended context-ceiling notice. | — |
 | `audit-check.mjs` | Dependency audit gate (CLAUDE.md §7.1 pt.18). | — |
-| `author-astra-core.mjs` | THE OPENAI AUTHORING LANE, decided (point 667). | — |
-| `author-astra.mjs` | THE COMMAND THAT LETS THE OPENAI LANE AUTHOR A POINT (work-order point 667). | usage: node scripts/author-astra.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
+| `author-astra-core.mjs` | THE AUTHORING LANES' WRAPPER, decided (point 667). | — |
+| `author-astra.mjs` | THE COMMAND THAT LETS AN OUTSIDE LANE AUTHOR A POINT (work-order point 667): the OpenAI lane by default, the Fable lane through author-fable.mjs. | usage: node scripts/author-astra.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `author-fable-core.mjs` | Pure decisions for the Fable authoring command. | — |
 | `author-fable.mjs` | Commission the Fable authoring lane through the same durable worktree, ledger, push, gate-report and no-merge contract as author-astra.mjs. | usage: node scripts/author-fable.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `author-routing-core.mjs` | WHICH AUTHORING LANE A POINT GOES TO (point 667). | — |
@@ -36,17 +36,17 @@
 | `batch-board.mjs` | Read-only projection of durable batch state for the progress board. | usage: node scripts/batch-board.mjs --batch <id> [--repo <dir>] [--json] |
 | `batch-boundary-core.mjs` | Pure core of the AUTONOMOUS SESSION BOUNDARY (user 27.07.2026). | — |
 | `batch-boundary-plane-core.mjs` | DURABLE TWO-PHASE BOUNDARY — ordered-work step 7. | — |
-| `batch-boundary-plane.mjs` | Tests and support for batch-boundary-plane. | — |
-| `batch-boundary.mjs` | The autonomous session boundary (point 373, user 27.07.2026) — the IO half. | Usage: node scripts/batch-boundary.mjs <point><br>usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''), |
+| `batch-boundary-plane.mjs` | No leading description for batch-boundary-plane. | — |
+| `batch-boundary.mjs` | The autonomous session boundary (point 373, user 27.07.2026) — the IO half. | Usage: node scripts/batch-boundary.mjs --prepare <point>, then --commit <point><br>usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''), |
 | `batch-checkpoint-core.mjs` | CHECKPOINT BARRIER — ordered-work step 6. | — |
-| `batch-checkpoint.mjs` | Tests and support for batch-checkpoint. | — |
+| `batch-checkpoint.mjs` | No leading description for batch-checkpoint. | — |
 | `batch-claim-core.mjs` | TAKING THE BATCH BACK INTO THE WINDOW THE USER IS SITTING AT (point 395, user 28.07.2026) — the decision half, pure and dependency-injected. | — |
 | `batch-claim.mjs` | TAKING THE BATCH BACK INTO THE WINDOW THE USER IS SITTING AT (point 395, user 28.07.2026) — the IO half. | usage: node scripts/batch-claim.mjs --session <id> [--why "<text>"] \| --wait [--timeout <min>] \| |
 | `batch-context-samples.mjs` | Independent context measurements for the durable-lane trial. | — |
 | `batch-daemon-core.mjs` | THE DAEMON'S DECISION CORE — step 3 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676). | — |
 | `batch-daemon-drill.mjs` | THE DRILL THAT REPRODUCES THE REAL REGRESSION — docs/handover-architecture.md, "The drill that reproduces the real regression" (work-order point 834; Sol A19). | — |
 | `batch-daemon-failure-drills.mjs` | The bounded failure matrix for ordered-work step 12. | — |
-| `batch-daemon.mjs` | THE OS LAUNCHER DAEMON — step 3 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M7). | usage: node scripts/batch-daemon.mjs start\|status\|stop\|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep] [--neuter-epoch] |
+| `batch-daemon.mjs` | THE OS LAUNCHER DAEMON — step 3 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M7). | usage: node scripts/batch-daemon.mjs start\|status\|stop\|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep] [--neuter-epoch] [--inject-failure] |
 | `batch-dispatch-core.mjs` | BOUNDED DISPATCH AND BACKPRESSURE — ordered-work step 5 in docs/handover-architecture.md. | — |
 | `batch-dispatch.mjs` | Thin dispatcher: read the main-session-authorized queue, decide from daemon state, and submit only the already-authorized start-attempt mutations. | — |
 | `batch-doctor-core.mjs` | Decision logic for the batch doctor (scripts/batch-doctor.mjs): after a parallel-session incident the OWNER must prove the repo was not corrupted by concurrent writes — and if it was, prefer THROWING AWAY suspect work (recoverably: rescue branch + stash, everything logged) over leaving a corrupted tree. | — |
@@ -61,36 +61,36 @@
 | `batch-in-flight.mjs` | DECLARING WORK THAT IS IN FLIGHT (point 388, fifth live finding 28.07.2026) — the IO half. | usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--point N] [--pid N] [--branch REF] |
 | `batch-landing-core.mjs` | THE LANDING JOURNAL'S STAGES AND CRASH RULE — the slice of step 9 that step 8 needs (work-order point 834; union M33/M34/M35). | — |
 | `batch-landing-journal-core.mjs` | CRASH-RECOVERABLE SERIAL LANDING — the remainder of ordered-work step 9. | — |
-| `batch-landing-journal.mjs` | Tests and support for batch-landing-journal. | — |
+| `batch-landing-journal.mjs` | No leading description for batch-landing-journal. | — |
 | `batch-launcher-core.mjs` | Pure core of the LAUNCHER, on both hosts (point 474, user 03.08.2026). | — |
 | `batch-launcher.mjs` | THE LINUX LAUNCHER (point 474, user 03.08.2026) — a self-scheduling daemon. | Usage: --start \| --arm \| --stop \| --status |
 | `batch-lease-core.mjs` | THE LEASE AND THE FENCE — pure decision core (layer 1 of docs/batch-resilience.md §3). | — |
 | `batch-lock.mjs` | Batch PAUSE state + legacy lock reader. | — |
 | `batch-metric-events.mjs` | Production bridge from measured operations to the daemon's fenced journal. | — |
 | `batch-metrics-core.mjs` | UNBIASED DURABLE-LANE METRICS — ordered-work step 11. | — |
-| `batch-metrics.mjs` | Seal inputs, record independent context samples, and reconstruct trial metrics. | usage: node scripts/batch-metrics.mjs report --batch <id> [--repo <dir>]<br>usage: node scripts/batch-metrics.mjs seal-plan --batch <id> --session <id> --fence <n> --plan <plan.json> [--repo <dir>]<br>usage: node scripts/batch-metrics.mjs sample-context --batch <id> --scope handover\|ordinary --transcript <session.jsonl> [--repo <dir>]<br>usage: node scripts/batch-metrics.mjs report --batch <id> [--repo <dir>] [--context <samples.json>] |
+| `batch-metrics.mjs` | Seal inputs, record independent context samples, and reconstruct trial metrics. | usage: node scripts/batch-metrics.mjs report --batch <id> [--repo <dir>] [--context <samples.json>]<br>usage: node scripts/batch-metrics.mjs seal-plan --batch <id> --session <id> --fence <n> --plan <plan.json> [--repo <dir>]<br>usage: node scripts/batch-metrics.mjs sample-context --batch <id> --scope handover\|ordinary --transcript <session.jsonl> [--repo <dir>] |
 | `batch-owner-work.mjs` | THE OWNER'S CORROBORATION, GATHERED ONCE FOR EVERY DOOR (four-eyes review of point 556, confirmed finding 2). | — |
 | `batch-ownership-core.mjs` | THE OWNERSHIP VERDICT — ONE function, and deliberately only one (point 612, with the cross-point ruling of point 614). | — |
 | `batch-pause-core.mjs` | EVERY PARK CARRIES A RESTART CLOCK (point 445, out of the fortnight-alone review). | — |
 | `batch-pause.mjs` | Deliberate writer for an allowed batch stop. | usage: node scripts/batch-pause.mjs --user-stop "<quoted user words>" \| --awaiting-user "<reason>" |
 | `batch-progress-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch never idle-stops. | — |
 | `batch-reconcile-core.mjs` | SUCCESSOR RECONCILIATION — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M26-M29, M41). | — |
-| `batch-reconcile.mjs` | EVIDENCE GATHERING FOR SUCCESSOR RECONCILIATION — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676). | usage: node scripts/batch-reconcile.mjs --repo <dir> --batch <id> [--apply --session <sid>] |
-| `batch-resume-hook-core.mjs` | WHAT A SESSION THAT DID NOT GET THE BATCH IS TOLD — the deciding half of scripts/batch-resume-hook.mjs's stand-down branch. | — |
+| `batch-reconcile.mjs` | EVIDENCE GATHERING FOR SUCCESSOR RECONCILIATION — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676). | usage: node scripts/batch-reconcile.mjs [--repo <dir>] --batch <id> [--apply --session <sid>] |
+| `batch-resume-hook-core.mjs` | WHAT THE SESSION-START HOOK SAYS — the deciding half of scripts/batch-resume-hook.mjs: the owner-runbook gate, the open-point headline, and above all the stand-down branch. | — |
 | `batch-resume-hook.mjs` | SessionStart hook: auto-resume the TASKS.md batch (user mandate 2026-07-14 — the batch must complete autonomously; no session may sit idle waiting for a "continue"). | — |
 | `batch-schema-core.mjs` | THE DURABLE LANE'S SCHEMAS AND INVARIANTS — step 1 of the "Ordered work" in docs/handover-architecture.md (work-order point 891, the front stage of 676). | — |
 | `batch-singleton-race-worker.mjs` | Test worker for the batch-singleton race tests: attempts one atomic acquire against the lock path in argv and prints the result. | — |
 | `batch-singleton.mjs` | HARD batch singleton (user mandate 24.07.2026, after the e9407cae incident: two live sessions drove the batch and committed to main concurrently). | usage: node scripts/batch-singleton.mjs [status\|release] |
-| `batch-standstill-core.mjs` | Tests and support for batch-standstill-core. | — |
-| `batch-standstill-inputs.mjs` | Tests and support for batch-standstill-inputs. | — |
-| `batch-standstill-report.mjs` | Tests and support for batch-standstill-report. | — |
+| `batch-standstill-core.mjs` | No leading description for batch-standstill-core. | — |
+| `batch-standstill-inputs.mjs` | No leading description for batch-standstill-inputs. | — |
+| `batch-standstill-report.mjs` | No leading description for batch-standstill-report. | — |
 | `batch-state-core.mjs` | THE DURABLE STATE STORE'S DECISION CORE — step 2 of the "Ordered work" in docs/handover-architecture.md (work-order point 892, the front stage of 676). | — |
 | `batch-state.mjs` | THE DURABLE STATE STORE'S I/O — step 2 of the "Ordered work" in docs/handover-architecture.md (work-order point 892, the front stage of 676). | — |
 | `batch-trial.mjs` | The measured verdict is the only path in this command that enables the lane. | usage: node scripts/batch-trial.mjs --batch <id> --baseline <baseline.json> --report <trial.json> [--repo <dir>] |
 | `blind-merge-core.mjs` | Pure accounting for the MERGE of a blind-parallel four-eyes stage (point 634). | — |
 | `blind-merge.mjs` | The command that MERGES a blind-parallel four-eyes stage — cheaply, and then countably (point 634). | usage: node scripts/blind-merge.mjs --a <A> --b <B> (what to decide) |
 | `board-archive-rotate.mjs` | Keeps the board's Erledigt section at its cap (point 371) by moving the oldest cards onto the archive page. | — |
-| `board-core.mjs` | Pure half of the board command (point 372): the card edit, so the markup the board guard accepts is pinned by tests rather than by the shape of one regex written once. | — |
+| `board-core.mjs` | Pure half of the board command (point 372): the card edits, plus the footer, criticality and current-work projection passes and the publish preflight they share, so the markup the board guard accepts is pinned by tests rather than by the shape of one regex written once. | — |
 | `board-currency-core.mjs` | Pure core of the BOARD-CURRENCY chain (point 400). | — |
 | `board-edit-core.mjs` | Dependency-injected controller for a board edit. | — |
 | `board-edit-lock.mjs` | Cross-process serialization for the board's read-modify-write commands. | — |
@@ -103,22 +103,22 @@
 | `board-probe-core.mjs` | THE BOARD REACHABILITY PROBE — pure decision core (point 562). | — |
 | `board-publish.mjs` | THE BOARD TRANSPORT (point 400, delta D) — the board goes live from a script, so EVERY session can publish it, and comes back over plain HTTPS, so a check can read the PAGE rather than a record of an attempt. | usage: node scripts/board-publish.mjs [--check \| --url] |
 | `board-queue-core.mjs` | Pure core of the DERIVED QUEUE (point 400, delta C). | — |
-| `board-queue.mjs` | THE QUEUE GENERATOR (point 400, delta C) — rebuild the Warteschlange from the work order plus the board's own prose, instead of maintaining it card by card. | usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--if-estimate "~old h"] [--text-stdin]<br>usage: board-queue.mjs [--check] \| set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] \| import |
+| `board-queue.mjs` | THE QUEUE GENERATOR (point 400, delta C) — rebuild the Warteschlange from the work order plus the board's own prose, instead of maintaining it card by card. | usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--if-estimate "~old h"] [--text-stdin]<br>usage: board-queue.mjs [--check] \| set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] [--text-stdin] \| import |
 | `board-refresher-core.mjs` | The board's self-refresh, as VERSIONED source (point 419 b). | — |
 | `board-remedy.mjs` | The board's remedy text, in ONE place (point 435). | — |
 | `board-state-core.mjs` | DERIVED BATCH STATE FOR THE BOARD (point 749). | — |
 | `board-state.mjs` | THE READER SIDE OF THE DERIVED BOARD STATE (point 749). | — |
 | `board-structure-core.mjs` | Is the board still STRUCTURALLY intact? | — |
 | `board-watchdog.mjs` | THE BOARD WATCHDOG (point 400, delta E) — one tick of "is the live board still telling the truth", run as its OWN process by scripts/batch-autostart.mjs. | — |
-| `board.mjs` | Point 372 — one command for the board instead of six. | usage: board.mjs status <point> "<text>"\|--text-stdin<br>usage: board.mjs eta <point> "<HH:MM><br>usage: board.mjs title <point> "<text>"\|--text-stdin<br>usage: board.mjs now <point> "<status>"\|--text-stdin<br>usage: board.mjs queue <point> ["<text>"\|--text-stdin]<br>usage: board.mjs done <point> ["<text>"] [--next <m> "<status>" \| --none "<reason>"]<br>usage: board.mjs none "<reason>"\|${TEXT_STDIN_FLAG}<br>usage: board.mjs closing <point> ["--title <Betreff>"] "<reason>"\|${TEXT_STDIN_FLAG}<br>usage: board.mjs closing <point> "<reason>"\|${TEXT_STDIN_FLAG}<br>usage: board.mjs vdzk-add [--automated] "<title>" "<question>"\|--text-stdin<br>usage: board.mjs vdzk-remove "<title>"\|--text-stdin<br>usage: board.mjs vdzk-keep "<title>" [...] [--why "<reason>"]<br>usage: board.mjs promote <point> "<times>" "<title>" "<status>"\|--text-stdin<br>usage: board.mjs focus <point> "<note>"\|--text-stdin<br>usage: board.mjs now\|status\|title\|queue <point> "<text>" \| eta <point> "<HH:MM>" \| |
+| `board.mjs` | Point 372 — one command for the board instead of six. | usage: board.mjs status <point> "<text>"\|--text-stdin<br>usage: board.mjs eta <point> "<HH:MM><br>usage: board.mjs title <point> "<text>"\|--text-stdin<br>usage: board.mjs now <point> "<status>"\|--text-stdin<br>usage: board.mjs queue <point> ["<text>"\|--text-stdin]<br>usage: board.mjs done <point> ["<text>"] [--next <m> "<status>" \| --none "<reason>"]<br>usage: board.mjs none "<reason>"\|${TEXT_STDIN_FLAG}<br>usage: board.mjs closing <point> ["--title <Betreff>"] "<reason>"\|${TEXT_STDIN_FLAG}<br>usage: board.mjs closing <point> "<reason>"\|${TEXT_STDIN_FLAG}<br>usage: board.mjs vdzk-add [--automated] "<title>" "<question>"\|--text-stdin<br>usage: board.mjs vdzk-remove "<title>"\|--text-stdin<br>usage: board.mjs vdzk-keep "<title>" [...] [--why "<reason>"]<br>usage: board.mjs promote <point> "<times>" "<title>" "<status>"\|--text-stdin<br>usage: board.mjs focus <point> "<note>"\|--text-stdin<br>usage: board.mjs now\|status\|title <point> "<text>" \| queue <point> ["<text>"] \| eta <point> "<HH:MM>" \| |
 | `branch-hygiene-core.mjs` | A MERGED BRANCH MUST NOT SURVIVE ITS MERGE — the pure decision half (branch-hygiene-guard.mjs is the fail-open I/O wrapper). | — |
 | `branch-hygiene-guard.mjs` | Stop hook: A MERGED BRANCH MUST NOT SURVIVE ITS MERGE. | — |
 | `build-geodata.mjs` | Geodata preprocessing (design.md §3 "Real geodata and terrain rendering"). | — |
-| `build-info.mjs` | THE REVISION MARKER THE BUILT SITE CARRIES — pure, never throws, Vitest-covered in scripts/deploy-staleness-core.test.mjs (which round-trips it through the reader, so emitter and reader cannot drift apart). | — |
+| `build-info.mjs` | THE REVISION MARKER THE BUILT SITE CARRIES — pure (no I/O), Vitest-covered in scripts/deploy-staleness-core.test.mjs (which round-trips it through the reader, so emitter and reader cannot drift apart). | — |
 | `bundle-first-core.mjs` | Pure decision core of the bundle-first Stop-hook guard (bundle-first-guard.mjs is the thin fail-open wrapper). | — |
-| `bundle-first-guard.mjs` | Stop hook: the BUNDLE-FIRST rule, until now memory only (`bundle-first-not-new-point`). | — |
+| `bundle-first-guard.mjs` | Stop hook: the BUNDLE-FIRST rule (memory `bundle-first-not-new-point`). | — |
 | `carrier-bell-core.mjs` | THE FINDINGS CARRIER BELL — the deciding half. | — |
-| `chat-core.mjs` | THE CHAT CHANNEL'S DECIDING HALF — pure, no I/O, no clock of its own. | — |
+| `chat-core.mjs` | THE CHAT CHANNEL'S DECIDING HALF — pure, no I/O; `now` defaults to Date.now() but every clock reading can be injected. | — |
 | `chat-delivery-core.mjs` | PER-TOOL-CALL DELIVERY — the deciding half. | — |
 | `chat-inbox.mjs` | ONE TICK OF "HAS THE USER WRITTEN ANYTHING" — the reader half of the channel. | — |
 | `chat-reply.mjs` | THE WRITER HALF — an agent reply on its way to the phone. | — |
@@ -129,7 +129,7 @@
 | `check-deployed-benchmark.mjs` | Prove the F8 benchmark reached the DEPLOYED build (point 277). | Usage: node scripts/check-deployed-benchmark.mjs [url] |
 | `child-retry-core.mjs` | LAYER 5 — RETRY A CHILD, NOT AN OUTAGE (point 434 part 3), the decision half: pure, dependency-injected, no I/O. | — |
 | `child-retry.mjs` | LAYER 5 — RETRY A CHILD, NOT AN OUTAGE (point 434 part 3), the I/O half. | usage: |
-| `ci-failure-cause-core.mjs` | WHERE a red CI run's cause lies — pure, never throws, Vitest-covered in ci-failure-cause-core.test.mjs. | — |
+| `ci-failure-cause-core.mjs` | WHERE a red CI run's cause lies — pure (classifyFailureCause never throws), Vitest-covered in ci-failure-cause-core.test.mjs. | — |
 | `ci-gate-verdict-core.mjs` | Pure decision logic of the CI gate verdict step (point 513, user decision 05.08.2026). | — |
 | `ci-gate-verdict.mjs` | The CI gate's verdict step (point 513). | — |
 | `ci-status-guard-core.mjs` | Pure decision logic for the CI-status Stop hook (ci-status-guard.mjs). | — |
@@ -147,8 +147,8 @@
 | `container-ask-guard.mjs` | Stop hook (user 04.08.2026, memory container-work-is-mine): the outgoing answer may not hand the USER a step that runs inside the dev container. | — |
 | `context-budget-core.mjs` | PRE-CALL CONTEXT ADMISSION — the pure arithmetic shared by every fence call. | — |
 | `context-budget.mjs` | Runtime transaction for pre-call context admission. | — |
-| `context-fence-core.mjs` | THE CONTEXT FENCE (point 700) — the decision half, pure. | — |
-| `context-fence-guard.mjs` | THE CONTEXT FENCE (point 700) — thin fail-OPEN I/O wrapper around the pure core (context-fence-core.mjs). | — |
+| `context-fence-core.mjs` | THE CONTEXT FENCE (point 700) — the call classification, pure. | — |
+| `context-fence-guard.mjs` | THE CONTEXT FENCE (point 700) — thin fail-OPEN I/O wrapper around the pure admission arithmetic (context-budget-core.mjs, via context-budget.mjs), which takes its call classification from context-fence-core.mjs. | — |
 | `context-fence-override.mjs` | Create one short-lived, session-bound, point-bound, single-use context permit. | — |
 | `context-fence-permit-core.mjs` | The emergency context permit, pure validation and record shaping. | — |
 | `context-fence-permit.mjs` | Durable, single-use context permit IO. | — |
@@ -157,9 +157,9 @@
 | `context-watermark-core.mjs` | THE CONTEXT WATERMARK (point 675, defeat 3) — the decision half, pure. | — |
 | `context-watermark.mjs` | THE CONTEXT WATERMARK (point 675, defeat 3) — the IO half. | — |
 | `criticality-review-guard-core.mjs` | Pure decision core of the CRITICALITY four-eyes gate (work-order point 298). | — |
-| `criticality-review-guard.mjs` | Stop hook (work-order point 298): a HIGH-criticality point does not get ticked without a second model's recorded, ANSWERED review. | usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>" |
+| `criticality-review-guard.mjs` | Stop hook (work-order point 298), SWITCHED OFF (see below): it once refused a HIGH-criticality tick without a second model's recorded, ANSWERED review; today the hook path exits silently and `--status` reports the same debt. | usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>" |
 | `cut-account-attest.mjs` | Preserve the floor witnesses while the platform's expiring transcript exists. | Usage: node scripts/cut-account-attest.mjs [owner\|subagent]<br>usage: verbatim(usage), kind: verbatim(kind), earliest: verbatim(earliest) } |
-| `cut-account-core.mjs` | Pure parser and judge for the CUT ACCOUNT of work-order point 757. | — |
+| `cut-account-core.mjs` | Pure parser and judge for the CUT ACCOUNT of work-order point 757, plus the parsing and dating of its FLOOR readings (session kinds, Berlin dates). | — |
 | `dashboard-card-topic-guard-core.mjs` | Pure decision logic of the dashboard-card-topic Stop-hook guard (dashboard-card-topic-guard.mjs is the thin fail-open I/O wrapper). | — |
 | `dashboard-card-topic-guard.mjs` | Stop hook (user mandate 23.07.2026): GUARANTEE each batch-dashboard card speaks STRICTLY about its OWN topic — the active "272" now-card once reported the status of points 246 and 266, and reminders do not hold. | — |
 | `dashboard-conciseness-guard-core.mjs` | Pure decision logic of the dashboard-conciseness Stop-hook guard (dashboard-conciseness-guard.mjs is the thin fail-open I/O wrapper). | — |
@@ -171,9 +171,9 @@
 | `dashboard-integrity-guard.mjs` | Stop hook (user mandate 22.07.2026): the dashboard must be TRUSTABLE, not merely present — in one session the now-card named the wrong point for hours, a queue card kept describing an outdated spec, and each error was only fixed when the USER spotted it. | — |
 | `dashboard-point-reader-core.mjs` | One grammar for point ownership recovered from FREE dashboard title text. | — |
 | `dashboard-publish.mjs` | LEGACY (claude.ai artifact, retired 29.07.2026) — the board's transport is `scripts/board-publish.mjs`, which pushes the live page from every session. | usage: node scripts/dashboard-publish.mjs [--to <scratchpad path>] \| --confirm-published \| --defer "<reason> |
-| `dashboard-reminder-core.mjs` | The text the UserPromptSubmit hook injects into EVERY user prompt — the most expensive text in this project, so it lives in a pure module the Vitest layer can hold to its shape and its size (point 436). | — |
-| `dashboard-reminder-hook.mjs` | UserPromptSubmit hook (user mandate 16.07.2026, after repeated dashboard staleness): inject the standing dashboard obligation into the context on EVERY user prompt, so no turn can end with a stale board. | — |
-| `dashboard-state.mjs` | Shared state I/O for the dashboard-currency toolchain (dashboard-guard, focus, dashboard-publish, lock-heartbeat-hook). | — |
+| `dashboard-reminder-core.mjs` | The text the UserPromptSubmit hook injects into every user prompt of the batch owner (a non-owner gets STAND_DOWN_TEXT instead) — the most expensive text in this project, so it lives in a pure module the Vitest layer can hold to its shape and its size (point 436). | — |
+| `dashboard-reminder-hook.mjs` | UserPromptSubmit hook (user mandate 16.07.2026, after repeated dashboard staleness): inject the standing dashboard obligation into the context on every user prompt of the batch owner, so no turn can end with a stale board — plus the context-level line and, for an attended window past the ceiling, a one-time notice (a non-owner gets the stand-down text instead). | — |
+| `dashboard-state.mjs` | Shared state I/O for the dashboard-currency toolchain (the dashboard guards, focus, the board scripts, the prompt and heartbeat hooks, among others). | — |
 | `dashboard-sync-core.mjs` | Pure decision logic of the dashboard SYNC Stop-hook guard (dashboard-sync.mjs is the thin I/O wrapper). | — |
 | `dashboard-sync.mjs` | Stop hook (point 308, user mandate): the »Woran ich gerade arbeite« card must mirror REALITY — the checked-out git branch, the worktree agent pool and the TASKS.md point state — not only the declared focus. | — |
 | `decision-card-guard-core.mjs` | THE CHAT IS AN INBOX, NOT A NOTICE-BOARD — pure decision half of the Stop hook scripts/decision-card-guard.mjs (point 421). | — |
@@ -188,9 +188,9 @@
 | `doc-budget-core.mjs` | Pure decision core for the document-budget guard (user 26.07.2026). | — |
 | `doc-budget-guard.mjs` | Stop hook: the constantly-read documents stay within their budgets (user 26.07.2026). | — |
 | `doc-corpus.mjs` | The documents a work-order `§` may point at (point 365 A). | — |
-| `durable-lane-flag-core.mjs` | THE ACTIVATION FLAG OF THE DURABLE AUTHORING LANE, and the interlock that keeps it off (work-order point 891, step 1; docs/handover-architecture.md, mechanism 2 "Rollback: the REGIME IS THE DAEMON'S EXISTENCE"). | — |
+| `durable-lane-flag-core.mjs` | THE ACTIVATION FLAG OF THE DURABLE AUTHORING LANE, and the interlock that keeps it off until every required step is green (work-order point 891, step 1; docs/handover-architecture.md, mechanism 2 "Rollback: the REGIME IS THE DAEMON'S EXISTENCE"). | — |
 | `enable-hooks.mjs` | Wire the versioned git hooks (point 302). | — |
-| `fable-switch-core.mjs` | The one decision about whether Fable may be used at all. | — |
+| `fable-switch-core.mjs` | The one decision about whether Fable may be used at all, plus the model identities, the result-JSON parsing and the merger roster that decision is read against. | — |
 | `fable-switch.mjs` | The only writer for the shared Fable decision. | usage: node scripts/fable-switch.mjs --status \| --on --why "<user instruction>" \| --off --why "<user instruction>" |
 | `finding.mjs` | Record a finding so it outlives the session that made it. | Usage:<br>usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point\|bundle>] |
 | `findings-core.mjs` | Pure decision core of the findings-durability check. | — |
@@ -229,8 +229,8 @@
 | `handover-card-contract.mjs` | The one valid handover-card answer when the work order has no open point. | — |
 | `handover-repair-loop-core.mjs` | Pure decisions for the two feedback loops measured on 20.08.2026. | — |
 | `handover-repair-loop.mjs` | I/O half for the claim-survival and guard-repair observers. | — |
-| `help-core.mjs` | ONE INDEX OVER EVERY REPOSITORY COMMAND — the pure half of scripts/help.mjs. | usage:` strings. This module only harvests and<br>usage: |
-| `help.mjs` | FIND A REPOSITORY COMMAND WITHOUT LISTING 421 FILES — the I/O half. | usage: node scripts/help.mjs <topic> \| --write |
+| `help-core.mjs` | ONE INDEX OVER EVERY TOP-LEVEL scripts/*.mjs COMMAND — the pure half of scripts/help.mjs. | usage:` strings. This module only harvests and<br>usage: |
+| `help.mjs` | FIND A REPOSITORY COMMAND WITHOUT LISTING EVERY SCRIPT — the I/O half. | usage: node scripts/help.mjs <topic> \| --write |
 | `is-main.mjs` | Was this module started directly, or imported? | — |
 | `land-cleanup-core.mjs` | WHICH WORKTREE MAY THE LANDING DELETE? | — |
 | `land-point-core.mjs` | THE LANDING CHAIN, as pure decisions (point 594). | — |
@@ -273,7 +273,7 @@
 | `pause-retry-drill.mjs` | THE RESTART-CLOCK DRILL (point 445). | — |
 | `perf-bench.mjs` | Bird's-eye framerate benchmark + CONFIG SWEEP (point 276). | Usage: start a dev server, then: |
 | `perf-breakdown.mjs` | Per-object triangle breakdown of the bird's-eye frame (point 276). | Usage: BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-breakdown.mjs |
-| `perf-structure.mjs` | Structural frame-load probe (point 276): what the renderer actually SUBMITS per frame at a fixed state — draw calls, triangles, compiled programs, scene object count. | Usage: BASE_URL=http://localhost:5174/ VERIFY_GL=webgpu node scripts/perf-structure.mjs |
+| `perf-structure.mjs` | Structural frame-load probe (point 276): what the renderer actually SUBMITS per frame at a fixed state — render calls, draw calls, triangles, and the live geometry and texture counts. | Usage: BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-structure.mjs |
 | `permission-autogrant-core.mjs` | Pure core of the permission auto-grant (see scripts/permission-autogrant.mjs). | — |
 | `permission-autogrant.mjs` | PermissionRequest hook: grants what the harness would otherwise ask the user about. | — |
 | `picture-stability-core.mjs` | Pure decision logic of the capture-stability probe (picture-stability.mjs is the I/O wrapper: it drives the suite, reads the PNGs and restores the tracked frames). | — |
@@ -285,7 +285,7 @@
 | `point-proof-guard.mjs` | POINT-PROOF gate (work-order point 437 C) — thin fail-OPEN I/O wrapper + CLI around the pure core (point-proof-core.mjs). | usage: node scripts/point-proof-guard.mjs --ran <point number> --evidence "<result> |
 | `pre-push-gate-core.mjs` | Pure decision logic of the pre-push gate (point 302): which checks a push must survive before it may reach the remote, and whether a set of results blocks it. | — |
 | `pre-push-gate.mjs` | Pre-push wrapper for the fast gate (point 302). | — |
-| `prep-arm-hook.mjs` | PostToolUse[Bash] hook (user mandate 21.07.2026): AUTO-ARM the waiting-time prep guard so the guarantee does not depend on the assistant remembering to arm it. | — |
+| `prep-arm-hook.mjs` | PostToolUse[Bash\|PowerShell] hook (user mandate 21.07.2026): AUTO-ARM the waiting-time prep guard so the guarantee does not depend on the assistant remembering to arm it. | — |
 | `prep-guard-core.mjs` | Pure decision core of the waiting-time prep guard (user mandate 21.07.2026; extracted 07.08.2026 for point 437 E). | — |
 | `prep-guard.mjs` | Stop hook (user mandate 21.07.2026): GUARANTEE waiting-time prep. | — |
 | `probe-label-fusion.mjs` | DOES THE DRAWN LABEL MATCH THE DECLUTTER'S MODEL? | — |
@@ -295,9 +295,9 @@
 | `queue-calibration-core.mjs` | WHAT A QUEUE CARD PROMISES, MEASURED AGAINST WHAT THE WORK TOOK (point 730). | — |
 | `queue-calibration.mjs` | THE QUEUE'S ESTIMATES, MEASURED AGAINST THE BATCH THAT LANDS THEM (point 730). | — |
 | `queue-order-guard-core.mjs` | Pure decision logic of the queue-order Stop-hook guard (queue-order-guard.mjs is the thin fail-open I/O wrapper). | — |
-| `queue-order-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch rules the assistant repeatedly broke despite reminders — (1) the dashboard Warteschlange works known-bug FIXES before the finder/QA tickets (memory queue-order-fixes-before-finders) and renders the work order's own sequence, (1c) an APPENDED point is ranked once, deliberately, before the turn ends (point 590), and (2) no dashboard card claims a point is done ("behoben"/"erledigt"/…) while it is still open in TASKS.md. | — |
-| `queue-rank-core.mjs` | THE APPEND GATE (point 590) — an appended point is ranked ONCE, deliberately. | — |
-| `queue-rank.mjs` | THE APPEND GATE (point 590) — an appended point is ranked ONCE, deliberately. | — |
+| `queue-order-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch rules the assistant repeatedly broke despite reminders — (1) the dashboard Warteschlange works known-bug FIXES before the finder/QA tickets (memory queue-order-fixes-before-finders) and renders the work order's own sequence, (1c) an APPENDED point is ranked, deliberately, before the turn ends (point 590), (1d) a machine-filed point stands before the release point only with stated high urgency and a recorded reason (point 789), and (2) no dashboard card claims a point is done ("behoben"/"erledigt"/…) while it is still open in TASKS.md. | — |
+| `queue-rank-core.mjs` | THE APPEND GATE (point 590) — an appended point is ranked deliberately — and THE RELEASE BOUNDARY (point 789) below it. | — |
+| `queue-rank.mjs` | THE APPEND GATE (point 590) AND THE RELEASE BOUNDARY (point 789) — the CLI. | — |
 | `quota-drill.mjs` | THE FAKE-SIGNATURE DRILL (point 444, 30.07.2026). | — |
 | `render-verify-charges.mjs` | THE RED CHARGE LEDGER — which currently-known red belongs to which OPEN work-order point (point 550). | — |
 | `render-verify-core.mjs` | Pure decision logic of the render-verify Stop-hook guard (render-verify-guard.mjs is the thin I/O wrapper). | — |
@@ -305,12 +305,12 @@
 | `render-verify-recorder.mjs` | Mechanical evidence that a verify suite REALLY ran on a given renderer backend (point 210's lesson: the sea-coast fix was called done after a WebGL2-only check while the user's WebGPU picture was still broken). | — |
 | `render-verify-state.mjs` | Shared state I/O for the render-verify (both-backends) toolchain (render-verify-guard, render-verify-recorder). | — |
 | `repo-paths.mjs` | Repo paths that follow the checkout the process was GIVEN. | — |
-| `repository-integrity.mjs` | Tests and support for repository-integrity. | — |
+| `repository-integrity.mjs` | No leading description for repository-integrity. | — |
 | `resume-batch.mjs` | THE SUCCESSOR'S STARTUP — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M26-M29). | usage: node scripts/resume-batch.mjs --batch <id> [--repo <dir>] [--session <sid>] |
 | `retro-core.mjs` | Pure logic of the retrospective-currency toolchain: the sources fingerprint, the auto-generated doc section and the stale/fresh decision. | — |
 | `retro-currency-guard.mjs` | Stop hook: GUARANTEE the retrospective document (docs/analysis_de/retrospektive-zusammenarbeit.md) stays current — enforcement, not a reminder (the document's own lesson #1: only blocking mechanisms hold). | — |
-| `retro-refresh.mjs` | Refresh the retrospective's auto-generated section (docs/analysis_de/retrospektive-zusammenarbeit.md — git-ignored, German). | — |
-| `retro-sources.mjs` | Shared fs/git source collector for the retrospective-currency toolchain (retro-refresh.mjs + retro-currency-guard.mjs). | — |
+| `retro-refresh.mjs` | Refresh the retrospective's auto-generated section (docs/analysis_de/retrospektive-zusammenarbeit.md — tracked, German). | — |
+| `retro-sources.mjs` | Shared fs/git source collector for the retrospective-currency toolchain (retro-refresh.mjs + retro-currency-guard.mjs; rule-review-state.mjs borrows defaultMemoryDir). | — |
 | `review-astra-core.mjs` | Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624). | — |
 | `review-astra.mjs` | THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624). | usage: node scripts/review-astra.mjs [--reviewer astra\|fable\|opus\|opus48] --sha <sha> --brief "<what to judge>" \\ |
 | `review-material-core.mjs` | WHAT A REVIEW ROUND ACTUALLY CARRIED — the material budget, its accounting, and the passes a range too large is cut into (work-order point 714). | — |
@@ -326,7 +326,7 @@
 | `session-death-core.mjs` | Pure reading of "why did the interactive session die" out of the batch journal and the machine's own counters (user question, 05.09.2026 — the fourth time the same exit 143 was investigated by hand). | — |
 | `session-death.mjs` | "Why did the interactive session die?" — the recurring lookup as a command (user rule: script the recurring lookup, never dump raw data). | usage: node scripts/session-death.mjs [--limit <n>] |
 | `settled-owner-rulings.mjs` | The single tracked register of owner decisions that must not be put back to the owner. | — |
-| `settled-ruling-core.mjs` | Tests and support for settled-ruling-core. | — |
+| `settled-ruling-core.mjs` | No leading description for settled-ruling-core. | — |
 | `tasks-archive-guard-core.mjs` | Pure decision core for the tasks-archive guard (user 26.07.2026). | — |
 | `tasks-archive-guard.mjs` | Stop hook: the work order stays split — TASKS.md open, docs/tasks-archive.md finished (user 26.07.2026). | — |
 | `tasks-source.mjs` | One place that knows the work order is stored in TWO files (user 26.07.2026). | — |
@@ -335,15 +335,15 @@
 | `textureFields.mjs` | Shared texture-baking core: periodic (tileable) noise fields, the material height/colorize definitions and the albedo+normal bake loop. | — |
 | `throttle-probe-core.mjs` | IS THIS CHECK LOAD-DEPENDENT? | — |
 | `throttle-probe.mjs` | THE THROTTLE PROBE (point 640) — answer "was that red just load?" with a measurement instead of an argument. | — |
-| `timestamp-guard-core.mjs` | Pure decision logic of the timestamp Stop-hook guard (timestamp-guard.mjs): every chat reply must BEGIN with the bold Europe/Berlin timestamp in the canonical form "**Donnerstag, 23.07.2026, 09:55**" (chat-timestamp rule). | — |
-| `timestamp-guard.mjs` | Stop hook (user mandate 23.07.2026, ninth escalation of the chat-timestamp rule): GUARANTEE every chat reply begins with the bold Europe/Berlin timestamp ("**Donnerstag, 23.07.2026, 09:55**"). | — |
+| `timestamp-guard-core.mjs` | Pure decision logic of the timestamp Stop-hook guard (timestamp-guard.mjs): every chat reply must BEGIN with the bold Europe/Berlin timestamp in the canonical form "**Donnerstag, 23.07.2026, 09:55**" (chat-timestamp rule), followed by the " · Kontext: … Tokens" reading (HEADER_SUFFIX_RE), which is enforced wherever a real reading exists. | — |
+| `timestamp-guard.mjs` | Stop hook (user mandate 23.07.2026, ninth escalation of the chat-timestamp rule): GUARANTEE every chat reply begins with the bold Europe/Berlin timestamp ("**Donnerstag, 23.07.2026, 09:55**") and its " · Kontext: … Tokens" reading. | — |
 | `timestamp-race-fixture.mjs` | Builder for scripts/fixtures/timestamp-guard-302ms-race.json — the replay of the measured 302 ms Stop-hook race (point 769). | — |
 | `tool-output-budget-core.mjs` | Pure output-budget logic for the PreToolUse interception in path-scope-guard.mjs. | — |
 | `tool-output-budget-launch.mjs` | Launch boundary for tool-output-budget.mjs. | — |
 | `tool-output-budget.mjs` | Generic spill-to-log runner used by the path-scope PreToolUse hook. | — |
 | `tool-output-intercept-core.mjs` | Pure PreToolUse input rewriting for the large producers named by the output budget. | — |
 | `tool-output-log-retention.mjs` | Retention for the tool-output budget's spill logs. | — |
-| `tool-output-shell.mjs` | Re-run the intercepted command in the caller's configured shell without turning it into a login session. | — |
+| `tool-output-shell.mjs` | Re-run the intercepted command in the caller's configured shell ($SHELL; always PowerShell on win32) without turning it into a login session. | — |
 | `user-gate-core.mjs` | THE TYPED USER GATE — advice continues; only a real confirmation waits. | — |
 | `user-said-core.mjs` | WHAT THE USER SAID, AND WHEN — the pure half of scripts/user-said.mjs. | — |
 | `user-said.mjs` | WHAT THE USER SAID, AND WHEN — the CLI half. | usage: node scripts/user-said.mjs [--grep <regex>] [--since <iso\|90m\|6h\|2d\|07:31>] |
@@ -351,13 +351,13 @@
 | `vdzk-answer.mjs` | Carrier for an answer written into a session that may not edit the board. | usage: vdzk-answer.mjs --applied "<fragment><br>usage: vdzk-answer.mjs "<fragment>" --answer "<what the user decided> |
 | `verify-bringup.mjs` | Host bring-up for the browser verification (point 475): `npm run verify:bringup`. | — |
 | `wait-command-core.mjs` | THE WAIT THAT CAN NEVER RETURN (point 1048, union entry U14) — the pure half. | — |
-| `wait-command-guard.mjs` | PreToolUse(Bash) guard: no hand-rolled wait for a process (point 1048). | — |
+| `wait-command-guard.mjs` | PreToolUse(Bash, PowerShell) guard: no hand-rolled wait for a process (point 1048). | — |
 | `wait-lease-core.mjs` | ONE WAIT PER SESSION AND RUN (point 1048, union entries U11, U12, U13) - the pure half. | — |
 | `wait-lease.mjs` | THE WAIT REGISTRY (point 1048, union entries U11, U12, U13) - the IO half. | usage: |
 | `wait-marker-core.mjs` | THE WAIT MARKER A HOOK SETS (point 592) — the pure decision half. | — |
 | `wait-marker.mjs` | THE WAIT MARKER A HOOK SETS (point 592) — the IO half. | — |
 | `window-hide-core.mjs` | NO CONSOLE WINDOW MAY STEAL THE USER'S FOCUS (point 401, user report 28.07.2026: "es poppen immer wieder Konsolenfenster auf, die mir den Fokus stehlen"). | — |
-| `windows-task-core.mjs` | THE BOOT PATH ON THE WINDOWS HOST, and the mutual watch between the two scheduled tasks that carry it (point 447, user 30.07.2026). | — |
+| `windows-task-core.mjs` | THE BOOT PATH ON THE WINDOWS HOST, the mutual watch between the two scheduled tasks that carry it (point 447, user 30.07.2026), and the hourly emergency task the watchdog also keeps alive. | — |
 | `windows-task-watch.mjs` | THE MUTUAL WATCH between the two Windows scheduled tasks (point 447). | usage: node ${WATCH_SCRIPT_PATH} --check primary\|watchdog\|emergency [--dry-run] [--json] |
 | `worktree-bootstrap-core.mjs` | WHAT A FRESH AGENT WORKTREE OWES ITS GATES — the decision, pure. | — |
 | `worktree-bootstrap.mjs` | GIVE A FRESH AGENT WORKTREE ITS DEPENDENCIES — one command, idempotent. | — |

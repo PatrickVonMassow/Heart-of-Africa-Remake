@@ -11,7 +11,7 @@ import {
   headAndArgs,
   segmentInvokesScript,
 } from './command-classify-core.mjs'
-import { CALL_KINDS, callKind, summarizeSeries } from './context-incidents-core.mjs'
+import { callKind, summarizeSeries } from './context-incidents-core.mjs'
 import { classifyFenceCall } from './context-fence-core.mjs'
 import {
   CONTEXT_CEILING_TOKENS,
@@ -23,8 +23,8 @@ import { CONTEXT_SESSION_CLASS, SESSION_CEILING_REMEDIES } from './session-conte
  * Control operations whose output is bounded by construction. This is an
  * enumerated set, not "everything which is not a start": an ordinary Read or
  * shell call never becomes exempt merely because the old fence allowed it.
- * Point 597 enforces the output bounds; until then these are the exact assumed
- * bounded controls named by the work order.
+ * Point 597 enforces their output bounds; these are the exact bounded controls
+ * named by the work order.
  */
 export const BOUNDED_CONTROL_OPERATIONS = Object.freeze({
   'git-commit': Object.freeze({
@@ -316,8 +316,6 @@ export function remainingBudgetDecision({
     unknownTypeCost,
   }
 }
-
-export { CALL_KINDS }
 
 /** The armed refusal explains the complete inequality and its one-use escape. */
 export function contextBudgetRefusal({

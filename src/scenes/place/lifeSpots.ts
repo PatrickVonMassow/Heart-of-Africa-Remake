@@ -1,6 +1,6 @@
 // Fixed positions of the settlement-life props (design.md §19). Shared
 // between PlaceLife (rendering) and the layout builder (colliders and
-// keep-clear zones in PlaceScene).
+// keep-clear zones in layout.ts).
 
 import { WALKER_RADIUS } from './collision'
 import { mulberry32 } from '../../world/noise'
@@ -20,7 +20,7 @@ export const LOOM_SPOT: [number, number] = [-8.5, -7]
 export const WEAVER_OFFSET = 0.55
 
 /** A prop's local +Z points towards the village centre. */
-export function inwardStationBody(spot: readonly [number, number], offset: number) {
+function inwardStationBody(spot: readonly [number, number], offset: number) {
   const yaw = Math.atan2(-spot[0], -spot[1])
   return { x: spot[0] + Math.sin(yaw) * offset, z: spot[1] + Math.cos(yaw) * offset, r: WALKER_RADIUS }
 }
@@ -65,7 +65,7 @@ export function portAdultStations(seed: number): Array<[number, number]> {
 /**
  * Whether a village carries a well at all (user 07./10.09.2026). The
  * communication village fetches its water from the river — its errand adults
- * teach RIVER on the water path (point 1087) — so a second water source there
+ * teach RIVER at the water stand (point 1087) — so a second water source there
  * is redundant and makes the teaching harder to read. Every other village keeps
  * its well. The exception is bound to `ROCK_VILLAGE_ID` rather than a fresh
  * string, so it follows the communication slice if that village ever moves.
@@ -85,8 +85,9 @@ export function villageKeepClearSpots(placeId: string): Array<[number, number]> 
 /**
  * Where the ADULTS of a village stand: the fixed vignettes of §19.10 — the pair
  * talking, the pounder, the drummer, the well, the weaver, and the three around
- * the fire. The errand walkers are deliberately NOT here: they cross the whole
- * settlement by design and no placement can separate them from anything.
+ * the fire, with the fixed stops of the water- and bundle-carriers. Their walks
+ * are deliberately NOT here: they cross the whole settlement by design and no
+ * placement can separate them from anything.
  *
  * This list exists for one rule (work-order point 481.4): the children must
  * play far enough from the adults that the §13.4 hearing range separates the
@@ -130,7 +131,8 @@ export function villageLifeProps(fire: readonly [number, number], placeId: strin
   ]
 }
 
-/** The prop alone does not cover every figure: reserve the actual body spots too. */
+/** The prop alone does not cover every figure: reserve the body spots too (the
+ *  weaver's is the nominal reservation `weaverStance`, not where she is drawn). */
 export function villageLifeFootprints(fire: readonly [number, number], placeId: string) {
   return [
     ...villageLifeProps(fire, placeId),
@@ -156,7 +158,7 @@ export interface PlayGround {
   /** Fraction of the ground a child can actually stand on, 0..1; 1 when the
    *  caller gave no collider predicate. */
   openness: number
-  /** Fraction of the ground with a built wall within `FABRIC_REACH`, 0..1 — how
+  /** Fraction of the ground with a building's centre within `FABRIC_REACH`, 0..1 — how
    *  much of the play spot stands AGAINST the settlement rather than out on the
    *  bare edge behind it (point 524). 1 when the caller named no fabric. */
   fabric: number
@@ -168,8 +170,9 @@ export interface PlayGround {
 export const MIN_PLAY_RADIUS = 4
 
 /**
- * Room kept between the ground's far edge and the walkable rim, so a player can
- * stand around the group and watch it from ANY side. Walking past the rim
+ * Room kept between the ground's far edge and the walkable rim, where the
+ * ground's size leaves it, so a player can stand around the group and watch it
+ * from ANY side. Walking past the rim
  * LEAVES the settlement (design.md §2), so a ground pushed hard against it
  * would put the spectator out of the village on half the bearings — and
  * watching is how the whole teaching is learned.
@@ -177,7 +180,7 @@ export const MIN_PLAY_RADIUS = 4
 export const SPECTATOR_MARGIN = 5
 
 /**
- * How near a built wall must stand for that patch of ground to count as being
+ * How near a building's centre must stand for that patch of ground to count as being
  * AGAINST the settlement (point 524). Six metres is a village yard: at that
  * distance a hut fills a good part of the frame behind a child, while eight or
  * more let the outer half of a ground drift onto the bare plain and still score
@@ -187,10 +190,10 @@ export const SPECTATOR_MARGIN = 5
 export const FABRIC_REACH = 6
 
 /**
- * How much of the ground must stand against the fabric before it counts as a
- * play spot at all. Half is the bar the sparsest shipped villages (the
- * scattered forest plans of design.md §4.5) can still clear; the ring and
- * compound plans reach 0.9 and above.
+ * How much of the ground must stand against the fabric for it to rank first;
+ * below it the search falls back (see `childPlayGround`). Half is the bar the
+ * sparsest shipped plans can still clear; the ring and compound plans reach 0.9
+ * and above.
  */
 export const MIN_FABRIC = 0.5
 
@@ -200,8 +203,8 @@ export const MIN_FABRIC = 0.5
  * mongo-village, seed 7, a disc whose middle lay two metres from the chief's
  * hut. That is the "ground you cannot see into" the placement rule was written
  * about (point 480's own evidence), so it is a floor now and not a preference,
- * ranked BESIDE `MIN_FABRIC` among the separated candidates, and never at the
- * separation's expense: a settlement that offers no open separated ground keeps
+ * ranked BESIDE `MIN_FABRIC` among the separated candidates, and never paid for
+ * with separation: a settlement that offers no open separated ground keeps
  * its separation and reports the openness it had to accept.
  */
 export const MIN_OPENNESS = 0.7
@@ -217,7 +220,8 @@ const WEIGHT_FABRIC = 10
 const WEIGHT_OPENNESS = 6
 const WEIGHT_SIZE = 4
 
-/** Metres between two candidate grounds along a radius and along a bearing. */
+/** Metres between two candidate grounds in size and in distance from the
+ *  centre; the bearings are a fixed fan, so their spacing grows outward. */
 const SEARCH_STEP = 0.5
 
 /**
@@ -227,19 +231,23 @@ const SEARCH_STEP = 0.5
  * (point 481.4) — and that STANDS AGAINST the settlement's built fabric, so the
  * chase is watched with the village behind it (point 524).
  *
- * Derived rather than hand-placed on purpose — a village's vignettes move with
- * its people's layout (design.md §4.5), and a hard-coded corner would silently
- * stop being the far one.
+ * Derived rather than hand-placed on purpose — the built fabric and the free
+ * ground differ with each people's plan (design.md §4.5) and seed, and a
+ * hard-coded corner would silently stop being a good one.
  *
- * WHAT GIVES, AND IN WHICH ORDER. The disc always stays inside the walkable rim
- * with a spectator's margin around it; beyond that the search ranks candidates:
- *  1. separated AND against the fabric — every shipped village has such a spot;
+ * WHAT GIVES, AND IN WHICH ORDER. The disc stays inside the walkable rim with a
+ * spectator's margin around it where its size leaves room for one (a disc as
+ * wide as the walkable radius sits centred); beyond that the search ranks
+ * candidates:
+ *  1. separated AND against the fabric AND open (`MIN_OPENNESS`), falling back
+ *     to the best separated ground when that is against the fabric;
  *  2. against the fabric alone: the SEPARATION gives before the picture does
  *     (point 524.2), because children pushed out behind the rocks stop being
  *     village life at all. A caller that gets one of these back has two teaching
  *     voices inside one earshot and must tell them apart by other means;
  *  3. separated alone, then whatever the place allows.
- * Within a rank the score below decides, and SIZE is what it spends: the ground
+ * Within ranks 1 and 3 the score below decides (rank 2 takes the highest
+ * clearance first and scores only among equals), and SIZE is what it spends: the ground
  * SHRINKS (down to MIN_PLAY_RADIUS) to sit among the huts rather than reaching
  * out past the last of them. `clearance`, `openness` and `fabric` report what
  * was actually achieved, so a layout that cannot manage one of them fails a
@@ -288,7 +296,7 @@ export function childPlayGround(
     const free = options.free
     return free ? sample(x, z, r, free) : 1
   }
-  /** Fraction of the disc with a wall within reach; 1 when nothing is known. */
+  /** Fraction of the disc with a building centre within reach; 1 when nothing is known. */
   const fabricAt = (x: number, z: number, r: number): number =>
     fabric
       ? sample(x, z, r, (sx, sz) => fabric.some(([bx, bz]) => Math.hypot(bx - sx, bz - sz) <= FABRIC_REACH))
@@ -354,7 +362,8 @@ export function childPlayGround(
   const separated = picked.best
   if (separated && separated.fabric >= MIN_FABRIC) return separated
 
-  // Rank 2: no separated ground stands against the village, so the SEPARATION
+  // Rank 2: the best-scoring separated ground does not stand against the
+  // village (a lower-scoring separated one might; it is not looked for), so the SEPARATION
   // gives (point 524.2) — and gives as little as it must. Walked in order of
   // clearance, the first ground that stands against the fabric is the one that
   // loses the least, and only the equally-clear ones after it are weighed. The

@@ -6,14 +6,15 @@
 // The error constants come from the 22.08.2026 reading of finished, non-zero
 // run records under local/: 12 readable error logs, median 2,153 characters,
 // p95/max 56,359. A 64 KiB first-cause maximum therefore keeps that measured
-// p95 whole. The 96 KiB error channel is eight times the ordinary channel and
+// p95 whole. Every budget counts string characters (UTF-16 code units, as
+// `.length` does), sized in KiB multiples. The 96 KiB error channel is eight times the ordinary channel and
 // leaves room for further distinct-cause excerpts without opening an unbounded
 // path.
 
 export const ORDINARY_OUTPUT_BUDGET = 12 * 1024
 export const ERROR_OUTPUT_BUDGET = 96 * 1024
 export const FIRST_CAUSE_HARD_MAX = 64 * 1024
-export const DISTINCT_CAUSE_EXCERPT = 6 * 1024
+const DISTINCT_CAUSE_EXCERPT = 6 * 1024
 export const PER_CALL_MAX_CHARS = ERROR_OUTPUT_BUDGET
 
 // Constructed so the linter does not mistake an intentional ESC matcher for an
@@ -25,7 +26,7 @@ const cleanPath = (path) => String(path || 'the captured log').replace(/[\r\n]/g
 
 /** The one supported route back to captured detail. It is line-bounded even
  * when the caller supplies no grep. */
-export function logQuery(logPath) {
+function logQuery(logPath) {
   return `node scripts/verify/run-logged.mjs --show ${cleanPath(logPath)} --tail 120`
 }
 
@@ -97,7 +98,7 @@ function signatureOf(block) {
  * Output without such headers is one cause. Exact repeated paragraphs are the
  * fallback for tools which repeat a stack but print no test header.
  */
-export function distinctErrorCauses(text) {
+function distinctErrorCauses(text) {
   const source = String(text ?? '')
   const lines = source.split(/\r?\n/)
   const starts = []
@@ -160,7 +161,7 @@ export function budgetErrorOutput(text, { logPath = '', command = '' } = {}) {
   ]
   const cuts = [...names.cuts]
 
-  const first = causes[0] ?? { text: '', occurrences: 1 }
+  const first = causes[0]
   lines.push(`── first distinct cause (${first.occurrences} occurrence${first.occurrences === 1 ? '' : 's'}) ──`)
   const firstBounded = cutMiddle(first.text, FIRST_CAUSE_HARD_MAX, { logPath })
   lines.push(firstBounded.text)
@@ -204,7 +205,7 @@ export function budgetErrorOutput(text, { logPath = '', command = '' } = {}) {
   return { text: rendered, cuts, causes, names: failingTestNames(source), rawChars: source.length }
 }
 
-export function budgetOrdinaryOutput(text, { logPath = '' } = {}) {
+function budgetOrdinaryOutput(text, { logPath = '' } = {}) {
   const bounded = cutMiddle(String(text ?? ''), ORDINARY_OUTPUT_BUDGET, { logPath })
   return { text: bounded.text, cuts: bounded.cut ? [bounded] : [], rawChars: String(text ?? '').length }
 }

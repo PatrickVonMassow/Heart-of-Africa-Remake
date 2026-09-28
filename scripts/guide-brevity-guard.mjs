@@ -53,10 +53,9 @@ if (isMainModule(import.meta.url)) {
         /* manual/no-input run — the empty id follows the ordinary ownership rule */
       }
     }
+    // --status answers whatever the pause and the lock say, through the same gathering.
     const gathered = status
-      ? existsSync(GUIDE)
-        ? { applicable: true, inputs: { guideText: readFileSync(GUIDE, 'utf8') } }
-        : { applicable: false, why: 'the guide is not in this checkout' }
+      ? gatherGuideBrevityInputs({ paused: false, otherOwner: false })
       : gatherGuideBrevityInputs({ sessionId: payload.session_id || '' })
     if (!gathered.applicable) {
       if (status) console.log(`guide-brevity stands down: ${gathered.why}`)

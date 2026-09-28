@@ -1,4 +1,4 @@
-// Deterministic seeded PRNG for the property-fuzz layer (design.md §7.2's
+// Deterministic seeded PRNG for the property-fuzz layer (CLAUDE.md §7.2's
 // "verify at realistically reachable states" applied in bulk): the fuzz tests
 // draw thousands of random states and MUST be reproducible — a violation is
 // reported with its seed and replays exactly. Never Math.random() here.

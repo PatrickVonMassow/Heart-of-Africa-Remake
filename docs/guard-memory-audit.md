@@ -1,7 +1,8 @@
 # Guard-chain & memory audit — the repeatable pass
 
 The guard chain and the memory corpus are the project's immune system, and both
-grow only by accretion: 37 wired hooks, 35 enforcer scripts, 74 memories. Nothing
+grow only by accretion: 37 wired hooks, 35 enforcer scripts, 74 memories at the
+pass of 07.08.2026. Nothing
 ever forces a read of the whole set, so a rule that stopped being true keeps being
 obeyed, and a check that stopped reaching its subject keeps reading as green. This
 document is the pass that reads it (work-order point 297).
@@ -67,7 +68,7 @@ instead of restating it. Follow-up point.
 **2 · The four-eyes gate does not reach hooks, though the rule says it does.**
 CLAUDE.md §7.2 states `mechanism-review-guard` "lets no new or changed guard, gate
 or **hook** end a turn without the OTHER model's recorded review".
-`isMechanismPath` matches `-guard`/`-gate` and `scripts/git-hooks/*` only, so eight
+`isMechanismPath` matches `-guard`/`-gate` and `scripts/git-hooks/*` only, so seven
 wired enforcers are outside it — `batch-resume-hook`, `dashboard-reminder-hook`,
 `lock-heartbeat-hook`, `lock-release-hook`, `prep-arm-hook`, `dashboard-sync`,
 `worktree-reminder` and their cores. `dashboard-reminder-hook` is the very file

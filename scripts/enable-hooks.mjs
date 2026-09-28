@@ -12,7 +12,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 
-export const HOOKS_PATH = 'scripts/git-hooks'
+const HOOKS_PATH = 'scripts/git-hooks'
 
 try {
   if (!existsSync(resolve(REPO_ROOT, '.git')) || !existsSync(resolve(REPO_ROOT, HOOKS_PATH))) {
@@ -25,8 +25,8 @@ try {
   } catch {
     /* unset — git exits 1 for a missing key */
   }
-  // An absolute path pointing at the same directory counts as configured; only
-  // an unset or foreign value is rewritten, so a deliberate override survives.
+  // An absolute path pointing at the same directory counts as configured; an
+  // unset or foreign value is rewritten, so no other override survives an install.
   const configured = current && resolve(REPO_ROOT, current) === resolve(REPO_ROOT, HOOKS_PATH)
   if (!configured) {
     git(['config', '--local', 'core.hooksPath', HOOKS_PATH])

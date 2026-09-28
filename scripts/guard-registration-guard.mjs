@@ -11,8 +11,11 @@
 // CLOSED, which is the whole point.
 import { execFileSync } from 'node:child_process'
 import {
+  EXPECTED_PATH,
   evaluate,
   formatVerdict,
+  PREFLIGHT_PATH,
+  SETTINGS_PATH,
   STAGED_PATH_ARGS,
   touchesGuardWiring,
 } from './guard-registration-core.mjs'
@@ -36,9 +39,9 @@ try {
   if (touchesGuardWiring(names)) {
     const verdict = evaluate({
       paths: names,
-      settingsJson: staged('.claude/settings.json'),
-      preflightSource: staged('scripts/guard-preflight.mjs'),
-      expectedSource: staged('scripts/guard-preflight-expected.mjs'),
+      settingsJson: staged(SETTINGS_PATH),
+      preflightSource: staged(PREFLIGHT_PATH),
+      expectedSource: staged(EXPECTED_PATH),
     })
     if (verdict.block) {
       process.stderr.write(`${formatVerdict(verdict)}\n`)

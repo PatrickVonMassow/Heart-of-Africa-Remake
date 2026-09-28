@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { checkAuthorship } from './authorship-check-core.mjs'
 
 /** Expand the transcript spelling documentation uses without invoking a shell. */
-export function expandHomePath(path, home = homedir()) {
+function expandHomePath(path, home = homedir()) {
   const raw = String(path ?? '').trim()
   if (raw === '~') return home
   if (raw.startsWith('~/') || raw.startsWith('~\\')) return join(home, raw.slice(2))

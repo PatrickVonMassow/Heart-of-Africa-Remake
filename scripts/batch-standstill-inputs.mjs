@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve, win32 } from 'node:path'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
@@ -36,7 +36,7 @@ export function timestampedLogBoundaries(text = '') {
   return entries.sort((a, b) => a.at - b.at)
 }
 
-/** Legacy launcher text provides event boundaries and a conservative no-worker
+/** Launcher log text (autostart.log) provides event boundaries and a conservative no-worker
  * state only when the line itself says both facts. It never promotes a living
  * writer or heartbeat to work. Journal-era vetoes carry exact bounds elsewhere. */
 export function autostartEvidence(text = '', { end = Number.POSITIVE_INFINITY } = {}) {
@@ -57,7 +57,8 @@ export function autostartEvidence(text = '', { end = Number.POSITIVE_INFINITY } 
 }
 
 /** Atomic JSON state contributes boundaries and, where it carries the launcher's
- * measured veto object, the exact maximum veto interval. */
+ * measured veto object, a veto interval ending two hours after the writer's last
+ * write (the veto's maximum, hard-coded below). */
 export function autostartLastEvidence(text = '') {
   let record
   try { record = JSON.parse(text) } catch { return { intervals: [], boundaries: [] } }
@@ -121,7 +122,8 @@ function delegatedTip(item, { repo } = {}) {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim()
     if (!/^[0-9a-f]{40}$/i.test(sha)) return null
-    // A tip already contained by main is counted by the first-parent source.
+    // A tip already contained by main is represented there (its merge commit on
+    // the first-parent line).
     // Only an independently moved delegate branch belongs in this source.
     try {
       execFileSync('git', ['-C', repo, 'merge-base', '--is-ancestor', sha, 'main'], {
@@ -149,7 +151,7 @@ export function delegatedBranchProgress(text = '', { repo, records = [], start =
   const events = []
   const seen = new Set()
   const historical = records
-    .filter((record) => record?.event === 'delegated-start' || record?.event === 'delegated-finish')
+    .filter((record) => record?.event === ACTIVITY_EVENTS.DELEGATED_START || record?.event === ACTIVITY_EVENTS.DELEGATED_FINISH)
     .flatMap((record) => record?.evidence?.items ?? [])
   for (const item of [...(declaration?.evidence ?? []), ...historical]) {
     if (item?.kind !== 'branch' && item?.kind !== 'worktree') continue
@@ -413,5 +415,3 @@ export function declaredInputPaths(repo, transcriptPaths = [], ref = 'main') {
     journal: join(repo, '.claude', 'batch-activity.jsonl'),
   }
 }
-
-export function existing(path) { return existsSync(path) }

@@ -16,7 +16,7 @@ import { readPause } from './board-state.mjs'
 import { readVerifyProcesses } from './verify/large-run-wait.mjs'
 import { livenessVerdict, pointVerifyVerdict, progressLine, renderLivenessBlock, runningVerifications } from './board-liveness-core.mjs'
 
-export const LIVENESS_PATHS = {
+const LIVENESS_PATHS = {
   lock: commonRepoPath('.claude/batch-lock.json'),
   focus: commonRepoPath('.claude/current-focus.json'),
   launcherLog: commonRepoPath('.claude/batch-launcher.log'),
@@ -34,7 +34,7 @@ function readJson(path) {
 }
 
 /** The last meaningful launcher log line (the log is megabytes: read its tail). */
-export function readLauncherLine(path = LIVENESS_PATHS.launcherLog) {
+function readLauncherLine(path = LIVENESS_PATHS.launcherLog) {
   let fd = null
   try {
     if (!existsSync(path)) return ''

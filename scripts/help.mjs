@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FIND A REPOSITORY COMMAND WITHOUT LISTING 421 FILES — the I/O half.
+// FIND A REPOSITORY COMMAND WITHOUT LISTING EVERY SCRIPT — the I/O half.
 //
 //   node scripts/help.mjs "remove a board card"  # ranked commands and usage
 //   node scripts/help.mjs --write                 # regenerate docs/command-index.md
@@ -9,7 +9,8 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { findCommands, harvestCommands, renderCommandIndex } from './help-core.mjs'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { isMainModule } from './is-main.mjs'
+import { repoPath } from './repo-paths.mjs'
 
 export function readCommandEntries(scriptsDir = repoPath('scripts')) {
   return harvestCommands(
@@ -19,9 +20,7 @@ export function readCommandEntries(scriptsDir = repoPath('scripts')) {
   )
 }
 
-const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
-
-if (isMain) {
+if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
   const entries = readCommandEntries()
   if (argv[0] === '--write') {
@@ -47,5 +46,3 @@ if (isMain) {
     }
   }
 }
-
-export { REPO_ROOT }

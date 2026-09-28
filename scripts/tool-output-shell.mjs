@@ -1,4 +1,5 @@
-/** Re-run the intercepted command in the caller's configured shell without
+/** Re-run the intercepted command in the caller's configured shell ($SHELL;
+ * always PowerShell on win32) without
  * turning it into a login session. Profiles must not alter the harness-provided
  * environment or print text that is then charged to the command's budget. */
 export function shellInvocation(

@@ -1,4 +1,5 @@
-// Pure parser and judge for the CUT ACCOUNT of work-order point 757.
+// Pure parser and judge for the CUT ACCOUNT of work-order point 757, plus the
+// parsing and dating of its FLOOR readings (session kinds, Berlin dates).
 //
 // WHY IT EXISTS: point 757 cut the three documents every session loads before it
 // does anything — the project's CLAUDE.md, the user's global CLAUDE.md and
@@ -15,10 +16,12 @@
 //            makes the prose a second copy, which is the whole premise of the cut,
 //   DROPPED  on the user's explicit ruling, which is quoted with its date.
 //
-// This module reads that account and refuses the three ways it can rot: an entry
-// with no account at all, a MOVED entry whose destination does not exist, and a
-// COVERED entry naming a guard that is not wired into .claude/settings.json. The
-// third is the one that matters most — a rule "covered" by a guard nobody runs is
+// This module reads that account and refuses the ways it can rot — chiefly a
+// MOVED entry whose destination does not exist and a COVERED entry naming a
+// guard that is not wired into .claude/settings.json (besides an unknown source
+// or account, a DROPPED entry without a dated ruling, and a duplicate). A line
+// that does not parse as an entry at all is skipped as prose. The COVERED case
+// is the one that matters most — a rule "covered" by a guard nobody runs is
 // exactly the silent loss the account exists to prevent, and it is the state the
 // project reached twice before (four built guards hung in no hook chain).
 //
@@ -128,7 +131,8 @@ export function evaluateCutAccount(entries, known = {}) {
  * documents live in the user's home, so a caller running on a machine without
  * that tree — a CI runner has no `~/.claude` — cannot judge whether such a
  * destination exists, and must not read its absence as a lost rule. A
- * repository-relative destination is always judgeable and never external.
+ * destination that resolves inside the repository root is judgeable and never
+ * external (a relative `../x` resolves outside it and is).
  */
 export function isExternalDestination(path, root = '') {
   const p = String(path ?? '').trim()
@@ -243,15 +247,16 @@ export const FLOOR_KINDS = Object.freeze(['owner', 'subagent'])
  *   FLOOR <kind> :: <date> :: `<transcript path>` :: `<a> + <b> + <c> = <sum>` :: LIVE
  *   (or append `:: EXPIRED :: DD.MM.YYYY :: <attesting commit>` to the sum)
  *
- * The reading may wrap after any `::`, which is why the shape is matched against
- * the paragraph rather than a single line; evidence metadata follows the sum
- * on the same line. Missing metadata stays null so the judge can refuse it.
+ * The reading may wrap after any `::` up to the sum, which is why the shape is
+ * matched against the paragraph rather than a single line; evidence metadata
+ * must follow the sum on the same line. Missing metadata stays null so the judge can refuse it.
  * The three summands are
  * `input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens` of
- * the FIRST assistant message, and they are carried instead of the total alone
- * so a later reader can re-derive the number from the named transcript rather
- * than trust it. A sum that does not add up is the one failure this parser
- * cannot excuse: it is what a copied-over figure looks like.
+ * the FIRST assistant message carrying usage, and they are carried instead of
+ * the total alone so a later reader can re-derive the number from the named
+ * transcript rather than trust it. A sum that does not add up is recorded as
+ * `adds: false` and refused by the attest judge (cut-account-attest.mjs): it is
+ * what a copied-over figure looks like.
  */
 const FLOOR_RE =
   /FLOOR\s+([a-z]+)\s*::\s*([\d.]+)\s*::\s*`([^`]+)`\s*::\s*`\s*([\d,]+)\s*\+\s*([\d,]+)\s*\+\s*([\d,]+)\s*=\s*([\d,]+)\s*`([^\n]*)/g

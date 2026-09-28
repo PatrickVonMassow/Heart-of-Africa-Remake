@@ -1,12 +1,14 @@
-// Pure half of the board command (point 372): the card edit, so the markup the
-// board guard accepts is pinned by tests rather than by the shape of one
-// regex written once. The wrapper does the I/O.
+// Pure half of the board command (point 372): the card edits, plus the footer,
+// criticality and current-work projection passes and the publish preflight they
+// share, so the markup the board guard accepts is pinned by tests rather than by
+// the shape of one regex written once. The wrapper does the I/O.
 //
-// The imports are the auditor's OWN name for "no estimate yet" and the handover
-// card's shared destination predicate. A card this module writes must satisfy
-// the gates that read it, and spelling either value a second time here is how
-// the writer and readers would drift apart. Both imported modules are leaves,
-// so the direction cannot become a cycle.
+// The imports are values the gates that read these cards own (the auditor's
+// name for "no estimate yet", the handover card's destination predicate, the
+// state-card vocabulary, criticality parsing, VDZK admissibility). A card this
+// module writes must satisfy those gates, and spelling a value a second time
+// here is how writer and readers would drift apart. None of the imported
+// modules reaches back to this one, so the direction is no cycle.
 import { QUEUE_STUB_META, parseNowCardPoints } from './dashboard-guard-core.mjs'
 import { pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 import { namesFollowOnWork } from './handover-card-contract.mjs'
@@ -24,11 +26,11 @@ export { namesFollowOnWork }
 export const TEXT_STDIN_FLAG = '--text-stdin'
 
 /**
- * LF, ALWAYS — applied on every write of the board (point 439).
+ * LF, ALWAYS — applied to the board as an edit reads it and after its
+ * transform (point 439).
  *
- * The board's markup anchors are matched with literal newlines
- * (`ERLEDIGT_ANCHOR` below, the section bounds here), so the line ending is not
- * cosmetic. On 30.07.2026 a now-card had to be retitled by hand because no
+ * The Erledigt anchor (`ERLEDIGT_ANCHOR` below) is matched with a literal
+ * newline, so the line ending is not cosmetic. On 30.07.2026 a now-card had to be retitled by hand because no
  * command could do it; the editor wrote the file back in Windows text mode,
  * every `\n` became `\r\n`, the following node writes left the file MIXED — and
  * `board-archive-rotate.mjs` then failed to find the Erledigt section at all, so
@@ -142,7 +144,7 @@ export function berlinStamp(now = new Date()) {
 }
 
 /** Berlin date and wall clock — "27.07.2026, 16:32", the footer's own notation. */
-export function berlinDateStamp(now = new Date()) {
+function berlinDateStamp(now = new Date()) {
   const parts = new Intl.DateTimeFormat('de-DE', {
     timeZone: 'Europe/Berlin',
     day: '2-digit',
@@ -188,14 +190,14 @@ export function refreshFooter(html, { openCount, now = new Date() } = {}) {
  * order in his head, and a card titled "Abschlussarbeiten zum gerade beendeten
  * Punkt" told him neither which point nor what it was about.
  *
- * The one deliberate exception is the handover card (`NO_CURRENT_WORK_TITLE`):
- * it belongs to NO point, so it keeps its unnumbered form and names the
- * successor's point in prose instead.
+ * The deliberate exceptions belong to NO point and stay unnumbered: the handover
+ * card (`NO_CURRENT_WORK_TITLE`), which names the successor's point in prose
+ * instead, the derived state card, the stub and the empty-state element.
  */
 const numberChip = (point) => `<span class="num">${point}</span>`
 
 /** German board labels for the English criticality vocabulary used by code. */
-export const CRITICALITY_LABELS = Object.freeze({ low: 'niedrig', med: 'mittel', high: 'hoch' })
+const CRITICALITY_LABELS = Object.freeze({ low: 'niedrig', med: 'mittel', high: 'hoch' })
 
 const CRITICALITY_BADGE_RE =
   /<span\s+class="criticality(?:\s+criticality-(?:low|med|high))?"[^>]*>[\s\S]*?<\/span>\s*/g
@@ -313,13 +315,14 @@ export function renderCardCriticalities(html, tasksText) {
 }
 
 /**
- * A card TITLE as markup-safe text (four-eyes review, 12.08.2026). Every reader
- * of a title — the gate, the finders, the retitle itself — matches `[^<]*`, so a
- * raw `<` in a title made the card unreadable to all of them AND unrepairable by
- * the very command that had written it. Entity-aware, so a title carried from
+ * A card TITLE as markup-safe text (four-eyes review, 12.08.2026). When the
+ * title readers — the gate, the finders, the retitle itself — matched `[^<]*`,
+ * a raw `<` in a title made the card unreadable to all of them AND unrepairable
+ * by the very command that had written it; a title is still escaped so it can
+ * never carry markup. Entity-aware, so a title carried from
  * one card to another does not gain a second `&amp;` on each move.
  */
-export function escapeCardTitle(text) {
+function escapeCardTitle(text) {
   return String(text ?? '')
     .replace(/&(?!(?:[a-z]+|#\d+);)/gi, '&amp;')
     .replace(/</g, '&lt;')
@@ -369,13 +372,17 @@ export function upgradeNowCards(html) {
   )
 }
 
+/** A card as the plain text it showed — what a removal hands back to be printed. */
+const cardText = (card) => String(card).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
 /**
  * The document without the current-work cards that name NEITHER a point NOR a
  * state — the shape no command could otherwise remove (four-eyes review,
  * 12.08.2026). Returns the cleaned document and, for each card removed, its
- * title AND its text: this is the ONE place the board loses content, so what it
- * loses is handed back for the caller to print. Nothing else deletes a card —
- * the state writers replace only what really is that state.
+ * title AND its text: this is the one sweep that removes cards no command
+ * named, so what it loses is handed back for the caller to print. The other
+ * removals (state writers, projection and derived-card strips, done-card
+ * merges, VDZK removal) take only the cards they own.
  *
  * Such a card is refused by the publish gate anyway, and every way of repairing
  * it needs a number it does not have — while a numbered card standing beside it
@@ -383,9 +390,6 @@ export function upgradeNowCards(html) {
  * could not be published becomes publishable by the next command, whichever it
  * was.
  */
-/** A card as the plain text it showed — what a removal hands back to be printed. */
-const cardText = (card) => String(card).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-
 export function dropStrayNowCards(html) {
   const dropped = []
   const doc = String(html ?? '')
@@ -393,7 +397,7 @@ export function dropStrayNowCards(html) {
   // writers replace only inside the current-work section, so an unnumbered state
   // card that has drifted OUT of it is reachable by nothing else and would stand
   // for ever (four-eyes review, 12.08.2026). Here it is removed and reported,
-  // which is the whole point of this being the one removal path.
+  // which is the whole point of this being the reporting sweep.
   let inSection = () => true
   try {
     const { from, end } = sectionBounds(doc, 'now')
@@ -404,9 +408,9 @@ export function dropStrayNowCards(html) {
   const out = doc.replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card, at) => {
     const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
     const title = (summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? ''
-    // A NUMBER, or the handover card's own title — nothing else is repairable:
-    // a numbered card is reached by `title`/`queue`/`done`, and the handover
-    // card by `none`. A marker alone does not save a card here either, or an
+    // A NUMBER, or a state card's own title, is repairable: a numbered card is
+    // reached by `title`/`queue`/`done`, and the handover card by `none`. Below,
+    // the authenticated derived card and a marked closing card are kept too. A marker alone does not save a card here either, or an
     // impostor wearing one would be exactly as unremovable as before.
     // OUTSIDE THE SECTION NOTHING IS REACHABLE (four-eyes review, 12.08.2026):
     // every writer and every state removal works inside the current-work section,
@@ -452,7 +456,7 @@ export function summaryPoint(summary) {
 }
 
 /** A title without the leading "651 — " a card written before the chip carried. */
-export function stripPointPrefix(title, point) {
+function stripPointPrefix(title, point) {
   return String(title ?? '')
     .replace(new RegExp(`^\\s*${point}\\s*${DASH}\\s*`), '')
     .trim()
@@ -608,9 +612,9 @@ export function nowCard(html, point) {
  * is missing (sixth cross-review): the old whole-document fallback let a
  * render read cards out of foreign sections and let the comparison bless the
  * result — a structural fail-open under a preflight that must fail CLOSED. A
- * caller with a deliberate fragment semantics (the fail-open Stop predicate
- * `claimsNoCurrentWork`) scopes itself and says so; nothing gets the whole
- * document as "the section" by default any more.
+ * caller with a deliberate fragment semantics (`setCardTitle`, which rewrites
+ * one card by its head) opts in with `whenMissing: 'document'`; nothing gets
+ * the whole document as "the section" by default any more.
  */
 function nowSectionSlice(html, { whenMissing = 'throw' } = {}) {
   const text = String(html ?? '')
@@ -757,11 +761,12 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     const unnumberedCards = unnumbered.length
     const idleCards = unnumbered.filter((card) => isTrulyStateCard(card.html, 'idle')).length
     const handoverCards = unnumbered.filter((card) => isHandoverCard(card.html)).length
-    // Every unnumbered card that is neither the idle claim nor the ONE sanctioned
-    // handover card (sixth cross-vendor round).
+    // Every unnumbered card that is neither the idle claim, a derived card, nor
+    // the ONE sanctioned handover card (sixth cross-vendor round).
     const derivedCards = unnumbered.filter((card) => isTrulyDerivedCard(card.html)).length
     const strayCards = unnumberedCards - idleCards - derivedCards - Math.min(handoverCards, 1)
-    // Verified zero has TWO honest forms (second cross-vendor review): the one
+    // Verified zero has two authored honest forms (second cross-vendor review;
+    // the closing card below is the third): the one
     // authored idle card carrying the written handover reason, or — when nobody
     // wrote one — exactly the one parser-distinct empty element. Never both,
     // never a stack, and never a non-idle card standing in for either.
@@ -772,7 +777,8 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     // form was counted, so an arbitrary hand-written `.now` card stood visibly
     // in the section, belonged to no active point, and the fail-closed publish
     // preflight blessed it as a faithful projection. Beside active work the
-    // section is exactly the derived cards; the render refuses the same state,
+    // section holds only numbered cards, derived cards and at most one handover
+    // card; the render refuses the same state,
     // so the two halves cannot disagree about it.
     // AND THE DERIVED STATE CARD IS EXEMPT HERE TOO (point 935, measured on the
     // live board): the exemption existed only in the branch below, so a machine
@@ -826,14 +832,14 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
   }
 }
 
-/** The one sentence an unwritten stub says, and the only body it may carry. */
+/** The one sentence an unwritten stub says; renderNowStub may append carried prose after it. */
 const NOW_STUB_TEXT = 'Diese Karte braucht noch ihren handgeschriebenen Text.'
 
 /** A visible placeholder; its copy is explicitly not mistaken for authored prose.
  *  `carried` is authored text rescued from the idle card the render replaces —
  *  it rides in the stub's body so the transition never blanks what a session
  *  wrote (fifth cross-vendor round, pass 2). */
-export function renderNowStub(point, { stamp = berlinStamp(), carried = '' } = {}) {
+function renderNowStub(point, { stamp = berlinStamp(), carried = '' } = {}) {
   const note = String(carried ?? '').trim()
   const text = note ? `${NOW_STUB_TEXT}\n\nAus der Übergabekarte übernommen: ${note}` : NOW_STUB_TEXT
   return (
@@ -1107,7 +1113,7 @@ export function estimateHours(meta) {
 /** 2.5 → "~2,5 h" — the queue header's own notation (German decimal comma). */
 export function hoursLabel(hours) {
   const rounded = Math.max(0.5, Math.round(hours * 2) / 2)
-  return `~${String(rounded).replace(/\.0$/, '').replace('.', ',')} h`
+  return `~${String(rounded).replace('.', ',')} h`
 }
 
 /** "16:20" + 2.5 → "18:50", wrapping past midnight. */
@@ -1129,7 +1135,7 @@ function spanHours(times) {
 
 const titleOf = (card) => (card.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? ''
 const metaOf = (card) => (card.match(/<span class="meta">([^<]*)<\/span>/) ?? [])[1] ?? ''
-/** The card's last status text, stamp span stripped — what a move carries over. */
+/** The card's status text, every paragraph, stamp spans stripped — what a move carries over. */
 const statusOf = (card) => {
   // EVERY paragraph, not only the last (point 439): once a card text may carry
   // blank-line paragraph breaks, taking the tail alone would silently drop the
@@ -1213,8 +1219,8 @@ export function toQueue(html, point, { text, estimate } = {}) {
     // bookkeeping of a session must not be blocked by the session ending —
     // which a throw here did, at the most expensive moment there is. The
     // no-op still honours a caller's text/estimate, exactly as the drift
-    // path does. The throw is kept ONLY for a point nowhere on the board at
-    // all — the typo it was always protecting against.
+    // path does. The throw is kept ONLY for a point with neither a current-work
+    // nor a queue card — the typo it was always protecting against.
     if (standing) return updateStanding(html)
     throw new Error(`board: point ${point} is nowhere on the board — no current-work card and no queue card`)
   }
@@ -1230,9 +1236,10 @@ export function toQueue(html, point, { text, estimate } = {}) {
 }
 
 /**
- * Move a current-work card into the archive, keeping its START time and adding
- * the end — the shape the Erledigt section fixes. The body carries the card's
- * last status over unless the caller writes a closing one.
+ * Move a current-work card into the archive, keeping its START time (the
+ * earliest across the point's merged Erledigt cards) and adding the end — the
+ * shape the Erledigt section fixes. The body carries the card's status text,
+ * every paragraph, over unless the caller writes a closing one.
  */
 export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   const card = nowCard(html, point)
@@ -1518,7 +1525,7 @@ const FILLER_WORDS = new Set([
   'letzte', 'aktuellen', 'aktuelle', 'beendeten', 'beendete', 'abgeschlossenen', 'fertigen', 'meines',
   'meiner', 'diesem', 'diesen', 'dieses', 'punkt', 'punkts', 'punktes', 'point', 'points', 'the', 'this',
   'that', 'of', 'for', 'to', 'on', 'at', 'just', 'now', 'current', 'finished', 'closed', 'my', 'work',
-  'works', 'duties', 'a', 'an', 'and',
+  'works', 'duties', 'a', 'and',
 ])
 
 /**
@@ -1534,7 +1541,7 @@ const FILLER_WORDS = new Set([
  */
 export function stageOnlyTitle(title) {
   let text = String(title ?? '')
-    .replace(/^\s*\d+\s*[—–-]\s*/, '')
+    .replace(new RegExp(`^\\s*\\d+\\s*${DASH}\\s*`), '')
     .trim()
   if (!text) return true
   for (const w of STAGE_WORDS) text = text.replace(new RegExp(`\\b${w}\\b`, 'gi'), ' ')
@@ -1559,9 +1566,6 @@ const STATE_ATTR = (kind) => ` data-state="${kind}"`
 /** Any run of markup that stays INSIDE one card — never past its closing tag. */
 const WITHIN_CARD = '(?:(?!</details>)[\\s\\S])*?'
 
-/** The two state kinds: the unnumbered handover card, and the closing card. */
-export const STATE_KINDS = ['idle', 'closing']
-
 /** The pre-655 title of each state card — the fallback every matcher carries. */
 const LEGACY_STATE_TITLE = { idle: NO_CURRENT_WORK_TITLE, closing: CLOSING_WORK_TITLE }
 
@@ -1579,11 +1583,6 @@ const LEGACY_STATE_TITLE = { idle: NO_CURRENT_WORK_TITLE, closing: CLOSING_WORK_
 const derivedCardPattern = () =>
   new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>[\\s\\S]*?</details>\\s*`, 'g')
 
-/**
- * Is this really the derived card — unnumbered, and titled as one of its two
- * states? A marker is hand-writable, so here as everywhere it never authorises a
- * removal on its own.
- */
 const escapeForRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /** A card's meta field carries a clock time and nothing else. */
@@ -1606,7 +1605,7 @@ const cardStamp = (stamp) => {
  * false-negative at the price of a false-positive.
  *
  * So the card is authenticated the other way round. It is written by ONE
- * function thirty lines above this one, in one shape; anything that is not that
+ * function, applyDerivedStateCard below, in one shape; anything that is not that
  * shape is not the machine's card and gets no exemption. Every evasion of the
  * negative test fails this one, and no card this module writes can.
  */
@@ -1615,6 +1614,11 @@ const DERIVED_SUMMARY = new RegExp(
     '<span class="right"><span class="meta">\\d{1,2}:\\d{2}</span></span>$',
 )
 
+/**
+ * Is this really the derived card — unnumbered, and titled as one of its two
+ * states? A marker is hand-writable, so here as everywhere it never authorises a
+ * removal on its own.
+ */
 function isTrulyDerivedCard(card) {
   const text = String(card ?? '')
   // THE MARKER IS REQUIRED, AS IT IS FOR THE HANDOVER CARD (ninth cross-vendor
@@ -1624,8 +1628,7 @@ function isTrulyDerivedCard(card) {
   // card had the same one.
   if (!new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>`).test(text)) return false
   const summary = (text.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-  const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
-  if (!(title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE)) return false
+  // DERIVED_SUMMARY anchors the two reserved titles itself.
   return DERIVED_SUMMARY.test(summary.trim())
 }
 
@@ -1687,35 +1690,6 @@ const stateCardPattern = (kind) =>
     'g',
   )
 
-/**
- * Is this card REALLY the state its marker claims (four-eyes review,
- * 12.08.2026)? A marker is hand-writable and a state card is REPLACED, so a
- * marker alone must never authorise a deletion: the idle card is unnumbered and
- * carries its constant title, the closing card carries a composed closing title.
- * Anything else keeps standing and the publish gate names it.
- */
-/**
- * The session handover card — one of the two unnumbered cards that may stand
- * beside derived numbered ones (point 700's clause, answered by point 713).
- *
- * THE MARKER ALONE IS NOT THE PROOF (eighth cross-vendor round), here as
- * everywhere else in this file: a marker is hand-writable, so a card wearing
- * it must also HAVE the shape — no point chip, and a body that actually says
- * something. Otherwise any hand-marked card would buy itself the exemption
- * that the stray rule exists to deny.
- */
-/**
- * Does this summary carry a point number ANYWHERE?
- *
- * `summaryPoint` reads the CANONICAL leading chip, which is the right reading
- * when the question is "which point is this card's" — and the WRONG one when
- * the question is "is this card unnumbered" (point 935's review). A card marked
- * `data-state="derived"`, wearing a reserved title and carrying
- * `<span class="num">935</span>` further along its summary, passed as
- * unnumbered — and with an empty expected set that publishes a visible point
- * chip under the claim that nothing is running. `parseNowCardPoints` has always
- * scanned the whole section; the three state predicates now agree with it.
- */
 const classTokens = (attrs) => {
   // `\bclass` also matches the tail of `data-class`, which read an ordinary
   // authored attribute as a title span and RETIRED a legitimate card. The
@@ -1731,6 +1705,19 @@ const visibleText = (html) =>
     .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
 
+/**
+ * Does this summary carry a point number ANYWHERE?
+ *
+ * `summaryPoint` reads the CANONICAL leading chip, which is the right reading
+ * when the question is "which point is this card's" — and the WRONG one when
+ * the question is "is this card unnumbered" (point 935's review). A card marked
+ * `data-state="derived"`, wearing a reserved title and carrying
+ * `<span class="num">935</span>` further along its summary, passed as
+ * unnumbered — and with an empty expected set that publishes a visible point
+ * chip under the claim that nothing is running. `parseNowCardPoints` has always
+ * scanned the whole section; the handover and state-card predicates now agree
+ * with it.
+ */
 const summaryCarriesPoint = (summary) => {
   // A COMMENT IS NOT VISIBLE, so a number inside one is not a chip — scanning it
   // as markup retired legitimate cards (same round as the `data-class` slip).
@@ -1765,6 +1752,16 @@ const summaryCarriesPoint = (summary) => {
   return false
 }
 
+/**
+ * The session handover card — one of the two unnumbered cards that may stand
+ * beside derived numbered ones (point 700's clause, answered by point 713).
+ *
+ * THE MARKER ALONE IS NOT THE PROOF (eighth cross-vendor round), here as
+ * everywhere else in this file: a marker is hand-writable, so a card wearing
+ * it must also HAVE the shape — no point chip, and a body that actually says
+ * something. Otherwise any hand-marked card would buy itself the exemption
+ * that the stray rule exists to deny.
+ */
 function isHandoverCard(card) {
   const text = String(card ?? '')
   if (!/<details class="now"[^>]*data-state="handover"[^>]*>/.test(text)) return false
@@ -1773,6 +1770,13 @@ function isHandoverCard(card) {
   return cardBodyText(text).length > 0
 }
 
+/**
+ * Is this card REALLY the state its marker claims (four-eyes review,
+ * 12.08.2026)? A marker is hand-writable and a state card is REPLACED, so a
+ * marker alone must never authorise a deletion: the idle card is unnumbered and
+ * carries its constant title, the closing card carries a composed closing title.
+ * Anything else keeps standing and the publish gate names it.
+ */
 function isTrulyStateCard(card, kind) {
   const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
@@ -1805,7 +1809,7 @@ export function closingWorkCards(html) {
  * that somehow wears the idle marker is running work, and deleting it would cost
  * exactly what the marker was introduced to protect.
  */
-export function stripNoCurrentWork(html) {
+function stripNoCurrentWork(html) {
   return withinNowSection(html, (scope) =>
     scope
       .replace(noWorkCardPattern(), (card) => (isTrulyStateCard(card, 'idle') ? '' : card))
@@ -1818,8 +1822,8 @@ export function stripNoCurrentWork(html) {
  * (four-eyes review, 12.08.2026). A state card that has drifted out of the
  * section is a `now-card-outside` violation the gate reports; deleting it from
  * the archive or the queue on the next state write would take that evidence away
- * silently, and the one path allowed to remove a card is the one that says so.
- * A fragment without the section is judged as it stands, like the claims are.
+ * silently; such a card is removed only by dropStrayNowCards, which reports it.
+ * A document without the section is edited as it stands.
  */
 function withinNowSection(html, edit) {
   const text = String(html ?? '')
@@ -1841,27 +1845,20 @@ function withinNowSection(html, edit) {
  * a card is left standing and the publish gate refuses it by name; it carries a
  * number, so `queue <N>`, `done <N>` and `title <N>` all reach it.
  */
-export function stripClosingWork(html) {
+function stripClosingWork(html) {
   return withinNowSection(html, (scope) =>
     scope.replace(closingCardPattern(), (card) => (isTrulyStateCard(card, 'closing') ? '' : card)),
   )
 }
 
 /**
- * The document without ANY state card. The three kinds are mutually exclusive
- * (`board-structure-core` refuses a board carrying two), so whatever writes one
- * kind clears the others in the same edit.
- *
- * AN UNNUMBERED CARD IS A STATE CARD, whatever it says (four-eyes review,
- * 12.08.2026). Since point 655 a current-work card either names its point in the
- * chip or IS the handover card, so a card with neither chip nor legacy title
- * number can only be a state card — one written by hand, or by a version of this
- * module that had no marker yet. Without this clause nothing could remove such a
- * card: the state patterns miss it and every point command needs a number, so
- * the publish gate would refuse the board and the only repair left would be the
- * hand edit this whole module exists to make unnecessary.
+ * The document without the idle and closing state cards. The two kinds are
+ * mutually exclusive (`board-structure-core` refuses a board carrying both), so
+ * whatever writes one kind clears the other in the same edit. The derived state
+ * card stands beside them and is not touched here; an unnumbered card that is
+ * neither state is swept (and reported) by dropStrayNowCards.
  */
-export function stripStateCards(html) {
+function stripStateCards(html) {
   return stripClosingWork(stripNoCurrentWork(html))
 }
 
@@ -1949,7 +1946,7 @@ function sectionStateCards(html, kind) {
  * session hand-edited the file instead — and a hand-edit APPENDS. Two idle cards
  * are now unreachable through this path, whatever calls it and however often.
  *
- * IT IS THE ONE UNNUMBERED CARD (point 655), so it owes the reader in prose what
+ * IT IS THE ONE AUTHORED UNNUMBERED CARD (point 655), so it owes the reader in prose what
  * the numbered cards give him in a chip: the reason must NAME the point the
  * successor picks up, or say canonically that the work order has none. The
  * publish gate refuses a handover card that does neither.
@@ -2033,7 +2030,6 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
     // paragraph — composed here, so no caller can leave the subject out.
     text: `${subject_} — dieser Punkt ist zusammengeführt und abgehakt; die ${CLOSING_STAGE} stehen noch aus.\n\n${duties}`,
     stamp,
-    emptyReason: 'board: closing needs a reason — the reader must learn WHICH duties are still owed',
     claim: 'that only closing duties are left',
   })
 }
@@ -2177,7 +2173,8 @@ export function addVdzk(html, title, text) {
   if (!String(text ?? '').trim()) throw new Error('board: vdzk-add needs the question itself as the card body')
   const verdict = judgeAutomatedCard({ title, body: text })
   if (!verdict.ok) throw new Error(verdict.reason)
-  // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
+  // ESCAPED, body included — the only builder that escapes its body (four-eyes
+  // review 30.07.2026): the
   // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
   // a paste of it is the LIKELY first call — and an unescaped `<` produces a card
   // whose title parses as empty, i.e. an invisible open question.
@@ -2227,8 +2224,8 @@ export function removeVdzk(html, fragment) {
 }
 
 /**
- * Replace the body of the current-work card for `point` with one stamped
- * paragraph. Throws when there is no such card — a status for a point that is
+ * Replace the body of the current-work card for `point` with the text's
+ * paragraphs, the first one stamped. Throws when there is no such card — a status for a point that is
  * not shown as current work would be a status nobody can read, and silently
  * doing nothing is the failure this project keeps paying for.
  */
@@ -2317,7 +2314,8 @@ export function setCardTitle(html, point, title) {
   }
   // Both sections carry the number in a chip of its own since point 655, so a
   // retitle only ever rewrites the SUBJECT — and a now-card still written in the
-  // old shape ("439 — …") is lifted into the chip shape on the way.
+  // old shape ("439 — …") is lifted into the chip shape on the way. The queue
+  // branch below writes the text as given, without stripping a "439 — " prefix.
   // ON A CLOSING CARD THE TITLE KEEPS ITS SHAPE. The marker and the composed
   // title are one statement; retitling only the subject would leave a card the
   // gate reads as a false closing marker.
@@ -2391,6 +2389,7 @@ export function queueEstimateHours(html, point) {
 export function promotionEstimateWarning(html, point) {
   return queueEstimateHours(html, point) == null
     ? `board: point ${point} was promoted with NO estimate, so its card shows a start time and no ` +
-        `expected end. Set one and re-promote: node scripts/board-queue.mjs set ${point} --estimate "~2 h"`
+        `expected end. Give it one: node scripts/board.mjs eta ${point} "<HH:MM>" (a queue --estimate no ` +
+        'longer reaches the promoted card)'
     : null
 }

@@ -33,8 +33,9 @@ try {
   const messageFlag = process.argv.indexOf('--message')
   if (messageFlag !== -1) {
     const path = process.argv[messageFlag + 1]
-    // No path, or an unreadable one, is not a finding: judge nothing rather
-    // than block a commit over a file this guard failed to open.
+    // No path is judged as an empty message (no finding); an unreadable one
+    // throws into the catch below, which allows the commit with an error line —
+    // never block a commit over a file this guard failed to open.
     const message = path ? readFileSync(path, 'utf8') : ''
     const verdict = evaluateCommitMessage(message)
     if (verdict.block) refuse(formatMessageVerdict(verdict))

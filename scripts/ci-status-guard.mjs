@@ -9,14 +9,15 @@
 // failed. So this observes every ref the repository pushed inside the window —
 // named from the local push reflog, never from an API sweep over branches. Main
 // and a branch offered back for landing gate on a concluded green run; a branch
-// whose author is still declared in flight is reported without owning the
-// supervisor's turn end. The exemption ends with that declaration. A ref that
+// whose author is still declared in flight is only named on stderr (no block,
+// no alert), so it does not own the supervisor's turn end. The exemption ends with that declaration. A ref that
 // no longer exists is dropped, and terminal answers are cached per sha so the
 // common turn costs no API call. The decision logic lives in
 // ci-status-guard-core.mjs (pure, Vitest-covered).
 //
-// Fail-OPEN above all: CI pending, no run yet, token missing, offline, non-200,
-// any internal error → allow, so the guard can never freeze a session. All
+// Fail-OPEN above all: CI pending past the wait budget, no run yet, offline,
+// non-200, any internal error → allow, so the guard can never freeze a session
+// (a missing token only means an unauthenticated request). All
 // network/git calls carry short timeouts so turn-end cannot hang. The API call
 // uses node:https with agent:false — global fetch (undici) plus process.exit
 // crashes libuv on Windows (UV_HANDLE_CLOSING assert), and its keep-alive
@@ -189,7 +190,7 @@ function git(args) {
   }).trim()
 }
 
-/** HEAD counts as pushed once ANY origin ref contains it (local refs, no
+/** HEAD counts as pushed once ANY remote-tracking ref contains it (local refs, no
  *  network). Feature branches push to origin/feat/<point>-<slug>, so the old
  *  origin/main-only ancestor check silenced the guard for ALL branch work —
  *  a red branch run would have gone unnoticed until the merge. */
@@ -502,10 +503,11 @@ function remoteRefNames() {
 const REFLOG_ENTRIES = 2000
 
 /** The push reflog, newest first — ONE git process, no network.
- *  WORST CASE per turn end: 4 git processes (rev-parse, branch -r --contains,
- *  this reflog read, for-each-ref), each on local refs, measured at 31 ms
- *  together. Nothing here scales with the number of branches, with the size of
- *  the ledger, or with repository age. */
+ *  The common turn end costs a handful of local git processes (rev-parse,
+ *  branch -r --contains, this reflog read, for-each-ref, remote get-url, plus
+ *  one probe per declared in-flight worktree), measured at about 31 ms for the first four; a red adds
+ *  cat-file/diff. The process count does not scale with the number of
+ *  branches, the size of the ledger or repository age. */
 function pushReflog() {
   try {
     return git([
@@ -521,10 +523,11 @@ function pushReflog() {
   }
 }
 
-/** Judge ONE red sha the way the HEAD path always did: every failed run on it,
- *  each classified for WHERE its fault lies, so an outage cannot be mistaken for
- *  our own breakage (points 526/528). Returns the chosen classification, whether
- *  every red is unactionable, and the famine clocks to keep. */
+/** Judge ONE red sha: every failed run on it, each classified for WHERE its
+ *  fault lies, so an outage cannot be mistaken for our own breakage (points
+ *  526/528). Returns the chosen classification, whether every red is
+ *  unactionable, the famine clocks to keep, the judged workflows and the
+ *  re-run wait a failed-jobs dispatch started (`rerunWait`). */
 async function judgeRed(repo, { sha, runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
   const reds = failedRuns(runs, sha)
   const judged = []
@@ -697,7 +700,6 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
           notifyCiRed(ciRedAlertMessage({ target, classification, standDown })),
   })
 
-  let durableWait = state.ciWait ?? null
   if (!readOnly) {
     const persisted = mutateState((current) => {
       const observations = (swept.observations ?? []).filter((item) => item?.target?.disposition !== 'report')
@@ -714,7 +716,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
         ciWait: nextWait,
       }
     })
-    durableWait = persisted?.ciWait ?? null
+    const durableWait = persisted?.ciWait ?? null
 
     const owner = readOwnerLock()
     for (const observation of (swept.observations ?? []).filter((item) => item?.target?.disposition !== 'report')) {
@@ -816,7 +818,7 @@ async function observeDurableWait(wakeToken) {
         const sameRun = ciWaitIdentity(observation) === current.ciWait.identity
         renewed = renewCiWait(sameRun ? current.ciWait : null, observation, {
           now: observedAt,
-          // A re-run changes run id but not the observer's obligation.
+          // A different run identity does not change the observer's obligation.
           makeWakeToken: () => wakeToken,
         }) ?? current.ciWait
         if (!sameRun) {

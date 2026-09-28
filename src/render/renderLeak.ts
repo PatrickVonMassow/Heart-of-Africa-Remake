@@ -35,9 +35,10 @@
 // that window the count sits in a DIP with the whole post chain missing — the
 // trap that produced point 334's false "+14 leaked". So the watch samples on
 // requestAnimationFrame and waits for the render-target count to repeat before
-// it judges. A reading that never settles (a headless page that stops painting)
-// is recorded and DROPPED, never asserted: fail-soft on an environment stall,
-// fail-loud only on a product bug.
+// it judges. A reading that does not settle within the frame budget is
+// recorded and DROPPED, never asserted; a page that stops producing animation
+// frames altogether leaves its watch pending and judges nothing. Fail-soft on
+// an environment stall, fail-loud only on a product bug.
 //
 // DEV only — the whole module is behind import.meta.env.DEV and is imported
 // dynamically from src/App.tsx, so it is absent from the shipped bundle.
@@ -72,7 +73,8 @@ export interface LeakCounts {
 export const LEAK_BOUNDS: LeakCounts = { renderTargets: 2, textures: 96 }
 
 /** The levers that legitimately change the resident GPU set. Everything not in
- *  here must NOT move the counts — that is what makes a rise a leak. */
+ *  here must NOT move the render-target count, and may move the texture count
+ *  only within its bounds (streaming) — that is what makes a rise a leak. */
 export interface SignatureInput {
   mode: string
   /** Settlements differ in fires (shadow maps) and materials; only meaningful
@@ -142,8 +144,9 @@ export type Baselines = Readonly<Record<string, Baseline>>
  *  18 render targets / 39 textures where its steady state is 22 / 58, and every
  *  later visit would have been reported as a +4 leak. The baseline is therefore
  *  the HIGH-WATER MARK over the first visits, not the first reading. The cost is
- *  one transition of delay: a leak that grows per transition is still over the
- *  bound on the first judged reading. */
+ *  one transition of delay: a leak that grows by more than the bound per
+ *  transition is still caught on the first judged reading, a smaller one by
+ *  the total-drift bound below. */
 const WARMUP_VISITS = 2
 
 /** How far the ratcheting texture baseline may drift from the warm-up mark in
@@ -171,8 +174,9 @@ const TEXTURE_DRIFT_FACTOR = 3
  *   ratchet is what the total-drift bound above closes: it must not let a leak
  *   too small for one step raise its own bar for ever.
  *
- * A 'leak' leaves the baselines untouched, so the condition keeps reporting for
- * as long as it holds instead of silently re-baselining itself away.
+ * A 'leak' leaves the baseline counts untouched (only the visit count
+ * advances), so the condition keeps reporting for as long as it holds instead
+ * of silently re-baselining itself away.
  */
 export function evaluateReading(
   baselines: Baselines,
@@ -278,7 +282,9 @@ export interface HistoryEntry {
 export interface SettlePolicy {
   /** Frames that must pass after a transition before a reading may count. */
   minFrames: number
-  /** Identical consecutive render-target readings that make a reading settled.
+  /** Repeats of the render-target reading, after the first, that make a
+   *  reading settled. A frame without a reading (no renderer) neither breaks
+   *  nor extends the run.
    *  Settling is judged on the RENDER TARGETS alone: the texture count keeps
    *  moving while content streams, so demanding it repeat would leave the
    *  strict half of the invariant permanently unsettled. */

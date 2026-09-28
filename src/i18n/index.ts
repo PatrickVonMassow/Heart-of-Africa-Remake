@@ -1,7 +1,8 @@
 // Localization runtime (design.md §17): English is the default game language,
 // German is available, and further languages only need a new dictionary
-// implementing the Strings contract. The language is switched at runtime via
-// the debug menu (design.md §21).
+// implementing the Strings contract. The start language may come from the URL
+// (`?lang=`, config/startLang.ts); at runtime it is switched via the debug menu
+// (design.md §21).
 
 import { create } from 'zustand'
 import { startLangFromUrl } from '../config/startLang'

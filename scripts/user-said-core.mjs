@@ -3,7 +3,7 @@
 // WHY THIS EXISTS. On 20.08.2026 the user asked why an answered question was
 // still on the board. Answering it needed four timestamps: when the question was
 // asked, when he answered, when the card was published, when it was republished.
-// Nothing in this repository reads the session transcripts, so the search ran as
+// Nothing in this repository read the session transcripts then, so the search ran as
 // hand-written node one-liners that printed raw conversation prose — about 25k
 // tokens pulled into a context that every later reply re-sends. The answer was
 // four lines long. That ratio is the defect this file removes.
@@ -21,7 +21,7 @@
 // with the fixtures that pin them.
 
 /** Harness-generated text that arrives inside a genuine human turn. */
-export const NOISE_PREFIXES = [
+const NOISE_PREFIXES = [
   '<ide_opened_file>',
   '<ide_selection>',
   '<local-command-caveat>',

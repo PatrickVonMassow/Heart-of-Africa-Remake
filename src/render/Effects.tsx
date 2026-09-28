@@ -1,19 +1,20 @@
 // Post-processing pipeline (design.md §2 "Licht- und Post-Processing-
-// Pipeline"): scene pass with MRT normals → GTAO (screen-space ambient
-// occlusion) → optional TRAA (temporal anti-aliasing) → bloom → color
-// grading (warm highlights, gentle saturation) → subtle vignette. Tone
+// Pipeline"): scene pass with MRT normals → optional GTAO (screen-space
+// ambient occlusion) → optional TRAA (temporal anti-aliasing) → optional bloom
+// → color grading (warm tint, gentle saturation) → subtle vignette. Tone
 // mapping (ACES) and output color space are applied by THREE.RenderPipeline
 // itself. Also installs the procedural IBL environment on the scene.
 //
 // TRAA is the default since its manual WebGPU check passed (CLAUDE.md §7.1
-// pt. 32); the debug toggle (design.md §21.3) disables temporal resolve.
+// pt. 32); the low graphics level and the debug toggle (design.md §21.3)
+// disable temporal resolve.
 // All modes share a single-sampled half-float scene pass with velocity. Only
 // the downstream post chain is rebuilt when an effect is toggled.
 //
 // Screen-space reflections were integrated (design.md §2.7) but removed again
 // after the manual WebGPU check (CLAUDE.md pt. 32): with the bird's-eye camera
-// never reaching grazing angles and the first-person scenes having no water or
-// gloss, no in-game situation makes SSR read, so it was dead weight.
+// never reaching grazing angles and the first-person scenes then having no
+// water or gloss, no in-game situation made SSR read, so it was dead weight.
 //
 // OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
@@ -32,7 +33,7 @@ import { useUi, effectiveSsao, effectiveTraa, effectiveBloom } from '../state/ui
 /** Sun direction used for the IBL texture (matches the scene suns closely). */
 const IBL_SUN: [number, number, number] = [0.5, 0.65, 0.36]
 
-/** Minimum screen-space AO factor: occlusion darkens a surface to at most this
+/** Minimum screen-space AO factor: occlusion never darkens a surface below this
  *  fraction, so the deepest crevice reads as a dark grey rather than crushing an
  *  already-shadowed ground to flat black (point 106). */
 const AO_FLOOR = 0.4
@@ -89,9 +90,9 @@ export function Effects() {
     const depth = scenePass.getTextureNode('depth')
     const normal = scenePass.getTextureNode('normal')
 
-    // Screen-space ambient occlusion (single-channel target → use .r). Off in
-    // the touch quality preset (point 84), where the AO pass is skipped
-    // entirely so it costs nothing on mobile GPUs.
+    // Screen-space ambient occlusion (single-channel target → use .r). On only
+    // at the high level (point 276) and off in the touch preset (point 84); when
+    // off the AO pass is skipped entirely so it costs nothing.
     // Typed as the mul result (Node<vec4>) so the AO-off branch (plain color)
     // and the AO-on branch (color × occlusion) share one type.
     let aoComposed: ReturnType<typeof color.mul> = color
@@ -173,7 +174,7 @@ export function Effects() {
       withBloom = composed.add(bloomNode)
     }
 
-    // Color grading: gentle saturation lift and warm highlights.
+    // Color grading: gentle saturation lift and a warm tint over the whole image.
     const luma = withBloom.rgb.dot(vec3(0.2126, 0.7152, 0.0722))
     const saturated = mix(vec3(luma, luma, luma), withBloom.rgb, 1.07)
     const graded = saturated.mul(vec3(1.03, 1.0, 0.965))

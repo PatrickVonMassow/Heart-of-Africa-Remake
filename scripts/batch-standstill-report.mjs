@@ -72,7 +72,7 @@ export function gatherStandstillReport({
   const paths = declaredInputPaths(repo, transcriptFiles({ repo, start }), ref)
   const journal = readJournal(paths.journal)
   const verifyLogDir = resolve(repo, 'local', 'verify-logs')
-  // The clamp of union entry U15: an interval ends when its identity does, not
+  // The clamp of point 1048, union entry U15: an interval ends when its identity does, not
   // when its lease would have.
   const journalDerived = journalIntervals(journal.records, {
     start,

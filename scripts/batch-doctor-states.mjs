@@ -43,12 +43,12 @@ export const gitIn =
 // (a) STALE GIT LOCKS — a killed commit or push
 // ---------------------------------------------------------------------------
 //
-// `index.lock` is git's write mutex; `refs/**/*.lock` and `packed-refs.lock` are
-// what a killed push leaves. None of them is cleaned up by the process that dies,
+// `index.lock` and `HEAD.lock` are git's write mutexes; `refs/**/*.lock` and
+// `packed-refs.lock` are what a killed push leaves. None of them is cleaned up by the process that dies,
 // and while one lies there EVERY git write is refused — including the doctor's own
 // repairs, which is why this action is planned first.
 //
-// AGE IS THE PROOF, and it is generous. A live `git commit` holds the index lock
+// AGE IS THE ONLY EVIDENCE (no process is checked), and the window is generous. A live `git commit` holds the index lock
 // for well under a second; ten minutes is beyond any honest hold and short enough
 // that an unattended run is not blocked for an hour. A lock younger than that is
 // left alone: taking one from a running git corrupts the very thing this repairs.
@@ -118,7 +118,7 @@ export function clearStaleGitLocks(locks = []) {
       rmSync(path, { force: true })
       removed.push(path)
     } catch {
-      /* held by something after all — the caller reports the remaining finding */
+      /* held by something after all — left out of `removed`; the next run finds it again */
     }
   }
   return removed
@@ -224,8 +224,7 @@ export function pruneWorktrees(git) {
  * were decided at gather time, seconds or minutes earlier, and `judgeTarget`
  * treats a REGISTERED worktree as a licensed removal (`git worktree remove
  * --force`, uncommitted work and all). So a target that turns out registered NOW —
- * because git had failed at gather time and has recovered since, or because an
- * agent registered a tree in between — is REFUSED rather than deleted: only
+ * because an agent registered a tree in between — is REFUSED rather than deleted: only
  * `orphan-under-worktrees-dir` is an orphan, and only an orphan is removed here.
  * A `git worktree list` that fails at this moment PROPAGATES, so the caller
  * reports the action as failed and nothing is deleted on absent evidence.
@@ -260,8 +259,9 @@ export function removeOrphanWorktrees(dirs = [], { git } = {}) {
 // hold the ports the next run needs and eat CPU for the rest of the absence — the
 // same class that cost four unit-test timeouts on 28.07.2026, only unattended.
 //
-// MATCHED BY COMMAND LINE, NEVER BY NAME. `classifyProcess` (verify/machine-load-
-// core.mjs) is the shared matcher, and `fromThisRepo` narrows it to leftovers of
+// MATCHED BY COMMAND LINE, NEVER BY NAME. `strayProcesses` (verify/machine-load-
+// core.mjs, built on `classifyProcess`) is the shared matcher, and `fromThisRepo`
+// narrows it to leftovers of
 // THIS checkout: a stranger's chrome is neither ours to kill nor usually the
 // cause. The sweep is additionally gated on there being no live session that could
 // own them — that condition lives in the pure planner.
@@ -420,8 +420,9 @@ export function restoreTasksFromHead({ repo, git, now = Date.now() } = {}) {
 // standing, and from then on every tick reads the batch as reserved and spawns
 // nothing — the batch stands still for as long as nobody looks.
 //
-// TWO PROOFS, NOT ONE: past its own stale window AND the recorded process gone.
-// The window alone would race a slow but healthy spawn.
+// TWO PROOFS WHERE TWO EXIST: past its own stale window AND no recorded process
+// still alive (the doctor always passes a probe). The window alone would race a
+// slow but healthy spawn; a lock that records no pid has only the window.
 
 export const PENDING_LOCK_STALE_MS = 10 * 60 * 1000
 
@@ -484,7 +485,7 @@ export function findBoardBehind({ repo } = {}) {
   try {
     state = JSON.parse(readFileSync(join(repo, '.claude', 'dashboard-state.json'), 'utf8'))
   } catch {
-    return null // no state at all: nothing has ever been published from here
+    return null // no readable state: nothing to compare the board against
   }
   const boardPath = resolve(repo, state?.dashboardPath ?? '.batch-dashboard.html')
   let local
@@ -516,11 +517,11 @@ const defaultRun = (exe, args, cwd) =>
 //
 // The launcher's doctor verdict, left for the session it spawns seconds later so
 // that the common case costs nothing. The rule is pure in batch-doctor-core.mjs
-// (`mandateMarkerVerdict`); these three lines are the wiring that carried it
-// untested until point 443.
+// (`mandateMarkerVerdict`); the three functions below are the wiring that carried
+// it untested until point 443.
 
-/** Read AND DELETE the marker, readable or not. The deletion happens BEFORE the
- *  parse: a corrupt marker used to throw past it and be re-parsed at every
+/** Read AND DELETE the marker, parseable or not (an unreadable one is left for
+ *  the expiry). The deletion happens BEFORE the parse: a corrupt marker used to throw past it and be re-parsed at every
  *  session start for ever. One-shot means one-shot. */
 export function consumeMandateMarker({ path, now = Date.now(), maxAgeMs = MANDATE_MAX_AGE_MS, remove = rmSync } = {}) {
   let raw = null

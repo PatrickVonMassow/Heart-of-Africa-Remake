@@ -11,9 +11,10 @@ const SPOIL_RADIALS = 40
  * A POLAR grid whose outer rim IS the mound's own edge. A rectangular sheet
  * covers the corners outside the ellipse too, and since it carries the earth
  * material at ground level, those corners read as a hard brown diamond laid on
- * the sand around the heap — visible in the first village frame of this point.
- * Here the last ring sits exactly where the height reaches zero, so the earth
- * simply ends where the mound does. Heights come from the walking surface.
+ * the sand around the heap — visible in the first village frame taken of it.
+ * Here the last ring sits on the mound's own edge, where its height reaches
+ * zero, so the earth simply ends where the mound does. Heights are the mound
+ * term of the walking surface (`spoilHeightAt`), lifted 4 mm against z-fighting.
  */
 export function buildDigSpoilGeometry(site: DigSite, progress?: DigSiteProgress): BufferGeometry {
   const positions: number[] = []

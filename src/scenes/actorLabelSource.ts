@@ -8,10 +8,11 @@
 //
 // Two shapes, because the two scenes really are different:
 //   • a SOURCE FUNCTION for what is drawn from a list (the herds, the vultures,
-//     the camps): it reads the same records the render pass wrote;
+//     the carcasses): it reads the same records the render pass wrote;
 //   • a MARK on an object (`markActor`) for what is drawn as its own node (an
-//     inhabitant, a goat): one tag at the figure, and the traversal finds it,
-//     so twenty call sites do not each have to register and unregister.
+//     inhabitant, a goat, a pitched camp, the canoe): one tag at the figure, and
+//     the traversal finds it, so the call sites do not each have to register
+//     and unregister.
 
 import type { ActorAge, ActorKind } from '../systems/actorLabels'
 
@@ -34,7 +35,7 @@ export interface LabelledActor {
 }
 
 /** Pushes this scene's actors into the given array (no allocation per frame). */
-export type ActorSource = (out: LabelledActor[]) => void
+type ActorSource = (out: LabelledActor[]) => void
 
 const sources = new Set<ActorSource>()
 
@@ -46,7 +47,8 @@ export function registerActorSource(source: ActorSource): () => void {
   }
 }
 
-/** Everything the mounted scenes can see right now, reusing `out`. */
+/** Everything the registered sources report right now, reusing `out`. Marked
+ *  scene nodes are gathered separately (pushMarkedActors, called by ActorLabels.tsx). */
 export function collectActors(out: LabelledActor[] = []): LabelledActor[] {
   out.length = 0
   for (const source of sources) source(out)
@@ -56,7 +58,7 @@ export function collectActors(out: LabelledActor[] = []): LabelledActor[] {
 /** What a marked object is. `height` is its label's rise above the object's
  *  own origin, in the object's local units — the world scale is applied when
  *  the mark is read, so a figure drawn at half size labels at half the rise. */
-export interface ActorMark {
+interface ActorMark {
   kind: ActorKind
   age?: ActorAge
   height: number
@@ -131,8 +133,9 @@ export function markedActorRise(root: MarkedNode | null | undefined): number | n
   return found.m[13] + found.mark.height * scale - base[13]
 }
 
-/** The nearest marked node at or under `root`, depth first — an invisible node
- *  takes its subtree with it, exactly as the label collection does. */
+/** The first marked node at or under `root` in depth-first order (not
+ *  necessarily the shallowest) — an invisible node takes its subtree with it,
+ *  exactly as the label collection does. */
 function firstMarked(
   root: MarkedNode,
 ): { mark: ActorMark; m: ArrayLike<number> } | null {

@@ -16,9 +16,10 @@
 // asks `scripts/verify/machine-load.mjs`, and if the machine is not quiet it
 // re-runs THAT step ONCE and uses the second result. The bar itself is
 // unchanged: a red on a quiet machine blocks immediately, a step that fails
-// twice blocks whatever the machine says, and nothing is skipped, warned-about
-// instead of blocked, or bypassed. The only question the retry answers is
-// whether the first red was evidence.
+// twice blocks whatever the machine says, and the retry itself skips, softens or
+// bypasses nothing. (The gate's own stand-downs — no node_modules, an audit that
+// cannot run — are separate and printed where they happen.) The only question
+// the retry answers is whether the first red was evidence.
 //
 // Every retry PRINTS what is being re-run and why — a silent retry would hide a
 // real intermittent defect, which is exactly what the house rule about visible
@@ -130,12 +131,14 @@ function readLoadLevel({ when } = {}) {
 }
 
 /**
- * The gate's own memory of the last green unit run (point 404). Git-ignored and
+ * The gate's own memory of the unit test-file baseline, written when that count
+ * moves (point 404). Git-ignored and
  * per checkout, because each checkout has its own dependency tree and its own
  * branch — a baseline shared across them would compare two different worlds.
  *
  * FAIL-OPEN on every I/O error: a missing, unreadable or garbled state file
- * yields "no baseline", which records and passes rather than blocking.
+ * yields "no baseline", which records rather than blocking on the baseline
+ * (the on-disk count can still block).
  */
 const gateStatePath = () => resolve(REPO_ROOT, GATE_STATE_FILE)
 
@@ -154,8 +157,8 @@ function writeGateState(state) {
   // scanner holding the file for a few milliseconds is enough — this repository
   // has already had that EPERM once, on the batch lock.
   const { ok, error } = tryWriteJsonAtomic(gateStatePath(), state)
-  // Said out loud rather than swallowed: a baseline that cannot be written is
-  // a gate that will never notice the next shrink either.
+  // Said out loud rather than swallowed: a baseline that cannot be written
+  // leaves the next run compared with a stale one.
   if (!ok) console.log(`pre-push gate: the test-count baseline could not be written (${error?.message})`)
 }
 

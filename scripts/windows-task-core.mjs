@@ -1,5 +1,6 @@
-// THE BOOT PATH ON THE WINDOWS HOST, and the mutual watch between the two
-// scheduled tasks that carry it (point 447, user 30.07.2026).
+// THE BOOT PATH ON THE WINDOWS HOST, the mutual watch between the two
+// scheduled tasks that carry it (point 447, user 30.07.2026), and the hourly
+// emergency task the watchdog also keeps alive.
 //
 // WHY THIS EXISTS. The measured state of `HoA-Batch-Autostart` on the Windows
 // host was ONE time trigger every 15 minutes with `StartWhenAvailable`, principal
@@ -22,7 +23,7 @@
 // the probe command, how a task report is read, and what a peer's state means.
 //
 // PURE. Every decision here is a function of its arguments — no file, no
-// process, no clock of its own. The IO half lives in
+// process, and no clock beyond a `Date.now()` default a caller can override. The IO half lives in
 // `scripts/windows-task-watch.mjs`, which is what both tasks actually run.
 
 /** The primary launcher task. Restated rather than imported: this module must
@@ -41,7 +42,8 @@ export const EMERGENCY_INTERVAL_MINUTES = 60
 export const EMERGENCY_OFFSET_MINUTES = 12
 export const EMERGENCY_SCRIPT_PATH = 'scripts/batch-emergency.mjs'
 
-/** The repeat cadence both tasks use, in minutes — the primary's measured one. */
+/** The repeat cadence of the primary and the watchdog, in minutes — the
+ *  primary's measured one (the emergency task runs hourly, above). */
 export const TASK_INTERVAL_MINUTES = 15
 
 /** The watchdog's start delay after boot. It OFFSETS the two cadences so they
@@ -160,9 +162,10 @@ export function normalizeState(state) {
  * A probe's stdout → the normalized report every consumer reads. PURE.
  *
  * Accepts the JSON text, an already-parsed object, or junk. Junk answers
- * `{ readable: false }` — deliberately NOT `exists: false`, because "PowerShell
- * printed something I cannot read" must never be mistaken for "the task is
- * gone" and re-register a task that is fine.
+ * `{ readable: false }`, and a consumer reads `readable` BEFORE `exists` (the
+ * `exists: false` beside it is a placeholder), because "PowerShell printed
+ * something I cannot read" must never be mistaken for "the task is gone" and
+ * re-register a task that is fine — `peerVerdict` checks it first.
  */
 export function parseTaskReport(raw, { taskName = null } = {}) {
   let data = raw
@@ -200,8 +203,9 @@ export function parseTaskReport(raw, { taskName = null } = {}) {
  *
  * The order is the order of severity, and each rung is deliberately the SMALLEST
  * repair that fixes it: a missing task is re-registered from its exported XML, a
- * disabled one is enabled, a silent one is started. A task that RAN but reported
- * a non-zero result is NOT restarted — the scheduling works, the payload failed,
+ * disabled one is enabled, a silent one is started (whatever its last result).
+ * A task that RAN within the silence limit but reported a non-zero result is NOT
+ * restarted — the scheduling works, the payload failed,
  * and restarting a failing payload every quarter of an hour would turn one broken
  * run into a loop. It is reported, which is what the readiness check reads.
  */
@@ -298,7 +302,7 @@ export function parseWatchArgs(argv = []) {
   const args = argv.slice()
   while (args.length) {
     const a = String(args.shift())
-    if (a === '--check' || a === '--peer') {
+    if (a === '--check') {
       const role = String(args.shift() ?? '')
       if (!taskNameFor(role)) {
         out.error = `unknown role '${role}' — expected one of ${Object.keys(TASK_NAMES).join(', ')}`
@@ -316,6 +320,6 @@ export function parseWatchArgs(argv = []) {
       return out
     }
   }
-  if (!out.help && !out.role) out.error = 'no role given — use --check primary|watchdog'
+  if (!out.help && !out.role) out.error = `no role given — use --check ${Object.keys(TASK_NAMES).join('|')}`
   return out
 }

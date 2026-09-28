@@ -15,8 +15,11 @@
 //   2. every phase resets the world seed, the date, the position, the travel
 //      speed, the zoom, the journal and the event/deadline switches;
 //   3. the frame clock is pinned to a FIXED TIMESTEP and every phase runs a
-//      FIXED FRAME COUNT — the simulation therefore takes the identical steps
-//      in every config, and only the measured wall-clock varies.
+//      FIXED FRAME COUNT — the simulation therefore takes the same number of
+//      counted steps in every config, and mainly the measured wall-clock
+//      varies. Not pinned: the clock's elapsed time carries over between
+//      phases and configs (animation phases differ), and frames rendered while
+//      the final GPU-timer flush is awaited can also advance the fixed clock.
 
 import { addAfterEffect, addEffect } from '@react-three/fiber'
 import { balance } from '../config/balance'

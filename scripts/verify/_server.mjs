@@ -1,7 +1,8 @@
-// Shared vite-server plumbing for the verification (extracted from run-all.mjs
-// unchanged, point 294): the regression runner and the baseline classifier both
-// need to start a dev server on a free port and kill its whole process tree
-// afterwards, and one implementation of that is enough.
+// Shared vite-server plumbing for the verification (extracted from run-all.mjs,
+// point 294; pinned to 127.0.0.1 by point 475): the regression runner, the
+// baseline classifier and the backend-lane check all need to start a dev server
+// on a free port and kill its whole process tree afterwards, and one
+// implementation of that is enough.
 import { spawn, spawnSync } from 'node:child_process'
 import http from 'node:http'
 import net from 'node:net'
@@ -9,7 +10,7 @@ import net from 'node:net'
 const isWin = process.platform === 'win32'
 
 /** An OS-assigned free ephemeral port. */
-export function getFreePort() {
+function getFreePort() {
   return new Promise((resolve, reject) => {
     const srv = net.createServer()
     srv.once('error', reject)
@@ -20,7 +21,7 @@ export function getFreePort() {
   })
 }
 
-export function waitForServer(url, timeoutMs) {
+function waitForServer(url, timeoutMs) {
   const start = Date.now()
   return new Promise((resolve, reject) => {
     const tick = () => {

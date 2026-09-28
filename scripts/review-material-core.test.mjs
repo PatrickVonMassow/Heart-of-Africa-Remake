@@ -3,7 +3,6 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   assembleMaterial,
-  formatBudgetNotice,
   formatPassFiles,
   formatPassManifest,
   formatCoveragePlan,
@@ -858,7 +857,6 @@ describe('the passes a range too large is cut into', () => {
     expect(plan.passes.flatMap((p) => p.files)).not.toContain('x.md')
     expect(plan.fits).toBe(false)
     expect(formatCoveragePlan(plan)).toContain('0% planned coverage (0/1 changed files); x.md')
-    expect(formatBudgetNotice(plan)).toContain(`x.md — ${plan.uncoverable[0].reason}`)
   })
 
   it('costs a deleted file from the patch alone, so it is not lost from the plan', () => {
@@ -900,7 +898,6 @@ describe('the passes a range too large is cut into', () => {
     expect(text).toContain('DIFFSTAT ALONE')
     expect(text).toContain('NARROWER range')
     expect(text).not.toContain('--pass 1')
-    expect(formatBudgetNotice(plan, { sha: 'a'.repeat(40) })).toContain('DIFFSTAT ALONE')
     // The assembly agrees: the same parts do not fit one round.
     const assembly = assembleMaterial({ stat: 's'.repeat(2000), patch: patchFor(['a.mjs']), files: [file('a.mjs', 100)], budget })
     expect(assembly.statTruncated).toBe(true)
@@ -1095,11 +1092,6 @@ describe('the manifest a pass carries — the material states its own shape', ()
     expect(plan.fits).toBe(true)
     expect(plan.passes).toHaveLength(1)
     expect(plan.passes[0].patchOnly).toEqual(['a.mjs', 'b.mjs'])
-    // …and the caller is TOLD the delivery level of that one round.
-    const notice = formatBudgetNotice(plan, { sha: 'abcdef1' })
-    expect(notice).toContain('It fits in one round')
-    expect(notice).toContain('diff alone')
-    expect(notice).toContain('a.mjs')
   })
 
   it('counts against the ceiling — a manifest nobody reserved room for fails the fit', () => {
@@ -1209,31 +1201,8 @@ describe('the review scripts stay reviewable as text', () => {
   })
 })
 
-describe('what the caller is told before the round is spent', () => {
-  it('names the threshold and this range against it', () => {
-    const plan = planPasses({ stat: 's', patch: patchFor(['a.mjs']), files: [file('a.mjs', 50)], budget: 20_000 })
-    const notice = formatBudgetNotice(plan, { sha: 'abcdef1234' })
-    expect(notice).toContain('20000 characters per round')
-    expect(notice).toContain('It fits in one round.')
-  })
-
-  it('names every pass and its files when it does not fit', () => {
-    const paths = ['a.mjs', 'b.mjs', 'c.mjs']
-    const plan = planPasses({ stat: 's', patch: patchFor(paths), files: paths.map((p) => file(p, 4000)), budget: 10_000 })
-    const notice = formatBudgetNotice(plan, { sha: 'abcdef1234567' })
-    expect(notice).toContain('PASSES over the FILE SET')
-    expect(notice).toContain('--pass 1')
-    for (const p of paths) expect(notice).toContain(p)
-    expect(notice).toContain('splitting by COMMIT does not help')
-  })
-
-  it('names the files beyond reach of any pass', () => {
-    const huge = ['diff --git a/x.md b/x.md', `+${'y'.repeat(30_000)}`].join('\n')
-    const plan = planPasses({ stat: 's', patch: huge, files: [file('x.md', 10)], budget: 5000 })
-    expect(formatBudgetNotice(plan, { sha: 'aaaaaaa' })).toContain('BEYOND REACH')
-  })
-
-  it('refuses a plan wider than the recorder holds, advertising NO pass command (landing-round pass 5)', () => {
+describe('a plan wider than the recorder holds', () => {
+  it('refuses it, advertising NO pass command (landing-round pass 5)', () => {
     // parsePassSpec refuses any total above MAX_PASS_TOTAL, so a plan of more
     // passes advertised runnable commands whose records were all refused —
     // rounds consumed on a review that could never be recorded.
@@ -1252,11 +1221,7 @@ describe('what the caller is told before the round is spent', () => {
       })),
       uncoverable: [],
     }
-    const notice = formatBudgetNotice(wide, { sha: 'abcdef1234567' })
-    expect(notice).toContain(`more than the ${MAX_PASS_TOTAL}`)
-    expect(notice).toContain('narrow the range')
-    expect(notice).not.toContain('--pass 1')
-    // …and the plan-only refusal path says the same instead of listing passes.
+    // The plan-only refusal path names the ceiling instead of listing passes.
     const refusal = formatShortfall(planShortfall(wide), { sha: 'abcdef1234567', plan: wide })
     expect(refusal).toContain(`more than the ${MAX_PASS_TOTAL}`)
     expect(refusal).not.toContain('--pass 1')

@@ -28,8 +28,8 @@ function erledigtSpan(html) {
 }
 
 const check = process.argv.includes('--check')
-// NORMALISED BEFORE ANYTHING IS MEASURED (point 439). The anchor above is matched
-// with a literal newline, so a board an editor wrote back in Windows text mode
+// NORMALISED BEFORE ANYTHING IS MEASURED (point 439). erledigtSectionStart's
+// anchor (board-core.mjs) is matched with a literal newline, so a board an editor wrote back in Windows text mode
 // made this script throw a stack trace mid-`attest` on a board that looked
 // perfect in the browser. The offsets below index THESE bytes, so the file is
 // written back normalised too — a mixed file cannot survive one rotation.
@@ -63,8 +63,5 @@ const anchor = archive.indexOf('<h2>')
 const at = archive.indexOf('\n', archive.indexOf('</h2>', anchor)) + 1
 writeFileSync(ARCHIVE, archive.slice(0, at) + moved.join('') + archive.slice(at))
 
-const after = (readFileSync(BOARD, 'utf8').slice(start).match(CARD) ?? []).length
 console.log(`moved ${moved.length} card(s) to the archive; board now holds ${cards.length - moved.length}`)
-if (cards.length - moved.length !== ERLEDIGT_ON_BOARD) throw new Error('rotation left the wrong count')
 console.log(`${REPUBLISH} (the publisher pushes board and archive together)`)
-void after

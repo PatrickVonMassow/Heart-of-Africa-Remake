@@ -5,7 +5,8 @@
 // and low byte independently and invents phantom elevations at texel edges —
 // and G holds an inland-water mask baked from the hydrology vectors (river
 // ribbons and lake polygons), which the DEM itself cannot provide: carved
-// rivers lie ABOVE sea level, so elevation alone cannot exclude them.
+// rivers lie ABOVE sea level, so elevation alone cannot exclude them. B holds
+// the DEM's own dataset-land flag (read through demDatasetLand).
 
 import * as THREE from 'three/webgpu'
 import { float, texture, vec2 } from 'three/tsl'

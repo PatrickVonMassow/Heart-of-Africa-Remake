@@ -27,21 +27,23 @@ import {
   removedRecordMessage,
   seedRecord,
   settleRecord,
-  unrankedAppends,
   ORIGIN_MACHINE,
   ORIGIN_USER,
   PLACE_AHEAD,
   PLACE_LAST,
-  originOf,
   BOUNDARY_SEED_CMD,
   boundaryUnarmedMessage,
-  releaseBoundaryBreaches,
   releaseBoundaryMessage,
   releaseBoundaryState,
   seedBoundary,
   statesHighUrgency,
 } from './queue-rank-core.mjs'
 import { RELEASE_TAG_POINT } from './board-queue-core.mjs'
+
+/** The appended points whose rank nobody has settled yet. */
+const unrankedAppends = (open, record) => appendGateState(open, record).pending
+/** Just the release-boundary breaches. */
+const releaseBoundaryBreaches = (open, record, options = {}) => releaseBoundaryState(open, record, options).breaches
 
 /** A record whose baseline says "these points were here when the order was last settled". */
 const settledAt = (points, ranked = {}) => ({ ranked, settled: { at: '2026-08-10T09:00:00.000Z', points } })
@@ -644,11 +646,10 @@ describe('ORIGIN is stated, never inherited by omission', () => {
     const last = { 700: { at: '', why: 'nothing waits on it', origin: ORIGIN_MACHINE, place: PLACE_LAST } }
     expect(unrankedAppends([9, 5, 700], settledAt([5, 9], last))).toEqual([])
   })
-  it('reads a missing, old or damaged origin as the MACHINE', () => {
-    expect(originOf({ ranked: { 7: { why: 'w' } } }, 7)).toBe(ORIGIN_MACHINE)
-    expect(originOf({ ranked: { 7: { why: 'w', origin: 'users' } } }, 7)).toBe(ORIGIN_MACHINE)
-    expect(originOf({}, 7)).toBe(ORIGIN_MACHINE)
-    expect(originOf({ ranked: { 7: { why: 'w', origin: ORIGIN_USER } } }, 7)).toBe(ORIGIN_USER)
+  it('keeps only an explicit user origin; a missing or damaged one claims nothing', () => {
+    expect(normaliseRankRecord({ ranked: { 7: { why: 'w' } } }).ranked[7].origin).toBeUndefined()
+    expect(normaliseRankRecord({ ranked: { 7: { why: 'w', origin: 'users' } } }).ranked[7].origin).toBeUndefined()
+    expect(normaliseRankRecord({ ranked: { 7: { why: 'w', origin: ORIGIN_USER } } }).ranked[7].origin).toBe(ORIGIN_USER)
   })
   it('keeps a hand-edited reason to ONE line, so the record cannot carry a paragraph', () => {
     const paragraph = parseRankRecord('{"ranked":{"7":{"why":"first line\\n\\nsecond line"}},"settled":{"at":"t","points":[7]}}')

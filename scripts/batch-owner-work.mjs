@@ -16,11 +16,11 @@
 // batch-singleton cannot import them back. `acquire` therefore takes the verdict
 // as DATA (`opts.work`) and this module is what fills it in.
 //
-// CHEAP BY CONSTRUCTION. The probes run git, and three of the four callers are on
-// a hook path — so nothing is gathered unless the lock is actually in a state
+// CHEAP BY CONSTRUCTION. The probes run git, and its callers include hook paths
+// (batch-progress-guard, batch-resume-hook) — so nothing is gathered unless the lock is actually in a state
 // where corroboration could change the answer: an expired lease, or the stretch a
 // declared wait bought. In every other case the arithmetic decides alone, exactly
-// as before, and this returns null for one file read.
+// as before, and this returns null without reading anything.
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
 import { assessOwnerWork, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import { probePid } from './batch-singleton.mjs'
@@ -30,8 +30,9 @@ import { leaseExpired, inDeclaredWaitWindow, LEASE_MS } from './batch-lease-core
  * IS THIS LOCK IN A STATE WHERE CORROBORATION MATTERS? PURE.
  *
  * Only two: the lease has run out, or we are inside the stretch a declared wait
- * bought beyond an ordinary window. Anywhere else `assessOwner` never reaches the
- * branch that reads `work`, so gathering would be pure cost.
+ * bought beyond an ordinary window. Anywhere else only the idle rule reads `work`
+ * (`work.declared`), and there a sanctioned wait is already visible on the lock
+ * (`lockDeclaresWait`), so gathering would be pure cost.
  */
 export function corroborationNeeded(lock, { now = Date.now(), leaseMs = LEASE_MS } = {}) {
   if (!lock || typeof lock !== 'object') return false

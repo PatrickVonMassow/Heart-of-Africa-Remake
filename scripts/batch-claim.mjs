@@ -51,8 +51,6 @@ import {
   GIT_STATE_UNVERIFIABLE,
 } from './batch-claim-core.mjs'
 
-export { CLAIM_PATH }
-
 /** The calibratable maximum age, HOA_CLAIM_MAX_MIN in minutes. Read here, not in
  *  the core, so the decision function stays pure and testable. */
 export function maxAgeMs(env = process.env) {
@@ -100,8 +98,9 @@ export function renewOwnClaim(
 }
 
 /**
- * A git operation that must NOT be cut in half: a merge, a cherry-pick, a rebase
- * or a conflicted index. Returns its name, `null` when the checkout is clean, or
+ * A git operation that must NOT be cut in half: a merge, a cherry-pick, a revert,
+ * a rebase or a conflicted index. Returns its name, `null` when none is in
+ * progress (uncommitted edits are not looked at), or
  * `GIT_STATE_UNVERIFIABLE` when the probe could not find out — this is one input
  * to a guard, never a reason to fail one, so it still never throws.
  *
@@ -230,7 +229,7 @@ export function handBackToClaimant(
 }
 
 /** The exact gathered state printed by --status and consumed by --wait. */
-export function gatherClaimStatus(sid = '', { now = Date.now() } = {}) {
+function gatherClaimStatus(sid = '', { now = Date.now() } = {}) {
   const lock = readOwnerLock()
   const ownerAlive = lock
     ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
@@ -315,7 +314,7 @@ if (isMain) {
               'age out; it ends when the claiming window closes.'
             : 'No live owner holds the batch — re-run the claim with --session <id> and it is yours at once. ' +
               `Do not wait: with no owner to wait for the claim is honoured only for ${Math.round(maxAgeMs() / 60000)} ` +
-              'min from when it was RECORDED, and then the ordinary handover takes over so the batch is never ' +
+              'min from when it was recorded or last renewed, and then the ordinary handover takes over so the batch is never ' +
               'left ownerless.'),
       )
     } else if (view.reserve === true) {
@@ -367,7 +366,7 @@ if (isMain) {
     process.exit(0)
   }
 
-  if (argv.length === 0 || (!has('--session') && !has('--status'))) fail(usage)
+  if (!has('--session')) fail(usage)
   needSid()
 
   // 1. IS IT FREE? With no live owner the claim is satisfied AT ONCE — there is
@@ -427,7 +426,8 @@ if (isMain) {
     fail(
       `session ${write.claimantSid} claimed the batch ${Math.round((write.ageMs ?? 0) / 60000)} min ago and that ` +
         'claim is still renewed, so this one would be a second window pulling the batch two ways. Exactly one ' +
-        'session drives. Have that window run `--withdraw`, close it, or let its activity window expire. Nothing recorded.',
+        'session drives. Have that window run `--withdraw` or close it; with no live owner its claim also lapses ' +
+        'when its take-up window runs out. Nothing recorded.',
     )
   }
   const claim = {
@@ -457,11 +457,12 @@ if (isMain) {
           : ` (A ${check.reason.replace(/^git-/, '')} is in progress in this checkout right now.)`
         : '') +
       ` Re-run \`node scripts/batch-claim.mjs --session ${sid}\` to take the batch once it is free — the same ` +
-      `command claims and takes. The reservation lasts ${mins} min from this real claimant activity; re-running ` +
-      'the same command renews it, while a merely open editor window does not. A closed or recycled claimant ' +
-      'expires immediately. When the activity window runs out, the ordinary handover takes over rather than ' +
-      'leaving the batch ownerless. And once the owner has RELEASED for it the claim is spent: the lock is free ' +
-      'and the first window to acquire wins, so re-run this command AT ONCE when the release is reported; if the ' +
-      'launcher got there first, claim again against the new owner.',
+      'command claims and takes. While the owner holds the lock this claim does not age; it ends when this ' +
+      `window closes. Once nobody is left to wait for, it lasts ${mins} min from the release or this window's ` +
+      'latest real activity; re-running the same command renews it, while a merely open editor window does not. ' +
+      'A closed or recycled claimant expires immediately, and when the window runs out the ordinary handover ' +
+      'takes over rather than leaving the batch ownerless. Once the owner has RELEASED for it the claim is spent, ' +
+      'but the free lock stays RESERVED for this window against the automated acquirers, so re-run this command ' +
+      'AT ONCE when the release is reported; if another session got there first, claim again against the new owner.',
   )
 }

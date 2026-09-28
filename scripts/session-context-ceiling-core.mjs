@@ -41,7 +41,8 @@ export function contextSessionIdentity({ agentId = null, sessionId = '' } = {}) 
   return agent ? `${sid}:agent:${agent}` : sid
 }
 
-/** Direct reading tools are admitted and booked, but never denied. */
+/** The operation class of a tool call: direct reading tools and the answer
+ *  itself are admitted and booked, but never denied; anything else is a call. */
 export function contextOperationOf({ toolName = '', operation = null } = {}) {
   if (Object.values(CONTEXT_OPERATION).includes(operation)) return operation
   const tool = String(toolName ?? '').trim().toLowerCase()

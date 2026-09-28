@@ -1,6 +1,7 @@
 // HOW A GROUND CROP IS READ (work-order 641).
 //
-// The settlement-edge measurement in polish.mjs judges the painted edge by the
+// The settlement-edge measurement (run by polish.mjs; its reading lives in
+// edgeBandReading.mjs and its settle in edgeBandSettle.mjs) judges the painted edge by the
 // luminance of small ground crops with the band switched on and off. It used to
 // read the crop's MEAN of a single picture, and that is not robust: on
 // 11.08.2026 the `giza (wet)` check went red on WebGPU at `outside ×0.963` — the
@@ -9,7 +10,7 @@
 //
 // MEASURED CAUSE (not inferred). Sampling that crop 284 times over 90 s at giza
 // with the wet override on, band strength fixed, sun and hemi light constant:
-// the crop's mean sat at 102.5 and jumped to 114.0 — +11.4 % — about every 13 s,
+// the crop's mean sat at 102.6 and jumped to 114.2 — +11.4 % — about every 13 s,
 // eleven times in 150 s. The saved frames show what it is: the RAIN of §19.13
 // draws close-to-camera streaks, and a bright near-white streak roughly 14 px
 // wide falls straight through the 150×46 crop. It is not load, not the band, not
@@ -40,22 +41,16 @@
 //                                                over ANY part of the crop is
 //                                                measured at full strength
 //
-// The reads must therefore be different PICTURES of the same scene: polish.mjs
-// spaces them by both frames and the page's own elapsed time, because a streak
-// lingers ~0.7 s and twelve frames can be 0.2 s.
+// The reads must therefore be different PICTURES of the same scene: the settle
+// (edgeBandSettle.mjs) spaces them by both frames and the page's own elapsed
+// time (READ_GAP_FRAMES, READ_GAP_MS), because a streak lingers up to
+// STREAK_LINGER_MS and twelve frames can be 0.2 s.
 //
 // THE ORIGINAL SINGLE-PICTURE SETTLE needed the same two properties and got
-// them a different way (retained below as settleReading and its fixtures).
-// The live settle now uses full shot windows in edgeBandSettle.mjs: even a
-// rain-robust single-picture statistic did not fix its too-short time interval.
-// It reads one picture at a time, so it has no time axis to reject a streak in —
-// and a spatial median would make it blind in exactly the way described above:
-// it would call a crop settled while a leak was still arriving in the near rows.
-// A rain streak is BRIGHT and a band leak is DARK, so the settle reading drops
-// the brightest fifth of the crop and averages the rest (`settleReading`).
-// Measured on the fixtures: a 14 px streak moves it by 0.27 % and a 25 px one by
-// 0.53 %, while the 8-row leak the spatial median reports as ×1.000 moves it by
-// 3.8 %. A streak can still cost the loop an iteration; it cannot end it early.
+// them a different way: it dropped the brightest fifth of one picture and
+// averaged the rest. It is retired — even a rain-robust single-picture
+// statistic could not fix its too-short time interval — and the live settle
+// uses full shot windows in edgeBandSettle.mjs, guarded by shotDrift below.
 //
 // The decisions are pure and pinned in cropLuma.test.mjs; the browser side only
 // hands the pixels over.
@@ -63,15 +58,15 @@
 /** How many reads one shot takes, and how far apart. The gap is BOTH conditions,
  *  because neither alone is a picture: frames alone can be milliseconds on a fast
  *  machine, and elapsed time alone is no new frame on a throttled one.
- *  cropLuma.test.mjs pins the inequality these four have to satisfy, which is
- *  what stops a later edit from quietly taking the reads back to three or
- *  closing the gap. */
+ *  cropLuma.test.mjs pins the inequality READ_COUNT and READ_GAP_MS have to
+ *  satisfy against STREAK_LINGER_MS below, which is what stops a later edit from
+ *  quietly taking the reads back to three or closing the gap. */
 export const READ_COUNT = 5
 export const READ_GAP_MS = 600
 export const READ_GAP_FRAMES = 12
 
 /** How long one §19.13 streak stays in the crop — MEASURED, not assumed, at
- *  giza in the rains (local/streak-probe.mjs, local/streak-lifetime.mjs).
+ *  giza in the rains (with two probe scripts under local/, since removed).
  *  Sampling the crop once per animation frame for 120 s, twice: of 52 crossings
  *  not ONE spanned two consecutive samples 134 ms apart.
  *
@@ -143,45 +138,6 @@ export function mean(values) {
   return sum / n
 }
 
-/** The share of the crop the settle reading drops — the bright end, where the
- *  rain is. A 14 px streak is 9.3 % of the crop's pixels and a 25 px one 16.7 %,
- *  so a fifth clears both with room to spare, while a DARKENING leak is
- *  untouched by a bright-end trim however far it reaches. */
-export const SETTLE_DROP_BRIGHTEST = 0.2
-
-/** The mean of the crop with its brightest `dropBrightest` share removed. */
-export function trimmedMean(samples, dropBrightest = SETTLE_DROP_BRIGHTEST) {
-  const n = samples.length
-  if (n === 0) return null
-  const sorted = Float64Array.from(samples).sort()
-  const keep = Math.max(1, Math.round(n * (1 - dropBrightest)))
-  let sum = 0
-  for (let i = 0; i < keep; i++) sum += sorted[i]
-  return sum / keep
-}
-
-/**
- * The SETTLE reading of one crop, whose job is to say whether the picture has
- * stopped moving. A rain streak must not end that loop early and must not
- * restart it forever; a band leak arriving in part of the crop MUST hold it
- * open, which is what a spatial median here would not do.
- *
- * THE TRIM IS ONE-SIDED ON PURPOSE. Trimming both ends would be symmetric and
- * would put the blindness straight back: a leak DARKENS the crop, so the darkest
- * pixels are the defect and a low-end trim would drop exactly them. The bright
- * end is where the rain is and the dark end is where the defect is, so only the
- * bright end goes.
- *
- * What that costs is bounded and covered elsewhere: a defect that BRIGHTENS a
- * fifth of the crop or less can hide from this reading — but not from the
- * measurement, which is a plain mean and reads both directions, against a bar
- * (`|1 - outside| < 0.025`) that is likewise two-sided. The settle loop can be a
- * few frames early on such a defect; the check still reports it.
- */
-export function settleReading(samples) {
-  return trimmedMean(samples)
-}
-
 /**
  * THE READING OF ONE SHOT, from repeated reads of the SAME crop.
  *
@@ -211,9 +167,9 @@ export function shotReading(reads) {
  *
  * `shotReading` drops anything that reaches a minority of the reads, which is
  * what makes the rain harmless — and it would drop a real defect ARRIVING
- * mid-shot just as silently. The original one-sided single-picture settle
- * (`settleReading`) could miss a BRIGHTENING over part of the crop. The live
- * settle now uses this guard on the full window before measuring that window.
+ * mid-shot just as silently. The retired one-sided single-picture settle could
+ * miss a BRIGHTENING over part of the crop. The live settle now uses this guard
+ * on the full window before measuring that window.
  *
  * This defence is sign-agnostic: read the first half and
  * the last half separately. Each sub-window is still rain-robust — a streak
@@ -231,10 +187,11 @@ export function shotDrift(reads) {
   // the halves are [1,2,3] and [4,5,6], a change arriving at read 4 or 5 and
   // staying is two of the last three and cannot be dropped, and one that appears
   // only in read 6 never entered the measurement at all — read 6 is not part of
-  // it. Three per half is the floor at which a single streak is still a minority.
+  // it (it enters only the normaliser `whole` below, where one read of six
+  // cannot carry the median). Three per half is the floor at which a single
+  // streak is still a minority.
   if (!Array.isArray(reads) || reads.length < 6) return null
   const half = Math.floor(reads.length / 2)
-  if (half < 3) return null
   const first = shotReading(reads.slice(0, half))
   const last = shotReading(reads.slice(reads.length - half))
   const whole = shotReading(reads)

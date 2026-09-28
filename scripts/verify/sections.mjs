@@ -6,7 +6,7 @@
 // not the game (one had to STAGE an animal instead of hoping one streamed into
 // view, one read the label list a frame before the drawn labels). Each such
 // repair replayed `enrichments` whole: one browser session, 251 checks, over 17
-// minutes on the WebGL 2 lane, then the same round again on the second backend.
+// minutes on the WebGL 2 lane that day (the 09.08.2026 median is 951 s), then the same round again on the second backend.
 //
 // A name filter on `check()` would buy nothing: the suites are linear scripts —
 // boot, jump, wait for herds, assert, jump on — and the expensive part is the
@@ -134,7 +134,7 @@ export function listNonPredictive(source) {
 /**
  * HOW MANY SUBJECTS A CHECK ACTUALLY SAW (point 1136, user order 15.09.2026).
  *
- * WHY. `nonPredictive` below declares, once and for all, that a check's narrow
+ * WHY. `nonPredictive` (listNonPredictive, above) declares, once and for all, that a check's narrow
  * reading cannot predict the suite's. That is the FALLBACK. The cheaper and
  * provable answer is to CREATE the rare situation and then say how often it was
  * really reached — because a check that saw nothing gives no all-clear, and a
@@ -255,8 +255,9 @@ export function planSectionRun({ tier = null, filter = [], section = null, known
  * checks should run, and records the block as the one a following `check()`
  * belongs to.
  *
- * `sections` is the declared list (for the loud refusal); passing none disables
- * only the refusal, never the selection.
+ * `sections` is the declared list (for the loud refusal). A run without a
+ * request is unaffected by an empty list; a named request against one is
+ * refused like any unknown name.
  */
 export function makeSectionGate({ sections = [], requested = null, suite = 'the suite' } = {}) {
   const verdict = resolveSelection({ sections, requested, suite })
@@ -367,7 +368,7 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
      */
     unrun: () =>
       verdict.partial && !ran.includes(verdict.requested)
-        ? `section "${verdict.requested}" was selected but never ran — ${suite} declares the name (possibly only in a comment or behind an unreached branch) and no block executed it; nothing was verified`
+        ? `section "${verdict.requested}" was selected but never ran — ${suite} declares the name (possibly behind an unreached branch) and no block executed it; nothing was verified`
         : null,
   }
   return gate
@@ -389,14 +390,15 @@ export const sectionGateWasBuilt = () => gateBuilt
 /**
  * The gate for the suite that is running: its own source decides the valid
  * names, `VERIFY_SECTION` carries the request. A source that cannot be read
- * (an unusual argv) only costs the loud refusal, never the run.
+ * (an unusual argv) leaves a whole run unaffected, but then no name is declared,
+ * so a `VERIFY_SECTION` request is refused.
  */
 export function sectionGate({ suitePath = process.argv[1], env = process.env } = {}) {
   let source = ''
   try {
     source = readFileSync(suitePath, 'utf8')
   } catch {
-    /* no source to parse — selection still works, the candidate list does not */
+    /* no source to parse — a whole run proceeds; a named request is refused */
   }
   const gate = makeSectionGate({
     sections: listSections(source),

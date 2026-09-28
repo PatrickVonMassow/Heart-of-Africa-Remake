@@ -21,7 +21,9 @@
 //   1. a REQUEST addressed to the user (an imperative, a "bitte/please …",
 //      "kannst du …", or a fenced command block with a second-person lead-in);
 //   2. a CONTAINER STEP in the same block (a command, a script, a repo path);
-//   3. no EXEMPTION in the clause that carries the request.
+//   3. no EXEMPTION in the clause that carries the request (for a step that is
+//      not an unmistakable execution, a capability cue in a neighbouring clause
+//      exempts too — see `judgeRequest`).
 // Everything is judged per BLOCK (a paragraph plus any fenced code attached to
 // it) and per CLAUSE, never over the whole message: a windowed scan over the
 // full text let one honest sentence clear a demand three sentences away.
@@ -34,7 +36,8 @@ export const EXCERPT_CHARS = 160
 
 /**
  * Steps that are UNMISTAKABLY an execution inside the container. These beat the
- * capability exemption below, because none of them is a capability: `docker
+ * NEIGHBOURING-clause capability exemption (a cue in the request's own clause
+ * still exempts), because none of them is a capability: `docker
  * exec`, `sudo bash …` and `npm run …` are the running of the work itself. The
  * historic pair — `sudo bash scripts/verify-host-setup.sh` and the
  * `docker exec -u root …` line — are both here by construction.
@@ -417,7 +420,8 @@ export function findContainerAsks(text) {
       if (request) requests.push({ clause, i, request })
     })
     // A fenced command block with a second-person lead-in is an ask even
-    // without a request verb ("Bei dir im Terminal:" + the fence).
+    // without a request verb ("Bei dir im Terminal:" + the fence) — but only
+    // when the fence holds an EXECUTION step; a wider container step does not.
     if (requests.length === 0 && code && firstMatch(EXECUTION_STEP_PATTERNS, code)) {
       const i = clauses.length - 1
       const clause = clauses[i] ?? ''

@@ -27,7 +27,8 @@ export function pointNumbersFromChip(raw) {
  * The sync guard additionally opts into `allowUnseparatedSingle` for its older
  * `306 Closing…` titles; keeping that exception here lets the consumer retain
  * its compatibility contract without growing another numeric parser.
- * A four-digit token is ambiguous with a year and therefore counts only when
+ * A number whose VALUE has four digits (leading zeros dropped — `02026` is 2026,
+ * `0001` is 1) is ambiguous with a year and therefore counts only when
  * `knownPoints` proves that exact TASKS point. Other lengths stay uncapped.
  *
  * Returns both the accepted points and the end of the numeric prefix so callers

@@ -31,11 +31,11 @@
 //      moving; every terminal diagnosis repeats at the capped interval.
 //
 // Where two verdicts are close this file chooses the CHEAPER MISTAKE: not
-// retrying costs one deliberate re-spawn in the morning; retrying into an
-// outage costs the night.
+// retrying costs one clocked recovery a little later; retrying into an outage
+// costs the night.
 
-/** At most two retries of one point — beyond that the failure is not transient
- *  however it presents itself. */
+/** At most two retries of one point — beyond that the failure is no longer
+ *  retried, however transient it presents itself. */
 export const MAX_RETRIES = 2
 
 /** Backoff before retry 1 and retry 2. Long enough for a provider blip to pass
@@ -52,7 +52,7 @@ export const OUTAGE_WINDOW_MS = 15 * 60 * 1000
 
 /** How many DISTINCT children with the same signature make it an outage. Two —
  *  which is exactly what that night produced. */
-export const OUTAGE_CHILD_THRESHOLD = 2
+const OUTAGE_CHILD_THRESHOLD = 2
 
 /** The token ceiling one work-order point may consume across all its spawns.
  *  Calibratable via HOA_POINT_TOKEN_CAP (see scripts/child-retry.mjs). A big
@@ -63,7 +63,7 @@ export const POINT_TOKEN_CAP = 1_500_000
 /** How long a recorded death stays in the state file. Longer than the outage
  *  window so the window can never be emptied by pruning, short enough that the
  *  file stays small. */
-export const DEATH_RETENTION_MS = 6 * 60 * 60 * 1000
+const DEATH_RETENTION_MS = 6 * 60 * 60 * 1000
 
 /**
  * NON-TRANSIENT MARKERS, MATCHED FIRST AND WINNING.
@@ -73,7 +73,7 @@ export const DEATH_RETENTION_MS = 6 * 60 * 60 * 1000
  * gate with 500 assertions in it would be retried into the same red gate twice.
  * So these are checked before anything else, and any hit ends the question.
  */
-export const NON_TRANSIENT_PATTERNS = [
+const NON_TRANSIENT_PATTERNS = [
   { label: 'gate-red', re: /\b(?:gate|ci|regression|vitest|test|tests|build|(?:ox)?lint|audit|typecheck)\b[^\n]{0,60}\b(?:red|fail|failed|failing|failure|error[s]?)\b/i },
   { label: 'gate-red', re: /\b(?:fail|failed|failing|failure)\b[^\n]{0,60}\b(?:gate|ci|regression|vitest|test|tests|build|(?:ox)?lint|audit)\b/i },
   { label: 'guard-block', re: /\bguard\b[^\n]{0,60}\b(?:block|blocked|blocks|denied|deny)\b/i },
@@ -101,7 +101,7 @@ export const NON_TRANSIENT_PATTERNS = [
  * the NEVER-retry class, and retrying one buys the identical red a second time.
  * `api error` stays, because that IS the harness's own death.
  */
-export const TRANSIENT_PATTERNS = [
+const TRANSIENT_PATTERNS = [
   { signature: null, re: /\b(?:http|https|status|statuscode|status[ _-]?code|api error)\b\W{0,4}(429|5\d\d)\b/i, group: 1 },
   { signature: null, re: /\b(429|5\d\d)\b\s*(?:internal server error|bad gateway|service unavailable|gateway time-?out|too many requests|overloaded)/i, group: 1 },
   { signature: 'http-529', re: /\boverloaded(?:_error)?\b/i },
@@ -111,8 +111,8 @@ export const TRANSIENT_PATTERNS = [
   { signature: 'api-error', re: /\bAPI (?:Error|error)\b/ },
 ]
 
-/** Signatures this module emits, as the command's `--signature` also accepts
- *  them pre-normalised (a caller that already classified need not re-print the
+/** Signatures this module emits; the command's `--death` also accepts them
+ *  pre-normalised (a caller that already classified need not re-print the
  *  provider's prose). */
 const NORMALISED_SIGNATURE = /^(?:http-(?:429|5\d\d)|econnreset|etimedout|api-error)$/
 
@@ -163,7 +163,7 @@ export function emptyState() {
 /** The recorded deaths of a state document, defensively. A half-written or
  *  hand-edited file must not throw here — layer 5 has to answer even when every
  *  other layer's input is missing, stale or garbage (§8, independence). */
-export function stateDeaths(state) {
+function stateDeaths(state) {
   return Array.isArray(state?.deaths) ? state.deaths : []
 }
 
@@ -201,7 +201,8 @@ const recoveryPrompt = ({ action, point, branch }) => {
   return `EXCHANGE point ${point}${where} for the next workable queue item; reconsider this branch at the recorded probe time.`
 }
 
-/** A durable decision record carried both in state and onto the board. */
+/** A durable decision record kept in the retry state, from which the board
+ *  derives its card. */
 export function childRecoveryRecord({ point, branch, recoveryClass, recoveryAction, reason, decidedAt, retryAt }) {
   const subject = `Punkt ${point ?? '?'}: ${recoveryAction}`
   return {
@@ -282,7 +283,8 @@ export function outageWitnesses({ deaths = [], signature, key, now = Date.now(),
 }
 
 /**
- * THE DECISION. Pure: everything it reads is an argument.
+ * THE DECISION. Pure: everything it reads is an argument (`now` defaults to
+ * Date.now()).
  *
  * @returns {{verdict: 'retry'|'recover'|'outage-probe'|'scheduled'|'stand-down', ...}}
  */
@@ -376,7 +378,6 @@ export function retryDecision({
   const witnesses = outageWitnesses({ deaths: stateDeaths(state), signature, key, now, windowMs: outageWindowMs })
   if (witnesses.length >= outageThreshold) {
     return {
-      ...base,
       ...recover(base, {
         action: 'probe-outage',
         recoveryClass: 'outage',
@@ -556,7 +557,8 @@ export function outageProbeReason(decision, stamp) {
   )
 }
 
-/** One human line for the console and the log — English, this is machine-facing. */
+/** A human summary (one to three lines) for the console — English, this is
+ *  machine-facing. */
 export function describeDecision(d) {
   const head = `${d.verdict.toUpperCase()} — ${d.reason}`
   if (d.verdict === 'retry') return `${head}\n  wait ${Math.round(d.backoffMs / 1000)} s, then re-spawn.\n  ${d.promptHint}`

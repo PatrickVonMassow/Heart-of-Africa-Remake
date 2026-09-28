@@ -7,10 +7,13 @@
 // copy still named the claude.ai mirror the user retired on 29.07.2026.
 //
 // Two rules keep that from recurring:
-//   - the COMMANDS live here and nowhere else, so a transport change is one edit;
+//   - the publish and attest COMMANDS a remedy names live here, so a transport
+//     change is one edit (card-edit remedies elsewhere still spell
+//     `node scripts/board.mjs …` in place);
 //   - the board CONTRACT — the four-section structure, the transport, the update
-//     discipline — is stated exactly ONCE, in the memory `batch-dashboard-artifact`.
-//     Every other place refers to it (CONTRACT below) instead of restating it.
+//     discipline — is stated in prose exactly ONCE, in the memory
+//     `batch-dashboard-artifact`. Other places refer to it (CONTRACT below); the
+//     gates carry only the data they check (e.g. `REQUIRED_SECTIONS`).
 
 /** Publish the board to the live page. Works in EVERY session, headless included. */
 export const PUBLISH_CMD = 'node scripts/board-publish.mjs'
@@ -37,17 +40,19 @@ export const NOW_CARD_CMD = `${EDIT_CMD} now`
 export const NONE_CARD_CMD = `${EDIT_CMD} none`
 
 /**
- * Write the "only the closing duties are left" card (point 544).
+ * Write the "only the closing duties are left" card (point 544) — a prefix:
+ * since point 655 the card names its point, so callers append
+ * `<N> "<Grund>"`.
  *
  * The third thing a session can truthfully say. A session that has merged and
- * ticked its point but still owes its closing duties is neither idle nor working
- * a numbered point, so under the idle card the point-470 deny fired on every
+ * ticked its point but still owes its closing duties is neither idle nor at work
+ * on the point itself, so under the idle card the point-470 deny fired on every
  * call while neither of its two remedies could reach the state. This one can,
  * and the deny names it.
  */
 export const CLOSING_CARD_CMD = `${EDIT_CMD} closing`
 
-/** The tail every board remedy ends with. */
+/** The tail a board remedy ends with when its fix needs a republish. */
 export const REPUBLISH = `republish (${PUBLISH_CMD}) and re-run ${SYNCED_CMD}`
 
 /** Where the board's binding contract is stated — the ONE statement of it. */

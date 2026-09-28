@@ -4,8 +4,8 @@
 // overriding a value the design states concretely. This is therefore not a
 // change of the start: the DEFAULT stays Cairo, and only an explicit
 // `?start=<placeId>` moves it, for testing a settlement without walking the
-// continent first. The user asked for the Bambara village while the
-// communication PoC is under repair — that village is where it is taught.
+// continent first. The user asked for it to reach the Bambara village, where
+// the communication is taught.
 //
 // It works in the PRODUCTION build on purpose, exactly like `?bench` and unlike
 // the DEV-only `?seed`: the user tests the DEPLOYED page, so a dev-only switch

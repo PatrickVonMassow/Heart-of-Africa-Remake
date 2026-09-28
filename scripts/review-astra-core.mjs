@@ -14,7 +14,8 @@
 // THE FAILURE MODE THIS FILE IS SHAPED AROUND: a review nobody ran must never be
 // recorded as done. That is worse than having no second pair of eyes, because
 // the mechanism/criticality gates then read GREEN on a commit nothing judged.
-// So every path out of a failed Astra run yields an eligible Claude reviewer and NO
+// So every path out of a failed Astra run yields the first eligible Claude reviewer
+// (or none, said plainly, when every one of them authored the range) and NO
 // verdict — the verdict is the reviewer's to give, never the runner's to
 // invent — and the model that is RECORDED is always the one that actually ran,
 // never the one that was preferred.
@@ -42,7 +43,6 @@ import {
   fableIsOn,
 } from './fable-switch-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
-import { modelTrailerIdentities } from './model-guard-core.mjs'
 import {
   assembleMaterial,
   formatPassFiles,
@@ -108,7 +108,7 @@ export function reviewerDescriptor(value = '') {
 }
 
 /** A review candidate chain with the shared switch applied. */
-export function availableReviewChain(chain, fableState) {
+function availableReviewChain(chain, fableState) {
   if (fableState === undefined || fableIsOn(fableState)) return Object.freeze([...chain])
   return Object.freeze(chain.filter((model) => !sameModel(model, FABLE_MODEL)))
 }
@@ -172,7 +172,9 @@ export function causeTextFor(kind) {
  * wrong one. The specific wording is therefore matched before the bare code.
  * A pattern that matches nothing simply falls through to ERROR_EXIT, which is
  * the honest answer — every kind here ends at the same fallback, so a
- * misclassification costs a sentence of explanation, never a wrong reviewer.
+ * misclassification never picks a wrong reviewer; it costs a sentence of
+ * explanation and, for the OUTAGE_OUTCOMES kinds, the share switch's measured
+ * outage count (recordAstraRun).
  */
 const FAILURE_PATTERNS = [
   [OUTCOME.MODEL_REFUSED, /not supported when using codex with a chatgpt account|unknown model|model[^.\n]*not (?:supported|available|found)/i],
@@ -190,21 +192,24 @@ const FAILURE_PATTERNS = [
   // `Reconnecting…` storm after it — and a server that answered 429 DID speak about
   // the account, however the stream ended. Hence the order below: a definitive quota
   // verdict is matched first and wins wherever both appear; transport is the answer
-  // only when nothing was ever said. The narrow `DEFINITIVE_QUOTA` is deliberately not
-  // the broad allowance pattern — "rate limit" as a hint or a doc line must not
+  // only when nothing was ever said. The narrow definitive pattern (the first
+  // ALLOWANCE_EXHAUSTED entry below) is deliberately not the broad allowance pattern — "rate limit" as a hint or a doc line must not
   // outrank a dead socket, only an actual refusal may.
   // NOT a bare `429` (second review, 11.08.2026). A real codex transcript reconnects
   // through repeated websocket 403s and then prints `last status: 429` as the LAST
   // thing it saw — an account with allowance to spare, whose run died in transport.
   // A bare code first would call that a spent account, which is the very mistake this
   // whole ordering exists to prevent, only one round further along. So the definitive
-  // pattern demands the server's own REFUSING WORDS, and a naked code falls through to
-  // transport and then to the broad pattern below.
+  // pattern demands the server's own REFUSING WORDS. A naked code matches no pattern
+  // here: the rest of the text decides (transport, then the broad pattern below),
+  // and a bare `429` with nothing else ends at ERROR_EXIT.
   [OUTCOME.ALLOWANCE_EXHAUSTED, /too many requests|usage limit (?:reached|exceeded|hit)|you(?:'ve| have) hit your usage limit|quota (?:exceeded|exhausted)|credit balance|rate limit exceeded/i],
   [OUTCOME.UNREACHABLE, /error sending request|stream disconnected|reconnecting\b|connection (?:refused|reset|closed)|enotfound|eai_again|econnrefused|econnreset|etimedout|dns error|failed to lookup|network (?:error|is unreachable)/i],
   [OUTCOME.ALLOWANCE_EXHAUSTED, /usage limit|rate limit|quota|allowance|plan limit/i],
   [OUTCOME.LOGIN_EXPIRED, /not logged in|log ?in again|codex login|refresh token|invalid[_ ]api[_ ]key|unauthorized|authentication|\b401\b|\b403\b/i],
-  [OUTCOME.UNREACHABLE, /enotfound|eai_again|econnrefused|econnreset|etimedout|dns error|failed to lookup|error sending request|network (?:error|is unreachable)|connection (?:refused|reset|closed)|proxy|tls|certificate/i],
+  // Every other transport wording is caught by the first UNREACHABLE entry above;
+  // only these late hints are left for after the broad allowance and login checks.
+  [OUTCOME.UNREACHABLE, /proxy|tls|certificate/i],
 ]
 
 /**
@@ -344,36 +349,6 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass 
   ].join('\n')
 }
 
-/**
- * Pull the verdict and its evidence out of the reviewer's final message.
- *
- * Tolerant on the way in — markdown emphasis, a code fence, a leading bullet —
- * and strict on the way out: a verdict word the recorder does not accept, or an
- * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
- * been reviewed, and the caller falls back rather than record a guess.
- */
-/** The VALUE of a labelled RAW line: everything after its first colon — the
- *  label always carries one, and decoration adds none before it. A label
- *  written `**EVIDENCE:**` closes its decoration right after the colon; that
- *  one marker run is dropped only when whitespace follows it, so a value that
- *  genuinely begins with a marker stays.
- *
- *  THE BOUNDARY, so nobody re-litigates it (final convergence): a RULING —
- *  anything that DECIDES by looking at the text: placeholder detection,
- *  presence, length, any match or classification — reads the STRIPPED copy,
- *  because decoration must not change a decision. A QUOTE — anything whose
- *  text reaches output a caller reads, cites or acts on — reads the RAW text
- *  through this helper, byte for byte, because the strip rewrites content
- *  (`src/__init__.py` → `src/init.py`). The one deliberate exception is the
- *  ADMISSION scan, which reads BOTH spellings: there the two readings can
- *  only widen the net, never shield it.
- *
- *  PADDING IS FORMAT, NOT CONTENT (trim sweep, final convergence): a labelled
- *  single-line field trims the separator whitespace at its edges — after the
- *  label's colon, around an entry's pipes, at line end — because that padding
- *  belongs to the `LABEL: value` / `id | file | text` format the prompts
- *  demand; the bytes INSIDE a field travel exactly. A whole-message quote
- *  (ask-astra's explain) is not a labelled field and trims NOTHING. */
 /** The SHAPE-AWARE decoration strip every ruling reads (final-round pass 1,
  *  third instance): deleting `[*_#>` + backtick] characters outright let a
  *  FABRICATED label match — `D_ONE:` became `DONE:` — so label recognition
@@ -411,10 +386,34 @@ export function stripDecoration(text) {
  *  the raw scan (markers break the word boundaries) and the pair strip (the
  *  runs differ), but no decoration survives deletion. It can FABRICATE an
  *  admission from mid-word markers — which only ever refuses a round
- *  (fail-closed), never clears one — so it is used by the admission scan
- *  ALONE, never for matching or quoting. */
+ *  (fail-closed), never clears one — so it is used only where a hit can only
+ *  refuse (the admission scan and the placeholder test), never for matching
+ *  or quoting. */
 export const charStripped = (text) => String(text ?? '').replace(/[*`_#>~]/g, '')
 
+/** The VALUE of a labelled RAW line: everything after its first colon — the
+ *  label always carries one, and decoration adds none before it. A label
+ *  written `**EVIDENCE:**` closes its decoration right after the colon; that
+ *  one marker run is dropped only when whitespace follows it, so a value that
+ *  genuinely begins with a marker stays.
+ *
+ *  THE BOUNDARY, so nobody re-litigates it (final convergence): a RULING —
+ *  anything that DECIDES by looking at the text: placeholder detection,
+ *  presence, length, any match or classification — reads the STRIPPED copy,
+ *  because decoration must not change a decision. A QUOTE — anything whose
+ *  text reaches output a caller reads, cites or acts on — reads the RAW text
+ *  through this helper, byte for byte, because the strip rewrites content
+ *  (`src/__init__.py` → `src/init.py`). The one deliberate exception is the
+ *  ADMISSION scan, which reads every spelling (raw, stripped and
+ *  charStripped): there the extra readings can only widen the net, never
+ *  shield it.
+ *
+ *  PADDING IS FORMAT, NOT CONTENT (trim sweep, final convergence): a labelled
+ *  single-line field trims the separator whitespace at its edges — after the
+ *  label's colon, around an entry's pipes, at line end — because that padding
+ *  belongs to the `LABEL: value` / `id | file | text` format the prompts
+ *  demand; the bytes INSIDE a field travel exactly. A whole-message quote
+ *  (ask-astra's explain) is not a labelled field and trims NOTHING. */
 export function rawFieldValue(rawLine) {
   const at = String(rawLine ?? '').indexOf(':')
   if (at < 0) return ''
@@ -424,18 +423,28 @@ export function rawFieldValue(rawLine) {
     .trim()
 }
 
+/**
+ * Pull the verdict and its evidence out of the reviewer's final message.
+ *
+ * Tolerant on the way in — markdown emphasis, a code fence, a leading bullet —
+ * and strict on the way out: a verdict word the recorder does not accept, or an
+ * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
+ * been reviewed, and the caller records nothing — an Astra run is handed on, a
+ * selected Claude run ends without a record — rather than record a guess.
+ */
 export function parseVerdict(text, { receipt = '' } = {}) {
   const raw = String(text ?? '')
   // THE PAIR MUST BE THE END OF THE MESSAGE (four-eyes finding, 10.08.2026). The
-  // prompt asks for exactly two closing lines; taking the last match of each
-  // INDEPENDENTLY would happily pair a verdict with an evidence line from some
-  // earlier paragraph, so the two final non-empty lines are what is read.
+  // prompt asks for exactly two closing lines (three with a RECEIPT); taking the
+  // last match of each INDEPENDENTLY would happily pair a verdict with an
+  // evidence line from some earlier paragraph, so the final non-empty lines are
+  // what is read.
   //
   // MATCHED ON THE STRIPPED LINE, QUOTED FROM THE RAW ONE (final convergence):
-  // the char-deleting strip exists so a decorated label still matches — but it
-  // rewrites content (`src/__init__.py` → `src/init.py`), and the EVIDENCE
-  // read here is what `--record` writes into the ledger. The character strip
-  // removes no newline, so lines pair one to one. Stated exceptions, safe by
+  // the decoration strip (stripDecoration) exists so a decorated label still
+  // matches — but it rewrites content (`src/__init__.py` → `src/init.py`), and
+  // the EVIDENCE read here is what `--record` writes into the ledger. The strip
+  // preserves the line count, so lines pair one to one. Stated exceptions, safe by
   // shape: the RECEIPT (hex token) and the VERDICT word are identifiers the
   // strip cannot rewrite and are read from the stripped line.
   const expected = String(receipt ?? '').trim()
@@ -484,9 +493,8 @@ export function parseVerdict(text, { receipt = '' } = {}) {
   // was checked and then describes the reviewed code in the net's vocabulary is
   // a review, and routing its verdict to a fallback would discard it (measured
   // 18.08.2026, point 714 pass 2 — see blindReviewerAdmission).
-  // Scanned RAW and STRIPPED, either hit admitting (the dual-scan rule): the
-  // raw spelling may shield the words behind decoration the stripped one
-  // unwraps, and vice versa.
+  // Scanned RAW, STRIPPED and char-stripped, any hit admitting: one spelling
+  // may shield the words behind decoration another unwraps.
   const evidenceClean = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
   if (
     blindReviewerAdmission(evidence) ||
@@ -518,9 +526,9 @@ export function parseVerdict(text, { receipt = '' } = {}) {
  *
  * The one rule this function exists for: the recorded model NAMES THE RUN THAT
  * ACTUALLY HAPPENED, never the preference. Astra is preferred, so a successful Astra
- * run records Astra — but every failure records the selected Claude reviewer, and does
- * so with an EMPTY verdict, because at that moment no second pair of eyes has
- * seen the change yet. `ready` says whether a record may be written at all.
+ * run records Astra — but every failure names the selected Claude reviewer, with an
+ * EMPTY verdict, because at that moment no second pair of eyes has seen the
+ * change yet (formatReviewReport decides whether any template is printed). `ready` says whether a record may be written at all.
  */
 export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall, fableState } = {}) {
   // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). Astra now
@@ -619,23 +627,11 @@ function firstNonAuthor(chain, authorModels) {
  *
  * Judged by `isOpenAiLane`, so every spelling of the lane answers alike — the
  * trailer's "GPT-6 Astra", a bare "Astra", the raw id, and the RETIRED
- * "GPT-5.6 Sol" (point 1061). Four eyes is a VENDOR boundary: work the lane
- * wrote under its old name is work it may not review under its new one.
+ * "GPT-5.6 Sol" (point 1061). A renamed lane is still the same model: work the
+ * lane wrote under its old name is work it may not review under its new one.
  */
 export function astraAuthored(authorModels = '') {
   return authorList(authorModels).some((a) => isOpenAiLane(a))
-}
-
-/**
- * The Claude reviewer for work ASTRA AUTHORED — the first of CLAUDE_REVIEW_CHAIN
- * that authored no part of the range, or '' when every one of them did.
- *
- * Empty is a real answer and is reported as one: a range written by Astra AND by
- * all three Claude models has no reviewer that is not also an author, and
- * saying so beats recording a self-review.
- */
-export function claudeReviewerFor(authorModels = '', fableState) {
-  return firstNonAuthor(availableReviewChain(CLAUDE_REVIEW_CHAIN, fableState), authorModels)
 }
 
 /**
@@ -666,13 +662,6 @@ export function formatReviewMaterial(options = {}) {
 }
 
 /**
- * The paths a patch ADDS whole, whose current content would be sent twice.
- *
- * On this branch the duplicate cost the review its material budget: the patch
- * already carried every added file in full, and the copies pushed the files the
- * reviewer was asked to judge out of the ceiling (second cross-vendor round).
- */
-/**
  * May the added files' content be left out because the patch carries it?
  *
  * ONLY while the patch fits whole. Once it is capped, its tail is cut — and an
@@ -684,6 +673,13 @@ export function addedFilesAreCoveredByPatch(patchLength, budget = MATERIAL_BUDGE
   return Number(patchLength) <= Math.floor(Number(budget) * Number(share))
 }
 
+/**
+ * The paths a patch ADDS whole, whose current content would be sent twice.
+ *
+ * On this branch the duplicate cost the review its material budget: the patch
+ * already carried every added file in full, and the copies pushed the files the
+ * reviewer was asked to judge out of the ceiling (second cross-vendor round).
+ */
 export function newFilePathsIn(patch) {
   const paths = new Set()
   const lines = String(patch ?? '').split('\n')
@@ -708,7 +704,7 @@ export function newFilePathsIn(patch) {
  * first. Reviewer identity lives under `Reviewed-By` and never reaches this
  * field, so naming a reviewer cannot disqualify that reviewer as an author.
  *
- * `modelFromTrailers` deliberately returns the FIRST Claude co-author, which is
+ * `modelFromTrailers` deliberately returns the FIRST model co-author, which is
  * the right answer for "who wrote this" but the wrong one for "who may not
  * review this": a commit naming two models would hide the second, and the
  * fallback chain could then pick a model that authored the work (third
@@ -719,11 +715,6 @@ export function modelsInTrailerField(field) {
     .split(';')
     .map((part) => modelFromTrailers(part))
     .filter(Boolean)
-}
-
-/** The author and reviewer models in a complete commit message, by trailer key. */
-export function modelsInCommitMessage(message) {
-  return modelTrailerIdentities(message)
 }
 
 /**
@@ -755,20 +746,20 @@ export const PROBE_MAX_AGE_MS = 30 * 86_400_000
  * token usage, no model field). So the identity rests on the server REFUSING an
  * unknown id — which `--probe` demonstrates — and the honest thing is to say
  * when that demonstration is missing or old rather than to imply it every time.
- * A warning, never a block: an unproven id is a reason to distrust the ledger
- * line, not a reason to leave a change unreviewed.
+ * The answer is a warning, not a verdict: ensureModelProven (review-astra.mjs)
+ * re-runs the probe on it, and only a probe that then fails blocks the review.
  */
 export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_AGE_MS, fingerprint = '') {
   const at = Number(receipt?.at ?? 0)
   if (!receipt || receipt.refused !== true || !at) {
-    return { fresh: false, warning: `the model id ${ASTRA_MODEL_ID} has never been proven honoured on this machine — run: node scripts/review-astra.mjs --probe` }
+    return { fresh: false, warning: `the model id ${ASTRA_MODEL_ID} has never been proven honoured on this machine — proving it (node scripts/review-astra.mjs --probe)` }
   }
   // THE PROOF IS BOUND TO WHAT PRODUCED IT (fifth cross-vendor round). The
   // receipt outlives container rebuilds, so a proof taken with another codex
   // version, another binary or another account says nothing about the run being
   // attributed now: a changed fingerprint expires it immediately, whatever its
-  // age. An empty fingerprint on either side only means "cannot tell", and time
-  // alone decides then.
+  // age. An empty CURRENT fingerprint only means "cannot tell", and time alone
+  // decides then; a receipt without one predates fingerprinting and is re-proven.
   if (fingerprint && receipt.fingerprint && receipt.fingerprint !== fingerprint) {
     return {
       fresh: false,
@@ -780,7 +771,7 @@ export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_A
   }
   const ageDays = Math.floor((now - at) / 86_400_000)
   if (now - at > maxAgeMs) {
-    return { fresh: false, warning: `the model-id probe is ${ageDays} days old — run: node scripts/review-astra.mjs --probe` }
+    return { fresh: false, warning: `the model-id probe is ${ageDays} days old — re-proving it (node scripts/review-astra.mjs --probe)` }
   }
   return { fresh: true, warning: '', ageDays }
 }
@@ -840,10 +831,11 @@ const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slic
 /**
  * The record command, in the shape `mechanism-review.mjs --record` expects.
  *
- * After a Astra run it is complete and can be run as printed. After a fallback the
- * verdict and the evidence stand as ANGLE-BRACKET PLACEHOLDERS the recorder
- * refuses — so a hand that pastes it without giving the review to Fable first
- * gets a refusal, not a green ledger line.
+ * After a completed run (Astra, or a selected Claude reviewer) it is complete and
+ * can be run as printed. In the hand-over template the verdict and the evidence
+ * stand as ANGLE-BRACKET PLACEHOLDERS the recorder refuses — so a hand that
+ * pastes it without the named reviewer's review first gets a refusal, not a
+ * green ledger line.
  */
 export function formatRecordCommand({
   sha = '',
@@ -884,7 +876,8 @@ export function formatRecordCommand({
 /**
  * The whole verdict of a run as the command prints it: one line naming what
  * happened — LOUD on a fallback, per the point's "name the cause in ONE line" —
- * then the record command.
+ * then, only where a record may be offered, the record command or the
+ * reviewer command that starts the hand-over.
  */
 export function formatReviewReport({
   decision = {},
@@ -932,7 +925,7 @@ export function formatReviewReport({
   if (partial) {
     const said = decision.fellBack
       ? `${ASTRA_MODEL_NAME} did not review it: ${decision.cause}`
-      : `${ASTRA_MODEL_NAME} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
+      : `${decision.ranBy || ASTRA_MODEL_NAME} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
     return [
       `review-astra: ${said}`,
       '',
@@ -967,7 +960,7 @@ export function formatReviewReport({
       ? `  The review is ${who}'s, and it is NOT done.`
       : '  No model of the chain may review this range — every one of them authored part of it.'
     const said = !decision.fellBack
-      ? `${ASTRA_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
+      ? `${decision.ranBy || ASTRA_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
       : decision.kind === OUTCOME.SELF_REVIEW
         ? `ROLE SWAP — ${ASTRA_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
         : `${ASTRA_MODEL_NAME} did not review it: ${decision.cause}.\n${handOver}`
@@ -1047,19 +1040,20 @@ export function formatReviewReport({
   }
   // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round). A record
   // is offered only for what was actually read — and after a spawn error, a
-  // timeout, a dead host, a refused login or an error exit, nothing was: the
-  // material was lost with the run. The placeholder template used to survive
+  // timeout, a dead host, a refused login or an error exit, nothing is proven
+  // read: whether the material arrived is unknown. The placeholder template used to survive
   // here for the next reviewer to fill, but a ready-made whole-sha template is
   // an offer no completed hand-off backs. The two kinds below are different: a
-  // NO_VERDICT run completed its transfer and answered unusably, and the share
+  // NO_VERDICT run exited cleanly and answered unusably (a missing or wrong
+  // RECEIPT included), and the share
   // switch never attempted one — both hand-offs rest on a measured, fitting
   // plan, so their template (whose placeholders the recorder refuses anyway)
   // stays. Every other kind — the unknown ones included — refuses.
   if (decision.kind !== OUTCOME.NO_VERDICT && decision.kind !== OUTCOME.SWITCHED_OFF) {
     return [
       `review-astra: FALLBACK — ${ASTRA_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
-      '  NO RECORD COMMAND IS PRINTED: the hand-off did not complete, so nothing of this range',
-      "  was read — the whole round's material was lost with the run.",
+      '  NO RECORD COMMAND IS PRINTED: no completed hand-off proves any of this range was read,',
+      '  so nothing of it may be recorded.',
       `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
       '  it reads the range itself, and only what IT actually read may be recorded.',
       ...(reviewerCommand ? ['', `     ${reviewerCommand}`] : []),

@@ -54,8 +54,9 @@ const GLOBAL = /\b(?:window|globalThis)\.(__[A-Za-z0-9_$]+)/g
 /**
  * The `(` of the `if`-head whose condition contains the call starting at
  * `declStart`, or -1. Scanned backwards over MASKED text, so a paren in prose or
- * in a string cannot be mistaken for one; a `{`, `}` or `;` at depth 0 ends the
- * search, because none of them can stand inside an `if` condition.
+ * in a string cannot be mistaken for one; any `{`, `}` or `;` on the way ends
+ * the search, whatever the paren depth, because none of them can stand inside
+ * an `if` condition.
  */
 function conditionOpen(masked, declStart) {
   let depth = 0
@@ -171,7 +172,8 @@ export function crossSectionGlobals(source) {
 /** A module-level `let`/`var` declarator, up to and including its FIRST name. */
 const BINDING_DECL = /(?<![\w$.])(let|var)\s+([A-Za-z_$][\w$]*)/g
 /** What makes an identifier occurrence a WRITE rather than a read: assignment,
- *  compound assignment or an increment. `==`, `===` and `=>` are reads. */
+ *  compound assignment or a POSTFIX increment/decrement. `==`, `===` and `=>`
+ *  are reads, and so — a known limit of this text match — is a prefix `++x`. */
 const WRITE_AFTER = /^\s*(?:\*\*=|<<=|>>>?=|&&=|\|\|=|\?\?=|[+\-*/%&|^]=(?!=)|=(?![=>])|\+\+|--)/
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 

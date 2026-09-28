@@ -1,18 +1,20 @@
-// THE CONTEXT FENCE (point 700) — the decision half, pure.
+// THE CONTEXT FENCE (point 700) — the call classification, pure.
 //
 // WHY: the context watermark spoke only in the Stop chain, which fires when a
 // turn tries to END — so every call that STARTS something (a suite, an agent, a
 // new work-order point) went through untouched, and a session measured at 2.9×
 // the mark kept starting browser suites and agent rounds for another hour
-// (17.08.2026). This core decides, for one PreToolUse call, whether the call
-// would START a new unit of work while the measured context is past the mark.
+// (17.08.2026). This core classifies, for one PreToolUse call, whether the call
+// would START a new unit of work. It takes no reading and no mark: admission is
+// budget arithmetic in context-budget-core.mjs, which uses this classification
+// to price a start that has no measured cost yet.
 //
-// THE FENCE ENDS A SESSION, IT NEVER IDLES ONE (user 17.08.2026). It therefore
-// denies ONLY what begins new work — spawning an agent, starting a browser
-// verify run, authoring a work-order point / memory / document — and leaves
-// everything that FINISHES the step in flight untouched: reads, commits,
-// pushes, the landing, the board, the boundary bookkeeping, the fast unit gate.
-// A denied session is never trapped: the allowed set contains the whole exit.
+// THE FENCE ENDS A SESSION, IT NEVER IDLES ONE (user 17.08.2026). The first
+// build therefore denied ONLY what begins new work — spawning an agent,
+// starting a browser verify run, authoring a work-order point / memory /
+// document — past the mark. Admission now charges every growing call, reads
+// included (context-fence-guard.mjs), and exempts only the enumerated bounded
+// controls; what this file classifies as a START is what still matters here.
 //
 // FILING A POINT IS STARTING WORK (user 17.08.2026): writing a work-order
 // point, a memory or a doc section past the mark feels like bookkeeping and
@@ -20,11 +22,6 @@
 // after the watermark fired. Past the mark a finding goes to the CARRIER (one
 // command, one line) and the successor writes it out in a cheap context; the
 // refusal names that path.
-//
-// Fail direction: an unreadable measurement allows EVERYTHING (state
-// 'unreadable' → no block). The watermark's own Stop-chain guard already
-// alerts loudly on an unobtainable reading; a fence that guessed would deny on
-// an assumption, which the measurement rule forbids.
 //
 // A COMMAND IS CLASSIFIED BY WHAT IT RUNS, NOT BY ITS TEXT (Sol review of
 // d0aebb6, finding 1). The first build pattern-matched the raw string, which
@@ -48,22 +45,22 @@ import {
 export const FENCE_END_COMMAND = 'node scripts/batch-boundary.mjs --prepare --context'
 
 /** The carrier command a finding goes to instead of the work order/docs. */
-export const FENCE_CARRIER_COMMAND =
+const FENCE_CARRIER_COMMAND =
   'node scripts/finding.mjs --record "<title>" --detail "<one line>"'
 
 /** Tools whose call IS the start of a new unit of work: a delegated agent. */
 export const AGENT_TOOLS = new Set(['Agent', 'Task'])
 
 /** Tools that WRITE the file they name. Only these can author; a Read on
- *  TASKS.md is a read, and every read stays allowed whatever the mark says. */
-export const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
+ *  TASKS.md is a read, never authoring. */
+const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 
 /**
  * WHAT COUNTS AS STARTING A NEW UNIT, BY THE SCRIPT IT RUNS — widened
  * deliberately, and the coverage stated (Sol review of d0aebb6, finding 3):
  *   COVERED: the two sanctioned suite launchers (`run-all.mjs`,
  *   `run-logged.mjs` — everything `npm test`/`test:small`/`test:large` also
- *   reaches), delegating an author (`author-astra.mjs`), starting a
+ *   reaches), delegating an author (`author-astra.mjs`, `author-fable.mjs`), starting a
  *   cross-vendor review (`review-astra.mjs`) and a delegated ask
  *   (`ask-astra.mjs`) — each begins an expensive new unit of work.
  *   AND TAKING THE BATCH (`batch-claim.mjs`, point 542): a claim is not
@@ -590,8 +587,8 @@ function authoringDirDestination(dest, resolvePath) {
  *     the target is denied too — its intent is not cheaply decidable from
  *     outside, and the ordinary reads (the Read tool, `sed -n`, `grep`, `cat`)
  *     all stay open, so the session keeps a way to find anything out.
- * Everything that READS stays allowed — `sed -n '1,20p' TASKS.md`, `grep …
- * TASKS.md`, a copy OUT of the target.
+ * Everything else that plainly READS is no authoring — `sed -n '1,20p'
+ * TASKS.md`, `grep … TASKS.md`, a copy OUT of the target.
  *
  * WHAT THIS CLASSIFIER CLAIMS — AND WHAT IT DOES NOT. It catches the
  * ORDINARY shell forms that write the fenced documents: redirection, the
@@ -626,8 +623,8 @@ function authoringDirDestination(dest, resolvePath) {
  *   - MISSED WRITE: a directory destination carrying no evidence is judged
  *     the file it was spelled as, so `cp notes.md docs` passes — closing it
  *     needs a FILESYSTEM fact (is `docs` a directory?), which argv cannot
- *     carry and exactly what the injected `isDirectory` supplies where the
- *     guard can;
+ *     carry and exactly what an injected `isDirectory` would supply (no
+ *     production caller injects one today);
  *   - REFUSED READ: the deliberate eval over-reach above — an eval that only
  *     READS a fenced document is denied; deciding an eval's intent means
  *     reading its PROGRAM, not its argv, so no table closes it. The ordinary
@@ -813,7 +810,8 @@ function segmentStart(seg, resolvePath, isDirectory) {
  * command built to run the fenced work through a fresh name has already
  * decided to defeat its own fence. One cheap catch is taken (an `ln` whose
  * TARGET lies under scripts/verify counts as starting a verify run —
- * `segmentStart`), which closes the literal example; the copy-based
+ * `segmentStart`, and only for `ln -s`: a hard link is the copy-shaped
+ * escape), which closes the literal example; the copy-based
  * constructed escape PASSES and is pinned by test as the intended limit,
  * not an oversight.
  */
@@ -838,14 +836,16 @@ export function resolveThroughAncestors(abs, { realpath } = {}) {
 
 /**
  * Does this call START a new unit of work? PURE.
- * Returns { starts, what, authoring } — `authoring` marks the refusals that
- * must name the carrier as the way to keep a finding.
+ * Returns { starts, what, authoring, clearFirst? } — `authoring` marks a start
+ * that is a document write, `clearFirst` a start whose way out includes
+ * `/clear` (CLEAR_FIRST_SCRIPTS).
  * `resolvePath` is the injectable path resolver for the verify-prefix rule
- * (the guard passes `realpathSync`; without one the rule stays lexical), and
- * `isDirectory` the injectable TYPE resolver for the directory-destination
- * evidence (a stat-based check at the guard; without one, a destination
- * carrying no trailing-slash or -t evidence is judged a FILE — the reading
- * side) — the core itself never touches the disk.
+ * (the guard hands context-budget its `resolveThroughAncestors` adapter over
+ * `realpathSync`; without one the rule stays lexical), and `isDirectory` the
+ * injectable TYPE resolver for the directory-destination evidence (no
+ * production caller passes one today; without it, a destination carrying no
+ * trailing-slash or -t evidence is judged a FILE — the reading side) — the
+ * core itself never touches the disk.
  */
 export function classifyFenceCall({ toolName, command, filePath, resolvePath, isDirectory } = {}) {
   const tool = String(toolName ?? '').trim()

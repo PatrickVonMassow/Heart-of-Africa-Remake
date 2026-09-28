@@ -2,10 +2,10 @@
 // Check an artefact's claimed author against per-message session metadata.
 //
 //   node scripts/authorship-check.mjs --artefact <file> --at <ISO timestamp> \
-//       --transcript <session.jsonl> [--claimed <model>] [--json]
+//       [--transcript <session.jsonl>] [--claimed <model>] [--json]
 //
 // `--claimed` is for line-list/derived artefacts with no heading; otherwise the
-// JSON `model` field or first markdown heading is read. A missing transcript is
+// JSON `model` field or first visible markdown H1 is read. A missing transcript is
 // reported as UNVERIFIED, never accepted as agreement. A disagreement exits 1;
 // unreadable/unclaimed evidence exits 2.
 import { readFileSync } from 'node:fs'
@@ -62,7 +62,8 @@ export function parseArgs(argv = []) {
 export const usage = () =>
   'usage: node scripts/authorship-check.mjs --artefact <file> --at <ISO timestamp> \\\n' +
   '           [--transcript <session.jsonl>] [--claimed <model>] [--json]\n' +
-  '\nThe comparison uses message.model at the artefact timestamp, per message and including\n' +
+  '\nThe comparison uses the per-message transcript model (message.model, or a Codex\n' +
+  'turn_context model) at the artefact timestamp, including\n' +
   'delegated sidechains. A missing transcript is printed as UNVERIFIED, never agreement.'
 
 if (isMainModule(import.meta.url)) {
@@ -85,6 +86,6 @@ if (isMainModule(import.meta.url)) {
     artefactAt: at,
     transcriptPath: transcript,
   })
-  console.log(json ? JSON.stringify({ artefact, transcript: transcript || null, ...result }, null, 2) : formatAuthorship(result, artefact))
+  console.log(json ? JSON.stringify({ artefact, ...result }, null, 2) : formatAuthorship(result, artefact))
   process.exit(result.status === 'agreement' ? 0 : result.status === 'disagreement' ? 1 : 2)
 }

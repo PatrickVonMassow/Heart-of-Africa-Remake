@@ -15,9 +15,9 @@
 //    is composed (CLAUDE.md §7.2, `guard-preflight.mjs --for answer`);
 //  - the WORDING: a guard that blocks anyway demands the SAME thing it always
 //    demanded, but names the deliverable for what it is — one short line, not a
-//    re-run of the answer. `shortAckDemand()` is that sentence, shared by every
-//    guard that has to ask for a closing line, so there is one wording to keep
-//    right instead of one per guard.
+//    re-run of the answer. `shortAckDemand()` is that sentence for a guard that
+//    hands over an exact line to copy (timestamp-guard); a guard with its own
+//    short-reply wording (clear-claim-guard) is still held by the ratchet below.
 //
 // `findRepeatDemands()` is the ratchet: it reads a guard's SOURCE (comments
 // stripped, so the history above may be told in prose) and reports any surviving
@@ -43,8 +43,9 @@ export function shortAckDemand(expectedLine) {
 
 /**
  * Phrasings that tell the model to produce the previous answer a second time.
- * Deliberately narrow: each one is an AFFIRMATIVE instruction, so a guard may
+ * Deliberately narrow: each one matches an instruction SHAPE, so a guard may
  * still say "never a second copy of the answer" without tripping its own gate.
+ * There is no negation check — "do not repeat the answer" matches too.
  */
 export const REPEAT_DEMAND_PATTERNS = [
   { id: 'reply-again', re: /\b(reply|answer|message|antwort)\s+again\b/i },
@@ -60,13 +61,13 @@ export const REPEAT_DEMAND_PATTERNS = [
 ]
 
 /**
- * Source text with `//` line comments and `/* *\/` blocks removed, so the
+ * Source text with whole-line `//` comments and `/* *\/` blocks removed, so the
  * ratchet judges what a guard SAYS to the model, not what its comments explain
- * about the bug. String literals are left intact — that is the whole point.
+ * about the bug. A trailing `//` comment after code stays.
  *
- * Not a JS parser: a `//` inside a string literal would be stripped too. That
- * direction is harmless here (it can only hide a match inside a URL-ish string,
- * never invent one), and it keeps this module dependency-free and pure.
+ * Not a JS parser: a string literal is left intact unless it contains a `/*…*\/`
+ * span (replaced by a space) or a line of a template literal starts with `//`.
+ * That keeps this module dependency-free and pure.
  */
 export function stripComments(source) {
   return String(source ?? '')
@@ -89,8 +90,9 @@ const SEAM_START = /^\s*(['"`])/
  *
  * — where no single physical line contains "reply again". A formatter wrapping a
  * long message re-creates that shape for free, so the ratchet has to read across
- * the seam (four-eyes review, Fable 5, 29.07.2026). `line` stays the number of
- * the FIRST physical line, which is where the message begins.
+ * the seam (four-eyes review, Fable 5, 29.07.2026). `line` is the number of the
+ * FIRST line where the message begins, counted after comment stripping (a
+ * multi-line block comment collapses to one line).
  */
 export function logicalLines(source) {
   const raw = stripComments(source).replace(/\r\n/g, '\n').split('\n')

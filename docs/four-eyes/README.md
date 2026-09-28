@@ -80,7 +80,8 @@ the union disagrees, `676-union.json` governs.
 RECOVERED on 22.08.2026 from the origin session's scratchpad and `local/`, both of them
 untracked; the halves had never been versioned, which is why the rule above now exists.
 Both labels are therefore after-the-fact, so `676-provenance.md` carries the
-producing-message metadata for BOTH halves, as the rule above requires.
+producing-message metadata for half A and the delegation chain for half B, as the
+rule above requires.
 
 **Half A's own heading says Fable 5 wrote it, and that is false** — the transcript
 metadata says Claude Opus 5, and Fable had stopped serving nearly three hours before the

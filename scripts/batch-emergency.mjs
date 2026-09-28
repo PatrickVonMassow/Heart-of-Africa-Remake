@@ -14,6 +14,7 @@ import { openPointsOf, frontCandidates } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import {
   LOCK_PATH,
+  PID_START_TOLERANCE_MS,
   probePid,
   readOwnerLock,
   readSessionProcesses,
@@ -22,12 +23,10 @@ import {
 } from './batch-singleton.mjs'
 import { EMERGENCY_THRESHOLD_MS, emergencyDecision, recoveryEpisodeKey, strikeRecord } from './batch-emergency-core.mjs'
 import { readRegistry, registryPath, retireWaiters } from './wait-lease.mjs'
-import { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME, PRIMARY_TASK_NAME } from './windows-task-core.mjs'
+import { PRIMARY_TASK_NAME } from './windows-task-core.mjs'
 
-export { EMERGENCY_INTERVAL_MINUTES, EMERGENCY_SCRIPT_PATH, EMERGENCY_TASK_NAME }
-export const EMERGENCY_STATE_PATH = join(REPO_ROOT, 'local', 'batch-emergency-state.json')
-export const EMERGENCY_LOG_PATH = join(REPO_ROOT, 'local', 'batch-emergency-strikes.jsonl')
-export const EMERGENCY_VETO_PATH = join(REPO_ROOT, 'local', 'batch-emergency-veto.json')
+const EMERGENCY_STATE_PATH = join(REPO_ROOT, 'local', 'batch-emergency-state.json')
+const EMERGENCY_VETO_PATH = join(REPO_ROOT, 'local', 'batch-emergency-veto.json')
 
 /** The report reads a run record and resolves its log once. Feed that same
  * snapshot into runRecordFor's process-identity reduction so the reported pid
@@ -83,7 +82,7 @@ export function terminateLockedOwner(lock, { execute = execFileSync, kill = proc
   if (!lock || !Number.isInteger(lock.pid) || lock.pid <= 0) return { step: 'terminate-owner', ok: true, skipped: 'no-owner-pid' }
   const observed = probe(lock.pid)
   if (!observed.exists) return { step: 'terminate-owner', ok: true, skipped: 'owner-already-dead', pid: lock.pid }
-  if (!Number.isFinite(lock.pidStartedAt) || !Number.isFinite(observed.startedAt) || Math.abs(lock.pidStartedAt - observed.startedAt) > 2000) {
+  if (!Number.isFinite(lock.pidStartedAt) || !Number.isFinite(observed.startedAt) || Math.abs(lock.pidStartedAt - observed.startedAt) > PID_START_TOLERANCE_MS) {
     return { step: 'terminate-owner', ok: false, error: 'owner pid incarnation is not proven', pid: lock.pid }
   }
   try {
@@ -91,9 +90,9 @@ export function terminateLockedOwner(lock, { execute = execFileSync, kill = proc
       execute('taskkill.exe', ['/PID', String(lock.pid), '/T', '/F'], { windowsHide: true, timeout: 30_000, stdio: 'ignore' })
     } else {
       // Deliberately exact-pid only. POSIX descendant termination needs a
-      // separately proved process tree; see docs/batch-autonomy.md. The
-      // verification lease still has a two-hour per-record ceiling, but a
-      // living orphan wrapper can satisfy identity until then.
+      // separately proved process tree; see docs/batch-autonomy.md. A living
+      // orphan wrapper can keep a verification lease alive, but the lease is
+      // capped at last progress + 2 h and the absolute deadline ignores it.
       kill(lock.pid, 'SIGTERM')
     }
     return { step: 'terminate-owner', ok: true, pid: lock.pid }
@@ -122,7 +121,7 @@ export function defaultInputs({
   }
 }
 
-/** The real strike path, dependency-injected only so the chaos drill can run it
+/** The real strike path, dependency-injected so the chaos drill and tests can run it
  * without touching the live batch. The intent is atomic before any repair act. */
 export function runEmergency({
   repo = REPO_ROOT, now = Date.now(), thresholdMs = EMERGENCY_THRESHOLD_MS,
@@ -141,8 +140,8 @@ export function runEmergency({
   // boundary being recovered from plus the owner generation being recovered —
   // the same key points 947 and 958 reach recovery under. A run that crashed
   // after writing its intent finds that intent again and RESUMES it: the id and
-  // the deferral record are reused, so a retried recovery still yields exactly
-  // one successor and one queue exception.
+  // the deferral record are reused, so a retried recovery still yields one
+  // queue exception (the restart itself runs again on every strike).
   const episode = recoveryEpisodeKey({ progressAt: decision.progressAt, ownerGeneration: lock?.fence ?? null })
   const pending = observed.state?.pending
   const resuming = pending?.phase === 'intent' && episode !== null && pending?.episode === episode
@@ -216,7 +215,7 @@ export function runEmergency({
   return { decision, outcomes, restored, dryRun: false }
 }
 
-export const usage = () => [
+const usage = () => [
   'usage: node scripts/batch-emergency.mjs [--dry-run|--status]',
   '       node scripts/batch-emergency.mjs --veto "<reason>" --until <ISO>',
   '       node scripts/batch-emergency.mjs --clear-veto',

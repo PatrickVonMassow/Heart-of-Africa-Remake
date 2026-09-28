@@ -17,7 +17,6 @@ import {
   segmentIntent,
   directSegmentIntent,
   isMutatingSegment,
-  firstMutatingSegment,
   segmentInvokesScript,
   segmentInvokesPathWhere,
   segmentMentionsFile,
@@ -414,17 +413,6 @@ describe('file mutation and redirection', () => {
   it('an unknown program reads — this gate under-blocks rather than traps', () => {
     expect(segmentIntent('some-new-tool --do-something')).toBe('read')
     expect(segmentIntent('')).toBe('read')
-  })
-})
-
-describe('firstMutatingSegment', () => {
-  it('names the segment that writes, not the whole line', () => {
-    expect(firstMutatingSegment('git status && git log --oneline && git commit -m x')).toBe('git commit -m x')
-    expect(firstMutatingSegment('node scripts/focus.mjs confirm; npm run build')).toBe('npm run build')
-  })
-  it('is empty when every segment reads', () => {
-    expect(firstMutatingSegment('git worktree list | head -3')).toBe('')
-    expect(firstMutatingSegment(null)).toBe('')
   })
 })
 

@@ -1,4 +1,4 @@
-// Pure detector for assertions that CANNOT FAIL.
+// Pure detector for assertions whose outcome is FIXED (mostly: that cannot fail).
 //
 // The night a degraded model authored three deliveries, its signature was not
 // broken code — it was work that LOOKED finished. Among it were tests whose
@@ -6,8 +6,8 @@
 // nothing. Green suite, untouched defect, and the review that would have caught
 // it is exactly the review a busy session skips because the suite is green.
 //
-// A tautology is machine-detectable with no judgement and no false positives,
-// so it should never again depend on someone reading the diff. This deliberately
+// A tautology is machine-detectable with no judgement (raw lines are scanned,
+// comments and strings included), so it should never again depend on someone reading the diff. This deliberately
 // does NOT try to find "a test with no assertion at all": assertions are
 // routinely made through local helpers, and a heuristic for that produced three
 // false accusations on the first run — a detector that cries wolf is worse than
@@ -16,9 +16,10 @@
 /**
  * Assertions whose truth is fixed at authoring time. Each is a comparison of
  * two literals, or a presence check on a literal — no program state is
- * consulted, so no change to the product can ever make it fail.
+ * consulted, so no change to the product can ever change the outcome (some
+ * forms, e.g. `expect(true).toBeFalsy()`, always fail instead).
  */
-export const TAUTOLOGY_RES = [
+const TAUTOLOGY_RES = [
   // expect(true).toBe(true) / expect(1).toEqual(1) / expect('a').toBe('a')
   {
     re: /expect\(\s*(true|false|-?\d+(?:\.\d+)?|'[^']*'|"[^"]*"|`[^`$]*`)\s*\)\s*\.\s*(?:toBe|toEqual|toStrictEqual)\(\s*\1\s*\)/g,
@@ -34,7 +35,7 @@ export const TAUTOLOGY_RES = [
 ]
 
 /**
- * Every cannot-fail assertion in a source text, as
+ * Every fixed-outcome assertion in a source text, as
  * `{ line, text, hint }`. Line numbers are 1-based so a finding can be opened.
  */
 export function findTautologies(source) {
@@ -55,12 +56,12 @@ export function formatTautologies(byFile) {
   const entries = Object.entries(byFile ?? {}).filter(([, v]) => v.length)
   if (!entries.length) return ''
   return [
-    'ZUSICHERUNGEN, DIE NICHT FEHLSCHLAGEN KÖNNEN:',
+    'ZUSICHERUNGEN MIT FESTSTEHENDEM ERGEBNIS:',
     ...entries.flatMap(([file, hits]) =>
       hits.map((h) => `  · ${file}:${h.line} — ${h.text} (${h.hint})`),
     ),
     '',
-    'Ein solcher Test ist grün, gleichgültig was das Programm tut. Er täuscht Abdeckung',
+    'Ein solcher Test hat ein feststehendes Ergebnis, gleichgültig was das Programm tut. Er täuscht Abdeckung',
     'vor, wo keine ist — und wird gerade dort geschrieben, wo eine Änderung nichts',
     'bewirkt hat. Ersetze ihn durch eine Zusicherung über echten Programmzustand oder',
     'lösche ihn; eine leere Stelle ist ehrlicher als eine falsche.',

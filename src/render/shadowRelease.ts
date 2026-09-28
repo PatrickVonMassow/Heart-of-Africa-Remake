@@ -24,13 +24,13 @@
 // on, and the same one the place scene's own shadow maps make on every visit.
 
 /** The disposable part of a render target — all this module needs of one. */
-export interface DisposableTarget {
+interface DisposableTarget {
   dispose: () => void
 }
 
 /** One cascade of a CSM node: three's ShadowNode, narrowed to its shadow map.
  *  The map is null until the cascade has been rendered once. */
-export interface CascadeShadowNode {
+interface CascadeShadowNode {
   shadowMap?: DisposableTarget | null
 }
 
@@ -43,7 +43,8 @@ export interface CascadedShadowNode {
 
 /**
  * Dispose the render target of every cascade that has one, and report how many
- * were handed back. Safe on a node that has never rendered (no maps yet), on a
+ * dispose calls were made (a map already freed counts again; its dispose is a
+ * renderer no-op). Safe on a node that has never rendered (no maps yet), on a
  * missing node, and on a second call — three drops a destroyed target's dispose
  * listener, so disposing an already-freed map is a no-op on the renderer.
  */

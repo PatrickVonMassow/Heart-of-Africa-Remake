@@ -188,9 +188,11 @@ function callPatterns(api) {
 }
 
 /**
- * Every child-process call in one file. PURE.
+ * Every child-process call in one file written as `api(` — a space before the
+ * parenthesis (`spawn (…)`) is not matched. PURE.
  *
- * Returns [{ api, line, hasFlag }]. `hasFlag` is true when `windowsHide` appears
+ * Returns [{ api, line, hasFlag, args }], `args` being the call's own argument
+ * text that an exception's `matching` scope is tested against. `hasFlag` is true when `windowsHide` appears
  * anywhere in the call's own argument span — deliberately generous, because
  * `{ ...opts, windowsHide: true }` and a helper spread are both legitimate and a
  * stricter reading would only invite the flag to be written somewhere unreadable.
@@ -236,7 +238,9 @@ export function findChildProcessCalls(text) {
  *
  * `awaiting` marks an exception that is expected to GO: the flag belongs there, and
  * the only reason it is not there yet is that another agent held the file when point
- * 401 was built. Removing the entry is what proves the debt was paid.
+ * 401 was built. Removing the entry is what proves the debt was paid. None stands
+ * today (below); the kind and the unscoped entry it needs stay supported for the
+ * next file held that way.
  */
 export const ALLOW = {
   'scripts/batch-autostart.mjs': {
@@ -294,8 +298,9 @@ export function auditWindowHide(files = [], { allow: allowMap = ALLOW } = {}) {
   return { ok: offenders.length === 0 && unusedAllow.length === 0, offenders, unusedAllow }
 }
 
-/** The failure text, so the message is pinned rather than left to a test. PURE. */
-export function formatWindowHideVerdict({ offenders = [], unusedAllow = [] } = {}) {
+/** The failure text, so the message is pinned rather than left to a test. PURE.
+ *  `allow` is the exception map the verdict was audited against (default ALLOW). */
+export function formatWindowHideVerdict({ offenders = [], unusedAllow = [] } = {}, { allow: allowMap = ALLOW } = {}) {
   const lines = []
   if (offenders.length) {
     lines.push(
@@ -310,7 +315,7 @@ export function formatWindowHideVerdict({ offenders = [], unusedAllow = [] } = {
       `${unusedAllow.length} documented exception(s) in ALLOW no longer apply — delete them (an \`awaiting\` entry ` +
         'is a debt, and this is how it is proven paid):',
     )
-    for (const p of unusedAllow) lines.push(`  ${p} — ${ALLOW[p]?.why ?? ''}`)
+    for (const p of unusedAllow) lines.push(`  ${p} — ${allowMap?.[p]?.why ?? ''}`)
   }
   return lines.join('\n')
 }

@@ -7,7 +7,8 @@
 // into a chronicle, because every new lesson feels worth its own paragraph.
 //
 // So the brevity is MEASURED, not intended: a total budget, a per-pitfall
-// budget, a demand that every pitfall ends in an actionable prompt, a semantic
+// budget, a demand that every pitfall carries a `→ *Prompt:*` or `→ *Mechanismus:*`
+// marker within its risk-line bound, a semantic
 // contract for the falsification meta-rule, and a detector for the
 // project-specific markers that signal a war story leaking in (dates, point
 // numbers, repo paths, the project's own tech and nouns).
@@ -248,7 +249,8 @@ export const LIMITS = {
   // that names its reason rather than its backlog — inside that entry's own line budget. The same
   // read caught the neighbouring priority-in-prose entry having been REPLACED rather than
   // shortened a commit earlier: the divergence check and "Priorisiere das Ziel" were gone, and
-  // no test missed them. Both are back, paid for inside the same entries, and pinned below.
+  // no test missed them. Both are back, paid for inside the same entries, and pinned in
+// guide-brevity-core.test.mjs.
   // Measured 500 / 4545, and the ceilings are that, with zero slack.
   // RAISED 31.08.2026 by the measured net of ONE genuinely new claim, FOLDED rather than given an
   // entry of its own: a review verdict judges the MATERIAL it was handed, so a split range, an
@@ -357,7 +359,7 @@ export const LIMITS = {
   // risk, a real blockade or a simplification, everything else going to a collected,
   // NON-BLOCKING list. Written in the tightest form that still carries it, and no neighbouring
   // entry could be shortened without dropping a claim its own test pins: it measures +6 lines /
-  // +63 words, so the ceilings move 570 -> 576 and 5311 -> 5372 with zero slack. Not escalated
+  // +63 words, so the ceilings move 570 -> 576 and 5309 -> 5372 with zero slack. Not escalated
   // to the user, under his general withdrawal of ask-before-raising of 10.08.2026; this written
   // justification is the last step.
   // RAISED 07.09.2026 by the measured net of ONE genuinely new claim (retrospective §3.241): a
@@ -609,9 +611,9 @@ export const LIMITS = {
   // 18.09.2026, second fold of the day: the lesson that a check the test environment CANNOT
   // perform is measured and filed as its own visible task, not carried as a footnote, reached
   // the guide as one clause on "Gruener Test, falsches Bild" and was paid for inside the same
-  // two entries. Net: +-0 lines / -1 word. The line ceiling stays at 700.
+  // two entries. Net: +-0 lines / -1 word. The line ceiling stayed where it was (700 then).
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
-  // pointed out that this comment had long stopped describing the numbers. The
+  // pointed out that the ceiling comments had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
   // converges on zero slack by construction, and granting slack would itself be
   // the unearned loosening the rule forbids. So any net growth blocks, and the
@@ -626,7 +628,7 @@ export const LIMITS = {
   // the TIP ITSELF; the rest came from six neighbouring entries, of which only
   // prose was cut — the one tightening that had dropped a claim ("schreib zu
   // jeder Regel, was sie misst") was restored and repaid inside its own entry.
-  // NO per-entry split is recorded here ON PURPOSE: two review rounds each
+  // NO per-entry split was recorded for THIS raise, ON PURPOSE: two review rounds each
   // invalidated the previous breakdown, because every internal repayment moves
   // it while the totals stay put. The split lives in the review ledger, which is
   // dated and never rewritten. The standing rule is shorten-before-raise; when
@@ -946,7 +948,8 @@ export const LIMITS = {
 
 // Markers of project-specific content. Each one belongs in the retrospective
 // instead — the guide must read for someone who has never seen this repo.
-// Raised on 02.09.2026 by ONE genuinely new tip, measured at +9 lines / +108 words net:
+// (A LIMITS note, kept here by history:) the LIMITS ceilings above were raised on 02.09.2026
+// by ONE genuinely new tip, measured at +9 lines / +108 words net:
 // a test whose SUBJECT moves out from under it. It keeps asking its question and keeps
 // answering correctly — about nothing at all — and unlike a red it never says so. Measured on
 // this project the same day: moving one quarter emptied a whole block of a pinned test, of
@@ -976,8 +979,9 @@ export const PROJECT_MARKERS = [
     hint: 'Technologie dieses Projekts (die Anleitung bleibt werkzeug-neutral)',
   },
   {
-    // Compound forms only — bare "Elefant" also lives in the German idiom about
-    // the elephant in the room, and a guard must not police figures of speech.
+    // No bare "Elefant" — it also lives in the German idiom about the elephant in
+    // the room, and a guard must not police figures of speech — so the elephant
+    // matches only in compounds; the other nouns match bare or with any suffix.
     re: /\b(?:Krokodil|Elefantenherde|Elefantenbulle|Savanne|Kanu|Dorfältest|Karawane|Giraffe|Löwenjagd)\w*/i,
     hint: 'Spielinhalt dieses Projekts',
   },
@@ -1016,7 +1020,7 @@ export function measureGuide(text) {
   }
   // A TERMINATING NEWLINE ENDS THE LAST LINE, it does not open another one.
   // `split('\n')` leaves a phantom entry for it, so every POSIX-terminated file
-  // measured one line too many and the ceilings below were all ratcheted against
+  // measured one line too many and the ceilings above were all ratcheted against
   // that inflated count (four-eyes finding, GPT-5.6 Sol on 4d88250, 31.08.2026).
   // Drop exactly that one sentinel — never all trailing blanks, which are real
   // lines a guide can waste — and read the empty document as no lines at all.
@@ -1080,8 +1084,9 @@ export function sliceSection(text, headingRe) {
 
 /**
  * Split a section's lines into top-level `- **…**` entries. A new entry starts
- * at a line beginning with `- ` at column 0; everything indented under it (and
- * blank lines inside it) belongs to that entry.
+ * at a line matching `-`, whitespace and a bold opener at column 0; everything
+ * indented under it (and blank lines inside it) belongs to that entry, and any
+ * other un-indented line — an unbolded bullet included — ends it.
  */
 export function parseEntries(sectionLines) {
   const entries = []
@@ -1094,7 +1099,7 @@ export function parseEntries(sectionLines) {
       continue
     }
     if (!cur) continue
-    if (/^\S/.test(text) && text.trim() !== '') {
+    if (/^\S/.test(text)) {
       // Un-indented prose ends the entry (a section footer, say).
       cur = null
       continue
@@ -1169,8 +1174,8 @@ export function auditGuide(text, limits = LIMITS) {
   const violations = []
   const push = (kind, line, detail) => violations.push({ kind, line, detail })
 
-  // CRLF must audit identically to LF, and the fingerprint comment is
-  // bookkeeping rather than content — excluded from BOTH budgets, not just one.
+  // CRLF must audit identically to LF. The fingerprint comment is bookkeeping:
+  // measureGuide excludes it from BOTH budgets; `lines` feeds only the marker scan.
   const lines = src.replace(/\r\n/g, '\n').split('\n')
   const measured = measureGuide(src)
 
@@ -1250,7 +1255,7 @@ export function auditGuide(text, limits = LIMITS) {
     }
     const actionIdx = entry.lines.findIndex((l) => ACTION_RE.test(l))
     if (actionIdx < 0) {
-      push('no-prompt', entry.line, `„${entry.title}" nennt kein „→ *Prompt:*" — Risiko ohne Lösung`)
+      push('no-prompt', entry.line, `„${entry.title}" nennt kein „→ *Prompt:*" oder „→ *Mechanismus:*" — Risiko ohne Lösung`)
     } else if (actionIdx > limits.maxRiskLines) {
       push(
         'risk-too-long',
@@ -1274,7 +1279,7 @@ export function formatViolations(violations) {
     `(${violations.length} Verstoß/Verstöße):\n${body}\n` +
     'Die Anleitung ist eine KURZE Einsteiger-Anleitung: Pflichtaussagen und Struktur ' +
     'bleiben erhalten; ausführliche Projekterfahrung gehört nach ' +
-    'docs/analysis_de/retrospektive-zusammenarbeit.md — kürze dort hinüber, statt das ' +
-    'Budget zu erhöhen. Prüfen mit: node scripts/guide-brevity-guard.mjs --status'
+    'docs/analysis_de/retrospektive-zusammenarbeit.md — kürze dort hinüber; das Budget steigt ' +
+    'nur um die gemessene Größe eines wirklich neuen Tipps. Prüfen mit: node scripts/guide-brevity-guard.mjs --status'
   )
 }

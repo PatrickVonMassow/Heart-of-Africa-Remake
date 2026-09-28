@@ -3,7 +3,7 @@
 // Two things run here, and only one of them speaks.
 //
 // THE WEAVING has one clack per pass: the shuttle goes across the warp and
-// back, the reed beats the weft down on each arrival, and the woven strip grows
+// back, the reed beats the weft down once as the pass turns, and the woven strip grows
 // from the seat along the warp by a small length per completed pass until it
 // reaches the stake and is taken off. A player who watches for half a minute
 // sees progress, not a loop on a fixed picture.
@@ -34,8 +34,6 @@ import type { ConceptId } from '../../communication/lexicon'
 
 /** The two words the loom teaches. They are also their own concept ids. */
 export type LoomDirection = Extract<ConceptId, 'UPSTREAM' | 'DOWNSTREAM'>
-
-export const LOOM_DIRECTIONS: readonly LoomDirection[] = ['UPSTREAM', 'DOWNSTREAM']
 
 /** Which way along the warp a direction points; downstream is positive. */
 export function warpSign(direction: LoomDirection): 1 | -1 {
@@ -74,7 +72,7 @@ export interface LoomWorkView {
 }
 
 /** The helper's errand along the warp. */
-export interface LoomErrand {
+interface LoomErrand {
   toward: LoomDirection
   /**
    * `hold` is the pause between the word and the first step (work-order 1184):
@@ -98,12 +96,13 @@ export interface LoomWorkState {
   finished: number
   bundles: Record<LoomDirection, number>
   /**
-   * Phase of the shuttle's pass, 0..1. It leaves the weaver's hand at 0,
-   * reaches the far side at 0.5 and is back at 1, where the pass completes.
+   * Phase of the shuttle's pass, 0..1: centred over the warp at 0 and 0.5, at
+   * the far hand at 0.25 and the near hand at 0.75; the pass completes at 1.
    */
   pass: number
-  /** Completed passes since the strip was last taken off — the picture's own
-   *  proof that the cycle is time-driven and not a fixed loop. */
+  /** Completed passes since the station was entered (a take-off does not reset
+   *  it) — the picture's own proof that the cycle is time-driven and not a
+   *  fixed loop. */
   passes: number
   /** Metres of woven strip, measured from the seat along the warp. */
   cloth: number
@@ -127,7 +126,7 @@ export interface LoomWorkState {
   readonly situation: object
 }
 
-/** A station that has just been entered: nothing woven, nothing owed. */
+/** A station that has just been entered: a strip already under way, nothing owed. */
 export function createLoomWork(cfg: LoomWorkConfig, rand: () => number): LoomWorkState {
   return {
     clock: 0,
@@ -163,14 +162,10 @@ function pickDirection(state: LoomWorkState, rand: () => number): LoomDirection 
   return drawn
 }
 
-/** How long the helper's walk to his stand takes, at the configured pace. */
-export function tendWalkSeconds(cfg: LoomWorkConfig): number {
-  return cfg.tendStand / cfg.helperPace
-}
-
 /**
  * Backstop: a word that has been owed this long without ever being said means
- * the station is stuck — no helper for minutes, or a floor that never grants.
+ * the station is stuck — a floor that never grants, or children who never leave
+ * its earshot (time without a helper, or before ROCK is heard, is not counted).
  * Long enough that a hush and a busy village are not defects, short enough that
  * a genuinely mute loom is reported while the player is still standing there.
  */
@@ -229,7 +224,7 @@ export function stepLoomWork(
     const target = warpSign(errand.toward) * cfg.tendStand
     if (errand.phase === 'hold') {
       // HE WAS TOLD, AND HE IS LISTENING (work-order 1184). The instruction
-      // used to move him in the frame it was spoken, before its four syllables
+      // used to move him in the frame it was spoken, before its syllables
       // had finished, which reads as the weaver narrating her own helper rather
       // than as an order given to him.
       if (errand.clock >= instructionDelay(errand.toward, view.vocabulary)) {
@@ -273,8 +268,9 @@ export function stepLoomWork(
     // NOBODY SPEAKS TO NOBODY: with no helper at the station the order is not
     // given at all, and it is not lost either — it waits for him.
     const blocked = !view.rockHeard || !view.helper || view.childrenHear(view.seat.x, view.seat.z)
-    // The backstop counts only the time the word COULD have been said. A
-    // station with nobody to address is LEGITIMATELY quiet, and an alarm that
+    // The backstop counts only the time there was somebody to say the word to
+    // (children in earshot still count). A station with nobody to address is
+    // LEGITIMATELY quiet, and an alarm that
     // cries on a healthy quiet spell is switched off within a week (point 589).
     if (view.helper && view.rockHeard) state.owedFor += dt
     const floor = view.floor
@@ -321,8 +317,9 @@ function approach(value: number, target: number, step: number): number {
 
 /**
  * The visible state of the station on one frame, in the loom's own local frame:
- * the shuttle's place across the warp, the beat the reed is in, and how far the
- * woven strip reaches from the seat.
+ * the shuttle's place across the warp, the beat the reed is in, how far the
+ * woven strip reaches from the seat, where the helper is and what he carries,
+ * the take-off fold and the yarn bundles at each end.
  */
 export interface LoomPicture {
   /** The shuttle's offset across the warp, -1 (near hand) .. 1 (far hand). */
@@ -342,8 +339,8 @@ export interface LoomPicture {
 }
 
 export function loomPicture(state: LoomWorkState, helperCycleSeconds = balance.villageLife.loom.helperCycleSeconds): LoomPicture {
-  // The shuttle crosses and returns once per pass; the reed beats as it lands,
-  // which is what gives the body its lean.
+  // The shuttle crosses and returns once per pass; the reed beats once, as the
+  // pass turns with the shuttle centred, which is what gives the body its lean.
   const across = Math.sin(state.pass * Math.PI * 2)
   return {
     shuttle: across,

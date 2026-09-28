@@ -3,24 +3,29 @@
 //
 // ONE GAME, FOUR WORDS, NOTHING STAGED. The children roam their own quarter of
 // the village out of earshot of the adults; at the end of that phase one of them
-// calls RIVER, points at the water and the whole group runs to the bank — and
+// calls RIVER (once the listener has heard ROCK; before that the cycle opens
+// silently), points at the water and the whole group runs to the bank — and
 // that caller is the first catcher. Between two rocks, one upstream and one
-// downstream, they then play run after run: the direction is announced before
-// each one, the catcher taps ROCK while everybody holds, whoever reaches the far
-// rock calls ROCK, whoever is caught drops out where he stands, and the sides
+// downstream, they then play run after run: once ROCK is known the direction is
+// announced before each one, a catcher lays its hand on its own rock and says
+// ROCK while everybody holds (the run opens silently where the hand cannot reach
+// the stone), a runner who reaches the far rock and can touch it calls ROCK,
+// whoever is caught drops out where he stands, and the sides
 // swap every run so the announced direction alternates by construction. When no
 // free runner is left the caught children remain down long enough for the result
 // to read, then everybody walks back toward the roaming quarter.
 //
 // EVERY UTTERANCE FALLS AT A FIXED POINT OF THE ROUND. There is no situation
-// catalogue and no scheduler: the opening call, the direction announcement, the
-// catcher's tap and the arrival are moments of the game itself. That is
+// catalogue and no scheduler: the opening call, the boulder naming, the
+// direction announcement, the catcher's tap and the arrival are moments of the
+// game itself. That is
 // the whole difference to what point 686 removed — the old catalogue forced
 // eleven concepts onto a chase that could not carry them, and the player read
 // nothing out of it.
 //
-// THE THREE WRONG READINGS THIS CLOSES (the cross-vendor review of 13.08.2026
-// blocked the first draft on them, and none of it is optional):
+// THE WRONG READINGS THIS CLOSES (the cross-vendor review of 13.08.2026 blocked
+// the first draft on them, and none of it is optional; the boulder naming gives
+// way only when no child can reach the stone or the guard's overtime runs out):
 //  - ROCK must not be learnable as "base", "goal" or "made it". So the catcher
 //    TAPS his own rock and names it at the start of a run, with nobody arriving,
 //    and during the roaming phase a child climbs an ORDINARY scattered boulder
@@ -65,13 +70,13 @@ export type BankEnd = 'upstream' | 'downstream'
 
 /** The words the round speaks. A subset of the lexicon's concepts by type, so a
  *  moment can never name a word the game does not teach. */
-export type BankConcept = 'RIVER' | 'UPSTREAM' | 'DOWNSTREAM' | 'ROCK'
+type BankConcept = 'RIVER' | 'UPSTREAM' | 'DOWNSTREAM' | 'ROCK'
 
 /** The phases of one cycle, in the order they run. */
-export type BankPhase = 'roam' | 'gather' | 'run' | 'regroup' | 'part'
+type BankPhase = 'roam' | 'gather' | 'run' | 'regroup' | 'part'
 
 /** What a child is in the current run. */
-export type BankRole = 'runner' | 'catcher' | 'out'
+type BankRole = 'runner' | 'catcher' | 'out'
 
 /** The fixed point of the round an utterance falls at. */
 export type BankMoment = 'call' | 'boulder' | 'announce' | 'tap' | 'arrival'
@@ -82,7 +87,7 @@ export function bankVoiceRegister(moment: BankMoment): VoiceRegister {
 
 /** What the utterance was aimed at. ROCK falls once with nobody arriving and
  *  once outside the game altogether. */
-export type BankAim = 'water' | 'rock' | 'boulder'
+type BankAim = 'water' | 'rock' | 'boulder'
 
 /** Where a child is in the climb onto the off-game boulder: on its way up, up
  *  there, on its way down, or on the ground like everybody else. */
@@ -176,8 +181,9 @@ export interface BankChild extends TagChild {
    * judged windows against a 0.25 % gate; with it, 0.03 %).
    */
   settled: boolean
-  /** A CATCHER's chosen quarry, or −1. Held for the run rather than re-picked
-   *  every frame: a catcher that always went for whoever was nearest simply
+  /** A CATCHER's chosen quarry, or −1. Re-checked every frame but switched only
+   *  when another runner is `targetSwitchMargin` nearer: a catcher that always
+   *  went for whoever was nearest simply
    *  swept a bunched group and tagged all of it, and no run ever ended in an
    *  arrival. */
   quarry: number
@@ -258,7 +264,7 @@ export interface BankStage {
 
 /** Everything the round needs beyond the walking, all calibratable
  *  (`balance.villageLife.bankGame`, debug-editable). */
-export interface BankRoundConfig {
+interface BankRoundConfig {
   /** How long the group roams between two cycles. Short — of the order of a
    *  minute — so a visiting player does not miss the call that opens one. */
   roamSeconds: number
@@ -272,8 +278,9 @@ export interface BankRoundConfig {
   runSeconds: number
   /** How long everybody holds at the stations while the catcher taps ROCK. */
   tapPauseSeconds: number
-  /** Backstop and settling radius for the tapper's short walk into the line. */
+  /** Backstop on the tapper's short walk back into the line. */
   tapReturnSeconds: number
+  /** Settling radius of a catcher at its station, that walk included. */
   catcherStationDistance: number
   /** How long an arriving runner rests its hand on the far stone. */
   arrivalHoldSeconds: number
@@ -368,7 +375,8 @@ export interface BankState {
   phaseFor: number
   /** The rock the runners start this run from; the far rock is the other one. */
   from: BankEnd
-  /** The word announced for the current run, or null outside one. */
+  /** The word announced for the coming or current run, or null while none has
+   *  been announced. */
   direction: BankConcept | null
   /** ROCK was unheard when this run opened. Held through the run even if its
    *  tap teaches ROCK; the following run then requires a direction. */
@@ -390,7 +398,7 @@ export interface BankState {
   /** Whether the off-game ROCK guard is FINISHED WITHOUT A NAMING this phase —
    *  because every child proved unable to reach the boulder, or because the
    *  guard spent its overtime (`roamGuardSeconds`). Either way the cycle is free
-   *  to open. */
+   *  to open; a climber already on the stone may still name it before it does. */
   abandonedBoulder: boolean
   /** Runs opened in this cycle. The normal exit is still the last runner being
    *  caught; this bounds a cycle in which every runner gets through untouched. */
@@ -414,13 +422,16 @@ export interface BankState {
    */
   playedClock: number
   playing: boolean
-  /** Utterances born in the current step. An ordinary moment that falls inside
-   *  the hearing gap is omitted, never carried into a later moment. */
+  /** Utterances born in the current step. Without a speech floor an ordinary
+   *  moment that falls inside the hearing gap is omitted, never carried into a
+   *  later moment; with a floor a refused moment is never born here, and its
+   *  producer waits at the moment and asks again. */
   pending: BankUtterance[]
   sinceSaid: number
   /** Seconds left of the visible tap hold at the start of a run — running ONLY
    *  while a tap was actually spoken. A run that opens silently, because the
-   *  tapper could not reach its stone, holds nobody: freezing the group for a
+   *  tapper could not reach its stone, starts no tap hold (the tapper's walk
+   *  back into the line, `returnFor`, still holds the group): freezing it for a
    *  word that never falls is a pause the player cannot read, and it made the
    *  hold useless as the window in which the tap is measured (08.09.2026). */
   tapFor: number
@@ -431,8 +442,8 @@ export interface BankState {
   /** The first arrival of this run has reached the speech output. */
   arrivalSpoken: boolean
   /** The point-589 long-run watch on the round's own SPEECH. It moved here with
-   *  the words: the alarm used to sit on the situation catalogue the five-word
-   *  rebuild deleted, and was left watching a producer that could no longer
+   *  the words: the alarm used to sit on the situation catalogue point 686
+   *  deleted, and was left watching a producer that could no longer
    *  produce anything at all. */
   speech: ProducerWatch
 }
@@ -484,7 +495,7 @@ function landingFor(
   // does — the body separation and the escape nudge push two figures apart every
   // frame, and they are what owns a crowd. What must not happen is a landing
   // chosen while somebody was there and then never looked at again, and that is
-  // what the per-frame re-read above prevents.
+  // what the per-frame re-read in `stepClimb` prevents.
   const free = world.nudge(c.footX, c.footZ)
   if (!taken(free.x, free.z)) return { x: free.x, z: free.z }
   return { x: c.footX, z: c.footZ }
@@ -670,8 +681,8 @@ export function bankChildTouching(s: BankState, i: number): boolean {
 /** Other bodies yield to a tagged child or a child holding contact. */
 export function bankChildCanSeparate(c: BankChild, touching = false): boolean {
   // …and a child ON THE STONE is not in anybody's way either (work-order 1080):
-  // the separation works in the ground plane and knows nothing about the half
-  // metre it is standing above it, so left in the set it would be shoved off
+  // the separation works in the ground plane and knows nothing about the
+  // boulder's height it stands at, so left in the set it would be shoved off
   // the boulder by whoever wandered past below.
   return !c.crouched && !onStone(c) && !touching && !(c.arrival && c.arrival.holdFor !== null)
 }
@@ -784,8 +795,8 @@ export function rockAt(stage: Pick<BankStage, 'upstream' | 'downstream'>, end: B
 
 /**
  * Where the child in slot `slot` waits at the rock at `end`: a stride off the
- * rock's own centre on the side facing the other rock, fanned out sideways so a
- * group of four is a line rather than a heap. Standing ON the rock is
+ * rock's own centre on the side facing the other rock, fanned out sideways in
+ * rows of three so a group stands in lines rather than a heap. Standing ON the rock is
  * impossible — it is a collider — so the stations are what the walk aims at and
  * the arrival is judged against the rock itself.
  */
@@ -944,7 +955,7 @@ const catchers = (s: BankState): number[] =>
 const free = (s: BankState): number[] =>
   s.children.map((_, i) => i).filter((i) => s.children[i].role === 'runner' && !s.children[i].arrived)
 
-/** Opens a cycle: the caller names the river and becomes the first catcher,
+/** Opens a cycle: the caller names the river (once ROCK is known) and becomes the first catcher,
  *  everyone else is a runner, and the runners take the rock nearer the group. */
 function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWorld): void {
   const n = s.children.length
@@ -1125,8 +1136,8 @@ function endRun(s: BankState, cfg: BankConfig): void {
     chosen < 0 || s.tapTurns[i] < s.tapTurns[chosen] ? i : chosen, -1)
 }
 
-/** Back to roaming: everybody is a runner again, and a climber is picked for the
- *  boulder that is no part of the game. */
+/** Back to roaming: everybody is a runner again, and the climber for the boulder
+ *  that is no part of the game is left to `stepRoam` to pick. */
 function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   s.phase = 'roam'
   s.phaseFor = cfg.roamSeconds * (1 + (rand() * 2 - 1) * cfg.roamSpread)
@@ -1152,16 +1163,10 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
 }
 
 /**
- * One step of the round. Mutates in place — a settlement runs this every frame —
- * and is otherwise pure: every decision is a function of the state, the config,
- * the stage and the world predicates. Returns the utterance that fell this
- * frame, or null; the caller speaks it exactly as it speaks any village speech.
- */
-/**
  * One step of the round, plus the long-run watch on what it SAID (point 589).
  * The alarm is about the output that reaches the player — an utterance spoken —
- * never about the timer meant to schedule it, and it is DEV-gated at the call
- * site so a production build allocates nothing per frame.
+ * never about the timer meant to schedule it, and it is DEV-gated here so a
+ * production build allocates nothing per frame.
  */
 export function stepBankGame(
   s: BankState,
@@ -1189,6 +1194,12 @@ export function stepBankGame(
   return spoken
 }
 
+/**
+ * One step of the round. Mutates in place — a settlement runs this every frame —
+ * and is otherwise pure: every decision is a function of the state, the config,
+ * the stage and the world predicates. Returns the utterance that fell this
+ * frame, or null; the caller speaks it exactly as it speaks any village speech.
+ */
 function advanceBankGame(
   s: BankState,
   dt: number,
@@ -1251,8 +1262,10 @@ function advanceBankGame(
     // so without this the cycle opened on the same frame the word fell and
     // `openCycle` put the climber back on the ground: the player heard ROCK and
     // saw the child already walking away from a rock it never stood on. The
-    // climb is bounded by its own three lengths, so this can only ever hold the
-    // cycle for the seconds the child needs to come down.
+    // climb then ends on its own clocks (the descent capped at four sink
+    // lengths), so this holds the cycle for the seconds the child needs to come
+    // down — though while the floor still withholds its word it waits at the
+    // top of its rise.
     !s.children.some(onStone)
   ) {
     openCycle(s, stage, cfg, world)
@@ -1413,7 +1426,7 @@ function drive(
   c.lean += (want - c.lean) * Math.min(1, dt * 4)
 }
 
-/** A fresh drift for a roaming child: a heading it has not just come from. */
+/** A fresh drift for a roaming child: a new uniformly random heading. */
 function roamGoal(c: BankChild, rand: () => number): void {
   c.goalFor = 0
   c.roamHeading = rand() * Math.PI * 2
@@ -1437,7 +1450,8 @@ function stepRoam(
   world: BankWorld,
   rand: () => number,
 ): void {
-  // The climber is picked HERE rather than only when a roaming phase opens, so
+  // The climber is picked HERE, on the roaming steps, not when a roaming phase
+  // opens (openRoam only resets it), so
   // the FIRST phase of a visit has one too: a player who walks in and watches
   // the group would otherwise wait a whole cycle for the one utterance that
   // shows ROCK outside the game.
@@ -1506,7 +1520,8 @@ function stepRoam(
         // village stone a few paces off the group's own quarter, not a place the
         // round has to get to. Where one stands behind a hut the watch above
         // gives up on it and the next child tries, which is what the guard's own
-        // abandon is for — and the bound below keeps that from holding a cycle.
+        // abandon is for — and the roam overtime bound in advanceBankGame keeps
+        // that from holding a cycle.
         drive(s, i, boulder, false, dt, cfg, world)
         continue
       }
@@ -1717,7 +1732,8 @@ export function wayTo(
 }
 
 /** The walk to the stations — down to the bank at the head of a cycle, and
- *  across between two runs, which is the ONLY time a tagged child moves. */
+ *  across between two runs. Within a run a tagged child stays down; it walks
+ *  again only here and in the parting walk. */
 function stepStations(
   s: BankState,
   dt: number,
@@ -1744,8 +1760,9 @@ function stepStations(
     const away = dist(c, to)
     if (tapping) {
       // THE TAPPER IS SETTLED WHEN ITS HAND REACHES, not when its body is within
-      // an arrival radius (work-order 1065). A station's arrival radius is 1.3 m
-      // of slack — the whole distance being closed here — so a tapper judged by
+      // an arrival radius (work-order 1065). A station's arrival radius
+      // (`reachDistance`) is metres of slack — the whole distance being closed
+      // here — so a tapper judged by
       // it would stop exactly where the old defect stood.
       const reach = touchReach(stage, wait, c)
       c.settled = !!reach && Math.abs(reach.gap) <= TOUCH_GAP
@@ -1968,24 +1985,23 @@ function stepRun(
   for (const ci of catchers(s)) {
     const catcher = s.children[ci]
     const ri = catcher.quarry
-    {
-      const runner = s.children[ri]
-      if (ri < 0 || !runner || runner.role !== 'runner' || runner.arrived) continue
-      if (!catchReached(catcher, runner, cfg, world)) continue
-      runner.role = 'out'
-      runner.crouched = true
-      runner.arrived = false
-      // It stops in the same frame it is caught: from here it is a posture, not
-      // a walker, until the run ends.
-      runner.pace = 0
-      runner.held = true
-      catcher.quarry = -1
-      catcher.madeTag = true
-      s.tags++
-    }
+    if (ri < 0) continue
+    const runner = s.children[ri]
+    if (!runner || runner.role !== 'runner' || runner.arrived) continue
+    if (!catchReached(catcher, runner, cfg, world)) continue
+    runner.role = 'out'
+    runner.crouched = true
+    runner.arrived = false
+    // It stops in the same frame it is caught: from here it is a posture, not
+    // a walker, until the run ends.
+    runner.pace = 0
+    runner.held = true
+    catcher.quarry = -1
+    catcher.madeTag = true
+    s.tags++
   }
 
-  // A run ENDS when every runner has either touched the far rock or been tagged
+  // A run ENDS when every runner has either reached the far rock or been tagged
   // — and the backstop closes it where a child could not get there at all.
   if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, cfg)
 }

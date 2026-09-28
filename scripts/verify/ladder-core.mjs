@@ -19,9 +19,11 @@
 // I/O — git, mtimes, the run ledger, the suite sources — is gathered by
 // scripts/verify/ladder.mjs and handed in.
 //
-// THE RULE, in one sentence: a FULL browser suite run is refused while the files
-// that suite covers carry edits newer than the newest GREEN narrower run of the
-// same material.
+// THE RULES: a FULL browser suite run is refused while the files that suite
+// covers carry edits newer than its newest GREEN run of that material (a
+// narrower one, as the ladder intends; a green whole run also answers) — and,
+// checked first, while its last whole run went red with a named block that was
+// never re-run green (point 1126, unrepairedReds below).
 //
 // AND TWO THINGS THE MEASUREMENT OF 10.09.2026 ADDED, the night after the order,
 // because a ladder whose rung lies buys false confidence instead of time:
@@ -44,7 +46,7 @@
 //     the ladder STEPS ASIDE and the waiver is recorded with the run.
 //
 // FAIL OPEN, ALWAYS. Every verdict this file can reach is `ok: true` except the
-// one case it is sure about, and the caller treats a gathering error the same
+// two cases it is sure about (REFUSED, RED_RUNG), and the caller treats a gathering error the same
 // way: a ladder that cannot read the tree must never be the reason a regression
 // did not run.
 import { DEV_SUITES, SERVERLESS_SUITES, parseArgs, selectBackend, suitesFor } from './tiers.mjs'
@@ -54,13 +56,13 @@ import { plannedCheck } from '../point-brief-core.mjs'
  *  REASON — a bare flag would be a habit within a week. */
 export const LADDER_ESCAPE_FLAG = '--no-ladder'
 
-/** Verdict statuses, in the order this file can reach them. */
+/** Verdict statuses. UNREADABLE is set by scripts/verify/ladder.mjs, not here. */
 export const LADDER_STATUS = Object.freeze({
   RUNG: 'rung', // this run IS the cheap rung — never refused
   NOT_APPLICABLE: 'not-applicable', // no browser suite in it at all
   FREE: 'free', // nothing the run covers carries an edit
   CLIMBED: 'climbed', // every covered suite has a green narrow run since
-  REFUSED: 'refused', // the one blocking answer
+  REFUSED: 'refused', // a blocking answer: the edit rule
   RED_RUNG: 'red-rung', // the other one: a red whose own block was never re-run
   WAIVED_ESCAPE: 'waived-escape', // --no-ladder "<why>"
   WAIVED_NON_PREDICTIVE: 'waived-non-predictive', // the only rung declared itself a liar
@@ -135,7 +137,7 @@ function newest(values) {
   return out
 }
 
-/** Does this section of this suite declare a NON-PREDICTIVE check? */
+/** The NON-PREDICTIVE declarations this section of this suite makes ([] for none). */
 function declaresNonPredictive(declarations, section) {
   return (declarations ?? []).filter((d) => d && d.section === section)
 }
@@ -193,15 +195,19 @@ export function unrepairedReds({ suites = [], runs = [] } = {}) {
 /**
  * THE LADDER'S ANSWER for one run.
  *
- * Inputs (all gathered by scripts/verify/ladder.mjs, all optional so a missing
- * half degrades to "free" rather than to a refusal):
+ * Inputs (all gathered by scripts/verify/ladder.mjs, all optional; missing
+ * `changes` and `merges` degrade to FREE, but missing `runs` beside covered
+ * edits reads as unclimbed and refuses):
  *   run          — `classifyLadderRun` output.
- *   changes      — [{ path, editedAt }] the branch's edited files with their
- *                  newest edit time (mtime or commit time, whichever is later).
+ *   changes      — [{ path, editedAt, sections? }] the branch's edited files,
+ *                  dated by editTimeFor (commit time for a clean file, the
+ *                  later of mtime and commit for a dirty one); `sections` where
+ *                  an edit to a suite's own source names its blocks.
  *   merges       — [{ at }] the merge commits on this branch: a merge ages a
  *                  rung exactly as an edit does.
  *   runs         — the render-verify ledger's run records: { suite, exit,
- *                  startedAt, partial, section }.
+ *                  startedAt, partial, section, terminalVerdict, crashed, reds,
+ *                  at }.
  *   map          — the work order's diff→suite mapping (`parseDiffSuiteMap`).
  *   nonPredictive — { [suite]: [{ section, check, why }] } read from each
  *                  suite's own source.
@@ -332,7 +338,7 @@ export function ladderVerdict({
 
   // The escape is read AFTER the material is known, so its record names what it
   // waived rather than only that it was used.
-  if (escape && String(escape.why ?? '').trim() !== '') {
+  if (escapeGiven) {
     return answer(
       LADDER_STATUS.WAIVED_ESCAPE,
       `${LADDER_ESCAPE_FLAG}: ${String(escape.why).trim()}`,
@@ -382,8 +388,8 @@ export function ladderVerdict({
   }
 
   if (unclimbed.length > 0) {
-    // THE COMMANDS, LABELLED. Which section covers a given edit cannot be
-    // derived from the diff, so the ladder never pretends it was: it offers the
+    // THE COMMANDS, LABELLED. Which section covers an edit is derivable only for
+    // an edit to a suite's own source, so the ladder never pretends: it offers the
     // section this suite LAST ran — in a repair loop that is almost always the
     // one being repaired — and, beside it, the call that prints the real names
     // in a tenth of a second and without booting a browser.
@@ -403,7 +409,7 @@ export function ladderVerdict({
       LADDER_STATUS.REFUSED,
       `the cheap rung is unclimbed for ${unclimbed.join(', ')}: ${files.length} covered file(s) carry edits, and no GREEN ` +
         `narrower run of ${unclimbed.length === 1 ? 'that suite' : 'those suites'} is recorded since ${agedBy}. ` +
-        'Climb it first — the section run costs about two minutes against the pass\'s thirty; ' +
+        'Climb it first — the section run costs about two minutes against the pass\'s 31 to 63; ' +
         `\`--section=list\` prints a suite's real names in a tenth of a second and without a browser. ` +
         `If the narrow rung genuinely cannot exist, say so: ${LADDER_ESCAPE_FLAG} "<why>".`,
       { commands, suites: unclimbed, threshold, record: { suites: unclimbed, threshold, files: files.slice(0, 12), commands } },

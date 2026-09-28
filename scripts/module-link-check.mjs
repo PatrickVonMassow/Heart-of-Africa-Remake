@@ -6,11 +6,11 @@
 // stay green over a file node will not load at all — which is what happened to
 // `scripts/batch-autostart.mjs`, the 900-second OS recovery tick and the only
 // thing that restarts a dead batch: it imported `pidCorroboration` from
-// `batch-ownership-core.mjs`, which exports it from `batch-singleton.mjs`.
+// `batch-ownership-core.mjs`, though only `batch-singleton.mjs` exports it.
 //
 // The obvious witness — import the file in a real node process — is not
-// available for every file. The launcher does all its work at module load, so
-// importing it IS running it, and a witness that leans on the launcher's own CLI
+// available for every file. The launcher does its work at module load behind
+// nothing but its own CLI guard, so importing it risks running it, and a witness that leans on the launcher's own CLI
 // guard to stop the side effects fails the moment that guard regresses (this was
 // the first version, refused by the cross-vendor review). So this module answers
 // the question WITHOUT loading the subject: it reads the subject's static import
@@ -86,7 +86,8 @@ export function scanStaticImports(source) {
 /**
  * ASK EVERY TARGET FOR THE NAMES THE SUBJECT WANTS.
  *
- * EVERY target, not only the relative ones (cross-vendor review, GPT-5.6 Sol,
+ * EVERY target that binds a name — a namespace-only or side-effect import binds
+ * none and is skipped — not only the relative ones (cross-vendor review, GPT-5.6 Sol,
  * 22.08.2026). Node refuses `import { readFileSyc } from 'node:fs'` exactly as
  * it refuses a mis-sourced local name, and the launcher imports from `node:fs`,
  * `node:child_process` and `node:path` — skipping those would have left the

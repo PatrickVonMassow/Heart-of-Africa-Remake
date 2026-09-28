@@ -34,7 +34,8 @@ export function devAssert(cond: boolean, code: string, detail?: () => string): v
   }
 }
 
-/** Test hook: clear the rate-limit memory (deterministic unit tests). */
+/** Test hook: clear the rate-limit memory and the window.__longRun probe
+ *  (deterministic unit tests). */
 export function resetDevAsserts(): void {
   lastFired.clear()
   if (typeof window !== 'undefined') delete (window as unknown as { __longRun?: unknown }).__longRun
@@ -86,7 +87,7 @@ export const LONG_RUN_SUSPEND_SECONDS = 5
  * the start (CLAUDE.md §3) — so no known startup can be mistaken for a stalled
  * producer.
  */
-export const LONG_RUN_SUSPENDED_ABOVE_SECONDS = 30
+const LONG_RUN_SUSPENDED_ABOVE_SECONDS = 30
 
 /** One long-run producer's memory. Plain data, owned by the system that
  *  produces, so a pure step function can carry it and a test can drive it. */
@@ -102,7 +103,7 @@ export function createProducerWatch(): ProducerWatch {
 }
 
 /** What one step tells the watch about its producer. */
-export interface ProducerStep {
+interface ProducerStep {
   /** Stable assert code, e.g. `errands-silent`. */
   code: string
   /** Seconds this step advanced the world by. */

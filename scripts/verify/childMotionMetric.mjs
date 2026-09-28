@@ -7,10 +7,11 @@
 // (scripts/verify/polish.mjs, section `children-motion`) reads a trace out of
 // the running settlement, and the replay test (src/scenes/place/tagShuffle.test.ts)
 // steps the same settlement in the fast layer. They HAD two implementations, and
-// both carried the same two blind spots — which is precisely how a gate built to
-// prove a bug fixed can prove nothing at all.
+// both carried the same two blind spots (1 and 2 below) — which is precisely how a
+// gate built to prove a bug fixed can prove nothing at all. Points 3 and 4 are
+// what the calibration and the review added on top.
 //
-// THE TWO BLIND SPOTS, AND WHAT THIS MODULE DOES INSTEAD:
+// THE BLIND SPOTS, AND WHAT THIS MODULE DOES INSTEAD:
 //
 //  1. WALKED IS THE GAME'S OWN, NOT A SUM OF POSITION DELTAS. `TagChild.walked`
 //     counts only what the child's legs carried it (`moveChild`); the rescue
@@ -43,10 +44,6 @@
 //     read AT the span by interpolation rather than at the last sample before
 //     it, and a sparsely sampled trace is judged to its end instead of being
 //     abandoned at the first window no single sample gap could fill.
-//
-// The rescues are counted and gated on their own account (`rescueRate`): a child
-// the settlement had to pick up was, by definition, going nowhere for the whole
-// window before it, so a nudge is a FINDING and never an escape.
 
 /**
  * The calibration, and the measurements behind every number of it. Measured over
@@ -123,11 +120,12 @@ export const CHILD_MOTION = {
    *  judged nothing reports a share of 0, which reads exactly like a clean one. */
   minJudgedSeconds: 20,
   /**
-   * THE ONLY FLOOR AMONG ALL THESE CEILINGS: metres the QUIETEST child must have
-   * walked per minute OF PLAY. Every other bar here is an upper bound, and a
-   * child that never moves clears all of them at once — nothing walked is
-   * nothing shuffled, nothing stuck, nothing carried and a trace judgeable end
-   * to end. Measured on the three shipped villages, the quietest child of each
+   * THE ONLY FLOOR ON MOTION AMONG ALL THESE CEILINGS: metres the QUIETEST
+   * child must have walked per minute OF PLAY. Every other motion bar here is an
+   * upper bound (judgedGate, minJudgedSeconds and playedGate are floors on how
+   * much was judged, not on motion), and a child that never moves clears all of
+   * them at once — nothing walked is nothing shuffled, nothing stuck, nothing
+   * carried and a trace as judgeable as any. Measured on the three shipped villages, the quietest child of each
    * walks 102.2 / 112.5 / 109.2 m per played minute (the groups 106.8-115.0),
    * so the bar sits four times below the quietest legitimate play on record —
    * low enough for a child that stands out a stretch of a round.
@@ -258,9 +256,9 @@ export function groundPath(track) {
  *
  * THE SHARE IS TIME-WEIGHTED, and that is the whole point of it. A window opens
  * at every sample, but it counts for the game time that sample stands for — the
- * gap to the next one — so the answer is the fraction of the traced minute the
- * children spent shuffling, not the fraction of the RENDERED FRAMES that fell
- * inside a shuffle. Frames are not evenly spaced: headless, on a loaded machine,
+ * gap to the next one — so the answer is the fraction of the JUDGED game time
+ * the children spent shuffling (unjudged time is reported apart), not the
+ * fraction of the RENDERED FRAMES that fell inside a shuffle. Frames are not evenly spaced: headless, on a loaded machine,
  * they run from 20 ms to over a second, and a per-frame count lets the fast
  * stretches outvote the slow ones. `windows` and `bad` are kept as plain counts
  * because they say how much was looked at, but nothing is gated on them.
@@ -401,8 +399,8 @@ export function shuffleWindows(tracks, cfg = {}) {
       // HOW LITTLE GROUND IS TOO LITTLE: a fixed circle, or a share of what the
       // child walked, whichever is tighter. The circle alone is the one-second
       // question; the ratio is what lets a SHORTER window ask the same thing
-      // without a length of its own to calibrate (`ratio` is Infinity by
-      // default, which leaves the circle exactly as it was).
+      // without a length of its own to calibrate (`ratio` is 0 by default —
+      // no ratio bar — which leaves the circle exactly as it was).
       const bar = ratio > 0 ? Math.min(circle, walked / ratio) : circle
       if (walked > minPath && out < bar) {
         mine.bad++
@@ -416,7 +414,7 @@ export function shuffleWindows(tracks, cfg = {}) {
       }
     }
     // The tail no window can reach into: unjudged, and said so.
-    mine.unjudged += track[last].clock - track[Math.min(i, last)].clock
+    mine.unjudged += track[last].clock - track[i].clock
   }
 
   for (const c of perChild) {
@@ -429,8 +427,8 @@ export function shuffleWindows(tracks, cfg = {}) {
   const covered = sum((c) => c.covered)
   // THE WORST CHILD, NOT THE AVERAGE ONE. The defect is per child — one child
   // wedged in a pocket while its three siblings play — and an aggregate divides
-  // it by the group: Sol's construction has one child of four shuffling into a
-  // rescue twenty times a minute and every aggregate here reads clean.
+  // it by the group: the snag construction of the calibration (one child of
+  // four freed every three seconds) reads clean on every aggregate here.
   let worstShare = 0
   let worstShareChild = -1
   let leastJudged = perChild.length > 0 ? 1 : 0
@@ -493,14 +491,14 @@ export function shuffleWindows(tracks, cfg = {}) {
  * of, or claiming more metres in play than the legs walked at all — reports
  * `countersPublished: false` and is refused rather than read as nothing-walked.
  *
- * Note what a MISSING `playing` field does: it reads as not playing, so a trace
- * that cannot show a game in it does not pass for one. A number that is not a
+ * Note what a MISSING counter does: `countersPublished` goes false and the trace
+ * is refused, so a trace that cannot show a game in it does not pass for one. A number that is not a
  * number is the same kind of nothing: `numbersFinite` says whether the clock and
  * the walked distance can be read at all, and the callers demand it rather than
  * comparing against a NaN, which loses every comparison it is in.
  *
- * @param {ReadonlyArray<ReadonlyArray<{clock:number,walked:number,playing?:boolean}>>} tracks
- * @returns {{children:number,seconds:number,playedSeconds:number,playedShare:number,walked:number,walkedPerChildMinute:number,numbersFinite:boolean,perChild:object[],quietestWalkedPerPlayedMinute:number,quietestChild:number}}
+ * @param {ReadonlyArray<ReadonlyArray<{clock:number,walked:number,playedClock:number,walkedWhilePlaying:number}>>} tracks
+ * @returns {{children:number,countersPublished:boolean,seconds:number,playedSeconds:number,playedShare:number,walked:number,walkedPerChildMinute:number,numbersFinite:boolean,perChild:object[],quietestWalkedPerPlayedMinute:number,quietestChild:number}}
  */
 export function traceLiveness(tracks) {
   const real = tracks.filter((t) => t.length >= 2)
@@ -584,7 +582,6 @@ export function traceLiveness(tracks) {
       quietestChild = k
     }
   })
-  if (quietestWalkedPerPlayedMinute === Infinity) quietestWalkedPerPlayedMinute = 0
   return {
     children: real.length,
     numbersFinite,
@@ -675,16 +672,15 @@ export function holdsAGame(live, cfg = {}) {
  * teleport itself, where the distance is known exactly, and this reads it.
  *
  * NEITHER COUNTER MAY BE MISSING. A trace that does not publish `carried` is NOT
- * reported as carry-free, and one that does not publish `nudges` is not reported
- * as never-rescued —
- * `carriedPublished` says so, and the gates demand it. A missing field must
+ * reported as carry-free — `carriedPublished` says so — and one that does not
+ * publish `nudges` is not reported as never-rescued — `nudgesPublished` says so;
+ * the gates demand both. A missing field must
  * never read as good news, and the check for it covers the WHOLE track: sample
  * zero, which the stepping loop never looks at, and tracks too short to hold a
  * step at all, which it skips outright. A set with no samples in it says
  * nothing, which is also not the same as nothing having been carried.
  *
  * @param {ReadonlyArray<ReadonlyArray<{clock:number,nudges?:number,carried?:number}>>} tracks
- * @param {Partial<typeof CHILD_MOTION>} [cfg]
  */
 export function rescueRate(tracks) {
   let rescues = 0

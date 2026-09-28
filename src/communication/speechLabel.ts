@@ -21,7 +21,7 @@ import type { Phrase, UtteranceId } from './lexicon'
 export const NO_READING = '???'
 
 /**
- * How high a GROWN figure reaches above its own feet, in settlement units —
+ * How high a GROWN figure reaches above its own feet, in metres (place units) —
  * the height its actor record carries (`markActor` in PlaceLife's Figure, the
  * body height plus the head). Only a FALLBACK: a speaker is measured from its
  * own record, and this stands in for one that carries none (the dev hook can
@@ -73,7 +73,7 @@ export interface SpeechLabel {
 export interface SpeechLabelState {
   readonly labels: readonly SpeechLabel[]
   /**
-   * The speaker a click would take (point 588): the nearest one in reach, whose
+   * The speaker the guess key would take (point 588): the nearest one in reach, whose
    * label is highlighted and carries the invitation. null while none is.
    */
   readonly targetId: string | null
@@ -84,7 +84,7 @@ export function noSpeechLabels(): SpeechLabelState {
 }
 
 /**
- * Names the speaker a click would take. Unchanged input returns the SAME state
+ * Names the speaker the guess key would take. Unchanged input returns the SAME state
  * object, so the label layer does not re-render on a frame that decided nothing.
  */
 export function withSpeechTarget(state: SpeechLabelState, targetId: string | null): SpeechLabelState {
@@ -93,9 +93,9 @@ export function withSpeechTarget(state: SpeechLabelState, targetId: string | nul
 
 /**
  * How long a label stands: the calibratable base for one atom, plus one pause
- * per further atom, so a seven-atom phrase stays readable to its end while a
- * single call is gone again in a moment. Brief either way — the scene never
- * accumulates standing text.
+ * per further atom, so a longer phrase stands longer while a single call is
+ * gone again in a moment. Brief either way — only the targeted note outlasts
+ * its time (expireSpeechLabels).
  */
 export function speechLabelSeconds(atomCount: number): number {
   const { labelSeconds, phrasePauseSeconds } = balance.communication
@@ -104,8 +104,8 @@ export function speechLabelSeconds(atomCount: number): number {
 
 /**
  * Shows one speaker's atoms. Replaces whatever that speaker was saying (a head
- * never carries two labels) and sweeps out the labels that have run out, so a
- * scene nobody looks at cannot pile them up either.
+ * never carries two labels) and sweeps out the labels that have run out (the
+ * targeted one excepted), so a scene nobody looks at cannot pile them up either.
  */
 export function showSpeechLabel(
   state: SpeechLabelState,
@@ -136,10 +136,10 @@ export function showSpeechLabel(
 }
 
 /**
- * Drops every label whose time has run out — EXCEPT the one a click would take
- * (point 588). A label stands 2.6 s, which is shorter than reaching for the
- * mouse, so the click target the player is invited to click keeps standing for
- * as long as it stays the target; the moment another speaker takes the
+ * Drops every label whose time has run out — EXCEPT the one the guess key
+ * would take (point 588). A label stands only a few seconds, which is shorter
+ * than deciding to guess, so the note the player is invited to guess at keeps
+ * standing for as long as it stays the target; the moment another speaker takes the
  * highlight, or the player walks out of reach, it goes with the next sweep.
  */
 export function expireSpeechLabels(state: SpeechLabelState, now: number): SpeechLabelState {
@@ -172,7 +172,7 @@ export function dropSpeechLabel(state: SpeechLabelState, speakerId: string): Spe
 }
 
 /** One atom as the label shows it: what was said, and what the player makes of it. */
-export interface AtomReading {
+interface AtomReading {
   /** The syllables as they are spoken and as the journal lists them. */
   utterance: UtteranceId
   /** The player's own note, or NO_READING where he wrote none. */
@@ -195,9 +195,11 @@ export function labelReadings(memory: CommunicationMemory, atoms: Phrase): AtomR
 }
 
 /**
- * Whether a label is shown at all: only for speech the player has ALREADY
- * observed. Someone shouting an utterance he has never heard from close up
- * gets no label — the observation is what unlocks the note, not the label.
+ * Whether a label is shown at all: only for speech of which the player has
+ * ALREADY observed at least one atom — that one atom unlocks the whole phrase's
+ * label, unheard atoms reading NO_READING. Someone shouting an utterance he has
+ * never heard from close up gets no label — the observation is what unlocks
+ * the note, not the label.
  */
 export function isSpeechLabelVisible(memory: CommunicationMemory, atoms: Phrase): boolean {
   return atoms.some((atom) => hasHeard(memory, atom))

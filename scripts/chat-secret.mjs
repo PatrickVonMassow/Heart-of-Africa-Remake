@@ -1,7 +1,7 @@
 // THE SHARED SECRET OF THE CHAT CHANNEL — read it, or make one.
 //
-//   node scripts/chat-secret.mjs            # print the secret and the setup steps
-//   node scripts/chat-secret.mjs --init     # create one if none exists, then print it
+//   node scripts/chat-secret.mjs            # print the secret (created if none can
+//                                           # be read) and the setup steps
 //   node scripts/chat-secret.mjs --rotate   # replace it (both sides must be re-paired)
 //   node scripts/chat-secret.mjs --topics   # also print the derived topic names
 //
@@ -17,7 +17,7 @@ import { dirname } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
 import { deriveTopics } from './chat-core.mjs'
 
-export const SECRET_PATH = repoPath('.claude', 'chat-secret')
+const SECRET_PATH = repoPath('.claude', 'chat-secret')
 
 /** The machine-readable name of the one chat fault that must leave the machine
  *  out of band. The inbox tick puts it in its `fault` field and the launcher
@@ -72,16 +72,18 @@ export function readSecret(path = SECRET_PATH) {
   return readSecretStatus(path).secret
 }
 
-/** 160 bits, base32-ish and hyphenated: long enough to be unguessable, short
- *  enough to retype on a phone keyboard without a mistake. */
+/** 20 random bytes onto a 31-symbol alphabet (modulo, slightly biased): about
+ *  99 bits, hyphenated — long enough to be unguessable, short enough to retype
+ *  on a phone keyboard without a mistake. */
 export function generateSecret(bytes = randomBytes(20)) {
   const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789' // no l/i/o/0/1 — they misread
   const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('')
   return chars.replace(/(.{5})(?=.)/g, '$1-')
 }
 
-/** Create the secret if there is none. Returns { secret, created }. */
-export function ensureSecret(path = SECRET_PATH) {
+/** Create the secret if none can be read — an absent AND an unreadable one are
+ *  replaced. Returns { secret, created }. */
+function ensureSecret(path = SECRET_PATH) {
   const existing = readSecret(path)
   if (existing) return { secret: existing, created: false }
   const secret = generateSecret()

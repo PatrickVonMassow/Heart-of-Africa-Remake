@@ -19,8 +19,8 @@
 //    the classic explanation "not tenable"), so its bimodal calendar is stated
 //    outright rather than computed.
 //  * The Sahel around 1890 was WET — the game's window sits inside the
-//    1870-1895 humid period. Its dry-season floor is therefore lifted, not the
-//    modern drought image.
+//    1870-1895 humid period. Its wetness scale is therefore lifted
+//    (ZONE_WETNESS), not the modern drought image.
 
 /**
  * Rainfall regimes across the game world. These are climate zones, NOT the
@@ -45,14 +45,15 @@ export type ClimateZone =
 /**
  * Relative rainfall by month (index 0 = January), 0 = effectively rainless,
  * 1 = the zone's own peak. These are SHAPES, not millimetres: a Saharan 1 is a
- * trace and a Congo 1 is a downpour. Absolute wetness comes from `zoneWetness`.
+ * trace and a Congo 1 is a downpour. Absolute wetness comes from `ZONE_WETNESS`.
  */
 const MONTH_PROFILE: Record<ClimateZone, readonly number[]> = {
   // Nov-Mar core, Jun-Aug bone dry (Algiers ~600mm, Alexandria 235mm).
   mediterranean: [1, 0.85, 0.6, 0.35, 0.15, 0.02, 0, 0.02, 0.2, 0.5, 0.9, 1],
   // Winter regime, and even at its "peak" this is a trace.
   'sahara-north': [1, 0.9, 0.7, 0.4, 0.15, 0.05, 0, 0, 0.05, 0.3, 0.6, 0.9],
-  // Summer regime: the rainband's far northern edge, Jul-Sep only.
+  // Summer regime: the rainband's far northern edge, mainly Jul-Sep with traces
+  // in May-Jun and October.
   'sahara-south': [0, 0, 0, 0, 0.05, 0.2, 0.7, 1, 0.5, 0.05, 0, 0],
   // ~90% of the rain falls Jun-Sep, peaking August; harvest October.
   sahel: [0, 0, 0, 0.02, 0.12, 0.45, 0.85, 1, 0.7, 0.15, 0.01, 0],
@@ -106,7 +107,7 @@ const ZONE_WETNESS: Record<ClimateZone, number> = {
 }
 
 /** Hyper-arid deserts where any modelled rain is wrong (point 147/223). The
- *  wetness model has no longitudinal term, so a latitude-only zone would give the
+ *  southern zones are chosen by latitude alone, so a latitude-only zone would give the
  *  rainless coastal Namib the same summer rain as the semi-arid interior at that
  *  latitude — these boxes carve the truly rainless strips back out. */
 function isHyperArid(lat: number, lon: number): boolean {
@@ -119,8 +120,8 @@ function isHyperArid(lat: number, lon: number): boolean {
   if (lat >= -27 && lat <= -17 && lon >= 10.5 && lon <= 13.8) return true
   // The northern continuation of the same fog desert into Angola — the Iona /
   // Namibe (Moçâmedes) desert, ~15-17S along the coast. It fell OUTSIDE the box
-  // above (which stops at the Angola border, -17), so the no-longitudinal-term
-  // model gave the Benguela-current coast the southern-plateau's summer rain:
+  // above (which stops at the Angola border, -17), so the latitude-only
+  // southern-plateau rule gave the Benguela-current coast the southern-plateau's summer rain:
   // Namibe (~15.2S, 12.2E) greened to 1.0 and rained in January, on ~50mm/yr
   // desert. The escarpment lies closer to the coast this far north than in the
   // Kaokoveld, so the eastern edge is tighter (~13.2E): inland of it the Angolan
@@ -131,7 +132,7 @@ function isHyperArid(lat: number, lon: number): boolean {
 }
 
 /** Metres above which the Horn's terrain runs the kiremt/belg calendar. */
-export const HIGHLAND_ELEVATION_M = 1500
+const HIGHLAND_ELEVATION_M = 1500
 
 /**
  * The climate zone at a place (design.md §19; `docs/climate-1890.md` §3).
@@ -160,10 +161,10 @@ export function climateZoneAt(lat: number, lon: number, elevationM: number): Cli
   // moved into the Haud would have been given the CONGO's rains. Found by the
   // village-move conflict check, not by a test.
   if (lat >= 6 && lat < 12.5 && lon >= 42) return 'horn'
-  if (lat >= -12 && lat < 6 && lon >= 31.5) return 'east-rift'
+  if (lat < 6 && lon >= 31.5) return 'east-rift'
   if (lat >= -5 && lat <= 5 && lon >= 12 && lon < 31.5) return 'congo'
   if (lat > 5 && lat < 11 && lon >= 12 && lon < 31.5) return 'congo-north'
-  if (lat >= -12 && lat < -5 && lon >= 12 && lon < 31.5) return 'southern-plateau'
+  if (lat < -5 && lon >= 12 && lon < 31.5) return 'southern-plateau'
   // West Africa, split by longitude: the August break is an upwelling effect off
   // the Gulf of Guinea and does not reach the Atlantic-facing coast at 10-15W.
   if (lat >= 4 && lat < 11 && lon >= -6 && lon < 12) return 'guinea-coast'
@@ -181,10 +182,10 @@ export function climateZoneAt(lat: number, lon: number, elevationM: number): Cli
   // It was: the rules above leave a hole between the congo row (which demands
   // lon >= 12) and the guinea-coast row (which demands lat >= 4), and every
   // equatorial coordinate west of 12E fell through it to 'sahara-north' — the
-  // Fang village at 1.8N/11.5E, in rainforest, sampled 0.000 wetness in July,
-  // the peak of its own rains. Whatever is added here, keep this guard: a
+  // Fang village at 1.8N/11.5E, in rainforest, sampled 0.000 wetness in July.
+  // Whatever is added here, keep this guard: a
   // tropical coordinate reaching a Saharan default is a bug, not a climate.
-  if (lat > -25 && lat < 18) return 'congo-north'
+  if (lat < 18) return 'congo-north'
   return 'sahara-north'
 }
 
@@ -201,7 +202,7 @@ function isNearNorthCoast(lat: number, lon: number): boolean {
  * §5.1). TEMPORARY: while the expedition deadline is suspended, the date runs
  * to the end of the game's window and STOPS there rather than the run ending.
  */
-export const LAST_YEAR = 1895
+const LAST_YEAR = 1895
 
 /** Days from the start of `startYear` to 31 December of `LAST_YEAR`. */
 export function lastDay(startYear: number): number {
@@ -219,8 +220,9 @@ export function clampDay(day: number, startYear: number): number {
 
 /**
  * Debug (design.md §21.1): the in-game day one year later (`+1`) or earlier
- * (`-1`), keeping the month and day-of-month, clamped to the game's window
- * 1890..1895. Returns the unchanged day at either end, so the keys simply stop.
+ * (`-1`), keeping the month and day-of-month (29 February rolls to 1 March in a
+ * common year), clamped to `startYear`..`LAST_YEAR`. Returns the unchanged day
+ * at either end, so the keys simply stop.
  */
 export function dayOfYearJump(day: number, delta: number, startYear: number): number {
   const d = new Date(Date.UTC(startYear, 0, 1) + Math.floor(day) * 86400000)
@@ -245,8 +247,8 @@ export const MONTH_KEYS = [
  *
  * Keeps the YEAR deliberately: jumping the month must not end the expedition
  * or rewrite its progress. Mid-month (the 15th) rather than the 1st, because
- * the wetness curve interpolates between month midpoints — the 15th is where
- * a month's profile value actually reads.
+ * the wetness curve interpolates between month midpoints (equal twelfths of
+ * the year) — the 15th lies within a day of where a month's profile value reads.
  */
 export function dayOfMonthJump(day: number, month: number, startYear: number): number {
   const m = Math.min(12, Math.max(1, Math.round(month)))
@@ -254,7 +256,7 @@ export function dayOfMonthJump(day: number, month: number, startYear: number): n
   return (Date.UTC(year, m - 1, 15) - Date.UTC(startYear, 0, 1)) / 86400000
 }
 
-/** Continuous day of the year, 0..365 (fractional), from the in-game day. */
+/** Continuous day of the year, 0 up to 365 (366 in a leap year, fractional), from the in-game day. */
 export function dayOfYear(day: number, startYear: number): number {
   const ms = Date.UTC(startYear, 0, 1) + day * 86400000
   const d = new Date(ms)
@@ -309,7 +311,8 @@ export function coldnessAt(
 }
 
 // The harmattan (docs/climate-1890.md): the West African winter dust wind.
-// Core late November to mid-March, worst in January, reaching ~5N to ~20N.
+// Core late November to mid-March, worst in January, reaching ~5N to ~20N per
+// the research; modelled as a 10-18N core fading over 4°, so ~6N to ~22N.
 const HARMATTAN_PEAK_DOY = 15 // mid-January, the worst of it
 const HARMATTAN_HALF_WIDTH_DAYS = 58 // late Nov .. mid-Mar around the peak
 const HARMATTAN_LAT_CORE = [10, 18] as const
@@ -334,8 +337,8 @@ const HARMATTAN_LON_FADE = 6
  * and the dress and the sky each read what they need from it.
  *
  * The other half of why this exists: `coldnessAt`'s amplitude falls off toward
- * the equator (correctly — the annual swing does), so the Sahel reads "never
- * cold" all year. That is right about the ANNUAL swing and wrong about the
+ * the equator (correctly — the annual swing does), so most of the Sahel reads
+ * barely cold, if at all. That is right about the ANNUAL swing and wrong about the
  * January dawn, and only a separate driver can hold both.
  */
 export function harmattanAt(day: number, lat: number, lon: number, startYear: number): number {
@@ -357,7 +360,8 @@ export function harmattanAt(day: number, lat: number, lon: number, startYear: nu
 }
 
 /**
- * The zone's own month curve at this day, 0 (its driest) .. 1 (its own peak) —
+ * The zone's own month curve at this day, 0..1 (1 at its own peak; its driest
+ * month need not be 0) —
  * the shape before the zone's absolute scale is applied. Shared by the absolute
  * `wetnessAt` and the relative `floraGreennessAt` so the two can never drift.
  */
@@ -418,11 +422,6 @@ export function karifAt(
   return season * highland
 }
 
-/**
- * Wetness at a place and time, 0 (rainless) .. 1 (the wettest the world gets).
- * Interpolated smoothly across the month profile so a season arrives and fades
- * rather than switching on a month boundary.
- */
 /**
  * Wetness the game should act on: the debug override when set (design.md §21 —
  * the season selector is the testing tool), else the date-derived value.
@@ -536,14 +535,15 @@ export function skyOvercastParams(
 
 // Seasonal snow (design.md §19.13, point 141): only where it really occurred —
 // the High Atlas (Nov-Apr, harshest Feb-Mar, bare Jul-Aug) and the Drakensberg
-// (Jun-Aug, the austral winter). Everything else at low altitude is barred:
+// (Jun-Aug, the austral winter). Each is modelled as a linear ramp around its
+// peak, so thin snow reaches mid-Nov..mid-May and late May..early Sep. Everything else at low altitude is barred:
 // savanna snow is physically impossible, and no settlement qualifies.
 const SEASONAL_SNOW_MASSIFS = {
   atlas: { lat: 31.06, lon: -7.91, radiusDeg: 0.7, peakDoy: 46, halfWidthDays: 90 },
   drakensberg: { lat: -29.47, lon: 29.27, radiusDeg: 0.8, peakDoy: 196, halfWidthDays: 55 },
 } as const
 
-export type SnowMassif = keyof typeof SEASONAL_SNOW_MASSIFS
+type SnowMassif = keyof typeof SEASONAL_SNOW_MASSIFS
 
 /** The world position and reach of a seasonal-snow massif (for the shader mask). */
 export function snowMassifDef(m: SnowMassif) {
@@ -669,7 +669,7 @@ export interface StrikeSchedulerState {
  * One frame of the lightning-strike scheduler (point 166; shared by the
  * bird's-eye Climate and the settlement view). Returns the fired bolt's
  * flash→thunder delay in seconds, or null when no bolt fires this frame.
- * Pure over its state argument, so the re-fire behaviour — including the
+ * Deterministic, and mutates only its state argument, so the re-fire behaviour — including the
  * gate-flicker survival above — is unit-testable without a browser.
  */
 export function strikeSchedulerStep(state: StrikeSchedulerState, stormStrength: number, now: number): number | null {
@@ -749,7 +749,7 @@ export function sunDimFactor(wetness: number, strength: number): number {
  * @param sheltered whether the fire sits under the cook-shelter canopy
  * @param shelteredDamp full-rain damping under the shelter (small; `balance.fire.shelteredRainDamp`)
  * @param openDamp full-rain damping in the open (large; `balance.fire.openRainDamp`)
- * @returns a factor in (0..1]: 1 when dry, lower as rain rises, never below 0
+ * @returns a factor in [0..1]: 1 when dry, lower as rain rises, never below 0
  */
 export function fireRainFactor(rain: number, sheltered: boolean, shelteredDamp: number, openDamp: number): number {
   const r = Math.min(1, Math.max(0, rain))
@@ -767,6 +767,11 @@ export function fireRainFactor(rain: number, sheltered: boolean, shelteredDamp: 
  */
 export const CURRENT_WEATHER = { wetness: 0, dust: 0, flash: 0 }
 
+/**
+ * Wetness at a place and time, 0 (rainless) .. 1 (the wettest the world gets).
+ * Interpolated smoothly across the month profile so a season arrives and fades
+ * rather than switching on a month boundary.
+ */
 export function wetnessAt(
   day: number,
   lat: number,
@@ -778,8 +783,8 @@ export function wetnessAt(
   const zone = climateZoneAt(lat, lon, elevationM)
   let wet = zoneShapeAt(day, zone, startYear) * ZONE_WETNESS[zone]
   // The Sahel's season shortens sharply with latitude: 4-5 months in the south,
-  // 1-2 at 16-18N. Squeeze the shape rather than shifting it — the peak stays
-  // August everywhere, only the shoulders retreat.
+  // 1-2 at 16-18N. Approximated by scaling the whole curve down northward — the
+  // peak stays August everywhere; the months are not narrowed.
   if (zone === 'sahel') {
     const north = Math.min(1, Math.max(0, (lat - 11) / 7)) // 0 at 11N, 1 at 18N
     wet *= 1 - north * 0.55
@@ -789,7 +794,8 @@ export function wetnessAt(
 
 // The Nile flood (docs/climate-1890.md, point 138). Unregulated in 1890 (no dam
 // until 1898): it rises from early June and peaks at Cairo in OCTOBER, the most
-// visible cycle in the game and right at the start port.
+// visible cycle in the game and right at the start port. The modelled crest (a
+// Jul/Aug source peak lagged 62 days) lands late September to early October.
 //
 // The one thing a naive build gets wrong: the flood is NOT local rain. Cairo is
 // rainless the year round, yet the river there crests in October — because the
@@ -800,8 +806,8 @@ const NILE_SOURCE = { lat: 11.5, lon: 37.0, elevationM: 2000 } // the Blue Nile 
 // Ethiopian kiremt peaks in Jul/Aug; the crest reaches Cairo ~2 months later.
 const NILE_FLOOD_LAG_DAYS = 62
 // Low water below this kiremt wetness; full flood at the source's own peak. The
-// source is normalised against ITS peak (not against 1) because a highland zone
-// tops out at ~0.66, so the flood would otherwise never crest.
+// source is normalised against ITS peak (not against 1) because the highland zone
+// tops out at 0.7; the peak sits a little below it, so the crest saturates.
 const NILE_FLOOD_FLOOR = 0.05
 const NILE_FLOOD_PEAK = 0.6
 
@@ -856,7 +862,8 @@ export function okavangoFloodAt(day: number, startYear: number): number {
   )
 }
 
-/** Below this zone peak a place is too arid to carry green worth bleaching. */
+/** Zone peak at which greenness reaches full scale; a drier zone's greenness is
+ *  scaled down in proportion. */
 const GREENING_ZONE_FLOOR = 0.5
 
 /**
@@ -932,15 +939,14 @@ export const SEASON_SLOTS = [
 export function seasonSlotAt(lat: number, lon: number, elevationM: number): number {
   if (isHyperArid(lat, lon)) return 0
   const zone = climateZoneAt(lat, lon, elevationM)
-  const idx = (SEASON_SLOTS as readonly string[]).indexOf(zone)
-  return idx > 0 ? idx : 0
+  return (SEASON_SLOTS as readonly string[]).indexOf(zone)
 }
 
 /**
  * This day's greenness per slot (the same curve floraGreennessAt uses),
- * with the §21 debug override filling every slot when set. Slot 0
- * (hyper-arid) stays 0 except under the override — exactly the special
- * case floraGreennessAt applies by position.
+ * with the §21 debug override filling every slot when set, as
+ * effectiveGreenness applies it. Slot 0 (hyper-arid) stays 0 except under the
+ * override — the special case floraGreennessAt applies by position.
  */
 export function slotGreenness(day: number, slot: number, startYear: number, override: number | null): number {
   if (override !== null) return Math.min(1, Math.max(0, override))

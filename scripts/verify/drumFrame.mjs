@@ -2,7 +2,7 @@
 import { frameShutter } from './frameSubject.mjs'
 
 /** Runs in the browser; the wall clock must be the performance's own clock. */
-export function readDrumWindow() {
+function readDrumWindow() {
   const beating = window.__ui.getState().drumPerformance
   return {
     message: beating?.plan.message ?? null,

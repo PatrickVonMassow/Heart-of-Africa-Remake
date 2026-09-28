@@ -1,4 +1,4 @@
-// THE REVISION MARKER THE BUILT SITE CARRIES — pure, never throws, Vitest-covered
+// THE REVISION MARKER THE BUILT SITE CARRIES — pure (no I/O), Vitest-covered
 // in scripts/deploy-staleness-core.test.mjs (which round-trips it through the
 // reader, so emitter and reader cannot drift apart).
 //
@@ -45,7 +45,8 @@ export function resolveBuildCommit({ gitSha = '', env = {} } = {}) {
 }
 
 /**
- * The marker payload. `commit` is the full sha the comparison uses; `short` is
+ * The marker payload. `commit` is the normalised sha the comparison uses (as
+ * git or GITHUB_SHA spelled it, 7–40 hex, lowercased); `short` is
  * what a human reads; `ref` names the branch or tag this build came from, so a
  * frozen tag build under /vX.Y/ is distinguishable from the root site.
  */

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667).
 //
-//   node scripts/astra-share.mjs --status     # what goes where right now, in ONE line
+//   node scripts/astra-share.mjs --status     # what goes where right now
 //   node scripts/astra-share.mjs --more       # one step towards Astra
 //   node scripts/astra-share.mjs --less       # one step back towards Claude
 //   node scripts/astra-share.mjs --set prefer-astra|default|claude-only
@@ -51,7 +51,7 @@ import {
  * `ASTRA_SHARE_FILE` redirects it, which is how the CLI suite exercises the real command
  * without touching the developer's own setting.
  */
-export const SETTING_FILE =
+const SETTING_FILE =
   process.env.ASTRA_SHARE_FILE ||
   settingPathFrom(
     spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
@@ -86,16 +86,12 @@ export function currentSetting(file = SETTING_FILE) {
  * The line a consumer prints when the state file is broken, or ''.
  *
  * It exists because a fallback nobody is told about is a setting nobody chose (cross-
- * vendor review, 12.08.2026): `review-astra.mjs` and `board-publish.mjs` read the setting,
- * so they must also say when it is not the operator's.
+ * vendor review, 12.08.2026): every consumer that reads the setting (review-astra,
+ * ask-astra, author-astra, board-publish, point-brief) must also say when it is not the
+ * operator's.
  */
 export function settingProblemLine(state, who = 'astra-share') {
   return state?.problem ? `${who}: the share setting is UNUSABLE — ${state.problem}. Repair it: node scripts/astra-share.mjs --set <setting>` : ''
-}
-
-/** Where one kind of work goes right now — the one call every consumer needs. */
-export function routeOf(kind, file = SETTING_FILE) {
-  return effectiveRoute(kind, currentSetting(file)).to
 }
 
 // An operator change keeps a recorded outage: the fallback is measured, not chosen.

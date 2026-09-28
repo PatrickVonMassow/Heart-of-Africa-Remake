@@ -88,8 +88,8 @@ try {
 
   const common = wroteA.filter((f) => wroteB.includes(f))
   if (common.length === 0) {
-    console.error(`No frame was written by both runs (run 1: ${wroteA.length}, run 2: ${wroteB.length}).`)
-    process.exit(1)
+    // Thrown, not exited: process.exit here would skip the restore in `finally`.
+    throw new Error(`No frame was written by both runs (run 1: ${wroteA.length}, run 2: ${wroteB.length}).`)
   }
 
   const rows = []
@@ -111,7 +111,7 @@ try {
   )
   if (s.stable) {
     console.log(
-      `STABLE — every frame is under the ${(SIGNAL_BAR * 100).toFixed(2)} % signal bar. A pixel pre-filter is worth attempting on this suite.`,
+      `STABLE — every frame both runs wrote is at or under the ${(SIGNAL_BAR * 100).toFixed(2)} % signal bar. A pixel pre-filter is worth attempting on this suite.`,
     )
   } else {
     console.log(

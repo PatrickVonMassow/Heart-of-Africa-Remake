@@ -12,10 +12,12 @@
 //
 // Co-Authored-By is authorship; Reviewed-By is review. The distinct keys keep a
 // reviewer out of every author reader. Decision logic: model-guard-core.mjs
-// (pure, Vitest-covered). This wrapper only reads the message file and prints
-// the refusal. FAIL-OPEN on an internal error,
-// like every gate here — a broken gate must never make the tree uncommittable —
-// while a real finding fails CLOSED, which is the whole point.
+// (pure, Vitest-covered). This wrapper reads the message file and the Fable
+// switch state and prints the refusal. FAIL-OPEN on an internal error, like
+// every gate here — a broken gate must never make the tree uncommittable — while
+// a real finding fails CLOSED, which is the whole point. An unreadable or
+// invalid Fable switch state is not an internal error: it is a missing policy
+// and refuses the commit.
 import { readFileSync } from 'node:fs'
 import { evaluateCommitTrailers, formatCommitTrailerVerdict } from './model-guard-core.mjs'
 import { currentFableState } from './fable-switch.mjs'

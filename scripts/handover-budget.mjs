@@ -5,10 +5,10 @@ import { writeJsonAtomic } from './atomic-write.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { handoverBudgetCompletion, handoverBudgetStart } from './handover-budget-core.mjs'
 
-export const HANDOVER_BUDGET_START_PATH = repoPath('.claude/handover-budget.json')
-export const HANDOVER_BUDGET_SERIES_PATH = repoPath('.claude/handover-costs.jsonl')
+const HANDOVER_BUDGET_START_PATH = repoPath('.claude/handover-budget.json')
+const HANDOVER_BUDGET_SERIES_PATH = repoPath('.claude/handover-costs.jsonl')
 
-export function readHandoverBudgetStart(path = HANDOVER_BUDGET_START_PATH) {
+function readHandoverBudgetStart(path = HANDOVER_BUDGET_START_PATH) {
   try {
     const value = JSON.parse(readFileSync(path, 'utf8'))
     return value && typeof value === 'object' && !Array.isArray(value) ? value : null
@@ -50,7 +50,7 @@ export function recordHandoverBudgetCompletion(input = {}, {
   try {
     const record = handoverBudgetCompletion({ ...input, start: read(startPath) })
     if (!record) {
-      say('\nWARNING: the handover cap could not be judged because its first refusal had no matching context reading; the boundary stands.')
+      say('\nWARNING: the handover cap could not be judged — no matching start reading, no usable end reading, or no valid cap; the boundary stands.')
       return { written: false, reason: 'unmeasured', record: null }
     }
     makeDir(dirname(seriesPath), { recursive: true })

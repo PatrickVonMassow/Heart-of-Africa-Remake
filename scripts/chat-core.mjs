@@ -1,4 +1,5 @@
-// THE CHAT CHANNEL'S DECIDING HALF — pure, no I/O, no clock of its own.
+// THE CHAT CHANNEL'S DECIDING HALF — pure, no I/O; `now` defaults to Date.now()
+// but every clock reading can be injected.
 //
 // The board is READ from a phone; this is the way back. The transport is ntfy
 // (already a dependency of scripts/notify.mjs): one INBOX topic carries phone →
@@ -13,7 +14,8 @@
 //     any tracked file and never into the published page. The page asks the user
 //     for the secret once and keeps it in localStorage; the machine keeps it in
 //     the git-ignored .claude/chat-secret.
-//   - every message carries an HMAC-SHA256 over its canonical (id, ts, text).
+//   - every message carries an HMAC-SHA256 over its canonical (protocol,
+//     direction, id, ts, text).
 //     Anything unsigned, mis-signed, stale or already seen is DROPPED here.
 // The signature is authentication, NOT authorisation: a verified message is
 // still untrusted INPUT. It may never authorise an outward-facing or
@@ -51,15 +53,16 @@ export const PROTOCOL = 'hoa-chat-1'
  */
 export const DIRECTIONS = Object.freeze(['inbox', 'outbox'])
 
-/** Human-recognisable prefix; the entropy is the 128 bits behind it. The
+/** Human-recognisable prefix; 128 hash bits follow it, as unguessable as the
+ *  secret they derive from (chat-secret.mjs: about 99 bits). The
  *  DIRECTION is deliberately not in the name — a leaked topic should not also
  *  announce which of the two is the one the agent reads. */
-export const TOPIC_PREFIX = 'hoa'
+const TOPIC_PREFIX = 'hoa'
 
 /** ntfy.sh caches a message for 12 hours ("Messages you publish are temporarily
  *  cached on our servers (default: 12 hours)", https://docs.ntfy.sh/privacy/;
  *  the server default `cache-duration: 12h`, https://docs.ntfy.sh/config/).
- *  The acceptance window matches it: beyond retention a replay is impossible
+ *  The acceptance window matches it: beyond it a replay is refused as stale
  *  anyway, and a shorter window would silently discard a message the user sent
  *  while the batch was down. Calibratable — the CLI reads HOA_CHAT_MAX_AGE_MS. */
 export const DEFAULT_MAX_AGE_MS = 12 * 60 * 60 * 1000
@@ -72,12 +75,13 @@ export const MAX_TEXT_LEN = 2000
 
 /** How many ids the TRANSPORT ledger remembers. These are cheap and disposable:
  *  an ntfy id says only "this exact post was looked at once", so losing the
- *  oldest ones costs at most one re-verification. The ENVELOPE ids do NOT live
- *  under this cap — see `pruneIdLedger`. */
+ *  oldest ones costs at most one re-verification. Accepted envelope ids are
+ *  pushed here too, but their protection does NOT depend on this cap — their
+ *  own age-bounded ledger holds them; see `pruneIdLedger`. */
 export const SEEN_MAX = 500
 
 /**
- * THE ENVELOPE LEDGER IS BOUNDED BY THE ACCEPTANCE WINDOW, NOT BY A COUNT.
+ * THE ENVELOPE LEDGER IS BOUNDED BY THE ACCEPTANCE WINDOW, NOT BY A REPLAY COUNT.
  *
  * Both id kinds used to share one `SEEN_MAX`-capped array, and dropped events
  * were pushed into it too — so ~500 junk posts to a known inbox topic EVICTED
@@ -87,8 +91,9 @@ export const SEEN_MAX = 500
  * envelope older than it is refused as `stale` whatever the ledger says.
  *
  * So an accepted envelope id is kept for exactly that window — `maxAgeMs` plus
- * the clock skew, past which `assessEvent` can never accept it again — and the
- * transport ids go on rotating as before.
+ * the clock skew, past which `assessEvent` can never accept it again — subject
+ * only to the `ID_LEDGER_MAX` disk bound, and the transport ids go on rotating
+ * as before.
  */
 export function envelopeRetentionMs(maxAgeMs = DEFAULT_MAX_AGE_MS) {
   const ms = Number(maxAgeMs)
@@ -198,7 +203,8 @@ export async function signMessage(secret, message) {
   return toHex(await crypto.subtle.sign('HMAC', key, bytes))
 }
 
-/** Length-independent hex compare — no early exit on the first differing byte. */
+/** Hex compare with no early exit on the first differing char. Unequal lengths
+ *  return false at once — a hex HMAC's length is public anyway. */
 export function constantTimeEqual(a, b) {
   const x = String(a ?? '')
   const y = String(b ?? '')
@@ -225,8 +231,8 @@ export async function verifyMessage(secret, message, signature) {
 }
 
 /**
- * Build the wire envelope for a text. Used by the page (direction `inbox`) and
- * by chat-reply (direction `outbox`).
+ * Build the wire envelope for a text. Used by chat-reply (direction `outbox`);
+ * the page's literal copy of the protocol builds the `inbox` ones.
  *
  * The direction is signed but NOT written into the envelope: putting it on the
  * wire would only invite a reader to trust the label instead of the channel.
@@ -293,8 +299,8 @@ export const seenKeys = ({ ntfyId, envelopeId }) =>
  * Drop reasons, in the order they are decided:
  *   not-a-message  the event is an `open`/`keepalive`/`poll_request` frame
  *   duplicate      its ntfy id is already in the ledger — decided FIRST, so a
- *                  re-read of the cache costs no verification and a message
- *                  once rejected is never re-reported as a fresh fault
+ *                  re-read of the cache costs no verification and a rejected
+ *                  message is not re-reported while its id is remembered
  *   malformed      no parseable envelope of this protocol version
  *   unsigned       an envelope with no signature at all
  *   bad-signature  a signature that does not hold under the secret FOR THE
@@ -378,8 +384,9 @@ export async function assessEvent({
  *
  *   - `bad-signature` / `unsigned` / `malformed` — not our sender; see the oracle
  *     note above.
- *   - `duplicate` — the ORIGINAL was accepted and delivered, so the user's words
- *     did land; a notice would say the opposite. It would also hand a captured
+ *   - `duplicate` — the ORIGINAL was either accepted and delivered, so the
+ *     user's words did land, or already earned its notice; a new notice would
+ *     be wrong or redundant. It would also hand a captured
  *     envelope an amplifier: replay it and the machine posts on demand.
  *   - `stale` / `expired` — THE BLOCKING FINDING of the four-eyes review. Once an
  *     accepted envelope id has aged out of the ledger, a replay of that very
@@ -388,18 +395,20 @@ export async function assessEvent({
  *     already CARRIED OUT never arrived, and ask them to send it again. The
  *     information needed to tell the two apart is genuinely gone, so the notice
  *     is narrowed to the half where the ambiguity cannot arise rather than
- *     guessed at. Nothing is lost in practice — the acceptance window matches
- *     ntfy's cache, so an `expired` message is one the transport has dropped too.
+ *     guessed at. Nothing is lost in practice — the default acceptance window
+ *     matches ntfy's cache, so an `expired` message is one the transport has
+ *     dropped too.
  */
-export const NOTIFIABLE_DROP_REASONS = Object.freeze(['ahead'])
+const NOTIFIABLE_DROP_REASONS = Object.freeze(['ahead'])
 
 /** At most this many notices per poll. A burst of stale messages is a broken
  *  clock, not a conversation — one poll may not turn it into an outbox flood. */
 export const MAX_DROP_NOTICES = 3
 
 /**
- * A timestamp as the board reader reads it. TOTAL — null for a junk value, an
- * ISO string where the runtime has no usable ICU data.
+ * A timestamp as the board reader reads it — null for a junk value, an ISO
+ * string where the runtime has no usable ICU data. (A finite value outside the
+ * Date range still throws.)
  */
 export function formatChatStamp(ts, { locale = 'de-DE', timeZone = 'Europe/Berlin' } = {}) {
   // `typeof`, not `Number(…)`: `Number(null)` is 0, and 0 is finite, so a MISSING
@@ -449,8 +458,8 @@ export function dropNoticeDecision({ verdict, notified = [], sent = 0, max = MAX
   const kind = verdict.reason === 'stale' ? verdict.staleKind : verdict.reason
   if (!NOTIFIABLE_DROP_REASONS.includes(kind)) return no('not-notifiable')
   if (typeof verdict.envelopeId !== 'string' || verdict.envelopeId === '') return no('no-envelope-id')
-  // One notice per message, ever — a replay under fresh transport ids may not
-  // become a notice generator.
+  // One notice per message while the notified ledger remembers it — a replay
+  // under fresh transport ids may not become a notice generator.
   if ((Array.isArray(notified) ? notified : []).some((e) => e?.id === verdict.envelopeId)) return no('already-notified')
   if (!(Number(sent) < Number(max))) return no('rate-limited')
   return { notify: true, reason: kind }
@@ -511,8 +520,7 @@ export function chatInboxLogLines(result) {
 /**
  * A whole poll response → what to spool and what the next state is. ASYNC, PURE.
  *
- * THE CURSOR IS NOT THE DEDUPE (the delivery discipline this point was written
- * with). The cursor only narrows the next poll; the LEDGER of seen ids is what
+ * THE CURSOR IS NOT THE DEDUPE. The cursor only narrows the next poll; the LEDGER of seen ids is what
  * guarantees a message is spooled once. So a lost, reset or corrupt cursor
  * replays the whole retention window through here and produces nothing twice —
  * which is exactly what scripts/chat-core.test.mjs proves.
@@ -524,13 +532,14 @@ export function chatInboxLogLines(result) {
  * through to the verification — an envelope signed for the other one drops as
  * `bad-signature`.
  *
- * THE STATE HAS TWO LEDGERS, and that is the fix for the flood (see
+ * THE STATE KEEPS SEPARATE LEDGERS, and that is the fix for the flood (see
  * `envelopeRetentionMs`). `seen` stays what it was — the count-capped list of
  * transport ids, which dropped events still push into — while `envelopes` holds
  * every ACCEPTED envelope id under its own age-bounded retention, so no volume
  * of junk can evict one inside the window in which it could still be replayed.
  * Accepted envelope ids go into BOTH: the duplicate storage costs nothing and
- * keeps a reader of an older state file working unchanged.
+ * keeps a reader of an older state file working unchanged. A third, `notified`,
+ * remembers drop notices (see the drop-notice section).
  */
 export async function ingest({
   events,
@@ -594,8 +603,8 @@ export async function ingest({
       }
       // A drop the SENDER can act on goes back to them; everything else stays
       // silent. The ledger entry is written whether or not the post later
-      // succeeds: the transport id is already remembered, so this message will
-      // never be judged again, and a notice is at-most-once by design.
+      // succeeds: the transport id is already remembered, so this message is
+      // not judged again while it is, and a notice is at-most-once by design.
       const plan = dropNoticeDecision({ verdict, notified, sent: notices.length })
       if (plan.notify) {
         notices.push({
@@ -640,9 +649,9 @@ export function sinceParam(state = {}, { maxAgeMs = DEFAULT_MAX_AGE_MS } = {}) {
 /**
  * THE SHARED TEST VECTOR — the only thing holding the two implementations of
  * this protocol together. The browser half is a literal inside
- * public/board/index.html (a deployed page cannot import this module), so both
- * scripts/chat-core.test.mjs and scripts/chat-viewer.test.mjs assert against
- * these fixed values. A change to a derivation string, the topic length or the
+ * public/board/index.html (a deployed page cannot import this module), so the
+ * chat and viewer test suites (chat-core, chat-viewer and others) assert
+ * against these fixed values. A change to a derivation string, the topic length or the
  * canonical form breaks them on BOTH sides at once, which is the point.
  *
  * The two signatures are the SAME message in the two directions, and they

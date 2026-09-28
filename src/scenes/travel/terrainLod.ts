@@ -8,8 +8,9 @@
 // shading is already smooth (central-difference vertex normals), so the
 // remaining facets are the SILHOUETTE class: only finer tessellation rounds
 // them. Mirroring the accepted coastal doubling, a near chunk with real
-// mountain relief doubles its segments (capped), so mountains sample at
-// ~1 texel while the flat basins keep the base cost.
+// mountain relief doubles its segments (capped): the inner rings (≤ 2) then
+// sample mountains at ~1 texel, rings 3–4 at half their base spacing, while the
+// flat basins keep the base cost.
 
 import { worldToLatLon } from '../../world/geo'
 import { elevationAt, landFractionAt } from '../../world/geodata'
@@ -40,7 +41,7 @@ export const REFINE_SEGMENT_CAP = 112
 let refineEnabled = true
 let refineSegmentCap = REFINE_SEGMENT_CAP
 
-export interface TerrainRefineOverride {
+interface TerrainRefineOverride {
   enabled: boolean
   segmentCap: number
 }
@@ -95,7 +96,7 @@ export function chunkIsCoastal(cx: number, cz: number): boolean {
 }
 
 /** A chunk peaking above this is mountain terrain (terrain.ts MOUNTAIN_M). */
-export const MOUNTAIN_CHUNK_PEAK_M = 1600
+const MOUNTAIN_CHUNK_PEAK_M = 1600
 /**
  * Land-relief span (meters) above which a chunk reads as mountainous. A 2.4
  * deg chunk is large, so the span accumulates: measured over the whole world

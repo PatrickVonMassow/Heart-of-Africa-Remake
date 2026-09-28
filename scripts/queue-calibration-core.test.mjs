@@ -42,7 +42,7 @@ import {
   promiseMedians,
   rewritePlan,
   roundHours,
-  SPAN_NO_BRANCH,
+  SPAN_UNKNOWN,
   summarise,
   UNTAGGED,
   updateEstimateLedger,
@@ -68,7 +68,7 @@ const landing = (over = {}) => ({
  */
 const mainSessionLandings = (n, over = {}) =>
   Array.from({ length: n }, (_, i) =>
-    landing({ point: 800 + i, delegated: false, elapsedHours: null, spanBasis: SPAN_NO_BRANCH, picture: null, ...over }),
+    landing({ point: 800 + i, delegated: false, elapsedHours: null, spanBasis: SPAN_UNKNOWN, picture: null, ...over }),
   )
 
 /** `n` landings of one class whose ratio is exactly `ratio`. */

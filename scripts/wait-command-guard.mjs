@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PreToolUse(Bash) guard: no hand-rolled wait for a process (point 1048).
+// PreToolUse(Bash, PowerShell) guard: no hand-rolled wait for a process (point 1048).
 //
 // On 02./03.09.2026 the owning session spawned a background watcher of the form
 // `while pgrep -f "npm exec vitest" >/dev/null; do sleep 30; done` at every

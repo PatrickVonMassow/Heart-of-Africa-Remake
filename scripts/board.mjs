@@ -1,9 +1,9 @@
 // Point 372 — one command for the board instead of six.
 //
 // Keeping the board current used to cost six tool calls per change (edit,
-// publish, mirror, --synced, focus, prep), several times per point, each
-// billed at the whole context. That is also why the board lagged: a six-step
-// ritual gets postponed, a one-step one does not.
+// publish, the since-retired mirror, --synced, focus, prep), several times per
+// point, each billed at the whole context. That is also why the board lagged: a
+// six-step ritual gets postponed, a two-step one (an edit, then `attest`) does not.
 //
 //   node scripts/board.mjs now    <point> "<status>"  # queue → current work
 //   node scripts/board.mjs status <point> "<text>"    # restate a now-card's status
@@ -13,13 +13,21 @@
 //                                                     # archive + promote in ONE write
 //   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
 //   node scripts/board.mjs none   "<reason>"           # the gap card, no point to close
-//   node scripts/board.mjs closing <point> "<reason>"  # …still owed: its closing duties
-//   node scripts/board.mjs vdzk-add ["--automated"] "<title>" "<question>"
+//   node scripts/board.mjs closing <point> [--title "<Betreff>"] "<reason>"
+//                                                     # …still owed: its closing duties
+//   node scripts/board.mjs eta    <point> "<HH:MM>"    # a now-card's expected end
+//   node scripts/board.mjs promote <point> "<times>" "<title>" "<status>"
+//                                                     # write a now-card directly
+//   node scripts/board.mjs merge-done                 # fold duplicate Erledigt cards
+//   node scripts/board.mjs vdzk-add "<title>" "<question>"
 //                                                     # ask the user a decision
+//                                                     # (--automated: accepted, ignored)
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs vdzk-keep "<title>" [...] # message did not answer it
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
-//   node scripts/board.mjs attest                     # rotate, publish, audit, confirm
+//   node scripts/board.mjs attest                     # rotate, audit (--synced), confirm prep
+//
+// (`paused` only redirects: a pause is derived state since point 749.)
 //
 // GERMAN TEXT GOES IN ON STDIN (point 410). Wherever a "<text>" stands above,
 // `--text-stdin` may take its place and the text is read from stdin as UTF-8:
@@ -215,7 +223,8 @@ function prepareActiveTransition({
       // each other — the very split-brain this shared transition exists to
       // close, with the edit lock offering no rollback of its own. The
       // declaration write is in-process and restorable; the focus subprocess
-      // failed and wrote nothing. Restore, then fail the command loudly.
+      // failed and wrote nothing. Where the transition is rollbackable, restore;
+      // either way, fail the command loudly.
       if (!rollbackable) {
         throw new Error(
           `${error.message} — the board edit is already written, so the active-work record KEEPS the new ` +
@@ -470,12 +479,12 @@ try {
     })
   } else {
     console.error(
-      'usage: board.mjs now|status|title|queue <point> "<text>" | eta <point> "<HH:MM>" | ' +
+      'usage: board.mjs now|status|title <point> "<text>" | queue <point> ["<text>"] | eta <point> "<HH:MM>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
         'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'vdzk-keep "<title>" [...] [--why "<reason>"] | ' +
-        'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
+        'promote <point> "<times>" "<title>" "<status>" | merge-done | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,
     )
     process.exitCode = 2

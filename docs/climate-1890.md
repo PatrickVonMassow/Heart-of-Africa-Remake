@@ -36,7 +36,7 @@ game already places Lake Chad; its extent should match the period, not today.
 - Droughts in the Sahel — https://en.wikipedia.org/wiki/Droughts_in_the_Sahel
 - Lake Chad — https://www.britannica.com/place/Lake-Chad
 
-### 1.2 The equatorial glaciers were 8–12× today's ✅
+### 1.2 The equatorial glaciers were roughly 12–24× today's ✅
 
 Kilimanjaro, Mount Kenya and the Rwenzori stood near their Little Ice Age
 maximum. Against the first reliable survey (~1900) they retain today: Kilimanjaro
@@ -166,8 +166,9 @@ Notes that matter for implementation:
   (belg Feb–May, kiremt Jun–Sep, bega Oct–Jan) for rainfall; the traditional
   four-season calendar (kiremt, *mekher* Sep–Nov, bega, belg) is the more
   period-authentic naming if the game ever says a season out loud.
-- **The Cape is the one zone with real 1890 data** ✅ — the South African
-  Astronomical Observatory series runs continuously from **1841**. Mean onset 13
+- **The Cape is the one zone with a continuous instrumental series through 1890** ✅
+  (the continent-wide period dataset of §7 is regional and indexed) — the South
+  African Astronomical Observatory series runs continuously from **1841**. Mean onset 13
   April, cessation 18 October. The 19th century had **longer, earlier-starting
   wet seasons** than today, with ~10 % more rain. Model Cape Town slightly wetter
   with a slightly longer, earlier season than modern normals.
@@ -282,7 +283,8 @@ In 1890 model these at LIA extent (§1.2): Kilimanjaro's cap mostly **above
 Mount Kenya with a *dozen real glaciers* down to ~4,600–4,700 m, not today's
 patches; Rwenzori with **six+ glaciated peaks**, not today's three.
 
-**Seasonal snow — only outside the tropics:**
+**Seasonal snow cover to render — only outside the tropics** (tropical transient
+snow is listed under the bare massifs below):
 
 | Massif | Coords | Months | Snowline |
 | --- | --- | --- | --- |
@@ -291,8 +293,8 @@ patches; Rwenzori with **six+ glaciated peaks**, not today's three.
 
 **Model these as BARE — the near misses matter:**
 
-- **Mount Elgon (4,321 m)** — the threshold case: the highest African mountain
-  completely free of glaciation. Misses the equilibrium line by <200 m.
+- **Mount Elgon (4,321 m)** — the threshold case: completely free of glaciation
+  although it misses the equilibrium line by <200 m.
 - **Simien / Ras Dashen (4,550 m)** — transient only, Dec–Feb above ~4,200 m; no
   glacier (Ethiopia's rain is summer, so the high ground is dry when it is cold).
   ✅ Fine period pedigree though: Henry Salt recorded snow on 9 April 1814.

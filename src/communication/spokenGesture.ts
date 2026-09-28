@@ -2,8 +2,8 @@
 // (work-order point 580, docs/communication-poc-spec.md).
 //
 // THE RULE, in ONE place because it must hold identically for the children's
-// situations and the adults' errands: a figure that GESTURES is a figure the
-// player can hear and read, or it does not gesture. The gesture carries exactly
+// situations and the adults' errands: a figure that GESTURES stands within the
+// player's hearing range, or it does not gesture. The gesture carries exactly
 // as far as the voice and no further — beyond the hearing radius the figure
 // stays still instead of miming a concept the player gets no word for.
 //
@@ -28,7 +28,7 @@ import {
 } from '../render/gesture'
 
 /** What reaches the player from a figure speaking `distance` away. */
-export interface SpeechReach {
+interface SpeechReach {
   /** The utterance arrives: it is recorded, and its label is raised. */
   audible: boolean
   /** The figure gestures at all — the SAME gate, never one without the other. */

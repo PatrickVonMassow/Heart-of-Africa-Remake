@@ -1,5 +1,6 @@
-// Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
-// a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
+// Headless polish verification (CLAUDE.md §7.1.31 and neighbours): settlement
+// orientation once the chief is met, distant panorama wildlife, speech, season,
+// travel capture, Giza and settlement life (design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { frameSpeakingDrums } from './drumFrame.mjs'
@@ -35,10 +36,7 @@ import { onBaselineLane } from './baseline-classify-core.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
-// Point 549: the same world every run. Unseeded, this suite built a new
-// settlement layout per attempt and half its checks were a draw — see
-// verify-seed.mjs for the measurement. The seed is applied by the LAUNCHER now
-// (point 557), so this is the plain URL every other suite carries.
+// The seed is applied by the launcher (verify-seed.mjs), so this is the plain URL.
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 // SECTIONS (point 566). Every block below the boot prologue is a named block
@@ -125,11 +123,8 @@ const probeSilhouetteFooting = async (page, check, label) => {
     p.z = saved.z
     p.yaw = saved.yaw
     // `pitch` is part of the pose since point 392 (the view looks up and down),
-    // so restoring it restores the aim the caller had — before that it was a
-    // stray field the probe itself added, and the undefined branch below is
-    // what handed the object back unchanged then.
-    if (saved.pitch === undefined) delete p.pitch
-    else p.pitch = saved.pitch
+    // so restoring it restores the aim the caller had.
+    p.pitch = saved.pitch
   }, pose)
   check(
     `${label}: every panorama silhouette's feet meet drawn ground (point 181)`,
@@ -144,7 +139,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // it stands in, the building it is aimed at, the overlay it documents — and the
 // shutter proves that subject is in the picture before the file is written.
 const frame = frameShutter(page, OUT)
-// The collider geometry the staged-wedge section reads with (scripts/verify/colliderProbe.mjs).
+// The collider geometry the wedged-adults and village sections read with (scripts/verify/colliderProbe.mjs).
 await installColliderProbe(page)
 const errors = []
 page.on('console', (m) => {
@@ -262,8 +257,9 @@ if (section('giza-skyline')) {
 
   // Point 273: Menkaure's red-granite base casing read as a floating RED ERROR
   // BAND at this distant skyline scale, so it was removed (kept only at the
-  // walkable site). Prove no strongly red-dominant pixels remain over the
-  // pyramid silhouette — a red-granite stripe would light many up. The sky is
+  // walkable site). Prove no strongly red-dominant pixels remain anywhere in the
+  // skyline frame (it holds the pyramid silhouette) — a red-granite stripe would
+  // light many up. The sky is
   // warm haze (r≈g≈b-ish) and the pyramids are tawny (r>g>b but not RED), so a
   // true red band (r well above BOTH g and b) is the error signature.
   {
@@ -330,7 +326,7 @@ if (section('panorama-wildlife')) {
     'every panorama silhouette sits on the ground line it was placed on',
     // Point 300: the body DIPS onto whichever leg is planted (that is what puts
     // the standing foot on the ground), so the anchor may sit below the line by
-    // that dip — `drop` — and never above it.
+    // that dip — `drop` — and at most 0.2 above it.
     wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY - w.drop - 1e-3 && w.y <= w.visibleY + 0.2),
     `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}-${(w.drop ?? 0).toFixed(2)}`).join(', ')}]`,
   )
@@ -348,8 +344,8 @@ if (section('panorama-wildlife')) {
   // Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
   // Their stride phase rides the ground they cover on the ring, so over the same
   // interval each one's phase advance divided by its (scale-normalised, point 286)
-  // gait speed is the SAME constant — a wall-clock bob would advance them all
-  // alike whatever their speed.
+  // gait speed and its cadence is the SAME constant — a wall-clock bob would
+  // advance them all alike whatever their speed.
   {
     const sample = () =>
       page.evaluate(() =>
@@ -388,7 +384,7 @@ if (section('panorama-wildlife')) {
   // Point 286: the silhouettes must WALK FORWARD, never backward. The facing is
   // derived from the ring velocity, so each visible silhouette's displacement over
   // an interval must project POSITIVELY onto its facing (forward = (sin yaw,
-  // cos yaw)), and a moving one must actually advance. The reverted bug set the
+  // cos yaw)) or be zero, and at least one must actually advance. The reverted bug set the
   // yaw exactly π off the tangent, so every silhouette moonwalked.
   //
   // Stepped by RENDERED FRAMES, never by a wall clock: this scene occasionally
@@ -634,8 +630,9 @@ if (section('speech-hypothesis')) {
   // a hypothesis. The axis that actually varies for the player is the world SEED,
   // which is drawn at every start; the village is not.
   await goToPlace('bambara-village')
-  // A SHIPPED word, not a hand-typed shape: RIVER as src/communication/lexicon.ts
-  // beats it. A five-syllable literal survived the four-syllable rebuild here and
+  // A word the game speaks, not a hand-typed shape: one of the six four-syllable
+  // words (RIVER in SHIPPED_VOCABULARY, src/communication/vocabulary.ts; its
+  // meaning is rolled per run). A five-syllable literal survived the four-syllable rebuild here and
   // proved the label path for an utterance the game can no longer produce
   // (point 686); src/communication/verifySuiteUtterances.test.ts pins it now.
   const RIVER = 'ba-BA-ba-BA'
@@ -865,8 +862,7 @@ if (section('speech-hypothesis')) {
       if (!(s.bodyX > 0)) return 'off the left edge'
       if (!(s.bodyX < s.vw)) return 'off the right edge'
       if (!(s.bodyY > s.labelBottom)) return 'above its own note'
-      if (!(s.bodyY < s.vh)) return 'below the bottom edge'
-      return 'in frame'
+      return 'below the bottom edge'
     }
     const misses = [...new Set(samples.filter((s) => !inFrame(s)).map(missReason))]
     check(
@@ -950,13 +946,13 @@ if (section('speech-hypothesis')) {
     p.x = saved.x
     p.z = saved.z
     p.yaw = saved.yaw
-    if (saved.pitch !== undefined) p.pitch = saved.pitch
+    p.pitch = saved.pitch
   }, pose)
 }
 // --- Guessing a meaning where it is spoken (design.md §13.4, points 588/691) --
 // The arbitration, the dialog and the note it writes are pinned in the Vitest
-// layer. What ONLY a browser can answer is the input path: the use key opens the
-// dialog at all, a real left click on the settlement view opens NOTHING because
+// layer. What ONLY a browser can answer is the input path: the guess key E opens
+// the dialog at all (point 1139), a real left click on the settlement view opens NOTHING because
 // the mouse handler is gone (point 691), the pointer lock is given up for the
 // dialog and asked back on close, and real keystrokes land in the field. The
 // lock itself cannot be exercised here — it is deliberately never engaged under
@@ -1183,7 +1179,7 @@ if (section('speech-guess')) {
       p.x = saved.x
       p.z = saved.z
       p.yaw = saved.yaw
-      if (saved.pitch !== undefined) p.pitch = saved.pitch
+      p.pitch = saved.pitch
     },
     { u: GUESS_UTTERANCE, saved: guessPose },
   )
@@ -1270,7 +1266,8 @@ if (section('panorama-slope-footing')) {
     leaning.ok,
     `at ${where} — ${leaning.detail}`,
   )
-  // Hand the scene back to the settlement the rest of this suite expects.
+  // Leave the scene in maasai-village, as a whole run always has; every later
+  // section stages its own place.
   await goTo('maasai-village')
 }
 
@@ -1324,8 +1321,8 @@ if (section('orientation-markers')) {
     const d = Math.hypot(mx, mz) || 1
     // Stand 14 m from the hut on the line toward the settlement centre — the open
     // ground every layout keeps clear — and far enough back that the marker at
-    // ~5.6 m sits well inside the vertical field of view (the place camera builds
-    // its rotation from yaw alone, so there is no pitch to tilt up with).
+    // ~5.6 m sits well inside the vertical field of view (the pitch is left as it
+    // stands, so the distance, not a tilt, frames the marker).
     p.x = mx - (mx / d) * 14
     p.z = mz - (mz / d) * 14
     // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
@@ -1350,7 +1347,8 @@ if (section('orientation-markers')) {
   const again = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
   check('the orientation persists across re-entry', again >= 1, `${again} markers`)
 
-  // A settlement without a gift stays unmarked.
+  // A settlement whose chief was not met stays unmarked. (The check name below
+  // keeps its old wording: it is the ledger identity.)
   await page.evaluate(() => {
     const g = window.__game.getState()
     g.leavePlace()
@@ -1525,9 +1523,9 @@ if (section('settlement-season')) {
     cairoMaxRain = Math.max(cairoMaxRain, await page.evaluate(() => window.__placeSeason().rain))
   }
   check('Cairo stays bone dry in every month (hyper-arid, no rain)', cairoMaxRain === 0, `max rain ${cairoMaxRain.toFixed(3)}`)
-  // Restore what the panorama check below expects: standing in a DIRECTLY
-  // entered place (place->place, no travel scene, so no capture). Enter without
-  // leaving first, and reset the calendar.
+  // Leave a DIRECTLY entered place behind (place->place, no travel scene, so no
+  // capture), as a whole run always has; the capture section below stages its
+  // own. Enter without leaving first, and reset the calendar.
   await page.evaluate(() => {
     const g = window.__game.getState()
     g.debugJumpToMonth(1)
@@ -1538,16 +1536,17 @@ if (section('settlement-season')) {
 
 // --- Travel panorama capture (design.md §2.5, point 81) -----------------------
 // Entering from the travel scene captures the REAL surroundings as the
-// first-person horizon: at the riverside Nubian village the Nile must show in
-// the north/east sectors (direction-true), while a direct place->place enter
-// (no travel scene) falls back to the geometry backdrop.
+// first-person horizon: at the riverside Nubian village the Nile must show as a
+// directional water signal and an injected compass pillar proves the band
+// direction-true, while a direct place->place enter (no travel scene) falls back
+// to the geometry backdrop.
 if (section('travel-panorama-capture')) {
   await goToPlace('maasai-village')
   const before = await page.evaluate(() => window.__placePanoramaActive ?? null)
   check('a direct enter without the travel scene falls back (no capture)', before === false, `active ${before}`)
-  // Point 96 gate: this leave happens AFTER several settlement visits (the
-  // suite has entered masai, swahili, capetown, timbuktu, mongo and cairo by
-  // now) — exactly the recipe that used to freeze the main thread 13-16 s on
+  // Point 96 gate: in a whole run this leave happens AFTER several settlement
+  // visits (maasai, bambara, swahili, pedi or sidama, capetown and cairo among
+  // them; a single --section run stages none of them) — exactly the recipe that used to freeze the main thread 13-16 s on
   // synchronous shader re-links. With the module-singleton meshes/materials/
   // CSM the travel programs survive the place visits, so the transition must
   // stay fluid.
@@ -1640,15 +1639,14 @@ if (section('travel-panorama-capture')) {
   await probeSilhouetteFooting(page, check, 'nubian-village (capture active)')
   const f = pano.fractions
   // The Nile must show as a clearly DIRECTIONAL water signal: real water
-  // pixels overall, concentrated in some sectors while others stay dry
-  // (which way the river bends around the village depends on the run's
+  // pixels overall with one leading sector (no sector is required to be dry;
+  // which way the river bends around the village depends on the run's
   // camera height over the bank dunes — the geography itself is fixed).
   const total = f ? f.reduce((a, b) => a + b, 0) : 0
   const max = f ? Math.max(...f) : 0
   const min = f ? Math.min(...f) : 1
   // Water present with a leading sector; the strict east-west proof lives in
-  // the rendered-pixel check below (the band mirror made per-sector ratios a
-  // weak discriminator with the low camera).
+  // the rendered-pixel check below.
   check(
     'the Nile shows as a water signal in the band',
     !!f && total > 0.003 && max > total * 0.3 && min >= 0,
@@ -1674,7 +1672,8 @@ if (section('travel-panorama-capture')) {
     return hit
   }
   // Condition-based probing: poll until the pillar shows (west) or the
-  // window ends (east must stay empty) — fixed sleeps starve under load.
+  // window ends (east must stay under a tenth of west) — fixed sleeps starve
+  // under load.
   const magentaPx = async (yaw, pollMs) => {
     await page.evaluate((y) => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = y; p.pitch = 0.02 }, yaw)
     const deadline = Date.now() + pollMs
@@ -1975,7 +1974,7 @@ if (section('giza-site')) {
       }
       return { width: c.width, splitColumns: split, worstGapRows: worst }
     })
-    // Measured on this very state: with the capture reaching 900 wu the band
+    // Measured before the bound: with the capture reaching 900 wu the band
     // split 231/3072 of Giza's columns (and 168/3072 of Cairo's — the defect was
     // never Giza-only, just most visible on an open plateau), gaps up to 11 rows;
     // bounded to the committed ring it splits none, and a settlement's worst is
@@ -2055,12 +2054,13 @@ if (section('giza-site')) {
 
     // Human-viewable evidence from two standpoints on the site.
     const radius = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
+    // South rim, then east rim.
     const posts = [
-      ['south rim', 0, radius * 0.75, Math.PI / 2],
-      ['east rim', radius * 0.7, 0, Math.PI],
+      [0, radius * 0.75, Math.PI / 2],
+      [radius * 0.7, 0, Math.PI],
     ]
     let shot = 0
-    for (const [, px, pz, yaw] of posts) {
+    for (const [px, pz, yaw] of posts) {
       await page.evaluate(
         ([x, z, y]) => {
           const p = window.__placePlayer
@@ -2165,7 +2165,8 @@ if (section('giza-site')) {
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
-// arms the renderer DRAWS actually take the four poses, that a gesture ends on
+// gesture state the live figures publish takes the four poses (each framed on
+// the drawn pair), that a gesture ends on
 // its own while the game runs, and that a figure at rest really stands at rest.
 // The state machine itself (bounded duration, one gesture per figure, the
 // return to rest) is pinned purely in src/render/gesture.test.ts.
@@ -2220,14 +2221,14 @@ if (section('villager-gestures')) {
               requestAnimationFrame(() =>
                 requestAnimationFrame(() => {
                   const h = window.__placeRayHit(c.cx, 1.05, c.cz)
-                  res({ x: p.x, z: p.z, hit: h.hitDistance, target: h.targetDistance, name: h.hitName })
+                  res({ hit: h.hitDistance, target: h.targetDistance, name: h.hitName })
                 }),
               )
             }),
           [a, centre],
         )
         if (hit.hit == null || hit.hit >= hit.target - 0.45) {
-          return { stood: { x: hit.x, z: hit.z, cx: centre.cx, cz: centre.cz, bearing: a }, tried: i + 1, blocked }
+          return { stood: { cx: centre.cx, cz: centre.cz, bearing: a }, tried: i + 1, blocked }
         }
         blocked.push(`${a.toFixed(2)}→${hit.name} at ${hit.hit.toFixed(2)} of ${hit.target.toFixed(2)}`)
       }
@@ -2251,7 +2252,7 @@ if (section('villager-gestures')) {
 
     // --- the four poses, one frame each -------------------------------------
     // Long durations so the pose survives the shutter's own settling; the wait
-    // is on the GESTURE's own clock, never on the wall clock.
+    // is on the pose being open, never on the wall clock.
     const HOLD = 12
     const poseAway = (p) =>
       Math.abs(p.left.pitch - 0.04) +
@@ -2337,7 +2338,7 @@ if (section('villager-gestures')) {
     )
 
     // --- sampled over the standing conversation -----------------------------
-    // A single instant proves nothing about a scheduler: sample across frames.
+    // A single instant proves nothing about a quiet pair: sample across frames.
     // Since point 580 the sample must find the pair QUIET — the two used to
     // cycle the four gestures as ambient dressing, with no utterance behind any
     // of them and at any distance, which is the mute pantomime the user
@@ -2371,15 +2372,15 @@ if (section('villager-gestures')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 // --- Cold-weather dress (design.md §19.13, point 120g) ---
-// LAST in the file on purpose: it hops between settlements, and each leave
-// remounts the travel scene, which makes the next enter capture a panorama —
-// exactly the state the fallback check above asserts is absent.
-// --- (checks) ------------------------
-// The Zulu isipuku is the ONE period-sourced case (Mayr 1907): a cloak worn
-// over the everyday dress in cold weather. So the Zulu village must dress for
-// its austral winter and shed the cloak in its summer — while the peoples the
-// research found no evidence for stay bare in any month, however cold their
-// own ground gets. See src/systems/dress.ts for the per-people evidence.
+// It hops between settlements, and each leave remounts the travel scene, which
+// makes the next enter capture a panorama — the state the travel-panorama-capture
+// fallback check asserts is absent, which is why that section stages its own
+// direct enter.
+// The Zulu isipuku (Mayr 1907) is a cloak worn over the everyday dress in cold
+// weather, so the Zulu village must dress for its austral winter and shed the
+// cloak in its summer; the San, Somali and Hausa cases rest on Passarge, Swayne
+// and Barth, while a people without a seasonal rule stays bare in any month.
+// See src/systems/dress.ts for the per-people evidence.
 if (section('cold-weather-dress')) {
   // NOTE: debugJumpToMonth is ONE-indexed (dayOfMonthJump clamps to 1..12 then
   // subtracts one; Hud.tsx calls it as i + 1). A zero-based probe lands a month
@@ -2397,9 +2398,9 @@ if (section('cold-weather-dress')) {
     return page.evaluate(() => window.__placeDress ?? null)
   }
 
-  // Point 137: the six dressed peoples, each at its own village in its own
-  // month, against the fifteen that never dress. The pure mapping is covered in
-  // src/systems/dress.test.ts; this is the live half.
+  // Point 137: four of the dressed peoples, each at its own village in its own
+  // month, and the Maasai as a people that never dresses. The pure mapping is
+  // covered in src/systems/dress.test.ts; this is the live half.
   const somaliKarif = await dressAt('somali-village', 8) // August — the karif on the Haud
   await frame('113-somali-karif-tobe', { place: 'somali-village', label: 'the Somali karif dress' })
   const somaliJilal = await dressAt('somali-village', 2) // February — jilal, dry and HOT
@@ -2562,8 +2563,9 @@ if (section('campfire-shadows')) {
   // (point 499). After 1.5 s it has not here: both probe points then landed on the
   // same unrendered ground and every contrast came out as exactly 0.0 — ON and OFF
   // alike, three stones each, which is a blind probe rather than a missing shadow.
-  // Built, the same measurement reads OFF 8/-5/12 and ON 56/40/53, inside the
-  // recorded ranges. Neither threshold below is touched.
+  // Built, the same measurement reads OFF 8/-5/12 and ON 56/40/53, each on its
+  // side of the bars (OFF under 20, ON at 25 or more). Neither threshold below is
+  // touched.
   await waitForSceneBuilt(page)
 
   // The fire ring's stones ARE the visible occluders (light at the pit centre,
@@ -2645,7 +2647,8 @@ if (section('campfire-shadows')) {
     window.__ui.getState().setSeasonWetnessOverride(null)
   })
 
-  // Measured on both backends: OFF contrast 3-12, ON contrast 42-57.
+  // Measured on both backends across the readings recorded here: OFF contrast
+  // about -5 to 12, ON contrast about 34 to 57.
   //
   // Point 387 — the ON check was red on `main` at per-stone [1.6, -1.3, 0]:
   // three readings of three different signs, all sitting on zero. VERDICT: the
@@ -2673,17 +2676,19 @@ if (section('campfire-shadows')) {
 }
 
 // --- The settlement edge painted on the ground (design.md §2.6, point 352/488) ---
-// The band must TELL THE TRUTH, so this measures it in the rendered picture and
-// against the leave check itself, in EVERY kind of place and at BOTH ends of the
-// year — a step visible only in the dry-season straw would be half a feature.
+// The band must TELL THE TRUTH, so this measures it in the rendered picture in
+// four kinds of place, in both seasons (the wetness override forces dry and
+// wet), and against the leave check itself in one village — a step visible only
+// in the dry-season straw would be half a feature.
 if (section('settlement-edge')) {
   // Ground crops: how far inside / outside the boundary each sample sits.
   //
   // THE INSIDE CROP SITS INSIDE THE BAND, NOT ON ITS INNER EDGE (work-order
   // 688). It stood at −5 m, which was well clear of the band this check was
   // written against — but the band was widened to 8 m in play on 27.08.2026 and
-  // the crops were not re-aimed with it. −5 then sat ON the band's own inner
-  // edge (radius − 4, ± the 0.4 m wander), the least stable ground on the whole
+  // the crops were not re-aimed with it. −5 then sat just inside the band's own
+  // inner edge (radius − 4, ± the 0.4 m wander), close enough for its crop to
+  // straddle it — the least stable ground on the whole
   // profile, and whether the criterion passed came down to which bearing the
   // corridor scan happened to pick.
   //
@@ -2697,7 +2702,7 @@ if (section('settlement-edge')) {
   // core says it should. At −3 the sweep is at full strength everywhere and in
   // both seasons; at −5 it is not — bambara in the rains reads ×0.838 there,
   // ABOVE its own boundary crop, and the give-way check had a margin of −0.001
-  // against a bar of 0.008. Off −3 the same margins are 0.11 to 0.16: the bar is
+  // against a bar of 0.008. Off −3 the same margins are 0.07 to 0.16: the bar is
   // unchanged and is no longer decided by noise.
   const SAMPLES = [
     { name: 'inside', at: -3 },
@@ -2888,7 +2893,7 @@ if (section('settlement-edge')) {
     // spatial median). Five reads, so a streak surviving into two of them still
     // cannot reach the middle value.
     //
-    // The isolated WebGPU run exposed a THIRD missing-reading cause: maasai
+    // The isolated WebGPU run exposed another missing-reading cause: maasai
     // dry had healthy inside luminance (ON 73.4, OFF 107.5), but drift of
     // 1.29% / 1.25%. The two-frame absolute settle admitted a slow trend that
     // the full shot rejected. Wait on the shot's OWN timescale and statistic,
@@ -3001,7 +3006,8 @@ if (section('settlement-edge')) {
   // Both were reading a wet state still on its way in. With the soak and the
   // light on it polled until they stop, four consecutive WebGL 2 runs reported
   // capetown inside ×0.946, ×0.944, ×0.944, ×0.946 (spread 0.002) and giza
-  // inside ×0.905, ×0.906, ×0.906.
+  // inside ×0.905, ×0.906, ×0.906 (three recorded). These figures predate the
+  // re-aimed −3 crop and the 8 m band.
   //
   // WHAT STILL ROTATED, AND WHY (point 641). The outside half kept moving —
   // ×1.000, ×1.000, ×0.980, and on 11.08.2026 `giza (wet)` went red at ×0.963,
@@ -3027,8 +3033,8 @@ if (section('settlement-edge')) {
   const kinds = [
     // THE CASE THE USER REPORTED (point 581) LEADS. His frame was the Bambara
     // village: pale sand inside, pale sand outside, the master strength already
-    // at its ceiling and the line still unreadable. A roster that measures three
-    // other kinds and not this one cannot say the report is answered, so the
+    // at its ceiling and the line still unreadable. A roster that measures the
+    // other three places and not this one cannot say the report is answered, so the
     // sand-on-sand village is measured and PHOTOGRAPHED like the rest.
     { id: 'bambara-village', shoot: { name: '581-sand-village-edge-band', label: 'the swept Bambara village ground giving way at the edge' } },
     { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
@@ -3082,7 +3088,7 @@ if (section('settlement-edge')) {
     check(
       'walking straight over the painted edge is the frame in which the village is left (design.md §2.6)',
       crossing.left && Math.abs(crossing.last - crossing.radius) < 1.5,
-      `left at ${crossing.last?.toFixed(2)} m of a ${crossing.radius} m boundary`,
+      `left at ${crossing.last.toFixed(2)} m of a ${crossing.radius} m boundary`,
     )
   }
 }
@@ -3092,9 +3098,9 @@ if (section('settlement-edge')) {
 // route: the pure round is pinned in src/scenes/place/tagGame.test.ts, but only
 // the live scene can show that the paths are not periodic, that the gap between
 // chaser and quarry breathes, that the role really moves, and that a child is
-// seen running out of steam. Sampled over an interval, and gated on a round
-// actually being in play — the group idles between rounds by design, so a sample
-// window straddling a break would judge the wrong thing.
+// seen running out of steam. Sampled over an interval that opens once a round is
+// in play and runs on through the breaks — the group idles between rounds by
+// design, so the checks below judge playing samples and breaks apart.
 if (section('children-tag')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -3439,14 +3445,14 @@ if (section('children-tag')) {
     // and then re-standing on the winner looked tidier and produced a frame of
     // the inside of a hut: re-standing recomputes the aim against a pair that
     // has run on, so the camera lands 5.5 m from somewhere nobody validated. The
-    // reading is taken again after the shutter's own delay, too, because the
-    // children keep running through it — and only a standpoint that still holds
-    // both of them opens it.
+    // reading is taken again a few frames on, too, because the children keep
+    // running — and only a standpoint that still holds both of them opens it.
     //
     // The offsets fan out from the inward-looking bearing rather than sweeping
-    // the circle from due north, so the first standpoint that qualifies is the
-    // one with the most village behind the pair, not merely the first with a
-    // clear line — and it is still shot from where it was validated.
+    // the circle from due north, so the bearings tried first are those most
+    // likely to have the village behind the pair; the first that qualifies is
+    // taken (no bearing is compared against another), and it is still shot from
+    // where it was validated.
     const OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8].map((n) => (n / 16) * Math.PI * 2)
     // THE PICTURE IS WAITED FOR ONCE, HERE — before the sweep, not between the
     // reading and the shutter. The shutter opens only on a scene that has been
@@ -3473,7 +3479,7 @@ if (section('children-tag')) {
           const r = await readsFromHere()
           const verdict = judgeTagStandpoint(r)
           if (!verdict.ok) {
-            bestSeen = `best read: ${describeReading(r)} — ${verdict.reason}`
+            bestSeen = `last read: ${describeReading(r)} — ${verdict.reason}`
             continue
           }
           // It reads from here NOW — does it still, a few frames on? Only then
@@ -3500,10 +3506,10 @@ if (section('children-tag')) {
     if (stood) {
       // The subject is A CHILD (point 524), read where it is NOW rather than
       // where the pair was when the standpoint was picked: the settle delay
-      // above is eight frames of running children, and the shutter must be told
-      // what it is actually looking at. The midpoint between the two used to
-      // stand here, and a midpoint is a patch of ground — it projects into an
-      // empty plain as happily as into a game of tag.
+      // above is six frames of running children, and the shutter must be told
+      // what it is actually looking at. The midpoint between the two stays only
+      // as the fallback when no chaser is published — a midpoint is a patch of
+      // ground and projects into an empty plain as happily as into a game of tag.
       const subject = await page.evaluate(() => {
         const t = window.__placeTag()
         if (!t || t.chaser < 0) return null
@@ -3582,7 +3588,7 @@ if (section('tag-catch')) {
     )
 
     // Side-on to the pair, a few metres off, on a line the rendered scene
-    // leaves clear to the subject — both sides tried, the nearer range first.
+    // leaves clear to the subject — both sides tried at 3.2 m, then 4.2 m, then 2.6 m.
     // Each candidate is stood on, DRAWN, and only then ray-probed: the camera
     // follows the player pose in the next frame, not in the call that sets it.
     const standBeside = async (from, to, subject) => {
@@ -3630,7 +3636,7 @@ if (section('tag-catch')) {
           if (!aimed) continue
           await nextFrames(3)
           const hit = await page.evaluate((q) => window.__placeRayHit?.(q.x, 0.3, q.z) ?? null, subject)
-          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back, side, hit }
+          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back }
         }
       }
       return null
@@ -3820,10 +3826,10 @@ async function checkChildrenMotion(motionPlace) {
       FRAMES,
     )
     const log = trace.log
-    const n = log[0]?.c.length ?? 0
+    const n = log[0].c.length
     checkAt(
       'the trace covers a real stretch of the game, frame by frame',
-      log.length >= FRAMES && n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
+      n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
       `${log.length} frames, ${n} children, ${(log[log.length - 1].clock - log[0].clock).toFixed(1)}s`,
     )
     // AND THE TRACE ITSELF HOLDS A GAME (point 656). Between rounds the group
@@ -3875,7 +3881,7 @@ async function checkChildrenMotion(motionPlace) {
     checkAt(
       'no two children are ever inside one another, in any frame',
       overlapFrames === 0,
-      `${overlapFrames} of ${log.length} frames, worst ${Math.max(0, worstOverlap).toFixed(4)} m inside a ${contact.toFixed(3)} m contact`,
+      `${overlapFrames} of ${log.length} frames, worst ${worstOverlap.toFixed(4)} m inside a ${contact.toFixed(3)} m contact`,
     )
 
     // 1. NOTHING SNAGS. A child COMMANDED to move that covers no ground is the
@@ -3945,9 +3951,9 @@ async function checkChildrenMotion(motionPlace) {
       'no child walks without getting anywhere',
       // The bar is CHILD-SECONDS of game, not a count of frames: this trace is
       // 1200 rendered frames and buys anything from 20 s of game to a minute
-      // and a half of it. 20 child-seconds is the same floor the trace check
-      // above sets (5 s of game, four children), read in the unit the share is
-      // weighted in.
+      // and a half of it. The floor is CHILD_MOTION.minJudgedSeconds, 20
+      // child-seconds (childMotionMetric.mjs) — four children over five seconds
+      // of game — read in the unit the share is weighted in.
       // AND THE VERDICT MUST REST ON THE TRACE, CHILD BY CHILD. A live frame gap
       // longer than the window is judged by nobody — interpolating across a
       // silence longer than the question would invent the answer — so a share is
@@ -4000,11 +4006,11 @@ async function checkChildrenMotion(motionPlace) {
       // EACH FIGURE WITH THE CHILD IT BELONGS TO, AND CALLED WHAT IT IS. Three
       // different questions with three possibly different answers: the highest
       // RATE (what the gate reads), the most rescues in ABSOLUTE count, and the
-      // furthest CARRIED. The rate used to be printed as "most-often-picked-up",
+      // most CARRIED per minute. The rate used to be printed as "most-often-picked-up",
       // which is the count's name, and the count was not printed at all.
       `highest rescue rate: child ${rescues.worstRescueChild} at ` +
         `${rescues.worstPerChildMinute.toFixed(2)}/min. Most rescues in all: child ` +
-        `${rescues.worstChild} with ${rescues.worstRescues}. Furthest carried: child ` +
+        `${rescues.worstChild} with ${rescues.worstRescues}. Most carried per minute: child ` +
         `${rescues.worstCarriedChild} at ${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min. ` +
         `Group ` +
         `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
@@ -4015,8 +4021,9 @@ async function checkChildrenMotion(motionPlace) {
 
     // AND A LOOK AT THEM. The complaint is what the player SEES, so the run
     // leaves a frame of the children themselves — the traveller stepped back to
-    // the group and turned to face it, the shutter projecting their centroid so
-    // a frame named after them cannot photograph an empty lane (point 375).
+    // the group and turned to face the nearest child it can see, the shutter
+    // projecting that child so a frame named after them cannot photograph an
+    // empty lane (point 375).
     // THE STANDPOINT IS SEARCHED, AND SO IS THE MOMENT. Where the children
     // stand decides what any standpoint can see of them: their ground is 13 m
     // across with the huts standing in it, so while the chase has them strung
@@ -4024,7 +4031,8 @@ async function checkChildrenMotion(motionPlace) {
     // of them past a wall — a photograph of an empty village with a figure in
     // it. The search below is therefore run EVERY frame and the shutter waits,
     // bounded, for a moment worth photographing; if the game never offers one it
-    // shoots the best it found rather than skipping the picture.
+    // searches once more and shoots that moment's best vantage rather than
+    // skipping the picture.
     await page.evaluate(() => {
       window.__pickChildVantage = () => {
         const kids = window.__placeTag().children
@@ -4042,7 +4050,8 @@ async function checkChildrenMotion(motionPlace) {
         // obstacle whatever: it read every child as visible THROUGH a wall,
         // stood the camera inside one, and the frame named after the children
         // photographed a mud face (point 690). Every body the layout collides
-        // against counts now, as the circle that encloses it; anything smaller
+        // against counts now, as the circle that encloses it — except wall
+        // segments, which the search leaves out; anything smaller
         // than a child neither hides one nor crowds the camera and is dropped,
         // so scattered stones do not veto every vantage in the settlement.
         const huts = [
@@ -4085,7 +4094,8 @@ async function checkChildrenMotion(motionPlace) {
             // against a hut generously wider than its footprint.
             const seen = kids.filter((k) => !blocks(sx, sz, k.x, k.z, 1.2))
             if (seen.length === 0) continue
-            // Then ELBOW ROOM, then nearness. Seeing them was not enough on its
+            // Then ELBOW ROOM and nearness, weighed in one score in which each
+            // child seen outweighs both. Seeing them was not enough on its
             // own: the first standpoint that did stood in the alley between two
             // dwellings, and at eye height a wall a metre away fills half the
             // picture whatever the sightline says. Room counts up to four metres
@@ -4106,13 +4116,9 @@ async function checkChildrenMotion(motionPlace) {
             const score = seen.length * 1000 + clear * 50 - near * 30
             if (score > bestScore) {
               bestScore = score
-              best = { sx, sz, seen: seen.length, of: kids.length, clear, dist, near }
-              const vx = seen.reduce((s, k) => s + k.x, 0) / seen.length
-              const vz = seen.reduce((s, k) => s + k.z, 0) / seen.length
-              best.vx = vx
-              best.vz = vz
-              // THE NEAREST CHILD IT CAN SEE, which is what the frame DECLARES.
-              // The centroid is where the camera looks; it is not a thing, and a
+              best = { sx, sz, seen: seen.length, of: kids.length, clear, near }
+              // THE NEAREST CHILD IT CAN SEE, which is what the frame DECLARES
+              // and the camera faces. A centroid is not a thing, and a
               // frame that declares it satisfies the shutter by projecting a
               // point in empty air — which is how a port frame came back green
               // with no child in it at all (point 690). A child is a body: if it
@@ -4148,7 +4154,7 @@ async function checkChildrenMotion(motionPlace) {
       // by construction, and it is the same body the shutter is handed (point 690).
       p.yaw = Math.atan2(-(best.kx - p.x), -(best.kz - p.z))
       return {
-        pose, cx: best.vx, cz: best.vz, kx: best.kx, kz: best.kz,
+        pose, kx: best.kx, kz: best.kz,
         seen: best.seen, of: best.of, clear: best.clear, near: best.near,
       }
     })
@@ -4163,7 +4169,7 @@ async function checkChildrenMotion(motionPlace) {
       !!aimed && aimed.seen >= Math.min(3, aimed.of) && aimed.clear >= 2.5,
       aimed
         ? `${aimed.seen} of ${aimed.of} in the clear, ${aimed.clear.toFixed(1)} m of room around the camera, ` +
-          `nearest child ${aimed.near.toFixed(1)} m off`
+          `seen children ${aimed.near.toFixed(1)} m off on average`
         : 'no vantage at all',
     )
     if (aimed) {
@@ -4178,7 +4184,7 @@ async function checkChildrenMotion(motionPlace) {
         local: { x: aimed.kx, y: 1.0, z: aimed.kz },
         label:
           `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear, ` +
-          `nearest at ${aimed.near.toFixed(1)} m)`,
+          `on average ${aimed.near.toFixed(1)} m off)`,
       })
       await page.evaluate((pose) => {
         const p = window.__placePlayer
@@ -4200,7 +4206,7 @@ async function checkChildrenMotion(motionPlace) {
 }
 
 if (section('children-motion')) {
-  // Keep the same motion thresholds on both games, including the port staging.
+  // Keep the same motion thresholds in all three settlements, including the port staging.
   for (const motionPlace of ['bambara-village', 'maasai-village', 'cairo']) {
     await checkChildrenMotion(motionPlace)
   }
@@ -4238,8 +4244,9 @@ if (section('children-bank-game')) {
   // The roaming phase is a balance value the debug menu edits (§21), and its
   // shipped 55 s is chosen so a VISITING player does not miss the call that opens
   // a cycle. This section needs the RUN, twice, so it shortens the roam the way
-  // the debug menu would and puts it back afterwards. Nothing else about the
-  // cycle is touched: the walk down to the bank and every run is the shipped one.
+  // the debug menu would and puts it back afterwards. It also lengthens the tap
+  // pause (below) and, for the tap photograph, the arrival hold, and latches the
+  // charge; the walk down to the bank and every run are the shipped ones.
   //
   // BOTH LENGTHS OF THAT PHASE, not only the first. `roamSeconds` is what the
   // phase is SCHEDULED for; the off-game ROCK guard may then hold the cycle for
@@ -4247,8 +4254,9 @@ if (section('children-bank-game')) {
   // unnamed every cycle, so the guard runs its overtime out every time. Shortening
   // the schedule alone therefore did not shorten the phase at all: measured in the
   // fast-layer replay, the roaming phase still ran 55 s and the cycles came 74-100 s
-  // apart, which is what left the window below with a single 2 s run in it. With
-  // both shortened the cycles come 35-59 s apart. The guard's own bound is proved
+  // apart, which left the lane window of that time with a single 2 s run in it.
+  // With both shortened the cycles came 35-59 s apart (measured before the tap
+  // pause was lengthened; the run-wait budget below gives today's spacing). The guard's own bound is proved
   // at its SHIPPED length in `src/scenes/place/tagShuffle.test.ts`; this is a
   // spectator-time knob, not a weakened assertion.
   const shippedRoam = await page.evaluate(() => {
@@ -4319,7 +4327,6 @@ if (section('children-bank-game')) {
       const len = Math.hypot(dx, dz) || 1
       const ax = dx / len
       const az = dz / len
-      const pose = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch }
       // Inland is the side of the lane the village is on — the water is the other
       // one, and there is no standing in it.
       const inland = ax * -near.z - az * -near.x > 0 ? 1 : -1
@@ -4350,7 +4357,7 @@ if (section('children-bank-game')) {
         const m = c.kind === 'segment' ? { x: (c.x1 + c.x2) / 2, z: (c.z1 + c.z2) / 2 } : { x: c.x, z: c.z }
         clear = Math.min(clear, Math.hypot(p.x - m.x, p.z - m.z) - reach(c))
       }
-      return { pose, near, far, r: L.playRocks.r, stretch: len, back, clear, x: p.x, z: p.z }
+      return { near, far, r: L.playRocks.r, stretch: len, back, clear, x: p.x, z: p.z }
     })
     check(
       'a spectator can stand back of the start line on ground the colliders leave free',
@@ -4466,8 +4473,9 @@ if (section('children-bank-game')) {
 
       // THE CALL REACHES THE STAND THE GAME IS PHOTOGRAPHED FROM (work-order
       // 1073). The defect this exists for: the runner announces the direction
-      // from the START rock while this stand lies 22.0 m from EITHER rock, and
-      // the old 10 m hearing radius is a HARD cut — so from the one place the
+      // from the START rock while this stand lies about 0.28 of the stretch from
+      // it and 1.26 from the far rock, and the ordinary 10 m hearing radius
+      // (communication.hearingRadius) is a HARD cut — so from the one place the
       // project photographs the round, the taught direction word arrived as no
       // sound, no reading and no arm at all. The CALL register carries it. What
       // only a browser can answer is whether the reading and the arm are in the
@@ -4522,7 +4530,7 @@ if (section('children-bank-game')) {
         !!called && !!called.gesture && called.gesture.kind === 'point' && called.gesture.t < called.gesture.duration,
         JSON.stringify(called && called.gesture),
       )
-      if (called && Array.isArray(called.atoms) && called.atoms.length > 0) {
+      if (called) {
         // Held for the shutter exactly as the chief's answer is, and for the
         // same reason: a reading stands its few seconds only and the scene-ready
         // wait before a frame outlasts them. What was really said is measured
@@ -4571,7 +4579,7 @@ if (section('children-bank-game')) {
       p.z = (near.z + far.z) / 2
       p.pitch = 0
       p.yaw = Math.atan2(far.x - p.x, far.z - p.z) + Math.PI
-      return { x: p.x, z: p.z, ax: dx / len, az: dz / len, far, r: L.playRocks.r, berth: window.__balance.villageLife.bankGame.strangerBerth }
+      return { ax: dx / len, az: dz / len, far, r: L.playRocks.r, berth: window.__balance.villageLife.bankGame.strangerBerth }
     })
     // WAITING FOR A RUN IS WAITING ON THE GAME'S CLOCK, NOT ON THE WALL'S. This
     // was a 240 s wall-clock deadline on an event of the round's own clock, and
@@ -4601,7 +4609,6 @@ if (section('children-bank-game')) {
           return { phase: t.phase, playedClock: t.playedClock }
         })
       const first = await readRound()
-      let seen = first.playedClock
       const wallStart = Date.now()
       // THE WINDOW OPENS ON A CYCLE'S FIRST RUN, never wherever a run happens to
       // be. Two things were wrong with taking any run at all. The round keeps
@@ -4638,7 +4645,7 @@ if (section('children-bank-game')) {
         // dead-page detector and nothing else: a scene that is still stepping
         // satisfies it in a frame however slow the machine, and only one that
         // has stopped buying game time at all can run it out.
-        seen = now.playedClock
+        const seen = now.playedClock
         const stepped = await page
           .waitForFunction((was) => window.__placeTag().playedClock > was, seen, {
             timeout: RUN_WAIT_STALL_MS,
@@ -4659,7 +4666,7 @@ if (section('children-bank-game')) {
       running
         ? `after ${runPlayed.toFixed(1)}s of played time (budget ${RUN_WAIT_PLAYED_S}s)`
         : runDead
-          ? `THE PAGE STOPPED STEPPING — only ${runPlayed.toFixed(1)}s of played time in ` +
+          ? `THE PAGE STOPPED STEPPING (or the wall-clock bound ran out) — only ${runPlayed.toFixed(1)}s of played time in ` +
             `${(runWallMs / 1000).toFixed(0)}s of wall clock. This is a dead or frozen scene, NOT a round ` +
             `that failed to open a run: nothing about the GAME is judged by this red.`
           : `the round played ${runPlayed.toFixed(1)}s of its own clock without opening a run ` +
@@ -4678,7 +4685,7 @@ if (section('children-bank-game')) {
       // the round is the shipped one and every check below reads the longer trace.
       const LANE_WINDOW_S = 120
       // What counts as "went nowhere" over that window. A child that walked less
-      // than half a metre in forty-five seconds of play did not walk; anything
+      // than half a metre over the whole window of play did not walk; anything
       // above it is a slow child, which is a different complaint and not this
       // check's.
       const LANE_STARVED_M = 0.5
@@ -4713,7 +4720,6 @@ if (section('children-bank-game')) {
             playedClock: t.playedClock,
             phase: t.phase,
             tags: t.tags,
-            bodyRadius: t.bodyRadius,
             px: p.x,
             pz: p.z,
             // `held` is the settlement's own word for a stillness that was ORDERED —
@@ -4879,11 +4885,12 @@ if (section('children-bank-game')) {
         `closest approach ${minGap.toFixed(2)} m against the berth ${(bodies + planted.berth).toFixed(2)} m ` +
           `(strangerBerth ${planted.berth})`,
       )
-      // A window in which no runner ever came within `LANE_SHOT_GAP` of him is a
-      // FAILURE of the check above, not a picture to paper over — but the frame
+      // A window in which no child of a run ever came within `LANE_SHOT_GAP` of
+      // him, ahead of him and closing, is a FAILURE of the check directly below,
+      // not a picture to paper over — but the frame
       // is still written, aimed at the stage, so the reader can see WHAT the
       // group was doing instead.
-      check('and the run was photographed with a child in it', shotRun, shotRun ? '' : 'no runner came near enough to shoot')
+      check('and the run was photographed with a child in it', shotRun, shotRun ? '' : 'no runner came near enough, ahead and closing, to shoot')
       if (!shotRun) {
         await frame('687-bank-game-traveller', {
           local: { x: planted.far.x, y: planted.r * 0.5, z: planted.far.z },
@@ -4907,7 +4914,8 @@ if (section('children-bank-game')) {
     // hand-sphere faceting, rounded up by 1 mm. The flank is now the exact mesh,
     // not the edge-bin approximation that overstated it by up to 64 mm in the
     // unit fixtures (docs/hand-stone-contact.md). Judge the new pictures too;
-    // this bar covers BOTH whole holds and their recorded word frames.
+    // this bar covers the hold the checks below judge (the trace restarts at
+    // every hold, so the last one read) and its recorded word frames.
     const contactBar = 0.005
     const holdSeconds = await page.evaluate(
       () => window.__balance?.villageLife?.bankGame?.tapPauseSeconds ?? 0,
@@ -4960,7 +4968,7 @@ if (section('children-bank-game')) {
     let tapAimed = false
     let tapShot = false
     const holdTrace = []
-    /** A spectator's stance in the lane, four metres off and level with the
+    /** A spectator's stance in the lane, 4.2 m off and level with the
      *  contact, so a hand and a stone read as two things.
      *
      *  AND ON THE SIDE THE ARM IS ON (work-order 1065). The quarter-turn used to
@@ -4998,7 +5006,7 @@ if (section('children-bank-game')) {
         p.z = stand.z
         p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
         p.pitch = -0.1
-        return { x: p.x, z: p.z }
+        return true
       }, hand))
     // THE BUDGET IS THE HOLD'S OWN LENGTH, NOT A ROUND NUMBER (work-order 1065).
     // INSIDE a hold this loop steps ONE frame per turn, so reading a hold from
@@ -5083,12 +5091,11 @@ if (section('children-bank-game')) {
       // ONE READING OF A HOLD IS A COIN TOSS. The loop used to stop at its first
       // good reading, so which single frame of a nine-second hold got measured
       // was luck — and the worst-reading check below then went red or green at
-      // random on the same code (measured 08.09.2026). It now reads the hold at
-      // every frame and runs THROUGH IT: a hand that arrives and then leaves
-      // again is caught only by staying to the end, so the loop leaves on the
-      // far side of a hold, never inside one.
-      // …and never from inside a hold: `inHold` is the current sample's own state,
-      // so the loop can only leave on the far side of one.
+      // random on the same code (measured 08.09.2026). It now samples the hold
+      // one frame per turn and runs THROUGH IT: a hand that arrives and then
+      // leaves again is caught only by staying to the end. `inHold` is the
+      // current sample's own state, so the loop can only leave on the far side
+      // of a hold.
       if (bestTouch && Math.abs(bestTouch.gap) <= contactBar && sawTouchPose && heldToTheEnd && !inHold) break
       await nextFrames(now && now.phase === 'run' && now.tapFor > 0 ? 1 : 2)
     }
@@ -5148,10 +5155,9 @@ if (section('children-bank-game')) {
         // failed at 61.1 cm). The opening is still worth one frame, so it is
         // kept and the window is spliced in after it.
         const worst = holdTrace.indexOf(stationTap)
-        const around =
-          worst < 0
-            ? holdTrace.slice(0, 6)
-            : [holdTrace[0], ...holdTrace.slice(Math.max(1, worst - 3), worst + 4)]
+        // stationTap is only ever set on a holding sample the trace has just
+        // taken, and both reset together, so it is always in the trace.
+        const around = [holdTrace[0], ...holdTrace.slice(Math.max(1, worst - 3), worst + 4)]
         check(
           'and the tapping hand stays within 5 mm of the flank over the whole hold',
           Math.abs(stationTap.gap) <= contactBar,
@@ -5353,8 +5359,8 @@ if (section('children-bank-game')) {
     )
   }
 
-  // The world goes back as it was found: the shipped roaming phase, and the game
-  // left outside the settlement — every section after this one would otherwise be
+  // The world goes back as it was found: the shipped roam, roam guard, tap pause
+  // and arrival hold, and the game left outside the settlement — every section after this one would otherwise be
   // reading a village this one staged.
   await page.evaluate((was) => {
     const b = window.__balance.villageLife.bankGame
@@ -5371,9 +5377,9 @@ if (section('children-bank-game')) {
 // THE OFF-GAME ROCK HAS TO BE SEEN (work-order 1080). The children's spec asks
 // for ROCK to be spoken at a stone that is no part of the game, so the word
 // cannot be learned as "the thing you run to" — and the round has said it since
-// work-order 687. Nothing in this file ever looked at it: the only mention of
-// the boulder here SHORTENS the guard so the running section need not wait for
-// it, and at the verify seed the stone goes unnamed every cycle. So the picture
+// work-order 687. Until this section nothing in this file looked at it: the only
+// mention of the boulder SHORTENED the guard so the running section need not
+// wait for it. So the picture
 // side of that guard was never taken at all, while the unit suite asserted a
 // flag that a child hovering 2.2 m from the stone for a third of a second
 // satisfied. The user reported the climb as missing from the game, and he was
@@ -5394,15 +5400,13 @@ if (section('children-boulder-climb')) {
   // approach finish, and cutting it would stage away the very moment this
   // section exists to photograph.
   //
-  //
   // AND THE HOLD IS NOT TOUCHED (work-order 1082). It used to be forced to 25 s
   // to give the shutter's five-second readiness wait room, and THAT staging was
   // the defect: the accepted picture proved the mechanic ran, never that a player
   // could see it, and the user reported the climb missing a second time at
   // shipped values. The stand is now the shipped one, the readiness wait is taken
   // BEFORE the climb rather than during it, and the frame is declared as the
-  // moment it is (`settle: false`) — the same way every other frame of a moment
-  // in this file is taken.
+  // moment it is (`settle: false`), as other moment frames in this file are.
   const shippedClimbRoam = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
     const was = { roamSeconds: b.roamSeconds }
@@ -5424,9 +5428,9 @@ if (section('children-boulder-climb')) {
     // the children, who give the traveller a wider berth than they give each
     // other (spec item 7), swerved round it until the approach watch gave up:
     // three minutes of `roam` in which no child ever started to climb. The
-    // camera therefore stands on the far side of the stone from the children's
-    // own quarter, and falls back to the flanks where that would put it off the
-    // settlement's ground.
+    // camera therefore keeps out of the wedge toward the children's quarter and
+    // takes the best-lit side of the rest of the circle; it stands in the wedge
+    // only when the settlement's ground leaves nothing else.
     // AND IT STANDS WHERE THE SUN IS BEHIND IT. The first take of this frame put
     // the camera on whichever side came first and photographed the shadowed
     // flank: a black stone with a black figure on it against bright sand, which
@@ -5473,8 +5477,8 @@ if (section('children-boulder-climb')) {
       if (!best) return null
       p.x = best.x
       p.z = best.z
-      // The place camera's own convention, as every other aimed frame in this
-      // file writes it: the bearing to the target plus a half turn.
+      // The place camera's own convention, as the other aimed frames in this
+      // file write it: the bearing to the target plus a half turn.
       p.yaw = Math.atan2(b.x - p.x, b.z - p.z) + Math.PI
       p.pitch = 0
       return best
@@ -5486,9 +5490,10 @@ if (section('children-boulder-climb')) {
     // readiness wait started after the child is up there would photograph the
     // empty stone it climbed down from.
     await waitForSceneReady(page).catch(() => {})
-    // THE CLIMB ITSELF, waited for on the round's own state. The roaming phase
-    // is the shipped one: the guard holds the cycle until the boulder is named,
-    // so a visit that begins in `roam` reaches this without any staging.
+    // THE CLIMB ITSELF, waited for on the round's own state. Only the roam's
+    // schedule is shortened above; the guard is the shipped one and holds the
+    // cycle for up to its 45 s until the boulder is named, so a visit that begins
+    // in `roam` reaches this without further staging.
     const up = await page
       .waitForFunction(
         () => (window.__placeTag().children ?? []).some((c) => c.climb === 'top'),
@@ -5571,7 +5576,6 @@ if (section('children-boulder-climb')) {
           const label = (window.__speech?.labels() ?? []).find((l) => l.speakerId === `kid-${i}`)
           return {
             i,
-            climb: c.climb,
             child: ndcFeet && ndcHead
               ? { pixels: (Math.abs(ndcHead[1] - ndcFeet[1]) / 2) * height, occluded, confirmed, ndcFeet, ndcHead }
               : { pixels: 0, occluded, confirmed, ndcFeet: null, ndcHead: null },
@@ -5632,22 +5636,6 @@ if (section('children-boulder-climb')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
-// --- The adults at the water and the ground work ------------------------------
-// THE ADULTS TEACH BY DOING THEIR OWN WORK (work-order 688). The errand
-// catalogue is gone: what the live scene has to show now is that the two words
-// really are spoken, that they are spoken IN THE VILLAGE and never at the bank,
-// and that the digging one falls while a man is at the ground rather than while
-// he walks to it. The where-and-when is proven in Vitest over the pure module
-// (`adultWork.test.ts`); what only the browser can settle is that PlaceLife
-// carries it out at all — a villager with a jar, a villager at the dig pose, and
-// a word over his head.
-//
-// The rest of the section proves the STAGE the teaching stands on: the dig
-// sites, the water path, the bank, the drawn river and the direction its current
-// runs.
-//
-// The village is the PoC's own (the Bambara village); the ground work is in
-// every village.
 // --- No adult stays wedged (work-order 1138) ---------------------------------
 // The user photographed two adults pressed into the corner between a dwelling's
 // wall and a fence panel, still there frame after frame. The escape ladder that
@@ -5755,8 +5743,10 @@ if (section('wedged-adults')) {
     )
     // THE REPORTED PICTURE, STAGED WHERE THE REPORT WAS MADE: the village's own
     // tightest slot between two different bodies — a hut wall and a fence run is
-    // exactly such a pair — with a household walker set down in it. What the
-    // pair of frames then shows is the reported corner with an adult pressed
+    // exactly such a pair — with a household walker set down in it. The search
+    // takes the smallest gap in the layout and stands in for the reported corner
+    // rather than matching its location. What the pair of frames then shows is
+    // that slot with an adult pressed
     // into it and, one window later, the same corner with the adult gone. The
     // subject of both shutters is the SLOT, which stays in the picture whether
     // the body is still in it or not (point 375).
@@ -5810,8 +5800,9 @@ if (section('wedged-adults')) {
           local: { x: wedge.x, y: 0.9, z: wedge.z },
           label: "an adult set down in the reported village's tightest slot",
         })
-        // Long enough for every rung of the ladder to have answered, measured on
-        // the game's own window rather than on a frame count.
+        // Long enough for every rung of the ladder to have answered: 600 drawn
+        // frames, and the check below asserts they spanned at least the escape
+        // window's own seconds.
         const freeing = await readBodies(600)
         const out = freeing.at(-1).bodies.find((b) => b.who === 'walker 0')
         const seconds2 = (freeing.at(-1).t - freeing[0].t) / 1000
@@ -5853,8 +5844,8 @@ if (section('wedged-adults')) {
 //
 // It stands BEFORE `village-stations` rather than after it because
 // `polishVillageStations.test.mjs` runs that section by slicing the source
-// between its header and `adult-errands`: a section in between is swept into
-// the slice and run against the stub.
+// between its header and the next section's (`village-loom`): a section in
+// between would be swept into the slice and run against the stub.
 if (section('bambara-no-well')) {
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   const WELL_NAME = 'village-well'
@@ -5959,7 +5950,7 @@ if (section('bambara-no-well')) {
       await frame('1092-bambara-former-well-spot', {
         local: { x: staged.spot.x, y: 0.9, z: staged.spot.z },
         label: 'the bambara village at the spot where the well stood: no well '
-          + 'anywhere, and a family hut on the ground the well left free',
+          + 'anywhere, and (at this seed) a family hut on the ground the well left free',
       })
     }
   } finally {
@@ -5973,7 +5964,8 @@ if (section('bambara-no-well')) {
 
 // The fixed weaver in the user's "Festklemmend" report, not a moving adult.
 // Run on each backend with the ordinary polish launcher; the frame declares
-// the live figure as its subject and leaves the trading post in the background.
+// the live figure as its subject, and frames the trading post with her only
+// when it stands close.
 if (section('village-stations')) {
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   try {
@@ -6019,7 +6011,7 @@ if (section('village-stations')) {
       const e = figure.matrixWorld.elements
       const facesLoom = e[8] * (prop.x - body.x) + e[10] * (prop.z - body.z) > 0
       // The point wants the trading post's wall VISIBLY CLEAR BEHIND her, so
-      // ONE frame has to carry both: the stand goes to the SIDE of the pair
+      // when the wall is close ONE frame carries both: the stand goes to the SIDE of the pair
       // and the view is aimed between them. Square to the pair the loom falls
       // BESIDE her instead of in front of her, and the open ground between her
       // and the wall is what the picture shows. Reject a stand or sight line
@@ -6045,14 +6037,15 @@ if (section('village-stations')) {
       const aim = far
         ? { x: body.x, z: body.z }
         : { x: body.x + (market.pos[0] - body.x) * 0.4, z: body.z + (market.pos[1] - body.z) * 0.4 }
-      // A hut further off needs the lens further back to hold both in one frame.
+      // Close by, the lens stands 1.1 × the span back (4.5 to 9 m) to hold her
+      // and the trading post in one frame; far off it stands a fixed 6 m from her.
       const stand = far ? 6 : Math.min(9, Math.max(4.5, span * 1.1))
       let cameraGap = -Infinity
       let framed = null
       for (let k = 0; k < 24; k++) {
         // Square to the pair first, then swing AWAY from the hut in steps:
         // that closes the two together, at the price of the loom drifting in
-        // front of her, so the squarest stand that frames both wins.
+        // front of her, so the squarest stand that frames both (far off: her) wins.
         const angle = toMarket + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
         const x = body.x + Math.sin(angle) * stand
         const z = body.z + Math.cos(angle) * stand
@@ -6075,8 +6068,9 @@ if (section('village-stations')) {
           const az = pz - z
           return Math.abs(Math.atan2((ax * vz - az * vx) / reach, (ax * vx + az * vz) / reach) * 180 / Math.PI)
         }
-        // Half of the 50-degree vertical fov spreads to about 33 degrees over a
-        // wide frame; 26 keeps both subjects clear of the very edge.
+        // Half of the 50-degree vertical fov (App.tsx) spreads to about 37 degrees
+        // across the suite's 1440×900 frame; 26 keeps her, and close by the
+        // trading post, clear of the very edge.
         const bodyOff = offAxis(body.x, body.z)
         const marketOff = offAxis(market.pos[0], market.pos[1])
         if (bodyOff > 26 || (!far && marketOff > 26)) continue
@@ -6105,7 +6099,7 @@ if (section('village-stations')) {
     await nextFrames(3)
     if (staged.cameraGap >= 0.35) await frame('1143-village-weaver-clear-of-market', {
       local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
-      label: 'the reported-seed weaver at her loom seen from the side, with open ground between her and the trading-post wall',
+      label: 'the reported-seed weaver at her loom seen from the side, on open ground clear of the trading-post wall',
     })
   } finally {
     await page.evaluate((seed) => {
@@ -6120,13 +6114,16 @@ if (section('village-stations')) {
 // 1157), from the standpoint of the report that opened it: Bambara Village at
 // seed 394349866, where the user photographed a figure with both arms hanging.
 //
-// Two pictures, and they answer two different questions.
-//  - THE MOTION. Two frames a second apart, from ONE camera stand, must DIFFER
-//    where her arms and the shuttle are. A scene-graph reading alone would not
+// Four frames, answering three questions.
+//  - THE MOTION. Two frames (working-a/-b) half a pass of the weaver's own clock
+//    apart, from ONE close camera stand, must DIFFER where her arms and the
+//    shuttle are. A scene-graph reading alone would not
 //    settle it: the defect reported was a picture, so the evidence is pixels.
 //  - THE TEACHING. One frame carrying the helper part-way along the warp, the
 //    weaver's own reading over her head, and the river in the same picture — the
-//    three things that make the axis claim checkable by the player.
+//    three things that make the axis claim checkable by the player; taken from
+//    a separate wide stand (named-tending).
+//  - THE PLAZA. The station read from the plaza a player crosses (point 1183).
 if (section('village-loom')) {
   /** The loom station's projected height from the plaza stand, in pixels of a
    *  900-high viewport (work-order 1191). Measured 23.09.2026: 94.9 px from
@@ -6150,14 +6147,12 @@ if (section('village-loom')) {
       !!window.__placeScene?.getObjectByName('village-loom-shuttle'), null, { timeout: 40000 })
     await waitForSceneBuilt(page)
 
-    // THE STAND: on the inland side of the warp, looking straight out at the
-    // water. The warp then runs left-to-right across the picture, the weaver is
-    // in the middle of it, the helper is in frame wherever the word sends him,
-    // and the river lies beyond — one stand that serves both questions.
+    // THE STANDS: on the inland side of the warp, looking out toward the water.
+    // A close stand serves the motion (below); the teaching frame takes a
+    // separate wide stand later, because one stand for both failed the eye.
     const stand = await page.evaluate(() => {
       const layout = window.__placeLayout
       const station = layout.loom
-      const bank = layout.bank
       const solids = layout.colliders.filter(c => !(
         (c.kind === 'segment' && c.x1 === station.upstream.x && c.z1 === station.upstream.z) ||
         (c.x === station.weaver.x && c.z === station.weaver.z)
@@ -6201,9 +6196,6 @@ if (section('village-loom')) {
       return close && {
         close,
         weaver: station.weaver,
-        seat: station.seat,
-        warpHalf: Math.hypot(station.downstream.x - station.seat.x, station.downstream.z - station.seat.z),
-        water: bank ? { x: bank.bank.x, z: bank.bank.z } : null,
         onRiverAxis: station.onRiverAxis,
       }
     })
@@ -6300,7 +6292,8 @@ if (section('village-loom')) {
       // THE TEACHING PICTURE. The stand steps back FIRST: the teaching is the
       // station's — her, the warp, the helper wherever the word sends him, and
       // the river behind them — and it is taken while he is still on his way,
-      // so nothing may run between the wait and the shutter.
+      // so as little as possible runs between the wait and the shutter (two
+      // readings and their checks do), and the state is read again after it.
       const wide = await page.evaluate(() =>
         window.__loomPlace([7.5, 8.5, 6.5, 9.5], 2.4, window.__loomStation.seat, -0.05))
       check('a wide stand carries the whole station with the water behind it', !!wide,
@@ -6338,9 +6331,9 @@ if (section('village-loom')) {
           const state = new Function('limit', 'return (' + src + ')(limit)')(limit)
           const along = state.along
           const screen = window.__speech?.anchorScreen('village-weaver') ?? null
-          // Three points ON THE WATER: three metres beyond the waterline
-          // straight out from her seat, and a stride either way along the
-          // warp. Each is projected through the live camera; the frame is
+          // Nine points ON THE WATER: three depths beyond the waterline (below)
+          // straight out from her seat, each also a stride either way along
+          // the warp. Each is projected through the live camera; the frame is
           // then read at the ones inside it.
           const cam = window.__placeCamera
           const V = Object.getPrototypeOf(cam.position).constructor
@@ -6527,9 +6520,9 @@ if (section('adult-errands')) {
   })
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
   // The sample window's calibration is set BEFORE the settlement mounts: the
-  // group size is read once per visit, and a village of four spends the whole
-  // window walking to the water and back — the queue is fair, so the errands at
-  // the end of the catalogue never come round while everybody is out on the bank.
+  // group size is read once per visit. A village of four once spent the whole
+  // window on the water errand; ten adults and the section's own casting of the
+  // errands it needs (work-order 1136) replaced that wait.
   // Every one of these is a balance value the debug menu edits.
   await page.evaluate(() => {
     const e = window.__balance.villageLife.adultErrands
@@ -6692,9 +6685,9 @@ if (section('adult-errands')) {
         }
       }
       // AND NO ADULT VOICE EVER FALLS INSIDE THE CHILDREN'S EARSHOT (the spec's
-      // own rule). The speaker is read WHERE HE STOOD WHEN HE SPOKE — only on
-      // the sample that first carries a NEW utterance, which `age` resetting to
-      // zero identifies. Reading his CURRENT place on every later sample instead
+      // own rule). The speaker is read as near to WHERE HE STOOD WHEN HE SPOKE
+      // as sampling allows — on the first sample that carries a NEW utterance
+      // (a new key, or `age` falling back). Reading his CURRENT place on every later sample instead
       // measured a man who had walked on: a correct carrier says RIVER at the
       // head of the path and then goes down to the water, which failed the check
       // though nothing was wrong, while a word really spoken at the bank slipped
@@ -6754,18 +6747,16 @@ if (section('adult-errands')) {
     // per casting by the game itself, which is why it is read here and not
     // counted by the sampler.
     //
-    // TWO, not one. The check below asserts a ROUND TRIP — the jar goes down
-    // empty and comes back full — so a single errand caught mid-way proves
-    // nothing, and one completed errand could still be a fluke of where the
-    // window happened to open. Below two the verdict is NOT COVERING: the
-    // window said nothing about the jar, which is neither a defect nor an
-    // all-clear. That is exactly the state twelve green climbs used to report
-    // as green on 09.09.2026.
+    // Below the floor the verdict is NOT COVERING: the window said nothing
+    // about the jar, which is neither a defect nor an all-clear. That is
+    // exactly the state twelve green climbs used to report as green on
+    // 09.09.2026.
     const errandsCast = staged['water-out'] ?? 0
     // WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP, not a casting
     // (GPT-6 Astra, cross-vendor round): the game stages 'water-back' at the
     // moment the fill ends and the carrier turns for home, so it counts the
-    // trips that actually had an empty leg AND a full one. ONE is the honest
+    // trips that had an empty leg and filled — the full leg home has begun,
+    // not necessarily ended. ONE is the honest
     // floor — one round trip is exactly the evidence the assertion asks for,
     // and the measured blockade of 10.09.2026 had none: its single errand was
     // 33 of about 2000 ticks into the fetch when the window closed.
@@ -6836,14 +6827,12 @@ if (section('adult-errands')) {
     // Four re-aimed cameras all read the old fill as a man face-down in the
     // river, so what is photographed here is the FIGURE, not another angle on
     // it: a villager pinned into the decided pose at the hold, judged by a
-    // reader who is told only "what is this man doing?". The errand itself does
-    // not dip yet — that act is work-order 1087 — so the pose is forced onto the
-    // villager it belongs to, jar in hand, through the dev route.
+    // reader who is told only "what is this man doing?".
     // THE MAN HAS TO BE ALONE IN THE FRAME. The first attempt stood three metres
     // off whoever came first and photographed a thicket of ten cones: a fold
     // cannot be judged against a silhouette that overlaps two other bodies. So
-    // the subject is the MOST ISOLATED villager, and the camera takes the
-    // bearing whose line to him is actually clear.
+    // the check below asks that the carrier stands clear of the others, and the
+    // camera takes the bearing whose line to him is actually clear.
     // THE SUBJECT IS THE MAN WHO IS REALLY FILLING (work-order 1087). Until the
     // errand had a fill of its own, this block picked the most ISOLATED villager
     // and forced the pose onto him wherever he happened to stand — a drill that
@@ -6885,8 +6874,7 @@ if (section('adult-errands')) {
             // bought no strictness and cost the ORDER check its window: one errand
             // runs at a time, and a fill held longer leaves the next check waiting
             // for the errand after it.
-            // AND NOT PAST THE PLATEAU EITHER. The comment above had the window
-            // right and the condition kept only its lower half: after 0.76 the dip
+            // AND NOT PAST THE PLATEAU EITHER: after 0.76 the dip
             // ramps back out, so a sample at 0.92 reads a y-scale of 0.93 on a
             // figure that is drawing exactly as designed, and the squat check calls
             // that a defect. Measured on WebGL 2, 15.09.2026: first pass red at
@@ -6924,7 +6912,8 @@ if (section('adult-errands')) {
         // its round trip is a small share of a window the DIG pairs otherwise
         // fill, so a fill of a few seconds is genuinely missed by a short poll —
         // measured repeatedly. Waiting longer for the REAL act is the honest
-        // lever; making the errand more frequent for the camera is not.
+        // lever; the cast above only puts a carrier on the water when none is
+        // out, it does not shorten or skip the act itself.
         { timeout: 180000 },
       )
       .then((handle) => handle.jsonValue())
@@ -6992,7 +6981,7 @@ if (section('adult-errands')) {
         !!drawn && drawn.drawn.handY != null && drawn.drawn.handY < 0.3,
         drawn ? `hand at ${drawn.drawn.handY == null ? 'nothing' : drawn.drawn.handY.toFixed(3)} m` : 'no villager',
       )
-      // Four metres off on a CLEAR bearing, level with him: the fold is a
+      // Three metres off on a CLEAR bearing, level with him: the fold is a
       // silhouette question, so nothing may stand in the line, and a camera
       // looking down its own axis at a bent figure foreshortens the very angle
       // under judgement. Each bearing is DRAWN before it is judged — the camera
@@ -7008,7 +6997,7 @@ if (section('adult-errands')) {
         // WebGPU frame through, where two neighbours stood BESIDE him — inside
         // three metres, so never "past him" — and buried his outline anyway.
         // A neighbour is dropped when it sits within 0.30 rad of the view axis
-        // anywhere in front of the lens: at his own three metres that is 0.9 m
+        // between 0.3 and 9 m in front of the lens: at his own three metres that is 0.9 m
         // to the side, and further out it widens exactly as the picture does.
         const clearLine = (bearing) => {
           const cx = posed.x + Math.sin(bearing) * 3
@@ -7115,7 +7104,8 @@ if (section('adult-errands')) {
       // bird's-eye view and DESTROYS the place scene — measured as
       // "Execution context was destroyed" mid-capture, and before that as three
       // frames of an empty river. A spot no further from the settlement's middle
-      // than the subject himself is inland of him by construction.
+      // than the subject himself stands for inland of him (the river lies
+      // outward); it is a proxy, not the bank normal.
       const subjectR = Math.hypot(subject.x, subject.z)
       for (let i = 0; i < 12; i++) {
         const bearing = (i / 12) * Math.PI * 2
@@ -7166,17 +7156,18 @@ if (section('adult-errands')) {
     // THE CARRIERS ARE WALKING, AND NEITHER SHUTTER IS INSTANT. At the section's
     // calibrated pace of 6 the carrier left the stand before the order window
     // could be caught at all, and on the way back he crossed the frame between
-    // the aim and the exposure. So the settlement is held still for the shutter —
+    // the aim and the exposure. So the settlement is slowed to a crawl (pace
+    // 0.5) for the shutter —
     // but only AFTER a moment has been found, never while one is being waited
     // for. Slowing it to FIND one was measured to be self-defeating: every errand
     // slows with it, so the DIG pairs hold the free adults three times as long,
     // the water errand comes round a third as often, and the very wait that was
     // widened is the one that times out. A green that needed a retry covers
-    // nothing (CLAUDE.md 7.2).
+    // nothing (CLAUDE.md §7.2).
     const holdStill = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 0.5 })
     const letThemWalk = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
     await page.evaluate(() => {
-      window.__errandWatch = { seen: {}, best: Infinity }
+      window.__errandWatch = { seen: {} }
     })
     const order = await page
       .waitForFunction(
@@ -7211,7 +7202,6 @@ if (section('adult-errands')) {
           for (let i = 0; i < v.length; i++) {
             if (i === sender || v[i].work?.situation !== 'water-out' || v[i].carry !== 'emptyJar') continue
             const gap = Math.hypot(v[i].x - stand.x, v[i].z - stand.z)
-            w.best = Math.min(w.best, gap)
             return { stand, carrier: { x: v[i].x, z: v[i].z }, sender: { x: v[sender].x, z: v[sender].z }, gap }
           }
           return null
@@ -7221,7 +7211,7 @@ if (section('adult-errands')) {
       )
       .then((handle) => handle.jsonValue())
       .catch(() => null)
-    const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {}, best: Infinity })
+    const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {} })
     check(
       'the order at the stand can be photographed: a sender still there and a carrier already going',
       // AND THE SENDER IS AT THE STAND. Both utterances falling inside the
@@ -7235,14 +7225,13 @@ if (section('adult-errands')) {
         ? `carrier ${order.gap.toFixed(1)} m off the stand, ` +
           `sender ${Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z).toFixed(1)} m`
         : `no order in 180 s — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
-          `nearest sent carrier to the stand: ${Number.isFinite(watched.best) ? `${watched.best.toFixed(1)} m` : 'none'}; ` +
           `returning carrier got to ${watched.back != null ? `${watched.back.toFixed(2)} m` : 'never seen'} of the stand, ` +
           `arrived-samples ${watched.backArrived ?? 0}, his goal sits ${watched.backGoal != null ? `${watched.backGoal.toFixed(2)} m` : '?'} from it`,
     )
     if (order) await holdStill()
     if (order) {
-      // Backed off the stand along the bisector of the two men, so both and the
-      // stand between them are in one frame.
+      // Backed off their midpoint on the first of twelve bearings that
+      // `placeCamera` accepts, so both and the stand between them are in one frame.
       const mid = { x: (order.carrier.x + order.sender.x) / 2, z: (order.carrier.z + order.sender.z) / 2 }
       // Far enough back that the further of the two men is still in the picture,
       // and on a bearing the ground accepts with nothing standing in the line —
@@ -7281,16 +7270,14 @@ if (section('adult-errands')) {
           for (let i = 0; i < v.length; i++) {
             if (v[i].carry !== 'fullJar' || v[i].work?.situation !== 'water-back') continue
             if (Math.hypot(v[i].x - stand.x, v[i].z - stand.z) > 15) continue
-            return { who: i, x: v[i].x, z: v[i].z, yaw: v[i].yaw }
+            return { who: i, x: v[i].x, z: v[i].z }
           }
           return null
         },
         null,
-        // THREE MINUTES, not ninety seconds. ONE water errand runs at a time and
-        // its round trip is a small share of a window the DIG pairs otherwise
-        // fill, so a fill of a few seconds is genuinely missed by a short poll —
-        // measured repeatedly. Waiting longer for the REAL act is the honest
-        // lever; making the errand more frequent for the camera is not.
+        // THREE MINUTES, as for the fill: ONE water errand runs at a time, and
+        // its return leg within 15 m of the stand is a short share of a round
+        // trip the DIG pairs' window otherwise fills.
         { timeout: 180000 },
       )
       .then((handle) => handle.jsonValue())
@@ -7302,29 +7289,27 @@ if (section('adult-errands')) {
     )
     if (returning) await holdStill()
     if (returning) {
-      // Side-on and close, level with the jar rather than below it: the water
+      // Side-on and close, a little above the jar rather than below it: the water
       // surface at the rim is the subject, and it is an ELLIPSE that closes as
       // the lens drops toward the jar's own height.
       const live = await page.evaluate((w) => {
         const v = window.__placeErrands().villagers[w]
         return { x: v.x, z: v.z }
       }, returning.who)
-      // STRAIGHT INLAND OF HIM, no sweep. A bearing search around a man on the
-      // bank keeps offering spots on the water side, and a lens there tears the
-      // scene down; the line from him toward the settlement's middle is inside
-      // by construction, and it puts the river behind him, which is where the
-      // walk he is on comes from. Slightly DOWN, so the jar on his head is met
-      // from a little above and the water standing at its rim is an ellipse
-      // rather than an edge.
+      // No bearing sweep: a search around a man on the bank keeps offering spots
+      // on the water side, and a lens there tears the scene down. Slightly DOWN,
+      // so the jar on his head is met from a little above and the water standing
+      // at its rim is an ellipse rather than an edge.
       await page.evaluate((v) => {
         const p = window.__placePlayer
         const len = Math.max(0.001, Math.hypot(v.x, v.z))
         // ACROSS his path, not along it. He walks INLAND, so a lens set inland
         // of him is a lens he walks into — the frame came back filled by the
         // shadowed flank of his own cone. The two directions square to the
-        // radial both lie on the ground he is walking on; the one nearer the
-        // settlement's middle is taken, and five metres leaves the composition
-        // intact even if he drifts a pace before the shutter.
+        // radial both lie on the ground he is walking on and are equally far
+        // from the settlement's middle, so the comparison below only breaks the
+        // tie; five metres leaves the composition intact even if he drifts a
+        // pace before the shutter.
         const nx = v.x / len
         const nz = v.z / len
         const pick = (sx, sz) => Math.hypot(v.x + sx * 5, v.z + sz * 5)
@@ -7528,8 +7513,10 @@ if (section('adult-errands')) {
           // the middle, so a patch at the very rim, one drift step from the next
           // red, only ever wins when the picture holds nothing better.
           if (Math.abs(ndc.x) > 0.9 || Math.abs(ndc.y) > 0.9) continue
-          // Centred decides, nearness breaks the tie: a patch dead ahead 200 m
-          // downstream reads as water, not as the foam at this bank.
+          // Centring weighs most, and distance adds 0.002 per metre to every
+          // score, so of two near-equally centred patches the nearer wins: a
+          // patch dead ahead 200 m downstream reads as water, not as the foam at
+          // this bank.
           const score = Math.hypot(ndc.x, ndc.y) + Math.hypot(f.x - p.x, f.z - p.z) * 0.002
           if (score < bestScore) {
             bestScore = score
@@ -7668,13 +7655,13 @@ if (section('adult-errands')) {
         check(
           `the water beyond the plate’s rim is the SAME water as the water at the bank (≤ ${RIM_STEP_LIMIT}/255 per channel)`,
           enough && step <= RIM_STEP_LIMIT,
-          `${mid.strips} clear strips · far ${say(mid.far)} against near ${say(mid.near)} — step ${step.toFixed(1)} ` +
+          `middle capture: ${mid.strips} clear strips · far ${say(mid.far)} against near ${say(mid.near)} — median step ${step.toFixed(1)} ` +
             `(${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
         )
         check(
           'and the handover zone itself carries neither band’s edge — no line at the rim',
           enough && zoneStep <= RIM_STEP_LIMIT,
-          `rim zone ${say(mid.zone)} against the water either side — step ${zoneStep.toFixed(1)} ` +
+          `middle capture: rim zone ${say(mid.zone)} against the water either side — median step ${zoneStep.toFixed(1)} ` +
             `(${readings.map((r) => r.zoneStep.toFixed(1)).join(', ')})`,
         )
       }
@@ -7737,7 +7724,8 @@ if (section('adult-errands')) {
   // an open standing view (the layout unit test pins both the view and crossing).
   //
   // IT ASKS THE BUILD WHETHER IT CAN BE PHOTOGRAPHED AT ALL. The baseline
-  // classifier runs THIS suite file against the PRE-CHANGE app, which has no
+  // classifier (run by hand since point 1135) runs THIS suite file against the
+  // PRE-CHANGE app, which has no
   // durable dig record — and an unguarded call to it threw an uncaught
   // TypeError that killed the whole baseline run after 225 of 274 checks, twice
   // (measured 14.09.2026). A died baseline yields no verdict, so every red of
@@ -7865,9 +7853,9 @@ if (section('stone-step')) {
     const { ROCK_RADIUS_UNITS } = await import('/src/render/flora.ts')
     const layout = window.__placeLayout
     if (!layout) return null
-    // The settlement's surface WITHOUT its stones: the shore slopes and worked
-    // earth rises, and a stone standing on either would hide its own rise in
-    // the reading below.
+    // The settlement's surface WITHOUT its stones and with no digging progress
+    // (`progress: []`): the shore slopes and the dig sites' own ground rise, and
+    // a stone standing on either would hide its own rise in the reading below.
     const bare = (x, z) => placeGroundHeight({ bank: layout.bank, sites: layout.digSites, progress: [], rocks: [] }, x, z)
     // The clearest walked-over stone the settlement has: standable, on flat
     // ground away from the bank, and with room for the player to walk in at it
@@ -8086,9 +8074,9 @@ if (section('roof-clearance')) {
    *  Point 549: it reports WHAT IT SEARCHED, never a bare `null`. Three checks
    *  ride on this one search — the village eaves, the port eaves and the cook
    *  shelter — and each of them used to fail as `false` beside the target's
-   *  coordinates, which says nothing about why 49 bearings were all rejected.
-   *  Now the miss names how many bearings the disc edge closed, how many each
-   *  collider closed, and which colliders those were. */
+   *  coordinates, which says nothing about why 48 (49 with a preferred one)
+   *  bearings were all rejected. Now the miss names how many bearings the disc
+   *  edge closed, and which four colliders closed the most and how many each. */
   const searchStandOff = (target, startR, prefer = null) =>
     page.evaluate(
       ([t, start, preferred]) => {
@@ -8138,33 +8126,32 @@ if (section('roof-clearance')) {
           p.z = t.z + Math.sin(b) * start
           p.pitch = 0
           p.yaw = Math.atan2(-(t.x - p.x), -(t.z - p.z))
-          return { bearing: b, tried: bearings.length, colliders: others.length }
+          return { bearing: b, tried: bearings.indexOf(b) + 1 }
         }
         const worst = [...byCollider.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
         return {
           bearing: null,
           tried: bearings.length,
-          colliders: others.length,
           detail: `${bearings.length} bearings from r=${start} to r=1.2, all blocked: ${byDisc} by the disc edge (radius ${radius}), the rest by [${worst.map(([k, n]) => `${k}×${n}`).join(', ')}] of ${others.length} colliders`,
         }
       },
       [target, startR, prefer],
     )
 
+  // THE SPREAD, RECORDED (point 549). Three standpoint searches rotated: the
+  // zulu hut approach (this search) reported a bare `false` in one of five runs
+  // and passed the other four, the cairo trade house (this search) did the
+  // same, and the conversational standpoint (the villager-gestures section's
+  // own 16-bearing search) reddened once on a loaded machine. With the world
+  // seed pinned, the search reporting what it tried, and one retry from a
+  // settled scene, four consecutive WebGL 2 runs picked the IDENTICAL
+  // standpoint every time — the zulu hut at {x 15.79, z 2.20} on bearing 2.487
+  // of 48, the cairo trade house at {x -19.22, z -1.18} on bearing 0.000 of 49,
+  // the conversational standpoint on bearing 0.00, the first of 16. A search
+  // over a world that does not change no longer produces a verdict that does.
   /** The same search, but never reporting a miss off a scene that may still be
    *  streaming in: a first miss is retried once from a settled state (point
    *  549 — the settled-reading shape point 499 established). */
-  // THE SPREAD, RECORDED (point 549). Three checks rode on this one search and
-  // each of them rotated: the zulu hut approach reported a bare `false` in one
-  // of five runs and passed the other four, the cairo trade house did the same,
-  // and the conversational standpoint reddened once on a loaded machine. With
-  // the world seed pinned, the search reporting what it tried, and one retry
-  // from a settled scene, four consecutive WebGL 2 runs picked the IDENTICAL
-  // standpoint every time — the zulu hut at {x 15.79, z 2.20} on bearing 2.487
-  // of 48 tried, the cairo trade house at {x -19.22, z -1.18} on bearing 0.000
-  // of 49, the conversational standpoint on bearing 0.00, the first of 16. A
-  // search over a world that does not change no longer produces a verdict that
-  // does.
   const standOff = async (target, startR, prefer = null) => {
     const first = await searchStandOff(target, startR, prefer)
     if (first.bearing != null) return first
@@ -8182,11 +8169,11 @@ if (section('roof-clearance')) {
    *  at wherever it came to rest. A blocked step SLIDES along the collider, so
    *  the last frames of a stalled walk drift sideways along the wall by however
    *  much the host drew in them — and the eaves probe then reads whatever
-   *  happens to stand at that drifted spot. Measured: the same trade house, same
-   *  seed, same approach bearing, once read `1.52 m down to ground-disc` and
-   *  once `0.24 m down to BoxGeometry`. Standing him back on the nearest point
-   *  the walk actually reached is a position he really walked to, and it is the
-   *  one the check means: at the eaves. */
+   *  happens to stand at that drifted spot. Standing him back on the nearest
+   *  point the walk actually reached is a position he really walked to, and it
+   *  is the one the check means: at the eaves. (The trade-house rotation that
+   *  outlived this repair, from standpoints within seven centimetres, was a
+   *  porter's crate — see the section header.) */
   const walkUntilStalled = async (target, maxMs = 20000) => {
     const step = () =>
       page.evaluate(
@@ -8223,7 +8210,6 @@ if (section('roof-clearance')) {
       best,
     )
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    return best.d
   }
 
   /** What the frame really draws straight above and straight below the eye, over
@@ -8232,7 +8218,7 @@ if (section('roof-clearance')) {
    *  The player stands still here, so the building fabric — the only thing this
    *  criterion is about — reads identically in every frame of the window. What
    *  varies is the settlement's TRAFFIC: measured at the cairo standpoint over
-   *  2842 consecutive frames, 115 of them had a porter's carried crate 0.26 m
+   *  2842 consecutive frames, 115 of them had a porter's carried crate 0.23–0.28 m
    *  under the eye and 72 his robe, and a single-frame probe therefore decided
    *  the verdict by whether a porter happened to be passing. The window is
    *  recorded in ONE round trip and judged by the pure `judgeEavesColumn`. */
@@ -8331,7 +8317,7 @@ if (section('roof-clearance')) {
     check(`${label}: nothing hangs under the eye at the eaves`, verdict.belowClear, `${verdict.belowDetail}, ${where}`)
     // And whatever DOES hang over him clears the eye, the near plane and a margin.
     check(`${label}: the roof over him clears the head`, verdict.roofClears, `${verdict.roofDetail}, ${where}`)
-    return { target, probe: { bearing: stood.bearing, x: at.x, z: at.z } }
+    return { target, probe: { bearing: stood.bearing } }
   }
 
   /** The photograph a HUMAN judges: the eave line where roof meets wall, taken
@@ -8432,17 +8418,6 @@ if (section('roof-clearance')) {
 // checked here is that the SAME layer answers in this perspective, over the
 // inhabitants and their animals, and that it leaves nothing behind.
 if (section('ctrl-actor-labels')) {
-  const frames = (n) =>
-    page.evaluate(
-      (count) =>
-        new Promise((res) => {
-          let i = 0
-          const step = () => (++i >= count ? res() : requestAnimationFrame(step))
-          requestAnimationFrame(step)
-        }),
-      n,
-    )
-
   await page.evaluate(() => {
     const g = window.__game.getState()
     g.setJournalOpen(false)
@@ -8466,7 +8441,7 @@ if (section('ctrl-actor-labels')) {
     p.pitch = 0
     p.yaw = Math.atan2(-(0 - p.x), -(0 - p.z))
   })
-  await frames(4)
+  await nextFrames(3) // four drawn frames
 
   const idle = await page.evaluate(() => document.querySelectorAll('.actor-label').length)
   check('a settlement stands unlabelled while Ctrl is up (point 342)', idle === 0, `${idle} labels`)
@@ -8617,8 +8592,9 @@ if (section('ctrl-actor-labels')) {
     `${walking.named}/${walking.moved} moved figures named after ${walking.frames} frame(s) [${walking.kinds.join(', ')}]`,
   )
 
-  // NO TWO DRAWN BOXES FUSE IN THIS CROWD (point 628). Every check above asks
-  // the DOM whether a TEXT is present — which is exactly what let the evidence
+  // NO TWO DRAWN BOXES FUSE IN THIS CROWD (point 628). The label checks above
+  // ask which TEXT is present and where its figure stands, never how its drawn
+  // box lies — which is exactly what let the evidence
   // frame below read "Villager llager" while the whole suite was green: the
   // defective frame had been written by ANOTHER revision's run (main, 14.08,
   // before the declutter), and no assertion in THIS suite — the one that owns
@@ -8691,7 +8667,7 @@ if (section('ctrl-actor-labels')) {
 
   const fusionPost = await sampleFusion(45)
   // The DENSE-CROWD cushion, not the sparse one (point 1067): this scene holds
-  // 17–23 labels, so a loaded lane's drift crosses the tolerance in several
+  // roughly 17–24 labels, so a loaded lane's drift crosses the tolerance in several
   // frames of the ninety where the savanna twin sees none. The measurement
   // behind the number is in labelFusion.mjs beside FUSE_CROWD_SHARE.
   const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost), { maxShare: FUSE_CROWD_SHARE })
@@ -8747,9 +8723,10 @@ if (section('chief-to-drummer')) {
   check('the village names where its drummer sits', !!drummer, JSON.stringify(drummer))
   const inFrontOf = (at, away) => ({ x: at.x + Math.sin(drummer.facing) * away, z: at.z + Math.cos(drummer.facing) * away })
   await standAt(inFrontOf(drummer, 2), drummer)
-  // Wait for the prompt that NAMES this key, not for any prompt: a villager
-  // speaking nearby would otherwise own the key and the press would open his
-  // guess dialog instead (the arbitration of point 691).
+  // Wait for the prompt that NAMES this key, not for any prompt: another offer
+  // standing at the same moment would make the press mean something else.
+  // (Before the two keys of point 1139, a nearby word could take this key and
+  // open a guess dialog — the arbitration of point 691.)
   const askDrummer = await page.evaluate(async () => {
     const { getStrings } = await import('/src/i18n/index.ts')
     return getStrings().labels.askDrummer
@@ -8821,10 +8798,15 @@ if (section('chief-to-drummer')) {
     .waitForFunction(() => !!document.querySelector('.dialog.speech-guess'), null, { timeout: 15000 })
     .then(() => true)
     .catch(() => false)
+  const chiefCameOut = await page.evaluate(() => window.__game.getState().chiefOutside[window.__game.getState().placeId] === true)
   check(
     'E takes the word and leaves the man to SPACE (point 1139)',
-    guessAtDrummer && (await page.evaluate(() => window.__game.getState().chiefOutside[window.__game.getState().placeId] !== true)),
-    guessAtDrummer ? 'the chief came out of his hut on the guess key' : 'no guess dialog opened at the drummer',
+    guessAtDrummer && !chiefCameOut,
+    !guessAtDrummer
+      ? 'no guess dialog opened at the drummer'
+      : chiefCameOut
+        ? 'the chief came out of his hut on the guess key'
+        : 'the guess dialog opened and the chief stayed in his hut',
   )
   await page.evaluate(() => window.__ui.getState().setDialog(null))
   await nextFrames(2)
@@ -8897,7 +8879,6 @@ if (section('chief-to-drummer')) {
     // 4. In FRONT of the pair, the key at the DRUMMER beats the message out.
     const mid = { x: (stood.x + stood.drummer[0]) / 2, z: (stood.z + stood.drummer[1]) / 2 }
     const front = { x: mid.x + Math.sin(stood.facing) * 5, z: mid.z + Math.cos(stood.facing) * 5 }
-    await standAt(front, mid)
     await standAt(inFrontOf({ x: stood.drummer[0], z: stood.drummer[1] }, 2), mid)
     const askLabel = await page.evaluate(async () => {
       const { getStrings } = await import('/src/i18n/index.ts')
@@ -9043,8 +9024,9 @@ if (section('artefact-give')) {
 
   if (chiefStood && outward) {
     const reach = await page.evaluate(() => window.__balance.communication.giveReach)
-    /** Stand `away` metres in front of the chief, on the open ground his own
-     *  door faces, looking at him — the pose the player gives the find in. */
+    /** Stand `away` metres in front of the chief, on the open ground he faces
+     *  beside the drummer (`outward`), looking at him — the pose the player
+     *  gives the find in. */
     const standOff = async (away) => {
       await page.evaluate(
         ({ at, dir, away }) => {

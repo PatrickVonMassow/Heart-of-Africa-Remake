@@ -9,8 +9,8 @@
 // every live red window of the point-657 measurement sat in one of the two —
 // single evaders pacing the pinch, and whole groups herding into the corridor
 // and compressing there. Steering remedies were measured first and rejected
-// one after another (the work-order records four; this branch measured five
-// more, and the second round two further — a rate-limited banked turn and a
+// one after another (the work-order records four; its implementation measured
+// five more, and the second round two further — a rate-limited banked turn and a
 // committed breakaway, recorded with their measurements in `evadeHeading`'s
 // ramp comment): a rule strong enough to keep a child out of a wedge also
 // bends the game everywhere there is no wedge.
@@ -33,12 +33,12 @@ import type { Collider } from './collision'
  *  bodies abreast, room to turn round or pass. Measured on the reported
  *  ground: the slots that trapped children are 0.76 and 0.89 m wide, the
  *  passages a healthy game really uses 1.36 and 1.61 m — the bar sits between
- *  the families, nearer the traps. */
+ *  the families, nearer the passages. */
 export const WEDGE_PASSAGE = 1.2
 
 /** How opposed the two nearest-boundary directions must be for the point to
- *  count as BETWEEN the pair (cosine): −0.2 admits corridors whose walls are
- *  up to ~101° from anti-parallel, and refuses the near-parallel directions a
+ *  count as BETWEEN the pair (cosine): −0.2 admits directions more than ~101.5°
+ *  apart (up to ~78.5° off anti-parallel), and refuses the near-parallel directions a
  *  point beside two joined fence panels sees. */
 const OPPOSED_DOT = -0.2
 
@@ -97,7 +97,8 @@ function boxBoundary(bx: number, bz: number, hx: number, hz: number, rot: number
     const ez = wz - z
     const len = Math.hypot(ex, ez)
     // Inside the box the clamp is the point itself; the wedge test only cares
-    // about free ground, so a zero direction is fine there.
+    // about free ground, so zero distance with an arbitrary unit direction (+x)
+    // is fine there.
     return len < 1e-9 ? { d: 0, nx: 1, nz: 0 } : { d: len, nx: ex / len, nz: ez / len }
   }
 }
@@ -138,9 +139,10 @@ function bounds(c: Collider): { x: number; z: number; reach: number } {
 /**
  * Would a NEW collider of `reach` at (x, z) become half of a PINCH PAIR?
  *
- * The same closest-approach test `buildWedgeCarve` preselects its pairs with, so
- * a placement this answers false for cannot carve a sub-passage slot out of
- * anybody's ground. Placement code asks it BEFORE putting something down
+ * The same closest-approach test `buildWedgeCarve` preselects its collider pairs
+ * with, so a placement this answers false for forms no sub-passage slot with
+ * another collider. The carve also pairs colliders with the ground's own rim,
+ * which this does not ask. Placement code asks it BEFORE putting something down
  * (work-order 1082: the stone a child climbs stands beside the children's own
  * quarter, and a stone that narrows a corridor there is paid for twice — once in
  * the carved ground and once in the shuffle the squeeze produces).

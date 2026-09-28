@@ -210,23 +210,23 @@ describe('nowCardMatchesWork (check A)', () => {
   const foreignEdits = ['src/render/demElevation.ts', 'src/world/terrain.ts'] // both in 210's spec only
 
   it('blocks when card+focus say 215 but every edit is 210 work (the real failure)', () => {
-    const r = nowCardMatchesWork({ nowPoint: 215, focusPoint: 215, touchedFiles: foreignEdits, specs })
+    const r = nowCardMatchesWork({ nowPoints: new Set([215]), focusPoint: 215, touchedFiles: foreignEdits, specs })
     expect(r.ok).toBe(false)
     expect(r.foreignPoints).toEqual([210])
     expect(r.evidence.join(' ')).toContain('src/world/terrain.ts')
   })
   it('blocks on a single foreign commit-subject point number', () => {
-    const r = nowCardMatchesWork({ nowPoint: 215, focusPoint: 215, commitSubjects: ['wip on 210 shelf'], specs })
+    const r = nowCardMatchesWork({ nowPoints: new Set([215]), focusPoint: 215, commitSubjects: ['wip on 210 shelf'], specs })
     expect(r.ok).toBe(false)
     expect(r.foreignPoints).toEqual([210])
   })
   it('allows when either the now-card or the focus matches the evidence', () => {
-    expect(nowCardMatchesWork({ nowPoint: 210, focusPoint: 215, touchedFiles: foreignEdits, specs }).ok).toBe(true)
-    expect(nowCardMatchesWork({ nowPoint: 215, focusPoint: 210, touchedFiles: foreignEdits, specs }).ok).toBe(true)
+    expect(nowCardMatchesWork({ nowPoints: new Set([210]), focusPoint: 215, touchedFiles: foreignEdits, specs }).ok).toBe(true)
+    expect(nowCardMatchesWork({ nowPoints: new Set([215]), focusPoint: 210, touchedFiles: foreignEdits, specs }).ok).toBe(true)
   })
   it('allows a mixed turn: one supporting file neutralizes the foreign evidence', () => {
     const r = nowCardMatchesWork({
-      nowPoint: 215,
+      nowPoints: new Set([215]),
       focusPoint: 215,
       touchedFiles: [...foreignEdits, 'src/scenes/place/backdrop.ts'],
       specs,
@@ -234,12 +234,12 @@ describe('nowCardMatchesWork (check A)', () => {
     expect(r.ok).toBe(true)
   })
   it('allows below the foreign-file threshold (single ambiguous edit)', () => {
-    expect(nowCardMatchesWork({ nowPoint: 215, touchedFiles: ['src/world/terrain.ts'], specs }).ok).toBe(true)
+    expect(nowCardMatchesWork({ nowPoints: new Set([215]), touchedFiles: ['src/world/terrain.ts'], specs }).ok).toBe(true)
   })
   it('never counts a CLOSED point as foreign (pivot away from finished work)', () => {
     const done = parsePointSpecs(SPECS.replace('- [ ] 210.', '- [x] 210.'))
     const r = nowCardMatchesWork({
-      nowPoint: 215,
+      nowPoints: new Set([215]),
       commitSubjects: ['finish 210'],
       touchedFiles: ['src/render/demElevation.ts', 'src/world/terrain.ts'],
       specs: done,
@@ -248,7 +248,7 @@ describe('nowCardMatchesWork (check A)', () => {
   })
   it('ignores files no spec names and non-evidence paths', () => {
     const r = nowCardMatchesWork({
-      nowPoint: 215,
+      nowPoints: new Set([215]),
       touchedFiles: ['src/unrelated/a.ts', 'TASKS.md', '.batch-dashboard.html', 'docs/x.md'],
       specs,
     })
@@ -256,16 +256,16 @@ describe('nowCardMatchesWork (check A)', () => {
   })
   it('normalizes backslash paths (Windows git output)', () => {
     const r = nowCardMatchesWork({
-      nowPoint: 215,
+      nowPoints: new Set([215]),
       touchedFiles: ['src\\render\\demElevation.ts', 'src\\world\\terrain.ts'],
       specs,
     })
     expect(r.ok).toBe(false)
   })
   it('allows non-point work and is total on malformed input', () => {
-    expect(nowCardMatchesWork({ nowPoint: null, focusPoint: null, touchedFiles: foreignEdits, specs }).ok).toBe(true)
+    expect(nowCardMatchesWork({ nowPoints: null, focusPoint: null, touchedFiles: foreignEdits, specs }).ok).toBe(true)
     expect(nowCardMatchesWork(null).ok).toBe(true)
-    expect(nowCardMatchesWork({ nowPoint: 215, touchedFiles: 'garbage', specs: 'garbage' }).ok).toBe(true)
+    expect(nowCardMatchesWork({ nowPoints: new Set([215]), touchedFiles: 'garbage', specs: 'garbage' }).ok).toBe(true)
   })
   it('accepts evidence for ANY of several parallel now-card points (nowPoints Set)', () => {
     // Two cards in the now-section (215 and 210); every edit is 210 work —

@@ -1,10 +1,10 @@
 # Review 659: audio at shipped defaults, and teaching order (named cause 3)
 
-Reviewer: Claude (Opus 5.5), read-only. Worktree `/workspace/hoa/.claude/worktrees/point-659` at `175e15d92`.
+Reviewer: Claude (Opus 5.5), read-only. Worktree `/workspace/hoa/.claude/worktrees/point-659` at `175e15d92`, analysing the runs recorded on `80c0a39ff`.
 Runs: WebGPU `communication-webgpu-1790297789751` (order `words-first`, compatibility feature level),
 WebGL 2 `communication-webgl-1790296797094` (order `message-first`). Both routes report `status: passed`, `victory: false`.
-The analysis tools are in this scratchpad: `dsp.js`, `overview.js`, `detail.js`, `trace.js` and `fixed.js`. They use Node and their own FFT because numpy is not installed.
-Raw outputs are in `ov-webgpu.txt`, `ov-webgl.txt`, `detail-webgpu.txt` and `detail-webgl.txt`.
+The analysis tools were session-scratchpad files, not retained in the repository: `dsp.js`, `overview.js`, `detail.js`, `trace.js` and `fixed.js`. They used Node and their own FFT because numpy is not installed.
+Their raw outputs (`ov-webgpu.txt`, `ov-webgl.txt`, `detail-webgpu.txt`, `detail-webgl.txt`) were not retained either.
 
 ## Task A: sound judgment (from the WAVs, not from the receipts)
 

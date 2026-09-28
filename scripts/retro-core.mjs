@@ -5,13 +5,13 @@
 // the SAME canonical structure — a drift between them would either trap the
 // session (guard stricter) or silently let staleness through (guard laxer).
 //
-// The retrospective (docs/analysis_de/retrospektive-zusammenarbeit.md, git-ignored,
+// The retrospective (docs/analysis_de/retrospektive-zusammenarbeit.md, tracked,
 // German) records the project's recurring problem classes and their hardened
 // solutions. Its own lesson #1 is that reminders do not keep documents
 // current — only enforcement does — so its currency is enforced by a guard
 // keyed on a fingerprint over the DURABLE SOURCES that define the
 // problem/solution history:
-//   (1) the feedback/project memories in the project memory dir (a new or
+//   (1) the feedback/project/user memories in the project memory dir (a new or
 //       extended memory = a new/escalated problem class),
 //   (2) the guard/hook scripts in scripts/ (each guard = a hardened solution),
 //   (3) the revert trail in git log (a revert = a failed solution attempt),
@@ -26,7 +26,7 @@ import { createHash } from 'node:crypto'
 // can regenerate it without ever touching the human/agent-authored prose.
 export const AUTO_START = '<!-- AUTO-GENERATED:START -->'
 export const AUTO_END = '<!-- AUTO-GENERATED:END -->'
-export const FINGERPRINT_RE = /<!-- RETRO-FINGERPRINT: ([0-9a-f]{64}) -->/
+const FINGERPRINT_RE = /<!-- RETRO-FINGERPRINT: ([0-9a-f]{64}) -->/
 
 // The BEGINNER GUIDE (vibe-coding-anleitung.md) is derived from the same
 // sources but has no auto-generated section — it is prose all the way down, so
@@ -69,7 +69,7 @@ export function parseMemoryDescription(text) {
 
 /** Guard/hook/infra script basenames — the "each guard = a solution" source.
  *  Cores, tests and race workers are implementation detail, not solutions. */
-export const GUARD_NAME_RE = /(guard|hook|singleton|doctor|lock|autostart|reminder)/
+const GUARD_NAME_RE = /(guard|hook|singleton|doctor|lock|autostart|reminder)/
 export function guardScriptNames(fileNames) {
   if (!Array.isArray(fileNames)) return []
   return fileNames
@@ -98,8 +98,8 @@ export function revertCommits(gitLogText) {
 }
 
 /** Keywords marking a TASKS point title as process/meta work (vs. game
- *  content). A heuristic by design — exported so the test pins it. */
-export const PROCESS_KEYWORDS =
+ *  content). A heuristic by design; the tests pin it through processTaskPoints. */
+const PROCESS_KEYWORDS =
   /\b(guard|hook|dashboard|workflow|process|singleton|batch|retrospective|delegation|worktree|memory|memories|autonomy|lock|closing|regression|qa)\b/i
 
 /** Process/meta TASKS points as [{num, done, title}] from the raw TASKS.md
@@ -245,7 +245,7 @@ export function renderAutoSection({
       (r) => `| ${esc(r.klass)} | ${r.attempts} | ${r.severity} | ${esc(r.measure)} | ${r.status} |`,
     ),
     '',
-    `Erfasste Quellen: ${rows.length} Feedback-/Projekt-Memories · ${guards.length} Guard-/Hook-Skripte · ` +
+    `Erfasste Quellen: ${rows.length} Feedback-/Projekt-/User-Memories · ${guards.length} Guard-/Hook-Skripte · ` +
       `${reverts.length} Revert-/Reapply-Commits · ${processPoints.length} Prozess-/Meta-TASKS-Punkte (davon ${openPoints} offen).`,
     '',
     `<!-- RETRO-FINGERPRINT: ${fingerprint} -->`,
@@ -259,7 +259,7 @@ export function renderAutoSection({
  * `docText` with ONLY the marker-delimited region replaced by `section`
  * (which carries its own markers). Everything outside the markers is
  * preserved byte-identical. When the markers are absent the section is
- * appended at the end behind a rule.
+ * appended at the end behind a rule, the doc's trailing whitespace trimmed first.
  */
 export function replaceAutoSection(docText, section) {
   if (typeof docText !== 'string') return `${section}\n`
@@ -337,7 +337,7 @@ export function refreshedDoc(existingDocText, sources, { refreshedStamp = '', re
  *  `N.M` id. Every level from `##` down counts, so a lesson written one level UP
  *  or DOWN cannot silently escape the ledger — the four-eyes review found that a
  *  `####` demotion slipped through the first cut of both patterns. */
-export const LESSON_HEADING_RE = /^(#{2,6})\s+(\d+\.\d+)\s+(.*)$/
+const LESSON_HEADING_RE = /^(#{2,6})\s+(\d+\.\d+)\s+(.*)$/
 /** A heading BELOW `##` in the prose region — every one of these must be a
  *  lesson, or it is an unledgerable bypass. */
 const SUB_HEADING_RE = /^#{3,6}\s+(.*)$/
@@ -347,7 +347,7 @@ const SUB_HEADING_RE = /^#{3,6}\s+(.*)$/
  *  alternation is LONGEST-FIRST: with `js` before `json`, `.claude/settings.json`
  *  matched as `.claude/settings.js` and the guard reported a live file as dead
  *  (caught by the against-the-real-documents check below, not by the unit cases). */
-export const LEDGER_PATH_RE = /(?:[\w.-]+\/)+[\w.-]+\.(?:jsonl|json|mjs|cjs|jsx|tsx|ts|js|md)/g
+const LEDGER_PATH_RE = /(?:[\w.-]+\/)+[\w.-]+\.(?:jsonl|json|mjs|cjs|jsx|tsx|ts|js|md)/g
 
 /** Marker that a (3) row is an ADMITTED GAP rather than a considered "none" —
  *  the point's instruction that a lesson with no enforcement is REPORTED, never
@@ -359,7 +359,7 @@ const MIN_REASON_CHARS = 25
 
 /**
  * The retrospective's lesson subsections as [{id, title}], plus the `###`
- * headings that carry no `N.M` id (`unledgerable` — they would otherwise be a
+ * to `######` headings that carry no `N.M` id (`unledgerable` — they would otherwise be a
  * free bypass of the gate). Only the PROSE region is inspected: the
  * marker-delimited appendix is machine-generated and decides nothing.
  */
@@ -418,9 +418,10 @@ export function ledgerGaps(entries = []) {
  *     without its fingerprint stamp is stale by definition, never exempt.
  *   - a row present but WRONG (bad outcome, empty reason, dead path) → BLOCK.
  *     It is a one-edit fix and can never trap.
- *   - the file exists but NOT ONE row parses → ALLOW with a loud warning. A
- *     parser that reads nothing is far likelier broken than a corpus that is
- *     genuinely empty, and this is the only shape a parse bug can take here.
+ *   - the file exists but NOT ONE row parses → BLOCK where the file shows table
+ *     syntax (a corrupted table), and ALLOW with a loud warning only where it
+ *     holds no table at all: a parser that reads nothing there is far likelier
+ *     broken than a corpus that is genuinely empty.
  *   - no lessons parsed out of the retrospective → ALLOW with a warning, same
  *     argument in the other direction.
  * A thrown exception is the wrapper's fail-open, as for every guard here.
@@ -453,9 +454,9 @@ export function evaluateLedger({ retroText, ledgerText, pathExists = () => true 
   const { entries } = parseLedger(ledgerText)
   if (entries.length === 0) {
     // A file with table syntax in it but no readable row is a CORRUPTED table,
-    // not a parser fault — allowing there would let "gut the table to prose"
-    // escape the gate, which the four-eyes review found as the one remaining
-    // hole. Fail open only where the file shows no table at all.
+    // not a parser fault, and blocks (the four-eyes review's hole). Fail open
+    // only where the file shows no table at all — which leaves replacing the
+    // whole table by prose as the accepted residual of that fail-open.
     if (/^\s*\|/m.test(ledgerText)) {
       return {
         decision: 'block',
@@ -562,7 +563,7 @@ export function evaluateLedger({ retroText, ledgerText, pathExists = () => true 
 // Guard decision.
 
 /** The guide's review stamp (see GUIDE_FINGERPRINT_RE), or null. */
-export function extractGuideFingerprint(text) {
+function extractGuideFingerprint(text) {
   if (typeof text !== 'string') return null
   const m = text.match(GUIDE_FINGERPRINT_RE)
   return m ? m[1] : null
@@ -582,7 +583,7 @@ export function evaluateCurrency({ docText, guideText, currentFingerprint } = {}
   const recorded = extractFingerprint(docText)
   if (!recorded || recorded !== currentFingerprint) {
     const detail = recorded
-      ? 'the durable sources (feedback/project memories, guard scripts, revert trail, process TASKS points) changed since its last refresh'
+      ? 'the durable sources (feedback/project/user memories, guard scripts, revert trail, process TASKS points) changed since its last refresh'
       : 'it carries no sources fingerprint yet (never refreshed under the currency mechanism)'
     return {
       decision: 'block',

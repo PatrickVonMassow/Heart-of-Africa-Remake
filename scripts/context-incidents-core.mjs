@@ -2,8 +2,8 @@
 //
 // WHY: the boundary MEASURES an overshoot, prints it, and forgets it. A session
 // handed over at 311,039 tokens against the 150,000 ceiling (19.08.2026) and the
-// next reading started from zero, so nobody could say whether arming the context
-// fence (point 542) changed anything. This module turns a single reading into a
+// next reading started from zero, so nobody could say whether the context fence
+// (point 542; in observe mode by default since point 758) changed anything. This module turns a single reading into a
 // SERIES: one appended record per incident, each carrying the measurement, the
 // per-turn context growth of that session and the growth PER KIND OF CALL with
 // its input size — so the later decision rests on readings instead of guesses.
@@ -12,14 +12,16 @@
 // record is evidence. `scripts/context-incidents.mjs` reads it back.
 //
 // THE RESIDUAL, WITH ITS DIRECTION: a session that dies without taking a
-// boundary writes NO record, so the series UNDER-counts and never over-counts.
+// boundary writes NO overshoot record, so overshoots are UNDER-counted (startup
+// readings and seeded records come from elsewhere). The reader does not
+// deduplicate: a series file handed in twice counts twice.
 // Closing that would mean deriving the reading at session start from the
 // predecessor's transcript — a separate point, not claimed here.
 import { expandSegments, headAndArgs, segmentInvokesPathWhere, segmentInvokesScript } from './command-classify-core.mjs'
 
 /** Record format version. Readers keep older versions readable; a writer only
  *  ever appends the newest. */
-export const INCIDENT_VERSION = 1
+const INCIDENT_VERSION = 1
 
 /** WHAT KIND OF INCIDENT a record describes.
  *  'overshoot' — a boundary taken further past the ceiling than the margin.
@@ -57,7 +59,7 @@ export const CALL_KINDS = {
  * (`kinds`), which keeps the attribution auditable rather than silently
  * averaged.
  */
-export const KIND_PRECEDENCE = [
+const KIND_PRECEDENCE = [
   CALL_KINDS.AGENT,
   CALL_KINDS.BROWSER_SUITE,
   CALL_KINDS.DELEGATED_ASK,
@@ -81,8 +83,9 @@ export const UPPER_QUANTILE = 0.9
 export const TOP_STEPS = 10
 
 /** Per-kind sample cap. Beyond it an even-stride subsample is kept (and marked),
- *  so a long session cannot grow the record without bound while the quantile
- *  stays representative — dropping the largest or the smallest would not. */
+ *  so a long session cannot grow the record without bound while the samples
+ *  stay spread over the whole run — dropping the largest or the smallest would
+ *  bias the quantile outright (a stride can still miss an alternating pattern). */
 export const MAX_KIND_SAMPLES = 400
 
 const AGENT_TOOLS = new Set(['Agent', 'Task'])
@@ -91,12 +94,14 @@ const SEARCH_TOOLS = new Set(['Grep', 'Glob'])
 const WEB_TOOLS = new Set(['WebFetch', 'WebSearch'])
 const READ_TOOLS = new Set(['Read'])
 
-/** The sanctioned browser-suite launchers, and the delegating asks. Same names
- *  the context fence classifies as "starting new work" — one vocabulary. */
+/** The sanctioned browser-suite launchers, and the delegating asks — the names
+ *  the context fence classifies as "starting new work", kept as separate lists
+ *  here (the fence's run-wait.mjs exemption and npm subcommand parsing are not
+ *  mirrored). */
 const SUITE_SCRIPTS = ['run-all.mjs', 'run-logged.mjs']
 const ASK_SCRIPTS = ['ask-astra.mjs', 'author-astra.mjs', 'author-fable.mjs', 'review-astra.mjs']
 const VERIFY_PREFIX = /(?:^|\/)scripts\/verify\/[^\s]+\.mjs$/i
-/** npm subcommands that ARE a browser run, and the fast gates beside them. */
+/** npm script names that ARE a browser run, and the fast gates beside them. */
 const NPM_SUITE_ARGS = new Set(['test', 'test:small', 'test:large'])
 const NPM_GATE_ARGS = new Set(['test:unit', 'build', 'lint'])
 
@@ -122,8 +127,8 @@ export function shellKind(command) {
     const { head, args } = headAndArgs(seg)
     if (head === 'npm' || head === 'pnpm' || head === 'yarn') {
       const words = (args ?? []).map((a) => String(a?.text ?? a)).filter((w) => !w.startsWith('-'))
-      // `npm run test:small` and `npm test:small` both name the script in the
-      // words after the head; `run` is not itself a script name.
+      // Any non-flag word after the head is compared, so `npm run test:small`
+      // (and even a bare `npm test:small`) counts; `run` is not itself a script name.
       for (const w of words) {
         if (NPM_SUITE_ARGS.has(w)) found.add(CALL_KINDS.BROWSER_SUITE)
         if (NPM_GATE_ARGS.has(w)) found.add(CALL_KINDS.FAST_GATE)
@@ -148,7 +153,8 @@ export function callKind({ name = '', input = null } = {}) {
 /**
  * THE INPUT SIZE of a call, in characters of material — every string the tool
  * input carries (the shell line, the agent's prompt, the material handed to a
- * delegated ask). JSON punctuation is deliberately not counted: the reading is
+ * delegated ask), numbers and booleans by their printed length, down to a
+ * nesting depth of 6. JSON punctuation is deliberately not counted: the reading is
  * "how much did I hand in", not "how big was the envelope".
  */
 export function callInputChars(input, depth = 0) {
@@ -337,7 +343,7 @@ export function startupReading(calls = []) {
 /** How far past `ceiling` a reading stands, and whether that exceeds the stated
  *  margin. `over` is null when there is no usable reading — an unmeasured
  *  distance must never read as a small one. */
-export function overshootOf({ tokens, ceiling, margin } = {}) {
+function overshootOf({ tokens, ceiling, margin } = {}) {
   const usable = typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0
   if (!usable) return { over: null, beyondMargin: false }
   const over = tokens - Number(ceiling)
@@ -358,8 +364,8 @@ export function shouldRecordIncident({ tokens, ceiling, margin } = {}) {
  * THE INCIDENT RECORD. PURE — every input is handed in, nothing is read here.
  *
  * `watermark` is the mark the overshoot is measured against (the cost CEILING at
- * a boundary); `trigger` is the admission mark a growth step is judged against,
- * so a step that BEGAN below it is visible as such.
+ * a boundary); `trigger` is the handover threshold a growth step is judged
+ * against, so a step that BEGAN below it is visible as such.
  */
 export function buildIncident({
   kind = INCIDENT_KINDS.OVERSHOOT,
@@ -464,11 +470,9 @@ export function parseIncidents(text) {
   return { records, malformed }
 }
 
-/** The records at or after `sinceMs`, optionally of one kind only. */
-export function filterSeries(records = [], { sinceMs = null, kind = null } = {}) {
-  return (records ?? []).filter(
-    (r) => (sinceMs == null || r.atMs >= sinceMs) && (kind == null || r.kind === kind),
-  )
+/** The records at or after `sinceMs`. */
+export function filterSeries(records = [], { sinceMs = null } = {}) {
+  return (records ?? []).filter((r) => sinceMs == null || r.atMs >= sinceMs)
 }
 
 /**
@@ -563,13 +567,13 @@ export function formatSeriesReport(summary, { malformed = 0, sources = [] } = {}
   if (kinds.length) lines.push(`  by record kind: ${kinds.map(([k, n]) => `${k} ${n}`).join(', ')}`)
   if (!summary.count) {
     lines.push('  NO RECORDS. Either no boundary overshot the margin in that span, or a session died without')
-    lines.push('  taking a boundary — the series UNDER-counts by construction and never over-counts.')
+    lines.push('  taking a boundary — the series UNDER-counts such sessions by construction.')
     return lines.join('\n')
   }
   lines.push(`  span: ${summary.first} … ${summary.last}`)
   lines.push(
     // The MARK, not "the ceiling": a boundary overshoot is measured against the
-    // cost ceiling and a startup reading against the admission trigger, and each
+    // cost ceiling and a startup reading against the handover trigger, and each
     // record names its own in `watermark`.
     `  overshoot past the record's own mark: min ${num(summary.overshoot.min)}, median ${num(summary.overshoot.median)}, ` +
       `p${q} ${num(summary.overshoot.p)}, max ${num(summary.overshoot.max)} tokens`,
@@ -609,6 +613,6 @@ export function formatSeriesReport(summary, { malformed = 0, sources = [] } = {}
   lines.push(
     '  RESIDUAL, with its direction: a session that dies without taking a boundary writes no record, so this',
   )
-  lines.push('  series UNDER-counts and never over-counts. Nothing here is filed or ranked automatically.')
+  lines.push('  series UNDER-counts; lines are not deduplicated. Nothing here is filed or ranked automatically.')
   return lines.join('\n')
 }

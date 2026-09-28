@@ -13,10 +13,11 @@
 // walking pair can drift a few pixels into each other on a fast machine, for
 // a frame or two, and the next refresh separates them again.
 //
-// The bar therefore refuses the first and tolerates the second: no pair may
-// EVER overlap deeper than FUSE_HARD in both axes (half a box height — the
-// unreadable class), and shallow grazes may stand in at most FUSE_MAX_SHARE
-// of the sampled frames.
+// The bar therefore refuses the first and tolerates the second: frames holding
+// a pair fused beyond FUSE_TOLERANCE, and frames whose deepest pair reaches
+// FUSE_HARD in both axes (one full line height — the unreadable class), may
+// each stand in at most the shared share (FUSE_MAX_SHARE by default) of the
+// sampled frames (point 1067).
 
 /** Overlap in BOTH axes beyond this many CSS pixels counts as a fused pair. */
 export const FUSE_TOLERANCE = 6
@@ -81,27 +82,6 @@ export const FUSE_MAX_SHARE = 0.05
 export const FUSE_CROWD_SHARE = 0.15
 
 /**
- * Judge one sampled series. `reading` is what the page-side sampler returns:
- *   samples      — frames sampled (must cover at least a couple of refreshes),
- *   fusedFrames  — frames in which ANY pair overlapped beyond FUSE_TOLERANCE,
- *   deepFrames   — of those, the frames whose deepest pair reached FUSE_HARD,
- *   worstDepth   — deepest min(across, down) overlap any pair ever showed,
- *   worstPair    — that pair, described ("A"ד B" WxH px),
- *   labelsMin    — fewest labels any sampled frame held,
- *   labelsMax    — most labels any sampled frame held.
- * A reading that measured no crowd is a FAILURE: this bar exists for the dense
- * scene, and an empty sample would certify nothing (the point-628 lesson —
- * the defective frame stood in the repo while every check was green). The
- * floor binds labelsMin, the WHOLE sample (Sol review, 17.08.): a peak of two
- * labels in one frame followed by 89 frames with every label unmounted is a
- * scene hiding labels instead of placing them, not a certified crowd — and a
- * sampler that never reported the floor is refused outright.
- * `minLabels` is that floor: 2 where the caller stages a crowd (the village),
- * 1 where a lone subject is a legitimate scene (the open savanna, whose
- * presence bar is a separate check). It clamps at 1 — no caller may accept an
- * empty picture.
- */
-/**
  * Merge two sampled windows into one reading. The suites sample a window
  * BEFORE their screenshot and a second one AFTER it (Sol review, 17.08.): a
  * check that closes its sample and then opens the shutter certifies a picture
@@ -113,9 +93,9 @@ export const FUSE_CROWD_SHARE = 0.15
  * RESIDUAL (Sol re-review, 17.08.; accepted, not fixable from the page): the
  * bracket cannot see (1) a fusion that exists ONLY between the last measured
  * frame before the shutter and the first one after — i.e. one that both
- * appears and vanishes inside the capture itself — nor (2) a shallow
- * (< FUSE_HARD) fusion that coincides with the capture while staying inside
- * the FUSE_MAX_SHARE tolerance of the merged series, nor (3) the label FLOOR
+ * appears and vanishes inside the capture itself — nor (2) a fusion, shallow or
+ * at FUSE_HARD, that coincides with the capture while staying inside the shared
+ * allowance of the merged series, nor (3) the label FLOOR
  * at that same instant (third Sol round): both windows can satisfy `minLabels`
  * while the labels are gone from the captured composite alone, so the bar can
  * certify a screenshot without the crowd it demands. It cannot, because no
@@ -126,9 +106,10 @@ export const FUSE_CROWD_SHARE = 0.15
  * the honest form of that claim (same round): the SUBJECTS move every frame, so
  * geometry does change on the capture's timescale — but the placement does not.
  * The declutter's decisions persist until its next 10 Hz refresh, so per-frame
- * drift moves a box by the distance a villager walks in ~16 ms, which is the
- * shallow class (2) already names, not the full-line overlap this bar exists
- * for. A defect of THAT class stands for whole refresh intervals and lands in
+ * drift moves a box by the distance a villager walks in one frame (~16 ms on a
+ * quiet lane, 130–170 ms on a loaded one, where it can pass the line-height
+ * bar) — the transient class (2) already names, not the STANDING overlap this
+ * bar exists for. A defect of THAT class stands for whole refresh intervals and lands in
  * at least one window; only a capture-synchronous unmount could take the floor
  * out, and nothing schedules one.
  */
@@ -158,6 +139,28 @@ export function mergeFusionReadings(a, b) {
   }
 }
 
+/**
+ * Judge one sampled series. `reading` is what the page-side sampler returns:
+ *   samples      — frames sampled (the caller should cover at least a couple of
+ *                  refreshes; only a nonpositive count is refused here),
+ *   fusedFrames  — frames in which ANY pair overlapped beyond FUSE_TOLERANCE,
+ *   deepFrames   — of those, the frames whose deepest pair reached FUSE_HARD,
+ *   worstDepth   — deepest min(across, down) overlap any pair ever showed,
+ *   worstPair    — that pair, described ("A"ד B" WxH px),
+ *   labelsMin    — fewest labels any sampled frame held,
+ *   labelsMax    — most labels any sampled frame held.
+ * A reading that measured no crowd is a FAILURE: this bar exists for the dense
+ * scene, and an empty sample would certify nothing (the point-628 lesson —
+ * the defective frame stood in the repo while every check was green). The
+ * floor binds labelsMin, the WHOLE sample (Sol review, 17.08.): a peak of two
+ * labels in one frame followed by 89 frames with every label unmounted is a
+ * scene hiding labels instead of placing them, not a certified crowd — and a
+ * sampler that never reported the floor is refused outright.
+ * `minLabels` is that floor: 2 where the caller stages a crowd (the village),
+ * 1 where a lone subject is a legitimate scene (the open savanna, whose
+ * presence bar is a separate check). It clamps at 1 — no caller may accept an
+ * empty picture.
+ */
 export function judgeLabelFusion(
   reading,
   { tolerance = FUSE_TOLERANCE, hard = FUSE_HARD, maxShare = FUSE_MAX_SHARE, minLabels = 2 } = {},

@@ -1,7 +1,7 @@
 // DEV frame/burst attribution probe (docs/perf-driving-hitches.md): the two
 // movement-threshold bursts in the travel view — the terrain chunk builds on a
-// boundary crossing and the flora instance rebuild every 16 wu — record their
-// per-frame cost here, alongside a ring buffer of frame deltas. TravelScene
+// boundary crossing and the flora instance rebuild every 16 wu (amortised over
+// up to FLORA_FILL_MAX_FRAMES frames) — record their per-frame cost here, alongside a ring buffer of frame deltas. TravelScene
 // exposes it as `window.__perf` in DEV so a driven verification (and manual
 // profiling) can attribute long frames to their burst. Recording is a few
 // field writes per frame; nothing reads the data unless asked.

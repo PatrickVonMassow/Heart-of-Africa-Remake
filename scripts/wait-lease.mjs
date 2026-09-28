@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // THE WAIT REGISTRY (point 1048, union entries U11, U12, U13) - the IO half.
 //
-// It owns one small file, `.claude/wait-leases.json`, and four verbs on it:
-// acquire, release, list and check. Everything that decides is in
+// It owns one small file, `.claude/wait-leases.json`, and three CLI verbs on
+// it: --claim, --release and --status. Everything that decides is in
 // scripts/wait-lease-core.mjs; this file only reads, probes, writes, kills and
 // journals.
 //
 // The one behaviour worth stating here: a REPLACE retires the pids the core
-// names, and it verifies each pid's start time before signalling it. The
+// names, and where both start times are known it verifies the pid's before
+// signalling it (an unknown one does not block the signal). The
 // incident was caused by a `pgrep -f <pattern>` that matched its own command
 // line; nothing in this file ever matches a process by its text.
 import { existsSync, readFileSync } from 'node:fs'
@@ -86,9 +87,9 @@ function journal(event, { lease, cause, evidence = {}, at = Date.now(), journalP
 }
 
 /**
- * Retire the waits a replace has orphaned. Start time first, then TERM, then
- * KILL on the next call if it is still there: an unrelated process that merely
- * inherited the pid keeps running, which is the whole point of the check.
+ * Retire the waits a replace has orphaned. Start time first, then TERM (there is
+ * no KILL escalation): an unrelated process that merely inherited the pid keeps
+ * running, which is the whole point of the check.
  */
 export function retireWaiters(entries = [], { kill = process.kill.bind(process), now = Date.now() } = {}) {
   const outcomes = []

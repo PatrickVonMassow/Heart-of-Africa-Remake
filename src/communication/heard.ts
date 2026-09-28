@@ -3,7 +3,7 @@
 // overhead labels and the drum message alike, so the three can never drift
 // apart — and plain JSON throughout, so it travels with the save unchanged.
 //
-// Pure logic: every function takes a memory and returns one, and an update
+// Pure logic: every update takes a memory and returns one, and an update
 // that changes nothing returns the SAME object, so a consumer can compare by
 // reference. Nothing here decides WHERE the player stands — the scene measures
 // the distance and asks isWithinHearing().
@@ -12,7 +12,7 @@ import { balance } from '../config/balance'
 import { compareUtterances, type Phrase, type UtteranceId } from './lexicon'
 
 /** One utterance the player has heard at least once. */
-export interface HeardUtterance {
+interface HeardUtterance {
   utterance: UtteranceId
   /** In-game day of the FIRST hearing (later hearings change nothing). */
   firstHeardDay: number

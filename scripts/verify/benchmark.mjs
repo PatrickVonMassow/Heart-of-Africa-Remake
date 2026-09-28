@@ -188,7 +188,7 @@ check(
       const r = p.ranking
       const sortedDesc = r.every((e, i) => i === 0 || r[i - 1].tris >= e.tris)
       const shares = r.reduce((s, e) => s + e.pct, 0)
-      return r.length > 0 && sortedDesc && (r.length === 0 || Math.abs(shares - 1) < 1e-6)
+      return r.length > 0 && sortedDesc && Math.abs(shares - 1) < 1e-6
     }),
   low ? JSON.stringify(low.phases.map((p) => p.ranking.slice(0, 3).map((e) => `${e.system} ${Math.round(e.pct * 100)}%`))) : 'no lowProfile',
 )
@@ -267,7 +267,7 @@ await page.waitForTimeout(300)
 check('Esc closes the result panel', (await page.locator('.bench-report').count()) === 0)
 
 // The digest itself, so a suite run leaves the actual numbers behind (run-all
-// captures this; only a direct run prints it).
+// captures it in the run log; a direct run shows it on the console).
 console.log(report.summary.join('\n'))
 
 check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))

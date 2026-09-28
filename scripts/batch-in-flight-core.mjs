@@ -21,11 +21,14 @@
 //   1. EVIDENCE, NOT ASSERTION — and RECENCY, never mere existence. A declaration
 //      names things a probe can answer, and each answer must be FRESH: a pid whose
 //      process is alive AND started when the declaration says (a reused pid is a
-//      stranger), a branch whose tip commit is recent, a worktree where git work
-//      recently happened, a log still being written to. Existence alone was the
+//      stranger), a branch whose tip commit is recent, a worktree whose working
+//      files or writer-moved git metadata recently changed, a log still being
+//      written to. Existence alone was the
 //      one real hole the four-eyes review found — ~94 stale branches in this
 //      repository would each have passed forever.
-//   2. ALL of it must check out, not some. When one of three agents finishes, the
+//   2. ALL of it must check out, not some (one exception: a silent log beside
+//      output that still moves is ignored, see `assessInFlight`). When one of
+//      three agents finishes, the
 //      declaration stops holding and the guard blocks again — which is right: the
 //      finished agent's work is now the session's next action (merge it), and
 //      re-declaring the remaining two is one command. Erring the other way would
@@ -37,7 +40,7 @@
 //      while its agent had been building for 63 minutes and was mid-merge, and
 //      nothing refreshes a declaration while the work runs. What ends the wait is
 //      the EVIDENCE going quiet: output (a branch, a worktree) stops checking out
-//      within `WORK_FRESH_MS` of the last commit, all by itself. Past
+//      within `WORK_FRESH_MS` of the last commit or file write, all by itself. Past
 //      `IN_FLIGHT_MAX_AGE_MS` the guard blocks exactly as before wherever nothing
 //      is producing output — a pid that merely exists, a log that is merely
 //      appended to — so the clock still bounds the assertion-shaped evidence it
@@ -65,7 +68,8 @@ export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
  * for it (second four-eyes review, 28.07.2026, finding A).
  *
  * The launcher's question is not the guard's. The GUARD asks "may a turn end ride
- * on this declaration?", where an aged one must stop counting — that is what
+ * on this declaration?", where an aged one without moving output must stop
+ * counting — that is what
  * `IN_FLIGHT_MAX_AGE_MS` (45 min) is for. The LAUNCHER asks "what was this owner
  * waiting on?", and for that age is a poor disqualifier: a declaration does not
  * become false by growing old, it becomes false when the session went on working
@@ -140,26 +144,6 @@ export function assessCiWait({ wait, now = Date.now(), probePid = () => null } =
 }
 
 /**
- * MAY A DECLARATION STILL SHIELD SOMETHING FROM A SWEEP? PURE (point 437 G).
- *
- * The branch sweep read the in-flight file RAW — every branch and worktree it
- * named was exempt, with no age and no liveness asked — while the expiry lived
- * in a consumer the sweep never called. A dead session's declaration therefore
- * shielded its branch and its worktree from the sweep FOR EVER, which is the one
- * thing the sweep exists to prevent.
- *
- * This is the cheap half of `assessInFlight`: the same `at` field and the same
- * `IN_FLIGHT_MAX_AGE_MS`, without the evidence probes. That is the right depth
- * HERE and nowhere else — a branch whose work is genuinely still moving is
- * already protected by the sweep's own grace window on its tip date, so this
- * only has to stop a declaration that has simply been left behind. The costlier
- * output probing stays where a WAIT is judged, because there a false "dead"
- * kills a running agent, while here it costs one turn.
- *
- * Returns { shields, reason, ageMs }. Anything unreadable SHIELDS: a declaration
- * this cannot parse is not evidence that the work is over.
- */
-/**
  * IS THE SESSION THAT WROTE THIS DECLARATION STILL RUNNING? PURE (point 1048,
  * union entry U2).
  *
@@ -211,13 +195,33 @@ export function declarationWriterAlive({
   return { known: true, alive: true, reason: 'writer-alive', pid }
 }
 
+/**
+ * MAY A DECLARATION STILL SHIELD SOMETHING FROM A SWEEP? PURE (point 437 G).
+ *
+ * The branch sweep read the in-flight file RAW — every branch and worktree it
+ * named was exempt, with no age and no liveness asked — while the expiry lived
+ * in a consumer the sweep never called. A dead session's declaration therefore
+ * shielded its branch and its worktree from the sweep FOR EVER, which is the one
+ * thing the sweep exists to prevent.
+ *
+ * This is the cheap half of `assessInFlight`: the same `at` field and the same
+ * `IN_FLIGHT_MAX_AGE_MS`, without the evidence probes (only the writer's own
+ * pid is probed, see `declarationWriterAlive`). That is the right depth
+ * HERE and nowhere else — a branch whose work is genuinely still moving is
+ * already protected by the sweep's own grace window on its tip date, so this
+ * only has to stop a declaration that has simply been left behind. The costlier
+ * output probing stays where a WAIT is judged, because there a false "dead"
+ * kills a running agent, while here it costs one turn.
+ *
+ * Returns { shields, reason, ageMs, writer }. Anything unreadable SHIELDS: a declaration
+ * this cannot parse is not evidence that the work is over.
+ */
 export function declarationShields({
   declaration,
   now = Date.now(),
   maxAgeMs = IN_FLIGHT_MAX_AGE_MS,
-  // The writer probe is INJECTED and defaults to absent, so every existing
-  // caller keeps the clock-only behaviour it was written against and only a
-  // caller that can actually probe pays for the stricter answer.
+  // The writer probe is INJECTED and defaults to absent: without it the answer
+  // stays clock-only (the branch sweep passes one).
   probePid = null,
 } = {}) {
   if (!declaration || typeof declaration !== 'object') return { shields: true, reason: 'unreadable', ageMs: null }
@@ -227,7 +231,8 @@ export function declarationShields({
   // A stamp from the future is a clock nothing here can reason about — shield,
   // and let the wait-side assessment, which blocks on skew, be the strict one.
   if (!(ageMs >= 0)) return { shields: true, reason: 'clock-skew', ageMs }
-  // A DEAD WRITER SHIELDS NOTHING (union entry U2), whatever the clock says. A
+  // A DEAD WRITER SHIELDS NOTHING (union entry U2), whatever the declaration's
+  // age (an unreadable or future stamp has already shielded above). A
   // declaration is a claim about what a running session is doing; once that
   // session is gone the claim has no subject.
   const writer = declarationWriterAlive({ declaration, probePid })
@@ -251,14 +256,11 @@ export const LOG_FRESH_MS = 15 * 60 * 1000
  * it sat on the COMMON path: the guard's block message steers sessions to exactly
  * these two kinds. So they are judged the way the log kind already was — by
  * recency. A delegated agent commits per step, so a quarter of an hour without a
- * commit or a git operation in its tree means it is finished, stuck or gone;
+ * commit, a working-file write or a writer-moved git stamp in its tree means it
+ * is finished, stuck or gone;
  * whichever it is, the session's next action is to look, not to keep waiting.
  */
 export const WORK_FRESH_MS = 15 * 60 * 1000
-
-/** The evidence kinds a probe can actually answer. An unknown kind is never
- *  "assume fine": it fails, and the declaration with it. */
-export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
 
 /**
  * EVIDENCE THAT IS THE WORK'S OWN OUTPUT (point 434 (5), 30.07.2026).
@@ -314,7 +316,7 @@ export function writerGitMetadataAt(stamps = {}) {
 /**
  * THE NEWEST OF THE TWO WORKTREE STAMPS, AND WHICH ONE IT WAS. PURE.
  *
- * `gitAt` is the git metadata's mtime, `filesAt` the newest working-file mtime.
+ * `gitAt` is the newest writer-moved git stamp (`writerGitMetadataAt`), `filesAt` the newest working-file mtime.
  * Returns { at, source } — or null when neither could be read, which keeps the
  * `worktree-gone` path exactly as it was. A tie goes to the working files: they
  * are the half a reader cannot contaminate.
@@ -377,7 +379,7 @@ export function porcelainPaths(out, { limit = 400 } = {}) {
 }
 
 /** Checked-out feat/* branches from Git's worktree register. Detached trees and
- * the main checkout are deliberately absent: only a registered feature
+ * checkouts on any other branch (normally the main checkout) are absent: only a registered feature
  * checkout can be the lockless writer this evidence is meant to find. */
 export function registeredFeatureWorktrees(porcelain) {
   if (typeof porcelain !== 'string') return []
@@ -476,15 +478,14 @@ const normRef = (r) =>
  * Recency made existence-only evidence honest (point 388's own four-eyes round),
  * but nothing restricted WHAT may be named — and some things are eternally fresh
  * by construction (four-eyes review 28.07.2026, finding 1.2):
- *   - the REPO ROOT as a `--worktree`: every `git status` the declaring session
- *     runs touches its index, so it is git-active at all times, by the session's
- *     own hand;
+ *   - the REPO ROOT as a `--worktree`: the declaring session's own edits and
+ *     commits keep it fresh at all times, by the session's own hand;
  *   - `main`, or the declaring checkout's OWN current branch, as a `--branch`:
  *     the first moves on everyone else's merges, the second on the session's own
  *     commits.
- * Either one would hold a declaration open indefinitely — and because the
- * declaration also suppressed the silent-owner notification, naming one left the
- * session LESS observed than declaring nothing at all. They are refused at
+ * Either one would hold a declaration open indefinitely — and because advancing
+ * declared work also holds off the launcher's takeover of an expired lease,
+ * naming one left the session LESS observed than declaring nothing at all. They are refused at
  * declaration time, where the mistake is one command away from being fixed,
  * rather than silently honoured for hours.
  *
@@ -503,7 +504,7 @@ export function selfReferentialEvidence({ evidence, repoRoot, currentBranch = nu
         out.push({
           kind: 'worktree',
           value: String(item.path),
-          why: 'that is this checkout itself — every git command the session runs keeps it fresh forever',
+          why: "that is this checkout itself — the session's own edits and commits keep it fresh forever",
         })
       }
     } else if (item?.kind === 'branch') {
@@ -513,7 +514,7 @@ export function selfReferentialEvidence({ evidence, repoRoot, currentBranch = nu
         out.push({
           kind: 'branch',
           value: String(item.ref),
-          why: 'main (and HEAD) move on every merge in the repository, not on the work being waited for',
+          why: 'main moves on every merge in the repository and HEAD is this checkout itself, not the work being waited for',
         })
       } else if (own && ref === own) {
         out.push({
@@ -539,8 +540,8 @@ const minutes = (ms) => Math.round(ms / 60000)
  *                      `combineWorktreeStamps`); a bare number keeps its old meaning
  *   mtimeOf          — (path) => number|null epoch ms, null when absent
  *
- * EVERY kind is now judged on RECENCY, not on existence — a pid by the identity
- * of the process behind it, the other three by when something last happened.
+ * No kind is judged on existence alone — a pid on the identity of the process
+ * behind it, the other three on RECENCY (when something last happened).
  *
  * Returns { ok, kind, describe, detail, progressAt } — `describe` is what the
  * guard's allow message says out loud, so a later reader of the transcript can
@@ -632,7 +633,8 @@ export function checkEvidence(
  *                 the lock uses — so a context compaction that mints a new
  *                 session id does not orphan a declaration this very process
  *                 wrote, while a genuinely second window still fails it.
- *   now, maxAgeMs, and the four probes of `checkEvidence`.
+ *   now, maxAgeMs, the four probes of `checkEvidence`, and `runFailureOf`
+ *                 — (logPath) => string|null, a reproducing failure in a declared log.
  *
  * Returns { live, reason, ageMs, summary, items, judgedOn, ignored }. `live` true
  * is the ONLY value that may relax the block; every other path leaves the guard
@@ -640,7 +642,8 @@ export function checkEvidence(
  * transcript reader can see whether a log or the work's own output decided it.
  *
  * TWO RULES COME FROM POINT 434 (30.07.2026), and both say the same thing —
- * liveness is read from OUTPUT, never from a clock and never from silence:
+ * liveness is read from OUTPUT where there is output, never from silence; the
+ * clock bounds only evidence that produces none:
  *   (5) A SILENT LOG ALONE IS NOT DEATH. Where the declared work is an agent
  *       whose branch or worktree is still moving, a log that has gone quiet is
  *       ignored (and named in `ignored`). Every other kind still has to hold —
@@ -651,7 +654,8 @@ export function checkEvidence(
  *       minutes and was mid-merge. The expiry now only bites where nothing is
  *       producing output — a pid that merely exists, a log that is merely being
  *       written. Fresh output needs no deadline: it goes quiet on its own inside
- *       `WORK_FRESH_MS`, which is the bound the expiry was standing in for.
+ *       its freshness window (`WORK_FRESH_MS` unless the item sets `freshMs`),
+ *       which is the bound the expiry was standing in for.
  */
 export function assessInFlight({
   declaration,
@@ -742,8 +746,8 @@ export function assessInFlight({
  * the remote-tracking ref could not be read) and null for pid/log kinds.
  *
  * The rule: every branch/worktree item needs a PUSHED checkpoint (local tip ==
- * remote-tracking tip), and at least ONE ADOPTABLE item must exist — a
- * declaration of only bare pids and logs names nothing a successor could adopt:
+ * remote-tracking tip), and a non-empty declaration needs at least ONE ADOPTABLE
+ * item — a declaration of only bare pids and logs names nothing a successor could adopt:
  * the process dies with this session and the log proves nothing about what
  * survives.
  *
@@ -913,7 +917,8 @@ export function markTransferred({ declaration, bySid, now, checkpoints = [], run
  *
  * `items` are `checkEvidence` results for the declaration's evidence;
  * `checkpointStates` re-reads each recorded checkpoint:
- * { ref, recordedSha, localSha } (localSha null = branch gone).
+ * { ref, recordedSha, localSha, ancestor } (localSha null = branch gone;
+ * `ancestor` true = localSha descends from recordedSha).
  *
  * The asymmetry is deliberate: adoption DROPS evidence that no longer checks out
  * (an old session's child pid is dead by construction) but must SAY so — and it
@@ -1020,7 +1025,7 @@ export const COMMIT_ONLY_GRACE_MS = 5 * 60 * 1000
  *   'quiet'        — git output COULD be measured and has stood still.
  *   'unmeasurable' — neither a worktree nor a branch could be read, so the only
  *                    thing left is silence, and silence is not evidence of death
- *                    (docs/batch-resilience.md §5). The caller must LOOK.
+ *                    (docs/batch-resilience.md, Layer 5b). The caller must LOOK.
  */
 export function agentOutputVerdict({
   worktreeAt = null,
@@ -1081,8 +1086,8 @@ export function agentOutputVerdict({
         judgedOn: 'git',
         ageMs: now - newestGit,
         detail: commitShaped && now - newestGit <= graceMs
-          ? `only a ${minutes(now - newestGit)} min old commit, with nothing running and no working file touched ` +
-            `since (a commit is the last thing a session does)`
+          ? `only a ${minutes(now - newestGit)} min old commit, with no live process measured and no working-file ` +
+            `movement seen since (a commit is the last thing a session does)`
           : `no commit and nothing written for ${minutes(now - newestGit)} min${stampName ? ` (newest: ${stampName})` : ''}`,
       }
     }
@@ -1199,13 +1204,15 @@ export function successorAgentOrientation({ declaration = null, sid = '', agentC
 // broken: the wait declaration is built and enforced, the idle guard is satisfied,
 // and the cap is an UPPER bound that nothing checks from below. Measured that day:
 // one agent, two free slots, ninety minutes, a queue full of independent points.
+// (Since point 712 a slot is occupied by an open branch, not an agent; see below.)
 //
 // So the mechanism that already judges the wait also asks the lower bound — and it
 // must not become a nag, which is why every state in which the empty slots are
 // genuinely unusable answers "no reason needed" on its own.
 
-/** The delegation pool cap (CLAUDE.md §6): at most three concurrent agents — and
- *  since point 427 also a TARGET while independent work is queued. */
+/** The pool cap: at most three open feat/* branches (point 712) and three
+ *  concurrent agents — and since point 427 also a TARGET while independent work
+ *  is queued. */
 export const POOL_CAP = 3
 
 /**
@@ -1413,8 +1420,8 @@ export function slotsRemedy({ slots = {}, cap = POOL_CAP } = {}) {
 
 // ---- A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE (point 712) ---------------
 //
-// The cap above counts CONCURRENT AGENTS, so an agent that finishes returns its
-// slot and leaves its branch standing. Branches then accumulate unbounded: nine
+// The cap above USED TO count CONCURRENT AGENTS, so an agent that finished returned its
+// slot and left its branch standing. Branches then accumulated unbounded: nine
 // stood open on 17.08.2026, the two OLDEST of them the communication mechanic
 // this release exists for — `feat/336-croc-staging` 13 days old and 1679 commits
 // behind `main`, indistinguishable from live work. Built work that never lands
@@ -1429,10 +1436,10 @@ export function slotsRemedy({ slots = {}, cap = POOL_CAP } = {}) {
 export const COMMISSION_RECORD_PATH = '.claude/commission-record.json'
 
 /** How a branch is taken out of the count — named by the refusal itself. */
-export const BRANCH_PARK_CMD = 'node scripts/commission-guard.mjs --park <branch> --reason "<why>"'
+const BRANCH_PARK_CMD = 'node scripts/commission-guard.mjs --park <branch> --reason "<why>"'
 
 /** …and the other way out, which is the one that should normally be taken. */
-export const BRANCH_LAND_CMD = 'node scripts/land-point.mjs <N> --model <m>'
+const BRANCH_LAND_CMD = 'node scripts/land-point.mjs <N> --model <m>'
 
 /** `refs/heads/x`, `heads/x`, `origin/x` and `x` all name one branch — the
  *  spelling rule the evidence checks already use, exported so the branch-slot
@@ -1702,7 +1709,7 @@ function mentionSentence(text, index) {
  * `feat/687-b` still does not answer for `feat/687-bank-game`: the boundary is a
  * separator, not any character.
  */
-export function branchAnswersTo(named, standing, { loose = false } = {}) {
+function branchAnswersTo(named, standing, { loose = false } = {}) {
   const a = normRef(named)
   const b = normRef(standing)
   if (!a || !b) return false
@@ -1713,7 +1720,8 @@ export function branchAnswersTo(named, standing, { loose = false } = {}) {
 /** EVERY spelling that CUTS a branch, each capturing the name it creates. The
  *  name is read off the FLAG rather than off the whole command, so
  *  `git checkout -b feat/712-x origin/feat/705-y` opens 712 and not the branch
- *  it started FROM. `git branch -D …` is excluded by the `(?!-)`.
+ *  it started FROM. `git branch …` is read separately by `gitBranchCreates`,
+ *  which rejects the deleting and listing modes.
  *
  *  THE LONG FORMS ARE HERE BECAUSE THE SHORT ONES ALONE WERE A BYPASS (Sol,
  *  review of 3078d166): `git switch --create feat/697-x` cut a branch the guard
@@ -1748,13 +1756,6 @@ const BRANCH_NOT_CREATING =
 /** …and the ones that CREATE by copying or renaming, where the new name is LAST. */
 const BRANCH_COPY_OR_MOVE = /^(?:-[cCmM]|--copy|--move)$/
 
-/** Flags of `git branch` whose VALUE is the next token, so it is not a name.
- *  `--recurse-submodules` is BOOLEAN (its mode travels only via `=`), so listing
- *  it here consumed the branch-name token and the creation went unread (fourth
- *  review, finding 3). */
-const BRANCH_VALUE_FLAGS = new Set(['--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort',
-  '--format', '--set-upstream-to', '-u', '--abbrev', '--color'])
-
 /**
  * The branch a `git branch …` segment CREATES, or [] where it creates none.
  * READ AS TOKENS, not as one expression: `git branch --track feat/697-x main`
@@ -1775,7 +1776,6 @@ function gitBranchCreates(seg) {
     if (t.startsWith('-')) {
       if (BRANCH_NOT_CREATING.test(t)) return []
       if (BRANCH_COPY_OR_MOVE.test(t)) copyOrMove = true
-      if (BRANCH_VALUE_FLAGS.has(t)) i += 1
       continue
     }
     names.push(unquote(t))
@@ -1817,18 +1817,21 @@ function segmentTarget(seg) {
 /**
  * WHICH POINTS IS THIS TOOL CALL OPENING WORK ON? PURE.
  *
- * Returns { points, point, refs, how }: `points` is EVERY point the call opens,
+ * Returns { points, point, refs, refsLoose, how } (plus `ambiguous` for
+ * ambiguous prose): `points` is EVERY point the call opens,
  * `point` the first of them (the single-target shorthand the CLI and the report
  * use), `refs` the branch names the call CREATES where a cut flag names them, and
  * `how` names the act recognised for it — `agent` for a spawn, `branch` for a
  * `feat/<N>-…` being CUT, `worktree` for a tree created on one, `author` for an
- * authoring run — with `none` where the call opens nothing this rule knows about.
+ * authoring run, `ambiguous-prose` for a spawn prompt it will not guess at — with
+ * `none` where the call opens nothing this rule knows about.
  *
  * `refs` is what separates FINISHING from opening a SECOND branch for one point
  * (Sol, review of 3078d166): the point alone said "687 is already in flight", so
  * `git branch feat/687-b` past a standing `feat/687-a` walked through a full
- * pool. A ref is collected only where a FLAG creates it, never from prose — a
- * spawn prompt naming `feat/697-goat` is identifying the branch it works on.
+ * pool. In a shell command a ref is collected only where a FLAG creates it; a
+ * spawn prompt naming `feat/697-goat` is identifying the branch it works on, so
+ * its refs are collected LOOSELY (`refsLoose`).
  *
  * A CALL THAT OPENS TWO POINTS OPENS BOTH, and every one of them is judged. The
  * first cut of this rule answered NULL to any second number, which made
@@ -1849,9 +1852,9 @@ function segmentTarget(seg) {
  * CREATES anything, and none is recognised here.
  *
  * A READ-ONLY RUN OPENS NOTHING either: `author-astra.mjs --routing` answers which
- * lane owns a point and either author command's `--dry-run` prints the prompt it
- * would send. Refusing
- * those would deny the very question a session asks BEFORE it commissions.
+ * lane owns a point and every author command's `--dry-run` prints the prompt it
+ * would send. Refusing those would deny the very question a session asks BEFORE
+ * it commissions.
  */
 export function commissionTarget({ toolName = '', command = '', prompt = '', description = '' } = {}) {
   const none = { point: null, points: [], refs: [], refsLoose: false, how: 'none' }
@@ -1899,8 +1902,8 @@ export function commissionTarget({ toolName = '', command = '', prompt = '', des
     // left the spawn path on the point-wide exemption, so "point 687 on branch
     // feat/687-b" walked past a standing feat/687-a at a full pool — the very
     // escape the ref narrowing had just closed on the shell path. They are
-    // matched LOOSELY, because prose describes rather than creates — and a
-    // branch a clause names only to FORBID is no branch to be worked.
+    // matched LOOSELY, because prose describes rather than creates (a negated
+    // mention never reaches here: it is `ambiguous-prose` above).
     if (byBranch.length) {
       return found(byBranch, 'agent', mentionedRefs)
     }
@@ -2048,7 +2051,7 @@ export function commissionRecordReport(record) {
 /**
  * WHICH OPEN BRANCHES OCCUPY A SLOT? PURE.
  *
- * `branches` is [{ ref, tipAt, behind }] — every `feat/*` branch not contained in
+ * `branches` is [{ ref, tip, tipAt, behind }] — every `feat/*` branch not contained in
  * `main`, as the wrapper reads them from git. Local and remote spellings of one
  * branch are ONE branch; two branches for one point are TWO (687 had exactly
  * that on 17.08.2026, and both were real work standing open).
@@ -2067,25 +2070,10 @@ export function commissionRecordReport(record) {
  * was recorded, and it is read a whole second coarse, because git's committer
  * date is: only a tip in a strictly later second counts as movement, so a park
  * is never undone by the rounding of the very commit it was taken on.
- *
- * `exclude` is the point (or the POINTS — one shell call can open two) being
- * commissioned. Their own branches are not slots the commissioning would consume
- * — re-cutting or pushing an existing branch is finishing, not opening.
- *
- * `excludeRefs` NARROWS that to the branch actually named, where the call names
- * one. A point-wide exemption let a SECOND branch for a point in flight walk
- * through a full pool (Sol, review of 3078d166): with `feat/687-a` standing,
- * `git branch feat/687-b` was excused by its own point. So where the call names
- * the ref it creates, only THAT ref is exempt, and the point's other branches go
- * on holding their slots; where no ref is named — a spawn, a prose target — the
- * point-wide exemption stands, because the branch cannot be identified.
  */
 export function openBranchSlots({
   branches = [],
   parked = {},
-  exclude = null,
-  excludeRefs = null,
-  looseRefs = false,
   cap = POOL_CAP,
   now = Date.now(),
 } = {}) {
@@ -2097,16 +2085,6 @@ export function openBranchSlots({
       tip: normaliseTip(e?.tip),
     })
   }
-  const skipRefs = (Array.isArray(excludeRefs) ? excludeRefs : excludeRefs ? [excludeRefs] : [])
-    .map(normRef)
-    .filter(Boolean)
-  // A point whose OWN ref the call named is exempt for that ref alone.
-  const namedPoints = new Set(skipRefs.map(pointOfBranch).filter((n) => n !== null))
-  const skip = new Set(
-    (Array.isArray(exclude) ? exclude : [exclude])
-      .map(Number)
-      .filter((n) => Number.isInteger(n) && n > 0 && !namedPoints.has(n)),
-  )
   const seen = new Map()
   const parkedOut = []
   const invalidParks = []
@@ -2130,10 +2108,6 @@ export function openBranchSlots({
       // `movedSincePark`), but it is MARKED, so the reporting side can say the
       // baseline could not be checked instead of passing it off as verified.
       parkedOut.push({ ...item, reason: park.reason, ...(park.tip && !item.tip ? { tipUnverified: true } : {}) })
-      seen.set(ref, true)
-      continue
-    }
-    if (skipRefs.some((r) => branchAnswersTo(r, ref, { loose: looseRefs })) || (item.point !== null && skip.has(item.point))) {
       seen.set(ref, true)
       continue
     }
@@ -2176,7 +2150,8 @@ function parkHolds(park) {
  *  "parked at <sha>" baseline. */
 function movedSincePark(park, item) {
   if (park?.tip) return Boolean(item.tip) && item.tip !== park.tip
-  if (!Number.isFinite(park?.at) || item.tipAt === null) return false
+  // `parkHolds` already guaranteed a finite `at` for a tipless park.
+  if (item.tipAt === null) return false
   // Git's committer date is whole seconds, the park stamp is milliseconds: only a
   // tip in a strictly LATER second is evidence of a commit after the park.
   return item.tipAt >= Math.floor(park.at / 1000) * 1000 + 1000
@@ -2185,8 +2160,8 @@ function movedSincePark(park, item) {
 /**
  * MAY A FURTHER POINT BE OPENED, GIVEN THE BRANCHES THAT STAND? PURE.
  *
- * Returns { allowed, why, open, parkedOut, count, slotsFree, cap, adding,
- * reopens }. `reopens` names the PARKED branches this call assigns work back
+ * Returns { allowed, why, open, parkedOut, invalidParks, count, slotsFree, cap,
+ * point, points, refs, adding, reopens }. `reopens` names the PARKED branches this call assigns work back
  * onto — each one reoccupies its slot at the assignment, and the wrapper clears
  * its park the moment the call is allowed (finding 6). `readable`
  * false is the fail-open case the wrapper passes when git could not be
@@ -2269,7 +2244,8 @@ export function branchSlotDecision({
 /**
  * The branch refusal's wording. PURE: the point requires it to list the open
  * branches OLDEST FIRST with each one's age and behind-count, and to name the
- * two ways out.
+ * way out: LAND or PARK, and where the call alone exceeds what that can free,
+ * commissioning fewer targets.
  */
 export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
   const open = Array.isArray(decision?.open) ? decision.open : []
@@ -2358,7 +2334,7 @@ export function statusVerdict({ declaration = null, live = false, reason = '', s
  * A declaration nobody can check is not proof of anything — it is treated as no
  * evidence at all (point 402), never as a reason to keep an owner alive.
  */
-export const UNANSWERABLE_DETAILS = new Set([
+const UNANSWERABLE_DETAILS = new Set([
   'unknown-kind',
   'not-a-pid',
   'no-ref',
@@ -2367,47 +2343,6 @@ export const UNANSWERABLE_DETAILS = new Set([
   'start-time-unverifiable',
 ])
 
-/**
- * IS THE LOCK OWNER'S DECLARED WORK STILL ADVANCING? PURE.
- *
- * The LAUNCHER's question, and it is not the guard's. `assessInFlight` asks "may
- * THIS session end its turn", so it demands that ALL evidence still holds and
- * that the declaration has not aged out. The launcher asks the narrower one that
- * decides whether a silent owner is working or wedged (point 402 (c)): is ANY of
- * the declared work still moving? A session with three agents out and two of them
- * finished is plainly alive, and shooting it would be the exact failure this
- * whole point exists to end.
- *
- * Same probes, same `checkEvidence`, same ownership rules — nothing about
- * liveness is re-invented here.
- *
- * Inputs:
- *   declaration — the parsed `.claude/batch-in-flight.json`, or null
- *   lock        — the parsed batch lock, whose owner the declaration must belong to
- *   now, maxAgeMs, and the four probes of `checkEvidence`
- *
- * Returns { declared, advancing, declaredAt, reason, summary, items }:
- *   advancing  — something the declaration names moved inside its freshness window.
- *                Judged on the EVIDENCE alone, so it holds however old the
- *                declaration is: an agent that is still committing is still
- *                building, whatever the paperwork's timestamp says.
- *   declared   — there is a CURRENT declaration, so its silence means something.
- *                Goes false once the declaration ages past `maxAgeMs`, and that is
- *                deliberate: a stale declaration says nothing about what the
- *                session is doing NOW (it may well be inside one long verification
- *                run), so it must not be allowed to tighten the wedge bound.
- *                `maxAgeMs` defaults to `LAUNCHER_WORK_MAX_AGE_MS`, NOT to the
- *                guard's `IN_FLIGHT_MAX_AGE_MS`: with the guard's 45 minutes here
- *                the stall verdict this feeds is arithmetically unreachable (see
- *                that constant). The staleness that actually matters — a session
- *                that went on working after declaring — is caught by `lastWord`
- *                in `assessOwner`, not by this clock.
- *   declaredAt — WHEN it was declared, passed through so `assessOwner` can ask the
- *                second question the four-eyes review found missing (finding 1.1):
- *                is this declaration still the owner's LAST WORD, or did the
- *                session go on working after writing it? A heartbeat newer than
- *                `declaredAt` answers that without any new notion of liveness.
- */
 /**
  * WHAT MAY CORROBORATE AN EXPIRED LEASE. PURE, and deliberately NOT `judgedOn`.
  *
@@ -2424,13 +2359,46 @@ export const UNANSWERABLE_DETAILS = new Set([
  *
  * PRODUCED output wins over a bare pid: 'git' > 'log' > 'process' > 'none'.
  */
-export function corroborationJudgedOn(items = []) {
+function corroborationJudgedOn(items = []) {
   const ok = (Array.isArray(items) ? items : []).filter((i) => i?.ok === true)
   if (ok.some((i) => OUTPUT_KINDS.has(i.kind))) return 'git'
   if (ok.some((i) => i.kind === 'log')) return 'log'
   return ok.some((i) => i.kind === 'pid') ? 'process' : 'none'
 }
 
+/**
+ * IS THE LOCK OWNER'S DECLARED WORK STILL ADVANCING? PURE.
+ *
+ * The LAUNCHER's question, and it is not the guard's. `assessInFlight` asks "may
+ * THIS session end its turn", so it demands that ALL evidence still holds (bar a
+ * silent log beside moving output) and, where no output moves, that the
+ * declaration has not aged out. The launcher asks the narrower one that
+ * feeds the lease takeover (point 402 (c)): is ANY of
+ * the declared work still moving? A session with three agents out and two of them
+ * finished is plainly alive, and shooting it would be the exact failure this
+ * whole point exists to end.
+ *
+ * Same probes, same `checkEvidence`, same ownership rules — nothing about
+ * liveness is re-invented here.
+ *
+ * Inputs:
+ *   declaration — the parsed `.claude/batch-in-flight.json`, or null
+ *   lock        — the parsed batch lock, whose owner the declaration must belong to
+ *   now, maxAgeMs, and the four probes of `checkEvidence`
+ *
+ * Returns { declared, advancing, declaredAt, reason, summary, items, judgedOn,
+ * corroboratedBy }:
+ *   advancing  — something the declaration names moved inside its freshness window.
+ *                Judged on the EVIDENCE alone, so it holds however old the
+ *                declaration is: an agent that is still committing is still
+ *                building, whatever the paperwork's timestamp says.
+ *   declared   — there is a CURRENT declaration (not from the future, not older
+ *                than `maxAgeMs`, which defaults to `LAUNCHER_WORK_MAX_AGE_MS`,
+ *                the launcher's reporting window — see that constant).
+ *   declaredAt — WHEN it was declared, passed through for the report.
+ *   judgedOn   — `evidenceVerdict`'s ranking, for messages.
+ *   corroboratedBy — `corroborationJudgedOn`'s ranking, for the lease takeover.
+ */
 export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WORK_MAX_AGE_MS, ...probes } = {}) {
   const out = (o) => ({
     declared: false,
@@ -2460,8 +2428,8 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
   // belongs where a declaration shields something: `declarationShields`.
   const declaredAt = declaration.at
   const ageMs = now - declaredAt
-  // A declaration from the future is a clock this cannot reason about → the same
-  // as an aged-out one: no bearing on the present.
+  // A declaration from the future is a clock this cannot reason about → not
+  // CURRENT, the same as an aged-out one; its evidence is still probed below.
   const current = ageMs >= 0 && ageMs <= maxAgeMs
 
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []

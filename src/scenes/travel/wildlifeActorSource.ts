@@ -72,7 +72,7 @@ export function pushHerdActors(
 
 /** The little of a drawn scene node these sources read — structural, so the
  *  matrix below runs without a renderer. */
-export interface DrawnGroup {
+interface DrawnGroup {
   visible: boolean
   matrixWorld: { elements: ArrayLike<number> }
 }
@@ -101,7 +101,7 @@ export function pushHuntActor(
 }
 
 /** A flock group: each bird is its own object under it (design.md §19.6). */
-export interface FlockGroup {
+interface FlockGroup {
   visible: boolean
   children: readonly { matrixWorld: { elements: ArrayLike<number> } }[]
 }

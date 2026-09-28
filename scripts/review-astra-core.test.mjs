@@ -6,6 +6,7 @@
 // preference in both directions.
 import { describe, expect, it } from 'vitest'
 import { reviewIdentityProblem, validateRecord, VERDICTS } from './mechanism-review-core.mjs'
+import { modelTrailerIdentities } from './model-guard-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -22,14 +23,12 @@ import {
   formatReviewReport,
   isUnknownModelRefusal,
   modelsInTrailerField,
-  modelsInCommitMessage,
   newFilePathsIn,
   OUTCOME,
   parseVerdict,
   PROBE_MAX_AGE_MS,
   probeFreshness,
   savedAuthPathFrom,
-  claudeReviewerFor,
   CLAUDE_REVIEW_CHAIN,
   astraAuthored,
   SECOND_FALLBACK_MODEL_NAME,
@@ -385,7 +384,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
     expect(decideReview({ ...failed, fableState: FABLE_OFF }).model).toBe(OPUS_MODEL)
     expect(fallbackReviewerFor('', FABLE_OFF)).toBe(OPUS_MODEL)
-    expect(claudeReviewerFor(['GPT-5.6 Sol', OPUS_MODEL], FABLE_OFF)).toBe(OPUS_FALLBACK_MODEL)
+    expect(decideReview({ authorModel: ['GPT-5.6 Sol', OPUS_MODEL], fableState: FABLE_OFF }).model).toBe(OPUS_FALLBACK_MODEL)
     expect(decideReview({ ...failed, authorModel: [OPUS_MODEL, OPUS_FALLBACK_MODEL], fableState: FABLE_OFF })).toMatchObject({
       model: '',
       chain: [OPUS_MODEL, OPUS_FALLBACK_MODEL],
@@ -411,7 +410,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
   })
 
   it('reads the reviewer separately, so reviewer credit is not authorship', () => {
-    const identities = modelsInCommitMessage(
+    const identities = modelTrailerIdentities(
       'Separate review identity\n\n' +
         `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\n` +
         'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>\n',
@@ -439,7 +438,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
         [`${CLAUDE_MODEL} <noreply@anthropic.com>`, 'GPT-5.6 Sol <noreply@openai.com>'],
       ],
     ]) {
-      const identities = modelsInCommitMessage(
+      const identities = modelTrailerIdentities(
         `${sha}\n\n` +
           lines.map((line) => `Co-Authored-By: ${line}`).join('\n') +
           '\n',
@@ -984,12 +983,12 @@ describe('the reversed direction — where SOL authored', () => {
 
   it('hands a Sol-authored range to Opus 5 — the model that also lands it', () => {
     expect(CLAUDE_REVIEW_CHAIN[0]).toBe(OPUS_MODEL)
-    expect(claudeReviewerFor(ASTRA_COMMIT)).toBe(OPUS_MODEL)
+    expect(decideReview({ authorModel: ASTRA_COMMIT }).model).toBe(OPUS_MODEL)
     // …and skips a Claude model that authored part of the range.
-    expect(claudeReviewerFor([ASTRA_COMMIT, `${CLAUDE_MODEL} <x@y>`])).toBe('Fable 5.1')
-    expect(claudeReviewerFor([ASTRA_COMMIT, `${CLAUDE_MODEL} <x@y>`, 'Claude Fable 5.1 <x@y>'])).toBe(OPUS_FALLBACK_MODEL)
+    expect(decideReview({ authorModel: [ASTRA_COMMIT, `${CLAUDE_MODEL} <x@y>`] }).model).toBe('Fable 5.1')
+    expect(decideReview({ authorModel: [ASTRA_COMMIT, `${CLAUDE_MODEL} <x@y>`, 'Claude Fable 5.1 <x@y>'] }).model).toBe(OPUS_FALLBACK_MODEL)
     // Every candidate authored part of it: no reviewer, said plainly.
-    expect(claudeReviewerFor([ASTRA_COMMIT, `${CLAUDE_MODEL}`, 'Claude Fable 5.1', 'Claude Opus 4.8'])).toBe('')
+    expect(decideReview({ authorModel: [ASTRA_COMMIT, `${CLAUDE_MODEL}`, 'Claude Fable 5.1', 'Claude Opus 4.8'] }).model).toBe('')
   })
 
   it('refuses to record a SUCCESSFUL Sol run over a range Sol authored', () => {

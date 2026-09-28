@@ -6,8 +6,9 @@
 // on 07.08.2026 `polish` could not exit 0 for reasons belonging to OTHER points:
 // the render-target assert of point 546 fired as a console error on both
 // backends (fixed and ticked 08.08.2026 — its entry left with the tick, which is
-// the expiry working), and the goat-stance check reds on the software WebGPU
-// lane (point 506). Every change under scripts/verify/ — even a pure comment
+// the expiry working), and the goat-stance check reds on the WebGPU lane (then
+// point 506, since folded into 642; its software-lane premise was refuted, see
+// the goat entry). Every change under scripts/verify/ — even a pure comment
 // diff — could then only be cleared by a hand-written `--defer`, and a gate
 // routinely overridden by hand stops being a gate.
 //
@@ -22,12 +23,13 @@
 //   - `point` names an OPEN work-order point that describes THIS red. A red
 //     nobody has filed gets a point first, not a ledger entry.
 //   - Scope as NARROWLY as the evidence allows: `suite` and `backend` restrict
-//     where the charge applies. A check that reds only on the software WebGPU
-//     lane must stay a real red on WebGL 2.
+//     where the charge applies. A check that reds only on the WebGPU lane must
+//     stay a real red on WebGL 2.
 //   - `match` is tested against the red's printed name (a failing check's label,
 //     or `console error: <normalised text>` for a console pseudo-check). Match on
 //     the stable part of the wording, never on a measured number.
-//   - `why` is one dated sentence: the evidence that this red is that point's.
+//   - `why` is the dated evidence that this red is that point's, as short as the
+//     evidence allows.
 //
 // The Vitest sweep (render-verify-core.test.mjs) pins the shape of every entry
 // and that each one still names a point the work order holds open.
@@ -37,7 +39,7 @@
  * @property {number} point    the OPEN work-order point that owns this red
  * @property {RegExp} match    tested against the red's printed name
  * @property {RegExp} [detailMatch] when present, the printed measurement must match too
- * @property {string} why      one dated sentence of evidence
+ * @property {string} why      the dated evidence
  * @property {string} [suite]  only this suite's reds (omitted: any suite)
  * @property {'webgpu'|'webgl'} [backend] only this backend's reds (omitted: both)
  * @property {'core'|'compatibility'} [featureLevel] only runs recorded AT that WebGPU
@@ -163,11 +165,10 @@ export const RED_CHARGES = [
     suite: 'startup',
     backend: 'webgl',
     kind: 'console',
-    // THE LAST LANE COMBINATION POINT 939 STILL LACKED. Its siblings cover
-    // webgpu/startup, webgpu/polish, webgpu/report and webgl/polish; the same
-    // Vite transient reached webgl/startup and was therefore unaccounted, which
-    // is the rule of this table working rather than failing — an entry excuses
-    // only the lane its evidence measured.
+    // A LANE COMBINATION POINT 939 LACKED WHEN THIS WAS WRITTEN: the same Vite
+    // transient reached webgl/startup and was therefore unaccounted, which is the
+    // rule of this table working rather than failing — an entry excuses only the
+    // lane its evidence measured.
     match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
     why:
       'MEASURED 16.09.2026 at 22:43:12Z on main, webgl/startup, and again 26 seconds later on the '
@@ -231,8 +232,8 @@ export const RED_CHARGES = [
       + 'the stereo separation and the limiter ceiling — and all three frames were written. It is '
       + 'a cold or invalidated Vite optimize-dep cache re-bundling while the suite page is already '
       + 'open, the environment transient CLAUDE.md §7.2 tells us to fail soft on, and the identical '
-      + 'reading point 939 already owns on webgpu/startup, webgpu/report, webgpu/polish, '
-      + 'webgpu/settings, webgl/startup and webgl/polish. Nothing of the code under test reaches '
+      + 'reading point 939 already owns on the other lanes its entries here name. Nothing of the '
+      + 'code under test reaches '
       + 'it. The run was also taken on a LOADED machine and the runner said so itself, so it is '
       + 'not treated as a timing verdict; the charge covers the transient, not the machine. The '
       + 'charge dies with point 939.',
@@ -251,7 +252,7 @@ export const RED_CHARGES = [
       + '12.09.2026 00:04:47Z (head bf27c94e6) recorded exactly two reds — the ground-detail check, '
       + 'already owned by point 514, and this 504 console error, which no point owned. It is the '
       + 'same cold Vite optimize-dep cache re-bundling while the suite pages are open that point '
-      + '939 already owns on webgpu/startup, webgpu/report, webgpu/polish and webgl/polish, and it '
+      + '939 already owns on the other lanes its entries here name, and it '
       + 'came in a night of five settings runs whose other reds are all accounted. Nothing of the '
       + 'code under test reaches this reading. The charge dies with point 939.',
   },
@@ -270,8 +271,9 @@ export const RED_CHARGES = [
       'b2f6f5f5 (worst standstill 7632 / 8167 / 7833 / 7801 ms against the 4000 ms budget, ' +
       'blocked thread ~3.3 s, ~2.3 s inside one animation frame): the readings sit within 7 % of ' +
       'each other at load average 3.1-4.7, where a load artefact scatters, so it is reproducible ' +
-      'and not the machine. 733 owns naming whether the freeze belongs to the app or to the ' +
-      'compatibility adapter the restored lane rides, and the charge dies with that point. ' +
+      'and not the machine. 733 owned naming whether the freeze belongs to the app or to the ' +
+      'compatibility adapter the restored lane rides (the WebGL 2 entry below reads it as the app, ' +
+      '26.09.2026), and the charge dies with that point. ' +
       'SCOPED TO THAT LANE 28.08.2026 (cross-vendor review): the entry carried neither backend ' +
       'nor level while its own evidence names one restored compatibility adapter, so it would ' +
       'have excused the same freeze on WebGL 2 and on the core adapter, where nobody has ever ' +
@@ -290,8 +292,8 @@ export const RED_CHARGES = [
       'WIDENED TO WEBGL 2 26.09.2026 BY THE CLOSING RUN (point 633 names this measurement). The ' +
       'LARGE on a4e1a811a read 4026 ms on webgl/startup; five further runs on the same HEAD at ' +
       'load 2.3-2.6 read 3962 / 4020 / 3998 / 3981 ms plus three passes - the freeze sits on the ' +
-      '4000 ms budget with the webgpu shape (~1.3 s blocked thread, ~2.7 s inside one animation ' +
-      'frame), so it is the app, not the compatibility adapter. The core-adapter lane stays ' +
+      '4000 ms budget with a similar shape (~1.3 s blocked thread, ~2.7 s inside one animation ' +
+      'frame, against WebGPU\'s ~3.3 s / ~2.3 s), so it is the app, not the compatibility adapter. The core-adapter lane stays ' +
       'unmeasured and uncharged. The charge dies with point 733.',
   },
   {
@@ -306,13 +308,9 @@ export const RED_CHARGES = [
       'construction, so an acceptance meant to outlive point 666 cannot be charged to it — ' +
       '694 holds it until the measure is sharpened or the acceptance is made permanent. ' +
       'DECISION (b), 14.08.2026: accept only the measured WebGL 2 composition, at its named ' +
-      'expected live rate of one run in ten; a different backend or a detail other than exactly ' +
-      '1.29 m walked inside 0.32 m stays unaccounted and red. The player-visible WebGPU standstill ' +
-      'was not this accepted window: the reported-seed replay reproduced child 3 shivering ' +
-      'permanently because every 0.9 m anchor crossing reset the rescue clock. The behavior fix ' +
-      'now completes that clock, carries the child 2.30 m once, and leaves the remaining 88 s ' +
-      'clean at both trace scales. Inherited by 666 at the 657 tick (13.08.2026), exactly as 666 ' +
-      'was filed to do; a third ' +
+      'expected live rate of one run in ten; a detail other than exactly 1.29 m walked inside ' +
+      '0.32 m stays unaccounted and red under this entry (the WebGPU composition has its own ' +
+      'entry below). A third ' +
       'trigger of the same window — the way-round sign boundary inside the release ramp, cure ' +
       'measured and rejected 13.08.2026 (evadeHeading ramp comment) — is charged with it. ' +
       'RESIDUAL after the point-657 second round (measured 13.08.2026 on the deterministic ' +
@@ -355,16 +353,6 @@ export const RED_CHARGES = [
       'PREDATES the point-666 rescue fix — 666 measured it at 0.31 % on a live-cadence replay ' +
       'seed before that fix existed, the same magnitude as today\'s 0.29 % — but that says ' +
       'nothing about its RATE after the fix, which is unmeasured and is point 694\'s to measure. ' +
-      'A detailMatch ENTRY USED TO WORK FORWARD ONLY, and no longer does (measured 14.08.2026, ' +
-      'repaired 28.08.2026 under point 734, pinned by a Vitest case): the parser hands chargeReds ' +
-      'the printed detail, so the owner was stamped while the run was RECORDED — but the record ' +
-      'kept name/key/kind/point and DROPPED the detail, so a red already on disk could never be ' +
-      'charged afterwards. This one was not, which is why closing it took a deferral and a re-run ' +
-      'rather than the charge the ledger advertises. The record now keeps the measurement (200 ' +
-      'characters, the same text the charge was matched against), so an entry written today owns ' +
-      'a red recorded today onwards. Reds recorded BEFORE that repair carry no detail and stay ' +
-      'out of reach of a detailMatch entry — the information was never written down, and nothing ' +
-      'can recover it. ' +
       'It disproves the backend scoping of the entry above — the artefact is the one-second ' +
       'window meeting a live dt cadence, not a renderer — and it shows why a signature keyed to a ' +
       'measured number cannot cover a stochastic artefact: this run minted a new one. Both ' +
@@ -381,15 +369,6 @@ export const RED_CHARGES = [
   {
     // RE-POINTED 20.08.2026: point 506 was folded into 642, and a charge to a ticked point
     // expires. 642 carries 506's mechanism, so it owns this red now.
-    // THE STATED REASON NO LONGER HOLDS AS WRITTEN. 506 argued from a SOFTWARE WebGPU lane.
-    // Measured today with scripts/verify/backend-lane-check.mjs: BOTH lanes are hardware-backed
-    // on the same GPU and WebGPU reports COMPATIBILITY level. That refutes the software premise
-    // and nothing more — it does not measure the two lanes' rates against each other and it
-    // does not show what causes the stance red. (The cross-vendor review of 20.08.2026 refused
-    // the causal reading this comment first carried, and it was right to.) Point 725 disputes
-    // the artefact reading altogether. So this entry is a stopgap on contested ground: it keeps
-    // the release branch honest, and 642 owes the measurement that decides whether the red is a
-    // lane artefact or a product defect.
     point: 642,
     suite: 'polish',
     backend: 'webgpu',
@@ -474,79 +453,19 @@ export const RED_CHARGES = [
       'msaa-texture/view/command-buffer and async-pipeline errors are its downstream. Read off the ' +
       'two 13.08.2026 webgpu/settings records, where they sit beside the checks the entry above ' +
       'already charges, and BOTH recorded featureLevel=compatibility. Scoped to that LEVEL as well ' +
-      'as to suite, backend and kind (cross-model review, 19.08.2026: three of the texts are ' +
-      'generic WebGPU cascade wording, so unscoped they would excuse a real defect on the CORE ' +
+      'as to suite, backend and kind (cross-model review, 19.08.2026: the cascade texts were ' +
+      'generic WebGPU wording, so unscoped they would have excused a real defect on the CORE ' +
       'adapter the player runs). On core each of these stays a real red, and the charge dies with ' +
       'point 514.',
-    // The RGBA16Float alternative names the ONE evidenced validation error —
-    // "The texture format (TextureFormat::RGBA16Float) does not sup[port
-    // multisampling]", as the recorded names carry it (cut by the 120-char
-    // normalisation) — never the bare format name: a different RGBA16Float
-    // fault on this lane is NOT the measured cascade and must stay red
-    // (round-5 review, 19.08.2026).
-    //
-    // AND WHAT THAT ALTERNATIVE DOES NOT COVER, PLAINLY (review finding,
-    // 28.08.2026): it ends at `does not sup` because that is where the STORED
-    // NAME ends — measured over the 45 distinct console identities in
-    // local/verify-baseline-logs, every one of these texts is 138-165
-    // characters and the record keeps 15 + 120. The operation that would
-    // distinguish this validation error from another RGBA16Float
-    // unsupported-operation cascade is therefore not in the record at all, so
-    // such a cascade on this lane WOULD be charged here. What holds the entry
-    // narrow instead is the rest of its scope — this suite, this backend, the
-    // console kind, and the compatibility feature level — and the fact that the
-    // charge dies with point 514.
-    //
-    // AND THE MSAA TEXTURE ALTERNATIVE CARRIES ITS SENTENCE (review finding,
-    // 28.08.2026, round 19). It read the OBJECT NAME alone — `Invalid Texture
-    // "output-msaa"` — which any future defect touching either attachment would
-    // have printed, and it would have been charged here retroactively. More of
-    // the measured text fits: the stored name keeps 15 + 120 characters, and the
-    // whole sentence is 127, so `… is invalid due to a previous` survives the
-    // cut for both attachment names. The alternative is that, and a downstream
-    // sentence about either texture from any OTHER validation error stays red.
-    //
-    // THE THREE GENERIC ALTERNATIVES ARE REPLACED BY THE CASCADE'S OWN
-    // SIGNATURE (review finding, 28.08.2026). `Invalid TextureView` and
-    // `Invalid CommandBuffer from CommandEncoder` are ordinary WebGPU object
-    // names: they say nothing about a cause, and a charge reads ONE red at a
-    // time, so an unrelated settings defect printing either would have been
-    // charged here retroactively.
-    //
-    // AND THAT SENTENCE IS ABOUT *THIS* ENTRY'S SCOPE, NOT A BAN (cross-vendor
-    // review, 01.09.2026): entries further down DO carry those object names as
-    // their whole signature. They may, because each was measured on this one
-    // lane and is scoped to suite, backend, compatibility level and console
-    // kind, and each dies with point 514 — the scope does the work the cause
-    // cannot. What stays forbidden is what this comment was written against: an
-    // entry HERE, whose evidence is the RGBA16Float root, reaching those names
-    // as a bare alternative.
-    //
-    // THE DOWNSTREAM SENTENCE IS NOT SELF-LIMITING, AND THIS ENTRY NO LONGER
-    // CLAIMS IT IS (review finding, 28.08.2026). The earlier wording argued
-    // that `is invalid due to a previous error` may be owned wholesale because
-    // the ROOT it points back to is a red of its own that nothing here charges.
-    // A charge sees ONE red, never the run, so nothing verifies that the root
-    // is present and still uncharged in the SAME record — a lone downstream
-    // message, with its root gone or already excused, was owned outright. The
-    // alternative is therefore cut down to the object name the storm was
-    // MEASURED with (`[Invalid TextureView]`, in the uncaptured-validation
-    // form, never the async-pipeline one), so a downstream sentence from any
-    // other object stays a real red. Verifying the root in the record needs a
-    // charge that can read the whole run, which this mechanism does not have;
-    // that is POINT 990, which owns it, rather than something argued away here.
-    // Round 21 raised the same reading again: until 990 lands, suite, backend,
-    // the compatibility level, the console kind and the measured sentence are
-    // the whole of this scope, and the charge dies with point 514 in any case.
-    //
-    // ONE ALTERNATIVE, ONE DETAIL — SO THEY CANNOT CROSS (review finding,
-    // 28.08.2026, round 22). `match` and `detailMatch` are asked
-    // independently, so a red whose NAME was the RGBA16Float root could pass the
-    // narrow half on an `Invalid TextureView` sentence somewhere else in its
-    // detail — the opposite of what the root alternative claims to require. The
-    // measured sentences are the same in both halves now, which couples them:
-    // the root's detail must name multisampling, and each downstream sentence
-    // must name its own object.
+    // THE ROOT ONLY. This entry charges the one evidenced validation error, the
+    // RGBA16Float multisampling root; each downstream sentence (the two MSAA
+    // attachments, the TextureView) has its own entry below, so a name and a
+    // detail cannot be satisfied by two different sentences (review rounds 22
+    // and 23, 28.08.2026). The stored NAME ends at `does not sup`; the detail
+    // below decides which unsupported operation it was. Whether the root sits
+    // uncharged in the same record needs a charge that reads the whole run —
+    // POINT 990's; until then suite, backend, compatibility level and console
+    // kind are the scope, and the charge dies with point 514.
     match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup/i,
     // AND THE ROOT IS READ OFF THE DETAIL, WHERE ITS SENTENCE SURVIVES WHOLE
     // (review finding, 28.08.2026, round 20). The stored NAME keeps 120
@@ -562,8 +481,8 @@ export const RED_CHARGES = [
     // which is the honest answer and not a charge.
     detailMatch: /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not support multisampling/i,
   },
-  // THE TWO DOWNSTREAM SENTENCES GET THEIR OWN ENTRIES (review finding,
-  // 28.08.2026, round 22). One entry cannot pair a name alternative with a
+  // THE DOWNSTREAM SENTENCES GET THEIR OWN ENTRIES (review finding,
+  // 28.08.2026, round 22; the two MSAA attachments split again in round 23). One entry cannot pair a name alternative with a
   // detail alternative: `match` and `detailMatch` are asked independently, so a
   // red NAMED for the root passed the narrow half on a TextureView sentence
   // somewhere else in its detail — the opposite of what the root claims to
@@ -578,10 +497,10 @@ export const RED_CHARGES = [
     featureLevel: 'compatibility',
     kind: 'console',
     why:
-      'THE MSAA ATTACHMENT HALF of the cascade the entry above describes in full, split out ' +
-      '28.08.2026 (round 22) so its name and its measured sentence cannot be satisfied by a ' +
-      'different alternative. Read off the two 13.08.2026 webgpu/settings records, where both ' +
-      'attachments print this sentence beside the root. On the core adapter, on WebGL 2, in ' +
+      'THE OUTPUT-MSAA ATTACHMENT of the cascade the root entry above describes, split out ' +
+      '28.08.2026 (rounds 22 and 23) so its name and its measured sentence cannot be satisfied by a ' +
+      'different alternative. Read off the two 13.08.2026 webgpu/settings records, where this ' +
+      'attachment prints this sentence beside the root. On the core adapter, on WebGL 2, in ' +
       'another suite or as a CHECK it stays a real red, and the charge dies with point 514.',
     match: /^console error: THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid Texture "output-msaa"\] is invalid due to a previous/i,
     detailMatch: /^THREE\.WebGPURenderer: Uncaptured WebGPU GPUValidationError: \[Invalid Texture "output-msaa"\] is invalid due to a previous error/i,
@@ -613,8 +532,8 @@ export const RED_CHARGES = [
     why:
       'THE TEXTURE-VIEW HALF of the same cascade, split out 28.08.2026 (round 22) for the same ' +
       'reason. It is the ONE downstream object name the storm was measured with, in the ' +
-      'uncaptured-validation form; the separately measured ShadowMaterial async-pipeline form ' +
-      'has its own narrow entry below. ' +
+      'uncaptured-validation form; the separately measured async-pipeline form has its own ' +
+      'entry below, narrowed to four pipeline classes. ' +
       'What this entry still cannot ask is whether the root it points back to is present and ' +
       'uncharged in the same record: a charge reads ONE red and never the run around it, which ' +
       'is POINT 990. On core, on WebGL 2, in another suite or as a CHECK it stays a real red, ' +
@@ -709,7 +628,7 @@ export const RED_CHARGES = [
     match: /handover zone itself carries neither band.s edge/i,
     why:
       'The SECOND half of the same rim measurement: it reads red beside the "SAME water" check ' +
-      'above, in the same adult-errands rotation, whenever that one does — measured 22.09.2026 ' +
+      'below, in the same adult-errands rotation, whenever that one does — measured 22.09.2026 ' +
       'on WebGPU (compatibility) at 02eec84 with the rim zone 13/94/105 against the water either ' +
       'side, step 42 — and it is the same unresolved question point 568 owns: whether the sample ' +
       'is taken too early or the rim seam is real.',
@@ -723,8 +642,8 @@ export const RED_CHARGES = [
     why:
       'The rim measurement\'s second half, now measured on WebGL 2 as well — 22.09.2026 at ' +
       'e1b7d1561, rim zone 3/82/97 against the water either side, step 60.2 (63.6, 57.3, 60.2), ' +
-      'in the same adult-errands run whose SAME-water check read step 114.4. The WebGPU entry ' +
-      'above says in its own words that a backend stays uncharged until someone measures it ' +
+      'in the same adult-errands run whose SAME-water check read step 114.4. The SAME-water WebGPU ' +
+      'entry below says in its own words that a backend stays uncharged until someone measures it ' +
       'there; this is that measurement, and it changes nothing about the open question point ' +
       '568 owns — whether the sample is taken too early or the rim seam is real.',
   },
@@ -780,7 +699,8 @@ export const RED_CHARGES = [
     match: /^frame 15-worldmodel-victoria-falls\b/i,
     // NARROWED TO THE MEASURED FAILURE MODE (review finding, 28.08.2026, round
     // 25). Its evidence covers one way this frame reds — the subject missing
-    // from the rendered picture — and unlike the three entries point 995 owns,
+    // from the rendered picture — and unlike the three entries whose re-recording
+    // point 995 owns,
     // this one accounts for no recorded red today, so reading the detail costs
     // nothing and a different failure of the same frame stays a real red. A
     // record written before the detail was kept carries none and is out of
@@ -812,8 +732,8 @@ export const RED_CHARGES = [
       '"its subject is not in the rendered picture: off the left and bottom edge of the frame" — ' +
       'twice including the suite own retry, while the six other landmark frames pass and the same ' +
       'suite on WebGL 2 passes all seven in the same sitting. The signature has ROTATED from one ' +
-      'landmark to another, which decides the second of the two causes point 627 had to choose ' +
-      'between, and it stays 627 until the unsettled jump is fixed at its cause.' +
+      'landmark to another, which rules out the second of the two causes point 627 had to choose ' +
+      'between (a real placement change), and it stays 627 until the unsettled jump is fixed at its cause.' +
       'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
       'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
       'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
@@ -869,7 +789,7 @@ export const RED_CHARGES = [
       'red — Vite re-bundling its dependency optimizer in the middle of the run, an environment ' +
       'transient by CLAUDE.md own classification and not a product defect, captured by the ' +
       'recorder as an ordinary console red. Point 939 was opened for exactly this red and owns it ' +
-      'until the lane is made immune or the text is classified as environment.' +
+      'until the lane is made immune or the recorder treats the text as the environment transient it is.' +
       'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), with every other ' +
       'WebGPU entry: an entry may excuse only the lane its evidence measured, and on the CORE ' +
       'adapter the player runs this red stays real. Measured that day across the 40 recorded ' +
@@ -909,9 +829,8 @@ export const RED_CHARGES = [
       + 'Measured 06.09.2026 10:13Z on main (0e53f9ce2), webgpu/benchmark at recorded '
       + 'featureLevel=compatibility: the dev server answered a request with 504 while the run was '
       + 'open, which CLAUDE.md §7.2 classifies as an environment transient rather than a product '
-      + 'defect. 939 already holds it as a startup/webgpu console red, as a report/webgpu check '
-      + 'and as a polish/webgl console red, and each entry excuses only the lane its evidence '
-      + 'measured — this is the fourth lane it has now been measured on. The run\'s other eight '
+      + 'defect. 939 already holds it on its other lanes, and each entry excuses only the lane its '
+      + 'evidence measured. The run\'s other eight '
       + 'reds are the ones points 1009 and 1012 describe and are untouched here. The charge dies '
       + 'with point 939.',
   },
@@ -968,7 +887,7 @@ export const RED_CHARGES = [
       'subject on the WebGPU compatibility lane while the WebGL 2 run of the same suite minutes ' +
       'apart did not, and its final state — the wait after a jump polling the camera arrival ' +
       'instead of counting milliseconds — is the cause this red has; it is 514 until that lands. ' +
-      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), like the two ' +
+      'SCOPED TO THE COMPATIBILITY LEVEL 28.08.2026 (cross-vendor review), like the ' +
       'webgpu/settings entries above and for the same reason: the evidence names a lane fault, so ' +
       'unscoped this entry would retroactively excuse the same frame on the CORE adapter the player ' +
       'runs, where it stays a real red. The narrowing changes no evidence — the 17.08.2026 08:25 ' +
@@ -994,7 +913,8 @@ export const RED_CHARGES = [
       + '`--section=children-bank-game` read the hold to "ended false" with 0 readings, and the '
       + 'retry of the same section ran 27 pass / 0 fail — the same red-then-green signature 1119 '
       + 'records from 12.09.2026, where it read 137 readings and "ended false" under a measured '
-      + 'load. Scoped to the lane and the section it has been seen in: nothing here excuses these '
+      + 'load. Scoped to the lane (the entry has no section field; its match names that section\'s '
+      + 'arrival checks): nothing here excuses these '
       + 'checks on WebGPU, where the same pass ran them green. The charge dies with 1119, whose '
       + 'first step is the throttle probe that decides between the check\'s frame budget and the '
       + 'arrival hold itself.',
@@ -1158,7 +1078,7 @@ export const RED_CHARGES = [
     // finding). The crossing line is 223 characters, so EVERY record of it is
     // cut at 200 — and a cut measurement may answer only an entry that says in
     // its own voice that its signature reads the front and the missing tail
-    // cannot matter. This one does: it needs the crossing count and the phase
+    // cannot matter. This one does: it needs the crossing sentence and the phase
     // list with a positive `run×`, both of which stand at character 178 of the
     // kept text, 22 characters clear of the bound. What the bound removes is the
     // ` over 45s played, 3 tagged` epilogue, which the signature never reads and
@@ -1181,7 +1101,7 @@ export const RED_CHARGES = [
       + '698, and on a CORE adapter this check was never measured and stays a real red. '
       + 'AND IT READS THE FRONT OF A MEASUREMENT THE RECORD CUT (detailReadsPrefix): the crossing '
       + 'line is 223 characters, so every record of it is cut at the 200-character bound. The '
-      + 'signature needs the crossing count and a positive `run×` in the phase list, and both '
+      + 'signature needs the crossing sentence and a positive `run×` in the phase list, and both '
       + 'stand 22 characters clear of that bound; what the bound removes is the '
       + '" over 45s played, 3 tagged" epilogue, which the signature never reads and which cannot '
       + 'turn a running round into a broken one.',
@@ -1301,7 +1221,8 @@ export const RED_CHARGES = [
       + 'DETAIL-SCOPED, not merely name-scoped: "no console errors" is a generic assertion, so '
       + 'without detailMatch this entry would have excused ANY console error the benchmark ever '
       + 'reports. Only the measured RGBA16Float sentence is excused; every other console error in '
-      + 'this suite stays a real red, on this lane as on any other. The charge dies with 514.',
+      + 'this suite stays a real red under this entry (another entry may own its own, as 939 owns '
+      + 'the 504). The charge dies with 514.',
   },
   {
     point: 927,
@@ -1327,11 +1248,11 @@ export const RED_CHARGES = [
       + 'the identical tree passes the report suite whole on WebGL 2 with all four members '
       + 'present. The 29.08.2026 LARGE run on feat/687-roam-bound-fixes reproduces exactly the '
       + 'three checks 927 lists, twice, on the WebGPU lane. '
-      + 'BACKEND-SCOPED for the reason the point itself measured: on WebGL 2 these three stay real '
+      + 'BACKEND-SCOPED for the reason the point itself measured: on WebGL 2 these two stay real '
       + 'reds, because there the picture is there and its absence would be a NEW defect. '
       + 'LEVEL-SCOPED like every other WebGPU entry in this ledger: 927 recorded no feature '
       + 'level, while BOTH runs that reproduce it here carry featureLevel=compatibility, so the '
-      + 'core adapter the player runs was never measured and the same three checks stay red '
+      + 'core adapter the player runs was never measured and the same two checks stay red '
       + 'there. This entry accounts for the red; it does '
       + 'not soften it — 927 is criticality HIGH and the archive is a broken channel to the user '
       + 'until it lands.',
@@ -1399,8 +1320,8 @@ export const RED_CHARGES = [
     // sharpest discriminator (it stood at 0.00 % while the one-second reading
     // reddened), is NOT in the text a charge can read. The scope is therefore
     // everything the record does hold, spelled out rather than left to a
-    // wildcard: the group share under a tenth of a percent, its window count and
-    // the judgeability reading. A sustained tread — a group share of 1 % or more,
+    // wildcard: the group share under 0.2 %, its window count and
+    // the judgeability reading. A sustained tread — a group share of 0.2 % or more,
     // or a red without the judgeability line — is a different composition and
     // stays a real red.
     // READS ONLY THE FRONT, and says so: the record cuts at 200 characters, which
@@ -1411,13 +1332,13 @@ export const RED_CHARGES = [
     // WORSE than what is charged here, and a worse one is a different
     // composition — but it is also unreadable by construction, so this entry
     // deliberately owns the whole of it: a tread that the one-second series puts
-    // under a tenth of a percent is the transient this charge is for, whatever
+    // under 0.2 % is the transient this charge is for, whatever
     // the cut hides. The threshold sentence is a constant the check prints.
     // THE INDEX ADMITS THE SENTINEL -1 (widened 17.09.2026, see the second
     // measurement in `why`). A one-second series that found NO offending window
     // at all prints `worst child -1` instead of a real index — strictly weaker
-    // than the composition already charged here, and the group-share cap of a
-    // tenth of a percent still binds, so a sustained tread cannot slip through
+    // than the composition already charged here, and the group-share cap of
+    // 0.2 % still binds, so a sustained tread cannot slip through
     // on the widened index.
     detailReadsPrefix: true,
     detailMatch:
@@ -1433,12 +1354,13 @@ export const RED_CHARGES = [
       + 'the record keeps everything up to the words "In 0.5s bursts: worst" and no further. WHAT '
       + 'THE BOUND REMOVES is the burst series and the constant threshold sentence the check always '
       + 'prints. The signature stops after the judgeability reading, well clear of that bound, and '
-      + 'reads only numbers the record really holds: the one-second group share under a tenth of a '
-      + 'percent, its window count, and the judgeability shares. A sustained tread — a group share '
-      + 'of a tenth of a percent or more — is a different composition and stays a real red. The '
+      + 'reads only numbers the record really holds: the one-second group share (under 0.2 % since '
+      + 'the third measurement below), its window count, and the judgeability shares. A sustained '
+      + 'tread — a larger group share — is a different composition and stays a real red. The '
       + 'burst reading cannot be scoped because it lies past the cut; this entry therefore owns the '
-      + 'transient whatever the cut hides, and point 1068 owes the throttle probe that says whether '
-      + 'it is load or a defect. The charge dies with that point. '
+      + 'transient whatever the cut hides, and point 1068 owes the answer to whether it is load or a '
+      + 'defect (its throttle probe came back 0/8 red, see the third measurement). The charge dies '
+      + 'with that point. '
       + 'SECOND MEASUREMENT, 17.09.2026 on feat/1140-cursor-mode-lock, VERIFY_GL=webgl (log '
       + '.claude/worktrees/point-1140/local/verify-logs/2026-09-17T10-34-43-933-docs-i18n-flow-'
       + 'collision-polish-settings-enrichments.log): the MIRROR composition — worst child -1 at '
@@ -1488,7 +1410,7 @@ export const RED_CHARGES = [
     // allows. An unscoped entry would also excuse a lane nobody has read, and it
     // would put this lane's measurement under a `why` that never measured it.
     // The composition, the cut and the cap are the sibling's, unchanged: the
-    // group share under a tenth of a percent, its window count, the judgeability
+    // group share under 0.2 %, its window count, the judgeability
     // reading. A sustained tread — a group share of 0.2 % and up, or a red
     // without the judgeability line — is a different composition and stays red.
     detailReadsPrefix: true,
@@ -1565,7 +1487,7 @@ export const RED_CHARGES = [
       + 'beyond 6 px, deepest 19 px, and the retry passed with 200 checks, so the record is '
       + 'SUSPECT and covers nothing. '
       + 'This entry gives the red an owner that can CLOSE it; it does not decide the cause. Point '
-      + '1010 owes the throttle probe that separates real fusion at this crowd density from a '
+      + '1010 owes closing it — point 1067 settled the cause as real motion (see above) rather than a '
       + 'loaded host, and the charge dies with it.',
   },
   {
@@ -1694,7 +1616,7 @@ export const RED_CHARGES = [
     backend: 'webgl',
     kind: 'check',
     // NO detailMatch. The printed measurement is one lit-minus-shadow number per
-    // ring stone, and the ledger's own rule forbids matching a measured number —
+    // ring stone, and the ledger's rule keeps measured numbers out of a signature —
     // there is no wording left to narrow on once the numbers are out. The scope
     // is therefore the check, the suite and the WebGL 2 lane, which is exactly
     // the case point 642 already names in its own text.
@@ -1720,7 +1642,8 @@ export const RED_CHARGES = [
     suite: 'world',
     backend: 'webgl',
     kind: 'check',
-    // NO detailMatch: the printed detail is the fixed words naming which edges
+    // NO detailMatch here (other frame entries narrow on "subject is not in the
+    // rendered picture"): the printed detail is the fixed words naming which edges
     // the subject left, and it carries no measurement to narrow on. The frame
     // NAME is the scope — a different frame missing its subject is a different
     // case and stays a real red, which is how the falls came to be filed.
@@ -1738,12 +1661,6 @@ export const RED_CHARGES = [
       + 'mis-aimed frame costs a whole pass; the charge dies with it.',
   },
   {
-    // POINT 690 LANDED, so its entry is gone: the round it excused has been
-    // rebuilt and moved to the port cities, and that charge said in its own
-    // words that it dies with the point. The ledger's rule expires a charge with
-    // its point, and the test over this file enforces it — which is how the
-    // entry was caught, on the push gate of the very commit that closed the
-    // point, exactly as the point-1156 entry before it was.
     point: 1145,
     suite: 'enrichments',
     kind: 'check',

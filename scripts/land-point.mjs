@@ -2,8 +2,9 @@
 //
 //   node scripts/land-point.mjs 594 --model "Claude Opus 5.5"   land it
 //   node scripts/land-point.mjs 594 --dry      print the plan, touch nothing
-//   node scripts/land-point.mjs 594 --serial   force the gate serial
-//   node scripts/land-point.mjs 594 --branch feat/594-x   name the branch yourself
+//   node scripts/land-point.mjs 594 --model "…" --serial   force the gate serial (--parallel: parallel)
+//   node scripts/land-point.mjs 594 --model "…" --branch feat/594-x   name the branch yourself
+//   node scripts/land-point.mjs 594 --model "…" --batch <id> --landing-id <id>   durable batch landing
 //
 // It runs on `main`, in the MAIN tree, and it does what CLAUDE.md §6 already
 // demands by hand: merge (--no-ff), fast gate, tick, archive move, COMMIT AND
@@ -12,13 +13,14 @@
 //
 // `--model` names the model running the landing, and is required for any real
 // run: the tick commit's co-author trailer is model-guard's only evidence of who
-// authored it, and nothing in the repository can tell the script which model it
-// is. It is validated against the allowlist BEFORE the merge, so a wrong one
+// authored it, and the script cannot observe which model is running it. It is validated against the allowlist BEFORE the merge, so a wrong one
 // costs nothing.
 //
-// EVERY DECISION IS IN scripts/land-point-core.mjs AND PINNED BY VITEST. This
-// file is the I/O half only: git, npm, the two file writes, the two sub-scripts.
-// Read the core for WHY any of it happens; read this for WHAT it runs.
+// THE DECISIONS LIVE IN scripts/land-point-core.mjs AND scripts/land-cleanup-core.mjs,
+// PINNED BY VITEST. This file is the I/O half: git, npm, the work-order writes, the
+// sub-scripts it spawns (machine-load, focus, board-publish, worktree-cleanup,
+// audit-check), the journal, metric and declaration writes — plus the deletion
+// ordering in deleteLandedBranch. Read the cores for WHY; read this for WHAT runs.
 //
 // IT STOPS AT THE FIRST RED. There is no --force and no --continue: a chain that
 // can be talked past its own failure is a chain that leaves half states, which is
@@ -91,7 +93,7 @@ const readJson = (path) => {
 }
 
 /**
- * `git worktree list --porcelain` → [{ path, branch, locked }].
+ * `git worktree list --porcelain` → [{ path, branch, head, locked }].
  *
  * THE LOCK IS THE POINT (629). The isolation harness locks an agent's worktree
  * while the agent works in it — `locked claude agent agent-<id> (pid … start …)`
@@ -402,7 +404,7 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
       } catch (e) {
         // EEXIST means somebody carried it between the listing and the copy —
         // which is the outcome this function wanted anyway. It is only that when
-        // what stands there is a READABLE RECORD; anything else occupying the
+        // what stands there is a regular file; anything else occupying the
         // name is a record this landing could not keep, and is counted.
         if (e && e.code === 'EEXIST' && regularity(join(dest, name)) === 'file') continue
         failed += 1
@@ -415,10 +417,11 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
 /**
  * List, probe, decide — the whole cleanup selection, taken FRESH.
  *
- * It runs three times, and none of them is redundant: once for the PLAN (so
+ * It runs at several points, and none of them is redundant: once for the PLAN (so
  * `--dry` shows what would be removed and what would be left standing), once at
- * the START of the cleanup step, and once PER PATH inside the removal loop, in the
- * moment before that path is handed to the deleting command.
+ * the START of the cleanup step, and again before each branch deletion; each path
+ * is re-proven by reproveOne in the moment before it is handed to the deleting
+ * command.
  *
  * `mergeTarget` is what the landing takes: the BRANCH before the merge (what it is
  * about to absorb) and `HEAD` of main after it (what it did absorb). Asking against
@@ -444,7 +447,7 @@ export function selectCleanup({ branch, since, mergeTarget = null, cwd = REPO_RO
  * path. So the tree in front of the deletion is listed and probed AGAIN, alone,
  * and judged against the expectation the selection handed over. The remaining
  * window — between this answer and the `rm` inside the deleting command — is
- * closed by `worktree-cleanup.mjs --expect-branch`, which re-proves it a third
+ * closed by `worktree-cleanup.mjs --expect <identity>`, which re-proves it a third
  * time inside the process that actually deletes.
  */
 export function reproveOne({ path, expected, since, mergeTarget = null, cwd = REPO_ROOT, mainRoot = REPO_ROOT } = {}) {
@@ -507,7 +510,8 @@ export function branchRepairHint(branch) {
  *   REJECTED (`! [rejected] (delete) -> <b> (stale info)`, exit 1) and the branch
  *   survives; with a matching lease it deletes. The check happens at the server, at
  *   the instant of the update, so NO window exists between our read and the delete:
- *   anything pushed to that branch after the sha we merged makes the deletion fail.
+ *   anything pushed to that branch after the local tip read just before the delete
+ *   (which `git branch -d` has just proven merged) makes the deletion fail.
  *   This is what closes the "somebody pushed since the snapshot" race outright,
  *   rather than narrowing it.
  *
@@ -797,7 +801,8 @@ async function main(argv) {
   if (!Number.isInteger(number) || number <= 0) {
     console.error(
       'usage: node scripts/land-point.mjs <point> --model "<authoring model>"\n' +
-        '                                   [--dry] [--serial|--parallel] [--branch <name>]',
+        '                                   [--dry] [--serial|--parallel] [--branch <name>]\n' +
+        '                                   [--batch <id> --landing-id <id>]',
     )
     return 2
   }
@@ -970,7 +975,7 @@ async function main(argv) {
       for (const r of red) console.error(`\n--- ${r.id} ---\n${r.output}`)
       error = new LandingError('the fast gate is red', {
         step: 'gate',
-        repair: `fix ${red.map((r) => r.id).join(', ')}, then re-run — main already carries the merge, so re-running resumes from the gate`,
+        repair: `fix ${red.map((r) => r.id).join(', ')}, then re-run — main already carries the merge, so the re-run finds it done and reaches the gate again`,
       })
       step('gate', VERDICT.failed, `${gate.mode}: ${red.map((r) => r.id).join(', ')} red`)
       throw error
@@ -1049,9 +1054,9 @@ async function main(argv) {
         // steps AFTER the push never ran, so they are owed by hand.
         repair:
           'git push origin main — the tick IS committed locally, and the feature branch is still intact. '
-          + 'Then finish the two steps this chain never reached, BY HAND, because a re-run dies at the tick: '
-          + 'node scripts/board-publish.mjs, then node scripts/worktree-cleanup.mjs <worktree> and delete the branch '
-          + 'locally and on the remote.',
+          + 'Then finish what this chain never reached, BY HAND, because a re-run dies at the tick: the now-card '
+          + 'settlement and node scripts/board-publish.mjs, under --batch the landing journal stages, then '
+          + 'node scripts/worktree-cleanup.mjs <worktree> and delete the branch locally and on the remote.',
       })
       step('push', VERDICT.failed, childWords(e))
       throw error
@@ -1095,7 +1100,8 @@ async function main(argv) {
           step: 'board',
           // NOT "re-run this command": the tick has landed, so a re-run dies at
           // the tick step with "not in TASKS.md". The publisher is the repair.
-          repair: 'node scripts/board-publish.mjs — the point itself has landed; only the board is behind',
+          repair: 'node scripts/board-publish.mjs — the point itself has landed; the board and the branch/worktree '
+            + 'cleanup are behind (node scripts/worktree-cleanup.mjs <worktree>, then delete the branch)',
         })
         step('board', VERDICT.failed, childWords(e))
         throw error
@@ -1155,9 +1161,9 @@ async function main(argv) {
       }
     }
     // A KEPT WORKTREE KEEPS ITS BRANCH, and so does one that could not be removed:
-    // git refuses `branch -d` on a branch a worktree has checked out, and the
-    // REMOTE deletion is independent — it would succeed while the local one failed,
-    // deleting the branch the retained tree is standing on.
+    // git refuses `branch -d` on a branch a worktree has checked out, and a REMOTE
+    // deletion that ran while the local one failed would delete the branch the
+    // retained tree is standing on — so deleteLandedBranch skips the remote then.
     //
     // AND THE STATE IS READ AGAIN HERE (whole-branch review, finding 6). `cleanup`
     // was taken before the removals ran; a checkout that appeared since — a
@@ -1199,8 +1205,8 @@ async function main(argv) {
       console.log(line)
     }
     if (problems.length) {
-      // NOT a failure of the landing — the point IS on main, ticked and archived.
-      // Reported loudly as debris, because `branch-hygiene-guard` is the backstop
+      // The point IS on main, ticked and archived, yet the step is reported FAILED:
+      // debris is reported loudly, because `branch-hygiene-guard` is the backstop
       // and a silent leftover is what filled the repository on 28.07.2026.
       step('cleanup', VERDICT.failed, problems.join(' | '))
       error = new LandingError('the point landed, but its branch/worktree could not be removed', {
@@ -1232,8 +1238,11 @@ async function main(argv) {
   // boundary, which read as "everything else is handled" while the tick was in
   // fact left uncommitted — the omission was the bug's cover.
   console.log(
-    '\nDONE BY THIS COMMAND: the merge, the gate, the tick, the archive move, the tick\n' +
-      'COMMIT and the push of main, the board publish and the branch/worktree cleanup.\n' +
+    (error
+      ? '\nDONE BY THIS COMMAND: only the steps marked OK above.\n'
+      : '\nDONE BY THIS COMMAND: the merge, the gate, the tick, the archive move, the tick\n' +
+        'COMMIT and the push of main, the now-card settlement, the board publish and the\n' +
+        'branch/worktree cleanup.\n') +
       'NOT DONE: the picture verification on both backends (it belongs BEFORE the merge,\n' +
       'on the branch), and the point boundary — two-phase (point 675):\n' +
       `  node scripts/batch-boundary.mjs --prepare ${number}   (then its bookkeeping)\n` +

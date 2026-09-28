@@ -7,9 +7,10 @@
 // its spec names, and a one-line identification per cross-referenced point.
 //
 // THE BRIEF MUST NOT STARVE ITS READER — a smaller context that costs a rebuild
-// is no saving. Hence two hard failures instead of a silent omission: an unknown
-// point number, and a `§` reference that resolves in none of the documents
-// searched (a renumbering must error, not quietly drop a section). Everything the
+// is no saving. Hence three hard failures instead of a silent omission: an
+// unknown point number, a `§` reference that resolves in none of the documents
+// searched (a renumbering must error, not quietly drop a section), and an
+// adopted point that exists nowhere. Everything the
 // resolver cannot carry is NAMED in the brief's reference map, never dropped.
 //
 // THE BRIEF MUST NOT LIE TO ITS READER EITHER. The work order writes `§` for four
@@ -18,7 +19,7 @@
 // §B2.1`), and, sloppily, a work-order POINT number. A resolver that knows only
 // design.md carries design.md §8 where the spec meant peoples-1890 §8, verbatim
 // and without a word — the reader cannot tell. So every reference is resolved
-// against ALL of them, every carried section is LABELLED with the document it
+// against design.md, CLAUDE.md and every document the spec names, every carried section is LABELLED with the document it
 // came from, and the reference map lists every `§` and where it went.
 //
 // AND WHERE IT CANNOT KNOW, IT SAYS SO. Two ambiguities are structural, not
@@ -34,7 +35,8 @@
 import { createHash } from 'node:crypto'
 import { DEFAULT_SETTING as DEFAULT_ASTRA_SHARE, briefLine as astraBriefLine } from './astra-share-core.mjs'
 
-/** Thrown for a failure the reader must see: unknown point, dangling section. */
+/** Thrown for a failure the reader must see: unknown point, dangling section,
+ *  adopted point that exists nowhere. */
 export class BriefError extends Error {
   constructor(message) {
     super(message)
@@ -71,16 +73,16 @@ export const BRIEF_TOKEN_CEILING = 24000
  *                citations, while "only the fauna and the §2.5 silhouettes" and
  *                "sixteen peoples unchanged … the §7 displacement" are not. Only
  *                strict adjacency (whitespace between the word and the `§`)
- *                separates them, so that is the rule.
+ *                separates them, so that is the rule — it takes no window.
  */
-export const DOC_WINDOW = { file: 220, basename: 60, stem: 0 }
+export const DOC_WINDOW = { file: 220, basename: 60 }
 
 /**
  * Extra prose names for documents the work order cites by neither filename nor
  * basename. Only unambiguous ones — a name that also reads as ordinary prose
  * belongs to the adjacency-only `stem` style, not here.
  */
-export const DOC_ALIASES = [
+const DOC_ALIASES = [
   { path: 'docs/analysis_de/retrospektive-zusammenarbeit.md', word: 'retrospekti\\w*', style: 'basename' },
   { path: 'docs/analysis_de/retrospektive-zusammenarbeit.md', word: 'retrospecti\\w*', style: 'basename' },
 ]
@@ -112,7 +114,8 @@ const SECTION_RANGE_RE = /§\s*((?:[A-Z])?\d+(?:\.\d+)*)\s*[-–—]\s*§\s*((?:
  * resolved like any other reference, and only their FAILURE is downgraded — a
  * reference that resolves nowhere is a hard failure, unless it stands alone in
  * backticks, in which case it is reported as notation. So a real citation written
- * that way still reaches the reader, and a real renumbering still fails loudly.
+ * that way still reaches the reader, and a real renumbering still fails loudly —
+ * except in that standalone-backtick form, which it cannot tell from notation.
  */
 function notationSpans(text) {
   const spans = []
@@ -127,7 +130,7 @@ function notationSpans(text) {
 /**
  * Every point of the work order (open TASKS.md and archived, concatenated by
  * readTasksAll). A point starts at `- [ ] N.` / `- [x] N.` and runs until the
- * next such line or the next `## ` section heading — EXCEPT inside a fenced code
+ * next such line or the next markdown heading (any level) — EXCEPT inside a fenced code
  * block, where such a line is quoted example text and must not cut the body in
  * half (a truncated spec is the failure mode this whole module exists to avoid).
  * `startLine`/`endLine` index into the normalised source so a caller can prove
@@ -180,12 +183,6 @@ export function parseWorkOrderPoints(text) {
   return points
 }
 
-/** The point with that number, or null. Later duplicates lose to the first. */
-export function findPoint(text, number) {
-  const n = Number(number)
-  return parseWorkOrderPoints(text).find((p) => p.number === n) ?? null
-}
-
 /**
  * A short identifying line for a cross-referenced point: enough to know WHICH
  * point is meant without carrying its whole body (the saving being the point).
@@ -200,7 +197,8 @@ export function pointTitle(point, maxChars = 140) {
   return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trim()}…`
 }
 
-/** Numeric section order: 4.2 before 4.10, 4 before 4.1; letters sort first. */
+/** Numeric section order: 4.2 before 4.10, 4 before 4.1; plain numbers sort
+ *  before lettered ids. */
 export function compareSectionIds(a, b) {
   const split = (s) => {
     const m = /^([A-Z]?)(.*)$/.exec(String(s))
@@ -218,11 +216,13 @@ export function compareSectionIds(a, b) {
 
 /**
  * Sections of a markdown document by id. A section's text runs from its heading
- * to the next heading of the SAME OR HIGHER level, so `### 19.8` stops at
- * `### 19.16` while `## 19` spans its subsections. For a top-level section only
- * the intro before the first subsection is kept, plus an index of the subsection
- * titles: pulling a whole chapter (§19 is ~400 lines) would defeat the brief, and
- * the reader is told it may read a NAMED subsection on demand.
+ * to the next NUMBERED heading of the SAME OR HIGHER level (an unnumbered heading
+ * ends nothing), so `### 19.8` stops at `### 19.16` while `## 19` spans its
+ * subsections. For any section with direct subsections (numbered headings exactly
+ * one level deeper; one that skips a level is not counted) only the intro before
+ * the first of them is kept, plus an index of their titles: pulling a whole
+ * chapter (§19 is ~400 lines) would defeat the brief, and the reader is told it
+ * may read a NAMED subsection on demand.
  *
  * Heading levels 1–6 are all indexed. The research documents use `## B1.` and
  * `### B2.1`, and design.md's own `##`/`###`/`####` are a subset of that.
@@ -251,7 +251,7 @@ export function parseDesignSections(designText) {
       ? heads.slice(idx + 1).find((c) => c.line < end && c.level === h.level + 1).line
       : end
     // A duplicate id would silently shadow the earlier section, so the FIRST
-    // heading wins and the collision is visible to a caller that looks for it.
+    // heading wins and the later duplicate is dropped.
     if (!sections.has(h.id)) {
       sections.set(h.id, {
         id: h.id,
@@ -290,8 +290,8 @@ export function aliasesFor(path) {
 /**
  * The documents a `§` may belong to, prepared once. `design` and `claude` are
  * named separately because they carry special roles: design.md is the default
- * owner of an unattributed `§` (the plain `§4.2` style in this queue always means
- * it) and the only document whose sections the brief carries verbatim; CLAUDE.md
+ * owner of an unattributed `§` (the plain `§4.2` style in this queue normally means
+ * it; a bare `§N` may also be a CLAUDE.md §7.1 criterion, see above) and the only document whose sections the brief carries verbatim; CLAUDE.md
  * is in every agent's context already, so its sections are named, not carried.
  */
 export function buildDocRegistry({ designText = '', claudeText = '', docs = [] } = {}) {
@@ -372,7 +372,8 @@ function docMentions(text, registry) {
  * a document named earlier only orders the candidates, it never forces a section
  * the document does not have:
  *   1. the nearest document named within its style's window, if it has the id;
- *   2. the last document named at ANY distance, if it has the id — point 142
+ *   2. the last document named by file or basename at ANY distance (a stem
+ *      reaches only by adjacency, step 1), if it has the id — point 142
  *      names `docs/peoples-1890.md` once at the top and then cites §4.0.1, §4.9,
  *      §4.0.5 hundreds of characters below, which no fixed window can reach;
  *   3. design.md, the documented default for a bare `§`;
@@ -399,7 +400,7 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
   const seen = new Map()
 
   // `continue`, not `break`: two aliases of one document overlap (the filename
-  // `docs/peoples-1890.md` contains the basename `peoples-1890`), so a mention
+  // `peoples-1890.md` contains the basename `peoples-1890`), so a mention
   // that ends after `at` may still be followed by one that does not.
   const nearOwner = (at) => {
     let best = null
@@ -493,8 +494,8 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
  *
  * It is also the size brake. Inlining a point verbatim costs its whole body
  * (352 is 2.5k characters), and an uncapped walk would pull a chain of them into
- * every brief that starts one — the brief's entire value is that it is ~1.8k
- * tokens rather than ~108k.
+ * every brief that starts one — the brief's entire value is that it is ~1.7k
+ * tokens (median) rather than ~105k.
  */
 export const ADOPTION_DEPTH_CAP = 2
 
@@ -532,7 +533,7 @@ const POINT_REF_SRC = String.raw`(?<![\w-])(?:work-order\s+)?(?:points?|pts?\.?)
  * false one inlines a whole body into every brief that mentions the point, so
  * the errors are not symmetric and the conservative side is the right one.
  */
-export const ADOPTING_PATTERNS = [
+const ADOPTING_PATTERNS = [
   {
     id: 'possessive-spec',
     why: "\"point N's specification/spec\" — the other point's own text is what governs",
@@ -585,7 +586,7 @@ export const ADOPTING_PATTERNS = [
  * newline is allowed; a blank line inside is not, which is what keeps an
  * unpaired quote from swallowing the rest of a spec.
  */
-export function quotedSpans(text) {
+function quotedSpans(text) {
   const spans = []
   for (const m of normalise(text).matchAll(/"([^"]{0,600})"|“([^”]{0,600})”/g)) {
     if (/\n[ \t]*\n/.test(m[0])) continue
@@ -635,12 +636,8 @@ export function classifyPointRefs(spec, { selfNumber = null } = {}) {
  * a reference past the cap is named, not carried, so a stale one there is
  * reported on its line the way an unknown cross-reference already is.
  */
-export function collectAdoptedSpecs({
-  points = [],
-  root,
-  cap = ADOPTION_DEPTH_CAP,
-  mayBeCriterion = () => false,
-} = {}) {
+function collectAdoptedSpecs({ points = [], root, mayBeCriterion = () => false } = {}) {
+  const cap = ADOPTION_DEPTH_CAP
   const byNumber = new Map(points.map((p) => [p.number, p]))
   const chain = []
   const beyond = []
@@ -698,7 +695,7 @@ export function collectAdoptedSpecs({
  * in docs/rule-corpus-audit.md), so the head is what separates a declaration
  * from a mention — nothing else in the wording does.
  */
-export const SLICE_DECLARATION_HEAD_LINES = 20
+const SLICE_DECLARATION_HEAD_LINES = 20
 
 /** `work-order points 477–488`, `work-order point 361`, `work-order points 12, 13`. */
 const SLICE_DECLARATION_RE = /work-order\s+(?:points?|pts?\.?)\s+(\d+(?:\s*(?:[-–—]|,|\/|\s+and\s+)\s*\d+)*)/gi
@@ -750,11 +747,11 @@ function declarationSentence(text, at, maxChars = 180) {
  * that declaration is the whole mechanism, and it puts the duty on the document
  * (declare your points) rather than on every reader (go looking).
  */
-export function parseSliceDeclarations(docs = [], { headLines = SLICE_DECLARATION_HEAD_LINES } = {}) {
+export function parseSliceDeclarations(docs = []) {
   const out = []
   for (const doc of docs) {
     if (!doc || !doc.path) continue
-    const head = normalise(doc.text).split('\n').slice(0, headLines).join('\n')
+    const head = normalise(doc.text).split('\n').slice(0, SLICE_DECLARATION_HEAD_LINES).join('\n')
     for (const m of head.matchAll(SLICE_DECLARATION_RE)) {
       const { numbers, scope } = expandPointScope(m[1])
       if (!numbers.length) continue
@@ -765,9 +762,9 @@ export function parseSliceDeclarations(docs = [], { headLines = SLICE_DECLARATIO
 }
 
 /** The declarations that cover `number` — usually none, occasionally one or two. */
-export function sliceDocsFor(docs = [], number, options) {
+export function sliceDocsFor(docs = [], number) {
   const n = Number(number)
-  return parseSliceDeclarations(docs, options).filter((d) => d.numbers.includes(n))
+  return parseSliceDeclarations(docs).filter((d) => d.numbers.includes(n))
 }
 
 /** Other work-order points a spec names ("per point 288", "pt. 30", "points 175/177"). */
@@ -794,7 +791,7 @@ export function extractPointRefs(spec, selfNumber = null) {
  *
  * WHY IT IS WORTH THE LINES IT COSTS. Measured over this project's own
  * transcripts: only 5.0 % of responses issue more than one tool call, while
- * search/read alone is 25.1 % of the weighted spend, and 4036 responses —
+ * search/read alone is ~25 % of the weighted spend, and 4036 responses —
  * 15.2 % of all output — repeated an EXACTLY identical shell command inside a
  * single session. One saved response is ~22.9k weighted tokens and 24.4 s of
  * MACHINE time (not calendar time: up to three agents run in parallel, so this
@@ -806,7 +803,7 @@ export function extractPointRefs(spec, selfNumber = null) {
  * that needs another's OUTPUT, and re-using a fact that has since changed — so
  * the rule cannot be read as "batch everything, read nothing twice".
  *
- * Shared verbatim with the batch resume prompt's German rendering in
+ * Mirrored, as a German rendering, in the batch resume prompt in
  * scripts/batch-autostart-core.mjs; change the two together.
  */
 export const CALL_DISCIPLINE = [
@@ -862,7 +859,7 @@ export function isRenderPoint(spec) {
  * point-assigned verification tokens; eight of ten recorded `enrichments` runs
  * FAILED while still writing all 37 frames at 951–1029 s each. And the cheapest
  * rung already existed and was unused: point 566 built `--section`, `enrichments`
- * declares nine of them, and on 09.08.2026 nothing routed anyone to it — not one
+ * then declared nine of them, and on 09.08.2026 nothing routed anyone to it — not one
  * recorded run was partial, and the three agents commissioned that evening were
  * not told it exists. This block is that routing.
  *
@@ -950,7 +947,7 @@ export const VERIFICATION_LADDER = [
 // ---------------------------------------------------------------------------
 // ORIENTATION IN THE CODE (point 598). The brief oriented its reader in the
 // SPEC and left it to find its way around the TREE by searching — and search is
-// 25.2 % of the weighted spend, most of it in a delegated agent's first
+// ~25 % of the weighted spend, most of it in a delegated agent's first
 // responses. So the brief also carries the paths the spec itself names, what
 // lives in their directories, and the check set to iterate against.
 //
@@ -969,7 +966,8 @@ const ROOT_DIRS = ['src', 'scripts', 'docs', 'public', 'verification', 'local', 
 const ROOT_FILES = ['CLAUDE.md', 'TASKS.md', 'design.md', 'README.md', 'package.json', 'index.html', 'vite.config.ts']
 const PATH_EXT = /\.(?:ts|tsx|mjs|cjs|js|jsx|json|md|html|css|yml|yaml|png|glsl|wgsl)$/
 
-/** A token that could be a path: no whitespace, no quotes, at least one slash. */
+/** A token that could be a path: no whitespace, no quotes (pathsIn then
+ *  requires a slash or a known root file). */
 const PATH_TOKEN = /[A-Za-z0-9_@.][A-Za-z0-9_./-]*/g
 
 /**
@@ -994,8 +992,8 @@ export function pathsIn(spec) {
     if (!p.includes('/')) continue
     const top = p.split('/')[0]
     if (!ROOT_DIRS.includes(top) && !PATH_EXT.test(p)) continue
-    // A trailing slash marks a directory and is kept — `src/ui/` and `src/ui`
-    // are the same place, so one spelling wins to keep the list short.
+    // A trailing slash marks a directory and is kept, repeated slashes
+    // collapsed to one; `src/ui/` and `src/ui` stay two entries.
     p = p.replace(/\/+$/, '/')
     if (seen.has(p)) continue
     seen.add(p)
@@ -1099,7 +1097,7 @@ export function plannedCheck(paths, map) {
  * as "where to look" would put a line nobody needs in every brief, and would
  * plan the `docs` suite for every point on the strength of a citation.
  */
-export const ORIENTATION_SKIP = new Set(['design.md', 'CLAUDE.md', 'TASKS.md', 'docs/tasks-archive.md'])
+const ORIENTATION_SKIP = new Set(['design.md', 'CLAUDE.md', 'TASKS.md', 'docs/tasks-archive.md'])
 
 /** How many named paths / directories one orientation block carries. A brief
  *  that lists forty files has stopped orienting anybody, and the cost of the
@@ -1117,16 +1115,16 @@ export const ORIENTATION_LIMITS = { paths: 12, dirs: 6, siblings: 8, sections: 1
  *
  * THE CHECK SET IS AN ITERATION SET, NOT AN ACCEPTANCE (correction 23.08.2026).
  * It is printed as suite/`--section` PAIRS — a diff touching several suites has
- * no single pair — and the whole-suite final proof stands under its OWN heading
+ * no single pair — and the point's gate (point 1134) stands under its OWN heading
  * below it, because a cheap rung printed as "the check that proves it" is read
- * as the acceptance, and point 595 says the proof is the whole suite.
+ * as the acceptance.
  */
 export function orientationBlock({ files = [], dirs = [], check = null, sections = {}, checkSource = 'spec' } = {}) {
   const out = []
   if (!files.length && !dirs.length && !(check && check.byRule.length)) return out
   out.push(
     '--- ORIENTATION (GENERATED HINT — the spec decides, this only says where to look) ---',
-    'Read from the tree at generation time, so it cannot be stale. It is where the',
+    'Read from the tree at generation time — regenerate if the tree has moved since. It is where the',
     'specification points, NOT a list of files to change, and it is not exhaustive.',
   )
   if (files.length) {
@@ -1168,7 +1166,7 @@ export function orientationBlock({ files = [], dirs = [], check = null, sections
         if (!planned.includes(suite)) planned.push(suite)
         const list = sections[suite]
         if (list && list.length) {
-          // `enrichments` declares forty; printing them all would cost more than
+          // `enrichments` declares over forty; printing them all would cost more than
           // the search this block replaces. The rest are one command away, and
           // that command is named instead of the names.
           const shown = list.slice(0, ORIENTATION_LIMITS.sections)
@@ -1222,19 +1220,18 @@ const HOUSE_FACTS = [
   '- If this brief proves INSUFFICIENT, or contradicts the code you find: ESCALATE (stop and',
   '  report what is missing) rather than guess. A guessed spec costs a rebuild, which is more',
   '  expensive than the question.',
-  '- Point titles use sentence case rather than full uppercase; acronyms and individual',
-  '  emphasised words may stay capitalised.',
   '',
-  'HOUSE FACTS NO POINT STATES — each of these cost a real agent real work today (27.07.2026),',
+  'HOUSE FACTS NO POINT STATES — each of these cost a real agent real work (list begun 27.07.2026),',
   'which is why they are delivered rather than remembered:',
   '- `docs/` and the `verification/` screenshots are TRACKED in git. Neither is scratch space;',
   '  deleting from them deletes repository content.',
   '- `scripts/retro-refresh.mjs` must NEVER run from a git WORKTREE: it derives its source',
   '  directory from the checkout path, finds nothing, and rewrote a document as empty while',
   '  exiting 0. It throws now — but doc refreshes belong to the main session in the main tree.',
-  '- Every guard here STANDS DOWN for a session that does not own the batch lock and for a',
-  '  paused batch (`heldByOtherLiveOwner`, `.claude/batch-paused`). A new guard that omits it',
-  '  will fire on subagents and on a paused run.',
+  '- Every session guard here (Stop / PreToolUse) STANDS DOWN for a session that does not own',
+  '  the batch lock and for a paused batch (`heldByOtherLiveOwner`, `.claude/batch-paused`). A',
+  '  new one that omits it will fire on subagents and on a paused run. The commit and push',
+  '  hooks (pre-push, commit-msg) deliberately bind every session.',
   '- CLAUDE.md, design.md and the work order preamble carry MEASURED ceilings',
   '  (`scripts/doc-budget-core.mjs`), and CLAUDE.md sits near its limit. Measure before you',
   '  add a paragraph; raising a ceiling needs a written justification in the same commit.',
@@ -1256,8 +1253,10 @@ const HOUSE_FACTS = [
   '- Every commit records its AUTHORING MODEL in the co-author trailer. That trailer is the',
   '  only machine-readable evidence `scripts/model-guard.mjs` has, so the bare',
   '  `Co-Authored-By: Claude <noreply@anthropic.com>` names no model and trips the tripwire,',
-  '  which STOPS the batch. Write your own model:',
+  '  which STOPS the batch. Write the name of the model YOU are, in this form:',
   '  `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.',
+  '- Point titles use sentence case rather than full uppercase; acronyms and individual',
+  '  emphasised words may stay capitalised.',
 ]
 
 /**
@@ -1268,7 +1267,7 @@ const HOUSE_FACTS = [
  * readers to skip the line. The setting itself is READ from `.claude/astra-share.json` by
  * the wrapper — nothing here keeps its own copy of the routing table.
  */
-export function headerLines(astraShare = DEFAULT_ASTRA_SHARE) {
+function headerLines(astraShare = DEFAULT_ASTRA_SHARE) {
   return [...HOUSE_FACTS, astraBriefLine(astraShare), '', ...CALL_DISCIPLINE]
 }
 
@@ -1276,7 +1275,7 @@ export function headerLines(astraShare = DEFAULT_ASTRA_SHARE) {
  * The brief's closing block: what the agent writes BACK (point 458).
  *
  * WHY IT IS PART OF THE BRIEF. Point 365 bounded the INPUT side of delegation —
- * ~1.8k tokens of brief against ~108k of reading assignment — but nothing bounded
+ * ~1.7k tokens of brief (median) against ~105k of reading assignment — but nothing bounded
  * the OUTPUT, and the agent's final text is the only thing that enters the main
  * session's context. It is also the part the main session needs least in prose:
  * the merge reads git for every fact it acts on (branch, SHAs, changed files),
@@ -1293,9 +1292,9 @@ export function returnBlock(number) {
     'not a narrative. Report exactly these, in this order:',
     `- the WORK-ORDER POINT NUMBER (${number}) and the BRANCH NAME;`,
     '- the COMMIT SHAs, in the order you made them;',
-    '- the GATES YOU ACTUALLY RAN — `npm run build`, `npm run lint`, `npm run test:unit`, and',
-    '  each browser suite BY NAME — each with its VERDICT. A gate you did not run is reported',
-    '  as not run, never as green;',
+    '- the GATES YOU ACTUALLY RAN — `tsc`, `npm run build`, `npm run lint`, `npm run test:unit`,',
+    '  the lockfile audit where owed, each browser suite BY NAME and the picture judgement —',
+    '  each with its VERDICT. A gate you did not run is reported as not run, never as green;',
     '- the CHANGED FILES as PATHS ONLY;',
     '- OPEN ITEMS AND ESCALATIONS — anything left undone, guessed at, or blocked;',
     '- the point-365 question answered: did this BRIEF SUFFICE, and what was MISSING?',
@@ -1321,7 +1320,7 @@ export function workOrderFingerprint(tasksText) {
 }
 
 /** The one-line provenance stamp. Unknown parts are named as unknown, never faked. */
-export function formatRevisionLine({ head = null, dirty = null, workOrder = null } = {}) {
+function formatRevisionLine({ head = null, dirty = null, workOrder = null } = {}) {
   const dirtyMark = dirty === true ? ' +dirty' : dirty === false ? '' : ' +dirty?'
   return (
     `SOURCE REVISION: HEAD ${head || 'unknown'}${dirtyMark} · work-order ${workOrder || 'unknown'} — ` +
@@ -1334,7 +1333,8 @@ export function formatRevisionLine({ head = null, dirty = null, workOrder = null
  * rather than applied silently (point 516 item 2): the reader must be able to
  * tell "this point adopts nothing further" from "the walk stopped here".
  */
-export function adoptionHeaderLines(cap = ADOPTION_DEPTH_CAP) {
+function adoptionHeaderLines() {
+  const cap = ADOPTION_DEPTH_CAP
   return [
     '--- ADOPTED SPECIFICATIONS (carried in full — this point declares them binding) ---',
     `DEPTH CAP ${cap}: adoption is followed ${cap} level(s) — the points this one adopts, and the ones`,
@@ -1356,7 +1356,6 @@ export function assembleBrief({
   revision,
   adopted = [],
   adoptionBeyond = [],
-  adoptionCap = ADOPTION_DEPTH_CAP,
   sliceDocs = [],
   astraShare = DEFAULT_ASTRA_SHARE,
 }) {
@@ -1372,7 +1371,7 @@ export function assembleBrief({
     '',
   ]
   if (adopted.length || adoptionBeyond.length) {
-    out.push(...adoptionHeaderLines(adoptionCap))
+    out.push(...adoptionHeaderLines())
     for (const a of adopted) {
       out.push(
         '',
@@ -1461,7 +1460,8 @@ export function assembleBrief({
 
 /**
  * The whole job: point number → brief text. Throws BriefError on an unknown point
- * number and on a `§` that resolves in none of the documents searched.
+ * number, on a `§` that resolves in none of the documents searched, and on an
+ * adopted point that exists nowhere.
  */
 export function buildBrief({
   tasksText,
@@ -1567,7 +1567,7 @@ export function buildBrief({
         criterionNote(Number(r.id))
       )
     }
-    const where = r.docPath === 'design.md' ? 'carried above' : 'read on demand'
+    const where = r.docPath === 'design.md' && r.kind === 'section' ? 'carried above' : 'read on demand'
     if (r.kind === 'part') {
       return `§${r.id} → ${r.docPath}, the whole §${r.id} part (${r.members.join(', ')}) — ${where}${alsoNote(r)}`
     }
@@ -1619,7 +1619,7 @@ export function buildBrief({
     ...adoptionAmbiguous.map((a) => {
       const title = criterionTitle(a.number)
       return (
-        `point ${a.number} → adopting wording "${a.phrase}", but ${a.number} is ALSO CLAUDE.md §7.1 ` +
+        `point ${a.number} → adopting wording "${a.phrase}", but ${a.number} may ALSO be CLAUDE.md §7.1 ` +
         `ACCEPTANCE CRITERION ${a.number}${title ? ` "${title}"` : ''}, which no resolver can tell from a ` +
         'point number. The specification is therefore NOT carried; if the sentence means the point, run: ' +
         `node scripts/point-brief.mjs ${a.number}`
@@ -1660,7 +1660,7 @@ export function buildBrief({
         'the sections BETWEEN them are part of the reference and must be read on demand.',
     )
   }
-  if (!carried.length) notes.push('no design.md section is carried — the spec names none that resolves there.')
+  if (!carried.length) notes.push('no design.md section is carried — the spec names no design.md section to carry.')
   notes.push(
     'This brief is generated. If the work order changed since, re-run: node scripts/point-brief.mjs ' +
       `${point.number}`,

@@ -1,9 +1,9 @@
 // One fixed village composition for the two purpose cues and walkable spoil.
-// The layout/clearance test pins this choice without running a browser.
+// src/scenes/place/digPicture.test.ts pins this choice without running a browser.
 // Re-picked when the well left this village (point 1092), and again when point
 // 1173 grew the settlement: the dig search reads the collider set and the
-// walkable radius, so a larger disc spread the pair well past the 8 m this was
-// composed at. Seed 58 is the one candidate in the first 600 that keeps the
+// walkable radius, so a larger disc spread the pair well past the 6–9 m span
+// this was first composed for. Seed 58 is the one candidate in the first 600 that keeps the
 // whole composition — both holes, their furniture and the walkable spoil lane —
 // inside the frame at the widened stand-off, at a span of 11.8 m.
 export const DIG_PICTURE = { placeId: 'bambara-village', seed: 58 }
@@ -29,7 +29,7 @@ export function digPictureView(sites) {
   // viewport the horizontal frame is ~73 deg, so half a span of `s` needs about
   // `s/2 / tan(36.7 deg)` = 0.67 s of depth to sit inside the edge. The factor
   // below carries that plus the furniture that stands beside each hole.
-  const back = Math.max(8, span * 0.95)
+  const back = span * 0.95
   const x = aim.x - (b.z - a.z) / span * back
   const z = aim.z + (b.x - a.x) / span * back
   return { x, z, yaw: Math.atan2(-(aim.x - x), -(aim.z - z)), pitch: -0.17, aim }
@@ -68,7 +68,7 @@ export function readDigPicture() {
     const bounds = (root) => {
       const points = []
       root.traverseVisible((o) => {
-        if (!o.isMesh || !o.visible) return
+        if (!o.isMesh) return
         o.geometry.computeBoundingBox()
         const box = o.geometry.boundingBox
         for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {

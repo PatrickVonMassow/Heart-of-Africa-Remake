@@ -1,6 +1,6 @@
 // Region-border ribbon geometry (design.md §3.1): the boundaries of the five
 // regions as dashed ground markings draped over the terrain, land only. Kept in
-// its own module (three-free of React) so the pure test and the RegionBorders
+// its own module (free of React) so the pure test and the RegionBorders
 // component share the builder and the ink tone.
 
 import * as THREE from 'three/webgpu'
@@ -43,11 +43,11 @@ export function buildBorderGeometry(seed: number): THREE.BufferGeometry {
         const inv = HALF_WIDTH / (Math.hypot(px, pz) || 1)
         px *= inv
         pz *= inv
-        // Sample EACH corner's own terrain height so the ribbon lies flush on
-        // the ground. Using only the two centreline heights let an offset
-        // corner float above a lower riverbank; the screen-space AO then read
-        // that floating gap as full occlusion and blackened the ribbon into a
-        // "black bar near the river" (point 101). Flush corners remove the gap.
+        // Sample EACH corner's own terrain height so every corner sits the same
+        // BORDER_LIFT above its own ground. Using only the two centreline
+        // heights let an offset corner float far above a lower riverbank; the
+        // screen-space AO then read that gap as full occlusion and blackened
+        // the ribbon into a "black bar near the river" (point 101).
         const corners: Array<[number, number]> = [
           [a.x - px, a.z - pz],
           [a.x + px, a.z + pz],

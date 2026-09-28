@@ -65,10 +65,12 @@ export interface InhabitantBody {
    *  at their stations (the cook, the drummer, a conversing pair). */
   fixed: boolean
   /** Seconds this body has been overlapping without being able to push free —
-   *  the wedge timer point 578.3 bounds. */
+   *  the wedge timer point 578.3 bounds. A net push of zero (overlaps that
+   *  cancel out) resets it like a successful push. */
   wedged: number
   /**
-   * How often the wedge escape had to pick this body up (point 656 follow-up).
+   * How often the wedge escape fired for this body, whether or not it found
+   * free ground to pick it up to (point 656 follow-up).
    * The escape below is a TELEPORT, exactly like the chase's own rescue — and
    * it was counted by nobody: a child freed this way jumped in the trace while
    * its published `nudges` stood still, so the motion metric read the
@@ -104,7 +106,8 @@ export interface SeparationConfig {
   /** Fraction of the remaining overlap taken out per step (0..1). At 1 the
    *  overlap is gone in the step it appeared, which is the point: below 1 the
    *  pass falls behind two movers closing on each other and the pair stays
-   *  visibly inside one another. It never overshoots at any value. */
+   *  visibly inside one another. It never overshoots a single overlap at any
+   *  value; overlaps with several neighbours are summed before it applies. */
   stiffness: number
   /** Cap on how fast a body may be pushed (m/s), so a DEEP overlap (a spawn
    *  stack) comes apart as a step rather than as a teleport. It must stay above
@@ -180,8 +183,8 @@ export function releaseBodies(set: InhabitantSet, bodies: readonly InhabitantBod
 }
 
 /**
- * True where another inhabitant's body occupies the ground a mover of
- * `moverRadius` wants to step to (work-order point 657).
+ * True where another inhabitant's body occupies the ground a mover of body
+ * radius `moverBodyRadius` wants to step to (work-order point 657).
  *
  * THE SEPARATION IS A CORRECTION, NOT A STEERING: it fires only after a stepper
  * has already walked its figure into a body, and the child's chase probed a
@@ -193,8 +196,9 @@ export function releaseBodies(set: InhabitantSet, bodies: readonly InhabitantBod
  * contacts steering cannot avoid.
  *
  * The radius is the PAIR'S CONTACT distance: the standing body's contact radius
- * plus `moverBodyRadius`, the mover's own — the exact line below which the
- * separation would start correcting, and NOT the wider walker footprint. That
+ * plus `moverBodyRadius`, the mover's own — the contact line the separation
+ * corrects toward (it acts only a slop inside it), and NOT the wider walker
+ * footprint. That
  * width was measured and rejected: at footprint width four children read each
  * other as 0.43 m walls on a 20 m ground and the game itself degraded (the
  * quietest child of one shipped village fell from ~110 to 22 walked metres per
@@ -225,15 +229,15 @@ export function groundOccupied(
 
 /**
  * One walking step that goes ROUND the other inhabitants (point 657, the
- * adults' half): where the wanted step would land in another body, the heading
+ * adults' half): where the wanted step would cross another body, the heading
  * deflects round it — the wildlife's own deflection, static ground and bodies
  * judged together — and the caller sweeps its own move to the returned point
  * exactly as before. Without this the errand walkers and porters steered by
  * colliders alone and walked straight THROUGH the children, who then had
  * nothing to walk round but a body already pressing on them.
  *
- * Cheap on the ordinary frame: everything beyond one `groundOccupied` probe
- * runs only when the direct step really lands in a body.
+ * Cheap on the ordinary frame: everything beyond one closed-form crossing test
+ * over the bodies runs only when the direct step really crosses a body.
  *
  * FULLY BOXED IN, THE ORIGIN COMES BACK — never the occupied destination
  * (GPT-5.6 Sol, 12.08.2026). The wanted point used to be returned unchanged,
@@ -300,7 +304,7 @@ export function stepRoundBodies(
   if (!(dist > 1e-9)) return { x: fromX, z: fromZ }
   // Reject a crossing while choosing the bearing, so another bearing is tried.
   // Testing only its endpoint picked the same unsweepable deflection forever
-  // beside a stationary water carrier, then rejected it below on every frame.
+  // beside a stationary water carrier, then rejected it afterwards on every frame.
   const both = (x: number, z: number) => blocked(x, z) || occupiedAt(x, z) || crosses(fromX, fromZ, x, z)
   const r = deflectedStep(fromX, fromZ, Math.atan2(dx, dz), dist, both, Math.max(dist, selfRadius * 2))
   return { x: r.x, z: r.z }
@@ -315,15 +319,17 @@ function stackedBearing(index: number): number {
 }
 
 /**
- * Pushes ONE body out of everything it overlaps, damped, and reports whether it
- * moved. The caller runs this right after its own stepper has written the body's
+ * Pushes ONE body out of everything it overlaps and reports whether the push
+ * moved it (an escape nudge is not reported here; it is counted in `nudges` and
+ * `carried`). The caller runs this right after its own stepper has written the body's
  * position, then reads `body.x`/`body.z` back into its figure — so the drawn
  * figure, the collider resolve and the body all agree within the frame.
  *
  * A fixed body never moves. A push into blocked ground is retried along the two
  * perpendiculars (sliding out along a wall rather than into it); when none of
  * the three is free the body counts as wedged, and past the calibratable window
- * it is nudged to free ground — bounded time, per point 578.3.
+ * the world's `nudge`, where one is given and finds free ground, carries it
+ * there — bounded time, per point 578.3.
  */
 export function separateBody(
   set: InhabitantSet,
@@ -351,8 +357,8 @@ function pushBody(
   dt: number,
   wedgeDt: number,
   cfg: SeparationConfig,
-  world: SeparationWorld = {},
-  budget = Math.max(0, cfg.maxSpeed) * dt,
+  world: SeparationWorld,
+  budget: number,
 ): number {
   if (!(dt > 0) || self.fixed || !self.active) return 0
   const selfIndex = set.bodies.indexOf(self)
@@ -479,17 +485,4 @@ export function separateGroup(
     }
     if (!moved) return
   }
-}
-
-/** Every non-fixed body of the set, resolved as one group. Handy for a caller
- *  that owns the whole set (and for the tests); a scene component separates its
- *  own bodies where it moved them, so the figure it draws is the body that was
- *  resolved. */
-export function separateAll(
-  set: InhabitantSet,
-  dt: number,
-  cfg: SeparationConfig,
-  world: SeparationWorld = {},
-): void {
-  separateGroup(set, set.bodies, dt, cfg, world)
 }

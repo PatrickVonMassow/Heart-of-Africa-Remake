@@ -36,7 +36,8 @@ export function createSceneFrame(scenePass: ReturnType<typeof createScenePass>, 
     },
     render(processing: RenderPipeline, temporal: TemporalPass | null) {
       // The first scene draw precedes the post graph's initial build/setup.
-      // Apply the pass's backend-dependent attachment policy before that draw.
+      // Apply the pass's attachment setup (scenePass.ts's single-sampled policy,
+      // shared by both backends) before that draw.
       scenePass.setup({ renderer } as unknown as Parameters<typeof scenePass.setup>[0])
       projection.copy(scenePass.camera.projectionMatrix)
       velocity.setProjectionMatrix(projection)

@@ -14,7 +14,7 @@
 //
 // Spans may nest (e.g. [emph] inside [excited]); the innermost mood wins.
 
-export type VoiceMood = 'neutral' | 'awe' | 'whisper' | 'excited' | 'somber' | 'weary' | 'fear'
+type VoiceMood = 'neutral' | 'awe' | 'whisper' | 'excited' | 'somber' | 'weary' | 'fear'
 
 /** One unit of speech: shaped text plus delivery parameters. */
 export interface SpeechSegment {
@@ -27,7 +27,6 @@ export interface SpeechSegment {
   pauseAfter: number
 }
 
-const MOODS = ['awe', 'whisper', 'excited', 'somber', 'weary', 'fear'] as const
 const TAG_RE = /\[(\/?)(awe|whisper|excited|somber|weary|fear|emph|mute|pause|breath)\]/g
 
 const PAUSE_SHORT = 0.45
@@ -39,7 +38,7 @@ export function stripVoiceMarkup(text: string): string {
   return text.replace(TAG_RE, '').replace(/ {2,}/g, ' ').trim()
 }
 
-// Punctuation shaping per mood: Kokoro reads "…" as a beat and "!" with
+// Punctuation shaping per mood: Kokoro reads "..." as a beat and "!" with
 // energy, so sentence endings are rewritten to carry the emotion.
 const endOfSentence = /(?<=\S)\.(?=\s|$)/g
 const softEnd = /(?<=\S)[.!](?=\s|$)/g
@@ -107,7 +106,8 @@ export function toSpeechSegments(text: string): SpeechSegment[] {
       addPause(PAUSE_EMPH)
     } else if (closing) {
       if (moodStack.length > 1) moodStack.pop()
-    } else if ((MOODS as readonly string[]).includes(tag)) {
+    } else {
+      // TAG_RE admits only the six moods here; every other tag is handled above.
       moodStack.push(tag as VoiceMood)
     }
   }
@@ -121,7 +121,7 @@ export function toSpeechSegments(text: string): SpeechSegment[] {
       volume: style.volume,
       pauseAfter: seg.pauseAfter,
     }
-  }).filter((seg) => seg.text.length > 0)
+  })
 }
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).

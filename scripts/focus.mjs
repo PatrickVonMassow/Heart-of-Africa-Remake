@@ -9,7 +9,8 @@
 //                                     # "I checked — focus and now-card still match"
 //   node scripts/focus.mjs show       # inspect
 //
-// `confirm` REFUSES (exit 1) while NO now-card names the declared focus — the
+// `confirm` REFUSES (exit 1) while NO now-card names a declared POINT focus (a
+// `-` focus skips the card check) — the
 // mismatch must be reconciled, not acknowledged away. The match is against ANY
 // now-card in the section, never only the first (point 713): several strands
 // legitimately stand at once, the section's order is the render's to decide
@@ -106,8 +107,8 @@ if (cmd === 'confirm') {
   if (focus.point != null && !cp.has(focus.point)) {
     console.error(
       `focus confirm REFUSED: no now-card names the declared focus ${focus.point} ("${focus.note ?? ''}") — ` +
-        `the section carries ${cardList(cp)}. Reconcile first — update the card (+ republish ` +
-        '+ --synced) or re-declare via focus.mjs set.',
+        `the section carries ${cardList(cp)}. Reconcile first — update the card, then ${REPUBLISH}, ` +
+        'or re-declare via focus.mjs set.',
     )
     process.exit(1)
   }

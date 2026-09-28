@@ -23,7 +23,7 @@ export function isExecutable(path) {
 
 /** Does this path exist at all? Shared libraries are not executable on Debian, so the
  *  chain probe below asks existence, not the X bit. (Total, like isExecutable.) */
-export function fileExists(path) {
+function fileExists(path) {
   try {
     accessSync(path, constants.F_OK)
     return true
@@ -52,7 +52,8 @@ export function hasHardwareGlChain(platform = process.platform, exists = fileExi
 }
 
 /**
- * The first candidate that exists, or null. A bare name is looked up on `pathVar` (the
+ * The first candidate that exists and is executable (`isExecutable` by default),
+ * or null. A bare name is looked up on `pathVar` (the
  * host's PATH), an absolute candidate is probed directly. Returns null on a platform
  * the pure core declines to probe (Windows, macOS), where Playwright resolves the
  * `chrome` channel itself.

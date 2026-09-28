@@ -11,8 +11,9 @@ const boundedLines = (value, fallback) => {
 /** Split run-logged's own flags from the arguments forwarded to run-all. The
  * three line selectors are bounded here before either --show or a verify
  * digest sees them; the character budget remains the final output ceiling.
- * `--no-ladder "<why>"` is consumed here too — run-all knows nothing about the
- * ladder, which is decided before the runner is ever spawned. */
+ * `--no-ladder "<why>"` is consumed here too: the wrapper asks the ladder before
+ * the runner is spawned and marks it asked (RVA_LADDER_ASKED), and run-all asks
+ * it itself only when no parent has. */
 export function parseRunLoggedArgs(argv) {
   const own = {
     show: null,

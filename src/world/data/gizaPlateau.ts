@@ -20,7 +20,9 @@ import { clearedOfRiversBy } from '../riverClearance'
 /** Rendered spread of the Giza field from its mount (Sphinx east end), degrees. */
 export const GIZA_FIELD_RADIUS_DEG = 0.35
 
-/** Raw anchor: the real plateau, west of the Nile at Cairo's latitude. */
+/** Raw anchor, west of the Nile at Cairo's latitude — about 0.5° west of the
+ *  real plateau (~31.13° E), since the rendered field must keep its radius
+ *  plus the river width clear of the Nile axis (~31.23° E here). */
 const GIZA_ANCHOR = { lat: 29.98, lon: 30.59 }
 
 /** The one position of the Giza plateau — landmark AND monument map point. */

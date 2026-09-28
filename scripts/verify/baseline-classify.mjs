@@ -21,13 +21,17 @@
 //   --current-context <standalone|in-pass>  how supplied failures were measured;
 //                       omitted means unknown, never assumed comparable
 //   --current-checks <n>  how many checks the CURRENT run reached — the yardstick
-//                       for the died-early verdict (point 418). run-all hands it
-//                       over; it is measured here when the suite runs here.
+//                       for the died-early verdict (point 418). A caller that
+//                       measured the run hands it over; it is measured here
+//                       when the suite runs here.
 //   --report-file <f>  write structured classification for the run report
 //   --keep              keep the baseline worktree even on success (it is reused
 //                       anyway; this only skips the retention prune)
-//   --strict            exit 1 when a SUSPECT check was found (default: 0 —
-//                       this is a triage aid, the suite result stays the gate)
+//   --strict            exit 1 when a SUSPECT check was found, a baseline run
+//                       died, or the baseline produced no result (default: 0 —
+//                       this is a triage aid, the suite result stays the gate).
+//                       A CURRENT run that crashed without naming a check
+//                       exits 1 regardless.
 //
 // SINCE POINT 1135 NOTHING CALLS THIS AUTOMATICALLY. The LARGE's baseline passes
 // are deleted: a red is classified against the charge ledger, which is the
@@ -36,9 +40,10 @@
 // worktree under the git-ignored local/verify-baseline/, sharing the repo's
 // node_modules through Node's ancestor resolution (no second install).
 //
-// The classification is EVIDENCE, not a verdict: it runs the CURRENT check
-// against the BASELINE app code, so it reports the caveats that can bend that
-// reading (a changed suite file, changed dependencies or boot helpers).
+// The classification is EVIDENCE, not a verdict: a browser suite runs the
+// CURRENT check against the BASELINE app code (a serverless suite runs the
+// baseline's own script), so it reports the caveats that can bend that reading
+// (a changed suite file, changed dependencies or boot helpers).
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -64,8 +69,8 @@ const ROOT = join(HERE, '..', '..')
 const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
 
 /** Files whose drift between the baseline and HEAD can bend the comparison:
- *  the baseline checkout runs against the CURRENT node_modules and the current
- *  shared boot helpers, because it has none of its own. */
+ *  the baseline checkout runs against the CURRENT node_modules (it has none of
+ *  its own) and, for a browser suite, the current shared boot helpers. */
 const INFRA_PATHS = [
   'package.json',
   'package-lock.json',
@@ -235,7 +240,7 @@ function runSuiteOnce({ suitePath, cwd, baseUrl, label, logPath, baselineLane, o
 async function main() {
   const opts = parseWrapperArgs(process.argv.slice(2))
   if (!opts.suite || ![...DEV_SUITES, 'crossbrowser'].includes(opts.suite)) {
-    console.log(`usage: node scripts/verify/baseline-classify.mjs <suite> [--ref <git-ref>] [--runs n] [--failed "<check>"] [--current-out <file>] [--report-file <file>] [--strict]`)
+    console.log(`usage: node scripts/verify/baseline-classify.mjs <suite> [--ref <git-ref>] [--runs n] [--failed "<check>"] [--current-out <file>] [--current-context standalone|in-pass] [--current-checks n] [--report-file <file>] [--keep] [--strict]`)
     console.log(`known suites: ${[...DEV_SUITES, 'crossbrowser'].join(', ')}`)
     process.exit(2)
   }
@@ -259,12 +264,12 @@ async function main() {
   const needsServer = !SERVERLESS_SUITES.includes(opts.suite)
   const tree = prepareBaselineTree(baseline.sha)
 
-  // What is red NOW: handed in by run-all (its captured output or the names), or
-  // measured here by running the suite in THIS tree.
+  // What is red NOW: handed in by the caller (its captured output or the names),
+  // or measured here by running the suite in THIS tree.
   let currentFailed = opts.failed.map(checkFromName)
   // runSuiteOnce is an isolated process. An inherited section filter narrows
   // BOTH locally measured runs; supplied failures have no such guarantee.
-  const section = String(process.env.VERIFY_SECTION ?? '').trim()
+  const section = String(process.env[SECTION_ENV] ?? '').trim()
   let baselineContext = section ? `standalone section "${section}"` : 'standalone'
   let currentContext = opts.currentContext
   // How far the CURRENT run got — the yardstick a died-early baseline is

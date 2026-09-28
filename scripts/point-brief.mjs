@@ -4,13 +4,13 @@
 // hundred words. The decision/assembly logic is pure in point-brief-core.mjs.
 //
 //   node scripts/point-brief.mjs 365            # the brief on stdout
-//   node scripts/point-brief.mjs 365 --tokens   # + the measured size on stderr
+//   node scripts/point-brief.mjs 365 --tokens   # + the estimated size on stderr
 //
 // Unlike the guards here this script FAILS LOUDLY (exit 1) rather than
 // fail-open: a silently thinned brief would send its reader off blind, and a
 // rebuild costs far more than the failed run. Over the token ceiling is a
-// failure too — a brief nobody notices is over budget is how the saving quietly
-// disappears.
+// failure too (exit 2, the brief still printed) — a brief nobody notices is over
+// budget is how the saving quietly disappears.
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
@@ -66,7 +66,8 @@ function gitRevision() {
  * itself names. But a brief is also REGENERATED — after a sync, after a review,
  * whenever the work order moved — and by then the branch carries the real thing.
  * The real diff beats a prospective list, so it is read here and handed in; an
- * empty answer (a clean tree on `main`) leaves the prospective path intact.
+ * empty answer (a clean tree on `main` level with origin/main) leaves the
+ * prospective path intact.
  *
  * Committed work is measured from the fork point, so `main`'s own traffic never
  * enters the set; uncommitted work is added because it is just as much part of
@@ -106,7 +107,9 @@ function currentDiffPaths() {
  * paths the spec named and the suites its mapping resolved to; everything here
  * is read at generation time, so nothing in the block can be stale.
  *
- * Three readings, each cheap and each bounded:
+ * Three readings, each cheap; only what the block PRINTS is capped (a header is
+ * scanned from the first 4000 characters of its file, and every named path is
+ * visited):
  *  - the named file's OWN first header line. These files open with a comment
  *    saying what they are for, which is a better one-liner than anything a
  *    generator could invent — and a path that is NOT in the tree is said so,
@@ -207,9 +210,10 @@ try {
   const { brief, tokens, designRefs, referenced } = buildBrief({
     tasksText: readTasksAll(),
     designText: readFileSync(DESIGN_PATH, 'utf8'),
-    // CLAUDE.md is read only to RECOGNISE its own sections (§7.1/§7.2 are cited
-    // without naming the file); the brief never carries its text — the harness
-    // injects CLAUDE.md into every context anyway.
+    // CLAUDE.md is read to RECOGNISE its own sections (§7.1/§7.2 are cited
+    // without naming the file) and its §7.1 criteria, which decide the criterion
+    // ambiguity; the brief never carries its text — the harness injects
+    // CLAUDE.md into every context anyway.
     claudeText: existsSync(CLAUDE_PATH) ? readFileSync(CLAUDE_PATH, 'utf8') : '',
     docs: readDocCorpus(),
     number,

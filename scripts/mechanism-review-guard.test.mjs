@@ -18,7 +18,6 @@ import {
   measureReviewGap,
   mechanismLogCommand,
   parseRangeLog,
-  parseMechanismLog,
   pendingReviewContributions,
   authorshipBlockResponse,
   authorshipRead,
@@ -28,7 +27,6 @@ import {
   rangeCommits,
   gatherMechanismReviewInputs,
   GATE_SWITCHED_OFF,
-  deferralEndsTheRun,
   statusReportsFindings,
   resolveMechanismReviewSessionId,
   shouldSeedRecoveryAnchor,
@@ -46,6 +44,12 @@ import {
   modelsFromTrailers,
 } from './mechanism-review-core.mjs'
 import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+
+/** The range parse narrowed to mechanism commits — the view these parser tests pin. */
+const parseMechanismLog = (out, files) =>
+  parseRangeLog(out)
+    .map((commit) => ({ ...commit, files: mechanismPathsIn(commit.files, { scriptFiles: files }) }))
+    .filter((commit) => commit.files.length)
 import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 
@@ -74,19 +78,6 @@ describe('the switched-off gate (point 1036)', () => {
     // decision under test is taken before any history is read.
     const read = gatherMechanismReviewInputs({ sessionId: '', report: true, ...EMPTY_RANGE })
     expect(read.applicable).toBe(true)
-  })
-
-  it('lets the report outlive a context-fence deferral, and only the report', () => {
-    // The fence suspends ENFORCEMENT. With the block gone there is nothing left
-    // to suspend, so a fenced session that exits before printing takes the last
-    // reader of the debt with it — the same silence the batch-lock stand-down
-    // used to produce.
-    expect(deferralEndsTheRun({ deferred: true }, { status: true })).toBe(false)
-    expect(deferralEndsTheRun({ deferred: true }, { status: false })).toBe(true)
-    expect(deferralEndsTheRun({ deferred: true })).toBe(true)
-    // An undeferred verdict never ends the run here either way.
-    expect(deferralEndsTheRun({ deferred: false }, { status: false })).toBe(false)
-    expect(deferralEndsTheRun(null, { status: false })).toBe(false)
   })
 
   it('reports the debt from the findings, never from the dead block flag', () => {

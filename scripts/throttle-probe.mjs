@@ -4,7 +4,8 @@
 //   node scripts/throttle-probe.mjs polish --section=ctrl-actor-labels --runs 8
 //
 // It runs ONE declared section of ONE suite N times with the whole stack pinned
-// to a single CPU and `rate - 1` busy processes squeezing that same CPU, and
+// to `--cpus` CPUs (one by default) and `rate - 1` busy processes per pinned CPU
+// squeezing each to about 1/rate of a core, and
 // reports how often it reddens and on which checks. That is the instrument the
 // point-600 repair used ad hoc — 8 of 8 red under a CPU throttle, the mechanism
 // named, 0 of 8 after the fix — made a house command, because the alternative on
@@ -42,6 +43,7 @@ import { DEV_SUITES, laneFor, selectBackend } from './verify/tiers.mjs'
 import {
   classifyRun,
   countAlive,
+  DEFAULT_TIMEOUT_MS,
   formatProbeReport,
   parseCpusAllowedList,
   parseProbeArgs,
@@ -63,7 +65,7 @@ const USAGE = [
   '  --rate <n>        how hard to squeeze: the run gets about 1/n of a core (default 4)',
   '  --cpus <n>        how many cores the whole run is pinned to (default 1)',
   '  --backend <b>     webgpu | webgl (default: the house lane)',
-  '  --timeout-ms <n>  kill a run that has not finished (default 900000)',
+  `  --timeout-ms <n>  kill a run that has not finished (default ${DEFAULT_TIMEOUT_MS})`,
   '  --no-throttle     the unthrottled control run, for comparison',
   '',
   'It reports the SKEW RATE and the checks that reddened. It closes no red:',
@@ -124,7 +126,7 @@ function startSpinners(plan) {
 
 /**
  * Is this process still BURNING CPU? Not "does the pid exist": a spinner that
- * exited while `spawnSync` held the event loop is an unreaped ZOMBIE, which
+ * exited and was not yet reaped is a ZOMBIE, which
  * still answers signal 0 and squeezes nothing. Linux says so in
  * /proc/<pid>/stat, whose third field is the state — `Z` for a zombie. Anything
  * unreadable counts as NOT running, which understates the squeeze rather than
@@ -143,8 +145,7 @@ function stillRunning(pid) {
 
 /** Kill them, and say how many were STILL RUNNING when the run ended — a spinner
  *  that died early squeezed nothing for the rest of it. Liveness is asked of the
- *  OS (signal 0), because the child objects cannot have learnt of an exit while
- *  spawnSync held the event loop. */
+ *  OS (/proc/<pid>/stat via stillRunning), never of the child objects. */
 function stopSpinners(spun) {
   const alive = countAlive(spun.map((c) => c.pid), stillRunning)
   for (const child of spun) {
@@ -196,10 +197,10 @@ function logDirFor(suite, section) {
 /**
  * ONE probe run, in its OWN PROCESS GROUP.
  *
- * `spawnSync`'s timeout kills the runner and nothing else, so a killed run left
- * its dev server and its browser behind — burning the very CPU the next run is
- * trying to measure, and holding its port. Detached, the child leads a group,
- * and the timeout kills the GROUP.
+ * Killing only the runner left its dev server and its browser behind — burning
+ * the very CPU the next run is trying to measure, and holding its port.
+ * Detached, the child leads a group, and our own timeout kills the GROUP
+ * (killTree); what left the group is swept after the kill (sweepAfterKill).
  */
 function runOnce(plan, opts) {
   const args = [
@@ -240,8 +241,8 @@ function runOnce(plan, opts) {
     })
     child.on('close', (code) => {
       clearTimeout(timer)
-      // A killed group leaves nothing behind, but give the descendants a moment
-      // to go before the next run starts measuring.
+      // Descendants that left the killed group are swept by the caller
+      // (sweepAfterKill) before the next run starts measuring.
       resolve({ out, timedOut, exit: timedOut ? null : code })
     })
   })
@@ -410,7 +411,7 @@ async function main(argv = process.argv.slice(2)) {
       checks,
       ran: suiteRanSince(startedAt, opts.suite, opts.section),
     })
-    results.push({ kind, ok: kind === 'green', checks, exit })
+    results.push({ kind, checks, exit })
     if (logDir) {
       try {
         writeFileSync(join(logDir, `run-${String(i + 1).padStart(2, '0')}.log`), out)
@@ -447,5 +448,3 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 if (isMainModule(import.meta.url)) process.exit(await main())
-
-export { main }

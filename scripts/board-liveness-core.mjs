@@ -29,9 +29,9 @@ export const LIVENESS_GRACE_MS = 5 * 60 * 1000
 export const STANDSTILL_AFTER_MS = LIVENESS_TICK_MS + LIVENESS_GRACE_MS
 
 /** The markers the rendered pieces carry, so a re-render replaces rather than stacks. */
-export const LIVENESS_CLASS = 'liveness'
-export const LIVENESS_STYLE_ID = 'board-liveness-style'
-export const LIVENESS_SCRIPT_ID = 'board-liveness-age'
+const LIVENESS_CLASS = 'liveness'
+const LIVENESS_STYLE_ID = 'board-liveness-style'
+const LIVENESS_SCRIPT_ID = 'board-liveness-age'
 
 const finite = (v) => {
   const n = Number(v)
@@ -42,7 +42,7 @@ const escapeHtml = (s) =>
   String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
 /** "vor 3 min", "vor 2 h 05 min" — German, whole minutes, never negative. */
-export function ageText(ms) {
+function ageText(ms) {
   const min = Math.max(0, Math.floor(Number(ms) / 60000))
   if (min < 60) return `vor ${min} min`
   const h = Math.floor(min / 60)
@@ -50,12 +50,12 @@ export function ageText(ms) {
 }
 
 /** "75 min" / "2 h 05 min" — a duration without the "vor". */
-export function durationText(ms) {
+function durationText(ms) {
   return ageText(ms).replace(/^vor /, '')
 }
 
 /** Berlin wall-clock time of an instant: "03:45", with the date when not today. */
-export function berlinClock(at, now = Date.now()) {
+function berlinClock(at, now = Date.now()) {
   const t = finite(at)
   if (!t) return '?'
   const day = (x) => new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }).format(new Date(x))
@@ -218,7 +218,7 @@ export function renderLivenessBlock({ liveness, progress, measuredAt = Date.now(
 }
 
 /** Portrait-legible: wraps anywhere, never overflows, standing is loud. */
-export const LIVENESS_STYLE =
+const LIVENESS_STYLE =
   `<style id="${LIVENESS_STYLE_ID}">` +
   '.liveness{margin:8px 0 12px;padding:8px 10px;border:1px solid var(--rule,#ccc);border-left:4px solid var(--ok,#5a8a4a);border-radius:6px;font-size:0.9rem;overflow-wrap:anywhere;word-break:break-word;max-width:100%;box-sizing:border-box}' +
   '.liveness p{margin:2px 0}' +
@@ -234,7 +234,7 @@ export const LIVENESS_STYLE =
  * than one tick plus grace — a cached page cannot claim a live batch.
  * Written without a less-than sign so no markup scanner can misread it.
  */
-export const LIVENESS_SCRIPT =
+const LIVENESS_SCRIPT =
   `<script id="${LIVENESS_SCRIPT_ID}">` +
   '(function(){function tick(){var el=document.querySelector(".liveness");if(!el)return;' +
   'var at=Number(el.getAttribute("data-measured-at"));var p=el.querySelector(".liveness-age");if(!p||!(at>0))return;' +

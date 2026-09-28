@@ -6,7 +6,7 @@
 import type { Material } from '../world/geo'
 import type { EquipmentId } from '../state/store'
 
-export interface BalanceConfig {
+interface BalanceConfig {
   /** Travel speed on the continent map, world units per second (1 unit = 0.1 degree). */
   travelSpeed: number
   /** Walking speed inside places (first-person), meters per second. */
@@ -375,8 +375,6 @@ export interface BalanceConfig {
      *  minimum presence is guaranteed (≈ 1.5× the default-zoom view ring). */
     vicinityRadius: number
   }
-  /** Touch / tablet controls (design.md §17.5, point 84). Feel only — the
-   *  gameplay speeds and sensitivities are unchanged. */
   /** Calf/parent water drama (design.md §19.8, point 122). */
   waterDrama: {
     /** Seconds a strong current may carry an animal before it drowns. */
@@ -423,7 +421,8 @@ export interface BalanceConfig {
     /** Per-prey weapon strength, reasoned from the animal's real armament. */
     preyWeapon: Record<string, number>
     /** Per-predator readiness to abandon a contested kill — INVERSE to §14.1's
-     *  danger order cheetah < leopard < hyena < lion (src/systems/events.ts). */
+     *  danger order cheetah < leopard < hyena < lion (src/systems/events.ts);
+     *  the crocodile, outside that order, is set on its own. */
     predatorFlight: Record<string, number>
     /** Per-predator fragility under a strong parent's strike (point 146):
      *  the kill factor of the revenge outcome. Kept LOW — being eaten stays
@@ -657,6 +656,8 @@ export interface BalanceConfig {
      *  acceptable, never to quieten a regression. */
     pictureFreezeBudgetMs: number
   }
+  /** Touch / tablet controls (design.md §17.5, point 84). Feel only — the
+   *  gameplay speeds and sensitivities are unchanged. */
   touch: {
     /** Virtual-stick travel radius (px) and its resting dead zone (px). */
     stickRadius: number
@@ -809,7 +810,8 @@ export interface BalanceConfig {
       partSeconds: number
       /** How long caught children stay down after the cycle's last run. */
       endPauseSeconds: number
-      /** How near a rock's centre counts as touching it. */
+      /** Arrival (safe) radius around a rock's centre, outside its collider;
+       *  the runner walks on from here before its hand names the stone. */
       reachDistance: number
       /** How far off a rock's centre a child's waiting station stands. */
       standOff: number
@@ -835,9 +837,9 @@ export interface BalanceConfig {
        *  spoken at the top of the rise, so this is the time the player has to
        *  connect the word with what the child is standing on. */
       climbHoldSeconds: number
-      /** How high a scattered boulder's top must stand for the stage to prefer
-       *  it as the one that gets climbed (m). Below it a stone is a pebble a
-       *  child would step over rather than onto. */
+      /** How high a scattered boulder's top must stand for the FALLBACK search
+       *  to take it as the climbed stone when the layout derived none (m); with
+       *  none that tall the fallback takes the tallest stone there is. */
       climbableRockTop: number
       /** The most OVERTIME the off-game ROCK guard may hold a cycle for, past
        *  the roaming phase's own length. Beyond it the RIVER call goes out with
@@ -1161,7 +1163,7 @@ export const balance: BalanceConfig = {
     dehydrationOnsetDays: 0.5,
     canteenDrainPerDay: 0, // demo start preset (point 104): no thirst by default (was 0.9); debug-editable
     canteenDesertDrainPerDay: 0, // demo start preset (point 104): was 3.0; debug-editable
-    canteenCapacity: 500, // user calibration: reduced from 2000; a full canteen now lasts 500/0.9 ≈ 555 land days
+    canteenCapacity: 500, // user calibration: reduced from 2000; at the former 0.9 drain a full canteen lasted 500/0.9 ≈ 555 land days
     sunblindRecoveryDays: 3,
     poorThreshold: 40,
   },
@@ -1272,7 +1274,7 @@ export const balance: BalanceConfig = {
     // Calibratable (point 245): juveniles are the preferred prey — raised from
     // the earlier 0.6 so the family drama fires more often near the player.
     juvenilePreyBias: 0.85,
-    // Calibratable (point 245): a drinking calf is ≫ 6× the lunge weight of an
+    // Calibratable (point 245): a drinking calf is 6× the lunge weight of an
     // adult drinker, so the crocodile ambush overwhelmingly picks the juvenile.
     juvenileDrinkCrocBias: 6,
     // Calibratable (point 262): a bereaved juvenile is taken in by an adult of
@@ -1536,7 +1538,8 @@ export const balance: BalanceConfig = {
       // find the child and the stone under it, and comes down a touch faster
       // than it went up. At a middling boulder that makes the rise ~1.2 m
       // across and ~0.42 m up in 0.9 s: a walking pace while climbing.
-      // Together ~4.5 s per naming, five or six namings in ten minutes: still a
+      // Together ~4.5 s per naming at the then 2.8 s hold, five or six namings
+      // in ten minutes: still a
       // small part of a roaming phase, so the group keeps wandering and the
       // child-motion floor (25 m per played minute against a measured 102 m) is
       // untouched.
@@ -1556,18 +1559,19 @@ export const balance: BalanceConfig = {
       climbHoldSeconds: 7,
       climbSinkSeconds: 0.7,
       // A stone whose top is lower than this is a pebble: a child steps OVER it
-      // rather than onto it, and the climb would read as a stumble. It is a
-      // FLOOR and not a preference — measured, because the first cut of it was
-      // both. At 0.30 m the bar refused the nearest stone in two of four shipped
+      // rather than onto it, and the climb would read as a stumble. HISTORY
+      // (before work-order 1082, when the value was 0.20 m): it was then a
+      // search FLOOR, measured, because the first cut of it was both floor and
+      // preference. At 0.30 m the bar refused the nearest stone in two of four shipped
       // village/seed layouts and sent the climber to one 5 m further off (in
       // bambara-village at seed 2972259115, 6.7 m → 12.0 m); the approach then
       // failed, the guard spent its overtime with the boulder unnamed, and the
       // group's whole trajectory moved enough to push a child's station-walk
       // over the shuffle gate (0.274 % against 0.25 %). The scatter's tops run
       // 0.16-0.53 m, and 0.25 m is a child's step; only the smallest instances
-      // are genuinely too low to stand on. At 0.20 m the nearest stone wins in
-      // every shipped layout, which is what the round wants: the stone the
-      // children are next to anyway.
+      // are genuinely too low to stand on. At 0.20 m the nearest stone won in
+      // every shipped layout, which was what the round wanted: the stone the
+      // children were next to anyway.
       //
       // THE COMPETITION IS OVER (work-order 1082), so the floor could be raised
       // where the note above could not raise it: the layout now DERIVES the
@@ -1610,15 +1614,15 @@ export const balance: BalanceConfig = {
       // so an atom runs 1.2 s; this leaves a clear breath between two moments
       // that fall together.
       utteranceGapSeconds: 2,
-      // The long-run alarm's window (point 589), which the bank round inherits
-      // from the situation catalogue the five-word rebuild deleted. Read off the
+      // The long-run alarm's window (point 589), first set for the situation
+      // catalogue the five-word rebuild deleted and now read off the bank
       // round's OWN phases: the longest LEGITIMATE quiet spell runs from the
       // last arrival to the next cycle's RIVER call — endPauseSeconds (3), the
       // walk home (8), plus a
       // roaming phase at its widest spread (55 x 1.25 = 68.75) plus the off-game
-      // ROCK guard's whole overtime (45), which is ~122 s, and in that stretch a
-      // cycle whose boulder proves unreachable says nothing at all. Half again
-      // over that, so only a round that has genuinely stopped speaking trips it.
+      // ROCK guard's whole overtime (45), which is ~125 s, and in that stretch a
+      // cycle whose boulder proves unreachable says nothing at all. Roughly
+      // half again over that, so only a round that has genuinely stopped speaking trips it.
       roundSilenceSeconds: 180,
     },
     // The adults' errands (work-order point 483). Calibratable starting values
@@ -1714,8 +1718,9 @@ export const balance: BalanceConfig = {
     //    stand 0.48 m apart — clear of one another at the torso without the
     //    village shouldering itself all day (the animals' 0.18 for the same
     //    reason). A child is drawn at 0.55, so its pair separates at 0.264 m.
-    //  - THE CATCH WINS (point 578.4): the children's catch distance is 0.8 m,
-    //    three times the separation two children settle at, so a chaser is
+    //  - THE CATCH WINS (point 578.4): the children's catch distance (0.45 m in
+    //    tag, 0.8 m in the bank game) is 1.7 to three times the separation two
+    //    children settle at, so a chaser is
     //    always well inside its tag before the bodies ever touch.
     //  - THE SLOP is the anti-jitter half, and it is the whole of it: nothing is
     //    corrected inside a centimetre, so a settled pair has nothing left to

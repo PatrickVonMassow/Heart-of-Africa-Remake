@@ -4,7 +4,7 @@ import { openStateStore, writeFileAtomic } from './batch-state.mjs'
 import { advanceLanding, landingLockVerdict, landingReadyToMerge } from './batch-landing-journal-core.mjs'
 
 const readJson = (path) => { try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return null } }
-export const landingPaths = (store) => ({ journal: join(store.dir, 'landing.json'), lock: join(store.dir, 'landing.lock'), owner: join(store.dir, 'landing.lock', 'owner.json') })
+const landingPaths = (store) => ({ journal: join(store.dir, 'landing.json'), lock: join(store.dir, 'landing.lock'), owner: join(store.dir, 'landing.lock', 'owner.json') })
 
 export function acquireLandingLock({ repoDir, batchId, claimant } = {}) {
   const store = openStateStore({ repoDir, batchId })
@@ -21,12 +21,12 @@ export function acquireLandingLock({ repoDir, batchId, claimant } = {}) {
   }
 }
 
-export function readLanding({ repoDir, batchId } = {}) {
+function readLanding({ repoDir, batchId } = {}) {
   const store = openStateStore({ repoDir, batchId })
   return readJson(landingPaths(store).journal)
 }
 
-export function writeLanding({ repoDir, batchId, transaction } = {}) {
+function writeLanding({ repoDir, batchId, transaction } = {}) {
   const store = openStateStore({ repoDir, batchId })
   writeFileAtomic(landingPaths(store).journal, `${JSON.stringify(transaction)}\n`)
   return { ok: true }

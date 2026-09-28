@@ -1,7 +1,9 @@
 // SessionStart hook: auto-resume the TASKS.md batch (user mandate 2026-07-14 —
 // the batch must complete autonomously; no session may sit idle waiting for a
-// "continue"). Prints the resume instruction only while TASKS.md still has
-// unticked points AND this session actually WINS the batch ownership:
+// "continue"). Every session first re-arms a dead launcher. Prints the resume
+// instruction only while TASKS.md still has actionable points AND this session
+// actually WINS the batch ownership; otherwise it prints the all-gated, pause or
+// stand-down text:
 //   - a user PAUSE marker (.claude/batch-paused) suppresses auto-resume entirely
 //     until an explicit go;
 //   - ownership goes through the ATOMIC acquire in scripts/batch-singleton.mjs
@@ -51,7 +53,7 @@ import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 import { currentFableState } from './fable-switch.mjs'
-import { OPUS_MODEL, servingPolicyLine } from './fable-switch-core.mjs'
+import { servingPolicyLine } from './fable-switch-core.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { noteHandoverAttributionSuccessorStart } from './handover-attribution.mjs'
 
@@ -103,6 +105,8 @@ function ownsBatch(ownership) {
   return ownership === 'acquired-spawn' || ownership === 'acquired' || ownership === 'mine'
 }
 
+const MANDATE_PATH = repoPath('.claude', 'repo-mandate.json')
+
 /** The doctor's verdict on the tree this session woke up in (point 442).
  *
  *  PREFER THE LAUNCHER'S OWN READING. When a successor was just spawned, the
@@ -120,8 +124,6 @@ function ownsBatch(ownership) {
  *  Never throws: an unrunnable doctor reports itself and `resumeRepairMandate` stays
  *  silent about it — the launcher's alert already carries that news, and a session
  *  cannot mend a broken doctor. */
-const MANDATE_PATH = repoPath('.claude', 'repo-mandate.json')
-
 function readRepoVerdict(nowMs = Date.now()) {
   // One-shot, expiring, junk-proof — and now UNDER TEST (point 443 (h)): the read
   // and the deletion live in scripts/batch-doctor-states.mjs, the rule that judges
@@ -146,8 +148,8 @@ function readRepoVerdict(nowMs = Date.now()) {
 
 // One-shot marker the OS launcher writes when it spawns a session to take over
 // a DEAD batch. It merely helps BIND the spawned session to the launcher's
-// pending-spawn lock — it never overrides a live lock (the atomic acquire
-// remains the only way to ownership).
+// pending-spawn lock — it never overrides a live lock (ownership comes only
+// through convertPendingSpawn or the atomic acquire).
 const AUTH_PATH = repoPath('.claude', 'autostart-authorized.json')
 function autostartAuthorization(nowMs) {
   try {
@@ -210,17 +212,16 @@ try {
 }
 
 const RESUME_BODY =
-  'Continue the batch autonomously per CLAUDE.md/TASKS.md — feature-branch workflow ' +
+  'Continue the batch autonomously per CLAUDE.md/TASKS.md, ONE stretch of work per session (POINT ' +
+  'BOUNDARY below) — feature-branch workflow ' +
   '(§6): each point on its OWN feat/<point>-<slug> branch off main; implement -> docs -> ' +
   'tests -> atomic commit + push the BRANCH after every commit; merge to main ONLY when the ' +
   'point is complete + verified (tests green; render/GUI changes picture-checked on BOTH ' +
-  'backends); TASKS.md is MAIN-only — tick the point on main at the merge; cross-cutting ' +
-  'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
+  'backends); TASKS.md is MAIN-only — tick the point on main at the merge; small cross-cutting ' +
+  'bookkeeping may land directly on main, a larger mechanism goes to its own worktree. MAXIMAL ' +
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
   'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
-  'the model policy stated above, so the points go to GPT-6 Astra — the hard and critical ' +
-  'ones included — while a point whose verification is the work stays with ' + OPUS_MODEL + ' unless ' +
-  'its spec marks it hard ' +
+  'the model policy stated above, whose lanes decide who authors each point ' +
   '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
   'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
@@ -274,8 +275,8 @@ try {
     const nums = open.map((l) => l.match(/\d+/)[0])
     const fableState = currentFableState()
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
-    // degraded to Haiku and wrecked three points — name the ALLOWLIST at every
-    // session start; the model-guard Stop hook enforces it at the first
+    // degraded to Haiku and wrecked three points — name the authoring policy at
+    // every session start; the model-guard Stop hook enforces it at the first
     // forbidden commit.
     // The policy wording also NAMES THE COMMISSION COMMAND (point 1077,
     // 09.09.2026): the cut ran and the command did not — 280 of 379 open points
@@ -333,12 +334,11 @@ try {
       // launcher spawned — must NOT take the lock the owner is about to release
       // for that window, or the claim would hand the batch straight back to a
       // headless successor. Only a live, unexpired claim by a session that is not
-      // THIS one reserves; the walk that establishes our own identity is paid for
-      // only when a claim file actually exists.
+      // THIS one reserves.
       const claim = readClaim()
-      // Resolved ONCE and reused: the stand-down below needs the same identity
-      // to tell "I am the responder the watcher woke" from "some responder is
-      // running", and the ancestor walk is the expensive half of this branch.
+      // The ancestor resolved once at startup is reused, and only when a claim
+      // exists: the stand-down below needs it to tell "I am the responder the
+      // watcher woke" from "some responder is running".
       const ancestor = claim ? sessionProcess : null
       // The lock is read BEFORE the claim is judged: whether a LIVE SESSION owner
       // still holds it decides whether the claim ages at all (point 434 (6a)) —
@@ -452,7 +452,7 @@ try {
         )
       } else {
         // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
-        // Four situations reach this branch and they need different words — most
+        // Five situations reach this branch and they need different words — most
         // of all the MESSAGE RESPONDER, which the single old text forbade the one
         // thing it was woken to do (append the user's instruction as a point), so
         // an instruction from the phone was read, obeyed into silence and lost.

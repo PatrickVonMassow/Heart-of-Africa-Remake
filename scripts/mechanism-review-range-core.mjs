@@ -8,12 +8,12 @@ import { independentReviewProblem, modelVendor, sameModel } from './mechanism-re
 import { ASTRA_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
 import { passComposition } from './review-material-core.mjs'
 
-export const REVIEWER_CANDIDATES = Object.freeze([ASTRA_MODEL, OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
-export const UNREVIEWABLE_NARROWING_REMEDY =
+const REVIEWER_CANDIDATES = Object.freeze([ASTRA_MODEL, OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
+const UNREVIEWABLE_NARROWING_REMEDY =
   'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-astra.'
-export const NO_ELIGIBLE_REVIEWER_REASON =
+const NO_ELIGIBLE_REVIEWER_REASON =
   `every configured reviewer model authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
-export const UNKNOWN_AUTHOR_REVIEWER_REASON =
+const UNKNOWN_AUTHOR_REVIEWER_REASON =
   `authorship vendor is unknown, so no reviewer can prove cross-vendor independence. ${UNREVIEWABLE_NARROWING_REMEDY}`
 
 // THE FOUR-EYES GATE IS ON MECHANISMS, NOT ON THE WORK ORDER (cross-vendor
@@ -69,7 +69,7 @@ export function reviewEndStateFiles(files = []) {
 // Spelled via fromCharCode so this source file stays free of raw control bytes.
 const RANGE_RECORD = String.fromCharCode(0x1e)
 const RANGE_FIELD = String.fromCharCode(0x1f)
-// A header line, WHOLE: sentinel, 40-hex sha, epoch — and nothing free-text
+// A header line, WHOLE: sentinel, 40-hex sha, epoch, parent shas — and nothing free-text
 // (escalation round, pass 2). The header used to carry the subject and the
 // trailers behind two more separators, and a legal SUBJECT containing the
 // separator shifted the real trailer field out of the destructuring — the
@@ -126,7 +126,7 @@ export function commitObjectParents(out) {
   // otherwise read as a header that terminated immediately and answer "no
   // parents": the same silent nothing a hidden merged tip produces.
   if (!/^tree [0-9a-f]{40}$/.test((lines[0] ?? '').replace(/\r$/, ''))) {
-    throw new Error('output does not open on a commit object header terminator — its parent lines cannot be trusted')
+    throw new Error('output does not open on a commit object tree line — its parent lines cannot be trusted')
   }
   const parents = []
   let terminated = false
@@ -147,8 +147,8 @@ export function commitObjectParents(out) {
       // that ends the header — so a truncated read answered with the parents it
       // happened to have seen. A real object always has something after that
       // blank line, even if only the empty string its own trailing newline
-      // leaves. A caller that TRIMS its output loses that evidence for a commit
-      // with an empty message, and such a commit is then refused: no tooling in
+      // leaves. The recorder's git() TRIMS its output and so loses that evidence
+      // for a commit with an empty message, which is then refused: no tooling in
       // this repository writes one, and refusing is the safe side.
       terminated = index < lines.length - 1
       break
@@ -225,8 +225,9 @@ export function commitAuthors(commit = {}) {
  * contribution belongs to the trailer-bearing tip(s) Git says it merged (all
  * non-first parents). This is structural ancestry, not a subject-line guess.
  *
- * An ordinary trailerless commit, or a merge whose merged parent is outside the
- * measured range or is itself unattributable, deliberately stays unknown.
+ * An ordinary trailerless commit, or a merge whose merged parent is itself
+ * unattributable, deliberately stays unknown. A merged parent outside the
+ * measured range is read from the caller's `parentAuthorModels`, else unknown.
  */
 const authorshipResolver = (commits = []) => {
   const bySha = new Map((commits ?? []).map((commit) => [String(commit?.sha ?? ''), commit]))
@@ -390,8 +391,10 @@ export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
  * Group end-state files into reviewable authorship slices.
  *
  * Files with the same author-vendor set may travel together. A path touched by
- * both vendors stays ONE end-state file group; it is explicitly unreviewable
- * when no third vendor is configured, never expanded back into commit slices.
+ * both vendors stays ONE end-state file group, reviewed by the first configured
+ * model that authored none of it (see eligibleReviewer) and explicitly
+ * unreviewable only when every configured model authored part of it; it is
+ * never expanded back into commit slices.
  */
 export function planAuthorshipGroups({
   commits = [],
@@ -448,7 +451,8 @@ const contained = (record, sha) => {
  *     wrong type and is never coerced into a time.
  *  2. Among the readings that carry a clock, the newest rules — the later
  *     LEDGER LINE breaking a tie, the ledger being append-only.
- *  3. An unclocked reading cannot be placed in that order, so it never CLEARS.
+ *  3. An unclocked reading cannot be placed in that order, so while a clocked
+ *     reading exists it never CLEARS.
  *     But a refusal appended AFTER that newest clocked reading is exactly what
  *     the line still proves, so it rules and the contribution stays owed.
  *     Appended BEFORE it, the refusal is superseded — nothing can freeze a
@@ -553,12 +557,8 @@ export function outstandingFiles({
         continue
       }
       const key = artefact.file
-      // A CLOCK IS A NUMBER OR IT IS NOTHING. `Number(record.at ?? 0)` read a
-      // numeric STRING as a time and an absent stamp as the epoch, so a row
-      // whose clock nobody wrote still outranked one that had it; and `NaN`
-      // could not be ordered at all, which froze the first such row as the
-      // permanent winner and hid every later reading behind it.
-      const at = typeof record.at === 'number' && Number.isFinite(record.at) ? record.at : null
+      // A CLOCK IS A NUMBER OR IT IS NOTHING: clockOf owns that rule.
+      const at = clockOf(record)
       if (!latest.has(key)) latest.set(key, [])
       // Pushed in ledger order: the position in this list IS the line, so no
       // reading carries a line of its own that could go missing.
@@ -626,62 +626,4 @@ export function formatInvalidatedCoverage(items = [], { quoteFile = String } = {
     lines.push(`    ${String(record.sha).slice(0, 7) || '<unknown>'}${pass}: ${record.files.map(quoteFile).join(', ')}`)
   }
   return lines.join('\n')
-}
-
-/** Rebuild commit input from an outstanding end-state file list. */
-export function commitsForFiles(artefacts = []) {
-  const bySha = new Map()
-  for (const artefact of artefacts ?? []) {
-    for (const contribution of artefact.changes ?? []) {
-      if (!bySha.has(contribution.sha)) {
-        bySha.set(contribution.sha, { ...contribution.commit, sha: contribution.sha, files: [] })
-      }
-      const commit = bySha.get(contribution.sha)
-      if (!commit.files.includes(artefact.file)) commit.files.push(artefact.file)
-    }
-  }
-  return [...bySha.values()]
-}
-
-/** The typed facts printed by --status; an unavailable size plan is never zero. */
-export function summarizeReviewDebt({ outstanding = [], sizedPlan = null } = {}) {
-  const owed = Array.isArray(outstanding) ? outstanding.length : 0
-  if (!owed) return { passCount: 0, materialChars: 0, groups: [] }
-  // `typeof` before coercion: `Number(null)` and `Number('')` are 0, so an
-  // UNMEASURED rawSize would pass a bare isFinite check and report zero
-  // material — a cleared-looking figure for work nobody measured.
-  if (
-    !sizedPlan ||
-    !Array.isArray(sizedPlan.passes) ||
-    typeof sizedPlan.rawSize !== 'number' ||
-    !Number.isFinite(sizedPlan.rawSize)
-  ) {
-    return { passCount: null, materialChars: null, groups: [] }
-  }
-  // The size a reader can ACT on is what the owed passes carry, because that is
-  // what a round reads and what the budget bounds. The plan's own `rawSize` is
-  // the UNSPLIT assembly of every group — measured 18.08.2026 it stood at 466106
-  // beside a one-round plan whose pass carried 116875, and a figure four times
-  // the budget beside "1 pass" reads as a count that cannot be true.
-  // A PART-MEASURED PLAN REPORTS NOTHING. Summing what some passes carry and
-  // treating an unmeasured one as zero understates the debt by exactly the
-  // passes nobody sized, and understating it is how this gate came to be
-  // ignored. Only two answers are honest: what every pass carries, or — where
-  // none was measured — the plan's unsplit assembly, which at least names its
-  // own frame.
-  const sizes = sizedPlan.passes.map((pass) => {
-    const size = Number(pass?.rawSize ?? pass?.size)
-    return Number.isFinite(size) ? size : null
-  })
-  const measured = sizes.filter((size) => size !== null)
-  const materialChars = !measured.length
-    ? Number(sizedPlan.rawSize)
-    : measured.length < sizes.length
-      ? null
-      : measured.reduce((sum, size) => sum + size, 0)
-  return {
-    passCount: sizedPlan.passes.length,
-    materialChars,
-    groups: sizedPlan.passes,
-  }
 }

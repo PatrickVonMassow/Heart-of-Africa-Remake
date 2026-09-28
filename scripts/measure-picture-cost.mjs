@@ -1,8 +1,8 @@
 // Measures what ONE rendered-picture check costs (work-order point 361, measure phase).
 //
-// The picture check is the project's most expensive control, and 42 of the open
-// points touch the canvas — but the price of a SINGLE check was never measured.
-// This script produces the numbers that `docs/picture-check-cost.md` records:
+// The picture check is the project's most expensive control, and many open points
+// touch the canvas — but the price of a SINGLE check had not been measured before
+// this script. It produces the numbers that `docs/picture-check-cost.md` records:
 //
 //   1. per suite: how many screenshots it writes, their pixel dimensions and
 //      byte sizes, and its wall-clock runtime;
@@ -25,8 +25,9 @@
 // therefore, costs ceil(width / 28) x ceil(height / 28) visual tokens." Models
 // from Claude 4.7 on are the HIGH-RESOLUTION tier: long edge <= 2576 px and
 // <= 4784 visual tokens; everything else is the STANDARD tier (1568 px / 1568
-// tokens). Larger images are downscaled first. Every screenshot here is well
-// inside the high-resolution tier's limits, so the formula applies unclamped.
+// tokens), which this script does not model. Larger images are downscaled first.
+// The screenshots are expected inside the high-resolution limits; one that is not
+// is flagged `clamped`, but its token figure stays the unscaled formula.
 //
 // Usage: node scripts/measure-picture-cost.mjs [--json]
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
@@ -39,18 +40,18 @@ const SUITE_DIR = join(ROOT, 'scripts', 'verify')
 const STATE = join(ROOT, '.claude', 'render-verify-state.json')
 
 /** One visual token per 28x28 patch; partial patches count as whole ones. */
-export const PATCH = 28
+const PATCH = 28
 /** High-resolution tier (Claude 4.7 and later): long-edge and token ceilings. */
-export const HIRES_MAX_LONG_EDGE = 2576
-export const HIRES_MAX_TOKENS = 4784
+const HIRES_MAX_LONG_EDGE = 2576
+const HIRES_MAX_TOKENS = 4784
 
 /** Visual tokens an image of these pixel dimensions costs to LOOK at. */
-export function visualTokens(width, height) {
+function visualTokens(width, height) {
   return Math.ceil(width / PATCH) * Math.ceil(height / PATCH)
 }
 
 /** Does this image fit the high-resolution tier without being downscaled? */
-export function fitsHiRes(width, height) {
+function fitsHiRes(width, height) {
   return Math.max(width, height) <= HIRES_MAX_LONG_EDGE && visualTokens(width, height) <= HIRES_MAX_TOKENS
 }
 
@@ -68,7 +69,7 @@ function pngSize(buf) {
  * A bare `${OUT}${name}.png` (flow, world, preview) carries no literal at all
  * and matches nothing — those suites are attributed from the run log instead.
  */
-export function screenshotMatchers(source) {
+function screenshotMatchers(source) {
   const out = []
   for (const m of source.matchAll(/\$\{OUT\}([^`'"]*?\.png)/g)) {
     const tpl = m[1]
@@ -90,7 +91,7 @@ function escapeRx(s) {
 }
 
 /** Every on-disk screenshot with its dimensions, bytes and reviewing tokens. */
-export function inventory(dir = SHOT_DIR) {
+function inventory(dir = SHOT_DIR) {
   if (!existsSync(dir)) return []
   const rows = []
   for (const name of readdirSync(dir)) {
@@ -111,7 +112,7 @@ export function inventory(dir = SHOT_DIR) {
 }
 
 /** suite name -> matchers, from the suite sources. */
-export function suiteMatchers(dir = SUITE_DIR) {
+function suiteMatchers(dir = SUITE_DIR) {
   const map = new Map()
   for (const f of readdirSync(dir)) {
     if (!f.endsWith('.mjs') || f.endsWith('.test.mjs') || f.startsWith('_')) continue
@@ -127,7 +128,7 @@ export function suiteMatchers(dir = SUITE_DIR) {
  * names per record), which covers the suites whose call sites go through a
  * `shot(name)` helper and leave no literal in the source.
  */
-export function recordedOwners(path = STATE) {
+function recordedOwners(path = STATE) {
   const owners = new Map()
   if (!existsSync(path)) return owners
   const state = JSON.parse(readFileSync(path, 'utf8'))
@@ -138,7 +139,7 @@ export function recordedOwners(path = STATE) {
 }
 
 /** Attribute each screenshot to the suite whose source (or run log) names it. */
-export function attribute(shots, matchers, recorded = new Map()) {
+function attribute(shots, matchers, recorded = new Map()) {
   const bySuite = new Map()
   const orphans = []
   for (const shot of shots) {
@@ -162,7 +163,7 @@ export function attribute(shots, matchers, recorded = new Map()) {
 }
 
 /** Recorded verify runs: runtime and shot count per suite/backend. */
-export function runs(path = STATE) {
+function runs(path = STATE) {
   if (!existsSync(path)) return []
   const state = JSON.parse(readFileSync(path, 'utf8'))
   return (state.runs ?? []).map((r) => ({
@@ -176,7 +177,7 @@ export function runs(path = STATE) {
 }
 
 /** Median of a numeric array (0 for empty). */
-export function median(xs) {
+function median(xs) {
   if (!xs.length) return 0
   const s = [...xs].sort((a, b) => a - b)
   const mid = s.length >> 1

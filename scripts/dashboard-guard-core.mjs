@@ -10,6 +10,7 @@
 //
 // Every remedy below names the publish steps from scripts/board-remedy.mjs —
 // one copy, so a transport change cannot leave a block pointing at a dead path.
+// (The offline escape, `dashboard-publish.mjs --defer`, is named directly.)
 import { PUBLISH_CMD, REPUBLISH, SYNCED_CMD } from './board-remedy.mjs'
 import { pointNumbersFromChip, pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 
@@ -33,14 +34,14 @@ export function parseTasks(text) {
 /**
  * ALL point numbers of the now-SECTION cards — from the numbered CHIP
  * (`<span class="num">210</span>`, the shape every now-card carries since
- * point 655) or, for a card written before that, the leading number of its
- * TITLE (`<span class="t">210 — …`). As a Set in document order. With the
+ * point 655) and from its TITLE's ownership grammar (`<span class="t">210 — …`);
+ * both are read on every card. As a Set in document order. With the
  * feature-branch + worktree workflow several TASKS points are worked in
  * parallel, so "Woran ich gerade arbeite" holds one card PER point in active
  * work (user decision 22.07.2026) — every invariant below reads this SET, not
- * a single card. Only card TITLES count, never incidental mentions in the
- * status text ("the point-200 class" falsely covered 200 once); a card whose
- * title has no leading number (non-point work) contributes nothing. Empty Set
+ * a single card. Only the chip and the title count, never incidental mentions
+ * in the status text ("the point-200 class" falsely covered 200 once); a card
+ * with neither (non-point work) contributes nothing. Empty Set
  * on a missing section or non-string input.
  */
 export function parseNowCardPoints(html, options = {}) {
@@ -151,9 +152,6 @@ export function parseKlaerungPoints(html, options = {}) {
 /** The four binding sections, in the user's mandated order (18.07.2026). */
 export const SECTION_TITLES = ['Woran ich gerade arbeite', 'Von dir zu klären', 'Warteschlange', 'Erledigt']
 
-/** Sections whose whole body collapses behind their heading (user 26.07.2026).
- *  Erledigt is the archive: it dwarfs the board and is the least-read part, so
- *  its heading is the toggle and it starts CLOSED like every card. */
 /** Every section folds behind its own heading (user 27.07.2026); only Erledigt
  *  starts closed, and the `open` ban plus the board's script handle that. */
 export const COLLAPSIBLE_SECTIONS = [
@@ -186,7 +184,7 @@ export const QUEUE_GATED_META = 'wartet auf deine Entscheidung'
 
 /** The body that same generated card carries while nobody has written prose for
  *  the point. Defined here for the same reason as the meta above: the rule that
- *  COUNTS these cards must recognise the exact string the generator emits. */
+ *  COUNTS these cards recognises it by its first 40 characters. */
 export const QUEUE_STUB_BODY =
   'Noch keine Beschreibung auf dem Board — der Punkt steht im Arbeitsauftrag. ' +
   'Text setzen: node scripts/board.mjs queue <N> "<Text>".'
@@ -194,10 +192,10 @@ export const QUEUE_STUB_BODY =
 /** How much of the queue may be placeholder before it counts as a regression.
  *  A quarter is generous for a normal day — a handful of freshly appended points
  *  with no prose yet — and far below the 97 % the board actually reached. */
-export const STUB_SHARE_CEILING = 0.25
+const STUB_SHARE_CEILING = 0.25
 /** …and how many may stand in a ROW. A run is what a reader hits: three stubs
  *  in sequence already reads as an empty board however good the rest is. */
-export const STUB_RUN_CEILING = 3
+const STUB_RUN_CEILING = 3
 
 // cp1252: byte → displayed char (the 0x80-0x9F block; every other byte shows
 // its own code point). The detector uses it REVERSED.
@@ -218,7 +216,9 @@ const CP1252_REVERSE = (() => {
 /**
  * Structural mojibake detector (Opus plan-review change 1): instead of a
  * substring blocklist, map each char back to its cp1252 byte and flag any spot
- * where a VALID UTF-8 multibyte sequence emerges — that shape only arises when
+ * where a UTF-8-SHAPED multibyte run emerges (a lead byte C2–F4 followed by the
+ * right number of continuation bytes; overlongs and surrogates are not told
+ * apart) — that shape only arises when
  * UTF-8 bytes were mis-read as cp1252 (the 24.07 damage hit umlauts, dashes,
  * quotes, the minus and pi signs and even the BOM). Legitimate content
  * (German text, typographic quotes, em dashes, middots, arrows, check marks,
@@ -311,20 +311,19 @@ export function sliceSections(html) {
 }
 
 /**
- * Parse one section's cards → [{open, meta, body, points}]. Point numbers come
+ * Parse one section's cards → [{meta, body, title, points}]. Point numbers come
  * from `.num` spans holding structured numbers (a "203A" sub-delivery belongs
- * to point 203) plus a leading `.t` number incl. the compound forms of the real board
- * ("287+288 —", "232·233·234 —", "71/72 —", "313: …") — Opus plan-review
- * hardening 6.
+ * to point 203) plus the `.t` title's ownership grammar incl. the compound forms
+ * of the real board ("287+288 —", "232·233·234 —", "71/72 —", "313: …") — Opus
+ * plan-review hardening 6.
  */
 export function parseCards(sectionHtml, options = {}) {
   const cards = []
   if (typeof sectionHtml !== 'string') return cards
-  // Split a compound point field into its numbers ("232·233·234", "92+94",
-  // "71/72"); a suffixed sub-delivery marker ("203A") belongs to its base
-  // point, while a nonnumeric marker ("CI", "✓") yields none. The
-  // machine-written `.num` field contains only point numbers and is uncapped.
-  // A four-digit number recovered from FREE title text is ambiguous with a
+  // The compound splitting ("232·233·234", "92+94", "71/72"; "203A" belongs to
+  // 203, "CI"/"✓" yield none) lives in dashboard-point-reader-core
+  // (`pointNumbersFromChip`, `pointOwnershipFromTitle`). The machine-written
+  // `.num` field contains only point numbers and is uncapped. A four-digit number recovered from FREE title text is ambiguous with a
   // year (`2026 — Jahresrückblick`). It counts only when TASKS context confirms
   // that exact point; this is a provenance check, not a numeric ceiling. Other
   // lengths remain separator-qualified, and the structured field stays the
@@ -360,13 +359,6 @@ export function parseCards(sectionHtml, options = {}) {
   return cards
 }
 
-/**
- * The point-313 audit → violations [{code, msg}]; empty = consistent. `doneSeen`
- * is the baseline of done points already reviewed (persisted by the wrapper on
- * each CLEAN --synced); a non-array baseline skips the new-tick checks — the
- * wrapper seeds it on the first clean pass, so pre-guard history is
- * grandfathered exactly once.
- */
 /**
  * Grace on the expected-end rule: a card is overdue only this many minutes
  * PAST its own estimate, so a board republished on the minute cannot flap.
@@ -494,6 +486,13 @@ export function footerOpenCount(html) {
   return null
 }
 
+/**
+ * The point-313 audit → violations [{code, msg}]; empty = consistent. `doneSeen`
+ * is the baseline of done points already reviewed (persisted by the wrapper on
+ * each CLEAN --synced); a non-array baseline skips the new-tick checks — the
+ * wrapper seeds it on the first clean pass, so pre-guard history is
+ * grandfathered exactly once.
+ */
 export function auditDashboard(html, input = {}) {
   const v = []
   if (typeof html !== 'string' || !html) return v
@@ -521,10 +520,10 @@ export function auditDashboard(html, input = {}) {
     })
   }
 
-  // COLLAPSIBLE SECTION — user 26.07.2026: Erledigt collapses behind its own
-  // heading and starts closed. The `open` ban above already covers "closed", so
-  // this rule only pins that the wrapper still EXISTS: a republish that dropped
-  // it would silently unfold the longest part of the board again.
+  // COLLAPSIBLE SECTIONS — every section collapses behind its own heading (user
+  // 26./27.07.2026). The `open` ban above already covers "closed", so this rule
+  // only pins that each wrapper still EXISTS: a republish that dropped one would
+  // silently unfold that section again.
   for (const title of COLLAPSIBLE_SECTIONS) {
     const wrapped = new RegExp(`<details\\b[^>]*>\\s*<summary>\\s*<h2>${title}</h2>\\s*</summary>`).test(html)
     if (!wrapped && html.includes(`<h2>${title}</h2>`)) {
@@ -798,7 +797,8 @@ export function auditDashboard(html, input = {}) {
 
   // FOOTER CURRENCY — the FOOTER's "N offene Punkte" figure must match
   // TASKS.md. Card prose may say any number it likes (see footerOpenCount); a
-  // document without a footer states nothing to be stale, so it passes.
+  // document without a footer states nothing to be stale, so it passes, and
+  // with no open point parsed from TASKS.md nothing is compared at all.
   const footCount = footerOpenCount(html)
   if (footCount !== null && open.length && footCount !== open.length) {
     v.push({
@@ -829,6 +829,9 @@ const ALLOW = { decision: 'allow' }
  *   sessionId         this session's id (from the hook's stdin JSON)
  *   lastToolAt        last tool call of THIS session (0: none known)
  *   now, freshMs      clock + focus-freshness window override
+ *   nowCardHash       hash of the now-card body text (invariant 8c)
+ *   nowMinutes        Berlin minutes of the day, for the expected-end rule
+ *   knownPoints       TASKS point numbers, for the card-title grammar
  */
 export function evaluate(input) {
   const {
@@ -891,7 +894,7 @@ export function evaluate(input) {
   }
 
   // (4) COMPLETENESS — every open point is visible: queue, one of the
-  // now-cards' own titles, or a "Von dir zu klären" card (a point blocked on
+  // now-cards' own chips or titles, or a "Von dir zu klären" card (a point blocked on
   // the user lives ONLY there — see 4c).
   const missing = open.filter((n) => !nowPoints.has(n) && !queued.has(n) && !klaerung.has(n))
   if (missing.length) {
@@ -955,7 +958,7 @@ export function evaluate(input) {
   }
 
   // (6) NOW-CARD == FOCUS — the exact 200-vs-210 slip: the declared focus
-  // point must be AMONG the now-card title points (with parallel work the
+  // point must be AMONG the now-card points (chips and titles; with parallel work the
   // section holds several cards; the focus names the one being driven RIGHT
   // NOW, not necessarily the first). (A null focus point — non-point work —
   // skips the membership check; the pivot ritual in (7) still applies.)
@@ -1012,7 +1015,7 @@ export function evaluate(input) {
       const min = Math.round((now - reviewedAt) / 60000)
       return block(
         `NOW-CARD TEXT UNCHANGED THROUGH ~${min} min OF WORK: the "Woran ich gerade arbeite" body is ` +
-          'byte-identical to the one reviewed last time, so it cannot be describing what you are doing ' +
+          'identical (tags stripped, whitespace collapsed) to the one reviewed last time, so it cannot be describing what you are doing ' +
           'RIGHT NOW. Rewrite it SHORT and HIGH-LEVEL — the live sub-state in one or two sentences ' +
           `("Stand HH:MM: …"), no history, no plan — then ${REPUBLISH}. Confirming the focus alone ` +
           'does NOT satisfy this: the text itself is the deliverable.',

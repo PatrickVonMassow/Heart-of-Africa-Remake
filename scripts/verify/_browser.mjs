@@ -2,7 +2,8 @@
 // lane). Every suite historically called chromium.launch itself with the ANGLE args
 // on Playwright's BUNDLED Chromium, whose headless requestDevice fails, so they
 // silently ran the WebGL2 path (the old "WebGPU is untestable headless" belief). The
-// 19.07.2026 breakthrough: SYSTEM Chrome (channel:'chrome') with --headless=new +
+// 19.07.2026 breakthrough: SYSTEM Chrome (then `channel:'chrome'`, now the probed
+// executable path — launch-args-core.mjs) with --headless=new +
 // --enable-unsafe-webgpu renders the REAL WebGPU backend headless on a secure-context
 // (localhost) page. This module centralises the launch so the backend is one env var,
 // and asserts the backend that initialised is the one requested — no silent fallback
@@ -113,7 +114,7 @@ export async function assertBackend(page) {
   if (!info) throw new Error('assertBackend: window.__renderer not found — the game did not finish loading')
   if (VERIFY_GL === 'webgpu' && !info.isWebGPU) {
     throw new Error(
-      'assertBackend: VERIFY_GL=webgpu but the renderer initialised on WebGL2 — the headless WebGPU lane silently fell back (needs system Chrome + a real GPU)',
+      'assertBackend: VERIFY_GL=webgpu but the renderer initialised on WebGL2 — the headless WebGPU lane silently fell back (needs system Chrome with a working WebGPU adapter — npm run verify:bringup)',
     )
   }
   if (VERIFY_GL === 'webgl' && info.isWebGPU) {

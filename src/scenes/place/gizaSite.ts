@@ -11,7 +11,8 @@
 // donkeys) but no trade, no elder and no hints — a walkable monument space.
 //
 // The site is distinct from the game's Meroë (Nubian) pyramids by design: Giza
-// is a FEW HUGE, shallow ~52° masses (height ≈ 0.64·base·2), Meroë a dense
+// is a FEW HUGE, shallow masses (edges at ~52°, height ≈ 1.28 × the cone's
+// circumradius), Meroë a dense
 // cluster of small, steep ~70° cones — the slope ratio here is far flatter than
 // MEROE_PYRAMIDS' (~2.6·base) so the two can never be mistaken.
 
@@ -48,7 +49,7 @@ export const GIZA_SITE_RADIUS = openPlainWalkRadius(
 )
 
 /** Distance south of the centre at which the traveller arrives (design.md §2.3
- *  spawns him just inside the southern edge facing north). Held at its own
+ *  spawns him in the south, facing north). Held at its own
  *  value rather than `radius − 10`: the disc grew to give the desert its room,
  *  and the approach view of the pyramid row must not grow with it. */
 export const GIZA_SPAWN_Z = 50
@@ -131,8 +132,8 @@ export interface GizaAmbientAnchor {
 }
 
 // A handful of figures, no throng (docs/giza-1890.md §4): robed guides and a
-// Bedouin cameleer with his camel by the Sphinx and the great pyramids, a
-// donkey-boy with his donkey, and a few 1890s tourists between the spawn and
+// Bedouin cameleer with his camel on the approach, a lone camel by the Sphinx,
+// a donkey-boy with his donkey, and a few 1890s tourists between the spawn and
 // the monuments so they read in front of the pyramids on approach.
 export const GIZA_AMBIENT: readonly GizaAmbientAnchor[] = [
   { role: 'guide', x: 12, z: 8 },
@@ -190,7 +191,7 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
     playRocks: null, // and with no bank there is no children's stretch (687)
     waterPath: null,
     waterStand: null, // nor a water path to it (688)
-    playGround: null, // a monument site has no inhabitants, so no children roam it
+    playGround: null, // only ambient visitors here, no children to roam it
     loom: null, // and no village life to weave (1157)
     gaveWayToLoom: { households: 0, dwellings: 0, rebuilt: 0 },
     wayOut: null, // the bare plateau has no dressing to keep off a crossing (688)

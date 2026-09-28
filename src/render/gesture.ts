@@ -1,11 +1,12 @@
 // Villager gestures (point 479): the pose half of what an inhabitant does while
 // it speaks. A cone with a sphere head cannot show WHAT it is talking about, and
-// the pointing gesture is the anchor the HERE/THERE concepts hang on — so the
+// the pointing gesture is the anchor the direction words hang on — so the
 // figure gains arms, and this module is the state machine that moves them.
 //
 // Everything here is PURE: no THREE object, no clock, no React. The scene owns
 // one `GestureState` per figure and advances it with the frame delta; the pose
-// it reads back is a set of Euler angles for the two shoulder pivots. That split
+// it reads back is a set of Euler angles for the two shoulder pivots plus the
+// trunk's lean and turn. That split
 // is what lets the whole behaviour be pinned in the fast Vitest layer, and it is
 // what lets the speaking layer drive a gesture without knowing any geometry:
 // `startGesture` takes a kind and an aim, nothing else.
@@ -17,7 +18,7 @@
 import { FIGURE_LIMBS } from './figures'
 
 /**
- * The four gestures that read at conversational distance.
+ * The five gestures that read at conversational distance.
  * - `beckon`  — come here: the arm scoops toward the speaker, repeatedly.
  * - `point`   — at a visible spot or person: the arm holds a straight aim.
  * - `refuse`  — no: both arms out, palms forward, the trunk shaking.
@@ -30,7 +31,7 @@ import { FIGURE_LIMBS } from './figures'
  */
 export type GestureKind = 'beckon' | 'point' | 'refuse' | 'indicate' | 'touch'
 
-/** Every kind, in a stable order (menus, tests, the verification sweep). */
+/** Every kind, in a stable order (tests). */
 export const GESTURE_KINDS: readonly GestureKind[] = ['beckon', 'point', 'refuse', 'indicate', 'touch']
 
 /**
@@ -58,18 +59,19 @@ export const GESTURE_DURATIONS: Record<GestureKind, number> = {
  * Seconds the pose takes to grow out of rest and to settle back into it. The
  * envelope is what makes point 479's "the pose returns to rest" true
  * CONTINUOUSLY rather than by a snap on the last frame: a gesture starts at rest
- * and ends at rest, so a figure interrupted mid-gesture never jerks.
+ * (a GESTURE_NO_FADE_IN kind excepted) and ends at rest, so a gesture that runs
+ * its course never jerks. Starting a new gesture replaces the running one
+ * outright.
  */
 export const GESTURE_BLEND = 0.3
 
 /**
- * Kinds whose pose may NOT fade in over the shared blend, with the seconds they
- * take instead. A hand laid on a stone arrives and stays: given the common
- * 0.3 s at each end, a 1.5 s touch would be off the surface for four tenths of
- * its own length — including the instant the word falls, which is the one frame
- * the contact exists to prove (work-order 1065).
+ * Kinds with a blend of their own, in seconds. A hand laid on a stone arrives
+ * and stays: given the common 0.3 s at each end, a 1.5 s touch would be off the
+ * surface for four tenths of its own length (work-order 1065). The touch fades
+ * OUT over its 0.12 s; its fade-in is dropped entirely (GESTURE_NO_FADE_IN).
  */
-export const GESTURE_BLENDS: Partial<Record<GestureKind, number>> = { touch: 0.12 }
+const GESTURE_BLENDS: Partial<Record<GestureKind, number>> = { touch: 0.12 }
 
 /**
  * Kinds that begin AT the pose instead of growing into it — the fade-out is
@@ -163,7 +165,8 @@ export interface GestureState {
   bearing: number
   /** Aim elevation (rad): >0 above the shoulder, <0 below it. */
   elevation: number
-  /** Per-figure phase offset so a crowd never gestures in lockstep. */
+  /** Per-figure phase offset, read by the refusal's shake so a crowd never
+   *  shakes in lockstep. */
   phase: number
 }
 
@@ -182,9 +185,11 @@ export interface GestureAim {
   bearing?: number
   /** Elevation of the aimed spot (rad). */
   elevation?: number
-  /** Override the kind's default duration (seconds). */
+  /** Override the kind's default duration (seconds). For a GESTURE_NO_FADE_IN
+   *  kind this is the HOLD; its fade-out is added on top. */
   duration?: number
-  /** Per-figure phase offset (rad) so simultaneous gestures do not beat together. */
+  /** Per-figure phase offset (rad); the refusal's shake reads it so
+   *  simultaneous refusals do not beat together. */
   phase?: number
 }
 
@@ -234,19 +239,18 @@ function smoothstep(x: number): number {
 }
 
 /**
- * How far into the pose the figure is at this instant: 0 at the start, 1 in the
- * middle, 0 again at the end. Also 0 for a gesture whose blend windows overlap
- * on a very short duration — a gesture too short to grow simply never shows,
- * which is better than one that snaps.
+ * How far into the pose the figure is at this instant: 0 at the start (1 for a
+ * GESTURE_NO_FADE_IN kind), 1 in the middle, 0 again at the end. On a very
+ * short duration the blend shrinks to half of it, so the pose still peaks at
+ * the middle instead of snapping.
  */
 export function gestureEnvelope(s: GestureState): number {
   if (s.kind === null || s.duration <= 0) return 0
   const blend = Math.min(gestureBlendOf(s.kind), s.duration / 2)
-  if (blend <= 0) return 0
   const out = smoothstep((s.duration - s.t) / blend)
   // A kind that begins AT its pose skips the in-ramp only; it still returns to
   // rest, so nothing about point 479's "the pose returns to rest" changes.
-  if (GESTURE_NO_FADE_IN.includes(s.kind)) return s.t < 0 ? 0 : out
+  if (GESTURE_NO_FADE_IN.includes(s.kind)) return out
   return Math.min(smoothstep(s.t / blend), out)
 }
 
@@ -362,15 +366,17 @@ function blendArm(rest: ArmPose, target: ArmPose, e: number): ArmPose {
  * The pose a gesture shows at its current instant. Pure: the same state always
  * yields the same pose, and a rest state always yields exactly `REST_POSE`.
  *
- * Each gesture is one MOTION, not one held shape — at conversational distance a
- * static arm reads as a stick, while a scoop, a shake or a sweep reads as an
- * intention:
+ * Most gestures are a MOTION rather than a held shape — at conversational
+ * distance a static arm reads as a stick, while a scoop, a shake or a sweep
+ * reads as an intention; `point` and `touch` hold still on purpose:
  * - `beckon`  scoops the raised arm back toward the trunk, twice, leaning in.
  * - `point`   holds one straight aim, still, so the eye follows the arm out.
  * - `refuse`  raises both arms outward, palms forward, and shakes the trunk.
  * - `indicate` sweeps the arm from straight ahead out onto the bearing and
  *              holds it there — the travelling yaw is what tells it apart from
  *              a point at a still frame AND in motion.
+ * - `touch`   leans in and lays the hand on the aimed surface, still, the free
+ *              arm swung back.
  */
 export function gesturePose(s: GestureState): FigurePose {
   const e = gestureEnvelope(s)
@@ -379,10 +385,11 @@ export function gesturePose(s: GestureState): FigurePose {
   const otherSide: ArmSide = side === 'left' ? 'right' : 'left'
   const restArm = REST_POSE[side]
   const restOther = REST_POSE[otherSide]
-  // Progress through the gesture, 0..1 — the sweeps and beats ride this rather
-  // than a wall clock, so a gesture given a longer duration is SLOWER, not the
-  // same motion with a pause bolted on.
-  const u = s.duration > 0 ? Math.max(0, Math.min(1, s.t / s.duration)) : 0
+  // Progress through the gesture, 0..1 — the beckon's scoops and the refusal's
+  // shakes ride this rather than a wall clock, so such a gesture given a longer
+  // duration is SLOWER (the indicate sweep rides its own seconds, below). The
+  // envelope check above has already left for any duration <= 0.
+  const u = Math.max(0, Math.min(1, s.t / s.duration))
 
   let arm: ArmPose
   let other: ArmPose = restOther
@@ -494,8 +501,9 @@ export function digPose(seconds: number, phase = 0): FigurePose {
   const pitch = -0.7 - raise * 1.0
   const roll = 0.16 - raise * 0.05
   return {
-    // Both hands are on the shaft, so the arms move together and roll IN toward
-    // each other rather than hanging out along the cone.
+    // Both hands are on the shaft, so the arms move together and stay rolled in
+    // close to the body (far less outward roll than rest) rather than hanging
+    // out along the cone.
     left: { pitch, yaw: -0.12, roll },
     right: { pitch, yaw: 0.12, roll: -roll },
     // The trunk folds over the ground at the strike and comes up with the lift.
@@ -519,7 +527,8 @@ const REST_ELEVATION = -Math.PI / 2 - REST_POSE.left.pitch
  * 0.74 rad, and four re-aimed cameras all read it the same way: a man lying
  * face-down in the river. A villager is a legless cone, so a trunk past the
  * dig's own magnitude has nothing left to read as a bend — there is no knee to
- * say the body meant to go down. The tagged child (`CROUCH_POSE`) folds deeper
+ * say the body meant to go down. The crouching bank-game child (PlaceLife's
+ * `CROUCH_POSE`) folds deeper
  * still and reads as a squat, because its HEIGHT and its ARMS move with the
  * fold. The fill borrows that shape: the fold is capped at `WORK_LEAN_MAX`, the
  * body sinks to `FILL_SQUAT` of its height, and the remaining reach is the arm's.
@@ -539,7 +548,7 @@ export const FILL_REACH_BEARING = 0.22
  *  With `WORK_LEAN_MAX` and `FILL_SQUAT` it puts the hand under an eighth of the
  *  figure's height, which is where water at the feet is — the reach the fold no
  *  longer provides. */
-export const FILL_REACH_ELEVATION = -1.28
+const FILL_REACH_ELEVATION = -1.28
 
 /** The side the jar is carried on, and therefore the arm that dips it. */
 export const FILL_CARRY_SIDE: ArmSide = 'left'
@@ -610,8 +619,8 @@ export function fillSquat(progress: number): number {
  * squat included — the same chain `handAt` walks, but off a POSE rather than off
  * an aim, because the fill's arm carries a roll that an aim cannot express.
  *
- * It exists so the reach can be ASSERTED and so the jar prop can be hung without
- * anybody re-deriving the arm: a solve, a test and the drawn hand must describe
+ * It exists so the reach can be ASSERTED (the jar prop is not hung from it
+ * yet) without anybody re-deriving the arm: a solve, a test and the drawn hand must describe
  * one arm (work-order 1065's lesson, paid for in centimetres).
  */
 export function fillHandAt(progress: number, pivotY = 0): [number, number, number] {
@@ -629,8 +638,8 @@ export function fillHandAt(progress: number, pivotY = 0): [number, number, numbe
 
 /**
  * How far a pose stands from rest, as a single scalar (rad, summed over the
- * angles that move). The verification and the tests use it to say "this figure
- * is visibly gesturing" without asserting on a hand-picked angle.
+ * angles that move). The tests use it to say "this figure is visibly
+ * gesturing" without asserting on a hand-picked angle.
  */
 export function poseDistanceFromRest(p: FigurePose): number {
   const arm = (a: ArmPose, r: ArmPose) =>

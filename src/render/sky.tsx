@@ -82,13 +82,16 @@ export function SkyDome({
     // spectacular; the phenomenon is the opposite.
     const s = max(mu, 0)
     const disc = pow(s, float(1200)).mul(3.0)
+    // HARMATTAN_DUST_U carries paleMix = 0.7·d (harmattanSkyParams), so /0.7
+    // recovers the dust d; 0.75 and 0.8 are that function's haloMute and
+    // sunRedden, keeping the halo factor >= 0.25.
     const halo = pow(s, float(6)).mul(0.22).mul(float(1).sub(HARMATTAN_DUST_U.mul(0.75 / 0.7)))
     const sunCol = mix(color(preset.sun), color('#c4502a'), HARMATTAN_DUST_U.mul(0.8 / 0.7).clamp(0, 1))
     col = col.add(sunCol.mul(disc.add(halo)))
 
-    // Slow drifting cloud bank, faded out toward the horizon. Built for every
-    // preset so the wet season can grow a deck over a clear-sky region too;
-    // the presence factor keeps a cloudless preset cloudless while it is dry.
+    // Slow drifting cloud bank, faded out toward the horizon. Built
+    // unconditionally so the wet season can thicken the deck over any preset;
+    // the presence factor fades a very thin deck out.
     {
       const effClouds = float(preset.clouds).add(OVERCAST_CLOUDS_U).clamp(0, 1)
       const presence = effClouds.mul(4).clamp(0, 1)

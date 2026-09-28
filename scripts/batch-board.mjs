@@ -8,7 +8,7 @@ import { openStateStore, readJournal } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { batchBoardText, projectBatchBoard } from './batch-board-core.mjs'
 
-export function gatherBatchBoard({ repoDir = REPO_ROOT, batchId, now = Date.now() } = {}) {
+function gatherBatchBoard({ repoDir = REPO_ROOT, batchId, now = Date.now() } = {}) {
   const report = gatherEvidence({ repoDir, batchId })
   const store = openStateStore({ repoDir, batchId })
   const journal = readJournal(store)

@@ -61,8 +61,7 @@ if (arg && arg !== '--to') {
 }
 
 // Default: sync repo → scratchpad. Target resolution order: explicit --to, the
-// session's scratchpad (env), the last recorded target (kept current by the
-// UserPromptSubmit hook, so a plain Bash call works without the env).
+// session's scratchpad (env), the last target this script recorded.
 const target =
   (arg === '--to' && process.argv[3]) ||
   (process.env.CLAUDE_SCRATCHPAD_DIR ? resolve(process.env.CLAUDE_SCRATCHPAD_DIR, 'hoa-batch-dashboard.html') : null) ||
@@ -77,7 +76,7 @@ if (!target) {
 
 // The footer's date and open-point count are derived, not typed: every tick
 // otherwise left a stale figure that the audit refused two steps later, after
-// the publish. Same parse as the audit, so the two cannot disagree.
+// the publish. Same parser (parseTasks) as the audit, so the two cannot disagree.
 try {
   const html = readFileSync(repoFile, 'utf8')
   const { open } = parseTasks(readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8'))
@@ -92,10 +91,11 @@ try {
   console.error(`dashboard-publish: footer not refreshed (${e.message})`)
 }
 
-// STRUCTURE BEFORE PUBLISH (28.07.2026): the consistency audit runs at
-// --synced, which is AFTER the publish, so a board broken by an edit reached the
-// reader and was repaired afterwards — three times in one evening. A malformed
-// board must not be copyable out at all, so the gate sits here too. Structure
+// STRUCTURE BEFORE COPY (28.07.2026, when this script was still the publish
+// path): the consistency audit runs at --synced, which is AFTER the publish, so
+// a board broken by an edit reached the reader and was repaired afterwards —
+// three times in one evening. A malformed board must not be copyable out at all,
+// so the gate sits here too. Structure
 // only; the audit keeps owning content and freshness.
 const broken = structureViolations(readFileSync(repoFile, 'utf8'))
 if (broken.length) {

@@ -1,12 +1,12 @@
 // River and lake surfaces for the travel view (design.md §2/§11): the water
 // follows the terrain's height profile. Rivers are ribbon meshes laid into
 // the carved beds — the surface sits just above the bed for the whole length,
-// so the ribbon is continuous and never buried, descending overall from source
-// to mouth — with a calm
+// so the ribbon is never buried and breaks only where a lake's sheet carries
+// the water, descending overall from source to mouth — with a calm
 // surface (no wave field), edge foam and a visible downstream current that
-// speeds up at rapids; the five waterfall landmarks get white cascades with
-// plunge-pool foam, and rivers rising in open land get a spring marker.
-// Lakes are flat polygon surfaces at their local shore height.
+// speeds up at rapids; the waterfall landmarks get white cascades with
+// plunge-pool foam, and rivers rising in open land get a welling spring pool.
+// Lakes are flat polygon surfaces just above their highest interior bed sample.
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -35,7 +35,7 @@ import { LAKES } from '../../world/data/lakes'
 import { WATERFALLS } from '../../world/data/landmarks'
 // The surface heights and the axis sampling are shared with the module the
 // floating canoe reads (waterSurface.ts), so a floater and the rendered
-// surface can never diverge.
+// surface agree — the GPU ripple and the canoe's own local-bed floor aside.
 import {
   NILE_FLOOD,
   LAKE_LIFT,
@@ -85,9 +85,10 @@ function buildRivers(seed: number): {
   geometry: THREE.BufferGeometry
   falls: FallDef[]
   springs: SpringDef[]
-  /** Per-river continuity report (dev/verification): number of drawn ribbon
-   *  strips (1 = fully continuous) and points where the surface would sit below
-   *  the bed (0 = never buried under the terrain). */
+  /** Per-river continuity report (dev/verification): the ocean-continuity strip
+   *  count (1 = continuous; a lake crossing does not count as a break), points
+   *  where the surface would sit below the bed (0 = never buried under the
+   *  terrain), and ribbon edges whose outside probe is not a land bank. */
   report: Record<string, { strips: number; buried: number; interiorEdges: number }>
 } {
   const positions: number[] = []
@@ -181,13 +182,14 @@ function buildRivers(seed: number): {
 
     // Ribbon strip. Isolated inland points that the domain-warped biome map
     // misclassifies as ocean are bridged so they do not tear the river into
-    // pieces; the mouth of an open strip is carried MOUTH_BRIDGE points into
+    // pieces; the mouth of an open strip is carried MOUTH_BRIDGE (waterSurface.ts) points into
     // the sea so it merges with the sea sheet (point 211a); only a sustained
     // ocean run (the open sea beyond the mouth) ends the ribbon. The drawn/
     // connected decisions live in the pure planRibbonRows, which also SUPPRESSES
     // rows lying inside a lake (point 254): the lake sheet already renders that
     // water, so the point-234 in-lake head strip must NOT be drawn over it — it
-    // showed through the sheet (both draw depthWrite-off) as a visible strip.
+    // showed through the sheet (the ribbon draws without depth write) as a
+    // visible strip.
     // The ribbon resumes at the shore (first row outside the lake): the outflow
     // still reads, no spring returns, and `strips` stays the ocean-continuity
     // count (a lake crossing is continuous water under its sheet, not a gap).
@@ -221,9 +223,7 @@ function buildRivers(seed: number): {
       // row starts fresh (planRibbonRows already cleared its `connected`).
       if (!plan.emitted[i]) continue
       const isOcean = rows[i].ocean
-      // Lake rows hug the LAKE sheet just beneath it (point 234) — they are
-      // covered water by design, not a burial under open terrain.
-      if (!isOcean && !rows[i].lake && surf[i] < rows[i].bed - 0.05) buried++
+      if (!isOcean && surf[i] < rows[i].bed - 0.05) buried++
       const a = world[Math.max(0, i - 1)]
       const b = world[Math.min(world.length - 1, i + 1)]
       let px = -(b.z - a.z)
@@ -244,9 +244,9 @@ function buildRivers(seed: number): {
       // as an interior edge (the bank/foam metric stays about land banks only).
       const bankL = isOcean ? 0 : bankAt(world[i].x - px * PROBE, world[i].z - pz * PROBE, i)
       const bankR = isOcean ? 0 : bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
-      // The interior-edge metric stays about land banks at junctions: rows
-      // inside a lake carry no bank by design (point 234), like sea rows.
-      if (!isOcean && !rows[i].lake) interiorEdges += (1 - bankL) + (1 - bankR)
+      // The interior-edge metric counts every edge whose outside probe is not a
+      // land bank — a junction band, a lake or the ocean beside the ribbon.
+      if (!isOcean) interiorEdges += (1 - bankL) + (1 - bankR)
       banks.push(bankL, bankR)
       // Point 233: per-vertex junction hand-over — a junior arm's water fades
       // out inside its senior partner's band so the shared region blends once.
@@ -278,12 +278,6 @@ function buildRivers(seed: number): {
   return { geometry, falls, springs, report }
 }
 
-/**
- * River surface material: calm water (only a slight surface shimmer), a
- * visible downstream current from streak noise scrolling along the arc
- * coordinate, foam along the banks and white water where the flow attribute
- * rises (rapids, waterfalls).
- */
 // Module singletons (point 96): remounts must reuse the same materials so the
 // renderer keeps their programs (a fresh set re-links synchronously on the
 // first draw after leavePlace()).
@@ -295,6 +289,12 @@ let lakeMaterialCache: THREE.MeshStandardNodeMaterial | null = null
 // ribbon and the CPU float height read the same rise from one source. A
 // module uniform keeps the material a singleton (point 96 — no re-link).
 const NILE_FLOOD_U = uniform(0)
+/**
+ * River surface material: calm water (only a slight surface shimmer), a
+ * visible downstream current from streak noise scrolling along the arc
+ * coordinate, foam along the banks and white water where the flow attribute
+ * rises (rapids, waterfalls).
+ */
 function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   if (riverMaterialCache) return riverMaterialCache
   const m = riverMaterialCache = new THREE.MeshStandardNodeMaterial()
@@ -371,7 +371,7 @@ function createLakeMaterial(): THREE.MeshStandardNodeMaterial {
   return m
 }
 
-/** Flat lake polygon at its local shore height (design.md §2 water). */
+/** Flat lake polygon just above its highest interior bed sample (design.md §2 water). */
 function buildLakeSurfaces(
   seed: number,
 ): Array<{ geometry: THREE.BufferGeometry; y: number; bedMax: number }> {
@@ -418,7 +418,7 @@ function Waterfall({ fall }: { fall: FallDef }) {
 
 /** Spring: a small welling water pool where a river rises in open land
  *  (point 219). A shallow basin at the source height with rising bubbles and
- *  expanding surface ripples, replacing the former flat symbolic ring. */
+ *  expanding surface ripples. */
 function Spring({ spring }: { spring: SpringDef }) {
   const ripples = useRef<(THREE.Mesh | null)[]>([])
   const bubbles = useRef<(THREE.Mesh | null)[]>([])
@@ -490,9 +490,9 @@ function Spring({ spring }: { spring: SpringDef }) {
   )
 }
 
-// River ribbon + lake sheets, MODULE-cached by seed (point 96): under the
-// travel scene's dispose={null} a per-mount build would leak the whole river
-// network's GPU buffers on every place visit — the cache reuses them on
+// River ribbon + lake sheets, MODULE-cached by seed (point 96): the ribbon and
+// lake meshes opt out of disposal (`dispose={null}` on each), so a per-mount
+// build would leak the whole river network's GPU buffers on every place visit — the cache reuses them on
 // re-entry (and skips the CPU rebuild); a new run disposes and rebuilds.
 let riversBundleCache: {
   seed: number

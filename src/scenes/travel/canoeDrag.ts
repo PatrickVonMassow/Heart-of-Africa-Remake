@@ -39,7 +39,8 @@ export const CANOE_ROLL_MAX = 0.35
  * LAST and wins: a hull dragged on land must never pierce the water surface
  * at a bank (design.md §7 — on land he drags it; user-reported clipping).
  * The rope rotates to the nearest land at full length; on a spit too narrow
- * for that, it shortens toward the land-standing player instead.
+ * for that, it shortens toward the land-standing player instead; with water
+ * on every side even then, the trail point collapses onto the player.
  */
 export function updateTrailPoint(
   px: number,

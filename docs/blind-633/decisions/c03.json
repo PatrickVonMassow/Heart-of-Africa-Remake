@@ -1,0 +1,2797 @@
+[
+ {
+  "id": "U1272",
+  "decision": "rewritten",
+  "reason": "header now says \"Pure\" without the \"total\" claim"
+ },
+ {
+  "id": "U1273",
+  "decision": "rewritten",
+  "reason": "grace doc now states it is measured from the tip commit date"
+ },
+ {
+  "id": "U1274",
+  "decision": "rewritten",
+  "reason": "normBranch doc now names refs/remotes/ stripping and lowercasing"
+ },
+ {
+  "id": "U1275",
+  "decision": "kept",
+  "reason": "claim does not hold: the comment speaks of the caller-passed root, and isBaselineCheckout is called with repoRoot (the main checkout)"
+ },
+ {
+  "id": "U1276",
+  "decision": "rewritten",
+  "reason": "Inputs block now documents mainTip and its tipSha exemption"
+ },
+ {
+  "id": "U1277",
+  "decision": "rewritten",
+  "reason": "\"two-command local probe\" replaced by \"cheap local probe\""
+ },
+ {
+  "id": "U1278",
+  "decision": "rewritten",
+  "reason": "worktree-protection comment now names repoRoot as main checkout and ownPath as the guard's tree"
+ },
+ {
+  "id": "U1279",
+  "decision": "rewritten",
+  "reason": "header no longer counts \"two\" questions"
+ },
+ {
+  "id": "U1280",
+  "decision": "rewritten",
+  "reason": "header now names the per-detached-worktree git show and merge-base"
+ },
+ {
+  "id": "U1281",
+  "decision": "rewritten",
+  "reason": "comment now says a malformed field is dropped and shields nothing"
+ },
+ {
+  "id": "U1282",
+  "decision": "kept",
+  "reason": "claim does not hold: IN_FLIGHT_MAX_AGE_MS in batch-in-flight-core.mjs is 45 * 60 * 1000, so \"45 minutes\" is right"
+ },
+ {
+  "id": "U1283",
+  "decision": "removed",
+  "reason": "unread ageMs dropped from all readInFlight return paths"
+ },
+ {
+  "id": "U1284",
+  "decision": "rewritten",
+  "reason": "header now names the 4/8/50 m quantisation and the 254 cap"
+ },
+ {
+  "id": "U1285",
+  "decision": "kept",
+  "reason": "defensive saturation clamp costs nothing and guards future bound changes"
+ },
+ {
+  "id": "U1286",
+  "decision": "rewritten",
+  "reason": "header now says \"pure (no I/O)\" instead of \"never throws\""
+ },
+ {
+  "id": "U1287",
+  "decision": "kept",
+  "reason": "claim does not hold: vite.config.ts imports build-info.mjs as the production emitter"
+ },
+ {
+  "id": "U1288",
+  "decision": "rewritten",
+  "reason": "payload doc now says commit is the normalised 7-40 hex sha"
+ },
+ {
+  "id": "U1289",
+  "decision": "rewritten",
+  "reason": "\"until now memory only\" change-log wording dropped from the header"
+ },
+ {
+  "id": "U1290",
+  "decision": "rewritten",
+  "reason": "placement doc now says a #-marked reference counts"
+ },
+ {
+  "id": "U1291",
+  "decision": "rewritten",
+  "reason": "UNBUNDLED_MARKER doc now calls it the bold marker closing the table section"
+ },
+ {
+  "id": "U1292",
+  "decision": "rewritten",
+  "reason": "referenceList comment now describes integer equality instead of spelling round-trip"
+ },
+ {
+  "id": "U1293",
+  "decision": "rewritten",
+  "reason": "parseBundles doc now names list, \"at least\" five pipes and the uppercase id"
+ },
+ {
+  "id": "U1294",
+  "decision": "rewritten",
+  "reason": "list comment now says duplicateHomes still counts a row as ONE home"
+ },
+ {
+  "id": "U1295",
+  "decision": "kept",
+  "reason": "exported pure parser keeps its own absent-marker answer; costs one line and is tested directly"
+ },
+ {
+  "id": "U1296",
+  "decision": "backlog",
+  "reason": "scripts/bundle-first-core.mjs:162 — bullet regex needs content after the marker, so an empty \"- \" bullet is not counted and later \"Not bundled\" ordinals shift by one"
+ },
+ {
+  "id": "U1297",
+  "decision": "rewritten",
+  "reason": "duplicateHomes doc now quotes \"exactly one bundle … or in the unbundled list\"; the block message's \"EXACTLY once\" paraphrases the same invariant"
+ },
+ {
+  "id": "U1298",
+  "decision": "rewritten",
+  "reason": "duplicateHomes reads b.list (always supplied by parseBundles); the [...b.points] fallback dropped, tests pass real shapes"
+ },
+ {
+  "id": "U1299",
+  "decision": "removed",
+  "reason": "Set-shaped unbundled fallback branch removed; production passes parseUnbundled's bullets array"
+ },
+ {
+  "id": "U1300",
+  "decision": "rewritten",
+  "reason": "duplicateRemedy, bundleRemedy and MAX_NAMED are no longer exported"
+ },
+ {
+  "id": "U1301",
+  "decision": "rewritten",
+  "reason": "bundleRemedy now says to write the point as a #<n> reference"
+ },
+ {
+  "id": "U1302",
+  "decision": "rewritten",
+  "reason": "evaluate doc now says bad CONTENT allows and the argument must be an object or undefined"
+ },
+ {
+  "id": "U1303",
+  "decision": "rewritten",
+  "reason": "\"until now memory only\" dropped from the guard header"
+ },
+ {
+  "id": "U1304",
+  "decision": "rewritten",
+  "reason": "stdin comment now says the session id only decides lock ownership"
+ },
+ {
+  "id": "U1305",
+  "decision": "kept",
+  "reason": "claim does not hold: finding.mjs --drain lists what still waits (inspects); --drained marks one landed"
+ },
+ {
+  "id": "U1306",
+  "decision": "kept",
+  "reason": "claim does not hold: the bell's --drain is the listing command, chat-spool's --drained is the marking command; both are right"
+ },
+ {
+  "id": "U1307",
+  "decision": "kept",
+  "reason": "pure core keeps its own ownership check although chat-spool.mjs returns earlier; cheap defence, covered by carrier-bell-core.test.mjs"
+ },
+ {
+  "id": "U1308",
+  "decision": "rewritten",
+  "reason": "header now says now defaults to Date.now() but every clock reading can be injected"
+ },
+ {
+  "id": "U1309",
+  "decision": "rewritten",
+  "reason": "header now lists protocol and direction in the signed canonical form"
+ },
+ {
+  "id": "U1310",
+  "decision": "rewritten",
+  "reason": "topic doc now says the 128 hash bits are only as unguessable as the ~99-bit secret"
+ },
+ {
+  "id": "U1311",
+  "decision": "rewritten",
+  "reason": "TOPIC_PREFIX and NOTIFIABLE_DROP_REASONS are no longer exported"
+ },
+ {
+  "id": "U1312",
+  "decision": "rewritten",
+  "reason": "retention rationale now says a replay beyond the window is refused as stale"
+ },
+ {
+  "id": "U1313",
+  "decision": "rewritten",
+  "reason": "SEEN_MAX doc now says accepted envelope ids are pushed there too but rely on their own ledger"
+ },
+ {
+  "id": "U1314",
+  "decision": "rewritten",
+  "reason": "envelope-ledger heading now says \"not by a replay count\" and names the ID_LEDGER_MAX disk bound"
+ },
+ {
+  "id": "U1315",
+  "decision": "rewritten",
+  "reason": "constantTimeEqual doc now says unequal lengths return at once"
+ },
+ {
+  "id": "U1316",
+  "decision": "rewritten",
+  "reason": "makeEnvelope doc now says only chat-reply uses it; the page carries a literal copy"
+ },
+ {
+  "id": "U1317",
+  "decision": "rewritten",
+  "reason": "duplicate reason now says \"not re-reported while its id is remembered\""
+ },
+ {
+  "id": "U1318",
+  "decision": "rewritten",
+  "reason": "duplicate rationale now covers an original that already earned its notice"
+ },
+ {
+  "id": "U1319",
+  "decision": "rewritten",
+  "reason": "expired rationale now says the DEFAULT window matches ntfy's cache"
+ },
+ {
+  "id": "U1320",
+  "decision": "rewritten",
+  "reason": "formatChatStamp doc drops TOTAL and states that an out-of-range finite value still throws"
+ },
+ {
+  "id": "U1321",
+  "decision": "rewritten",
+  "reason": "notice comment now says one notice while the notified ledger remembers it"
+ },
+ {
+  "id": "U1322",
+  "decision": "rewritten",
+  "reason": "unnamed point reference dropped"
+ },
+ {
+  "id": "U1323",
+  "decision": "rewritten",
+  "reason": "state description now names the third ledger, notified"
+ },
+ {
+  "id": "U1324",
+  "decision": "rewritten",
+  "reason": "comment now says the message is not judged again while its id is remembered"
+ },
+ {
+  "id": "U1325",
+  "decision": "rewritten",
+  "reason": "TEST_VECTOR doc no longer claims exactly two test files"
+ },
+ {
+  "id": "U1326",
+  "decision": "rewritten",
+  "reason": "stage-1 fifteen-minute wording replaced by what a launcher tick alone would bound"
+ },
+ {
+  "id": "U1327",
+  "decision": "rewritten",
+  "reason": "token rule now notes the combined hook may still ring the carrier bell"
+ },
+ {
+  "id": "U1328",
+  "decision": "rewritten",
+  "reason": "SAFE_ID is no longer exported"
+ },
+ {
+  "id": "U1329",
+  "decision": "removed",
+  "reason": "MAX_TEXT_CHARS removed; messageLine imports chat-core's MAX_TEXT_LEN (same value 2000)"
+ },
+ {
+  "id": "U1330",
+  "decision": "rewritten",
+  "reason": "spoolFileName doc now states the disjointness assumes no ntfy id starts with m-"
+ },
+ {
+  "id": "U1331",
+  "decision": "backlog",
+  "reason": "scripts/chat-delivery-core.mjs:94 — isoOrUnknown renders a missing ts (Number(null) = 0) as 1970-01-01, unlike chat-core's formatChatStamp which rejects it"
+ },
+ {
+  "id": "U1332",
+  "decision": "rewritten",
+  "reason": "header now says exit 0 on every path it controls and that the post-fetch process.exit may still abort"
+ },
+ {
+  "id": "U1333",
+  "decision": "rewritten",
+  "reason": "\"at fifteen points\" replaced by \"at many points\""
+ },
+ {
+  "id": "U1334",
+  "decision": "rewritten",
+  "reason": "gating comment now names secretGateReport too"
+ },
+ {
+  "id": "U1335",
+  "decision": "kept",
+  "reason": "guard against an empty notice text is cheap defence at an I/O boundary; ingest's shape may change"
+ },
+ {
+  "id": "U1336",
+  "decision": "rewritten",
+  "reason": "readReplyReceipt doc now says it returns { at, id }"
+ },
+ {
+  "id": "U1337",
+  "decision": "rewritten",
+  "reason": "usage no longer lists the unread --init flag; bare print creates the secret if none can be read"
+ },
+ {
+  "id": "U1338",
+  "decision": "rewritten",
+  "reason": "SECRET_PATH and ensureSecret are no longer exported"
+ },
+ {
+  "id": "U1339",
+  "decision": "rewritten",
+  "reason": "generateSecret doc now says ~99 bits over a 31-symbol alphabet, slightly biased"
+ },
+ {
+  "id": "U1340",
+  "decision": "rewritten",
+  "reason": "ensureSecret doc now says an absent and an unreadable secret are both replaced"
+ },
+ {
+  "id": "U1341",
+  "decision": "rewritten",
+  "reason": "header now names <ntfyId>.json with m-<id>.json as fallback"
+ },
+ {
+  "id": "U1342",
+  "decision": "rewritten",
+  "reason": "crash window now says it loses the messages that call claimed (up to MAX_PER_CALL)"
+ },
+ {
+  "id": "U1343",
+  "decision": "rewritten",
+  "reason": "SPOOL_DIR, LEGACY_SPOOL_PATH, CARRIER_BELL_STATE_PATH, renameWithRetry and restoreClaimedMessage are no longer exported"
+ },
+ {
+  "id": "U1344",
+  "decision": "kept",
+  "reason": "claim does not hold: finding.mjs --drain lists and --drained marks landed; both texts are right for their purpose"
+ },
+ {
+  "id": "U1345",
+  "decision": "backlog",
+  "reason": "scripts/chat-spool.mjs:56 — consumed retention is a fixed seven days and pruneConsumed ignores HOA_CHAT_MAX_AGE_MS, so a window set above seven days outlives the replay ledger seed"
+ },
+ {
+  "id": "U1346",
+  "decision": "removed",
+  "reason": "renameWithRetry's unread attempts/error fields and last-error accumulator removed; callers read only .ok"
+ },
+ {
+  "id": "U1347",
+  "decision": "rewritten",
+  "reason": "readConsumed doc now says \"not yet pruned (see pruneConsumed)\""
+ },
+ {
+  "id": "U1348",
+  "decision": "rewritten",
+  "reason": "spoolMessage doc now says idempotent for sequential callers only"
+ },
+ {
+  "id": "U1349",
+  "decision": "rewritten",
+  "reason": "delivery doc now says a failed restore leaves the message in consumed/"
+ },
+ {
+  "id": "U1350",
+  "decision": "rewritten",
+  "reason": "readLegacyJsonl doc now says file (append) order"
+ },
+ {
+  "id": "U1351",
+  "decision": "kept",
+  "reason": "one-time stage-1 migration is cheap, idempotent and protects any checkout still holding the old spool; removal cannot be proven safe"
+ },
+ {
+  "id": "U1352",
+  "decision": "rewritten",
+  "reason": "migration rationale now says per-tool-call delivery may show an already-carried message once more"
+ },
+ {
+  "id": "U1353",
+  "decision": "rewritten",
+  "reason": "archive-gate comment now says every PARSEABLE line and that a torn line survives only in the archive"
+ },
+ {
+  "id": "U1354",
+  "decision": "rewritten",
+  "reason": "wake-gate sentence now names the DEFER_EXPIRED exception"
+ },
+ {
+  "id": "U1355",
+  "decision": "rewritten",
+  "reason": "OWNER_LIVE doc now says delivery at the owner's next tool call, bounded by DEFERRAL_MS"
+ },
+ {
+  "id": "U1356",
+  "decision": "rewritten",
+  "reason": "wokenIds doc now notes the SEEN_MAX cap"
+ },
+ {
+  "id": "U1357",
+  "decision": "rewritten",
+  "reason": "adoption doc now says the wrapper only re-files the claim and does not supervise or time out the adopted responder"
+ },
+ {
+  "id": "U1358",
+  "decision": "rewritten",
+  "reason": "WATCHER_PID_FILE doc no longer claims importing the watcher installs signal handlers"
+ },
+ {
+  "id": "U1359",
+  "decision": "rewritten",
+  "reason": "supervision doc now names the lenient existence branch when no start time is known"
+ },
+ {
+  "id": "U1360",
+  "decision": "rewritten",
+  "reason": "watcherSupervision return contract no longer lists 'stop'"
+ },
+ {
+  "id": "U1361",
+  "decision": "rewritten",
+  "reason": "RECONNECT_BASE_MS is no longer exported"
+ },
+ {
+  "id": "U1362",
+  "decision": "backlog",
+  "reason": "scripts/chat-watcher-core.mjs:376 — RESPONDER_MAX_MS promises kill-and-release for every responder, but an adopted responder gets no timer and nothing kills it"
+ },
+ {
+  "id": "U1363",
+  "decision": "rewritten",
+  "reason": "RESPONDER_MAX_CHARS is no longer exported"
+ },
+ {
+  "id": "U1364",
+  "decision": "rewritten",
+  "reason": "ackPlan doc now says the receipt must not predate the spawn"
+ },
+ {
+  "id": "U1365",
+  "decision": "rewritten",
+  "reason": "header now names the one timer (deferral sweep) that re-reads the local spool"
+ },
+ {
+  "id": "U1366",
+  "decision": "rewritten",
+  "reason": "dry-run rationale now says the live path is mostly observed with no session and names the deferral-sweep exception"
+ },
+ {
+  "id": "U1367",
+  "decision": "rewritten",
+  "reason": "PID_PATH is no longer exported"
+ },
+ {
+  "id": "U1368",
+  "decision": "backlog",
+  "reason": "scripts/chat-watcher.mjs:649 — --status and --stop judge the pidfile by pid existence and kill rec.pid without comparing pidStartedAt, so a recycled pid could be killed"
+ },
+ {
+  "id": "U1369",
+  "decision": "rewritten",
+  "reason": "gatherState doc now says the owner is asked WITH the in-flight declaration"
+ },
+ {
+  "id": "U1370",
+  "decision": "rewritten",
+  "reason": "ack comment now says the receipt does not name its sender, so any reply in the window counts"
+ },
+ {
+  "id": "U1371",
+  "decision": "rewritten",
+  "reason": "comment now says a re-read mis-signed event is logged as a duplicate, never judged again"
+ },
+ {
+  "id": "U1372",
+  "decision": "rewritten",
+  "reason": "sweep doc now names the 15 s floor"
+ },
+ {
+  "id": "U1373",
+  "decision": "rewritten",
+  "reason": "header now says only opening sets the exit code; closing and console errors are reported in the JSON line"
+ },
+ {
+  "id": "U1374",
+  "decision": "rewritten",
+  "reason": "open and close checks share one selector, .bench-backdrop, the overlay's real root in both states"
+ },
+ {
+  "id": "U1375",
+  "decision": "kept",
+  "reason": "claim does not hold: src/ui/BenchmarkOverlay.tsx renders .bench-backdrop as the overlay root in both progress and report states"
+ },
+ {
+  "id": "U1376",
+  "decision": "rewritten",
+  "reason": "MAX_RETRIES doc now says the failure is no longer retried, not that it becomes non-transient"
+ },
+ {
+  "id": "U1377",
+  "decision": "rewritten",
+  "reason": "OUTAGE_CHILD_THRESHOLD is no longer exported"
+ },
+ {
+  "id": "U1378",
+  "decision": "rewritten",
+  "reason": "DEATH_RETENTION_MS is no longer exported"
+ },
+ {
+  "id": "U1379",
+  "decision": "rewritten",
+  "reason": "NON_TRANSIENT_PATTERNS is no longer exported"
+ },
+ {
+  "id": "U1380",
+  "decision": "rewritten",
+  "reason": "TRANSIENT_PATTERNS is no longer exported"
+ },
+ {
+  "id": "U1381",
+  "decision": "rewritten",
+  "reason": "comment now says --death accepts pre-normalised signatures (no --signature option exists)"
+ },
+ {
+  "id": "U1382",
+  "decision": "rewritten",
+  "reason": "stateDeaths is no longer exported"
+ },
+ {
+  "id": "U1383",
+  "decision": "rewritten",
+  "reason": "retryDecision doc now notes the Date.now() default of now"
+ },
+ {
+  "id": "U1384",
+  "decision": "backlog",
+  "reason": "scripts/child-retry-core.mjs:509 — recordRecovery spreads the old point record, so after a branch-changed exchange the new branch still inherits retries and tokens, against the comment at :403"
+ },
+ {
+  "id": "U1385",
+  "decision": "kept",
+  "reason": "outageProbeReason prints the default window, which is the only window production passes"
+ },
+ {
+  "id": "U1386",
+  "decision": "backlog",
+  "reason": "scripts/child-retry.mjs:225 — a missing --point becomes Number(null) = 0 and passes the finite check instead of printing usage"
+ },
+ {
+  "id": "U1387",
+  "decision": "rewritten",
+  "reason": "comment now says stand-down and scheduled change no state while the log line still records the decision"
+ },
+ {
+  "id": "U1388",
+  "decision": "rewritten",
+  "reason": "fallback comment now says the log line records a summary"
+ },
+ {
+  "id": "U1389",
+  "decision": "rewritten",
+  "reason": "header now says only classifyFailureCause never throws"
+ },
+ {
+  "id": "U1390",
+  "decision": "rewritten",
+  "reason": "header now says only the Pages workflow answers unknown on an unavailable job list; others fall back to repository"
+ },
+ {
+  "id": "U1391",
+  "decision": "rewritten",
+  "reason": "GITHUB_SIDE_JOBS is no longer exported"
+ },
+ {
+  "id": "U1392",
+  "decision": "backlog",
+  "reason": "scripts/ci-failure-cause-core.mjs:55 — NEVER_STARTED_REMEDY denies any repository fix, yet an unknown runs-on label (a workflow-file fault) can also leave a job never assigned to a runner"
+ },
+ {
+  "id": "U1393",
+  "decision": "rewritten",
+  "reason": "ranNothingOfOurs doc now says it rules out a defect in the repository's CODE, not a broken workflow file"
+ },
+ {
+  "id": "U1394",
+  "decision": "rewritten",
+  "reason": "JOBS_MAX_PAGES is no longer exported"
+ },
+ {
+  "id": "U1395",
+  "decision": "rewritten",
+  "reason": "actionable contract now lists every non-actionable branch (never-started, famine waived or escalated, Pages 503 with no blocker)"
+ },
+ {
+  "id": "U1396",
+  "decision": "backlog",
+  "reason": "scripts/ci-failure-cause-core.mjs:260 — the never-started path returns external without the workflowsUntouched proof the doc requires for any outage reading"
+ },
+ {
+  "id": "U1397",
+  "decision": "rewritten",
+  "reason": "header now says the helpers are total and verdict expects an object or undefined"
+ },
+ {
+  "id": "U1398",
+  "decision": "rewritten",
+  "reason": "header no longer claims nothing may fail; it states the aggregate step fails hard runs itself"
+ },
+ {
+  "id": "U1399",
+  "decision": "rewritten",
+  "reason": "verdict now derives mails from mailsOnFailure, so the rule is stated once as its doc says (kept: tests import it)"
+ },
+ {
+  "id": "U1400",
+  "decision": "rewritten",
+  "reason": "soft summary now says the alert goes and the commit gets a red status, not that both already happened"
+ },
+ {
+  "id": "U1401",
+  "decision": "rewritten",
+  "reason": "status-post comment now says the ntfy alert step keys off the outputs already written"
+ },
+ {
+  "id": "U1402",
+  "decision": "rewritten",
+  "reason": "lifecycle comment now says \"at every tick\" instead of \"every few minutes\""
+ },
+ {
+  "id": "U1403",
+  "decision": "rewritten",
+  "reason": "stampOf note now says every site uses it"
+ },
+ {
+  "id": "U1404",
+  "decision": "rewritten",
+  "reason": "epoch example now says some fifty-six years"
+ },
+ {
+  "id": "U1405",
+  "decision": "rewritten",
+  "reason": "claimIsOurs doc now says four copies"
+ },
+ {
+  "id": "U1406",
+  "decision": "backlog",
+  "reason": "scripts/chat-watcher-core.mjs:23 — \"released on every exit path\" fails for an adopted responder: the re-filed claim names the watcher and is released only when the watcher exits"
+ },
+ {
+  "id": "U1407",
+  "decision": "backlog",
+  "reason": "scripts/chat-watcher-core.mjs:298 — adoptDecision judges the orphaned responder alive by pid existence only, against the file's identity rule"
+ },
+ {
+  "id": "U1408",
+  "decision": "kept",
+  "reason": "separate paused branches carry distinct reason strings the logs and tests read"
+ },
+ {
+  "id": "U1409",
+  "decision": "kept",
+  "reason": "claim does not hold as stale: batch-autostart-core's RESUME_PROMPT still carries the same ASCII rationale and the two prompts are read side by side"
+ },
+ {
+  "id": "U1410",
+  "decision": "kept",
+  "reason": "test-only exports of live internal behaviour, not cruft"
+ },
+ {
+  "id": "U1411",
+  "decision": "rewritten",
+  "reason": "deferralMs doc now says the env var is read on every call while the sweep interval is fixed at startup"
+ },
+ {
+  "id": "U1412",
+  "decision": "rewritten",
+  "reason": "keepalive cadence now \"regularly\" instead of an unverified \"every few seconds\""
+ },
+ {
+  "id": "U1413",
+  "decision": "rewritten",
+  "reason": "\"cheaper mistake\" now contrasts a clocked recovery with retrying into an outage"
+ },
+ {
+  "id": "U1414",
+  "decision": "rewritten",
+  "reason": "childRecoveryRecord doc now says it is kept in the retry state from which the board derives its card"
+ },
+ {
+  "id": "U1415",
+  "decision": "removed",
+  "reason": "redundant outer ...base spread removed; recover(base, …) already spreads base"
+ },
+ {
+  "id": "U1416",
+  "decision": "rewritten",
+  "reason": "describeDecision doc now says one to three lines for the console"
+ },
+ {
+  "id": "U1417",
+  "decision": "backlog",
+  "reason": "scripts/child-retry.mjs:101 — committedOnBranch counts every commit on main..branch, including ones before the spawn, while the rule says \"committed since its spawn\""
+ },
+ {
+  "id": "U1418",
+  "decision": "kept",
+  "reason": "test-only exports of live behaviour, not cruft"
+ },
+ {
+  "id": "U1419",
+  "decision": "rewritten",
+  "reason": "header usage now lists --critical"
+ },
+ {
+  "id": "U1420",
+  "decision": "rewritten",
+  "reason": "branch-era note about parallel .gitignore branches removed"
+ },
+ {
+  "id": "U1421",
+  "decision": "rewritten",
+  "reason": "lazy-import rationale corrected: batch-lock.mjs now uses repo-paths; the lazy import only keeps it out of test imports"
+ },
+ {
+  "id": "U1422",
+  "decision": "kept",
+  "reason": "test-only exports of live behaviour via main(), not cruft"
+ },
+ {
+  "id": "U1423",
+  "decision": "rewritten",
+  "reason": "header now describes the observation-first, name-second structure"
+ },
+ {
+  "id": "U1424",
+  "decision": "rewritten",
+  "reason": "the orphaned SECONDARY OBSERVATION block moved into the cancelled-run branch it describes"
+ },
+ {
+  "id": "U1425",
+  "decision": "rewritten",
+  "reason": "@returns now lists neverStarted, rerunFailedJobs, alertDetail and deadlineAt"
+ },
+ {
+  "id": "U1426",
+  "decision": "kept",
+  "reason": "test-only exports of behaviour live inside classifyFailureCause"
+ },
+ {
+  "id": "U1427",
+  "decision": "rewritten",
+  "reason": "verdict @returns now documents protectedRef"
+ },
+ {
+  "id": "U1428",
+  "decision": "rewritten",
+  "reason": "only ci.yml calls the verdict, always with GATE_SHARDS; comments now name the no-GATE_SHARDS path as used by no current workflow"
+ },
+ {
+  "id": "U1429",
+  "decision": "rewritten",
+  "reason": "header now describes the two shards and the aggregate gate job that fails hard runs itself"
+ },
+ {
+  "id": "U1430",
+  "decision": "kept",
+  "reason": "nothing to change: the entry only notes an unreliable index row, no code or comment defect"
+ },
+ {
+  "id": "U1431",
+  "decision": "kept",
+  "reason": "test-only exports of behaviour live via isSoftRun"
+ },
+ {
+  "id": "U1432",
+  "decision": "rewritten",
+  "reason": "wrapper header now says it fails a hard aggregate run itself"
+ },
+ {
+  "id": "U1433",
+  "decision": "rewritten",
+  "reason": "header now says it classifies every pushed ref via refTargets/sweepTargets"
+ },
+ {
+  "id": "U1434",
+  "decision": "kept",
+  "reason": "the gh field-name fallbacks are exercised by the tests' gh-shaped fixtures and the header already says the wrapper feeds REST today; the block hint is conditional (\"With gh installed\")"
+ },
+ {
+  "id": "U1435",
+  "decision": "rewritten",
+  "reason": "header now says only the synchronous helpers never throw and sweepTargets rejects when an injected callback does"
+ },
+ {
+  "id": "U1436",
+  "decision": "rewritten",
+  "reason": "classifyRuns doc now names the superseded-cancellation drop and runAttempt"
+ },
+ {
+  "id": "U1437",
+  "decision": "rewritten",
+  "reason": "recoveredWorkflows doc now says any completed non-failure conclusion, unknown included"
+ },
+ {
+  "id": "U1438",
+  "decision": "removed",
+  "reason": "test-only shouldBlock removed; its consistency test now compares the classified state directly"
+ },
+ {
+  "id": "U1439",
+  "decision": "rewritten",
+  "reason": "cheapness paragraph now says \"next to nothing\" and caching lasts for the push window"
+ },
+ {
+  "id": "U1440",
+  "decision": "rewritten",
+  "reason": "\"four local git calls\" replaced by \"a handful of local git calls\""
+ },
+ {
+  "id": "U1441",
+  "decision": "rewritten",
+  "reason": "RUN_GRACE_MS doc now frames no-run per commit"
+ },
+ {
+  "id": "U1442",
+  "decision": "rewritten",
+  "reason": "CI_WAIT_BACKOFF_MIN_MS, CI_WAIT_BACKOFF_MAX_MS and CI_WAIT_VERSION are no longer exported"
+ },
+ {
+  "id": "U1443",
+  "decision": "rewritten",
+  "reason": "FAMINE_TTL_MS doc now says the first-sighting clock is never refreshed"
+ },
+ {
+  "id": "U1444",
+  "decision": "rewritten",
+  "reason": "both \"finding 1\" citations now carry their review dates (06.08 and 07.08.2026)"
+ },
+ {
+  "id": "U1445",
+  "decision": "kept",
+  "reason": "both residual (c) citations come from the same 07.08.2026 review commit and concern the waiver clock; renaming would falsify the record"
+ },
+ {
+  "id": "U1446",
+  "decision": "rewritten",
+  "reason": "core's residual (b) now dated 07.08.2026, distinct from the wrapper's 06.08.2026 residual (b)"
+ },
+ {
+  "id": "U1447",
+  "decision": "rewritten",
+  "reason": "refTargets doc now says a HEAD pushed only from elsewhere is appended last"
+ },
+ {
+  "id": "U1448",
+  "decision": "rewritten",
+  "reason": "\"never re-asked\" now \"not re-asked while cached\", naming pruneShaCache"
+ },
+ {
+  "id": "U1449",
+  "decision": "rewritten",
+  "reason": "pruneShaCache doc now says a still-pushed HEAD is simply asked again"
+ },
+ {
+  "id": "U1450",
+  "decision": "rewritten",
+  "reason": "sweepTargets @returns now lists observations"
+ },
+ {
+  "id": "U1451",
+  "decision": "rewritten",
+  "reason": "waitReason is no longer exported"
+ },
+ {
+  "id": "U1452",
+  "decision": "rewritten",
+  "reason": "ciRedAlertMessage doc now names escalate as a trigger too"
+ },
+ {
+  "id": "U1453",
+  "decision": "rewritten",
+  "reason": "shouldNotify doc and parameter names now describe the per-ref alert key (sha or sha:run:hour)"
+ },
+ {
+  "id": "U1454",
+  "decision": "rewritten",
+  "reason": "block text now names a green re-run beside a fixing push and a user stop"
+ },
+ {
+  "id": "U1455",
+  "decision": "kept",
+  "reason": "test-only exports of live internal behaviour, not cruft"
+ },
+ {
+  "id": "U1456",
+  "decision": "kept",
+  "reason": "claim does not hold: the wrapper counts reds over three weeks, the core describes one night; the two accounts do not contradict"
+ },
+ {
+  "id": "U1457",
+  "decision": "rewritten",
+  "reason": "fail-open list now says \"CI pending past the wait budget\""
+ },
+ {
+  "id": "U1458",
+  "decision": "rewritten",
+  "reason": "fail-open list drops \"token missing\" and notes a missing token only means an unauthenticated request"
+ },
+ {
+  "id": "U1459",
+  "decision": "rewritten",
+  "reason": "header now says a report-only branch is only named on stderr, with no block and no alert"
+ },
+ {
+  "id": "U1460",
+  "decision": "kept",
+  "reason": "harmless fallback token path; whether a Windows host still uses it cannot be decided here"
+ },
+ {
+  "id": "U1461",
+  "decision": "rewritten",
+  "reason": "isPushed doc now says any remote-tracking ref"
+ },
+ {
+  "id": "U1462",
+  "decision": "kept",
+  "reason": "the wrapper only ever feeds the REST shape, whose id it matches"
+ },
+ {
+  "id": "U1463",
+  "decision": "rewritten",
+  "reason": "cost note now lists remote get-url, the worktree probe and the red-path cat-file/diff"
+ },
+ {
+  "id": "U1464",
+  "decision": "rewritten",
+  "reason": "cost note now says the process count does not scale with branch count"
+ },
+ {
+  "id": "U1465",
+  "decision": "rewritten",
+  "reason": "judgeRed doc drops \"the HEAD path\" and names rerunWait"
+ },
+ {
+  "id": "U1466",
+  "decision": "kept",
+  "reason": "the fallback costs nothing and keeps judgeRed safe if the two reductions ever diverge"
+ },
+ {
+  "id": "U1467",
+  "decision": "removed",
+  "reason": "durableWait's unused initial value removed; it is now declared where it is first set"
+ },
+ {
+  "id": "U1468",
+  "decision": "rewritten",
+  "reason": "observer comment now says a different run identity, not a re-run, changes nothing for the obligation"
+ },
+ {
+  "id": "U1469",
+  "decision": "rewritten",
+  "reason": "the \"How a reply asks\" doc moved onto CLEAR_INVITATION"
+ },
+ {
+  "id": "U1470",
+  "decision": "rewritten",
+  "reason": "comment now limits \"nothing may follow\" to TAIL and names COMMAND_TAIL's \"und …\" continuation"
+ },
+ {
+  "id": "U1471",
+  "decision": "kept",
+  "reason": "CLEAR_INVITATION is live via invitesClear; the test import is legitimate"
+ },
+ {
+  "id": "U1472",
+  "decision": "rewritten",
+  "reason": "stale \"English keeps no end constraint\" lines removed"
+ },
+ {
+  "id": "U1473",
+  "decision": "backlog",
+  "reason": "scripts/clear-claim-guard-core.mjs:125 — NEGATOR is German only, so a negated English invitation (\"Run /clear, but do not do that.\") still matches"
+ },
+ {
+  "id": "U1474",
+  "decision": "rewritten",
+  "reason": "NEGATOR doc now points at the asymmetry invitesClear states"
+ },
+ {
+  "id": "U1475",
+  "decision": "rewritten",
+  "reason": "withoutQuotations doc now says whole-line fixtures are removed and inline backticks unwrapped"
+ },
+ {
+  "id": "U1476",
+  "decision": "rewritten",
+  "reason": "sentencesOf is no longer exported"
+ },
+ {
+  "id": "U1477",
+  "decision": "rewritten",
+  "reason": "textPredatesClaim's stranded doc moved onto its function"
+ },
+ {
+  "id": "U1478",
+  "decision": "rewritten",
+  "reason": "textPredatesClaim doc now says the newest readable timestamp answers it"
+ },
+ {
+  "id": "U1479",
+  "decision": "rewritten",
+  "reason": "replyNotFlushed is no longer exported"
+ },
+ {
+  "id": "U1480",
+  "decision": "rewritten",
+  "reason": "textPredatesClaim is no longer exported"
+ },
+ {
+  "id": "U1481",
+  "decision": "rewritten",
+  "reason": "early-return comment now says it checks only claim and session id presence; evaluate judges ownership"
+ },
+ {
+  "id": "U1482",
+  "decision": "rewritten",
+  "reason": "header now says the guard bars a release and names the wrapper's fail-open exception instead of \"impossible\"/\"never\""
+ },
+ {
+  "id": "U1483",
+  "decision": "rewritten",
+  "reason": "header now lists every gated act (force, delete, --follow-tags, gh release create)"
+ },
+ {
+  "id": "U1484",
+  "decision": "backlog",
+  "reason": "scripts/closing-guard.mjs:144 — the wrapper always judges HEAD, so `git tag v0.3 <other-sha>` is assessed against HEAD's closing, not the tagged commit's"
+ },
+ {
+  "id": "U1485",
+  "decision": "rewritten",
+  "reason": "CLOSING_STEPS doc now says a new cleanup step must also join CLEANUP_STEP_IDS"
+ },
+ {
+  "id": "U1486",
+  "decision": "rewritten",
+  "reason": "withoutProse moved above the isVersionTagCommand doc, which now sits on its function"
+ },
+ {
+  "id": "U1487",
+  "decision": "backlog",
+  "reason": "scripts/closing-guard-core.mjs:113 — isVersionTagCommand also matches listing (`git tag -l v0.3`), which is neither create nor push"
+ },
+ {
+  "id": "U1488",
+  "decision": "backlog",
+  "reason": "scripts/closing-guard-core.mjs:113 — a branch push with a version-shaped name (`git push origin refs/heads/v0.3`) matches although branch pushes are documented as not gated"
+ },
+ {
+  "id": "U1489",
+  "decision": "rewritten",
+  "reason": "poc mentions dropped from the prose-stripping and segment comments; poc is not gated"
+ },
+ {
+  "id": "U1490",
+  "decision": "rewritten",
+  "reason": "withoutProse doc now says only QUOTED -m/--message values are stripped"
+ },
+ {
+  "id": "U1491",
+  "decision": "removed",
+  "reason": "unused WORK_ORDER_FILES removed"
+ },
+ {
+  "id": "U1492",
+  "decision": "kept",
+  "reason": "test-only exports of live internal behaviour, not cruft"
+ },
+ {
+  "id": "U1493",
+  "decision": "rewritten",
+  "reason": "corpus measurement now dated as \"the corpus of the time (536 points)\""
+ },
+ {
+  "id": "U1494",
+  "decision": "rewritten",
+  "reason": "missing-record-time note now says it applies once the second regression is recorded"
+ },
+ {
+  "id": "U1495",
+  "decision": "rewritten",
+  "reason": "RUN_COMMIT_IN_TEXT doc now says every named run target must be the commit being closed"
+ },
+ {
+  "id": "U1496",
+  "decision": "removed",
+  "reason": "test-only ORDERED_STEP_IDS removed with its three test assertions"
+ },
+ {
+  "id": "U1497",
+  "decision": "kept",
+  "reason": "orderProblems stays exported: the totality tests now call it in place of the removed afterCleanupProblem"
+ },
+ {
+  "id": "U1498",
+  "decision": "rewritten",
+  "reason": "repair example no longer embeds a fixed 2026-08-11 timestamp that the same check would reject"
+ },
+ {
+  "id": "U1499",
+  "decision": "rewritten",
+  "reason": "duplicate-evidence message now says \"the same claim (case and punctuation aside)\""
+ },
+ {
+  "id": "U1500",
+  "decision": "rewritten",
+  "reason": "bare-date message now says to drop or fix that date when naming the commit"
+ },
+ {
+  "id": "U1501",
+  "decision": "removed",
+  "reason": "test-only afterCleanupProblem removed; its totality tests call orderProblems directly"
+ },
+ {
+  "id": "U1502",
+  "decision": "backlog",
+  "reason": "scripts/closing-guard.mjs:60 — writeState swallows a failed write (\"CLI convenience only\") although it is the only record of a step, and the CLI still prints \"Recorded\""
+ },
+ {
+  "id": "U1503",
+  "decision": "removed",
+  "reason": "always-null resetAt field no longer written on --reset"
+ },
+ {
+  "id": "U1504",
+  "decision": "rewritten",
+  "reason": "comment now says other calls read only the small closing state"
+ },
+ {
+  "id": "U1505",
+  "decision": "rewritten",
+  "reason": "header now says shortAckDemand serves guards handing over an exact line (timestamp-guard) and names clear-claim-guard's own wording"
+ },
+ {
+  "id": "U1506",
+  "decision": "kept",
+  "reason": "test-only exports of live internal behaviour, not cruft"
+ },
+ {
+  "id": "U1507",
+  "decision": "rewritten",
+  "reason": "pattern doc now says it matches an instruction shape with no negation check"
+ },
+ {
+  "id": "U1508",
+  "decision": "rewritten",
+  "reason": "stripComments doc now says only whole-line // comments are removed and a trailing one stays"
+ },
+ {
+  "id": "U1509",
+  "decision": "rewritten",
+  "reason": "stripComments doc now says a string containing a /*…*/ span is altered"
+ },
+ {
+  "id": "U1510",
+  "decision": "rewritten",
+  "reason": "logicalLines doc now says line numbers count after comment stripping"
+ },
+ {
+  "id": "U1511",
+  "decision": "kept",
+  "reason": "hookScripts is the ratchet's reader of .claude/settings.json; living beside the ratchet it serves is fine"
+ },
+ {
+  "id": "U1512",
+  "decision": "removed",
+  "reason": "test-only firstMutatingSegment removed with its test block"
+ },
+ {
+  "id": "U1513",
+  "decision": "rewritten",
+  "reason": "header now names the wrapper-payload exception to \"quoted text never decides\""
+ },
+ {
+  "id": "U1514",
+  "decision": "rewritten",
+  "reason": "header now says fail open by default and names the conservative exceptions"
+ },
+ {
+  "id": "U1515",
+  "decision": "rewritten",
+  "reason": "WRITING_HEADS doc now notes a bare --help/--version is judged first"
+ },
+ {
+  "id": "U1516",
+  "decision": "rewritten",
+  "reason": "INTERPRETERS doc now notes a directly run script is its own head"
+ },
+ {
+  "id": "U1517",
+  "decision": "rewritten",
+  "reason": "baseOf and commandHead docs now say only exe/cmd/bat/ps1 are stripped"
+ },
+ {
+  "id": "U1518",
+  "decision": "rewritten",
+  "reason": "hasShellCommandArgument doc now names --file"
+ },
+ {
+  "id": "U1519",
+  "decision": "removed",
+  "reason": "unreachable -e/--eval/-p/--print entries dropped from nodeExecutesStdin's value flags (the regex above returns first)"
+ },
+ {
+  "id": "U1520",
+  "decision": "rewritten",
+  "reason": "expandSegments doc now says the walk stops at maxDepth and only onTruncate reports it"
+ },
+ {
+  "id": "U1521",
+  "decision": "rewritten",
+  "reason": "worktree comment now says the listed subcommands write and anything else reads"
+ },
+ {
+  "id": "U1522",
+  "decision": "backlog",
+  "reason": "scripts/command-classify-core.mjs:824 — segmentInvokesScript matches a script name in ANY argument after an interpreter, so a path passed as data (`node tools/x.mjs scripts/board-publish.mjs`) counts as invoking it"
+ },
+ {
+  "id": "U1523",
+  "decision": "backlog",
+  "reason": "scripts/command-classify-core.mjs:823 — the non-interpreter branches test seg.words[0], so `sudo scripts/x.mjs` checks \"sudo\" instead of the skipped-to script path"
+ },
+ {
+  "id": "U1524",
+  "decision": "rewritten",
+  "reason": "segmentInvokesPathWhere doc now says an unresolved word is judged as without a resolver"
+ },
+ {
+  "id": "U1525",
+  "decision": "rewritten",
+  "reason": "segmentMentionsFile doc now says any word or redirection target"
+ },
+ {
+  "id": "U1526",
+  "decision": "rewritten",
+  "reason": "header now says \"the PreToolUse gates\", not \"both\""
+ },
+ {
+  "id": "U1527",
+  "decision": "rewritten",
+  "reason": "isMutatingSegment note now says \"the name the gates import\""
+ },
+ {
+  "id": "U1528",
+  "decision": "kept",
+  "reason": "commandHead is live internally; test import is legitimate"
+ },
+ {
+  "id": "U1529",
+  "decision": "kept",
+  "reason": "nestedCommands is live internally; test import is legitimate"
+ },
+ {
+  "id": "U1530",
+  "decision": "rewritten",
+  "reason": "SHELL_COMMAND_FLAGS doc now says a -File argument is the script, unwrapped as a command line all the same"
+ },
+ {
+  "id": "U1531",
+  "decision": "rewritten",
+  "reason": "npx now carries its own comment; the cmdlet group is labelled \"write or control processes\""
+ },
+ {
+  "id": "U1532",
+  "decision": "kept",
+  "reason": "claim does not hold: batch-lease-core passes onTruncate at both fence sites and refuses; callers without it (the idle-claim gate) under-block as described"
+ },
+ {
+  "id": "U1533",
+  "decision": "kept",
+  "reason": "no defect shown: the rationale cites history in other files, which is not a contradiction with this code"
+ },
+ {
+  "id": "U1534",
+  "decision": "rewritten",
+  "reason": "COMMISSION_TOOLS is no longer exported"
+ },
+ {
+  "id": "U1535",
+  "decision": "rewritten",
+  "reason": "header now says neither decision is re-made here and names the combination and fail-open in commissionVerdict"
+ },
+ {
+  "id": "U1536",
+  "decision": "rewritten",
+  "reason": "dormant report now says it refuses nothing on the tools the matcher misses"
+ },
+ {
+  "id": "U1537",
+  "decision": "rewritten",
+  "reason": "commissionVerdict doc now says slots is the one per-call verdict"
+ },
+ {
+  "id": "U1538",
+  "decision": "kept",
+  "reason": "each export is called by this file's hook/CLI path; test imports are legitimate"
+ },
+ {
+  "id": "U1539",
+  "decision": "removed",
+  "reason": "redundant override fallback dropped: gathered inputs set override from the same record for inputs.point = targets[0]"
+ },
+ {
+  "id": "U1540",
+  "decision": "rewritten",
+  "reason": "status line now says both refusals stand down on unreadable git"
+ },
+ {
+  "id": "U1541",
+  "decision": "kept",
+  "reason": "the pre-tip clock fallback lives in batch-in-flight-core and still serves any old park record; removal cannot be proven safe here"
+ },
+ {
+  "id": "U1542",
+  "decision": "kept",
+  "reason": "claim does not hold: commissionDecision lives in board-queue-core.mjs and branchSlotDecision in batch-in-flight-core.mjs as the header says"
+ },
+ {
+  "id": "U1543",
+  "decision": "rewritten",
+  "reason": "header now names the wrapper's --message commit-msg mode"
+ },
+ {
+  "id": "U1544",
+  "decision": "kept",
+  "reason": "internal constants stay exported as the reviewable rule tables; the export costs nothing"
+ },
+ {
+  "id": "U1545",
+  "decision": "backlog",
+  "reason": "scripts/commit-scope-guard-core.mjs:147 — RESCUE_TRAILER_RE is multiline-anchored over the whole message, so a \"Rescue: …\" subject line satisfies the trailer requirement"
+ },
+ {
+  "id": "U1546",
+  "decision": "backlog",
+  "reason": "scripts/commit-scope-guard-core.mjs:155 — skip-checks: true is detected anywhere in the message, not only in the trailer block its doc describes"
+ },
+ {
+  "id": "U1547",
+  "decision": "rewritten",
+  "reason": "large-binary finding now mentions the listed large-file paths beside LARGE_FILE_DIRS"
+ },
+ {
+  "id": "U1548",
+  "decision": "rewritten",
+  "reason": "--message comment now says an unreadable file throws into the outer catch, which allows the commit"
+ },
+ {
+  "id": "U1549",
+  "decision": "rewritten",
+  "reason": "rule 3 now names the neighbouring-clause capability exemption"
+ },
+ {
+  "id": "U1550",
+  "decision": "rewritten",
+  "reason": "EXECUTION_STEP_PATTERNS doc now says they beat only the neighbouring-clause capability reading"
+ },
+ {
+  "id": "U1551",
+  "decision": "kept",
+  "reason": "internal pattern tables stay exported for their tests; the export costs nothing"
+ },
+ {
+  "id": "U1552",
+  "decision": "backlog",
+  "reason": "scripts/container-ask-guard-core.mjs:229 — the time-clause exclusion guards only the bare \"I\"; \"before I've\"/\"before I'll\" still match the contraction alternative"
+ },
+ {
+  "id": "U1553",
+  "decision": "rewritten",
+  "reason": "fence lead-in comment now says only an EXECUTION step in the fence triggers it"
+ },
+ {
+  "id": "U1554",
+  "decision": "kept",
+  "reason": "no code defect: the entry only questions index figures"
+ },
+ {
+  "id": "U1555",
+  "decision": "kept",
+  "reason": "test-only exports of live internal behaviour, not cruft"
+ },
+ {
+  "id": "U1556",
+  "decision": "kept",
+  "reason": "claim does not hold as a defect: inspectLastAssistantText does return the first text block, exactly as the accepted-gap note says"
+ },
+ {
+  "id": "U1557",
+  "decision": "kept",
+  "reason": "claim does not hold: timestamp-guard.mjs still blocks on an unverifiable transcript (MAX_UNVERIFIABLE_BLOCKS), so the contrast is accurate"
+ },
+ {
+  "id": "U1558",
+  "decision": "rewritten",
+  "reason": "point 597 is closed (docs/tasks-archive.md); the \"until then … assumed\" wording dropped"
+ },
+ {
+  "id": "U1559",
+  "decision": "backlog",
+  "reason": "scripts/context-budget-core.mjs:90 — cat/head/more/tail after a pipe count as bounded output pagers without any argument check, so `x | cat big.log` is admitted as a bounded control"
+ },
+ {
+  "id": "U1560",
+  "decision": "kept",
+  "reason": "internal helper stays exported; test import is legitimate"
+ },
+ {
+  "id": "U1561",
+  "decision": "backlog",
+  "reason": "scripts/context-budget-core.mjs:165 — reconcilePendingLedger clears the pending debit on ANY changed reading identity, with no check that the new reading is newer"
+ },
+ {
+  "id": "U1562",
+  "decision": "removed",
+  "reason": "unused `export { CALL_KINDS }` re-export and its import removed"
+ },
+ {
+  "id": "U1563",
+  "decision": "kept",
+  "reason": "boundedControlCall is live via remainingBudgetDecision; test import is legitimate"
+ },
+ {
+  "id": "U1564",
+  "decision": "backlog",
+  "reason": "scripts/context-budget-core.mjs:345 — the subagent/attended refusal says \"reads … remain allowed\" although the header and remainingBudgetDecision judge reads against the same budget"
+ },
+ {
+  "id": "U1565",
+  "decision": "rewritten",
+  "reason": "CONTEXT_FENCE_LEDGER_PATH unexported and documented as the directory anchor of the per-context ledgers"
+ },
+ {
+  "id": "U1566",
+  "decision": "kept",
+  "reason": "internal default path stays exported; costs nothing"
+ },
+ {
+  "id": "U1567",
+  "decision": "rewritten",
+  "reason": "readPendingLedger's default path to the legacy shared ledger removed; every caller passes the per-context path"
+ },
+ {
+  "id": "U1568",
+  "decision": "kept",
+  "reason": "no code change possible: a stale .claude runtime file is simply never read; cleaning a user's disk is not a repository edit"
+ },
+ {
+  "id": "U1569",
+  "decision": "rewritten",
+  "reason": "header now speaks of the per-context pending-debit ledgers"
+ },
+ {
+  "id": "U1570",
+  "decision": "kept",
+  "reason": "contextLedgerPath is live internally; test import is legitimate"
+ },
+ {
+  "id": "U1571",
+  "decision": "rewritten",
+  "reason": "FENCE_CARRIER_COMMAND is no longer exported"
+ },
+ {
+  "id": "U1572",
+  "decision": "rewritten",
+  "reason": "FILE_WRITING_TOOLS is no longer exported"
+ },
+ {
+  "id": "U1573",
+  "decision": "rewritten",
+  "reason": "core header now says the first build denied only starts and that admission now charges reads too"
+ },
+ {
+  "id": "U1574",
+  "decision": "rewritten",
+  "reason": "FILE_WRITING_TOOLS doc and the \"everything that reads\" line no longer promise every read stays allowed"
+ },
+ {
+  "id": "U1575",
+  "decision": "rewritten",
+  "reason": "START_SCRIPTS coverage comment now names author-fable.mjs"
+ },
+ {
+  "id": "U1576",
+  "decision": "kept",
+  "reason": "the null guard on splitShortCluster costs nothing and keeps the loop from throwing if the earlier filters change"
+ },
+ {
+  "id": "U1577",
+  "decision": "rewritten",
+  "reason": "resolver summary now says the catch is only for ln -s; a hard link is the copy-shaped escape"
+ },
+ {
+  "id": "U1578",
+  "decision": "rewritten",
+  "reason": "classifyFenceCall doc now names the resolveThroughAncestors adapter and says no caller injects isDirectory"
+ },
+ {
+  "id": "U1579",
+  "decision": "rewritten",
+  "reason": "guard header now names the budget core as what it wraps and the fence core as the classifier"
+ },
+ {
+  "id": "U1580",
+  "decision": "rewritten",
+  "reason": "registration comment now matches the live matcher (MultiEdit, $CLAUDE_PROJECT_DIR) and says Read/Grep/Glob are not matched"
+ },
+ {
+  "id": "U1581",
+  "decision": "rewritten",
+  "reason": "guard's constructed-link summary now says ln -s only"
+ },
+ {
+  "id": "U1582",
+  "decision": "rewritten",
+  "reason": "CONTEXT_FENCE_PERMIT_VERSION is no longer exported"
+ },
+ {
+  "id": "U1583",
+  "decision": "rewritten",
+  "reason": "the six path/lock constants are no longer exported"
+ },
+ {
+  "id": "U1584",
+  "decision": "removed",
+  "reason": "unused readContextPermit removed"
+ },
+ {
+  "id": "U1585",
+  "decision": "rewritten",
+  "reason": "INCIDENT_VERSION, KIND_PRECEDENCE and overshootOf are no longer exported"
+ },
+ {
+  "id": "U1586",
+  "decision": "rewritten",
+  "reason": "comments now speak of npm script names and say any non-flag word is compared"
+ },
+ {
+  "id": "U1587",
+  "decision": "rewritten",
+  "reason": "callInputChars doc now names the depth-6 cutoff and numbers/booleans"
+ },
+ {
+  "id": "U1588",
+  "decision": "backlog",
+  "reason": "scripts/context-incidents-core.mjs:203 — extractCalls skips usage-less lines before reading their blocks, so tool_use blocks on a streamed line without usage are lost despite the \"all its lines\" doc"
+ },
+ {
+  "id": "U1589",
+  "decision": "rewritten",
+  "reason": "sampling doc no longer guarantees a representative quantile"
+ },
+ {
+  "id": "U1590",
+  "decision": "rewritten",
+  "reason": "trigger now described as the handover threshold (buildIncident doc and the report comment)"
+ },
+ {
+  "id": "U1591",
+  "decision": "rewritten",
+  "reason": "residual now limited to overshoot records; startup and seeded records named"
+ },
+ {
+  "id": "U1592",
+  "decision": "rewritten",
+  "reason": "\"never over-counts\" dropped from the header and the printed report; lines are not deduplicated"
+ },
+ {
+  "id": "U1593",
+  "decision": "removed",
+  "reason": "unused kind option of filterSeries removed"
+ },
+ {
+  "id": "U1594",
+  "decision": "rewritten",
+  "reason": "INCIDENTS_PATH, SEED_PATH and MAX_TRANSCRIPT_BYTES are no longer exported"
+ },
+ {
+  "id": "U1595",
+  "decision": "rewritten",
+  "reason": "cap doc now says the file is read whole and only the last characters are kept"
+ },
+ {
+  "id": "U1596",
+  "decision": "backlog",
+  "reason": "scripts/context-incidents.mjs:137 — a truncated transcript still yields startupTokens from the first call in the tail, although the comment says a truncated read reports no startup reading"
+ },
+ {
+  "id": "U1597",
+  "decision": "rewritten",
+  "reason": "CLI help no longer claims \"never over-counts\""
+ },
+ {
+  "id": "U1598",
+  "decision": "rewritten",
+  "reason": "armed mode now described as the per-call budget refusal; the authoring-target refusal is dated to the mark-based fence of that day"
+ },
+ {
+  "id": "U1599",
+  "decision": "rewritten",
+  "reason": "floor rationale now says a fresh session stands past the mark before its first call, naming the former admission role as history"
+ },
+ {
+  "id": "U1600",
+  "decision": "rewritten",
+  "reason": "watermarkDecision's stranded doc moved onto the function"
+ },
+ {
+  "id": "U1601",
+  "decision": "rewritten",
+  "reason": "TAIL_BYTES is no longer exported"
+ },
+ {
+  "id": "U1602",
+  "decision": "backlog",
+  "reason": "scripts/context-watermark.mjs:78 — locateTranscript falls back to the newest project JSONL when the session's own file is absent, so another session's reading can be used against the own-session rule"
+ },
+ {
+  "id": "U1603",
+  "decision": "rewritten",
+  "reason": "GATED_LEVEL is no longer exported"
+ },
+ {
+  "id": "U1604",
+  "decision": "rewritten",
+  "reason": "header now names the findings-filed receipt and the verified unavailable clearance beside the later merge"
+ },
+ {
+  "id": "U1605",
+  "decision": "rewritten",
+  "reason": "doc now says an occurrence directly preceded by a quote mark is skipped"
+ },
+ {
+  "id": "U1606",
+  "decision": "rewritten",
+  "reason": "doc now says at most one match per line"
+ },
+ {
+  "id": "U1607",
+  "decision": "rewritten",
+  "reason": "newlyTicked doc now says done now and not done at the baseline"
+ },
+ {
+  "id": "U1608",
+  "decision": "backlog",
+  "reason": "scripts/criticality-review-guard-core.mjs:173 — strictAncestorProbe checks only endpoint membership, so a partial ancestry listing can answer false without the git fallback the doc promises"
+ },
+ {
+  "id": "U1609",
+  "decision": "rewritten",
+  "reason": "coverage comment now names the commission, landing merge or feat/<point> lane as the range start"
+ },
+ {
+  "id": "U1610",
+  "decision": "removed",
+  "reason": "unreachable r.reachable === false check removed from filed (reachable is pre-filtered)"
+ },
+ {
+  "id": "U1611",
+  "decision": "removed",
+  "reason": "redundant point-number check removed from filed (all rows are pre-filtered by point); the sha check stays"
+ },
+ {
+  "id": "U1612",
+  "decision": "rewritten",
+  "reason": "no-review message now says a row failing the well-formedness check does not count"
+ },
+ {
+  "id": "U1613",
+  "decision": "rewritten",
+  "reason": "malformed-record message now lists the other well-formedness failures"
+ },
+ {
+  "id": "U1614",
+  "decision": "rewritten",
+  "reason": "self-review message now covers a row that names no author"
+ },
+ {
+  "id": "U1615",
+  "decision": "rewritten",
+  "reason": "unanswered message no longer asserts a later merge exists and names the findings-filed remedy"
+ },
+ {
+  "id": "U1616",
+  "decision": "rewritten",
+  "reason": "\"the only record/review\" wording dropped from the not-in-history and self-review messages"
+ },
+ {
+  "id": "U1617",
+  "decision": "rewritten",
+  "reason": "core WHY now says it classifies starts and takes no reading or mark"
+ },
+ {
+  "id": "U1618",
+  "decision": "removed",
+  "reason": "the core's \"fail direction on an unreadable measurement\" paragraph removed; the core never sees a measurement"
+ },
+ {
+  "id": "U1619",
+  "decision": "backlog",
+  "reason": "scripts/context-fence-core.mjs:877 — fenceRefusal (and FENCE_END_COMMAND) still word a mark-based denial but have no production caller since the guard refuses via contextBudgetRefusal; remove them with the test fixture that wraps classifications in them"
+ },
+ {
+  "id": "U1620",
+  "decision": "kept",
+  "reason": "claim does not hold as dead code: context-budget-core's remainingBudgetDecision calls classifyFenceCall to price a start"
+ },
+ {
+  "id": "U1621",
+  "decision": "kept",
+  "reason": "FENCE_END_COMMAND is test-imported; its fate goes with fenceRefusal (see the backlog line for U1619)"
+ },
+ {
+  "id": "U1622",
+  "decision": "kept",
+  "reason": "authoringTarget is live via classifyFenceCall; test import is legitimate"
+ },
+ {
+  "id": "U1623",
+  "decision": "rewritten",
+  "reason": "residual now says no production caller injects isDirectory today"
+ },
+ {
+  "id": "U1624",
+  "decision": "rewritten",
+  "reason": "classifyFenceCall doc now lists clearFirst"
+ },
+ {
+  "id": "U1625",
+  "decision": "rewritten",
+  "reason": "observations comment now says the incidents series also holds seeded startup readings"
+ },
+ {
+  "id": "U1626",
+  "decision": "kept",
+  "reason": "CONTEXT_FENCE_PERMIT_TTL_MS is the live default of issueContextPermit; test import is legitimate"
+ },
+ {
+  "id": "U1627",
+  "decision": "rewritten",
+  "reason": "claim does not hold (lock-heartbeat-hook.mjs, PostToolUse matcher '', calls it); the comment now names that hook"
+ },
+ {
+  "id": "U1628",
+  "decision": "rewritten",
+  "reason": "WHY now says the fence is in observe mode by default since point 758"
+ },
+ {
+  "id": "U1629",
+  "decision": "rewritten",
+  "reason": "header no longer says the fence was armed"
+ },
+ {
+  "id": "U1630",
+  "decision": "rewritten",
+  "reason": "\"one vocabulary\" replaced by \"kept as separate lists\", naming what is not mirrored"
+ },
+ {
+  "id": "U1631",
+  "decision": "kept",
+  "reason": "test-only exports of live internal behaviour, not cruft"
+ },
+ {
+  "id": "U1632",
+  "decision": "rewritten",
+  "reason": "--status stays accepted (removal would turn a harmless call into exit 2); the line now says why"
+ },
+ {
+  "id": "U1633",
+  "decision": "kept",
+  "reason": "claim does not hold: .gitignore lists .claude/batch-fence.json"
+ },
+ {
+  "id": "U1634",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/handover-budget.mjs records and reads .claude/handover-costs.jsonl"
+ },
+ {
+  "id": "U1635",
+  "decision": "removed",
+  "reason": "gatherWatermark's watermark override removed; no caller passes it"
+ },
+ {
+  "id": "U1636",
+  "decision": "rewritten",
+  "reason": "usage line now shows --status as optional"
+ },
+ {
+  "id": "U1637",
+  "decision": "rewritten",
+  "reason": "evaluateCriticalityReview doc now lists the further record fields and head in the return"
+ },
+ {
+  "id": "U1638",
+  "decision": "kept",
+  "reason": "tickedNumbers and newlyTicked are live via highTicks; test import is legitimate"
+ },
+ {
+  "id": "U1639",
+  "decision": "rewritten",
+  "reason": "the 38-row count is now dated 23.08.2026"
+ },
+ {
+  "id": "U1640",
+  "decision": "rewritten",
+  "reason": "header now says the Stop hook is switched off and --status reports the debt"
+ },
+ {
+  "id": "U1641",
+  "decision": "rewritten",
+  "reason": "header now lists work order, baseline and ledger among what the wrapper gathers"
+ },
+ {
+  "id": "U1642",
+  "decision": "rewritten",
+  "reason": "the unreadable-ledger comment now says only --status reaches it; the header's fail-open claim was removed with the switch-off wording"
+ },
+ {
+  "id": "U1643",
+  "decision": "rewritten",
+  "reason": "pause and lock stand-downs removed from the header; only the main-only stand-down remains"
+ },
+ {
+  "id": "U1644",
+  "decision": "rewritten",
+  "reason": "contradiction resolved: header no longer claims pause/lock stand-downs"
+ },
+ {
+  "id": "U1645",
+  "decision": "rewritten",
+  "reason": "grandfathering paragraph now says nothing writes the baseline any more"
+ },
+ {
+  "id": "U1646",
+  "decision": "rewritten",
+  "reason": "header usage now lists --record-findings-filed"
+ },
+ {
+  "id": "U1647",
+  "decision": "rewritten",
+  "reason": "reversal note now names everything the switch-off removed"
+ },
+ {
+  "id": "U1648",
+  "decision": "rewritten",
+  "reason": "CRITICALITY_GATE_SWITCHED_OFF is no longer exported"
+ },
+ {
+  "id": "U1649",
+  "decision": "rewritten",
+  "reason": "TICK_BRANCH is no longer exported"
+ },
+ {
+  "id": "U1650",
+  "decision": "rewritten",
+  "reason": "unavailableReceiptUsage is no longer exported"
+ },
+ {
+  "id": "U1651",
+  "decision": "rewritten",
+  "reason": "maxBuffer rationale now dated to the blocking gate and says --status would report an error today"
+ },
+ {
+  "id": "U1652",
+  "decision": "kept",
+  "reason": "each export backs live CLI/internal behaviour; test imports are legitimate"
+ },
+ {
+  "id": "U1653",
+  "decision": "rewritten",
+  "reason": "pointAuthorship is no longer exported"
+ },
+ {
+  "id": "U1654",
+  "decision": "rewritten",
+  "reason": "findings-filed doc now names the CLI route that writes the receipt"
+ },
+ {
+  "id": "U1655",
+  "decision": "rewritten",
+  "reason": "findingsFiledUsage is no longer exported"
+ },
+ {
+  "id": "U1656",
+  "decision": "removed",
+  "reason": "writeBaseline and its mkdirSync/writeFileSync/dirname imports removed with its unreachable call"
+ },
+ {
+  "id": "U1657",
+  "decision": "rewritten",
+  "reason": "showAt doc now says \"report\", not \"block the turn\""
+ },
+ {
+  "id": "U1658",
+  "decision": "rewritten",
+  "reason": "showAt doc now says the caller re-bases only for a missing baseline commit"
+ },
+ {
+  "id": "U1659",
+  "decision": "rewritten",
+  "reason": "readWorkOrder doc now dates the baseline advance to the blocking gate"
+ },
+ {
+  "id": "U1660",
+  "decision": "rewritten",
+  "reason": "commitMissing doc now says \"does not resolve to a commit\""
+ },
+ {
+  "id": "U1661",
+  "decision": "rewritten",
+  "reason": "claim holds (guard-preflight calls it without report): doc now says the preflight gets the switched-off stand-down"
+ },
+ {
+  "id": "U1662",
+  "decision": "rewritten",
+  "reason": "comment now says the report should see the tick while it is being made"
+ },
+ {
+  "id": "U1663",
+  "decision": "rewritten",
+  "reason": "comment no longer says clearing would advance the baseline"
+ },
+ {
+  "id": "U1664",
+  "decision": "removed",
+  "reason": "the bare { … } scaffolding block around the tick reading removed"
+ },
+ {
+  "id": "U1665",
+  "decision": "rewritten",
+  "reason": "rationale now speaks of the report, not disabling the gate"
+ },
+ {
+  "id": "U1666",
+  "decision": "rewritten",
+  "reason": "comment now says off main the fallback reads TASKS.md directly"
+ },
+ {
+  "id": "U1667",
+  "decision": "kept",
+  "reason": "still wired as a Stop hook in .claude/settings.json; its silent exit IS the switched-off state and the wiring keeps re-arming one commit away"
+ },
+ {
+  "id": "U1668",
+  "decision": "rewritten",
+  "reason": "gap-clause commentary now describes the report, not a block"
+ },
+ {
+  "id": "U1669",
+  "decision": "removed",
+  "reason": "unreachable '<none — arms at this HEAD>' fallback removed (the baseline is always a sha)"
+ },
+ {
+  "id": "U1670",
+  "decision": "removed",
+  "reason": "unreachable block/gap-suspension/baseline-advance tail removed; the --status branch is now unconditional past the stand-down"
+ },
+ {
+  "id": "U1671",
+  "decision": "removed",
+  "reason": "the \"blocking resumes\" comment went with the dead tail"
+ },
+ {
+  "id": "U1672",
+  "decision": "rewritten",
+  "reason": "unreadable-ledger comment now speaks of the report's evidence"
+ },
+ {
+  "id": "U1673",
+  "decision": "rewritten",
+  "reason": "comment now says only --status reaches the branch and that its JSON is the old hook shape"
+ },
+ {
+  "id": "U1674",
+  "decision": "kept",
+  "reason": "validateAttestation and readOptional serve verifyFloorEvidence, whose caller is the Vitest gate (cut-account-core.test.mjs) by design"
+ },
+ {
+  "id": "U1675",
+  "decision": "kept",
+  "reason": "verifyFloorEvidence's caller is the Vitest case, which the account names as its gate; test-as-gate is the intended audit route"
+ },
+ {
+  "id": "U1676",
+  "decision": "kept",
+  "reason": "document-history note explaining the prose-total match; nothing in the code contradicts it"
+ },
+ {
+  "id": "U1677",
+  "decision": "rewritten",
+  "reason": "header now names the floor readings and dating beside the account judge"
+ },
+ {
+  "id": "U1678",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/blind-merge.mjs exists"
+ },
+ {
+  "id": "U1679",
+  "decision": "rewritten",
+  "reason": "header no longer claims to refuse an entry with no account; a non-matching line is skipped as prose"
+ },
+ {
+  "id": "U1680",
+  "decision": "rewritten",
+  "reason": "header now lists the further refusals (unknown source/account, undated DROPPED, duplicate)"
+ },
+ {
+  "id": "U1681",
+  "decision": "kept",
+  "reason": "the account judge's caller is its Vitest case by design (header: \"the exit code belong[s] to the callers (the Vitest case)\")"
+ },
+ {
+  "id": "U1682",
+  "decision": "rewritten",
+  "reason": "isExternalDestination doc now says a destination resolving inside the root is never external, and ../x is"
+ },
+ {
+  "id": "U1683",
+  "decision": "rewritten",
+  "reason": "FLOOR doc now says wrapping works up to the sum and metadata must share its line"
+ },
+ {
+  "id": "U1684",
+  "decision": "rewritten",
+  "reason": "FLOOR doc now says the first assistant message carrying usage"
+ },
+ {
+  "id": "U1685",
+  "decision": "rewritten",
+  "reason": "FLOOR doc now says a wrong sum is recorded as adds:false and refused by the attest judge"
+ },
+ {
+  "id": "U1686",
+  "decision": "kept",
+  "reason": "the total field is pinned by its test and costs nothing"
+ },
+ {
+  "id": "U1687",
+  "decision": "kept",
+  "reason": "dated residual note about the two readings of that time; no code defect"
+ },
+ {
+  "id": "U1688",
+  "decision": "rewritten",
+  "reason": "the board-remedy note moved out of the rule text to the paragraph's end"
+ },
+ {
+  "id": "U1689",
+  "decision": "rewritten",
+  "reason": "header exemption list now names the derived state card"
+ },
+ {
+  "id": "U1690",
+  "decision": "rewritten",
+  "reason": "parseCards doc now lists kind and the chip/title ownership grammar, and the null point for a multi-point card"
+ },
+ {
+  "id": "U1691",
+  "decision": "kept",
+  "reason": "claim does not hold: board-state-core.mjs exports MAX_STATE_PARAGRAPHS = 3 and slices to it"
+ },
+ {
+  "id": "U1692",
+  "decision": "rewritten",
+  "reason": "wrapper header now says it also reads the work order's point numbers"
+ },
+ {
+  "id": "U1693",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-card-topic-guard-core.mjs:83 — three divergent parseCards (topic-core, conciseness-core, guard-core) share one name with different signatures and return shapes"
+ },
+ {
+  "id": "U1694",
+  "decision": "rewritten",
+  "reason": "header now names the offline --defer escape as the one directly named step"
+ },
+ {
+  "id": "U1695",
+  "decision": "kept",
+  "reason": "claim does not hold as a defect: both `board.mjs queue <N>` and `board-queue.mjs set <N>` exist and write queue prose"
+ },
+ {
+  "id": "U1696",
+  "decision": "rewritten",
+  "reason": "parseNowCardPoints doc and the completeness/focus comments now say chip and title are both read"
+ },
+ {
+  "id": "U1697",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-guard-core.mjs:49 — parseNowCardPoints (and the sibling cores' sectionSlice) anchor on the bare phrase \"Woran ich gerade arbeite\", against parseQueuePoints' own \"anchor on the section header\" rule"
+ },
+ {
+  "id": "U1698",
+  "decision": "removed",
+  "reason": "the superseded 26.07 COLLAPSIBLE_SECTIONS JSDoc removed"
+ },
+ {
+  "id": "U1699",
+  "decision": "rewritten",
+  "reason": "stub-body doc now says it is recognised by its first 40 characters"
+ },
+ {
+  "id": "U1700",
+  "decision": "rewritten",
+  "reason": "STUB_SHARE_CEILING and STUB_RUN_CEILING are no longer exported"
+ },
+ {
+  "id": "U1701",
+  "decision": "rewritten",
+  "reason": "mojibake doc now says UTF-8-shaped runs, not valid sequences"
+ },
+ {
+  "id": "U1702",
+  "decision": "rewritten",
+  "reason": "parseCards doc now returns {meta, body, title, points}"
+ },
+ {
+  "id": "U1703",
+  "decision": "rewritten",
+  "reason": "compound-splitting comment now points to dashboard-point-reader-core"
+ },
+ {
+  "id": "U1704",
+  "decision": "rewritten",
+  "reason": "auditDashboard's stranded doc moved onto the function"
+ },
+ {
+  "id": "U1705",
+  "decision": "rewritten",
+  "reason": "collapsible-section comment now covers every section (26./27.07.2026)"
+ },
+ {
+  "id": "U1706",
+  "decision": "rewritten",
+  "reason": "footer comment now says nothing is compared when no open point was parsed"
+ },
+ {
+  "id": "U1707",
+  "decision": "rewritten",
+  "reason": "evaluate input doc now lists nowCardHash, nowMinutes and knownPoints"
+ },
+ {
+  "id": "U1708",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-guard-core.mjs:893 — waiting-on-user points are documented both as gated queue cards (178–185, 634–643) and as belonging only under \"Von dir zu klären\" (893–895, 940–943)"
+ },
+ {
+  "id": "U1709",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-guard-core.mjs:920 — the one-section rule says a DONE point sits in no open section, but only done∩queue and question overlaps are checked, not done∩now"
+ },
+ {
+  "id": "U1710",
+  "decision": "rewritten",
+  "reason": "unchanged-card message now says identical after stripping tags and collapsing whitespace"
+ },
+ {
+  "id": "U1711",
+  "decision": "kept",
+  "reason": "the legacy publishedHash branch may still serve an old marker; removal cannot be proven safe"
+ },
+ {
+  "id": "U1712",
+  "decision": "rewritten",
+  "reason": "fixture doc now says any `N — …` title renders as chip plus title"
+ },
+ {
+  "id": "U1713",
+  "decision": "rewritten",
+  "reason": "fixture shapes comment now lists the status time, section wrappers and archive link"
+ },
+ {
+  "id": "U1714",
+  "decision": "rewritten",
+  "reason": "green() now satisfies the publish invariant through pagesPublishedHash, the live transport"
+ },
+ {
+  "id": "U1715",
+  "decision": "rewritten",
+  "reason": "header inventory now lists (8c) and the ETA rule"
+ },
+ {
+  "id": "U1716",
+  "decision": "rewritten",
+  "reason": "comment now names the unattributed-activity and no-session cases"
+ },
+ {
+  "id": "U1717",
+  "decision": "rewritten",
+  "reason": "comment now names the first pass with no stored baseline"
+ },
+ {
+  "id": "U1718",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-guard.mjs:226 — --synced accepts any publishDeferred record without comparing its repoHash to the current file, though a deferral covers only the content it was taken for"
+ },
+ {
+  "id": "U1719",
+  "decision": "kept",
+  "reason": "the legacy mirror hash may still stand in an old state file; harmless and cannot be proven dead"
+ },
+ {
+  "id": "U1720",
+  "decision": "kept",
+  "reason": "claim does not hold: the due-mark writer (lock-heartbeat-hook.mjs:234) also fingerprints raw readFileSync(TASKS), the same source"
+ },
+ {
+  "id": "U1721",
+  "decision": "rewritten",
+  "reason": "the fallback now uses BOARD_FILE_DEFAULT instead of a second literal (same value, same resolution)"
+ },
+ {
+  "id": "U1722",
+  "decision": "kept",
+  "reason": "exports match their documented callers"
+ },
+ {
+  "id": "U1723",
+  "decision": "rewritten",
+  "reason": "EVIDENCE_PATH_RE is no longer exported"
+ },
+ {
+  "id": "U1724",
+  "decision": "rewritten",
+  "reason": "header now lists (D) and the derived now-section check beside (A)–(C)"
+ },
+ {
+  "id": "U1725",
+  "decision": "rewritten",
+  "reason": "header now says evaluate is total, not every function"
+ },
+ {
+  "id": "U1726",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-integrity-guard-core.mjs:108 — pointsFromText only matches points 100–299, so commit-subject evidence (check A) is dead for every current point number"
+ },
+ {
+  "id": "U1727",
+  "decision": "removed",
+  "reason": "nowCardMatchesWork's back-compat nowPoint input removed; its tests now pass nowPoints"
+ },
+ {
+  "id": "U1728",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-integrity-guard-core.mjs:388 — evaluate returns before staleQueueCards when no TASKS point is open, so the standalone closed/unknown queue-card check never runs then"
+ },
+ {
+  "id": "U1729",
+  "decision": "rewritten",
+  "reason": "evaluate doc moved onto evaluate, names activeWork/paused/heldByOther and the commits-since-review source"
+ },
+ {
+  "id": "U1730",
+  "decision": "kept",
+  "reason": "paused/heldByOther keep nowProjectionStopDecision's pure contract; the tests drive them and the defaults cost nothing"
+ },
+ {
+  "id": "U1731",
+  "decision": "rewritten",
+  "reason": "the two hand-written \"republish, re-run --synced\" remedies now use ${REPUBLISH}"
+ },
+ {
+  "id": "U1732",
+  "decision": "kept",
+  "reason": "claim does not hold: REPUBLISH is \"republish (…board-publish.mjs) and re-run …dashboard-guard.mjs --synced\", which re-records the snapshots"
+ },
+ {
+  "id": "U1733",
+  "decision": "rewritten",
+  "reason": "comment now says a board with neither now-card nor queue cards"
+ },
+ {
+  "id": "U1734",
+  "decision": "kept",
+  "reason": "exports reached from evaluate in production; intentional test surface"
+ },
+ {
+  "id": "U1735",
+  "decision": "rewritten",
+  "reason": "header now says a git timeout only empties the git evidence while other checks still decide"
+ },
+ {
+  "id": "U1736",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-integrity-guard.mjs:29 — the guard reads a fixed REPO_ROOT/.batch-dashboard.html instead of dashboard-state's boardFilePath resolver"
+ },
+ {
+  "id": "U1737",
+  "decision": "rewritten",
+  "reason": "wrapper header now lists (D) and the now-section check"
+ },
+ {
+  "id": "U1738",
+  "decision": "rewritten",
+  "reason": "point-reader doc now says the four-digit rule measures the numeric value, leading zeros dropped"
+ },
+ {
+  "id": "U1739",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-publish.mjs:63 — the default repo→scratchpad copy mode and its scratchpadPath/syncHash/fileSyncedAt bookkeeping outlived the retired mirror; only --defer is still needed"
+ },
+ {
+  "id": "U1740",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-publish.mjs:37 — --confirm-published still writes a publishedHash that dashboard-guard accepts as a live publish, a manual attestation route left from the retired mirror"
+ },
+ {
+  "id": "U1741",
+  "decision": "rewritten",
+  "reason": "target comment no longer claims the UserPromptSubmit hook keeps the path current"
+ },
+ {
+  "id": "U1742",
+  "decision": "rewritten",
+  "reason": "footer comment now says the same parser (parseTasks) as the audit"
+ },
+ {
+  "id": "U1743",
+  "decision": "rewritten",
+  "reason": "structure-gate comment now dated to when this script was still the publish path"
+ },
+ {
+  "id": "U1744",
+  "decision": "rewritten",
+  "reason": "header now says owner prompts, with STAND_DOWN_TEXT for non-owners"
+ },
+ {
+  "id": "U1745",
+  "decision": "kept",
+  "reason": "claim does not hold: the injected text measures 843 characters, under 900 as stated; 950 is the enforced ceiling"
+ },
+ {
+  "id": "U1746",
+  "decision": "rewritten",
+  "reason": "the block total now reads \"about 925 (139 + 358 + 427, plus separators)\""
+ },
+ {
+  "id": "U1747",
+  "decision": "rewritten",
+  "reason": "contextLevelInstruction is no longer exported"
+ },
+ {
+  "id": "U1748",
+  "decision": "rewritten",
+  "reason": "promptInjectionText doc now says hookInjectionText adds the context line and ceiling notice"
+ },
+ {
+  "id": "U1749",
+  "decision": "kept",
+  "reason": "claim does not hold: board.mjs vdzk-add accepts the positional \"<title>\" \"<question>\" form as well as --text-stdin"
+ },
+ {
+  "id": "U1750",
+  "decision": "rewritten",
+  "reason": "header gate list now names section-not-collapsible"
+ },
+ {
+  "id": "U1751",
+  "decision": "kept",
+  "reason": "test-visible exports all feed hookInjectionText in production"
+ },
+ {
+  "id": "U1752",
+  "decision": "rewritten",
+  "reason": "stand-down comment now says the context line and any ceiling notice come along"
+ },
+ {
+  "id": "U1753",
+  "decision": "rewritten",
+  "reason": "hook header now names the context line, ceiling notice, stand-down text, decision-card seeding and handover withdrawal"
+ },
+ {
+  "id": "U1754",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-state.mjs:20 — writeJsonAtomic shares one ${path}.tmp across writers and mergeState is an unlocked read-spread-write, so concurrent merges can overwrite each other"
+ },
+ {
+  "id": "U1755",
+  "decision": "rewritten",
+  "reason": "consumer list replaced by a representative description"
+ },
+ {
+  "id": "U1756",
+  "decision": "rewritten",
+  "reason": "\"All five\" now reads \"All four, and the board file itself\""
+ },
+ {
+  "id": "U1757",
+  "decision": "rewritten",
+  "reason": "dashboard-state.json description now names the publish records and guard bookkeeping"
+ },
+ {
+  "id": "U1758",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-state.mjs:36 — boardFilePath is the canonical resolver, yet dashboard-guard (--waive-audit), dashboard-integrity-guard, dashboard-sync, decision-card-guard and dashboard-publish still resolve .batch-dashboard.html against REPO_ROOT themselves"
+ },
+ {
+  "id": "U1759",
+  "decision": "rewritten",
+  "reason": "header no longer claims every function is total; names the card-list precondition and the wrapper's catch"
+ },
+ {
+  "id": "U1760",
+  "decision": "rewritten",
+  "reason": "parseTasksPoints doc now says DEFERRED open lines"
+ },
+ {
+  "id": "U1761",
+  "decision": "rewritten",
+  "reason": "nowCardTitles doc now says every card in the section"
+ },
+ {
+  "id": "U1762",
+  "decision": "kept",
+  "reason": "test-visible exports feed nowCardTitles/matches/evaluate in production"
+ },
+ {
+  "id": "U1763",
+  "decision": "rewritten",
+  "reason": "the orphaned \"the prompt's\" quotation reworded as a plain example"
+ },
+ {
+  "id": "U1764",
+  "decision": "rewritten",
+  "reason": "head-drift catalogue entry now says by point or label"
+ },
+ {
+  "id": "U1765",
+  "decision": "rewritten",
+  "reason": "unknown-point catalogue entry now names the branch/label corroboration exemption"
+ },
+ {
+  "id": "U1766",
+  "decision": "rewritten",
+  "reason": "stale-done catalogue entry now names the label and agent-claim exemptions"
+ },
+ {
+  "id": "U1767",
+  "decision": "rewritten",
+  "reason": "agent-claim catalogue entry now says a card with no point number"
+ },
+ {
+  "id": "U1768",
+  "decision": "rewritten",
+  "reason": "report and wrapper header now say an unreadable git answer reads as no branch and an empty pool"
+ },
+ {
+  "id": "U1769",
+  "decision": "rewritten",
+  "reason": "evaluate doc now returns drift too"
+ },
+ {
+  "id": "U1770",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-sync-core.mjs:254 — the sync guard demands a now-card whenever points are open, against the integrity guard's verified zero-active-work empty state"
+ },
+ {
+  "id": "U1771",
+  "decision": "backlog",
+  "reason": "scripts/dashboard-sync.mjs:39 — the guard reads a fixed REPO_ROOT/.batch-dashboard.html, not the registered dashboard its header names"
+ },
+ {
+  "id": "U1772",
+  "decision": "rewritten",
+  "reason": "the DECISION_PHRASES JSDoc moved below the import onto its constant"
+ },
+ {
+  "id": "U1773",
+  "decision": "rewritten",
+  "reason": "'self' doc now names the retrospective/standing-arrangement exception"
+ },
+ {
+  "id": "U1774",
+  "decision": "rewritten",
+  "reason": "SECOND_PERSON is no longer exported"
+ },
+ {
+  "id": "U1775",
+  "decision": "rewritten",
+  "reason": "STRONG_WORD_LENGTH and DISTINCTIVE_WORD_LENGTH are no longer exported"
+ },
+ {
+  "id": "U1776",
+  "decision": "backlog",
+  "reason": "scripts/decision-card-guard-core.mjs:421 — isRetrospective and describesStandingArrangement match with \\b, which JavaScript treats as a boundary at umlauts, against the module's own WORD_CHARS rule"
+ },
+ {
+  "id": "U1777",
+  "decision": "rewritten",
+  "reason": "isQuestion is no longer exported"
+ },
+ {
+  "id": "U1778",
+  "decision": "kept",
+  "reason": "firingPhrase is exported and tested on its own; its `?` branch keeps it correct for a direct caller"
+ },
+ {
+  "id": "U1779",
+  "decision": "rewritten",
+  "reason": "IMPERATIVE_PHRASES and BACKWARD_MARKERS are no longer exported"
+ },
+ {
+  "id": "U1780",
+  "decision": "rewritten",
+  "reason": "describesStandingArrangement is no longer exported"
+ },
+ {
+  "id": "U1781",
+  "decision": "rewritten",
+  "reason": "contentWords doc now says digits may appear inside a token; pure numbers out"
+ },
+ {
+  "id": "U1782",
+  "decision": "rewritten",
+  "reason": "topicWords doc no longer justifies an export by the block reason"
+ },
+ {
+  "id": "U1783",
+  "decision": "rewritten",
+  "reason": "REMEDY doc now says it is the card-presence block's remedy; other verdicts name their own"
+ },
+ {
+  "id": "U1784",
+  "decision": "rewritten",
+  "reason": "evaluate doc now names the settled-ruling refusal that blocks first"
+ },
+ {
+  "id": "U1785",
+  "decision": "rewritten",
+  "reason": "validUserMessage is no longer exported"
+ },
+ {
+  "id": "U1786",
+  "decision": "kept",
+  "reason": "test-visible exports all feed evaluate/evaluateCardReviews/answerDeadline in production"
+ },
+ {
+  "id": "U1787",
+  "decision": "backlog",
+  "reason": "scripts/decision-card-guard.mjs:36 — the board path is a fixed repoPath('.batch-dashboard.html') rather than the registered/canonical path"
+ },
+ {
+  "id": "U1788",
+  "decision": "backlog",
+  "reason": "scripts/decision-card-guard.mjs:69 — the preflight calls the condition inapplicable for non-owners, while the Stop path still evaluates card reviews for them (365–377)"
+ },
+ {
+  "id": "U1789",
+  "decision": "rewritten",
+  "reason": "readDecisionCardState, writeDecisionCardState and decisionSession are no longer exported"
+ },
+ {
+  "id": "U1790",
+  "decision": "rewritten",
+  "reason": "unreadable-state error now says the next user prompt seeds the state"
+ },
+ {
+  "id": "U1791",
+  "decision": "rewritten",
+  "reason": "stdin comment now says a manual run reads the '' session's state"
+ },
+ {
+  "id": "U1792",
+  "decision": "rewritten",
+  "reason": "header now says a clean result timestamped at or after the decision"
+ },
+ {
+  "id": "U1793",
+  "decision": "rewritten",
+  "reason": "BATCH_DOCTOR_GATE_KEY and BATCH_DOCTOR_GATE_MEASUREMENT are no longer exported"
+ },
+ {
+  "id": "U1794",
+  "decision": "kept",
+  "reason": "the legacy PARALLEL path still serves the standing record until it expires; it cannot be proven dead here"
+ },
+ {
+  "id": "U1795",
+  "decision": "rewritten",
+  "reason": "measurementForRecord is no longer exported"
+ },
+ {
+  "id": "U1796",
+  "decision": "rewritten",
+  "reason": "\"a flag is never a value\" doc now says only a token beginning with -- is refused; a single-dash token is a value"
+ },
+ {
+  "id": "U1797",
+  "decision": "rewritten",
+  "reason": "VALUELESS_FLAGS doc now says a flag takes the next token unless it begins with --"
+ },
+ {
+  "id": "U1798",
+  "decision": "removed",
+  "reason": "unreachable '-h' removed from VALUELESS_FLAGS (it arrives canonicalised as --help)"
+ },
+ {
+  "id": "U1799",
+  "decision": "rewritten",
+  "reason": "notification now says the batch moves on, not that it already has"
+ },
+ {
+  "id": "U1800",
+  "decision": "rewritten",
+  "reason": "the \"continue elsewhere\" instruction is dropped in the stranded case"
+ },
+ {
+  "id": "U1801",
+  "decision": "rewritten",
+  "reason": "header now says the reason is built from --act/--detail/--prepared and refused by markGated"
+ },
+ {
+  "id": "U1802",
+  "decision": "backlog",
+  "reason": "scripts/defer-for-user.mjs:184 — TASKS.md holds no AWAITING-USER marker any more, so the --migrate path (migrateLegacyGates) is a finished one-off migration"
+ },
+ {
+  "id": "U1803",
+  "decision": "rewritten",
+  "reason": "header usage now lists --help | -h"
+ },
+ {
+  "id": "U1804",
+  "decision": "kept",
+  "reason": "claim does not hold: CLAUDE.md §6 (Working Method) states \"TASKS.md is main-only\""
+ },
+ {
+  "id": "U1805",
+  "decision": "backlog",
+  "reason": "scripts/defer-for-user.mjs:311 — the stranded notification counts every gated marker as an open point, though --forget documents markers that stand on already-ticked points"
+ },
+ {
+  "id": "U1806",
+  "decision": "rewritten",
+  "reason": "header now says the verdict functions never throw and nextAttempts expects its own plain state"
+ },
+ {
+  "id": "U1807",
+  "decision": "kept",
+  "reason": "the header names this module's own consumer; same-named retryDecision functions elsewhere are unrelated"
+ },
+ {
+  "id": "U1808",
+  "decision": "rewritten",
+  "reason": "header now says both revisions are named wherever known (unknown and marker-less verdicts excepted)"
+ },
+ {
+  "id": "U1809",
+  "decision": "kept",
+  "reason": "the 404 → stale policy is the documented, reasoned exception (every build since the marker emits one)"
+ },
+ {
+  "id": "U1810",
+  "decision": "kept",
+  "reason": "test-visible constants are the live defaults inside the module"
+ },
+ {
+  "id": "U1811",
+  "decision": "rewritten",
+  "reason": "MAX_DISPATCHES doc now says three attempts a cooldown apart (0/30/60 min)"
+ },
+ {
+  "id": "U1812",
+  "decision": "rewritten",
+  "reason": "parseBuildInfo doc now names an HTML page served with 200 instead of a 404 page"
+ },
+ {
+  "id": "U1813",
+  "decision": "rewritten",
+  "reason": "judgeServedRevision JSDoc now documents now, graceMs and inFlightGraceMs"
+ },
+ {
+  "id": "U1814",
+  "decision": "removed",
+  "reason": "unread run id and conclusion dropped from the mapped deploy run and the core JSDoc"
+ },
+ {
+  "id": "U1815",
+  "decision": "rewritten",
+  "reason": "exhaustion message says \"not another run\" instead of a hard-coded \"fourth\""
+ },
+ {
+  "id": "U1816",
+  "decision": "removed",
+  "reason": "unreachable \"this is not a GitHub clone\" blocker removed (without a repo no dispatch is ever decided)"
+ },
+ {
+  "id": "U1817",
+  "decision": "kept",
+  "reason": "harmless fallback token path; whether a Windows host still uses it cannot be decided here"
+ },
+ {
+  "id": "U1818",
+  "decision": "rewritten",
+  "reason": "\"at fifteen points\" replaced by \"at many points\""
+ },
+ {
+  "id": "U1819",
+  "decision": "rewritten",
+  "reason": "time-budget note now includes the later 5-second git calls"
+ },
+ {
+  "id": "U1820",
+  "decision": "rewritten",
+  "reason": "header now says it resolves the two packages (by package.json), not binaries"
+ },
+ {
+  "id": "U1821",
+  "decision": "rewritten",
+  "reason": "diagnosis now says a link (a junction on Windows), matching worktree-bootstrap's symlink"
+ },
+ {
+  "id": "U1822",
+  "decision": "kept",
+  "reason": "missingDependencies is live through the file's own main block; test import is legitimate"
+ },
+ {
+  "id": "U1823",
+  "decision": "rewritten",
+  "reason": "header and spawn comment now say the runner writes to the attempt's log file via descriptors, not pipes"
+ },
+ {
+  "id": "U1824",
+  "decision": "kept",
+  "reason": "no defect shown: durable-lane-flag-core.mjs exists and gates daemon start (mayStartDaemon); the release check belongs to closing, not to this comment"
+ },
+ {
+  "id": "U1825",
+  "decision": "backlog",
+  "reason": "scripts/detached-agent.mjs:357 — the author-astra spawn opens two log descriptors inline and never closes them in the parent, against spawnDetached's own \"the fd is closed in the PARENT\" rule"
+ },
+ {
+  "id": "U1826",
+  "decision": "rewritten",
+  "reason": "WORKER_TICK_MS, STUB_WORK_EVERY_MS and WORKER_EXIT are no longer exported"
+ },
+ {
+  "id": "U1827",
+  "decision": "rewritten",
+  "reason": "WORKER_EXIT doc now says the daemon learns the outcome from the status file's phase, not from exit codes"
+ },
+ {
+  "id": "U1828",
+  "decision": "rewritten",
+  "reason": "the ack-sha rationale moved into checkpointAcknowledgment's doc; the call site keeps a one-line pointer"
+ },
+ {
+  "id": "U1829",
+  "decision": "rewritten",
+  "reason": "stopRunner doc now says only the immediate runner is tracked"
+ },
+ {
+  "id": "U1830",
+  "decision": "kept",
+  "reason": "cancellation is told apart by its status phase, which the contract (and the corrected WORKER_EXIT doc) names; exit codes carry no such role"
+ }
+]

@@ -7,7 +7,8 @@
 // build now says so itself.
 //
 // Runs in a couple of milliseconds and changes nothing on the happy path: it
-// resolves the two binaries `npm run build` needs and gets out of the way.
+// resolves the two packages whose binaries `npm run build` needs (typescript,
+// vite — by their package.json) and gets out of the way.
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { repoPath } from './repo-paths.mjs'
@@ -34,8 +35,8 @@ export const DIAGNOSIS = (missing) =>
     "This is what \"'tsc' is not recognized\" means. It is NOT a defect in the code.",
     'Two known causes. In a FRESH AGENT WORKTREE they were never there — a worktree checks',
     'out the tracked tree only, and node_modules is git-ignored. In the MAIN tree the cause is',
-    'a worktree removed with `git worktree remove` or `rm -rf`: the worktree carries a junction',
-    "to the main tree's node_modules and the delete follows it.",
+    'a worktree removed with `git worktree remove` or `rm -rf`: the worktree carries a link (a',
+    "junction on Windows) to the main tree's node_modules and the delete follows it.",
     'Repair in a worktree:   node scripts/worktree-bootstrap.mjs   (links the main tree, seconds)',
     'Repair in the main tree: npm install',
     'Prevent: node scripts/worktree-cleanup.mjs <worktree-path>   (never the bare git/rm commands)',

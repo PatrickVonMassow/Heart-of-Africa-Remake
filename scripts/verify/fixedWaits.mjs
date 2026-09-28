@@ -3,12 +3,13 @@
 // The project rule is to wait on a CONDITION or the app's own clock, never on
 // the wall clock: a fixed sleep is either too short (a flake that accuses the
 // product) or too long (a slow suite nobody wants to run). The suites carry a
-// large inherited stock of them, and the load-related red runs of the last days
-// all trace back to that stock.
+// large inherited stock of them, and load-related red runs have traced back to
+// that stock.
 //
 // Clearing 239 of them at once is not on. So this is a RATCHET, not an
-// amnesty: the current count per file is recorded, and the gate fails only when
-// a file GAINS one. New waits cannot be added, and every one removed lowers the
+// amnesty: the current count per file is recorded (fixed-wait-baseline.json),
+// and the gate — the sweep in fixedWaits.test.mjs, run in the unit layer —
+// fails only when a file GAINS one. New waits cannot be added, and every one removed lowers the
 // bar permanently. The same shape as the guard-health debt list, for the same
 // reason — a check that fires on every run is a check nobody reads.
 
@@ -18,7 +19,7 @@
  * matched: it is usually derived from the app's own timing, which is the
  * behaviour the rule asks for.
  */
-export const FIXED_WAIT_RE = /(?:waitForTimeout\(\s*\d|setTimeout\(\s*[A-Za-z_$][\w$]*\s*,\s*\d)/g
+const FIXED_WAIT_RE = /(?:waitForTimeout\(\s*\d|setTimeout\(\s*[A-Za-z_$][\w$]*\s*,\s*\d)/g
 
 /** How many fixed waits a source text contains. */
 export function countFixedWaits(source) {

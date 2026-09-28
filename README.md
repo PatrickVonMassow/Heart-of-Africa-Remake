@@ -47,7 +47,8 @@ PoC playable directly in the browser at:
   continent, and a first-person view inside walkable settlements; the game
   switches between them when entering or leaving a settlement.
 - **Living world.** Ten port cities, 22 peoples, 17 rivers and real landmarks
-  at their correct 1890 positions; the map is trimmed to the walkable continent
+  at their 1890 positions (sites shifted just clear of the widened rivers where
+  needed), plus the fictional elephant graveyard; the map is trimmed to the walkable continent
   (the world ends at the African Red Sea coast). Settlements are densely built
   and inhabited: procedurally varied dwellings, street networks, and villagers
   who go about their routines, with full player/NPC collision. Ambient wildlife
@@ -75,8 +76,9 @@ PoC playable directly in the browser at:
   decoded hints, language-neutrally, re-rendered in the selected language.
   Every English entry can be read aloud in-browser
   via the Kokoro TTS model, with emotional voice markup shaping the delivery.
-- **Saving and controls.** Automatic checkpoints on every port visit with a
-  tabular load overview.
+- **Saving.** Automatic checkpoints on every port visit; after a death a
+  successor can take over from the last one. The startup load overview is
+  suspended in the PoC.
 - **The goal.** A procedurally placed tomb triangulated from regional hints;
   digging at the right spot with the shovel wins the game.
 
@@ -133,7 +135,8 @@ language means adding one file.
 
 Changes to guards, gates and other load-bearing mechanisms get a second pair of
 eyes from a model of a *different* vendor — different training, less correlated
-blind spots. That review runs through one command:
+blind spots. Claude reviews Astra-authored work; Astra reviews Claude-authored
+work through one command:
 
 ```
 node scripts/review-astra.mjs --sha <sha> --brief "<what to judge>"
@@ -172,7 +175,7 @@ islands and the unreachable Madagascar render as open sea
 ## Project structure
 
 ```
-design.md            authoritative design document (do not modify)
+design.md            authoritative design document (changes land with the code)
 CLAUDE.md            POC scope, acceptance criteria, build rules
 scripts/             geodata preprocessing + headless verification (scripts/verify/)
 public/geodata/      generated DEM + terrain textures
@@ -199,7 +202,8 @@ This repository contains the **proof of concept**: the core gameplay loop is not
 
 All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented, with the
 screenshot evidence in `verification/`; the simplifications and open items that
-remain are recorded in the code (`// OPEN:`) and in `TASKS.md`.
+remain are recorded in the code (`// OPEN:`), in `TASKS.md` and in
+`docs/backlog.md`.
 
 The full headless regression runs with `npm test` — a fast Vitest (jsdom) layer
 plus 15 Playwright browser suites; the test strategy and coverage map live in
@@ -242,7 +246,8 @@ Softscape, or any rights holder of the original game.
 
 - No code, graphics, audio, text or other assets from the 1985 original are
   used, extracted or redistributed here. Everything in this repository was
-  built from scratch.
+  built from scratch, apart from the third-party data and libraries named under
+  Data and libraries.
 - *The Heart of Africa*, *The Seven Cities of Gold* and all related names and
   marks are the property of their respective owners. They are used here only to
   identify the work this project pays tribute to — nominative use, no claim of

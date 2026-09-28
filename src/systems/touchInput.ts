@@ -3,7 +3,7 @@
 // TouchControls overlay and the input.ts merge so no magic numbers live in the
 // DOM code. three-free and side-effect-free (Vitest-covered).
 
-export interface Axes {
+interface Axes {
   x: number
   y: number
 }
@@ -12,8 +12,9 @@ export interface Axes {
  * Map a drag offset (px) from the virtual stick's centre to movement axes in
  * [-1..1]. Within the dead zone the stick reads zero; past it the magnitude is
  * re-scaled from the dead-zone edge to the stick radius and clamped to 1, so a
- * diagonal is never faster than a straight push (matching the gamepad/keyboard
- * clamp, design.md §2.2). y is negated so dragging UP (screen −y) walks
+ * diagonal is never faster than a straight push (design.md §2.2; moveAxes
+ * clamps each axis separately, so its keyboard diagonal is not normalised).
+ * y is negated so dragging UP (screen −y) walks
  * forward, like the gamepad's left stick.
  */
 export function stickVector(dx: number, dy: number, radius: number, deadZone: number): Axes {
@@ -40,7 +41,7 @@ export function pinchRatio(oldDist: number, newDist: number): number {
  * touch layer arms only on the first real touch and never disarms, so a desktop
  * (no touch events) stays pixel-identical.
  */
-export interface EngageLatch {
+interface EngageLatch {
   engaged: () => boolean
   /** Arms the latch; returns true only on the very first call. */
   engage: () => boolean

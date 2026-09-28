@@ -9,8 +9,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 
-/** Claude Code's per-project directory name: every non-alphanumeric run in the
- *  project path becomes a dash (`c:/Users/…/hoa` → `c--Users-…-hoa`). */
+/** Claude Code's per-project directory name: every non-alphanumeric character in
+ *  the project path becomes a dash (`/workspace/hoa` → `-workspace-hoa`). */
 export function projectSlug(root = REPO_ROOT) {
   return String(root).replace(/[^A-Za-z0-9]/g, '-')
 }

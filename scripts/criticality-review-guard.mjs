@@ -1,5 +1,6 @@
-// Stop hook (work-order point 298): a HIGH-criticality point does not get
-// ticked without a second model's recorded, ANSWERED review.
+// Stop hook (work-order point 298), SWITCHED OFF (see below): it once refused a
+// HIGH-criticality tick without a second model's recorded, ANSWERED review;
+// today the hook path exits silently and `--status` reports the same debt.
 //
 // The rule — triage difficulty × criticality, and put a different pair of eyes
 // on the HIGH work — was carried by intention and applied where somebody
@@ -9,20 +10,18 @@
 // deadline are must-work systems that live nowhere near scripts/.
 //
 // Decision logic: criticality-review-guard-core.mjs (pure, Vitest-covered). This
-// wrapper only gathers git output and one state file, and is fail-OPEN — an
-// internal error never traps the session.
+// wrapper gathers git output, the work order, the stored baseline and the review
+// ledger.
 //
-// WHERE IT STANDS DOWN, and why each one:
-//   - .claude/batch-paused exists                    (the batch is not running)
-//   - another live session owns the batch lock       (subagents must not be judged)
-//   - the checkout is not on `main`                  TASKS.md is main-only and the
-//     tick happens on main (CLAUDE.md §6). On a feature branch the work order is
-//     whatever main last said, so a branch that merges main in would otherwise
-//     re-report main's own (already cleared) ticks as its own.
+// WHERE THE REPORT STANDS DOWN: the checkout is not on `main` — TASKS.md is
+// main-only and the tick happens on main (CLAUDE.md §6). On a feature branch the
+// work order is whatever main last said, so a branch that merges main in would
+// otherwise re-report main's own (already cleared) ticks as its own.
 //
-// GRANDFATHERING: the baseline is per branch and self-arms at the fork point on
-// its first run, exactly as mechanism-review-guard does. The points ticked before
-// this gate existed owe nothing.
+// GRANDFATHERING: the baseline is per branch; with none stored the report starts
+// at the fork point (`bootstrapBase`). With the block switched off nothing writes
+// the baseline any more, so a stored one stays where the last blocking run left
+// it.
 //
 // How the gate clears:
 //   node scripts/mechanism-review.mjs --record <sha> --point <N> --model <name> \
@@ -31,9 +30,9 @@
 // CLI:
 //   node scripts/criticality-review-guard.mjs --status
 // usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>"
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+//        node scripts/criticality-review-guard.mjs --record-findings-filed <sha> --point <N> --model "<reviewer>" --finding-points "<N,N,…>"
+import { readFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
-import { dirname } from 'node:path'
 import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
@@ -67,8 +66,9 @@ import {
 //
 //   node scripts/criticality-review-guard.mjs --status
 //
-// Reversing this is one commit: drop the stand-down below.
-export const CRITICALITY_GATE_SWITCHED_OFF =
+// Reversing this means restoring what the switch-off removed: the hook path's
+// block and baseline advance, and its pause/lock stand-downs (see git history).
+const CRITICALITY_GATE_SWITCHED_OFF =
   'the criticality gate no longer blocks — switched off under the infrastructure freeze ' +
   '(CLAUDE.md §2, user decision 01.09.2026), together with the four-eyes mechanism gate it ' +
   'is the twin of. Nothing is forgiven and the debt stays readable: ' +
@@ -80,21 +80,22 @@ export const CRITICALITY_GATE_SWITCHED_OFF =
 export const BASELINE_PATH = commonRepoPath('.claude/criticality-review-baseline.json')
 
 /** The branch ticks happen on (CLAUDE.md §6: TASKS.md is main-only). */
-export const TICK_BRANCH = 'main'
+const TICK_BRANCH = 'main'
 
 const TASKS_FILE = 'TASKS.md'
 const ARCHIVE_FILE = 'docs/tasks-archive.md'
 const AUTHORING_COMMISSION_KIND = 'authoring-commission'
 
-export const unavailableReceiptUsage = () =>
+const unavailableReceiptUsage = () =>
   'node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> ' +
   '--files "<exact measured paths>" --reason "<why no reviewer vendor is eligible>"'
 
 // maxBuffer is NOT a precaution here, it is the difference between a guard that
 // works and one that never once fires: `git show <rev>:docs/tasks-archive.md`
 // returns the WHOLE archive — 1.12 MB on 07.08.2026 and only growing — against
-// execSync's 1 MB default. Past it the child dies with ENOBUFS, the throw reaches
-// the wrapper's fail-open, and the gate allows every turn while looking armed.
+// execSync's 1 MB default. Past it the child dies with ENOBUFS and the throw
+// reaches the wrapper's catch (when the gate still blocked, it allowed every turn
+// while looking armed; today `--status` would report an error).
 // Found on main the moment the branch merged; the guard's own fixtures build temp
 // repos whose work order is a few hundred bytes and could not see it.
 const git = (cmd) =>
@@ -286,7 +287,7 @@ export const pointAuthorshipLogCommand = (commissionSha, reviewSha) => [
 ]
 
 /** Git-owned authorship and touched-file facts for one point's own lane. */
-export function pointAuthorship(commissionSha, reviewSha) {
+function pointAuthorship(commissionSha, reviewSha) {
   const commits = parseRangeLog(gitRawFile(pointAuthorshipLogCommand(commissionSha, reviewSha)), {
     decodePath: unquoteGitPath,
   })
@@ -409,10 +410,10 @@ export function buildUnavailableReceipt({
 /**
  * The receipt for the OTHER durable answer to a refusal (`FINDINGS_FILED_KIND`).
  *
- * The gate's own refusal text names two ways to answer a `do-not-merge`: fix it
+ * The gate's refusal text names two ways to answer a `do-not-merge`: fix it
  * and record the re-review, or file every finding as an open work-order point
- * and append this receipt naming them. Nothing could write it — measured
- * 01.09.2026, while a refusal raised AFTER a point had landed could not be
+ * and append this receipt naming them (`--record-findings-filed` writes it).
+ * Before that route existed nothing could write it — measured 01.09.2026, while a refusal raised AFTER a point had landed could not be
  * answered the first way either, because the point's reviewed range ends at its
  * landing and a later commit is therefore not "a LATER commit" to the index.
  * A rule whose only remaining exit is unbuildable is a rule that gets waived.
@@ -520,7 +521,7 @@ export function buildFindingsFiledReceipt({
   }
 }
 
-export const findingsFiledUsage = () =>
+const findingsFiledUsage = () =>
   'node scripts/criticality-review-guard.mjs --record-findings-filed <sha> --point <N> ' +
   '--model "<reviewer that refused>" --finding-points "<N,N,…>"'
 
@@ -645,13 +646,6 @@ function readBaselineState() {
   }
 }
 
-function writeBaseline(branch, head) {
-  const state = readBaselineState()
-  const baselines = { ...(state.baselines ?? {}), [branch]: head }
-  mkdirSync(dirname(BASELINE_PATH), { recursive: true })
-  writeFileSync(BASELINE_PATH, `${JSON.stringify({ ...state, baselines }, null, 2)}\n`)
-}
-
 /** The baseline this branch is judged against, or null. */
 export function baselineFor(state, branch) {
   const map = state?.baselines ?? {}
@@ -663,9 +657,9 @@ export function baselineFor(state, branch) {
  *
  * The empty answer is only for a MISSING PATH, never for a failure to ask: a
  * baseline whose archive read as empty would make every archived point look
- * newly ticked and block the turn on a hundred of them. Anything other than
- * git's own "path does not exist" therefore rethrows into the caller, which
- * re-arms rather than guesses.
+ * newly ticked and report a hundred of them. Anything other than git's own
+ * "path does not exist" therefore rethrows into the caller, which re-bases only
+ * when the baseline commit is missing and otherwise rethrows.
  */
 export function showAt(rev, path, run = (cmd) => git(cmd)) {
   try {
@@ -683,15 +677,14 @@ export function showAt(rev, path, run = (cmd) => git(cmd)) {
  *
  * ENOENT is the ONLY empty answer, and the distinction is the whole point (found
  * by the four-eyes review of this branch): a swallowed read error made the
- * PENDING TICK VANISH, the gate report clear, and — because a clear run advances
- * the baseline — the forgiveness PERMANENT. Reproduced: arm, tick a high point,
- * `chmod 000` the archive, and the gate stayed clear after the mode was
- * restored. On the Windows host a sharing-violation read failure is a documented
- * recurring event, so this is not a hypothetical.
+ * PENDING TICK VANISH and the gate report clear — and while a clear run still
+ * advanced the baseline, the forgiveness PERMANENT. On the Windows host a
+ * sharing-violation read failure is a documented recurring event, so this is
+ * not a hypothetical.
  *
- * Anything else therefore rethrows into the wrapper's per-turn fail-open, which
- * allows the stop and writes NO state — the same rule `showAt` follows one call
- * down: an empty answer is for a missing path, never for a failure to ask.
+ * Anything else therefore rethrows into the wrapper's catch, which writes NO
+ * state — the same rule `showAt` follows one call down: an empty answer is for a
+ * missing path, never for a failure to ask.
  */
 export function readWorkOrder(path, read = (p) => readFileSync(p, 'utf8')) {
   try {
@@ -703,8 +696,8 @@ export function readWorkOrder(path, read = (p) => readFileSync(p, 'utf8')) {
 }
 
 /**
- * True when `sha` names no reachable commit — the one condition under which an
- * undiffable baseline may be re-armed. A probe that could not answer counts as
+ * True when `sha` does not resolve to a commit (`rev-parse --verify`) — the one
+ * condition under which an undiffable baseline may be re-based. A probe that could not answer counts as
  * PRESENT, so a transient git failure never forgives a pending tick.
  */
 export function commitMissing(sha, run = (cmd) => execSync(cmd, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })) {
@@ -772,9 +765,9 @@ function ancestryProbe(head, shas) {
 }
 
 /**
- * Everything the core needs — exported so the guard preflight judges the gate
- * from the SAME gathering the Stop hook uses rather than a second copy of this
- * git work, which would drift and hand back a false "clean".
+ * Everything the core needs — exported so the guard preflight asks the SAME
+ * gathering (called without `report`, it gets the switched-off stand-down)
+ * rather than a second copy of this git work.
  */
 export function gatherCriticalityReviewInputs({ report = false } = {}) {
   // `--status` still MEASURES, and neither the pause nor the batch lock may
@@ -803,40 +796,38 @@ export function gatherCriticalityReviewInputs({ report = false } = {}) {
   }
 
   // NOW is read from the WORKING TREE, not from HEAD: the tick is a file edit,
-  // and the gate should bite while it is still being made rather than one turn
-  // after it is committed.
+  // and the report should see it while it is still being made rather than one
+  // turn after it is committed.
   const headTasks = readWorkOrder(repoPath(TASKS_FILE))
   const headArchive = readWorkOrder(repoPath(ARCHIVE_FILE))
-  // No work order at all: stand down rather than clear. Clearing would ADVANCE
-  // the baseline past a tick this checkout simply could not see.
+  // No work order at all: stand down rather than report clear over a tick this
+  // checkout simply could not see.
   if (!headTasks && !headArchive) {
     return { applicable: false, why: 'no work order in this checkout' }
   }
 
   let effective = baseline
   let ticks = []
-  {
-    try {
-      ticks = highTicks({
-        baseTasks: showAt(base, TASKS_FILE),
-        baseArchive: showAt(base, ARCHIVE_FILE),
-        headTasks,
-        headArchive,
-      })
-    } catch (e) {
-      // ONLY a baseline that is genuinely GONE may move the gate — a rebased or
-      // gc'd baseline makes the read fail forever, and falling through to the
-      // wrapper's fail-open would disable the gate for good. Every other failure
-      // rethrows into the per-turn fail-open, which leaves the gate where it was.
-      if (!commitMissing(base)) throw e
-      effective = bootstrapBase(head)
-      ticks = highTicks({
-        baseTasks: showAt(effective, TASKS_FILE),
-        baseArchive: showAt(effective, ARCHIVE_FILE),
-        headTasks,
-        headArchive,
-      })
-    }
+  try {
+    ticks = highTicks({
+      baseTasks: showAt(base, TASKS_FILE),
+      baseArchive: showAt(base, ARCHIVE_FILE),
+      headTasks,
+      headArchive,
+    })
+  } catch (e) {
+    // ONLY a baseline that is genuinely GONE may move the report's base — a
+    // rebased or gc'd baseline makes the read fail forever, and falling through
+    // to the wrapper's catch would leave the report broken for good. Every other
+    // failure rethrows.
+    if (!commitMissing(base)) throw e
+    effective = bootstrapBase(head)
+    ticks = highTicks({
+      baseTasks: showAt(effective, TASKS_FILE),
+      baseArchive: showAt(effective, ARCHIVE_FILE),
+      headTasks,
+      headArchive,
+    })
   }
 
   // Only the ledger lines that name a pending point — in the common turn that is
@@ -915,8 +906,8 @@ if (isMainModule(import.meta.url)) {
       const built = buildFindingsFiledReceipt({
         ...parsed.values,
         records: readRecords(),
-        // The OPEN set is read the same way the gate reads it, so a receipt can
-        // never name a point the gate would then find closed.
+        // The OPEN set comes from the gate's own gathering where it applies; off
+        // main the fallback reads TASKS.md directly.
         openPoints: gathered.applicable ? gathered.inputs.openPoints : [...openNumbers(readFileSync(repoPath('TASKS.md'), 'utf8'))],
       })
       if (!built.ok) {
@@ -946,61 +937,43 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
+    // Only `--status` gets this far: without it the gathering stands down above.
     const verdict = evaluateCriticalityReview(gathered.inputs)
 
-    // THE GAP CLAUSE, mirrored from mechanism-review-guard (point 714): a
-    // standing refusal whose re-review no caller can assemble must not trap
-    // the session. Only where EVERY blocking finding is record-backed AND
-    // every record's own range measures unassemblable does the block degrade
-    // to a report; a finding without a record demands a fresh review of a sha
-    // the caller chooses, so it always keeps blocking. Keyed on measurement
-    // alone; a failed assessment rules no gap.
+    // THE GAP CLAUSE, mirrored from mechanism-review-guard (point 714): where
+    // EVERY refusing finding is record-backed AND every record's own range
+    // measures unassemblable, the report names the gap instead of the refusal.
+    // Keyed on measurement alone; a failed assessment rules no gap.
     let gap = null
     if (verdict.block) {
       try {
         const { assessCriticalityGap } = await import('./mechanism-review-guard-gap.mjs')
         gap = await assessCriticalityGap(verdict.findings)
       } catch {
-        /* no ruling — the block below stands */
+        /* no ruling — the refusal is reported as it stands */
       }
     }
 
-    if (status) {
-      console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
-      console.log(`baseline:  ${String(gathered.baseline ?? '<none — arms at this HEAD>').slice(0, 7)}`)
-      const ticks = gathered.inputs.ticks ?? []
-      console.log(`high-criticality points ticked since the baseline: ${ticks.length}`)
-      for (const t of ticks) {
-        const mine = (gathered.inputs.records ?? []).filter((r) => Number(r.point) === t.number)
-        console.log(
-          `  point ${t.number} — ${t.rationale || '(no rationale given)'}\n      ` +
-            `${mine.length} record(s), ${mine.filter((r) => r.reachable).length} in this history`,
-        )
-      }
-      if (gap?.gap) console.log(`\n${gap.report}`)
-      else console.log(verdict.block ? `\n${formatCriticalityReviewVerdict(verdict)}` : '\nGATE CLEAR')
-      process.exit(0)
-    }
-
-    if (verdict.block) {
-      if (gap?.gap) {
-        // Deliberately NOT a baseline advance: the demand is suspended, never
-        // satisfied, and blocking resumes when the material fits again.
-        console.error(gap.report)
-        process.exit(0)
-      }
-      process.stdout.write(
-        JSON.stringify({ decision: 'block', reason: formatCriticalityReviewVerdict(verdict) }),
+    console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
+    console.log(`baseline:  ${String(gathered.baseline).slice(0, 7)}`)
+    const ticks = gathered.inputs.ticks ?? []
+    console.log(`high-criticality points ticked since the baseline: ${ticks.length}`)
+    for (const t of ticks) {
+      const mine = (gathered.inputs.records ?? []).filter((r) => Number(r.point) === t.number)
+      console.log(
+        `  point ${t.number} — ${t.rationale || '(no rationale given)'}\n      ` +
+          `${mine.length} record(s), ${mine.filter((r) => r.reachable).length} in this history`,
       )
-      process.exit(0)
     }
-    if (gathered.head) writeBaseline(gathered.branch, gathered.head)
+    if (gap?.gap) console.log(`\n${gap.report}`)
+    else console.log(verdict.block ? `\n${formatCriticalityReviewVerdict(verdict)}` : '\nGATE CLEAR')
     process.exit(0)
   } catch (e) {
     // AN UNREADABLE LEDGER IS NOT AN ENVIRONMENT TRANSIENT (cross-vendor review
-    // of point 780). The ledger IS this gate's evidence: without it the gate
-    // cannot tell a reviewed mechanism from an unreviewed one, so the fail-open
-    // catch below would wave through exactly what it exists to stop.
+    // of point 780). The ledger IS the report's evidence: without it nothing can
+    // be told reviewed or unreviewed, so it is named rather than reported as an
+    // ordinary error. (Only `--status` reaches this; the JSON shape is the one
+    // the blocking hook once emitted.)
     if (e && e.ledgerUnreadable) {
       process.stdout.write(
         JSON.stringify({

@@ -1,12 +1,13 @@
 // THE LANDING JOURNAL'S STAGES AND CRASH RULE — the slice of step 9 that step 8
-// needs (work-order point 834; union M33/M34/M35). The full crash-recoverable
-// landing inside scripts/land-point.mjs is 676's remainder; what is settled
-// HERE is the vocabulary a landing journal records and what a successor does
+// needs (work-order point 834; union M33/M34/M35). The journal itself lives in
+// scripts/batch-landing-journal*.mjs, driven by scripts/land-point.mjs; what is
+// settled HERE is the vocabulary a landing journal records and what a successor does
 // with a journal that stopped mid-way — because reconciliation must classify a
 // crashed landing without guessing, and the rule is M34's: repeat any human
 // judgment whose completion cannot be proven.
 //
-// Pure, dark, and imported only by the reconciliation core.
+// Pure and dark; imported by the reconciliation, boundary-plane and
+// landing-journal cores.
 
 /** The ordered stages of one landing transaction (M33). Everything before
  *  `merge` is judgment and verification; `merge` is the published act; what

@@ -2,7 +2,7 @@
 // pure in scripts/context-watermark-core.mjs; this reads the transcript the
 // harness writes and answers "past, below, or unreadable". CLI:
 //
-//   node scripts/context-watermark.mjs --status [--transcript <path>]
+//   node scripts/context-watermark.mjs [--status] [--transcript <path>]
 //
 // The Stop hook hands the guard the transcript path directly; this CLI locates
 // it from the session's own project directory when none is given. An
@@ -43,7 +43,7 @@ export function fenceMode(env = process.env) {
 
 /** How much of the transcript tail is read. The newest usage record sits within
  *  the last few messages; half a megabyte covers even a screenshot-heavy turn. */
-export const TAIL_BYTES = 512 * 1024
+const TAIL_BYTES = 512 * 1024
 
 /** The LAST `maxBytes` of a file, as text. Null when it cannot be read. */
 export function readTail(path, maxBytes = TAIL_BYTES) {
@@ -118,15 +118,14 @@ const fstatOf = (path) => {
  * { state, tokens, watermark, alert } plus { transcript } naming what was read
  * — 'unreadable' when no file or no usage record was found, never a guess.
  *
- * `watermark` lets a caller inspect the same reading against an explicit mark.
- * Omitted, the handover threshold applies. Admission no longer supplies a
- * second global mark; it consumes the raw reading prospectively.
+ * The mark is the handover threshold (`triggerTokens`). Admission supplies no
+ * second mark; it consumes the raw reading prospectively.
  */
-export function gatherWatermark({ transcriptPath = '', sid = '', env = process.env, watermark } = {}) {
+export function gatherWatermark({ transcriptPath = '', sid = '', env = process.env } = {}) {
   const path = String(transcriptPath ?? '').trim() || locateTranscript({ sid })
   const tail = path ? readTail(path) : null
   const reading = tail === null ? null : parseContextTokens(tail)
-  const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : triggerTokens(env)
+  const mark = triggerTokens(env)
   return {
     ...watermarkDecision({ reading, watermark: mark }),
     readingAt: reading?.at ?? null,

@@ -3,8 +3,9 @@
 // WHY: 80 % of the token spend sits above 150k context, because one batch
 // session carries point after point. Run 24/7 that is the dominant cost
 // (1.25 %/h of the weekly quota against the ~0.6 %/h that fits). The cure is the
-// mechanism that already exists: the session ENDS at a point boundary and the OS
-// LAUNCHER brings up a fresh one, which `batch-resume-hook`
+// mechanism that already exists: the session ENDS at a boundary and the launcher
+// (the Windows Scheduled Task, or the repo's own daemon elsewhere) brings up a
+// fresh one — `--commit` also requests it at once — which `batch-resume-hook`
 // re-orients. Nothing new drives the batch — what changes is that ending is now
 // a LEGAL way to finish a turn.
 //
@@ -12,16 +13,18 @@
 // hard-blocks every turn end while open points remain, so without it the guard
 // would block exactly the behaviour the change wants; and if the guard simply
 // stopped blocking, a disabled launcher would strand the batch forever. So a
-// boundary stop is legal only when BOTH hold:
+// POINT boundary stop is legal only when BOTH hold (a CONTEXT boundary replaces
+// 1. with a measured watermark reading, see `assessBoundary`):
 //
 //   1. The point the session claims to have closed is VERIFIABLY closed — gone
-//      from TASKS.md's open list AND ticked in docs/tasks-archive.md. The claim
-//      alone proves nothing; the work order is the authority.
+//      from TASKS.md's open list AND ticked (in docs/tasks-archive.md, or still
+//      in TASKS.md before the archive move). The claim alone proves nothing; the
+//      work order is the authority.
 //   2. The launcher is ARMED (the scheduled task's real state, probed, not
 //      assumed). Unknown counts as NOT armed: erring toward "keep working" can
 //      cost context, erring toward "stop" can cost the whole batch.
 //
-// POINT 388 (28.07.2026) corrects one assumption of the paragraph this replaces.
+// POINT 388 (28.07.2026) corrected one assumption of the original design.
 // The boundary used to end at "the stop is permitted": the lock was left to
 // expire the honest way, on the reasoning that the old process dies within
 // minutes. It does not. On the first live night a session ended its TURN and kept
@@ -33,11 +36,12 @@
 //   - `boundaryDueFrom` below: a point closed IN THIS SESSION with no marker
 //     recorded makes the guard BLOCK and name the command, instead of falling
 //     through to a message where the boundary is one option among many.
-//   - the Stop hook marks the lock HANDED OVER (scripts/batch-singleton.mjs
-//     `markHandover`) at the moment it allows the stop, and only there. The
-//     singleton stays intact: the handover is not an age heuristic but the
-//     owner's own statement, it survives only while no further tool call bumps
-//     the heartbeat past it, and a live pid still gets a grace window.
+//   - the lock is marked HANDED OVER (scripts/batch-singleton.mjs
+//     `markHandover`) by `--commit` and by the Stop hook that allows the stop.
+//     The singleton stays intact: the handover is not an age heuristic but the
+//     owner's own statement, sealed in the lock (see the seal below: a later
+//     mutation escalates rather than withdraws), and a live pid still gets a
+//     grace window.
 //   - the launcher REPORTS a silent owner instead of only logging it.
 //
 // The imports are NAMES, from constants/contract modules that import nothing:
@@ -87,8 +91,8 @@ export function classifyLauncherState(raw) {
  * Returns 'open' | 'closed' | 'unknown'.
  *
  * "Closed" needs BOTH halves: absent from the open list and present, ticked, in
- * the archive. Absence alone would read a point that was never written — or one
- * lost to a bad edit — as finished.
+ * the archive or still in TASKS.md. Absence alone would read a point that was
+ * never written — or one lost to a bad edit — as finished.
  */
 export function pointClosure(n, tasksOpenText, archiveText) {
   const num = Number(n)
@@ -104,21 +108,12 @@ export function pointClosure(n, tasksOpenText, archiveText) {
 }
 
 /**
- * Judge a recorded boundary marker. Inputs are plain data:
- *   marker    — { sessionId, point, at } or null
- *   sid       — the session asking (the Stop hook's own session id)
- *   now       — epoch ms
- *   closure   — 'open' | 'closed' | 'unknown' from pointClosure()
- *   freshMs   — override for tests
- * Returns { valid, point, reason }.
- */
-/**
  * IS THIS MARKER FRESH? PURE, and the one place that decides it (Sol's review of
  * ffa0a78). A FUTURE stamp is not fresh: `now - at < freshMs` alone accepted a
  * marker dated forward, which would authorise a stop and hold the seal far
  * beyond the window — a clock that jumped, or a hand-written marker. An age
  * below zero is therefore treated exactly like an expired one: the boundary is
- * re-taken, which costs one command.
+ * re-taken with `--prepare` and `--commit`.
  */
 export function markerFresh(marker, now, freshMs = BOUNDARY_FRESH_MS) {
   const at = marker?.at
@@ -127,6 +122,17 @@ export function markerFresh(marker, now, freshMs = BOUNDARY_FRESH_MS) {
   return age >= 0 && age < freshMs
 }
 
+/**
+ * Judge a recorded boundary marker. Inputs are plain data:
+ *   marker       — { sessionId, phase, cause, at, point } (point cause) or
+ *                  { …, tokens, watermark } (context cause), or null
+ *   sid          — the session asking (the Stop hook's own session id)
+ *   now          — epoch ms
+ *   closure      — 'open' | 'closed' | 'unknown' from pointClosure()
+ *   freshMs      — override for tests
+ *   watermarkNow — the currently configured watermark, if known
+ * Returns { valid, point, reason }.
+ */
 export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_FRESH_MS, watermarkNow = null }) {
   if (!marker || typeof marker !== 'object') {
     return { valid: false, point: null, reason: 'no-marker' }
@@ -247,8 +253,9 @@ export function boundaryDueFrom({ tick, ownerSince, now, dueMs = BOUNDARY_DUE_MS
 
 // --- What ends a boundary, and what does not (live finding 2, 28.07.2026) -----
 //
-// Taking the boundary writes a marker and marks the lock handed over; any
-// further work withdraws it again, which is right in itself. But the Stop chain
+// Originally, taking the boundary wrote a marker at once and any further work
+// withdrew it again (the two-phase boundary below has since replaced that, and
+// an unphased marker now authorises nothing). But the Stop chain
 // ROUTINELY sends a session back to work AFTER the boundary is taken — a missing
 // timestamp, an unreviewed mechanism commit, a dashboard whose HEAD moved — and
 // each of those rounds silently un-took the handover. The log shows it to the
@@ -256,12 +263,13 @@ export function boundaryDueFrom({ tick, ownerSince, now, dueMs = BOUNDARY_DUE_MS
 // A boundary that only survives a turn with nothing left to do is not a
 // mechanism, because finding something left to do is the Stop chain's purpose.
 //
-// So the withdrawal distinguishes work that CONTINUES the batch from work a Stop
-// guard DEMANDED: the marker survives edits confined to the CLOSING SET — the
-// board, the review ledger, the work order's own entry and the boundary's own
-// bookkeeping — and anything else withdraws it. Deliberately conservative: an
-// unrecognised tool, an unparseable command and a call with no target all
-// withdraw. A wrongly withdrawn boundary costs one command to re-take; a wrongly
+// So the classification distinguishes work that CONTINUES the batch from work a
+// Stop guard DEMANDED: calls confined to the CLOSING SET — the board, the review
+// ledger, the work order's own entry and the boundary's own bookkeeping — leave
+// the handover standing, and anything else does not (`handoverSurvivesCall`).
+// Deliberately conservative: an unrecognised tool, an unparseable command and a
+// call with no target all count as work. A wrongly refused call costs the
+// session the two commands to re-take the boundary; a wrongly
 // KEPT one lets a successor spawn beside a working session, which is the
 // incident class this whole apparatus exists to prevent.
 
@@ -271,15 +279,18 @@ export function boundaryDueFrom({ tick, ownerSince, now, dueMs = BOUNDARY_DUE_MS
 // bookkeeping (the card publish, every guard remedy a blocked turn forces)
 // counted as work and cleared the marker. Measured twice on 13.08.2026; once it
 // left the batch idle for forty minutes. The boundary is now two-phase:
-//   --prepare  does/validates ALL bookkeeping and writes NO marker — there is
-//              nothing to delete while the session finishes ending;
+//   --prepare  checks the preconditions, writes a receipt (with the board
+//              reading) and names the bookkeeping to do next, but writes NO
+//              marker — there is nothing to delete while the session finishes
+//              ending;
 //   --commit   is the session's LAST repository action: it seals the marker
-//              (phase 'committed'), and any mutation attempted afterwards is an
-//              EXPLICIT, LOUD error (a PreToolUse deny naming `--clear` as the
-//              way back) rather than a silent marker deletion.
+//              (phase 'committed'), and a later call outside the closing set is
+//              an EXPLICIT, LOUD error while the marker is fresh (a PreToolUse
+//              deny naming `--clear` as the way back) rather than a silent
+//              marker deletion.
 
-/** Marker phases. A legacy marker (no phase field) keeps the old withdrawal
- *  semantics; only a COMMITTED marker is sealed. */
+/** Marker phases. A legacy marker (no phase field) authorises nothing and
+ *  seals nothing; only a COMMITTED marker counts. */
 export const BOUNDARY_PHASES = Object.freeze({ COMMITTED: 'committed' })
 
 /** What kind of boundary the marker records: a closed point, or the context
@@ -293,30 +304,6 @@ export function markerPhase(marker) {
 }
 
 /**
- * THE PREPARE RECEIPT (Sol's review of 4e93933): two phases are only two phases
- * if the first one is REQUIRED. `--commit --context` could be called with no
- * `--prepare` at all, so the board card that says WHY the batch handed over —
- * the part of defeat 3 the reader actually sees — could be skipped silently; the
- * point commit checked only that the OLD current-work card was gone.
- *
- * `--prepare` therefore leaves a receipt, and `--commit` refuses without a fresh
- * one of its own session, cause and point. The receipt is NOT a marker: nothing
- * withdraws it and no guard reads it, so it cannot revive defeat 1 (work
- * deleting what the boundary needs), and its refusal names a ONE-COMMAND way
- * back — `--prepare` is runnable whenever `--commit` would be, so this can
- * refuse a session but never trap one.
- *
- * RESIDUAL, deliberately: a session that prepares, then works for a while, then
- * commits within the freshness window still passes. The receipt proves the
- * bookkeeping phase RAN, not that nothing followed it; what follows the commit
- * is the sealed marker's business.
- */
-/** RAISED with every change to what `cardsBefore` HOLDS (Sol's review of
- *  ebf7d00): v2 stored regions cut only at the card ends, so an old receipt's
- *  prefixed string would no longer equal the region this code now cuts, and the
- *  unchanged card would read as fresh. A receipt of an older version is refused
- *  and re-taken rather than compared across representations. */
-/**
  * THE BOUNDARY AS AN IMMUTABLE FACT (point 1048, union entry U19).
  *
  * The marker file answered "is the boundary still good?" with freshness plus
@@ -328,8 +315,9 @@ export function markerPhase(marker) {
  *
  * The seal below is written into the LOCK at commit time and says what cannot
  * change afterwards: which session handed over, at which owner generation, and
- * from which head. Its validity is a comparison of those three against the lock
- * as it stands — never an elapsed time, never an unchanged tree.
+ * from which head. Its validity compares the session and, where both are known,
+ * the owner generation against the lock as it stands (the head is recorded, not
+ * compared) — never an elapsed time, never an unchanged tree.
  *
  * A later mutation ESCALATES rather than withdraws (the union leaves the choice
  * open and names both halves): the boundary keeps standing, the mutation is
@@ -337,7 +325,7 @@ export function markerPhase(marker) {
  * mutation instead would put the session back in the deadlock union entry U17
  * had just opened.
  */
-export const BOUNDARY_SEAL_V = 1
+const BOUNDARY_SEAL_V = 1
 
 export function committedBoundarySeal({ marker, generation = null, head = null, at = null } = {}) {
   if (marker?.phase !== BOUNDARY_PHASES.COMMITTED) return null
@@ -378,7 +366,7 @@ export function boundarySealHolds({ seal, sid, generation = null } = {}) {
 /** How many recorded mutations before a kept seal becomes an ALERT rather than
  *  a log line. One slip is a session finishing its bookkeeping; a second is a
  *  session that did not understand it had handed over. */
-export const SEAL_MUTATION_ALERT_AFTER = 2
+const SEAL_MUTATION_ALERT_AFTER = 2
 
 /**
  * What a repository mutation after a committed boundary does. The answer is
@@ -401,8 +389,32 @@ export function boundaryMutationDecision({
   }
 }
 
+/** RAISED with every change to what `cardsBefore` HOLDS (Sol's review of
+ *  ebf7d00). Example: v2 stored regions cut only at the card ends, so such a
+ *  receipt's prefixed string would not equal the region this code cuts, and the
+ *  unchanged card would read as fresh. A receipt of an older version is refused
+ *  and re-taken rather than compared across representations. */
 export const PREPARED_RECEIPT_V = 4
 
+/**
+ * THE PREPARE RECEIPT (Sol's review of 4e93933): two phases are only two phases
+ * if the first one is REQUIRED. `--commit --context` could be called with no
+ * `--prepare` at all, so the board card that says WHY the batch handed over —
+ * the part of defeat 3 the reader actually sees — could be skipped silently; the
+ * point commit checked only that the OLD current-work card was gone.
+ *
+ * `--prepare` therefore leaves a receipt, and `--commit` refuses without a fresh
+ * one of its own session, cause and point. The receipt is NOT a marker: only
+ * `--clear` removes it and no guard reads it, so it cannot revive defeat 1 (work
+ * deleting what the boundary needs), and its refusal names a ONE-COMMAND way
+ * back — `--prepare` is runnable whenever `--commit` would be, so this can
+ * refuse a session but never trap one.
+ *
+ * RESIDUAL, deliberately: a session that prepares, then works for a while, then
+ * commits within the freshness window still passes. The receipt proves the
+ * bookkeeping phase RAN, not that nothing followed it; what follows the commit
+ * is the sealed marker's business.
+ */
 export function preparedReceipt({
   sid,
   cause = BOUNDARY_CAUSES.POINT,
@@ -489,12 +501,27 @@ export function unpreparedRefusal({
 }
 
 /** The card sentence each boundary cause opens with — the reader's proof that
- *  the handover was announced, and what `boardCarriesCard` looks for. */
-export const BOUNDARY_CARD_HEADS = Object.freeze({
+ *  the handover was announced. `cardProofFragments` repeats an ASCII-safe prefix
+ *  of it for `boardCarriesCard`. */
+const BOUNDARY_CARD_HEADS = Object.freeze({
   [BOUNDARY_CAUSES.CONTEXT]:
     'Der Kontext dieser Sitzung hat die Wasserstandsmarke erreicht; ich übergebe deshalb jetzt, statt weiter in diesem teuren Kontext zu arbeiten.',
   [BOUNDARY_CAUSES.POINT]: 'Der Punkt ist abgeschlossen.',
 })
+
+/** Where one board card ENDS: every card is a `<details>` block, so this is the
+ *  real boundary the proof is cut at, not a guessed distance. */
+const CARD_END = '</details>'
+
+/** …and where one begins, so a region is cut back to the card itself rather than
+ *  to whatever stood between it and the card before it. */
+const CARD_START = '<details'
+
+/** The fallback for a board carrying no card markup at all — one card's length
+ *  (the longest card is ~900 characters, the slack covers its surroundings).
+ *  A distance can only ever be a fallback: adjacent cards are as close as their
+ *  markup puts them (Sol's review of 1589da5). */
+export const CARD_PROOF_WINDOW = 2000
 
 /**
  * WHAT PROVES THIS CARD IS ON THE BOARD? PURE — the fragments that identify a
@@ -507,20 +534,6 @@ export const BOUNDARY_CARD_HEADS = Object.freeze({
  * that pipeline starts escaping one. They are pinned against the real card text
  * by a test, so a reworded card breaks the test rather than the mechanism.
  */
-/** Where one board card ENDS: every card is a `<details>` block, so this is the
- *  real boundary the proof is cut at, not a guessed distance. */
-export const CARD_END = '</details>'
-
-/** …and where one begins, so a region is cut back to the card itself rather than
- *  to whatever stood between it and the card before it. */
-export const CARD_START = '<details'
-
-/** The fallback for a board carrying no card markup at all — one card's length
- *  (the longest card is ~900 characters, the slack covers its surroundings).
- *  A distance can only ever be a fallback: adjacent cards are as close as their
- *  markup puts them (Sol's review of 1589da5). */
-export const CARD_PROOF_WINDOW = 2000
-
 export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination } = {}) {
   const head =
     cause === BOUNDARY_CAUSES.CONTEXT
@@ -550,26 +563,11 @@ export function claimantCardIdentity(claim) {
   }
 }
 
-/**
- * DOES THE BOARD CARRY THAT CARD? PURE. Returns
- * { carries, verifiable, missing } — `verifiable` false for a board that could
- * not be read at all.
- *
- * An unreadable board does NOT refuse: a session that cannot reach its board
- * must still be able to hand over, or a missing file ends the batch instead of
- * a session. The caller SAYS SO rather than passing in silence — the one
- * outcome this whole point forbids.
- *
- * RESIDUAL, named because no check here can close it: a card left standing from
- * a PREVIOUS handover satisfies these fragments. Telling this handover's card
- * from the last one needs an identity on the card itself, which is the board's
- * user-owned structure, not this mechanism's to change.
- */
 /** The rounding slack on a `HH:MM` stamp compared with a millisecond clock: one
  *  minute at each end, and nothing more. The acceptable arc is otherwise the
  *  REAL interval between the preparation and now — bounded by the receipt's own
  *  freshness rather than by an invented window (Sol's review of 46c994e). */
-export const CARD_STAMP_SLACK_MIN = 1
+const CARD_STAMP_SLACK_MIN = 1
 
 /** Berlin wall-clock minute of the day — the board stamps `Stand HH:MM` in that
  *  zone, so a comparison must be made in it. PURE for a given instant. */
@@ -596,7 +594,8 @@ export function berlinMinuteOfDay(ms) {
  * stale card could land in is the elapsed hour at most — not a window this
  * function invents.
  *
- * An UNSTAMPED region does not prove currency where the board stamps at all: it
+ * Without a preparation time (`sinceMs`) every region passes. Otherwise an
+ * UNSTAMPED region does not prove currency where the board stamps at all: it
  * is refused, exactly because every generated state card carries a stamp. On a
  * board that stamps nothing it passes, so a card format without stamps cannot
  * trap a session at its boundary.
@@ -618,8 +617,8 @@ export function cardStampIsCurrent(
   // THE STAMP IS RESOLVED TO A REAL INSTANT, not to an arc on a clock face
   // (Sol's review of 9dcc783). Modular minute arithmetic reads Berlin's DST
   // rollback — where 02:00–03:00 happens twice — as a nearly full day, and a
-  // stale card of that night walks through. So the LATEST instant not after the
-  // commit whose Berlin wall clock shows this stamp is found, and that instant
+  // stale card of that night walks through. So the LATEST instant not after now
+  // plus the slack whose Berlin wall clock shows this stamp is found, and that instant
   // is compared with the preparation. The doubled hour resolves to its second
   // occurrence, which is the correct one, and the search costs at most a day of
   // minutes on one command.
@@ -668,6 +667,22 @@ export function cardRegions(boardText, fragments = [], { windowChars = CARD_PROO
     })
 }
 
+/**
+ * DOES THE BOARD CARRY THAT CARD? PURE. Returns
+ * { carries, verifiable, missing } — `verifiable` false for a board that could
+ * not be read at all — plus `split` (fragments present but in no one card),
+ * `malformedKnown` (a recorded region is not such a card) or `stale` (no card
+ * newer than the preparation) on those refusals.
+ *
+ * An unreadable board does NOT refuse: a session that cannot reach its board
+ * must still be able to hand over, or a missing file ends the batch instead of
+ * a session. The caller SAYS SO rather than passing in silence — the one
+ * outcome this whole point forbids.
+ *
+ * A card left standing from a PREVIOUS handover also carries these fragments;
+ * `knownRegions` (the receipt's board reading) and the card's `Stand HH:MM`
+ * stamp (`cardStampIsCurrent`) tell it from this handover's card.
+ */
 export function boardCarriesCard(
   boardText,
   fragments = [],
@@ -690,8 +705,8 @@ export function boardCarriesCard(
   // cheaper second signal, and only where the board stamps at all.
   // A RECORDED REGION THAT IS NOT A CARD is a broken reading, not an empty one
   // (Sol's review of 9ff9311): `['not a card']` would match nothing, and every
-  // leftover card would count as new. Every entry `--prepare` writes carries the
-  // head fragment by construction, so one that does not means the receipt cannot
+  // leftover card would count as new. Every entry `--prepare` writes carries
+  // every fragment by construction, so one that does not means the receipt cannot
   // be judged against — say so instead of passing.
   if (
     Array.isArray(knownRegions) &&
@@ -709,24 +724,6 @@ export function boardCarriesCard(
   return { carries: true, verifiable: true, missing: [] }
 }
 
-/**
- * MUST THIS CALL BE DENIED BECAUSE THE BOUNDARY IS COMMITTED? PURE.
- *
- * Only a fresh, committed marker belonging to the asking session denies, and only
- * a call that is NOT part of ending (the closing set stays open, so the card
- * publish and `--clear` itself are never blocked). Everything else — a stale
- * marker, a foreign one, a legacy one — denies nothing: the deny is a seal on a
- * deliberate `--commit`, never a trap, and its reason names the one-command way
- * back. Returns { deny, reason }.
- *
- * THE SEAL EXPIRES WITH THE MARKER, deliberately (Sol's review of 4e93933 called
- * this a fail-open route; it is the fail-open RULE). A marker past `freshMs` no
- * longer authorises a stop either — `assessBoundary` calls it `marker-stale` —
- * so a session that outsits its own seal has not handed over and kept working:
- * its handover lapsed and must be re-taken from `--prepare`. The alternative, a
- * seal without end, is the one thing a guard here may never be: a session
- * trapped by a marker nothing can time out.
- */
 /**
  * IS THIS SESSION'S BOUNDARY SEALED? PURE (point 1048, union entry U17).
  *
@@ -751,6 +748,24 @@ export function boundaryIsSealed({ marker, sid, now, freshMs = BOUNDARY_FRESH_MS
   return markerFresh(marker, now, freshMs)
 }
 
+/**
+ * MUST THIS CALL BE DENIED BECAUSE THE BOUNDARY IS COMMITTED? PURE.
+ *
+ * Only a fresh, committed marker belonging to the asking session denies, and only
+ * a call that is NOT part of ending (the closing set stays open, so the card
+ * publish and `--clear` itself are never blocked). Everything else — a stale
+ * marker, a foreign one, a legacy one — denies nothing: the deny is a seal on a
+ * deliberate `--commit`, never a trap, and its reason names the one-command way
+ * back. Returns { deny, reason }.
+ *
+ * THE SEAL EXPIRES WITH THE MARKER, deliberately (Sol's review of 4e93933 called
+ * this a fail-open route; it is the fail-open RULE). A marker past `freshMs` no
+ * longer authorises a stop either — `assessBoundary` calls it `marker-stale` —
+ * so a session that outsits its own seal has not handed over and kept working:
+ * its handover lapsed and must be re-taken from `--prepare`. The alternative, a
+ * seal without end, is the one thing a guard here may never be: a session
+ * trapped by a marker nothing can time out.
+ */
 export function sealedBoundaryDeny({
   marker,
   sid,
@@ -812,7 +827,7 @@ export const CLOSING_SET_FILES = new Set([
  *  to end. Real work is deliberately absent; its guard hands the debt to the
  *  successor instead. The boundary test derives that inventory from the live
  *  Stop chain and its imported cores. */
-export const CLOSING_SET_SCRIPTS = [
+const CLOSING_SET_SCRIPTS = [
   'dashboard-publish',
   'dashboard-sync',
   'focus',
@@ -862,24 +877,8 @@ export function isClosingSetPath(p) {
   return CLOSING_SET_FILES.has(parts[parts.length - 1])
 }
 
-/**
- * A shell command counts only when EVERY one of its segments is a closing-set
- * script (bare navigation is neutral). One `git commit` or one `npm test` in the
- * chain is the session carrying on, whatever else rides along with it.
- *
- * The SEPARATOR set is the load-bearing part, and it errs toward splitting. A
- * single `&` was missing from it (four-eyes review, Fable 5): `node
- * scripts/board.mjs & npm test` then parsed as ONE segment whose head matched a
- * closing script, so the handover survived real work — the dangerous direction,
- * because a kept handover plus a long enough silence lets a successor spawn
- * beside a working session.
- *
- * A segment must also be nothing but the invocation and harmless OUTPUT
- * handling: any command substitution (`$(…)`, backticks) or redirection to a
- * file (`>`, `<`) makes it non-closing, whatever its head reads as. A descriptor
- * merge such as `2>&1` is different: it only selects where already-produced
- * output is displayed, and is removed before separators are classified.
- */
+// Command substitution or file redirection makes a segment opaque (see
+// `isClosingSetCommand`).
 const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
 
 /**
@@ -894,10 +893,9 @@ const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
  * demanding the space would leave the very shape this point exists to unblock
  * denied for a typing habit. A LONE TRAILING `&` IS NOT SUCH A SEPARATOR (Sol
  * re-review of c5a97818): stripping the merge in `--clear 2>&1&` would leave
- * `--clear &`, whose empty trailing segment disappears in the split, and the call
- * would pass as closing work while actually running detached. Only `&&`, which
- * sequences, qualifies — and the detachment itself is refused separately below,
- * so no spelling of it reaches the segment split.
+ * `--clear &`, a detached call. Only `&&`, which sequences, qualifies — and the
+ * detachment itself is refused separately below, so no spelling of it reaches
+ * the segment split.
  */
 export function withoutOutputDescriptorMerges(command) {
   return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=[\s;|]|&&|$)/g, '$1')
@@ -947,7 +945,7 @@ function commandSegments(command) {
  * because the dangerous direction is a KEPT handover beside real work: a pager may
  * only TRAIL a closing line (never sit in the middle), a pager alone is never a
  * closing line, and the opaque-segment ban above is untouched — so `cat > file`,
- * `tail $(…)` and every redirection still count as work.
+ * `tail $(…)` and every file redirection still count as work.
  */
 export const OUTPUT_PAGERS = ['head', 'tail', 'more', 'cat']
 const PAGER_SEGMENT_RE = new RegExp(`^(?:${OUTPUT_PAGERS.join('|')})(?:\\.exe)?(?:\\s|$)`, 'i')
@@ -956,6 +954,25 @@ export function isOutputPagerSegment(segment) {
   return PAGER_SEGMENT_RE.test(String(segment ?? '').trim())
 }
 
+/**
+ * A shell command counts only when EVERY one of its segments is a closing-set
+ * script (bare navigation is neutral, and one output pager may trail it after a
+ * pipe). One `git commit` or one `npm test` in the
+ * chain is the session carrying on, whatever else rides along with it.
+ *
+ * The SEPARATOR set errs toward splitting. A single `&` was once missing from it
+ * (four-eyes review, Fable 5): `node scripts/board.mjs & npm test` then parsed
+ * as ONE segment whose head matched a closing script, so the handover survived
+ * real work — the dangerous direction, because a kept handover plus a long
+ * enough silence lets a successor spawn beside a working session. A lone `&` is
+ * now refused outright by `DETACH_RE` before the split.
+ *
+ * A segment must also be nothing but the invocation and harmless OUTPUT
+ * handling: any command substitution (`$(…)`, backticks) or redirection to a
+ * file (`>`, `<`) makes it non-closing, whatever its head reads as. A descriptor
+ * merge such as `2>&1` is different: it only selects where already-produced
+ * output is displayed, and is removed before separators are classified.
+ */
 export function isClosingSetCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return false
   const stripped = withoutOutputDescriptorMerges(command)
@@ -980,20 +997,14 @@ export function isClosingSetCommand(command) {
 }
 
 /**
- * The triggering call, in one line for `.claude/boundary.log` (point 426 (b)).
- * PURE. Truncated, because a command line can be arbitrarily long and this is a log
- * entry, not a transcript.
- */
-export const WITHDRAWAL_TRIGGER_MAX = 200
-
-/**
  * The hook payload's own idea of WHEN the call happened, or null. PURE.
  *
  * Point 396 needs it to tell a session that is working again from a PostToolUse hook
  * that arrived late, and the payload shape is not guaranteed to carry one — so every
  * plausible field is tried and the answer may honestly be null, in which case the
- * settle window decides instead. Both a number of milliseconds and an ISO string are
- * accepted; anything else is ignored rather than guessed at.
+ * caller's settle window (lock-heartbeat-hook) decides instead. Both a number of
+ * milliseconds and an ISO string are accepted; anything else is ignored rather
+ * than guessed at.
  */
 export function hookCallTimestamp(payload = {}) {
   const candidates = [
@@ -1012,6 +1023,13 @@ export function hookCallTimestamp(payload = {}) {
   }
   return null
 }
+
+/**
+ * The triggering call, in one line for `.claude/boundary.log` (point 426 (b)).
+ * PURE. Truncated, because a command line can be arbitrarily long and this is a log
+ * entry, not a transcript.
+ */
+export const WITHDRAWAL_TRIGGER_MAX = 200
 
 export function describeWithdrawalTrigger({ toolName, filePath, command } = {}) {
   const tool = String(toolName ?? '').trim() || 'unknown tool'
@@ -1065,8 +1083,9 @@ export const BOUNDARY_DESTINATIONS = Object.freeze({
  * WHO CONTINUES AFTER THIS BOUNDARY? PURE.
  *
  * `claimHonoured` is the launcher's own bail predicate — today
- * `reservationDecision(...).acquire === false`, which covers the pending claim AND
- * the released one still reserving the freed lock (point 461) — so the card cannot
+ * `resolveBoundaryDestination(...).action === 'reserve'` (batch-claim-core), built
+ * on `reservationDecision(...).acquire === false`, which covers the pending claim
+ * AND the released one still reserving the freed lock (point 461) — so the card cannot
  * drift from what the launcher will actually do. A claim that is merely RECORDED
  * (expired, dead, released by a claimant that is gone) reserves nothing, and the
  * card then correctly announces the fresh session.
@@ -1078,21 +1097,6 @@ export function boundaryDestination({ claimHonoured = false, claimantSid = null 
     : { destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, claimantSid: null }
 }
 
-/**
- * THE BOUNDARY CARD, in German, one text per state. PURE.
- *
- * User-facing prose (the board is read on a phone), so it says the destination in
- * the first sentence and never leaves the reader to infer it.
- *
- * IT NAMES THE NEXT OPEN POINT (point 800), or states canonically that none
- * remains. This text is prescribed for use VERBATIM in the unnumbered gap card
- * `board.mjs done <n> --none` writes. The board writer requires that destination,
- * and the topic guard permits it only on this state card by title; the shared
- * property test applies the same writer predicate so those two rules cannot
- * drift apart again. The closed point's own story belongs in Erledigt anyway,
- * which is where `done` files it in the same edit; this card says where the
- * batch GOES.
- */
 /**
  * THE COMMAND THAT PUTS THE BOUNDARY CARD UP. PURE.
  *
@@ -1113,6 +1117,22 @@ export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
     : `${NONE_CARD_CMD} --text-stdin`
 }
 
+/**
+ * THE BOUNDARY CARD, in German, one text per state. PURE.
+ *
+ * User-facing prose (the board is read on a phone), so it says the destination in
+ * the sentence right after the cause head and never leaves the reader to infer it.
+ *
+ * IT NAMES THE NEXT OPEN POINT (point 800), or states canonically that none
+ * remains. This text is prescribed for use VERBATIM in the unnumbered gap card
+ * that `board.mjs done <n> --none` or `board.mjs none` writes (see
+ * `boundaryCardCommand`), for a point or a context boundary. The board writer requires that destination,
+ * and the topic guard permits it only on this state card by title; the shared
+ * property test applies the same writer predicate so those two rules cannot
+ * drift apart again. A closed point's own story belongs in Erledigt anyway,
+ * which is where `done` files it in the same edit; this card says where the
+ * batch GOES.
+ */
 export function boundaryCardText({
   destination,
   claimantSid = null,

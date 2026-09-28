@@ -16,7 +16,7 @@ export function utcDayWindow(day) {
   return { ok: true, start, end: start + 86_400_000 }
 }
 
-export function landingPointFromCommit(commit = {}) {
+function landingPointFromCommit(commit = {}) {
   const subject = String(commit.subject ?? '')
   const point = Number(subject.match(/feat\/(\d+)(?:[-/]|\b)/)?.[1])
   return Number.isInteger(point) && point > 0 ? point : null

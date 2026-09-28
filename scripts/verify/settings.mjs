@@ -5,12 +5,15 @@
 // to src/systems/movement.test.ts, the F3/F4/Tab-toggle store asserts to
 // src/state/store.debug.test.ts, and the DebugMenu label/field/dropdown/
 // renderer render asserts to src/ui/DebugMenu.test.tsx. What stays here needs a
-// real browser: the first-person eye height (window.__placeCamera), the
-// in-scene walk measurement, the user-select computed style, the RAF-driven
+// real browser: the first-person eye height (window.__placeCamera), the ground
+// detail and shimmer, the in-scene walk measurement, the head bob, the vertical
+// look and the pitched frames, the user-select computed style, the RAF-driven
 // lion-feed depiction (window.__lionHunt), the ambience engine + proximity
-// animal call rise/fade (AudioContext/window.__wildlife), the Tab-no-focus-shift
-// behaviour (activeElement/canvas), the TRAA pipeline toggle (real pipeline
-// rebuild + frame check), the screenshots and the console-error gate.
+// animal call rise/fade (AudioContext/window.__wildlife) with the drum bed,
+// village speech and speech bus, the Tab-no-focus-shift behaviour
+// (activeElement/canvas), the TRAA pipeline toggle (real pipeline rebuild +
+// frame check), the graphics levels, the debug-panel wheel zoom, the keyboard
+// lock, the render-leak watch, the screenshots and the console-error gate.
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browser.mjs'
 import { frameShutter, capturePixels } from './frameSubject.mjs'
@@ -90,8 +93,8 @@ const ensureTravel = async () => {
 
 // A screenshot is the reliable way to make a throttled headless page render; an
 // 8x8 clip keeps it cheap. rAF alone cannot be awaited here — it is the very
-// thing that stalls. Both the TRAA texture-count reading and the render-leak
-// watch pump their frames with it.
+// thing that stalls. The TRAA texture-count reading, the graphics-level TRAA
+// draw and the render-leak watch pump their frames with it.
 const forceFrame = () => capturePixels(page, 'forced frame for the texture count', { clip: { x: 0, y: 0, width: 8, height: 8 } })
 
 // The first-person look, driven the way a player's mouse drives it — the vertical
@@ -204,7 +207,7 @@ if (section('ground-shimmer')) {
   )
 }
 
-// --- Strafe/backward move in the scene (design.md §2) ------------------------
+// --- Forward and strafe move in the scene (design.md §2) ---------------------
 // The exact 80 % ratio is proven by the pure velocity helper in Vitest
 // (src/systems/movement.test.ts); here we only confirm both directions move a
 // real character in the live scene (frame-count-dependent distance, so the two
@@ -246,7 +249,8 @@ if (section('walk-move')) {
   check('strafing actually moves the character', strafeD > 0.5, `${strafeD.toFixed(2)} m`)
 }
 
-// --- Walk feel: head bob oscillates while walking, settles at rest (point 97) --
+// --- Walk feel: head bob moves the eye while walking, settles at rest (point 97)
+// (the walking check reads the bob's largest deviation from the rest height).
 // Bob/footsteps follow the eased VELOCITY and step phase (held-input driven),
 // not the distance travelled, so the position is pinned to the centre each
 // sample to keep the traveller from walking out of the settlement.
@@ -304,7 +308,9 @@ if (section('head-bob')) {
 // this exercises the production path, not a test-only hook.
 if (section('vertical-look')) {
   await resetLook()
-  // Inverted by default (user 28.07.2026): mouse FORWARD (movementY < 0) = down.
+  // Inverted is the default (user 28.07.2026): mouse FORWARD (movementY < 0) =
+  // down. resetLook sets it explicitly, so this reads the inverted mapping; the
+  // default value itself is not what is measured here.
   const down1 = await mouseLook(0, -200)
   check(
     'pushing the mouse forward looks DOWN (inverted default, point 392)',
@@ -462,7 +468,8 @@ if (section('debug-menu-style')) {
   check('GUI text is not selectable', select.bar === 'none' && select.label === 'none', JSON.stringify(select))
   check('form inputs keep normal text selection', select.input === 'text', JSON.stringify(select))
   // Point 375: the frames prove the thing they are named after is on screen —
-  // the open debug menu, the feeding lion, the rendered TRAA frame.
+  // the open debug menu here, and likewise the feeding lion, the rendered TRAA
+  // frame, the pitched frames and the graphics-level frames below.
   await shot('67-settings-debug-menu', { element: '.debug-menu', label: 'the German debug menu' })
 
   // Close the debug menu and restore English before the scene checks.
@@ -480,7 +487,7 @@ if (section('lion-feeding')) {
     const pos = window.__game.getState().pos
     const s = window.__lionHunt.state
     // Force a generic grazer feed: a naturally started calf hunt (victimHunt)
-    // would keep the scripted prey/stain meshes hidden (the herds draw a calf
+    // would keep the scripted prey mesh and the ground stain hidden (the herds draw a calf
     // victim instead), so clear it before forcing the feed state.
     s.victim = null
     s.victimHunt = false
@@ -566,7 +573,9 @@ if (section('tab-focus')) {
 
 // --- Proximity animal calls under the ambience (design.md §19) ---------------
 // A nearby animal raises its own call in the soundscape; the call fades once
-// the player leaves. Measured via the ambience layer target (audio itself is
+// the animal is gone — the reproducer removes it by identity rather than
+// walking the player away (the check keeps its 'player moves away' name as its
+// ledger identity). Measured via the ambience layer target (audio itself is
 // not asserted headless). The engine is started on demand.
 if (section('animal-calls')) {
   await ensureTravel()
@@ -619,7 +628,9 @@ if (section('animal-calls')) {
     aniSound.gone < 0.1 && aniSound.layerGone < 0.02, JSON.stringify(aniSound))
 }
 
-// --- Point 153: coastal surf fade + per-source birdsong slider ---------------
+// --- Ambience sources: coastal surf fade and per-source birdsong slider (point
+// 153), the silenced drum bed (point 672), village speech (§13.4) and its own
+// speech bus (point 577) ---------------------------------------------------------
 // Read the layer TARGETS synchronously (no await) so the 700 ms ambience
 // controller cannot overwrite the forced coast/scene mid-check. Surf follows
 // the coast proximity; birdsong scales with its own volume slider.
@@ -656,6 +667,9 @@ if (section('ambience-sources')) {
     surf153.atCoast > 0 && surf153.inland === 0, JSON.stringify(surf153))
   check('the surf gust also fades to silence inland (no leak past the target)',
     surf153.wobbleCoast > 0 && surf153.wobbleInland === 0, JSON.stringify(surf153))
+  check('the birdsong slider scales that source gain (point 153)',
+    surf153.birdsFull > 0 && surf153.birdsHalf > 0 && surf153.birdsHalf < surf153.birdsFull && surf153.birdsOff === 0,
+    JSON.stringify(surf153))
   // --- The village drum BED is silent at the shipped default (point 672) -------
   // A meaningless bed can be mistaken for the chief's drum MESSAGE, so it ships
   // off — in the village and near one. The debug audition switch must still
@@ -672,7 +686,7 @@ if (section('ambience-sources')) {
     a.setScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false })
     const auditioned = a.layerTarget('drums')
     b.drumBed.enabled = shipsEnabled
-    // Leave the scene as the birdsong check above left it.
+    // Leave the scene as the birdsong measurement above left it.
     a.setScene({ region: 'central', mode: 'travel', placeKind: null, nearVillage: false })
     return { shipsEnabled, inVillage, nearVillage, auditioned }
   })
@@ -728,46 +742,42 @@ if (section('ambience-sources')) {
     speech.phrase.syllables === speech.spokenFar.syllables + 2 * BEATS, JSON.stringify(speech))
 
   // --- Point 577: the speech is NOT on the "everything else" bus -------------
-// The reported bug (F6 `keineBaBAs.zip`, ambientVolume 0) was invisible to the
-// check above: the plan still reported a positive peak, and only the bus behind
-// it was zero. So this reads the live GAIN of the buses in the running engine.
-const speechBus = await page.evaluate((atom) => {
-  const a = window.__ambience
-  const b = window.__balance
-  const ambientWas = b.ambientVolume
-  const speechWas = b.communication.speechVolume
-  a.start()
-  // The player's own state: "everything else" silenced to hear the voices.
-  b.ambientVolume = 0
-  a.refresh()
-  const before = { ...a.speechProbe() }
-  a.speak(atom, 0)
-  const muted = {
-    probe: { ...a.speechProbe() },
-    speech: a.busGain('speech'),
-    ambient: a.busGain('ambient'),
-  }
-  // …and the speech's own slider, which must be the one thing that silences it.
-  b.ambientVolume = ambientWas
-  b.communication.speechVolume = 0
-  a.refresh()
-  const off = { speech: a.busGain('speech'), ambient: a.busGain('ambient') }
-  b.communication.speechVolume = speechWas
-  a.refresh()
-  const restored = a.busGain('speech')
-  return { before, muted, off, restored }
-}, ATOMS[0])
-check('the syllables still play with "everything else" at zero (point 577)',
-  speechBus.muted.probe.syllables === speechBus.before.syllables + BEATS &&
-    speechBus.muted.probe.lastPeak > 0 && speechBus.muted.speech > 0 && speechBus.muted.ambient === 0,
-  JSON.stringify(speechBus))
-check('the speech slider is the only one that silences it, and the bed stays up',
-  speechBus.off.speech === 0 && speechBus.off.ambient > 0 && speechBus.restored > 0,
-  JSON.stringify(speechBus))
-
-  check('the birdsong slider scales that source gain (point 153)',
-    surf153.birdsFull > 0 && surf153.birdsHalf > 0 && surf153.birdsHalf < surf153.birdsFull && surf153.birdsOff === 0,
-    JSON.stringify(surf153))
+  // The reported bug (F6 `keineBaBAs.zip`, ambientVolume 0) was invisible to the
+  // check above: the plan still reported a positive peak, and only the bus behind
+  // it was zero. So this reads the live GAIN of the buses in the running engine.
+  const speechBus = await page.evaluate((atom) => {
+    const a = window.__ambience
+    const b = window.__balance
+    const ambientWas = b.ambientVolume
+    const speechWas = b.communication.speechVolume
+    a.start()
+    // The player's own state: "everything else" silenced to hear the voices.
+    b.ambientVolume = 0
+    a.refresh()
+    const before = { ...a.speechProbe() }
+    a.speak(atom, 0)
+    const muted = {
+      probe: { ...a.speechProbe() },
+      speech: a.busGain('speech'),
+      ambient: a.busGain('ambient'),
+    }
+    // …and the speech's own slider, which must be the one thing that silences it.
+    b.ambientVolume = ambientWas
+    b.communication.speechVolume = 0
+    a.refresh()
+    const off = { speech: a.busGain('speech'), ambient: a.busGain('ambient') }
+    b.communication.speechVolume = speechWas
+    a.refresh()
+    const restored = a.busGain('speech')
+    return { before, muted, off, restored }
+  }, ATOMS[0])
+  check('the syllables still play with "everything else" at zero (point 577)',
+    speechBus.muted.probe.syllables === speechBus.before.syllables + BEATS &&
+      speechBus.muted.probe.lastPeak > 0 && speechBus.muted.speech > 0 && speechBus.muted.ambient === 0,
+    JSON.stringify(speechBus))
+  check('the speech slider is the only one that silences it, and the bed stays up',
+    speechBus.off.speech === 0 && speechBus.off.ambient > 0 && speechBus.restored > 0,
+    JSON.stringify(speechBus))
 }
 
 // --- TRAA toggle (design.md §2.7; CLAUDE.md §7.1 pt. 32) ----------------------
@@ -800,7 +810,8 @@ if (section('traa-toggle')) {
     `${traaTiming.callbacks} callback completions in ${Math.round(traaTiming.elapsedMs)} ms; ` +
     `repeat links released ${traaOffPipelines.pipelines?.reused - traaOnPipelines.pipelines?.reused}`)
   // The runner keeps only the FAILING check line, so the evidence that names the
-  // cause of a black frame belongs IN the detail, not in a console line beside it.
+  // cause of a black frame is carried IN the detail below; the console lines
+  // above serve only a reader of the full log.
   /** Which materials are waiting in the first-use queue — a black scene behind a
    *  backlog of SCENE materials is a relink, behind post materials a pacing cost. */
   const queuedByMaterial = (state) => {
@@ -955,17 +966,12 @@ if (section('graphics-levels')) {
   })
   // Read the effective levers the SAME way ui.ts derives them (level preset AND
   // the allow-flag), so the live check matches the pure-tested selectors.
-  const PRESETS = {
-    low: { dpr: 1, ssao: false, traa: false, bloom: false, shadows: true, shadowRes: 1024, fire: false },
-    medium: { dpr: null, ssao: false, traa: true, bloom: true, shadows: true, shadowRes: 2048, fire: true },
-    high: { dpr: null, ssao: true, traa: true, bloom: true, shadows: true, shadowRes: 4096, fire: true },
-  }
   const effective = () => page.evaluate(() => {
     const s = window.__ui.getState()
     const P = {
-      low: { dpr: 1, ssao: false, traa: false, bloom: false, shadows: true, shadowRes: 1024, fire: false },
-      medium: { dpr: null, ssao: false, traa: true, bloom: true, shadows: true, shadowRes: 2048, fire: true },
-      high: { dpr: null, ssao: true, traa: true, bloom: true, shadows: true, shadowRes: 4096, fire: true },
+      low: { ssao: false, traa: false, bloom: false, shadows: true, shadowRes: 1024, fire: false },
+      medium: { ssao: false, traa: true, bloom: true, shadows: true, shadowRes: 2048, fire: true },
+      high: { ssao: true, traa: true, bloom: true, shadows: true, shadowRes: 4096, fire: true },
     }[s.detailLevel]
     return {
       level: s.detailLevel,
@@ -990,13 +996,15 @@ if (section('graphics-levels')) {
     atMedium.level === 'medium' && atMedium.ssao === false && atMedium.traa && atMedium.bloom &&
     atMedium.shadows && atMedium.shadowRes === 2048 && atMedium.fireShadows === true,
     JSON.stringify(atMedium))
-  // Own the reproducer even in a section-only run. Each mode must reach the
+  // The black-frame reproducer (TRAA on/off cycles before the LOW preset, frame
+  // 1105 below) runs inside this section, so a section-only run still
+  // exercises it. Each mode must reach the
   // scene pass and render before the next toggle; batched store writes do not
   // exercise pipeline teardown/rebuild. The MRT is NOT the observable here --
   // the repair keeps velocity allocated in every mode, so waiting for it to
-  // disappear would wait forever. Drive the toggle the way the traa-toggle
-  // section does: let the rebuild commit, then force a frame that builds its
-  // targets. End with the allow-flag restored so the F9 effective-lever and
+  // disappear would wait forever. Like the traa-toggle section, let the rebuild
+  // commit and then force a frame that builds its targets — but awaited on the
+  // application's clock rather than that section's fixed pause. End with the allow-flag restored so the F9 effective-lever and
   // flag-preservation checks retain their meaning.
   // The rebuild is awaited on the APPLICATION's clock: __postBuilds counts up
   // when the new pipeline is committed, so no wall-clock pause is needed. A
@@ -1021,7 +1029,7 @@ if (section('graphics-levels')) {
   const atLow = await cycleF9()
   check('F9 → low: post off, shadows low-res, no campfire shadows',
     atLow.level === 'low' && atLow.ssao === false && atLow.traa === false && atLow.bloom === false &&
-    atLow.shadowRes === PRESETS.low.shadowRes && atLow.fireShadows === false, JSON.stringify(atLow))
+    atLow.shadowRes === 1024 && atLow.fireShadows === false, JSON.stringify(atLow))
   // The defect this section guards was a BLACK picture, so the LOW preset
   // leaves a frame behind rather than a number alone (CLAUDE.md §7.2).
   const lowShot = await shot('1105-graphics-level-low', {
@@ -1046,12 +1054,13 @@ if (section('graphics-levels')) {
     errors.slice(errsBeforeLow).join(' | ').slice(0, 300))
 }
 
-// --- Point 325: a wheel over the debug panel scrolls it, never the zoom -------
+// --- Point 325: a wheel over the debug panel never moves the zoom -------------
 // The bird's-eye zoom listens on `window`, so a wheel over the long debug menu
-// used to scroll the panel AND zoom the view underneath it. The counter-check
-// matters as much: the same wheel over the canvas must still zoom, so the gate
-// costs the scene nothing. Deliberately LAST — the check moves the camera and
-// briefly opens the debug menu, and no other assertion may inherit that state.
+// used to scroll the panel AND zoom the view underneath it (the panel's own
+// scroll is not measured here). The counter-check matters as much: the same
+// wheel over the canvas must still zoom, so the gate costs the scene nothing.
+// The check moves the camera and briefly opens the debug menu, so it puts the
+// zoom back at its end and no later section inherits that state.
 if (section('debug-wheel-zoom')) {
   await ensureTravel()
   await page.waitForFunction(() => window.__travelWheelReady === true, null, { timeout: 20000 }).catch(() => {})
@@ -1165,8 +1174,9 @@ if (section('keyboard-lock')) {
     hidden.map((c) => c.kind).join(','))
 
   // F11 AFTER the pointer lock: it fires neither fullscreenchange nor
-  // pointerlockchange and sets no fullscreenElement — the viewport just grows.
-  // Only the resize listener sees it, in the state the settings call safe.
+  // pointerlockchange — the viewport just grows. Only the resize listener sees
+  // it, in the state the settings call safe; the reproducer drives that grown
+  // browser-fullscreen state as `fullscreen: true`.
   await drive({ fullscreen: false, pointerLocked: true, event: 'pointerlockchange' })
   const beforeF11 = await drive({ fullscreen: false, pointerLocked: true, event: 'resize' })
   const f11 = await drive({ fullscreen: true, pointerLocked: true, event: 'resize' })
@@ -1205,8 +1215,8 @@ if (section('render-leak-watch')) {
     // Frames, not wall clock: the watch advances one step per RENDERED frame and
     // a headless page paints only when something forces it to (see settledReading
     // above), so each round of this loop forces exactly the tick it waits for.
-    // The cap is the watch's OWN give-up point (SETTLE_POLICY.maxFrames), not a
-    // guessed number: below it a slow cold-compile round could be cut off and the
+    // The cap copies the watch's OWN give-up point (SETTLE_POLICY.maxFrames, 600
+    // in src/render/renderLeak.ts), not a guessed number: below it a slow cold-compile round could be cut off and the
     // reading dropped, which would show up as a rotating flake rather than as the
     // finding it is. The normal case leaves after ~32 frames.
     const settleWatch = async (tries = 600) => {

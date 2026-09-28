@@ -5,7 +5,6 @@
 import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  ADULT_CONCEPTS,
   assertNoOwedWord,
   ADULT_SITUATIONS,
   carryOf,
@@ -28,7 +27,6 @@ import { clearOfSpoil, DIG_RIM_DISTANCE } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { instructionDelay, utteranceSeconds } from '../../communication/speaking'
 import { balance } from '../../config/balance'
-import { CONCEPT_IDS } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
 import { resetDevAsserts } from '../../systems/devAssert'
 
@@ -213,15 +211,9 @@ function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
 }
 
 describe('the adults keep to their four teaching situations', () => {
-  it('owns only RIVER and DIG, with two situations for each', () => {
-    expect([...ADULT_CONCEPTS].sort()).toEqual(['DIG', 'RIVER'])
-    for (const concept of ADULT_CONCEPTS) expect(CONCEPT_IDS).toContain(concept)
+  it('owns two situations for each of its words', () => {
     expect(ADULT_SITUATIONS.filter((id) => id.startsWith('water-'))).toHaveLength(2)
     expect(ADULT_SITUATIONS.filter((id) => id.startsWith('dig-'))).toHaveLength(2)
-  })
-
-  it('leaves the direction words and ROCK to the children', () => {
-    for (const concept of ADULT_CONCEPTS) expect(['UPSTREAM', 'DOWNSTREAM', 'ROCK']).not.toContain(concept)
   })
 })
 

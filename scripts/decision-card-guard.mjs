@@ -98,7 +98,7 @@ export function gatherDecisionCardCondition({
   }
 }
 
-export const readDecisionCardState = () => {
+const readDecisionCardState = () => {
   try {
     const state = JSON.parse(readFileSync(STATE_PATH, 'utf8'))
     return state && typeof state === 'object' && !Array.isArray(state) ? state : null
@@ -107,7 +107,7 @@ export const readDecisionCardState = () => {
   }
 }
 
-export const writeDecisionCardState = (state) => {
+const writeDecisionCardState = (state) => {
   try {
     mkdirSync(dirname(STATE_PATH), { recursive: true })
     writeJsonAtomic(STATE_PATH, state)
@@ -204,7 +204,7 @@ export function extractLastUserMessage(jsonl) {
 
 const sessionsOf = (state) => state?.sessions && typeof state.sessions === 'object' ? state.sessions : {}
 
-export function decisionSession(state, sessionId) {
+function decisionSession(state, sessionId) {
   const session = sessionsOf(state)[sessionId]
   return session && typeof session === 'object' ? session : null
 }
@@ -273,7 +273,7 @@ export function recordDecisionCardKeep(
   { sessionId = process.env.CLAUDE_SESSION_ID || '' } = {},
 ) {
   const state = readDecisionCardState()
-  if (!state) throw new Error('decision-card guard state is unreadable; wait for the guard to name the active message')
+  if (!state) throw new Error('decision-card guard state is unreadable; the next user prompt seeds it (UserPromptSubmit hook)')
   const selected = selectedSession(state, sessionId)
   const { session } = selected
   if (!session.userMessage?.id || !session.userMessage?.text) {
@@ -313,7 +313,7 @@ if (isMainModule(import.meta.url)) {
     try {
       payload = JSON.parse(readFileSync(0, 'utf8'))
     } catch {
-      /* a manual run has no stdin — the rule is global truth, not session-local */
+      /* a manual run has no stdin — it then reads the '' session's state */
     }
     const sessionId = (payload && payload.session_id) || ''
     const transcriptPath = payload && payload.transcript_path

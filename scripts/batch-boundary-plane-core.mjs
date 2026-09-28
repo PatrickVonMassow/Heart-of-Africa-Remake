@@ -2,7 +2,7 @@
 // core owns context/point cards; this core owns the daemon-backed batch proof.
 import { landingAllowsBoundary } from './batch-landing-core.mjs'
 
-export const DURABLE_BOUNDARY_PREPARE_V = 1
+const DURABLE_BOUNDARY_PREPARE_V = 1
 
 export function durablePrepareVerdict({ daemon, state, landingStage = null, bookkeeping, board, queue, checkpoint } = {}) {
   const refusals = []

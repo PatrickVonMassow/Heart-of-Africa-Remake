@@ -2,9 +2,9 @@
 // docs/handover-architecture.md (work-order point 834, the front stage of 676;
 // union M17/M18).
 //
-// M17: the in-flight declaration becomes the ADOPTION RECORD. What is missing
-// today is exactly that nothing tells the successor a run is now its own — a
-// PID alone cannot, because it can be reused. So a declaration may carry a
+// M17: the in-flight declaration becomes the ADOPTION RECORD, which tells the
+// successor a run is now its own — a PID alone cannot, because it can be
+// reused. So a declaration may carry a
 // `durable` block naming the stable batch, point and attempt identities, the
 // worker's process-start identity, and a `transferable` flag; this module
 // decides whether that block is usable, and batch-in-flight.mjs refuses to
@@ -58,14 +58,15 @@ export function durableBlock({ batchId, pointId, attemptId, pid, pidStartedAt, t
  *                     reachable from the remote tip (`git merge-base
  *                     --is-ancestor <checkpoint> <tip>`, equality included)
  *
- *  The verdict is `live` only when nothing disagrees. Anything else is
- *  `expired` WITH the alerts that say what stopped agreeing — or `invalid`
- *  when the block or the clock cannot even be judged, which no caller may
- *  read as anything but a refusal.
+ *  The verdict is `not-transferable` when there is no durable block with
+ *  `transferable: true`, `invalid` when the block or the clock cannot even be
+ *  judged (which no caller may read as anything but a refusal), `live` only
+ *  when nothing disagrees, and otherwise `expired` WITH the alerts that say
+ *  what stopped agreeing.
  *
- *  A `live` verdict carries the LANE it was taken for (`lane: { batchId,
- *  pointId, attemptId }`), because an agreement that names no lane could be
- *  replayed against another declaration. */
+ *  `live` and `expired` carry the LANE they were taken for (`lane: { batchId,
+ *  pointId, attemptId, pid, pidStartedAt }`), because an agreement that names
+ *  no lane could be replayed against another declaration. */
 export function agreementVerdict({ durable = null, probes = {}, now, maxSilenceMs = AGREEMENT_SILENCE_MS } = {}) {
   const alerts = []
   if (!durable || durable.transferable !== true) {

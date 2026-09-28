@@ -10,7 +10,8 @@ what the game did wrong stays readable.
 
 **The trigger and the exemplar.** The Great Sphinx of Giza was buried to the
 shoulders in wind-blown sand until Baraize's 1925–36 clearance, so a ~1890
-depiction must show it half-buried — the game builds it fully exposed. This pass
+depiction must show it half-buried — the game built it fully exposed (since
+resolved, A1). This pass
 sweeps the whole world for that *class* of error: things that look plausible to a
 modern eye but were demonstrably different in 1890.
 
@@ -93,7 +94,7 @@ the picture at both mount points on both backends.
 
 **(1) What the game does.** `src/render/landmarks.ts` `buildMeroePyramids()`
 (lines 59–76) builds six clean, unbroken four-sided cones at height ≈ 2.6–3.2 ×
-base (~69°, correctly steeper than Giza). Every pyramid has an intact sharp apex.
+half-base (~69°, correctly steeper than Giza). Every pyramid has an intact sharp apex.
 
 **(2) The record.** In **1834** the Italian treasure hunter **Giuseppe Ferlini**
 dismantled the pyramid of Kandake Amanishakheto (Beg. N6) at Meroë, working down
@@ -293,7 +294,7 @@ citations) establishes: all three lost their polished Tura-limestone casing to
 centuries of quarrying, leaving stepped tawny cores; **Khufu's apex and top
 courses are gone**, leaving a small flat platform, not a point; **Khafre alone
 still carries a cap of original smooth casing near its apex** — the only
-surviving casing on any Giza pyramid and "the single most useful visual cue on
+surviving limestone casing on any Giza pyramid and "the single most useful visual cue on
 the plateau"; **Menkaure's lower courses are cased in red Aswan granite**, a
 darker band at the base — FIELD/REVIEW.
 
@@ -596,8 +597,8 @@ one. The correct value is "Confluence with the Orange".
 
 **(1) What the game does.** The fauna roster
 (`src/scenes/travel/Wildlife.tsx:150`) is elephant, giraffe, zebra, wildebeest,
-antelope, warthog, flamingo, crocodile, plover, plus lion/cheetah/leopard/hyena
-and vultures, the lioness+cub and the ground-nesting plover.
+antelope, warthog, flamingo, crocodile, the ground-nesting plover, plus
+lion/cheetah/leopard/hyena and vultures, and the lioness+cub.
 
 **(2) The record.** The three animals every 1890 expedition account is full of —
 **hippopotamus** (the standing hazard of every river crossing and canoe passage),

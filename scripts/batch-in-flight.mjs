@@ -1,10 +1,15 @@
 // DECLARING WORK THAT IS IN FLIGHT (point 388, fifth live finding 28.07.2026) —
 // the IO half. The decision logic is pure in scripts/batch-in-flight-core.mjs;
-// this module only reads/writes the marker and runs the probes that PROVE the
-// declared work is still running. CLI:
+// this module reads/writes the marker, runs the probes that PROVE the declared
+// work is still running, and does the side writes that go with it (activity
+// events, the commissioning record, the lease extension, transfer/adoption
+// records, the board heartbeat). CLI:
 //
-//   node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N]… [--branch REF]…
-//                                    [--worktree PATH]… [--log PATH]…
+//   node scripts/batch-in-flight.mjs --waiting-on "<what>" [--point N] [--pid N]…
+//                                    [--branch REF]… [--worktree PATH]… [--log PATH]…
+//                                    [--slots-free "<why>"]
+//                                    [--durable-batch ID --durable-point ID
+//                                     --durable-attempt ID [--transferable]]
 //   node scripts/batch-in-flight.mjs --status   what the Stop hook would decide
 //   node scripts/batch-in-flight.mjs --clear    the wait is over
 //   node scripts/batch-in-flight.mjs --agent-check [--worktree PATH]… [--branch REF]…
@@ -12,17 +17,21 @@
 //                                    may this delegated agent be REPLACED? Exit 0
 //                                    yes, exit 1 no. Run it IMMEDIATELY before
 //                                    the respawn (point 434 (5)).
+//   node scripts/batch-in-flight.mjs --handover-check   may the boundary transfer it
+//   node scripts/batch-in-flight.mjs --adopt            the successor takes it over
 //
 // Declaring is DELIBERATE and verified up front, exactly like taking a boundary:
-// the command refuses unless this is the batch lock's owner and every piece of
-// evidence checks out at the moment it is written, so the session learns at the
-// declaration rather than at a blocked turn end.
+// the command refuses unless a batch lock owner exists (the declaration is
+// written under that owner's session id) and every piece of evidence checks out
+// at the moment it is written, so the session learns at the declaration rather
+// than at a blocked turn end.
 //
-// It does NOT hand the batch over and does NOT touch the lock: a waiting session
-// is still the working session, and the launcher must keep seeing a live owner.
-// The ONLY thing it changes is that `batch-progress-guard` stops demanding work
-// the session cannot do while it waits — and it stops the moment the evidence
-// stops checking out, or the declaration ages out.
+// It does NOT hand the batch over: a waiting session is still the working
+// session, and the launcher must keep seeing a live owner. On the lock it only
+// extends the lease for the wait (`--waiting-on`) and drops that `declaredWait`
+// again (`--clear`). Otherwise `batch-progress-guard` stops demanding work the
+// session cannot do while it waits — and it stops the moment the evidence stops
+// checking out, or the declaration ages out.
 import { readFileSync, rmSync, statSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -87,8 +96,6 @@ import { berlinMinutes } from './dashboard-guard.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
-export { IN_FLIGHT_PATH }
-
 /**
  * The point a delegated activity event belongs to — READ, never re-derived
  * (sixth cross-vendor round). This used to run its own regex over the ref or
@@ -148,9 +155,19 @@ export function maxAgeMs(env = process.env) {
   return Number.isFinite(raw) && raw > 0 ? raw * 60 * 1000 : IN_FLIGHT_MAX_AGE_MS
 }
 
+/** The declaration, parsed; null when absent or unreadable. A read only —
+ *  clearing a dead one is `reapDeadDeclaration`'s job. */
+export function readDeclaration(path = IN_FLIGHT_PATH) {
+  try {
+    const d = JSON.parse(readFileSync(path, 'utf8'))
+    return d && typeof d === 'object' ? d : null
+  } catch {
+    return null
+  }
+}
+
 /**
- * THE DECLARATION, AND A DEAD ONE IS TOMBSTONED ON SIGHT (point 1048, union
- * entry U2).
+ * A DEAD DECLARATION IS TOMBSTONED ON SIGHT (point 1048, union entry U2).
  *
  * Measured 02./03.09.2026: this file named a pid dead since the afternoon and
  * kept "a verification is running" plausible all night; measured again
@@ -164,21 +181,12 @@ export function maxAgeMs(env = process.env) {
  * it is, because the cost of a wrong clear is a killed wait and the cost of a
  * missed one is a re-read.
  *
- * A TRANSFERRED declaration is exempt, and that exemption is the whole point of
- * the handover: it names its predecessor's pid ON PURPOSE, and that predecessor
- * is expected to be gone. Reaping it would delete the successor's inheritance.
- */
-export function readDeclaration(path = IN_FLIGHT_PATH) {
-  try {
-    const d = JSON.parse(readFileSync(path, 'utf8'))
-    return d && typeof d === 'object' ? d : null
-  } catch {
-    return null
-  }
-}
-
-/**
- * CLEAR A DECLARATION WHOSE WRITER IS GONE. Returns what it did.
+ * Any declaration carrying `transfer` is exempt. An un-adopted one names its
+ * predecessor's pid ON PURPOSE, and that predecessor is expected to be gone;
+ * reaping it would delete the successor's inheritance. An adopted one keeps
+ * `transfer` (and so the exemption) although its pid is now the adopter's.
+ *
+ * Returns what it did.
  *
  * Separate from `readDeclaration` on purpose: a READ must stay a read, and the
  * many callers that only want to look at the paperwork must not delete it as a
@@ -246,7 +254,7 @@ export function tagEvidencePoint(
 
 /**
  * WHEN did this branch last receive a commit? Epoch ms, or null when the ref does
- * not resolve. Existence was not enough (four-eyes review): ~94 `feat/*` and
+ * not resolve. Existence was not enough (four-eyes review): many `feat/*` and
  * `worktree-agent-*` branches live in this repository, so "the branch is there"
  * is true of work that finished days ago. Any git failure answers null — evidence
  * that cannot be established never counts as established. execFile, never a shell
@@ -272,7 +280,7 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
 
 /**
  * WHICH `feat/*` BRANCHES STAND OPEN (point 712)? `{ readable, branches }`, each
- * branch `{ ref, tipAt, behind }`.
+ * branch `{ ref, tipAt, tip, behind }`.
  *
  * "Open" is "not contained in `main`" — a merged branch is debris that
  * `branch-hygiene-guard` sweeps, not a slot somebody is holding. Local and
@@ -343,7 +351,7 @@ export function branchTip(ref, { cwd = REPO_ROOT } = {}) {
 }
 
 /** Where the commissioning record lives, resolved once. */
-export const COMMISSION_RECORD_FILE = resolve(REPO_ROOT, COMMISSION_RECORD_PATH)
+const COMMISSION_RECORD_FILE = resolve(REPO_ROOT, COMMISSION_RECORD_PATH)
 
 /** The recorded overrides and parks. A missing file is an EMPTY record, not a
  *  torn one — nothing recorded yet is the ordinary state.
@@ -368,7 +376,7 @@ export function writeCommissionRecord(record, path = COMMISSION_RECORD_FILE) {
 
 /** How many commits `base` holds that this branch does not — the cost of not
  *  landing it. Null where git cannot say. */
-export function commitsBehind(ref, { cwd = REPO_ROOT, base = 'main' } = {}) {
+function commitsBehind(ref, { cwd = REPO_ROOT, base = 'main' } = {}) {
   const name = String(ref ?? '').trim()
   if (!name || /[\s~^:?*[\]\\]/.test(name)) return null
   try {
@@ -417,15 +425,16 @@ const stampOf = (p) => {
  *   · `--ignore-submodules=all`, because a submodule's own dirtiness is not this
  *     checkout's work and would cost a recursive status.
  *
- * `limit` bounds the stats, not the newest-wins comparison; `git status` sorts by
- * PATH, so a checkout dirtier than the limit can miss the newest file and fall
+ * `porcelainPaths`' default limit bounds the stats, not the newest-wins
+ * comparison; `git status` sorts by PATH, so a checkout dirtier than the limit can miss the newest file and fall
  * back to the git metadata. That is the safe direction (it can only under-report
  * freshness), and an agent worktree does not reach it.
  *
- * Any failure answers null — evidence that cannot be established never counts as
- * established, the same rule `refTipAt` follows.
+ * A failed `git status` answers null — evidence that cannot be established never
+ * counts as established, the same rule `refTipAt` follows. A path that cannot be
+ * stat'ed is skipped; the newest of the rest still answers.
  */
-export function worktreeFilesActiveAt(root, { limit, excludePaths = [] } = {}) {
+export function worktreeFilesActiveAt(root, { excludePaths = [] } = {}) {
   const dir = String(root ?? '').trim()
   if (!dir) return null
   let out = ''
@@ -457,9 +466,9 @@ export function worktreeFilesActiveAt(root, { limit, excludePaths = [] } = {}) {
     return null
   }
   let newest = null
-  for (const rel of porcelainPaths(out, limit ? { limit } : {})) {
-    // An untracked DIRECTORY is reported as `dir/`; its own mtime moves when a
-    // file is created in it, which is the answer wanted here either way.
+  for (const rel of porcelainPaths(out)) {
+    // `-uall` names files, never a collapsed `dir/`; a path gone since the
+    // status call is skipped.
     const at = stampOf(resolve(dir, rel))
     if (typeof at === 'number' && (newest === null || at > newest)) newest = at
   }
@@ -544,9 +553,6 @@ export function resolveRefName(ref, { cwd = REPO_ROOT } = {}) {
   }
 }
 
-/** The branch this checkout has checked out, or null when it cannot be read (a
- *  detached HEAD, or no git at all). Only used to REFUSE naming it as evidence,
- *  so an unreadable answer refuses nothing extra. */
 /** An absolute path for what was typed. An empty value stays empty, so it keeps
  *  failing as "no path" instead of quietly becoming the working directory. */
 export function absPath(value) {
@@ -554,7 +560,10 @@ export function absPath(value) {
   return raw ? resolve(raw) : raw
 }
 
-export function currentBranchOf({ cwd = REPO_ROOT } = {}) {
+/** The branch this checkout has checked out, or null when it cannot be read (a
+ *  detached HEAD, or no git at all). Only used to REFUSE naming it as evidence,
+ *  so an unreadable answer refuses nothing extra. */
+function currentBranchOf({ cwd = REPO_ROOT } = {}) {
   try {
     const out = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       windowsHide: true,
@@ -569,11 +578,10 @@ export function currentBranchOf({ cwd = REPO_ROOT } = {}) {
   }
 }
 
-// The FULL probe, not the cheap one: `cheapProbePid` answers existence only (and
-// true on EPERM), so a reused pid would keep a declaration alive on a stranger's
-// process. The start time is what makes a pid an identity.
-/** Only the runner's structured verdict ends a LARGE wait. A quoted error,
- * first-attempt failure or a completed/stale run is not this signal. */
+/** Only the runner's own verdict line (`FAIL (twice, SAME check) … CANDIDATE
+ * REAL FAILURE`, matched as a whole log line) in a still-running LARGE run ends
+ * the wait. A quoted error, first-attempt failure or a completed/stale run is
+ * not this signal. */
 export function runFailureOf(logPath, { read = (path) => readFileSync(path, 'utf8') } = {}) {
   try {
     const log = absPath(logPath)
@@ -587,20 +595,18 @@ export function runFailureOf(logPath, { read = (path) => readFileSync(path, 'utf
   }
 }
 
+// The FULL probe, not the cheap one: `cheapProbePid` answers existence only (and
+// true on EPERM), so a reused pid would keep a declaration alive on a stranger's
+// process. The start time is what makes a pid an identity.
 const probes = { probePid, refTipAt, worktreeActiveAt, mtimeOf, runFailureOf }
 
-/**
- * Everything the Stop hook needs, gathered. Returns the core's assessment plus
- * the declaration it judged. Cheap in the common case: with no marker on disk it
- * returns before any probe runs, so an ordinary turn end pays nothing for this.
- */
 /** The path whose existence DECLARES a CLOSING FREEZE (CLAUDE.md §9) by hand: while a
  *  closing run is under way no agent work may land, so empty pool slots are correct.
  *  It is the override, not the primary signal — see `closingFreeze()`. */
-export const CLOSING_FREEZE_PATH = resolve(REPO_ROOT, '.claude', 'closing-freeze')
+const CLOSING_FREEZE_PATH = resolve(REPO_ROOT, '.claude', 'closing-freeze')
 /** Where `closing-guard` keeps its per-commit checklist. THIS is the signal a closing
  *  is really running, because it is written as a side effect of doing the closing. */
-export const CLOSING_STATE_PATH = resolve(REPO_ROOT, '.claude', 'closing-state.json')
+const CLOSING_STATE_PATH = resolve(REPO_ROOT, '.claude', 'closing-state.json')
 const PAUSE_PATH = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
 /**
@@ -689,7 +695,7 @@ export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
 
 /**
  * DOES THIS WAIT OWE A REASON FOR ITS IDLE POOL SLOTS (point 427)? The decision is
- * pure (`slotReasonDecision`); this gathers the four facts. Anything unreadable ends
+ * pure (`slotReasonDecision`); this gathers its facts. Anything unreadable ends
  * as "no demand" — the lower bound on the pool is worth a nudge, never a wedge.
  */
 export function gatherSlots(
@@ -737,6 +743,11 @@ export function gatherSlots(
   }
 }
 
+/**
+ * Everything the Stop hook needs, gathered. Returns the core's assessment plus
+ * the declaration it judged. Cheap in the common case: with no marker on disk it
+ * returns before any probe runs, so an ordinary turn end pays nothing for this.
+ */
 export function gatherInFlight(
   sid,
   { now = Date.now(), lockPath = LOCK_PATH, env = process.env, includeSlots = true } = {},
@@ -758,7 +769,7 @@ export function gatherInFlight(
     ...probes,
   })
   // Only worth asking for a wait that would otherwise be allowed: a declaration that
-  // is not live blocks anyway, and paying two git calls to explain a block nobody is
+  // is not live blocks anyway, and paying for the census (git calls, file reads) to explain a block nobody is
   // getting would be waste on the Stop hook's path. Callers that only need declaration
   // liveness can omit the slot census too; that census walks the work order and branch
   // diffs, none of which changes whether the declaration itself is live.
@@ -768,7 +779,7 @@ export function gatherInFlight(
 
 /**
  * MAY A DELEGATED AGENT BE REPLACED (point 434 (5))? The decision is pure
- * (`agentOutputVerdict` + `respawnDecision`); this only runs the same three
+ * (`agentOutputVerdict` + `respawnDecision`); this only runs the same
  * probes the declaration uses, so "is it still working" is answered from ONE
  * body of evidence rather than from two that can disagree.
  *
@@ -963,7 +974,7 @@ export function checkDeclaredAgentOutput(declaration, opts = {}) {
  *  null for an unusable name. `origin/<branch>` is the honest reading of
  *  "committed AND PUSHED" without a network round trip: a worktree push updates
  *  it in the shared git dir, and a branch never pushed simply has none. */
-export function checkpointOf(ref, { cwd = REPO_ROOT } = {}) {
+function checkpointOf(ref, { cwd = REPO_ROOT } = {}) {
   const name = String(ref ?? '')
     .trim()
     .replace(/^refs\/heads\//, '')
@@ -1206,7 +1217,7 @@ export function currentHeadOf({ cwd = REPO_ROOT } = {}) {
 }
 
 /** The declaration's evidence, annotated with checkpoints for `assessTransfer`. */
-export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
+function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
   const out = []
   for (const e of Array.isArray(declaration?.evidence) ? declaration.evidence : []) {
     if (e?.kind === 'branch') {
@@ -1584,7 +1595,7 @@ if (isMain) {
   if (reaped.reaped) {
     console.error(
       `batch-in-flight: cleared a declaration whose writing session is gone (pid ${reaped.pid}, ${reaped.reason}). ` +
-        'Nothing was in flight; the file was.',
+        'Work it named (a durable agent, say) may still be running; check it before relying on its absence.',
     )
   }
   const sid = readOwnerLock()?.sessionId ?? ''
@@ -1600,7 +1611,8 @@ if (isMain) {
 
   if (argv[0] === '--handover-check') {
     // May the boundary hand the declared work to a successor (point 675)?
-    // Read-only twin of what `batch-boundary.mjs --prepare/--commit` enforces.
+    // Judges what `batch-boundary.mjs --prepare/--commit` enforces without
+    // writing the transfer (the dead-declaration reap above still applies).
     const t = gatherHandoverTransfer(sid)
     if (t.blocked) {
       console.error(t.message)
@@ -1608,8 +1620,8 @@ if (isMain) {
     }
     console.log(
       t.note
-        ? `TRANSFERABLE — ${t.note}. A boundary commit will mark it transferred; the successor adopts it ` +
-            'with `node scripts/batch-in-flight.mjs --adopt`.'
+        ? `NOT BLOCKED — ${t.note}. A boundary commit marks this session's transferable declaration ` +
+            'transferred; the successor adopts it with `node scripts/batch-in-flight.mjs --adopt`.'
         : 'nothing is declared in flight — the handover is unconstrained.',
     )
     process.exit(0)
@@ -1827,9 +1839,8 @@ if (isMain) {
       )
     }
     // Evidence that cannot go quiet is refused HERE (four-eyes review
-    // 28.07.2026): the repo root is git-active whenever the session runs any git
-    // command, and `main` / this checkout's own branch move on work that is not
-    // the work being waited for. Such a declaration would hold indefinitely AND
+    // 28.07.2026): the repo root, `main` and this checkout's own branch move on
+    // the session's own work, which is not the work being waited for. Such a declaration would hold indefinitely AND
     // silence the launcher's silent-owner report, leaving the session less
     // observed than declaring nothing.
     const selfReferential = selfReferentialEvidence({
@@ -1899,9 +1910,8 @@ if (isMain) {
       // Empty string when not given, so the decision sees "no reason" rather than
       // an absent field it has to interpret (point 427).
       slotsFree: slotsFreeReason,
-      // Absent for today's declarations; present only where a daemon-owned run
-      // was declared adoptable (point 834). Nothing below reads it yet — the
-      // successor tooling of step 8 does.
+      // Present only where a daemon-owned run was declared adoptable (point
+      // 834). Nothing reads it yet.
       ...(durable ? { durable } : {}),
     }
     // Verify NOW, so a typo is caught here and not at a turn end that then blocks
@@ -1919,8 +1929,8 @@ if (isMain) {
     const slots = gatherSlots(declaration)
     if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
     // THE BOARD'S PROMISE MUST NOT AGE UNDER THIS WAIT (point 661): a wait is
-    // this session's licence to produce no turn end for up to an hour, so the
-    // `now-eta-past` audit would sleep exactly that long. Refuse the wait while
+    // this session's licence to produce no turn end for up to `maxAgeMs()`, so
+    // the `now-eta-past` audit would sleep that long. Refuse the wait while
     // a current-work "~HH:MM" already lies in the past — every re-declaration
     // then bounds the staleness. FAIL-OPEN on an unreadable or absent board
     // (html null → no refusal): a broken board must not trap the session.
@@ -1935,9 +1945,7 @@ if (isMain) {
     if (etaRefusal) fail(etaRefusal)
     writeDeclaration(declaration)
     emitDelegated(ACTIVITY_EVENTS.DELEGATED_START, declaration, { at: now })
-    // THE DECLARATION EXTENDS THE LEASE (point 556, and the piece
-    // docs/batch-resilience.md §3 left explicitly unbuilt: "nothing yet WRITES a
-    // longer lease when work is declared"). This is the answer to the incident of
+    // THE DECLARATION EXTENDS THE LEASE (point 556). This is the answer to the incident of
     // 08.08.2026: the house rule tells a session waiting on an agent or a long
     // verification to stay inside ONE long-blocking call, and from in there it can
     // renew nothing — its own lease ages to expiry precisely while it is most
@@ -1952,8 +1960,8 @@ if (isMain) {
     console.log(
       extended
         ? `the batch lease is extended to cover this wait (${leaseHours} h), so one blocking call may run past ` +
-            'the ordinary window without the launcher taking the batch. The extension lasts exactly as long as ' +
-            'the evidence below keeps advancing.'
+            'the ordinary window without the launcher taking the batch. The launcher ends the extension early ' +
+            'the moment the evidence below stops advancing.'
         : 'NOTE: the batch lease could NOT be extended for this wait — a blocking call longer than the ordinary ' +
             'window may lose the batch. Check `node scripts/batch-doctor.mjs`.',
     )

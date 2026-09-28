@@ -14,22 +14,22 @@
 // MERGE-TIME DELETION STAYS THE PRIMARY PATH. A backstop that fires routinely
 // has become the process, which is how this debt accumulated in the first place.
 //
-// Pure and total: every input is plain data, so the Vitest layer
+// Pure: every input is plain data, so the Vitest layer
 // (branch-hygiene-core.test.mjs) can sweep every branch without a git tree.
 
-/** Grace after a branch last moved before its survival counts as debris.
- *  Wide enough that the session which just merged is never blocked by the
- *  branch it is still finishing with, short enough to catch the same turn's
- *  forgetfulness. Calibratable via HOA_BRANCH_GRACE_MIN. */
+/** Grace, measured from a branch's TIP COMMIT date, before its survival counts
+ *  as debris. Wide enough that a session which just committed and merged is not
+ *  blocked by the branch it is still finishing with, short enough to catch the
+ *  same turn's forgetfulness. Calibratable via HOA_BRANCH_GRACE_MIN. */
 export const DEFAULT_GRACE_MS = 10 * 60 * 1000
 
 /** Refs that are never debris, whatever `--merged` says about them. */
 const PROTECTED_REFS = new Set(['main', 'origin/main', 'origin/head', 'head', '@'])
 
-/** `refs/heads/x`, `heads/x` and `x@{0}` all name the same branch here. The
- *  remote prefix is deliberately KEPT (`origin/x` is a different object from
- *  the local `x` and needs its own deletion), so this only strips the
- *  spellings that mean the identical ref. */
+/** `refs/heads/x`, `heads/x` and `x@{0}` all name the same branch here, and
+ *  `refs/remotes/origin/x` becomes `origin/x`. The remote name is deliberately
+ *  KEPT (`origin/x` is a different object from the local `x` and needs its own
+ *  deletion). Names are lowercased, so comparison is case-insensitive. */
 export const normBranch = (r) =>
   String(r ?? '')
     .trim()
@@ -78,9 +78,8 @@ export const isBaselineCheckout = (path, repoRoot) => {
   const p = normPath(path)
   const root = normPath(repoRoot)
   // Either spelling identifies them: under the main tree's `local/`, or by the
-  // directory the verify runner puts them in. The second is the one that still
-  // holds when the guard runs FROM a worktree, where its own root is not the
-  // main tree's.
+  // directory the verify runner puts them in — the second holds whatever root
+  // the caller passes.
   return (root && p.startsWith(`${root}/local/`)) || p.includes('/local/verify-baseline/')
 }
 
@@ -94,21 +93,23 @@ export const isBaselineCheckout = (path, repoRoot) => {
  *                   and it must never propose removing the tree it stands in
  *   graceMs         see DEFAULT_GRACE_MS
  *   readable        false when git could not be questioned → fail-open
- *   localMerged     [{ name, tipAt }]  local branches contained in origin/main
- *   remoteMerged    [{ name, tipAt }]  remote branches contained in origin/main
+ *   localMerged     [{ name, tipAt, tipSha }]  local branches contained in origin/main
+ *   remoteMerged    [{ name, tipAt, tipSha }]  remote branches contained in origin/main
  *                                      (named as git prints them: `origin/x`)
- *   worktrees       [{ path, branch|null, locked, tipAt, mergedHead }]
+ *   worktrees       [{ path, branch|null, locked, tipAt, tipSha, mergedHead }]
  *                   every worktree git knows, `mergedHead` true when its HEAD
  *                   is contained in origin/main (so a DETACHED leftover counts
  *                   too — those were a third of the debris)
  *   inFlightBranches / inFlightPaths
  *                   what a LIVE session has declared it is still working on
+ *   mainTip         origin/main's sha; a ref whose tipSha equals it was just
+ *                   cut and is never debris
  *
  * Returns { block, findings: [{ kind, name, ageMs, command }], reason }.
  *
  * WHY THE GRACE IS MEASURED ON THE TIP COMMIT: the moment a branch became
  * contained in main is not a thing git records cheaply, and this must stay a
- * two-command local probe. The tip date is the honest proxy for the case the
+ * cheap local probe. The tip date is the honest proxy for the case the
  * grace exists for — a session that just merged the branch it committed to
  * minutes ago — while the debris this fires on is hours to weeks old.
  */
@@ -150,8 +151,8 @@ export function assessBranchHygiene({
   const findings = []
 
   // A LIVING worktree protects its branch as well as itself. `locked` is git's
-  // own marker for "an agent is using this tree"; the repo root is the session's
-  // own checkout. Neither may be swept, and neither may their branches be —
+  // own marker for "an agent is using this tree"; repoRoot is the main checkout
+  // and ownPath the tree the guard runs from. None may be swept, and neither may their branches be —
   // git would refuse the branch deletion anyway, so a finding there is noise.
   const protectedByWorktree = new Set()
   const sweepable = []

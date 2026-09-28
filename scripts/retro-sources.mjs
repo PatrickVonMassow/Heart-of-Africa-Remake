@@ -1,14 +1,18 @@
 // Shared fs/git source collector for the retrospective-currency toolchain
-// (retro-refresh.mjs + retro-currency-guard.mjs). BOTH scripts must gather
+// (retro-refresh.mjs + retro-currency-guard.mjs; rule-review-state.mjs borrows
+// defaultMemoryDir). BOTH scripts must gather
 // the sources through this one module, or their fingerprints could disagree
 // and either trap the session in a refresh loop or let staleness through.
 // The pure classification/fingerprint logic lives in retro-core.mjs.
 //
-// Failure contract: a missing memory dir or absent TASKS.md contributes an
-// empty list (a legitimate machine state both sides see identically); a
-// FAILING subprocess (git) THROWS instead of degrading, because a transient
-// git error seen by only one side would fabricate a fingerprint mismatch —
-// the guard wrapper's fail-open catches the throw and allows the stop.
+// Failure contract: an absent TASKS.md contributes an empty point list —
+// archived points included, since both are read only when TASKS.md exists —
+// and an absent archive contributes nothing (legitimate machine states both
+// sides see identically). Two things THROW instead of degrading: a memory dir
+// that yields no memories (never a real state; see collectSources), and a
+// FAILING subprocess (git), because a transient git error seen by only one
+// side would fabricate a fingerprint mismatch. The guard then skips its
+// currency half and still judges the ledger.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { readTasksAll } from './tasks-source.mjs'
 import { execSync } from 'node:child_process'
@@ -36,7 +40,7 @@ export const REPO_ROOT = (() => {
   }
 })()
 
-/** The retrospective document (git-ignored; overridable for the test harness). */
+/** The retrospective document (tracked; overridable for the test harness). */
 export const DOC_PATH =
   process.env.RETRO_DOC_PATH || resolve(REPO_ROOT, 'docs', 'analysis_de', 'retrospektive-zusammenarbeit.md')
 
@@ -53,8 +57,9 @@ export const LEDGER_PATH =
 
 /**
  * The project memory dir under ~/.claude/projects/<munged repo path>/memory.
- * The munging mirrors the harness: every ':' '\' '/' becomes '-', the drive
- * letter is lowercased (C:\Users\... -> c--Users-...).
+ * The munging mirrors the harness: every ':' '\' '/' becomes '-', trailing
+ * dashes are dropped, and the drive letter is lowercased (C:\Users\... ->
+ * c--Users-...).
  */
 export function defaultMemoryDir(repoRoot = REPO_ROOT) {
   const munged = resolve(repoRoot).replace(/[:\\/]/g, '-').replace(/-+$/, '')
@@ -64,7 +69,7 @@ export function defaultMemoryDir(repoRoot = REPO_ROOT) {
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
 
-/** Feedback/project memory entries: [{name, description, hash, escalations}]. */
+/** Memory entries of a MEMORY_TYPES kind: [{name, description, hash, escalations}]. */
 export function collectMemories(memoryDir) {
   if (!memoryDir || !existsSync(memoryDir)) return []
   const out = []
@@ -72,7 +77,7 @@ export function collectMemories(memoryDir) {
     if (!file.endsWith('.md')) continue
     const text = readFileSync(resolve(memoryDir, file), 'utf8')
     const type = parseMemoryType(text)
-    if (!MEMORY_TYPES.has(type)) continue // MEMORY.md index and reference notes stay out
+    if (!MEMORY_TYPES.has(type)) continue // any other kind — the MEMORY.md index, reference notes — stays out
     out.push({
       name: basename(file, '.md'),
       description: parseMemoryDescription(text),
@@ -93,6 +98,7 @@ export function collectSources({
   memoryDir = process.env.RETRO_MEMORY_DIR || defaultMemoryDir(repoRoot),
   scriptsDir = resolve(repoRoot, 'scripts'),
   tasksPath = resolve(repoRoot, 'TASKS.md'),
+  archivePath = resolve(repoRoot, 'docs/tasks-archive.md'),
 } = {}) {
   const memories = collectMemories(memoryDir)
   // A memory directory that resolves to NOTHING is never a real state — the
@@ -103,8 +109,8 @@ export function collectSources({
   // diff review after ~65 rows had already been deleted). Refuse loudly instead.
   if (memories.length === 0) {
     throw new Error(
-      `retro-sources: no memories under ${memoryDir} — refusing to rewrite the appendix from an empty ` +
-        'source. Run this from the MAIN worktree, or set RETRO_MEMORY_DIR to the real directory.',
+      `retro-sources: no memories under ${memoryDir} — refusing to fingerprint an empty source (the ` +
+        'refresh would rewrite the appendix from it). Run this from the MAIN worktree, or set RETRO_MEMORY_DIR to the real directory.',
     )
   }
   const guards = existsSync(scriptsDir) ? guardScriptNames(readdirSync(scriptsDir)) : []
@@ -122,7 +128,7 @@ export function collectSources({
   // open" — the done dimension silently collapsed to zero (found by the
   // four-eyes review, 26.07.2026; exactly the failure tasks-source.mjs warns of).
   const processPoints = existsSync(tasksPath)
-    ? processTaskPoints(readTasksAll(tasksPath, resolve(repoRoot, 'docs/tasks-archive.md')))
+    ? processTaskPoints(readTasksAll(tasksPath, archivePath))
     : []
   return { memories, guards, reverts, processPoints }
 }

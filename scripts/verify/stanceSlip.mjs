@@ -6,20 +6,21 @@
 // the ground, the foot's world position must not move. Its travel is reported as
 // a fraction of the body's own travel.
 //
-// WHY IT IS A SERIES AND NOT A PAIR OF READS. Both of the old sampler's halves
-// were frame-rate dependent, and that is what made the check unable to give the
+// WHY IT IS A SERIES AND NOT A PAIR OF READS. The old sampler was frame-rate
+// dependent, and that is what made the check unable to give the
 // same answer twice on this host (measured 08.08.2026: 0.278, 0.603, 0.727,
 // 0.972 and 1.549 for ONE unchanged scene, against a bar of 0.25):
 //
-//   1. THE WINDOW HAD NO CEILING. It stepped the scene until some animal had
+//   THE WINDOW HAD NO CEILING. It stepped the scene until some animal had
 //      covered 5 % of its stride, one `page.evaluate` per frame — but the scene
 //      keeps drawing during the round trip, so the interval was however far the
 //      animal got between two reads. Under a slow frame the leg lifted, swung
 //      and was PLANTED AGAIN a whole cycle on, and the sampler — which only
 //      asked whether the leg was down at each END — read that replanting as one
-//      enormous slip. The 0.4-stride guard was a proxy for the wrap, and a
+//      enormous slip. The old 0.4-stride guard was a proxy for the wrap, and a
 //      leaky one: a stance carries the body half a stride, so an interval
-//      starting mid-stance wraps well before it.
+//      starting mid-stance wraps well before it. (0.4 survives only as the
+//      coarseness `cap` below, which has a different job.)
 //      FIX: the series is recorded frame by frame INSIDE the page, and an
 //      interval counts only if the leg was down in EVERY frame of it. Then a
 //      wrap is not filtered out — it cannot occur.
@@ -43,8 +44,10 @@ const usable = (p) => !!p && p.stance === true && !!p.foot && typeof p.foot.x ==
  * @param samples  frames in order; each is `{ [id]: { x, z, yaw, stride, stance, foot } }`
  * @param floor    an interval must carry the body this far, in strides — above any
  *                 measurement floor, far below the half-stride a stance lasts
- * @param cap      an interval carrying the body FURTHER than this in one frame step
- *                 is dropped: the run drew too coarsely to resolve a stance at all
+ * @param cap      an interval whose first frame past `floor` already has the body
+ *                 FURTHER than this from its start (one frame step jumped from
+ *                 under the floor to beyond it) is dropped: the run drew too
+ *                 coarsely to resolve a stance at all
  * @param minIntervals how many intervals a verdict needs to mean anything
  */
 export function judgeStanceSlip(samples, { floor = 0.05, cap = 0.4, minIntervals = 3 } = {}) {

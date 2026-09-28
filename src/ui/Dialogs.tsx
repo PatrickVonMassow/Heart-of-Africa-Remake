@@ -1,4 +1,5 @@
-// Trade, bazaar, ferry and camp dialogs (design.md §9/§10). The chief is met
+// Trade, bazaar, ferry and camp dialogs (design.md §9/§10); also routes the
+// drum-message and speech-guess dialogs. The chief is met
 // outside his hut, not in a window (§12). All player-visible text comes from
 // the language files (design.md §17 localization).
 

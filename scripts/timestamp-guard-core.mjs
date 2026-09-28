@@ -1,6 +1,8 @@
 // Pure decision logic of the timestamp Stop-hook guard (timestamp-guard.mjs):
 // every chat reply must BEGIN with the bold Europe/Berlin timestamp in the
-// canonical form "**Donnerstag, 23.07.2026, 09:55**" (chat-timestamp rule).
+// canonical form "**Donnerstag, 23.07.2026, 09:55**" (chat-timestamp rule),
+// followed by the " · Kontext: … Tokens" reading (HEADER_SUFFIX_RE), which is
+// enforced wherever a real reading exists.
 // The soft user-global pair (berlin-timestamp.cjs inject + check-reply-
 // timestamp.cjs nudge) proved insufficient — this core backs the HARD guard
 // that blocks turn-end until the reply carries a current stamp.
@@ -38,9 +40,11 @@ export function berlinStamp(date = new Date()) {
 // Tolerance: a reply composed over a long turn keeps its stamp valid for a
 // while (minute rollover between composing and the Stop check must never
 // false-block), and a small forward skew is tolerated. A stamp outside this
-// window is stale — hours-old or yesterday's stamps always block. The window
-// is built from per-minute ICU stamps, so midnight and DST rollovers are
-// handled by construction (candidate string comparison, no date arithmetic).
+// window is stale — an hours-old stamp always blocks (just after midnight the
+// window still holds the previous date's last minutes). The window is built
+// from per-minute ICU stamps, so midnight and DST rollovers are handled by
+// construction (minute offsets on the epoch, compared as candidate strings,
+// no calendar arithmetic).
 export const MINUTES_BACK = 15
 export const MINUTES_AHEAD = 3
 

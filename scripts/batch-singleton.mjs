@@ -10,12 +10,13 @@
 //      check declared exactly such a session dead and double-spawned (the
 //      incident's root cause). The LEASE answers the opposite question, the one
 //      the night of 29./30.07.2026 lost seven hours to: a process that is alive
-//      but no longer working keeps nothing. Renewal is PreToolUse and expiry is
-//      pure arithmetic — there is no probe, no verdict and no condition at the
-//      acquire door (docs/batch-resilience.md §3, layer 1;
+//      but no longer working keeps nothing. Renewal is PreToolUse; an expired
+//      lease is taken over unless the pid probe and advancing declared work
+//      corroborate the owner (`ownershipVerdict`, scripts/batch-ownership-core.mjs;
 //      scripts/batch-lease-core.mjs).
 //   1a. A FENCE (.claude/batch-fence.json), monotonic and never deleted: every
-//      acquisition takes a number, so a session that was dispossessed can be told
+//      acquisition takes a number where the fence file can be written (an
+//      implicit grant fails open), so a session that was dispossessed can be told
 //      apart from the one that holds the batch now. It cannot live in the lock
 //      file — `acquire` deletes that — and it is enforced at ONE PreToolUse
 //      chokepoint (scripts/board-first-guard.mjs) for the four paths that have no
@@ -34,10 +35,10 @@
 //      verify repo consistency (scripts/batch-doctor.mjs), and the autostart
 //      launcher kills a rogue spawn of its own making.
 //
-// Legacy compatibility: the lock file keeps the old `sessionId`/`claimedAt`
-// fields (claimedAt doubles as the heartbeat), so a not-yet-updated reader
-// still sees a fresh lock as "held". Pure decision logic is dependency-injected
-// and Vitest-covered in scripts/batch-singleton-core.test.mjs.
+// `sessionId` and `claimedAt` (the heartbeat) are the lock's core fields;
+// `readOwnerLock` requires both. Pure decision logic is dependency-injected
+// (here and in batch-lease-core, batch-ownership-core, batch-boundary-core) and
+// Vitest-covered in scripts/batch-singleton-core.test.mjs.
 import {
   appendFileSync,
   readFileSync,
@@ -85,12 +86,11 @@ function emitLockActivity(event, lock, { lockPath = LOCK_PATH, at = Date.now(), 
 }
 
 /**
- * Does a SEALED boundary marker protect the handover for THIS session right now
- * (point 675, defeat 1)? Only a committed marker that is FRESH and the
- * session's own: a stale or foreign one protects nothing (Sol review of
- * 807c2bf, finding 2) — past its freshness the marker cannot authorise a stop
- * anyway, so keeping the handover alive beside resumed work would let the
- * launcher spawn a successor next to a working session.
+ * Does a SEALED boundary protect the handover for THIS session right now
+ * (point 675, defeat 1)? Either a committed marker that is FRESH and the
+ * session's own (a stale or foreign marker protects nothing — Sol review of
+ * 807c2bf, finding 2), or the seal recorded in the lock itself, which has no
+ * clock and outlives the marker (point 1048, below).
  */
 function sealedMarkerHolds(marker, sessionId, now, lock = null) {
   // The freshness test is the boundary core's, so a future-dated marker cannot
@@ -113,12 +113,12 @@ function sealedMarkerHolds(marker, sessionId, now, lock = null) {
 
 // --- Constants (exported for tests and callers) -------------------------------
 
-/** A heartbeat younger than this proves life outright — no pid probe needed,
- *  and a dead-looking pid within this grace is still treated as alive (the
- *  owner may be mid-acquisition or the probe raced a restart). */
+/** The heartbeat grace, kept for tests: the grace itself is applied by
+ *  `ownershipVerdict`'s idle window (`IDLE_WINDOW_MS`), which coincides with
+ *  this value on purpose. */
 export const DEAD_CONFIRM_MS = 5 * 60 * 1000
-/** Legacy locks (no pid recorded) fall back to age-only liveness with this
- *  generous bound (the old STALE_MS). */
+/** Locks without a recorded pid (legacy, or a failed ancestor walk) fall back
+ *  to age-only liveness with this generous bound (the old STALE_MS). */
 export const LEGACY_STALE_MS = 45 * 60 * 1000
 /** One tick of the launcher — the HoA-Batch-Autostart task on Windows, the
  *  scripts/batch-launcher.mjs daemon on Linux. */
@@ -140,7 +140,7 @@ export const HANDOVER_GRACE_MS = 15 * 60 * 1000
  * is what "calibratable" means for a value the batch's own liveness hangs on. A
  * junk or non-positive value reads as the default rather than as "no window".
  */
-export function idleWindow(env = process.env) {
+function idleWindow(env = process.env) {
   const m = Number(env?.HOA_IDLE_WINDOW_MIN)
   return Number.isFinite(m) && m > 0 ? m * 60 * 1000 : IDLE_WINDOW_MS
 }
@@ -152,8 +152,9 @@ export const PARALLEL_FRESH_MS = 10 * 60 * 1000
 export const REAP_MUTEX_STALE_MS = 60 * 1000
 /** A fence writer's atomic write can itself retry for ~0.8 s. A claimant waits
  *  just beyond that bounded window before accepting a genuinely unavailable
- *  grant door and falling back to an unfenced lock. */
-export const FENCE_MUTEX_WAIT_MS = 1000
+ *  grant door: an implicit grant then falls back to an unfenced lock, an
+ *  explicitly requested fence to 'stale-fence'. */
+const FENCE_MUTEX_WAIT_MS = 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
@@ -165,7 +166,9 @@ export const PID_START_TOLERANCE_MS = 2000
 export const SPAWN_IDENTITY_TOLERANCE_MS = 60 * 1000
 
 /**
- * EVERY state file this module writes, derived from ONE lock path. PURE.
+ * The state files beside the lock, derived from ONE lock path. PURE. (The
+ * activity journal, `fence-notice.json` and the mutex directories are derived
+ * from the same directory elsewhere in this module.)
  *
  * A caller that redirects the lock — a test into a temp directory, a sandbox —
  * redirects the whole family with it, and can therefore never reach into the
@@ -189,6 +192,7 @@ export function statePathsFor(lockPath) {
     activityPath: join(dir, 'session-activity.json'),
     alertPath: join(dir, 'parallel-alert.json'),
     doctorStatePath: join(dir, 'doctor-state.json'),
+    // Also holds the batch-writer authority records (noteBatchWriter).
     ancestorCachePath: join(dir, 'session-process.json'),
   }
 }
@@ -210,7 +214,7 @@ export const CLAIM_PATH = DEFAULT_PATHS.claimPath
 /** The fence's own file. NEVER deleted — not by a release, not by a takeover, not
  *  by the doctor. It is the only record that survives `acquire` unlinking the
  *  lock, and losing it is what would let a dispossessed session's writes back in. */
-export const FENCE_PATH = DEFAULT_PATHS.fencePath
+const FENCE_PATH = DEFAULT_PATHS.fencePath
 export const ANCESTOR_CACHE_PATH = DEFAULT_PATHS.ancestorCachePath
 
 // --- Small IO helpers ----------------------------------------------------------
@@ -241,8 +245,9 @@ const readJson = (p) => {
 // PROPAGATES: a heartbeat that did not land must never read as one that did,
 // because `assessOwner` decides liveness on exactly that timestamp, and a run of
 // silently swallowed failures would age a LIVE session toward "provably dead".
-// The one caller that must not be taken down by the throw — the boundary branch
-// of the Stop guard — converts it to data in `markHandover` instead.
+// Callers that must not be taken down by the throw convert it to data
+// themselves (`markHandover` for the Stop guard's boundary branch; the per-call
+// lease writers catch it).
 //
 // The litter of that failure mode is swept up too: fourteen orphaned
 // `.claude/batch-lock.json.tmp-<pid>` files accreted in 76 minutes on
@@ -252,8 +257,8 @@ const readJson = (p) => {
 // --- Pure decision logic (dependency-injected, Vitest-covered) -----------------
 
 /**
- * Assess whether the owner recorded in `lock` is alive. Conservative: only a
- * PROVABLY dead owner frees the lock. Inputs:
+ * Assess whether the owner recorded in `lock` is alive. A lock is freed by a
+ * dead owner, a handover, or a lease that ran out without corroboration. Inputs:
  *   lock  — parsed lock file ({ sessionId, claimedAt, pid?, pidStartedAt?, kind? })
  *   now   — epoch ms
  *   bootTime — epoch ms this machine booted (claude never survives a reboot)
@@ -268,15 +273,14 @@ const readJson = (p) => {
  * to INFER from silence what only the owner can state, and on the night of
  * 29./30.07.2026 all three read a seven-hour standstill as "owner alive". They
  * are gone. What replaces them is the LEASE: the owner says how long it means to
- * keep the batch by writing `leaseUntil` BEFORE each call, and this function only
- * compares that number to the clock. No probing, no evidence, no judgement — a
- * lease that ran out is over even if the process is still breathing (it keeps
- * running; it merely stops owning the batch, and learns that at its next hook).
+ * keep the batch by writing `leaseUntil` BEFORE each call. A lease that ran out
+ * is over unless the pid probe and advancing, output-producing declared work
+ * corroborate the owner (`leaseTakeoverDecision`, point 556); a dispossessed
+ * process keeps running and learns it at its next hook.
  *
  * A LOCK WITHOUT `leaseUntil` IS NOT A SPECIAL CASE and needs no migration: it
- * reads as an implicit lease of `claimedAt + LEASE_MS` (`leaseUntilOf`), which is
- * the same shape the demolished age valve had. The live owner across this change
- * keeps working and writes a real lease at its next tool call.
+ * reads as an implicit lease of `claimedAt + LEASE_MS` (`leaseUntilOf` in
+ * batch-lease-core), the same shape the demolished age valve had.
  *
  * HANDOVER (point 388, revised by point 612): a lock the owner itself marked
  * handed-over reads NOT alive, even while its process still runs, and it does so
@@ -296,8 +300,9 @@ const readJson = (p) => {
  * heartbeat, the boot check, the lease and the idle window — is one decision, and
  * it lives in `ownershipVerdict` (scripts/batch-ownership-core.mjs) so that point
  * 612's idle rule and point 517's lease extension cannot become two competing
- * arithmetics on the same number. This function reads the files and the pid probe
- * and asks that one; only the pid branches below, which ARE probe semantics, stay.
+ * arithmetics on the same number. This function takes the lock and the pid probe
+ * as data and asks that one; only the pid branches below, which ARE probe
+ * semantics, stay.
  */
 export function assessOwner(lock, {
   now,
@@ -328,14 +333,14 @@ export function assessOwner(lock, {
   const kind = lock.kind === 'pending-spawn' ? 'pending-spawn' : 'session'
   const pid = typeof lock.pid === 'number' && lock.pid > 0 ? lock.pid : null
   if (pid === null) {
-    // Legacy lock (claimed before pids were recorded) — the lease above is the
-    // only bound it has, and this shorter one applies to a launcher's pending
-    // spawn that never came up.
+    // Pid-less lock (legacy, or a failed ancestor walk): age-bounded —
+    // PENDING_STALE_MS for a launcher's pending spawn that never came up,
+    // LEGACY_STALE_MS otherwise.
     const stale = kind === 'pending-spawn' ? PENDING_STALE_MS : LEGACY_STALE_MS
     return age <= stale ? { alive: true, reason: 'legacy-fresh' } : { alive: false, reason: 'legacy-stale' }
   }
   if (!probe || probe.exists !== true) {
-    // The owning process no longer exists → provably dead (past the grace).
+    // The owning process no longer exists → provably dead.
     return { alive: false, reason: 'pid-dead' }
   }
   if (
@@ -441,15 +446,15 @@ export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REA
 /**
  * WHAT THE PID PROBE SAYS ABOUT THE LOCK'S OWNER. PURE (the probe is passed in).
  *
- * The same three readings `assessOwner` has always made further down, lifted out
+ * The same three readings `assessOwner`'s pid branches make, lifted out
  * so the lease branch can corroborate with them (point 556) instead of taking the
  * batch before they are ever consulted:
  *   - `identifiable` false — the lock records no pid at all, so nothing can be
  *     asked about the process. That is the "unidentifiable" of the spec.
  *   - `live` false — the process is gone, or the number now belongs to a
  *     DIFFERENT process (`pidStartedAt` disagrees). Pid reuse is death here.
- *   - A missing start time on either side leaves `live` true, exactly as the older
- *     branch below does: it is a weaker answer, but the takeover it feeds also
+ *   - A missing start time on either side leaves `live` true, exactly as
+ *     `assessOwner`'s pid branch does: it is a weaker answer, but the takeover it feeds also
  *     requires the declared work to be advancing, so leniency here cannot on its
  *     own keep a wedged owner alive.
  */
@@ -501,8 +506,9 @@ export function isOwnSpawn({
 }
 
 /** After how many IDENTICAL consecutive verdicts the repetition itself is the
- *  signal (point 433 (c)). Two, i.e. the second identical tick — 30 minutes at the
- *  launcher's cadence — because eight identical lines is what the incident cost. */
+ *  signal (point 433 (c)). Two, i.e. the second identical tick — one launcher
+ *  tick (15 minutes) after the first — because eight identical lines is what the
+ *  incident cost. */
 export const VERDICT_REPEAT_ESCALATE_AT = 2
 
 /**
@@ -562,11 +568,11 @@ export function ownerStateKey(lock, suffix = '') {
  * that exists, and it needs no free lock, which fits the frequency far better.)
  *
  * The repository reserves this prefix for its own probes. That is a namespace
- * contract, not an assumption about the harness's session-id syntax. Three
- * consequences remain useful beyond the general no-restamp invariant:
- * `resolveOwnership` never grants a probe permission to act for the owner,
- * `acquire` refuses it the lock outright, and the classifier below is blind to
- * one on either side.
+ * contract, not an assumption about the harness's session-id syntax. Among the
+ * consequences beyond the general no-restamp invariant: `resolveOwnership` and
+ * `ownsLock` never grant a probe permission to act for the owner, `acquire`
+ * refuses it the lock outright, the writer and process records ignore it, and
+ * the parallel classifier is blind to one on either side.
  */
 export const PROBE_SESSION_PREFIX = 'preflight-'
 
@@ -574,25 +580,6 @@ export function isProbeSessionId(sid) {
   return typeof sid === 'string' && sid.trim().toLowerCase().startsWith(PROBE_SESSION_PREFIX)
 }
 
-/**
- * Parallel-session classifier. A parallel session is a sid that
- *   - started as a TOP-LEVEL session (recorded by the SessionStart hook —
- *     subagents/worktree agents never fire SessionStart, so they can never be
- *     flagged),
- *   - is not the owner,
- *   - has tool activity fresher than PARALLEL_FRESH_MS.
- * Inputs are plain maps: sessionsSeen { sid: firstSeenAt },
- * activity { sid: lastToolAt }.
- *
- * `exclude` names sessions that are second by DESIGN rather than by accident —
- * today exactly one: the window that has CLAIMED the batch through the sanctioned
- * channel (point 395). It is a live top-level session with fresh tool activity, so
- * it matches this classifier exactly, and flagging it would raise a
- * parallel-session alert that blocks the owner's turn end — and the block demands
- * the doctor, which is the one thing the handover then never gets past. A session
- * that announced itself in the open is not the covert second driver this detector
- * was written for.
- */
 const sessionRecord = (value) =>
   value && typeof value === 'object' && !Array.isArray(value) ? value : { seenAt: value }
 
@@ -622,7 +609,7 @@ function sameProcessIncarnation(record, lock) {
 }
 
 /** Does a SessionStart stand-down still describe this exact ownership episode? */
-export function standDownNoteCurrent({ record, owner, claim = null, writer = null } = {}) {
+function standDownNoteCurrent({ record, owner, claim = null, writer = null } = {}) {
   const note = record?.stoodDown
   if (!note || typeof note !== 'object') return false
   if (!sameProcessIncarnation(record, { pid: note.pid, pidStartedAt: note.pidStartedAt })) return false
@@ -635,6 +622,27 @@ export function standDownNoteCurrent({ record, owner, claim = null, writer = nul
   return true
 }
 
+/**
+ * Parallel-session classifier. A parallel session is a sid that
+ *   - started as a TOP-LEVEL session (recorded by the SessionStart hook —
+ *     subagents/worktree agents never fire SessionStart, so they can never be
+ *     flagged),
+ *   - is not the owner, a probe, or the owner's own process incarnation,
+ *   - has no current SessionStart stand-down note,
+ *   - has tool activity fresher than PARALLEL_FRESH_MS.
+ * An invalid owner sid flags nobody. Inputs are plain maps:
+ * sessionsSeen { sid: { seenAt, pid, pidStartedAt, generation, stoodDown } }
+ * (a bare number is the legacy `seenAt`), activity { sid: lastToolAt }.
+ *
+ * `exclude` names sessions that are second by DESIGN rather than by accident —
+ * today exactly one: the window that has CLAIMED the batch through the sanctioned
+ * channel (point 395). It is a live top-level session with fresh tool activity, so
+ * it matches this classifier exactly, and flagging it would raise a
+ * parallel-session alert that blocks the owner's turn end — and the block demands
+ * the doctor, which is the one thing the handover then never gets past. A session
+ * that announced itself in the open is not the covert second driver this detector
+ * was written for.
+ */
 export function classifyParallel({
   sessionsSeen,
   activity,
@@ -705,6 +713,10 @@ export function classifyParallel({
  *                        provably still running (point 388, fifth live finding):
  *                        the turn may end, the lock stays held, nothing is handed
  *                        over. The session is waiting, not idling
+ *   'block-slots-free' — a declared wait while pool slots stand free with an
+ *                        independent queued point and no written reason
+ *   'block-context-handover' — owner past a real context watermark with an
+ *                        armed launcher: hand over (point 675)
  *   'block-continue'   — owner + open points → keep working
  *   'block-format'     — TASKS.md unparseable → warn, never read as complete
  *
@@ -718,7 +730,7 @@ export function progressGuardDecision({
   paused,
   openCount,
   formatSuspect,
-  ownership, // 'mine' | 'held' | 'acquired' | 'lost-race' | 'none'
+  ownership, // acquire()'s result or 'none'; only 'mine' | 'acquired' may drive
   unhandledAlert,
   boundary = null, // { valid, point, reason } | null
   launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
@@ -760,8 +772,8 @@ export function progressGuardDecision({
   // the session to do something it may be unable to do — continue the next queue
   // item while the agent pool is at its cap, or take a boundary while delegated
   // agents are still building (ending would throw their work away). A DECLARED
-  // wait whose evidence a probe still confirms therefore passes both, and only
-  // those two: a parallel-session alert still blocks (remediation cannot wait),
+  // wait whose evidence a probe still confirms therefore passes both while its
+  // work is not transferable (point 675, below), and only those two: a parallel-session alert still blocks (remediation cannot wait),
   // an unarmed launcher still blocks, and a VALID boundary still hands over —
   // there the session already decided it is finished.
   //
@@ -832,7 +844,8 @@ export function cheapProbePid(pid) {
   }
 }
 
-/** Epoch ms the process started, or null. Windows: PowerShell FileTime. */
+/** Epoch ms the process started, or null. Linux: /proc stat start time
+ *  (assumes a 100 Hz clock tick); Windows: PowerShell FileTime. */
 export function processStartTime(pid) {
   if (process.platform !== 'win32') {
     try {
@@ -859,12 +872,15 @@ export function processStartTime(pid) {
   }
 }
 
-/** Find the claude process that owns this hook invocation: walk the parent
- *  chain (hook = node, spawned by a shell, spawned by claude). Returns
- *  { pid, startedAt } or null. Called at ACQUISITION only (one PowerShell
- *  round-trip), never on the per-tool-call heartbeat path. */
+/** How many parent hops `findClaudeAncestor` walks. */
 export const CLAUDE_ANCESTOR_HOPS = 10
 
+/** Find the claude process that owns this hook invocation: walk the parent
+ *  chain (hook = node, spawned by a shell, spawned by claude). Returns
+ *  { pid, startedAt } or null. Costs a PowerShell round trip on Windows, so the
+ *  hot paths reach it only once: acquisition, heartbeat's one-time pid backfill,
+ *  `ourClaudeProcess`'s memo miss, `transitionOwnerSession` and
+ *  `convertPendingSpawn`. */
 export function findClaudeAncestor(opts = {}) {
   const platform = opts.platform ?? process.platform
   const parentPid = opts.parentPid ?? process.ppid
@@ -1051,31 +1067,6 @@ export function withLockWriteMutex(lockPath, fn, { waitMs = 2000 } = {}) {
   }
 }
 
-/**
- * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race' |
- * 'stale-event' | 'stale-fence'.
- *   - 'acquired'  — this session now owns the batch.
- *   - 'mine'      — it already did (heartbeat refreshed).
- *   - 'held'      — a (provably or possibly) live other owner exists. STAND DOWN.
- *   - 'lost-race' — a concurrent starter won. STAND DOWN.
- *   - 'stale-event' — the lock no longer matches the triggering event.
- *   - 'stale-fence' — the explicit generation proposal no longer advances the mark.
- * Options: { kind, pid, pidStartedAt, now, deps } — deps override probes for tests.
- *
- * THERE IS NO `takeWedged` ANY MORE (point 434). A wedged owner used to be a case
- * the caller had to ASK for, having first proved it with a second mechanism; an
- * owner whose lease ran out is simply not alive, so the ordinary door lets the
- * successor in. Everything about the atomicity is unchanged — the takeover runs
- * through the SAME reap mutex and re-reads the lock INSIDE it, so two starters can
- * never both win and a lock that came back to life in the race window (a renewal
- * landed) keeps its owner. Nothing is killed here; the dispossessed process keeps
- * running and stands down at its next hook.
- *
- * EVERY SUCCESSFUL ACQUISITION TAKES A FENCE NUMBER, granted under that same
- * mutex where the takeover path holds it. The number goes into the never-deleted
- * fence file AND onto the lock, which is what lets the mark be re-seeded upward
- * if the fence file is ever lost.
- */
 export function acquisitionExpectationMatches(lock, expected) {
   if (!expected || typeof expected !== 'object') return true
   if (!lock || typeof lock !== 'object') return false
@@ -1086,6 +1077,35 @@ export function acquisitionExpectationMatches(lock, expected) {
   return true
 }
 
+/**
+ * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race' |
+ * 'stale-event' | 'stale-fence' | 'probe' | 'invalid'.
+ *   - 'acquired'  — this session now owns the batch.
+ *   - 'mine'      — it already did (heartbeat refreshed).
+ *   - 'held'      — a (provably or possibly) live other owner exists. STAND DOWN.
+ *   - 'lost-race' — a concurrent starter won. STAND DOWN.
+ *   - 'stale-event' — the lock no longer matches the triggering event.
+ *   - 'stale-fence' — the explicit generation proposal no longer advances the mark.
+ *   - 'probe' / 'invalid' — the session id may never own the batch.
+ * Options (flat): kind, pid, pidStartedAt, now, lockPath, fencePath, leaseMs,
+ * work, expected, requestedFence, extra, sweep; bootTime, probePidFn and
+ * findAncestorFn override the probes for tests.
+ *
+ * THERE IS NO `takeWedged` ANY MORE (point 434). A wedged owner used to be a case
+ * the caller had to ASK for, having first proved it with a second mechanism; an
+ * owner `assessOwner` reads as not alive (dead, handed over, or an uncorroborated
+ * expired lease) lets the successor in through the ordinary door. Everything about the atomicity is unchanged — the takeover runs
+ * through the SAME reap mutex and re-reads the lock INSIDE it, so two starters can
+ * never both win and a lock that came back to life in the race window (a renewal
+ * landed) keeps its owner. Nothing is killed here; the dispossessed process keeps
+ * running and stands down at its next hook.
+ *
+ * A SUCCESSFUL ACQUISITION TAKES A FENCE NUMBER where the fence file can be
+ * written (an implicit grant fails open; a requested one returns 'stale-fence'),
+ * granted under that same mutex where the takeover path holds it. The number goes into the never-deleted
+ * fence file AND onto the lock, which is what lets the mark be re-seeded upward
+ * if the fence file is ever lost.
+ */
 export function acquire(sessionId, opts = {}) {
   if (!sessionId) return 'held'
   // A PROBE IS NOT A SESSION (point 434 (8)): it may never own the batch. See
@@ -1102,7 +1122,7 @@ export function acquire(sessionId, opts = {}) {
   }
   const fencePath = opts.fencePath ?? statePathsFor(lockPath).fencePath
   // The fence the OUTGOING lock carried, if any: the seed that keeps the mark from
-  // falling if the fence file was lost (see `nextFence`). Read before the create,
+  // falling if the fence file was lost (see `fenceClaimDecision`). Read before the create,
   // because the create is what replaces the lock it comes from.
   let priorFence = null
   // WHOM THIS ACQUISITION TOOK THE BATCH FROM, and why (point 556). Set only on
@@ -1117,7 +1137,7 @@ export function acquire(sessionId, opts = {}) {
       sessionId,
       kind: opts.kind ?? 'session',
       startedAt: now,
-      claimedAt: now, // legacy heartbeat field
+      claimedAt: now, // the heartbeat
       acquiredAt: now,
       // The lease starts full: the acquiring session owns the batch for one whole
       // window before it has to say anything, which is what a booting session
@@ -1293,7 +1313,7 @@ export function fenceNoticePath(lockPath = LOCK_PATH) {
 /** How many sessions the notice ledger remembers. Bounded because the file is
  *  never deleted; past it the oldest reads as "never told", which costs one
  *  repeated notice and nothing else. */
-export const FENCE_NOTICE_HISTORY = 8
+const FENCE_NOTICE_HISTORY = 8
 
 /** Which fence number this session was last told about. 0 = never told.
  *  A MAP, NOT ONE RECORD (four-eyes review, finding 4): two fenced-out sessions
@@ -1335,10 +1355,9 @@ export function recordFenceNotice(sessionId, fence, opts = {}) {
  * Grant the next fence number to `sessionId`. Returns the number, or null when it
  * could not be recorded.
  *
- * Called ONLY from `acquire`/`convertPendingSpawn`, and there only by the winner
- * of the exclusive create — which is what serialises it: at most one process at a
- * time holds the lock this grant belongs to, and the takeover path additionally
- * holds the reap mutex. Monotonic and max-wins (`nextFence`, `grantedFenceState`),
+ * Called ONLY from `acquire` (by the winner of the exclusive create) and
+ * `convertPendingSpawn` (under the reap mutex), and serialised by its own
+ * `.claiming` mutex. Monotonic and max-wins (`fenceClaimDecision`, `grantedFenceState`),
  * seeded from the outgoing lock's own copy so that losing the file cannot walk the
  * mark backwards.
  *
@@ -1387,7 +1406,7 @@ export function grantFence(sessionId, opts = {}) {
  * Owner-guarded exactly like `heartbeat`, refused under a stale fence, and rate-
  * limited to one write per `LEASE_RENEW_INTERVAL_MS` — this file is on the
  * per-tool-call path and has a measured history of losing renames when it is
- * written too often (see the note above `readJson`).
+ * written too often (see the note below `readJson`).
  *
  * Returns { renewed, reason, leaseUntil }. Never throws.
  */
@@ -1420,17 +1439,14 @@ export function renewLease(sessionId, opts = {}) {
 
 /**
  * EXTEND the lease beyond the ordinary window, for work that is declared to take
- * longer than one. This is the ONLY way a long wait may keep the batch: the reader
- * side compares numbers and asks no questions, so work that needs more time says
- * so IN ADVANCE by writing a later `leaseUntil` (docs/batch-resilience.md §3 —
- * "declared work extends the lease by writing a longer leaseUntil when it is
- * declared, and the acquirer only compares numbers").
+ * longer than one. Work that needs more time says so IN ADVANCE by writing a
+ * later `leaseUntil` (docs/batch-resilience.md §3); past it, only corroborating
+ * evidence keeps the batch (`ownershipVerdict`).
  *
  * Owner-guarded, and it only ever moves the lease FORWARD.
  *
  * WIRED TO THE DECLARATION SINCE POINT 556. `batch-in-flight.mjs --waiting-on` is
- * now this function's caller, which is what docs/batch-resilience.md §3 left as
- * "not built here, and deliberately". With `declaredWait: true` the extension also
+ * this function's caller. With `declaredWait: true` the extension also
  * RECORDS itself on the lock as `{ at, until }`, and that record is what keeps the
  * window honest: `declaredWaitStale` lets the launcher — the one reader holding the
  * evidence — end the extension early when the declared work stops moving, so a
@@ -1481,10 +1497,10 @@ export function heartbeat(sessionId, opts = {}) {
   const lock = readOwnerLock(lockPath)
   if (!lock || lock.sessionId !== sessionId) return false
   const now = opts.now ?? Date.now()
-  // A heartbeat is proof the session is WORKING, so it withdraws a handover
-  // outright rather than only outdating it. The comparison in assessOwner would
-  // do the same, but an explicit delete also survives a clock stepped backwards
-  // (four-eyes review, finding 1) and leaves an honest lock file behind.
+  // A heartbeat is proof the session is WORKING, so it withdraws a handover by
+  // deleting it — the only way one is withdrawn, since assessOwner no longer
+  // compares timestamps (point 612). The delete also survives a clock stepped
+  // backwards (four-eyes review, finding 1).
   //
   // …UNLESS the work was part of ENDING (live finding 2, 28.07.2026): the Stop
   // chain routinely sends a session back for a timestamp, a review record or a
@@ -1492,8 +1508,7 @@ export function heartbeat(sessionId, opts = {}) {
   // silently un-took the handover — `HANDOVER point 378` at 08:56:12, `WITHDRAWN
   // point 378` at 08:56:16. The caller decides (handoverSurvivesCall in
   // batch-boundary-core.mjs); here the handover is carried forward by moving
-  // handedOverAt WITH claimedAt, so `claimedAt <= handedOverAt` still holds and
-  // nothing else in assessOwner needs to know about the exception.
+  // handedOverAt WITH claimedAt.
   //
   // …AND UNLESS THE CALL PREDATES THE HANDOVER (point 396, measured in
   // `.claude/boundary.log`): the Stop chain writes the handover while the
@@ -1513,9 +1528,9 @@ export function heartbeat(sessionId, opts = {}) {
     // A SEALED (committed) boundary marker carries the handover through EVERY
     // later hook (point 675, defeat 1): post-commit mutations are denied loudly
     // at PreToolUse, and the reads that do run must not un-take the flag the
-    // launcher spawns on. Bound to freshness and to THIS session (Sol review of
-    // 807c2bf, finding 2) — a stale or foreign marker carries nothing. Only
-    // read when a handover actually stands, so the hot path pays nothing.
+    // launcher spawns on. A fresh marker of THIS session, or the lock's own
+    // seal (see `sealedMarkerHolds`), carries it. Only read when a handover
+    // actually stands, so the hot path pays nothing.
     let sealed = false
     try {
       sealed = sealedMarkerHolds(readJson(statePathsFor(lockPath).boundaryPath), sessionId, now, lock)
@@ -1557,9 +1572,9 @@ export function updateOwnLock(sessionId, patch, lockPath = LOCK_PATH) {
 }
 
 /** A failed ancestor walk is remembered this long before it is retried — the
- *  walk costs a PowerShell round trip and a session's ancestry does not change,
- *  so asking once per session id is the whole budget. */
-export const ANCESTOR_RETRY_MS = 10 * 60 * 1000
+ *  walk costs a PowerShell round trip, so a miss is asked at most once per
+ *  window per session id. */
+const ANCESTOR_RETRY_MS = 10 * 60 * 1000
 
 /**
  * The claude process THIS session runs under, memoised per session id. The walk
@@ -1584,7 +1599,7 @@ export function ourClaudeProcess(sessionId, opts = {}) {
       }
     }
   } catch {
-    cache = null // unreadable cache → walk, but do not try to write it back
+    cache = null // a throwing probe → walk, but do not write back (an unreadable file reads as {})
   }
   const anc = (opts.findAncestorFn ?? findClaudeAncestor)()
   // A probe gets the same ANSWER and leaves no record (point 434 (8)): a synthetic
@@ -1750,7 +1765,6 @@ export function ownsLock(sessionId, opts = {}) {
   // The id shortcut below is this function's OWN — it does not pass through
   // `resolveOwnership`, so the probe rule has to be repeated here or a lock left
   // NAMING a probe would be ownable by that probe (four-eyes re-check, the nit).
-  // Symmetry with `heldByOtherLiveOwner`, which already answers false for one.
   if (isProbeSessionId(sessionId)) return { mine: false, via: 'probe-id', lock }
   if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', lock }
   if (opts.processIdentity === false || !sessionId) return { mine: false, via: 'session-id-mismatch', lock }
@@ -1898,17 +1912,11 @@ export function ownerSessionTear({ sessionId, lock, ancestor } = {}) {
   }
 }
 
-export function isOwner(sessionId, lockPath = LOCK_PATH) {
-  if (!sessionId) return false
-  const lock = readOwnerLock(lockPath)
-  return !!lock && lock.sessionId === sessionId
-}
-
 /**
  * The guards' stand-down predicate: true when ANOTHER session owns a live
  * lock — then this session must not be pushed to (or allowed to) drive the
  * batch. False when the lock is free/dead/mine (the progress-guard may then
- * acquire). Conservative on errors: an unreadable state reads as held.
+ * acquire). An unreadable lock reads as free; a thrown error reads as held.
  */
 export function heldByOtherLiveOwner(sessionId, opts = {}) {
   try {
@@ -1954,29 +1962,6 @@ export function release(sessionId, lockPath = LOCK_PATH) {
   return false
 }
 
-/**
- * HAND THE BATCH OVER (point 388). Marks the lock "the owner is finished" so the
- * launcher's next tick spawns the successor instead of reading a live owner — the
- * decoupling that cost five and a half idle hours on the night of 28.07.2026,
- * when a session ended its TURN at a permitted boundary but kept its PROCESS (and
- * therefore the lock) alive.
- *
- * It is deliberately NOT a release: the lock keeps naming this session and pid, so
- * the state stays inspectable and `heartbeat()` still belongs to this session
- * alone. `claimedAt` is NOT bumped — the comparison in assessOwner is what lets a
- * session that keeps working withdraw its own handover.
- *
- * Owner-guarded and no-op otherwise, and it must only ever be called where a
- * VALID boundary has been established (scripts/batch-progress-guard.mjs).
- *
- * It REPORTS rather than throws — `{ handed, reason, attempts, error }` — and
- * that is the whole point of the shape (live finding 1, 28.07.2026). It used to
- * throw an EPERM straight through the guard into its fail-open catch, so the stop
- * proceeded, the marker had already been consumed and nothing recorded that the
- * batch had NOT been passed on. This is the ONE place where the propagating write
- * of point 340 is converted to data, because its single caller must allow the
- * stop while telling the session the truth about it.
- */
 /** The head the boundary was committed from. Best effort: a seal without a ref
  *  is still a seal, and no bookkeeping read may fail a handover. */
 function currentHeadForSeal(lockPath) {
@@ -1990,6 +1975,29 @@ function currentHeadForSeal(lockPath) {
   }
 }
 
+/**
+ * HAND THE BATCH OVER (point 388). Marks the lock "the owner is finished" so the
+ * launcher's next tick spawns the successor instead of reading a live owner — the
+ * decoupling that cost five and a half idle hours on the night of 28.07.2026,
+ * when a session ended its TURN at a permitted boundary but kept its PROCESS (and
+ * therefore the lock) alive.
+ *
+ * It is deliberately NOT a release: the lock keeps naming this session and pid, so
+ * the state stays inspectable and `heartbeat()` still belongs to this session
+ * alone. `claimedAt` is NOT bumped; a session that keeps working withdraws its
+ * own handover by deleting it (`heartbeat`, `withdrawHandover`).
+ *
+ * Owner-guarded and no-op otherwise. Called at a valid point boundary, at the
+ * context boundary, and for the ordinary Stop-side handover.
+ *
+ * It REPORTS rather than throws — `{ handed, reason, attempts, error }` — and
+ * that is the whole point of the shape (live finding 1, 28.07.2026). It used to
+ * throw an EPERM straight through the guard into its fail-open catch, so the stop
+ * proceeded, the marker had already been consumed and nothing recorded that the
+ * batch had NOT been passed on. The propagating write of point 340 is converted
+ * to data here because the Stop-side caller must allow the stop while telling the
+ * session the truth about it.
+ */
 export function markHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
@@ -2046,8 +2054,8 @@ export function markHandover(sessionId, opts = {}) {
 }
 
 /**
- * A handover younger than this is never withdrawn (point 396). Calibratable via
- * HOA_HANDOVER_SETTLE_MS.
+ * Without a call timestamp, a handover younger than this is never withdrawn
+ * (point 396). Calibratable via HOA_HANDOVER_SETTLE_MS.
  *
  * ONE SECOND, because the thing being excluded is not a fast session but a LATE
  * HOOK. Two of the ten boundary attempts on the morning of 28.07.2026 were
@@ -2087,17 +2095,6 @@ export function withdrawalIsCausal({
   return now - handedOverAt >= settleMs
 }
 
-/**
- * WITHDRAW a handover — the session is demonstrably still working after all.
- * Owner-guarded, so it is a no-op once a successor has claimed the lock (by then
- * the old session is stood down by ownership anyway).
- *
- * This exists because the Stop chain does not end at batch-progress-guard:
- * sixteen guards run after it and several can block, and the session's first act
- * after such a block may be a single 40-minute tool call, during which no
- * heartbeat lands (four-eyes review, finding 1). Calling this from a PreToolUse
- * hook closes that window BEFORE the long call starts.
- */
 /** The boundary marker beside a lock, or null — for callers (the PreToolUse
  *  gate) that must judge a sealed boundary without importing the boundary CLI's
  *  whole dependency set. */
@@ -2105,6 +2102,17 @@ export function readBoundaryMarker(lockPath = LOCK_PATH) {
   return readJson(statePathsFor(lockPath).boundaryPath)
 }
 
+/**
+ * WITHDRAW a handover — the session is demonstrably still working after all.
+ * Owner-guarded, so it is a no-op once a successor has claimed the lock (by then
+ * the old session is stood down by ownership anyway).
+ *
+ * This exists because the Stop chain does not end at batch-progress-guard:
+ * further guards run after it and several can block, and the session's first act
+ * after such a block may be a single 40-minute tool call, during which no
+ * heartbeat lands (four-eyes review, finding 1). Calling this from a PreToolUse
+ * hook closes that window BEFORE the long call starts.
+ */
 export function withdrawHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
@@ -2113,8 +2121,8 @@ export function withdrawHandover(sessionId, opts = {}) {
   // consumed by the stop it authorised, so a Stop guard that sent the session
   // back to work left it with no marker and the next turn was met with "TAKE THE
   // POINT BOUNDARY" again — a loop. It now survives its own use, which makes
-  // THIS the one place a boundary ends: real work withdraws it, closing work
-  // does not. Removed even when no handover flag is set, so a marker recorded
+  // THIS the one place real work ends a boundary (SessionEnd's
+  // `clearOwnBoundary` retires the session's own marker); closing work does not. Removed even when no handover flag is set, so a marker recorded
   // and then followed by real work is withdrawn just the same.
   const boundaryPath = opts.boundaryPath ?? statePathsFor(lockPath).boundaryPath
   const now = opts.now ?? Date.now()
@@ -2128,8 +2136,7 @@ export function withdrawHandover(sessionId, opts = {}) {
   // (`sealedBoundaryDeny`), and only the deliberate `--clear` (or the user's own
   // prompt, `force`) withdraws. Without this, the seal would deny a mutation and
   // this withdrawal would still eat the marker for the call that was denied.
-  const sealNow = opts.now ?? Date.now()
-  if (sealedMarkerHolds(marker, sessionId, sealNow, lock) && opts.force !== true) {
+  if (sealedMarkerHolds(marker, sessionId, now, lock) && opts.force !== true) {
     // THE MUTATION ESCALATES, IT DOES NOT WITHDRAW (point 1048, union entry
     // U19). The seal stands, the triggering call is recorded against it, and
     // from the second one the log says so loudly instead of leaving the reader
@@ -2146,7 +2153,7 @@ export function withdrawHandover(sessionId, opts = {}) {
     try {
       appendFileSync(
         opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,
-        `[${new Date(sealNow).toISOString()}] ${escalation.alert ? 'SEALED BOUNDARY MUTATED AGAIN' : 'SEALED MARKER KEPT'} for ` +
+        `[${new Date(now).toISOString()}] ${escalation.alert ? 'SEALED BOUNDARY MUTATED AGAIN' : 'SEALED MARKER KEPT'} for ` +
           `${what} by ${sessionId} — a post-commit call (${opts.trigger ?? 'unrecorded'}) does not withdraw a ` +
           `committed boundary; only \`batch-boundary.mjs --clear\` or the user's own prompt does.` +
           (escalation.keep ? ` Mutation ${escalation.mutations} since the commit.` : '') +
@@ -2165,7 +2172,7 @@ export function withdrawHandover(sessionId, opts = {}) {
           {
             ...lock,
             handedOver: true,
-            handedOverAt: sealNow,
+            handedOverAt: now,
             boundarySeal: { ...lock.boundarySeal, mutations: escalation.mutations },
           },
           opts,
@@ -2214,8 +2221,8 @@ export function withdrawHandover(sessionId, opts = {}) {
   delete next.boundarySeal
   writeJsonAtomic(lockPath, next, opts)
   // Recorded beside the handover it cancels: without this line, a launcher tick
-  // that finds a live owner past the grace cannot be told apart from one whose
-  // handover was legitimately taken back, and the acceptance evidence would be
+  // that finds a live owner no longer handed over cannot be told apart from one
+  // whose handover was legitimately taken back, and the acceptance evidence would be
   // ambiguous exactly where it matters (four-eyes review). The log is a SIBLING
   // of the lock, never the repo default, so a redirected lock redirects it too.
   try {
@@ -2250,10 +2257,9 @@ export function clearOwnBoundary(sessionId, opts = {}) {
 }
 
 /** How stale a handover may get before a closing-set tool call refreshes it.
- *  Throttles the write: the boundary's grace is a quarter of an hour wide, so
- *  moving the stamp once a minute is ample, and every avoided write is one fewer
- *  chance for the rename to lose (points 340/388). */
-export const HANDOVER_TOUCH_MS = 60 * 1000
+ *  Throttles the write: every avoided write is one fewer chance for the rename
+ *  to lose (points 340/388). */
+const HANDOVER_TOUCH_MS = 60 * 1000
 
 /**
  * CARRY a handover forward across work that is part of ENDING the batch (live
@@ -2261,8 +2267,9 @@ export const HANDOVER_TOUCH_MS = 60 * 1000
  * throttled — it only rewrites the lock when the stamp has gone stale.
  *
  * It exists for the window `heartbeat` cannot cover: a PreToolUse hook runs
- * BEFORE the call, and a closing-set call could otherwise sit through the whole
- * grace with an ageing stamp before its PostToolUse heartbeat refreshes it.
+ * BEFORE the call, so it keeps `handedOverAt` current across closing-set calls.
+ * The handover no longer ages out (it frees ownership at once), so the stamp's
+ * only reader is the causality test of `withdrawalIsCausal`.
  */
 export function touchHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
@@ -2279,8 +2286,9 @@ export function touchHandover(sessionId, opts = {}) {
 /**
  * Convert a launcher 'pending-spawn' lock to this (just-spawned) session.
  * Succeeds only when the lock is pending AND names this session's claude
- * process (spawnedPid == our claude ancestor) or a fresh one-shot authorization
- * exists. Atomic via the same reap mutex. Returns true on success.
+ * process (spawnedPid == our claude ancestor) or the caller vouches for a fresh
+ * one-shot authorization (`opts.authorized`). Atomic via the same reap mutex.
+ * Returns true on success.
  */
 export function convertPendingSpawn(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
@@ -2459,7 +2467,7 @@ export function detectParallel(ownerSid, opts = {}) {
   })
 }
 
-/** Raise/read/clear the parallel alert the owner's Stop guard surfaces. */
+/** Raise/read/mark handled the parallel alert the owner's Stop guard surfaces. */
 export function raiseParallelAlert(info, opts = {}) {
   try {
     writeJsonAtomic(opts.path ?? PARALLEL_ALERT_PATH, { at: Date.now(), ...info })

@@ -3,7 +3,8 @@
 // The reasoning, and why this cannot overrule a guard, is in permission-autogrant-core.mjs.
 //
 // Fail-open by construction: every error path exits 0 with no output, which leaves the
-// decision to the harness (it asks). A broken hook costs a prompt, never a silent grant.
+// decision to the harness (it asks; a non-interactive `-p` session denies). A broken hook
+// costs a prompt or a denial, never a silent grant.
 
 import { decide, render } from './permission-autogrant-core.mjs'
 

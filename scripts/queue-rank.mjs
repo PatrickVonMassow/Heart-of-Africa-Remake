@@ -1,8 +1,10 @@
-// THE APPEND GATE (point 590) — an appended point is ranked ONCE, deliberately.
+// THE APPEND GATE (point 590) AND THE RELEASE BOUNDARY (point 789) — the CLI.
+// An appended point is ranked deliberately; a machine-filed point stands before
+// the release only with a recorded reason.
 //
-//   node scripts/queue-rank.mjs --status                          # what is still unranked
+//   node scripts/queue-rank.mjs --status                          # what is unranked, and the release front
 //   node scripts/queue-rank.mjs --ranked <N> --why "<one line>"   # last IS right, and why
-//   node scripts/queue-rank.mjs --ranked <N> --origin user --why …# the USER ranked it there
+//   node scripts/queue-rank.mjs --ahead <N> --origin user --why … # the USER put it before the release
 //   node scripts/queue-rank.mjs --ahead <N> --why "<one line>"    # it stands BEFORE the release, and why
 //   node scripts/queue-rank.mjs --seed --why "<one line>"         # arm: what stands today is judged
 //   node scripts/queue-rank.mjs --seed-boundary --why "<one line>" # arm: freeze the front of the order
@@ -20,9 +22,11 @@
 // the open set as it stood when the order was last settled — never off the
 // numbers or the positions (see queue-rank-core.mjs). This command therefore does
 // two things on every write: it records the decision, and, once NOTHING is
-// outstanding, it advances that baseline to today's order.
+// outstanding, it advances that baseline to today's order (while a question
+// stands or the release boundary is breached, the baseline and the frozen front
+// only shrink to what is still open).
 //
-// THE RECORD IS TRACKED, not runtime state: both halves are repository history,
+// THE RECORD IS TRACKED, not runtime state: all three parts are repository history,
 // and a clone that inherited nothing would re-ask about every point ever appended.
 // Decisions about points that are no longer open are dropped on every write — the
 // archive keeps the history, this file keeps the live judgments.
@@ -61,8 +65,8 @@ const RECORD = repoPath(RANK_RECORD_PATH)
  * while this command is LOUD and refuses to act — writing would replace every
  * decision the file holds with the one being made.
  */
-export function readRankRecord(path = RECORD) {
-  const record = parseRankRecord(existsSync(path) ? readFileSync(path, 'utf8') : null)
+function readRankRecord() {
+  const record = parseRankRecord(existsSync(RECORD) ? readFileSync(RECORD, 'utf8') : null)
   // The refusal names the source that HAS a readable copy, established the same
   // way the arming refusal establishes it — a fixed `git checkout HEAD` is wrong
   // wherever HEAD holds no copy, or holds the damage itself (ninth pass).
@@ -76,18 +80,17 @@ export function readRankRecord(path = RECORD) {
  * the order in the same write; one that leaves another question standing does
  * not, or the point still in question would be swallowed into the baseline.
  */
-function writeRankRecord(record, open, tasksMd = '', path = RECORD) {
+function writeRankRecord(record, open, tasksMd) {
   // The ticks matter only where the open order is empty — see settleRecord — and
   // that is also the only case worth reading the whole archive for.
   const closed = open.length ? [] : closedPointsOf(readTasksAll())
   // The release boundary freezes the baseline exactly as an unranked append does
-  // (point 789), and it has to be applied HERE as well as in the guard: this
-  // command writes the record too, and a settle from either side would remember
-  // the breaching point as a survivor and end the question by forgetting it.
+  // (point 789), applied HERE as well as in the guard because this command
+  // writes the record too.
   const blocked = releaseBoundaryProblemFrom(tasksMd, record).breaches.map((b) => b.point)
   const settled = settleRecord(open, record, { at: new Date().toISOString(), closed, blocked })
   const next = settled.changed ? settled.record : pruneRankRecord(record, open)
-  writeTextAtomic(path, `${JSON.stringify(next, null, 2)}\n`)
+  writeTextAtomic(RECORD, `${JSON.stringify(next, null, 2)}\n`)
   return next
 }
 
@@ -108,9 +111,8 @@ const runGit = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf
  * one leaves the caller in the refusal (cross-vendor review, sixth pass).
  *
  * IT FAILS CLOSED. Where git says nothing usable — not installed, not a
- * repository, a broken index — the answer is "carried". The one legitimate
- * arming happens before the record is ever committed, so refusing wrongly costs a
- * message that names the restore, while allowing wrongly is the hole itself.
+ * repository, a broken index — the answer is "carried". Refusing wrongly costs a
+ * message naming the state to inspect, while allowing wrongly is the hole itself.
  */
 export function recordProvenance(path = RANK_RECORD_PATH, git = runGit) {
   // Fail CLOSED on tracking — refusing wrongly costs a message, allowing wrongly
@@ -135,8 +137,7 @@ export function recordProvenance(path = RANK_RECORD_PATH, git = runGit) {
     const indexStage = match ? Number(match[1]) : null
     const history = git(['rev-list', '-n', '1', 'HEAD', '--', path])
     // git said nothing usable — not installed, not a repository, a broken index.
-    // The one legitimate arming happens before the record is ever committed, so
-    // refusing wrongly costs a message naming the state, while allowing wrongly
+    // Refusing wrongly costs a message naming the state, while allowing wrongly
     // is the hole itself.
     if (!inHead && indexStage === null && history.status !== 0) return failClosed
     const removedIn = String(history.stdout ?? '').trim()
@@ -157,21 +158,23 @@ export function recordProvenance(path = RANK_RECORD_PATH, git = runGit) {
  * Put the freshly armed record under git at once.
  *
  * THE ARMING WINDOW IS THE LAST REMOVAL ROUTE (cross-vendor review, seventh
- * pass). `--seed` is refused on a record the repository carries, which leaves
+ * pass). `--seed` is refused on a record the repository carries but the
+ * checkout is missing, which leaves
  * exactly one moment where removing the file still reads as "a checkout that
  * never had a baseline": between the first arming and the commit that tracks it.
  * Append a point in that window, delete the record, seed again, and the
  * outstanding question is settled by the collective reason after all. Staging the
- * record closes that window in the same command that opens it — the record is a
+ * record narrows that window in the same command that opens it (only the commit
+ * closes it, which the command then asks for) — the record is a
  * TRACKED artefact by design, and an armed one sitting outside git is the
  * anomaly. AND IT IS PART OF THE ARMING, NOT AN AFTERTHOUGHT (cross-vendor
  * review, eighth pass): a warning that the staging failed left the record armed
  * but untracked, which is the escape itself. A staging that fails therefore UNDOES
  * the write and refuses, so the checkout is exactly as it was before.
  */
-function stageRecord(path = RANK_RECORD_PATH) {
+function stageRecord() {
   try {
-    const added = runGit(['add', '--', path])
+    const added = runGit(['add', '--', RANK_RECORD_PATH])
     return added.status === 0 ? '' : String(added.stderr ?? '').trim() || `git add exited ${added.status}`
   } catch (e) {
     return (e && e.message) || 'git add could not be run'
@@ -180,12 +183,13 @@ function stageRecord(path = RANK_RECORD_PATH) {
 
 /** Put the checkout back as it was before an arming that could not be made
  *  durable — the previous bytes, or no file where there was none. */
-function undoWrite(before, path = RECORD) {
-  if (before === null) rmSync(path, { force: true })
-  else writeTextAtomic(path, before)
+function undoWrite(before) {
+  if (before === null) rmSync(RECORD, { force: true })
+  else writeTextAtomic(RECORD, before)
 }
 
-/** The flags this command DISPATCHES on. Exactly one of them, exactly once. */
+/** The flags this command DISPATCHES on. At most one of them, at most once;
+ *  none is the status read. */
 export const ACTION_FLAGS = Object.freeze(['--status', '--ranked', '--ahead', '--seed', '--seed-boundary'])
 
 /** The flags that carry a value. Repeating one is the same silent loss: only the
@@ -306,7 +310,7 @@ if (isMainModule(import.meta.url)) {
       const headRecord = runGit(['cat-file', '-p', `HEAD:${RANK_RECORD_PATH}`])
       if (headRecord.status !== 0 || !parseRankRecord(String(headRecord.stdout ?? '')).boundary) {
         console.log(
-          `  COMMIT ${RANK_RECORD_PATH} NOW. Until the repository carries this freeze, restoring the version in ` +
+          `  COMMIT ${RANK_RECORD_PATH} NOW. Until a commit carries this freeze, restoring the version in ` +
             'HEAD gives back a record that reads as never armed, and the next arming would grandfather whatever ' +
             'stands in front of the release then.',
         )
@@ -317,7 +321,7 @@ if (isMainModule(import.meta.url)) {
       // cloned) checkout does not owe an answer for history nobody in the
       // session judged. Every point appended afterwards is decided individually,
       // and `seedRecord` refuses an already armed record — and a record the
-      // repository still carries — so this can never be the shortcut out of an
+      // repository carries but the checkout is missing — so this can never be the shortcut out of an
       // outstanding question, by re-seeding or by removal.
       const before = existsSync(RECORD) ? readFileSync(RECORD, 'utf8') : null
       const next = writeRankRecord(
@@ -348,8 +352,9 @@ if (isMainModule(import.meta.url)) {
       // so the command says so instead of leaving it to be discovered.
       if (runGit(['cat-file', '-e', `HEAD:${RANK_RECORD_PATH}`]).status !== 0) {
         console.log(
-          `  COMMIT ${RANK_RECORD_PATH} NOW. Until the repository carries it, this arming is only staged, and ` +
-            'nothing that reads the checkout later can tell its removal from a baseline that never existed.',
+          `  COMMIT ${RANK_RECORD_PATH} NOW. Until a commit carries it, this arming is only staged, and once ` +
+            'it is unstaged and removed, nothing that reads the checkout later can tell that from a baseline ' +
+            'that never existed.',
         )
       }
     } else {

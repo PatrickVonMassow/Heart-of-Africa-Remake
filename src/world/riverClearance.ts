@@ -4,9 +4,10 @@
 // footprint clears the (calibratable) band. Deterministic (pure river geometry)
 // and bounded; an anchor already clear returns unchanged after one query.
 //
-// Its own dependency-free module because three callers need it and the import
-// chain forbids sharing it through any of them: data/landmarks.ts → terrain.ts
-// → geo.ts is an init-time chain, so geo.ts cannot import from landmarks.ts.
+// Its own module (depending only on hydro.ts) because data/landmarks.ts and
+// data/gizaPlateau.ts both need it and the import chain forbids sharing it
+// through either: data/landmarks.ts → terrain.ts → geo.ts is an init-time
+// chain. geo.ts keeps its own range-2 variant (clearedOfRivers).
 
 import { riverDistanceExact } from './hydro'
 

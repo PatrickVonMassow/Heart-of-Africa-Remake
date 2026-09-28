@@ -1,39 +1,19 @@
-// Cold-weather dress of the settlement inhabitants (design.md §19.13, TASKS
-// point 120g). Pure: a people plus a coldness gives the cloak worn over the
-// everyday dress, or none.
+// Seasonal dress of the settlement inhabitants (design.md §19.13, TASKS point
+// 120g). Pure: a people plus this frame's seasonal drivers (coldness, the
+// harmattan, the karif — systems/season.ts) gives the wrap worn over the
+// everyday dress, and how it sits, or none.
 //
 // This module is deliberately NARROW, and that is the finding, not a shortcut.
-// `docs/peoples-1890.md` §2.6 asked exactly this question — "does the same
-// person wear more in the cold?" — and the answer is yes for ONE of the game's
-// peoples, from a period source, and evidence-absent for the rest:
-//
-//  * Zulu — YES, and directly. Franz Mayr (Anthropos 2(4), 1907; PERIOD) on the
-//    isipuku ox-hide cloak: "greased and worn by day in cold weather as a cloak
-//    by males and females. During the night this cloak served as sleeping
-//    blanket." And: "On journeys or in cold weather women, like men, protect
-//    themselves with blankets which take the place of the… skins formerly used
-//    as cloaks." The cloak is ADDED OVER the everyday dress — the same figure,
-//    visibly more.
-//  * Tuareg, Sahel peoples (Hausa, Bambara, Mandinka) — NO. The research is
-//    explicit: "Sahel harmattan: EVIDENCE ABSENT — do not invent", and the only
-//    seasonal Tuareg claims found were 20th-century tourism copy. CLAUDE §2
-//    forbids inventing design content, so they get nothing.
-//  * San — the fur kaross as a cold-weather covering is reported, but from
-//    TERTIARY sources only; the research marks the seasonal claim THIN.
-//  * Ethiopian highlands (Sidama) — the principle is supported by Parkyns
-//    (PERIOD: the poor wrapped in a single sheet "by day and by night"), but no
-//    period account of kiremt-season dress was found, and the gabi-for-cold-
-//    months detail is modern and thin.
-//  * Basotho — period-correct blanket, but the game HAS no Basotho village and
-//    the research warns outright: "Lesotho is not Zululand." The Pedi are a
-//    different people; extending Mayr or the blanket to them would be exactly
-//    the extrapolation §2.6 warns against.
-//
-// The structural inference the research does allow — that dress here is cloaks
-// and wraps, so the honest seasonal signal is often HOW a garment is worn
-// rather than how many are worn — is not modelled: at the figures' primitive
-// fidelity a differently-drawn wrap would not read. Recorded as open in
-// design.md §19.13 rather than faked.
+// `docs/peoples-1890.md` §2.6/§7 asked "does the same person wear more in the
+// cold?", and only six of the game's peoples have a PERIOD source for a
+// seasonal garment — Zulu (Mayr), Tuareg and Hausa (Barth), San (Passarge),
+// Wayeyi (Andersson) and Somali (Swayne); SEASONAL_DRESS below records each
+// with its source and any inference. Every other people wears the same dress
+// all year: the research found no period evidence, and CLAUDE §2 forbids
+// inventing it. Some rules are rank-gated, and some change HOW a garment is
+// worn (`wear`: over the shoulders or drawn over the head) rather than add one.
+// The Basotho blanket belongs to a people the game does not have ("Lesotho is
+// not Zululand") and is not extended to the Pedi.
 
 import { COLD_DRESS_THRESHOLD } from './season'
 
@@ -65,8 +45,8 @@ const HAUSA_ZENNE = ['#e6e2d6', '#2a2a2e', '#26355c'] as const
 
 /**
  * The San ‡nau — a rectangular leather cloak (Passarge, p. 34), the same object
- * whether it hangs from one shoulder or closes over both. One tanned-hide tone,
- * because the CONFIGURATION is the season here, not the colour.
+ * whether it hangs from one shoulder or closes over both. Two close tanned-hide
+ * tones, because the CONFIGURATION is the season here, not the colour.
  */
 const SAN_NAU = ['#6b5136', '#7d6242'] as const
 
@@ -80,10 +60,10 @@ const WAYEYI_CAROSS = ['#8a7355', '#6d5a42'] as const
 const SOMALI_TOBE = ['#e8e4d8', '#a85a35'] as const
 
 /** Which driver a people's seasonal dress answers to (see systems/season.ts). */
-export type DressDriver = 'coldness' | 'harmattan' | 'karif'
+type DressDriver = 'coldness' | 'harmattan' | 'karif'
 
 /** How the wrap sits when the season calls for it. */
-export type DressWear = 'shoulders' | 'head'
+type DressWear = 'shoulders' | 'head'
 
 export interface SeasonalDress {
   /** The wrap's colours; pick per figure with `cloakForCloth`. */
@@ -112,7 +92,7 @@ interface DressRule extends SeasonalDress {
  * two are a garment already on the body being worn DIFFERENTLY.
  */
 const SEASONAL_DRESS: Record<string, DressRule> = {
-  // Mayr 1907, PERIOD, the one unambiguous case: the isipuku ox-hide cloak,
+  // Mayr 1907, PERIOD, the clearest cold-weather cloak: the isipuku ox-hide cloak,
   // "greased and worn by day in cold weather as a cloak by males and females".
   zulu: { driver: 'coldness', cloaks: ZULU_COLD_CLOAKS, rankOnly: false, wear: 'shoulders' },
   // Barth, PERIOD. INFERRED that it is seasonal rather than merely occasional —
@@ -144,7 +124,7 @@ const SEASONAL_DRESS: Record<string, DressRule> = {
 }
 
 /** This frame's seasonal drivers at a place (from systems/season.ts). */
-export interface DressDrivers {
+interface DressDrivers {
   coldness: number
   harmattan: number
   karif: number
@@ -156,11 +136,9 @@ export interface DressDrivers {
  *
  * Null is the answer for most of the roster, and it is a FINDING rather than a
  * gap — the peoples the research found no period evidence for stay bare however
- * cold their ground gets. The named traps: "Sahel harmattan: EVIDENCE ABSENT —
- * do not invent"; the Tuareg seasonal claims found were 20th-century tourism
- * copy; the Basotho blanket belongs to a people the game does not have ("Lesotho
- * is not Zululand"), so it never reaches the Pedi — whose village sits at 853 m
- * and has no frost to dress against anyway.
+ * cold their ground gets. The Basotho blanket belongs to a people the game does
+ * not have ("Lesotho is not Zululand"), so it never reaches the Pedi — whose
+ * village sits at 853 m and has no frost to dress against anyway.
  */
 export function seasonalDressFor(peopleId: string, d: DressDrivers): SeasonalDress | null {
   const rule = SEASONAL_DRESS[peopleId]

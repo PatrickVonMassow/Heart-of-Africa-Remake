@@ -21,12 +21,13 @@
 //        [--doc-impact-file <path>] [--open-questions-file <path>] \
 //        [--bundle "<German name>"] [--refs "<…>"] [--rev <sha>]
 //   --once with --request deduplicates by exact normalized title in every state.
-//   node scripts/finding.mjs --requests                    list what was deposited
+//   node scripts/finding.mjs --requests                    list pending requests
 //   node scripts/finding.mjs --show "<title substring>"    the full spec to append
 //   node scripts/finding.mjs --queued "<title>" --point <N>
 //   node scripts/finding.mjs --blocked "<title>" --why "<reason>"
+//   Writing forms take [--session <id>] to stamp the entry's session.
 //
-// EVERY LONG FIELD GOES IN AS A FILE, not as an argument: a final-state spec on
+// EVERY LONG REQUEST FIELD GOES IN AS A FILE, not as an argument: a final-state spec on
 // a PowerShell command line hits the quoting rules and the ~32K limit, and its
 // umlauts do not survive the shell. `--<field>` still takes a short ASCII text.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -65,10 +66,10 @@ metadata:
   type: project
 ---
 
-Every entry below was found during work and has NOT yet reached \`TASKS.md\`.
+Every entry below was found during work and is carried into \`TASKS.md\`.
 \`- [ ]\` still waits, \`- [x]\` has landed. Written by \`scripts/finding.mjs\`;
-the Stop guard \`findings-guard.mjs\` refuses a turn end while the batch owner
-leaves an entry here.
+the Stop guard \`findings-guard.mjs\` holds the batch owner to carrying the
+waiting entries in.
 
 A \`[request]\` entry is a FINISHED spec deposited by a window the user talked
 to but which did not hold the batch. The owner appends it to \`TASKS.md\`
@@ -133,7 +134,7 @@ function field(name) {
   return flag(`--${name}`) ?? ''
 }
 
-/** The revision the spec was cut from — asked of git, never of the caller. */
+/** The revision the spec was cut from — asked of git unless the caller passes --rev. */
 function headRevision() {
   try {
     return execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
@@ -378,7 +379,7 @@ if (!has('--drain') && !has('--requests')) {
   console.log('usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]')
   console.log('       node scripts/finding.mjs --none "<why this turn found nothing>"')
   console.log('       node scripts/finding.mjs --drain | --drained "<title>"')
-  console.log('       node scripts/finding.mjs --request "<title>" --spec-file <path> --why-file <path> […]')
+  console.log('       node scripts/finding.mjs --request "<title>" --spec-file <path> --why-file <path> [--once] […]')
   console.log('       node scripts/finding.mjs --requests | --show "<title>"')
   console.log('       node scripts/finding.mjs --queued "<title>" --point <N> | --blocked "<title>" --why "<reason>"')
 }

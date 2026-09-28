@@ -1,10 +1,14 @@
-// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@aa7f5b05
+// THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@aa7f5b05
+//
+// Astra (OpenAI, codex) is the default; `author-fable.mjs` drives the same core
+// with its own trailer, runtime, author model and command name.
 //
 // `scripts/review-astra.mjs` and `scripts/ask-astra.mjs` send Astra work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its
 // own worktree, committed step by step. Claude then reviews it, runs the suites,
 // judges the picture and lands it — the role swap of CLAUDE.md §6, which keeps
-// two vendors on every point and lets neither review itself.
+// two vendors on a point wherever both are reachable and lets neither review
+// itself (the outage fallback in astra-share-core is the named exception).
 //
 // TWO THINGS ARE DIFFERENT FROM THE READ-ONLY PATHS, and both are load-bearing:
 //
@@ -24,8 +28,9 @@
 //
 // 2. NOTHING IS TAKEN ON TRUST AFTERWARDS. The read-only paths refuse to record
 //    an answer nobody gave; this one refuses to report work nobody did. What
-//    counts is what is IN GIT — the commits that appeared, their trailers, the
-//    tree left behind — never what the run said about itself (`judgeAuthoring`).
+//    DELIVERS is what is IN GIT — the commits that appeared, their trailers, the
+//    tree left behind. The run's own account (its GATES line) can only mark the
+//    run unclean, never make it clean (`judgeAuthoring`).
 //
 // Side-effect free: the spawn, the git work and the push belong to
 // scripts/author-astra.mjs. Pinned by author-astra-core.test.mjs.
@@ -41,7 +46,7 @@ export { ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT }
  *  so the `commit-msg` gate and the serving-model tripwire both accept it. */
 export const ASTRA_TRAILER = allowedTrailers().find((t) => /astra/i.test(t)) ?? ''
 
-export const AUTHOR_COMPLETION_SUBJECT = 'Complete the authored changes'
+const AUTHOR_COMPLETION_SUBJECT = 'Complete the authored changes'
 
 /**
  * Build the two messages the wrapper is allowed to create.
@@ -139,8 +144,8 @@ export const KILL_GRACE_MS = 20_000
  * segments are matched WHOLE, so `GIT_AUTHOR_NAME` survives while `SSH_AUTH_SOCK`
  * does not.
  */
-export const SENSITIVE_ENV =
-  /(?:^|_)(TOKENS?|SECRETS?|PASSWORDS?|PASSWD|CREDENTIALS?|PAT|KEYS?|AUTH|ASKPASS|COOKIE|SESSION|JWT|NETRC|KUBECONFIG)(?:_|$)|API_?KEYS?|DATABASE_URL|CONNECTION_STRING|PGPASS|PGSERVICEFILE|NETRC|KUBECONFIG|_PWD$/i
+const SENSITIVE_ENV =
+  /(?:^|_)(TOKENS?|SECRETS?|PASSWORDS?|PASSWD|CREDENTIALS?|PAT|KEYS?|AUTH|ASKPASS|COOKIE|SESSION|JWT)(?:_|$)|API_?KEYS?|DATABASE_URL|CONNECTION_STRING|PGPASS|PGSERVICEFILE|NETRC|KUBECONFIG|_PWD$/i
 
 /**
  * …and the whole `GIT_CONFIG_*` family goes together, whatever it is called.
@@ -152,7 +157,7 @@ export const SENSITIVE_ENV =
  * worktree has no business inheriting: the fixture suites drop them for exactly
  * that reason.
  */
-export const GIT_CONFIG_ENV = /^GIT_CONFIG/i
+const GIT_CONFIG_ENV = /^GIT_CONFIG/i
 
 /** Is this variable withheld from the authoring child? */
 export function isWithheldEnv(key) {
@@ -247,10 +252,11 @@ export function readinessProblems({
   return problems
 }
 
-/** The house rules the authoring prompt states, one per line. Exported so the
- *  test pins them: a rule that quietly falls out of the prompt is a rule the
- *  lane stops following, and nothing else would notice. */
-export const houseRulesFor = (trailer = ASTRA_TRAILER) => Object.freeze([
+/** The house rules the authoring prompt states, one per line, for a lane's
+ *  trailer. HOUSE_RULES (the default-trailer copy) is exported so the test pins
+ *  them: a rule that quietly falls out of the prompt is a rule the lane stops
+ *  following, and nothing else would notice. */
+const houseRulesFor = (trailer = ASTRA_TRAILER) => Object.freeze([
   `Every commit ends with the trailer \`${trailer}\` — it is the ONLY machine-readable`,
   '  record of who authored it, and a commit without it is REFUSED by a git hook.',
   'COMMIT AT EVERY SELF-CONTAINED STEP, not at the end. An uncommitted tree is the one state',
@@ -351,10 +357,8 @@ export function buildAuthoringPrompt({
 }
 
 /**
- * The non-authoring step at the round that used to precede Fable escalation.
- * It outlives that escalation's suspension (20.08.2026): the pause was always
- * the point, and the lane change only followed it. It gives the
- * other vendor the point text, the generated brief and every recorded finding
+ * The non-authoring step at SPEC_EXAMINATION_ROUND, the round before automatic
+ * Fable escalation (author-routing-core.mjs). It gives the other vendor the point text, the generated brief and every recorded finding
  * in one read, and asks for the only two outcomes the ledger accepts.
  */
 export function buildSpecExaminationPrompt({
@@ -403,7 +407,7 @@ const NEGATED = /\b(?:without|no|zero|0)\s+(?:errors?|failures?|warnings?|findin
 /** A word that says a gate actually PASSED. Demanded, because the absence of a
  *  complaint is not a pass: `test:unit, build and lint all exited 1` carries no
  *  blacklisted word at all and was accepted (fourth cross-vendor round). */
-const GREEN = /\b(green|pass(?:ed|es|ing)?|ok|okay|clean|success(?:ful)?|error-free|no findings|zero findings)\b/i
+const GREEN = /\b(green|pass(?:ed|es|ing)?|ok|okay|clean|success(?:ful)?|error-free)\b/i
 
 /** The three gates the house rules demand, each of which must be NAMED. A line
  *  naming one and staying silent about the others reported a clean run for two
@@ -435,14 +439,15 @@ export function gatesProblem(gates) {
   if (missing.length) return `it does not say what ${missing.join(' and ')} did`
   const whole = line.replace(NEGATED, ' ')
   if (NOT_GREEN.test(whole)) return 'it reports a gate as anything but green'
-  // Only `;` and a newline separate CLAUSES: a comma is how one clause lists
-  // several gates ("test:unit, build and lint all green").
+  // `;`, a newline and a spaced ` · ` separate CLAUSES: a comma is how one
+  // clause lists several gates ("test:unit, build and lint all green").
   for (const part of whole.split(/[;\n]|(?:\s+·\s+)/)) {
     const clause = part.trim()
     if (!clause || !GATE_NAMES.some(({ re }) => re.test(clause))) continue
     if (!GREEN.test(clause)) return `"${clause}" names a gate without saying it passed`
   }
-  return GREEN.test(whole) ? '' : 'it never says the gates PASSED — an absent complaint is not a green run'
+  // Every gate is named, so at least one clause named one and carried GREEN.
+  return ''
 }
 
 /** The closing lines of an authoring answer, read off the END of the message.
@@ -497,28 +502,15 @@ export function parseAuthoringAnswer(text) {
 }
 
 /**
- * WHAT ACTUALLY HAPPENED, judged from git rather than from the run's own account.
+ * Does this trailer name `model` as the author — the PARSED model name, never
+ * the raw line?
  *
- * `commits` are the ones that appeared on the branch, newest first, each
- * `{ sha, subject, trailers }`. The run's message is an input, never the
- * verdict: a model that reports success while having committed nothing is the
- * exact failure this lane must not paper over, and a stalled run that DID commit
- * is worth keeping rather than throwing away.
+ * The raw line carries the address, and an allowlisted commit by another model
+ * whose e-mail happens to contain the lane model's name (cross-vendor review of
+ * point 667, P1: `<build@sol.example>` under the lane's former name) counted,
+ * read off the raw text, as this lane's own work.
  */
-/**
- * Does this trailer name ASTRA as the author — the PARSED model name, never the
- * raw line?
- *
- * The raw line carries the address, and `Claude Opus 5 <build@sol.example>` is
- * an allowlisted commit by another model whose e-mail happens to contain the
- * word (cross-vendor review of point 667, P1). Read off the raw text it counted
- * as this lane's own work.
- */
-export function namesSolAsAuthor(trailers) {
-  return namesModelAsAuthor(trailers, ASTRA_MODEL_NAME)
-}
-
-export function namesModelAsAuthor(trailers, model) {
+function namesModelAsAuthor(trailers, model) {
   return modelNamesIn(trailers).some((name) => sameModel(name, model))
 }
 
@@ -544,6 +536,15 @@ export function uncommittedSummary({ dirty = '', numstat = '' } = {}) {
   return { changedPaths, measuredPaths, binaryPaths, insertions, deletions }
 }
 
+/**
+ * WHAT ACTUALLY HAPPENED, judged from git rather than from the run's own account.
+ *
+ * `commits` are the ones that appeared on the branch, newest first, each
+ * `{ sha, subject, trailers }`. The run's message is an input, never the
+ * verdict: a model that reports success while having committed nothing is the
+ * exact failure this lane must not paper over, and a stalled run that DID commit
+ * is worth keeping rather than throwing away.
+ */
 export function judgeAuthoring({
   outcome = {},
   commits = [],

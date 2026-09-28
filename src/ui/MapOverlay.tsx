@@ -3,9 +3,10 @@
 // the conventions of engraved 1890s atlases (George Philip, Johnston): a
 // graticule with degree labels inside a piano-key border, blue water ink
 // (rivers, lakes, coastal hatching) against sepia land ink, hachure marks for
-// sighted mountains, each region's name ONCE in spaced capitals across its
-// heartland, a title cartouche with a scale bar — all on worn paper (folds,
-// stains, darkened corners) under the fog of war that exploration clears.
+// explored mountains (named once sighted), each region's name ONCE in spaced
+// capitals across its heartland, a title cartouche and a scale bar, and a fog
+// of war that exploration clears — all on worn paper (folds, stains, darkened
+// corners laid over everything at low alpha).
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useGame, exploreCellKey, EXPLORE_CELL_DEG } from '../state/store'
@@ -187,7 +188,7 @@ export function MapOverlay() {
       for (let i = 0; i < last; i++) {
         const [ax, ay] = points[i]
         const [bx, by] = points[(i + 1) % n]
-        // A segment is drawn once its midpoint area has been explored.
+        // A segment is drawn once its start point or midpoint area has been explored.
         const mx = (ax + bx) / 2
         const my = (ay + by) / 2
         if (!(isExplored(ax, ay) || isExplored(mx, my))) {
@@ -218,7 +219,7 @@ export function MapOverlay() {
     for (const poly of LAND_POLYGONS) drawPolyline(poly.points, true, 1.8, 0.9)
 
     // --- Hachure clusters for explored mountains (period relief drawing);
-    // sighted ones (design.md §17.2) carry their name in small italics.
+    // names of sighted ones (design.md §17.2) are lettered further down.
     ctx.strokeStyle = INK
     ctx.lineWidth = 0.9
     for (let mi = 0; mi < MOUNTAINS.length; mi++) {
@@ -413,7 +414,8 @@ export function MapOverlay() {
     }
     ctx.globalAlpha = 1
 
-    // Visited places with symbol and name (ports: square, villages: hut).
+    // Visited places with symbol and name (ports: square, villages: filled
+    // triangle, monuments: outlined pyramid).
     ctx.font = '11px Georgia, serif'
     ctx.fillStyle = INK
     ctx.textAlign = 'left'
@@ -641,7 +643,7 @@ export function MapOverlay() {
       ctx.fillRect(cxr - 90, cyr - 90, 180, 180)
     }
     ctx.globalAlpha = 1
-  }, [open, explored, visitedPlaces, landmarksSeen, freeCamps, pos, t])
+  }, [open, explored, visitedPlaces, landmarksSeen, freeCamps, t])
 
   if (!open) return null
   if (placeId) return <PlacePlan placeId={placeId} />
@@ -673,14 +675,6 @@ export function MapOverlay() {
 }
 
 /**
- * Settlement plan (design.md §6.1/§19.11 point 79): inside a place the map
- * shows a plan of the town instead of the continental atlas — the walkable
- * area with every functional (enterable) building marked and named, the
- * dwellings as unlabelled blocks and the lanes as light strokes, in the same
- * worn-paper ink style. Pure SVG over the deterministic layout, so it needs
- * no canvas and is fully assertable in jsdom.
- */
-/**
  * The water beyond the bank, for the settlement plan (work-order 482): the
  * half-plane past the waterline, drawn far enough out that the plan's own
  * square clips it — the atlas convention for a river running off the sheet.
@@ -698,6 +692,14 @@ function riverPath(bank: PlaceRiverBank, sx: (v: number) => number, S: number): 
   return `M ${pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L ')} Z`
 }
 
+/**
+ * Settlement plan (design.md §6.1/§19.11 point 79): inside a place the map
+ * shows a plan of the town instead of the continental atlas — the walkable
+ * area with every functional (enterable) building marked and named, the
+ * dwellings as unlabelled blocks and the lanes as light strokes, in the same
+ * worn-paper ink style. Pure SVG over the deterministic layout, so it needs
+ * no canvas and is fully assertable in jsdom.
+ */
 function PlacePlan({ placeId }: { placeId: string }) {
   const t = useStrings()
   const seed = useGame((s) => s.seed)

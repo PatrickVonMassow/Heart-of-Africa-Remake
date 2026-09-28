@@ -34,7 +34,7 @@ export const GROUND_DISC_OVERHANG = 14
 export const BACKDROP_DISC_OVERLAP = GROUND_DISC_OVERHANG - BACKDROP_INNER_OFFSET
 // How far the inner rim tucks below the settlement ground disc, so the rim is
 // hidden under the disc rather than joining it flush.
-export const BACKDROP_RIM_DROP = 2
+const BACKDROP_RIM_DROP = 2
 
 // --- How far a walkable disc may reach (point 390) ---------------------------
 
@@ -87,7 +87,8 @@ export function groundDiscSegments(discEdge: number): number {
 }
 
 /** Inner-rim fade-in (0 at r0 → 1 past the taper band) as a pure function of
- * the radius, shared by the mesh build and `backdropHeightAt`. */
+ * the radius, shared through `backdropSurfaceY` by the mesh build and
+ * `backdropHeightAt`. */
 export function backdropTaper(r: number, r0: number): number {
   const t = Math.log(Math.max(r, r0) / r0) / Math.log(BACKDROP_OUTER / r0)
   return Math.min(1, t / BACKDROP_TAPER_SPAN)
@@ -95,7 +96,8 @@ export function backdropTaper(r: number, r0: number): number {
 
 /**
  * Vertical base offset of the backdrop surface (before the relief term), a pure
- * function of the radius shared by the mesh build and `backdropHeightAt`.
+ * function of the radius shared through `backdropSurfaceY` by the mesh build
+ * and `backdropHeightAt`.
  *
  * The rim tucks `BACKDROP_RIM_DROP` below the settlement ground disc at r0 (so it
  * hides under the disc) and feathers UP to the disc plane (0) across the disc
@@ -191,13 +193,13 @@ export function backdropHeightAt(
  * Height at which the eye's line over the settlement's GROUND-DISC EDGE passes
  * the point (x, z) — the drawn ground line in that direction (point 181).
  *
- * The walkable disc is the nearest hard horizon from eye height: past its edge
- * the backdrop relief can dip out of sight (a plain like Cairo's dips below the
- * disc plane), and through that gap the far panorama band shows. A silhouette
- * anchored above this line therefore stands on nothing at all — the surface
- * behind its feet is the band cylinder, tens of units further out, and it hangs
- * in the sky over whatever the band happens to show there (the reported Cairo
- * pyramid). Anchored ON the line, its feet meet the last drawn ground.
+ * The walkable disc is the nearest hard horizon from eye height. Where drawn
+ * ground dips out of sight past it, the far panorama band shows through, and a
+ * silhouette anchored above this line stands on nothing at all — it hangs in
+ * the sky over whatever the band shows there (the reported Cairo pyramid).
+ * Since `backdropSurfaceY` clamps the backdrop past the edge to the disc plane
+ * or above, the line now lies at or below that ground for any point outside
+ * the disc; it remains the lower bound of `panoramaStandY`.
  *
  * Camera-relative on purpose: the disc edge is CLOSE, so its horizon drops
  * steeply as the player walks toward it. Evaluated from the live camera, the
@@ -234,8 +236,9 @@ export function discHorizonY(
  * left the animal hanging over the captured band (nothing under its feet), while
  * the bare heightfield buried it inside a dune where the relief rises and, with
  * the old `panoramaGroundY` clamp, lifted it off the ground again where the
- * relief dips. On a dune it now walks the ridge; on a plain that falls away it
- * stands exactly on the visible ground line.
+ * relief dips. On a dune it now walks the ridge; the drawn ground line is the
+ * floor under it, which the clamped backdrop past the disc edge already meets
+ * or exceeds.
  */
 export function panoramaStandY(
   x: number,

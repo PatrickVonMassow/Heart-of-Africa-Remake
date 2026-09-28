@@ -3,7 +3,8 @@
 // The Vitest layer proves the DECISION (scripts/batch-pause-core.test.mjs); this
 // proves the WIRING: that the real launcher tick — `node scripts/batch-autostart.mjs`,
 // the same process, the same code path, the same classification — parks on a clock
-// that is still running and RESUMES the batch the moment it runs out.
+// that is still running and, the moment it runs out, reaches the verdict that
+// resumes the batch (the resuming branch itself does not run here; see below).
 //
 // It parks with a SIXTY-SECOND clock and waits it out on the real wall clock, so
 // what the drill measures is the mechanism and not a mocked "now".
@@ -74,7 +75,7 @@ try {
   check(parked.parksTheTick === true, 'and parks — no session is started')
   check(parked.reason.startsWith('restart-clock drill:'), 'the reason survives into the verdict')
 
-  // 2. THE CLOCK RUNS OUT — the next tick resumes the batch.
+  // 2. THE CLOCK RUNS OUT — the next tick's verdict is the one that resumes the batch.
   const waitMs = FAST ? 0 : Math.max(0, parkedAt + CLOCK_MS - Date.now()) + 1500
   if (FAST) {
     // --fast re-parks with a clock that has already run out. The mechanism is the
@@ -121,4 +122,4 @@ if (failures.length) {
   console.error(`\nDRILL FAILED (${failures.length}): ${failures.join('; ')}`)
   process.exit(1)
 }
-console.log('\nDRILL PASSED — the live tick resumes a spent clock and sends an ambiguous marker to typed recovery.')
+console.log('\nDRILL PASSED — the live tick reads a spent clock as retry and sends an ambiguous marker to typed recovery.')

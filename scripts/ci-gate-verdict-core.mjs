@@ -11,15 +11,15 @@
 // repository-side switch for that mail: it follows the run's CONCLUSION, so the
 // only way to stop it is that a routine branch run never concludes in failure.
 //
-// Hence the split this module decides: on a `feat/**` PUSH every step of the job
-// is `continue-on-error`, the run concludes green, and the true result is
-// carried by the run summary, the `::error` annotations, the commit status on
-// the pushed sha and the ntfy alert. On `main` — the deployed branch — nothing
-// changes: the steps stay hard, the run goes red, and the mail goes out.
+// Hence the split this module decides: on a `feat/**` PUSH every step of the two
+// test shards and of the aggregate `gate` job is `continue-on-error`, the run
+// concludes green, and the true result is carried by the run summary, the
+// `::error` annotations, the commit status on the pushed sha and the ntfy alert.
+// On `main` — the deployed branch — the steps stay hard, the aggregate verdict
+// step fails a red or incomplete run itself, and the mail goes out.
 //
-// Never throws: a verdict that crashed would fail the very step whose whole
-// purpose is that nothing fails, so every entry point is total (`fail-open` in
-// the direction of "report less", never "fail the job").
+// The helpers below are total (`fail-open` in the direction of "report less");
+// `verdict` expects an object or undefined.
 
 import { PROTECTED_REF } from './pre-push-gate-core.mjs'
 
@@ -80,7 +80,8 @@ export function parseOutcomes(text) {
 
 /** Combine the two CI shards, requiring every gate step to have passed.
  * Missing output (for example a job timeout) must never become a green status.
- * Keep this stricter contract local to sharding: legacy callers still use the
+ * Keep this stricter contract local to sharding: the plain `GATE_OUTCOMES`
+ * list (the gate job's own steps, or a run without `GATE_SHARDS`) keeps the
  * original verdict semantics for superseded runs and steps that did not run. */
 export function shardOutcomes(outputs) {
   const required = ['checkout', 'node', 'install', 'build', 'lint', 'audit', 'unit']
@@ -99,7 +100,8 @@ export function shardOutcomes(outputs) {
 /**
  * The whole verdict for one run.
  * @returns {{soft:boolean, mails:boolean, failed:string[], failedSteps:string,
- *            ok:boolean, ref:string, outcomes:{step:string,outcome:string}[]}}
+ *            ok:boolean, ref:string, protectedRef:boolean,
+ *            outcomes:{step:string,outcome:string}[]}}
  */
 export function verdict({ event, ref, outcomes } = {}) {
   const list = Array.isArray(outcomes) ? outcomes : parseOutcomes(outcomes)
@@ -109,7 +111,7 @@ export function verdict({ event, ref, outcomes } = {}) {
     ref: String(ref ?? ''),
     protectedRef: String(ref ?? '') === PROTECTED_REF,
     soft,
-    mails: !soft && failed.length > 0,
+    mails: mailsOnFailure({ event, ref }) && failed.length > 0,
     failed,
     failedSteps: failed.join(', '),
     ok: failed.length === 0,
@@ -149,7 +151,7 @@ export function renderSummary(v, { runUrl = '' } = {}) {
         'This is a routine `feat/**` push. Its run deliberately cannot conclude in',
         'failure, because a failed run mails the repository owner and a red branch is',
         'expressly normal here. The failure above is real: fix it before the merge.',
-        'The alert went to the ntfy topic, and the commit carries a red status.',
+        'The alert goes to the ntfy topic, and the commit gets a red status.',
         '',
       )
     } else {

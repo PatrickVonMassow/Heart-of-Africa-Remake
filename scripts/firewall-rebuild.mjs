@@ -4,6 +4,7 @@
 //
 //   node scripts/firewall-rebuild.mjs              # print the plan, change nothing
 //   node scripts/firewall-rebuild.mjs --run        # open the gate, arm, launch detached
+//        [--watchdog-ms <ms>] [--force]             # deadline override; launch past a live run
 //   node scripts/firewall-rebuild.mjs --status     # what the last run did
 //   node scripts/firewall-rebuild.mjs --open       # emergency: unseal, firewall OFF
 //
@@ -29,12 +30,12 @@
 //    sealed". An open firewall in a dev container is a risk; a sealed one is a
 //    dead session that cannot even report it.
 //  * IT RUNS DETACHED. The rebuild is spawned in its own session (setsid), so a
-//    tool timeout kills the launcher and never the rebuild. Nothing in the
-//    foreground can be interrupted at the wrong moment, because nothing runs in
-//    the foreground.
+//    tool timeout kills the launcher and never the rebuild. Only the short,
+//    bounded gate commands run in the foreground; the rebuild never does.
 //  * IT ARMS A WATCHDOG. A supervisor holds a deadline; if the rebuild has not
 //    reported success by then, the gate is opened again — and it is opened on
-//    EVERY exit path of the supervisor, including a crash. The watchdog never
+//    every exit path the supervisor can observe: a clean exit, a crash and
+//    SIGTERM/SIGINT/SIGHUP (a SIGKILL cannot be caught). The watchdog never
 //    KILLS the rebuild: killing it mid-run is the original incident. It only
 //    guarantees the container stays reachable while the rebuild finishes or
 //    fails.
@@ -48,7 +49,7 @@ import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
 
 /** The container's own firewall script. Read-only from this repo's point of view. */
-export const FIREWALL_SCRIPT = '/usr/local/bin/init-firewall.sh'
+const FIREWALL_SCRIPT = '/usr/local/bin/init-firewall.sh'
 
 /**
  * This file, for the detached relaunch. Resolved through `repoPath` rather than
@@ -66,7 +67,7 @@ export const LOG_PATH = repoPath('local', 'firewall-rebuild.log')
 
 /**
  * How long the rebuild may take before the watchdog re-opens the gate. Generous
- * on purpose: a healthy run resolves ~16 domains and fetches the GitHub ranges,
+ * on purpose: a healthy run resolves about twenty domains and fetches the GitHub ranges,
  * which takes well under a minute, but a slow resolver must not trip the
  * watchdog while the run is still honest. The watchdog opening early costs an
  * open firewall; opening late costs a sealed container.
@@ -82,7 +83,8 @@ export const STALE_MS = 30 * 60 * 1000
  *
  * Policies alone are not enough — init-firewall.sh appends a blanket REJECT to
  * OUTPUT as its last rule, and a run killed after that line would stay sealed
- * under an ACCEPT policy. The deletes are therefore part of the gate. They are
+ * under an ACCEPT policy. The deletes (GATE_DELETES below) are therefore part of
+ * the gate. They are
  * targeted deletes, never a flush: a flush would also tear out the DNS,
  * loopback and host-network rules of a rebuild that is still running, and leave
  * it composing a broken chain on top of the hole.
@@ -101,21 +103,20 @@ export const GATE_DELETES = [
   ['iptables', '-D', 'INPUT', '-j', 'REJECT'],
   ['iptables', '-D', 'INPUT', '-j', 'DROP'],
 ]
-export const GATE_DELETE_REPEAT = 5
+const GATE_DELETE_REPEAT = 5
 
 /**
  * Phases a run passes through. `ok` is the only one that is not a problem.
  * `gate-open` is the record of a bare unseal — `--open`, the launcher's rescue
  * path, a supervisor killed by a signal: the gate is open and no rebuild is
- * behind it. Without that record `--status` answered "no run on record" while
+ * known to be behind it. Without that record `--status` answered "no run on record" while
  * the firewall was OFF, which is the complacent direction.
  */
 export const PHASES = ['idle', 'running', 'ok', 'failed', 'watchdog-opened', 'gate-open']
 
 /**
  * Signals that must still reach the gate. `process.on('exit')` does NOT fire on
- * any of them, so a `pkill -f node`, a container stop or an OOM kill of the
- * process group would otherwise leave the child dead mid-flush and the gate
+ * any of them, so a `pkill -f node` or a container stop would otherwise leave the child dead mid-flush and the gate
  * SHUT — the exact failure this whole script exists to make impossible.
  */
 export const SUPERVISOR_SIGNALS = ['SIGTERM', 'SIGINT', 'SIGHUP']
@@ -179,8 +180,8 @@ export function formatStatus(state, now = Date.now()) {
       return 'firewall-rebuild: no run on record.'
     case 'running':
       return c.stale
-        ? `firewall-rebuild: a run started ${secs}s ago and never reported back — its supervisor is gone.\n` +
-            'The gate was opened before it started, so the container is reachable; check the log and re-run.'
+        ? `firewall-rebuild: a run started ${secs}s ago and never reported back — its supervisor is probably gone.\n` +
+            'The gate was opened before it started, so the container should be reachable; check the log and re-run.'
         : `firewall-rebuild: RUNNING for ${secs}s (detached). Ask again in a moment.`
     case 'ok':
       return `firewall-rebuild: last run SUCCEEDED ${secs}s ago — the firewall is up and restrictive.`
@@ -197,13 +198,11 @@ export function formatStatus(state, now = Date.now()) {
       )
     case 'gate-open':
       return (
-        `firewall-rebuild: the gate was OPENED ${secs}s ago with no rebuild behind it` +
+        `firewall-rebuild: the gate was OPENED ${secs}s ago with no rebuild on record behind it` +
         `${state.gateOpenReason ? ` (${state.gateOpenReason})` : ''}.\n` +
         'THE FIREWALL IS OFF and the container is reachable. This is not a resting state — rebuild with\n' +
         '  node scripts/firewall-rebuild.mjs --run'
       )
-    default:
-      return 'firewall-rebuild: unknown state.'
   }
 }
 
@@ -259,13 +258,15 @@ function sudo(args, { timeout = 10_000 } = {}) {
  * command is independent, and a failure of one must not stop the others — this
  * is the last line of defence against a dead session.
  */
-export function openGate() {
+function openGate() {
   const done = []
   for (const cmd of GATE_COMMANDS) done.push({ cmd: cmd.join(' '), ...sudo(cmd) })
   for (const cmd of GATE_DELETES) {
     for (let i = 0; i < GATE_DELETE_REPEAT; i++) {
       const r = sudo(cmd)
-      if (!r.ok) break // no such rule (any more) — that is the goal, not an error
+      // A failed delete reads as "no such rule (any more)" — the goal, not an
+      // error. A sudo or iptables failure looks the same from here.
+      if (!r.ok) break
       done.push({ cmd: cmd.join(' '), ok: true })
     }
   }
@@ -279,8 +280,9 @@ export function openGate() {
  * allowlist ACCEPT stayed SEALED with nothing left to rescue it, and in the
  * ordinary case — the rebuild's own verification failing after the ruleset is
  * fully in place — `--status` announced a firewall that was OFF while it was in
- * fact restrictive. Opening an already-open gate costs three cheap iptables
- * calls; not opening a shut one costs the session.
+ * fact restrictive. Opening an already-open gate costs the three policy calls
+ * plus one failed delete per GATE_DELETES entry; not opening a shut one costs
+ * the session.
  */
 export function createReopener({ open = openGate, record = log } = {}) {
   return (why) => {
@@ -312,7 +314,7 @@ export function installRecovery({ on, exit, reopen, isDone, onSignal = () => {} 
 
 // ---- modes ----------------------------------------------------------------
 
-function planText() {
+function planText(watchdogMs = WATCHDOG_MS) {
   return [
     'firewall-rebuild — PLAN ONLY, nothing was changed. Add --run to execute.',
     '',
@@ -321,7 +323,7 @@ function planText() {
     '     WHY FIRST: the rebuild flushes the chains while the policies stay DROP, and its own',
     '     `curl https://api.github.com/meta` would then have no rule permitting it. That hang is',
     '     what ran into the tool timeout on 04.08.2026 and left the container sealed.',
-    `  2. arm the watchdog:   re-open the gate if no success is reported within ${Math.round(WATCHDOG_MS / 1000)}s`,
+    `  2. arm the watchdog:   re-open the gate if no success is reported within ${Math.round(watchdogMs / 1000)}s`,
     `  3. launch detached:    sudo -n ${FIREWALL_SCRIPT}  (own session — no tool timeout can reach it)`,
     `  4. read the outcome:   node scripts/firewall-rebuild.mjs --status   (log: ${LOG_PATH})`,
     '',
@@ -467,7 +469,7 @@ if (isMainModule(import.meta.url)) {
   // in `--status` or the plan can never open a firewall nobody asked it to touch.
   const args = parseArgs(process.argv.slice(2))
   if (args.mode === 'plan') {
-    console.log(planText())
+    console.log(planText(args.watchdogMs))
     process.exit(0)
   }
   if (args.mode === 'status') {

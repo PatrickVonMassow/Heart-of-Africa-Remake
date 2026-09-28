@@ -40,7 +40,7 @@ const REQUIRED_CHECKS = [
   'the durable lease names the worker the daemon spawned',
   'the worker is alive under its lease identity before the kill',
   'the worker pushed while the parent lived',
-  'the parent group is dead',
+  'the parent group leader is dead',
   'the daemon survived under its recorded pid and start time',
   'the durable record after the kill still names that same daemon',
   'the worker pushed a SHA that did not exist when the parent died',

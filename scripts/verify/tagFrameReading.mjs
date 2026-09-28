@@ -26,7 +26,7 @@ export const KID_SCALE = 0.55
 /** A child's full height, feet to crown, in metres. */
 export const KID_HEIGHT = KID_SCALE * (1.0 + 0.18 + 0.16)
 /** The head sphere's diameter in metres — 23.9 % of that height. */
-export const KID_HEAD_DIAMETER = KID_SCALE * 2 * 0.16
+const KID_HEAD_DIAMETER = KID_SCALE * 2 * 0.16
 /** The body cone's width where it is widest, at the hip: `bodyRadius` 0.32
  *  shrunk by the legged figure's trunk factor (1 - `hipY` 0.38). 29.6 % of the
  *  height. */
@@ -42,7 +42,7 @@ export const KID_BODY_WIDTH = KID_SCALE * 2 * 0.32 * (1 - 0.38)
  * under a pixel, antialiasing flattens the shading, and it is the dot the
  * reviewer saw over the boulders.
  */
-export const HEAD_READABLE_PX = 16
+const HEAD_READABLE_PX = 16
 
 /**
  * The minimum height, in frame pixels, of a child's projected figure.
@@ -59,7 +59,8 @@ export const MIN_CHILD_PIXELS = Math.round((HEAD_READABLE_PX * KID_HEIGHT) / KID
 
 /**
  * Heights up the child's own axis, as fractions of its height, that the suite
- * ray-probes. Spread from shin to head so an occluder of ANY height is met: the
+ * ray-probes. Spread from shin to the base of the neck (0.75 of the height sits
+ * just under the head sphere) so an occluder of ANY height is met: the
  * boulder line hid everything to the shoulders and a single chest probe at 0.68
  * of the height was the one sample it happened to leave clear.
  */
@@ -76,12 +77,12 @@ export const CONFIRMED_RATIO = 1.15
 /** How many samples must positively HIT the child. Projection alone can frame a
  *  child that is not drawn where the game state says it is; two confirmed hits
  *  say the rendered figure is on that sight line. */
-export const MIN_CONFIRMED_SAMPLES = 2
+const MIN_CONFIRMED_SAMPLES = 2
 
 /** The share of the frame a child must stay inside. A figure clipped by the
  *  very edge is in the picture by arithmetic, and the shutter's own settle is
  *  several frames of running children after the reading. */
-export const FRAME_MARGIN = 0.7
+const FRAME_MARGIN = 0.7
 
 /**
  * How far apart the two must stand ACROSS the frame, in their own body widths.
@@ -97,10 +98,10 @@ export const FRAME_MARGIN = 0.7
  * rather than one wide one. That is 44 % of a child's own on-screen height, so
  * the rule scales with the standpoint instead of fixing a pixel count.
  */
-export const SEPARATION_IN_BODIES = 1.5
+const SEPARATION_IN_BODIES = 1.5
 /** ...expressed against the figure's projected height, which is what a reading
  *  measures. */
-export const MIN_SEPARATION_FACTOR = (SEPARATION_IN_BODIES * KID_BODY_WIDTH) / KID_HEIGHT
+const MIN_SEPARATION_FACTOR = (SEPARATION_IN_BODIES * KID_BODY_WIDTH) / KID_HEIGHT
 
 // --- What must stand around them ---------------------------------------------
 /** How much village a frame must hold behind the children. Two buildings is what
@@ -109,22 +110,11 @@ export const MIN_SEPARATION_FACTOR = (SEPARATION_IN_BODIES * KID_BODY_WIDTH) / K
 export const VILLAGE_BEHIND = 2
 /** The chase is photographed at a TIGHT moment: the gap breathes by design, and
  *  at full stretch the two do not both survive the shutter's settle. */
-export const TIGHT_GAP = 6
+const TIGHT_GAP = 6
 /** And the camera is not pressed against a wall: a hut two metres in front of
  *  the lens is not "the village behind them", it is a wall. */
-export const WALL_CLEARANCE = 3.5
+const WALL_CLEARANCE = 3.5
 
-/**
- * Judge one standpoint's reading. `children` holds one entry per figure that
- * must be readable (the chaser and its quarry), each:
- *   `{ pixels, occluded, confirmed, ndcFeet: [x, y] | null, ndcHead: [x, y] | null }`
- * where `occluded`/`confirmed` count AXIS_SAMPLES. FEET AND HEAD BOTH: a child
- * whose waist is comfortably inside the frame can still stand with its legs cut
- * off by the bottom edge, and a cropped figure is not a readable one.
- *
- * Returns `{ ok, reason }` — `reason` naming the FIRST rule that failed, so a
- * red run says which one and with what number.
- */
 /**
  * ONE CHILD, as the frame shows it: whole, inside the frame, unoccluded, drawn
  * where the state says it is, and big enough to read as a person.
@@ -148,6 +138,20 @@ export function judgeChildFigure(c, who) {
   return { ok: true, reason: `${who} reads whole and unoccluded at ${Math.round(c.pixels)} px` }
 }
 
+/**
+ * Judge one standpoint's reading: `{ clear, behind, gap, nearestWall,
+ * separation, children }` — a clear sight line, the buildings behind the pair,
+ * the pair's gap in metres, the nearest wall to the lens, their on-screen
+ * separation in pixels, and `children`, one entry per figure that must be
+ * readable (the chaser and its quarry), each:
+ *   `{ pixels, occluded, confirmed, ndcFeet: [x, y] | null, ndcHead: [x, y] | null }`
+ * where `occluded`/`confirmed` count AXIS_SAMPLES. FEET AND HEAD BOTH: a child
+ * whose waist is comfortably inside the frame can still stand with its legs cut
+ * off by the bottom edge, and a cropped figure is not a readable one.
+ *
+ * Returns `{ ok, reason }` — `reason` naming the FIRST rule that failed, so a
+ * red run says which one and with what number.
+ */
 export function judgeTagStandpoint(reading) {
   const { clear, behind, gap, nearestWall, children } = reading
   if (!clear) return { ok: false, reason: 'the sight line to the pair is obstructed' }

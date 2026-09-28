@@ -1,0 +1,3132 @@
+[
+  {
+    "id": "U2427",
+    "decision": "rewritten",
+    "reason": "dropped the export of REVIEWER_CANDIDATES; constant kept for local defaults"
+  },
+  {
+    "id": "U2428",
+    "decision": "rewritten",
+    "reason": "dropped the export of UNREVIEWABLE_NARROWING_REMEDY; only interpolated locally"
+  },
+  {
+    "id": "U2429",
+    "decision": "rewritten",
+    "reason": "dropped the exports of NO_ELIGIBLE_REVIEWER_REASON and UNKNOWN_AUTHOR_REVIEWER_REASON; read only by reviewerFields"
+  },
+  {
+    "id": "U2430",
+    "decision": "rewritten",
+    "reason": "header-line comment now names the parent-sha field the regex and %P carry"
+  },
+  {
+    "id": "U2431",
+    "decision": "rewritten",
+    "reason": "error text now names the opening tree line it checks; test regex updated"
+  },
+  {
+    "id": "U2432",
+    "decision": "rewritten",
+    "reason": "comment now states that the recorder's git() trims, instead of a hypothetical caller"
+  },
+  {
+    "id": "U2433",
+    "decision": "rewritten",
+    "reason": "authorshipResolver doc now says an out-of-range merged parent is read from parentAuthorModels, else unknown"
+  },
+  {
+    "id": "U2434",
+    "decision": "kept",
+    "reason": "claim does not hold: mechanism-review-guard.mjs:587, criticality-review-guard.mjs:301 and review-astra.mjs:358 set parentAuthorModels"
+  },
+  {
+    "id": "U2435",
+    "decision": "rewritten",
+    "reason": "planAuthorshipGroups doc now describes eligibleReviewer's exact-model fallback for mixed-vendor files"
+  },
+  {
+    "id": "U2436",
+    "decision": "kept",
+    "reason": "newestReading is a general selector whose rules are exercised by tests and the refusal call; the doc describes the selector correctly"
+  },
+  {
+    "id": "U2437",
+    "decision": "rewritten",
+    "reason": "clock rule 3 now scoped to 'while a clocked reading exists', consistent with rule 4"
+  },
+  {
+    "id": "U2438",
+    "decision": "backlog",
+    "reason": "scripts/mechanism-review-range-core.mjs:583 — refusal supersession compares Number(answer.record.at) > Number(reading.record.at), the coercing clock the file's own strict-clock rule forbids; switching to clockOf changes behaviour for string/absent stamps"
+  },
+  {
+    "id": "U2439",
+    "decision": "rewritten",
+    "reason": "reading clock now computed by clockOf(record) instead of repeating its rule inline"
+  },
+  {
+    "id": "U2440",
+    "decision": "removed",
+    "reason": "removed test-only commitsForFiles and its test"
+  },
+  {
+    "id": "U2441",
+    "decision": "removed",
+    "reason": "removed summarizeReviewDebt (no production consumer since the guard's --status stopped using it) and its tests"
+  },
+  {
+    "id": "U2442",
+    "decision": "removed",
+    "reason": "comment lived in summarizeReviewDebt, which was removed as dead code"
+  },
+  {
+    "id": "U2443",
+    "decision": "rewritten",
+    "reason": "module overview now says this file also makes the repository-backed identity, half-authorship and carry checks"
+  },
+  {
+    "id": "U2444",
+    "decision": "rewritten",
+    "reason": "header usage block now points at usage(), which carries the full flag surface"
+  },
+  {
+    "id": "U2445",
+    "decision": "kept",
+    "reason": "claim does not hold: scripts/mechanism-review-cli.test.mjs imports KNOWN_FLAGS through this re-export"
+  },
+  {
+    "id": "U2446",
+    "decision": "rewritten",
+    "reason": "gitToplevel comment now says git() below"
+  },
+  {
+    "id": "U2447",
+    "decision": "rewritten",
+    "reason": "Anthropic identity refusal now names --model-result as the alternative to --model-transcript"
+  },
+  {
+    "id": "U2448",
+    "decision": "rewritten",
+    "reason": "dropped the always-'claude' runtime field and the unreachable half of the guard"
+  },
+  {
+    "id": "U2449",
+    "decision": "rewritten",
+    "reason": "dropped the exports of repoRelative, committedOid, workingBlobOid, recountFromBlobs, committedBlobText, countUnionFiles and buildCarriedRecord; implementations kept"
+  },
+  {
+    "id": "U2450",
+    "decision": "rewritten",
+    "reason": "committedBlobText doc now says it returns trimmed UTF-8 text"
+  },
+  {
+    "id": "U2451",
+    "decision": "rewritten",
+    "reason": "union verification comment now anchors at the row's commit, not HEAD"
+  },
+  {
+    "id": "U2452",
+    "decision": "rewritten",
+    "reason": "readRecords' JSDoc moved from above reverifyReviewerAgreement to readRecords"
+  },
+  {
+    "id": "U2453",
+    "decision": "rewritten",
+    "reason": "point 880 is closed; comment now states the remaining gap without assigning it to a closed point"
+  },
+  {
+    "id": "U2454",
+    "decision": "kept",
+    "reason": "claim does not hold: criticality-review-guard.mjs:743 interpolates shas into a shell merge-base line via execSync"
+  },
+  {
+    "id": "U2455",
+    "decision": "rewritten",
+    "reason": "fold-proof comment now says half authors are re-read from the recorded commit's blobs"
+  },
+  {
+    "id": "U2456",
+    "decision": "rewritten",
+    "reason": "fold-proof comment now says only review mode falls back to the trailer proxy; blind-parallel refuses"
+  },
+  {
+    "id": "U2457",
+    "decision": "rewritten",
+    "reason": "comment now locates VERIFIED_REVIEWER_SINCE in mechanism-review-core.mjs and says every new row postdates it"
+  },
+  {
+    "id": "U2458",
+    "decision": "backlog",
+    "reason": "scripts/mechanism-review.mjs:1168 — carry-source selection orders rows by Number(y.at ?? 0), the coercing clock the range core rejects; fixing changes selection for string/absent stamps"
+  },
+  {
+    "id": "U2459",
+    "decision": "kept",
+    "reason": "usage is imported by mechanism-review-cli.test.mjs and printed by refusals; nothing to change"
+  },
+  {
+    "id": "U2460",
+    "decision": "rewritten",
+    "reason": "usage synopsis now lists --union/--list-a/--list-b as the alternative to --accounting, plus --pass/--pass-files and --carried-from"
+  },
+  {
+    "id": "U2461",
+    "decision": "rewritten",
+    "reason": "usage now says an unverified Claude reviewer is refused and names --model-result"
+  },
+  {
+    "id": "U2462",
+    "decision": "rewritten",
+    "reason": "usage now says a pass clears its files only once every pass of the split is recorded"
+  },
+  {
+    "id": "U2463",
+    "decision": "rewritten",
+    "reason": "--carried-from usage now names mode and --framing and the gates' re-verification of copied fields"
+  },
+  {
+    "id": "U2464",
+    "decision": "kept",
+    "reason": "claim does not hold: the usage describes the handover chains ASTRA_UNAVAILABLE_REVIEW_CHAIN [Fable, Opus, Opus 4.8] and ASTRA_AUTHORED_REVIEW_CHAIN [Opus, Fable, Opus 4.8] in mechanism-review-core.mjs:344-345, not the planner roster"
+  },
+  {
+    "id": "U2465",
+    "decision": "rewritten",
+    "reason": "the broken-off header clause now ends as a sentence (original wording ended '; the' before the next line)"
+  },
+  {
+    "id": "U2466",
+    "decision": "rewritten",
+    "reason": "header policy dates now name 25.07, 13.08 (OpenAI lane admitted) and 18.08.2026, matching the reason text and history"
+  },
+  {
+    "id": "U2467",
+    "decision": "backlog",
+    "reason": "scripts/model-guard-core.mjs:78 — ALLOWED admits the retired GPT-5.6 Sol for new commits too, though it is justified only as history verification; no historical-only restriction exists"
+  },
+  {
+    "id": "U2468",
+    "decision": "rewritten",
+    "reason": "header now points at MODEL_FAMILY_WORD, MODEL_VENDOR_ADDRESS and namesNonClaudeModel instead of the removed MODEL_TRAILER alias"
+  },
+  {
+    "id": "U2469",
+    "decision": "rewritten",
+    "reason": "ALLOWED doc now says Fable lives in the switch-gated FABLE_ALLOWED"
+  },
+  {
+    "id": "U2470",
+    "decision": "rewritten",
+    "reason": "dropped the exports of CLAUDE_TRAILER, MODEL_FAMILY_WORD, MODEL_VENDOR_ADDRESS, namesNonClaudeModel, allowedModelsPhrase, TRANSCRIPT_HINT, BACKUP_REF_PREFIX and backupRefNotice"
+  },
+  {
+    "id": "U2471",
+    "decision": "rewritten",
+    "reason": "MODEL_FAMILY_WORD doc now names Opus, Astra with the retired Sol, and Fable while admitted"
+  },
+  {
+    "id": "U2472",
+    "decision": "removed",
+    "reason": "removed the chatgpt alternative; the unanchored gpt alternative already matches inside it and the regex is only used with test()"
+  },
+  {
+    "id": "U2473",
+    "decision": "removed",
+    "reason": "removed the unreferenced MODEL_TRAILER alias"
+  },
+  {
+    "id": "U2474",
+    "decision": "rewritten",
+    "reason": "NON_MODEL_WORDS doc now names the Code/Agent words and says bracketed suffixes are dropped earlier"
+  },
+  {
+    "id": "U2475",
+    "decision": "rewritten",
+    "reason": "modelNamesIn doc now mentions the symbol/conjunction split into several claims"
+  },
+  {
+    "id": "U2476",
+    "decision": "rewritten",
+    "reason": "judgeTrailer verdict doc now says a forbidden name wins over several names"
+  },
+  {
+    "id": "U2477",
+    "decision": "rewritten",
+    "reason": "judgeTrailer doc now says non-Claude trailers are model evidence and 'allowed' without names means a human co-author"
+  },
+  {
+    "id": "U2478",
+    "decision": "rewritten",
+    "reason": "split rationale now says a nameless fragment is no model evidence, only a forbidden-name fragment fails loud"
+  },
+  {
+    "id": "U2479",
+    "decision": "rewritten",
+    "reason": "isPolicyBreach doc now covers any recognised model outside the allowlist"
+  },
+  {
+    "id": "U2480",
+    "decision": "rewritten",
+    "reason": "evaluateCommitTrailers doc now lists all return fields and says an invalid switch state throws"
+  },
+  {
+    "id": "U2481",
+    "decision": "kept",
+    "reason": "the ?? fallbacks keep formatCommitTrailerVerdict safe for hand-built verdicts; harmless"
+  },
+  {
+    "id": "U2482",
+    "decision": "rewritten",
+    "reason": "comment now says an invalid policy throws and a missing one admits no Fable (fails closed per commit)"
+  },
+  {
+    "id": "U2483",
+    "decision": "rewritten",
+    "reason": "findUnidentifiedCommits doc now covers none, several allowed and nameless vendor-address trailers"
+  },
+  {
+    "id": "U2484",
+    "decision": "backlog",
+    "reason": "scripts/model-guard-core.mjs:576 — TRANSCRIPT_HINT points at ~/.codex/sessions for Astra model evidence while mechanism-review.mjs:221 says no session transcript holds that lane's messages; which is right depends on the Codex transcript schema"
+  },
+  {
+    "id": "U2485",
+    "decision": "rewritten",
+    "reason": "formatUnidentifiedReason doc now says 'names no single model'"
+  },
+  {
+    "id": "U2486",
+    "decision": "rewritten",
+    "reason": "diagnostic now says 'model co-author trailer' instead of 'Claude co-author trailer'"
+  },
+  {
+    "id": "U2487",
+    "decision": "rewritten",
+    "reason": "remedy now lists every allowed trailer from allowedTrailers(fableState) instead of only the Claude one"
+  },
+  {
+    "id": "U2488",
+    "decision": "rewritten",
+    "reason": "header now names the 48-hour log window"
+  },
+  {
+    "id": "U2489",
+    "decision": "rewritten",
+    "reason": "header roster now Opus 5 / Opus 4.8 / GPT-6 Astra, Fable while the switch is ON"
+  },
+  {
+    "id": "U2490",
+    "decision": "rewritten",
+    "reason": "header now says the guard stands down for any pause record"
+  },
+  {
+    "id": "U2491",
+    "decision": "kept",
+    "reason": "RECENT_LOG_FORMAT is used in production at line 69; exporting it for tests is fine"
+  },
+  {
+    "id": "U2492",
+    "decision": "kept",
+    "reason": "the self-arm still pins the baseline for commits inside the 48-hour window at first run; the rationale is harmless"
+  },
+  {
+    "id": "U2493",
+    "decision": "backlog",
+    "reason": "scripts/model-guard.mjs:68 — recentLog passes a %-laden pretty format through execSync as a shell line; on cmd.exe %-spans expand (range core requires an args array)"
+  },
+  {
+    "id": "U2494",
+    "decision": "rewritten",
+    "reason": "dropped the export of MODEL_HANDOFF_VERSION; used only internally"
+  },
+  {
+    "id": "U2495",
+    "decision": "rewritten",
+    "reason": "dropped the export of modelHandoffDecisionRecord; used only internally"
+  },
+  {
+    "id": "U2496",
+    "decision": "rewritten",
+    "reason": "removed the no-op ternary; probeRoute is initialRoute"
+  },
+  {
+    "id": "U2497",
+    "decision": "removed",
+    "reason": "removed the unreachable non-finite verifiedThrough test; found is non-empty with finite timestamps"
+  },
+  {
+    "id": "U2498",
+    "decision": "backlog",
+    "reason": "scripts/model-handoff-core.mjs:129 — the fresh-session requirement excludes the requester only when a session id is supplied; with no sid the requesting session is not excluded"
+  },
+  {
+    "id": "U2499",
+    "decision": "rewritten",
+    "reason": "launch prompt now says the recorded lane or a later lane of the route may prove the handoff"
+  },
+  {
+    "id": "U2500",
+    "decision": "kept",
+    "reason": "MODEL_HANDOFF_PROBE_MS is the live default of modelHandoffDecision; the test export is fine"
+  },
+  {
+    "id": "U2501",
+    "decision": "kept",
+    "reason": "readModelHandoff is called by live modelHandoffDecision and modelHandoffSpawn"
+  },
+  {
+    "id": "U2502",
+    "decision": "backlog",
+    "reason": "scripts/model-handoff-core.mjs:48 — decisionRecord is rebuilt for state files written before stateFor always wrote one; drop once no such state file can exist"
+  },
+  {
+    "id": "U2503",
+    "decision": "backlog",
+    "reason": "scripts/model-handoff-core.mjs:3 — the header says the suspect lane never clears its own finding, but a clocked probe resets targetIndex to 0 and route[0] may then verify"
+  },
+  {
+    "id": "U2504",
+    "decision": "kept",
+    "reason": "the Veto invitation addresses the user reading the decision record; a veto is a user reply to the owner session, not a machine input"
+  },
+  {
+    "id": "U2505",
+    "decision": "kept",
+    "reason": "claim does not hold: scripts/model-guard.mjs:36 defines HANDOFF as .claude/model-guard-handoff.json"
+  },
+  {
+    "id": "U2506",
+    "decision": "rewritten",
+    "reason": "header now says the wrapper also reads the Fable switch state"
+  },
+  {
+    "id": "U2507",
+    "decision": "rewritten",
+    "reason": "header now says an unreadable or invalid Fable state refuses the commit rather than failing open"
+  },
+  {
+    "id": "U2508",
+    "decision": "rewritten",
+    "reason": "incident sentence now says only batch-singleton.mjs exports pidCorroboration"
+  },
+  {
+    "id": "U2509",
+    "decision": "backlog",
+    "reason": "scripts/module-link-check.mjs:28 — stripComments removes every /*...*/ span without recognising string literals, so the 'cannot hide an import' guarantee exceeds the implementation"
+  },
+  {
+    "id": "U2510",
+    "decision": "backlog",
+    "reason": "scripts/module-link-check.mjs:30 — a trailing // comment containing ';' can invent an import statement, contrary to the 'cannot start a statement' claim"
+  },
+  {
+    "id": "U2511",
+    "decision": "rewritten",
+    "reason": "doc now says namespace-only and side-effect imports bind no name and are skipped"
+  },
+  {
+    "id": "U2512",
+    "decision": "rewritten",
+    "reason": "header now says the launcher's module-load work sits behind only its CLI guard, consistent with the next sentence"
+  },
+  {
+    "id": "U2513",
+    "decision": "kept",
+    "reason": "missingNamedImports drives the CLI; scanStaticImports is a documented pure half pinned by tests"
+  },
+  {
+    "id": "U2514",
+    "decision": "kept",
+    "reason": "the fixture exports exist to be reached by path; the index count is a name collision"
+  },
+  {
+    "id": "U2515",
+    "decision": "rewritten",
+    "reason": "dropped the export of TOPIC_FILE; only the internal default"
+  },
+  {
+    "id": "U2516",
+    "decision": "rewritten",
+    "reason": "return doc now lists no topic, ladder hold-back and send failure, and says only a hold-back is logged"
+  },
+  {
+    "id": "U2517",
+    "decision": "rewritten",
+    "reason": "CLI failure text now names the ladder hold-back"
+  },
+  {
+    "id": "U2518",
+    "decision": "kept",
+    "reason": "ntfyTopic is called by the live notify; test export fine"
+  },
+  {
+    "id": "U2519",
+    "decision": "kept",
+    "reason": "claim does not hold: notify's ladder escalate() in alert-escalation.mjs:205 reads HOA_ALERT_ESCALATION=off"
+  },
+  {
+    "id": "U2520",
+    "decision": "rewritten",
+    "reason": "CLI guard reduced to the endsWith check; the file:// disjunct implied it"
+  },
+  {
+    "id": "U2521",
+    "decision": "rewritten",
+    "reason": "dropped the exports of TERMINAL_STATUSES, COMPLETED_STATUSES and UNKNOWN_STATUSES; used only in the module"
+  },
+  {
+    "id": "U2522",
+    "decision": "rewritten",
+    "reason": "removed the unqualified 'never throws' from the header; stallReport throws on a null entry"
+  },
+  {
+    "id": "U2523",
+    "decision": "rewritten",
+    "reason": "INSPECT_LIMIT doc now says a blocker is normally among the newest few and an outside sha is inspected wherever it sits"
+  },
+  {
+    "id": "U2524",
+    "decision": "backlog",
+    "reason": "scripts/pages-deploy-unblock-core.mjs:137 — shouldRetryDeploy promises a retry after any deploy failure, but the wrapper writes retry=false when the deployment listing itself fails (pages-deploy-unblock.mjs:192-195)"
+  },
+  {
+    "id": "U2525",
+    "decision": "rewritten",
+    "reason": "empty-list report now says no stuck deployment was found among those inspected instead of asserting the cause"
+  },
+  {
+    "id": "U2526",
+    "decision": "kept",
+    "reason": "isBlockingStatus and ageMinutes are called live by blockingDeployments and stallReport"
+  },
+  {
+    "id": "U2527",
+    "decision": "removed",
+    "reason": "removed the unread id field from candidateDeployments; the test now checks dedup via createdAt"
+  },
+  {
+    "id": "U2528",
+    "decision": "removed",
+    "reason": "removed the bare-string ?? c fallback; cancelAll only yields objects with sha"
+  },
+  {
+    "id": "U2529",
+    "decision": "rewritten",
+    "reason": "closing handle now addresses a manual run and notes the workflow's own retry step"
+  },
+  {
+    "id": "U2530",
+    "decision": "rewritten",
+    "reason": "dropped the export of resolveRepo; only main uses it"
+  },
+  {
+    "id": "U2531",
+    "decision": "backlog",
+    "reason": "scripts/pages-deploy-unblock.mjs:143 — a failed per-sha status lookup is recorded as not_found, silently, although the header promises to say what it could not do"
+  },
+  {
+    "id": "U2532",
+    "decision": "kept",
+    "reason": "index counts for flag/inspect are name collisions; nothing in the code to change"
+  },
+  {
+    "id": "U2533",
+    "decision": "kept",
+    "reason": "cancelAll and writeGithubOutput are live in main; the test export is justified in place"
+  },
+  {
+    "id": "U2534",
+    "decision": "rewritten",
+    "reason": "header and output-contract doc now name the cleared= key too"
+  },
+  {
+    "id": "U2535",
+    "decision": "kept",
+    "reason": "claim does not hold: scripts/ci-status-guard.mjs exists and records the node:https rationale at line 21"
+  },
+  {
+    "id": "U2536",
+    "decision": "rewritten",
+    "reason": "dropped the exports of DENY_NOTES, PATH_SHAPE and formatDeny; used only in the module"
+  },
+  {
+    "id": "U2537",
+    "decision": "backlog",
+    "reason": "scripts/path-scope-core.mjs:76 — the /root/.cache allow-root looks redundant once /root folds to ~ (~/.cache is allowed); verify the fold on a root-run step before dropping it"
+  },
+  {
+    "id": "U2538",
+    "decision": "backlog",
+    "reason": "scripts/path-scope-core.mjs:161 — the absolute-path-only contract of canonicalisePath omits the drive-only spelling (C:) that line 179 accepts and folds to c:/"
+  },
+  {
+    "id": "U2539",
+    "decision": "backlog",
+    "reason": "scripts/path-scope-core.mjs:303 — isUnparseable runs on the original command before heredoc bodies are stripped, so a $, backtick or odd quote inside a body allows the whole command, not only the body"
+  },
+  {
+    "id": "U2540",
+    "decision": "backlog",
+    "reason": "scripts/path-scope-core.mjs:296 — the 'remove every heredoc body' promise misses empty quoted delimiters (<<'' / <<\"\"), dropped by if (delim) at line 290"
+  },
+  {
+    "id": "U2541",
+    "decision": "backlog",
+    "reason": "scripts/path-scope-core.mjs:343 — the quoted-word exemption comment does not mention that redirection targets are inspected unconditionally (line 364)"
+  },
+  {
+    "id": "U2542",
+    "decision": "backlog",
+    "reason": "scripts/path-scope-core.mjs:348 — a first-class filePath is not judged 'regardless' when the same evaluation also carries an unparseable command (line 420 allows)"
+  },
+  {
+    "id": "U2543",
+    "decision": "kept",
+    "reason": "the evaluate index count is a name collision; path-scope-guard.mjs is the importer and nothing needs changing"
+  },
+  {
+    "id": "U2544",
+    "decision": "rewritten",
+    "reason": "fail level 1 now names any $ or backtick, matching isUnparseable"
+  },
+  {
+    "id": "U2545",
+    "decision": "rewritten",
+    "reason": "deny text's in-scope summary now names ~/.cache, ~/.pw-browsers, ~/.config, /backup and system directories and points at ALLOW_ROOTS"
+  },
+  {
+    "id": "U2546",
+    "decision": "rewritten",
+    "reason": "heredoc rationale now names the injected parser and where lexCommand lives"
+  },
+  {
+    "id": "U2547",
+    "decision": "kept",
+    "reason": "the listed exports sit on the live evaluate path; test exports are fine"
+  },
+  {
+    "id": "U2548",
+    "decision": "rewritten",
+    "reason": "dropped the exports of COMMAND_TOOLS and machineContext; used only in the module"
+  },
+  {
+    "id": "U2549",
+    "decision": "rewritten",
+    "reason": "dropped the export of gatherPathScope; preToolUseEnvelope uses it locally"
+  },
+  {
+    "id": "U2550",
+    "decision": "rewritten",
+    "reason": "gatherPathScope doc no longer claims the preflight shares it (guard-preflight does not import it)"
+  },
+  {
+    "id": "U2551",
+    "decision": "removed",
+    "reason": "removed the unread cause:'not-lock-owner' field; the only consumer of such causes, guard-preflight, does not call this gatherer"
+  },
+  {
+    "id": "U2552",
+    "decision": "rewritten",
+    "reason": "introduction, step comment and success message now say the drill reaches the resuming verdict, not that it resumes the batch"
+  },
+  {
+    "id": "U2553",
+    "decision": "backlog",
+    "reason": "scripts/pause-retry-drill.mjs:101 — drill step 3 still exercises the untyped legacy watchdog marker; drop the step once no writer produces that marker"
+  },
+  {
+    "id": "U2554",
+    "decision": "rewritten",
+    "reason": "header now says the bench attributes whole-frame-interval cost, with no separate GPU timer"
+  },
+  {
+    "id": "U2555",
+    "decision": "rewritten",
+    "reason": "env list now names BENCH_SPIKE_MS and BENCH_DPR"
+  },
+  {
+    "id": "U2556",
+    "decision": "rewritten",
+    "reason": "warm-up comment now says one discarded measurement of the first selected point"
+  },
+  {
+    "id": "U2557",
+    "decision": "kept",
+    "reason": "the optional-chained setters keep the bench runnable against older builds; harmless"
+  },
+  {
+    "id": "U2558",
+    "decision": "kept",
+    "reason": "claim does not hold: docs/perf-276-findings.md exists"
+  },
+  {
+    "id": "U2559",
+    "decision": "rewritten",
+    "reason": "header now says it sums geometry triangles of meshes whose own visible flag is set, without culling or draw ranges"
+  },
+  {
+    "id": "U2560",
+    "decision": "rewritten",
+    "reason": "header now says attribution is per nearest named object"
+  },
+  {
+    "id": "U2561",
+    "decision": "rewritten",
+    "reason": "header now lists the fields the probe returns (calls, drawCalls, triangles, geometries, textures)"
+  },
+  {
+    "id": "U2562",
+    "decision": "rewritten",
+    "reason": "usage line now uses port 5173 like the default and siblings"
+  },
+  {
+    "id": "U2563",
+    "decision": "rewritten",
+    "reason": "core header, decide() doc and wrapper header now say a missing decision asks, or denies in a non-interactive -p session"
+  },
+  {
+    "id": "U2564",
+    "decision": "kept",
+    "reason": "decide/render index counts are name collisions; permission-autogrant.mjs is the importer"
+  },
+  {
+    "id": "U2565",
+    "decision": "backlog",
+    "reason": "scripts/permission-autogrant-core.mjs:54 — decide() builds a reason string that render() deliberately discards; only a unit test reads it"
+  },
+  {
+    "id": "U2566",
+    "decision": "rewritten",
+    "reason": "guard-chain list now includes path-scope and points at the full registration in .claude/settings.json"
+  },
+  {
+    "id": "U2567",
+    "decision": "rewritten",
+    "reason": "summarise doc and STABLE message now say 'at or under the bar', matching ratio > bar"
+  },
+  {
+    "id": "U2568",
+    "decision": "backlog",
+    "reason": "scripts/picture-stability-core.mjs:12 — the motivating 94 % measurement is stated at tolerance 24 while TOLERANCE is 8 and SIGNAL_BAR is defined against TOLERANCE; restate both figures at one threshold"
+  },
+  {
+    "id": "U2569",
+    "decision": "rewritten",
+    "reason": "the no-common-frames exit now throws inside try, so finally restores verification/ and removes the temp dir as the header promises"
+  },
+  {
+    "id": "U2570",
+    "decision": "backlog",
+    "reason": "scripts/picture-stability.mjs:11 — the restore covers tracked frames only (git restore); new untracked screenshot files a run writes are left behind"
+  },
+  {
+    "id": "U2571",
+    "decision": "rewritten",
+    "reason": "STABLE message now says every frame both runs wrote"
+  },
+  {
+    "id": "U2572",
+    "decision": "rewritten",
+    "reason": "decoder header now lists colour type 4 (gray+alpha)"
+  },
+  {
+    "id": "U2573",
+    "decision": "kept",
+    "reason": "the geodata scripts (build-geodata, generate-*-textures) are the importers; the scope statement holds"
+  },
+  {
+    "id": "U2574",
+    "decision": "rewritten",
+    "reason": "dropped the export of DOC_ALIASES; constant kept for buildDocRegistry"
+  },
+  {
+    "id": "U2575",
+    "decision": "removed",
+    "reason": "removed the test-only findPoint; the test keeps a local lookup over parseWorkOrderPoints"
+  },
+  {
+    "id": "U2576",
+    "decision": "rewritten",
+    "reason": "dropped the export of ADOPTING_PATTERNS; constant kept for classifyPointRefs"
+  },
+  {
+    "id": "U2577",
+    "decision": "kept",
+    "reason": "the why fields document each adopting wording beside its regex; they are the pattern's rationale, not dead data"
+  },
+  {
+    "id": "U2578",
+    "decision": "rewritten",
+    "reason": "dropped the export of quotedSpans; used by classifyPointRefs"
+  },
+  {
+    "id": "U2579",
+    "decision": "rewritten",
+    "reason": "dropped the export of collectAdoptedSpecs and its never-set cap parameter; it uses ADOPTION_DEPTH_CAP"
+  },
+  {
+    "id": "U2580",
+    "decision": "rewritten",
+    "reason": "dropped the export of SLICE_DECLARATION_HEAD_LINES and the never-set headLines/options parameters"
+  },
+  {
+    "id": "U2581",
+    "decision": "rewritten",
+    "reason": "dropped the export of ORIENTATION_SKIP; used only in the module"
+  },
+  {
+    "id": "U2582",
+    "decision": "rewritten",
+    "reason": "dropped the export of headerLines; used only by assembleBrief"
+  },
+  {
+    "id": "U2583",
+    "decision": "rewritten",
+    "reason": "dropped the export of formatRevisionLine; used only by assembleBrief"
+  },
+  {
+    "id": "U2584",
+    "decision": "rewritten",
+    "reason": "dropped the export of adoptionHeaderLines; used only by assembleBrief"
+  },
+  {
+    "id": "U2585",
+    "decision": "removed",
+    "reason": "removed assembleBrief's never-set adoptionCap parameter; the header uses ADOPTION_DEPTH_CAP"
+  },
+  {
+    "id": "U2586",
+    "decision": "kept",
+    "reason": "resolveSectionRefs' namedDocs return is part of its tested result; discarding it at one caller is fine"
+  },
+  {
+    "id": "U2587",
+    "decision": "kept",
+    "reason": "buildBrief's registry parameter lets tests inject a prepared registry; unused by the wrapper but harmless"
+  },
+  {
+    "id": "U2588",
+    "decision": "rewritten",
+    "reason": "dropped the export of RUNS_PATH; used only in the guard"
+  },
+  {
+    "id": "U2589",
+    "decision": "rewritten",
+    "reason": "dropped the export of readRuns; used only in the guard"
+  },
+  {
+    "id": "U2590",
+    "decision": "rewritten",
+    "reason": "dropped the export of pointsWithProof; used only by --status"
+  },
+  {
+    "id": "U2591",
+    "decision": "rewritten",
+    "reason": "dropped the export of LONG_STEPS; used by needsOpeningLoadReading"
+  },
+  {
+    "id": "U2592",
+    "decision": "rewritten",
+    "reason": "dropped the export of retryNotice; used by runGate"
+  },
+  {
+    "id": "U2593",
+    "decision": "rewritten",
+    "reason": "dropped the export of retryOutcomeNotice; used by runGate"
+  },
+  {
+    "id": "U2594",
+    "decision": "removed",
+    "reason": "removed the never-read DOC_WINDOW.stem; the doc now says stem mentions take no window (test adjusted)"
+  },
+  {
+    "id": "U2595",
+    "decision": "rewritten",
+    "reason": "header now names three hard failures including the adopted-point throw"
+  },
+  {
+    "id": "U2596",
+    "decision": "rewritten",
+    "reason": "BriefError and buildBrief docstrings now list the adopted-spec throw"
+  },
+  {
+    "id": "U2597",
+    "decision": "kept",
+    "reason": "the ceiling rationale is a dated measurement (27.07.2026) and says so; the ceiling itself is still enforced"
+  },
+  {
+    "id": "U2598",
+    "decision": "rewritten",
+    "reason": "brief-size figures at the adoption cap and return block now match the measured ~1.7k median / ~105k"
+  },
+  {
+    "id": "U2599",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:4 — the TASKS.md ~59k / design.md ~46k token figures date from 26.07.2026 (repeated in HOUSE_FACTS and point-brief.mjs:3); re-measure or date them"
+  },
+  {
+    "id": "U2600",
+    "decision": "rewritten",
+    "reason": "header now says references resolve against design.md, CLAUDE.md and every document the spec names"
+  },
+  {
+    "id": "U2601",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:29 — the named criterion alternative is printed only for work-order-point resolutions (criterionNote), not for every ambiguous bare section number as the header promises"
+  },
+  {
+    "id": "U2602",
+    "decision": "rewritten",
+    "reason": "notation comment now admits a standalone backticked reference cannot fail loudly"
+  },
+  {
+    "id": "U2603",
+    "decision": "rewritten",
+    "reason": "point-parser doc now says any markdown heading level ends a point"
+  },
+  {
+    "id": "U2604",
+    "decision": "rewritten",
+    "reason": "compareSectionIds doc now says plain numbers sort before lettered ids"
+  },
+  {
+    "id": "U2605",
+    "decision": "rewritten",
+    "reason": "parseDesignSections doc now says only numbered headings end a section"
+  },
+  {
+    "id": "U2606",
+    "decision": "rewritten",
+    "reason": "intro-only truncation now described for any section with direct subsections"
+  },
+  {
+    "id": "U2607",
+    "decision": "rewritten",
+    "reason": "doc now says a subsection that skips a heading level is not counted as a direct child"
+  },
+  {
+    "id": "U2608",
+    "decision": "rewritten",
+    "reason": "duplicate-id comment now says the later duplicate is dropped"
+  },
+  {
+    "id": "U2609",
+    "decision": "rewritten",
+    "reason": "registry doc now says a bare § normally means design.md and may be a CLAUDE.md §7.1 criterion"
+  },
+  {
+    "id": "U2610",
+    "decision": "rewritten",
+    "reason": "cascade step 2 now says file or basename mentions only; a stem reaches by adjacency"
+  },
+  {
+    "id": "U2611",
+    "decision": "kept",
+    "reason": "CLAUDE.md §7.1 still numbers 1..32; the constant is only a fallback when parsing fails"
+  },
+  {
+    "id": "U2612",
+    "decision": "rewritten",
+    "reason": "overlap example now uses the bare filename peoples-1890.md, which the basename alias can match inside"
+  },
+  {
+    "id": "U2613",
+    "decision": "rewritten",
+    "reason": "CALL_DISCIPLINE doc now says 'mirrored, as a German rendering' instead of 'shared verbatim'"
+  },
+  {
+    "id": "U2614",
+    "decision": "rewritten",
+    "reason": "both search-share figures now read ~25 %"
+  },
+  {
+    "id": "U2615",
+    "decision": "rewritten",
+    "reason": "ladder rationale now says enrichments 'then declared nine'; orientation comment says 'over forty' (43 measured)"
+  },
+  {
+    "id": "U2616",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:1197 — the orientation gate names npm run typecheck:test while the ladder's exhaustive list at line 886 names tsc; state one command for both"
+  },
+  {
+    "id": "U2617",
+    "decision": "rewritten",
+    "reason": "return protocol now lists tsc, the lockfile audit and the picture judgement among the gates"
+  },
+  {
+    "id": "U2618",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:888 — the ladder makes the --section rung part of the binding merge gate while stating a --section run is never coverage; the policy needs one reading"
+  },
+  {
+    "id": "U2619",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:1196 — the orientation block owes the cheapest covering rung and in the same block says a --section run counts as no coverage (same policy tension as line 888)"
+  },
+  {
+    "id": "U2620",
+    "decision": "rewritten",
+    "reason": "orientationBlock doc now points at the point-1134 gate instead of point 595's whole-suite proof"
+  },
+  {
+    "id": "U2621",
+    "decision": "rewritten",
+    "reason": "orientation text now says to regenerate if the tree moved, instead of 'cannot be stale'"
+  },
+  {
+    "id": "U2622",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:1126 — an orientation holding only unmapped paths is dropped by the early return, though uncovered paths must be named"
+  },
+  {
+    "id": "U2623",
+    "decision": "rewritten",
+    "reason": "PATH_TOKEN comment no longer claims the token requires a slash; pathsIn does"
+  },
+  {
+    "id": "U2624",
+    "decision": "rewritten",
+    "reason": "trailing-slash comment now says src/ui and src/ui/ stay two entries, matching the code"
+  },
+  {
+    "id": "U2625",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:1181 — 'declares no sections' is also printed when the suite's sections could not be read (point-brief.mjs:29-34, 179-185)"
+  },
+  {
+    "id": "U2626",
+    "decision": "rewritten",
+    "reason": "house-facts heading now says the list began 27.07.2026 instead of 'today'"
+  },
+  {
+    "id": "U2627",
+    "decision": "rewritten",
+    "reason": "co-author rule now says to write the model you are, with Opus 5 only as the form"
+  },
+  {
+    "id": "U2628",
+    "decision": "rewritten",
+    "reason": "sentence-case rule moved from HOW TO USE THIS BRIEF to the house facts"
+  },
+  {
+    "id": "U2629",
+    "decision": "rewritten",
+    "reason": "house fact now limits stand-down to session guards and says commit/push hooks bind every session"
+  },
+  {
+    "id": "U2630",
+    "decision": "rewritten",
+    "reason": "adoptionHeaderLines now reads ADOPTION_DEPTH_CAP directly, the two-level wording matching the fixed cap"
+  },
+  {
+    "id": "U2631",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:1271 — headerLines' astraShare default is a SETTING (astra-share-core DEFAULT_SETTING) while point-brief.mjs:221-223 passes a STATE object carrying .problem"
+  },
+  {
+    "id": "U2632",
+    "decision": "kept",
+    "reason": "claim does not hold: scripts/doc-budget-core.mjs and scripts/doc-budget-guard.mjs exist"
+  },
+  {
+    "id": "U2633",
+    "decision": "kept",
+    "reason": "a one-off corpus measurement stated as such; nothing to fix"
+  },
+  {
+    "id": "U2634",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:845 — RENDER_SUITE is a hand-kept suite list, the pattern the orientation comment (lines 958-959) calls wrong within a month; derive it from scripts/verify"
+  },
+  {
+    "id": "U2635",
+    "decision": "rewritten",
+    "reason": "a design.md lettered part is now labelled 'read on demand'; only carried sections say 'carried above'"
+  },
+  {
+    "id": "U2636",
+    "decision": "backlog",
+    "reason": "scripts/point-brief-core.mjs:1598 — adopted-reference map lines omit the alsoIn alternatives and criterion warning that lines 386-390 promise to keep"
+  },
+  {
+    "id": "U2637",
+    "decision": "rewritten",
+    "reason": "ambiguous-adoption message now says the number 'may ALSO be' a criterion, true also under the 1-32 fallback"
+  },
+  {
+    "id": "U2638",
+    "decision": "rewritten",
+    "reason": "empty-carried note now says the spec names no design.md section to carry"
+  },
+  {
+    "id": "U2639",
+    "decision": "rewritten",
+    "reason": "--tokens example now says estimated size"
+  },
+  {
+    "id": "U2640",
+    "decision": "rewritten",
+    "reason": "header now says over-ceiling exits 2 with the brief still printed"
+  },
+  {
+    "id": "U2641",
+    "decision": "rewritten",
+    "reason": "diff comment now says the prospective path survives on a clean main level with origin/main"
+  },
+  {
+    "id": "U2642",
+    "decision": "rewritten",
+    "reason": "readTree doc no longer claims every reading is bounded; only what the block prints is capped"
+  },
+  {
+    "id": "U2643",
+    "decision": "backlog",
+    "reason": "scripts/point-brief.mjs:176 — a named directory path ending in '/' that is missing emits no file line, so the catch's 'the file line above already says so' is false and the absence is lost"
+  },
+  {
+    "id": "U2644",
+    "decision": "rewritten",
+    "reason": "CLAUDE.md comment now says its §7.1 criteria are read too"
+  },
+  {
+    "id": "U2645",
+    "decision": "rewritten",
+    "reason": "core and guard headers now say one PROOF line per command, all of them to be covered"
+  },
+  {
+    "id": "U2646",
+    "decision": "rewritten",
+    "reason": "dropped the stale '500-odd points' corpus size"
+  },
+  {
+    "id": "U2647",
+    "decision": "rewritten",
+    "reason": "proofCommandsFor doc now says the first text whose copy names proof commands wins"
+  },
+  {
+    "id": "U2648",
+    "decision": "kept",
+    "reason": "claim does not hold: closingTickClaim exists in closing-guard-core.mjs:343 and tickClaim is documented as its shared form"
+  },
+  {
+    "id": "U2649",
+    "decision": "backlog",
+    "reason": "scripts/point-proof-core.mjs:5 — the motivating example calls scripts/measure-context-cost.mjs unused by any gate; batch-baseline and measure-point-cost now import its core, so recheck the example"
+  },
+  {
+    "id": "U2650",
+    "decision": "kept",
+    "reason": "claim does not hold: criticalityOf exists in criticality-review-guard-core.mjs"
+  },
+  {
+    "id": "U2651",
+    "decision": "rewritten",
+    "reason": "ledger doc now names the atIso field the guard writes"
+  },
+  {
+    "id": "U2652",
+    "decision": "rewritten",
+    "reason": "--status now judges freshness with proofSatisfied, so a changed demand no longer shows as satisfied"
+  },
+  {
+    "id": "U2653",
+    "decision": "rewritten",
+    "reason": "--status now judges freshness with proofSatisfied, so an unknown HEAD no longer shows as satisfied"
+  },
+  {
+    "id": "U2654",
+    "decision": "kept",
+    "reason": "claim does not hold: CI (ci.yml) runs build, lint, audit-check and test:unit, exactly FULL_GATE; npm run build already runs tsc -b"
+  },
+  {
+    "id": "U2655",
+    "decision": "rewritten",
+    "reason": "the light-gate plan reason now says 'board and screenshots only'; the function name is kept"
+  },
+  {
+    "id": "U2656",
+    "decision": "rewritten",
+    "reason": "gatePlan doc now says main gets the full gate unless every path is board or screenshot material"
+  },
+  {
+    "id": "U2657",
+    "decision": "rewritten",
+    "reason": "normaliseLoad doc now says an unrecognised level passes through and ranks as unknown"
+  },
+  {
+    "id": "U2658",
+    "decision": "rewritten",
+    "reason": "runGate doc now says a red blocks at once when no readLoad seam is supplied"
+  },
+  {
+    "id": "U2659",
+    "decision": "backlog",
+    "reason": "scripts/pre-push-gate-core.mjs:261 — a first-attempt red whose retry returns UNAVAILABLE is recorded ok:true, so a red can pass the gate without a successful re-run"
+  },
+  {
+    "id": "U2660",
+    "decision": "rewritten",
+    "reason": "retry-passed notice now reads the first red as the machine's and says an intermittent defect would look the same"
+  },
+  {
+    "id": "U2661",
+    "decision": "rewritten",
+    "reason": "runGate doc now says the load reader is asked on every first-attempt red"
+  },
+  {
+    "id": "U2662",
+    "decision": "rewritten",
+    "reason": "summaryLine doc now describes the returned text; the numeric rules moved to summaryCount"
+  },
+  {
+    "id": "U2663",
+    "decision": "rewritten",
+    "reason": "comment now says no counted file is missing past that point, the checkout possibly being uncountable"
+  },
+  {
+    "id": "U2664",
+    "decision": "kept",
+    "reason": "the 'never blocks' line prints only on the 'first' branch, reached after the missing-suites check, where the run does not block; the unit test pins that wording"
+  },
+  {
+    "id": "U2665",
+    "decision": "rewritten",
+    "reason": "retry verdict now says 'after a red on a machine not verified quiet', covering unmeasured load"
+  },
+  {
+    "id": "U2666",
+    "decision": "rewritten",
+    "reason": "formatVerdict comment now scopes the no-escape-hatch rule to the fast gate and explains the file-count acknowledgement"
+  },
+  {
+    "id": "U2667",
+    "decision": "rewritten",
+    "reason": "refusal now says CI runs the same steps and the state risks a red CI run, instead of asserting CI would fail"
+  },
+  {
+    "id": "U2668",
+    "decision": "rewritten",
+    "reason": "header now says the retry skips nothing and names the gate's separate stand-downs"
+  },
+  {
+    "id": "U2669",
+    "decision": "rewritten",
+    "reason": "gate-state doc now says the baseline is written when the file count moves"
+  },
+  {
+    "id": "U2670",
+    "decision": "rewritten",
+    "reason": "doc now says a lost baseline records rather than blocking on the baseline, the on-disk count still able to block"
+  },
+  {
+    "id": "U2671",
+    "decision": "rewritten",
+    "reason": "write-failure comment now says the next run is compared with a stale baseline"
+  },
+  {
+    "id": "U2672",
+    "decision": "kept",
+    "reason": "a worktree before worktree-bootstrap has no node_modules; the stand-down reason is accurate"
+  },
+  {
+    "id": "U2673",
+    "decision": "backlog",
+    "reason": "scripts/pre-push-gate.mjs:323 — an acknowledged on-disk shortfall with nextBaseline === baseline skips the state write, so the acknowledgment leaves no persisted trace"
+  },
+  {
+    "id": "U2674",
+    "decision": "rewritten",
+    "reason": "header now names PostToolUse[Bash|PowerShell]"
+  },
+  {
+    "id": "U2675",
+    "decision": "rewritten",
+    "reason": "a parsed non-object payload (JSON null) now exits 0 before property access, so the hook really never errors"
+  },
+  {
+    "id": "U2676",
+    "decision": "kept",
+    "reason": "claim does not hold as a defect: run-logged.mjs lives in scripts/verify/, which WAIT_CMD admits, so a run-logged launch arms"
+  },
+  {
+    "id": "U2677",
+    "decision": "kept",
+    "reason": "auto and at are diagnostic fields of a local marker a human reads; harmless"
+  },
+  {
+    "id": "U2678",
+    "decision": "rewritten",
+    "reason": "blocking message now says the task was launched and not yet cleared, instead of asserting it is in flight"
+  },
+  {
+    "id": "U2679",
+    "decision": "rewritten",
+    "reason": "prep wording now says read-only on the code, so updating the board card no longer contradicts it"
+  },
+  {
+    "id": "U2680",
+    "decision": "rewritten",
+    "reason": "Stop-mode description now says it blocks on a falsy or absent prepped in an object marker"
+  },
+  {
+    "id": "U2681",
+    "decision": "rewritten",
+    "reason": "SAMPLER doc now says it is a function handed to page.evaluate"
+  },
+  {
+    "id": "U2682",
+    "decision": "kept",
+    "reason": "the §7.2 citation here holds: CLAUDE.md §7.2 says a red closes only when fixed, charged or filed, so a probe closes no red"
+  },
+  {
+    "id": "U2683",
+    "decision": "kept",
+    "reason": "the extra worst-overlap fields are cheap diagnostic context in the sampled frames; harmless"
+  },
+  {
+    "id": "U2684",
+    "decision": "rewritten",
+    "reason": "fingerprint comment now says only text and top-left corner are compared, sizes not"
+  },
+  {
+    "id": "U2685",
+    "decision": "rewritten",
+    "reason": "fingerprint comment no longer claims a frozen fusion was originally placed; it only says it did not move between two frames"
+  },
+  {
+    "id": "U2686",
+    "decision": "rewritten",
+    "reason": "replaced the — escape in the comment with a real dash"
+  },
+  {
+    "id": "U2687",
+    "decision": "rewritten",
+    "reason": "crowd-wait comment now says the wait is bounded at 30 s and sampling proceeds on timeout"
+  },
+  {
+    "id": "U2688",
+    "decision": "backlog",
+    "reason": "scripts/probe-label-fusion.mjs:191 — the header promises a comparison with the declutter's cached labelBox() measurement, but the probe compares the seen box with a fresh probe measurement instead"
+  },
+  {
+    "id": "U2689",
+    "decision": "backlog",
+    "reason": "scripts/publish-outcome-core.mjs:2 — the module is marked LEGACY for the retired artifact mirror, yet lock-heartbeat-hook.mjs still imports it; decide whether the mirror path is retired and remove or relabel"
+  },
+  {
+    "id": "U2690",
+    "decision": "rewritten",
+    "reason": "'today's behaviour/record' now reads 'as before point 399'"
+  },
+  {
+    "id": "U2691",
+    "decision": "kept",
+    "reason": "responseText is used internally; the test export is fine"
+  },
+  {
+    "id": "U2692",
+    "decision": "kept",
+    "reason": "claim does not hold: publishDeferred is a dashboard-state field read and set around board-currency-core.mjs:174-229; clearing it on a publish is correct"
+  },
+  {
+    "id": "U2693",
+    "decision": "rewritten",
+    "reason": "decision docstring now names the only measure (commits in no remote ref), not working-tree changes"
+  },
+  {
+    "id": "U2694",
+    "decision": "rewritten",
+    "reason": "inFlight doc now says the declaration is age-bounded and not checked for liveness"
+  },
+  {
+    "id": "U2695",
+    "decision": "rewritten",
+    "reason": "proof command is now git rev-list --count HEAD --not --remotes, the guard's own measure, which also works detached"
+  },
+  {
+    "id": "U2696",
+    "decision": "rewritten",
+    "reason": "dropped the export of FULL_GATE_BRANCH; conflictNote uses it locally"
+  },
+  {
+    "id": "U2697",
+    "decision": "rewritten",
+    "reason": "header now says the estimates were unmeasured until this command"
+  },
+  {
+    "id": "U2698",
+    "decision": "rewritten",
+    "reason": "header now says factors rest on medians — a median of ratios, or a ratio of medians for the measured-elapsed basis"
+  },
+  {
+    "id": "U2699",
+    "decision": "rewritten",
+    "reason": "dropped the export of GLOBAL_FACTOR_TOLERANCE; kept as the decision's default"
+  },
+  {
+    "id": "U2700",
+    "decision": "kept",
+    "reason": "ESTIMATE_FLOOR_HOURS is used internally by roundHours; the test export is fine"
+  },
+  {
+    "id": "U2701",
+    "decision": "rewritten",
+    "reason": "dropped the export of ESTIMATE_STEP_HOURS; used by roundHours"
+  },
+  {
+    "id": "U2702",
+    "decision": "rewritten",
+    "reason": "CRITICALITY_LEVELS doc now calls them the standard labels and points at invented labels like MAXIMUM"
+  },
+  {
+    "id": "U2703",
+    "decision": "rewritten",
+    "reason": "dropped the export of CRITICALITY_LEVELS; used by parseCriticality"
+  },
+  {
+    "id": "U2704",
+    "decision": "rewritten",
+    "reason": "dropped the export of UNKNOWABLE_CLASSES; used by classSummaries"
+  },
+  {
+    "id": "U2705",
+    "decision": "rewritten",
+    "reason": "estimateTail doc now says the tail is trimmed and set behind one space"
+  },
+  {
+    "id": "U2706",
+    "decision": "kept",
+    "reason": "estimateTail, roundHours and formatEstimate are used internally; test exports are fine"
+  },
+  {
+    "id": "U2707",
+    "decision": "rewritten",
+    "reason": "parseTickEvents doc now says it reads every added '- [x] N.' line"
+  },
+  {
+    "id": "U2708",
+    "decision": "backlog",
+    "reason": "scripts/queue-calibration-core.mjs:212 — hard-coded repository counts (208 of 283 merges, 73 landings, 67 of 73 and 68/2/3) will age; date them or derive them in the report"
+  },
+  {
+    "id": "U2709",
+    "decision": "kept",
+    "reason": "mergedBranchPoint is used internally by attributeMerges; the test export is fine"
+  },
+  {
+    "id": "U2710",
+    "decision": "rewritten",
+    "reason": "dropped the exports of MERGE_LOOKBACK and MERGE_MAX_LAG_HOURS; kept as attributeMerges defaults"
+  },
+  {
+    "id": "U2711",
+    "decision": "rewritten",
+    "reason": "dropped the inconsistent p99 figure and said 'about twice' for 3 h against the 1.55 h maximum"
+  },
+  {
+    "id": "U2712",
+    "decision": "rewritten",
+    "reason": "first-parent record doc now says parent shas, not a count"
+  },
+  {
+    "id": "U2713",
+    "decision": "rewritten",
+    "reason": "removed the always-false claimed.has(byName.sha) test; the find already excludes claimed merges"
+  },
+  {
+    "id": "U2714",
+    "decision": "backlog",
+    "reason": "scripts/queue-calibration-core.mjs:343 — the lag-cutoff break assumes timestamps fall monotonically along the first-parent chain, which neither the parser nor attribution enforces"
+  },
+  {
+    "id": "U2715",
+    "decision": "removed",
+    "reason": "removed the never-assigned SPAN_NO_BRANCH, its always-zero 'explicitly no-branch' report counter, and the test fixture's use of it"
+  },
+  {
+    "id": "U2716",
+    "decision": "removed",
+    "reason": "removed spanBasisOf, which had no caller"
+  },
+  {
+    "id": "U2717",
+    "decision": "backlog",
+    "reason": "scripts/queue-calibration-core.mjs:393 — the legacy attribution/delegated and picture:true fallbacks in classesOf are unreachable from the command and serve only test fixtures; migrate the fixtures to lane/pictureClass, then drop them"
+  },
+  {
+    "id": "U2718",
+    "decision": "rewritten",
+    "reason": "classSummaries doc now notes axisSpread also holds picture-verified outside the vote"
+  },
+  {
+    "id": "U2719",
+    "decision": "rewritten",
+    "reason": "ratio comment now says the global-factor test reads the correctable population"
+  },
+  {
+    "id": "U2720",
+    "decision": "kept",
+    "reason": "classSummaries, axisSpread and globalFactorDecision are used internally; test exports are fine"
+  },
+  {
+    "id": "U2721",
+    "decision": "backlog",
+    "reason": "scripts/queue-calibration-core.mjs:521 — axisSpread's correctableComparable === undefined fallback is unreachable from classSummaries and serves only hand-built test summaries; migrate the tests, then drop it"
+  },
+  {
+    "id": "U2722",
+    "decision": "rewritten",
+    "reason": "globalFactorDecision doc now says every axis that can be compared, matching the excluded-axis rule below"
+  },
+  {
+    "id": "U2723",
+    "decision": "kept",
+    "reason": "the factor: null placeholders keep the decision shape stable before calibrationReading fills it"
+  },
+  {
+    "id": "U2724",
+    "decision": "rewritten",
+    "reason": "'on the day it ships' now reads in past tense about the first run"
+  },
+  {
+    "id": "U2725",
+    "decision": "removed",
+    "reason": "removed the impossible undefined checks after ?? null (promiseMedians, rewritePlan, CLI withEstimate)"
+  },
+  {
+    "id": "U2726",
+    "decision": "rewritten",
+    "reason": "the WHICH OPEN POINTS ASK FOR A PICTURE PROOF doc moved to pictureBearingPoints; PICTURE_VERIFIED got its own line"
+  },
+  {
+    "id": "U2727",
+    "decision": "kept",
+    "reason": "PICTURE_HOLDOUT_REASON is used internally; the test export is fine"
+  },
+  {
+    "id": "U2728",
+    "decision": "rewritten",
+    "reason": "dropped the exports of PICTURE_PROOF_MARKERS, PICTURE_BACKEND_MARKER, PICTURE_VISUAL_COMPANION and PICTURE_PROOF_UPKEEP"
+  },
+  {
+    "id": "U2729",
+    "decision": "kept",
+    "reason": "PICTURE_PROOF_DENIALS and splitClauses are used internally; test exports are fine"
+  },
+  {
+    "id": "U2730",
+    "decision": "rewritten",
+    "reason": "upkeep overview no longer advertises the removed noun-only stored-artefact rule"
+  },
+  {
+    "id": "U2731",
+    "decision": "rewritten",
+    "reason": "upkeep overview now says only a housekeeping verb's own object is touched, so an asked-for screenshot test stays a demand"
+  },
+  {
+    "id": "U2732",
+    "decision": "rewritten",
+    "reason": "list-continuation example now ends without a shared predicate, matching the rule"
+  },
+  {
+    "id": "U2733",
+    "decision": "rewritten",
+    "reason": "dropped the export of isListContinuation and its never-passed markers parameter"
+  },
+  {
+    "id": "U2734",
+    "decision": "rewritten",
+    "reason": "dropped the export of lineDemandsPicture; clauseDemandsPicture stays exported for its test"
+  },
+  {
+    "id": "U2735",
+    "decision": "backlog",
+    "reason": "scripts/queue-calibration-core.mjs:914 — hard-coded measurements ('sixteen review rounds', 'exactly one denial', 'all 196 picture-bearing points') will age as the work order grows"
+  },
+  {
+    "id": "U2736",
+    "decision": "kept",
+    "reason": "owesRenderedProof is used internally; the test export is fine"
+  },
+  {
+    "id": "U2737",
+    "decision": "rewritten",
+    "reason": "ledger doc now says a landed entry is measured against its baseline, the last promise before any correction, matching estimateForLanding"
+  },
+  {
+    "id": "U2738",
+    "decision": "rewritten",
+    "reason": "dropped the exports of ledgerEntry, ledgerWithIntent and ledgerWithoutIntent"
+  },
+  {
+    "id": "U2739",
+    "decision": "backlog",
+    "reason": "scripts/queue-calibration-core.mjs:1009 — updateEstimateLedger skips a card that lost its estimate or switched to an inherited one without clearing the old entry, so an obsolete baseline can survive into the landing snapshot"
+  },
+  {
+    "id": "U2740",
+    "decision": "rewritten",
+    "reason": "rewritePlan doc now names both correction bases"
+  },
+  {
+    "id": "U2741",
+    "decision": "kept",
+    "reason": "isComparedSnapshot and ledgerAfterApply are used internally; test exports are fine"
+  },
+  {
+    "id": "U2742",
+    "decision": "rewritten",
+    "reason": "applyCorrections doc now says writeCard returns { refused, detail }"
+  },
+  {
+    "id": "U2743",
+    "decision": "removed",
+    "reason": "removed the unused return value of the local save helper"
+  },
+  {
+    "id": "U2744",
+    "decision": "kept",
+    "reason": "claim does not hold: board-queue-core.mjs and board-queue.mjs read the calibration defaults"
+  },
+  {
+    "id": "U2745",
+    "decision": "rewritten",
+    "reason": "inheritedEstimate comment now says the medians come from the correctable population"
+  },
+  {
+    "id": "U2746",
+    "decision": "rewritten",
+    "reason": "usage block now lists --state-dir"
+  },
+  {
+    "id": "U2747",
+    "decision": "rewritten",
+    "reason": "re-run paragraph no longer claims factors read near 1.0; it says runs re-measure against the retained baselines"
+  },
+  {
+    "id": "U2748",
+    "decision": "rewritten",
+    "reason": "the 'picture-verified' literal now uses the imported PICTURE_VERIFIED"
+  },
+  {
+    "id": "U2749",
+    "decision": "rewritten",
+    "reason": "comment now says either the owed demand or a retained attestation holds a landing out"
+  },
+  {
+    "id": "U2750",
+    "decision": "rewritten",
+    "reason": "zero-snapshot message now says zero compared snapshots"
+  },
+  {
+    "id": "U2751",
+    "decision": "removed",
+    "reason": "removed the hard-coded 'point 713 still stands at 14 do-not-merge rounds' line; point 713 is closed"
+  },
+  {
+    "id": "U2752",
+    "decision": "rewritten",
+    "reason": "class note now says the span-based correction needs a promise median of the open cards"
+  },
+  {
+    "id": "U2753",
+    "decision": "rewritten",
+    "reason": "a non-comparable picture-verified class is now reported as outside the correctable population, not PENDING"
+  },
+  {
+    "id": "U2754",
+    "decision": "rewritten",
+    "reason": "spread report now names picture-verified as outside correction, apart from missing-information classes"
+  },
+  {
+    "id": "U2755",
+    "decision": "rewritten",
+    "reason": "report heading and store comment now call them the factors the rewrite applies, written whether or not --apply ran"
+  },
+  {
+    "id": "U2756",
+    "decision": "rewritten",
+    "reason": "pictureBearingPoints(tasksAll) is computed once and reused"
+  },
+  {
+    "id": "U2757",
+    "decision": "rewritten",
+    "reason": "parse error, inherited-defaults line and APPLIED line now print the actual state-dir paths, with the env override in the render instruction"
+  },
+  {
+    "id": "U2758",
+    "decision": "rewritten",
+    "reason": "comment now says the run without --apply leaves the queue untouched and writes the store once"
+  },
+  {
+    "id": "U2759",
+    "decision": "rewritten",
+    "reason": "header no longer says 'Three invariants'; it names rules 1, 1b, 1c, 1d and 2"
+  },
+  {
+    "id": "U2760",
+    "decision": "removed",
+    "reason": "removed the FINDER_POINTS/RELEASE_TAG_POINT re-export; its only user, the guard's own test, now imports them from board-queue-core.mjs"
+  },
+  {
+    "id": "U2761",
+    "decision": "rewritten",
+    "reason": "dropped the export of NON_CLAIM_CUES; DONE_CLAIM_TOKENS stays exported for its test"
+  },
+  {
+    "id": "U2762",
+    "decision": "rewritten",
+    "reason": "now-card and done-claim docs now name the chip as well as the title as the point source"
+  },
+  {
+    "id": "U2763",
+    "decision": "backlog",
+    "reason": "scripts/queue-order-guard-core.mjs:167 — nowCardPoint's title fallback serves cards written before point 655; drop it once every now-card carries a chip"
+  },
+  {
+    "id": "U2764",
+    "decision": "rewritten",
+    "reason": "comment now names RELEASE_TAG_POINT instead of hard-coding 174"
+  },
+  {
+    "id": "U2765",
+    "decision": "kept",
+    "reason": "the listed functions are used internally by evaluate; test exports are fine"
+  },
+  {
+    "id": "U2766",
+    "decision": "rewritten",
+    "reason": "queueOrderDrift doc now says only duplicates of points in the derived order are reported"
+  },
+  {
+    "id": "U2767",
+    "decision": "rewritten",
+    "reason": "evaluate now destructures its input inside the try, so evaluate(null) allows as the contract says"
+  },
+  {
+    "id": "U2768",
+    "decision": "rewritten",
+    "reason": "finder-order remedy now says to rebuild the queue from the work order instead of reordering cards by hand"
+  },
+  {
+    "id": "U2769",
+    "decision": "rewritten",
+    "reason": "duplicate remedy now says a generated queue renders each point at most once"
+  },
+  {
+    "id": "U2770",
+    "decision": "rewritten",
+    "reason": "drift message now says the position is among the points both lists share"
+  },
+  {
+    "id": "U2771",
+    "decision": "rewritten",
+    "reason": "wrapper header now lists rule 1d, the release boundary"
+  },
+  {
+    "id": "U2772",
+    "decision": "rewritten",
+    "reason": "wrapper header now lists every file read and the rank-baseline write"
+  },
+  {
+    "id": "U2773",
+    "decision": "rewritten",
+    "reason": "stand-down cause now uses CAUSE.notLockOwner from guard-preflight-core.mjs"
+  },
+  {
+    "id": "U2774",
+    "decision": "rewritten",
+    "reason": "missing-TASKS comment now says reading it as empty would pass too, silently, matching the core"
+  },
+  {
+    "id": "U2775",
+    "decision": "rewritten",
+    "reason": "header no longer promises 'ranked ONCE'; it names the repeat question after a remembered neighbour closes"
+  },
+  {
+    "id": "U2776",
+    "decision": "rewritten",
+    "reason": "header now names the release boundary (point 789) beside the append gate"
+  },
+  {
+    "id": "U2777",
+    "decision": "rewritten",
+    "reason": "'Everything here serves that single question' now says the first half serves it and the release boundary asks a second"
+  },
+  {
+    "id": "U2778",
+    "decision": "rewritten",
+    "reason": "state sketch now carries the place (and optional origin) field of ranked entries"
+  },
+  {
+    "id": "U2779",
+    "decision": "rewritten",
+    "reason": "baseline description now says it only shrinks while a question stands or the boundary is breached"
+  },
+  {
+    "id": "U2780",
+    "decision": "kept",
+    "reason": "the 174 in the rationale is historical context of the user's 20.08.2026 request, not a second source of the number"
+  },
+  {
+    "id": "U2781",
+    "decision": "rewritten",
+    "reason": "dropped the export of ORIGINS; used internally"
+  },
+  {
+    "id": "U2782",
+    "decision": "rewritten",
+    "reason": "dropped the export of URGENT_RANK_CMD; used internally"
+  },
+  {
+    "id": "U2783",
+    "decision": "rewritten",
+    "reason": "dropped the export of USER_RANK_CMD; used internally"
+  },
+  {
+    "id": "U2784",
+    "decision": "rewritten",
+    "reason": "dropped the export of BLOCKING_PATTERNS; used internally"
+  },
+  {
+    "id": "U2785",
+    "decision": "rewritten",
+    "reason": "NEGATION_CUE doc now names all three suppressions: attached before, own clause after, surrounding idiom"
+  },
+  {
+    "id": "U2786",
+    "decision": "rewritten",
+    "reason": "NEGATION_WINDOW doc now says it only bounds the slices the negation tests read"
+  },
+  {
+    "id": "U2787",
+    "decision": "backlog",
+    "reason": "scripts/queue-rank-core.mjs:190 — HYPOTHETICAL_BEFORE stops only at punctuation, not at connectors, so 'it may fail but it blocks the release' is read as a hypothesis; no test covers it"
+  },
+  {
+    "id": "U2788",
+    "decision": "rewritten",
+    "reason": "history note about `without` replaced by a statement of the current rule"
+  },
+  {
+    "id": "U2789",
+    "decision": "rewritten",
+    "reason": "RANK_RECORD_PATH doc now lists last and ahead decisions, the baseline and the frozen front"
+  },
+  {
+    "id": "U2790",
+    "decision": "rewritten",
+    "reason": "RESTORE_CMD doc now says HEAD is the default restore and recordProvenanceFrom prefers a readable index copy"
+  },
+  {
+    "id": "U2791",
+    "decision": "rewritten",
+    "reason": "dropped the export of INSPECT_CMD; used internally"
+  },
+  {
+    "id": "U2792",
+    "decision": "removed",
+    "reason": "removed the redundant !known.has(n) test; every point past lastKnown is unknown by construction"
+  },
+  {
+    "id": "U2793",
+    "decision": "rewritten",
+    "reason": "storedRecord doc now says writers build on it directly or through pruneRankRecord/storedChange"
+  },
+  {
+    "id": "U2794",
+    "decision": "rewritten",
+    "reason": "torn-flag doc now says every writer builds through storedRecord with the boundary part"
+  },
+  {
+    "id": "U2795",
+    "decision": "rewritten",
+    "reason": "normaliseRankRecord doc now gives the current shape with boundary, origin and place, and calls torn a parser mark"
+  },
+  {
+    "id": "U2796",
+    "decision": "kept",
+    "reason": "the git-reader path passes cat-file stdout after a status check, which matches the null-or-string contract in substance"
+  },
+  {
+    "id": "U2797",
+    "decision": "rewritten",
+    "reason": "'inside' now described as placed before a remembered point"
+  },
+  {
+    "id": "U2798",
+    "decision": "rewritten",
+    "reason": "the dangling '…and symmetrically' now states both directions itself"
+  },
+  {
+    "id": "U2799",
+    "decision": "removed",
+    "reason": "removed the test-only unrankedAppends wrapper; the test keeps a local helper over appendGateState"
+  },
+  {
+    "id": "U2800",
+    "decision": "rewritten",
+    "reason": "not-high cause now says no recorded reason can clear it, instead of none can be recorded"
+  },
+  {
+    "id": "U2801",
+    "decision": "removed",
+    "reason": "removed the test-only releaseBoundaryBreaches wrapper; the test keeps a local helper over releaseBoundaryState"
+  },
+  {
+    "id": "U2802",
+    "decision": "rewritten",
+    "reason": "dropped the export of boundaryArmedMessage; used by seedBoundary"
+  },
+  {
+    "id": "U2803",
+    "decision": "rewritten",
+    "reason": "archive comment now says the guard and the CLI read it only in this case, without the unverifiable size figure"
+  },
+  {
+    "id": "U2804",
+    "decision": "rewritten",
+    "reason": "baseline-freeze rationale now says the boundary judges against the frozen front; the obsolete survivor argument is gone"
+  },
+  {
+    "id": "U2805",
+    "decision": "removed",
+    "reason": "the 'fourth state' comment went with the unreachable branch it justified"
+  },
+  {
+    "id": "U2806",
+    "decision": "removed",
+    "reason": "removed the unreachable torn-or-unarmed return in the question branch; the same record returned earlier"
+  },
+  {
+    "id": "U2807",
+    "decision": "rewritten",
+    "reason": "dropped the always-true settled && in sameBaseline"
+  },
+  {
+    "id": "U2808",
+    "decision": "rewritten",
+    "reason": "TORN_RECORD_MESSAGE doc now names seedBoundary among the throwers"
+  },
+  {
+    "id": "U2809",
+    "decision": "rewritten",
+    "reason": "recordRank doc now covers both placements, last and ahead"
+  },
+  {
+    "id": "U2810",
+    "decision": "removed",
+    "reason": "removed the test-only originOf; the test now checks origin normalisation directly"
+  },
+  {
+    "id": "U2811",
+    "decision": "removed",
+    "reason": "originOf (user exemption regardless of place) is gone; the comment at the origin normaliser now points at releaseBoundaryState"
+  },
+  {
+    "id": "U2812",
+    "decision": "rewritten",
+    "reason": "comment now names removedRecordMessage instead of the non-existent REMOVED_RECORD_MESSAGE"
+  },
+  {
+    "id": "U2813",
+    "decision": "rewritten",
+    "reason": "removedRecordMessage doc now says a MISSING record the repository carries was removed, not every unarmed checkout"
+  },
+  {
+    "id": "U2814",
+    "decision": "rewritten",
+    "reason": "doc now says the caller is told the restore command, or how to inspect the state when none exists"
+  },
+  {
+    "id": "U2815",
+    "decision": "backlog",
+    "reason": "scripts/queue-rank-core.mjs:1077 — 'an EMPTY open order narrows nothing' holds only for the front; pruneRankRecord drops every ranked decision on an empty order, reachable via writeRankRecord and seedRecord on a transiently empty read"
+  },
+  {
+    "id": "U2816",
+    "decision": "rewritten",
+    "reason": "CLI header no longer promises 'ranked ONCE'"
+  },
+  {
+    "id": "U2817",
+    "decision": "rewritten",
+    "reason": "CLI header and --status gloss now name the release boundary"
+  },
+  {
+    "id": "U2818",
+    "decision": "rewritten",
+    "reason": "usage now shows the user's exemption as --ahead <N> --origin user"
+  },
+  {
+    "id": "U2819",
+    "decision": "rewritten",
+    "reason": "write description now says the baseline and front only shrink while a question stands or the boundary is breached"
+  },
+  {
+    "id": "U2820",
+    "decision": "rewritten",
+    "reason": "'both halves' now reads 'all three parts'"
+  },
+  {
+    "id": "U2821",
+    "decision": "rewritten",
+    "reason": "dropped the export and the never-overridden path parameter of readRankRecord"
+  },
+  {
+    "id": "U2822",
+    "decision": "rewritten",
+    "reason": "dropped the never-supplied default parameters of writeRankRecord, stageRecord and undoWrite"
+  },
+  {
+    "id": "U2823",
+    "decision": "rewritten",
+    "reason": "writer's freeze comment no longer claims settlement would end the question"
+  },
+  {
+    "id": "U2824",
+    "decision": "kept",
+    "reason": "runGit is injectable where it matters (recordProvenance); the other direct calls are fine"
+  },
+  {
+    "id": "U2825",
+    "decision": "backlog",
+    "reason": "scripts/queue-rank.mjs:110 — when ls-files fails (indexStage null) but rev-list succeeds empty, recordProvenance returns tracked=false instead of failing closed"
+  },
+  {
+    "id": "U2826",
+    "decision": "rewritten",
+    "reason": "fail-closed rationale no longer claims the one legitimate arming precedes the first commit"
+  },
+  {
+    "id": "U2827",
+    "decision": "rewritten",
+    "reason": "fail-closed rationale now says a wrong refusal names the state to inspect, not a restore"
+  },
+  {
+    "id": "U2828",
+    "decision": "rewritten",
+    "reason": "stageRecord doc now says --seed is refused on a carried record missing from the checkout"
+  },
+  {
+    "id": "U2829",
+    "decision": "rewritten",
+    "reason": "staging comment now says staging narrows the window and only the commit closes it"
+  },
+  {
+    "id": "U2830",
+    "decision": "rewritten",
+    "reason": "ACTION_FLAGS doc now says at most one, at most once, none meaning status"
+  },
+  {
+    "id": "U2831",
+    "decision": "rewritten",
+    "reason": "commit warnings now say 'until a commit carries', distinct from a staged copy"
+  },
+  {
+    "id": "U2832",
+    "decision": "rewritten",
+    "reason": "--seed dispatch comment now names the carried-but-missing refusal"
+  },
+  {
+    "id": "U2833",
+    "decision": "rewritten",
+    "reason": "baseline commit warning now names the unstaging step before a removal becomes undetectable"
+  },
+  {
+    "id": "U2834",
+    "decision": "kept",
+    "reason": "claim does not hold: docs/batch-autonomy.md (Q1 table and line 1012) names and runs the drill"
+  },
+  {
+    "id": "U2835",
+    "decision": "kept",
+    "reason": "claim does not hold: batch-autostart.mjs --quota-report reads the state file and exits before any write, so the drill writes nothing outside local/"
+  },
+  {
+    "id": "U2836",
+    "decision": "rewritten",
+    "reason": "the numbered assertion list now includes the logged-not-pushed probe check"
+  },
+  {
+    "id": "U2837",
+    "decision": "kept",
+    "reason": "a verbatim quotation of a dated log line; nothing to check or fix in code"
+  },
+  {
+    "id": "U2838",
+    "decision": "rewritten",
+    "reason": "assertion label now claims only what existsSync compares: the pause file is present exactly when it was before"
+  },
+  {
+    "id": "U2839",
+    "decision": "kept",
+    "reason": "10 min is SPAWN_BACKOFF_BASE_MS, the floor the check asserts; the 15 min is the OS launcher's tick that acts on it — the label is consistent"
+  },
+  {
+    "id": "U2840",
+    "decision": "rewritten",
+    "reason": "header now says the goat red was point 506's, since folded into 642, and that its software-lane premise was refuted"
+  },
+  {
+    "id": "U2841",
+    "decision": "rewritten",
+    "reason": "the why rule (and the typedef) now asks for the dated evidence, as short as it allows, not one sentence"
+  },
+  {
+    "id": "U2842",
+    "decision": "kept",
+    "reason": "the stale Nubian-chief expectation is already filed as point 1217, and this entry charges exactly that red to it"
+  },
+  {
+    "id": "U2843",
+    "decision": "kept",
+    "reason": "the same stale expectation in the touch check is already filed as point 1217, which this entry charges"
+  },
+  {
+    "id": "U2844",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:86 — point 1078's charge carries no backend scope although its evidence is webgl/world only, against the narrow-evidence rule at lines 24-26"
+  },
+  {
+    "id": "U2845",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:121 — the settlement-season charge covers dry and wet checks on both backends while its cited measurement is the dry check on WebGPU only"
+  },
+  {
+    "id": "U2846",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:144 — point 1043's charge applies across backends although its comparison was measured on WebGL 2 only"
+  },
+  {
+    "id": "U2847",
+    "decision": "rewritten",
+    "reason": "the 'last lane combination' comment and its sibling inventory are replaced by a statement that holds as siblings are added"
+  },
+  {
+    "id": "U2848",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:292 — 'five further runs' does not reconcile with four readings plus three passes; restate the run count from the record"
+  },
+  {
+    "id": "U2849",
+    "decision": "rewritten",
+    "reason": "the root entry's superseded 'not in the record at all' commentary is replaced by a short statement that the detail decides the operation"
+  },
+  {
+    "id": "U2850",
+    "decision": "rewritten",
+    "reason": "the MSAA-texture-alternative commentary is gone from the root entry; the attachments have their own entries"
+  },
+  {
+    "id": "U2851",
+    "decision": "rewritten",
+    "reason": "the '[Invalid TextureView] cut-down' commentary is gone from the root entry; that sentence has its own entry"
+  },
+  {
+    "id": "U2852",
+    "decision": "rewritten",
+    "reason": "the 'both halves / each downstream sentence' commentary is replaced by the root-only statement"
+  },
+  {
+    "id": "U2853",
+    "decision": "rewritten",
+    "reason": "the split comment now says the downstream sentences have their own entries, the attachments split again in round 23"
+  },
+  {
+    "id": "U2854",
+    "decision": "rewritten",
+    "reason": "the output-msaa why now describes one attachment, split in rounds 22 and 23"
+  },
+  {
+    "id": "U2855",
+    "decision": "rewritten",
+    "reason": "rim-zone WebGPU why now points at the SAME-water check below"
+  },
+  {
+    "id": "U2856",
+    "decision": "rewritten",
+    "reason": "WebGL rim-zone why now credits the SAME-water WebGPU entry below with the quoted wording"
+  },
+  {
+    "id": "U2857",
+    "decision": "rewritten",
+    "reason": "Khartoum why now says the rotation rules out the placement-change cause, consistent with fixing the unsettled jump"
+  },
+  {
+    "id": "U2858",
+    "decision": "rewritten",
+    "reason": "benchmark why no longer counts lanes; it says 939 holds the transient on its other lanes"
+  },
+  {
+    "id": "U2859",
+    "decision": "rewritten",
+    "reason": "'like the two webgpu/settings entries above' now reads 'like the webgpu/settings entries above'"
+  },
+  {
+    "id": "U2860",
+    "decision": "rewritten",
+    "reason": "both point-698 explanations now say the signature needs the crossing sentence, not a count"
+  },
+  {
+    "id": "U2861",
+    "decision": "rewritten",
+    "reason": "the WebGL 1068 entry's comments and why now state the 0.2 % group-share cap the matcher enforces"
+  },
+  {
+    "id": "U2862",
+    "decision": "rewritten",
+    "reason": "the WebGL 1068 why now records the throttle probe as done (0/8 red) and leaves the open question as load-or-defect"
+  },
+  {
+    "id": "U2863",
+    "decision": "rewritten",
+    "reason": "the WebGPU 1068 comment now says under 0.2 %, matching its regex"
+  },
+  {
+    "id": "U2864",
+    "decision": "kept",
+    "reason": "the 1010 detailMatch is kept on purpose for records made before 1067's restatement until 1010 closes"
+  },
+  {
+    "id": "U2865",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1651 — the dig-pair charge claims a count-zero shape restriction its matcher does not enforce (no detailMatch)"
+  },
+  {
+    "id": "U2866",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1673 — the river-bank charge describes a drifting-fleck failure shape, but its matcher restricts only the frame name"
+  },
+  {
+    "id": "U2867",
+    "decision": "rewritten",
+    "reason": "fire-shadow comment now says the ledger keeps measured numbers out of a signature, not that it forbids detailMatch numbers"
+  },
+  {
+    "id": "U2868",
+    "decision": "rewritten",
+    "reason": "Khartoum 1145 comment now acknowledges other frame entries narrow on the fixed wording and says why this one scopes by name"
+  },
+  {
+    "id": "U2869",
+    "decision": "removed",
+    "reason": "removed the point-690/1156 tombstone comment from inside the unrelated 1145 entry"
+  },
+  {
+    "id": "U2870",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1757 — the 1145 falls entry drops backend scope on causal reasoning ('not a renderer one'), which lines 1083-1089 reject as a substitute for measurement"
+  },
+  {
+    "id": "U2871",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1763 — the loom-hand charge covers both backends while its cited evidence is the webgpu polish pass only"
+  },
+  {
+    "id": "U2872",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1773 — the children-frame charge covers both backends while its failure evidence is webgl polish only"
+  },
+  {
+    "id": "U2873",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1792 — the spoil-crossing entry charges every backend on 'pure layout geometry' reasoning and a measurement that names no backend"
+  },
+  {
+    "id": "U2874",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1795 — the loom-plaza charge covers all backends from a webgpu/polish measurement plus a layout-only inference"
+  },
+  {
+    "id": "U2875",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1816 — the TTS-cache charge covers both backends although its evidence is webgl/voice only"
+  },
+  {
+    "id": "U2876",
+    "decision": "rewritten",
+    "reason": "benchmark MSAA why now says other console errors stay red under this entry, other entries owning their own (939's 504)"
+  },
+  {
+    "id": "U2877",
+    "decision": "rewritten",
+    "reason": "the scoping-rule example no longer rests on the refuted software WebGPU lane"
+  },
+  {
+    "id": "U2878",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:29 — the rule 'never on a measured number' is broken by both point-694 detailMatches (303, 350); line 370 concedes it; restate the rule or replace the signatures"
+  },
+  {
+    "id": "U2879",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1424 — both point-1068 detailMatches key on measured group-share digits, against the line-29 rule"
+  },
+  {
+    "id": "U2880",
+    "decision": "kept",
+    "reason": "'keep this list SHORT' is an aspiration that still states the right direction"
+  },
+  {
+    "id": "U2881",
+    "decision": "rewritten",
+    "reason": "the voice and settings whys no longer enumerate 939's lanes; they refer to the lanes its entries name"
+  },
+  {
+    "id": "U2882",
+    "decision": "rewritten",
+    "reason": "the WebGPU 733 why now records that the WebGL 2 entry reads the freeze as the app"
+  },
+  {
+    "id": "U2883",
+    "decision": "rewritten",
+    "reason": "the WebGL 733 why now says 'a similar shape' and gives both backends' numbers"
+  },
+  {
+    "id": "U2884",
+    "decision": "rewritten",
+    "reason": "the first 694 why no longer says another backend stays red; it points at the WebGPU entry below"
+  },
+  {
+    "id": "U2885",
+    "decision": "rewritten",
+    "reason": "removed the detailMatch-repair history from the WebGPU 694 why"
+  },
+  {
+    "id": "U2886",
+    "decision": "rewritten",
+    "reason": "removed the behaviour-fix and inheritance history from the first 694 why, keeping its evidence"
+  },
+  {
+    "id": "U2887",
+    "decision": "removed",
+    "reason": "removed the stale 'THE STATED REASON NO LONGER HOLDS' comment above the goat entry; its why states the refutation"
+  },
+  {
+    "id": "U2888",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:411 — the goat entry says the check passes on WebGL 2 (0.337) while 642's quoted text (fire-shadows entry) has the goat foot red on WebGL 2"
+  },
+  {
+    "id": "U2889",
+    "decision": "rewritten",
+    "reason": "the 'RGBA16Float alternative' wording is gone; the root match has no alternation"
+  },
+  {
+    "id": "U2890",
+    "decision": "rewritten",
+    "reason": "the '138-165 characters' claim is gone with the superseded commentary"
+  },
+  {
+    "id": "U2891",
+    "decision": "rewritten",
+    "reason": "the root why now speaks of the cascade texts in the past tense instead of 'three of the texts'"
+  },
+  {
+    "id": "U2892",
+    "decision": "rewritten",
+    "reason": "the TextureView why now says the async-pipeline entry covers four pipeline classes"
+  },
+  {
+    "id": "U2893",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:969 — the 514 frame-72 why assigns the camera-arrival wait to 514, while the 521 entry (1032, 1043-1044) says 521 owns that cause on every lane"
+  },
+  {
+    "id": "U2894",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1757 — the 1145 frame-72 entry is not backend-scoped and overlaps the 514 and 521 entries owning the same frame"
+  },
+  {
+    "id": "U2895",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1750 — the 1145 frame-72 match expects the subject wording in the red's name while siblings read it from the detail, so it may never fire"
+  },
+  {
+    "id": "U2896",
+    "decision": "rewritten",
+    "reason": "comment now says the three entries whose re-recording point 995 owns"
+  },
+  {
+    "id": "U2897",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1737 — the 1145 Khartoum entry reopens a cause the 627 Khartoum entry declares decided"
+  },
+  {
+    "id": "U2898",
+    "decision": "rewritten",
+    "reason": "the 1119 why no longer claims a section scope the entry cannot carry"
+  },
+  {
+    "id": "U2899",
+    "decision": "rewritten",
+    "reason": "the 1010 why now records that point 1067 settled the cause; 1010 owes closing it"
+  },
+  {
+    "id": "U2900",
+    "decision": "rewritten",
+    "reason": "the 927 picture why now says these two checks, matching its match"
+  },
+  {
+    "id": "U2901",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1295 — 'THE MSAA CASCADE REACHING A FOURTH SUITE' does not match the ledger, which holds MSAA-cascade entries for settings and benchmark only"
+  },
+  {
+    "id": "U2902",
+    "decision": "rewritten",
+    "reason": "the startup 939 why no longer waits for a classification CLAUDE.md already makes"
+  },
+  {
+    "id": "U2903",
+    "decision": "kept",
+    "reason": "the typedef documents the matcher's featureLevel vocabulary; 'core' is a valid value even if unused"
+  },
+  {
+    "id": "U2904",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-charges.mjs:1664 — the 1172 and 1121 whys cite polish.mjs line numbers (~6047, ~6660) that drift with edits; cite section or check names instead"
+  },
+  {
+    "id": "U2905",
+    "decision": "rewritten",
+    "reason": "header rule now names the DOM-only exception that owes one backend"
+  },
+  {
+    "id": "U2906",
+    "decision": "rewritten",
+    "reason": "BACKENDS doc and the two comments now say 'covering' (clean or accounted) instead of 'passing'"
+  },
+  {
+    "id": "U2907",
+    "decision": "removed",
+    "reason": "removed the unreachable scripts/verify/*.test.mjs early return and its duplicate rationale; the general .test rule returns first"
+  },
+  {
+    "id": "U2908",
+    "decision": "rewritten",
+    "reason": "chargeFor's JSDoc moved from above usableRegex to chargeFor"
+  },
+  {
+    "id": "U2909",
+    "decision": "rewritten",
+    "reason": "wasDetailCut doc now says detailCut is true when cut, false at the exact bound, absent otherwise"
+  },
+  {
+    "id": "U2910",
+    "decision": "rewritten",
+    "reason": "MAX_RED_DETAIL_LEN doc now says a cut red refuses every narrow charge not declaring detailReadsPrefix"
+  },
+  {
+    "id": "U2911",
+    "decision": "rewritten",
+    "reason": "RETRY_ENV value doc now describes the <kind>\\t<name> lines and the truncated-kind overflow line"
+  },
+  {
+    "id": "U2912",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-core.mjs:672 — RETRY_ENV's doc says run-all.mjs sets it on the retry child, but run-all only writes it blank (run-all.mjs:274) and formatSuspectEnv has no production caller; the suspect marking may never be written"
+  },
+  {
+    "id": "U2913",
+    "decision": "rewritten",
+    "reason": "truncation-marker comment now credits its KIND, not its wording, with keeping ledger entries off it"
+  },
+  {
+    "id": "U2914",
+    "decision": "removed",
+    "reason": "removed the test-only parseSuspectEnv adapter; the test keeps a local helper over parseSuspectReds"
+  },
+  {
+    "id": "U2915",
+    "decision": "removed",
+    "reason": "removed finite's unreachable try/catch; nothing inside can throw after the type checks"
+  },
+  {
+    "id": "U2916",
+    "decision": "rewritten",
+    "reason": "residualOf header now says a suspect exit-0 run usually carries no reds of its own, pointing at the exception"
+  },
+  {
+    "id": "U2917",
+    "decision": "rewritten",
+    "reason": "droppedLinesOf doc now says 0 when the record carries no count, not 'when not truncated'"
+  },
+  {
+    "id": "U2918",
+    "decision": "rewritten",
+    "reason": "canonicalText doc now states where its null substitution differs from JSON.stringify"
+  },
+  {
+    "id": "U2919",
+    "decision": "rewritten",
+    "reason": "comment now says three project modules are imported"
+  },
+  {
+    "id": "U2920",
+    "decision": "rewritten",
+    "reason": "clean verdict doc now says exit 0 means no reported failure and points at the crashed exit-0 path"
+  },
+  {
+    "id": "U2921",
+    "decision": "rewritten",
+    "reason": "red verdict doc now says a crash may print no FAIL line for what killed it"
+  },
+  {
+    "id": "U2922",
+    "decision": "rewritten",
+    "reason": "incomplete verdict doc now separates the lost part from the recorded reds, which keep blocking"
+  },
+  {
+    "id": "U2923",
+    "decision": "rewritten",
+    "reason": "coveringRun's stranded JSDoc merged onto coveringRun, with freshness by start time or matchesTree"
+  },
+  {
+    "id": "U2924",
+    "decision": "rewritten",
+    "reason": "the stranded featureLevel doc now sits on coveringRun, which takes the option"
+  },
+  {
+    "id": "U2925",
+    "decision": "rewritten",
+    "reason": "dropped the export of sawCodeSince; used only internally"
+  },
+  {
+    "id": "U2926",
+    "decision": "rewritten",
+    "reason": "unexplainedRuns heading now says 'in the window, or older and not yet shown gone'"
+  },
+  {
+    "id": "U2927",
+    "decision": "rewritten",
+    "reason": "fix route now requires the red's own suite to come up covering after the edit (doc and evaluate comment)"
+  },
+  {
+    "id": "U2928",
+    "decision": "rewritten",
+    "reason": "cross-reference now says the COVERING IS READ AS IT WAS RECORDED block is above"
+  },
+  {
+    "id": "U2929",
+    "decision": "rewritten",
+    "reason": "reRecorded doc now limits 'observed nothing' to the lost part of a truncated recording"
+  },
+  {
+    "id": "U2930",
+    "decision": "rewritten",
+    "reason": "retention comment now says 'shown covering (clean or accounted)'"
+  },
+  {
+    "id": "U2931",
+    "decision": "rewritten",
+    "reason": "fall-through comment now includes a signed crash's residual"
+  },
+  {
+    "id": "U2932",
+    "decision": "rewritten",
+    "reason": "dropped the unreachable postCrash alternative from the open_ fallback; the suspect branch stays"
+  },
+  {
+    "id": "U2933",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-core.mjs:1250 — 'PARTIAL excluded in BOTH directions' has an exception: a partial crashed record with a matching closure and an unowned retained red gets a non-empty postCrash and lands in unexplained runs"
+  },
+  {
+    "id": "U2934",
+    "decision": "rewritten",
+    "reason": "incomplete paragraph now says the LOST part has no identity, consistent with recorded reds blocking"
+  },
+  {
+    "id": "U2935",
+    "decision": "rewritten",
+    "reason": "crashed paragraph doc now keeps the reds printed before the crash as reds"
+  },
+  {
+    "id": "U2936",
+    "decision": "rewritten",
+    "reason": "evaluate's contract doc now lists every input and every return shape, including defer and waved"
+  },
+  {
+    "id": "U2937",
+    "decision": "rewritten",
+    "reason": "latestChangeAt doc now says it decides freshness only without matchesTree"
+  },
+  {
+    "id": "U2938",
+    "decision": "rewritten",
+    "reason": "rationale now limits 'nothing to explain' to the lost part and the crash itself"
+  },
+  {
+    "id": "U2939",
+    "decision": "rewritten",
+    "reason": "block heading now reads 'UNEXPLAINED RED NOT YET SHOWN GONE' (tests updated), no longer misdating retained reds"
+  },
+  {
+    "id": "U2940",
+    "decision": "rewritten",
+    "reason": "fix remedy now names the subsequent covering run of the red's own suite"
+  },
+  {
+    "id": "U2941",
+    "decision": "removed",
+    "reason": "removed the obsolete 'ONLY the incomplete fall-through' comment standing before its replacement"
+  },
+  {
+    "id": "U2942",
+    "decision": "rewritten",
+    "reason": "DOM-only message now says either backend suffices and WebGPU is only the default the command names"
+  },
+  {
+    "id": "U2943",
+    "decision": "rewritten",
+    "reason": "block message now asks to inspect both backends' frames only for a dual change"
+  },
+  {
+    "id": "U2944",
+    "decision": "rewritten",
+    "reason": "charge remedy now says the red stops blocking while a pre-charge run still covers nothing"
+  },
+  {
+    "id": "U2945",
+    "decision": "rewritten",
+    "reason": "--defer remedy now also names a cause outside the render set, matching the other prescriptions"
+  },
+  {
+    "id": "U2946",
+    "decision": "rewritten",
+    "reason": "NON_RENDER_VERIFY's JSDoc now sits on NON_RENDER_VERIFY instead of above the deleted-scripts set"
+  },
+  {
+    "id": "U2947",
+    "decision": "kept",
+    "reason": "DELETED_NON_RENDER_VERIFY is live via isRenderPath; the test export is fine"
+  },
+  {
+    "id": "U2948",
+    "decision": "kept",
+    "reason": "pointStatusesFrom is live through chargeablePoints; the test export is fine"
+  },
+  {
+    "id": "U2949",
+    "decision": "rewritten",
+    "reason": "the section-tag lesson is now attributed to section-tag-core.mjs instead of this file"
+  },
+  {
+    "id": "U2950",
+    "decision": "kept",
+    "reason": "the comment accurately says this reader strips nothing and old tag-shaped tails stay uncharged"
+  },
+  {
+    "id": "U2951",
+    "decision": "kept",
+    "reason": "TRUNCATED_KIND is used internally; the test export is fine"
+  },
+  {
+    "id": "U2952",
+    "decision": "rewritten",
+    "reason": "'Every detailMatch is anchored at both ends' now reads 'A detailMatch anchored at both ends'"
+  },
+  {
+    "id": "U2953",
+    "decision": "rewritten",
+    "reason": "runStamp doc now scopes 'one reading' to naming and points at sawCodeSince for start-time freshness"
+  },
+  {
+    "id": "U2954",
+    "decision": "kept",
+    "reason": "suspectRedsOf is used internally; the test export is fine"
+  },
+  {
+    "id": "U2955",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-core.mjs:693 — legacy-shape branches (a kindless marker line read as check; bare-name suspectOf entries) remain for older records; drop once none exist"
+  },
+  {
+    "id": "U2956",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-core.mjs:760 — legacy truncation reading (capture-truncated key, TRUNCATION_NAME, count parsed from the synthetic red) remains for records predating truncated/droppedLines"
+  },
+  {
+    "id": "U2957",
+    "decision": "rewritten",
+    "reason": "identity doc now says equality binds together with suite, backend and evidence"
+  },
+  {
+    "id": "U2958",
+    "decision": "rewritten",
+    "reason": "removed the repeated identity sentence from the 'still does not do' paragraph"
+  },
+  {
+    "id": "U2959",
+    "decision": "rewritten",
+    "reason": "verdict doc no longer speaks of the removed capture cap; it names the recorder's budgets"
+  },
+  {
+    "id": "U2960",
+    "decision": "rewritten",
+    "reason": "afterCrashClosure doc now locates openIncompleteRuns in render-verify-guard.mjs"
+  },
+  {
+    "id": "U2961",
+    "decision": "rewritten",
+    "reason": "incomplete verdict doc now names the re-recording route beside incompleteClosureFor"
+  },
+  {
+    "id": "U2962",
+    "decision": "kept",
+    "reason": "the partial guards in shownGone and reRecorded are redundant but explicit and cheap; harmless"
+  },
+  {
+    "id": "U2963",
+    "decision": "kept",
+    "reason": "derivedRedKey is live through redKeyOf; the Vitest parity export is fine"
+  },
+  {
+    "id": "U2964",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-core.mjs:1672 — latestRun claims the file's freshness reading but ignores matchesTree, which coveringRun uses when supplied, so the two can disagree"
+  },
+  {
+    "id": "U2965",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-core.mjs:1690 — baselineFor keeps a fallback to the legacy scalar clearedHead; drop once no state file holds only the scalar"
+  },
+  {
+    "id": "U2966",
+    "decision": "rewritten",
+    "reason": "'none of the eight' now names the eight replayed picture-caught bugs and their document"
+  },
+  {
+    "id": "U2967",
+    "decision": "rewritten",
+    "reason": "evaluate now hands coveringRun and runVerdict only openPoints and matchesTree, the options they read"
+  },
+  {
+    "id": "U2968",
+    "decision": "rewritten",
+    "reason": "block message now says every run is recorded automatically, not only passing ones"
+  },
+  {
+    "id": "U2969",
+    "decision": "rewritten",
+    "reason": "header now requires a covering run (clean or accounted) on each backend owed, one for a DOM-only change"
+  },
+  {
+    "id": "U2970",
+    "decision": "rewritten",
+    "reason": "header now says coverage names an ancestor commit, dirty-tree recordings included"
+  },
+  {
+    "id": "U2971",
+    "decision": "rewritten",
+    "reason": "header now says the incomplete closure is appended beside the record and the recorded reds keep blocking"
+  },
+  {
+    "id": "U2972",
+    "decision": "rewritten",
+    "reason": "commitMissing doc now says it tests whether a commit object exists, not reachability"
+  },
+  {
+    "id": "U2973",
+    "decision": "rewritten",
+    "reason": "the 42-of-48 figure is now dated as a measurement, not claimed for the 40-run live window"
+  },
+  {
+    "id": "U2974",
+    "decision": "rewritten",
+    "reason": "BaselineDiffError doc now says the baseline must also name no commit (commitMissing); other diff failures rethrow"
+  },
+  {
+    "id": "U2975",
+    "decision": "rewritten",
+    "reason": "openIncompleteRuns' JSDoc moved from above reRecordedBy onto openIncompleteRuns"
+  },
+  {
+    "id": "U2976",
+    "decision": "rewritten",
+    "reason": "dropped the export of reRecordedBy; used only internally"
+  },
+  {
+    "id": "U2977",
+    "decision": "rewritten",
+    "reason": "openCrashedRuns' JSDoc moved from above classOf onto openCrashedRuns"
+  },
+  {
+    "id": "U2978",
+    "decision": "rewritten",
+    "reason": "classOf doc no longer counts 'three classes'"
+  },
+  {
+    "id": "U2979",
+    "decision": "rewritten",
+    "reason": "openCrashedRuns doc now says unsigned and window-free, not 'still blocking'"
+  },
+  {
+    "id": "U2980",
+    "decision": "rewritten",
+    "reason": "CLI note now says one signature per run content, consistent with the identity passage"
+  },
+  {
+    "id": "U2981",
+    "decision": "rewritten",
+    "reason": "closure introduction now says a crashed run never reported what killed it, not that it reported nothing"
+  },
+  {
+    "id": "U2982",
+    "decision": "rewritten",
+    "reason": "--status now labels a deferral for another HEAD as inactive instead of always 'active'"
+  },
+  {
+    "id": "U2983",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-guard.mjs:1042 — 'clearedVia is set on EVERY clearance' is false for manual, bootstrap and rebaseline clearances, which omit clearedVia/accountedFor while mergeRenderState keeps the old fields"
+  },
+  {
+    "id": "U2984",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-guard.mjs:184 — latestChangeAt's doc says a covering run must postdate it, while coverage now binds proof to ancestry plus an unchanged render tree (matchesTree)"
+  },
+  {
+    "id": "U2985",
+    "decision": "kept",
+    "reason": "claim does not hold: the crash class is point 734's sixth round in both places"
+  },
+  {
+    "id": "U2986",
+    "decision": "rewritten",
+    "reason": "MAX_SIGNED_CLOSURES now takes MAX_RUNS from render-verify-state.mjs instead of a duplicated 40"
+  },
+  {
+    "id": "U2987",
+    "decision": "rewritten",
+    "reason": "removed the self-referential repair fragment from the CLI note"
+  },
+  {
+    "id": "U2988",
+    "decision": "rewritten",
+    "reason": "header usage now shows the --at and --run selectors"
+  },
+  {
+    "id": "U2989",
+    "decision": "rewritten",
+    "reason": "--status incomplete line now says lines dropped by the recorder, not the capture cap"
+  },
+  {
+    "id": "U2990",
+    "decision": "rewritten",
+    "reason": "classOf's suspect label now says 'a retry after a failed first attempt', true for red retries too"
+  },
+  {
+    "id": "U2991",
+    "decision": "rewritten",
+    "reason": "removed the review-history parenthetical from the user-facing --status crash line"
+  },
+  {
+    "id": "U2992",
+    "decision": "rewritten",
+    "reason": "the scalar-mirror justification now names the reader that uses it (baselineFor's fallback)"
+  },
+  {
+    "id": "U2993",
+    "decision": "rewritten",
+    "reason": "stand-down cause now uses CAUSE.notLockOwner from guard-preflight-core.mjs"
+  },
+  {
+    "id": "U2994",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-recorder.mjs:61 — CHECKOUT_DIR and the screenshot dir derive from import.meta.url, although repo-paths.mjs states source location is not repository identity and offers the HOA_REPO_ROOT/cwd resolution"
+  },
+  {
+    "id": "U2995",
+    "decision": "rewritten",
+    "reason": "buffer explanation now says repetition ran away in every measured log, pointing at the next paragraph for why that is no bound"
+  },
+  {
+    "id": "U2996",
+    "decision": "rewritten",
+    "reason": "LINE_PROBE_CHARS doc now names the undecidable long crash frame that the prefix cannot answer"
+  },
+  {
+    "id": "U2997",
+    "decision": "rewritten",
+    "reason": "composite-key example now says three composites over three identities"
+  },
+  {
+    "id": "U2998",
+    "decision": "rewritten",
+    "reason": "comment no longer calls the exit-0 crash omission open point 993; the crash is marked whatever the exit code"
+  },
+  {
+    "id": "U2999",
+    "decision": "rewritten",
+    "reason": "tree-field doc now says the recorder refuses nothing on them while the guard reads head for ancestry and tree matching"
+  },
+  {
+    "id": "U3000",
+    "decision": "rewritten",
+    "reason": "droppedLines comment now lists every refusal it counts: budgets, overlong, substituted characters, undecidable crash frames"
+  },
+  {
+    "id": "U3001",
+    "decision": "rewritten",
+    "reason": "charging comment now says crashed or output-losing runs are charged too, whatever their exit"
+  },
+  {
+    "id": "U3002",
+    "decision": "rewritten",
+    "reason": "truncation comment now names the covering re-recording beside the signed closure"
+  },
+  {
+    "id": "U3003",
+    "decision": "rewritten",
+    "reason": "round-17 rationale now says refuse() is also reached from an overlong possible crash frame"
+  },
+  {
+    "id": "U3004",
+    "decision": "rewritten",
+    "reason": "rationale now says an exit-0 run is marked incomplete only if it printed result lines (tolerated console output included) or an undecidable crash frame past the budgets"
+  },
+  {
+    "id": "U3005",
+    "decision": "backlog",
+    "reason": "scripts/render-verify-recorder.mjs:7 — screenshots are described as files this run actually wrote, but screenshotsSince selects by directory and mtime and records no writer identity"
+  },
+  {
+    "id": "U3006",
+    "decision": "rewritten",
+    "reason": "the signed way out is now located in the guard's sign-off CLI, judged by the core"
+  },
+  {
+    "id": "U3007",
+    "decision": "rewritten",
+    "reason": "removed the heading-history aside from the budget docblock"
+  },
+  {
+    "id": "U3008",
+    "decision": "kept",
+    "reason": "coveringRun does accept featureLevel; the doc names where a reader asks for the core path, not a current caller"
+  },
+  {
+    "id": "U3009",
+    "decision": "kept",
+    "reason": "the 'none today' remark is a hedged observation about suites and errs toward blocking; harmless"
+  },
+  {
+    "id": "U3010",
+    "decision": "rewritten",
+    "reason": "state-file schema now lists clearedBy, clearedVia, accountedFor, incompleteClosures and crashClosures"
+  },
+  {
+    "id": "U3011",
+    "decision": "rewritten",
+    "reason": "run-record description now lists head, dirty, reds, crash/truncation and suspect/partial flags"
+  },
+  {
+    "id": "U3012",
+    "decision": "rewritten",
+    "reason": "the guard now imports MAX_RUNS instead of duplicating 40; the export stays for that use"
+  },
+  {
+    "id": "U3013",
+    "decision": "rewritten",
+    "reason": "dropped the export of gitLocalEnvironmentNames; only the default argument uses it"
+  },
+  {
+    "id": "U3014",
+    "decision": "rewritten",
+    "reason": "protectRepository doc now says it is what the global setup (setup) installs"
+  },
+  {
+    "id": "U3015",
+    "decision": "rewritten",
+    "reason": "repositoryStatePaths doc now lists the common dir and the index path too"
+  },
+  {
+    "id": "U3016",
+    "decision": "rewritten",
+    "reason": "replaced the unsupported 'every two minutes' push timing with 'during the run'"
+  },
+  {
+    "id": "U3017",
+    "decision": "kept",
+    "reason": "claim does not hold: docs/handover-architecture.md holds the 'Ordered work' list (step 8 successor startup, step 5 bounded dispatch) and union rows M26-M29"
+  },
+  {
+    "id": "U3018",
+    "decision": "rewritten",
+    "reason": "dropped the export of FINGERPRINT_RE; used internally"
+  },
+  {
+    "id": "U3019",
+    "decision": "rewritten",
+    "reason": "dropped the export of GUARD_NAME_RE; used internally"
+  },
+  {
+    "id": "U3020",
+    "decision": "rewritten",
+    "reason": "dropped the export of PROCESS_KEYWORDS and corrected its 'exported so the test pins it' justification"
+  },
+  {
+    "id": "U3021",
+    "decision": "rewritten",
+    "reason": "memory-source descriptions in retro-core, retro-refresh and retro-currency-guard now include user memories"
+  },
+  {
+    "id": "U3022",
+    "decision": "rewritten",
+    "reason": "generated source tally now reads 'Feedback-/Projekt-/User-Memories'"
+  },
+  {
+    "id": "U3023",
+    "decision": "rewritten",
+    "reason": "replaceAutoSection doc now says the marker-absent path trims the doc's trailing whitespace"
+  },
+  {
+    "id": "U3024",
+    "decision": "rewritten",
+    "reason": "dropped the export of LESSON_HEADING_RE; used internally"
+  },
+  {
+    "id": "U3025",
+    "decision": "rewritten",
+    "reason": "dropped the export of LEDGER_PATH_RE; used internally"
+  },
+  {
+    "id": "U3026",
+    "decision": "rewritten",
+    "reason": "parseLessonSubsections doc now covers ### to ###### headings"
+  },
+  {
+    "id": "U3027",
+    "decision": "rewritten",
+    "reason": "FAILURE MODEL now says zero parsed rows block where table syntax exists and allow only without a table"
+  },
+  {
+    "id": "U3028",
+    "decision": "rewritten",
+    "reason": "zero-row comment now names prose-only replacement as the accepted residual of the no-table fail-open"
+  },
+  {
+    "id": "U3029",
+    "decision": "rewritten",
+    "reason": "dropped the export of extractGuideFingerprint; retro-refresh uses GUIDE_FINGERPRINT_RE directly"
+  },
+  {
+    "id": "U3030",
+    "decision": "rewritten",
+    "reason": "header now says unreadable stdin only loses the session id"
+  },
+  {
+    "id": "U3031",
+    "decision": "rewritten",
+    "reason": "header now says a source-collection failure skips only the currency half; the ledger half still decides"
+  },
+  {
+    "id": "U3032",
+    "decision": "rewritten",
+    "reason": "header now names the lesson-mechanism ledger and the guide review stamp checks"
+  },
+  {
+    "id": "U3033",
+    "decision": "rewritten",
+    "reason": "doc now locates the two-half split in decideRetroCurrency"
+  },
+  {
+    "id": "U3034",
+    "decision": "rewritten",
+    "reason": "no-op list now names the uncollectable-sources case that skips only the currency half"
+  },
+  {
+    "id": "U3035",
+    "decision": "rewritten",
+    "reason": "header now says running the refresh is enforced and the problem-class review is demanded; only the guide review carries a stamp"
+  },
+  {
+    "id": "U3036",
+    "decision": "rewritten",
+    "reason": "failure contract now says an empty memory dir throws, not that it is a legitimate empty state"
+  },
+  {
+    "id": "U3037",
+    "decision": "rewritten",
+    "reason": "failure contract now names both throw paths (empty memory dir, git)"
+  },
+  {
+    "id": "U3038",
+    "decision": "rewritten",
+    "reason": "error now says it refuses to fingerprint an empty source, true for the read-only guard too"
+  },
+  {
+    "id": "U3039",
+    "decision": "rewritten",
+    "reason": "collectSources now takes an archivePath option like the other paths"
+  },
+  {
+    "id": "U3040",
+    "decision": "rewritten",
+    "reason": "failure contract now covers the archive and that an absent TASKS.md drops archived points too"
+  },
+  {
+    "id": "U3041",
+    "decision": "rewritten",
+    "reason": "munging comment now mentions the trailing-dash strip"
+  },
+  {
+    "id": "U3042",
+    "decision": "rewritten",
+    "reason": "header now also names rule-review-state.mjs, which borrows defaultMemoryDir"
+  },
+  {
+    "id": "U3043",
+    "decision": "backlog",
+    "reason": "scripts/retro-sources.mjs:29 — the 'Vitest module URL is not file-scheme' premise may be outdated, which would make the cwd fallback unreachable; verify under the current Vitest"
+  },
+  {
+    "id": "U3044",
+    "decision": "kept",
+    "reason": "the !memoryDir guard keeps collectMemories total for direct callers; harmless"
+  },
+  {
+    "id": "U3045",
+    "decision": "kept",
+    "reason": "the existsSync(scriptsDir) guard keeps a test-supplied scriptsDir safe; harmless"
+  },
+  {
+    "id": "U3046",
+    "decision": "kept",
+    "reason": "claim does not hold: point 370 (every lesson gets a mechanism decision) exists in docs/tasks-archive.md"
+  },
+  {
+    "id": "U3047",
+    "decision": "kept",
+    "reason": "claim does not hold: the guide review attestation is retro-refresh.mjs --guide-reviewed setting GUIDE-FINGERPRINT"
+  },
+  {
+    "id": "U3048",
+    "decision": "rewritten",
+    "reason": "claim holds the other way: the retrospective is tracked in git, so 'git-ignored' is corrected to 'tracked' here and in retro-core and retro-refresh"
+  },
+  {
+    "id": "U3049",
+    "decision": "rewritten",
+    "reason": "exclusion comment now says any non-MEMORY_TYPES kind stays out, naming the index and reference notes as examples"
+  },
+  {
+    "id": "U3050",
+    "decision": "kept",
+    "reason": "a dated incident rationale; its figures are stated as history"
+  },
+  {
+    "id": "U3051",
+    "decision": "kept",
+    "reason": "a dated incident rationale for the throw; its figures are stated as history"
+  },
+  {
+    "id": "U3052",
+    "decision": "kept",
+    "reason": "claim does not hold: retro-core.mjs exports both computeFingerprint and buildRows"
+  }
+]

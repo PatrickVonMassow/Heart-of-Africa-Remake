@@ -3,6 +3,7 @@
 import { balance } from '../config/balance'
 import { devAssert } from '../systems/devAssert'
 import { isWithinHearing } from './heard'
+import { SEQUENCE_LENGTH } from './lexicon'
 import { utteranceSeconds, voiceRegister, type VoiceRegister } from './speaking'
 
 export interface FloorSource { x: number; z: number; register: VoiceRegister }
@@ -115,7 +116,7 @@ export class SpeechFloor {
     words?.delete(r.word)
     // The reservation outlasts the ordered act's own hold, so a calibrated
     // pause can never open a gap another exchange speaks into (work-order 1184).
-    const next = now + Math.max(utteranceSeconds(4) + balance.communication.consequenceSeconds, r.actAfter ?? 0)
+    const next = now + Math.max(utteranceSeconds(SEQUENCE_LENGTH) + balance.communication.consequenceSeconds, r.actAfter ?? 0)
     this.situations.set(r.situation, { name: r.name, sources: r.sources, next })
     if (this.audible(r.source)) this.consequence = { source: { ...r.source }, until: next }
     if (r.ends) this.release(r.situation)

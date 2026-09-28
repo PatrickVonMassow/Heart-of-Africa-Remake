@@ -1,4 +1,4 @@
-// Debug event trigger (design.md §21.3): the §19.8/§19.16 wildlife dramas and
+// Debug event trigger (design.md §21.3): the §19.8/§19.16/§19.17 wildlife dramas and
 // the §14 random events fired ON DEMAND from the debug menu. The dramas are
 // rare by design — the grass fire, for instance, attempts ignition once per
 // five minutes on savanna far ahead — so without a forced trigger they are
@@ -14,7 +14,7 @@
 
 import { EVENT_KINDS, type EventKind } from './events'
 
-/** The §19.8/§19.16 dramas the debug menu can stage near the traveller. */
+/** The §19.8/§19.16/§19.17 dramas the debug menu can stage near the traveller. */
 export type WildlifeDramaKind =
   | 'calfDrowning'
   | 'calfMired'
@@ -43,7 +43,7 @@ export const WILDLIFE_DRAMA_KINDS: readonly WildlifeDramaKind[] = [
 ]
 
 /** Traveller hazards outside the §14 roll (design.md §11): the ropeless fall. */
-export type TravellerHazardKind = 'mountainFall'
+type TravellerHazardKind = 'mountainFall'
 
 export const TRAVELLER_HAZARD_KINDS: readonly TravellerHazardKind[] = ['mountainFall']
 
@@ -73,12 +73,12 @@ export const DRAMA_PREFIX = 'drama:'
 export const EVENT_PREFIX = 'event:'
 export const HAZARD_PREFIX = 'hazard:'
 
-export interface DebugSelectOption {
+interface DebugSelectOption {
   value: string
   label: string
 }
 
-export interface DebugSelectGroup {
+interface DebugSelectGroup {
   label: string
   options: DebugSelectOption[]
 }
@@ -133,12 +133,12 @@ export function debugEventGroups(labels: DebugEventLabels, lang: string): DebugS
 // Precondition locator (pure).
 // ---------------------------------------------------------------------------
 
-export interface StagingSpot {
+interface StagingSpot {
   x: number
   z: number
 }
 
-export interface StagingSearch {
+interface StagingSearch {
   /** Largest radius probed, in world units. */
   maxRadius: number
   /** Radial gap between probed rings (default 4). */
@@ -184,7 +184,7 @@ export function nearestStagingSpot(
 // Scene registry.
 // ---------------------------------------------------------------------------
 
-export type WildlifeDramaTrigger = (kind: WildlifeDramaKind) => DebugEventFailure | null
+type WildlifeDramaTrigger = (kind: WildlifeDramaKind) => DebugEventFailure | null
 
 let dramaTrigger: WildlifeDramaTrigger | null = null
 
@@ -198,7 +198,7 @@ export function triggerWildlifeDrama(kind: WildlifeDramaKind): DebugEventFailure
   return dramaTrigger ? dramaTrigger(kind) : 'noScene'
 }
 
-export interface DebugEventActions {
+interface DebugEventActions {
   /** The §14 roll applied at the traveller's position (store.debugTriggerEvent). */
   randomEvent: (kind: EventKind) => void
   /** The §11 ropeless mountain fall (store.debugTriggerMountainFall). */

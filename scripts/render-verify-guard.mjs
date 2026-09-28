@@ -3,8 +3,8 @@
 // backends — WebGPU (the user's real backend) AND the WebGL2 fallback — judged
 // by the rendered picture. A reminder already failed (the point-210 sea-coast
 // fix was "done" on WebGL2 while WebGPU still showed the staircase), so this
-// BLOCKS turn-end while a committed render-path change lacks a recorded passing
-// run per backend. The decision logic lives in render-verify-core.mjs (pure,
+// BLOCKS turn-end while a committed render-path change lacks a recorded covering
+// run (clean or accounted for) on each backend it owes — one for a DOM-only change. The decision logic lives in render-verify-core.mjs (pure,
 // Vitest-covered); runs are recorded mechanically from INSIDE each verify-suite
 // process (render-verify-recorder.mjs, armed by scripts/verify/_browser.mjs).
 // This wrapper only gathers inputs and is fail-OPEN: any internal error →
@@ -13,8 +13,9 @@
 // How the gate clears, mechanically:
 //   VERIFY_GL=webgpu node scripts/verify/run-all.mjs <suite>   # exit 0 recorded
 //   VERIFY_GL=webgl  node scripts/verify/run-all.mjs <suite>   # exit 0 recorded
-// Coverage names a clean ancestor commit whose render files still match this
-// checkout, so a merge preserves proof and later render edits invalidate it.
+// Coverage names an ancestor commit (a recording from a dirty tree included)
+// whose render files still match this checkout, so a merge preserves proof and
+// later render edits invalidate it.
 // When both backends are covered the guard advances the baseline by itself —
 // no manual ritual.
 //
@@ -27,7 +28,8 @@
 // INCOMPLETE RECORDING (point 734): its red list is a fragment, so none of point
 // 640's three closings can reach it, and before this it could only be waived by
 // hand. It is now named as its own class and signed off per run, with evidence —
-// a closure that discards the record and clears no backend.
+// a closure appended beside the record that signs off only the lost part: the
+// reds it did record keep blocking, and it clears no backend.
 // A run that CRASHED rather than reported is named apart the same way (sixth
 // round): it judged no picture, no charge can reach it, and it is signed off
 // per run with the evidence of its kept log — a disposition, never coverage.
@@ -35,17 +37,19 @@
 //   node scripts/render-verify-guard.mjs --status          # inspect the gate (alias: status)
 //   node scripts/render-verify-guard.mjs --defer "<why>"   # loud escape valve
 //   node scripts/render-verify-guard.mjs --clear "<why>"   # manual baseline advance
-//   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why>"
-//   node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" --evidence "<what the log shows>"
+//   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" [--at <iso|ms>] [--run <id>] --evidence "<why>"
+//   node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" [--at <iso|ms>] [--run <id>] --evidence "<what the log shows>"
 import { readFileSync, statSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import {
+  MAX_RUNS,
   REPO_ROOT,
   RENDER_STATE_PATH,
   readRenderState,
   mergeRenderState,
 } from './render-verify-state.mjs'
+import { CAUSE } from './guard-preflight-core.mjs'
 import {
   isRenderPath,
   evaluate,
@@ -77,7 +81,7 @@ function git(cmd) {
 }
 
 /**
- * True when `sha` names no reachable commit — the one condition under which a
+ * True when `sha` names no commit object in the repository — the one condition under which a
  * failed baseline diff may advance the gate. A git failure here answers "cannot
  * tell", which counts as PRESENT: the gate then stays where it is rather than
  * clearing itself on a question it could not answer.
@@ -106,8 +110,8 @@ export function commitMissing(sha) {
  *
  *  A DIRTY tree does not by itself disqualify a run, and must not: `dirty` is
  *  what the recorder calls evidence and deliberately not a gate
- *  (render-verify-recorder.mjs), and 42 of the 48 green runs in the live
- *  window carry it — the owner's checkout holds the board and the work order
+ *  (render-verify-recorder.mjs), and 42 of the 48 green runs carried it when
+ *  this was measured — the owner's checkout holds the board and the work order
  *  while the picture is judged. What the render diff cannot be fooled by is the
  *  case that matters: a run whose OWN render edit was still uncommitted names
  *  the commit before it, so committing that edit makes the difference visible
@@ -223,7 +227,8 @@ function latestChangeAt(paths, head, base) {
 }
 
 /** Advance the verified baseline for `branch`: the per-branch map entry plus
- *  the legacy scalar mirror (status display, pre-branch-workflow readers). */
+ *  the legacy scalar mirror (the fallback baselineFor reads where a branch has
+ *  no entry of its own). */
 function advanceBaseline(state, branch, head, extra = {}) {
   mergeRenderState({
     clearedHead: head,
@@ -234,8 +239,8 @@ function advanceBaseline(state, branch, head, extra = {}) {
 
 /**
  * The ONE gather failure that may clear a pending gate: the recorded baseline no
- * longer diffs against HEAD (rebased away, gc'd, or a baseline from an unrelated
- * history). Blocking forever on a window that cannot be diffed would trap the
+ * longer diffs against HEAD AND names no commit any more (commitMissing:
+ * rebased away and gc'd); any other diff failure is rethrown. Blocking forever on a window that cannot be diffed would trap the
  * session, so that case re-baselines — fail-open ONCE, logged.
  *
  * It is a distinct type because every OTHER failure in the gathering must NOT
@@ -279,7 +284,7 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
   } = deps
   // Hard singleton: a session that does not own the live batch lock stands down.
   if (heldByOther(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
   }
   // A COMMITTED BOUNDARY IS TERMINAL (point 1048, union entry U18). The remedy
   // this gate prescribes is a browser suite run, and the committed boundary
@@ -357,9 +362,9 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
   }
 }
 
-/** How many signed closures the state keeps, per family. The run window itself
- *  holds 40, so a closure older than that names a run nobody can see. */
-const MAX_SIGNED_CLOSURES = 40
+/** How many signed closures the state keeps, per family: the size of the run
+ *  window, since a closure older than that names a run nobody can see. */
+const MAX_SIGNED_CLOSURES = MAX_RUNS
 
 /**
  * WHICH SIGNED CLOSURES SURVIVE THE CAP (review finding, 28.08.2026). Dropping
@@ -422,18 +427,6 @@ export function isoText(at) {
   }
 }
 
-/** The recorded runs whose EFFECTIVE verdict is `incomplete` and that are NOT
- *  yet signed off. Judged by runVerdict, not by the truncation marker alone
- *  (round-5 review, 19.08.2026): a run that truncated AND crashed stays `red`
- *  (a crash outranks everything) and one that truncated on a `--section` probe
- *  stays `partial` (it blocks nobody) — offering either a closure would let the
- *  CLI report a sign-off that lifts nothing.
- *
- *  AND THE CRASH CLOSURE IS PART OF THAT READING (review finding, 28.08.2026).
- *  A run that crashed AND truncated was excluded here FOREVER, because the raw
- *  record still says `crashed`. Once its crash is signed off, the lost lines are
- *  all that is left of it — and they had no signing route at all, so the record
- *  was either stuck or, worse, cleared with its reds unread. */
 /** Was this record's lost measurement RETAKEN — is there a later COVERING run of
  *  the same suite and backend (review finding, 28.08.2026, round 19)? Read for
  *  the status label only, never to remove a record from the sign-off list: the
@@ -441,7 +434,7 @@ export function isoText(at) {
  *  code since the last render edit, so a record can be answered by this reading
  *  and still be blocking by the gate's. Withholding its signature would strand
  *  it; saying "outside the window" about it would misdescribe it. */
-export function reRecordedBy(state, r, options) {
+function reRecordedBy(state, r, options) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
   const when = runStamp(r)
   if (when === null) return null
@@ -458,6 +451,18 @@ export function reRecordedBy(state, r, options) {
   )
 }
 
+/** The recorded runs whose EFFECTIVE verdict is `incomplete` and that are NOT
+ *  yet signed off. Judged by runVerdict, not by the truncation marker alone
+ *  (round-5 review, 19.08.2026): a run that truncated AND crashed stays `red`
+ *  (a crash outranks everything) and one that truncated on a `--section` probe
+ *  stays `partial` (it blocks nobody) — offering either a closure would let the
+ *  CLI report a sign-off that lifts nothing.
+ *
+ *  AND THE CRASH CLOSURE IS PART OF THAT READING (review finding, 28.08.2026).
+ *  A run that crashed AND truncated was excluded here FOREVER, because the raw
+ *  record still says `crashed`. Once its crash is signed off, the lost lines are
+ *  all that is left of it — and they had no signing route at all, so the record
+ *  was either stuck or, worse, cleared with its reds unread. */
 export function openIncompleteRuns(state) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
   return runs.filter(
@@ -468,20 +473,21 @@ export function openIncompleteRuns(state) {
   )
 }
 
-/** The recorded runs that CRASHED, are judged as such (a `--section` probe
- *  stays `partial` and blocks nobody), and are not yet signed off. What the
- *  `--crashed` sign-off may see — same discipline as openIncompleteRuns: the
- *  CLI can only ever name a run that is really recorded and still blocking. */
-/** WHAT ONE OPEN RECORD IS CALLED in the status report — the same three classes
- *  the gate blocks with, never "unaccounted red" for all of them (review
+/** WHAT ONE OPEN RECORD IS CALLED in the status report — the classes the gate
+ *  blocks with, never "unaccounted red" for all of them (review
  *  finding, 28.08.2026, round 17). */
 function classOf(entry) {
   if (entry?.status === 'incomplete') return 'INCOMPLETE RECORDING (not an unexplained red)'
   if (entry?.status === 'crashed') return 'CRASHED RUN (not an unexplained red)'
-  if (entry?.status === 'suspect') return 'SUSPECT run — it passed only on the retry'
+  if (entry?.status === 'suspect') return 'SUSPECT run — a retry after a failed first attempt'
   return 'unaccounted red'
 }
 
+/** The recorded runs that CRASHED, are judged as such (a `--section` probe
+ *  stays `partial` and blocks nobody), and are not yet signed off. What the
+ *  `--crashed` sign-off may see — same discipline as openIncompleteRuns: the
+ *  CLI can only ever name a run that is really recorded and still unsigned
+ *  (window-free on purpose: an older record keeps its obligation). */
 export function openCrashedRuns(state) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
   return runs.filter(
@@ -666,11 +672,12 @@ if (arg === '--defer') {
 // THE SAME NAMED WAY OUT FOR A RUN THAT DIED RATHER THAN REPORTED (sixth round).
 //
 // Neither run can be closed by any of point 640's three ways — they all need to
-// know WHAT the red was, and a truncated run never recorded it while a crashed
-// run reported nothing at all. Before this, the only exit was a hand-written
+// know WHAT the red was, and a truncated run never recorded all of it while a
+// crashed run never reported what killed it. Before this, the only exit was a hand-written
 // --defer, i.e. the waiver the charge ledger exists to abolish. This signs the
 // RECORD off instead — and only that: it clears NO backend, and it names
-// exactly ONE run, so two broken runs need two signatures with two reasons.
+// exactly ONE run by its content, so two different broken runs need two
+// signatures with two reasons.
 // EACH SIGNATURE CLOSES ITS OWN SENTENCE AND NOTHING ELSE: the reds a run did
 // record keep blocking and close the ordinary ways in BOTH families, and a run
 // that crashed AND truncated needs both signatures. The two live in separate
@@ -681,8 +688,7 @@ if (arg === '--defer') {
 // saying so beats reporting a success that binds nothing. A record whose
 // timestamp is unreadable is NOT refused — it is named by its `--run` identity
 // or by being the only open one of its suite and backend, which is the whole
-// reason the closure binds by content rather than by a stamp (round 14; this
-// note still described the pre-identity behaviour). The judgment itself is the
+// reason the closure binds by content rather than by a stamp (round 14). The judgment itself is the
 // draft pair above, so it is testable without a state file.
 /**
  * THE SIGN-OFF'S ARGUMENTS, read from the raw argv tail. Pure and exported for
@@ -926,7 +932,7 @@ if (arg === 'status' || arg === '--status') {
       console.log(
         `⚠ INCOMPLETE RECORDING (not an unexplained red): ${r.backend}/${r.suite} ` +
           `@${isoText(runStamp(r) ?? r.at)} (id ${runIdentity(r)}, ${blocksNow(r, 'incomplete')}) — ${droppedLinesOf(r)} result line(s) dropped by the ` +
-          'capture cap. Re-run the suite, or sign it off: node scripts/render-verify-guard.mjs ' +
+          'recorder. Re-run the suite, or sign it off: node scripts/render-verify-guard.mjs ' +
           `--incomplete "${r.backend}/${r.suite}" --evidence "<why>"`,
       )
     }
@@ -946,8 +952,7 @@ if (arg === 'status' || arg === '--status') {
           `(id ${runIdentity(r)}, ${blocksNow(r, 'crashed')}) — the run died rather than reported. THE CRASH ITSELF carries no ` +
           'red anybody can own, so the three closings of point 640 cannot reach it — but a red the ' +
           'run PRINTED BEFORE it died was really observed and still closes those three ordinary ' +
-          'ways (review finding, 28.08.2026, round 17: this line used to say nothing in the run ' +
-          'could be explained or charged, which the sign-off message directly contradicts). A ' +
+          'ways. A ' +
           're-run judges the picture but does NOT remove this record: fix the CAUSE (the render ' +
           'edit moves the window past it), or read its kept log (local/verify-logs/) and sign the ' +
           'CRASH off: node scripts/render-verify-guard.mjs ' +
@@ -957,7 +962,12 @@ if (arg === 'status' || arg === '--status') {
     for (const c of Array.isArray(state.crashClosures) ? state.crashClosures : []) {
       console.log(`(signed-off crashed run: ${c.backend}/${c.suite} @${isoText(c.at)} — "${c.evidence}")`)
     }
-    if (state.deferral) console.log(`⚠ active deferral @${String(state.deferral.head).slice(0, 7)}: "${state.deferral.reason}"`)
+    if (state.deferral) {
+      console.log(
+        `⚠ ${deferred ? 'active deferral' : 'deferral for another HEAD (inactive)'} ` +
+          `@${String(state.deferral.head).slice(0, 7)}: "${state.deferral.reason}"`,
+      )
+    }
     if (state.lastDeferral) console.log(`(last consumed deferral: "${state.lastDeferral.reason}")`)
     const runs = Array.isArray(state.runs) ? state.runs.slice(-8) : []
     console.log(`recent runs (${runs.length} of ${Array.isArray(state.runs) ? state.runs.length : 0}):`)
