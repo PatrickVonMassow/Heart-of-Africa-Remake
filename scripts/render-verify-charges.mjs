@@ -1640,7 +1640,8 @@ export const RED_CHARGES = [
   {
     point: 1145,
     suite: 'world',
-    backend: 'webgl',
+    // Both backends: 1145 names a travel/camera-settling miss, not a renderer one
+    // (measured again on webgpu 28.09.2026 at f2a30fcd0).
     kind: 'check',
     // NO detailMatch here (other frame entries narrow on "subject is not in the
     // rendered picture"): the printed detail is the fixed words naming which edges
@@ -1664,7 +1665,9 @@ export const RED_CHARGES = [
     point: 1145,
     suite: 'enrichments',
     kind: 'check',
-    match: /^frame 72-water-victoria-falls — its subject is not in the rendered picture/i,
+    // The check name is the frame alone; the miss wording is the printed detail.
+    match: /^frame 72-water-victoria-falls$/i,
+    detailMatch: /subject is not in the rendered picture/i,
     why:
       'POINT 1145 FILED THIS EXACT FRAME AND CLASSIFIED IT PRE-EXISTING. Measured again '
       + '19.09.2026 on the covering enrichments pass (webgpu, 45 pass / 1 fail) at main dd1e6a6b, '
