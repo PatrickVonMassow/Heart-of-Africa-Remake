@@ -52,7 +52,8 @@ write. To take the batch back into a visible window, run
 with no merge or uncheckpointed work mid-flight, transfers pushed author
 checkpoints and recorded runs, releases, and that same claim takes ownership.
 The claimant adopts the transferred declaration before starting anything else.
-Claims expire, dead claimants are ignored, and one session wins. Never infer a
+A claim ages only once no live owner holds the lock (or as an errand claim),
+dead claimants are ignored, and one session wins. Never infer a
 dead child from the owner lock: run `batch-in-flight.mjs --agent-check` over its
 declared worktree and branch; unreadable output is unknown, not death. Never ask
 the user to close a headless owner: verify its pid, use the claim, and use pause
@@ -60,7 +61,8 @@ the user to close a headless owner: verify its pid, use the claim, and use pause
 leaving the window unattended.
 
 `scripts/chat-watcher.mjs` may wake a bounded responder for inbox work only when
-there is no live owner and no honored claim; the launcher supervises it. A user
+there is no live owner and no honored claim, or past `DEFERRAL_MS` for a message
+a waiting owner has not collected; the launcher supervises it. A user
 message interrupts the batch rather than ending it: answer it, then make the
 turn's last action a batch action. The launcher and repair path are described in
 `docs/batch-autonomy.md`.
@@ -145,9 +147,8 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
 
 ## Board and owner-only operating hooks
 
-- Drain waiting findings from
-  `/home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md`
-  into the work order, then run
+- Drain waiting findings (`node scripts/finding.mjs --drain` lists them from the
+  memory carrier) into the work order, then run
   `node scripts/finding.mjs --drained "<title>"`.
 - Use `scripts/board.mjs` serially; concurrent calls race on the dashboard file.
   The canonical source is `.batch-dashboard.html` at the repository root and

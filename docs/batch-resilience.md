@@ -1,6 +1,7 @@
 # The batch must not be able to stand still
 
-Design document, 30.07.2026, second revision — the first was reviewed by the other
+Design document, 30.07.2026, second revision, with later revisions (08.08 and
+10.08.2026) and BUILT/DONE reports folded in — the first was reviewed by the other
 model against the code and the logs and came back GO-WITH-CHANGES with two new
 failures, one self-contradiction and one hole in the central promise. All of it is
 folded in below; the review's own verdict is recorded in
@@ -11,7 +12,8 @@ state at 04:19 was byte-for-byte what it had been six hours earlier. The user's
 instruction that day was explicit — preventing this reliably outranks batch
 progress.
 
-The build order is work-order point 434, except layer 2, which is point 433.
+The original build order was work-order point 434, except layer 2, which is point
+433 (§7 records the planned sequence); later layer-1 work ran under points 556 and 612.
 
 ---
 
@@ -21,15 +23,15 @@ The build order is work-order point 434, except layer 2, which is point 433.
 |---|---|---|
 | A | Both delegated agents died on a server-side HTTP 500 | Nothing retried them. A dead child was reported to the parent and that was the end of it. |
 | B | The environment's permission classifier went down; the owning session could not execute a single command | A session in this state cannot heal itself — it waits on a call that never returns. It had not crashed, so no crash path applied. **No layer below heals this by itself; see §4.** |
-| C | The launcher concluded "WEDGED owner" **nine** times over two hours and acted on none | Its authority is real but NARROW: `wedgeAction` may kill and take over only its OWN spawn (`batch-singleton.mjs:470–483`). The night's owner was started by hand, so `isOwnSpawn` was false and the verdict fell through to a log line. The gap is the CONDITION, not the absence of power. |
-| D | Before that, 221 minutes of silence read as "owner alive" | `WEDGED_MS` is four hours (`batch-singleton.mjs:60`) — longer than the unattended stretch it would have to save. |
+| C | The launcher concluded "WEDGED owner" **nine** times over two hours and acted on none | Its authority is real but NARROW: `wedgeAction` (since removed, §6) could kill and take over only its OWN spawn. The night's owner was started by hand, so `isOwnSpawn` was false and the verdict fell through to a log line. The gap is the CONDITION, not the absence of power. |
+| D | Before that, 221 minutes of silence read as "owner alive" | `WEDGED_MS` (since removed, §6) was four hours — longer than the unattended stretch it would have to save. |
 | E | The in-flight declaration expired during the night | Expiry means "the stop is no longer excused", which matters only to a session still taking turns. Nothing else followed. |
 | F | One notification went out at 00:06 and was never repeated or escalated | A single message to a sleeping user is indistinguishable from silence. |
 | G | The lock stayed held the whole time | It is a lock with an owner, not a lease with an expiry: releasing it requires somebody to decide, and the only candidates were the wedged session and a launcher whose authority did not reach it. |
 | H | At 02:21 the owner CAME BACK — "fresh-heartbeat, 0 min old" — and still produced nothing until 04:19 | The heartbeat proves the process lives, not that work advances. This is §2's documented hard case, live in the same night, and it is exactly what a heartbeat-renewed lease cannot see. |
 | I | ~~The launcher log ENDS at 02:21~~ **— WITHDRAWN 30.07.2026, this failure did not happen** | The log ticks every 15 minutes through to 08:36. What ends at 02:21 is the `WEDGED owner` line, because the owner's heartbeat ticked once and the verdict flipped to `skip: owner alive (fresh-heartbeat)`. I is not a second failure; it is H seen from the launcher's side. |
 
-**The pattern behind A–I:** every layer could OBSERVE the stall and none could ACT
+**The pattern behind A–H (I is withdrawn):** every layer could OBSERVE the stall and none could ACT
 on it — and where authority existed, a condition kept it from reaching. An
 observation that is written down feels like protection, which is what makes this
 the expensive kind of failure.
@@ -40,7 +42,7 @@ old at successive launcher ticks), so the session was completing SOME calls and
 producing nothing — precisely the case a heartbeat-renewed liveness test cannot
 see. I was a misreading of the log and is withdrawn above. Nothing further is
 recoverable from the artefacts, and the design already assumes this case, so the
-build may be frozen.
+build was frozen then (the 08.08.2026 point-556 revision in §3 later reopened it).
 
 ## 2. What the established practice does about it
 
@@ -80,37 +82,40 @@ renewed by it must outlive the longest single call — and this repo legitimatel
 window sized for that is no better than today's four hours. Extending the lease
 *before* the long call keeps the window short and the reader side pure; the pattern
 already exists here (`withdrawHandover` runs from a PreToolUse hook for the same
-reason, `batch-singleton.mjs:1170–1174`).
+reason, `withdrawHandover` in `batch-singleton.mjs`).
 
-Consequently there is **no probing at the acquire door**. The first revision said
+Consequently there is **no probing at the acquire door** (revised 08.08.2026 by
+point 556, below: an expired lease is taken only on a negative corroborating
+signal, at every door). The first revision said
 expiry is arithmetic and, two paragraphs later, that a declared in-flight wait
 extends the lease "while the declared work is provably moving" — which puts the
 judgement right back in. Declared work extends the lease by writing a longer
 `leaseUntil` when it is declared, and the acquirer only compares numbers.
 
 **The fence lives in its own file**, never deleted, monotonic, max-wins,
-incremented under the existing reap mutex (`batch-singleton.mjs:804–830`, mkdir-
+incremented under the existing reap mutex (in `batch-singleton.mjs`, mkdir-
 atomic). It cannot live inside the lock file: `acquire` deletes that file
-(`:925`) and a corrupt one reads as null (`:744–748`), so the high-water mark would
+and a corrupt one reads as null, so the high-water mark would
 be lost exactly when it matters and a fresh start at fence=1 would re-admit the old
 owner's writes.
 
 **Where the fence is actually checked.** The lock's own writers are already
-sessionId-guarded and need nothing (`heartbeat` `:941`, `markHandover` `:1148`,
-`updateOwnLock` `:985`, `withdrawHandover` `:1179`, `clearOwnBoundary` `:1226`).
+sessionId-guarded and need nothing (`heartbeat`, `markHandover`,
+`updateOwnLock`, `withdrawHandover`, `clearOwnBoundary`).
 Neither does `batch-claim` (own expiry plus pid probe) nor the read-only handover
 observer. The paths that matter are the ones with NO guard today: the `TASKS.md`
 tick and archive move, `git merge`/`push` to main, the board publish, and
-`dashboard-state.json` merges (`lock-heartbeat-hook.mjs:111–127`). Those cannot each
+`dashboard-state.json` merges (`lock-heartbeat-hook.mjs`). Those cannot each
 check for themselves, so the check goes in **one PreToolUse chokepoint** — the slot
-`board-first-guard` already occupies — which refuses every state-changing call from
-a session whose fence is stale. Without that chokepoint the fence protects only the
+`board-first-guard` already occupies — which refuses those four families of
+state-changing call (below) from a session whose fence is stale. Without that chokepoint the fence protects only the
 file that was already protected, and the woken owner still pushes to main.
 
 **One function owns the verdict** (point 612, with point 614's cross-point ruling).
 Point 612's idle window and point 517's lease extension pull the SAME `leaseUntil`
 arithmetic in opposite directions, so whichever landed second as an independent
-patch would silently undo the first. The whole question — does this lock still
+patch would silently undo the first. (Point 556's `leaseTakeoverDecision`, below, is
+called from inside it.) The whole question — does this lock still
 belong to its owner, and until when — is therefore answered by `ownershipVerdict`
 over `effectiveLeaseUntil` in `scripts/batch-ownership-core.mjs`, and 517's
 extension is expressed INSIDE `effectiveLeaseUntil`, never beside it.
@@ -138,13 +143,15 @@ everyday event. Nothing is killed either way.
 
 **A state change is the OWNER'S OWN.** The idle window may only be moved by
 something the owner wrote — its heartbeat, a commit of its own, a board write
-(`ownerActivityAt`) — and never by a file timestamp. The launcher today prints
+(`ownerActivityAt`) — and never by a file timestamp (which may only corroborate an
+already expired lease, point 556 below). The launcher today prints
 `declared work advancing — worktree … active 1 min ago (working files|git
 metadata)` off mtimes alone, so a leaked dev server or a file watcher touching a
 worktree would keep a dead-idle owner "active" for as long as the takeover override
 (1 h) or the work-max-age (4 h) allows. `idleVerdict` therefore takes no
-"is it advancing?" signal at all, and `ownershipVerdict` reads only `work.declared`
-— a declaration the owner wrote — never `work.advancing`. The same three inputs
+"is it advancing?" signal at all, and for the idle window `ownershipVerdict` reads
+only `work.declared` — a declaration the owner wrote; `work.advancing` enters only
+the expired-lease corroboration of point 556. The same three inputs
 answer for a takeover CLAIM that reserves the batch without working (point 616),
 which is why the function is free of the lock.
 
@@ -170,9 +177,12 @@ of them free choices:
   longest measured undeclared call at 27.8. The demolished valve's 45 could not be
   kept for exactly that reason. The ladder stays monotone: renew 5 < lease 60 <
   the external watcher's 120, and a launcher tick is 15, so recovery lands within
-  75 minutes of a standstill instead of never. The rate limit is not a nicety —
-  writing this file twice per tool call is what produced five `EPERM … rename
-  batch-lock.json` failures on 28.07.2026.
+  75 minutes of a standstill instead of never — for an owner nothing corroborates;
+  point 556's override (below) can add one further window, and a declared wait
+  extends to 4 h. The rate limit is not a nicety —
+  rewriting this file several times in quick succession is what produced five
+  `EPERM … rename batch-lock.json` failures on 28.07.2026 (traced in
+  `docs/batch-autonomy.md` to the Stop chain's triple write).
 - **A lock without `leaseUntil` carries an implicit one** (`claimedAt + LEASE_MS`),
   so nothing needs a migration step somebody has to remember: the live owner that
   merges the change keeps working and writes a real lease at its next call.
@@ -210,7 +220,7 @@ long-blocking call, and a session inside one renews nothing, so obeying the rule
 ages its own lease to expiry precisely while it is most productive — the longer the
 verification, the surer the dispossession.
 
-Two changes, both in the pure core:
+Three changes:
 
 - **The takeover asks the corroborating signals** (`leaseTakeoverDecision`). It
   takes the batch only where the pid is dead or unidentifiable, or the declared work
@@ -221,12 +231,12 @@ Two changes, both in the pure core:
   resolved inside the hour (four-eyes review, confirmed finding 1):
   - it must rest on PRODUCED output. `assessOwnerWork.advancing` is true if any
     answerable item checks out, and a declared `--pid` checks out for merely
-    EXISTING — this file's own "a live process (nothing produced), the weakest".
+    EXISTING — a live process that produces nothing.
     `judgedOn === 'process'` (or nothing at all) therefore corroborates nothing;
     `git` and `log` do, `log` being what an honest background run declares.
   - it EXPIRES. `TAKEOVER_OVERRIDE_MAX_MS` is one further window, so total silence
     stays inside two hours and the ladder stays monotone (renew 5 < lease 60 <
-    override +60 ≤ the external watcher's 120). And the launcher keeps ESCALATING
+    override +60 ≤ the external watcher's 120, plus up to one 15-minute tick to notice). And the launcher keeps ESCALATING
     while it skips, so the one state where it deliberately declines to act is not
     also the one state nobody is ever told about.
 - **Every door reads the corroborated verdict, not just the launcher** (confirmed
@@ -241,8 +251,7 @@ Two changes, both in the pure core:
   path. `batch-claim` is deliberately left out: that is a person taking the batch
   into the window they are sitting at, the manual override the whole mechanism
   serves — and it is the way back a dispossessed session is told to use.
-- **A declared wait extends the lease**, which is what this paragraph used to say
-  was unbuilt. `batch-in-flight.mjs --waiting-on` now calls `extendLease` for
+- **A declared wait extends the lease**, which §3 had left unbuilt. `batch-in-flight.mjs --waiting-on` now calls `extendLease` for
   `DECLARED_WAIT_LEASE_MS` (4 h, pinned to `LAUNCHER_WORK_MAX_AGE_MS`). Point 556
   offered the alternative of renewing at call START as well as at completion; it was
   REJECTED, and the reason is arithmetic: a renewal buys exactly one `LEASE_MS`
@@ -272,7 +281,9 @@ longer make.
 The narrow `isOwnSpawn` condition goes: a wedged owner is taken over whoever
 started it. The threshold comes down, and a repeated verdict escalates. Layer 1
 makes this cheap — the launcher stops judging wedgedness and finds an expired
-lease.
+lease (and, since point 556, a negative corroborating signal). Superseded in part
+by layer 1: §6 removed the wedge takeover and threshold; `isOwnSpawn` survives on
+the kill only, and `verdictRepeat` keeps the escalation.
 
 **433 also carries the failCount fix from §4**, because without it this layer is
 what turns a quiet night into a loud one.
@@ -291,7 +302,7 @@ ownership just as definitively, and a signal hung on the mark would leave exactl
 those two waiting out the quarter hour. So the watcher asks `assessOwner` — the same
 verdict the tick uses — and one code path decides "ownership just ended". Three
 properties keep it safe: it reacts to a CHANGE, never to a standing state, so a lock
-that has been free for hours does not tick the launcher four times a minute; `WAKE_MIN_GAP_MS`
+that has been free for hours does not tick the launcher over and over; `WAKE_MIN_GAP_MS`
 floors two early ticks a minute apart, so a tick that cannot spawn (backoff, quota,
 preflight) cannot spin; and it SPAWNS NOTHING — all it does is shorten a sleep, so
 the tick it brings forward is the same `batch-autostart.mjs` child as ever and the
@@ -324,7 +335,8 @@ watcher computes progress itself from the repo. The second is preferred: it need
 new service, and the "check-in carries the open-point count" requirement only means
 something where somebody evaluates it.
 
-**The external watcher releases and alerts; it never spawns.** One spawner is
+**The external watcher alerts; it never spawns** (this section first proposed that
+it also release — dropped when BUILT, below). One spawner is
 enough, and the launcher already owns the debounce state (`autostart-last.json`) that
 a second spawner would not see — two spawners produce double boots that then have to
 be reaped as rogue.
@@ -363,7 +375,9 @@ decides anything itself:**
 
 ```
 node scripts/child-retry.mjs --point <n> --branch <ref> --death "<what the harness said>"
-     [--child <agent id>] [--brief-revision <sha>] [--reported-complete] [--critical] [--tokens <n>]
+     [--child <agent id>] [--brief-revision <sha>] [--reported-complete]
+     [--committed|--no-committed] [--critical] [--tokens <n>]
+node scripts/child-retry.mjs --status | --complete --point <n> | --forget --point <n>
 ```
 
 It answers exactly one of five verdicts and never spawns anything:
@@ -400,18 +414,20 @@ the window, never work. `--status`, `--complete --point <n>` and `--forget
 --point <n>` let the owning agent read and adjust it explicitly.
 
 **It is deliberately NOT idempotent per death.** Running the identical command
-twice for ONE death books two retries against that point's budget. The command
+twice for ONE death books two retries against that point's budget (unless a
+recovery is already scheduled — then the duplicate is SCHEDULED and records nothing). The command
 has a single disciplined caller — the main session, once per dead child — and a
 death carries no id the command could deduplicate on without inventing one. The
 failure mode is therefore the safe direction: a double-run exhausts the immediate
 budget early and moves the point to its recovery schedule; it never grants an extra attempt. `--forget --point
 <n>` re-opens a budget spent by mistake.
 
-**THE ESCALATION LADDER, the remainder of part (1), built with it** — the
+**THE ESCALATION LADDER, built with it (point 434)** — the
 external watchdog of layers 3+4 alerts every 30 minutes and shares its ntfy topic
 with the CI-red alert, so a repeated identical alert must not repeat identically.
 `scripts/alert-escalation-core.mjs` (pure) and `scripts/alert-escalation.mjs`
-(I/O) sit in front of `scripts/notify.mjs`, so EVERY local alert climbs: sent at
+(I/O) sit in front of `scripts/notify.mjs`, so every local alert passes it, and one
+whose caller declared `high` or above climbs (see the contract below): sent at
 once, then not before 15, 30, 60 and 120 minutes, the ntfy priority rising with
 the rung — and the LAST RUNG PAUSES THE BATCH with a board card instead of
 buzzing a fifth time, which is the whole point: an alert can be slept through, a
@@ -443,10 +459,9 @@ notifications must not be declared urgent.
 pause does not climb in priority either: below the threshold every rung is
 delivered at the caller's own priority. Otherwise the rung-4 "urgent" would have
 buzzed the phone for a routine successor spawn every two hours — the same
-contract broken from the other side. (Still owed on the caller side, in the file
-that owns them: `Resurrected` and `Leaked worker reaped` should also pass
-`{ escalate: false }`, since their every occurrence is genuinely news. Until that
-lands they are throttled rather than mis-escalated, which is the safe direction.)
+contract broken from the other side. (On the caller side, `Resurrected` and `Leaked worker reaped` now post at `low`
+priority with `{ recurring: true }`, so they are throttled as events rather than
+mis-escalated, which is the safe direction.)
 
 **The rung is booked only after the message is actually out.** Booking it before
 the POST meant one transient ntfy failure silenced a standing alert for a whole
@@ -470,11 +485,13 @@ for an already-paused batch (the pause is a state, not an action to repeat), and
 
 If the lease expires and a successor spawns **into the same broken environment**, it
 wedges identically. And the runaway brake does not catch it: `failCount` only rises
-when the spawn's pid is GONE (`batch-autostart.mjs:385`), so a chain of
-alive-but-wedged successors never reaches it. Point 434 would then convert a silent
+when the spawn's pid was GONE, so a chain of
+alive-but-wedged successors never reached it. Point 434 would then convert a silent
 night into a loud, token-burning one — the opposite of the goal.
 
-Three parts, and they belong to 433 because that is the layer that spawns:
+Three parts, and they belong to 433 because that is the layer that spawns (BUILT in
+`batch-autostart-core.mjs`: the environment preflight and the spawn that must
+convert the lock or land a first commit):
 
 1. **An environment preflight before the spawn** — can a trivial tool call complete
    at all? A spawn into a refusing environment is not a rescue.
@@ -485,7 +502,7 @@ Three parts, and they belong to 433 because that is the layer that spawns:
 
 This also answers "the successor runs straight into the same outage".
 
-### Layer 5b — the same rule, applied to children (added 30.07.2026, after breaking it)
+### Layer 5b — the same rule, applied to children (added 30.07.2026, after breaking it; belongs with §3's layer 5)
 
 While this document was being written, a bundle agent's log fell silent for 59 minutes.
 The in-flight declaration reported `evidence-gone: silent for 59 min`, and the agent was
@@ -493,7 +510,7 @@ declared dead and replaced. It was alive: its worktree had committed four minute
 earlier, and the branch tip moved one minute before the replacement was spawned. The
 successor rebuilt two finished points, and both were about to build a third.
 
-The declaration accepts a worktree, a pid, a branch or a log as evidence and weighs them
+The declaration accepted a worktree, a pid, a branch or a log as evidence and weighed them
 equally. A log is the weakest: an agent that works without printing is indistinguishable
 from one that died. So where the declared work is an AGENT, git activity in its worktree
 or on its branch is the PRIMARY evidence, a silent log alone never supports the
@@ -518,11 +535,15 @@ every verdict names WHICH of the two sources answered.
 
 - **No rescue that depends on the wedged session noticing.** It is definitionally
   the party that cannot.
-- **No second local watchdog.** It shares the local fate AND the local evidence;
-  this night's launcher was awake all night and still read a heartbeat as life.
+- **No second local watchdog** of the owner's liveness. It shares the local fate
+  AND the local evidence; this night's launcher was awake all night and still read
+  a heartbeat as life. (The later Windows watchdog and emergency tasks of points
+  447/947 watch the launcher's scheduling and restore progress independently; see
+  `docs/batch-autonomy.md`.)
 - **No two spawners.**
-- **No window that kills a running verification** — that is what PreToolUse renewal
-  is for.
+- **No window that kills a running verification** — PreToolUse renewal covers an
+  ordinary call, and a declared wait (point 556) covers one longer than the lease;
+  the 08.08.2026 dispossession mid-verification (§3) is what taught the second half.
 - **No silent recovery.** Every take-over writes its reason where the morning
   reader finds it: log, board, notification.
 
@@ -541,8 +562,9 @@ option; `silenceStage`, `wedgeStage`, `wedgeNotifyDecision` and the two-stage
 silent-owner report in the launcher; `WEDGED_MS`, `WEDGE_NOTIFY_MS` and the
 `wedged` flag on the assessment; `spawnDecision`'s third outcome `skip-wedged`; and
 with the kill-then-take valve, the launcher's `waitForExit`/`sleepSync`.
-`assessOwner` no longer takes a `work` argument at all — a declaration is a report
-now, never a claim on the batch.
+`assessOwner` then took no `work` argument at all — a declaration was a report,
+never a claim on the batch (point 556 restored the argument: declared work now
+corroborates an expired lease, §3).
 
 Two things survived, and the reasons are worth keeping:
 
@@ -559,6 +581,9 @@ Two things survived, and the reasons are worth keeping:
   tick, is exactly what a person still needs to hear.
 
 ## 7. Order of the build
+
+(The plan as of 30.07.2026. Step 1's threshold was demolished with layer 1 (§6), and
+since point 556 the local takeover also judges repository output.)
 
 1. **Point 433 with §4 folded in** — the smallest delta on code that already works,
    and the threshold alone would have acted at 00:06 instead of never.

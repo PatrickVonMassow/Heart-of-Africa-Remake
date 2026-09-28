@@ -1,5 +1,8 @@
 # Geriatric Fauna: ageing, elderly behaviour and natural death (design.md §19)
 
+(This file also hosts a separate study, *Bird flight, escape and aerial predators*,
+under its own heading further down.)
+
 Research basis for the **elderly-animal** mechanic: which of the game's rendered
 animals realistically show old age, what an aged wild elephant / ungulate / big
 cat actually **looks like** and **does** differently, and whether death of old
@@ -24,7 +27,8 @@ senescence, dominance turnover and the bachelor-bull pattern are mechanisms, not
 split for the biology itself; the ~1890 framing is only the game's, and every
 species named was present in sub-Saharan Africa then. The one genuinely
 period-loaded item is the **graveyard folklore** (§4), which is treated as
-folklore.
+folklore; §10.5 later adds the ~1890 layer of what travellers believed about old
+animals (see the forward-pointer below).
 
 Evidence markers, extending the sibling docs' discipline:
 
@@ -35,16 +39,17 @@ Evidence markers, extending the sibling docs' discipline:
 | **INFERRED** | reasoned from general mammalian biology; **not** directly attested for this species — treat as a hypothesis |
 | **MYTH** | folklore, explicitly **not** supported by evidence — recorded to be marked as such, not built as fact |
 | **GAP** | not well documented — do not over-assert |
+| **PERIOD** | a ~1890 source or belief (added by §10) |
 
 The accuracy bar is the sibling docs': a hedged answer beats a confident wrong
 one, myth is labelled myth, and inference is labelled inference.
 
 > **⏩ FORWARD-POINTER (added by the point-265 second research pass, 24.07.2026).**
 > §10 went back over the primary literature and the ~1890 record. It **overturns
-> one recommendation** and **closes three of §8's gaps**, so read §2/§6 alongside
+> one recommendation** and **partly closes gaps §2 and §8 name**, so read §2/§6 alongside
 > it:
-> - **§2.1/§6 say "duller, greyer coat" for all ungulates — that is WRONG for the
->   giraffe.** Male giraffes darken toward black with age, they do not grey
+> - **§6 says "duller coat" for the giraffe and "duller, greyer coat" for the grazers
+>   — ageing a giraffe by colour is WRONG** (§2.1 now carries the exception inline). Male giraffes darken toward black with age, they do not grey
 >   (§10.2). Greying a giraffe would render the one species that visibly ages in
 >   the opposite direction.
 > - **§2.3's "specific ageing literature is thinner" GAP for the carnivores is
@@ -177,7 +182,8 @@ converge on a small set of traits, of which several are legible:
   gaunt and scarred; the wild male lifespan is short and the end is a visible
   wasting (§3.3).
 
-For **leopard, cheetah, hyena** the specific ageing literature is thinner: greying
+For **leopard, cheetah, hyena** the specific ageing literature is thinner (partly
+closed by §10.3's measured tooth-fracture rates): greying
 muzzle, dental wear/breakage, scarring and condition loss are the same
 mammalian-carnivore cues (spotted hyenas in particular carry heavy tooth wear and
 fracture from bone-cracking — REVIEW, from the carnivore dentition literature),
@@ -334,7 +340,7 @@ of their dead — that part is genuine — but that is not a cemetery, and it is
 separate behaviour.)
 
 **Game reconciliation.** The game already *has* an elephant graveyard as a
-§4.4 landmark — a piece of deliberate, licensed folklore/atmosphere, not a
+design.md §4.4 landmark — a piece of deliberate, licensed folklore/atmosphere, not a
 truth-claim. This research neither requires nor recommends removing it. What it
 recommends is that the **mechanism** the game builds be the *real* one: an old,
 dentally-failing elephant **drifts to water and dies there**, and the graveyard
@@ -377,7 +383,7 @@ Synthesising §3.3, §4 and §4.4 into stages the engine can drive (the biology 
 progressive decline, not a switch — so stage it):
 
 1. **Aged (chronic).** The animal carries the elderly appearance (§2) and
-   behaviour (§3): leaner, greyer, slower, edge-of-herd or solitary (per species),
+   behaviour (§3): leaner, greyer (never the giraffe, §10.2), slower, edge-of-herd or solitary (per species),
    declines/loses intraspecies contests, and is preferentially targeted by
    predators. It can persist in this state a long time. **Most old animals die
    here — taken by a predator — and never reach stage 2.**
@@ -388,7 +394,7 @@ progressive decline, not a switch — so stage it):
 3. **Collapse.** The animal goes down and dies — dropping into the game's
    **ordinary carcass system** (not a bespoke body path), where vultures **descend**
    and the existing scavenger/vulture logic consumes it. For an elephant, the death
-   site is at/near water and can feed the §4.4 graveyard framing (bones/tusks
+   site is at/near water and can feed the design.md §4.4 graveyard framing (bones/tusks
    accumulate there).
 
 This maps cleanly onto systems the game already owns: the carcass/vulture
@@ -400,6 +406,9 @@ the poor-condition vulture omen of pt. 22.
 
 ## 6. Recommendation — per species-group, concrete in-game traits
 
+> Superseded by §10.7's implementation table; §10.2 replaces the giraffe row (no
+> colour ageing) and §10.4 adds the elephant's best cue. Kept as the first pass.
+
 **Scope:** apply the elderly variant to the species where it reads and is
 supported. Keep every rate/threshold a low, **debug-editable** balance value
 (CLAUDE §2 / §21), respect the region pools (`REGION_PREY` / `REGION_PREDATORS`,
@@ -408,9 +417,9 @@ and route every natural death through the **ordinary carcass system**.
 
 | Species-group | Elderly variant? | Visual cues to render | Behaviour set | Dies of old age? |
 | --- | --- | --- | --- | --- |
-| **Elephant** | **Yes (flagship)** | worn/broken tusks, sunken temples, gaunt/bony frame, sagging wrinkled skin, ragged ears, slower gait | keeps normal high status (NOT ousted); when *failing*, drifts to water/soft forage and slows | **Yes** — molar-failure wasting → **dies at/near water** → feeds §4.4 graveyard framing |
+| **Elephant** | **Yes (flagship)** | worn/broken tusks, sunken temples, gaunt/bony frame, sagging wrinkled skin, ragged ears, slower gait | keeps normal high status (NOT ousted); when *failing*, drifts to water/soft forage and slows | **Yes** — molar-failure wasting → **dies at/near water** → feeds design.md §4.4 graveyard framing |
 | **Grazers: zebra, wildebeest, antelope/gazelle** | **Yes** | leaner/angular body, sway-backed dropped topline, duller greyer coat; worn horns (silhouette) | slower; lags at **herd rear/edge**; old males lose harem/territory and drift to bachelor; **preferentially targeted by predators**; declines/loses intraspecies contests | **Rarely** — usually taken by a predator first; a low natural-death rate is fine |
-| **Giraffe** | **Yes (light)** | leaner frame, duller coat, balded/worn ossicone tops | slower; loses necking contests; more catchable | Rarely (predator-taken first) |
+| **Giraffe** | **Yes (light)** | leaner frame, balded/worn ossicone tops (no colour ageing — §10.2) | slower; loses necking contests; more catchable | Rarely (predator-taken first) |
 | **Warthog** | **Yes (light)** | leaner, duller, worn/chipped tusks | slower; loses boar shoving; more catchable | Rarely |
 | **Buffalo** *(not rendered)* | archetype only | worn/splintered horns & boss, bald scarred hide, gaunt | **dagga-boy**: ousted, solitary/bachelor, shadows herd edge, **very predator-vulnerable** | Sometimes — port this pattern onto rendered species, don't build directly |
 | **Lion** | **Yes** | greyer/mottled nose, **thinning mane** (males), yellow/worn/broken teeth (implied), slack jowls/sagging lip, scars, gaunt | ousted male → nomad, hunts poorly alone, high risk; declines pride contests | **Yes** — wasting/starvation end (a rendered decline) |
@@ -422,7 +431,7 @@ and route every natural death through the **ordinary carcass system**.
 
 - **Appearance schema:** add an `elderly` build flag to the fauna builders that
   applies (a) a leaner/angular body scale, (b) for quadruped grazers a sway-backed
-  topline tweak, (c) a duller/greyer coat tint, and (for males where it applies)
+  topline tweak, (c) a duller/greyer coat tint (never on the giraffe, §10.2), and (for males where it applies)
   worn-horn/thin-mane variants. All cosmetic; no new mesh topology required.
 - **Behaviour:** an elderly individual moves at a reduced speed factor
   (`balance.elderly.speedFactor`, debug-editable); it **declines or loses**
@@ -440,8 +449,10 @@ and route every natural death through the **ordinary carcass system**.
 
 ### 6.2 Implementation brief — elderly elephant (the flagship, distinct path)
 
-- **Appearance:** `elderly` elephant build = worn/broken tusks, sunken temples,
-  gaunt bony frame, sagging skin, ragged ears, slower gait.
+- **Appearance:** `elderly` elephant build = worn/broken tusks — the best single
+  cue is asymmetric master/slave tusk wear (§10.4/§10.8) — gaunt bony frame,
+  sagging skin, ragged ears, slower gait (sunken temples are not legible at
+  bird's-eye scale, §10.4).
 - **Behaviour — DO NOT ostracise it.** An old bull keeps normal herd/solitary
   status (adult male elephants are already solitary/bachelor by life stage; old
   bulls are high-status, §3.1). The distinctive elderly behaviour is the **terminal
@@ -450,7 +461,7 @@ and route every natural death through the **ordinary carcass system**.
 - **Natural death & graveyard:** on reaching water in the failing state (or after
   a debug-editable window), it **dies at/near the water** into the ordinary carcass
   system; vultures gather then descend (§4.4). This is the *real* mechanism behind
-  the folklore — so wire the death site to reinforce the existing §4.4 **elephant
+  the folklore — so wire the death site to reinforce the existing design.md §4.4 **elephant
   graveyard** landmark (bones/tusks accumulating at water-side death sites) rather
   than inventing a pilgrimage to a fixed cemetery (that pilgrimage is **myth**, §4.3).
 - **Rates:** elephant natural death is the *showpiece* but must stay rare —
@@ -463,7 +474,7 @@ and route every natural death through the **ordinary carcass system**.
 - **Broken canine = a real death sentence for a cat** — a legitimate, grounded
   reason an old lion/leopard starves; could flavour a natural-death journal entry.
 - **Grey muzzle** is the single cheapest cross-species "old" tint and applies to
-  every mammal here.
+  every mammal here except the giraffe (no colour ageing, §10.2).
 - **Drought concentration** (§4.2) — old/weak animals dying around the last water
   in the dry season — dovetails with the existing seasonal shore-catchment system
   (§19.13) and would make elderly deaths cluster believably at water in the dry
@@ -477,7 +488,8 @@ and route every natural death through the **ordinary carcass system**.
 ## 8. Known unknowns — do not invent these
 
 - **Species-specific legible ageing cues for leopard, cheetah, hyena, giraffe,
-  warthog** beyond the general mammalian set — **GAP**. The recommendation treats
+  warthog** beyond the general mammalian set — **GAP** (partly closed since by
+  §10.2 for the giraffe and §10.3 for the carnivores' teeth). The recommendation treats
   them as "the lion/ungulate template," which is a reasoned default, not attested
   per species.
 - **Sway-back in wild zebra** is **INFERRED** from domestic-equine homology, not a
@@ -548,7 +560,8 @@ Vultures & dying/downed animals:
 
 This pass re-checked the primary literature on the points §8 flagged as gaps, and
 added the ~1890 period layer the intro had waived. It **overturns one
-recommendation** (giraffe coat colour), **closes three gaps** with measured data,
+recommendation** (giraffe coat colour), **partly closes gaps** with measured data
+(the carnivore-cue gap of §8; answers to §1's objection and §2.2's elephant cue),
 and **adds a period section**. One marker is added to the table, matching
 `peoples-1890.md`:
 
@@ -580,7 +593,8 @@ also the honest answer if the mechanic is ever questioned as unrealistic.
 
 ### 10.2 CORRECTION — the giraffe does not grey, it BLACKENS (and even that is not an age cue)
 
-§2.1 and §6 recommend "duller, greyer coat" for all ungulates including giraffe.
+§6 recommended "duller coat" for the giraffe and "duller, greyer coat" for the other
+ungulates (§2.1 has since been patched with the giraffe exception).
 **For the giraffe this is backwards**, and the correction comes with a second,
 more important caveat.
 
@@ -724,8 +738,8 @@ hunters off into the wilderness and away from villages
 [Ripley's — Elephant graveyards: the El Dorado of Africa](https://www.ripleys.com/stories/elephant-graveyards))
 — PERIOD/REVIEW.
 
-**This is a gift for the game and it costs nothing.** The §4.4 graveyard landmark
-and its ivory hauls (§7.1 pt. 25) are **exactly what an 1890 explorer would have
+**This is a gift for the game and it costs nothing.** The design.md §4.4 graveyard landmark
+and its ivory hauls (CLAUDE.md §7.1 pt. 25) are **exactly what an 1890 explorer would have
 been hunting for**, and §4.3's verdict (no such cemetery; bones accumulate at
 water) is **also period-plausible** — the debate was live in 1890, so a sceptical
 and a credulous journal voice are both era-authentic. The game does not need to
@@ -759,7 +773,7 @@ shortcut. ⚠️ An **elephant** carcass is a different case: the hide alone def
 most scavengers for a long time and the bones persist for years (which is *why*
 §4.2's bone accumulations exist at all). No verified elephant-specific figure was
 found — **GAP** — but a much longer elephant carcass/bone persistence than a
-zebra's is a safe INFERRED asymmetry, and it is the mechanism the §4.4 graveyard
+zebra's is a safe INFERRED asymmetry, and it is the mechanism the design.md §4.4 graveyard
 framing rests on.
 
 ### 10.7 Implementation table — ages / does not visibly age, with the carrying system
@@ -776,7 +790,7 @@ on those two builders is a direct, like-for-like extension — no new architectu
 
 | Species | Ages visibly? | Renderable cues | Behaviour | Carrying system |
 | --- | --- | --- | --- | --- |
-| **Elephant** | **Yes — flagship** | **asymmetric master/slave tusk** (§10.4, best cue), gaunt bony frame, sunken temples, ragged ears | keeps status, **never ousted** (§3.1); on failing, drifts to water | `buildElephant(calf)` → add `elderly` flag; per-side tusk scale; drift target reuses the river/lake water-cell lookup |
+| **Elephant** | **Yes — flagship** | **asymmetric master/slave tusk** (§10.4, best cue), gaunt bony frame, ragged ears (sunken temples not legible at bird's-eye, §10.4) | keeps status, **never ousted** (§3.1); on failing, drifts to water | `buildElephant(calf)` → add `elderly` flag; per-side tusk scale; drift target reuses the river/lake water-cell lookup |
 | **Giraffe** | **Yes, but NOT by colour** | leaner angular frame, dropped topline, worn ossicone tops — **no greying** (§10.2) | slower; loses necking contests; more catchable | `buildGiraffe(calf)` → add `elderly` flag; `parentAttackOutcome`-style matrix for contests |
 | **Zebra** | **Yes** | lean/angular body, **sway-backed topline**, duller greyer coat | slower; lags at herd rear; preferred predator target | `elderlyProportions(ZEBRA_SPEC)` — mirrors `calfProportions`; sway-back needs a **new spec field** (`buildQuadruped` derives `backY` from `legH + bodyR`, so a scalar alone will not bend the topline) |
 | **Wildebeest** | **Yes** | lean/angular, duller coat, worn horn silhouette | as zebra; old males lose harem, drift to bachelor | `elderlyProportions(WILDEBEEST_SPEC)` |
@@ -813,7 +827,8 @@ Ranked by legibility-per-unit-work at the game's bird's-eye scale:
    modern data, a per-side scale on existing geometry, and it distinguishes the
    flagship species at a glance.
 2. **Lean/angular body via an `elderlyProportions` spec transform** (§10.7) — one
-   pure function covering five grazer species at once, exactly mirroring the
+   pure function covering the four grazer specs (zebra, wildebeest, antelope,
+   warthog; the giraffe goes through `buildGiraffe`) at once, exactly mirroring the
    proven `calfProportions` precedent, and body condition is the
    best-supported cue in the whole document (§2.1).
 3. **Reduced movement speed** (§3.2) — no art at all, reads immediately in motion,
@@ -873,7 +888,7 @@ Carcass consumption rates:
 # Bird flight, escape and aerial predators (design.md §19)
 
 A second, self-contained fauna-behaviour research topic hosted in this file
-(the geriatric research above is §§1–9; this is a distinct study, so it carries
+(the geriatric research above is §§1–10; this is a distinct study, so it carries
 its own section numbering B1–B6 and its own sources). Written before any code so
 the **bird-flight-escape** and **aerial-predator** mechanics are built from a
 researched per-species/per-region table rather than by assumption. It reuses the
@@ -1073,7 +1088,8 @@ shelter**; level tail-chases usually favour the falcon
 biologically real for falcons, **not** a myth.
 
 **But the engineering question is separate from the biology.** The game's birds
-are currently simple ground/shore actors with no altitude dimension. Building a
+have no altitude dimension beyond the vultures' rendered soaring and circling;
+the rest are simple ground/shore actors. Building a
 **true 3D flight-height simulation** — persistent altitude bands for every bird,
 a raptor circling above, a physically-modelled stoop — is heavy machinery for a
 niche interaction, and **the majority of the region table (accipiters, harriers,

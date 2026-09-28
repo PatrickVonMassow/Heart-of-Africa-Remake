@@ -7,7 +7,7 @@ they encoded and where. The village slice is decided in design.md §13.4 and
 Other regional teaching remains outside the built slice. Evidence quality and
 gaps are marked rather than filled.
 
-Evidence markers: **PERIOD** (pre-1910 eyewitness) · **MODERN** (present-day
+Evidence markers: **PERIOD** (eyewitness of the period, up to the early 1910s) · **MODERN** (present-day
 scholarship) · **RETRO-APPLIED** (later fieldwork projected back onto 1890,
 e.g. Carrington 1949) · **CONTESTED** · **GAP**.
 
@@ -80,7 +80,8 @@ A player cannot learn the drums *first*; the drum is the *proof* of having
 understood the tongue. Design accordingly.
 
 **And the period position is a gift:** every source that explains the
-*mechanism* is 1944 or later. Pre-1910 eyewitnesses attest the *effect* —
+*mechanism* postdates the game — German mission linguistics from 1898 and
+Rattray 1916/1923 first (§4.9), the full account 1944 or later. Pre-1910 eyewitnesses attest the *effect* —
 Stanley 1885 (PERIOD): the drums "convey language as clear to the initiated as
 vocal speech"; Lloyd 1899 (PERIOD): a message 100 miles in under two hours —
 but none the how. (The lone early exception on tone: Whitehead's *Bobangi
@@ -224,8 +225,8 @@ delicate:
   reject. The game should build an INVENTED system on its mechanics, never
   transcribe the real one.** The same rule, for the same reasons, protects the
   lukasa (initiatory) and the funerary weight of adinkra.
-- Other anachronisms: **Bamum script is 1896+** — inside the play window but
-  after the start, and far east of it; Neo-Tifinagh letterforms are 1970s+;
+- Other anachronisms: **Bamum script is 1896+** — just after the play window
+  (1890–1895), and far east of it; Neo-Tifinagh letterforms are 1970s+;
   the "Adinkra Alphabet" is from 2015; most circulating adinkra meanings are
   Rattray **1927** (RETRO-APPLIED).
 
@@ -241,9 +242,9 @@ and then down the *east* coast. Ethiopia is its own literate island. "No
 satisfying explanation currently exists" for the surrogate distribution
 (James 2021) — but the observed clustering is stark and usable.
 
-What the evidence supports as **communication zones** (a proposal for the
-region question of design.md §13.4 — fewer than today's five, per the user's
-preference; the decision is the user's):
+What the evidence supports as **communication zones** (proposed for the
+region question of design.md §13.4 — fewer than the game's five bands of the
+time, per the user's preference; decided 03.08.2026, below):
 
 1. **The script North** (Sahara + Mediterranean fringe + Horn/Swahili coast
    arguably): meaning lives in WRITING — Tifinagh graffiti and short verse,
@@ -266,7 +267,7 @@ preference; the decision is the user's):
    answer, and the "aha" is realising the mujaguzo-like drums will never say
    anything new).
 
-That is four zones, or three if 3 folds into 2. Each is *invented but shaped
+That was four zones, or three if 3 folds into 2 (the decision below). Each is *invented but shaped
 like* its historical models, per §13.4's standard — and each teaches
 differently, which keeps five-times-the-same-puzzle off the table.
 

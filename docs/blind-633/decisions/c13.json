@@ -1,0 +1,2352 @@
+[
+ {
+  "id": "U6409",
+  "decision": "rewritten",
+  "reason": "intro now names the residuals (S-12 and host arming) instead of a single one"
+ },
+ {
+  "id": "U6410",
+  "decision": "rewritten",
+  "reason": "P4 row now records CLOCKLESS_CAUSES = user-stop only and 864/865/866 in place"
+ },
+ {
+  "id": "U6411",
+  "decision": "rewritten",
+  "reason": "U1 current-halt now states only typed AWAITING-CONFIRMATION gates and legacy AWAITING-USER never gates (user-gate-core.mjs)"
+ },
+ {
+  "id": "U6412",
+  "decision": "kept",
+  "reason": "claim does not hold: batch-singleton.mjs computes block-remediate (l.741) and batch-progress-guard.mjs acts on it (l.813); both references are right"
+ },
+ {
+  "id": "U6413",
+  "decision": "rewritten",
+  "reason": "U3 current-halt now describes the pre-864 shared marker as historical"
+ },
+ {
+  "id": "U6414",
+  "decision": "rewritten",
+  "reason": "C1 delivery now names point 864 in place instead of a future follow-up"
+ },
+ {
+  "id": "U6415",
+  "decision": "rewritten",
+  "reason": "P3 row now records point 865 in place, so S-14 and P3 agree"
+ },
+ {
+  "id": "U6416",
+  "decision": "rewritten",
+  "reason": "865 marked shipped and the interim paragraph now names only 867/868 as unlanded"
+ },
+ {
+  "id": "U6417",
+  "decision": "rewritten",
+  "reason": "Stop-hook summary now lists allow-boundary (point and --context watermark), allow-release and allow-in-flight instead of ONE exception"
+ },
+ {
+  "id": "U6418",
+  "decision": "backlog",
+  "reason": "docs/batch-autonomy.md:236 — mechanism 2 (in-session heartbeat cron) is described as a live layer, but nothing in the repository arms it beside the launcher daemon and hooks"
+ },
+ {
+  "id": "U6419",
+  "decision": "kept",
+  "reason": "claim does not hold: docs/wsl-vm-recovery.md:3 still records the container recovery as prepared, not deployed or accepted"
+ },
+ {
+  "id": "U6420",
+  "decision": "rewritten",
+  "reason": "launcher summary now marks the live-pid rule as the 24.07 rule and points to the lease with corroborated takeover"
+ },
+ {
+  "id": "U6421",
+  "decision": "kept",
+  "reason": "claim does not hold: the section 'Liveness is judged by PROGRESS' exists at line ~1375"
+ },
+ {
+  "id": "U6422",
+  "decision": "kept",
+  "reason": "claim does not hold: the section 'The board also runs BACK' exists at line ~2425"
+ },
+ {
+  "id": "U6423",
+  "decision": "rewritten",
+  "reason": "'used by no gate' is now marked as the state before point-proof-guard ('then used by no gate')"
+ },
+ {
+  "id": "U6424",
+  "decision": "rewritten",
+  "reason": "row 5 now notes the Windows task and the Linux container's entrypoint arming"
+ },
+ {
+  "id": "U6425",
+  "decision": "rewritten",
+  "reason": "row 6 now points to the existing section 'The two true residuals'"
+ },
+ {
+  "id": "U6426",
+  "decision": "rewritten",
+  "reason": "row 8 and the hard-singleton bullet now name the point-434 lease with corroborated takeover"
+ },
+ {
+  "id": "U6427",
+  "decision": "rewritten",
+  "reason": "row 9 now says guards are fail-open by default and a deliberately refusing guard says so in its own section"
+ },
+ {
+  "id": "U6428",
+  "decision": "rewritten",
+  "reason": "row 11 now records that point 864 keeps an all-advisory queue workable"
+ },
+ {
+  "id": "U6429",
+  "decision": "rewritten",
+  "reason": "row 12 now names scripts/windows/setup-boot-path.ps1 (exists) instead of an absent command 'below'"
+ },
+ {
+  "id": "U6430",
+  "decision": "rewritten",
+  "reason": "row 13 and the handover bullet now include the --context watermark boundary"
+ },
+ {
+  "id": "U6431",
+  "decision": "rewritten",
+  "reason": "row 15 now states the lease bound (60 min, 4 h under a declared wait, corroborated takeover) instead of six ticks/90 min"
+ },
+ {
+  "id": "U6432",
+  "decision": "rewritten",
+  "reason": "row 17 now records P3–P8 in place (points 864–866)"
+ },
+ {
+  "id": "U6433",
+  "decision": "rewritten",
+  "reason": "pause ladder text now keeps probing at the three-hour cap (planPause, point 866) and only a typed user-stop stays clockless"
+ },
+ {
+  "id": "U6434",
+  "decision": "rewritten",
+  "reason": "CLOCKLESS_CAUSES description now matches the code (user-stop only)"
+ },
+ {
+  "id": "U6435",
+  "decision": "rewritten",
+  "reason": "'the forward rule' is now recorded as the completed contraction (points 864–866)"
+ },
+ {
+  "id": "U6436",
+  "decision": "kept",
+  "reason": "claim does not hold: autostart-authorized.json is written by batch-autostart.mjs:1937 and read by batch-resume-hook.mjs:151"
+ },
+ {
+  "id": "U6437",
+  "decision": "rewritten",
+  "reason": "the 7-file count is now marked as the pre-fix state ('At the time')"
+ },
+ {
+  "id": "U6438",
+  "decision": "rewritten",
+  "reason": "the fence text now says the watermark CAN bind and denies only when armed, matching the observe default below"
+ },
+ {
+  "id": "U6439",
+  "decision": "kept",
+  "reason": "claim does not hold as stale: point 747 is still open in TASKS.md, so re-arming correctly remains its condition"
+ },
+ {
+  "id": "U6440",
+  "decision": "rewritten",
+  "reason": "the 30.07 table is now introduced as re-derivable only while its transcripts existed"
+ },
+ {
+  "id": "U6441",
+  "decision": "rewritten",
+  "reason": "the 42 % / 58 % shares are now marked as first-line-fold figures predating the 09.08 correction"
+ },
+ {
+  "id": "U6442",
+  "decision": "rewritten",
+  "reason": "the summary now carries the corrected 77.2 % → 69.8 % large-context share"
+ },
+ {
+  "id": "U6443",
+  "decision": "rewritten",
+  "reason": "the withdrawal paragraph now distinguishes the pre-675 withdrawal from the sealed committed marker"
+ },
+ {
+  "id": "U6444",
+  "decision": "kept",
+  "reason": "claim does not hold: lastWorkOrderTick is still imported and called by scripts/batch-handover-observe.mjs:18/86"
+ },
+ {
+  "id": "U6445",
+  "decision": "rewritten",
+  "reason": "'The three properties' changed to 'The properties' (five bullets follow)"
+ },
+ {
+  "id": "U6446",
+  "decision": "rewritten",
+  "reason": "hard-coded 'sixteen Stop hooks' (now 29 registered) replaced by 'the other Stop hooks'"
+ },
+ {
+  "id": "U6447",
+  "decision": "rewritten",
+  "reason": "closing-set exception now notes the sealed committed marker and that the bookkeeping runs between --prepare and --commit"
+ },
+ {
+  "id": "U6448",
+  "decision": "rewritten",
+  "reason": "lease bullet no longer says nothing is inferred from evidence; evidence corroborates an expiry"
+ },
+ {
+  "id": "U6449",
+  "decision": "rewritten",
+  "reason": "55-min cover now qualified as per backend, with the 80m48s two-backend run under a declared wait"
+ },
+ {
+  "id": "U6450",
+  "decision": "rewritten",
+  "reason": "declaration summary now excepts the explicit --waiting-on extendLease"
+ },
+ {
+  "id": "U6451",
+  "decision": "rewritten",
+  "reason": "fix-table row 1 now marks marker consumption as superseded by the lifecycle below"
+ },
+ {
+  "id": "U6452",
+  "decision": "rewritten",
+  "reason": "handover residual now records that since point 675 an unpushed checkpoint blocks the handover"
+ },
+ {
+  "id": "U6453",
+  "decision": "rewritten",
+  "reason": "'Four properties' changed to 'These properties' (six rows follow)"
+ },
+ {
+  "id": "U6454",
+  "decision": "rewritten",
+  "reason": "worktree freshness cell and rationale now include the newest working file of point 434 (5b)"
+ },
+ {
+  "id": "U6455",
+  "decision": "rewritten",
+  "reason": "in-flight boundary sentence now matches batch-singleton.mjs: only non-transferable work passes a due boundary"
+ },
+ {
+  "id": "U6456",
+  "decision": "kept",
+  "reason": "claim does not hold: point 402's mechanism is the section 'Liveness is judged by PROGRESS' further below"
+ },
+ {
+  "id": "U6457",
+  "decision": "rewritten",
+  "reason": "'process checks come first' now marked historical; ownershipVerdict (batch-ownership-core.mjs) runs the lease before the pid branches"
+ },
+ {
+  "id": "U6458",
+  "decision": "rewritten",
+  "reason": "item 2 (polling wait) now notes that a declared wait may end the turn on allow-in-flight without tool calls"
+ },
+ {
+  "id": "U6459",
+  "decision": "rewritten",
+  "reason": "'no amount of live evidence protects a lock' corrected: advancing work keeps an expired lease (lease-expired-owner-working, point 556)"
+ },
+ {
+  "id": "U6460",
+  "decision": "rewritten",
+  "reason": "isOwnSpawn call sites now named as the rogue-spawn remediation and reapableSpawns; the wedge reaping is gone"
+ },
+ {
+  "id": "U6461",
+  "decision": "rewritten",
+  "reason": "observer's WITHDRAWN explanation now distinguishes pre-seal tool-call withdrawal from --clear/user prompt"
+ },
+ {
+  "id": "U6462",
+  "decision": "rewritten",
+  "reason": "operating recipe now uses land-point.mjs and the two-phase --prepare/--commit boundary"
+ },
+ {
+  "id": "U6463",
+  "decision": "rewritten",
+  "reason": "non-owner TASKS.md rule now names the responder's point-append exception"
+ },
+ {
+  "id": "U6464",
+  "decision": "rewritten",
+  "reason": "claim table now credits the reservation to bound 1b"
+ },
+ {
+  "id": "U6465",
+  "decision": "rewritten",
+  "reason": "bound 4 now matches releaseDecision: transferable work (work-transferable) does not block a release"
+ },
+ {
+  "id": "U6466",
+  "decision": "rewritten",
+  "reason": "'Two consequences' changed to 'Consequences … all built'"
+ },
+ {
+  "id": "U6467",
+  "decision": "rewritten",
+  "reason": "residual now says an ownerless claim expires on CLAIM_MAX_AGE_MS counted from recording"
+ },
+ {
+  "id": "U6468",
+  "decision": "rewritten",
+  "reason": "request-boundary text now uses --prepare/--commit and says --clear withdraws"
+ },
+ {
+  "id": "U6469",
+  "decision": "rewritten",
+  "reason": "dashboard invariant list no longer fixed at nine and now names queue-stubbed as a later addition"
+ },
+ {
+  "id": "U6470",
+  "decision": "rewritten",
+  "reason": "remedy rule now names board-queue.mjs as the missing-card way out"
+ },
+ {
+  "id": "U6471",
+  "decision": "rewritten",
+  "reason": "board contract now 'authoritative in memory batch-dashboard-artifact, summarised elsewhere' instead of 'nothing restates it'"
+ },
+ {
+  "id": "U6472",
+  "decision": "rewritten",
+  "reason": "board command examples now pipe prose with --text-stdin, matching the stdin rule and board.mjs usage"
+ },
+ {
+  "id": "U6473",
+  "decision": "rewritten",
+  "reason": "board-first deny scope now excepts worktree agents (inventory row 12)"
+ },
+ {
+  "id": "U6474",
+  "decision": "rewritten",
+  "reason": "layer summary now says the watchdog fetches through its child board-watchdog.mjs"
+ },
+ {
+  "id": "U6475",
+  "decision": "rewritten",
+  "reason": "responder spawn rule (autonomy doc and runbook) now includes the DEFERRAL_MS wake beside a waiting owner"
+ },
+ {
+  "id": "U6476",
+  "decision": "rewritten",
+  "reason": "parallel-alert residual now names the DEFERRAL_MS wake beside a waiting owner"
+ },
+ {
+  "id": "U6477",
+  "decision": "rewritten",
+  "reason": "dry-run paragraph now says the live path is observed mainly with no session running, or past DEFERRAL_MS beside a waiting owner"
+ },
+ {
+  "id": "U6478",
+  "decision": "rewritten",
+  "reason": "in-session delivery now stated as never-twice/at-most-once (fail-open hook, no retry between rename and injection)"
+ },
+ {
+  "id": "U6479",
+  "decision": "rewritten",
+  "reason": "duplicate-notice rationale now covers previously notified envelopes as well"
+ },
+ {
+  "id": "U6480",
+  "decision": "rewritten",
+  "reason": "envelope-window vs cache-expiry equivalence now qualified by their different start events"
+ },
+ {
+  "id": "U6481",
+  "decision": "rewritten",
+  "reason": "security table now restricts drop notices to ahead drops, excluding duplicate and expired"
+ },
+ {
+  "id": "U6482",
+  "decision": "rewritten",
+  "reason": "both security-table pointers now say 'above' and name the sections"
+ },
+ {
+  "id": "U6483",
+  "decision": "rewritten",
+  "reason": "ci-status-guard now 'most of the chain's wall-clock (1592 of 2498 ms)' instead of the whole"
+ },
+ {
+  "id": "U6484",
+  "decision": "rewritten",
+  "reason": "render-verify intro now says before ticked/called done, with the gate firing on committed changes"
+ },
+ {
+  "id": "U6485",
+  "decision": "rewritten",
+  "reason": "'makes skipping a backend impossible' now 'loud', naming the --defer/--clear valves and fail-open"
+ },
+ {
+  "id": "U6486",
+  "decision": "rewritten",
+  "reason": "heading now '(reminded at spawn, never blocked)', matching the non-blocking worktree-reminder"
+ },
+ {
+  "id": "U6487",
+  "decision": "rewritten",
+  "reason": "item 3 now says the progress verdict feeds only the report since point 434"
+ },
+ {
+  "id": "U6488",
+  "decision": "rewritten",
+  "reason": "'(item 3 above)' now points at *Taking the boundary*, item 3, where the lease is described"
+ },
+ {
+  "id": "U6489",
+  "decision": "rewritten",
+  "reason": "runbook claim sentence now says a claim ages only once no live owner holds the lock (or as an errand claim)"
+ },
+ {
+  "id": "U6490",
+  "decision": "rewritten",
+  "reason": "watcher-claim paragraph now names the tick-derived CLAIM_MAX_AGE_MS instead of 'the 30-minute expiry'"
+ },
+ {
+  "id": "U6491",
+  "decision": "rewritten",
+  "reason": "claim-record schema now names by, releasedAt and releasedBy"
+ },
+ {
+  "id": "U6492",
+  "decision": "kept",
+  "reason": "'Four bounds' with sub-bounds 1a–1c remains accurate: four numbered bounds, 1a–1c refine bound 1"
+ },
+ {
+  "id": "U6493",
+  "decision": "rewritten",
+  "reason": "residual now cites the current heading 'The boot path, its mutual watch, and an independent emergency timer' and drops the count 'three'"
+ },
+ {
+  "id": "U6494",
+  "decision": "kept",
+  "reason": "claim does not hold: 947 is real — the blind standstill sweep (section at l.82) that added HoA-Batch-Emergency (S-27)"
+ },
+ {
+  "id": "U6495",
+  "decision": "kept",
+  "reason": "claim does not hold: dashboard-guard.mjs:236 and dashboard-guard-core.mjs:1073 still name dashboard-publish.mjs --defer as the offline remedy"
+ },
+ {
+  "id": "U6496",
+  "decision": "rewritten",
+  "reason": "transport list now names the retired mirror as a former third transport"
+ },
+ {
+  "id": "U6497",
+  "decision": "kept",
+  "reason": "claim does not hold: board.mjs usage has done <point> --none \"<reason>\", so --none is a real flag"
+ },
+ {
+  "id": "U6498",
+  "decision": "kept",
+  "reason": "claim does not hold: 'now' is a real board.mjs subcommand (usage: board.mjs now|status|title|queue <point>)"
+ },
+ {
+  "id": "U6499",
+  "decision": "backlog",
+  "reason": "docs/batch-autonomy.md:2171 — the pre-chip card migration shim runs on every edit and publish and may have nothing left to lift; verify against the live board and remove if empty"
+ },
+ {
+  "id": "U6500",
+  "decision": "backlog",
+  "reason": "docs/batch-autonomy.md:2414 — the MutationObserver fallback in the board viewer serves only boards published by an older refresher; likely removable once every published board carries BOARD_SWAP_EVENT"
+ },
+ {
+  "id": "U6501",
+  "decision": "rewritten",
+  "reason": "bounds sentence now maps to the five-row delivery table instead of 'first two / third'"
+ },
+ {
+  "id": "U6502",
+  "decision": "rewritten",
+  "reason": "'(see below)' for the reply receipt changed to '(see above)'"
+ },
+ {
+  "id": "U6503",
+  "decision": "rewritten",
+  "reason": "launcher cadence now '15 minutes' instead of 'every few minutes'"
+ },
+ {
+  "id": "U6504",
+  "decision": "backlog",
+  "reason": "docs/batch-autonomy.md:2615 / scripts/chat-spool.mjs:329 — the one-time stage-1 .jsonl spool migration likely has nothing left to migrate; remove once no checkout holds a stage-1 file"
+ },
+ {
+  "id": "U6505",
+  "decision": "rewritten",
+  "reason": "chat section placement now 'under the board's heading, inside <main>' with re-injection on swap"
+ },
+ {
+  "id": "U6506",
+  "decision": "rewritten",
+  "reason": "'the dormancy map above' now names INTENTIONALLY_DORMANT in guard-health-core.mjs (no dormancy map in the doc)"
+ },
+ {
+  "id": "U6507",
+  "decision": "rewritten",
+  "reason": "rollout text no longer pins 'the other 34'/'all 35'; RELATIVE_WIRING_ROLLOUT still exists and 39 hook lines remain relative"
+ },
+ {
+  "id": "U6508",
+  "decision": "rewritten",
+  "reason": "section now introduces the review and the 'untouched' proof (ci-status-guard's outage waiver) before the residuals"
+ },
+ {
+  "id": "U6509",
+  "decision": "rewritten",
+  "reason": "CLAUDE.md compression now marked as executed since (CLAUDE.md is ~200 lines, not 988), figures kept as the 30.07 state"
+ },
+ {
+  "id": "U6510",
+  "decision": "rewritten",
+  "reason": "the 96/235 and 73 figures are now marked as different corpora"
+ },
+ {
+  "id": "U6511",
+  "decision": "rewritten",
+  "reason": "launcher notification now 'on a batch the alert ladder has paused' instead of the demolished stall verdict"
+ },
+ {
+  "id": "U6512",
+  "decision": "kept",
+  "reason": "claim does not hold: both logs exist — .claude/autostart.log is the tick's decision log (batch-autostart.mjs:147), .claude/batch-launcher.log the Linux daemon's (batch-launcher.mjs:56)"
+ },
+ {
+  "id": "U6513",
+  "decision": "kept",
+  "reason": "claim does not hold: legacy-stale is still produced by batch-singleton.mjs:335 for a lock without pid, a live fallback branch"
+ },
+ {
+  "id": "U6514",
+  "decision": "backlog",
+  "reason": "scripts/user-gate-core.mjs — the legacy AWAITING-USER migration path (--migrate, classifyLegacyReason) has nothing left to migrate (0 markers in TASKS.md on 28.09.2026); removable, with docs/batch-autonomy.md:3143"
+ },
+ {
+  "id": "U6515",
+  "decision": "backlog",
+  "reason": "docs/batch-autonomy.md:1932 — 'The two true residuals' assume a logged-in Windows profile and Scheduled Task while the batch runs in the Linux container; restate for the container host once the WSL recovery (docs/wsl-vm-recovery.md) is accepted"
+ },
+ {
+  "id": "U6516",
+  "decision": "rewritten",
+  "reason": "runbook no longer hardcodes the machine-specific carrier path; it names finding.mjs --drain"
+ },
+ {
+  "id": "U6517",
+  "decision": "kept",
+  "reason": "claim does not hold as stale: point 747 (the fence's arming condition) is still open in TASKS.md, so 'until its arming point lands … observe' is current"
+ },
+ {
+  "id": "U6518",
+  "decision": "rewritten",
+  "reason": "batch-autonomy recipe (l.1582) now matches the runbook's land-point.mjs chain; runbook left as is"
+ },
+ {
+  "id": "U6519",
+  "decision": "rewritten",
+  "reason": "demolition summary now says assessOwner then lost its work argument and point 556 restored it (assessOwner takes work in batch-singleton.mjs)"
+ },
+ {
+  "id": "U6520",
+  "decision": "rewritten",
+  "reason": "'no probing at the acquire door' now points to the 08.08 point-556 revision (corroborated verdict at every door)"
+ },
+ {
+  "id": "U6521",
+  "decision": "rewritten",
+  "reason": "chokepoint now refuses the four call families, not every state-changing call"
+ },
+ {
+  "id": "U6522",
+  "decision": "rewritten",
+  "reason": "75-minute recovery now qualified for an uncorroborated owner, with the override window and 4 h declared wait"
+ },
+ {
+  "id": "U6523",
+  "decision": "rewritten",
+  "reason": "'no window kills a running verification' now credits the declared wait and names the 08.08 dispossession"
+ },
+ {
+  "id": "U6524",
+  "decision": "rewritten",
+  "reason": "'Two changes, both in the pure core' changed to 'Three changes'"
+ },
+ {
+  "id": "U6525",
+  "decision": "rewritten",
+  "reason": "Layer 2 now notes §6 removed the wedge takeover and isOwnSpawn survives on the kill only"
+ },
+ {
+  "id": "U6526",
+  "decision": "rewritten",
+  "reason": "external-watcher rule now 'alerts; never spawns', noting release was dropped when built"
+ },
+ {
+  "id": "U6527",
+  "decision": "backlog",
+  "reason": "docs/batch-resilience.md:319 — the GitHub Actions watchdog is called the dead man's switch, but nothing external notices if that workflow itself stops running (the check-in observer §2 describes is not supplied)"
+ },
+ {
+  "id": "U6528",
+  "decision": "kept",
+  "reason": "the healthchecks.io paragraph is the recorded design choice between two options (the second was preferred and built); it is rationale, not an unbuilt leftover"
+ },
+ {
+  "id": "U6529",
+  "decision": "rewritten",
+  "reason": "non-idempotence sentence now excepts the SCHEDULED duplicate that records nothing"
+ },
+ {
+  "id": "U6530",
+  "decision": "rewritten",
+  "reason": "escalation intro now says only high-or-above callers climb to the pause rung"
+ },
+ {
+  "id": "U6531",
+  "decision": "rewritten",
+  "reason": "vanished internal quotation replaced by its meaning (a live process that produces nothing)"
+ },
+ {
+  "id": "U6532",
+  "decision": "rewritten",
+  "reason": "equal weighting now past tense ('accepted … weighed'), the replacement ordering follows"
+ },
+ {
+  "id": "U6533",
+  "decision": "rewritten",
+  "reason": "'No second local watchdog' now scoped to owner liveness, naming the later Windows watchdog/emergency tasks as scheduling watchers"
+ },
+ {
+  "id": "U6534",
+  "decision": "rewritten",
+  "reason": "§7 now carries a note that since point 556 the local takeover also judges repository output"
+ },
+ {
+  "id": "U6535",
+  "decision": "rewritten",
+  "reason": "pattern line now 'A–H (I is withdrawn)'"
+ },
+ {
+  "id": "U6536",
+  "decision": "rewritten",
+  "reason": "header now names the later 08.08/10.08 revisions and BUILT/DONE reports"
+ },
+ {
+  "id": "U6537",
+  "decision": "rewritten",
+  "reason": "'the build may be frozen' now past tense, reopened by the 08.08 point-556 revision"
+ },
+ {
+  "id": "U6538",
+  "decision": "rewritten",
+  "reason": "wedgeAction line-number citation replaced by '(since removed, §6)'"
+ },
+ {
+  "id": "U6539",
+  "decision": "rewritten",
+  "reason": "WEDGED_MS line-number citation replaced by '(since removed, §6)'"
+ },
+ {
+  "id": "U6540",
+  "decision": "rewritten",
+  "reason": "drifted line-number pins in batch-singleton.mjs / lock-heartbeat-hook.mjs removed (withdrawHandover now at 2108, not 1170); function names kept"
+ },
+ {
+  "id": "U6541",
+  "decision": "rewritten",
+  "reason": "'what this paragraph used to say was unbuilt' now 'which §3 had left unbuilt'"
+ },
+ {
+  "id": "U6542",
+  "decision": "kept",
+  "reason": "claim does not hold: the sentence reports point 556's rejected alternative (renew at start and completion), not the built PreToolUse renewal"
+ },
+ {
+  "id": "U6543",
+  "decision": "rewritten",
+  "reason": "ladder now adds the 15-minute tick to the 60 + 60 ≤ 120 arithmetic"
+ },
+ {
+  "id": "U6544",
+  "decision": "rewritten",
+  "reason": "'one function owns the verdict' now notes leaseTakeoverDecision is called from inside ownershipVerdict"
+ },
+ {
+  "id": "U6545",
+  "decision": "kept",
+  "reason": "claim does not hold: l.111 credits 517's evidence-driven extension inside effectiveLeaseUntil; 556's declared-wait extension (l.244) is a separate mechanism"
+ },
+ {
+  "id": "U6546",
+  "decision": "rewritten",
+  "reason": "'never by a file timestamp' now scoped to the idle window; timestamps may corroborate an expired lease"
+ },
+ {
+  "id": "U6547",
+  "decision": "rewritten",
+  "reason": "Layer 2 now adds the point-556 corroborating signal to the expired-lease takeover"
+ },
+ {
+  "id": "U6548",
+  "decision": "rewritten",
+  "reason": "§4 spawn-safety parts now marked BUILT in batch-autostart-core.mjs; stale batch-autostart.mjs:385 pin removed"
+ },
+ {
+  "id": "U6549",
+  "decision": "rewritten",
+  "reason": "'four times a minute' replaced by 'over and over' (5 s poll, 1-min WAKE_MIN_GAP_MS)"
+ },
+ {
+  "id": "U6550",
+  "decision": "rewritten",
+  "reason": "child-retry usage block now matches the script's USAGE (--committed/--no-committed, --status, --complete, --forget)"
+ },
+ {
+  "id": "U6551",
+  "decision": "rewritten",
+  "reason": "'the remainder of part (1)' replaced by '(point 434)'"
+ },
+ {
+  "id": "U6552",
+  "decision": "rewritten",
+  "reason": "stale TODO replaced: both callers now post at low priority with { recurring: true } (batch-autostart.mjs)"
+ },
+ {
+  "id": "U6553",
+  "decision": "rewritten",
+  "reason": "Layer 5b heading now says it belongs with §3's layer 5"
+ },
+ {
+  "id": "U6554",
+  "decision": "rewritten",
+  "reason": "§7 now notes step 1's threshold was demolished with layer 1"
+ },
+ {
+  "id": "U6555",
+  "decision": "rewritten",
+  "reason": "build-order line now 'original build order', pointing to §7 and later points 556/612"
+ },
+ {
+  "id": "U6556",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/chat-delivery-hook.test.mjs exists"
+ },
+ {
+  "id": "U6557",
+  "decision": "rewritten",
+  "reason": "EPERM cause now 'several rewrites in quick succession', traced to the Stop chain's triple write as the singleton doc says"
+ },
+ {
+  "id": "U6558",
+  "decision": "kept",
+  "reason": "claim does not hold: board-first-guard.mjs is fail-open on its own errors, while the chokepoint deliberately refuses past the unwrapping depth; both are stated correctly"
+ },
+ {
+  "id": "U6559",
+  "decision": "rewritten",
+  "reason": "batch-singleton.mjs now 'the lock's sole I/O authority', with the verdict in batch-ownership-core / batch-lease-core"
+ },
+ {
+  "id": "U6560",
+  "decision": "rewritten",
+  "reason": "lock field inventory now includes leaseUntil and declaredWait"
+ },
+ {
+  "id": "U6561",
+  "decision": "backlog",
+  "reason": "docs/batch-singleton-analysis.md:66 — pid identity resolution is described only for Windows (claude.exe via CIM); the Linux container's resolution is not documented"
+ },
+ {
+  "id": "U6562",
+  "decision": "rewritten",
+  "reason": "section B now carries a supersession note: lease, idle window and corroborated takeover replace 'provably dead', 'alive pid ⇒ alive owner' and the wedged flag"
+ },
+ {
+  "id": "U6563",
+  "decision": "rewritten",
+  "reason": "liveness rules now marked as the 24.07 rules, noting an explicit handover frees the lock ahead of any heartbeat"
+ },
+ {
+  "id": "U6564",
+  "decision": "rewritten",
+  "reason": "DEAD_CONFIRM_MS ladder now marked superseded by the lease arithmetic (section-B note)"
+ },
+ {
+  "id": "U6565",
+  "decision": "rewritten",
+  "reason": "the wedged assessment and its notify/kill handling are now marked superseded (section-B note; removed per batch-resilience.md §6)"
+ },
+ {
+  "id": "U6566",
+  "decision": "kept",
+  "reason": "claim does not hold: LEGACY_STALE_MS is still 45 min in batch-singleton.mjs:122 and is applied to a pid-less lock after the lease branch; the doc matches the code"
+ },
+ {
+  "id": "U6567",
+  "decision": "rewritten",
+  "reason": "stand-down paragraph now names the fence chokepoint as the exception that still refuses a dispossessed session"
+ },
+ {
+  "id": "U6568",
+  "decision": "rewritten",
+  "reason": "launcher flow now past tense with the lease/corroboration replacement named"
+ },
+ {
+  "id": "U6569",
+  "decision": "rewritten",
+  "reason": "test invariant 4 now marked as the 24.07 invariant, with the point-556 takeover on expired lease plus stale work"
+ },
+ {
+  "id": "U6570",
+  "decision": "rewritten",
+  "reason": "timeline row now records that pid 25848 exited by 09:12 (apply step 1)"
+ },
+ {
+  "id": "U6571",
+  "decision": "rewritten",
+  "reason": "apply steps now headed as the done 24.07.2026 rollout record"
+ },
+ {
+  "id": "U6572",
+  "decision": "kept",
+  "reason": "claim does not hold: both exist — batch-launcher.mjs is the Linux tick daemon, batch-daemon.mjs the worker-lifecycle daemon of handover point 834"
+ },
+ {
+  "id": "U6573",
+  "decision": "rewritten",
+  "reason": "optional 5-min tick now notes the resilience ladder assumes 15 min and a shorter tick only tightens it"
+ },
+ {
+  "id": "U6574",
+  "decision": "removed",
+  "reason": "point 969 is closed (tasks-archive), the README says the folder goes when it lands and nothing but 633 artefacts reference it: docs/board-candidate/ deleted"
+ },
+ {
+  "id": "U6575",
+  "decision": "rewritten",
+  "reason": "'Follow-up 1166 can be closed' now 'was closed' (1166 ticked in docs/tasks-archive.md)"
+ },
+ {
+  "id": "U6576",
+  "decision": "kept",
+  "reason": "claim does not hold as stale: point 514 is still open in TASKS.md, and the record is dated to its run"
+ },
+ {
+  "id": "U6577",
+  "decision": "kept",
+  "reason": "dated verification snapshot of that run; counts are evidence of the run, not a standing claim"
+ },
+ {
+  "id": "U6578",
+  "decision": "rewritten",
+  "reason": "headline now 'roughly 12–24× today's', matching the table (~11.6×, ~24×, ~17–20×)"
+ },
+ {
+  "id": "U6579",
+  "decision": "rewritten",
+  "reason": "Cape sentence now 'one zone with a continuous instrumental series through 1890', distinguishing the regional Nicholson dataset of §7"
+ },
+ {
+  "id": "U6580",
+  "decision": "kept",
+  "reason": "claim does not hold: the paragraph itself states the zone model keys on latitude only and that the Benguela deserts are carved out by longitude-bounded isHyperArid boxes; no contradiction"
+ },
+ {
+  "id": "U6581",
+  "decision": "rewritten",
+  "reason": "Mount Elgon no longer called the highest glacier-free African mountain (Ras Dashen 4,550 m is higher)"
+ },
+ {
+  "id": "U6582",
+  "decision": "rewritten",
+  "reason": "heading now 'Seasonal snow cover to render — only outside the tropics' and points to tropical transient snow under the bare list"
+ },
+ {
+  "id": "U6583",
+  "decision": "kept",
+  "reason": "§9 is a deliberate pointer section that keeps the section number after the record moved (design-reference.md §19.14)"
+ },
+ {
+  "id": "U6584",
+  "decision": "kept",
+  "reason": "claim does not hold: design.md §19 (Atmosphere and Immersion) still exists; §9 points to the moved record"
+ },
+ {
+  "id": "U6585",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/README.md exists and its title cites design.md §3 real geodata"
+ },
+ {
+  "id": "U6586",
+  "decision": "rewritten",
+  "reason": "Bamum 1896+ now 'just after the play window (1890–1895)' per design.md §5.1 and the year stepper (no 1896)"
+ },
+ {
+  "id": "U6587",
+  "decision": "rewritten",
+  "reason": "mechanism-source sentence now names the 1898–1910 mission linguistics and Rattray 1916/1923 before the 1944+ accounts"
+ },
+ {
+  "id": "U6588",
+  "decision": "rewritten",
+  "reason": "PERIOD marker now 'eyewitness of the period, up to the early 1910s', matching Roscoe 1911, Dayrell 1910/11 and Talbot 1912"
+ },
+ {
+  "id": "U6589",
+  "decision": "rewritten",
+  "reason": "zone count now marked as proposal decided 03.08.2026 (three zones)"
+ },
+ {
+  "id": "U6590",
+  "decision": "rewritten",
+  "reason": "'today's five' now 'the game's five bands of the time'"
+ },
+ {
+  "id": "U6591",
+  "decision": "kept",
+  "reason": "section numbers are preserved (slice rule 3); §4.9 is an established cross-referenced number"
+ },
+ {
+  "id": "U6592",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:12 — generated by help.mjs (do not edit by hand); the usage harvester in scripts/help-core.mjs exposes source concatenation (KINDS.join) and trailing continuation backslashes for ask-astra and other multi-line usage strings"
+ },
+ {
+  "id": "U6593",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:26 — authorship-check usage ends at a continuation backslash; fix in the help-core.mjs usage harvester (generated file)"
+ },
+ {
+  "id": "U6594",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:40 — batch-boundary usage shows unevaluated template code (${phaseFlag}, conditional tail); fix in the help-core.mjs harvester or the script's usage string"
+ },
+ {
+  "id": "U6595",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:44 — batch-claim usage ends '--wait [--timeout <min>] \\|' without the next alternative; help-core.mjs harvester truncates multi-line usage"
+ },
+ {
+  "id": "U6596",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:54 — batch-doctor usage cell holds only 'Usage:'; harvester misses the following lines (real --gate example in batch-singleton-analysis.md)"
+ },
+ {
+  "id": "U6597",
+  "decision": "kept",
+  "reason": "claim does not hold: the three have distinct roles — batch-autostart.mjs is the tick, batch-launcher.mjs the Linux trigger daemon, batch-daemon.mjs the worker-lifecycle daemon of point 834; only the tick spawns sessions"
+ },
+ {
+  "id": "U6598",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:39 — help-core.mjs falls back to 'Tests and support for …' as the purpose of production modules without a header comment (:39, :42, :64, :84–86, :308, :329)"
+ },
+ {
+  "id": "U6599",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:113 — board usage shows a clipped eta quote, ${TEXT_STDIN_FLAG} constants and a bare trailing separator; help-core.mjs harvester"
+ },
+ {
+  "id": "U6600",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:131 — child-retry usage cell is only 'usage:' though scripts/child-retry.mjs USAGE is multi-line; harvester reads only the first line"
+ },
+ {
+  "id": "U6601",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:143 — commission-guard examples end at '--reason \"<why>' without a closing quote; harvester truncation"
+ },
+ {
+  "id": "U6602",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:161 — cut-account-attest usage is a harvested JavaScript object fragment ('verbatim(usage), kind: …'); harvester false match"
+ },
+ {
+  "id": "U6603",
+  "decision": "kept",
+  "reason": "claim does not hold as dead: dashboard-publish.mjs is still the offline --defer remedy named by dashboard-guard.mjs:236 and dashboard-guard-core.mjs:1073"
+ },
+ {
+  "id": "U6604",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:173 — dashboard-publish defer argument opens a quote before <reason> and never closes it; harvester truncation"
+ },
+ {
+  "id": "U6605",
+  "decision": "kept",
+  "reason": "claim does not hold: dashboard-publish.mjs:23 imports dashboard-state.mjs, so the consumer list is right"
+ },
+ {
+  "id": "U6606",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:182 — defer-for-user usage cell is exactly 'usage:'; harvester reads only the first line"
+ },
+ {
+  "id": "U6607",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:195 — finding usage has a redundant empty 'Usage:' heading before the real command; harvester"
+ },
+ {
+  "id": "U6608",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:197 — findings-fixtures usage cell is exactly 'Usage:'; harvester reads only the first line"
+ },
+ {
+  "id": "U6609",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:205 — focus usage ends at '\"<one line what>' without a closing quote; harvester truncation"
+ },
+ {
+  "id": "U6610",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:206 — fold-point usage stops inside '--delivered \"<evidence>' with unclosed quote and parentheses; harvester truncation"
+ },
+ {
+  "id": "U6611",
+  "decision": "kept",
+  "reason": "claim does not hold: not a duplicate — mandatory-duty-core.mjs is the import-free leaf (imported by render-verify-core, mechanism-review-core) and guard-duty-core.mjs re-exports it and adds the context-fence state; they share a first comment sentence"
+ },
+ {
+  "id": "U6612",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:232 — help-core usage cell holds its own explanatory prose ('usage:` strings. This module …') plus an empty 'usage:'; the harvester matches its own comment"
+ },
+ {
+  "id": "U6613",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:233 — help.mjs purpose says 'LISTING 421 FILES' while the generated header counts 360 scripts; fix the help.mjs header comment"
+ },
+ {
+  "id": "U6614",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:237 — land-point usage ends at '--model \"<authoring model>' without a closing quote; harvester truncation"
+ },
+ {
+  "id": "U6615",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:245 — measure-context-cost usage is the JavaScript expression 'foldUsage(usages) }'; harvester false match"
+ },
+ {
+  "id": "U6616",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:249 — measure-task-cost-core usage is the fragment 'usage: u }'; harvester false match"
+ },
+ {
+  "id": "U6617",
+  "decision": "kept",
+  "reason": "the fixtures are real files in scripts/ and the index lists every script by design; their purpose text says they are fixtures"
+ },
+ {
+  "id": "U6618",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:274 — perf-bench usage says 'start a dev server, then:' and omits the command; harvester reads only the first line"
+ },
+ {
+  "id": "U6619",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:283 — point-brief purpose quotes TASKS.md ~59k / design.md ~46k tokens, likely outdated since the design-reference split; fix the point-brief.mjs header comment"
+ },
+ {
+  "id": "U6620",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:285 — point-proof-guard usage ends at '--evidence \"<result>' without a closing quote; harvester truncation"
+ },
+ {
+  "id": "U6621",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:315 — review-astra usage ends with a continuation backslash; harvester reads only the first line"
+ },
+ {
+  "id": "U6622",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:351 — both vdzk-answer examples end in clipped quoted arguments (--applied, --answer); harvester truncation"
+ },
+ {
+  "id": "U6623",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:356 — wait-lease usage cell is exactly 'usage:'; harvester reads only the first line"
+ },
+ {
+  "id": "U6624",
+  "decision": "backlog",
+  "reason": "docs/command-index.md:361 — windows-task-watch usage shows unresolved ${WATCH_SCRIPT_PATH}; harvester or script usage string"
+ },
+ {
+  "id": "U6625",
+  "decision": "rewritten",
+  "reason": "opening now says the doc began as the checklist and points to the recorded green runs and round 7"
+ },
+ {
+  "id": "U6626",
+  "decision": "rewritten",
+  "reason": "runtime/no-execution statement now marked as the state at authoring time, with the measured runs below"
+ },
+ {
+  "id": "U6627",
+  "decision": "rewritten",
+  "reason": "harness heading now '(authored; browser runs recorded below)'"
+ },
+ {
+  "id": "U6628",
+  "decision": "backlog",
+  "reason": "docs/communication-playthrough.md:170 — the harness's registered frame total (reviews cite 48) may no longer match the delivered 73/74 frames per run; check the expected total in the continuous-route suite"
+ },
+ {
+  "id": "U6629",
+  "decision": "rewritten",
+  "reason": "orphaned 'That earlier stop is historical' removed"
+ },
+ {
+  "id": "U6630",
+  "decision": "rewritten",
+  "reason": "orphaned 'replaces the missing implementation' removed"
+ },
+ {
+  "id": "U6631",
+  "decision": "rewritten",
+  "reason": "reviewer duties now past tense with pointers to the recorded runs and review rounds"
+ },
+ {
+  "id": "U6632",
+  "decision": "rewritten",
+  "reason": "heading now 'Harness authoring gates (first harness leg)'"
+ },
+ {
+  "id": "U6633",
+  "decision": "rewritten",
+  "reason": "'the three named causes below it' now points above, under the route table"
+ },
+ {
+  "id": "U6634",
+  "decision": "rewritten",
+  "reason": "open picture/sound judgment now dated to 80c0a39ff and closed by round 7 at 26319ba3b"
+ },
+ {
+  "id": "U6635",
+  "decision": "rewritten",
+  "reason": "promised final gate outcome now points to findings-round-7.md (26319ba3b, green on both backends)"
+ },
+ {
+  "id": "U6636",
+  "decision": "rewritten",
+  "reason": "route step 2 now starts with rock-only lessons until ROCK is heard (Round 2 B3)"
+ },
+ {
+  "id": "U6637",
+  "decision": "rewritten",
+  "reason": "U-identifier rule now allows the reviews' own D/B/R numbering"
+ },
+ {
+  "id": "U6638",
+  "decision": "rewritten",
+  "reason": "U82 attention concern now marked judged in round 7"
+ },
+ {
+  "id": "U6639",
+  "decision": "backlog",
+  "reason": "docs/communication-playthrough.md:174 — 'Audio and failure record' is the pre-harness manual measurement instruction the harness now implements, and its output-tap description repeats l.145–146; fold into the harness section"
+ },
+ {
+  "id": "U6640",
+  "decision": "rewritten",
+  "reason": "the 17,160 five-syllable figure is now labelled as counted before rule (b)'s reversal exclusion"
+ },
+ {
+  "id": "U6641",
+  "decision": "rewritten",
+  "reason": "bank-game description now states the ROCK-first gating (no RIVER call or direction announcement until ROCK is heard)"
+ },
+ {
+  "id": "U6642",
+  "decision": "rewritten",
+  "reason": "storage pit no longer described with baskets and cover; completion leaves the open pit with mouth, rim and spoil heap (Round 2 B1)"
+ },
+ {
+  "id": "U6643",
+  "decision": "backlog",
+  "reason": "docs/communication-poc-spec.md:283 — the water errand's second RIVER follows the completed act (jar set down), against the word-before-action rule; a design question, not a text fix"
+ },
+ {
+  "id": "U6644",
+  "decision": "backlog",
+  "reason": "docs/communication-poc-spec.md:347 — the loom's separation is argued by TALK-radius spacing, which does not establish separation from the 34 m CALL range or cover the speech floor; check the layout against CALL reach"
+ },
+ {
+  "id": "U6645",
+  "decision": "rewritten",
+  "reason": "fixed-point sentence now covers game utterances and excepts the roaming boulder-climb ROCK"
+ },
+ {
+  "id": "U6646",
+  "decision": "kept",
+  "reason": "the catcher waits at the far stone between runs and steps back into his group only before a run starts; sequential positions, as proposed keep"
+ },
+ {
+  "id": "U6647",
+  "decision": "rewritten",
+  "reason": "the underived count 96 removed from the list of counts (24, 20, 8 remain, each derived in the section)"
+ },
+ {
+  "id": "U6648",
+  "decision": "backlog",
+  "reason": "docs/communication-poc-spec.md:120 — falloff 4 is given as CALL's own falloff but evaluated at the 10 m TALK rim; state which register each falloff figure belongs to"
+ },
+ {
+  "id": "U6649",
+  "decision": "rewritten",
+  "reason": "speech-floor section now records that speech yields to the whole drum performance"
+ },
+ {
+  "id": "U6650",
+  "decision": "removed",
+  "reason": "orphaned clause about 'the removed catalogues' deleted"
+ },
+ {
+  "id": "U6651",
+  "decision": "kept",
+  "reason": "claim does not hold: the fallback (vocabulary.ts:17) serves saves made before the roll; the save-compatibility section concerns saves from before the length change; the two are distinct"
+ },
+ {
+  "id": "U6652",
+  "decision": "kept",
+  "reason": "claim does not hold: the station layout is in src/scenes/place/loom.ts as the spec says; loomWork.ts holds the behaviour the reviews cite"
+ },
+ {
+  "id": "U6653",
+  "decision": "rewritten",
+  "reason": "sweep now notes the loom (work-order 1157) came after its audit revision"
+ },
+ {
+  "id": "U6654",
+  "decision": "kept",
+  "reason": "claim does not hold: 'not recorded as heard' is exactly the limitation the next bullet states (heard stored only at setup); no contradiction"
+ },
+ {
+  "id": "U6655",
+  "decision": "rewritten",
+  "reason": "header now says the worktree at 175e15d92 (a descendant of 80c0a39ff) analysed the runs recorded on 80c0a39ff"
+ },
+ {
+  "id": "U6656",
+  "decision": "rewritten",
+  "reason": "analysis tools and raw outputs now marked as scratchpad files not retained in the repository"
+ },
+ {
+  "id": "U6657",
+  "decision": "kept",
+  "reason": "dated review record of the harness as it was; later rounds record the ring buffer"
+ },
+ {
+  "id": "U6658",
+  "decision": "kept",
+  "reason": "dated review record; superseded detail stays as the evidence of that round"
+ },
+ {
+  "id": "U6659",
+  "decision": "kept",
+  "reason": "dated review record; the bank game's live heard-set reading came later (round 2 B3)"
+ },
+ {
+  "id": "U6660",
+  "decision": "kept",
+  "reason": "dated review record quoting the journal text as it then was"
+ },
+ {
+  "id": "U6661",
+  "decision": "kept",
+  "reason": "dated review record; the first-hearing receipt came later"
+ },
+ {
+  "id": "U6662",
+  "decision": "kept",
+  "reason": "dated review record; D6 was answered by the later speech-floor change"
+ },
+ {
+  "id": "U6663",
+  "decision": "kept",
+  "reason": "dated review record; D7's resolution is recorded in the playthrough's round-2 table (B2)"
+ },
+ {
+  "id": "U6664",
+  "decision": "rewritten",
+  "reason": "the local verification directory is now named as not retained in the repository"
+ },
+ {
+  "id": "U6665",
+  "decision": "backlog",
+  "reason": "docs/communication-review-659/pictures-steps-4-9.md D10–D12 and the seal simile, pictures-steps-1-3.md D9, D11, D12 — never carried into any round's finding list; check each against round 7 and file or close"
+ },
+ {
+  "id": "U6666",
+  "decision": "kept",
+  "reason": "dated round-1 verdict; round 7 supersedes it by date and name"
+ },
+ {
+  "id": "U6667",
+  "decision": "backlog",
+  "reason": "docs/communication-review-659/findings-round-3.md:11 — round 3 closes R2-B1 and R2-N1 but never states the disposition of R2-B2 (driver wait at step 2)"
+ },
+ {
+  "id": "U6668",
+  "decision": "rewritten",
+  "reason": "round 6 now states that R5-B1's frame is carried on as R6-B1, closed in round 7"
+ },
+ {
+  "id": "U6669",
+  "decision": "kept",
+  "reason": "claim does not hold: R6-N1 is filed in docs/backlog.md (l.12, '2026-09-25 point 659 round 6, R6-N1')"
+ },
+ {
+  "id": "U6670",
+  "decision": "kept",
+  "reason": "dated 'Not yet judged' sections of rounds 2–6; round 7 supersedes them by date"
+ },
+ {
+  "id": "U6671",
+  "decision": "rewritten",
+  "reason": "'Old D1–D5' now names pictures-steps-4-9.md as its source"
+ },
+ {
+  "id": "U6672",
+  "decision": "rewritten",
+  "reason": "'never the same model twice' now scoped to convergent review, with the same-model blind rerun named as the recorded --framing fallback"
+ },
+ {
+  "id": "U6673",
+  "decision": "rewritten",
+  "reason": "verdict table's allow row now requires an eligible other vendor covering every reviewable changed file"
+ },
+ {
+  "id": "U6674",
+  "decision": "rewritten",
+  "reason": "answered-review requirement now names the verified-unavailability receipt for files no vendor can review"
+ },
+ {
+  "id": "U6675",
+  "decision": "rewritten",
+  "reason": "refusal table now includes the review-findings-filed disposition"
+ },
+ {
+  "id": "U6676",
+  "decision": "kept",
+  "reason": "claim does not hold: the guard judges only main (TICK_BRANCH) while its baseline store is keyed per branch (writeBaseline); both statements match criticality-review-guard.mjs"
+ },
+ {
+  "id": "U6677",
+  "decision": "rewritten",
+  "reason": "Wiring section now says the guard is wired (settings.json Stop chain) and the INTENTIONALLY_DORMANT entry is gone"
+ },
+ {
+  "id": "U6678",
+  "decision": "rewritten",
+  "reason": "rule no longer names 'Fable 5' as reviewer; it defers to CLAUDE.md §6 cross-vendor policy, and the record example takes '<reviewer model>'"
+ },
+ {
+  "id": "U6679",
+  "decision": "rewritten",
+  "reason": "open-edge note now credits the implemented Somali tobe shape change and keeps the rest as §19.13's open line"
+ },
+ {
+  "id": "U6680",
+  "decision": "rewritten",
+  "reason": "tunables intro now says adjustable in the running game, with the BUILD-time values taking effect on reload"
+ },
+ {
+  "id": "U6681",
+  "decision": "backlog",
+  "reason": "docs/design-reference.md:157 — §21.2 claims the complete set of tunables but omits communication controls the spec calls calibratable (instructionHoldSeconds, chiefStaySeconds, giveReach, climbHoldSeconds, drumMessagePeak, loom.tendIntervalSeconds, bank-game phase/distance controls)"
+ },
+ {
+  "id": "U6682",
+  "decision": "rewritten",
+  "reason": "'verbatim' claim now says the blocks were moved verbatim and are kept current since"
+ },
+ {
+  "id": "U6683",
+  "decision": "rewritten",
+  "reason": "'change NOTHING with the season' now scoped to dress, consistent with fire/presence/market running for every settlement"
+ },
+ {
+  "id": "U6684",
+  "decision": "removed",
+  "reason": "detached 'Rank as class experience' bullet deleted; the table rows already state the rank gate"
+ },
+ {
+  "id": "U6685",
+  "decision": "kept",
+  "reason": "the March 1896 boundary is data: it keeps Zulu/Pedi/San clean for the whole 1890–1895 window, which the text states; not a code branch"
+ },
+ {
+  "id": "U6686",
+  "decision": "removed",
+  "reason": "trailing '---' separator at the end of the file deleted"
+ },
+ {
+  "id": "U6687",
+  "decision": "rewritten",
+  "reason": "opening now calls 14,355 a measured difference of which about 11.4k recurs per turn"
+ },
+ {
+  "id": "U6688",
+  "decision": "backlog",
+  "reason": "docs/document-cut-757.md:64 — point 757's forecast (4–6k yield, floor 55–57k) does not reconcile with the 57,970 baseline beside it (57,970 − 4..6k = 52–54k); the forecast's own baseline is not recorded"
+ },
+ {
+  "id": "U6689",
+  "decision": "rewritten",
+  "reason": "headroom sentence now 'preserving the one word of headroom' (1,318 of 1,319 plus matching raises), not 18"
+ },
+ {
+  "id": "U6690",
+  "decision": "rewritten",
+  "reason": "CLAUDE.md history now closes with the table's 205 / 1,468 and no headroom"
+ },
+ {
+  "id": "U6691",
+  "decision": "kept",
+  "reason": "historical provenance of the deleted owner transcript; its expiry, commit and attestation are recorded, as proposed"
+ },
+ {
+  "id": "U6692",
+  "decision": "kept",
+  "reason": "historical provenance of the deleted subagent transcript; its expiry and attesting commit are recorded"
+ },
+ {
+  "id": "U6693",
+  "decision": "kept",
+  "reason": "the guard skips absent files and the table deliberately keeps the configured ceiling, as the text says"
+ },
+ {
+  "id": "U6694",
+  "decision": "backlog",
+  "reason": "docs/document-cut-757.md:5 — U45 part 1 is listed as awaiting a ruling while l.234 lists 'U45 closing-freeze procedure' as MOVED without a part qualifier; name the part"
+ },
+ {
+  "id": "U6695",
+  "decision": "rewritten",
+  "reason": "history now records the 23.09.2026 raise to 53 / 820 (doc-budget-core.mjs comment), matching the table"
+ },
+ {
+  "id": "U6696",
+  "decision": "rewritten",
+  "reason": "the retired-entry advice is now placed after the 23.09 raise and noted as tried on 21.09 without paying"
+ },
+ {
+  "id": "U6697",
+  "decision": "backlog",
+  "reason": "docs/document-cut-757.md:239 — U51 destination uses ~/.claude/projects/-workspace-hoa-/memory (trailing dash); both -workspace-hoa- and -workspace-hoa memory directories hold a findings-carrier.md; settle which is canonical"
+ },
+ {
+  "id": "U6698",
+  "decision": "rewritten",
+  "reason": "'corrected in the same commit as this table' now 'in the commit that first introduced this table'"
+ },
+ {
+  "id": "U6699",
+  "decision": "rewritten",
+  "reason": "intro now notes §10.5's ~1890 belief layer beside the graveyard folklore"
+ },
+ {
+  "id": "U6700",
+  "decision": "rewritten",
+  "reason": "forward-pointer now says §6 prescribes the coat change and §2.1 already carries the giraffe exception inline"
+ },
+ {
+  "id": "U6701",
+  "decision": "rewritten",
+  "reason": "forward-pointer and §10 intro now say §10 partly closes gaps (carnivore cue gap of §8, plus answers to §1 and §2.2) instead of 'three of §8's gaps'"
+ },
+ {
+  "id": "U6702",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:90 — the general description makes solitude a universal ageing cue despite the species-specific exclusions at l.245–253"
+ },
+ {
+  "id": "U6703",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:257 — the all-species instruction that elderly males decline or lose dominance contests does not preserve the elephant exception (l.230–239, 411)"
+ },
+ {
+  "id": "U6704",
+  "decision": "rewritten",
+  "reason": "graveyard landmark references now read 'design.md §4.4', leaving the doc's own §4.4 (vultures) references intact"
+ },
+ {
+  "id": "U6705",
+  "decision": "rewritten",
+  "reason": "aged-stage description now excepts the giraffe from greying"
+ },
+ {
+  "id": "U6706",
+  "decision": "rewritten",
+  "reason": "§6 now carries an inline note that §10.7 supersedes it and §10.2 replaces the giraffe row"
+ },
+ {
+  "id": "U6707",
+  "decision": "rewritten",
+  "reason": "§6 giraffe row no longer ages by coat ('no colour ageing — §10.2')"
+ },
+ {
+  "id": "U6708",
+  "decision": "rewritten",
+  "reason": "§6.1 coat tint now excepts the giraffe"
+ },
+ {
+  "id": "U6709",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:427 — the common grazers-and-cats brief applies herd-edge positioning to species for which the doc rejects an elderly social shift (l.251–253, 787)"
+ },
+ {
+  "id": "U6710",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:433 — the natural-death brief starts terminal decline with a daily random roll while l.490–492 and 744–745 specify a condition threshold"
+ },
+ {
+  "id": "U6711",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:463 — §7's absolute 'broken canine = death sentence' drops the earlier 'often fatal' qualification (l.174–175)"
+ },
+ {
+  "id": "U6712",
+  "decision": "rewritten",
+  "reason": "grey-muzzle recommendation now excepts the giraffe"
+ },
+ {
+  "id": "U6713",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:620 — the pale, solitary elderly giraffe is called attested although l.608–610 say old pale males are more gregarious"
+ },
+ {
+  "id": "U6714",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:653 — the carnivore follow-up calls the broken-canine death beat well supported for hyena and lion beyond what the table and disclaimers (l.642–650) establish"
+ },
+ {
+  "id": "U6715",
+  "decision": "rewritten",
+  "reason": "§10.8 now says elderlyProportions covers the four grazer specs, the giraffe going through buildGiraffe"
+ },
+ {
+  "id": "U6716",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:825 — the residual-gap summary turns an unsuccessful literature search (l.738–743) into a universal claim that no field figure exists"
+ },
+ {
+  "id": "U6717",
+  "decision": "rewritten",
+  "reason": "bird preamble now says the geriatric research is §§1–10"
+ },
+ {
+  "id": "U6718",
+  "decision": "rewritten",
+  "reason": "engineering intro now names the vultures' rendered soaring as the one altitude exception"
+ },
+ {
+  "id": "U6719",
+  "decision": "backlog",
+  "reason": "docs/fauna-behaviour-1890.md:1079 — 'the majority of the region table (accipiters, harriers, fish eagle)' is numerically wrong (10 of 24 non-GAP rows per the claim); recount and restate, also l.1087–1088"
+ },
+ {
+  "id": "U6720",
+  "decision": "rewritten",
+  "reason": "evidence-marker table now lists the PERIOD marker §10 adds"
+ },
+ {
+  "id": "U6721",
+  "decision": "rewritten",
+  "reason": "§2.3 carnivore GAP now points to §10.3's measured data"
+ },
+ {
+  "id": "U6722",
+  "decision": "rewritten",
+  "reason": "§10.2 now quotes §6's giraffe row correctly ('duller coat') and notes §2.1 was patched"
+ },
+ {
+  "id": "U6723",
+  "decision": "rewritten",
+  "reason": "§6.2 elephant brief now leads with the asymmetric tusk cue and marks sunken temples as not legible"
+ },
+ {
+  "id": "U6724",
+  "decision": "rewritten",
+  "reason": "§10.7 elephant row now marks sunken temples as not legible at bird's-eye (§10.4)"
+ },
+ {
+  "id": "U6725",
+  "decision": "rewritten",
+  "reason": "§8's first known-unknown now notes §10.2/§10.3 partly closed it"
+ },
+ {
+  "id": "U6726",
+  "decision": "rewritten",
+  "reason": "'§7.1 pt. 25' now 'CLAUDE.md §7.1 pt. 25' (trade economy criterion)"
+ },
+ {
+  "id": "U6727",
+  "decision": "kept",
+  "reason": "claim does not hold: 'the gamebird build' in B1 means the birds' body build (grouse, francolins, quail), not a code builder"
+ },
+ {
+  "id": "U6728",
+  "decision": "kept",
+  "reason": "claim does not hold: calfProportions, buildElephant, buildGiraffe, buildLion, buildHyena, buildCatPredator, killFlockActive, calvesForGroup, parentAttackOutcome, REGION_PREY/REGION_PREDATORS and backY all still exist under src/ (elderlyProportions is the proposed transform)"
+ },
+ {
+  "id": "U6729",
+  "decision": "kept",
+  "reason": "claim does not hold: PreyKind and PredatorKind still exist under src/ beside src/render/fauna.ts"
+ },
+ {
+  "id": "U6730",
+  "decision": "kept",
+  "reason": "cross-references to design.md subsections and points are dated research pointers; §19 and the named points still exist"
+ },
+ {
+  "id": "U6731",
+  "decision": "kept",
+  "reason": "sources listed but not cited inline are acceptable in a source list, as proposed"
+ },
+ {
+  "id": "U6732",
+  "decision": "rewritten",
+  "reason": "file header now says the file also hosts the separate bird-flight study"
+ },
+ {
+  "id": "U6733",
+  "decision": "kept",
+  "reason": "verbatim archived half; disagreement between the two halves is what the counted docs/four-eyes/1048-union.json resolves (it exists)"
+ },
+ {
+  "id": "U6734",
+  "decision": "kept",
+  "reason": "verbatim archived half A of 1048; its reasoning is evidence and is not edited; the union governs"
+ },
+ {
+  "id": "U6735",
+  "decision": "kept",
+  "reason": "verbatim archived halves with different headline bounds; the counted 1048-union.json resolves them, as proposed keep"
+ },
+ {
+  "id": "U6736",
+  "decision": "kept",
+  "reason": "verbatim archived half; an internal tension in a blind proposal is evidence, resolved by the union, not edited"
+ },
+ {
+  "id": "U6737",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/1048-blind-b-sol.md:4 — the preamble says the half came back in the line form 'id | file | defect' while the body is '## B<n> — file' sections; either the preamble or the verbatim claim is wrong"
+ },
+ {
+  "id": "U6738",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/1048-blind-a-opus5.md:4 — stage 1048 has halves and 1048-union.json but no provenance record or README section, which README's filing rule expects"
+ },
+ {
+  "id": "U6739",
+  "decision": "kept",
+  "reason": "dated observations inside a verbatim half, as proposed keep"
+ },
+ {
+  "id": "U6740",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/659-provenance.md:7 — the session-authored half's provenance gives model and commit but not the quoted writing message (line, tool-call id, timestamp) README.md:29–30 requires"
+ },
+ {
+  "id": "U6741",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/659-provenance.md:10 — the delegated half's provenance lacks the quoted commissioning tool call, await and parsing step README.md:31–35 requires"
+ },
+ {
+  "id": "U6742",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/659-provenance.md:7 — the 659 halves exist only as .txt under docs/blind-659 converted to JSON; no verbatim .md halves or README section as the filing rule requires"
+ },
+ {
+  "id": "U6743",
+  "decision": "kept",
+  "reason": "the false heading is deliberately retained as evidence and annotated, as proposed keep"
+ },
+ {
+  "id": "U6744",
+  "decision": "kept",
+  "reason": "verbatim archived recommendations disagreeing across stages; they are evidence, and the built boundary is documented in batch-autonomy.md (sealed two-phase marker)"
+ },
+ {
+  "id": "U6745",
+  "decision": "rewritten",
+  "reason": "origin-session summary now says it wrote half A and commissioned and parsed half B, matching l.68–84"
+ },
+ {
+  "id": "U6746",
+  "decision": "kept",
+  "reason": "claim does not hold as stale: docs/handover-architecture.md:68 records the withdrawn correction and states the label is false; it does not carry the wrong label"
+ },
+ {
+  "id": "U6747",
+  "decision": "kept",
+  "reason": "historical conclusion marked as resolved the same evening in the record, as proposed keep"
+ },
+ {
+  "id": "U6748",
+  "decision": "rewritten",
+  "reason": "heading now 'nine days' (half A 13.08.2026, reading 22.08.2026)"
+ },
+ {
+  "id": "U6749",
+  "decision": "kept",
+  "reason": "verbatim archived halves disagreeing is expected; the counted docs/four-eyes/713-union.json exists and resolves them"
+ },
+ {
+  "id": "U6750",
+  "decision": "kept",
+  "reason": "verbatim archived halves disagreeing is expected; 713-union.json resolves them"
+ },
+ {
+  "id": "U6751",
+  "decision": "kept",
+  "reason": "verbatim archived halves disagreeing is expected; 713-union.json resolves them"
+ },
+ {
+  "id": "U6752",
+  "decision": "kept",
+  "reason": "verbatim archived halves disagreeing on criticality is expected; the union and the work order carry the ruling"
+ },
+ {
+  "id": "U6753",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/713-provenance.md:29 — the accepted 713 merge rests on a tracked session claim without message metadata or delegation chain, outside README.md:39–44's evidence routes"
+ },
+ {
+  "id": "U6754",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/713-provenance.md:37 — says the counted union here supersedes docs/blind-713/union.json; that file does not exist (docs/blind-713 holds direction-change.md and list-a.txt), so name the superseded artefact correctly"
+ },
+ {
+  "id": "U6755",
+  "decision": "kept",
+  "reason": "verbatim archived halves attributing defects to different files; the counted 947-union.json resolves them, as proposed keep"
+ },
+ {
+  "id": "U6756",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/947-blind-a-opus5.md:1 — stage 947 has halves and 947-union.json but no provenance record or README section, so the Opus 5 / Sol labels rest on file names"
+ },
+ {
+  "id": "U6757",
+  "decision": "rewritten",
+  "reason": "README's stage-676 summary now distinguishes half A's message metadata from half B's delegation chain"
+ },
+ {
+  "id": "U6758",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/README.md:66 — the README documents only stage 676 while the directory holds 633, 659, 713, 947 and 1048 artefacts with no section or union pointer"
+ },
+ {
+  "id": "U6759",
+  "decision": "backlog",
+  "reason": "docs/four-eyes/README.md:36 — names point 880 (now closed) as owner of the delegate-attestation residual; state whether 880 closed it or where it moved"
+ },
+ {
+  "id": "U6760",
+  "decision": "rewritten",
+  "reason": "Khafre's cap is now 'the only surviving Tura-limestone casing', noting Menkaure's surviving red-granite courses"
+ },
+ {
+  "id": "U6761",
+  "decision": "rewritten",
+  "reason": "stripped-core sentence now excepts Menkaure's red-granite lower courses"
+ },
+ {
+  "id": "U6762",
+  "decision": "rewritten",
+  "reason": "Khufu brief now gives built ≈ 146 and standing ≈ 138.5 with the apex missing, matching landmarks.ts:168"
+ },
+ {
+  "id": "U6763",
+  "decision": "backlog",
+  "reason": "docs/graphics-detail-levels.md:98 — waterCalm is a documented preset key that no render consumer reads (l.126–129); wire it or drop it from QUALITY_PRESETS and the doc"
+ },
+ {
+  "id": "U6764",
+  "decision": "backlog",
+  "reason": "docs/graphics-detail-levels.md:101 — wildlifeDensity is a documented preset key with no consumer ('will be read by the spawner once wired'); wire it or drop it"
+ },
+ {
+  "id": "U6765",
+  "decision": "kept",
+  "reason": "dated audit finding (07.08.2026) filed as a follow-up point; the audit reports and does not fix in place, so the record stands as written"
+ },
+ {
+  "id": "U6766",
+  "decision": "kept",
+  "reason": "dated audit finding filed as a follow-up point; the record of what the selector matched on 07.08.2026 stands"
+ },
+ {
+  "id": "U6767",
+  "decision": "kept",
+  "reason": "dated audit finding filed as a follow-up point; the record stands"
+ },
+ {
+  "id": "U6768",
+  "decision": "kept",
+  "reason": "dated audit finding filed as a follow-up point with proposed renames; the record stands"
+ },
+ {
+  "id": "U6769",
+  "decision": "kept",
+  "reason": "dated audit finding filed as a follow-up point; the record stands"
+ },
+ {
+  "id": "U6770",
+  "decision": "kept",
+  "reason": "dated audit finding about the memory index as it stood then; memory lives outside the repository and the record stands"
+ },
+ {
+  "id": "U6771",
+  "decision": "kept",
+  "reason": "dated audit finding about the memory index as it stood then; the record stands"
+ },
+ {
+  "id": "U6772",
+  "decision": "kept",
+  "reason": "dated audit finding filed as a follow-up point; the record stands"
+ },
+ {
+  "id": "U6773",
+  "decision": "kept",
+  "reason": "dated audit finding about a memory as it stood then; the record stands"
+ },
+ {
+  "id": "U6774",
+  "decision": "kept",
+  "reason": "dated audit finding about a memory as it stood then; the record stands"
+ },
+ {
+  "id": "U6775",
+  "decision": "kept",
+  "reason": "the audit deliberately keeps the legacy memory name for inbound links, as the claim itself notes"
+ },
+ {
+  "id": "U6776",
+  "decision": "kept",
+  "reason": "claim does not hold as stale: l.68 reports the false heading as false and withdrawn; the raw half's heading is deliberately retained as evidence (676-blind-a-opus5.md)"
+ },
+ {
+  "id": "U6777",
+  "decision": "rewritten",
+  "reason": "step 3 heading now names the authoring adapter author-astra.mjs, noting the union's author-sol.mjs as its earlier name (author-sol.mjs no longer exists)"
+ },
+ {
+  "id": "U6778",
+  "decision": "kept",
+  "reason": "frozen union entry, superseded in the prose as stated; the union is declared frozen evidence"
+ },
+ {
+  "id": "U6779",
+  "decision": "kept",
+  "reason": "frozen union entry; the supersession is stated in mechanism 2, as proposed keep"
+ },
+ {
+  "id": "U6780",
+  "decision": "backlog",
+  "reason": "docs/handover-architecture.md:265 — the metrics step says backlog-pressure time is reported separately, while union M12/M56 let recorded reason intervals leave the denominator; state how the two combine"
+ },
+ {
+  "id": "U6781",
+  "decision": "backlog",
+  "reason": "docs/handover-architecture.md:114 — union M36 requires an explicit rework state missing from M16's snapshot-state vocabulary; check the schema core"
+ },
+ {
+  "id": "U6782",
+  "decision": "rewritten",
+  "reason": "'no Playwright' statements (l.177, 261, 269) now say no Playwright test runner; the browser suites use Playwright as a library"
+ },
+ {
+  "id": "U6783",
+  "decision": "rewritten",
+  "reason": "'mechanism 1's table' now 'the lifecycle-state table (mechanism 2, below)'"
+ },
+ {
+  "id": "U6784",
+  "decision": "backlog",
+  "reason": "docs/handover-architecture.md:412 — the mutation-validation checklist checks sessionId/fence but not the generation l.624–634 require against credential reuse; check the daemon's validation"
+ },
+ {
+  "id": "U6785",
+  "decision": "rewritten",
+  "reason": "'carries exactly that pair' now names the publication counter seq of the three-field credential"
+ },
+ {
+  "id": "U6786",
+  "decision": "backlog",
+  "reason": "docs/handover-architecture.md:900 — the 'absent | present' orphaned-copy row clears the daemon identity without the proof of death M39 and l.875–882 demand; check the reconciliation code"
+ },
+ {
+  "id": "U6787",
+  "decision": "rewritten",
+  "reason": "acceptance summary now allows the liveness probe or journal mint order where a row names one"
+ },
+ {
+  "id": "U6788",
+  "decision": "kept",
+  "reason": "dated probe record (07.08.2026); an allowlist entry for an absent tool is harmless, and the permission allowances are kept broad by standing decision"
+ },
+ {
+  "id": "U6789",
+  "decision": "rewritten",
+  "reason": "'three orders of magnitude' corrected to 'two' (~78,000 / ~600 ≈ 130)"
+ },
+ {
+  "id": "U6790",
+  "decision": "rewritten",
+  "reason": "notification advice now scoped to Agent-tool children; durable authors outside the Agent tool are polled by log and branch tip"
+ },
+ {
+  "id": "U6791",
+  "decision": "rewritten",
+  "reason": "'Two additions … both' now introduces the four listed hosts as the browser and TTS verification hosts"
+ },
+ {
+  "id": "U6792",
+  "decision": "rewritten",
+  "reason": "reds sentence now dated 05.08.2026 and counts five red checks under the four points 500–503"
+ },
+ {
+  "id": "U6793",
+  "decision": "rewritten",
+  "reason": "rebuild-only statement now scoped to container-definition settings, naming the live repairs that apply at once"
+ },
+ {
+  "id": "U6794",
+  "decision": "rewritten",
+  "reason": "intro now says post-implementation notes of point 273 are marked where added"
+ },
+ {
+  "id": "U6795",
+  "decision": "rewritten",
+  "reason": "Khafre cap now recorded as rendered since point 273 (landmarks.ts:202)"
+ },
+ {
+  "id": "U6796",
+  "decision": "rewritten",
+  "reason": "§3's builder description now dated 'before point 273'"
+ },
+ {
+  "id": "U6797",
+  "decision": "rewritten",
+  "reason": "bird's-eye paragraph now excepts Menkaure's granite skirt, matching l.210–211"
+ },
+ {
+  "id": "U6798",
+  "decision": "rewritten",
+  "reason": "'no new landmark' now scoped to the bird's-eye landmark, naming gizaSitePyramidParts for the enterable site"
+ },
+ {
+  "id": "U6799",
+  "decision": "kept",
+  "reason": "claim does not hold: docs/peoples-1890.md, climate-1890.md and fauna-behaviour-1890.md all exist"
+ },
+ {
+  "id": "U6800",
+  "decision": "rewritten",
+  "reason": "lever-order sentence now says later levers (from figureLimbSegments on, incl. the per-pixel waterDetailOctaves) are appended in the order added"
+ },
+ {
+  "id": "U6801",
+  "decision": "rewritten",
+  "reason": "'today's 2048 default' now 'medium's 2048' (QUALITY_PRESETS)"
+ },
+ {
+  "id": "U6802",
+  "decision": "kept",
+  "reason": "as proposed keep: the compat WebGPU lane's dropped MSAA is a host-lane limitation recorded in host-environment.md, not a contradiction of the preset behaviour"
+ },
+ {
+  "id": "U6803",
+  "decision": "rewritten",
+  "reason": "'eight wired enforcers' changed to 'seven' (seven are named)"
+ },
+ {
+  "id": "U6804",
+  "decision": "rewritten",
+  "reason": "intro counts now dated to the 07.08.2026 pass"
+ },
+ {
+  "id": "U6805",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/rule-review.mjs exists beside rule-review-guard.mjs and rule-review-core.mjs"
+ },
+ {
+  "id": "U6806",
+  "decision": "kept",
+  "reason": "dated cadence note of the 07.08 pass, as proposed keep"
+ },
+ {
+  "id": "U6807",
+  "decision": "kept",
+  "reason": "dated finding list of the pass, as proposed keep"
+ },
+ {
+  "id": "U6808",
+  "decision": "rewritten",
+  "reason": "opening's 30 mm tolerance now marked as the then-existing value, 2 mm since"
+ },
+ {
+  "id": "U6809",
+  "decision": "backlog",
+  "reason": "docs/hand-stone-contact.md:99 — the case accounting does not sum: 27 reachable + 39 needing more search = 66 of the 78 bearing/seed cases; name the remaining 12"
+ },
+ {
+  "id": "U6810",
+  "decision": "backlog",
+  "reason": "docs/hand-stone-contact.md:49 — 'the reviewer still owes a picture judgment at this bar' has no recorded closure; record the judgment or where it happened"
+ },
+ {
+  "id": "U6811",
+  "decision": "removed",
+  "reason": "orphaned sentence about 'rotating adult-fill and settlement-visit findings' (never introduced) deleted"
+ },
+ {
+  "id": "U6812",
+  "decision": "kept",
+  "reason": "as proposed keep: 'the old nine-pixel bar' is the superseded browser bar the sentence replaces; its value is given"
+ },
+ {
+  "id": "U6813",
+  "decision": "backlog",
+  "reason": "docs/handover-architecture.md:143 — the reconciliation note pairs A3c/B33 (the fallback fold's pairing) while the third-model fold merged A3c+B30 (M31) and B33 into M34; restate against the counted union"
+ },
+ {
+  "id": "U6814",
+  "decision": "rewritten",
+  "reason": "a correction beside the M22 note now records that M2's survival reading was overtaken by the lane's death on 21.08.2026 (mechanism 1)"
+ },
+ {
+  "id": "U6815",
+  "decision": "backlog",
+  "reason": "docs/handover-architecture.md:199 — the activation interlock requires steps 8 AND 9 green (STEPS_REQUIRED_FOR_ACTIVATION includes 9), but the lane was switched on in 834 while the rest of step 9 belonged to 676; state which slice of 9 satisfied the interlock"
+ },
+ {
+  "id": "U6816",
+  "decision": "rewritten",
+  "reason": "'corrected in the same commit that builds it' now 'Step 7 below already carries that wording'"
+ },
+ {
+  "id": "U6817",
+  "decision": "rewritten",
+  "reason": "step 4's coordinator lease now uses the lock's fence as its epoch (no second counter), matching mechanism 2"
+ },
+ {
+  "id": "U6818",
+  "decision": "rewritten",
+  "reason": "the daemon-copy writer is now the lock owner from the daemon's record, consistent with l.794–795 and l.835"
+ },
+ {
+  "id": "U6819",
+  "decision": "removed",
+  "reason": "live-session snapshot '(the lock this batch is running under carries 603)' deleted"
+ },
+ {
+  "id": "U6820",
+  "decision": "kept",
+  "reason": "as proposed keep: the paragraph records a false claim that stood briefly, as a correction note"
+ },
+ {
+  "id": "U6821",
+  "decision": "kept",
+  "reason": "as proposed keep: records a correction withdrawn the same day"
+ },
+ {
+  "id": "U6822",
+  "decision": "kept",
+  "reason": "as proposed keep: records the removed 'List B' section as history"
+ },
+ {
+  "id": "U6823",
+  "decision": "rewritten",
+  "reason": "generation-prompt phrasing replaced ('The union was written without this repository's progress-board source path or test conventions')"
+ },
+ {
+  "id": "U6824",
+  "decision": "backlog",
+  "reason": "docs/handover-architecture.md:443 — mechanism 2 is laced with draft-revision history referring to answers and sentences no longer present (l.443, 475, 487–491, 519, 553, 560–561, 570, 592–593, 699–700, 730, 766–767, 792–793, 814–816, 856–857, 877–879); condense to the final design"
+ },
+ {
+  "id": "U6825",
+  "decision": "rewritten",
+  "reason": "seam table now records all points (889–895, 834, 676) as landed/closed, dated to the 24.08 plan"
+ },
+ {
+  "id": "U6826",
+  "decision": "kept",
+  "reason": "claim does not hold: both scripts exist — batch-autostart.mjs is the tick the supervisor starts, batch-launcher.mjs the Linux trigger daemon"
+ },
+ {
+  "id": "U6827",
+  "decision": "kept",
+  "reason": "claim does not hold: --drain is a flag of the listed stop command (batch-daemon.mjs usage: stop … [--drain])"
+ },
+ {
+  "id": "U6828",
+  "decision": "kept",
+  "reason": "the doc itself dates the probes and tells the reader to re-run them before acting; nothing is stale beyond that stated bound"
+ },
+ {
+  "id": "U6829",
+  "decision": "kept",
+  "reason": "claim does not hold: package.json defines test:unit, test:small, test:large and test:e2e, as the doc says"
+ },
+ {
+  "id": "U6830",
+  "decision": "kept",
+  "reason": "claim does not hold: §2 names both the Windows task and scripts/batch-launcher.mjs (the Linux daemon)"
+ },
+ {
+  "id": "U6831",
+  "decision": "kept",
+  "reason": "dated size snapshot inside a reasoning, as proposed keep"
+ },
+ {
+  "id": "U6832",
+  "decision": "kept",
+  "reason": "as proposed keep: the open list names point 373's options as of the evaluation"
+ },
+ {
+  "id": "U6833",
+  "decision": "rewritten",
+  "reason": "the dangling colon now points to the list after the 19.08.2026 outage note"
+ },
+ {
+  "id": "U6834",
+  "decision": "backlog",
+  "reason": "docs/host-environment.md:62 — the 04./05.08 measurements already cite --use-angle=gl-egl while the 19.08 section calls gl-egl the new repair replacing the gl route, and OpenGL 4.6 (l.79) vs OpenGL ES 3.1 (l.57) disagree; re-date or reconcile"
+ },
+ {
+  "id": "U6835",
+  "decision": "kept",
+  "reason": "claim does not hold as stated: 'one frame per second' and '22.7 renderer calls per second' are different units on possibly different scenes; no contradiction shown"
+ },
+ {
+  "id": "U6836",
+  "decision": "kept",
+  "reason": "approximate memory-corpus size in a host note, as proposed keep"
+ },
+ {
+  "id": "U6837",
+  "decision": "kept",
+  "reason": "dated 05.08.2026 findings tied to named points, as proposed keep"
+ },
+ {
+  "id": "U6838",
+  "decision": "rewritten",
+  "reason": "'mapped to one (or none)' now 'one or more (or none)', matching the two-driver rows"
+ },
+ {
+  "id": "U6839",
+  "decision": "rewritten",
+  "reason": "intro now allows one model-diverse pass per phase that calls for one (Phases 1, 5, 8) instead of a single pass overall"
+ },
+ {
+  "id": "U6840",
+  "decision": "rewritten",
+  "reason": "sequential-work prescription now excepts the Phase 8 cleanup's two blind halves"
+ },
+ {
+  "id": "U6841",
+  "decision": "rewritten",
+  "reason": "ordering rationale no longer promises an unconditional 3× flake-free run; it names the regressions before and after the cleanup"
+ },
+ {
+  "id": "U6842",
+  "decision": "rewritten",
+  "reason": "pre-build framing now notes the mechanic has since been built under point 264 (closed)"
+ },
+ {
+  "id": "U6843",
+  "decision": "rewritten",
+  "reason": "sibling list now includes docs/fauna-behaviour-1890.md"
+ },
+ {
+  "id": "U6844",
+  "decision": "rewritten",
+  "reason": "'exactly those the game renders' now 'those the game renders', the four unrendered species following"
+ },
+ {
+  "id": "U6845",
+  "decision": "backlog",
+  "reason": "docs/intraspecies-combat-1890.md:22 — the roster check is a point-in-time verification of fauna.ts and implies flamingo, vulture, plover and goat are keyed to PreyKind/PredatorKind; restate which roster each belongs to"
+ },
+ {
+  "id": "U6846",
+  "decision": "rewritten",
+  "reason": "unused REVIEW and CAPTIVE marker rows removed from the legend"
+ },
+ {
+  "id": "U6847",
+  "decision": "rewritten",
+  "reason": "territorial example now separates the solitary leopard from male cheetah coalitions"
+ },
+ {
+  "id": "U6848",
+  "decision": "backlog",
+  "reason": "docs/intraspecies-combat-1890.md:131 — §3's non-lethal list (wildebeest, antelope, warthog) does not match §4's Tier B (which has giraffe, crocodile and hyena); reconcile the two lists"
+ },
+ {
+  "id": "U6849",
+  "decision": "backlog",
+  "reason": "docs/intraspecies-combat-1890.md:161 — the buffalo row has no disposition downstream (no §4 tier, no §3 entry)"
+ },
+ {
+  "id": "U6850",
+  "decision": "backlog",
+  "reason": "docs/intraspecies-combat-1890.md:292 — buffalo is the only table species without a source in §5"
+ },
+ {
+  "id": "U6851",
+  "decision": "rewritten",
+  "reason": "§6 now refers to §4's relative frequencies (and any rate the build picks), since §4 states no rates"
+ },
+ {
+  "id": "U6852",
+  "decision": "rewritten",
+  "reason": "the leopard ~15–20% figure is now marked GAP, not a measured rate (§6)"
+ },
+ {
+  "id": "U6853",
+  "decision": "rewritten",
+  "reason": "known-unknown now names all four unrendered species (hippo, buffalo, ostrich, baboon)"
+ },
+ {
+  "id": "U6854",
+  "decision": "rewritten",
+  "reason": "drama cross-references now use 'point 126' / 'point 145c' instead of mixed § numbering"
+ },
+ {
+  "id": "U6855",
+  "decision": "rewritten",
+  "reason": "'CLAUDE §2 / §21' now 'CLAUDE.md §2 / design.md §21' (CLAUDE.md has no §21)"
+ },
+ {
+  "id": "U6856",
+  "decision": "kept",
+  "reason": "claim does not hold as drifted: caughtBy, gripSeconds, killFlock, parentAttackOutcome and REGION_PREY/REGION_PREDATORS all still exist under src/"
+ },
+ {
+  "id": "U6857",
+  "decision": "kept",
+  "reason": "claim does not hold: fauna-behaviour-1890.md §3.2 and §10.2 exist with the cited content"
+ },
+ {
+  "id": "U6858",
+  "decision": "rewritten",
+  "reason": "net verdict now 'no rendered species' fight cannot be built'"
+ },
+ {
+  "id": "U6859",
+  "decision": "rewritten",
+  "reason": "bundled-points list now includes 213, 285 and 306/631, which the doc bundles later"
+ },
+ {
+  "id": "U6860",
+  "decision": "kept",
+  "reason": "claim does not hold: the -astra scripts are the current names (scripts/review-astra.mjs, ask-astra.mjs exist; no -sol scripts remain)"
+ },
+ {
+  "id": "U6861",
+  "decision": "kept",
+  "reason": "claim does not hold: Astra is the current other-vendor model per CLAUDE.md §6; Sol is the earlier name used in older docs"
+ },
+ {
+  "id": "U6862",
+  "decision": "kept",
+  "reason": "the pinned content hash is the rule-echo marker mechanism by design; its staleness is what the guard detects"
+ },
+ {
+  "id": "U6863",
+  "decision": "kept",
+  "reason": "Maximum QA is a stricter release pass than the CLAUDE.md minimum; an unconditional audit there does not contradict the lockfile-triggered rule"
+ },
+ {
+  "id": "U6864",
+  "decision": "rewritten",
+  "reason": "flake handling in Phases 2 and 8 now follows CLAUDE.md §7.2: a retry covers nothing, a red closes by cause fixed, charged or filed"
+ },
+ {
+  "id": "U6865",
+  "decision": "rewritten",
+  "reason": "ordering rationale now names both closing regressions (before and after the cleanup)"
+ },
+ {
+  "id": "U6866",
+  "decision": "rewritten",
+  "reason": "cleanup now notes the blind-parallel form also classifies contradictions and orphaned references"
+ },
+ {
+  "id": "U6867",
+  "decision": "rewritten",
+  "reason": "blind-parallel description now names the third-model fold that counts every id (scripts/blind-merge.mjs)"
+ },
+ {
+  "id": "U6868",
+  "decision": "backlog",
+  "reason": "docs/maximum-qa.md:157 — the soak step names scripts/verify/leaks.mjs, which does not exist, 'or the documented harness'; name the real harness or file building it"
+ },
+ {
+  "id": "U6869",
+  "decision": "kept",
+  "reason": "the retrospective-currency section is a standing duty appended after the phases; its placement is editorial, as proposed file-point is not warranted"
+ },
+ {
+  "id": "U6870",
+  "decision": "rewritten",
+  "reason": "retrospective now described as tracked (git ls-files lists it), not git-ignored"
+ },
+ {
+  "id": "U6871",
+  "decision": "rewritten",
+  "reason": "'inspected by me' now 'inspected by the main session'"
+ },
+ {
+  "id": "U6872",
+  "decision": "rewritten",
+  "reason": "token total now 'about 60 million' (378 × 158,001 ≈ 59.7 million)"
+ },
+ {
+  "id": "U6873",
+  "decision": "kept",
+  "reason": "A and B are independent blind lists of the same session; differing descriptions are expected and not edited"
+ },
+ {
+  "id": "U6874",
+  "decision": "kept",
+  "reason": "dated defect record of 17.08.2026; the lists are evidence of that measurement"
+ },
+ {
+  "id": "U6875",
+  "decision": "backlog",
+  "reason": "docs/multistep-analysis-17-08/multistep-A.md + multistep-B.md — both files are unheaded id lists with no statement of question, author or disposition; add a header or fold them into their consuming point's record"
+ },
+ {
+  "id": "U6876",
+  "decision": "kept",
+  "reason": "dated list of 17.08.2026; script and section names are as they were then"
+ },
+ {
+  "id": "U6877",
+  "decision": "kept",
+  "reason": "as proposed keep: B's closing chain is one model's list, not a checklist"
+ },
+ {
+  "id": "U6878",
+  "decision": "kept",
+  "reason": "claim does not hold: B11 states the 150k rule while A9 measures a session that ran past it; the two do not conflict"
+ }
+]

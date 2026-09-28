@@ -18,8 +18,8 @@ listed here is not checked.
 
 ## Container specifics (Linux)
 
-The sandbox firewall allows a fixed domain list. Two additions the browser verification
-needs, both in `.devcontainer/init-firewall.sh`:
+The sandbox firewall allows a fixed domain list. The hosts the browser and TTS
+verification need, all in `.devcontainer/init-firewall.sh`:
 
 - `cdn.playwright.dev` — the download entry point (was already allowed).
 - `storage.googleapis.com` — where that entry point **redirects** the Chrome-for-Testing
@@ -36,7 +36,7 @@ needs, both in `.devcontainer/init-firewall.sh`:
 
 **Measured 04.08.2026 (point 493), so nobody has to guess again.** The GPU behind
 `/dev/dxg` IS reachable from the container, and what stood between the suites and it was
-packages, not hardware:
+packages, not hardware (the list follows the 19.08.2026 outage note below).
 
 **Outage and repair, measured 19.08.2026 (point 732).** The passthrough had not
 disappeared: `/dev/dxg`, `/usr/lib/wsl/lib`, `d3d12_dri.so`, `libGL.so.1`, and
@@ -126,12 +126,12 @@ undeclared 30 s (492), and `invariants` loses the device mid-run and still repor
 29 KB against 568 KB from a lane with the GPU, an all-but-empty picture the shutter still
 accepted (point 489). Never record acceptance screenshots from the software fallback lane.
 
-Quiet, the hardware WebGL 2 lane keeps exactly four reds, each twice and each already a
-named point: the leave capture and the two band probes (500/501) in `polish`, the calf that
+Quiet, the hardware WebGL 2 lane kept (05.08.2026) five red checks under four named
+points (500–503), each red twice: the leave capture and the two band probes (500/501) in `polish`, the calf that
 does not drown and the High Atlas snow (502/503) in `enrichments`. The panorama reds appear
 on both lanes and are those same defects. The dressing-growth check reporting
 `samples [0,0,0,0,0]` failed in one run of two — the measures-nothing flake point 200 lists.
-Nothing else on that lane is red.
+Nothing else on that lane was red then.
 
 `scripts/verify-host-setup.sh` installs all of it (root, once, idempotent) and
 `scripts/verify/backend-lane-check.mjs` proves the result at the PICTURE — it boots the
@@ -181,5 +181,6 @@ The image ships **npm 11**. The bundled npm 10.8.2 of `node:20` does not know
 `package-lock.json`'s `libc` field and strips it silently, which left the tree dirty after
 every container create.
 
-All of these settings live in the container definition, so they take effect only on a
-container rebuild, never on a restart.
+The settings that live in the container definition take effect only on a container
+rebuild, never on a restart; the live repairs above (the firewall top-up, the browser
+flags) apply at once.

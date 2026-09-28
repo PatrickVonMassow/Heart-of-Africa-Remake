@@ -17,7 +17,7 @@ and its follow-up (another speaker overwriting `last`) are answered there.
 - **R6-B1 closed.** `05-chief-walks-out` and `07-chief-walks-out` (both
   backends) stand outside the hut: the chief with his staff walks towards the
   drummer and the two drums, the hut wall at the right edge.
-- **Old D1–D5 closed.** Socket and relief visible on the talus block
+- **Old D1–D5 (of `pictures-steps-4-9.md`) closed.** Socket and relief visible on the talus block
   (`08-impression-and-socket`), the fitted piece shifted in `09-after-fit`;
   route frames come from separate positions and days (`06-upstream-river-0`
   at Bambara 01.01., `-2` at the rock 05.01.); `07-answer-sounding` shows the
