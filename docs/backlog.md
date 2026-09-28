@@ -1929,3 +1929,11 @@ re-took the lock on its next tool call. `batch-progress-guard`, `dashboard-guard
 `retro-currency-guard` then treat it as the batch worker and demand doctor/focus/retro work it may
 not do — a stop loop without an exit. None of the three guards has a responder exception. Backlog
 under the infrastructure freeze: it blocks no game work; promote when it blocks a landing.
+
+## Bookkeeping commits on main invalidate the running closing regression
+
+Found 28.09.2026 during closing 633: `closing-guard-core` requires the second LARGE to name
+exactly HEAD, but stop guards (retro currency, findings carrier, push arrival) force doc-only
+commits on main while that run is in flight. f2a30fcd0 was lost this way, and the run on
+40cfcea76 now trails doc-only commits. Candidate for a point if the closing cannot be recorded:
+treat commits after the run target that touch only docs/ as covered.
