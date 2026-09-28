@@ -31,7 +31,8 @@ export const EXIT_NOT_HELD = 2
 
 /** Does this run want the HAND baseline diagnosis? A LARGE no longer does:
  *  point 1135 deleted the automatic baseline passes, so only an explicit
- *  `--baseline` / `VERIFY_BASELINE=1` asks for one. */
+ *  `--baseline` / `VERIFY_BASELINE=1` asks for one — and the runner then only
+ *  prints the separate `baseline-classify.mjs` command that performs it. */
 export const wantsBaseline = ({ baseline = false, env = {} }) =>
   baseline || env.VERIFY_BASELINE === '1'
 

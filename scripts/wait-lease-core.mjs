@@ -15,8 +15,9 @@
 //   2. A second wait for a DIFFERENT run from the same session REPLACES the
 //      first and names its pid for termination: a session waits on one thing.
 //   3. A wait is bounded by a deadline derived from the run's own estimate.
-//      Crossing it is a journalled event; crossing 2.5 times the expectation,
-//      or the lease cap, marks the run hung and asks the emergency core to act.
+//      Crossing it is a journalled event; crossing the plan plus one suite
+//      ceiling while silent (see SUITE_CEILING_MS), or the lease cap, marks the
+//      run hung and asks the emergency core to act.
 //
 // The IO half (registry file, pid probing, killing, journal append) lives in
 // scripts/wait-lease.mjs; scripts/batch-in-flight.mjs and
@@ -86,7 +87,7 @@ const nonEmpty = (value) => (typeof value === 'string' && value.trim() !== '' ? 
 export function runIdFromLog(logPath) {
   const text = nonEmpty(logPath)
   if (!text) return null
-  const base = text.split(/[\\/]/).pop() ?? ''
+  const base = text.split(/[\\/]/).pop()
   const stripped = base.replace(/\.run\.json$/, '').replace(/\.log$/, '')
   return stripped === '' ? null : stripped
 }
@@ -146,7 +147,9 @@ export function normaliseRegistry(raw) {
  * Not "is it recent" - that is exactly the mistake the stale in-flight marker
  * made. A lease is live only while its writing process is alive AND the run it
  * names has not reached a terminal status. Either answer being unknown leaves
- * the lease alive, because a probe that cannot see is not evidence of death.
+ * the lease alive, because a probe that cannot see is not evidence of death —
+ * except that a lease a whole cap past its own hung mark is released whatever
+ * the probes say (`past-cap`).
  */
 export function leaseIsLive(lease, { now = Date.now(), probePid = () => null, runTerminal = () => false } = {}) {
   if (!lease) return { live: false, reason: 'no-lease' }
@@ -183,8 +186,8 @@ export function reapWaitLeases({ registry, now = Date.now(), probePid, runTermin
  * `--await` used to time out by printing advice and exiting 3, which is how the
  * session learned nothing and started another waiter. A wait now carries the
  * moment it becomes overdue and the moment its run is declared hung, both
- * derived from the run's own `--plan` estimate rather than from a wall-clock
- * guess, and both capped so an absent or absurd estimate cannot buy unlimited
+ * derived from the run's own `--plan` estimate (the hung mark adds one suite
+ * ceiling, SUITE_CEILING_MS, point 1135), and both capped so an absent or absurd estimate cannot buy unlimited
  * silence.
  */
 export function waitThresholds({
@@ -323,10 +326,11 @@ export function waitTimeoutDecision({
   let state = 'running'
   // A RUN THAT IS STILL PRODUCING EVIDENCE IS SLOW, NEVER HUNG (point 1137).
   //
-  // The hung mark is 2.5x an estimate the project has MEASURED to be a third to
+  // The hung mark WAS 2.5x an estimate (it is the plan plus one suite ceiling
+  // since point 1135) the project has MEASURED to be a third to
   // two thirds of the real cost (`SEPTEMBER_BANDS` in run-wait-core.mjs): the
   // plan for a whole `polish` pass is 5 min 41 s against a measured 9.9-61.5,
-  // so the mark falls at 14 minutes and every healthy pass crosses it. On
+  // so the mark fell at 14 minutes and every healthy pass crossed it. On
   // 15.09.2026 that is exactly what happened — a `polish` run that had already
   // written 34 of its 21 expected frames was reported HUNG at 17 min 28 s and
   // ended, and with it the only covering picture run the release was waiting

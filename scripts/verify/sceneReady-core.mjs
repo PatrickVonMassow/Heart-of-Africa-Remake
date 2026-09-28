@@ -118,7 +118,7 @@ export function judgeSceneReady(samples, opts = {}) {
     return {
       ready: false,
       unavailable: true,
-      reason: 'window.__renderer is not installed — this page draws no scene the readiness of which could be judged',
+      reason: 'window.__renderer is not installed — no scene here, or a production build without the dev hook, so readiness cannot be judged',
       spanMs: 0,
       samples: 0,
       drawCalls: spreadOf([], 'drawCalls'),
@@ -140,7 +140,7 @@ export function judgeSceneReady(samples, opts = {}) {
 
   if (!all.length) return { ...base, ready: false, reason: 'the renderer has not been sampled yet' }
   if (triangles.max <= 0 || drawCalls.max <= 0) {
-    return { ...base, ready: false, reason: 'no frame has been drawn yet (0 draw calls)' }
+    return { ...base, ready: false, reason: `no frame has been drawn yet (${drawCalls.max <= 0 ? '0 draw calls' : '0 triangles'})` }
   }
   // The FLOOR is asked of every mode: a frame taken in motion may be a moment,
   // but it may not be empty paper. It reads the LAST sample rather than the
@@ -189,8 +189,9 @@ export function judgeSceneReady(samples, opts = {}) {
  *
  * The I/O is injected — `read()` returns the sample buffer (or `null`), `sleep`
  * waits, `now` reads the clock — so the whole wait INCLUDING its timeout path is
- * pinned in the Vitest layer without a browser. Never throws: the caller decides
- * what a timeout means for its frame.
+ * pinned in the Vitest layer without a browser. It raises no error of its own
+ * (a rejection from the injected `read`/`sleep` still propagates): the caller
+ * decides what a timeout means for its frame.
  */
 export async function awaitSceneReady({ read, sleep, now = Date.now, ...opts } = {}) {
   const o = { ...SCENE_READY_DEFAULTS, ...opts }

@@ -351,13 +351,13 @@
 | `vdzk-answer.mjs` | Carrier for an answer written into a session that may not edit the board. | usage: vdzk-answer.mjs --applied "<fragment><br>usage: vdzk-answer.mjs "<fragment>" --answer "<what the user decided> |
 | `verify-bringup.mjs` | Host bring-up for the browser verification (point 475): `npm run verify:bringup`. | — |
 | `wait-command-core.mjs` | THE WAIT THAT CAN NEVER RETURN (point 1048, union entry U14) — the pure half. | — |
-| `wait-command-guard.mjs` | PreToolUse(Bash) guard: no hand-rolled wait for a process (point 1048). | — |
+| `wait-command-guard.mjs` | PreToolUse(Bash, PowerShell) guard: no hand-rolled wait for a process (point 1048). | — |
 | `wait-lease-core.mjs` | ONE WAIT PER SESSION AND RUN (point 1048, union entries U11, U12, U13) - the pure half. | — |
 | `wait-lease.mjs` | THE WAIT REGISTRY (point 1048, union entries U11, U12, U13) - the IO half. | usage: |
 | `wait-marker-core.mjs` | THE WAIT MARKER A HOOK SETS (point 592) — the pure decision half. | — |
 | `wait-marker.mjs` | THE WAIT MARKER A HOOK SETS (point 592) — the IO half. | — |
 | `window-hide-core.mjs` | NO CONSOLE WINDOW MAY STEAL THE USER'S FOCUS (point 401, user report 28.07.2026: "es poppen immer wieder Konsolenfenster auf, die mir den Fokus stehlen"). | — |
-| `windows-task-core.mjs` | THE BOOT PATH ON THE WINDOWS HOST, and the mutual watch between the two scheduled tasks that carry it (point 447, user 30.07.2026). | — |
+| `windows-task-core.mjs` | THE BOOT PATH ON THE WINDOWS HOST, the mutual watch between the two scheduled tasks that carry it (point 447, user 30.07.2026), and the hourly emergency task the watchdog also keeps alive. | — |
 | `windows-task-watch.mjs` | THE MUTUAL WATCH between the two Windows scheduled tasks (point 447). | usage: node ${WATCH_SCRIPT_PATH} --check primary\|watchdog\|emergency [--dry-run] [--json] |
 | `worktree-bootstrap-core.mjs` | WHAT A FRESH AGENT WORKTREE OWES ITS GATES — the decision, pure. | — |
 | `worktree-bootstrap.mjs` | GIVE A FRESH AGENT WORKTREE ITS DEPENDENCIES — one command, idempotent. | — |

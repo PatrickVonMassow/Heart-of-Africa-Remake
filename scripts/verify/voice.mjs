@@ -7,7 +7,8 @@
 // (scene), the in-browser Kokoro read-aloud reaching the speaking state, the
 // cold-load liveness gate (the WASM fallback keeps the main thread free while
 // the engine loads — measured and ATTRIBUTED per liveness.mjs, point 304), the
-// screenshots (64-66) and the console-error gate.
+// village stereo mix and its limiter, the children's tag cry, the screenshots
+// (64-66) and the console-error gate.
 // This run forces the WASM path via `window.__ttsForceWasm` — headless has no
 // WebGPU adapter, and WASM is what stays live (on Chromium hardware the engine
 // runs the faster WebGPU path, whose cold load the game pre-warms; point 117).
@@ -23,10 +24,11 @@ import { fileURLToPath } from 'node:url'
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 
-// SECTIONS (points 566/595). Four blocks, each owning the language it needs and
+// SECTIONS (points 566/595). Six blocks, each owning the language it needs and
 // the first user gesture the autoplay deferral demands, so re-shooting the German
 // journal frame no longer waits out a cold TTS engine load. The cache verdict at
-// the bottom is the one thing a partial run may NOT do: see there. The names are
+// the bottom runs in every run; what a partial run may NOT do is mark the cache
+// complete: see there. The names are
 // read out of THIS FILE by scripts/verify/sections.mjs, so an unknown one is
 // refused with the list of the real ones — and the run is stamped PARTIAL, never
 // suite coverage.
@@ -290,7 +292,9 @@ if (section('auto-narration')) {
   )
   let autoSpoke = false
   try {
-    // The model is already loaded, so only synthesis time remains.
+    // In a whole run the cold-load section has already loaded the model, so only
+    // synthesis time remains; a --section=auto-narration run meets a cold engine
+    // and the generous timeout covers the load.
     await page.waitForFunction(
       () => {
         const btns = document.querySelectorAll('.journal .speak')

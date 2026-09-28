@@ -2,8 +2,9 @@
 //
 // The measurement that produced this: 2857 responses in six days were polls
 // (10.9 % of the weighted spend), 1189 more were bare idle holders (3.6 %), and
-// the longest unbroken poll chain was 437 responses. A 42-minute LARGE run
-// polled every 30 s spends ~1.9 M weighted on the loop alone — for a result
+// the longest unbroken poll chain was 437 responses. A 42-minute LARGE run (the
+// single-pass plan of that time; both backends measured 115-121 min in
+// September) polled every 30 s spends ~1.9 M weighted on the loop alone — for a result
 // that is one word.
 //
 // USE IT LIKE THIS:
@@ -20,11 +21,14 @@
 //       The one COUNTED poll. Use it only where awaiting is genuinely
 //       impossible; it prints how many are left and what to do instead.
 //
-// With no <log> every mode resolves the newest run record in the log directory,
-// which is the ordinary case: the session has just started one run.
+// With no <log>, --await, --receipt and --status resolve the newest LIVE run in
+// the log directory, else the newest run at all — the ordinary case: the session
+// has just started one run. With several live runs --await refuses and asks for
+// the log; --plan reads no record.
 import { setTimeout as delay } from 'node:timers/promises'
 import { isAbsolute, join, relative } from 'node:path'
 import {
+  BLOCKING_LIMIT_MS,
   MAX_POLLS,
   backendsFrom,
   buildReceipt,
@@ -166,7 +170,7 @@ function doPlan(argv) {
   console.log(`  suites:   ${plan.suites.join(', ') || '(none)'}`)
   console.log(`  expected: ${formatDuration(plan.expectedMs)} (measured medians, docs/picture-check-cost.md §1)`)
   // THE PRICE, NOT ONLY THE PLAN (point 1083). The expectation above sums the
-  // July per-suite medians; the band below is what this shape of run really
+  // 09.08.2026 per-suite medians; the band below is what this shape of run really
   // took in September, so a run that is running long reads as running long.
   for (const line of formatObservedBand(plan.observedBand)) console.log(line)
   console.log(`  frames:   ${plan.expectedFrames} expected`)
@@ -232,7 +236,7 @@ async function doAwait(logArg, timeoutS) {
         passes: (record.backends ?? []).length || 1,
         suites: record.suites ?? [],
       })),
-    }).timeoutMs ?? 590_000)
+    }).timeoutMs ?? BLOCKING_LIMIT_MS)
   console.log(
     `# awaiting ${record.command ?? 'the run'} (pid ${record.pid ?? '?'}) — expected ` +
       `${formatDuration(record.expectedRuntimeMs ?? null)}, giving it ${formatDuration(budget)}. Nothing is being polled.`,
@@ -250,8 +254,9 @@ async function doAwait(logArg, timeoutS) {
     }
   } finally {
     // The lease belongs to THIS blocking call. Whether the run ended, the budget
-    // ran out or the process was interrupted, the lease goes with it — a lease
-    // outliving its waiter is the stale marker this point exists to remove.
+    // ran out or the wait threw, the lease goes with it — a lease outliving its
+    // waiter is the stale marker this point exists to remove. (A killed process
+    // runs no finally; its lease is left to the registry's reaping.)
     finishWait({ sessionId: session, runId, cause: 'await-returned' })
   }
   const waited = elapsedMs(current) ?? budget
@@ -261,8 +266,8 @@ async function doAwait(logArg, timeoutS) {
   // WHAT THE RUN ITSELF SAYS COMES FIRST (point 1137). This used to hand the
   // registry the run's own START time as its "last progress", which made every
   // long run look silent since the second it began; the registry now probes the
-  // lease's log, record and frames, and this call's own fallback asks the same
-  // question. A run that has written something within the progress lease is
+  // lease's run for progress, and this call's own fallback reads the writer's
+  // progress mark and the log (`lastProgressAtFor`). A run that has written something within the progress lease is
   // SLOW — the word for it is the STILL RUNNING line below, not HUNG.
   const status = waitStatus()
   const progressAt = lastProgressAtFor({ logPath: current?.log ?? null, recordPath: path })
@@ -280,15 +285,15 @@ async function doAwait(logArg, timeoutS) {
   if (hung) {
     console.log(
       `HUNG — ${formatDuration(waited)} is past this run's ceiling of ${formatDuration(ceiling)} (its plan plus one ` +
-        `suite ceiling) AND it has written nothing for ${formatDuration(PROGRESS_LEASE_MS)}. The wait has been recorded ` +
+        `suite ceiling, floored and capped as the lease is) AND it has written nothing for ${formatDuration(PROGRESS_LEASE_MS)}. The wait has been recorded ` +
         'as hung and the batch emergency lane will treat it as a standstill; end the run BY HAND rather than waiting again.',
     )
     return 5
   }
   if (progressAt !== null) {
     console.log(
-      `# STILL WORKING — last sign of life ${formatDuration(Date.now() - progressAt)} ago (its log, record or a ` +
-        'frame it wrote). Long is not hung: wait again rather than ending it.',
+      `# STILL WORKING — last sign of life ${formatDuration(Date.now() - progressAt)} ago (its progress mark or ` +
+        'its log). Long is not hung: wait again rather than ending it.',
     )
   }
   return 3
@@ -307,8 +312,9 @@ function doStatus(logArg) {
   }
   const counted = countPoll(path) ?? record
   // COUNTING THE POLL MUST NOT MANUFACTURE THE PROGRESS IT THEN READS (Astra
-  // review rounds 1 and 2): `countPoll` rewrites the record, so the mark is read
-  // from the writer's own marker FILE, which nothing but the run ever writes.
+  // review rounds 1 and 2): `countPoll` rewrites the record, so progress is read
+  // from the writer's own marker FILE and the log, which nothing but the run
+  // writes — never from the record.
   const progressAt = lastProgressAtFor({ logPath: counted.log ?? null, recordPath: path })
   const verdict = pollBudget({
     polls: counted.polls,

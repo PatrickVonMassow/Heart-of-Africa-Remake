@@ -77,11 +77,11 @@ const RESOLVED = resolveSeed(process.env.VERIFY_SEED)
 /** The seed this process pins. */
 export const VERIFY_SEED = RESOLVED.seed
 /** Where it came from: 'default' | 'pinned' | 'drawn'. */
-export const VERIFY_SEED_ORIGIN = RESOLVED.origin
+const VERIFY_SEED_ORIGIN = RESOLVED.origin
 
 /** The suite name a script path stands for: scripts/verify/collision.mjs → 'collision'. */
 export function suiteNameOf(scriptPath) {
-  const base = String(scriptPath ?? '').split(/[\\/]/).pop() ?? ''
+  const base = String(scriptPath ?? '').split(/[\\/]/).pop()
   return base.replace(/\.mjs$/, '')
 }
 
@@ -139,7 +139,9 @@ export function announceSeed(plan, { log = console.log, force = false } = {}) {
 /**
  * THE ONE ROUTE. Wrap a freshly launched browser so every page it hands out
  * navigates to the SEEDED url, whatever URL the suite passes — and announce, in
- * the suite's own output, which world this run walks.
+ * the suite's own output, which seed this run pins. (A URL that already carries
+ * its own `?seed` keeps it — see withVerifySeed — so the announcement is the
+ * pin, not a reading of the page.)
  *
  * Wrapping the launcher rather than the call site is the whole point: a suite
  * cannot forget it, and a new suite inherits it by opening a browser.

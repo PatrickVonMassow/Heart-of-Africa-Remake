@@ -491,7 +491,7 @@ describe('the completion receipt', () => {
     expect(text).toMatch(/abc1234 \(feat\/592-await-the-wait\)/)
     expect(text).toMatch(/local\/verify-logs\/x\.log/)
     expect(text).toMatch(/frames: 16\/16/)
-    expect(text).toMatch(/polls: {3}0 \(awaited, not polled\)/)
+    expect(text).toMatch(/polls: {3}0 \(never polled\)/)
     expect(text).toMatch(/failing: none/)
   })
 

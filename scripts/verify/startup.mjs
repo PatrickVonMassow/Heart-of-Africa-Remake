@@ -13,7 +13,8 @@
 //   * a 20 ms setInterval TICK TRAIN, whose stalls are attributed with
 //     ./liveness.mjs (point 304) into the part a blocked main thread caused and
 //     the part the page spent inside its own animation-frame callbacks, and
-//   * the gap between PAINTED frames.
+//   * the gap between completed animation-frame callbacks — the stand-in for
+//     painted frames (every wrapped rAF callback counts, drawing or not).
 //
 // The attribution is REPORTED but never subtracted: point 304 excused a long
 // animation frame because the thread stayed responsive, which is right for a
@@ -96,8 +97,9 @@ const warm = SELFTEST
       .then(() => true)
       .catch(() => false)
 
-// Close the measured window on the PICTURE'S OWN signal, never on a wall clock
-// (CLAUDE.md §7.2). The window has to contain the whole standstill and a piece
+// Close the measured window on the PICTURE'S OWN signal, not on a fixed wall
+// wait (CLAUDE.md §7.2); a 180 s timeout is only the backstop, and a window
+// closed by it is reported below as `picture settled: false`. The window has to contain the whole standstill and a piece
 // of the live picture after it, and only the probe knows when that has happened.
 // `pictureSettled` is the predicate (pure and unit-tested in liveness.test.mjs);
 // it is stringified into the page because the trains live there. Strictly
@@ -155,14 +157,15 @@ if (!SELFTEST) {
     probe.pipelines ? `${probe.pipelines.started} pipelines went async, ${probe.pipelines.dropped} dropped` : 'no pipeline hook',
   )
 }
+const withinBudget = freezeMs <= budget
 check(
   `the loading picture never freezes longer than the balance budget (${budget} ms, design.md §21.2)`,
-  freezeMs <= budget,
+  withinBudget,
   `worst standstill ${Math.round(freezeMs)} ms — blocked thread ${Math.round(blocks.blockMs)} ms, ` +
     `inside one animation frame ${Math.round(blocks.frameBlockMs)} ms, unpainted ${Math.round(rafGapMs)} ms`,
 )
 console.log(
-  `INFO  reported, not gated: raw tick gap ${Math.round(blocks.tickGapMs)} ms at t+${Math.round(blocks.blockAtMs - probe.t0)} ms; ` +
+  `INFO  reported beside the gate: raw tick gap ${Math.round(blocks.tickGapMs)} ms at t+${Math.round(blocks.blockAtMs - probe.t0)} ms; ` +
     `picture settled: ${settled}; backend ${VERIFY_GL}`,
 )
 
@@ -176,8 +179,9 @@ console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()
 if (SELFTEST) {
-  // Inverted run: the point of the self-test is that the budget gate FAILED.
-  const bit = failures > 0
+  // Inverted run: the point of the self-test is that the BUDGET gate failed —
+  // not that some other check (the trustworthiness one, say) did.
+  const bit = !withinBudget
   console.log(bit ? 'SELFTEST OK — the budget gate still bites' : 'SELFTEST FAILED — the gate passed a deliberately broken startup')
   process.exit(bit ? 0 : 1)
 }

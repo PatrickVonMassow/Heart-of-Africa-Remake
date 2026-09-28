@@ -1,8 +1,10 @@
 // Verification for the world model (CLAUDE.md §7.1.3): browser-only remainder.
 // The data-sanity asserts (counts, terrain sampling, coast/river distances)
 // moved to the fast Vitest suite (src/world/world.test.ts); what stays here
-// needs a real browser: console-error-free rendering and screenshots of the
-// bird's-eye view at characteristic locations. Dev server only.
+// needs a real browser: console-error-free rendering, screenshots of the
+// bird's-eye view at characteristic locations, and the communication errand's
+// live checks (the erratic's seating, the digs, the chief's hand-over, the clay
+// mould and the inventory clicks). Dev server only.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
@@ -16,7 +18,8 @@ mkdirSync(OUT, { recursive: true })
 
 // SECTIONS (points 566/595). Three blocks that share only the boot and the step
 // out into travel: the first frame after the scene switch (the point-489 blank
-// picture), the communication errand's frames and dig, and the landmark frames.
+// picture), the communication errand (its frames, digs and hand-over checks),
+// and the landmark frames.
 // Re-shooting one landmark used to replay the whole errand, dig included;
 // `--section=landmark-frames` is that repair loop. The names are read out of
 // THIS FILE by scripts/verify/sections.mjs, so an unknown one is refused with
@@ -120,7 +123,7 @@ if (process.env.FRAME_SUBJECT_SELFTEST) {
 // the Nile delta frame is the one that can be taken there, and its own bytes are
 // the evidence: measured on this host, the picture BEFORE the wait was 37-48 kB
 // (a dark frame, then a flat white wash, 14-16k triangles) and the finished one
-// 1008 kB (715k triangles). The floor is set an order of magnitude below the
+// 1008 kB (715k triangles). The floor is set about five times below the
 // finished picture and four times above the blank ones, so it separates the two
 // without pretending to be a golden-image comparison (point 361 — no frame is
 // compared against a reference here).
@@ -143,10 +146,11 @@ if (section('first-travel-frame')) {
 }
 
 // Work-order 482: the communication PoC's two ends of the errand — the Bambara
-// village standing on the Niger, and the erratic upstream where 487 will dig.
+// village standing on the Niger, and the erratic upstream where the point-487
+// dig happens.
 // The coordinates come from the scene's OWN dev hook, so the frames are aimed at
 // what the renderer actually placed for this run's seed, never at a coordinate
-// copied into this script. The whole errand — its two frames and its three digs
+// copied into this script. The whole errand — its three frames and its two digs
 // — is ONE section: the dig proves the spot the frames show, so splitting them
 // would leave each half proving half a claim.
 if (section('communication-errand')) {
@@ -192,10 +196,10 @@ if (section('communication-errand')) {
     // The quantity is the LOWEST ground under the whole footprint — the centre
     // sample is the wrong one (Sol's re-review, 11.08.2026): a base above the
     // footprint minimum but below the centre would have passed, and that IS the
-    // float this point was filed for. So the footprint is re-sampled here on a
-    // DENSE grid of its own, not on the site's ring pattern, and the drawn base
-    // must equal that minimum within a tolerance smaller than the smallest float a
-    // player can see (the block is ~3 world units tall; 0.02 is under 1 % of it).
+    // float this point was filed for. So the footprint's own ring points are
+    // re-sampled here from the terrain field, and the drawn base must equal that
+    // minimum within float noise (SEAT_TOLERANCE below); a dense grid is read
+    // beside it and only reported.
     const seat = await page.evaluate(async () => {
       const t = await import('/src/world/terrain.ts')
       const r = window.__communicationRock
@@ -366,7 +370,8 @@ if (section('communication-errand')) {
       window.__balance.randomEventsEnabled = false
       return was
     })
-    // WHAT THE TOAST SAID IS RECORDED AS IT IS SET, not read back afterwards.
+    // WHAT THE TOAST SAID IS RECORDED AS IT IS SET (clickForm's toast log,
+    // below), not read back afterwards.
     // The HUD clears a toast by itself after a few seconds; on a loaded machine
     // the read can arrive after that expiry and report an empty toast for a
     // click that answered perfectly well — a flake in the probe, not in the
@@ -494,7 +499,8 @@ if (section('communication-errand')) {
   }
 }
 
-// The Nile delta is already photographed above, out of the scene switch itself.
+// The Nile delta is photographed by the first-travel-frame section, out of the
+// scene switch itself.
 // Each jump stands on its own — the block needs nothing the errand left behind,
 // and it restores no state, so it runs alone exactly as it runs in sequence.
 if (section('landmark-frames')) {

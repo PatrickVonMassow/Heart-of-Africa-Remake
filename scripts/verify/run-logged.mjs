@@ -10,8 +10,8 @@
 // WHAT THE CALLER STILL SEES, because a digest that hides a failure is worse
 // than the cost it saves:
 //   - LIVE, while the run goes: the runner's own structured lines only — the
-//     per-suite PASS/FAIL/SKIP verdicts, the stage headings, the retry notices
-//     and the indented FAIL/ERR echoes (vitest's own ` FAIL  file > case` lines
+//     per-suite PASS/FAIL/SKIP verdicts, the stage headings and the indented
+//     FAIL/ERR echoes (vitest's own ` FAIL  file > case` lines
 //     among them). About one line per suite, so a background poller sees
 //     progress and a red suite names itself the moment it goes red.
 //   - AT THE END: exit code, duration, how much was captured, WHERE the log is,
@@ -26,8 +26,9 @@
 //     failing names UNCUT, the frames EXPECTED against the frames WRITTEN, and
 //     how often anybody polled it. `scripts/verify/run-wait.mjs` awaits and
 //     reads that record, which is what makes a poll loop unnecessary; the frame
-//     comparison is the half point 375's shutter cannot see, since a frame that
-//     was never written at all raises nothing today.
+//     comparison is the half point 375's shutter cannot see: a frame that was
+//     never written at all passes the shutter silently, and the receipt names
+//     it (FRAME(S) MISSING).
 //
 // Usage:
 //   node scripts/verify/run-logged.mjs [<run-all args…>]   (npm test / test:small / test:large)
@@ -37,9 +38,12 @@
 //   --quiet         no live echo; the end digest then carries the structured lines
 //   --keep N        the structured-line budget of the end digest (default 120)
 //   --tail N        raw tail lines on a failure (default 40)
+//   --again         run even when a green receipt for the same HEAD would answer
 //   --no-ladder "<why>"  start a full pass whose cheap rung is unclimbed, and
 //                   RECORD why (the verification ladder, point 1086)
-//   --log-file P    write the log here instead of local/verify-logs/<stamp>.log
+//   --log-file P    write the log here instead of <log dir>/<stamp>-<label>.log
+//                   (the log dir is VERIFY_LOG_DIR, else local/verify-logs,
+//                   rooted in the shared checkout)
 //                   (a launch WITHOUT it re-execs itself with the resolved path
 //                   appended — the record writer's argv must name its log; see
 //                   `commandNamesRun` in scripts/batch-in-flight.mjs)
@@ -75,10 +79,10 @@ import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = REPO_ROOT || join(HERE, '..', '..')
 /** How often the writer's progress mark may be re-stamped. The wait reads it
- *  against a 15-minute lease, so a minute of granularity is far finer than any
+ *  against the progress lease (PROGRESS_LEASE_MS), so a minute of granularity is far finer than any
  *  verdict needs and keeps the writes rare. */
 const PROGRESS_RECORD_MS = 60_000
-/** How often the writer counts its own frames — the only sign of life a long
+/** How often the writer samples its newest frame's time — the only sign of life a long
  *  render suite gives, because its output does not leave `run-all` until it ends. */
 const FRAME_SAMPLE_MS = 30_000
 const PROGRESS_EMIT_MS = 60_000
@@ -109,7 +113,7 @@ function emitRunActivity(
  *  orphaning it. */
 const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
 
-/** `2026-08-07T14-31-09-large.log` — sortable, and it says what it ran. */
+/** `2026-08-07T14-31-09-123-large.log` — sortable, and it says what it ran. */
 function logPathFor(args, own) {
   if (own.logFile) return isAbsolute(own.logFile) ? own.logFile : join(ROOT, own.logFile)
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, '')
@@ -212,8 +216,8 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
         status: exitCode === 0 ? 'green' : 'red',
         head: receipt.head,
         branch: receipt.branch,
-        framesExpected: receipt.framesExpected,
-        framesWritten: receipt.framesWritten,
+        framesExpected: receipt.frames?.expected ?? null,
+        framesWritten: receipt.frames?.written ?? null,
       },
     })
     return formatReceipt(receipt)
@@ -223,7 +227,8 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
 }
 
 /**
- * THE VERIFICATION LADDER (point 1086), asked before anything is spawned.
+ * THE VERIFICATION LADDER (point 1086), asked before the runner is spawned
+ * (the re-exec shim, when there is one, is already running).
  *
  * The rule was written down in point 595 and was therefore climbed by whoever
  * remembered it; measured 09.09.2026, one session used the full pass as its
@@ -372,7 +377,7 @@ function runVerify() {
 
   // THE STRETCH THE OUTPUT CANNOT SEE. `run-all.mjs` captures a suite's output,
   // so between two suite lines a 55-minute `polish` says nothing at all. Its
-  // FRAMES advance the whole time, so the writer samples its own frame count —
+  // FRAMES advance the whole time, so the writer samples its newest frame time —
   // sampled here, by the run itself, rather than read by whoever is waiting.
   //
   // THE RESIDUAL, STATED WITHOUT A BOUND IT DOES NOT HAVE (Astra review rounds 1,

@@ -6,7 +6,8 @@
 // CALENDAR for the weather-bearing spots. This script only CAPTURES; the finding
 // is the inspection of the images. Not a pass/fail suite.
 //
-// Env: BASE_URL (dev/preview server), SWEEP_OUT (folder), VERIFY_GL (webgl|webgpu).
+// Env: BASE_URL (dev server — the sweep drives the dev hooks), SWEEP_OUT (folder),
+// VERIFY_GL (webgl|webgpu).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import fs from 'node:fs'
@@ -65,13 +66,14 @@ for (const [name, lat, lon, month] of SPOTS) {
     [lat, lon, month],
   )
   await page.waitForTimeout(2500) // settle the jump lerp + let wildlife stream in
-  // Drive a filmstrip: hold forward and grab a frame every ~2 sim-seconds so the
+  // Drive a filmstrip: hold forward and grab a frame every ~1.8 s of wall clock so the
   // movement/streaming/emergent bugs (pop-in, jumping flora, pacing, snagging)
   // show up between frames.
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w' })))
   for (let f = 0; f < 4; f++) {
     await page.waitForTimeout(1800) // wall-clock cadence — a capture, not an assertion
-    // Keep the journal from covering the scene — region-discovery entries reopen it.
+    // Keep the journal from covering the scene — belt and braces beside the
+    // do-not-disturb above, for any entry that still opens it.
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     // The first frame of each filmstrip claims the named spot and is checked
     // against the live camera; the later ones deliberately drive AWAY from it,
@@ -84,7 +86,8 @@ for (const [name, lat, lon, month] of SPOTS) {
     )
   }
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' })))
-  if (month != null) await page.evaluate(() => window.__ui.getState().setDebugMonth && window.__ui.getState().setDebugMonth(null))
+  // The calendar is NOT reset between spots: a spot without a month inherits the
+  // last jumped one (there is no setDebugMonth to clear it).
 }
 
 console.log('console errors:', errors.length)

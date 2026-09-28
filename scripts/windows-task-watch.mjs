@@ -3,12 +3,14 @@
 // Both tasks run THIS script, each naming the OTHER:
 //   HoA-Batch-Watchdog   → node scripts/windows-task-watch.mjs --check primary
 //   HoA-Batch-Autostart  → node scripts/windows-task-watch.mjs --check watchdog
+// and the watchdog also keeps the hourly emergency task alive:
+//   HoA-Batch-Watchdog   → node scripts/windows-task-watch.mjs --check emergency
 //
 // so neither task is a single point of failure. A peer that is gone is
 // re-registered from the XML the setup script exported, a disabled one is
 // enabled, a silent one is started; a peer that RAN and failed is reported, not
-// restarted (see `peerVerdict` for why). Every run appends one line to
-// `local/windows-task-watch.log`.
+// restarted (see `peerVerdict` for why). A run whose verdict is not ok, or whose
+// repair failed, appends one line to `local/windows-task-watch.log`.
 //
 // Off Windows this is a no-op that exits 0: the Linux host has no Task
 // Scheduler, its launcher is the daemon (`scripts/batch-launcher.mjs`), and a
@@ -63,7 +65,8 @@ export function readTaskReport(taskName, { exec = execFileSync } = {}) {
   }
 }
 
-/** Carry out a verdict's repair. Returns { action, ok, error, command }. */
+/** Carry out a verdict's repair. Returns null when the verdict asks for none,
+ *  else { action, ok, error, command }. */
 export function applyRemedy(verdict, { taskName, exec = execFileSync, definitionExists = existsSync } = {}) {
   const action = verdict?.action ?? 'none'
   if (action === 'none') return null
@@ -97,11 +100,10 @@ export function logLine(line, { path = repoPath(LOG_PATH), now = () => new Date(
 }
 
 /**
- * One watch run. Returns { taskName, report, verdict, applied } — the same shape
- * the readiness check (point 448) reads, which is why it is a return value and
- * not only printed.
+ * One watch run. Returns { taskName, report, verdict, applied, paused }, which
+ * the CLI below prints (as a line or, with --json, whole).
  */
-export function watchPeer(
+function watchPeer(
   role,
   { apply = true, exec = execFileSync, now = Date.now(), paused = existsSync(repoPath('.claude', 'batch-paused')) } = {},
 ) {
