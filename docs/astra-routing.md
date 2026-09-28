@@ -1,6 +1,6 @@
 # Astra routing — moving work between the two vendors
 
-Work-order points 654 and 667. We pay two vendors whose allowances run out at
+Work-order points 654 and 667 (later sections: 1077, 1194). We pay two vendors whose allowances run out at
 different times. This is the lever that shifts load towards OpenAI **before**
 the Anthropic volume is nearly spent, rather than at the last percent.
 
@@ -13,8 +13,9 @@ Point 667 built the other half, because the read-only lever had reached its
 maximum while the largest single item of the spend — the AUTHORING of delegated
 points, ~58 % of the weighted total — was still entirely Anthropic's. Astra now
 authors suitable points, under a role swap that keeps four eyes: **where Astra
-authors, Claude reviews, runs the suites, judges the picture and lands.** Every
-point still has two vendors on it and neither model reviews its own work. See
+authors, Claude reviews, runs the suites, judges the picture and lands.** Outside
+`claude-only` and an outage fallback (below), every point has two vendors on it,
+and neither model ever reviews its own work. See
 [Authoring](#authoring-point-667) for what that costs and what it does not buy.
 
 ## The switch
@@ -32,8 +33,9 @@ node scripts/astra-share.mjs --set prefer-astra  # or default, or claude-only
 | `default` | GPT-6 Astra | Claude |
 | `prefer-astra` | GPT-6 Astra | GPT-6 Astra |
 
-`default` routes reviews and enumerate to Astra; diagnose, audit, explain and
-authoring stay with Claude. Audit stays with Claude deliberately because large
+`default` routes reviews and enumerate to Astra; diagnose, audit and explain stay
+with Claude. Authoring is not on this switch: the routing function of
+[Authoring](#authoring-point-667) decides it. Audit stays with Claude deliberately because large
 sweeps are costly; a blind audit half at `default` uses the existing `--anyway`.
 `prefer-astra` hands every
 read-only kind to Astra. `claude-only` is the escape hatch for the other
@@ -130,7 +132,8 @@ node scripts/author-astra.mjs --point 651 --dry-run  # the prompt and the argv, 
 node scripts/author-astra.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
-Run the command alone, without `setsid`, `tee` or shell redirection. The script
+Run the command alone, without `setsid` or `tee`, and never redirected onto its
+own log. The script
 detaches itself and appends to `local/<point>-<lane>-author.log` in the main
 checkout, so the log survives removal of the point's worktree. `--log <path>`
 overrides that destination; relative paths resolve from the caller's current
@@ -160,8 +163,8 @@ instead of waiting for the vendor (user 23.09.2026); see "An unreachable lane" a
 **What the cut actually moved**, measured over the whole open queue on
 18.08.2026, before and after the day's ruling: **203 points → 120 to the OpenAI
 lane / 0 Fable / 83 main session**, against 65 / 0 / 138 the day before. This is a MEASUREMENT,
-not a restatement of the policy — it stands here because nothing else records it,
-and it is the reading against which a later re-measurement is judged.
+not a restatement of the policy — it is the baseline of the cut; the 09.09.2026
+re-measurement under "Routed and not commissioned" counts a later, larger queue.
 
 **The lane runs like any delegated agent**: an isolated worktree, its own
 `feat/` branch, the point handed over as a BRIEF rather than a reading
@@ -224,7 +227,7 @@ works and the dispatch does not.
 | `Co-Authored-By` on `main` since 06.09. — Claude family | 182 |
 | `Co-Authored-By` on `main` since 06.09. — GPT-6 Astra | 6, all six from point 1069 |
 | `Reviewed-By: GPT-6 Astra` over the same range | 14 |
-| `author-astra.mjs` receipts (`.claude/author-<N>.log`) ever | 3 — points 1008, 1031 (31.08.), 1069 (07.09.) |
+| `author-astra.mjs` receipts (then `.claude/author-<N>.log`, now `local/<point>-<lane>-author.log`) ever | 3 — points 1008, 1031 (31.08.), 1069 (07.09.) |
 | — of those, in the last three days | 1 — point 1069 |
 
 Those rows say one thing together: **the REVIEW half of the lane runs and the
@@ -294,7 +297,7 @@ Astra end to end and the lane is then measured to run dry while game points wait
 in the Opus lane. Not before — until the command is used, the cut is not the
 constraint.
 
-## What is never routed, at any setting
+## What no setting routes
 
 - A point whose verification is the work, unless its spec marks it hard — since
   18.08.2026 a hard or critical point is Astra's whatever else it says, short of
@@ -306,8 +309,8 @@ constraint.
 - Driving the browser suites and **judging the picture**.
 - The landing (`scripts/land-point.mjs`) and the main session's bookkeeping.
 
-That last share answers to *reduction* (the point boundary, the brief), not to a
-change of vendor.
+The landing and bookkeeping share answers to *reduction* (the point boundary, the
+brief), not to a change of vendor.
 
 ## What the measurement says it is worth
 
@@ -325,11 +328,11 @@ Measured over 47,863 turns from 391 transcripts (03.–12.08.2026, weighted):
 | — unclear (never guessed into a half) | 0.1 % of it |
 
 So the routable text half is **19.9 % of the entire spend**, and 46.6 % of the
-delegated agents' own verification. That is what makes part A worth having, and
-what any decision about part B should be argued against.
+delegated agents' own verification. That is what makes the read-only lever (point
+654) worth having, and what the authoring half (point 667) was argued against.
 
 Eight classification errors were found by the cross-vendor review rounds of
-this very branch and are fixed in these figures: an unplaceable call used to be
+the point-654 branch and are fixed in these figures: an unplaceable call used to be
 dropped instead of voting (so a turn that read one log and did one unplaceable
 thing read as wholly routable); `node --check` on a verify script counted as a
 suite run; the exception for it was asked of the WHOLE shell line, so a line that
@@ -348,8 +351,9 @@ residue is visible rather than distributed.
 ## The first real run
 
 Recorded verbatim from 13.08.2026, so it names the commands and files as they were
-spelled then — `ask-sol.mjs`, `sol-share.mjs`, `review-sol.mjs` are today's
-`ask-astra.mjs`, `astra-share.mjs` and `review-astra.mjs`.
+spelled then — `ask-sol.mjs`, `sol-share.mjs`, `review-sol.mjs` and
+`review-sol-cli.test.mjs` are today's `ask-astra.mjs`, `astra-share.mjs`,
+`review-astra.mjs` and `review-astra-cli.test.mjs`.
 
 Not a stub: `scripts/review-sol-cli.test.mjs` was reproduced red on this branch —
 18 of 19 cases failing — and the run went
