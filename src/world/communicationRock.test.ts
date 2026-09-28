@@ -6,15 +6,13 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
 import {
   communicationRockSite,
-  communicationRockDigSpot,
-  communicationRockWorldPos,
   isAtCommunicationRock,
   ROCK_RIVER_ID,
   ROCK_VILLAGE_ID,
   ROCK_FOOTPRINT_UNITS,
   ROCK_HEIGHT_UNITS,
 } from './communicationRock'
-import { PLACES, RIVERS, placeById, latLonToWorld } from './geo'
+import { PLACES, RIVERS, placeById } from './geo'
 import { riverDistanceExact, riverFlowExact } from './hydro'
 import { densifyRiverAxis } from './riverProfile'
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
@@ -75,20 +73,6 @@ describe('the communication rock stands at the river, upstream of the village', 
     let best = Infinity
     for (const p of axis) best = Math.min(best, Math.hypot(p.lat - rock.lat, p.lon - rock.lon))
     expect(best).toBeLessThan(RIVER_WIDTH_DEG + 0.2) // beside THIS river's axis
-  })
-
-  it.each(SEEDS)('seed %i: the dig spot IS the drawn placement', (seed) => {
-    const rock = communicationRockSite(seed)
-    const dig = communicationRockDigSpot(seed)
-    expect(dig.lat).toBe(rock.lat)
-    expect(dig.lon).toBe(rock.lon)
-    const drawn = communicationRockWorldPos(seed)
-    const expected = latLonToWorld(rock.lat, rock.lon)
-    expect(drawn.x).toBe(expected.x)
-    expect(drawn.z).toBe(expected.z)
-    // The dig radius reaches the whole drawn block from its centre, so a player
-    // standing at the boulder the renderer draws can always dig (point 487).
-    expect(balance.digRadius).toBeGreaterThan(ROCK_FOOTPRINT_UNITS)
   })
 
   it('is deterministic per seed and moves with the seed', () => {

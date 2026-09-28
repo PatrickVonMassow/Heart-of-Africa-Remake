@@ -3,14 +3,16 @@
 // river, follow it upstream, dig at the big rock", so the rock must be a REAL
 // feature of the bird's-eye world the player travels to: a single conspicuous
 // erratic standing on the Niger's bank a short way UPSTREAM of the Bambara
-// village, outside the settlement, in travel reach of it.
+// village, outside the settlement, in travel reach of it. (Only if the whole
+// upstream search fails does a last resort fall back to the village centre,
+// marked `unvouched` when its footprint is not dry.)
 //
 // The placement is a pure, seeded function of the world model — the renderer
 // draws the boulder at exactly this coordinate and the dig spot IS that
 // coordinate, so no second, drifting position can exist (the rule points
 // 129/378 write for every collider: derive from what the picture draws).
 
-import { RIVERS, placeById, latLonToWorld } from './geo'
+import { RIVERS, placeById } from './geo'
 import { densifyRiverAxis } from './riverProfile'
 import { RIVER_WIDTH_DEG } from './riverWidth'
 import { mulberry32 } from './noise'
@@ -60,8 +62,9 @@ const bankOffsetDeg = (push = 0): number =>
  *  inside it, so a spot that is wet at the nominal offset is often dry a stone's
  *  throw further inland. */
 const BANK_PUSH_DEG = [0, 0.05, 0.1] as const
-/** How many points of the drawn footprint are tested besides its centre
- *  (work-order 585): a rim ring and a half-radius ring. The centre alone is not
+/** Probes per ring of the drawn footprint tested besides its centre
+ *  (work-order 585); footprintProbes lays three staggered rings (0.4, 0.72 and
+ *  1 of the radius). The centre alone is not
  *  enough — a block 1.8 units across whose centre stands a step from the
  *  waterline still has its foot in the river, and the report's picture shows
  *  exactly that. The same points decide how high the block's base sits. */
@@ -75,7 +78,7 @@ export interface CommunicationRockSite {
   /** Height of the drawn block in world units. */
   height: number
   /** The height the block's base is drawn at, in world units: the LOWEST ground
-   *  under its own footprint, read from the same terrain field the bird's-eye
+   *  among its footprint probes, read from the same terrain field the bird's-eye
    *  mesh takes its vertices from. The scene draws the base AT this height, so
    *  the boulder meets the drawn surface instead of hovering over it
    *  (work-order 585; the rule of points 129/378: derive from what the picture
@@ -110,13 +113,6 @@ export function communicationRockSite(seed: number): CommunicationRockSite {
   return site
 }
 
-/** The spot the shovel digs at (point 487) — by construction the coordinate the
- *  renderer draws the boulder at, never a separate record of it. */
-export function communicationRockDigSpot(seed: number): { lat: number; lon: number } {
-  const s = communicationRockSite(seed)
-  return { lat: s.lat, lon: s.lon }
-}
-
 /**
  * Is a coordinate close enough to the boulder for the shovel to reach what lies
  * buried at its foot (point 487)? The centre it measures against is
@@ -134,12 +130,6 @@ export function isAtCommunicationRock(
 ): boolean {
   const s = communicationRockSite(seed)
   return Math.hypot(lat - s.lat, lon - s.lon) <= radiusDeg
-}
-
-/** The boulder's position in world units, for the scene and the collider. */
-export function communicationRockWorldPos(seed: number): { x: number; z: number } {
-  const s = communicationRockSite(seed)
-  return latLonToWorld(s.lat, s.lon)
 }
 
 function buildSite(seed: number): CommunicationRockSite {
@@ -163,12 +153,10 @@ function buildSite(seed: number): CommunicationRockSite {
   const side = rand() < 0.5 ? 1 : -1
   const yaw = rand() * Math.PI * 2
 
-  // A WET SPOT IS REJECTED, NEVER SETTLED FOR (work-order 585). The search used
-  // to remember its FIRST candidate and hand that back once the tries ran out —
-  // and that candidate was kept whether it was dry or not, so the one branch
-  // that exists for the hard cases was the one branch that could stand the
-  // boulder in the river. There is no such branch any more: only a spot whose
-  // whole footprint is dry is ever returned.
+  // A WET SPOT IS REJECTED, NEVER SETTLED FOR (work-order 585): the search
+  // returns only a candidate whose footprint probes are all dry. The last resort
+  // below is the one exception, and it is marked `unvouched` when it fails the
+  // same test.
   for (let attempt = 0; attempt < ROCK_SEARCH_STEPS; attempt++) {
     const target = wanted + attempt * UPSTREAM_RETRY_STEP_DEG
     const at = walkUpstream(axis, near, target)
@@ -186,15 +174,12 @@ function buildSite(seed: number): CommunicationRockSite {
       }
     }
   }
-  // THE LAST RESORT VOUCHES FOR ITSELF OR SAYS IT CANNOT (four-eyes review by
-  // GPT-5.6 Sol, 11.08.2026). It used to be argued dry — a village keeps the
-  // §4.2 clearance to river water — and the argument is right for the shipped
-  // world, but an argument is not a measurement: on a synthetic all-water world
-  // this branch handed back a wet spot and a test blessed it. So the same
+  // THE LAST RESORT VOUCHES FOR ITSELF OR SAYS IT CANNOT: the village centre.
+  // A village keeps the §4.2 clearance to river water, so in the shipped world
+  // this spot is dry, but a synthetic all-water world reaches it wet. The same
   // footprint test the loop uses decides here too, and where it says no, the
-  // site is returned MARKED. Callers draw it as before; what changes is that the
-  // one case nobody can vouch for is no longer indistinguishable from the
-  // ordinary one, in the tests or in a bug report.
+  // site is returned MARKED `unvouched`, so the case nobody can vouch for stays
+  // distinguishable from an ordinary placement in tests and bug reports.
   const standsVouched = standsDry(village.lat, village.lon, seed)
   return {
     lat: village.lat,
@@ -207,7 +192,7 @@ function buildSite(seed: number): CommunicationRockSite {
     downstream: { lat: 0, lon: 1 },
     // Present only when it is true: an `unvouched: false` on every ordinary site
     // would invite a reader to treat the flag's ABSENCE as unknown rather than as
-    // vouched (Sol's fourth pass).
+    // vouched.
     ...(standsVouched ? {} : { unvouched: true as const }),
   }
 }
@@ -242,9 +227,10 @@ function footprintProbes(lat: number, lon: number): Array<{ lat: number; lon: nu
 }
 
 /**
- * Does the WHOLE drawn footprint stand on dry, unblocked ground? What the player
- * sees is the block's foot, not its centre point (work-order 585): a block whose
- * centre is a step from the waterline still stands in the river.
+ * Do all footprint probes stand on dry, unblocked ground (see footprintProbes
+ * for what that does and does not promise)? What the player sees is the block's
+ * foot, not its centre point (work-order 585): a block whose centre is a step
+ * from the waterline still stands in the river.
  */
 function standsDry(lat: number, lon: number, seed: number): boolean {
   for (const p of footprintProbes(lat, lon)) {
@@ -256,14 +242,14 @@ function standsDry(lat: number, lon: number, seed: number): boolean {
 }
 
 /**
- * How high the block's base is drawn: the LOWEST drawn ground under its
- * footprint (work-order 585).
+ * How high the block's base is drawn: the LOWEST drawn ground among its
+ * footprint probes (work-order 585).
  *
  * Not a floor value and not the centre sample. The base is a flat, horizontal
  * face while the bank it stands on rolls, so a base set to the centre height
  * hangs in the air wherever the ground falls away under the block's edge —
  * which is exactly the picture the report was filed for. Set to the lowest
- * ground it covers, the block never hovers; where the ground rises under it, it
+ * ground its probes read, the block does not visibly hover; where the ground rises under it, it
  * beds INTO the slope, which is how an erratic sits.
  */
 function groundHeight(lat: number, lon: number, seed: number): number {
