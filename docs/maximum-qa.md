@@ -2,12 +2,13 @@
 
 A single, repeatable, **token-frugal** quality gate that bundles every QA
 technique the project has built up (points 173, 184, 195–200, 203/203A, 204,
-205, 207). It is the pass to run before promoting a build to a public demo.
+205, 207, and since then 213, 285 and 306/631). It is the pass to run before promoting a build to a public demo.
 
 **No ultracode / no large agent fan-outs.** Ultracode workflows burn the
 session/weekly token budget in minutes. Maximum QA runs as ordinary inline
-work: sequential checks, the driven visual sweep inspected in the main loop, and
-at most a *single* model-diverse audit pass by the OTHER vendor (`scripts/review-astra.mjs`
+work: sequential checks (the Phase 8 cleanup's two blind halves excepted), the
+driven visual sweep inspected in the main loop, and at most one model-diverse
+pass per phase that calls for one (Phases 1, 5 and 8) by the OTHER vendor (`scripts/review-astra.mjs`
 / `scripts/ask-astra.mjs --kind audit`) whose findings are always harvested and verified inline. See the memory
 `workflows-token-budget`.
 
@@ -41,8 +42,9 @@ must pass clean before any tag.
   the golden-image baseline (7 ii) can only be baked once the game is
   coherence- and finder-stable, so the differential/fuzz/soak methods layer on
   after it.
-- **Closing last (Phase 8):** the full 3×-flake-free regression on both backends
-  proves the fully-fixed state, immediately before the tag.
+- **Closing last (Phase 8):** the full regression on both backends — once before
+  the cleanup and again after it — proves the fully-fixed state, immediately
+  before the tag.
 
 ---
 
@@ -63,8 +65,9 @@ must pass clean before any tag.
 - `npm run build`, `npm run lint` (oxlint, zero errors/warnings), `npm audit`
   (zero CVEs), `npm run test:unit` (the fast Vitest layer) — all green.
 - Run the LARGE browser regression (`npm test`) once to establish the baseline
-  for the rebuilt state. Record any rotating staging flakes separately (they are
-  not findings; a clean single retry confirms them).
+  for the rebuilt state. Record any rotating staging flake separately; it closes
+  only when its cause is fixed, charged to its point, or filed as a new point —
+  a retry covers nothing (CLAUDE.md §7.2).
 
 ## Phase 3 — In-game invariant assertions (the force multiplier, 207 i)
 - Ensure the dev-only `devAssert` channel is armed and its invariants current:
@@ -116,7 +119,7 @@ Cheap automated classes first, then the visual sweep:
 - **(F–N) cheap extras** — facing tracks velocity; scale/proportion in band;
   no static-object interpenetration; no black/magenta pixels or z-fight; river
   continuity/monotonic descent; no teleport/frozen-phase.
-- **(C) The driven visual filmstrip sweep — the PRIMARY net, inspected by me.**
+- **(C) The driven visual filmstrip sweep — the PRIMARY net, inspected by the main session.**
   A principled sample (not the full cross product) over the dimensions:
   location, situation/drama, month, year 1890–1895, **backend (WebGL2 + real
   WebGPU)**, movement (static vs. a driven filmstrip), **zoom** (achievable
@@ -167,15 +170,17 @@ Cheap automated classes first, then the visual sweep:
 
 ## Phase 8 — Final closing
 - Fix every finding from Phases 1–7 (each its own commit, pushed).
-- Dead-code / stale-doc / stale-comment cleanup as separate commits; audit every
+- Dead-code / stale-doc / stale-comment cleanup as separate commits (the
+  blind-parallel form also classifies contradictions and orphaned references); audit every
   `.md` for accreted cruft (preserve section numbers). Keep the implementation
   sections current (`implementation-sections-current`).
 - **The cleanup runs BLIND-PARALLEL (user 11.08.2026, point 631; closing step
   `cleanup-blind-parallel`).** What is dead and what is stale is an ENUMERATING
   stage, so it takes the divergent mode of CLAUDE.md §6: both models work from the
   same inputs to their own complete result, neither seeing the other's before it is
-  done; the union is deduplicated BY MEANING, marks what only one side found, and
-  drops nothing for being unusual. A reviewer handed a finished list checks that
+  done; a third model folds the union and counts every id
+  (`scripts/blind-merge.mjs`), deduplicating BY MEANING, marking what only one side
+  found, and dropping nothing for being unusual. A reviewer handed a finished list checks that
   list — which is exactly the wrong instrument for the legacy nobody thought of.
 - **Graphics detail-level doc current (user 24.07.2026):** explicitly confirm
   `docs/graphics-detail-levels.md` still matches `QUALITY_PRESETS`. The
@@ -184,8 +189,8 @@ Cheap automated classes first, then the visual sweep:
   never assumed away.
 - Full regression again (closing step `regression-after-cleanup`): build + lint +
   audit + Vitest + the LARGE browser set on BOTH backends, **3× flake-free** (a
-  single retry may clear a rotating staging flake; a persistent fail is a real
-  regression). It must come AFTER the last cleanup commit, and the guard checks
+  red run closes only by its cause fixed, charged or filed — a retry covers
+  nothing, CLAUDE.md §7.2). It must come AFTER the last cleanup commit, and the guard checks
   that. The evidence names either the commit being tagged, written as `on <sha>`
   so prose cannot be mistaken for it — a run on it tests
   exactly the state that will be tagged, which is the point of running it again —
@@ -233,7 +238,7 @@ Cheap automated classes first, then the visual sweep:
 ## Keep the retrospective current — the refresh script + the currency guard
 
 The collaboration retrospective (`docs/analysis_de/retrospektive-zusammenarbeit.md`,
-git-ignored, German) records the recurring problem classes and their hardened
+tracked, German) records the recurring problem classes and their hardened
 solutions. Its own lesson #1 — reminders do not keep documents current, only
 enforcement does — applies to the document itself, so its currency is
 **enforced**:
