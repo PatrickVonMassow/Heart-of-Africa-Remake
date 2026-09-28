@@ -18,9 +18,9 @@ Opus 5 und Fable 5 haben aus derselben Messung heraus je eine eigene,
 vollständige Liste geschrieben, ohne die des anderen zu sehen. Beide Hälften
 sind hier bedeutungsgleich vereinigt; **jeder Eintrag ist markiert, ob beide
 Hälften ihn hatten oder nur eine** — diese Markierung ist der ganze Ertrag des
-Verfahrens. Die Rohfassungen der beiden Hälften sind in der Git-Historie
-erhalten (`docs/analysis_de/_572-ideen-a.md`, `_572-ideen-b.md`, entfernt im
-Vereinigungs-Commit).
+Verfahrens. Die Rohfassungen der beiden Hälften (`_572-ideen-a.md`,
+`_572-ideen-b.md`) liegen weder im Baum noch in der Git-Historie; ihre
+Eintrags-IDs (A-…, B-…) sind darum nur Herkunftsmarken, nicht auflösbar.
 
 ---
 
@@ -141,7 +141,7 @@ Uhren, die Rangfolge der Phasen und die Dominanz des wieder-gelesenen Kontexts.
 **Messfenster:** 03.08.2026 11:01 UTC – 09.08.2026 11:55 UTC, also 6,04 Tage,
 **32.746 API-Antworten**, **64 nach `main` gemergte Punkte**. Ältere
 Transkripte hält die Maschine nicht mehr vor — das ist die härteste Grenze
-dieser Messung (§1.8).
+dieser Messung (§1.9).
 
 **Die Phasen** und woran der Klassifikator sie erkennt (Regeln vollständig in
 `scripts/measure-task-cost-core.mjs`, `BASH_RULES` / `FILE_RULES`):
@@ -443,7 +443,7 @@ Befund gemeldet, er ist hier neu erhoben und **bestätigt**):
   Maschine nicht mehr. Alles Punkt-bezogene gilt für die 64 Punkte dieser 6
   Tage; die Git-Uhr reicht weiter zurück (214 Merges seit 06.07.) und ist die
   einzige Größe hier mit längerem Horizont.
-- **Der Füll-Fehlerbalken ist halbiert, aber nicht verschwunden.** 97,4 % der
+- **Der Füll-Fehlerbalken ist deutlich kleiner (unbelegt 77,2 → 56,2 %), aber nicht verschwunden.** 97,4 % der
   Antworten setzen einen Werkzeugaufruf ab, aber nur **48,4 %** setzen einen
   ab, den der Klassifikator als Phasen-Evidenz liest (43,8 % der Kosten):
   Shell-Plumbing (`grep`, `git status`, `cat`) bekommt bewusst **keine**
@@ -556,8 +556,8 @@ Konvention, sondern die Rechnung**, mit einem bekannten Fehlerbalken: bei
 1-Stunden-TTL wäre der Cache-Write-Faktor 2,0 statt 1,25, was die Gesamtsumme um
 bis zu +10 % verschöbe — die Rangfolge der Phasen aber nicht. Welche TTL die
 Harness benutzt, ist von hier nicht messbar. (Beide Hälften haben diese Prüfung
-unabhängig durchgeführt und kamen zum selben Ergebnis; Quellen in §5 der
-jeweiligen Rohfassung, u. a. Anthropic-Plattformdoku Stand 24.06.2026, Flexera
+unabhängig durchgeführt und kamen zum selben Ergebnis; Quellen standen in den
+nicht erhaltenen Rohfassungen, u. a. Anthropic-Plattformdoku Stand 24.06.2026, Flexera
 „Prompt Caching breakdown" und DigitalApplied „Prompt Caching in 2026", beide
 abgerufen 09.08.2026.)
 
@@ -650,7 +650,7 @@ muss die Benachrichtigung tragen.
 `enrichments` 951 s, `flow` 140 s, `world` 73 s) — erster Poll nach 0,9 ×
 Medianlaufzeit statt nach 30 s kürzt eine 84er-Kette auf 2–3 [nur A]; eine harte
 Obergrenze „nach 5 Polls blockierend warten oder als hängend behandeln" kappt
-den Ausläufer (15 Ketten ≥ 10 tragen 5,2 %) [nur A]; und eine **Prüfziffer im
+den Ausläufer (13 Ketten ≥ 10 tragen 4,9 %, §1.8) [nur A]; und eine **Prüfziffer im
 Verify-Wrapper**, die Polls zählt und meldet, macht die Regel überhaupt erst
 sichtbar, ohne einen neuen Blocker zu bauen [nur B]. Für die Gates gilt dasselbe
 im Kleinen (1–3 min je Lauf, aber hohe Frequenz) [nur B].
@@ -720,7 +720,7 @@ bleibt es Zufall.
 
 **6 — Der Lande-Befehl [A+B: A als „Board/Focus/Queue in einen Aufruf", B als
 „die ganze Merge-Kette als ein Kommando"; hier vereinigt, weil dieselbe Sache in
-zwei Größen].** Gemessen: 4.755 Buchführungs-Antworten = 12,5 % der Ausgabe;
+zwei Größen].** Gemessen: 4.951 Buchführungs-Antworten = 12,6 % der Ausgabe;
 die Kette Merge → Fast-Gate → Tick → Archiv → Board-Publish → Worktree-Cleanup
 läuft heute als 8–12 einzelne Turns der Hauptsitzung bei deren vollem Kontext
 (Median 164 k). Ein Skript, das die Kette deterministisch abarbeitet und **eine**
@@ -766,7 +766,7 @@ fail-fast in der Iteration (passt zu 5), Volllauf für den finalen Beweis.
 *Risiko:* gering; ein roter Lauf wird ohnehin nicht kreditiert.
 
 **9 — Dauerlast weiter senken [A+B].** Nach Regel 2 spart jedes 1 k Tokens
-weniger Dauerlast **3,25 M je Fenster** (0,38 %) und 23,8 k je Punkt. CLAUDE.md
+weniger Dauerlast **3,27 M je Fenster** (0,37 %) und 23,8 k je Punkt. CLAUDE.md
 ist 45.543 Zeichen ≈ 11 k Tokens, das globale CLAUDE.md und der Memory-Index
 addieren ~5–8 k; zusammen sind das ~16–19 k Tokens in **jeder** Antwort **jeder**
 Sitzung. Kandidaten: die Geschichtsprosa in §6 (Datumsanekdoten,
@@ -845,7 +845,7 @@ der Agent, der ihn schrieb, musste den Symlink von Hand setzen.**
 Testbasis. Der Bootstrap muss den Lockfile-Hash prüfen und bei Abweichung echt
 installieren.
 
-**14 — Wiederholte identische Abfragen abstellen [nur A].** 4.031 Antworten
+**14 — Wiederholte identische Abfragen abstellen [nur A].** 4.036 Antworten
 (15,2 %) sind ein Shell-Kommando, das in derselben Sitzung schon wortgleich
 lief. Ein Teil ist legitim; der illegitime Teil ist das erneute Suchen nach
 einem Fakt, der schon im Kontext steht.
@@ -894,7 +894,7 @@ oft Guards real blocken und welche davon Fehlalarme sind, misst heute niemand
 und dann zum blockierten Zug. Er ist ausdrücklich beratend, der Guard bleibt
 maßgeblich.
 
-**18 — Buchführung delegieren [nur A].** Die Hauptsitzung trägt 62,2 % ihrer
+**18 — Buchführung delegieren [nur A].** Die Hauptsitzung trägt 62,3 % ihrer
 Kosten in `bookkeeping`, bei Median-Kontext 164 k. Derselbe `board.mjs`-Aufruf
 in einem frischen, kurzlebigen Agenten kostet 43,6 k × 0,1 = **4,4 k** statt
 16–48 k.
@@ -930,7 +930,7 @@ die Iteration begrenzen.
 gegen einen Median-Punkt von 5,82 M. Zwei verwandte Punkte in **einem** Branch
 sparen grob den amortisierten Hauptsitzungs-Anteil (3,65 M) und kosten das
 zusätzliche Kontextwachstum (~0,5–1 M): **netto −2,5 bis −3 M je Paar.** Für die
-~16 Punkte unter p25 (≤ 2,85 M) ist der Sockel **größer als der Punkt**.
+~16 Punkte unter p25 (≤ 3,05 M) ist der Sockel **größer als der Punkt**.
 *Gegenkosten Achse A:* der Kalender-Median steigt (zwei Punkte werden gemeinsam
 fertig), der p90 sinkt eher (ein Merge statt zwei).
 *Risiko:* ein Bündel, dessen eine Hälfte scheitert, blockiert die andere; und es
@@ -1060,7 +1060,7 @@ geschrieben; sie sind hier vereinigt und **keine wurde fallengelassen**.
 | **Allgemeine Pfad→Suite-Kopplungskarte** | [A+B] | Vom Replay getötet (`TravelScene.tsx` liegt in drei Suiten). Nur die Verengung auf reine `src/ui/`-Änderungen überlebte und **ist implementiert**. |
 | **Abdeckungsbasierte Testauswahl** (gemessene statt geratener Kopplung) | [nur A, mit ausdrücklichem Risikovermerk] | **Hier als „nicht jetzt" eingeordnet.** Es ist ein *anderes* Instrument als die verworfene Karte, aber: erheblicher Bau (Instrumentierung eines Browser-Laufs), laufende Kosten, und **die Verifikations-Disziplin steht auf dem Spiel** — eine Abdeckungsmessung sagt, welche Datei *ausgeführt* wurde, nicht welche das **Bild** verändert. Der gestufte Küstenverlauf kam aus einer Datei, die zur Laufzeit Geometrie liefert. Die Literatur (Rothermel/Harrold; minware; Parasoft, alle abgerufen 09.08.2026) meldet ≥ 50 % Ersparnis — **Hypothese**, und sie gilt für Unit-Suiten, nicht für Bildprüfungen. |
 | **Punkte grundsätzlich kleiner schneiden** | [nur A] · Gegenposition [nur B: S1] | Rechnet sich **nicht**: Punkte halbieren verdoppelt den Sockel (5,0 M) und spart nur Kontextwachstum. **Auflösung des Widerspruchs:** Fables Vorschlag ist damit *vereinbar*, weil er den Split ausdrücklich auf Punkte ≥ 3× Median beschränkt — dort übersteigt die Ersparnis den zweiten Sockel. Als Maßnahme 7(c) übernommen, als **allgemeine** Regel verworfen. |
-| **Den Arbeitsauftrag weiter aufteilen / das Archiv verschlanken / den Brief weiter optimieren** | [A+B] | **Neu begründet nach der Messkorrektur:** die Phase `brief` ist 1,9 % der Gesamtausgabe (nicht 0,5 %), Median 103 k je Punkt = 1,4 % eines Punktes. Das ist immer noch zu klein, um einen 4,9-M-Punkt zu tragen — aber die Begründung ist jetzt eine Abwägung, keine Selbstverständlichkeit. Die 1,2 M Zeichen des Archivs werden im Normalbetrieb von niemandem gelesen. **Ausnahme:** Maßnahme 15 (Code-Orientierung im Brief) ist etwas anderes und bleibt. |
+| **Den Arbeitsauftrag weiter aufteilen / das Archiv verschlanken / den Brief weiter optimieren** | [A+B] | **Neu begründet nach der Messkorrektur:** die Phase `brief` ist 1,9 % der Gesamtausgabe (nicht 0,5 %), Median 103 k je Punkt = 1,4 % eines Punktes. Das ist immer noch zu klein, um einen 5,0-M-Punkt zu tragen — aber die Begründung ist jetzt eine Abwägung, keine Selbstverständlichkeit. Die 1,2 M Zeichen des Archivs werden im Normalbetrieb von niemandem gelesen. **Ausnahme:** Maßnahme 15 (Code-Orientierung im Brief) ist etwas anderes und bleibt. |
 | **Kürzere Berichte / knapper schreiben als Sparmaßnahme** | [A: als kleine Maßnahme] · [B: ausdrücklich NICHT als Hebel] | **Aufgelöst zugunsten von B — und die Output-Korrektur (§1.0) macht die Verwerfung SCHÄRFER, nicht schwächer.** Der Output ist zwar 8,0 % statt 4,5 % gewichtet, aber die alte Rechnung „30 % knapper spart ~1,4 %" hat den falschen Topf angegriffen: von den 8,0 % liegen nur **0,43 Prozentpunkte** auf Antworten ohne jeden Werkzeugaufruf, also auf der Prosa, die ein Mensch liest. Der Rest ist Denken und die Argumente der Werkzeugaufrufe (Edits, Dateiinhalte, Kommandos) — Code, kein Stil. 30 % knapper zu schreiben spart damit **~0,13 % des Fensters**, eine Größenordnung weniger als bisher angenommen. Schreibdisziplin lohnt für Lesbarkeit, nicht für Tokens — und ein zu knapper Bericht kostet eine Rückfrage. Retrospektive §3.57: „die Anleitung an den Nutzer ist die schlechteste aller Antworten." **Kein Widerspruch zu Maßnahme 10:** dort geht es um GELESENE Werkzeug-Ausgaben, hier um GESCHRIEBENE Prosa. |
 | **Reasoning-Effort senken / Denk-Token deckeln** | [nur B] | **Bleibt verworfen — aber die Begründung ist nach der Output-Korrektur neu zu schreiben, und die Arithmetik trägt sie nicht mehr allein.** Die alte Zahl („zusammen 4,5 %, halbiert ≤ 2,3 %") war zu klein: der Output ist 8,0 % gewichtet, und der überwiegende Teil davon steht gar nicht als Text im Transkript — geschätzt aus den Inhaltsblöcken sind rund 3,8 M der 14,1 M Output-Tokens Werkzeug-Argumente und nur 0,4 M sichtbare Prosa, der Rest ist **Denken**. Eine Halbierung läge damit bei grob **2,8 %** des Fensters, mehr als die meisten gebauten Maßnahmen dieser Liste. Verworfen wird sie trotzdem, und zwar aus den beiden Gründen, die von der Zahl unabhängig sind: der stehenden Nutzer-Regel „Effort High für Implementierung", und dem Qualitätsrisiko — Denken ist die Arbeit, nicht ihr Beiprodukt, und dieses Projekt hat den Preis schlechter Arbeit gemessen (Retrospektive §3.33). Musterfall bleibt es dennoch für „externe Zahl überlebt die eigene Messung nicht" (Quellen: Boundev; T-Minus AI, abgerufen 09.08.2026, melden 3–7× Denk-Token auf mechanischen Schritten). **Was sich daraus ehrlich ergibt:** Denken ist nach dem wieder-gelesenen Kontext der zweitgrößte Posten, den das Modell selbst erzeugt. Das ist ein Messbefund, kein Hebel — und die Zerlegung ist eine Schätzung aus Zeichenlängen (≈ 4 Zeichen je Token), keine abgerechnete Zahl. |
 | **Den Pool verkleinern, um Tokens zu sparen** | [nur B] | Bereits gemacht und als Denkfehler seziert (Retrospektive §3.27): Parallelität vervielfacht Rate und Durchsatz gemeinsam; **pro fertigem Punkt** bleibt es gleich. Dieselbe Falle steckt in der Feldzahl „Multi-Agenten kosten 15×" — sie misst **pro Anfrage**, nicht **pro Arbeit**. |
@@ -1385,7 +1385,7 @@ carries a GENERATED orientation: the paths the specification itself names, and a
 per-directory line of responsibility derived from the tree and its file headers.
 It is marked as a HINT, never as an instruction ("the specification names these
 paths", not "change these files"), and it is generated on every run so it cannot
-go stale. Measured target: search/read is 25,2 % of the weighted spend and the
+go stale. Measured target: search/read is 25,1 % of the weighted spend and the
 first responses of a delegated agent are almost always search; five saved
 responses per point is ~2 % of a median point.
 *Criticality: low (a wrong list would misdirect, which generation-from-the-tree
@@ -1449,4 +1449,4 @@ point 375 was built against).*
 
 *Erstellt für Punkt 572. Die Messung ist reproduzierbar
 (`node scripts/measure-task-cost.mjs`), das Fenster wächst mit jedem Lauf, und
-die Zahlen oben sind der Stand vom 09.08.2026, 11:18 UTC.*
+die Zahlen oben sind der Stand vom 09.08.2026, 11:55 UTC.*

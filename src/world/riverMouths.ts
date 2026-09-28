@@ -17,7 +17,7 @@
 // ribbon, the mouth bridge (§11.3 point 211), the water mask or the ocean's
 // impassability changes — only how hard the water pushes in the last reach.
 //
-// Dependency-light on purpose (data + the vector coast only), because
+// Dependency-light on purpose (data, the vector coast and balance only), because
 // world/hydro.ts consumes it while building its segment index and must not
 // close a cycle back through terrain/geoIndex.
 
@@ -46,7 +46,7 @@ export const MOUTH_SLACK_DEG = balance.river.mouthSlackDeg
 export const SEA_MOUTH_COAST_DEG = 0.5
 
 /** Whether a course ends at the sea (as opposed to a confluence). */
-export function isSeaMouthEnd(lat: number, lon: number): boolean {
+function isSeaMouthEnd(lat: number, lon: number): boolean {
   return coastSignedDistance(lat, lon) < SEA_MOUTH_COAST_DEG
 }
 

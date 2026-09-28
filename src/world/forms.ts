@@ -23,9 +23,8 @@ import { CULTURAL_LANDMARKS } from './data/landmarks'
 import type { LatLon } from './geo'
 
 /** The shapes an item can have. One entry per form in the world. */
-export type FormId = 'rock-relief'
-
-export const FORM_IDS: readonly FormId[] = ['rock-relief']
+export const FORM_IDS = ['rock-relief'] as const
+export type FormId = (typeof FORM_IDS)[number]
 
 /** The places shaped to take one. */
 export type SocketId = 'bandiagara-talus'

@@ -87,7 +87,7 @@ export const RIVERS_DATA: RiverDef[] = [
   {
     id: 'vaal',
     sourceName: 'Drakensberg',
-    mouthName: 'Zusammenfluss mit dem Oranje',
+    mouthName: 'Confluence with the Orange',
     points: [
       [30.1, -26.4], [29.0, -26.75], [28.1, -26.9], [26.8, -27.0], [25.6, -27.6],
       [24.8, -28.1], [24.0, -28.5], [23.8, -29.07],
@@ -175,7 +175,7 @@ export const RIVERS_DATA: RiverDef[] = [
       [-10.75, 9.08], [-10.74, 10.04], [-9.88, 10.65], [-9.17, 11.42],
       [-8.0, 12.65], [-7.56, 12.86], [-6.27, 13.45], [-6.07, 13.7],
       [-5.05, 14.15],
-      // Passes south of Timbuktu (16.77): the stylized river band
+      // Passes south of Timbuktu (port at 16.95): the stylized river band
       // (RIVER_WIDTH_DEG) must not swallow the port site.
       [-4.2, 14.5], [-3.5, 15.5], [-3.0, 16.55],
       [-1.9, 16.95], [-0.35, 16.97], [-0.05, 16.27], [0.5, 15.5], [1.2, 14.6],

@@ -1,12 +1,14 @@
-// F6 bug report (design.md §21.1): one keypress produces the whole report —
-// the PICTURE of the moment, the complete game state and the user's own words,
-// handed out as ONE .zip the user can pass on unopened.
+// F6 bug report (design.md §21.1): one keypress captures the moment and opens
+// the report editor; its download button then hands out the whole report — the
+// PICTURE of the moment, the complete game state and the user's own words — as
+// ONE .zip the user can pass on unopened.
 //
 // The picture is read back from the canvas inside a rendered tick (see
 // render/frameCapture.ts) and holds the 3-D scene alone; every label and the
 // HUD are DOM, so they travel as the overlay snapshot beside it.
 //
-// Top-most modal (§17.4). Esc closes it, from the description field too, and
+// Stacks above panels and dialogs (§17.4); the start/victory/defeat overlays
+// share its z-index and, mounted later, sit above it. Esc closes it, from the description field too, and
 // leaves focus on no control (§17.5) — the field itself is autofocused on
 // purpose, so the user can start typing the moment the modal appears.
 
@@ -125,7 +127,7 @@ export function StateDump() {
     game.setToast(s.stateDump.saved)
   }
 
-  /** The state alone, unchanged from before — still one click away. */
+  /** The state JSON alone — still one click away. */
   const download = () => {
     saveBlob(new Blob([json], { type: 'application/json' }), dumpFilename(useGame.getState().seed))
   }

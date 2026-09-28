@@ -1,7 +1,7 @@
-// Runtime access to the real elevation dataset (design.md §3 "Reale Geodaten
-// und Terrain-Darstellung"). Loads public/geodata/dem.png — produced by
-// scripts/build-geodata.mjs from Terrarium/SRTM tiles — and provides bilinear
-// samplers for elevation, land mask and distance-to-coast.
+// Runtime access to the real elevation dataset (design.md §3.3 "Real geodata
+// and terrain rendering"). Loads public/geodata/dem.png — produced by
+// scripts/build-geodata.mjs from Terrarium/SRTM tiles — and provides a bicubic
+// elevation sampler and bilinear samplers for land mask and distance-to-coast.
 //
 // Channel layout (see the build script):
 //   R,G = (elevation_m + offset) as 16-bit big-endian
@@ -83,7 +83,7 @@ export async function loadGeodata(): Promise<void> {
 }
 
 /**
- * The decoded (and northeast-trimmed) DEM pixel grid, RGBA stride 4; for
+ * The decoded (and game-world-trimmed, see trimToGameWorld) DEM pixel grid, RGBA stride 4; for
  * consumers that need the raw texels (the water bathymetry texture) so they
  * see the same trimmed world as the samplers. Available after loadGeodata().
  */
@@ -136,9 +136,9 @@ function cubicWeights(f: number): [number, number, number, number] {
 }
 
 /**
- * Bicubic (Mitchell-Netravali) real elevation in meters. Outside the dataset
- * (open Atlantic / Indian Ocean / Mediterranean beyond the bbox) returns deep
- * ocean. C1-smooth so the terrain relief reads without polygon facets (point 215).
+ * Bicubic (Mitchell-Netravali) real elevation in meters. Within 0.5° outside the
+ * dataset the edge texels are clamped; beyond that margin (open Atlantic /
+ * Indian Ocean / Mediterranean) it returns deep ocean. C1-smooth so the terrain relief reads without polygon facets (point 215).
  */
 export function elevationAt(lat: number, lon: number): number {
   if (!pixels || !meta) return 0
@@ -190,7 +190,8 @@ export function landFractionAt(lat: number, lon: number): number {
   return top + (bot - top) * fy
 }
 
-/** Distance to the sea coast in degrees (bilinear; 0 in the ocean). */
+/** Distance to the sea coast in degrees (bilinear; 0 on ocean texels, so it
+ *  rises from 0 across the shoreline texel rather than at landFraction 0.5). */
 export function coastDistanceAt(lat: number, lon: number): number {
   if (!pixels || !meta) return 0
   const m = meta

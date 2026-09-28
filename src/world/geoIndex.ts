@@ -1,6 +1,7 @@
 // Geography query layer. Since the switch to real geodata (design.md §3
 // "Real geodata and terrain rendering") this delegates to:
-//   - geodata.ts: bilinear DEM samplers (elevation, land mask, coast dist)
+//   - geodata.ts: DEM samplers (bicubic elevation, bilinear land mask and
+//     coast distance)
 //     built from real SRTM-composite tiles by scripts/build-geodata.mjs
 //   - hydro.ts:  exact spline-densified vector distances for the authored
 //     ~1890 rivers and lakes (no rasterization, no stair-steps)
@@ -20,7 +21,7 @@ export function cellAt(lat: number, lon: number): number {
   return CELL_LAND
 }
 
-/** Distance to the sea coast in degrees (0 in the ocean). */
+/** Distance to the sea coast in degrees (0 on ocean texels; see coastDistanceAt). */
 export function coastDistance(lat: number, lon: number, maxDist = 4): number {
   return Math.min(maxDist, coastDistanceAt(lat, lon))
 }

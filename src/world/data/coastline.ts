@@ -2,10 +2,10 @@
 // atlas geography of ~1890 (design.md §3: authentic fixed geography). Points
 // are anchored to real coastal locations (capes, bays, river mouths, ports);
 // geoIndex.ts smooths them once more for a fine-grained shoreline.
-// Winding: mainland clockwise starting at Suez (the Suez isthmus closes the
+// Winding: mainland counter-clockwise in (lon, lat), starting at Suez (the Suez isthmus closes the
 // polygon — the continent boundary of 1890, the canal opened 1869).
 
-export interface LandPolygon {
+interface LandPolygon {
   name: string
   points: Array<[number, number]>
 }

@@ -46,7 +46,7 @@ export function regionStats(): RegionStats {
     let lat = sumLat[r] / n
     let lon = sumLon[r] / n
     // If the centroid falls off the region's own land (ocean, or across a
-    // border), walk outward on a coarse spiral until it sits on it.
+    // border), scan a 1° grid within ±14° and take the nearest cell on it.
     if (cellAt(lat, lon) === CELL_OCEAN || regionAt(lat, lon) !== r) {
       let best: { lat: number; lon: number } | null = null
       let bestD = Infinity

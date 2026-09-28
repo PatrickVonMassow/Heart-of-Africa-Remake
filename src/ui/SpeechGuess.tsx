@@ -6,9 +6,9 @@
 // very moment he saw what it MEANT. This dialog opens on the speaker himself,
 // carrying the syllables he spoke and whatever reading is already written.
 //
-// It writes the SAME store field the journal writes, so a reading entered here
-// stands in the book and over the speaker's head at once, and one entered in the
-// book shows up here. The game never interprets the text: it is the player's own
+// It writes the SAME store field the journal writes: the dialog opens with the
+// reading already in the book, and on Save its reading stands in the book and
+// over the speaker's head at once (Cancel leaves the note untouched). The game never interprets the text: it is the player's own
 // note, unchecked, as everywhere else.
 //
 // It is MODAL (user's decision) — the one deliberate exception to the non-modal

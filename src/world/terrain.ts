@@ -1,9 +1,12 @@
-// Terrain sampling on real geodata (design.md §3 "Reale Geodaten und
-// Terrain-Darstellung"): heights come from the SRTM-composite DEM
-// (world/geodata.ts), shorelines from its flood-filled ocean mask, river and
-// lake banks from exact ~1890 vector distances (world/hydro.ts). The seeded
-// noise only adds per-run micro-relief and color variety (design.md §18);
-// the geography itself is identical in every run.
+// Terrain sampling on real geodata (design.md §3.3 "Real geodata and
+// terrain rendering"): heights come from the SRTM-composite DEM
+// (world/geodata.ts), shorelines from its trimmed land mask — rebuilt near the
+// coast from the vector coastline and near the Red-Sea cut from the boundary
+// distance — river and lake banks from exact ~1890 vector distances
+// (world/hydro.ts). The seeded noise adds per-run micro-relief and color
+// variety and warps the biome/region borders, so it also picks the terrain
+// type near them (design.md §18); the geography itself is identical in every
+// run.
 
 import { regionAt } from './geo'
 import { coastDistance, lakeDistance, riverDistance } from './geoIndex'
@@ -40,14 +43,16 @@ export interface TerrainSample {
   splat: SplatWeights
 }
 
-/** River half-width in degrees for terrain carving. */
+// River half-width in degrees for terrain carving (owned by riverWidth.ts,
+// re-exported here for existing importers).
 import { RIVER_WIDTH_DEG } from './riverWidth'
 export { RIVER_WIDTH_DEG }
 
 /** Vertical exaggeration: world units per meter (stylized, map scale). */
 const METERS_TO_UNITS = 1.35 / 1000
 
-/** Real elevation thresholds (meters) for mountain terrain and snow. */
+/** Real elevation threshold (meters) for mountain terrain; ice uses the
+ *  per-massif lines of ICE_MASSIFS. */
 const MOUNTAIN_M = 1600
 /** Degrees of low-frequency meander applied to biome/region borders (design.md §3). */
 const BIOME_WARP = 3.0
@@ -59,17 +64,18 @@ const COAST_SMOOTH_BAND = 0.08
 
 // point 210: over this distance (degrees) out from the trim boundary the stamped
 // deep floor is replaced by a smooth shelf, so the depth-driven water colour
-// grades instead of banding at the ~800 m stamp step. SLOPE reaches the deep
-// tone (~-0.6) at the band edge, then joins the stamped floor seamlessly.
+// grades instead of banding at the stamp's one-texel plunge (~-3000 m). The
+// shelf deepens by SLOPE per degree and blends fully back to the stamped floor
+// at the band edge.
 const SHELF_BAND = 0.3
 const SHELF_SLOPE = 2.0
 // point 210b: how far LANDWARD of the trim boundary the kept-side shallow shelf
 // reaches. The Gulf-of-Suez head is a wide near-shore shallow that extends well
 // past COAST_SMOOTH_BAND; clamping the shelf only to 0.08 deg let the floor past
 // it plunge to the trim stamp and read as a blocky underwater wedge east of
-// Cairo. Beyond this band the DEM bathymetry is restored (eased, no step).
+// Cairo. Beyond this band the DEM bathymetry applies again.
 const KEPT_LANDWARD_BAND = 0.25
-const STAMP_FLOOR_M = -900 // below this the near-boundary DEM floor is trim-stamp garbage, not natural bathymetry
+const STAMP_FLOOR_M = -900 // below this the near-boundary DEM floor is taken for the trim stamp (natural bathymetry this deep is clamped too)
 const STAMP_SHELF_H = -0.15 // shallow shelf height the stamped gulf-head texels are lifted to
 
 // Permanent ice (design.md §19.13, point 141): ONLY the three massifs that
@@ -87,7 +93,7 @@ const STAMP_SHELF_H = -0.15 // shallow shelf height the stamped gulf-head texels
 // line, so each must actually show its cap. The GATE carries the truth (which
 // massifs had ice); the line only places the cap on the flattened peak. The
 // near misses stay excluded by the gate regardless — Elgon's DEM maximum is
-// 4,018 m and Ras Dashen's 4,114, below every line here anyway.
+// 4,018 m and Ras Dashen's 4,114, which would clear the lower lines here.
 const ICE_MASSIFS = [
   { lat: -3.07, lon: 37.35, radiusDeg: 0.55, lineM: 4450 }, // kilimanjaro (DEM peak 5,203)
   { lat: -0.15, lon: 37.31, radiusDeg: 0.5, lineM: 4100 }, // mount-kenya (DEM peak 4,454)
@@ -158,14 +164,9 @@ function biomeColor(type: TerrainType, n: number): [number, number, number] {
 
 function normalizeSplat(s: SplatWeights): SplatWeights {
   const sum = s[0] + s[1] + s[2] + s[3]
-  if (sum <= 0) return [1, 0, 0, 0]
   return [s[0] / sum, s[1] / sum, s[2] / sum, s[3] / sum]
 }
 
-/**
- * Sample terrain at geographic coordinates. `seed` controls the per-run
- * procedural appearance; geography itself is fixed real data.
- */
 /** Nearest lake by centroid — for the shore BLEND band just outside a polygon,
  *  where lakeIndexAt is already -1 (point 190). The lakes sit far apart, so the
  *  centroid pick is unambiguous. */
@@ -184,8 +185,8 @@ function nearestLakeIndex(lat: number, lon: number): number {
 }
 
 /** Per-lake BASIN LEVEL (point 190): the lowest shore ground on a ring pushed
- *  0.5 deg outside the polygon — far enough out that the samples lie beyond the
- *  0.3-deg lake carve band, so this never recurses into its own blend. A lake
+ *  0.5 deg outside the polygon — far enough out that the samples normally lie
+ *  beyond the 0.3-deg lake carve band (the sentinel below covers the rest). A lake
  *  bed is levelled by its water: the interior blends to (level − drop), which
  *  puts the rendered sheet (bedMax + LAKE_LIFT) slightly BELOW the lowest shore
  *  at every lake by construction — the fix for the floating Lake Edward. */
@@ -216,6 +217,10 @@ function lakeBasinLevel(li: number, seed: number): number {
   return lo
 }
 
+/**
+ * Sample terrain at geographic coordinates. `seed` controls the per-run
+ * procedural appearance; geography itself is fixed real data.
+ */
 export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSample {
   let land = landFractionAt(lat, lon)
   // point 209: the bilinear BINARY land mask crosses 0.5 only along the DEM
@@ -264,9 +269,10 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   const elevation = elevationAt(lat, lon)
   const detail = fbm2(lon * 3, lat * 3, seed + 7, 3)
 
-  // Continuous shoreline: height and color blend across the smooth
-  // (bilinear) land fraction, so the waterline is the smooth 0-contour of
-  // the height field — no per-vertex land/ocean steps.
+  // Continuous shoreline: height and color blend across the smooth land
+  // fraction (vector-rebuilt near the coast and the boundary above), so the
+  // waterline is the smooth 0-contour of the height field — no per-vertex
+  // land/ocean steps.
   const shoreT = sstep(0.32, 0.68, land)
   let hOcean = -0.12 + Math.max(-3.4, elevation * 0.0006)
   if (boundaryIsCoast && bsd < KEPT_LANDWARD_BAND) {
@@ -276,8 +282,9 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     // deep (seaward) edge; the shelf only deepens seaward (min(0, bsd)). Landward
     // (bsd>0) the shallow clamp used to stop at COAST_SMOOTH_BAND, so the wider
     // gulf-head near-shore ocean past it plunged to the trim stamp and read as a
-    // blocky underwater wedge east of Cairo (point 210b); extend the clamp across
-    // KEPT_LANDWARD_BAND, easing back to the DEM floor at the band edge (no step).
+    // blocky underwater wedge east of Cairo (point 210b); the full shallow clamp
+    // now holds across KEPT_LANDWARD_BAND (t = 0 for bsd >= 0), and the DEM floor
+    // applies beyond it.
     const t = Math.max(0, Math.min(1, -bsd / SHELF_BAND))
     const shelf = -0.05 + Math.min(0, bsd) * SHELF_SLOPE // shallow at the line, deepening outward
     hOcean = Math.max(hOcean, shelf * (1 - t) + hOcean * t)
@@ -287,11 +294,11 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   // cliffing the ocean floor into a blocky lit wedge seen through the transparent
   // shallows east of Cairo. The coast-gated shelf above never reaches it (its
   // inward sample is gulf water, not land), and a partial ease stays below the
-  // deep-tone threshold anyway. Clamp ONLY the stamped-floor texels (elevation
-  // below STAMP_FLOOR_M — the uniform garbage stamp, never natural bathymetry)
-  // near the boundary to a smooth shallow shelf, so they read as coastal
-  // shallows level with their real neighbours. Deep open water (natural
-  // bathymetry, or far from the boundary) is untouched.
+  // deep-tone threshold anyway. Clamp the texels below STAMP_FLOOR_M near the
+  // boundary (aimed at the uniform garbage stamp; the gate checks only elevation
+  // and boundary distance, so natural bathymetry that deep there is lifted too)
+  // to a smooth shallow shelf, so they read as coastal shallows level with their
+  // real neighbours. Water farther from the boundary is untouched.
   if (!boundaryIsCoast && elevation < STAMP_FLOOR_M && bsd > -SHELF_BAND && bsd < KEPT_LANDWARD_BAND) {
     // Blend the shallow clamp back to the DEM floor across the seaward half of
     // the band (bsd < 0), so it eases into the deep open gulf with no step; on
@@ -348,13 +355,12 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
         type = wlon < 18.5 && wlat > -31 ? 'desert' : 'savanna'
         break
       case 'west':
-      default:
         type = wlat < 8 && wlon < 2 && n > 0.35 ? 'jungle' : 'savanna'
         break
     }
   }
 
-  // Fertile strip along rivers turns desert green (visual only).
+  // Fertile strip along rivers turns desert into savanna (type and colour).
   if (type === 'desert' && riverD < 0.45) {
     type = 'savanna'
   }
@@ -409,9 +415,10 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     forestW,
   ]
 
-  // Lush banks along rivers and lakes (visual only).
+  // Lush banks along rivers (visual only). riverD is capped at 0.45, so bankT
+  // is always at least 0.1 and every non-mountain sample gets some tint.
   const bankT = 1 - Math.min(1, riverD / 0.5)
-  if (bankT > 0 && type !== 'mountain') {
+  if (type !== 'mountain') {
     const lush = sstep(0.15, 0.9, bankT) * 0.65
     color = mix(color, LUSH, lush)
     splat[1] += lush * 0.8
@@ -449,17 +456,18 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     }
   }
 
-  // Lakes and rivers carve a continuous channel: height follows the signed
-  // distance to the shoreline/centerline, so the waterline is the smooth
-  // 0-contour — no per-vertex steps along banks (design.md §3).
+  // Lakes and rivers carve a continuous channel whose weight eases across the
+  // banks with the distance to the shoreline/centerline — no per-vertex steps
+  // along banks (design.md §3).
   const lakeD = lakeDistance(lat, lon, 1)
   // RIVERS carve their bed *relative to the local relief*, so the water
   // follows the map's height profile (design.md §2/§11) instead of cutting
   // sea-level canyons through the highlands. LAKES are different (point 190):
   // a lake bed is levelled by its WATER — the old relative carve kept the rift
   // slope in the bed, so the max-bed sheet stood metres over the low shores
-  // (the user's floating Lake Edward). Inside a lake the height now blends to
-  // a flat per-lake BASIN LEVEL (lowest shore ground − drop), which puts the
+  // (the user's floating Lake Edward). Inside a lake the height now blends
+  // down to a per-lake BASIN LEVEL (lowest shore ground − drop; a spot already
+  // below it stays), which puts the
   // sheet (bedMax + LAKE_LIFT) slightly BELOW its lowest shore at every lake
   // by construction. The visible surfaces are separate meshes laid into these
   // beds (scenes/travel/Rivers.tsx).
@@ -484,7 +492,7 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   }
   const riverS = riverD - RIVER_WIDTH_DEG
   if (riverS < RIVER_WIDTH_DEG * 1.6) {
-    carve = Math.max(carve, sstep(RIVER_WIDTH_DEG * 1.6, -RIVER_WIDTH_DEG * 0.6, riverS) * 0.5)
+    carve = sstep(RIVER_WIDTH_DEG * 1.6, -RIVER_WIDTH_DEG * 0.6, riverS) * 0.5
     if (riverS < -0.005) type = 'water'
   }
   if (carve > 0) {

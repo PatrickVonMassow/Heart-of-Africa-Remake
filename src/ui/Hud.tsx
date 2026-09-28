@@ -1,5 +1,6 @@
-// HUD composition: status bar, inventory/hand bar, prompt, toast, journal,
-// dialogs, start/victory overlays and the debug menu. All player-visible
+// HUD composition: status bar, inventory bar, prompt, toast, journal, map,
+// dialogs, touch controls, cursor hint, state dump, benchmark, start/victory/
+// defeat overlays and the debug menu. All player-visible
 // text comes from the language files (design.md §17 localization).
 
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
@@ -40,15 +41,16 @@ function InventoryBar() {
   const seed = useGame((s) => s.seed)
   const afflictions = useGame((s) => s.afflictions)
   // Alphabetical by the LOCALIZED display name (point 104): the bar re-sorts
-  // on a language switch; gear first, treasures after (each sorted).
+  // on a language switch. Slot order: gear, carried forms, quest finds,
+  // treasures (each group sorted).
   const owned = (Object.keys(equipment) as EquipmentId[])
     .filter((e) => (equipment[e] ?? 0) > 0)
     .sort((a, b) => t.equipment[a].localeCompare(t.equipment[b], t.lang))
   const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0).sort((a, b) =>
     t.treasures[a].localeCompare(t.treasures[b], t.lang),
   )
-  // Carried FORMS come last. There is no item picture in this game, so the bar
-  // is where the thing's NAME stands — and the name is half of what the player
+  // Carried FORMS: the bar is where the thing's NAME stands (the rock relief
+  // also shows its clay impression) — and the name is half of what the player
   // has to put together with the direction he was given.
   const ownedForms = [...carriedForms].sort((a, b) => t.forms[a].localeCompare(t.forms[b], t.lang))
   // Quest FINDS (design.md §6): a thing dug up on an errand rides in the bar
@@ -101,8 +103,7 @@ function InventoryBar() {
   // mere possession (rifle/rope/machete/canoe) or refill themselves (canteen),
   // so a press answers in the traveller's voice instead of doing nothing: what
   // the thing does by itself, that it is doing it right now, or why it has no
-  // place among people. (The map is no longer an item — it opens from its own
-  // button / M, point 93.)
+  // place among people.
   const passiveAnswer = (e: EquipmentId): string => {
     const settlement = mode !== 'travel'
     switch (e) {
@@ -397,7 +398,8 @@ function SunblindVeil() {
 
 /**
  * Defeat overlay (design.md §15/§18): on death the journal falls silent and
- * a report about the explorer's remains appears instead.
+ * a report about the explorer's remains appears instead; an expired deadline
+ * shows its own report.
  */
 function DefeatOverlay() {
   const t = useStrings()
@@ -553,8 +555,8 @@ export function Hud() {
   useEffect(() => {
     // Tab toggles the journal (design.md §17). It is handled directly rather
     // than via onKeyPress so its default focus-cycling can be suppressed —
-    // except inside form controls (debug menu / dialog fields), where Tab
-    // still navigates between them, so it never causes focus problems.
+    // except inside text inputs, textareas and selects, where Tab still moves
+    // focus on.
     const onTab = (e: KeyboardEvent) => {
       if (e.code !== 'Tab') return
       const tag = (e.target as HTMLElement)?.tagName
@@ -583,7 +585,7 @@ export function Hud() {
       g.setToast(st.health.report(state, list))
     })
     // P: position query (design.md §17) — the coordinates as a spoken-style
-    // toast in the current language (the status bar shows them permanently).
+    // toast in the current language (the status bar shows no coordinates).
     const offP = onKeyPress('KeyP', () => {
       const g = useGame.getState()
       const st = getStrings()
@@ -624,8 +626,8 @@ export function Hud() {
     const offF6 = onKeyPress('F6', () => useUi.getState().toggleStateDump())
     // F9 = graphics quality level (design.md §21, point 276). Each press steps
     // DOWN one level, wrapping the bottom to the top: medium → low → high →
-    // medium. Read DERIVED (the effective* selectors), so it never clobbers the
-    // individual debug flags. (F9, not the neighbouring key Windows Chrome binds
+    // medium. It sets detailLevel alone, so the individual debug flags are
+    // never clobbered. (F9, not the neighbouring key Windows Chrome binds
     // to its Caret-Browsing dialog.)
     const offF9 = onKeyPress('F9', () => {
       useUi.getState().cycleDetailLevel()
@@ -637,8 +639,9 @@ export function Hud() {
     // so the runner is not dev-gated but imported LAZILY here, keeping it out
     // of the eager startup chunks (like the TTS stack).
     const offF8 = onKeyPress('F8', () => void startBenchmarkSafely())
-    // The twelve keys of the number row jump to the twelve months of the
-    // current year, for stepping through the seasons (design.md §21.1).
+    // Shift + the twelve keys of the number row jump to the twelve months of
+    // the current year, for stepping through the seasons (design.md §21.1);
+    // the plain digits belong to the inventory.
     // PHYSICAL codes, so the row reads 1..0 ß ´ on a German keyboard and
     // 1..0 - = on a US one — the same twelve adjacent keys either way.
     // + and - step the YEAR inside the game's window 1890..1895 (design.md
@@ -723,7 +726,7 @@ export function Hud() {
     <>
       <StatusBar />
       <FpsCounter />
-      {/* Health bar top-right, below the status bar, at the FPS-counter height. */}
+      {/* The health bar lives inside the status bar's right end (StatusBar). */}
       {/* The bottom band is ONE row (point 1146): the inventory bar on the left,
           the buttons on the right, so flex decides both their shared bottom edge
           and their clearance. The steering hint is the row's own child and out
@@ -773,7 +776,7 @@ export function Hud() {
       <StateDump />
       {/* The benchmark's progress/result modal (design.md §21.1, F8). */}
       <BenchmarkOverlay />
-      {/* Above panels and dialogs so it stays clickable; below the modal overlays. */}
+      {/* Above panels and dialogs (the renderer warning stays clickable); below the modal overlays. */}
       <SunblindVeil />
       <RendererWarning />
       <StartOverlay />
