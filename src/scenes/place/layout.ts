@@ -32,18 +32,19 @@ import {
 import { balance } from '../../config/balance'
 import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
-import { WORK_ARRIVE_RADIUS } from './adultWork'
+import { JOIN_STAND_OFF, WORK_ARRIVE_RADIUS } from './adultWork'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
-import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
+import type { UseCandidate } from './useKeyTarget'
 
 /** The walkable radius the place scene was first built at, and the unit
  *  `balance.settlementRoom` multiplies. It is a historical base, not a knob:
  *  the calibratable handle is the factor in `balance.ts` (point 1173). */
 export const PLACE_RADIUS_BASE = 28
-/** Walkable radius in meters; leaving it exits the place. Every consumer reads
- *  THIS (or the layout's own `radius`, which a port widens) — no caller keeps a
- *  radius of its own, so the factor alone moves the whole settlement. */
+/** Walkable radius of a village in meters; leaving it exits the place. Every
+ *  consumer reads THIS (or the layout's own `radius`; a port sets its own from
+ *  its size) — no caller keeps a radius of its own. The factor scales this
+ *  radius; distances the plans write as literals do not scale with it. */
 export const PLACE_RADIUS = PLACE_RADIUS_BASE * balance.settlementRoom
 
 /** How far inside the southern edge a settlement drops the arriving traveller. */
@@ -52,7 +53,8 @@ export const SPAWN_INSET = 10
 export interface Interactive {
   type: BuildingType
   pos: [number, number]
-  /** World-space point in front of the entrance door; touching it opens the building. */
+  /** World-space point in front of the entrance door; standing near it arms the
+   *  use key, and the press enters. */
   door?: [number, number]
   /** Yaw of the building (port trade houses front their lane with the door side). */
   rot?: number
@@ -109,7 +111,8 @@ export interface PlaceLayout {
   fences: FenceDef[]
   paths: PathDef[]
   flora: Array<{ x: number; z: number; h: number }>
-  /** Scattered boulders (solid, part of the collision set). */
+  /** Scattered boulders: solid and collided with, except the low stones one
+   *  walks over (`looseRockIsGround`). */
   rocks: Array<[number, number, number]>
   /**
    * The one stone in that scatter a child climbs to name ROCK outside the game
@@ -150,19 +153,13 @@ export interface PlaceLayout {
    * in every settlement without a bank.
    */
   playRocks: { upstream: BankPoint; downstream: BankPoint; r: number; scale: number } | null
-  /**
-   * The village's WATER PATH (work-order 688): the lane its water carriers walk
-   * between the settlement and the river. `head` is the point in the village
-   * where the path leaves the built ground — where both carriers speak, one
-   * setting out with an empty jar and one arriving with a full one — and `foot`
-   * is where it meets the bank, upstream of and clear of the children's stretch.
-   * Null in every settlement without a bank.
-   */
-  /** The village's walk to the water: `head` in the village where the word
-   *  falls, `foot` the drawn track's landing on flat ground, and `fill` the spot
-   *  IN the water where the carrier dips his jar (work-order 1087). Only head
-   *  and foot are drawn as a track; the last stretch down the shore is not a
-   *  worn path. */
+  /** The village's walk to the water (work-orders 688, 1087): `head` where the
+   *  path leaves the built ground, `foot` the drawn track's landing on flat
+   *  ground upstream of the children's stretch, and `fill` the spot IN the
+   *  water where the carrier dips his jar. Only head and foot are drawn as a
+   *  track; the last stretch down the shore is not a worn path. The errand's
+   *  words fall at the water stand, not here. Null in every settlement without
+   *  a bank. */
   waterPath: { head: BankPoint; foot: BankPoint; fill: BankPoint } | null
   /** The village water stand (work-order 1087): where the filled jars are set
    *  down and where both of the errand's words are spoken. Null where the
@@ -191,7 +188,8 @@ export interface PlaceLayout {
    * between two cycles of its bank game, and how far it roams. It is layout data
    * since work-order 688, because the adults' own teaching places — the dig
    * sites — are placed clear of it, and a quarter derived a second time in the
-   * scene would be a second quarter. Null outside villages.
+   * scene would be a second quarter. Null only at a monument site; a port's
+   * children get one too.
    *
    * `balance.villageLife.tag.playRadius` is read when the layout is built, so an
    * edit takes effect on the next visit rather than mid-scene — the same rule
@@ -208,7 +206,7 @@ export interface PlaceLayout {
    * is open.
    */
   wayOut: number | null
-  /** Livestock pen (kraal layouts). */
+  /** Livestock pen (kraal layouts, and the Tuareg camp's goat pen). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
   errands: Array<[number, number]>
@@ -273,15 +271,15 @@ export const DIG_SITE_RADIUS = 0.9
  */
 export const CENTRAL_GROUND_RADIUS = 9
 
-/** How near a dig site must stand to the thing whose work it is — a compound
- *  wall for the store pit, a lane edge for the post hole. Two paces: near
+/** How near a dig site must stand to the thing whose work it is — a dwelling's
+ *  body for the store pit, a lane edge for the post hole. Two paces: near
  *  enough that the eye joins the two, far enough that the digger still fits
  *  between them. */
 export const DIG_SITE_ANCHOR_REACH = 3.5
 
 /** Where the WORKED GROUND begins, as a fraction of the walkable radius: the
- *  turned patch lies out here, past the last compound rather than between
- *  them. */
+ *  turned patch lies at or past it, toward the edge rather than on the
+ *  square. */
 export const DIG_SITE_FIELD_BAND = 0.62
 
 /** How wide the settlement's WAY OUT is kept, measured from its axis (work-order
@@ -320,10 +318,8 @@ export const WATER_STAND_FIRE_GAPS = [3.4, 4.2, 5.0, 5.8] as const
 /** How many bearings of the working ring around the stand are tested, and how
  *  many of them must be open ground for the stand to count as reachable. */
 const WATER_STAND_APPROACHES = 16
-/** The ring the two men work from — `JOIN_STAND_OFF` in `adultWork.ts`, restated
- *  here rather than imported because the layout must not depend on the errand
- *  module; `layout.test.ts` pins the two together. */
-export const WATER_STAND_WORK_RING = 2.4
+/** The ring the two men work from — `JOIN_STAND_OFF` in `adultWork.ts`. */
+export const WATER_STAND_WORK_RING = JOIN_STAND_OFF
 /**
  * What the SEARCH demands, which is deliberately more than the nine bearings
  * `riverBank.test.ts` holds the finished layout to. The stand is placed before
@@ -340,11 +336,9 @@ export const WATER_STAND_RADIUS = 0.6
  *  who says RIVER at it points past it at the river. */
 const WATER_STAND_BEARINGS = 16
 
-/** Where the WATER PATH's head stands: on the bank's own bearing, out past the
- *  compound ring (7-14 m, work-order 604) at the edge of the built ground. It
- *  is the point both water carriers speak at, so it has to be a place the
- *  player can stand among the village and hear — not a spot on the open plain
- *  and not the middle of the square. */
+/** Where the WATER PATH's head stands: swept round the foot's bearing, out at
+ *  the edge of the built ground past the compounds — a place among the village,
+ *  not a spot on the open plain and not the middle of the square. */
 export const WATER_PATH_HEAD_RADIUS = 15
 
 /** The radii the head is tried at, the nominal one first: a dense plan can leave
@@ -362,7 +356,7 @@ export const WATER_PATH_HEAD_RADII = [
 
 /** How far to either side of the water's own bearing the head may be swept, in
  *  degrees, to find a straight walk that clears the settlement's buildings. */
-export const WATER_PATH_HEAD_SWEEP = 60
+const WATER_PATH_HEAD_SWEEP = 60
 
 /** Width of the water path, in metres: a walked footpath, narrower than the
  *  village's own lanes. */
@@ -404,7 +398,7 @@ function dwellingCollider(d: DwellingDef, style: RegionPlaceStyle): Collider {
 }
 
 /** Stand-off this dwelling's own ROOF demands, 0 where its rim hangs clear. */
-export function dwellingRoofStandOff(d: DwellingDef, style: RegionPlaceStyle): number {
+function dwellingRoofStandOff(d: DwellingDef, style: RegionPlaceStyle): number {
   return roofStandOff(dwellingRoofProfile(d, style))
 }
 
@@ -451,23 +445,6 @@ export function chiefStandingSpot(it: Interactive, hutRadius = 3.35): [number, n
 export const DOOR_TRIGGER_RADIUS = 1.2
 
 /**
- * The nearest actionable interactive for the Space use key (design.md §2.3):
- * the functional building at whose door the traveller stands, and the nearest
- * of them when two doors overlap — null when none is in reach. A PURE function
- * of the layout and the LIVE player position, so the key
- * press can act on where the traveller IS NOW rather than on the last rendered
- * frame's candidate: a synchronous keydown after a teleport or a fast step used
- * to read a frame-lagged `nearRef` and open the previously-near building.
- */
-export function nearestActionable(
-  layout: PlaceLayout | null,
-  x: number,
-  z: number,
-): Interactive | null {
-  return pickUseCandidate(doorCandidates(layout, x, z), null)?.payload ?? null
-}
-
-/**
  * Every functional door as a use-key candidate, measured against the LIVE
  * player position (work-order point 691). The reach filter is NOT applied here:
  * the arbitration compares a door with everything else SPACE could mean in the
@@ -506,8 +483,8 @@ const FENCE_PANEL_RADIUS: Record<FenceDef['kind'], number> = { thorn: 0.6, stone
  * passage only just wide enough leaves that grid too few free cells to find.
  */
 export const COMPOUND_RING_MIN = 6.2
-export const COMPOUND_WALL_GAP = 0.9
-export const COMPOUND_RING_CORRIDOR = 2.5
+const COMPOUND_WALL_GAP = 0.9
+const COMPOUND_RING_CORRIDOR = 2.5
 
 /** Neighbouring posts further apart than this multiple of the ring's own post
  *  spacing span a GATE the renderer leaves open — they are never joined. Posts
@@ -600,12 +577,6 @@ function fenceRing(
   return posts
 }
 
-/**
- * Procedural layout per run+place (design.md §18): the settlement pattern
- * follows the region (lanes / compound clusters / kraal ring), with far more
- * non-enterable dwellings and outbuildings than functional buildings, a
- * path network and fences (design.md §2 "Lively, densely built settlements").
- */
 /** Whether a point lies on a lane (within its width) — the footstep-surface
  *  classification (point 97): on a lane reads as a firmer stone/clay path, off
  *  it as softer open ground. */
@@ -762,8 +733,6 @@ function collidersNearRun(
   return out
 }
 
-/** A continuous corridor: each 0.1 m sample is widened by half a step,
- * so even a grazing box corner between samples cannot touch the drawn lane. */
 /**
  * THE PLAZA A VILLAGER LOOKS FROM (work-order 1190). The village's middle is a
  * ground rather than a point — the compounds sit evenly around it — so the loom
@@ -803,8 +772,8 @@ const PLAZA_SIGHT_SAMPLE = 0.2
  *
  * `sample` is how finely the run is walked. A COARSER step is the conservative
  * direction, not the cheap one: the clearance each sample is held to grows by
- * half the step, so a wider stride can only reject a corridor a finer one
- * accepted. The plaza sight line (work-order 1190) strides wide because it asks
+ * half the step, so even a grazing box corner between samples cannot touch the
+ * run, and a wider stride errs toward rejecting. The plaza sight line (work-order 1190) strides wide because it asks
  * about a view metres across and is asked thousands of times per layout.
  */
 function clearCorridor(colliders: readonly Collider[], head: BankPoint, foot: BankPoint, halfWidth: number, sample = 0.1): boolean {
@@ -878,6 +847,12 @@ function colliderBuckets(colliders: readonly Collider[], reach: number): (x: num
     buckets.get(`${Math.floor(x / COLLIDER_BUCKET)},${Math.floor(z / COLLIDER_BUCKET)}`) ?? NO_COLLIDERS
 }
 
+/**
+ * Procedural layout per run+place (design.md §18): the settlement pattern
+ * follows the region (lanes / compound clusters / kraal ring), with far more
+ * non-enterable dwellings and outbuildings than functional buildings, a
+ * path network and fences (design.md §2 "Lively, densely built settlements").
+ */
 export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const place = placeById(placeId)
   // Monument sites (design.md §4.4, point 273) are a bare walkable disc with the
@@ -902,21 +877,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const bank = buildRiverBank(place, radius)
   // The children's two play rocks (work-order 687), derived from that bank and
   // fixed BEFORE anything loose is scattered, so the dressing grows around the
-  // stage instead of into it. See `riverBank.ts` for the numbers and the
-  // measurement behind them.
+  // stage instead of into it. Where they stand is `riverBank.ts`'s; their size
+  // is `PLAY_ROCK_RADIUS` and `PLAY_ROCK_SCALE` above.
   const playRocks: PlaceLayout['playRocks'] = bank
     ? { ...bankPlayRocks(bank), r: PLAY_ROCK_RADIUS, scale: PLAY_ROCK_SCALE }
     : null
   // THE WATER PATH (work-order 688): the lane the village's water carriers walk.
-  // It is laid down HERE, before a single hut is placed, because it is a lane
-  // like any other — the plan builds against it, and nothing is put on it.
-  //
   // Its foot is `bankWaterFoot`'s landing, upstream of the children's stretch
-  // (see riverBank.ts for why upstream). Its head is the point where it leaves
-  // the built ground, on the same bearing, at `WATER_PATH_HEAD_RADIUS`: that is
-  // where BOTH carriers speak — one setting out with an empty jar, one arriving
-  // with a full one — so the word RIVER falls in the VILLAGE and never at the
-  // bank, where it would land inside the children's earshot.
+  // (see riverBank.ts for why upstream), fixed here. The head written here is a
+  // placeholder: the head is searched once the plan stands (see below), and the
+  // path is dropped where none is found.
   let waterPath: PlaceLayout['waterPath'] = bank
     ? {
         head: { x: bank.nx * WATER_PATH_HEAD_RADIUS, z: bank.nz * WATER_PATH_HEAD_RADIUS },
@@ -935,7 +905,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // baseline goods for gifts (design.md §9/§10).
     const chiefPos: [number, number] = [jitter(0, 4), jitter(-13, 3)]
     // Must match VillageHut's default facing (door toward the place center);
-    // the door point sits just outside the hut collider (r 3.35).
+    // the door point sits 3.9 m out, beyond the chief's (3.35) and the market's
+    // (2.9) hut bodies — a roof stand-off can widen either collider.
     const hutDoor = (p: [number, number]): [number, number] => {
       const facing = Math.atan2(p[0], p[1]) + Math.PI
       return [p[0] + Math.sin(facing) * 3.9, p[1] + Math.cos(facing) * 3.9]
@@ -955,8 +926,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // Keep the full window gap (design.md §2.6) to the chief's hut.
     const dChief = Math.hypot(marketPos[0] - chiefPos[0], marketPos[1] - chiefPos[1])
     if (dChief < 7.25) {
-      const nx = dChief > 1e-6 ? (marketPos[0] - chiefPos[0]) / dChief : -0.6
-      const nz = dChief > 1e-6 ? (marketPos[1] - chiefPos[1]) / dChief : 0.8
+      // Never zero: the chief stands 4.5 m or more north of every plan's market band.
+      const nx = (marketPos[0] - chiefPos[0]) / dChief
+      const nz = (marketPos[1] - chiefPos[1]) / dChief
       marketPos[0] = chiefPos[0] + nx * 7.25
       marketPos[1] = chiefPos[1] + nz * 7.25
     }
@@ -1021,7 +993,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   let pen: PlaceLayout['pen'] = null
   const center: [number, number] = [0, 1.5]
 
-  // Keep the southern spawn corridor (x≈0, z>6), interactives and the
+  // Keep the southern spawn corridor (|x| < 4.5, z > 5), interactives and the
   // life-prop spots (PlaceLife) clear.
   const lifeSpots: Array<[number, number]> =
     place.kind === 'village' ? villageKeepClearSpots(placeId) : [PORT_TALKERS]
@@ -1128,7 +1100,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // demands nothing and leaves the door exactly where it always sat.
     const standOff = dwellingRoofStandOff({ kind, x, z, rot, r, h, floors, door: [x, z] }, style)
     // `doorAt` adds the 0.5 m approach itself, so the seat radius carries only
-    // the body: the wall, or the roof's stand-off less that same 0.2 m of air.
+    // the body: the wall, or the roof's stand-off less 0.3 m, which leaves the
+    // door 0.2 m clear of it.
     const doorSeat = Math.max(r, standOff - 0.3)
     const facing = pickDoorRot(x, z, doorSeat, rot)
     const d: DwellingDef = {
@@ -1185,7 +1158,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       alleys.push(alley)
       paths.push(alley)
     }
-    if (size >= 3 && alleys.length > 0) {
+    if (size >= 3) {
       // Major cities widen the first alley's bend into a second small square.
       const mid = alleys[0].points[2]
       paths.push({ points: [[mid[0] - 2, mid[1]], [mid[0] + 2.5, mid[1] + 0.5]], width: 5.5 })
@@ -1345,7 +1318,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // the plain exit path with its wide cleared axis.
     if (plan !== 'street') pushPath([center, [0, 24]], 2.2)
     pushPath([center, [chief.pos[0], chief.pos[1] + 3.4]], 1.6, true)
-    pushPath([center, [-3.5, 2.5]], 1.1)
+    pushPath([center, [VILLAGE_FIRE[0], VILLAGE_FIRE[1]]], 1.1)
     errands.push([-2.2, 3.4], [jitter(1.5, 2), jitter(4, 2)], [chief.pos[0], chief.pos[1] + 4])
 
     const southGap: [number, number] = [Math.PI / 2, 0.55] // spawn corridor
@@ -1544,7 +1517,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         return added
       }
       topUpCompounds(Math.max(7, placedRings.length * 2), () => true)
-      // A shed and a drying rack scattered between the compounds.
+      // Up to two sheds scattered between the compounds.
       for (let i = 0; i < 6 && dwellings.filter((d) => d.kind === 'shed').length < 2; i++) {
         const a = rand() * Math.PI * 2
         const r = 9 + rand() * 8
@@ -1555,7 +1528,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       }
     } else if (plan === 'scatter') {
       // Dispersed camp: loose family groups of tents/small huts with
-      // irregular spacing — no lanes, no shared fence.
+      // irregular spacing — no lanes of its own beyond the common paths, no
+      // shared fence.
       const kind: DwellingKind = place.peopleId === 'tuareg' ? 'tent' : 'hut'
       const groups = 4 + (rand() < 0.5 ? 1 : 0)
       let placed = 0
@@ -1670,10 +1644,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // dropped independently can end up 0.4 m apart, and that slot is narrower than
   // anyone who walks: a villager routed past it is caught in the notch and a
   // traveller pressed into it cannot walk out. Every loose object therefore keeps
-  // a walkable gap from every other one — `isFree` covers the buildings, this
-  // covers the dressing among itself.
+  // a walkable gap from every other one — `isFree` covers the buildings, and
+  // `clearOfDressing` (further down, where the dressing is scattered) covers
+  // the dressing among itself.
+  //
   // A POST STANDING IN A BUILDING IS PULLED (work-order 604). Some plans raise
-  // their fence after the dwellings — a Tuareg camp windbreak, a kraal ring — so
+  // their fence after the dwellings — a Tuareg camp's goat pen, a kraal ring — so
   // `isFree` cannot keep the two apart, and a panel that runs through a tent
   // leaves a slot narrower than a man on either side of the crossing. The post is
   // dropped instead: the drawn run and the collider run are cut from the same
@@ -1704,7 +1680,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
-  // --- Collision set: every solid object becomes one or more circles ------
+  // --- Collision set: every solid object becomes circles, boxes or segments --
   const colliders: Collider[] = []
   interactives.forEach((it) => {
     if (place.kind === 'port') {
@@ -1716,8 +1692,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   })
   // WHAT GIVES WAY TO THE PLAZA'S VIEW OF THE LOOM (work-order 1190): the
-  // outbuildings, the trees and the loose stones. The dwellings, the chief's
-  // and the trading huts stand where the plan put them; a shed or a granary
+  // outbuildings, the trees and the loose stones. The chief's and the trading
+  // huts stand where the plan put them, and a dwelling moves only with its whole
+  // household (work-order 1191, below); a shed or a granary
   // standing in the one line the plaza has is left unbuilt, as a tree there is.
   const plazaYielding = new Map<Collider, () => void>()
   const floraBodies = new Set<Collider>()
@@ -1757,8 +1734,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // The props include the fire's stand-off; figure bodies are registered by
     // PlaceLife, so the kneeling cook needs no overlapping static collider.
     // THE LOOM PUTS NO CIRCLE HERE (work-order 1157). Its nominal ground is
-    // still reserved against the PLAN — `lifeSpots` and `villageLifeFootprints`
-    // both carry it, so the huts are fitted around it as before — but the
+    // still reserved against the PLAN — `villageLifeFootprints` carries it, so
+    // the huts are fitted around it as before — but the
     // collider it contributes is the WARP, and the warp cannot be laid until
     // the bank, the children's stage and the water lane have settled. It is
     // pushed there instead of here; nothing is pushed now and spliced out
@@ -1833,7 +1810,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // point: where the three teaching areas cannot all clear each other, THE
   // ADULTS move. The children's words hang on where they stand — at the rocks,
   // at the water — so the quarter is fixed first and the adults' own places, the
-  // water path's head and the three work sites, are fitted around it.
+  // water path's head and the dig sites, are fitted around it. (The water stand,
+  // placed just before, is the one adult place the quarter's search avoids.)
   //
   // It is decided in the LAYOUT rather than in the scene because those places are
   // placed against it, and a quarter derived once there and once here would be
@@ -1856,7 +1834,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   )
   /** Whether a body of radius `r` would stand in the children's quarter. */
   const inPlayGround = (x: number, z: number, r: number) =>
-    !!playGround && Math.hypot(x - playGround.x, z - playGround.z) < playGround.radius + r
+    Math.hypot(x - playGround.x, z - playGround.z) < playGround.radius + r
   /**
    * ... or on their WAY DOWN TO THE WATER (work-order 688). The bank round walks
    * the whole group from the quarter to the descent and back again once a cycle,
@@ -1867,7 +1845,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
    * afterwards.
    */
   const onWayToWater = (x: number, z: number, r: number) => {
-    if (!playGround || !bank) return false
+    if (!bank) return false
     const d = closestOnPolyline(
       [[playGround.x, playGround.z], [bank.bank.x, bank.bank.z]],
       x,
@@ -1890,7 +1868,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
    * How far a spot stands from the NEAREST place a child speaks: the roaming
    * quarter's rim, either play rock, and the descent they gather at.
    *
-   * One function for both adult places. The water path's head used to be judged
+   * One function for every adult place — the water path's head, the dig sites
+   * and the loom. The water path's head used to be judged
    * against the roaming quarter ALONE, so an outer head could stand within
    * hearing of children on the bank while the dig sites — judged against all
    * three — could not (GPT-5.6 Sol, confirming round, hearing separation).
@@ -1904,7 +1883,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
    */
   const toChildren = (x: number, z: number) => {
     let best = Infinity
-    if (playGround) best = Math.min(best, Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius)
+    best = Math.min(best, Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius)
     for (const p of playRocks ? [playRocks.upstream, playRocks.downstream] : []) {
       best = Math.min(best, Math.hypot(x - p.x, z - p.z))
     }
@@ -1913,13 +1892,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
   const inPlayEarshot = (x: number, z: number) => toChildren(x, z) < ADULT_SPEECH_MARGIN
 
-  // THE WATER PATH IS LAID LAST OF ALL THE ADULTS' PLACES (work-order 688). A
+  // THE WATER PATH IS LAID AFTER THE PLAN IS BUILT (work-order 688). A
   // lane forced through the house band BEFORE the plan costs it a dwelling
   // (measured at nubian-village, seed 42: seven boxes became six), so the track
   // is fitted to the settlement instead: its FOOT is fixed at the water, and its
-  // HEAD is swept round the bank's bearing until the straight walk between the
-  // two clears every building, the children's running lane AND their roaming
-  // quarter's earshot. A carrier's track is a straight worn line, not a lane that
+  // HEAD is swept round the foot's bearing until the straight walk between the
+  // two clears every building and the children's running lane, and the head
+  // itself stands out of earshot of every place the children speak. A carrier's track is a straight worn line, not a lane that
   // bends round three huts, and a straight one is also what reads as a path to
   // the river from inside the village.
   // Held beyond the block below so the post-settle re-check can ask exactly the
@@ -2015,10 +1994,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
-  // THE WAY OUT (work-order 688), read off the BUILT fabric before a single
-  // loose object is placed: the huts, the compound fences, the lanes and the
+  // THE WAY OUT (work-order 688), read off the BUILT fabric's colliders before a
+  // single loose object is placed: the huts, the compound fences and the
   // functional buildings are all standing by now, and none of them is moved for
-  // it. The play rocks are settled onto the bank further down, which the bank's
+  // it (the lanes carry no collider and do not enter it). The play rocks are settled onto the bank further down, which the bank's
   // own arc keeps out of the crossing anyway.
   const wayOut = pickWayOut(colliders, radius, bank)
   devAssert(
@@ -2119,7 +2098,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // share rose to 0.282 % against a 0.25 % gate. It therefore keeps the carve's
   // own corridor clear of every boundary already standing — the built fabric and
   // the dressing alike, which is why it is derived after both.
-  const climbRock = place.kind === 'village' && playGround
+  const climbRock = place.kind === 'village'
     ? deriveClimbRock(
         playGround,
         bank ? { x: bank.bank.x, z: bank.bank.z } : null,
@@ -2155,8 +2134,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
   // The bank a villager is SENT to obeys the same rule (point 155): it has to
-  // be ground the figure fits on against the full collider set — the water wall
-  // and whatever the dressing dropped near the shore included.
+  // be ground the figure fits on against the full collider set — whatever the
+  // dressing dropped near the shore included.
   if (bank) {
     // THE PLAY ROCKS ARE OUT OF THE PROBE, and have to be: they are derived from
     // the very endpoints being settled and move with them, so letting them block
@@ -2170,9 +2149,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // AND THE STAGE FOLLOWS THE BANK IT IS DERIVED FROM. Settling may pull the
     // endpoints inland; the play rocks were computed before it, so trusting them
     // afterwards would leave the round's stage and the villagers' bank as two
-    // geometries that agree only by luck. Measured 29.08.2026 the settling moves
-    // nothing — every river layout, forty seeds each, zero movement — which is
-    // exactly why this is re-derived rather than trusted: a divergence that never
+    // geometries that agree only by luck. Measured 29.08.2026 the settling moved
+    // nothing — every river layout, forty seeds each — and since point 1173 it
+    // can (below), which is exactly why this is re-derived rather than trusted: a divergence that never
     // happens has no symptom until the day it does, and then it is a player
     // standing between two banks.
     if (playRocks && playRockColliders) {
@@ -2291,9 +2270,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       }
       return { widest, line }
     }
-    // The ground a station may take once the households give way: their
-    // bodies, walls and lanes go with them. Trees and stones give way to the
-    // LINE only; the dressing is not thinned out for the station's ground.
     /** What a station displaces: the households in its plaza line — none
      *  where a line past the outbuildings alone is open — and on its ground. */
     const displacedBy = (station: LoomStation) => {
@@ -2323,7 +2299,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
      *  seat that would cost more is not taken. */
     const villagePlan = VILLAGE_PLANS[place.peopleId ?? ''] ?? 'compound'
     const affordable = ({ leaving, thinned }: ReturnType<typeof displacedBy>) => {
-      // The dressing is not thinned out below the way-out floor (point 688).
+      // The dressing is not thinned out below its floor (DRESSING_MIN_*, work-order 1191).
       if (flora.length - thinned.flora < DRESSING_MIN_FLORA) return false
       if (rocks.length - thinned.rocks < DRESSING_MIN_ROCKS) return false
       if (leaving.size === 0) return true
@@ -2335,6 +2311,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       if (left.length < VILLAGE_MIN_DWELLINGS) return false
       return villagePlan !== 'ksar' || left.filter((d) => d.kind === 'box').length >= KSAR_MIN_HOUSES
     }
+    // The ground a station may take once the households give way: their
+    // bodies, walls and lanes go with them. Trees and stones give way to the
+    // LINE only; the dressing is not thinned out for the station's ground.
     const standingSolids = colliders.filter((c) => !households.has(c))
     const householdLanes = new Set([...households.values()].flatMap((h) => h.paths))
     const standingLanes = paths.filter((lane) => !householdLanes.has(lane))
@@ -2503,8 +2482,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
-  // The village's ground work (work-order point 483): three patches where
-  // villagers dig — a store pit, a post hole and a patch turned over. They are
+  // The village's ground work (work-order point 483): two patches where
+  // villagers dig — a store pit (or, where no compound gives it room, a post
+  // hole) and a patch turned over. They are
   // placed like every other loose object (free ground, off the lanes, seeded by
   // the same generator) and they carry NO collider: a shallow pit is walked
   // over. The pair works from safe places on the rim.
@@ -2519,7 +2499,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // talkers share.
   const digSites: PlaceLayout['digSites'] = []
   if (place.kind === 'village') {
-    /** Distance to the nearest dwelling WALL, or Infinity where none is built. */
+    /** Distance to the nearest dwelling's body circle (centre less `r`), or
+     *  Infinity where none is built. */
     const toCompound = (x: number, z: number) =>
       dwellings.reduce((best, d) => Math.min(best, Math.hypot(x - d.x, z - d.z) - d.r), Infinity)
     /** Distance to the nearest lane EDGE. */
@@ -2537,12 +2518,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const earshot = ADULT_SPEECH_MARGIN
     /** What each kind of work needs of its spot, beyond the shared rules. */
     const belongs: Record<PlaceLayout['digSites'][number]['kind'], (x: number, z: number) => boolean> = {
-      // A store pit is sunk against the wall of the compound it stores for.
+      // A store pit is sunk against a dwelling of the compound it stores for.
       pit: (x, z) => toCompound(x, z) <= DIG_SITE_ANCHOR_REACH,
       // A post hole is dug where the post goes: at the side of a lane.
       postHole: (x, z) => toLane(x, z) <= DIG_SITE_ANCHOR_REACH,
-      // Ground is turned at the outer edge of what the village works, past the
-      // last compound rather than between them.
+      // Ground is turned at the outer edge of what the village works — out past
+      // the field band's share of the radius.
       patch: (x, z) => Math.hypot(x, z) >= radius * DIG_SITE_FIELD_BAND,
     }
     // Rank all candidates by distance inland, then retain the first that fits

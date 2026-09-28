@@ -5,11 +5,16 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  nearestActionable,
+  doorCandidates,
   DOOR_TRIGGER_RADIUS,
   type Interactive,
   type PlaceLayout,
 } from './layout'
+import { pickUseCandidate } from './useKeyTarget'
+
+// The door arbitration a press makes when nothing but doors is in reach.
+const nearestActionable = (layout: PlaceLayout | null, x: number, z: number): Interactive | null =>
+  pickUseCandidate(doorCandidates(layout, x, z), null)?.payload ?? null
 
 // The helper only reads `layout.interactives`; a partial layout suffices.
 const layoutOf = (interactives: Interactive[]): PlaceLayout =>
