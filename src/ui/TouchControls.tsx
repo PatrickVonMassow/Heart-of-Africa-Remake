@@ -1,8 +1,8 @@
 // On-screen touch controls (design.md §17.5, point 84): a virtual movement
 // stick (bottom-left) and a look/zoom drag surface (right screen half). It is
 // mounted by the HUD only while ui.touchActive, which the deliberate-input
-// guard in input.ts arms on the first real touch — so a desktop never sees it
-// and PC play is pixel-identical. The controls only WRITE into input.ts's touch
+// guard in input.ts arms on the first real touch — so a mouse-and-keyboard
+// session never sees it and stays pixel-identical. The controls only WRITE into input.ts's touch
 // state; the scenes consume it at the same merge points as the gamepad, so
 // there is no second input path.
 

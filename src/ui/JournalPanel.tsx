@@ -5,7 +5,7 @@
 // (English only — Kokoro has no German voice yet). New entries are narrated
 // automatically; the per-entry control replays or stops. A new entry is
 // visibly written into the book by a hand (design.md §16): the text reveals
-// stroke by stroke behind a moving hand, which is marked by the wound level
+// a few characters per 60 ms tick behind a moving hand, which is marked by the wound level
 // recorded on the entry — a severely wounded hand is bloody and leaves blood
 // traces on the page.
 
@@ -262,7 +262,8 @@ export function JournalPanel() {
   // Initial narration (design.md §15): the entry already in the book when
   // the game starts (the departure entry) also counts as newly appearing,
   // but the browser's autoplay policy blocks audio until the first user
-  // gesture — so its narration is deferred to exactly that gesture.
+  // gesture — so narration is deferred to exactly that gesture, which reads
+  // whichever entry is newest by then.
   useEffect(() => {
     if (!speechAvailable(t.lang)) return
     const onGesture = (ev: Event) => {
