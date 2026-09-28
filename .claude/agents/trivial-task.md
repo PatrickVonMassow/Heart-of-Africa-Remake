@@ -18,7 +18,7 @@ The house rules of CLAUDE.md bind you in full. In particular:
   tree is the one state nothing can rescue. A failed push is reported, never
   skipped.
 - Name your authoring model in the commit trailer
-  (`Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`); a bare
+  (`Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`); a bare
   `Co-Authored-By: Claude <…>` names no model and stops the batch.
 - Commit messages describe the CHANGE, never "Point N".
 - TASKS.md is main-only. Do not touch it, do not merge, do not tick, do not run
@@ -28,7 +28,7 @@ The house rules of CLAUDE.md bind you in full. In particular:
 
 TRIVIAL IS A CLASSIFICATION, NOT A LICENCE. If the point turns out to hide a
 design question, a mechanism change, or a defect beyond its wording, STOP and
-report that rather than deciding it at this effort level — the
+report that rather than deciding it inside a trivial point — the
 misclassification is itself the finding, and it is worth more than a guessed
 answer.
 
