@@ -41,7 +41,8 @@ export function spoilCentre(site: DigSite): ErrandPoint {
   return digLocalToWorld(site, spoilOffset(site), 0)
 }
 
-/** Local clod flight, landing on the same surface the villagers walk over. */
+/** Local clod flight, landing on the spoil mound — the mound term
+ *  (`spoilHeightAt`) of the surface the villagers walk over. */
 export function digEarthFlight(site: DigSite, progress: DigSiteProgress | undefined, age: number, clod: number): { x: number; y: number; z: number } {
   const u = Math.max(0, Math.min(1, age / 0.72))
   const x = 0.12 + (spoilOffset(site) - 0.12 + (clod % 3 - 1) * 0.12) * u
@@ -88,8 +89,10 @@ export function clearOfSpoil(site: DigSite, x: number, z: number, margin = DIG_W
  *  arrived (work-order 1087). */
 const MIN_STAND_GAP = 1.3
 
-/** Is this body at the site's working rim, blade in the hole and feet on
- *  unbroken ground? A figure outside it does not play the dig stroke, so a
+/** Is this body within the site's working rim — no farther from the centre than
+ *  the rim distance plus its tolerance? Only that outer bound is checked; the
+ *  stand search (`digStandingPlaces`) is what puts him on the rim itself. A
+ *  figure outside it does not play the dig stroke, so a
  *  future regression reads as a villager standing idle rather than as one
  *  hoeing untouched earth (work-order 1125). */
 export function atDigStand(site: ErrandPoint, x: number, z: number): boolean {
@@ -120,7 +123,7 @@ export function digStandingPlaces(site: DigSite, standable: (x: number, z: numbe
       const other = usable[j]
       if (Math.hypot(one.p.x - other.p.x, one.p.z - other.p.z) <= MIN_STAND_GAP) continue
       // Straight across the hole is PI apart; the weight keeps one bearing step
-      // (30 degrees) worth more than any reachable gain in heap distance.
+      // (15 degrees) worth more than any reachable gain in heap distance.
       const turn = Math.abs(one.a - other.a) % (Math.PI * 2)
       const apart = turn > Math.PI ? Math.PI * 2 - turn : turn
       const score = apart * 100 + Math.min(one.fromHeap, other.fromHeap)
