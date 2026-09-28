@@ -1904,3 +1904,11 @@ even when the answer says the whole file was read and carries 40+ evidenced entr
 parts, 1 Astra part). A duplicated list (B1 twice) is likewise rejected whole. Worked around by a
 brief amendment (`local/blind-633-4f6c83e/run-lane.sh`). Fix when it recurs: scope the net to the
 material itself, not to context outside it.
+
+## Closing 633 cleanup: 1011 backlog decisions
+
+The blind-parallel cleanup of closing 633 decided 1011 union entries as `backlog` (no player
+impact, no risk, no blockade). They stay in their tracked decision records rather than being copied
+here; list them with
+`node -e 'for(const f of require("fs").readdirSync("docs/blind-633/decisions"))for(const e of require("./docs/blind-633/decisions/"+f))if(e.decision==="backlog")console.log(f,e.id,e.reason)'`.
+The four entries decided `point` became points 1226-1229.

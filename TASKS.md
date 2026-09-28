@@ -16149,3 +16149,43 @@ to land than a mechanism that needs a review.
   Test: three consecutive full unit runs with both files green; bankGame alone 10/10.
   Refs: src/scenes/place/layout.test.ts, src/scenes/place/bankGame.test.ts.
   Bundle: Testinfrastruktur.
+- [ ] 1226. Worktree cleanup refuses a locked registered worktree without an expectation.
+  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c08.json U4362):
+  `scripts/worktree-cleanup.mjs` without `--expect` takes no lock, `git worktree remove --force`
+  refuses a git-locked tree, and `removeTreeSafely` then falls back to `rmSync` — contradicting its
+  own comment that a foreign lock refuses the removal first. An active agent's tree can be deleted.
+  FINAL STATE: on the no-expectation path a git-locked or dirty registered worktree is refused with
+  a named reason; nothing is removed.
+  Criticality: high — data risk (an active author's uncommitted work).
+  Test: unit case with a locked registered worktree and no `--expect` → refused, tree intact.
+  Refs: scripts/worktree-cleanup.mjs.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1227. Settlement rain reaches the ground.
+  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c09.json U4841):
+  `PlaceRain.tsx` places the rain column's base at eye height (1.5 m) with fall in
+  [0, RAIN_HEIGHT), so streaks run from eye height upward and never reach the ground.
+  FINAL STATE: the column is centred on the eye as the comments intend; streaks visibly reach the
+  ground in a settlement.
+  Criticality: medium — visible in every rainy settlement.
+  Test: unit assertion on the column bounds; picture of a rainy settlement on both backends.
+  Refs: src/scenes/place/PlaceRain.tsx.
+  Bundle: Dorfleben.
+- [ ] 1228. The fire tender faces the fire.
+  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c09.json U4844):
+  `PlaceLife.tsx` turns the fire tender toward the hard-coded point (-3.5, 2.5) instead of the fire
+  at `firePos` (he stands at firePos − (1.3, 0.7)).
+  FINAL STATE: his rotation aims at `firePos` in every village.
+  Criticality: low — visible in villages whose fire is off that point.
+  Test: unit assertion on the heading for a moved fire; picture in such a village on both backends.
+  Refs: src/scenes/place/PlaceLife.tsx.
+  Bundle: Dorfleben.
+- [ ] 1229. A predator robbed of its chase victim walks off from where it stands.
+  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c11.json U5474):
+  the crocodile-steal abort in `Wildlife.tsx` sets `s.lx/s.lz` to the kill-site flank although the
+  predator is still chasing elsewhere, so it visibly teleports.
+  FINAL STATE: the walk-off starts from the predator's current position, like the swim-escape
+  give-up.
+  Criticality: medium — a visible teleport in the panorama.
+  Test: unit case for the steal abort keeping the predator's position.
+  Refs: src/scenes/travel/Wildlife.tsx.
+  Bundle: Tierverhalten.
