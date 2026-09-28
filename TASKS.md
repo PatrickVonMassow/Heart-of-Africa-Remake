@@ -165,6 +165,44 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1230. A recorded cloud offload switch moves Claude-lane authoring into cloud sessions.
+  ORDER (user 28.09.2026 15:16: "Dieser Task soll direkt nach 174 umgesetzt werden."): this point
+  stands DIRECTLY AFTER point 174 — the next point worked once 174 (the tag) is ticked.
+  WHY (user 28.09.2026 15:13: "Ja, es soll einen neuen Schalter gaben. Wenn man den umlegt, sollen
+  Arbeiten in die Cloud ausgelagert werden."; 15:21: "Und der Switch soll bis auf weiteres auf an
+  stehen - also Auslagerung in die Cloud. Ich habe nämlich für einen begrenzten Zeitraum freies
+  Kontingent dafür und möchte das abschöpfen, bevor es verfällt."). The user's 11:05 approval to run
+  cleanup chunks c13/c14 on the free cloud credits was lost at a context handover; both ran locally
+  on the plan limit while the cloud credits (expiring 05.11.2026 08:59 MEZ) stayed unused.
+  SPEC: a recorded switch following `scripts/fable-switch.mjs` / `scripts/astra-share.mjs`:
+  `node scripts/cloud-switch.mjs --on|--off --reason "<…>"` and `--status`, state versioned so it
+  survives every handover; `--status` names the credit expiry so the switch is revisited then.
+  WHEN ON: Claude-lane authoring delegations (Agent-tool children and cleanup/union chunks that run
+  in local worktrees today) start as cloud sessions — own clone, own `feat/<point>-<slug>` branch,
+  push after every commit, brief in the prompt or a tracked file (local/ is not in the clone).
+  Review, suites, picture check and landing stay local; the batch picks up the pushed branch.
+  WHEN OFF: everything stays local, exactly as now.
+  FINAL STATE:
+  1. The switch exists with `--status`, and the batch-resume/handover text states its position.
+  2. The delegation path reads the switch: ON launches cloud, OFF local. A cloud slot counts
+     against the branch limit like any author.
+  3. PROOF OF OFF-MACHINE EXECUTION before `--on` is allowed: the 07.08.2026 probe
+     (docs/harness-primitives-evaluation.md) found `isolation: "remote"` running LOCALLY. Re-probe
+     with a check that cannot pass locally (the cloud author commits a hostname/marker absent from
+     this container), and the user confirms the cloud-session credit balance on
+     claude.ai/settings/usage dropped. If cloud runs locally or is unreachable, `--on` refuses with
+     that reason and the batch falls back to local, saying so on the board.
+  4. Unit tests for the switch core and the routing decision (ON→cloud, OFF→local,
+     unreachable→local with notice).
+  POSITION AT LANDING: ON until further notice (user 28.09.2026 15:21) — the point closes by
+  switching it ON with that quote as reason once step 3 passes.
+  Infrastructure freeze (CLAUDE.md §2): an explicit user order, not a self-initiated mechanism;
+  keep it to the switch plus the one routing read — no new router, planner or ledger.
+  Criticality: medium — routing of authoring work; a wrong ON silently burns plan quota locally.
+  Test: unit tests of the switch core and routing; the off-machine probe recorded with its marker.
+  Refs: scripts/fable-switch.mjs, scripts/astra-share.mjs, docs/harness-primitives-evaluation.md.
+  Bundle: not bundled (sequenced directly behind 174).
+
 - [ ] 1207. The stand-down fence refuses writes outside the checkout, so the documented request handoff cannot be used.
   FINAL STATE: a stood-down session can deposit a request with `finding.mjs --request` using files it writes itself, with no workaround.
 
