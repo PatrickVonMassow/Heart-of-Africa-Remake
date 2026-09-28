@@ -69,7 +69,7 @@ export function looseRockRise([x, z, s]: readonly [number, number, number], px: 
 
 /** One entry of the layout's rock scatter, as the rest of the game sees it. */
 export function looseRock([x, z, s]: readonly [number, number, number]): LooseRock {
-  return { x, z, radius: looseRockRadius(s), height: ROCK_TOP_UNITS * s }
+  return { x, z, radius: looseRockRadius(s), height: looseRockTop(s) }
 }
 
 /**
@@ -83,7 +83,7 @@ export function looseRock([x, z, s]: readonly [number, number, number]): LooseRo
  * nearest climbable one therefore wins.
  *
  * AND A SETTLEMENT WITHOUT ONE KEEPS THE GUARD ANYWAY, taking the tallest stone
- * it has. Dropping the boulder instead would drop the whole bank round with it —
+ * it has that is not walked over (null where every stone is ground). Dropping the boulder instead would drop the whole bank round with it —
  * `PlaceLife` builds no stage without a stone — which trades one word taught at
  * a low step for the entire game the children play.
  */
@@ -141,6 +141,18 @@ export const CLIMB_ROCK_SCALE = 1
 export const CLIMB_ROCK_TOP = ROCK_TOP_UNITS * CLIMB_ROCK_SCALE
 
 /**
+ * How far past the rim `deriveClimbRock` draws (the quarter's edge plus the
+ * stone's collider and a walker, about 1.2 m) the rings are tried, in metres.
+ * The first free candidate wins, so a settlement with room beside the quarter
+ * gets a stone a pace away and only a crowded one reaches for the outer rings.
+ * MEASURED over the 110 shipped village/seed layouts, from the quarter's own
+ * edge: 96 stand on the innermost ring (1.2 m out), the other 14 spread out to
+ * 6.0 m — and stopping at 2.4 m left 8 of the 110 with no derived stone at all,
+ * which is the one outcome this list is long enough to prevent.
+ */
+const RINGS = [0, 0.8, 1.6, 2.4, 3.2, 4, 4.8, 5.6]
+
+/**
  * THE STONE IS PLACED TO BE CLIMBED (work-order 1082), the way the two play
  * rocks are placed on the bank rather than looked for in the scatter.
  *
@@ -165,17 +177,6 @@ export const CLIMB_ROCK_TOP = ROCK_TOP_UNITS * CLIMB_ROCK_SCALE
  * the quarter disc and the dressing already scattered. Pure, so the derivation
  * can be pinned without a settlement.
  */
-/**
- * How far outside the quarter's rim the rings are tried, in metres. The first
- * free candidate wins, so a settlement with room beside the quarter gets a stone
- * a pace away and only a crowded one reaches for the outer rings. MEASURED over
- * the 110 shipped village/seed layouts: 96 stand on the innermost ring (1.2 m
- * outside the rim), the other 14 spread out to 6.0 m — and stopping at 2.4 m
- * left 8 of the 110 with no derived stone at all, which is the one outcome this
- * list is long enough to prevent.
- */
-const RINGS = [0, 0.8, 1.6, 2.4, 3.2, 4, 4.8, 5.6]
-
 export function deriveClimbRock(
   quarter: { x: number; z: number; radius: number },
   water: { x: number; z: number } | null,
@@ -189,7 +190,7 @@ export function deriveClimbRock(
   // by the quarter rule it was derived from through a rounding difference.
   const rim = quarter.radius + radius + clearance + 1e-3
   // Straight away from the water where there is one; a settlement without a bank
-  // has no preferred side and simply starts due north.
+  // has no preferred side and simply starts toward +z (south in place coordinates).
   const preferred = water
     ? Math.atan2(quarter.x - water.x, quarter.z - water.z)
     : 0
@@ -198,7 +199,7 @@ export function deriveClimbRock(
     for (let k = 0; k < STEPS; k++) {
       // Fanned out from the preferred side in alternating steps, so the first
       // free candidate is the one closest to it rather than the first one a
-      // sweep from due north happens to reach.
+      // sweep from a fixed bearing happens to reach.
       const turn = (Math.ceil(k / 2) * (k % 2 === 0 ? 1 : -1) * 2 * Math.PI) / STEPS
       const a = preferred + turn
       const x = quarter.x + Math.sin(a) * (rim + out)
