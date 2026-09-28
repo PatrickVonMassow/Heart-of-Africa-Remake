@@ -15,7 +15,6 @@ import {
   addTouchPinch,
   consumeTouchPinch,
   onTouchEngage,
-  isTouchEngaged,
   dispatchSyntheticKey,
   keyPressSource,
   wheelTargetsScene,
@@ -274,7 +273,6 @@ describe('dispatchSyntheticKey (design.md §17.5: gamepad/touch share the keyboa
 // touchstart is dispatched anywhere below.
 describe('touch engagement latch (design.md §17.5, point 84 — deliberate-input guard)', () => {
   it('starts unengaged and defers a registered callback', () => {
-    expect(isTouchEngaged()).toBe(false)
     const cb = vi.fn()
     onTouchEngage(cb)
     expect(cb).not.toHaveBeenCalled()
@@ -284,7 +282,6 @@ describe('touch engagement latch (design.md §17.5, point 84 — deliberate-inpu
     const cb = vi.fn()
     const unsub = onTouchEngage(cb)
     window.dispatchEvent(new Event('touchstart'))
-    expect(isTouchEngaged()).toBe(true)
     expect(cb).toHaveBeenCalledTimes(1)
     unsub() // already fired; unsubscribe is a no-op past engagement
   })
@@ -294,7 +291,7 @@ describe('touch engagement latch (design.md §17.5, point 84 — deliberate-inpu
     onTouchEngage(cb)
     expect(cb).toHaveBeenCalledTimes(1) // already armed -> fires synchronously
     window.dispatchEvent(new Event('touchstart')) // a second touch is not the arming one
-    expect(isTouchEngaged()).toBe(true)
+    expect(cb).toHaveBeenCalledTimes(1)
   })
 })
 
