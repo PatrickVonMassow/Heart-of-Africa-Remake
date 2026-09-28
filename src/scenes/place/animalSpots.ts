@@ -17,7 +17,7 @@ export const ANIMAL_RADIUS = WALKER_RADIUS
 
 /**
  * The radius an animal presents to the OTHERS. Deliberately smaller than the
- * mover radius: a goat is ~0.4 wide, so 0.18 + 0.3 = 0.48 m between centres
+ * mover radius: a goat is ~0.4 wide, so 0.18 + WALKER_RADIUS (0.3) = 0.48 m between centres
  * already keeps two bodies clear of each other, while the full 0.6 had the herd
  * shouldering one another all day — every jostle is motion the legs then have to
  * account for, and a grazing pen is not a scrum. Calibratable.
@@ -27,7 +27,7 @@ export const ANIMAL_BODY_RADIUS = 0.18
 /** A grazing spot: the point the animal wanders around, and the wobble that
  *  carries it (phase so the herd does not move as one, amplitude by setting —
  *  penned animals stay tighter than free-grazing ones). */
-export interface AnimalAnchor {
+interface AnimalAnchor {
   x: number
   z: number
   phase: number
@@ -36,25 +36,26 @@ export interface AnimalAnchor {
 
 /** An animal's body in the collider set — mutated in place each frame, so the
  *  scene array never has to be rebuilt. */
-export interface AnimalBody {
+interface AnimalBody {
   x: number
   z: number
   r: number
 }
 
 /** Circular enclosure the animals are kept in, when the settlement has one. */
-export interface AnimalPen {
+interface AnimalPen {
   x: number
   z: number
   r: number
 }
 
 /**
- * The grazing anchors for one settlement: inside the pen when there is one,
- * otherwise scattered in the open ring around the centre — and every one of
- * them validated against the FULL collider set the way point 155 validates a
+ * The grazing anchors for one settlement: drawn inside the pen when there is
+ * one, otherwise scattered in the open ring around the centre — and every one
+ * of them validated against the FULL collider set the way point 155 validates a
  * walker's errand target (a clear standing circle it can also leave), nudged to
- * the nearest free spot otherwise.
+ * the nearest free spot otherwise. The nudge does not re-check the pen, so a
+ * crowded pen can push an anchor past its fence.
  */
 export function animalAnchors(
   seed: number,
