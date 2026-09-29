@@ -185,6 +185,11 @@ export function rejudgeLarge({ records, argv, head, verifyGl, environment = '[]'
   return { covered, missing, docs }
 }
 
+/** A NUL-separated `git diff --name-only -z` list as paths. */
+export function parseNameList(output) {
+  return String(output ?? '').split('\0').filter(Boolean)
+}
+
 /** The git answer `rejudgeLarge` needs: changed paths old..HEAD, or null. */
 export function neutralDiffReader(cwd) {
   const git = (args) => execFileSync('git', args, {
@@ -193,7 +198,9 @@ export function neutralDiffReader(cwd) {
   return (old) => {
     try {
       git(['merge-base', '--is-ancestor', old, 'HEAD'])
-      return git(['diff', '--name-only', old, 'HEAD']).split('\n').map((l) => l.trim()).filter(Boolean)
+      // --no-renames: a rename lists BOTH its source and its destination, so a
+      // move out of src/ into docs/ is judged by the code it deleted too.
+      return parseNameList(git(['diff', '--name-only', '--no-renames', '-z', old, 'HEAD']))
     } catch {
       return null
     }

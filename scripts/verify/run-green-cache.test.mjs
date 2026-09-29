@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  cacheEnvironment, findGreenReceipt, formatCachedGreen, isNeutralPath, lastGreenReceipt, rejudgeBackend, rejudgeLarge, snapshotSuiteRuns,
+  cacheEnvironment, findGreenReceipt, formatCachedGreen, isNeutralPath, lastGreenReceipt, neutralDiffReader, parseNameList, rejudgeBackend, rejudgeLarge, snapshotSuiteRuns,
 } from './run-green-cache.mjs'
 import { DEV_SUITES, SERVERLESS_SUITES, WEBGL_ONLY_SUITES } from './tiers.mjs'
 
@@ -158,5 +159,29 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
     const runs = [suiteRun('polish', 'webgl'), suiteRun('polish', 'webgl', { head: 'other' }),
       suiteRun('polish', 'webgl', { partial: true }), suiteRun('polish', 'webgl', { startedAt: 1 })]
     expect(snapshotSuiteRuns(runs, { head: 'old1234', startedAt: 5, finishedAt: 30 })).toEqual([runs[0]])
+  })
+
+  it('judges both sides of a rename: moving code out of src/ into docs/ is not neutral', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-rejudge-rename-'))
+    const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    try {
+      git('init', '-q')
+      git('config', 'user.email', 't@example.invalid')
+      git('config', 'user.name', 'test')
+      mkdirSync(join(dir, 'src'))
+      writeFileSync(join(dir, 'src', 'a.ts'), 'export const a = 1\n'.repeat(20))
+      git('add', '.')
+      git('commit', '-q', '-m', 'base')
+      const base = git('rev-parse', 'HEAD').trim()
+      mkdirSync(join(dir, 'docs'))
+      git('mv', 'src/a.ts', 'docs/x.md')
+      git('commit', '-q', '-m', 'move')
+      const paths = neutralDiffReader(dir)(base)
+      expect(paths.sort()).toEqual(['docs/x.md', 'src/a.ts'])
+      expect(ask(paths).missing).toEqual(['webgl', 'webgpu'])
+      expect(parseNameList('src/a b.ts\0docs/x.md\0')).toEqual(['src/a b.ts', 'docs/x.md'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
