@@ -1116,18 +1116,35 @@ if (section('speech-owner')) {
       )
       .catch(() => {})
   const read = () =>
-    page.evaluate(() => {
+    page.evaluate(async () => {
+      // The configured dim, read from the game's own balance module, so the
+      // check follows a recalibration instead of a number written down here.
+      const { balance } = await import('/src/config/balance.ts')
+      // A rectangle alone proves nothing: `visibility: hidden` keeps it. What
+      // the player sees is the RENDERED element and the opacity of it and every
+      // ancestor multiplied together.
+      const rendered = (node) =>
+        !!node && node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })
+      const effectiveOpacity = (node) => {
+        let o = 1
+        for (let n = node; n && n instanceof Element; n = n.parentElement) o *= Number(getComputedStyle(n).opacity)
+        return o
+      }
       const one = (id) => {
         const el = document.querySelector(`.speech-label[data-speaker="${id}"]`)
         const bubble = el?.closest('.speech-bubble')
-        const tail = bubble?.querySelector('.speech-tail')?.getBoundingClientRect()
+        const tailNode = bubble?.querySelector('.speech-tail')
+        const tail = tailNode?.getBoundingClientRect()
         const pt = window.__speech?.anchorScreen(id)
         if (!el || !bubble || !tail || !pt) return null
         return {
           tip: { x: tail.left + tail.width / 2, y: tail.bottom },
           anchor: pt,
           height: el.getBoundingClientRect().height,
-          opacity: Number(getComputedStyle(bubble).opacity),
+          opacity: effectiveOpacity(el),
+          tailOpacity: effectiveOpacity(tailNode),
+          visible: rendered(el) && rendered(tailNode) && tail.width > 0 && tail.height > 0,
+          dim: balance.communication.labelRecede.opacity,
           receded: bubble.classList.contains('receded'),
           targeted: bubble.classList.contains('targeted'),
           onScreen: tail.bottom > 0 && tail.bottom < window.innerHeight && tail.left > 0 && tail.right < window.innerWidth,
@@ -1179,7 +1196,13 @@ if (section('speech-owner')) {
           dist(own.tip, crown) < dist(own.tip, otherCrown),
       )
     view.recede = !!older && !!newer && older.receded && !newer.receded &&
-      !older.targeted && !newer.targeted && older.opacity < 0.9 && newer.opacity > 0.99
+      !older.targeted && !newer.targeted &&
+      // Both notes and both tails actually drawn; the older at the configured,
+      // NONZERO dim (a vanished note is not a receded one), the newer at full.
+      older.visible && newer.visible &&
+      older.dim > 0.1 && older.dim < 0.95 &&
+      Math.abs(older.opacity - older.dim) < 0.03 && Math.abs(older.tailOpacity - older.dim) < 0.03 &&
+      Math.abs(newer.opacity - 1) < 0.01 && Math.abs(newer.tailOpacity - 1) < 0.01
     view.ok = clear(view.sight) && view.tails && view.recede
     return view
   }
