@@ -6,6 +6,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   planRemediation,
+  declaredRunAlive,
+  quarantineTargets,
   needsRepair,
   isConsistent,
   isEvidenceGrade,
@@ -663,3 +665,59 @@ describe('resumeRepairMandate — the same seam, checked from the session side',
     expect(resumeRepairMandate({ ran: false, code: null })).toBeNull()
   })
 })
+
+describe('quarantine spares the frames of a live declared verification run', () => {
+  const RUN_PID = 661900
+  const RUN_STARTED = 1_000_000
+  const declaration = {
+    v: 1,
+    waitingOn: 'polish picture run',
+    evidence: [{ kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'polish' }],
+  }
+  const alive = (pid) => (pid === RUN_PID ? { exists: true, startedAt: RUN_STARTED } : { exists: false, startedAt: null })
+  const dead = () => ({ exists: false, startedAt: null })
+  const reused = () => ({ exists: true, startedAt: RUN_STARTED + 60_000 })
+  const frame = 'verification/105-cairo-panorama-giza-clear.png'
+  const planFor = (probePid, decl = declaration) =>
+    planRemediation({
+      ...clean,
+      dirtyFiles: [frame],
+      parallelDetected: true,
+      verificationWriterLive: declaredRunAlive({ declaration: decl, probePid }),
+    })
+
+  it('a dirty verification/ file plus a live declared run is NOT planned for quarantine', () => {
+    expect(planFor(alive).map((a) => a.action)).not.toContain('quarantine-stash')
+  })
+
+  it('the same file without a declaration is still quarantined', () => {
+    expect(planFor(alive, null).map((a) => a.action)).toContain('quarantine-stash')
+  })
+
+  it('a declaration whose run pid is gone (or reused) protects nothing', () => {
+    expect(planFor(dead).map((a) => a.action)).toContain('quarantine-stash')
+    expect(planFor(reused).map((a) => a.action)).toContain('quarantine-stash')
+  })
+
+  it('a declaration with only log evidence names no live run', () => {
+    const logOnly = { ...declaration, evidence: [{ kind: 'log', path: 'local/run.log' }] }
+    expect(declaredRunAlive({ declaration: logOnly, probePid: alive })).toBe(false)
+  })
+
+  it('other dirty files are still quarantined, the live frames are kept out of the targets', () => {
+    const plan = planRemediation({
+      ...clean,
+      dirtyFiles: [frame, 'src/x.ts'],
+      parallelDetected: true,
+      verificationWriterLive: declaredRunAlive({ declaration, probePid: alive }),
+    })
+    const q = plan.find((a) => a.action === 'quarantine-stash')
+    expect(q.targets).toEqual(['src/x.ts'])
+    expect(q.protectedFiles).toEqual([frame])
+  })
+
+  it('without a live writer every dirty file is a target and nothing is protected', () => {
+    expect(quarantineTargets([frame, 'src/x.ts'])).toEqual({ targets: [frame, 'src/x.ts'], protectedFiles: [] })
+  })
+})
+

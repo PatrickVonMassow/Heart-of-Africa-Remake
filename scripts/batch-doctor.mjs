@@ -21,6 +21,7 @@ import { WAIT_LEASE_PATH } from './wait-lease-core.mjs'
 import { liveRecordPaths } from './verify/run-record.mjs'
 import {
   planRemediation,
+  declaredRunAlive,
   needsRepair,
   GATE_COMMANDS,
   judgeGateRun,
@@ -58,7 +59,9 @@ import {
   transitionOwnerSession,
   LOCK_PATH,
   DOCTOR_STATE_PATH,
+  IN_FLIGHT_PATH,
 } from './batch-singleton.mjs'
+import { readDeclaration } from './batch-in-flight.mjs'
 import { readMachine, listProcesses, repoMarker } from './verify/machine-load.mjs'
 import { COMMON_REPO_ROOT, REPO_ROOT, withoutGitLocalEnvironment } from './repo-paths.mjs'
 import { recordDoctorGateMeasurement } from './decision-log-core.mjs'
@@ -129,13 +132,22 @@ try {
 // and `pendingRepair` then blocked every Stop of that session — measured 20.09.2026
 // during the point 1094 picture run. The frames a LIVE verify run writes into
 // `verification/` are the same machine state: stashing them mid-run destroys the
-// run's picture evidence (measured 26.09.2026 during the closing LARGE).
+// run's picture evidence (measured 26.09.2026 during the closing LARGE, and
+// 18.09.2026 for a run declared through `batch-in-flight`). The decision is
+// `quarantineTargets` in the core; either live source protects the frames.
 let liveVerifyRun = false
 try {
   liveVerifyRun = liveRecordPaths().length > 0
 } catch {
   /* unreadable run records: count the frames as ordinary changes */
 }
+let declaredVerifyRun = false
+try {
+  declaredVerifyRun = declaredRunAlive({ declaration: readDeclaration(IN_FLIGHT_PATH), probePid })
+} catch {
+  /* unreadable declaration: it protects nothing */
+}
+const verificationWriterLive = liveVerifyRun || declaredVerifyRun
 let dirtyFiles = []
 try {
   dirtyFiles = git(['status', '--porcelain'])
@@ -146,7 +158,6 @@ try {
     // path's first character — every dirty list started with a mangled name.
     .map((l) => l.replace(/^[ MADRCU?!]{1,2} +/, ''))
     .filter((f) => f !== WAIT_LEASE_PATH)
-    .filter((f) => !(liveVerifyRun && f.startsWith('verification/')))
 } catch {
   /* unreadable status */
 }
@@ -263,6 +274,7 @@ const plan = planRemediation({
   branch,
   mergeInProgress,
   dirtyFiles,
+  verificationWriterLive,
   conflictMarkers,
   divergence,
   tasksParses,
@@ -294,8 +306,12 @@ for (const a of plan) {
       log('EXECUTED abort-merge: half-done merge aborted, pre-merge state restored')
     } else if (a.action === 'quarantine-stash') {
       const name = `doctor-quarantine-${new Date().toISOString().replace(/[:.]/g, '-')}`
-      git(['stash', 'push', '-u', '-m', name])
+      // With protected frames the stash names its targets (both sides of a rename);
+      // otherwise it takes the whole tree as before.
+      const pathspecs = (a.protectedFiles ?? []).length > 0 ? a.targets.flatMap((t) => t.split(' -> ')) : []
+      git(['stash', 'push', '-u', '-m', name, ...(pathspecs.length ? ['--', ...pathspecs] : [])])
       log(`EXECUTED quarantine-stash: uncommitted concurrent edits moved to stash "${name}" (git stash list to inspect, git stash pop to restore)`)
+      if ((a.protectedFiles ?? []).length > 0) log(`kept ${a.protectedFiles.length} verification/ file(s) of the live run out of the stash`)
     } else if (a.action === 'rescue-and-reset') {
       if (branch !== 'main') {
         log(`SKIPPED rescue-and-reset: checkout is on "${branch}", not main — resolve the branch state first`)
