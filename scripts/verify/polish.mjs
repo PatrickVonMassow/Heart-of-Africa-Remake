@@ -917,7 +917,9 @@ if (section('speech-hypothesis')) {
         // rather than at a height written down here (point 582 moved it).
         rise: label?.height ?? null,
         mark: figure.userData?.actor?.height ?? null,
-        scale: Math.hypot(e[0], e[1], e[2]),
+        // The VERTICAL scale, as the label's own rise uses: a kneeling figure is
+        // squashed in height only.
+        scale: Math.hypot(e[4], e[5], e[6]),
       }
     }, speakerIndex)
     // Point 582: the note floats a hand's breadth over THAT figure's head, at
@@ -968,7 +970,7 @@ if (section('speech-owner')) {
   })
   // Every pair of named figures standing 1.2-4 m apart, closest first: close
   // enough that an untailed note could float between the two heads.
-  const pairs = await page.evaluate(() => {
+  await page.evaluate(() => {
     const scene = window.__placeScene
     if (!scene) return []
     const found = []
@@ -981,11 +983,29 @@ if (section('speech-owner')) {
       const e = o.matrixWorld.elements
       return { x: e[12], z: e[14] }
     })
+    window.__speechOwnerStart = at
+    return at.length
+  })
+  // The figures WALK, and a pair that drifts apart between the choice and the
+  // shutter puts one note off the frame edge (measured: the notes at -165 and
+  // 1546 px of a 1440 view) — so the staging below is judged again AT the
+  // shutter. Whether each figure stands still is recorded for the detail only:
+  // preferring still pairs picked the drummer's crowded shelter every time.
+  await nextFrames(30)
+  const pairs = await page.evaluate(() => {
+    const figs = window.__speechOwnerFigures ?? []
+    const start = window.__speechOwnerStart ?? []
+    const at = figs.map((o) => {
+      o.updateWorldMatrix(true, false)
+      const e = o.matrixWorld.elements
+      return { x: e[12], z: e[14] }
+    })
+    const still = at.map((p, i) => Math.hypot(p.x - start[i].x, p.z - start[i].z) < 0.15)
     const out = []
     for (let i = 0; i < at.length; i++) {
       for (let j = i + 1; j < at.length; j++) {
         const d = Math.hypot(at[i].x - at[j].x, at[i].z - at[j].z)
-        if (d >= 1.2 && d <= 4) out.push({ a: i, b: j, d })
+        if (d >= 1.2 && d <= 4) out.push({ a: i, b: j, d, still: still[i] && still[j] })
       }
     }
     return out.sort((l, r) => l.d - r.d).slice(0, 24)
@@ -994,7 +1014,7 @@ if (section('speech-owner')) {
   // with a tiny targeting reach, so neither is the guess target — a targeted
   // note never recedes, and that exception is Vitest's to prove, not this
   // picture's.
-  const STAND_BACKS = [6, 5, 4]
+  const STAND_BACKS = [6, 5]
   const aimPair = (pair, back) =>
     page.evaluate(
       ({ a, b, back }) => {
@@ -1026,128 +1046,174 @@ if (section('speech-owner')) {
       },
       { a: pair.a, b: pair.b, back },
     )
+  // Per figure: the best head-height reading, or 0 when anything stands in
+  // front of the head at ANY of those heights (a post half across the face is
+  // an occluder even if one ray gets past it). A last reading, -1, is the roof
+  // test: a camera under the drum shelter frames beams and posts, not faces.
   const seen = (pair) =>
     page.evaluate(({ a, b }) => {
       const figs = window.__speechOwnerFigures
-      // Several heights up the body, the best one kept: a thin figure lets a
-      // single ray slip past an arm or between the legs, which is no occluder.
-      return [figs[a], figs[b]].map((f) => {
+      const cam = window.__placeCamera
+      const out = [figs[a], figs[b]].map((f) => {
         f.updateWorldMatrix(true, false)
         const e = f.matrixWorld.elements
-        const h = Math.max(0.5, Math.hypot(e[4], e[5], e[6]) * 1.45)
+        // The figure's OWN drawn height (its actor record), at its scale — a
+        // child is drawn small inside an unscaled group, and a grown height
+        // probed the air above its head.
+        const h = (f.userData?.actor?.height ?? 1.45) * Math.hypot(e[4], e[5], e[6])
         let best = null
-        for (const k of [0.35, 0.5, 0.65, 0.8, 0.92]) {
+        for (const k of [0.8, 0.88, 0.95]) {
           const hit = window.__placeRayHit(e[12], e[13] + h * k, e[14])
           if (hit.hitDistance == null) continue
           const ratio = hit.hitDistance / hit.targetDistance
+          if (ratio < 0.85) return 0
           if (best === null || Math.abs(ratio - 1) < Math.abs(best - 1)) best = ratio
         }
         return best
       })
+      const up = window.__placeRayHit(cam.position.x, cam.position.y + 8, cam.position.z)
+      if (up.hitDistance != null && up.hitDistance < up.targetDistance) out.push(-1)
+      return out
     }, pair)
-  let chosen = null
-  const probes = []
+  // The older note first, the newer a few frames later — exactly the order of
+  // an exchange. Both are held long so the expiry clock (pure-tested) plays no
+  // part; a village word raised in between would dim both, so the pair is
+  // spoken again right before the shutter too.
+  const speakPair = (pair) =>
+    page.evaluate(
+      async ({ a, b, u }) => {
+        const figs = window.__speechOwnerFigures
+        const raf = () => new Promise((r) => requestAnimationFrame(() => r()))
+        window.__game.getState().hearUtterance(u)
+        const say = (f, id) => {
+          const name = f.name
+          f.name = `${id}-figure`
+          const ok = window.__speech?.speak(id, [u], `${id}-figure`, 120, 0.1) === true
+          f.name = name
+          return ok
+        }
+        const older = say(figs[a], 'owner-older')
+        await raf()
+        await raf()
+        const newer = say(figs[b], 'owner-newer')
+        for (let i = 0; i < 3; i++) await raf()
+        return older && newer
+      },
+      { a: pair.a, b: pair.b, u: RIVER },
+    )
+  // The recede is a short CSS transition; wait for THAT to finish (no
+  // running animation on either bubble), not for a wall-clock pause.
+  const recedeSettled = () =>
+    page
+      .waitForFunction(
+        () =>
+          ['owner-older', 'owner-newer'].every((id) => {
+            const b = document.querySelector(`.speech-label[data-speaker="${id}"]`)?.closest('.speech-bubble')
+            return !!b && b.getAnimations().length === 0
+          }),
+        null,
+        { timeout: 5000 },
+      )
+      .catch(() => {})
+  const read = () =>
+    page.evaluate(() => {
+      const one = (id) => {
+        const el = document.querySelector(`.speech-label[data-speaker="${id}"]`)
+        const bubble = el?.closest('.speech-bubble')
+        const tail = bubble?.querySelector('.speech-tail')?.getBoundingClientRect()
+        const pt = window.__speech?.anchorScreen(id)
+        if (!el || !bubble || !tail || !pt) return null
+        return {
+          tip: { x: tail.left + tail.width / 2, y: tail.bottom },
+          anchor: pt,
+          height: el.getBoundingClientRect().height,
+          opacity: Number(getComputedStyle(bubble).opacity),
+          receded: bubble.classList.contains('receded'),
+          targeted: bubble.classList.contains('targeted'),
+          onScreen: tail.bottom > 0 && tail.bottom < window.innerHeight && tail.left > 0 && tail.right < window.innerWidth,
+        }
+      }
+      return { older: one('owner-older'), newer: one('owner-newer') }
+    })
+  const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y)
+  // The top of each speaker's DRAWN head on screen (its `figure-head` sphere).
+  const crowns = (pair) =>
+    page.evaluate(({ a, b }) => {
+      const figs = window.__speechOwnerFigures
+      const cam = window.__placeCamera
+      return [figs[a], figs[b]].map((f) => {
+        let head = null
+        f.traverse((o) => {
+          if (!head && o.name === 'figure-head') head = o
+        })
+        if (!head) return null
+        head.updateWorldMatrix(true, false)
+        const e = head.matrixWorld.elements
+        const v = new (Object.getPrototypeOf(cam.position).constructor)(e[12], e[13] + 0.16 * Math.hypot(e[4], e[5], e[6]), e[14])
+        v.project(cam)
+        return { x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight }
+      })
+    }, pair)
+  const clear = (ratios) => ratios.every((r) => r !== null && r >= 0.85 && r <= 1.15)
+  // Everything the picture must show, read on ONE aimed frame: both speakers
+  // unobstructed, both tails on screen and on their own anchors, the older
+  // note receded and neither the guess target.
+  const stage = async (pair) => {
+    await aimPair(pair, pair.back)
+    await nextFrames(2)
+    const view = { sight: await seen(pair), ...(await read()), crowns: await crowns(pair) }
+    const { older, newer } = view
+    const [olderCrown, newerCrown] = view.crowns ?? []
+    // Each tip on its own anchor, AND just above its own DRAWN head — nearer
+    // that head than the other speaker's — so the tail visibly points at the
+    // face it belongs to, not at air the anchor merely computes.
+    view.tails = !!older && !!newer && !!olderCrown && !!newerCrown &&
+      [[older, olderCrown, newerCrown], [newer, newerCrown, olderCrown]].every(
+        ([own, crown, otherCrown]) =>
+          own.onScreen &&
+          Math.abs(own.tip.x - own.anchor.x) <= 0.5 * own.height &&
+          Math.abs(own.tip.y - own.anchor.y) <= 0.35 * own.height &&
+          own.tip.y < crown.y &&
+          crown.y - own.tip.y <= 1.2 * own.height &&
+          Math.abs(own.tip.x - crown.x) <= 0.5 * own.height &&
+          dist(own.tip, crown) < dist(own.tip, otherCrown),
+      )
+    view.recede = !!older && !!newer && older.receded && !newer.receded &&
+      !older.targeted && !newer.targeted && older.opacity < 0.9 && newer.opacity > 0.99
+    view.ok = clear(view.sight) && view.tails && view.recede
+    return view
+  }
+  // A pair qualifies only if the whole staging holds AT THE SHUTTER: these
+  // figures walk, and one that steps behind a post or out of the frame after
+  // the choice is the next pair's turn, not a picture.
+  const MAX_ATTEMPTS = 8
+  const attempts = []
+  const rejected = []
+  let shot = null
   for (const pair of pairs) {
-    for (const back of STAND_BACKS) {
-      if (!(await aimPair(pair, back))) continue
+    if (attempts.length >= MAX_ATTEMPTS || shot) break
+    let back = null
+    for (const b of STAND_BACKS) {
+      if (!(await aimPair(pair, b))) continue
       await nextFrames(2)
-      const ratios = await seen(pair)
-      probes.push(ratios.map((r) => (r == null ? 'sky' : r.toFixed(2))).join('/'))
-      if (ratios.every((r) => r !== null && r >= 0.85 && r <= 1.15)) {
-        chosen = { ...pair, back }
+      const sight = await seen(pair)
+      if (clear(sight)) {
+        back = b
         break
       }
+      rejected.push(sight.map((r) => (r == null ? 'sky' : r.toFixed(2))).join('/'))
     }
-    if (chosen) break
-  }
-  check(
-    'the settlement offers two figures close together, both in clear view (point 1238)',
-    !!chosen,
-    `${pairs.length} pairs 1.2-4 m apart; sight lines [${probes.join(', ')}]`,
-  )
-  if (chosen) {
-    // The older note first, the newer a few frames later — exactly the order of
-    // an exchange. Both are held long so the expiry clock (pure-tested) plays no
-    // part; a village word raised in between would dim both, so the pair is
-    // spoken again right before the shutter too.
-    const speakPair = () =>
-      page.evaluate(
-        async ({ a, b, u }) => {
-          const figs = window.__speechOwnerFigures
-          const raf = () => new Promise((r) => requestAnimationFrame(() => r()))
-          window.__game.getState().hearUtterance(u)
-          const say = (f, id) => {
-            const name = f.name
-            f.name = `${id}-figure`
-            const ok = window.__speech?.speak(id, [u], `${id}-figure`, 120, 0.1) === true
-            f.name = name
-            return ok
-          }
-          const older = say(figs[a], 'owner-older')
-          await raf()
-          await raf()
-          const newer = say(figs[b], 'owner-newer')
-          for (let i = 0; i < 3; i++) await raf()
-          return older && newer
-        },
-        { a: chosen.a, b: chosen.b, u: RIVER },
-      )
-    const read = () =>
-      page.evaluate(() => {
-        const one = (id) => {
-          const el = document.querySelector(`.speech-label[data-speaker="${id}"]`)
-          const bubble = el?.closest('.speech-bubble')
-          const tail = bubble?.querySelector('.speech-tail')?.getBoundingClientRect()
-          const pt = window.__speech?.anchorScreen(id)
-          if (!el || !bubble || !tail || !pt) return null
-          return {
-            tip: { x: tail.left + tail.width / 2, y: tail.bottom },
-            anchor: pt,
-            height: el.getBoundingClientRect().height,
-            opacity: Number(getComputedStyle(bubble).opacity),
-            width: bubble.getBoundingClientRect().width,
-            receded: bubble.classList.contains('receded'),
-            targeted: bubble.classList.contains('targeted'),
-            onScreen: tail.bottom > 0 && tail.bottom < window.innerHeight && tail.left > 0 && tail.right < window.innerWidth,
-          }
-        }
-        const p = window.__placePlayer
-        const cam = window.__placeCamera
-        return {
-          older: one('owner-older'),
-          newer: one('owner-newer'),
-          player: p ? { x: +p.x.toFixed(2), z: +p.z.toFixed(2) } : null,
-          camera: cam ? { x: +cam.position.x.toFixed(2), z: +cam.position.z.toFixed(2) } : null,
-        }
-      })
-    await aimPair(chosen, chosen.back)
-    const spoke = await speakPair()
-    check('both figures can speak over their heads (point 1238)', spoke, `spoke ${spoke}`)
-    // The recede transition runs a quarter second; measure after it settles.
-    await page.waitForTimeout(400)
-    await aimPair(chosen, chosen.back)
-    await nextFrames(2)
-    const r = await read()
-    const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y)
-    check(
-      'each note’s tail tip stands on its own speaker’s anchor, nearer it than the other’s (point 1238)',
-      !!r.older && !!r.newer &&
-        [[r.older, r.newer], [r.newer, r.older]].every(
-          ([own, other]) =>
-            Math.abs(own.tip.x - own.anchor.x) <= 0.5 * own.height &&
-            Math.abs(own.tip.y - own.anchor.y) <= 0.35 * own.height &&
-            dist(own.tip, own.anchor) < dist(own.tip, other.anchor),
-        ),
-      JSON.stringify(r),
-    )
-    check(
-      'the older note recedes behind the newer one, neither being the guess target (point 1238)',
-      !!r.older && !!r.newer && r.older.receded && !r.newer.receded &&
-        !r.older.targeted && !r.newer.targeted &&
-        r.older.opacity < 0.9 && r.newer.opacity > 0.99,
-      JSON.stringify(r),
-    )
-    const pos = await aimPair(chosen, chosen.back)
+    if (back === null) continue
+    const cand = { ...pair, back }
+    if (!(await speakPair(cand))) continue
+    await recedeSettled()
+    const before = await stage(cand)
+    if (!before.ok) {
+      attempts.push({ pair: cand, at: 'staging', view: before })
+      await page.evaluate(() => window.__speech?.clear())
+      continue
+    }
+    const pos = await aimPair(cand, cand.back)
     const label = await page.evaluate(() => window.__speech?.labels().find((l) => l.speakerId === 'owner-newer'))
     let atShutter = null
     await captureFrame(
@@ -1161,30 +1227,35 @@ if (section('speech-owner')) {
           z: (pos[0].z + pos[1].z) / 2,
         },
         label: 'two close speakers, each note tailed to its own head, the older one receded',
+        // The figures walk: a full readiness wait lets the pair drift apart
+        // across the frame. The scene has long been drawn by now.
+        settle: false,
       },
       {
         beforeCapture: async () => {
-          await aimPair(chosen, chosen.back)
-          await speakPair()
-          await page.waitForTimeout(400)
-          await aimPair(chosen, chosen.back)
-          await nextFrames(2)
-          atShutter = await read()
+          await speakPair(cand)
+          await recedeSettled()
+          atShutter = await stage(cand)
         },
       },
     )
-    check(
-      'at the shutter both notes stand in the frame and the older is still the receded one (point 1238)',
-      !!atShutter?.older?.receded && atShutter?.newer?.receded === false &&
-        atShutter.older.onScreen && atShutter.newer.onScreen,
-      JSON.stringify(atShutter),
-    )
-    await page.evaluate((u) => {
-      window.__game.getState().setUtteranceHypothesis(u, '')
-      window.__speech?.clear()
-      delete window.__speechOwnerFigures
-    }, RIVER)
+    attempts.push({ pair: cand, at: 'shutter', view: atShutter })
+    if (atShutter?.ok) shot = atShutter
+    await page.evaluate(() => window.__speech?.clear())
   }
+  const brief = (a) => `${a.pair.a}/${a.pair.b}@${a.pair.back}m ${a.at}: sight ${a.view?.sight?.map((r) => (r == null ? 'sky' : r.toFixed(2))).join('/')} tails ${a.view?.tails} recede ${a.view?.recede}`
+  check(
+    'two close speakers are shot unobstructed, each tail on its own speaker’s anchor, the older note receded and neither targeted (point 1238)',
+    !!shot,
+    `${pairs.length} pairs 1.2-4 m apart (${pairs.filter((p) => p.still).length} standing still); attempts [${attempts.map(brief).join('; ')}]; sight rejected [${rejected.join(', ')}]` +
+      (shot ? ` — shot ${JSON.stringify({ older: shot.older, newer: shot.newer })}` : ''),
+  )
+  await page.evaluate((u) => {
+    window.__game.getState().setUtteranceHypothesis(u, '')
+    window.__speech?.clear()
+    delete window.__speechOwnerFigures
+    delete window.__speechOwnerStart
+  }, RIVER)
   await page.evaluate((saved) => {
     const p = window.__placePlayer
     if (!p || !saved) return
