@@ -289,6 +289,7 @@ describe('board-first-guard (spawned)', () => {
       const publish = callGuard('Bash', { command: 'node scripts/dashboard-publish.mjs' })
       expect(publish.decision?.hookSpecificOutput?.permissionDecisionReason ?? '').toContain('BATCH OWNERSHIP STAND-DOWN')
       expect(allowed('Bash', { command: 'node scripts/board.mjs publish' })).toBe(false)
+      expect(allowed('Bash', { command: 'node scripts/board-first-guard.mjs --status > .batch-dashboard.html' })).toBe(false)
     } finally {
       rmSync(resolve(tmpdir(), `claude-${process.getuid?.()}`, repo.replace(/[^A-Za-z0-9]/g, '-')), { recursive: true, force: true })
     }

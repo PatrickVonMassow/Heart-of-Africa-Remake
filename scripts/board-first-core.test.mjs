@@ -389,6 +389,20 @@ describe('the stand-down leaves the session scratchpad and the carrier open', ()
     expect(at({ toolName: 'Bash', command: `cat ${root}/.batch-dashboard.html` }).block).toBe(false)
   })
 
+  it('refuses a check script whose output redirection writes the board or any file outside the scratchpad', () => {
+    for (const command of [
+      'node scripts/board-first-guard.mjs --status > .batch-dashboard.html',
+      `node scripts/guard-preflight.mjs --for commit >> ${root}/.batch-dashboard.html`,
+      'node scripts/dashboard-guard.mjs 1> notes.txt',
+      `node scripts/guard-preflight.mjs --for commit > ${pad}/../x.txt`,
+      `node scripts/guard-preflight.mjs --for commit > ${pad}/hoa-batch-dashboard.html`,
+    ]) expect(at({ toolName: 'Bash', command }).block, command).toBe(true)
+    for (const command of [
+      'node scripts/guard-preflight.mjs --for commit > /dev/null 2>&1',
+      `node scripts/guard-preflight.mjs --for commit > ${pad}/preflight.txt`,
+    ]) expect(at({ toolName: 'Bash', command }).block, command).toBe(false)
+  })
+
   it('refuses a climb out of the scratchpad back into the checkout', () => {
     const climb = `${pad}/../../../../../workspace/hoa/TASKS.md`
     expect(write(climb, `${root}/TASKS.md`).block).toBe(true)
