@@ -22,7 +22,11 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import type { CommunicationMemory } from '../../communication/heard'
 import { type Phrase } from '../../communication/lexicon'
-import { isSpeechLabelVisible, type SpeechLabel } from '../../communication/speechLabel'
+import {
+  isSpeechLabelVisible,
+  speechLabelRecedes,
+  type SpeechLabel,
+} from '../../communication/speechLabel'
 import { labelPresentation } from '../../communication/speechTarget'
 import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
 import {
@@ -38,15 +42,20 @@ import {
 /** Scratch vector — the label positions are sampled every frame. */
 const WORLD = new THREE.Vector3()
 
+/** Lifts drei's wrapper by its own size so its bottom centre sits on the point. */
+const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,-100%,0)' }
+
 /** One speaker's note, following its figure. */
 function SpeechLabelView({
   label,
   memory,
   targeted,
+  receded,
 }: {
   label: SpeechLabel
   memory: CommunicationMemory
   targeted: boolean
+  receded: boolean
 }) {
   const group = useRef<THREE.Group>(null)
   // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
@@ -70,7 +79,9 @@ function SpeechLabelView({
 
   return (
     <group ref={group}>
-      <Html center zIndexRange={[20, 10]}>
+      {/* Not centred: the bubble's bottom centre — its tail's tip — stands on
+          the anchor, so the tail points down at this speaker's crown. */}
+      <Html style={TIP_ON_ANCHOR} zIndexRange={[20, 10]}>
         <SpeechLabelCard
           speakerId={label.speakerId}
           atoms={label.atoms}
@@ -78,6 +89,7 @@ function SpeechLabelView({
           vocabulary={vocabulary}
           conceptLabels={conceptLabels}
           targeted={targeted}
+          receded={receded}
         />
       </Html>
     </group>
@@ -133,11 +145,13 @@ export function SpeechLabels() {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
     w.__speech = {
-      speak: (speakerId: string, atoms: Phrase, anchorName?: string, seconds?: number) => {
+      // `reach` narrows who may TARGET the note, so a picture can stage two
+      // notes near the player with neither being the guess target.
+      speak: (speakerId: string, atoms: Phrase, anchorName?: string, seconds?: number, reach?: number) => {
         const anchor = scene.getObjectByName(anchorName ?? speakerId) ??
           (anchorName === undefined ? speechAnchor(speakerId) : null)
         if (!anchor || scene.getObjectById(anchor.id) !== anchor) return false
-        speakOverhead(speakerId, atoms, anchor, { seconds })
+        speakOverhead(speakerId, atoms, anchor, { seconds, reach })
         return true
       },
       anchorScreen: (speakerId: string) => {
@@ -175,19 +189,18 @@ export function SpeechLabels() {
   // the bottom prompt offers the hut.
   const { targetedId, hiddenId } = labelPresentation(dialog, labels.targetId, guessKeyArmed)
 
+  const drawn = labels.labels.filter(visible).filter((label) => label.speakerId !== hiddenId)
   return (
     <>
-      {labels.labels
-        .filter(visible)
-        .filter((label) => label.speakerId !== hiddenId)
-        .map((label) => (
-          <SpeechLabelView
-            key={label.speakerId}
-            label={label}
-            memory={memory}
-            targeted={label.speakerId === targetedId}
-          />
-        ))}
+      {drawn.map((label) => (
+        <SpeechLabelView
+          key={label.speakerId}
+          label={label}
+          memory={memory}
+          targeted={label.speakerId === targetedId}
+          receded={speechLabelRecedes(label, drawn, targetedId)}
+        />
+      ))}
     </>
   )
 }

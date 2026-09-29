@@ -122,6 +122,10 @@ describe('the marked figure’s rise above its anchor', () => {
 
   it('reads the mark on the anchor itself', () => {
     expect(markedActorRise(node(0, 0, 0, { scale: 0.5, userData: villager }))).toBeCloseTo(0.725)
+    // A kneeling figure is squashed in height only; its rise follows that.
+    const kneeling = node(0, 0, 0, { userData: villager })
+    kneeling.matrixWorld = { elements: [1, 0, 0, 0, 0, 0.75, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }
+    expect(markedActorRise(kneeling)).toBeCloseTo(1.45 * 0.75)
   })
 
   it('finds the figure deep under the anchor', () => {

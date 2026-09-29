@@ -1993,3 +1993,15 @@ beyond call reach, so a child on the near bank speaks and points instead. Values
 from constants, not measured on a built layout. OPEN: villager canoes are absent from
 `design.md`; whether the place scene draws the far bank at 109 m is unverified; a calling
 paddler reaches the children's zone in every variant. Backlog: design concept missing.
+
+## Speaking cue on the figure itself: examined and not built
+
+Examined 29.09.2026 with the speech-label tails and receding older labels. A figure could show
+that it is speaking, but no channel of the gesture machinery (`src/render/gesture.ts`) is free for
+it: the head is a featureless sphere, so a head motion moves no pixel; the trunk turn and lean
+already carry the refusal shake and the chase posture, and the arms carry the concept gestures.
+Only one gesture runs at a time, so a speaking gesture would replace the concept gesture issued
+with the same word, or itself read as one and teach a false meaning
+(`docs/communication-poc-spec.md`). The tail and the receding older label already answer whose
+note it is. Backlog: needs a separate, non-gestural channel (for example a mouth or face mark)
+that `design.md` does not describe.

@@ -204,3 +204,26 @@ export function labelReadings(memory: CommunicationMemory, atoms: Phrase): AtomR
 export function isSpeechLabelVisible(memory: CommunicationMemory, atoms: Phrase): boolean {
   return atoms.some((atom) => hasHeard(memory, atom))
 }
+
+/**
+ * Whether a drawn note stands back behind a newer one: with several notes up,
+ * the one raised last belongs to the current speaker and must be the most
+ * prominent, so every older note recedes. The targeted note never does — the
+ * player's guess target stays fully legible whatever was said after it.
+ * `drawn` is what is actually on screen, so a hidden newer note dims nothing.
+ */
+export function speechLabelRecedes(
+  label: SpeechLabel,
+  drawn: readonly SpeechLabel[],
+  targetedId: string | null,
+): boolean {
+  if (label.speakerId === targetedId) return false
+  return drawn.some((other) => other.speakerId !== label.speakerId && other.shownAt > label.shownAt)
+}
+
+/** How a note is drawn: full presence, or the calibratable receded look. */
+export function speechLabelPresence(receded: boolean): { opacity: number; scale: number } {
+  if (!receded) return { opacity: 1, scale: 1 }
+  const { opacity, scale } = balance.communication.labelRecede
+  return { opacity, scale }
+}

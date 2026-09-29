@@ -11,6 +11,7 @@ import { emptyMemory, observeUtterance, setHypothesis } from '../communication/h
 import { utteranceOf } from '../communication/lexicon'
 import { pickSpeechTarget } from '../communication/speechTarget'
 import { NO_READING } from '../communication/speechLabel'
+import { balance } from '../config/balance'
 import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
@@ -106,5 +107,37 @@ describe('which note a click would take (point 588)', () => {
   it('offers no guess on the debug concept view — that is the answer, not a question', () => {
     render(<SpeechLabelCard vocabulary={SHIPPED_VOCABULARY} speakerId="kid-1" atoms={[RIVER_UTTERANCE]} memory={memory} targeted conceptLabels />)
     expect(document.querySelector('.speech-invite')).toBeNull()
+  })
+})
+
+describe('whose a note is (point 1238)', () => {
+  const card = (props: { targeted?: boolean; receded?: boolean }) =>
+    render(
+      <SpeechLabelCard vocabulary={SHIPPED_VOCABULARY} speakerId="kid-1" atoms={[RIVER_UTTERANCE]} memory={memory} {...props} />,
+    )
+  const bubble = () => document.querySelector<HTMLElement>('.speech-bubble')!
+
+  it('carries a tail below the box, inside the one bubble the scene anchors', () => {
+    card({})
+    const children = [...bubble().children]
+    expect(children.map((c) => c.getAttribute('class'))).toEqual(['speech-label', 'speech-tail'])
+    expect(bubble().style.opacity).toBe('1')
+    expect(bubble().style.transform).toBe('scale(1)')
+  })
+
+  it('draws a receded note dimmed and smaller, by the balance values', () => {
+    card({ receded: true })
+    const { opacity, scale } = balance.communication.labelRecede
+    expect(bubble().className).toContain('receded')
+    expect(bubble().style.opacity).toBe(String(opacity))
+    expect(bubble().style.transform).toBe(`scale(${scale})`)
+  })
+
+  it('never dims the targeted note, and its tail shares the highlight', () => {
+    card({ receded: true, targeted: true })
+    expect(bubble().className).toContain('targeted')
+    expect(bubble().className).not.toContain('receded')
+    expect(bubble().style.opacity).toBe('1')
+    expect(bubble().querySelector('.speech-tail')).not.toBeNull()
   })
 })
