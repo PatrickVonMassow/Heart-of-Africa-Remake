@@ -24,6 +24,7 @@ import {
   authoringVenue,
   readState,
   recordProbe,
+  recordProbeFailure,
   recordUnreachable,
   statusReport,
   venueInstruction,
@@ -92,10 +93,17 @@ export function parseMarker(text) {
 
 function recordProbeFrom(ref, creditConfirmed) {
   const remoteRef = ref.startsWith('origin/') ? ref : `origin/${ref}`
-  git(['fetch', '--quiet', 'origin', ref.replace(/^origin\//, '')])
-  const shown = git(['show', `${remoteRef}:${PROBE_FILE}`])
-  if (shown.status !== 0) throw new Error(`no ${PROBE_FILE} on ${remoteRef}: ${String(shown.stderr ?? '').trim()}`)
   const current = currentCloudState()
+  const fail = (why) => {
+    save(recordProbeFailure(current.ok ? current : null, why, { by: setterIdentity() }))
+    throw new Error(`probe not readable, switch set OFF — ${why}`)
+  }
+  // A failed fetch must not fall back to a cached, older marker.
+  const fetched = git(['fetch', '--quiet', 'origin', ref.replace(/^origin\//, '')])
+  if (fetched.status !== 0)
+    fail(`fetch of ${remoteRef} failed: ${String(fetched.stderr ?? fetched.error ?? '').trim()}`)
+  const shown = git(['show', `${remoteRef}:${PROBE_FILE}`])
+  if (shown.status !== 0) fail(`no ${PROBE_FILE} on ${remoteRef}: ${String(shown.stderr ?? '').trim()}`)
   const probe = {
     branch: remoteRef,
     ...parseMarker(shown.stdout),

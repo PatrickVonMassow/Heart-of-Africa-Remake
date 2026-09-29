@@ -128,7 +128,8 @@ export function writeState(previous, direction, { reason = '', by = '', now = Da
     setBy,
     changedAt: Number(now),
     probe: kept,
-    ...(dir === 'on' && oneLine(previous?.unreachable) ? { unreachable: oneLine(previous.unreachable) } : {}),
+    // An outage survives every flip; only a passing probe (recordProbe) clears it.
+    ...(oneLine(previous?.unreachable) ? { unreachable: oneLine(previous.unreachable) } : {}),
   }
 }
 
@@ -139,11 +140,18 @@ export function writeState(previous, direction, { reason = '', by = '', now = Da
 export function recordProbe(previous, probe, { by = '', now = Date.now() } = {}) {
   const decoded = readProbe(probe)
   const verdict = probeVerdict(decoded)
-  if (verdict.offMachine && previous?.state === 'on') {
-    return writeState({ ...previous, unreachable: '' }, 'on', { reason: previous.reason, by, now, probe: decoded })
+  if (verdict.offMachine) {
+    const on = previous?.state === 'on'
+    const reason = on ? previous.reason : 'probe passed; switch left OFF'
+    return writeState({ ...previous, unreachable: '' }, on ? 'on' : 'off', { reason, by, now, probe: decoded })
   }
-  const reason = verdict.offMachine ? 'probe passed; switch left OFF' : `probe failed: ${verdict.why}`
-  return writeState(previous, 'off', { reason, by, now, probe: decoded })
+  return writeState(previous, 'off', { reason: `probe failed: ${verdict.why}`, by, now, probe: decoded })
+}
+
+/** A probe that could not even be read fails closed: OFF, and the old probe is dropped. */
+export function recordProbeFailure(previous, why, { by = '', now = Date.now() } = {}) {
+  const detail = oneLine(why).replace(/[\r\n]+/g, ' ') || 'unknown error'
+  return writeState(previous, 'off', { reason: `probe failed: ${detail}`, by, now, probe: null })
 }
 
 /** Record that a cloud launch failed: routing falls back to local until a passing probe is recorded. */

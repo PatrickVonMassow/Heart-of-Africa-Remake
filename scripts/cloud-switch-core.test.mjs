@@ -4,6 +4,7 @@ import {
   probeVerdict,
   readState,
   recordProbe,
+  recordProbeFailure,
   recordUnreachable,
   statusReport,
   venueInstruction,
@@ -176,5 +177,27 @@ describe('review fixes (Astra, 235e3c2)', () => {
     const route = authoringVenue(down)
     expect(route.venue).toBe('local')
     expect(route.notice).toMatch(/unreachable \(remote launch refused\)/)
+  })
+})
+
+describe('review fixes (Astra, 2cdaaae)', () => {
+  it('an unreadable probe turns ON off and drops the old passing probe', () => {
+    const next = readState(
+      JSON.stringify(recordProbeFailure(readState(record('on')), 'fetch failed', { by: 'b', now: NOW })),
+    )
+    expect(next).toMatchObject({ state: 'off', probe: null })
+    expect(next.reason).toMatch(/probe failed: fetch failed/)
+    expect(() => writeState(next, 'on', { reason: 'r', by: 'b', now: NOW })).toThrow(/no off-machine probe/)
+  })
+
+  it('an outage survives OFF then ON until a passing probe clears it', () => {
+    const down = readState(
+      JSON.stringify(recordUnreachable(readState(record('on')), 'launch refused', { by: 'b', now: NOW })),
+    )
+    const off = readState(JSON.stringify(writeState(down, 'off', { reason: 'r', by: 'b', now: NOW })))
+    const on = readState(JSON.stringify(writeState(off, 'on', { reason: 'r', by: 'b', now: NOW })))
+    expect(authoringVenue(on).venue).toBe('local')
+    const cleared = readState(JSON.stringify(recordProbe(on, probe(), { by: 'b', now: NOW })))
+    expect(authoringVenue(cleared).venue).toBe('cloud')
   })
 })
