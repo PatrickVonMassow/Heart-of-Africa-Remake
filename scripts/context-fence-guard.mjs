@@ -237,14 +237,18 @@ if (process.argv.includes('--status')) {
     brake.observed ? 'handover brake OBSERVED — an armed launcher would DENY' : null,
     admission.decision.fits === false ? 'ceiling OBSERVED — an armed fence would DENY' : null,
   ].filter(Boolean)
-  const verdict = brake.refused
-    ? 'DENY (handover brake)'
-    : ceilingDenies
-      ? 'DENY'
-      : observedNotes.length ? `allow (${observedNotes.join('; ')})` : 'allow'
+  // A paused batch passes every call in hook mode, so the status says allow too.
+  const paused = existsSync(PAUSE)
+  const verdict = paused
+    ? 'allow (the batch is paused — the hook passes every call)'
+    : brake.refused
+      ? 'DENY (handover brake)'
+      : ceilingDenies
+        ? 'DENY'
+        : observedNotes.length ? `allow (${observedNotes.join('; ')})` : 'allow'
   console.log(`verdict for an AGENT call: ${verdict}`)
-  if (brake.refused) console.log(handoverRefusal({ brake, start: agentStart }))
-  else if (ceilingDenies) {
+  if (!paused && brake.refused) console.log(handoverRefusal({ brake, start: agentStart }))
+  else if (!paused && ceilingDenies) {
     console.log(contextBudgetRefusal({ decision: admission.decision, reading, sessionId: sid, point: currentPoint() }))
   }
   process.exit(0)

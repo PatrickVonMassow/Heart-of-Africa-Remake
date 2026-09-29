@@ -580,6 +580,23 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
     expect(verdictLine(status().stdout)).toMatch(/^verdict for an AGENT call: allow \(handover brake OBSERVED/)
   })
 
+  it('a PAUSED batch: hook and --status both allow, even armed and above the mark', () => {
+    const pause = resolve(repo, '.claude', 'batch-paused')
+    writeFileSync(pause, 'paused for the test\n')
+    try {
+      for (const env of [DEFAULT, ARMED]) {
+        const r = call('Agent', {}, { env })
+        expect(r.status, r.stderr).toBe(0)
+        expect(r.stdout.trim()).toBe('')
+        const out = status(env).stdout
+        expect(out).toContain('verdict for an AGENT call: allow (the batch is paused')
+        expect(out).not.toContain('PAST THE CONTEXT WATERMARK')
+      }
+    } finally {
+      rmSync(pause, { force: true })
+    }
+  })
+
   it('does not bind a subagent — its spawn was the start, its gate is the step in flight', () => {
     expect(call('Bash', { command: 'npm test -- world' }, { agentId: 'agent-1' }).stdout.trim()).toBe('')
   })
