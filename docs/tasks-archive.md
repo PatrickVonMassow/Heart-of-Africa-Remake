@@ -32470,3 +32470,17 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
      a vulture flock that owns it, and no living young with that identity afterwards;
      and a Playwright picture on WebGPU of the carcass with the vultures.
   Bundle: Tierverhalten.
+
+- [x] 1232. A receipt re-judges across a render-neutral commit, so only the missing backends run again
+  ORDER (user 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."): this point stands DIRECTLY AFTER point 1185 in the work order.
+  SPEC: when the only commits between a finished verify receipt and the current HEAD touch render-neutral paths (the charge ledger scripts/render-verify-charges.mjs, docs, TASKS.md/backlog/bookkeeping, tests of scripts; NOT src/, public/, assets, package/lockfile, vite/runner config, or the verify suites themselves), the receipt is re-judged against the current charge ledger instead of discarded. Its re-judged per-backend verdict counts for the new HEAD; only backends the receipt did not complete run again.
+  The render-neutral classification reuses the existing path classifier (isBackendSensitivePath / the ladder edit ageing) rather than a new list; unknown path -> not neutral -> full run (fail closed).
+  A receipt whose run record is incomplete for a red (the "run record is incomplete, so no charge may be accepted" case) is NOT re-judged for that red; it stays unresolved and the backend reruns.
+  The closing step large-regression accepts a re-judged receipt plus the fresh backend receipt(s) as "both backends green on the release HEAD", and its evidence names both receipts and the neutral diff.
+  FINAL STATE: (1) re-judge path in the verify wrapper/receipt reuse; (2) closing-guard accepts the combined evidence; (3) unit tests: neutral diff -> reuse + missing backend only; src/ touched -> full run; unknown path -> full run; incomplete record -> no reuse for that red; (4) scripts/verify/README.md receipt section updated.
+  Infrastructure freeze (CLAUDE.md §2): explicit user order; it SIMPLIFIES (removes a whole rerun) and adds no new ledger, router or planner.
+  USER, verbatim:
+  User 28.09.2026 19:37: "Warum muss die gesamte Regression von vorne laufen, wenn bestimmte Teil bereits erfolgreich durchgetestet wurden?"
+  User 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."
+  Refs: point 633; scripts/render-verify-charges.mjs; scripts/closing-guard-core.mjs large-regression; scripts/verify/README.md receipt reuse
+  Bundle: Testinfrastruktur.
