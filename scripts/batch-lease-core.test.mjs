@@ -828,6 +828,7 @@ describe('the request handoff shape (point 1207)', () => {
     expect(ok(`echo hello > ${pad}/x.md`)).toBe(true)
     expect(ok(`printf '%s' hi >> ${pad}/x.md`)).toBe(true)
     expect(ok(`tee -a ${pad}/x.md < ${pad}/in`)).toBe(true)
+    expect(ok(`cd ${pad} &&\ncat > why.md <<'EOF'\nbody\nEOF`)).toBe(true)
   })
 
   it('refuses a write inside the checkout, direct or through the session cwd', () => {
@@ -872,6 +873,10 @@ describe('the request handoff shape (point 1207)', () => {
       `env -C ${checkoutRoot} cat > x.md`,
       `cat > ${pad}/f 2>&1`,
       `cat > ${pad}/f\nrm -rf src`,
+      // round 6: a multi-line header hiding an unquoted heredoc or expansion; `..` behind a link
+      `cd ${pad} &&\ncat > why.md <<EOF\n$(rm x)\nEOF`,
+      `cd ${pad} &&\necho $(rm x) > why.md`,
+      'echo x > /tmp/pad/link/../victim',
     ]
     for (const command of refused) expect(ok(command), command).toBe(false)
   })

@@ -193,7 +193,8 @@ export function ownershipStandDownDecision({
     const tool = String(toolName ?? '')
     const outsideFile =
       ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool) &&
-      !!filePath && !!checkoutRoot && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })
+      !!filePath && !String(filePath).split(/[\\/]/).includes('..') &&
+      !!checkoutRoot && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })
     const outsideShell =
       SHELL_TOOLS.has(tool) && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })
     if (outsideFile || outsideShell) return { block: false, reason: '', standDown: true }

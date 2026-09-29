@@ -894,9 +894,6 @@ export function handoffWritesOnlyOutsideCheckout(command, { cwd = '', checkoutRo
   try {
     const src = String(command ?? '')
     if (!checkoutRoot || !src.trim()) return false
-    const [firstLine, ...rest] = src.split('\n')
-    const hasBody = rest.some((line) => line.trim())
-    if (/[$`]/.test(firstLine)) return false
     const segments = parseSegments(src)
     if (segments.length !== expandSegments(src).length) return false
     if (segments.length < 1 || segments.length > 2) return false
@@ -918,12 +915,17 @@ export function handoffWritesOnlyOutsideCheckout(command, { cwd = '', checkoutRo
       dir = words[1]
     }
     const writer = segments[segments.length - 1]
+    // The HEADER is everything up to the end of the writer's own line; what
+    // follows can only be its heredoc body (review round 6: a multi-line header).
+    const header = src.slice(0, writer.end)
+    const hasBody = src.slice(writer.end).trim() !== ''
+    if (/[$`]/.test(header)) return false
     const [head, ...args] = writer.words.map((word) => word.text)
     const rule = HANDOFF_WRITERS.get(head)
     if (!rule) return false
     // A heredoc body stays literal only behind a quoted delimiter.
     if (hasBody && !writer.redirects.some((r) => r.op?.startsWith('<<'))) return false
-    const heredocs = firstLine.match(/<<-?\s*\S?/g) ?? []
+    const heredocs = writer.raw.match(/<<-?\s*\S?/g) ?? []
     if (hasBody && heredocs.some((h) => !/['"]$/.test(h))) return false
     const destinations = []
     for (const r of writer.redirects) {
