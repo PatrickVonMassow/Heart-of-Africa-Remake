@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  cacheEnvironment, findGreenReceipt, formatCachedGreen, isNeutralPath, lastGreenReceipt, neutralDiffReader, parseNameList, rejudgeBackend, rejudgeLarge, snapshotSuiteRuns,
+  cacheEnvironment, findGreenReceipt, formatCachedGreen, isNeutralPath, lastGreenReceipt, neutralDiffReader, parseNameList, readSuiteSink, rejudgeBackend, rejudgeLarge, snapshotSuiteRuns,
 } from './run-green-cache.mjs'
 import { DEV_SUITES, SERVERLESS_SUITES, WEBGL_ONLY_SUITES } from './tiers.mjs'
+import { MAX_RUNS, SUITE_SINK_ENV, appendSuiteSink } from '../render-verify-state.mjs'
 
 const ARGS = ['polish', '--section=adult-errands']
 const green = (overrides = {}) => ({
@@ -166,6 +167,28 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
     const records = [large([...passOf('webgl'), ...passOf('webgpu', quiet)])]
     expect(ask([], { records }).missing).toEqual(['webgpu'])
     expect(rejudgeBackend(records[0].record, 'webgpu', { openPoints: [], ledger: [] }).reason).toMatch(/no open point owns/)
+  })
+
+  it('keeps every suite record of a run longer than the state history cap', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-rejudge-sink-'))
+    try {
+      const sink = join(dir, 'large.log.suites.jsonl')
+      const all = [...passOf('webgl'), ...passOf('webgpu'), ...passOf('webgl'), ...passOf('webgpu')]
+        .map((r, i) => ({ ...r, suite: `${r.suite}-${i}` }))
+      expect(all.length).toBeGreaterThan(MAX_RUNS)
+      for (const r of all) appendSuiteSink(r, { [SUITE_SINK_ENV]: sink })
+      appendSuiteSink(suiteRun('polish', 'webgl'), {})
+      const snap = snapshotSuiteRuns(readSuiteSink(sink), { head: 'old1234', startedAt: 5, finishedAt: 30 })
+      expect(snap).toEqual(all)
+      const full = [...passOf('webgl'), ...passOf('webgpu')]
+      const sink2 = join(dir, 'b.suites.jsonl')
+      for (const r of full) appendSuiteSink(r, { [SUITE_SINK_ENV]: sink2 })
+      const record = large(snapshotSuiteRuns(readSuiteSink(sink2), { head: 'old1234', startedAt: 5, finishedAt: 30 }))
+      expect(ask([], { records: [record] }).missing).toEqual([])
+      expect(readSuiteSink(join(dir, 'absent.jsonl'))).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('judges both sides of a rename: moving code out of src/ into docs/ is not neutral', () => {

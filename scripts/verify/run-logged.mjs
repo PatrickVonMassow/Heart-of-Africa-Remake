@@ -67,10 +67,11 @@ import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
 import { developmentRunRefusal, parseRunLoggedArgs } from './run-logged-args.mjs'
 import {
-  cacheEnvironment, cleanWorktree, findGreenReceipt, formatCachedGreen, formatRejudged, neutralDiffReader, rejudgeLarge, snapshotSuiteRuns,
+  cacheEnvironment, cleanWorktree, findGreenReceipt, formatCachedGreen, formatRejudged, neutralDiffReader, readSuiteSink, rejudgeLarge,
+  snapshotSuiteRuns,
 } from './run-green-cache.mjs'
 import { parseArgs } from './tiers.mjs'
-import { readRenderState } from '../render-verify-state.mjs'
+import { SUITE_SINK_ENV } from '../render-verify-state.mjs'
 import { chargeablePoints } from '../render-verify-core.mjs'
 import { readTasksAll } from '../tasks-source.mjs'
 import { waitForLargeRun } from './large-run-wait.mjs'
@@ -204,10 +205,10 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
       framesExpected: baseRecord.expectedFrames,
       framesWritten,
     })
-    // A LARGE keeps its own suite records: the render-verify state holds fewer
-    // runs than one LARGE writes, and a later re-judge reads them from here.
+    // A LARGE keeps its own suite records, read from the run's own uncapped
+    // sink: the render-verify state holds fewer runs than one LARGE writes.
     const suiteRuns = parseArgs(baseRecord.args ?? []).isLargeEquivalent
-      ? { suiteRuns: snapshotSuiteRuns(readRenderState()?.runs, { head: baseRecord.head, startedAt: started, finishedAt: receipt.finishedAt }) }
+      ? { suiteRuns: snapshotSuiteRuns(readSuiteSink(suiteSinkFor(baseRecord.log)), { head: baseRecord.head, startedAt: started, finishedAt: receipt.finishedAt }) }
       : {}
     writeRecord(recordPath, {
       ...prior,
@@ -352,7 +353,7 @@ function runVerify() {
     // THE LADDER WAS ALREADY ASKED, above, with the escape this wrapper
     // consumes and does not forward. run-all asks it too — it is the entrypoint
     // the README names — so the marker keeps it to ONE question per run.
-    env: { ...process.env, RVA_LADDER_ASKED: '1' },
+    env: { ...process.env, RVA_LADDER_ASKED: '1', [SUITE_SINK_ENV]: suiteSinkFor(logPath) },
   })
 
   const lines = []
@@ -588,6 +589,11 @@ function reexecWithLogPath() {
     console.log(`FAIL  run-logged   could not re-exec with the log path: ${err.message}`)
     process.exitCode = 1
   })
+}
+
+/** Where one run's suite records are copied while it runs (beside its log). */
+function suiteSinkFor(logPath) {
+  return `${logPath}.suites.jsonl`
 }
 
 /** The run records in the log directory, newest file name first. */

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { readRecord } from './run-record.mjs'
 import { DEV_SUITES, SERVERLESS_SUITES, laneFor, parseArgs, selectBackend, suitesFor } from './tiers.mjs'
@@ -97,6 +97,16 @@ export function snapshotSuiteRuns(runs, { head, startedAt, finishedAt }) {
   return runs.filter((r) => r && typeof r.head === 'string' && r.head.startsWith(head) &&
     r.partial !== true && Number.isFinite(r.startedAt) && r.startedAt >= startedAt &&
     (!Number.isFinite(finishedAt) || (Number.isFinite(r.at) && r.at <= finishedAt)))
+}
+
+/** The run's own suite records from its sink file (one JSON per line); torn
+ *  lines are skipped, an unreadable file answers []. */
+export function readSuiteSink(path) {
+  let text
+  try { text = readFileSync(path, 'utf8') } catch { return [] }
+  return text.split('\n').filter(Boolean).flatMap((line) => {
+    try { return [JSON.parse(line)] } catch { return [] }
+  })
 }
 
 /** The backends a LARGE-equivalent command runs: unpinned both, pinned one. */

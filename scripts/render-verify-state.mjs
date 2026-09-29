@@ -17,6 +17,7 @@
 // actually wrote — never a parsed self-report. Writes are atomic (tmp + rename, via dashboard-state.mjs)
 // because a suite's exit handler can race the Stop-hook in the same moment.
 import { readJson, writeJsonAtomic, REPO_ROOT } from './dashboard-state.mjs'
+import { appendFileSync } from 'node:fs'
 import { commonRepoPath } from './repo-paths.mjs'
 
 export { REPO_ROOT }
@@ -41,8 +42,24 @@ export function mergeRenderState(patch) {
   return next
 }
 
+/** The env var naming the uncapped per-run copy of its suite records: set by
+ *  run-logged.mjs for one run, so the receipt's snapshot survives MAX_RUNS. */
+export const SUITE_SINK_ENV = 'HOA_RUN_SUITE_SINK'
+
+/** Append one record to the run's own sink, when one is named. Never throws. */
+export function appendSuiteSink(run, env = process.env) {
+  const sink = env?.[SUITE_SINK_ENV]
+  if (!sink) return
+  try {
+    appendFileSync(sink, `${JSON.stringify(run)}\n`)
+  } catch {
+    /* a lost copy only costs a later re-judge; the run itself stands */
+  }
+}
+
 /** Append a verify-run record (called from a suite's exit handler). */
 export function recordRun(run) {
+  appendSuiteSink(run)
   const state = readRenderState() ?? {}
   const runs = Array.isArray(state.runs) ? state.runs.slice() : []
   runs.push(run)

@@ -368,9 +368,11 @@ reuse a HEAD-only receipt. `--again` requests a fresh run. Reuse never creates
 coverage: a section receipt remains partial, and a full suite needs its own
 unfiltered receipt.
 
-**Re-judged LARGE receipts (user 28.09.2026).** A LARGE run copies its own
-per-suite records into its run record at close (`suiteRuns`); the render-verify
-state keeps fewer runs than one LARGE writes. When an unfiltered LARGE is
+**Re-judged LARGE receipts (user 28.09.2026).** While a run goes, every suite
+record is also appended to the run's own uncapped sink
+(`<log>.suites.jsonl`, named by `HOA_RUN_SUITE_SINK`); at close a LARGE copies
+them into its run record (`suiteRuns`). The render-verify state keeps fewer
+runs than one LARGE writes, so it cannot serve. When an unfiltered LARGE is
 launched on a clean tree, `rejudgeLarge` (`run-green-cache.mjs`) looks for a
 finished clean-tree LARGE receipt whose HEAD is an ancestor of this HEAD and
 whose diff to it is **render-neutral**: every path is outside the render set
