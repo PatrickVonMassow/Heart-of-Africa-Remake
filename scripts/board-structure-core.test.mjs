@@ -118,8 +118,15 @@ describe('structureViolations — the remaining structural rules', () => {
       sect(REQUIRED_SECTIONS[2]) +
       '\n' +
       sect(REQUIRED_SECTIONS[3]) +
+      '\n' +
+      sect(REQUIRED_SECTIONS[4]) +
       '\n</div>'
+    // All five present, only the ORDER wrong — so the order comparison is what
+    // fires, not a missing section (cross-vendor review 29.09.2026).
+    const present = [...swapped.matchAll(/<h2>([^<]*)<\/h2>/g)].map((m) => m[1]).sort()
+    expect(present).toEqual([...REQUIRED_SECTIONS].sort())
     expect(codes(swapped)).toContain('sections-wrong')
+    expect(codes(swapped)).not.toContain('section-wrappers')
   })
 
   it('catches an unbalanced summary', () => {

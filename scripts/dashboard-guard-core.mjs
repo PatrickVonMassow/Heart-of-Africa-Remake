@@ -354,7 +354,12 @@ export function parseCards(sectionHtml, options = {}) {
     const meta = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? null
     // The body slice must survive a container child, so take everything after
     // the body div's opening tag (the card ends at the next <details anyway).
-    const body = ((part.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? '')
+    // BOUNDED TO THE CARD (cross-vendor review 29.09.2026): the section's last
+    // card used to run on into the archive link and the footer, so an emptied
+    // last card still read as having a body. Cards do not nest, so the part's
+    // first closer is this card's own.
+    const own = part.split(/<\/details>/)[0]
+    const body = ((own.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
@@ -560,7 +565,9 @@ export function auditDashboard(html, input = {}) {
         msg: `the ${title} section holds ${onBoard} cards — the board keeps ${cap}, the older ones move to the archive page`,
       })
     }
-    if (onBoard > 0 && !/<a\s[^>]*href="https?:\/\/[^"]+"[^>]*>/.test(section)) {
+    // THE DESIGNATED LINK, not any link (cross-vendor review 29.09.2026): an
+    // evidence URL inside a card must not stand in for a deleted archive link.
+    if (onBoard > 0 && !/<p class="archive-link">(?:(?!<\/p>)[\s\S])*<a\s[^>]*href="https?:\/\/[^"]+"[^>]*>/.test(section)) {
       v.push({
         code: 'archive-link-missing',
         msg: `the ${title} section links no archive page — the moved cards would be unreachable`,
@@ -800,7 +807,7 @@ export function auditDashboard(html, input = {}) {
   // raw file: the viewer's script, a URL or a CSS class is none of the reader's
   // business, and only prose can be transliterated.
   const transliterated = []
-  for (const c of [nowCards, vdzkCards, queueCards, erledigtCards].flat()) {
+  for (const c of [nowCards, vdzkCards, queueCards, erledigtCards, logCards].flat()) {
     const hits = [...findTransliterations(c.title), ...findTransliterations(c.body)]
     if (hits.length) {
       transliterated.push(`"${c.title || c.points.join(', ') || '<untitled>'}" (${[...new Set(hits)].slice(0, 4).join(', ')})`)
