@@ -910,5 +910,10 @@ describe('the request handoff shape (point 1207)', () => {
     expect(
       mainWriteFenceDecision({ branch: 'main', toolName: 'Bash', command: 'cat > /tmp/fresh.md', checkoutRoot, cwd: checkoutRoot, canonical: hardLinked }).block,
     ).toBe(false)
+    // Review round 10: `..` and PowerShell operand lists never earn the fallback.
+    expect(mainWriteFenceDecision({ branch: 'main', toolName: 'Bash', command: 'cat > /tmp/link/../victim', checkoutRoot, cwd: checkoutRoot }).block).toBe(true)
+    expect(
+      mainWriteFenceDecision({ branch: 'main', toolName: 'PowerShell', command: 'mkdir /tmp/pad/request,src/new', checkoutRoot, cwd: checkoutRoot }).block,
+    ).toBe(true)
   })
 })

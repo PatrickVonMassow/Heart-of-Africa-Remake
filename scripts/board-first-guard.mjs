@@ -106,7 +106,11 @@ function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
     if (expandedLinks.has(existing)) return ''
     expandedLinks.add(existing)
     try {
-      const linkTarget = resolve(realpathSync(dirname(existing)), readlinkSync(existing))
+      const link = readlinkSync(existing)
+      // A `..` in the link text would be collapsed before the link it follows is
+      // expanded, so such a target proves nothing (point 1207, review round 10).
+      if (link.split(/[\\/]/).includes('..')) return ''
+      const linkTarget = resolve(realpathSync(dirname(existing)), link)
       candidate = resolve(linkTarget, relative(existing, candidate))
     } catch {
       return ''

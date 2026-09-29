@@ -849,6 +849,8 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
     // sources as well only ever makes the test STRICTER, which is the safe side.
   ].filter((text) => typeof text === 'string' && text.trim())
   if (candidates.length === 0) return false
+  // `resolve` collapses `..` before any link could be followed (point 1207, review round 10).
+  if (candidates.some((text) => text.split(/[\\/]/).includes('..'))) return false
   return candidates.every((target) => {
     const lexical = resolve(cwd || checkoutRoot, target)
     // With a resolver injected, the canonical path must lie outside TOO — a
@@ -985,7 +987,8 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
     if (directSegmentIntent(candidate) !== 'write') return false
     // A write that lands entirely OUTSIDE this checkout is not a main write
     // (point 749) — the session memory directory is the case that measured it.
-    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot, canonical })) return false
+    // PowerShell reads `a,b` as two operands, so only Bash earns it (point 1207).
+    if (tool === 'Bash' && segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot, canonical })) return false
     return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
   })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }

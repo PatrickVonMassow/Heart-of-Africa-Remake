@@ -183,6 +183,9 @@ describe('board-first-guard (spawned)', () => {
 
       // Review round 9: `..` behind a link into the checkout.
       symlinkSync(resolve(repo, 'scripts'), resolve(pad, 'link'))
+      symlinkSync(`${pad}/link/../new.md`, resolve(pad, 'request'))
+      expect(allowed('Write', { file_path: resolve(pad, 'request') })).toBe(false)
+      expect(allowed('Bash', { command: `echo x > ${resolve(pad, 'request')}` })).toBe(false)
       expect(allowed('Write', { file_path: `${pad}/link/../TASKS.md` })).toBe(false)
       expect(allowed('Bash', { command: `echo x > ${pad}/link/../TASKS.md` })).toBe(false)
 
@@ -196,6 +199,8 @@ describe('board-first-guard (spawned)', () => {
       for (const [tool, input] of [
         ['Write', { file_path: resolve(pad, 'shared.md') }],
         ['Write', { file_path: `${pad}/link/../TASKS.md` }],
+        ['Write', { file_path: resolve(pad, 'request') }],
+        ['Bash', { command: `cat > ${resolve(pad, 'request')}` }],
         ['Bash', { command: `echo x > ${pad}/link/../TASKS.md` }],
         ['Bash', { command: `cat > ${resolve(pad, 'shared.md')}` }],
       ]) {
