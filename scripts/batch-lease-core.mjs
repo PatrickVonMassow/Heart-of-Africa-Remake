@@ -815,9 +815,18 @@ export function resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot } = {}
  * scripts do, so neither may ever reach the containment test below.
  */
 const FILE_TOOLS = new Set([
-  'cat', 'tee', 'cp', 'mv', 'rm', 'rmdir', 'mkdir', 'touch', 'ln', 'chmod', 'sed', 'awk',
-  'printf', 'echo', 'head', 'tail', 'sort', 'dd',
+  // `sed`, `awk` and `dd` are absent: a program or `of=` operand names its
+  // destination inside an argument no path test can read (point 1207).
+  'cat', 'tee', 'cp', 'mv', 'rm', 'rmdir', 'mkdir', 'touch', 'ln', 'chmod',
+  'printf', 'echo', 'head', 'tail', 'sort',
 ])
+
+/**
+ * A path text the exemption may judge: no expansion, glob, quote, whitespace,
+ * `=` or `..` component. Anything else is resolved by the shell or the
+ * filesystem in ways a lexical test cannot follow (point 1207, review round 3).
+ */
+const plainPath = (text) => !/[$`*?[\]{}=\s'"\\]|^~/.test(text) && !text.split('/').includes('..')
 
 /**
  * Does this segment write ONLY outside the checkout? PURE (path resolution needs
@@ -848,8 +857,8 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
     // sources as well only ever makes the test STRICTER, which is the safe side.
   ].filter((text) => typeof text === 'string' && text.trim())
   if (candidates.length === 0) return false
-  // An unexpanded `$VAR`, command substitution or `~` names no knowable path (point 1207).
-  if (candidates.some((text) => /[$`]|^~/.test(text))) return false
+    if (!candidates.every(plainPath)) return false
+  if (args.some((arg) => arg.text.startsWith('-') && arg.text.includes('='))) return false
   // An UNKNOWN directory (segmentCwds) leaves every relative target unknown too.
   if (!cwd && candidates.some((text) => !isAbsolute(text))) return false
   return candidates.every(
@@ -917,7 +926,7 @@ export function segmentCwds(segments, cwd = '', { command = '', realpath = (path
     if (head === 'cd') {
       moved = true
       const target = args.map((arg) => arg.text).filter((text) => text && text !== '--')
-      const literal = target.length === 1 && !/^[-~]|[$`*?]/.test(target[0])
+      const literal = target.length === 1 && !target[0].startsWith('-') && plainPath(target[0])
       let next = ''
       try {
         next = literal && current ? realpath(resolve(current, target[0])) : ''

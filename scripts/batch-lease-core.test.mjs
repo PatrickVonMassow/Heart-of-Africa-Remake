@@ -545,6 +545,13 @@ describe('the main-write ownership fence', () => {
     expect(fromRoot('cd /tmp/pad && cat > link/src/x.ts', { realpath: link })).toBe(true)
     expect(fromRoot('cat > /tmp/pad/link/src/x.ts', { realpath: link })).toBe(true)
     expect(fromRoot('cat > /tmp/pad/new/x.md', { realpath: link })).toBe(false)
+    // Review round 3: `..`, a logical `cd ..`, a wildcard, a `--opt=` target and
+    // a `dd of=` operand.
+    expect(fromRoot('cat > /tmp/link/../src/x.ts')).toBe(true)
+    expect(fromRoot('cd /workspace/hoa/link && cd .. && cat > src/x.ts', { realpath: (p) => (p === '/workspace/hoa/link' ? '/tmp/pad' : p) })).toBe(true)
+    expect(fromRoot('rm /tmp/pad/link*/src/x.ts')).toBe(true)
+    expect(fromRoot('cp --target-directory=/workspace/hoa/src /tmp/a.ts')).toBe(true)
+    expect(fromRoot('dd if=/tmp/a of=/workspace/hoa/x')).toBe(true)
     // The plain `&&` chain from the scratchpad still passes, nested write included.
     expect(fromRoot('cd /tmp/pad && cat > a.md && tee b.md')).toBe(false)
     expect(shell('git commit -F /tmp/message.txt').writes).toBe(true)
