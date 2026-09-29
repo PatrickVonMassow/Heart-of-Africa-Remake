@@ -104,9 +104,9 @@ export const DOC_BUDGETS = [
     // intake — that every session must load, because they change what any later
     // point may be.
     // LOWERED to the 29.09.2026 four-eyes cut list (docs/context-cut-list-1209.md):
-    // 205 / 1468 became 193 / 1302; no rule dropped, §7.1 titles stay (tests pin them).
-    maxLines: 193,
-    maxWords: 1302,
+    // 205 / 1468 became 197 / 1328; no rule dropped, §7.1 titles stay (tests pin them).
+    maxLines: 197,
+    maxWords: 1328,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.

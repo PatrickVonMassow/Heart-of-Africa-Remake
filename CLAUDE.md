@@ -190,3 +190,7 @@ extension.
 Closing order: `CLOSING_STEPS` in `scripts/closing-guard-core.mjs`; drive it
 with `--status`, then `--step <id> --evidence "<proof>"`. `closing-guard` denies
 a tag or delivery-point tick until it is complete.
+
+Freeze code during closing: merge or park in-flight branches first, land no
+agent work during the run, and resume only after it completes. Owner procedure:
+`docs/batch-owner-runbook.md`.

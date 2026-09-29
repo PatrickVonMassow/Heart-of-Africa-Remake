@@ -85,10 +85,10 @@ reading after the change exists yet; these are estimates, not counts.
 | (c) SessionStart batch-resume output | ≈14.7 KB → ≈3.3 KB (runbook pasted → pointer −9.7 KB; resume body 3,311 → 1,798; model policy 1,003 → 781) | at session start ≈0 while the harness still shows only a 2 KB preview; ≈4,400 (2,850) tokens whenever the full output is read |
 | (c) Stop "do not stop the batch" refusal | ≈2,560 → ≈1,450 chars per firing | ≈430 (280) tokens per firing |
 | (c) Stop "dashboard not registered" refusal | ≈2,750 → ≈330 chars per firing (open-point list capped at three) | ≈935 (605) tokens per firing |
-| (d) CLAUDE.md condensation | 10,846 → 9,867 chars (205/1,468 → 193/1,302 lines/words); §7.1 titles kept because the brief resolver pins them | ≈380 (245) tokens per session |
-| (d) MEMORY.md condensation | 6,620 → ≈4,470 chars; 17 role-specific pointers moved to the memory leaf `context-details.md` (read on demand) | ≈830 (540) tokens per session |
+| (d) CLAUDE.md condensation | 10,827 → 10,036 chars (10,846 → 10,055 B; 205/1,468 → 197/1,328 lines/words); §7.1 titles kept because the brief resolver pins them | ≈305 (200) tokens per session |
+| (d) MEMORY.md condensation | 6,491 → 4,379 chars (6,620 → 4,467 B); 17 role-specific pointers moved to the memory leaf `context-details.md` (read on demand) | ≈815 (530) tokens per session |
 
-Fixed-load saving of a fresh session: ≈1,200 of ≈40,900 tokens from (d),
+Fixed-load saving of a fresh session: ≈1,120 of ≈40,900 tokens from (d),
 plus the per-prompt and per-firing savings of (c). The large remaining items
 (skill listing, account connectors) are not switchable from project files and
 wait on the attended step (b).

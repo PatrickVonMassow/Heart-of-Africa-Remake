@@ -172,9 +172,9 @@ export function promptInjectionText(mtimeNote = '') {
  */
 export function boardReminderText(mtimeNote = '') {
   return (
-    '[dashboard-reminder] Batch-Zustand geändert → Dashboard zuerst: ganze Datei lesen, jede Sektion ' +
-    'gegen den Ist-Zustand prüfen (aktuell, konsistent, redundanzfrei; keine Infos in fremde Sektionen; ' +
-    'Mobil-Hochformat), dann ' +
+    '[dashboard-reminder] Batch-Zustand geändert → Dashboard zuerst aktualisieren. Bei JEDER Änderung: ' +
+    'ganze Datei lesen, jede Sektion gegen den Ist-Zustand prüfen (aktuell, konsistent, redundanzfrei; ' +
+    'keine Infos in fremde Sektionen; Mobil-Hochformat), dann ' +
     `\`${EDIT_CMD} <cmd>\` oder \`${PUBLISH_CMD}\`. Strukturwunsch nur als Karte »Von dir zu klären« ` +
     `(${EDIT_CMD} vdzk-add). Struktur: Memory \`${CONTRACT_MEMORY}\`.` +
     mtimeNote
