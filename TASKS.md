@@ -77,43 +77,13 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 174. Tag the demo build `v0.3` and publish it at
-  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
-  GATE (user 10.08.2026, replacing the 19.07.2026 wording): v0.3 no longer waits for
-  EVERY open bugfix — that gate was unreachable and pushed the release out
-  indefinitely. What must be closed is exactly two classes:
-  1. the CRITICAL bugs (the tier-c block at the head of the work order — anything that
-     ends the player's session, loses the expedition, or voids a verification), and
-  2. everything on the COMMUNICATION MECHANIC, until the PoC is in a usable state —
-     that is the release's purpose.
-  Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
-  AND THE USER MUST HAVE GOT THROUGH THE MECHANIC ONCE (his decision 11.08.2026, 19:16:
-  "Wir sind weit von einem brauchbaren Stand der Kommunikationsmechanik entfernt. Wenn die
-  gemeldeten Bugs behoben sind, kann ich überhaupt mal anfangen, das eigentliche Feature zu
-  testen."). Green gates are not enough: as long as the reported defects keep him from
-  reaching the communication mechanic at all, nobody has tested what this release exists
-  for. So the gate also requires one completed play-through of the mechanic on the
-  deployed `main`, by the user. This tightens condition 2 above, it does not replace it.
-  THE CLOSING RUN IS ITS OWN POINT (user 11.08.2026, on the estimate: the ~1 h here was
-  true when this meant "tag and publish"). The SEQUENCE is binding and runs BEFORE this
-  point: full LARGE regression on both backends → the blind-parallel four-eyes cleanup of
-  legacy in ALL code and ALL documents (CLAUDE.md §6, closing step
-  `cleanup-blind-parallel`) → a SECOND full LARGE regression after the last cleanup commit
-  (`regression-after-cleanup`) → and only THEN the user's go for the tag. Point 633 carries
-  that run; point 631 anchored the order in the closing checklist, which refuses a tag
-  while the second regression does not stand after the cleanup. What
-  remains here is the irreversible last hour: the tag, the `poc` move, the deploy and the
-  check that the URLs serve the new state. No tag is cut on an unclosed state: this point
-  is never ticked without a complete closing run recorded at the very HEAD that carries
-  the tag, so the checklist gate holds here as much as it holds on 633.
-  FINAL TAG HELD FOR THE USER. The tag and the /v0.3/ publish are the one
-  irreversible, outward-facing step: do ALL the work up to it, then report "ready to
-  tag" and WAIT for the user's explicit go for that tag (`tags-only-on-request`).
-  When it comes, tag `v0.3` at that HEAD, MOVE the `poc` tag to the same commit, and
-  run the deploy via `workflow_dispatch` — the Pages workflow enumerates every `v*`
-  tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
-  that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
-  re-pointed.
+- [ ] 1233. Fleeing animals jitter at the water's edge instead of escaping into the water
+  ORDER (user 29.09.2026 08:05: "Das direkt als nächstes nach dem Veröffentlichen der 0,3 erledigen."): this point stands FIRST in the work order, directly after the v0.3 release.
+  REPORT (user 29.09.2026 07:51, F6 archive /backup/hoa/local/TiereFliehenNichtInsWasser.zip, copy into local/): "Die Tiere zucken am Wasser herum, anstatt vor mir ins Wasser zu fliehen". Seed 2877642954, position x/z -44.55/-138.16 (lat/lon 13.8165/-4.4553, region west, Niger), 28.02.1890, travel mode, build fb916b5, WebGPU, medium. The archive JSON's "wildlife" section holds all 80 animals nearby with state and target.
+  SPEC: reproduce from the archive state; find why fleeing animals pinned against a river/shore oscillate at the edge (flee target rejected by the water mask, re-picked each tick). Fix so a fleeing animal commits to a decision: species that swim/wade enter the water and cross or move along it; species that do not pick a stable escape along the bank. No per-frame direction flipping.
+  FINAL STATE: flee logic fixed; unit test on the water-edge flee decision (stable heading over consecutive ticks, water entry for a wading species); a picture/position check at the reported spot on the everyday backend.
+  Bundle: Tierverhalten.
+  Criticality: medium.
 
 - [ ] 1209. Every session starts and runs on a smaller fixed context load.
   USER ORDER 24.09.2026, 13:30: »Reihe die von dir vorgeschlagenen Maßnahmen zur Reduktion des
