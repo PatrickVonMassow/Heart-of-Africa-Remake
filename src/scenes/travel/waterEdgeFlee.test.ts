@@ -6,12 +6,15 @@ import {
   fleeHeading,
   fleeWaterStep,
   nearestBankTarget,
+  resolveFleeTarget,
   safeBankTarget,
   swimBrakedPace,
   turnToward,
   waterBetween,
   FLIGHT_GRACE_SECONDS,
   type BankThreat,
+  type FleeArbitrationState,
+  type FleeThreatSource,
 } from './wildlifeBehavior'
 
 // The water-edge flee decision (user report 29.09.2026: animals jitter at the
@@ -19,6 +22,7 @@ import {
 // constants (module-private there) so the tick loop below runs the same
 // hysteresis rings, turn cap and paces.
 const SHY = 6
+const PANIC = 3.2
 const EXIT = 1.5
 const TURN = 8
 const SHY_SPEED = 4.2
@@ -29,6 +33,13 @@ const wideRiver = (_x: number, z: number) => (z > 10 && z < 30 ? 'water' : 'sava
 const PLAYER = { x: 0, z: 8.5 }
 
 type BankRule = (x: number, z: number) => { tx: number; tz: number } | null
+/** The flee pick for one tick: the winning source and its heading, or null. */
+type FleePick = (x: number, z: number, t: number, engaged: boolean) => { source: FleeThreatSource; heading: number } | null
+
+const travellerOnly: FleePick = (x, z, _t, engaged) => {
+  const h = fleeHeading(x, z, [[PLAYER.x, PLAYER.z]], engaged ? SHY * EXIT : SHY)
+  return h === null ? null : { source: 'player', heading: h }
+}
 
 /** Ticks one animal pinned at the bank by the standing traveller through the
  *  flight → swim-out loop of Wildlife.tsx (shy flight with its hysteresis
@@ -37,7 +48,7 @@ function runFlight(
   bankRule: BankRule,
   seconds = 40,
   dt = 0.05,
-  threatsAt: (t: number) => Array<[number, number]> = () => [[PLAYER.x, PLAYER.z]],
+  pickAt: FleePick = travellerOnly,
 ) {
   let x = 0
   let z = 9.6
@@ -48,6 +59,7 @@ function runFlight(
   let engagements = 0
   let waterEntries = 0
   let wasWet = false
+  const sources: FleeThreatSource[] = []
   for (let t = 0; t < seconds; t += dt) {
     const x0 = x
     const z0 = z
@@ -61,11 +73,11 @@ function runFlight(
       }
       if (wideRiver(x, z) !== 'water' && d < 0.6) crossing = undefined
     } else {
-      const ring = dodge === undefined ? SHY : SHY * EXIT
-      const pick = fleeHeading(x, z, threatsAt(t), ring)
+      const pick = pickAt(x, z, t, dodge !== undefined)
       if (pick !== null) {
         if (dodge === undefined) engagements++
-        dodge = dodge === undefined ? pick : turnToward(dodge, pick, TURN * dt)
+        if (sources[sources.length - 1] !== pick.source) sources.push(pick.source)
+        dodge = dodge === undefined ? pick.heading : turnToward(dodge, pick.heading, TURN * dt)
         const pace = swimBrakedPace(SHY_SPEED, wideRiver(x, z), SWIM)
         const step = fleeWaterStep(x, z, dodge, pace * dt, wideRiver, 0.8)
         x = step.x
@@ -99,7 +111,7 @@ function runFlight(
     if (Math.abs(d) > big && Math.abs(lastTurn) > big && Math.sign(d) !== Math.sign(lastTurn)) zigzags++
     lastTurn = d
   }
-  return { x, z, engagements, waterEntries, maxTurn, zigzags, onLand: wideRiver(x, z) !== 'water', crossing }
+  return { x, z, engagements, waterEntries, sources, maxTurn, zigzags, onLand: wideRiver(x, z) !== 'water', crossing }
 }
 
 const threat: BankThreat[] = [{ ...PLAYER, r: SHY * balance.waterCross.fleeBankClearance }]
@@ -124,16 +136,40 @@ describe('water-edge flee: a fleeing animal commits instead of jittering at the 
     expect(Math.hypot(run.x - PLAYER.x, run.z - PLAYER.z)).toBeGreaterThanOrEqual(SHY)
   })
 
-  it('competing threats on the bank (traveller plus one closing in along it) still give one committed escape', () => {
-    // A second threat walks along the bank toward the animal, so the raw flee
-    // direction swings between "away from the traveller" and "away from it".
-    const walker = (t: number): [number, number] => [-8 + Math.min(t, 4) * 1.5, 7]
+  it('competing threats through the production arbitration: a hand-off between the elephant dart and the traveller still gives one committed escape', () => {
+    // An elephant wades along the bank toward the animal. resolveFleeTarget
+    // (the Wildlife.tsx arbitration point) ranks its dart above the
+    // traveller's shy flee, so the winning source switches mid-flight — the
+    // held heading must bend through that hand-off, never jitter.
+    const elephant = (t: number): [number, number] => [-7 + Math.min(t, 3) * 2.5, 10.5]
+    const state: FleeArbitrationState = {
+      species: 'antelope',
+      isJuvenile: false,
+      preyWeapon: balance.parentDefense.preyWeapon,
+      drama: {},
+      drinking: false,
+      stagedBankVictim: false,
+    }
+    const arbitrated: FleePick = (x, z, t, engaged) =>
+      resolveFleeTarget(
+        x,
+        z,
+        state,
+        [elephant(t)],
+        [[PLAYER.x, PLAYER.z]],
+        engaged ? PANIC * EXIT : PANIC,
+        engaged ? SHY * EXIT : SHY,
+      )
     const run = runFlight(
-      (x, z) => safeBankTarget(x, z, wideRiver, 30, [threat[0], { x: walker(40)[0], z: walker(40)[1], r: threat[0].r }]),
+      (x, z) => safeBankTarget(x, z, wideRiver, 30, [threat[0], { x: elephant(40)[0], z: elephant(40)[1], r: threat[0].r }]),
       40,
       0.05,
-      (t) => [[PLAYER.x, PLAYER.z], walker(t)],
+      arbitrated,
     )
+    // The run really crossed sources (else it proves nothing about the hand-off).
+    expect(run.sources).toContain('elephant')
+    expect(run.sources).toContain('player')
+    expect(run.sources.length).toBeGreaterThanOrEqual(2)
     // One flight, one water entry, no alternating turns. The swim-out may turn
     // once toward the nearest bank clear of both rings (the point-312 nearest
     // bank rule), a single held decision — it lands outside every shy ring.
@@ -141,7 +177,7 @@ describe('water-edge flee: a fleeing animal commits instead of jittering at the 
     expect(run.waterEntries).toBe(1)
     expect(run.zigzags).toBe(0)
     expect(run.onLand).toBe(true)
-    for (const [tx, tz] of [[PLAYER.x, PLAYER.z], walker(40)]) {
+    for (const [tx, tz] of [[PLAYER.x, PLAYER.z], elephant(40)]) {
       expect(Math.hypot(run.x - tx, run.z - tz)).toBeGreaterThanOrEqual(SHY)
     }
   })
