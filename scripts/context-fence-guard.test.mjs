@@ -644,7 +644,7 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
     // transforms `board.mjs` runs (`toQueue`, `toNoCurrentWork`), without its
     // archive rotation and publish.
     const git = (...args) => execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
-      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     })
     const autostart = resolve(repo, 'scripts', 'batch-autostart.mjs')
     const autostartSource = readFileSync(autostart, 'utf8')
