@@ -538,8 +538,6 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
   })
 
   it('reads are MEASURED into the level the next START is judged by, never refused themselves', () => {
-    // Holds in production once the registered matcher carries `Read` (the
-    // guard header's OPEN item); until then this proves the guard side only.
     rmSync(ledgerPath(), { force: true })
     writeTranscript(CONTEXT_TRIGGER_TOKENS - 5_000)
     expect(call('Agent', {}, { env: {} }).stdout.trim()).toBe('') // fits below the mark...
@@ -548,6 +546,24 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
     const r = call('Agent', {})
     expect(denial(r)).toContain('PAST THE CONTEXT WATERMARK')
     expect(denial(r)).toContain(String(CONTEXT_TRIGGER_TOKENS - 5_000 + 10_956))
+  })
+
+  it('a Read ABOVE the mark is booked into the ledger and recorded as no refusal — never denied', () => {
+    rmSync(ledgerPath(), { force: true })
+    const r = call('Read', { file_path: 'TASKS.md' })
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout.trim()).toBe('')
+    expect(JSON.parse(readFileSync(ledgerPath(), 'utf8')).pendingDebit).toBe(10_956)
+    expect(handoverObservations()).toEqual([])
+  })
+
+  it('the REGISTERED matcher routes Read, Agent, Task and Bash through this guard (.claude/settings.json)', () => {
+    const settings = JSON.parse(readFileSync(resolve(process.cwd(), '.claude', 'settings.json'), 'utf8'))
+    const entries = (settings.hooks?.PreToolUse ?? []).filter((e) =>
+      (e.hooks ?? []).some((h) => String(h.command ?? '').includes('scripts/context-fence-guard.mjs')))
+    expect(entries).toHaveLength(1)
+    const tools = String(entries[0].matcher).split('|')
+    for (const tool of ['Read', 'Agent', 'Task', 'Bash']) expect(tools, tool).toContain(tool)
   })
 
   it('does not bind a subagent — its spawn was the start, its gate is the step in flight', () => {

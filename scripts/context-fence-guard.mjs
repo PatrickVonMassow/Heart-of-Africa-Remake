@@ -7,25 +7,23 @@
 // wires it): one entry under `PreToolUse`, beside board-first-guard's. The
 // matcher carries `Task` because AGENT_TOOLS classifies it as a spawn — the
 // two must agree, or the fence never sees the very call it denies (Sol review
-// of d0aebb6, finding 4):
+// of d0aebb6, finding 4) — and `Read`, the largest p90 kind, so a read books
+// its debit into the level the handover brake judges (point 1204 (c)); a test
+// pins this registration:
 //
-//   { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell",
+//   { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell|Read",
 //     "hooks": [{ "type": "command",
 //                 "command": "node \"$CLAUDE_PROJECT_DIR/scripts/context-fence-guard.mjs\"" }] }
-//
-// OPEN: point 1204 (c) needs `|Read` appended to that matcher — `read` is the
-// largest p90 kind, and only a routed read books its debit into the level the
-// handover brake judges. The guard already books it; the registration change is
-// the main session's (protected path).
 //
 // Modes:
 //   1. PreToolUse HOOK: reads the tool call on stdin, MEASURES the session's
 //      context from its own transcript (the payload's transcript_path, else
 //      located by session id) and asks whether THIS call's measured p90 cost
 //      still fits below the ceiling after pending debits and the handover
-//      reserve. Shell reads are admitted like every other growing call (the
-//      Read/Grep/Glob tools are not in the matcher); only the enumerated
-//      bounded controls are exempt. Any internal error → ALLOW.
+//      reserve. Reads (the Read tool and shell reads) are admitted and booked
+//      like every other growing call, never refused at the handover mark;
+//      Grep/Glob are not in the matcher; only the enumerated bounded controls
+//      are exempt. Any internal error → ALLOW.
 //   2. `--status`: the current measurement and what a starting call would get.
 //
 // OBSERVATION MODE IS THE DEFAULT (point 758, user 20.08.2026). The fence is
