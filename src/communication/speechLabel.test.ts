@@ -17,6 +17,8 @@ import {
   readingOf,
   showSpeechLabel,
   speechLabelHeight,
+  speechLabelPresence,
+  speechLabelRecedes,
   speechLabelSeconds,
   withSpeechTarget,
 } from './speechLabel'
@@ -274,5 +276,69 @@ describe('the note rides on the speaker’s own height', () => {
     } finally {
       balance.communication.labelHeadroom = before
     }
+  })
+})
+
+describe('an older note recedes behind a newer one (point 1238)', () => {
+  const two = () =>
+    showSpeechLabel(
+      showSpeechLabel(noSpeechLabels(), 'elder', [RIVER_UTTERANCE], 10),
+      'youth',
+      [DIG],
+      11,
+    ).labels
+  const byId = (labels: ReturnType<typeof two>, id: string) => labels.find((l) => l.speakerId === id)!
+
+  it('dims the older note once a newer one is drawn, and never the newer', () => {
+    const labels = two()
+    expect(speechLabelRecedes(byId(labels, 'elder'), labels, null)).toBe(true)
+    expect(speechLabelRecedes(byId(labels, 'youth'), labels, null)).toBe(false)
+  })
+
+  it('never dims the targeted note, however much was said after it', () => {
+    const labels = two()
+    expect(speechLabelRecedes(byId(labels, 'elder'), labels, 'elder')).toBe(false)
+    // and the newer one stays at full presence while the older is the target
+    expect(speechLabelRecedes(byId(labels, 'youth'), labels, 'elder')).toBe(false)
+  })
+
+  it('leaves a lone note, and notes raised together, at full presence', () => {
+    const one = showSpeechLabel(noSpeechLabels(), 'elder', [RIVER_UTTERANCE], 10).labels
+    expect(speechLabelRecedes(one[0], one, null)).toBe(false)
+    const together = showSpeechLabel(
+      showSpeechLabel(noSpeechLabels(), 'a', [RIVER_UTTERANCE], 10), 'b', [DIG], 10,
+    ).labels
+    expect(together.some((l) => speechLabelRecedes(l, together, null))).toBe(false)
+  })
+
+  it('is judged against the DRAWN notes only — a hidden newer note dims nothing', () => {
+    const labels = two()
+    const drawn = labels.filter((l) => l.speakerId !== 'youth')
+    expect(speechLabelRecedes(byId(labels, 'elder'), drawn, null)).toBe(false)
+  })
+
+  it('a speaker speaking again comes to the front again', () => {
+    const labels = showSpeechLabel(
+      showSpeechLabel(showSpeechLabel(noSpeechLabels(), 'elder', [RIVER_UTTERANCE], 10), 'youth', [DIG], 11),
+      'elder', [DIG], 12,
+    ).labels
+    expect(speechLabelRecedes(byId(labels, 'elder'), labels, null)).toBe(false)
+    expect(speechLabelRecedes(byId(labels, 'youth'), labels, null)).toBe(true)
+  })
+
+  it('takes the receded look from balance, and full presence otherwise', () => {
+    expect(speechLabelPresence(false)).toEqual({ opacity: 1, scale: 1 })
+    const before = { ...balance.communication.labelRecede }
+    try {
+      balance.communication.labelRecede = { opacity: 0.3, scale: 0.7 }
+      expect(speechLabelPresence(true)).toEqual({ opacity: 0.3, scale: 0.7 })
+    } finally {
+      balance.communication.labelRecede = before
+    }
+    const { opacity, scale } = speechLabelPresence(true)
+    expect(opacity).toBeGreaterThan(0.2)
+    expect(opacity).toBeLessThan(1)
+    expect(scale).toBeGreaterThan(0.5)
+    expect(scale).toBeLessThan(1)
   })
 })

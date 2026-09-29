@@ -92,3 +92,27 @@ it('keeps speech notes at screen size and below the HUD instead of enlarging at 
     expect(props.zIndexRange).toEqual([20, 10])
   }
 })
+
+it('stands each note on its tail tip and hands the older of two notes the receded look (point 1238)', async () => {
+  const { useGame } = await import('../../state/store')
+  const elder = new THREE.Group()
+  const youth = new THREE.Group()
+  scene.add(elder, youth)
+  useGame.getState().hearUtterance(atoms[0])
+  speakOverhead('elder', atoms, elder, { now: 10 })
+  speakOverhead('youth', atoms, youth, { now: 11 })
+  htmlProps.mockClear()
+  render(<SpeechLabels />)
+  const calls = htmlProps.mock.calls.map(([props]) => props as {
+    center?: boolean
+    style?: { transform?: string }
+    children: { props: { speakerId: string; receded: boolean } }
+  })
+  expect(calls.length).toBeGreaterThanOrEqual(2)
+  for (const props of calls) {
+    expect(props.center).toBeFalsy()
+    expect(props.style?.transform).toBe('translate3d(-50%,-100%,0)')
+  }
+  const receded = Object.fromEntries(calls.map((p) => [p.children.props.speakerId, p.children.props.receded]))
+  expect(receded).toEqual({ elder: true, youth: false })
+})

@@ -1564,7 +1564,42 @@ textarea {
   color: var(--hud-text);
   white-space: nowrap;
   pointer-events: none;
-  transform: translateY(-8px);
+}
+
+/* The note plus its tail (point 1238). The scene layer anchors the bubble's
+   BOTTOM CENTRE — the tail's tip — over the speaker's crown, so the tail points
+   at its own speaker; a receded bubble shrinks about that same tip. */
+.speech-bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+}
+
+/* The tail overlaps the box's bottom border by one pixel so the two read as
+   one outline; its fill and stroke follow the box, targeted included. */
+.speech-tail {
+  display: block;
+  margin-top: -1px;
+  overflow: visible;
+}
+
+.speech-tail path {
+  fill: rgba(24, 18, 10, 0.72);
+  stroke: var(--hud-border);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.speech-bubble.targeted .speech-tail path {
+  fill: rgba(40, 30, 14, 0.86);
+  stroke: #d8b45a;
+}
+
+.speech-bubble.targeted .speech-tail {
+  filter: drop-shadow(0 0 3px rgba(216, 180, 90, 0.45));
 }
 
 /* The atoms of a phrase stand side by side, in the order they are spoken. */

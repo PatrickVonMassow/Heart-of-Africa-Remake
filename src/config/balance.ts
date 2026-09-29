@@ -1032,6 +1032,8 @@ interface BalanceConfig {
     drumMessagePeak: number
     /** The gap between a speaker's own crown and its note, in settlement units. */
     labelHeadroom: number
+    /** How an older note stands back while a newer one is shown (speechLabelRecedes). */
+    labelRecede: { opacity: number; scale: number }
     /** How close the traveller must stand to the chief, in settlement units, for
      *  the find from the boulder to be laid in his hands. */
     giveReach: number
@@ -1916,8 +1918,13 @@ export const balance: BalanceConfig = {
     // a player looking at the figures never saw it. It rides the SPEAKER's own
     // height now, and this is the whole gap left above it: enough for the box
     // to clear the head, little enough that the note plainly belongs to the
-    // figure under it.
-    labelHeadroom: 0.25,
+    // figure under it. Since the note carries a tail whose TIP stands on this
+    // point (the box above it), the gap is only what keeps the tip off the hair.
+    labelHeadroom: 0.15,
+    // Calibratable (CLAUDE.md §2): with two notes up, the older one steps back —
+    // dimmed and a little smaller — so the current speaker's note is always the
+    // most prominent. Still readable: the player may want to guess at it.
+    labelRecede: { opacity: 0.55, scale: 0.85 },
     // Calibratable (CLAUDE.md §2): the find is handed over face to face, so the
     // reach is an arm's length plus a step — a little over the 1.6 m the chief
     // stands beside his own door (CHIEF_STAND_OFFSET), and well inside the
