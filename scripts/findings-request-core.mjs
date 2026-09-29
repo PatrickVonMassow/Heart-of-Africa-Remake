@@ -339,7 +339,10 @@ export function formatRequest(entry) {
 /** The fields a stdin document may carry, in the CLI's own spelling. */
 export const DOCUMENT_FIELDS = ['spec', 'why', 'constraints', 'quotes', 'doc-impact', 'open-questions', 'bundle', 'refs']
 
-const PART_HEADER = /^--- *([A-Za-z-]+) *---\s*$/
+// ANY delimiter-shaped line is a header, so a misspelt one (`--- open_questions ---`)
+// is refused by name instead of sliding into the previous part's body. A line
+// of dashes alone (a markdown rule) stays body text.
+const PART_HEADER = /^---\s*(\S(?:.*\S)?)\s*---\s*$/
 
 /**
  * Split a delimited request document into its fields. PURE.
@@ -354,7 +357,7 @@ export function parseRequestDocument(text = '') {
   let current = null
   for (const [i, line] of lines.entries()) {
     const header = PART_HEADER.exec(line)
-    if (header) {
+    if (header && !/^-+$/.test(header[1])) {
       const name = header[1].toLowerCase()
       if (!DOCUMENT_FIELDS.includes(name)) return { error: `line ${i + 1}: unknown field "${header[1]}" — ${accepted}` }
       if (name in fields) return { error: `line ${i + 1}: field "${name}" given twice — ${accepted}` }

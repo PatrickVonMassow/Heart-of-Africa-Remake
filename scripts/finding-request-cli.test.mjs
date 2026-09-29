@@ -273,6 +273,9 @@ describe('a deposit that never touches the filesystem', () => {
     expect(err).toContain('--- spec ---, --- why ---')
     expect(run(['--request', 'Kaputt', '--stdin'], true, {}, '--- spek ---\nx\n')).toMatch(/unknown field "spek"/)
     expect(run(['--request', 'Kaputt', '--stdin'], true, {}, '--- spec ---\nx\n--- spec ---\ny\n')).toMatch(/"spec" given twice/)
+    const misspelt = run(['--request', 'Kaputt', '--stdin', '--session', 's'], true, {}, '--- spec ---\nx\n--- open_questions ---\nWer entscheidet?\n')
+    expect(misspelt).toMatch(/line 3: unknown field "open_questions"/)
+    expect(misspelt).toContain('--- open-questions ---')
     expect(run(['--requests'])).toMatch(/no carrier yet|0 request\(s\) waiting/)
   })
 

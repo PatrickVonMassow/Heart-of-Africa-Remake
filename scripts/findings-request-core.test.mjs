@@ -374,4 +374,11 @@ describe('parseRequestDocument — the whole deposit as one stdin document (poin
     expect(parseRequestDocument('').error).toMatch(/no part header/)
     expect(parseRequestDocument('').error).toContain('--- open-questions ---')
   })
+
+  it('refuses a misspelt header after a valid part instead of swallowing it as body', () => {
+    for (const bad of ['open_questions', 'open questions', 'Spec 2', 'doc impact']) {
+      expect(parseRequestDocument(`--- spec ---\nA\n--- ${bad} ---\nB`).error).toMatch(new RegExp(`line 3: unknown field "${bad}"`))
+    }
+    expect(parseRequestDocument('--- spec ---\nA\n----------\nB\n---\n').fields).toEqual({ spec: 'A\n----------\nB\n---' })
+  })
 })
