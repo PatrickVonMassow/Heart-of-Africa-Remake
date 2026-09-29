@@ -4974,12 +4974,14 @@ if (section('young-kill-carcass')) {
     // A parentless young of the same herd grazing beside the kill.
     const orphan = { x: kill.x + 7, z: kill.z, y: calf.y, rot: 0, scale: 0.55, phase: 0.43, chunk: calf.chunk, young: true }
     herds.zebra.push(orphan)
-    const yk = (window.__yk = { fam, orphan, kill, revived: false, relinked: false, orphanToKeeper: false, remnant: null })
+    const yk = (window.__yk = { fam, orphan, kill, revived: false, relinked: false, carcassLinked: false, orphanToKeeper: false, remnant: null })
     const watch = () => {
       const h = window.__wildlife.herdsRef.current
       if (calf.dead !== true) yk.revived = true
       const c = parent.child
       if (c && !c.dead && Math.hypot(c.x - kill.x, c.z - kill.z) < 20) yk.relinked = true
+      // Released at death, not at cleanup: no link to the dead young at any frame.
+      if (parent.child === calf || calf.parent === parent) yk.carcassLinked = true
       if (orphan.parent === parent) yk.orphanToKeeper = true
       if (!yk.remnant) {
         for (const list of Object.values(h)) {
@@ -4989,6 +4991,7 @@ if (section('young-kill-carcass')) {
       }
     }
     window.__ykWatch = watch
+    watch() // the first frame after death already counts
     // The kill flock lands on the remains once the keeper's vigil is over.
     const v = window.__vultures
     await window.__pollSim(60, () => {
@@ -5046,6 +5049,7 @@ if (section('young-kill-carcass')) {
     const out = {
       revived: yk.revived,
       relinked: yk.relinked,
+      carcassLinked: yk.carcassLinked,
       orphanToKeeper: yk.orphanToKeeper,
       remnantGone: !yk.remnant || yk.remnant.gone === true,
       calfListed: herds.zebra.includes(calf),
@@ -5063,7 +5067,7 @@ if (section('young-kill-carcass')) {
     return out
   })
   check('no living young with the killed one\'s identity, and none handed to the mourning parent at the kill (point 1213)',
-    after !== null && !after.revived && !after.relinked && !after.orphanToKeeper && !after.calfListed &&
+    after !== null && !after.revived && !after.relinked && !after.carcassLinked && !after.orphanToKeeper && !after.calfListed &&
       after.parentChild === null && after.parentAlive && after.remnantGone,
     JSON.stringify(after))
 }
