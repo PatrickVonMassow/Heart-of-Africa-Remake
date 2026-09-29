@@ -22,6 +22,7 @@ import { liveRecordPaths } from './verify/run-record.mjs'
 import {
   planRemediation,
   declaredRunAlive,
+  quarantineStashArgs,
   needsRepair,
   GATE_COMMANDS,
   judgeGateRun,
@@ -134,7 +135,7 @@ try {
 // `verification/` are the same machine state: stashing them mid-run destroys the
 // run's picture evidence (measured 26.09.2026 during the closing LARGE, and
 // 18.09.2026 for a run declared through `batch-in-flight`). The decision is
-// `quarantineTargets` in the core; either live source protects the frames.
+// `quarantineScope` in the core; either live source protects the frames.
 let liveVerifyRun = false
 try {
   liveVerifyRun = liveRecordPaths().length > 0
@@ -306,12 +307,9 @@ for (const a of plan) {
       log('EXECUTED abort-merge: half-done merge aborted, pre-merge state restored')
     } else if (a.action === 'quarantine-stash') {
       const name = `doctor-quarantine-${new Date().toISOString().replace(/[:.]/g, '-')}`
-      // With protected frames the stash names its targets (both sides of a rename);
-      // otherwise it takes the whole tree as before.
-      const pathspecs = (a.protectedFiles ?? []).length > 0 ? a.targets.flatMap((t) => t.split(' -> ')) : []
-      git(['stash', 'push', '-u', '-m', name, ...(pathspecs.length ? ['--', ...pathspecs] : [])])
+      git(quarantineStashArgs(name, { excludeVerification: a.excludeVerification }))
       log(`EXECUTED quarantine-stash: uncommitted concurrent edits moved to stash "${name}" (git stash list to inspect, git stash pop to restore)`)
-      if ((a.protectedFiles ?? []).length > 0) log(`kept ${a.protectedFiles.length} verification/ file(s) of the live run out of the stash`)
+      if (a.excludeVerification) log('kept verification/ out of the stash: a live verification run is writing it')
     } else if (a.action === 'rescue-and-reset') {
       if (branch !== 'main') {
         log(`SKIPPED rescue-and-reset: checkout is on "${branch}", not main — resolve the branch state first`)

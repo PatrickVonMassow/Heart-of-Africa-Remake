@@ -87,19 +87,15 @@ export function planRemediation(state) {
     })
   }
 
-  const quarantine = quarantineTargets(state.dirtyFiles, { verificationWriterLive: state.verificationWriterLive })
-  if (quarantine.targets.length > 0 && (state.parallelDetected || state.conflictMarkers)) {
+  const quarantine = quarantineScope(state.dirtyFiles, { verificationWriterLive: state.verificationWriterLive })
+  if (quarantine.needed && (state.parallelDetected || state.conflictMarkers)) {
     plan.push({
       action: 'quarantine-stash',
       level: 'repair',
-      targets: quarantine.targets,
-      // Non-empty only while a live run writes them: the stash must name its targets then.
-      protectedFiles: quarantine.protectedFiles,
+      excludeVerification: quarantine.excludeVerification,
       reason:
         'Uncommitted changes exist in the shared tree during/after a parallel-session window — they cannot be attributed to one author. Quarantine them in a stash (recoverable, named, logged) rather than build on them.' +
-        (quarantine.protectedFiles.length > 0
-          ? ` ${quarantine.protectedFiles.length} verification/ file(s) stay: a live verification run is writing them.`
-          : ''),
+        (quarantine.excludeVerification ? ' verification/ stays: a live verification run is writing it.' : ''),
     })
   }
 
@@ -587,17 +583,25 @@ export const alertNamesAnother = (args) => otherSessionsIn(args).length > 0
 /**
  * A LIVE VERIFICATION'S FRAMES ARE NOT UNATTRIBUTABLE (measured 18.09.2026: a
  * declared `polish` run lost 34 frames to two quarantine stashes). While a live
- * run writes `verification/`, those paths are its own output, never quarantined;
- * everything else is quarantined as before.
+ * run writes `verification/`, the whole directory stays out of the stash — by a
+ * pathspec exclusion, not a file list, so frames written after the status read
+ * are spared too. Only an entry with a path outside it (either side of a rename)
+ * makes a quarantine necessary then; without a live writer nothing changes.
  */
-export function quarantineTargets(dirtyFiles = [], { verificationWriterLive = false } = {}) {
-  const targets = []
-  const protectedFiles = []
-  for (const f of dirtyFiles ?? []) {
-    if (verificationWriterLive && String(f).startsWith('verification/')) protectedFiles.push(f)
-    else targets.push(f)
-  }
-  return { targets, protectedFiles }
+export const VERIFICATION_DIR = 'verification'
+
+export function quarantineScope(dirtyFiles = [], { verificationWriterLive = false } = {}) {
+  const entries = dirtyFiles ?? []
+  if (!verificationWriterLive) return { needed: entries.length > 0, excludeVerification: false }
+  const inVerification = (path) => path.replace(/^"/, '').startsWith(`${VERIFICATION_DIR}/`)
+  const needed = entries.some((entry) => String(entry).split(' -> ').some((path) => !inVerification(path)))
+  return { needed, excludeVerification: true }
+}
+
+/** The `git stash` arguments of a quarantine; `-u` takes untracked files too. */
+export function quarantineStashArgs(name, { excludeVerification = false } = {}) {
+  const args = ['stash', 'push', '-u', '-m', name]
+  return excludeVerification ? [...args, '--', '.', `:(exclude)${VERIFICATION_DIR}`] : args
 }
 
 /**

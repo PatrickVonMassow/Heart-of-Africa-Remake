@@ -4,10 +4,15 @@
 // named stash) instead of leaving a corrupted tree. The planner decides; the
 // wrapper executes and logs.
 import { describe, it, expect } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   planRemediation,
   declaredRunAlive,
-  quarantineTargets,
+  quarantineScope,
+  quarantineStashArgs,
   needsRepair,
   isConsistent,
   isEvidenceGrade,
@@ -704,7 +709,7 @@ describe('quarantine spares the frames of a live declared verification run', () 
     expect(declaredRunAlive({ declaration: logOnly, probePid: alive })).toBe(false)
   })
 
-  it('other dirty files are still quarantined, the live frames are kept out of the targets', () => {
+  it('other dirty files are still quarantined, with verification/ excluded while the run lives', () => {
     const plan = planRemediation({
       ...clean,
       dirtyFiles: [frame, 'src/x.ts'],
@@ -712,12 +717,45 @@ describe('quarantine spares the frames of a live declared verification run', () 
       verificationWriterLive: declaredRunAlive({ declaration, probePid: alive }),
     })
     const q = plan.find((a) => a.action === 'quarantine-stash')
-    expect(q.targets).toEqual(['src/x.ts'])
-    expect(q.protectedFiles).toEqual([frame])
+    expect(q.excludeVerification).toBe(true)
+    expect(planFor(dead).find((a) => a.action === 'quarantine-stash').excludeVerification).toBe(false)
   })
 
-  it('without a live writer every dirty file is a target and nothing is protected', () => {
-    expect(quarantineTargets([frame, 'src/x.ts'])).toEqual({ targets: [frame, 'src/x.ts'], protectedFiles: [] })
+  it('a rename crossing the verification/ boundary in either direction still needs a quarantine', () => {
+    const live = { verificationWriterLive: true }
+    expect(quarantineScope(['src/old.png -> verification/new.png'], live).needed).toBe(true)
+    expect(quarantineScope(['verification/old.png -> src/new.png'], live).needed).toBe(true)
+    expect(quarantineScope(['verification/a.png -> verification/b.png', '"verification/\\303\\244.png"'], live).needed).toBe(false)
+  })
+
+  it('executed in a git repo: a live writer keeps verification/ (even frames written after planning), otherwise all is stashed', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'doctor-quarantine-'))
+    const g = (dir, args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    const run = (excludeVerification) => {
+      const dir = mkdtempSync(join(tmp, 'repo-'))
+      g(dir, ['init', '-q'])
+      g(dir, ['config', 'user.email', 't@example.invalid'])
+      g(dir, ['config', 'user.name', 't'])
+      mkdirSync(join(dir, 'src'))
+      mkdirSync(join(dir, 'verification'))
+      writeFileSync(join(dir, 'src', 'a.ts'), 'a\n')
+      writeFileSync(join(dir, 'verification', 'old.png'), 'old\n')
+      g(dir, ['add', '-A'])
+      g(dir, ['commit', '-qm', 'init'])
+      writeFileSync(join(dir, 'src', 'a.ts'), 'changed\n') // tracked, dirty
+      writeFileSync(join(dir, 'src', 'b.ts'), 'new\n') // untracked
+      // written AFTER the plan: the status the planner saw never named it
+      writeFileSync(join(dir, 'verification', 'new.png'), 'frame\n')
+      writeFileSync(join(dir, 'verification', 'old.png'), 'redrawn\n')
+      g(dir, quarantineStashArgs('q', { excludeVerification }))
+      return g(dir, ['status', '--porcelain', '-uall']).split('\n').filter(Boolean).sort()
+    }
+    try {
+      expect(run(true)).toEqual([' M verification/old.png', '?? verification/new.png'].sort())
+      expect(run(false)).toEqual([])
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
   })
 })
 
