@@ -8,7 +8,7 @@
 // measurement through the payload's transcript_path, the owner-only binding,
 // the worktree stand-down and the fail-open promises.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
@@ -21,8 +21,9 @@ import { contextLedgerPath } from './context-budget.mjs'
 import { FENCE_END_COMMAND } from './context-fence-core.mjs'
 import { LAUNCHER_RECORD_VERSION } from './batch-launcher-core.mjs'
 import { runDaemon } from './batch-launcher.mjs'
-import { commitSealedBoundary, handoverAndRequest, requestImmediateSuccessor } from './batch-boundary.mjs'
-import { acquire, markHandover, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { acquire, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { toNoCurrentWork, toQueue } from './board-core.mjs'
+import { boardHtml } from './dashboard-guard-fixtures.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const REPLAY = JSON.parse(readFileSync(
@@ -629,82 +630,124 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
     expect(status().stdout).toContain('handover brake: ARMED')
   })
 
-  it('THE HANDOVER PATH CARRIES A REFUSED SESSION: suite denied, boundary allowed, successor runs the suite', { timeout: 60_000 }, async () => {
-    // Real parts: the owner lock is taken with `acquire`; the refusal and the
-    // allow-list come from the spawned guard; the launcher is the real
-    // `runDaemon` (its own record arms the brake), watching the real lock; the
-    // boundary step is `commitSealedBoundary` → `handoverAndRequest` →
-    // `markHandover` + `requestImmediateSuccessor`, as `--commit` wires them.
-    // SIMULATED, because a hermetic test cannot start a Claude session: the
-    // boundary's prepare/board checks (they need git and a published board), the
-    // exec behind `requestImmediateSuccessor` (captured, not run), and the
-    // daemon's tick child (`batch-autostart.mjs`), replaced by the successor's
-    // own real `acquire` of the handed-over lock.
-    const lockOpts = { lockPath: lockPath(), pid: process.pid, pidStartedAt: probePid(process.pid).startedAt, findAncestorFn: () => null }
-    rmSync(lockPath(), { force: true })
-    expect(acquire(SID, lockOpts)).toBe('acquired')
-    writeJson(focusPath(), { point: 1204, note: 'gate still needs a suite' })
-    const suite = { command: 'npm test -- world' }
-    const successor = 'context-fence-successor'
-    const requests = []
-    const ticks = []
-    const seen = {}
-    const outcome = await runDaemon({
-      recordPath: launcherPath(),
-      logPath: resolve(repo, '.claude', 'batch-launcher.log'),
-      tickMs: 10 * 60 * 1000,
-      pollMs: 20,
-      wakeGapMs: 0,
-      readLock: () => readOwnerLock(lockPath()),
-      isPaused: () => false,
-      tick: async () => {
-        ticks.push(Date.now())
-        if (ticks.length === 1) {
-          // Above the mark, with the daemon's own record arming the brake.
-          seen.denied = denial(call('Bash', suite))
-          seen.allowed = [FENCE_END_COMMAND, 'node scripts/batch-boundary.mjs --commit --context']
-            .map((command) => call('Bash', { command }).stdout.trim())
-          seen.handover = commitSealedBoundary({
-            marker: { sid: SID, cause: 'context', point: 1204 },
-            write: (m) => writeJson(resolve(repo, '.claude', 'batch-boundary.json'), m),
-            handover: () => handoverAndRequest({
-              sid: SID,
-              point: 1204,
-              mark: (sid, o) => markHandover(sid, { ...o, lockPath: lockPath(), head: 'test-head' }),
-              readLock: () => readOwnerLock(lockPath()),
-              request: (r) => requestImmediateSuccessor({ ...r, run: (...args) => requests.push(args) }),
-            }),
-          })
-        } else {
-          // The woken tick starts the successor, which claims the batch.
-          seen.acquired = acquire(successor, lockOpts)
-          writeJson(launcherPath(), { stopped: true, stoppedAt: Date.now() + 1 })
-        }
-        return 0
-      },
+  it('THE HANDOVER PATH CARRIES A REFUSED SESSION: suite denied, boundary taken, successor runs the suite', { timeout: 120_000 }, async () => {
+    // Real: the owner's `acquire`; the in-flight declaration of the unfinished
+    // point (its branch pushed, its gate still owing the suite) written by the
+    // real `batch-in-flight.mjs --waiting-on`; the spawned guard's deny and
+    // allow-list; `batch-boundary.mjs --prepare --context` and `--commit
+    // --context` as real CLI runs with their board checks; the real `runDaemon`
+    // (its own record arms the brake) woken by the handover.
+    // SIMULATED, because a hermetic test cannot start a Claude session or
+    // publish: `batch-autostart.mjs` (the session launch) is a stub that
+    // records its request; the daemon's tick child is the successor's own real
+    // `acquire`; the printed board commands are applied through the same pure
+    // transforms `board.mjs` runs (`toQueue`, `toNoCurrentWork`), without its
+    // archive rotation and publish.
+    const git = (...args) => execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
     })
-    expect(outcome).toBe('yielded')
-    expect(seen.denied).toContain(FENCE_END_COMMAND)
-    expect(seen.allowed).toEqual(['', ''])
-    expect(readOwnerLock(lockPath()).sessionId).toBe(successor)
-    expect(seen.acquired).toBe('acquired')
-    expect(requests).toHaveLength(1)
-    expect(requests[0][1]).toEqual(expect.arrayContaining(['--immediate', '--generation']))
-    // Woken by the handover, not the quarter-hour tick.
-    expect(ticks).toHaveLength(2)
-    expect(ticks[1] - ticks[0]).toBeLessThan(5_000)
-    // The successor, below the mark in a fresh context, runs the suite — with
-    // the launcher armed again, so the pass is not the observe fallback.
-    armLauncher()
-    const fresh = resolve(repo, 'successor-transcript.jsonl')
-    writeFileSync(fresh, `${JSON.stringify({ message: { usage: { input_tokens: 40_000 } } })}\n`)
+    const autostart = resolve(repo, 'scripts', 'batch-autostart.mjs')
+    const autostartSource = readFileSync(autostart, 'utf8')
+    const requestsPath = resolve(repo, '.claude', 'autostart-requests.jsonl')
+    const board = resolve(repo, '.batch-dashboard.html')
+    const cli = (args, env = {}) => spawnSync(process.execPath, args, {
+      windowsHide: true, cwd: repo, encoding: 'utf8',
+      env: { ...process.env, HOA_CONTEXT_FENCE_MODE: '', HOA_CONTEXT_TRIGGER_TOKENS: '', HOA_CONTEXT_REFUSAL_TOKENS: '', ...env },
+    })
+    const BRANCH = 'feat/1204-arm-handover-watermark'
+    const cleanup = () => {
+      writeFileSync(autostart, autostartSource)
+      for (const f of ['.git', 'origin.git', '.batch-dashboard.html', '.claude/batch-in-flight.json',
+        '.claude/batch-boundary.json', '.claude/batch-boundary-prepared.json', '.claude/autostart-requests.jsonl']) {
+        rmSync(resolve(repo, f), { recursive: true, force: true })
+      }
+    }
     try {
-      const r = call('Bash', suite, { sessionId: successor, transcript: fresh })
-      expect(r.status, r.stderr).toBe(0)
-      expect(r.stdout.trim()).toBe('')
+      git('init', '-q', '-b', 'main')
+      git('commit', '-q', '--allow-empty', '-m', 'base')
+      git('init', '-q', '--bare', 'origin.git')
+      git('remote', 'add', 'origin', resolve(repo, 'origin.git'))
+      git('branch', BRANCH)
+      git('push', '-q', 'origin', 'main', BRANCH)
+      writeFileSync(autostart, "import { appendFileSync } from 'node:fs'\n" +
+        `appendFileSync(${JSON.stringify(requestsPath)}, JSON.stringify(process.argv.slice(2)) + '\\n')\n`)
+
+      const lockOpts = { lockPath: lockPath(), pid: process.pid, pidStartedAt: probePid(process.pid).startedAt, findAncestorFn: () => null }
+      rmSync(lockPath(), { force: true })
+      expect(acquire(SID, lockOpts)).toBe('acquired')
+      writeJson(focusPath(), { point: 1204, note: 'gate still needs a suite' })
+      const declared = cli(['scripts/batch-in-flight.mjs', '--waiting-on', 'point 1204: its gate still needs the world suite',
+        '--point', '1204', '--branch', BRANCH])
+      expect(declared.status, declared.stderr).toBe(0)
+      writeFileSync(board, boardHtml({ nowPoint: 1204, nowTitle: 'Handover-Wasserstand scharf schalten', queue: [1205], done: [] }))
+
+      const suite = { command: 'npm test -- world' }
+      const successor = 'context-fence-successor'
+      const ticks = []
+      const seen = {}
+      const outcome = await runDaemon({
+        recordPath: launcherPath(),
+        logPath: resolve(repo, '.claude', 'batch-launcher.log'),
+        tickMs: 10 * 60 * 1000,
+        pollMs: 20,
+        wakeGapMs: 0,
+        readLock: () => readOwnerLock(lockPath()),
+        isPaused: () => false,
+        tick: async () => {
+          ticks.push(Date.now())
+          if (ticks.length > 1) {
+            // The woken tick starts the successor, which claims the batch.
+            seen.acquired = acquire(successor, lockOpts)
+            writeJson(launcherPath(), { stopped: true, stoppedAt: Date.now() + 1 })
+            return 0
+          }
+          // Above the mark, the daemon's own record arming the brake: the
+          // suite the gate still needs is refused...
+          seen.denied = denial(call('Bash', suite))
+          // ...and the whole way out passes the guard...
+          const prepareArgs = ['scripts/batch-boundary.mjs', '--prepare', '--context', '--transcript', transcriptPath()]
+          const commitArgs = ['scripts/batch-boundary.mjs', '--commit', '--context', '--transcript', transcriptPath()]
+          seen.allowed = [prepareArgs, commitArgs, ['scripts/board.mjs', 'queue', '1204'], ['scripts/board.mjs', 'none', '--text-stdin']]
+            .map((args) => call('Bash', { command: `node ${args.join(' ')}` }).stdout.trim())
+          // ...and works: the outstanding suite does not block the preparation.
+          seen.prepare = cli(prepareArgs)
+          const card = seen.prepare.stdout.split('verbatim into the unnumbered gap card:\n\n')[1]?.split('\n\n  node scripts/board.mjs')[0] ?? ''
+          writeFileSync(board, toNoCurrentWork(toQueue(readFileSync(board, 'utf8'), '1204'), card))
+          seen.commit = cli(commitArgs)
+          return 0
+        },
+      })
+      expect(outcome).toBe('yielded')
+      expect(seen.denied).toContain(FENCE_END_COMMAND)
+      expect(seen.allowed).toEqual(['', '', '', ''])
+      expect(seen.prepare.status, seen.prepare.stderr).toBe(0)
+      expect(seen.prepare.stdout).toContain('the declared in-flight work is transferable')
+      expect(seen.prepare.stdout).toContain('node scripts/board.mjs queue 1204')
+      expect(seen.commit.status, seen.commit.stderr).toBe(0)
+      expect(seen.commit.stdout).toContain('boundary COMMITTED at the context watermark')
+      expect(seen.commit.stdout).toContain('marked TRANSFERRED')
+      expect(seen.commit.stderr).not.toContain('could NOT be verified')
+      expect(readFileSync(requestsPath, 'utf8')).toContain('--immediate')
+      // Woken by the handover, not the quarter-hour tick; the successor owns the batch.
+      expect(ticks).toHaveLength(2)
+      expect(ticks[1] - ticks[0]).toBeLessThan(10_000)
+      expect(seen.acquired).toBe('acquired')
+      expect(readOwnerLock(lockPath()).sessionId).toBe(successor)
+      // The successor, below the mark in a fresh context, runs the suite — with
+      // the launcher armed again, so the pass is not the observe fallback.
+      armLauncher()
+      const fresh = resolve(repo, 'successor-transcript.jsonl')
+      writeFileSync(fresh, `${JSON.stringify({ message: { usage: { input_tokens: 40_000 } } })}\n`)
+      try {
+        const r = call('Bash', suite, { sessionId: successor, transcript: fresh })
+        expect(r.status, r.stderr).toBe(0)
+        expect(r.stdout.trim()).toBe('')
+      } finally {
+        rmSync(fresh, { force: true })
+        rmSync(ledgerPath(successor), { force: true })
+      }
     } finally {
-      rmSync(fresh, { force: true })
-      rmSync(ledgerPath(successor), { force: true })
+      cleanup()
     }
   })
 })
