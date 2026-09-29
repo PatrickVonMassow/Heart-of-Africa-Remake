@@ -7437,6 +7437,124 @@ if (section('water-edge-flee')) {
   }
 }
 
+// --- The unreactive calf (user report 29.09.2026, »Kalb reagiert nicht auf mich») --
+// Archive JungtierReagiertNicht.zip, seed 2232886032, day 74.25: a juvenile
+// antelope 1.24 from the traveller stood on the water 0.04 short of its crossing
+// target on the bank and did not flee — the mover skipped every step that close
+// but ended only on land, and the crossing held the flight off. Staged at the
+// reported spot from the archive's wildlife section, plus the bank hold (a calf
+// whose parent stands in the traveller's ring across the river).
+if (section('calf-crossing-flee')) {
+  await page.evaluate(() => window.__game.getState().debugJumpTo(10.5508, 31.6024))
+  await page.waitForFunction(() => window.__wildlife && window.__game.getState().mode === 'travel', null, { timeout: 15000 })
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
+  await page.evaluate(() => window.__game.setState({ pos: { x: 316.02, z: -105.51 }, day: 74.25 }))
+  await page.evaluate(() => window.__sleepSim(0.6))
+  await page.evaluate(() => {
+    const P = { x: 316.02, z: -105.51 }
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const st = { P, T, staged: [] }
+    window.__calfCross = st
+    st.clear = () => {
+      const herds = window.__wildlife.herdsRef.current
+      herds.antelope = herds.antelope.filter((a) => !st.staged.includes(a))
+      st.staged = []
+    }
+    // `crossing` set: the archived state; unset: the bank-hold variant.
+    st.stage = (variant) => {
+      st.clear()
+      const herds = window.__wildlife.herdsRef.current
+      const archived = variant === 'crossing' || variant === 'arrival'
+      // The arrival case holds the traveller outside every ring, so only the
+      // crossing mover — not the flight — can end the swim.
+      st.holdAt = variant === 'arrival' ? { x: 304, z: -105.51 } : P
+      const parent = archived
+        ? { x: 319.78, z: -94.97, y: 0.21, rot: 0, scale: 1, phase: 0.31 }
+        : { x: 323.7, z: -104.05, y: 0.2, rot: 0, scale: 1, phase: 0.31 }
+      const calf = archived
+        ? { x: 317.18, z: -105.05, y: 0.18, rot: 0, scale: 0.55, phase: 0.72, young: true, parent,
+            crossing: { tx: 317.18, tz: -105.09, time: 0 } }
+        : { x: 316.2, z: -104.2, y: 0.3, rot: 0, scale: 0.55, phase: 0.72, young: true, parent }
+      parent.child = calf
+      herds.antelope.unshift(parent, calf)
+      st.staged = [parent, calf]
+      return calf
+    }
+    st.hold = () => {
+      window.__game.setState({ pos: { ...(st.holdAt ?? P) } })
+      if (window.__wildlife.lion) { window.__wildlife.lion.mode = 'idle'; window.__wildlife.lion.timer = 999 }
+    }
+  })
+  const runVariant = (variant) => page.evaluate(async (v) => {
+    const st = window.__calfCross
+    const calf = st.stage(v)
+    const s0 = window.__simTime()
+    const out = {
+      variant: v,
+      start: { terrain: st.T(calf.x, calf.z), dP: +Math.hypot(calf.x - st.P.x, calf.z - st.P.z).toFixed(2) },
+      crossingEndedAt: calf.crossing === undefined ? 0 : null, fledAt: null, outOfRingAt: null,
+      wetInFlight: false, fallIn: false, maxDP: 0,
+    }
+    await window.__pollSim(5, () => {
+      st.hold()
+      const t = +(window.__simTime() - s0).toFixed(2)
+      if (out.crossingEndedAt === null && calf.crossing === undefined) {
+        out.crossingEndedAt = t
+        out.atEnd = { toTarget: +Math.hypot(calf.x - 317.18, calf.z + 105.09).toFixed(3), terrain: st.T(calf.x, calf.z),
+          dH: +Math.hypot(calf.x - st.holdAt.x, calf.z - st.holdAt.z).toFixed(2) }
+      }
+      if (out.fledAt === null && calf.dodgeHeading !== undefined) out.fledAt = t
+      if (calf.dodgeHeading !== undefined && st.T(calf.x, calf.z) === 'water') out.wetInFlight = true
+      // A flight swim taken for a fall-in is the defect; a later gambol bout
+      // off the far bank is the §19.8 accident the rescue drama hangs on.
+      if ((calf.inWater !== undefined || calf.rescued) && !out.fallIn && !calf.bouted) {
+        out.fallIn = true
+        out.fallInAt = { t, dP: +Math.hypot(calf.x - st.P.x, calf.z - st.P.z).toFixed(2), bouted: !!calf.bouted,
+          chaseSwim: !!calf.chaseSwim, dodge: calf.dodgeHeading !== undefined, entry: calf.rescueEntry ?? null }
+      }
+      const dP = Math.hypot(calf.x - st.P.x, calf.z - st.P.z)
+      out.maxDP = Math.max(out.maxDP, +dP.toFixed(2))
+      if (out.outOfRingAt === null && dP > 6) out.outOfRingAt = t
+      return false
+    })
+    return out
+  }, variant)
+  const arrival = await runVariant('arrival')
+  check('with the traveller outside every ring the archived crossing arrives: set onto its bank target at once, never held to the deadline',
+    arrival.start.terrain === 'water' && arrival.crossingEndedAt !== null && arrival.crossingEndedAt < 1 &&
+      !!arrival.atEnd && arrival.atEnd.toTarget < 0.01 && arrival.atEnd.terrain !== 'water' && arrival.atEnd.dH > 9 &&
+      arrival.fledAt === null,
+    JSON.stringify(arrival))
+  const crossing = await runVariant('crossing')
+  check('calf-crossing-flee staging reproduces the archived calf on the water beside the traveller',
+    crossing.start.terrain === 'water' && crossing.start.dP < 1.5, JSON.stringify(crossing))
+  check('the archived crossing whose target sits at the calf resolves at once, not at the deadline',
+    crossing.crossingEndedAt !== null && crossing.crossingEndedAt < 1, JSON.stringify(crossing))
+  check('the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in',
+    crossing.fledAt !== null && crossing.fledAt < 1.5 && crossing.outOfRingAt !== null && crossing.wetInFlight && !crossing.fallIn,
+    JSON.stringify(crossing))
+  const hold = await runVariant('hold')
+  check('a calf held on its bank (parent across the river inside the ring) still flees the traveller, never as a fall-in',
+    hold.start.terrain !== 'water' && hold.fledAt !== null && hold.fledAt < 1.5 && hold.outOfRingAt !== null && !hold.fallIn,
+    JSON.stringify(hold))
+  // The picture: the archived calf, a moment into its flight, at the reported spot.
+  await captureFrame(page, OUT, 'calf-crossing-flee-flees', {
+    world: { x: 318.2, z: -104.6 },
+    label: 'the archived juvenile antelope fleeing the traveller into the river at the reported spot',
+  }, {
+    beforeCapture: () => page.evaluate(async () => {
+      const st = window.__calfCross
+      const calf = st.stage('crossing')
+      await window.__pollSim(3, () => {
+        st.hold()
+        return calf.dodgeHeading !== undefined && Math.hypot(calf.x - st.P.x, calf.z - st.P.z) > 2.2
+      })
+    }),
+  })
+  await page.evaluate(() => window.__calfCross.clear())
+}
+
 // --- Point 6: the predator never despawns in view (zoom-aware) ----------------
 // design.md §19: after the meal the predator trots off and leaves the stage
 // only well beyond the visible surroundings; a chase that strays aborts past

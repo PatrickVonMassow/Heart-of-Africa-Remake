@@ -66,6 +66,8 @@ import {
   calfWaterCause,
   calfFollowAcrossWater,
   crossingTarget,
+  crossingStep,
+  crossingYieldsToFlight,
   waterBetween,
   type BankThreat,
   waterDramaOwns,
@@ -4570,6 +4572,29 @@ function Herds() {
             atBody &&
             (lionActive ||
               elephantPos.some(([ex, ez]) => Math.hypot(ex - a.x, ez - a.z) < PREY_PANIC_RADIUS * PREY_PANIC_EXIT))
+          // A swim is no drama (design.md §19.5 (c)): a traveller inside the
+          // shy ring ends a crossing or swim-out, and the flight below — the
+          // calf's shy bolt or the adult block — takes the frame, into the
+          // water where the escape leads there. The crossing branch sets
+          // familyHeld and used to hold both off for its whole deadline.
+          if (
+            a.crossing !== undefined &&
+            crossingYieldsToFlight(
+              a.x,
+              a.z,
+              {
+                species: sp,
+                isJuvenile: !!a.young,
+                preyWeapon: balance.parentDefense.preyWeapon,
+                drama: dramaStateOf(a, false),
+                drinking: a.drink !== undefined,
+                stagedBankVictim: stagedBankVictim(a),
+              },
+              playerThreat,
+              PLAYER_SHY_RADIUS,
+            )
+          )
+            a.crossing = undefined
           if ((a.caught !== undefined && a.caught > 0) || a.fireTrapped !== undefined) {
             // Caught by a predator (resolved in the full-list pre-pass above)
             // — or by the grass-fire line (point 145a), same thrash:
@@ -4603,20 +4628,23 @@ function Herds() {
             // to the nearest bank): straight for the target at the seasonal
             // wade speed, chest-deep ON the rendered surface; landing — or the
             // resolve deadline (invariant I4) — ends it.
+            // (crossingStep: an arrival within balance.waterCross.arriveUnits
+            // ends it too, so a target just past the waterline never stalls it.)
             const c = a.crossing
-            c.time += dt
             const cdx = c.tx - a.x
             const cdz = c.tz - a.z
-            const cd = Math.hypot(cdx, cdz)
-            const swim = swimPace
-            if (cd > 0.05) {
-              a.x += (cdx / cd) * Math.min(cd, swim * dt)
-              a.z += (cdz / cd) * Math.min(cd, swim * dt)
-            }
+            const cs = crossingStep(
+              a.x, a.z, c, dt, swimPace,
+              (x, z) => { const t = terrainTypeAtWorld(x, z); return t !== 'water' && t !== 'ocean' },
+              balance.waterCross.resolveSeconds, balance.waterCross.arriveUnits,
+            )
+            c.time = cs.time
+            a.x = cs.x
+            a.z = cs.z
             const cll2 = worldToLatLon(a.x, a.z)
             const ct2 = sampleTerrain(cll2.lat, cll2.lon, seed)
             const onLand = ct2.type !== 'water' && ct2.type !== 'ocean'
-            if ((onLand && cd < 0.6) || c.time > balance.waterCross.resolveSeconds) {
+            if (cs.end !== null) {
               a.crossing = undefined
               if (!onLand) {
                 // The deadline grounds a swimmer still on the water at the
@@ -4637,7 +4665,7 @@ function Herds() {
             px = a.x
             pz = a.z
             bodyY = a.y // the height just derived for THIS spot (see the kick branch)
-            yaw = Math.atan2(cdx, cdz)
+            yaw = cdx !== 0 || cdz !== 0 ? Math.atan2(cdx, cdz) : (a.face ?? a.rot)
             pitch = 0.08
             familyHeld = true
           } else if (a.kick !== undefined) {

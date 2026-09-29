@@ -247,6 +247,61 @@ export function resolveFleeTarget(
 }
 
 /**
+ * A crossing or swim-out yields to the player-shy flight (design.md §19.5 (c)):
+ * a swim is ordinary behaviour, not a drama, so a traveller inside the shy ring
+ * ends it and the animal flees — into the water where the escape leads there.
+ * Every other drama flag still gates the flight exactly as resolveFleeTarget
+ * does; only the crossing itself no longer counts as one here.
+ */
+export function crossingYieldsToFlight(
+  x: number,
+  z: number,
+  s: FleeArbitrationState,
+  player: ReadonlyArray<readonly [number, number]>,
+  playerRing: number,
+): boolean {
+  const free = { ...s, drama: { ...s.drama, crossing: undefined } }
+  return resolveFleeTarget(x, z, free, [], player, 0, playerRing) !== null
+}
+
+/**
+ * One frame of the crossing mover (points 192/312, invariant I4). The swim
+ * steps straight for its bank target at `pace`; it ends when the animal stands
+ * on land near the target, when it has ARRIVED (within `arriveUnits` — it is
+ * then set onto the target, a bank point, so a target whose waterline lies a
+ * hair before it cannot stall the swim; the caller grounds an arrival that is
+ * still wet, like the deadline), or at the resolve deadline. A target at the
+ * animal's own position therefore resolves on the first frame. The old
+ * mover skipped every step once within 0.05 of the target but needed land
+ * under the body to end — a calf 0.04 short of its bank swam in place for the
+ * whole deadline, and the crossing held off its flight from the traveller.
+ */
+export function crossingStep(
+  x: number,
+  z: number,
+  c: { tx: number; tz: number; time: number },
+  dt: number,
+  pace: number,
+  onLandAt: (x: number, z: number) => boolean,
+  resolveSeconds: number,
+  arriveUnits: number,
+  landUnits = 0.6,
+): { x: number; z: number; time: number; end: null | 'landed' | 'arrived' | 'deadline' } {
+  const time = c.time + dt
+  const dx = c.tx - x
+  const dz = c.tz - z
+  const d = Math.hypot(dx, dz)
+  const stepLen = Math.min(d, pace * dt)
+  const nx = d > 0 ? x + (dx / d) * stepLen : x
+  const nz = d > 0 ? z + (dz / d) * stepLen : z
+  const left = d - stepLen
+  if (left <= arriveUnits) return { x: c.tx, z: c.tz, time, end: 'arrived' }
+  if (onLandAt(nx, nz) && left < landUnits) return { x: nx, z: nz, time, end: 'landed' }
+  if (time > resolveSeconds) return { x: nx, z: nz, time, end: 'deadline' }
+  return { x: nx, z: nz, time, end: null }
+}
+
+/**
  * Blocking station for a parent whose calf is being run down by a predator
  * (design.md §19): the parent keeps itself between the hunter and its young,
  * at a point `offset` from the calf toward the predator — a living shield on
