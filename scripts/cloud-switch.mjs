@@ -93,16 +93,20 @@ export function parseMarker(text) {
 
 function recordProbeFrom(ref, creditConfirmed) {
   const remoteRef = ref.startsWith('origin/') ? ref : `origin/${ref}`
-  const current = currentCloudState()
+  // The state is read AFTER the fetch and applied at once, so an OFF set meanwhile is not undone.
+  const current = () => {
+    const state = currentCloudState()
+    return state.ok ? state : null
+  }
   const fail = (why) => {
-    save(recordProbeFailure(current.ok ? current : null, why, { by: setterIdentity() }))
+    save(recordProbeFailure(current(), why, { by: setterIdentity() }))
     throw new Error(`probe not readable, switch set OFF — ${why}`)
   }
-  // A failed fetch must not fall back to a cached, older marker.
+  // Read the commit just fetched (FETCH_HEAD), never a cached and possibly older remote-tracking ref.
   const fetched = git(['fetch', '--quiet', 'origin', ref.replace(/^origin\//, '')])
   if (fetched.status !== 0)
     fail(`fetch of ${remoteRef} failed: ${String(fetched.stderr ?? fetched.error ?? '').trim()}`)
-  const shown = git(['show', `${remoteRef}:${PROBE_FILE}`])
+  const shown = git(['show', `FETCH_HEAD:${PROBE_FILE}`])
   if (shown.status !== 0) fail(`no ${PROBE_FILE} on ${remoteRef}: ${String(shown.stderr ?? '').trim()}`)
   const probe = {
     branch: remoteRef,
@@ -112,7 +116,7 @@ function recordProbeFrom(ref, creditConfirmed) {
     creditConfirmed,
     at: Date.now(),
   }
-  save(recordProbe(current.ok ? current : null, probe, { by: setterIdentity() }))
+  save(recordProbe(current(), probe, { by: setterIdentity() }))
 }
 
 function save(record, file = STATE_FILE) {
