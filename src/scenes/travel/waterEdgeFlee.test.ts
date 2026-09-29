@@ -9,6 +9,7 @@ import {
   safeBankTarget,
   swimBrakedPace,
   turnToward,
+  waterBetween,
   FLIGHT_GRACE_SECONDS,
   type BankThreat,
 } from './wildlifeBehavior'
@@ -27,15 +28,21 @@ const SWIM = 1.6
 const wideRiver = (_x: number, z: number) => (z > 10 && z < 30 ? 'water' : 'savanna')
 const PLAYER = { x: 0, z: 8.5 }
 
-type BankRule = (x: number, z: number) => { tx: number; tz: number } | null
+type BankRule = (x: number, z: number, heading?: number) => { tx: number; tz: number } | null
 
 /** Ticks one animal pinned at the bank by the standing traveller through the
  *  flight → swim-out loop of Wildlife.tsx (shy flight with its hysteresis
  *  ring, flight grace, then a crossing to the bank the rule picks). */
-function runFlight(bankRule: BankRule, seconds = 40, dt = 0.05) {
+function runFlight(
+  bankRule: BankRule,
+  seconds = 40,
+  dt = 0.05,
+  threatsAt: (t: number) => Array<[number, number]> = () => [[PLAYER.x, PLAYER.z]],
+) {
   let x = 0
   let z = 9.6
   let dodge: number | undefined
+  let lastDodge: number | undefined
   let crossing: { tx: number; tz: number } | undefined
   let fleeAt = -Infinity
   const headings: number[] = []
@@ -43,12 +50,12 @@ function runFlight(bankRule: BankRule, seconds = 40, dt = 0.05) {
   let waterEntries = 0
   let wasWet = false
   for (let t = 0; t < seconds; t += dt) {
-    let heading: number | null = null
+    const x0 = x
+    const z0 = z
     if (crossing) {
       const dx = crossing.tx - x
       const dz = crossing.tz - z
       const d = Math.hypot(dx, dz)
-      heading = Math.atan2(dx, dz)
       if (d > 0.05) {
         x += (dx / d) * Math.min(d, SWIM * dt)
         z += (dz / d) * Math.min(d, SWIM * dt)
@@ -56,7 +63,7 @@ function runFlight(bankRule: BankRule, seconds = 40, dt = 0.05) {
       if (wideRiver(x, z) !== 'water' && d < 0.6) crossing = undefined
     } else {
       const ring = dodge === undefined ? SHY : SHY * EXIT
-      const pick = fleeHeading(x, z, [[PLAYER.x, PLAYER.z]], ring)
+      const pick = fleeHeading(x, z, threatsAt(t), ring)
       if (pick !== null) {
         if (dodge === undefined) engagements++
         dodge = dodge === undefined ? pick : turnToward(dodge, pick, TURN * dt)
@@ -65,28 +72,36 @@ function runFlight(bankRule: BankRule, seconds = 40, dt = 0.05) {
         x = step.x
         z = step.z
         fleeAt = t
-        heading = dodge
       } else {
+        if (dodge !== undefined) lastDodge = dodge
         dodge = undefined
         if (wideRiver(x, z) === 'water' && t - fleeAt >= FLIGHT_GRACE_SECONDS) {
-          const bank = bankRule(x, z)
+          const bank = bankRule(x, z, lastDodge)
           if (bank) crossing = bank
         }
       }
     }
-    if (heading !== null) headings.push(heading)
+    // The heading the animal actually moved on this tick (not the requested one).
+    if (Math.hypot(x - x0, z - z0) > 1e-4) headings.push(Math.atan2(x - x0, z - z0))
     const wet = wideRiver(x, z) === 'water'
     if (wet && !wasWet) waterEntries++
     wasWet = wet
   }
+  // maxTurn catches a reversal; zigzags counts consecutive turns of opposite
+  // sign, each above 10° — the smaller alternating jitter a cap alone misses.
   let maxTurn = 0
+  let zigzags = 0
+  let lastTurn = 0
+  const big = Math.PI / 18
   for (let i = 1; i < headings.length; i++) {
     let d = headings[i] - headings[i - 1]
     while (d > Math.PI) d -= Math.PI * 2
     while (d < -Math.PI) d += Math.PI * 2
     maxTurn = Math.max(maxTurn, Math.abs(d))
+    if (Math.abs(d) > big && Math.abs(lastTurn) > big && Math.sign(d) !== Math.sign(lastTurn)) zigzags++
+    lastTurn = d
   }
-  return { x, z, engagements, waterEntries, maxTurn, onLand: wideRiver(x, z) !== 'water', crossing }
+  return { x, z, engagements, waterEntries, maxTurn, zigzags, onLand: wideRiver(x, z) !== 'water', crossing }
 }
 
 const threat: BankThreat[] = [{ ...PLAYER, r: SHY * balance.waterCross.fleeBankClearance }]
@@ -99,15 +114,46 @@ describe('water-edge flee: a fleeing animal commits instead of jittering at the 
   })
 
   it('the safe bank: one flight, one water entry, no reversal of the heading, and it lands clear of the traveller', () => {
-    const run = runFlight((x, z) => safeBankTarget(x, z, wideRiver, 30, threat))
+    const run = runFlight((x, z, h) => safeBankTarget(x, z, wideRiver, 30, threat, 16, 0.5, h))
     expect(run.engagements).toBe(1)
     expect(run.waterEntries).toBe(1)
     // Consecutive ticks never flip the heading (the flight → swim hand-off
     // bends it, it never turns it round).
     expect(run.maxTurn).toBeLessThan(Math.PI / 2)
+    expect(run.zigzags).toBe(0)
     expect(run.onLand).toBe(true)
     expect(run.crossing).toBeUndefined()
     expect(Math.hypot(run.x - PLAYER.x, run.z - PLAYER.z)).toBeGreaterThanOrEqual(SHY)
+  })
+
+  it('competing threats on the bank (traveller plus one closing in along it) still give one committed escape', () => {
+    // A second threat walks along the bank toward the animal, so the raw flee
+    // direction swings between "away from the traveller" and "away from it".
+    const walker = (t: number): [number, number] => [-8 + Math.min(t, 4) * 1.5, 7]
+    const run = runFlight(
+      (x, z, h) =>
+        safeBankTarget(x, z, wideRiver, 30, [threat[0], { x: walker(40)[0], z: walker(40)[1], r: threat[0].r }], 16, 0.5, h),
+      40,
+      0.05,
+      (t) => [[PLAYER.x, PLAYER.z], walker(t)],
+    )
+    expect(run.engagements).toBe(1)
+    expect(run.waterEntries).toBe(1)
+    expect(run.maxTurn).toBeLessThan(Math.PI / 2)
+    expect(run.zigzags).toBe(0)
+    expect(run.onLand).toBe(true)
+  })
+
+  it('given the flight heading, a safe bank ahead beats a nearer safe bank behind', () => {
+    // Mid-river, fled north (+z): the traveller's bank lies behind, and a bank
+    // point there just outside the rings is nearer than the far bank.
+    const two: BankThreat[] = [threat[0], { x: -2, z: 7, r: threat[0].r }]
+    const back = safeBankTarget(1.26, 17.43, wideRiver, 30, two)!
+    expect(back.tz).toBeLessThan(10)
+    const on = safeBankTarget(1.26, 17.43, wideRiver, 30, two, 16, 0.5, 0)!
+    expect(on.tz).toBeGreaterThanOrEqual(30)
+    // Without a threat the heading changes nothing.
+    expect(safeBankTarget(0, 11, wideRiver, 30, [], 16, 0.5, 0)).toEqual(nearestBankTarget(0, 11, wideRiver, 30))
   })
 
   it('with no threat in play the safe bank is exactly the nearest bank', () => {
@@ -151,5 +197,15 @@ describe('water-edge flee: a calf that swims on purpose is not a fall-in', () =>
     expect(calfFollowAcrossWater(0.5, 9.5, threat)).toBe('hold')
     expect(calfFollowAcrossWater(0.5, 9.5, [])).toBe('swim')
     expect(calfFollowAcrossWater(20, 9.5, threat)).toBe('swim')
+  })
+
+  it('the bank hold sees water between calf and parent at any distance, even within the follow radius', () => {
+    // A narrow channel (2 units) the calf crossed: parent 4 units away, well
+    // inside the follow radius, still has water between them.
+    const narrow = (_x: number, z: number) => (z > 10 && z < 12 ? 'water' : 'savanna')
+    expect(waterBetween(0, 13, 0, 9, narrow)).toBe(true)
+    expect(waterBetween(0, 13, 3, 14, narrow)).toBe(false)
+    // A step coarser than the channel still finds it (the endpoints and n samples).
+    expect(waterBetween(0, 12.5, 0, 9.5, narrow, 1)).toBe(true)
   })
 })

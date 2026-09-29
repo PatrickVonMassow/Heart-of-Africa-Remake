@@ -66,6 +66,7 @@ import {
   calfWaterCause,
   calfFollowAcrossWater,
   crossingTarget,
+  waterBetween,
   type BankThreat,
   waterDramaOwns,
   waterExit,
@@ -2310,6 +2311,9 @@ function Herds() {
         terrainTypeAtWorld,
         CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds,
         bankThreatsFor(sp, !!a.young),
+        16,
+        0.5,
+        a.rot, // a finished flight leaves its heading here: carry it on
       )
 
     // Stream wildlife by chunk (design.md §19): keep every animal that may be on
@@ -4904,6 +4908,19 @@ function Herds() {
               // inside it — so play and follow never alternate per frame.
               if (a.playLock && d < GAMBOL_RANGE * 0.6) a.playLock = undefined
               if (!a.playLock && d > GAMBOL_RANGE) a.playLock = true
+              // The bank hold, decided before play at ANY distance: water
+              // between the calf and a parent standing in a threat ring holds
+              // it on its own bank (calfFollowAcrossWater) — a gambol toward
+              // that parent would carry it back into the river.
+              {
+                const threats = bankThreatsFor(sp, true)
+                a.waterHold =
+                  threats.length > 0 &&
+                  calfFollowAcrossWater(keep.x, keep.z, threats) === 'hold' &&
+                  waterBetween(a.x, a.z, keep.x, keep.z, terrainTypeAtWorld)
+                    ? true
+                    : undefined
+              }
               // Grief silences the play (point 369): for the whole mourning
               // window the calf does not break into a gambol bout — the picture
               // that used to say nothing had happened.
@@ -4980,7 +4997,6 @@ function Herds() {
                 const wetHere = terrainTypeAtWorld(a.x, a.z) === 'water'
                 const wetAhead = terrainTypeAtWorld(fx, fz) === 'water'
                 const across = wetHere || wetAhead ? calfFollowAcrossWater(keep.x, keep.z, bankThreatsFor(sp, true)) : null
-                a.waterHold = across === 'hold' ? true : undefined
                 if (across === null) {
                   a.x = fx
                   a.z = fz
@@ -5010,7 +5026,6 @@ function Herds() {
               } else {
                 a.hop = undefined
                 a.boutDetour = undefined
-                a.waterHold = undefined // back beside the one it keeps to
                 // At a living parent it nurses; at the spot its parent fell it
                 // holds the §19.8 vigil's lowered head instead (point 369).
                 pitch = keep === a.mournAt ? -0.15 : -0.22
