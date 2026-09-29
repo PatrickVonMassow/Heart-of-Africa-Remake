@@ -152,8 +152,9 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
   `node scripts/finding.mjs --drained "<title>"`.
 - Use `scripts/board.mjs` serially; concurrent calls race on the dashboard file.
   The canonical source is `.batch-dashboard.html` at the repository root and
-  `scripts/board-publish.mjs` publishes it to Pages. Its four-section structure
-  changes only with explicit approval; never auto-open a card.
+  `scripts/board-publish.mjs` publishes it to Pages. Its five-section structure
+  (the collapsed “Entscheidungsprotokoll” last, below “Erledigt”) changes only
+  with explicit approval; never auto-open a card.
 - Keep one current-work card per active point, every open point in the queue,
   and only genuine user decisions under “Von dir zu klären”. The board may use a
   public HTTPS transport; privacy is not a constraint.
