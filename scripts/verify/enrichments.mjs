@@ -7498,7 +7498,13 @@ if (section('calf-crossing-flee')) {
       if (out.crossingEndedAt === null && calf.crossing === undefined) out.crossingEndedAt = t
       if (out.fledAt === null && calf.dodgeHeading !== undefined) out.fledAt = t
       if (calf.dodgeHeading !== undefined && st.T(calf.x, calf.z) === 'water') out.wetInFlight = true
-      if (calf.inWater !== undefined || calf.rescued) out.fallIn = true
+      // A flight swim taken for a fall-in is the defect; a later gambol bout
+      // off the far bank is the §19.8 accident the rescue drama hangs on.
+      if ((calf.inWater !== undefined || calf.rescued) && !out.fallIn && !calf.bouted) {
+        out.fallIn = true
+        out.fallInAt = { t, dP: +Math.hypot(calf.x - st.P.x, calf.z - st.P.z).toFixed(2), bouted: !!calf.bouted,
+          chaseSwim: !!calf.chaseSwim, dodge: calf.dodgeHeading !== undefined, entry: calf.rescueEntry ?? null }
+      }
       const dP = Math.hypot(calf.x - st.P.x, calf.z - st.P.z)
       out.maxDP = Math.max(out.maxDP, +dP.toFixed(2))
       if (out.outOfRingAt === null && dP > 6) out.outOfRingAt = t
@@ -7511,11 +7517,11 @@ if (section('calf-crossing-flee')) {
     crossing.start.terrain === 'water' && crossing.start.dP < 1.5, JSON.stringify(crossing))
   check('the archived crossing whose target sits at the calf resolves at once, not at the deadline',
     crossing.crossingEndedAt !== null && crossing.crossingEndedAt < 1, JSON.stringify(crossing))
-  check('the calf inside the traveller shy ring flees, into the river where its escape leads, without a fall-in',
+  check('the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in',
     crossing.fledAt !== null && crossing.fledAt < 1.5 && crossing.outOfRingAt !== null && crossing.wetInFlight && !crossing.fallIn,
     JSON.stringify(crossing))
   const hold = await runVariant('hold')
-  check('a calf held on its bank (parent across the river inside the ring) still flees the traveller',
+  check('a calf held on its bank (parent across the river inside the ring) still flees the traveller, never as a fall-in',
     hold.start.terrain !== 'water' && hold.fledAt !== null && hold.fledAt < 1.5 && hold.outOfRingAt !== null && !hold.fallIn,
     JSON.stringify(hold))
   // The picture: the archived calf, a moment into its flight, at the reported spot.
