@@ -4926,6 +4926,141 @@ if (section('calf-predation-drama')) {
   )
 }
 
+// --- Point 1213: a young killed by a predator stays dead ---------------------
+// User report 25.09.2026: the lion took a young animal, the parent stood over
+// it, no vultures landed, and then a living young hopped about at the kill,
+// linked to the mourning parent. The bereaved parent was the nearest free adult
+// for the orphan adoption. Staged: a calf kill with the parent out of charge
+// reach (so it stands vigil) and a parentless young grazing beside the kill.
+// The young stays dead, the parent is handed no other young at the kill, the
+// kill flock lands on the remains — the frame shows that — and finishes them.
+if (section('young-kill-carcass')) {
+  await pinFamily(-2.2, 34.8)
+  const staged = await page.evaluate(async () => {
+    const bal = window.__balance.vigil
+    window.__ykPrev = { delay: bal.predatorDelay, secs: bal.seconds }
+    bal.predatorDelay = 99999 // no drawn predator: the keeper lives through the vigil
+    bal.seconds = 8
+    const p0 = window.__game.getState().pos
+    const fam = window.__makeTestFamily(p0.x + 6, p0.z + 5)
+    const { parent, calf } = fam
+    parent.x = calf.x - 200 // parked out of the race (see point 121 above)
+    parent.z = calf.z
+    const seed = window.__game.getState().seed
+    const dry = (x, z) => { const t = window.__terrainType(-z / 10, x / 10, seed); return t !== 'water' && t !== 'ocean' }
+    let flee = { x: -1, z: 0 }
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2
+      const d = { x: Math.cos(a), z: Math.sin(a) }
+      let ok = true
+      for (let r = 0; r <= 24 && ok; r += 0.5) ok = dry(calf.x + d.x * r, calf.z + d.z * r)
+      if (ok) { flee = d; break }
+    }
+    const st = window.__lionHunt.state
+    st.mode = 'chase'; st.victim = calf; st.victimHunt = true
+    st.lx = calf.x - flee.x * 10; st.lz = calf.z - flee.z * 10; st.px = calf.x; st.pz = calf.z; st.timer = 0
+    await window.__pollSim(30, () => calf.caught !== undefined || calf.dead, 110000)
+    if (calf.caught !== undefined && !calf.dead) {
+      parent.x = calf.x - 40 // out of charge reach: it stands vigil, it is not taken
+      parent.z = calf.z
+    }
+    await window.__pollSim(20, () => calf.dead === true, 80000)
+    const out = { calfDead: !!calf.dead, vigil: parent.vigil !== undefined, landed: false, remnant: null }
+    if (!calf.dead) return out
+    const kill = { x: calf.x, z: calf.z }
+    const herds = window.__wildlife.herdsRef.current
+    // A parentless young of the same herd grazing beside the kill.
+    const orphan = { x: kill.x + 7, z: kill.z, y: calf.y, rot: 0, scale: 0.55, phase: 0.43, chunk: calf.chunk, young: true }
+    herds.zebra.push(orphan)
+    const yk = (window.__yk = { fam, orphan, kill, revived: false, relinked: false, orphanToKeeper: false, remnant: null })
+    const watch = () => {
+      const h = window.__wildlife.herdsRef.current
+      if (calf.dead !== true) yk.revived = true
+      const c = parent.child
+      if (c && !c.dead && Math.hypot(c.x - kill.x, c.z - kill.z) < 20) yk.relinked = true
+      if (orphan.parent === parent) yk.orphanToKeeper = true
+      if (!yk.remnant) yk.remnant = h.zebra.find((a) => a.remnant && a.dead && Math.hypot(a.x - kill.x, a.z - kill.z) < 2) ?? null
+    }
+    window.__ykWatch = watch
+    // The kill flock lands on the remains once the keeper's vigil is over.
+    const v = window.__vultures
+    await window.__pollSim(60, () => {
+      watch()
+      return !!yk.remnant && v.killDescend.current > 0.7 &&
+        Math.hypot(v.killFlight.current.x - yk.remnant.x, v.killFlight.current.z - yk.remnant.z) < 2.2
+    }, 200000)
+    out.vigil = out.vigil || parent.vigil !== undefined
+    out.landed = !!yk.remnant && v.killDescend.current > 0.7
+    if (yk.remnant) {
+      yk.remnant.dissolve = 60 // hold the remains for the picture; finished below
+      out.remnant = { x: yk.remnant.x, z: yk.remnant.z }
+    }
+    out.near = []
+    for (const [sp, list] of Object.entries(herds)) for (const a of list) {
+      const d = Math.hypot(a.x - kill.x, a.z - kill.z)
+      if (d < 8) out.near.push(`${sp}${a === calf ? ':calf' : a === parent ? ':parent' : a === orphan ? ':orphan' : ''} d=${d.toFixed(1)} dead=${!!a.dead} rem=${!!a.remnant} scale=${a.scale.toFixed(2)} young=${!!a.young}`)
+    }
+    out.parentAt = +Math.hypot(parent.x - kill.x, parent.z - kill.z).toFixed(1)
+    return out
+  })
+  check('the killed young stays dead and leaves remains at the kill (point 1213)',
+    staged.calfDead && staged.remnant !== null, JSON.stringify(staged))
+  check('the kill flock lands on the young\'s remains (point 1213)', staged.landed, JSON.stringify(staged))
+  if (staged.remnant) {
+    // The traveller steps up beside the kill, so the bird's-eye frame is centred
+    // on it, and the camera closes in the way the report's player had it.
+    const zoom0 = await page.evaluate((r) => {
+      const pos = window.__game.getState().pos
+      window.__game.setState({ pos: { ...pos, x: r.x, z: r.z + 2.5 } })
+      const u = window.__ui.getState()
+      const z = u.travelZoom
+      u.setTravelZoom(0.45)
+      return z
+    }, staged.remnant)
+    await page.evaluate(() => window.__pollSim(20, () => window.__camera.settled()))
+    await shot('1213-young-kill-vultures', {
+      world: { x: staged.remnant.x, z: staged.remnant.z },
+      label: 'the killed young\'s remains with the vultures landed on them',
+    })
+    await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoom0)
+  }
+  const after = await page.evaluate(async () => {
+    const yk = window.__yk
+    if (!yk) return null
+    const { parent, calf } = yk.fam
+    if (yk.remnant) yk.remnant.dissolve = 1 // the flock finishes them
+    await window.__pollSim(20, () => {
+      window.__ykWatch()
+      return !yk.remnant || yk.remnant.gone === true
+    }, 80000)
+    await window.__sleepSim(3)
+    window.__ykWatch()
+    const herds = window.__wildlife.herdsRef.current
+    const out = {
+      revived: yk.revived,
+      relinked: yk.relinked,
+      orphanToKeeper: yk.orphanToKeeper,
+      remnantGone: !yk.remnant || yk.remnant.gone === true,
+      calfListed: herds.zebra.includes(calf),
+      parentChild: parent.child ? (parent.child === calf ? 'calf' : 'other') : null,
+      parentAlive: !parent.dead,
+    }
+    const bal = window.__balance.vigil
+    bal.predatorDelay = window.__ykPrev.delay
+    bal.seconds = window.__ykPrev.secs
+    const st = window.__lionHunt.state
+    st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false
+    yk.fam.dispose()
+    herds.zebra = window.__wildlife.herdsRef.current.zebra.filter((a) => a !== yk.orphan)
+    window.__yk = undefined
+    return out
+  })
+  check('no living young with the killed one\'s identity, and none handed to the mourning parent at the kill (point 1213)',
+    after !== null && !after.revived && !after.relinked && !after.orphanToKeeper && !after.calfListed &&
+      after.parentChild === null && after.parentAlive && after.remnantGone,
+    JSON.stringify(after))
+}
+
 // --- Point 126: elephant mourning at the graveyard ---------------------------
 // A herd whose centre enters the mourn radius walks to the bones, holds
 // there with lowered heads for the window, and moves on. A NATURAL herd is
