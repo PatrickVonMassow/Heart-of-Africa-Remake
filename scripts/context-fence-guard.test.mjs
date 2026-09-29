@@ -19,8 +19,10 @@ import {
 } from './context-watermark-core.mjs'
 import { contextLedgerPath } from './context-budget.mjs'
 import { FENCE_END_COMMAND } from './context-fence-core.mjs'
-import { LAUNCHER_RECORD_VERSION, ownershipSignal, releaseSpawnDecision } from './batch-launcher-core.mjs'
-import { probePid } from './batch-singleton.mjs'
+import { LAUNCHER_RECORD_VERSION } from './batch-launcher-core.mjs'
+import { runDaemon } from './batch-launcher.mjs'
+import { commitSealedBoundary, handoverAndRequest, requestImmediateSuccessor } from './batch-boundary.mjs'
+import { acquire, markHandover, probePid, readOwnerLock } from './batch-singleton.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const REPLAY = JSON.parse(readFileSync(
@@ -610,22 +612,73 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
     expect(status().stdout).toContain('handover brake: ARMED')
   })
 
-  it('THE HANDOVER PATH CARRIES A REFUSED SESSION: suite denied, boundary allowed, successor runs the suite', () => {
-    // A point in flight whose gate still needs a suite, above the mark.
+  it('THE HANDOVER PATH CARRIES A REFUSED SESSION: suite denied, boundary allowed, successor runs the suite', { timeout: 60_000 }, async () => {
+    // Real parts: the owner lock is taken with `acquire`; the refusal and the
+    // allow-list come from the spawned guard; the launcher is the real
+    // `runDaemon` (its own record arms the brake), watching the real lock; the
+    // boundary step is `commitSealedBoundary` → `handoverAndRequest` →
+    // `markHandover` + `requestImmediateSuccessor`, as `--commit` wires them.
+    // SIMULATED, because a hermetic test cannot start a Claude session: the
+    // boundary's prepare/board checks (they need git and a published board), the
+    // exec behind `requestImmediateSuccessor` (captured, not run), and the
+    // daemon's tick child (`batch-autostart.mjs`), replaced by the successor's
+    // own real `acquire` of the handed-over lock.
+    const lockOpts = { lockPath: lockPath(), pid: process.pid, pidStartedAt: probePid(process.pid).startedAt, findAncestorFn: () => null }
+    rmSync(lockPath(), { force: true })
+    expect(acquire(SID, lockOpts)).toBe('acquired')
     writeJson(focusPath(), { point: 1204, note: 'gate still needs a suite' })
     const suite = { command: 'npm test -- world' }
-    expect(denial(call('Bash', suite))).toContain(FENCE_END_COMMAND)
-    // The refusal's own way out is allowed...
-    expect(call('Bash', { command: FENCE_END_COMMAND }).stdout.trim()).toBe('')
-    expect(call('Bash', { command: 'node scripts/batch-boundary.mjs --commit --context' }).stdout.trim()).toBe('')
-    // ...the boundary releases the lock, and the ARMED launcher (the brake's
-    // precondition) reacts to the release by starting the successor's tick.
-    const held = ownershipSignal({ lock: JSON.parse(readFileSync(lockPath(), 'utf8')), assessment: { alive: true } })
-    rmSync(lockPath(), { force: true })
-    expect(releaseSpawnDecision({ signal: ownershipSignal({ lock: null }), previous: held }).wake).toBe(true)
-    // The successor claims the batch in a fresh context and runs the suite.
     const successor = 'context-fence-successor'
-    writeJson(lockPath(), { v: 2, sessionId: successor, claimedAt: Date.now(), pid: process.pid })
+    const requests = []
+    const ticks = []
+    const seen = {}
+    const outcome = await runDaemon({
+      recordPath: launcherPath(),
+      logPath: resolve(repo, '.claude', 'batch-launcher.log'),
+      tickMs: 10 * 60 * 1000,
+      pollMs: 20,
+      wakeGapMs: 0,
+      readLock: () => readOwnerLock(lockPath()),
+      isPaused: () => false,
+      tick: async () => {
+        ticks.push(Date.now())
+        if (ticks.length === 1) {
+          // Above the mark, with the daemon's own record arming the brake.
+          seen.denied = denial(call('Bash', suite))
+          seen.allowed = [FENCE_END_COMMAND, 'node scripts/batch-boundary.mjs --commit --context']
+            .map((command) => call('Bash', { command }).stdout.trim())
+          seen.handover = commitSealedBoundary({
+            marker: { sid: SID, cause: 'context', point: 1204 },
+            write: (m) => writeJson(resolve(repo, '.claude', 'batch-boundary.json'), m),
+            handover: () => handoverAndRequest({
+              sid: SID,
+              point: 1204,
+              mark: (sid, o) => markHandover(sid, { ...o, lockPath: lockPath(), head: 'test-head' }),
+              readLock: () => readOwnerLock(lockPath()),
+              request: (r) => requestImmediateSuccessor({ ...r, run: (...args) => requests.push(args) }),
+            }),
+          })
+        } else {
+          // The woken tick starts the successor, which claims the batch.
+          seen.acquired = acquire(successor, lockOpts)
+          writeJson(launcherPath(), { stopped: true, stoppedAt: Date.now() + 1 })
+        }
+        return 0
+      },
+    })
+    expect(outcome).toBe('yielded')
+    expect(seen.denied).toContain(FENCE_END_COMMAND)
+    expect(seen.allowed).toEqual(['', ''])
+    expect(readOwnerLock(lockPath()).sessionId).toBe(successor)
+    expect(seen.acquired).toBe('acquired')
+    expect(requests).toHaveLength(1)
+    expect(requests[0][1]).toEqual(expect.arrayContaining(['--immediate', '--generation']))
+    // Woken by the handover, not the quarter-hour tick.
+    expect(ticks).toHaveLength(2)
+    expect(ticks[1] - ticks[0]).toBeLessThan(5_000)
+    // The successor, below the mark in a fresh context, runs the suite — with
+    // the launcher armed again, so the pass is not the observe fallback.
+    armLauncher()
     const fresh = resolve(repo, 'successor-transcript.jsonl')
     writeFileSync(fresh, `${JSON.stringify({ message: { usage: { input_tokens: 40_000 } } })}\n`)
     try {
