@@ -2326,9 +2326,22 @@ export function migrateDecisionLog(html) {
       let left = section
       for (const card of records) left = left.replace(card, '')
       out = out.slice(0, vdzk.from) + left + out.slice(vdzk.end)
-      const { from } = sectionBounds(out, 'log')
+      // BELOW the records already in the log (cross-vendor review, fourth
+      // round): once the writer routes by prefix, no new record lands under
+      // "Von dir zu klären", so the ones still standing there are older than
+      // every record in the log and newest-first puts them underneath.
+      const { from, end } = sectionBounds(out, 'log')
+      const logCards = [...out.slice(from, end).matchAll(/<details>\s*<summary>[\s\S]*?<\/details>\s*/g)]
       const moved = records.map((card) => `${card.trimEnd()}\n`).join('')
-      out = `${out.slice(0, from)}\n${moved}${out.slice(from).replace(/^\n/, '')}`
+      if (logCards.length) {
+        const last = logCards[logCards.length - 1]
+        let at = from + last.index + last[0].trimEnd().length
+        const lead = out[at] === '\n' ? '' : '\n'
+        if (!lead) at += 1
+        out = `${out.slice(0, at)}${lead}${moved}${out.slice(at)}`
+      } else {
+        out = `${out.slice(0, from)}\n${moved}${out.slice(from).replace(/^\n/, '')}`
+      }
     }
   } catch {
     return source

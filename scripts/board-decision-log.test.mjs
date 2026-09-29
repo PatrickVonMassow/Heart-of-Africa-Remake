@@ -221,6 +221,19 @@ describe('the one-off migration', () => {
     expect(migrateDecisionLog(out)).toBe(out)
   })
 
+  it('puts legacy records below the ones already in a populated log, keeping newest first', () => {
+    const populated = board({ vdzk: `${record(1)}${record(2)}`, log: `${record(9)}<p class="archive-link">x</p>\n` })
+    const out = migrateDecisionLog(populated)
+    expect(titlesIn(out, DECISION_LOG_TITLE)).toEqual([
+      'Entscheidungsprotokoll: Entscheidung 9',
+      'Entscheidungsprotokoll: Entscheidung 1',
+      'Entscheidungsprotokoll: Entscheidung 2',
+    ])
+    expect(out.indexOf('Entscheidung 2')).toBeLessThan(out.indexOf('class="archive-link"'))
+    expect(structureViolations(out)).toEqual([])
+    expect(migrateDecisionLog(out)).toBe(out)
+  })
+
   it('returns a damaged board unchanged rather than guess', () => {
     const damaged = legacy.replace('<details class="sect"><summary><h2>Erledigt</h2>', '<summary><h2>Erledigt</h2>')
     expect(migrateDecisionLog(damaged)).toBe(damaged)
