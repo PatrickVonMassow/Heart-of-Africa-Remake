@@ -40,6 +40,7 @@ import {
   segmentInvokesPathWhere,
   segmentInvokesScript,
 } from './command-classify-core.mjs'
+import { CONTEXT_SESSION_CLASS, SESSION_CEILING_REMEDIES } from './session-context-ceiling-core.mjs'
 
 /** The one command that ends the session — every refusal names it. */
 export const FENCE_END_COMMAND = 'node scripts/batch-boundary.mjs --prepare --context'
@@ -892,4 +893,66 @@ export function fenceRefusal({ tokens, watermark, what, authoring = false, clear
     '`--commit --context` as the last repository action. A running verification is NO reason to stay: ' +
     'it transfers through its run record and the successor reads the receipt.'
   )
+}
+
+/**
+ * THE HANDOVER BRAKE (point 1204) — does the 122k handover watermark REFUSE
+ * this call? PURE. The ceiling admission (context-budget-core.mjs) keeps its
+ * own observe/armed mode; this brake is independent of it and binds in BOTH.
+ *
+ *   level    — the transcript reading plus the reconciled pending debit, so
+ *              growth booked since the last API reading (reads included)
+ *              counts toward the mark the next START is judged by.
+ *   refused  — at/past the mark, a START (classifyFenceCall), a bound session
+ *              class, and a launcher that can start the successor.
+ *   observed — the same call while the launcher CANNOT start a successor
+ *              (record dead/unknown/disabled): the brake stays at observe and
+ *              says so, because a refusal nothing can answer is a blockade
+ *              (user 24.09.2026).
+ * A SUBAGENT is not bound: its spawn was the start, and its gate is the step
+ * in flight; the caller's own next start meets the brake. Reads, finishing
+ * calls and the boundary are never starts, so they always pass.
+ */
+export function handoverBrakeDecision({
+  tokens = null,
+  pendingDebit = 0,
+  watermark,
+  start = null,
+  launcher = 'unknown',
+  sessionClass = CONTEXT_SESSION_CLASS.BATCH_OWNER,
+} = {}) {
+  const reading = typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0 ? tokens : null
+  const pending = typeof pendingDebit === 'number' && Number.isFinite(pendingDebit) && pendingDebit > 0
+    ? pendingDebit
+    : 0
+  const mark = typeof watermark === 'number' && Number.isFinite(watermark) && watermark > 0 ? watermark : null
+  const level = reading === null ? null : reading + pending
+  const past = level !== null && mark !== null && level >= mark
+  const armed = launcher === 'armed'
+  const bound = sessionClass !== CONTEXT_SESSION_CLASS.SUBAGENT
+  const wouldRefuse = past && bound && start?.starts === true
+  return {
+    level,
+    watermark: mark,
+    past,
+    mode: armed ? 'armed' : 'observe',
+    launcher: String(launcher ?? 'unknown'),
+    refused: wouldRefuse && armed,
+    observed: wouldRefuse && !armed,
+  }
+}
+
+/** The handover refusal for one braked call: `fenceRefusal` with the measured
+ *  level, plus the attended remedy where the session cannot take a boundary. */
+export function handoverRefusal({ brake, start, sessionClass = CONTEXT_SESSION_CLASS.BATCH_OWNER } = {}) {
+  const text = fenceRefusal({
+    tokens: brake?.level,
+    watermark: brake?.watermark,
+    what: start?.what,
+    authoring: start?.authoring === true,
+    clearFirst: start?.clearFirst === true,
+  })
+  return sessionClass === CONTEXT_SESSION_CLASS.ATTENDED
+    ? `${text} ${SESSION_CEILING_REMEDIES[CONTEXT_SESSION_CLASS.ATTENDED].text}`
+    : text
 }

@@ -21,6 +21,7 @@ import {
   pointClosure,
   tickedPointsInDiff,
   boundaryCardCommand,
+  contextBoundaryCardCommands,
   handoverSurvivesCall,
   isClosingSetPath,
   isClosingSetCommand,
@@ -749,6 +750,15 @@ describe('the boundary card names where the batch actually goes', () => {
   // `done <n> --none` for a point whose card was already archived left the
   // session with no working command at all, so it hand-edited the board file —
   // and a hand-edit appends, which is how three idle cards came to stand stacked.
+  it('a context boundary sends every standing point back to the queue before the gap card', () => {
+    expect(contextBoundaryCardCommands()).toEqual(['node scripts/board.mjs none --text-stdin'])
+    expect(contextBoundaryCardCommands({ standingPoints: [1205, 1204, 1204, 0] })).toEqual([
+      'node scripts/board.mjs queue 1204',
+      'node scripts/board.mjs queue 1205',
+      'node scripts/board.mjs none --text-stdin',
+    ])
+  })
+
   it('names the command that fits the board it is printed for', () => {
     expect(boundaryCardCommand({ point: 434, pointCardStanding: true })).toBe(
       'node scripts/board.mjs done 434 --none --text-stdin',

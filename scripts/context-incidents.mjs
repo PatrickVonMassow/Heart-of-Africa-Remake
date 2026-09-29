@@ -8,6 +8,7 @@
 //   node scripts/context-incidents.mjs --file <path>        read one series file
 //   node scripts/context-incidents.mjs --quantile 0.95      a different upper quantile
 //   node scripts/context-incidents.mjs --json               the summary as JSON
+//   node scripts/context-incidents.mjs --trend              overshoots per day + median, last 7 days
 //
 // It reports how many overshoots there were, their size distribution, what each
 // session was doing, and the growth per KIND of call — the reading the deferred
@@ -48,6 +49,8 @@ import {
   buildIncident,
   extractCalls,
   formatSeriesReport,
+  formatTrendReport,
+  overshootTrend,
   parseIncidents,
   shouldRecordIncident,
   summarizeSeries,
@@ -251,11 +254,13 @@ export function parseReadArgs(argv = []) {
   let sinceCommit = ''
   let quantile = UPPER_QUANTILE
   let json = false
+  let trend = false
   const unknown = []
   for (let i = 0; i < argv.length; i += 1) {
     const arg = String(argv[i])
     if (arg === '--status') continue // accepted and ignored: the bare reading IS the status
     else if (arg === '--json') json = true
+    else if (arg === '--trend') trend = true
     else if (arg === '--file') files.push(String(argv[++i] ?? ''))
     else if (arg === '--since') since = String(argv[++i] ?? '')
     else if (arg === '--since-commit') sinceCommit = String(argv[++i] ?? '')
@@ -263,7 +268,7 @@ export function parseReadArgs(argv = []) {
     else unknown.push(arg)
   }
   if (!Number.isFinite(quantile) || quantile <= 0 || quantile >= 1) quantile = UPPER_QUANTILE
-  return { files: files.filter(Boolean), since, sinceCommit, quantile, json, unknown }
+  return { files: files.filter(Boolean), since, sinceCommit, quantile, json, trend, unknown }
 }
 
 /** Resolve `--since` / `--since-commit` to one cut-off. Returns { sinceMs, label, error }. */
@@ -288,10 +293,11 @@ if (isMainModule(import.meta.url)) {
   if (argv.includes('--help') || argv.includes('-h')) {
     console.log(
       'node scripts/context-incidents.mjs [--since <date>] [--since-commit <sha>] [--file <path>]… ' +
-        '[--quantile <0..1>] [--json]\n\n' +
+        '[--quantile <0..1>] [--json] [--trend]\n\n' +
         'Reads the context-overshoot series: how many overshoots, how big, what each session was doing, and\n' +
         'the growth per kind of call. Nothing is filed or ranked. A session that dies without taking a\n' +
-        'boundary writes no record, so the series UNDER-counts; lines are not deduplicated.',
+        'boundary writes no record, so the series UNDER-counts; lines are not deduplicated.\n' +
+        '--trend prints the verdict instead: overshoots per day and the median overshoot, last 7 days.',
     )
     process.exit(0)
   }
@@ -306,6 +312,15 @@ if (isMainModule(import.meta.url)) {
     process.exit(2)
   }
   const series = readSeries(opts.files.length ? opts.files : [SEED_PATH, INCIDENTS_PATH])
+  if (opts.trend) {
+    const trend = overshootTrend(series.records, { sinceMs: cut.sinceMs, sinceLabel: cut.label ?? '' })
+    console.log(
+      opts.json
+        ? JSON.stringify({ ...trend, malformed: series.malformed, sources: series.sources }, null, 2)
+        : formatTrendReport(trend, { malformed: series.malformed }),
+    )
+    process.exit(0)
+  }
   const summary = summarizeSeries(series.records, {
     quantile: opts.quantile,
     sinceMs: cut.sinceMs,

@@ -50,6 +50,7 @@ import {
   assessBoundary,
   boardCarriesCard,
   boundaryCardCommand,
+  contextBoundaryCardCommands,
   cardProofFragments,
   cardRegions,
   claimantCardIdentity,
@@ -72,7 +73,7 @@ import { noteBoundaryIncident } from './context-incidents.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
-import { parseTasks } from './dashboard-guard-core.mjs'
+import { parseNowCardPoints, parseTasks } from './dashboard-guard-core.mjs'
 import { recordHandoverBudgetCompletion } from './handover-budget.mjs'
 import {
   noteHandoverAttributionCommit,
@@ -479,6 +480,11 @@ function requireBoardCard({
  * Any read failure answers false — the pointless `--none` is the one that can
  * fail; `board.mjs none` works in both states, so it is the safe default.
  */
+/** The points whose current-work cards stand on the board; empty when unreadable. */
+export function standingNowPoints({ path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
+  return [...parseNowCardPoints(readText(path) ?? '')]
+}
+
 export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
   try {
     return nowCard(readFileSync(path, 'utf8'), point) != null
@@ -779,7 +785,9 @@ if (isMain) {
         'THE BOARD CARD — it says WHY this handover happens (the watermark, not a closed point); take it ' +
         'verbatim into the unnumbered gap card:\n\n' +
         `${card}\n\n` +
-        `  ${boundaryCardCommand({ point: null, pointCardStanding: false })}   (the German goes in on stdin)\n` +
+        contextBoundaryCardCommands({ standingPoints: standingNowPoints() })
+          .map((cmd) => `  ${cmd}${cmd.endsWith('--text-stdin') ? '   (the German goes in on stdin)' : '   (unfinished: back to the queue first)'}\n`)
+          .join('') +
         `  ${PUBLISH_CMD}\n`
       if (phaseFlag === '--prepare') {
         // The RECEIPT, not a marker: it proves phase one ran, and `--commit`

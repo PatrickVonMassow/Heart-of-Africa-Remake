@@ -1117,6 +1117,15 @@ export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
     : `${NONE_CARD_CMD} --text-stdin`
 }
 
+/** THE CONTEXT BOUNDARY'S CARD COMMANDS (point 1204 (e)). Its point is handed
+ *  over UNFINISHED, so its current-work card still stands — and `board.mjs
+ *  none` refuses while any does. Each standing point goes back to the queue
+ *  first (the successor resumes it), then the gap card goes up. PURE. */
+export function contextBoundaryCardCommands({ standingPoints = [] } = {}) {
+  const points = [...new Set(standingPoints)].filter((p) => Number.isInteger(p) && p > 0).sort((a, b) => a - b)
+  return [...points.map((p) => `${EDIT_CMD} queue ${p}`), `${NONE_CARD_CMD} --text-stdin`]
+}
+
 /**
  * THE BOUNDARY CARD, in German, one text per state. PURE.
  *
