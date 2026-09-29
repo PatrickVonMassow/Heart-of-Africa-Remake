@@ -181,32 +181,27 @@ const STAND_DOWN_CHECK_SCRIPTS = ['guard-preflight.mjs', 'dashboard-guard.mjs', 
  * (board writes, board.mjs, focus, publish) is the OWNER's remedy, so here it
  * counts as a mutation — wherever the board file lies — except the pure checks.
  */
-function standDownCall({ toolName, command, filePath, scratchpad = '' }) {
+function standDownCall({ toolName, command, filePath }) {
   const call = classifyCall({ toolName, command, filePath })
   if (call.kind !== 'escape') return call
   if (!SHELL_TOOLS.has(String(toolName ?? ''))) return { kind: 'mutating', segment: '' }
   for (const seg of parseSegments(command)) {
     if (!isEscapeSegment(seg)) continue
-    if (!segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS) || checkWritesOutsideScratchpad(seg, scratchpad))
+    if (!segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS) || checkWritesFile(seg))
       return { kind: 'mutating', segment: seg.raw }
   }
   return { kind: 'read-only', segment: '' }
 }
 
-const NULL_SINKS = new Set(['/dev/null', '$null', 'nul', 'nul:', '/dev/zero'])
-
-/** Does a check script's output redirection write a file other than a null sink
- *  or an ABSOLUTE path inside the session scratchpad? (`> .batch-dashboard.html`
- *  would truncate the board while the check itself only reads.) */
-function checkWritesOutsideScratchpad(seg, scratchpad) {
-  const pad = String(scratchpad ?? '').replace(/[\\/]+$/, '')
+/** Does a check script's output redirection write a file? Only `/dev/null` and
+ *  descriptor duplication pass: a named target — even in the scratchpad, where
+ *  a link may point at the board — could truncate batch state while the check
+ *  itself only reads. The output stays readable on stdout. */
+function checkWritesFile(seg) {
   return (seg.redirects ?? []).some((r) => {
     if (!String(r.op).includes('>') || !r.target) return false
     if (String(r.op).endsWith('&') && /^(?:\d+|-)$/.test(r.target)) return false
-    const target = String(r.target)
-    if (NULL_SINKS.has(target.toLowerCase())) return false
-    const inPad = !!pad && target.startsWith(`${pad}/`) && !target.split(/[\\/]/).includes('..') && !isBoardFile(target)
-    return !inPad
+    return String(r.target) !== '/dev/null'
   })
 }
 
@@ -243,7 +238,7 @@ export function ownershipStandDownDecision({
     if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
       return { block: false, reason: '', standDown: heldByOtherLiveOwner === true }
     }
-    const call = standDownCall({ toolName, command, filePath, scratchpad })
+    const call = standDownCall({ toolName, command, filePath })
     if (call.kind !== 'mutating') return { block: false, reason: '', standDown: true }
     // The documented request handoff writes OUTSIDE the checkout — a file-tool
     // write to a resolved outside path, or the whitelisted shell shape (point 1207).
