@@ -20,6 +20,7 @@ import {
   removeDecisionRecord,
   removeVdzk,
   rotateBoardArchives,
+  rotateForPublish,
   runArchiveRotation,
 } from './board-core.mjs'
 import { REQUIRED_SECTIONS, structureViolations } from './board-structure-core.mjs'
@@ -381,6 +382,22 @@ describe('cross-vendor review round 1 (29.09.2026)', () => {
     expect(r.moved.log).toBe(1)
     expect(r.archived.log).toBe(3)
     expect(r.archive.split('Entscheidung 7<').length - 1).toBe(2)
+  })
+
+  it('the publish path rotates as it migrates, so 21 legacy records never go out oversized', () => {
+    const legacy = board({ withLog: false, vdzk: records(1, ENTSCHEIDUNGEN_ON_BOARD + 1) })
+    let written = null
+    const out = rotateForPublish({ board: legacy, archive: archivePage(), pageUrl: URL, writeArchive: (h) => { written = h } })
+    expect(titlesIn(out, DECISION_LOG_TITLE)).toHaveLength(ENTSCHEIDUNGEN_ON_BOARD)
+    expect(titlesIn(out, 'Von dir zu klären')).toEqual([])
+    expect(written).toContain('Entscheidung 21')
+    expect(out).toContain('Die ältere Entscheidung steht im')
+    expect(auditDashboard(out, {})).toEqual([])
+    expect(structureViolations(out)).toEqual([])
+    // No archive page: migrate only; an unreadable board comes back migrated-or-unchanged.
+    expect(rotateForPublish({ board: legacy, archive: null, writeArchive: () => {} })).toBe(migrateDecisionLog(legacy))
+    const damaged = legacy.replace('<details class="sect"><summary><h2>Erledigt</h2>', '<summary><h2>Erledigt</h2>')
+    expect(rotateForPublish({ board: damaged, archive: archivePage(), writeArchive: () => { throw new Error('no') } })).toBe(damaged)
   })
 
   it('places archived cards inside their sections on a single-line archive page', () => {

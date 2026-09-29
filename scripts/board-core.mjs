@@ -2383,6 +2383,25 @@ export function runArchiveRotation({ board, archive, writeArchive, writeBoard, p
   return r
 }
 
+/**
+ * The publish path's board start (cross-vendor review, fourth round): migrate
+ * AND rotate, so a first publish that moves more than the cap of records into
+ * the log cannot publish it oversized. Archive written first, as above; the
+ * board comes back for the publisher's own single write. No archive page, or a
+ * board the rotation cannot read: migrate only, and the structure gate judges.
+ */
+export function rotateForPublish({ board, archive, writeArchive, pageUrl = ARCHIVE_PAGE_URL }) {
+  if (archive == null) return migrateDecisionLog(board)
+  let r
+  try {
+    r = rotateBoardArchives({ board, archive, pageUrl })
+  } catch {
+    return migrateDecisionLog(board)
+  }
+  if (r.archive !== archive) writeArchive(r.archive)
+  return r.board
+}
+
 /** One section's archive link paragraph, counting the cards the archive holds for it. */
 export function archiveLinkParagraph(key, archived, pageUrl = ARCHIVE_PAGE_URL) {
   const text = ARCHIVE_LINK_TEXT[key]
