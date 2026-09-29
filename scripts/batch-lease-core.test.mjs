@@ -827,7 +827,7 @@ describe('the request handoff shape (point 1207)', () => {
     expect(ok(`mkdir -p ${pad}/req`)).toBe(true)
     expect(ok(`echo hello > ${pad}/x.md`)).toBe(true)
     expect(ok(`printf '%s' hi >> ${pad}/x.md`)).toBe(true)
-    expect(ok(`tee -a ${pad}/x.md < ${pad}/in`)).toBe(true)
+    expect(ok(`tee -a ${pad}/x.md <<'EOF'\nbody\nEOF`)).toBe(true)
     expect(ok(`cd ${pad} &&\ncat > why.md <<'EOF'\nbody\nEOF`)).toBe(true)
   })
 
@@ -879,6 +879,55 @@ describe('the request handoff shape (point 1207)', () => {
       'echo x > /tmp/pad/link/../victim',
     ]
     for (const command of refused) expect(ok(command), command).toBe(false)
+  })
+
+  it('refuses descriptor aliases and every input redirection but a heredoc (review round 11)', () => {
+    const refused = [
+      // stdin rebound to an inside file, then written through its alias
+      `cat < ${checkoutRoot}/victim > /dev/stdin`,
+      `tee /dev/stdin < ${checkoutRoot}/victim`,
+      `cat > /proc/self/fd/0 < ${checkoutRoot}/victim`,
+      `cat 3< ${checkoutRoot}/victim > /dev/fd/3`,
+      `cd /dev/fd && cat < ${checkoutRoot}/victim > 0`,
+      // the shell's own cwd and root, which are not the guard's
+      'cd /proc/self/cwd && cat > TASKS.md',
+      'touch /proc/self/root/workspace/hoa/x',
+      'mkdir -p /proc/1234/cwd/src',
+      // /proc and /dev themselves, and the harmless names under them
+      'touch /dev',
+      'echo x > /dev/stdout',
+      `cat > ${pad}/x.md 2>/dev/null`,
+      // an input redirection that is no heredoc, inside or outside
+      `cat < ${pad}/in > ${pad}/x.md`,
+      `tee -a ${pad}/x.md < ${pad}/in`,
+      `cat <<< body > ${pad}/x.md`,
+      `cat 0<> ${pad}/in > ${pad}/x.md`,
+      `cat <&3 > ${pad}/x.md`,
+    ]
+    for (const command of refused) expect(ok(command), command).toBe(false)
+    // A link that RESOLVES into /proc or /dev is no better than the name itself.
+    for (const target of ['/dev/stdin', '/proc/self/fd/0', '/proc/1234/cwd/x.md', '/dev']) {
+      expect(
+        handoffWritesOnlyOutsideCheckout(`cat > ${pad}/x.md`, { cwd: checkoutRoot, checkoutRoot, canonical: () => target }),
+        target,
+      ).toBe(false)
+    }
+    // Names that merely begin like them stay ordinary paths.
+    expect(ok('echo x > /devices/x.md')).toBe(true)
+    expect(ok('echo x > /tmp/proc/x.md')).toBe(true)
+  })
+
+  it('keeps the older per-segment exemption away from descriptor aliases too (review round 11)', () => {
+    const writes = (command, resolver = canonical) =>
+      mainWritingAction({ toolName: 'Bash', command, checkoutRoot, cwd: checkoutRoot, canonical: resolver }).writes
+    expect(writes(`cat < ${checkoutRoot}/victim > /dev/stdin`)).toBe(true)
+    expect(writes(`cp ${pad}/a /dev/stdin < ${checkoutRoot}/victim`)).toBe(true)
+    expect(writes(`cp ${pad}/a /proc/self/cwd/TASKS.md`)).toBe(true)
+    expect(writes(`cat 3< ${checkoutRoot}/victim > /dev/fd/3`)).toBe(true)
+    expect(writes(`cp ${pad}/a ${pad}/b`, () => '/proc/self/fd/0')).toBe(true)
+    // The discarding sink stays what it was: no destination at all.
+    expect(writes(`rm ${pad}/x.md 2>/dev/null`)).toBe(false)
+    expect(writes(`cp ${pad}/a ${pad}/b`)).toBe(false)
   })
 
   it('treats an unresolvable destination as inside', () => {

@@ -821,6 +821,14 @@ const FILE_TOOLS = new Set([
 ])
 
 /**
+ * /proc and /dev name per-process objects: `/dev/stdin`, `/dev/fd/<n>` and
+ * `/proc/self/cwd` mean one thing to the guard and another to the shell that
+ * writes, so a path under them is never outside-checkout evidence (point 1207,
+ * review round 11: `cat < inside > /dev/stdin` wrote the input file).
+ */
+const processLocalPath = (path) => /^\/(proc|dev)(\/|$)/.test(String(path))
+
+/**
  * Does this segment write ONLY outside the checkout? PURE (path resolution needs
  * no filesystem).
  *
@@ -841,7 +849,8 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
   const { head, args } = headAndArgs(segment)
   if (!FILE_TOOLS.has(String(head))) return false
   const candidates = [
-    ...(segment?.redirects ?? []).filter((r) => r.op?.includes('>')).map((r) => r.target),
+    // `/dev/null` alone is no destination: it discards, whoever opens it.
+    ...(segment?.redirects ?? []).filter((r) => r.op?.includes('>') && r.target !== '/dev/null').map((r) => r.target),
     ...args.map((arg) => arg.text).filter((text) => text && !text.startsWith('-') && text !== '--'),
     // EVERY positional counts, bare filenames included (measured while building
     // this: requiring a slash let `cp <outside> TASKS.md` pass as an outside-only
@@ -857,6 +866,8 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
     // hard or symbolic link may share an inside file (point 1207, review round 8).
     const resolved = typeof canonical === 'function' ? canonicalEvidence(lexical, canonical) : lexical
     return (
+      !processLocalPath(lexical) &&
+      !processLocalPath(resolved) &&
       !resolvedTargetInCheckout({ resolvedFilePath: lexical, checkoutRoot }) &&
       !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
     )
@@ -889,9 +900,12 @@ function canonicalEvidence(path, canonical) {
  * `touch`. Every destination (a `>`/`>>` target, a tee/mkdir/touch operand) is
  * a plain path, resolved against the `cd` target or the session cwd and passed
  * through `canonical` (the guard's symlink-following write-target resolver),
- * and must land outside the checkout; '' or a throw counts as inside. The
- * command line carries no expansion, and a heredoc body is admitted only
- * behind a quoted delimiter, which keeps it literal.
+ * and must land outside the checkout; '' or a throw counts as inside. No
+ * destination lies under /proc or /dev, before or after resolution, and the
+ * only input redirection is a heredoc, so no descriptor can be rebound to an
+ * inside file (review round 11). The command line carries no expansion, and a
+ * heredoc body is admitted only behind a quoted delimiter, which keeps it
+ * literal.
  */
 const HANDOFF_WRITERS = new Map([
   ['cat', { options: [], operandsWrite: false }],
@@ -913,8 +927,9 @@ export function handoffWritesOnlyOutsideCheckout(command, { cwd = '', checkoutRo
     if (segments.length !== expandSegments(src).length) return false
     if (segments.length < 1 || segments.length > 2) return false
     const outside = (path) => {
+      if (processLocalPath(path)) return false
       const resolved = canonicalEvidence(path, canonical)
-      return !!resolved && !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
+      return !!resolved && !processLocalPath(resolved) && !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
     }
     let dir = cwd
     if (segments.length === 2) {
@@ -941,7 +956,10 @@ export function handoffWritesOnlyOutsideCheckout(command, { cwd = '', checkoutRo
     const destinations = []
     for (const r of writer.redirects) {
       if (r.op?.includes('&')) return false
+      if (r.op === '<<' || r.op === '<<-') continue
+      if (r.op?.includes('<')) return false
       if (r.op?.includes('>')) destinations.push(r.target)
+      else return false
     }
     const operands = []
     for (const arg of args) {
