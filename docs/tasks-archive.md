@@ -32414,3 +32414,38 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   FINAL STATE: reproduce from the archive state (seed/position and the wildlife section, not a freshly staged scene — the gap of 1233); a juvenile inside the traveller's shy ring reacts (flees, into water where the escape leads there, design.md §19.5 (c)); a crossing always resolves (no degenerate target at the animal's own position, invariant I4) and does not suppress the player-shy flee; also check the calf bank hold 1233 introduced for the same suppression. Unit test on that decision (crossing with collapsed target -> resolves; calf in crossing/bank-hold with the traveller inside the ring -> flees); a position check in the browser at the reported spot on the everyday backend.
   Bundle: Tierverhalten.
   Criticality: medium.
+
+- [x] 1204. Arm the handover watermark so it refuses instead of observing.
+  PROBLEM, user order 24.09.2026: "Du kommst immer wieder über die 150k und bringst danach eine
+  Begründung. … Aber das scheint nicht zu helfen, denn du scheinst nicht daraus zu lernen."
+  Measured that morning: 25 overshoots in the four days since 2026-09-20, median +99k, max +336k
+  past the 150k ceiling; `context-fence-guard.mjs --status` reports mode observe / armed false.
+  FINAL STATE: a session cannot pass the 122,000-token handover watermark without being
+  stopped, and the stop is not a status string it has to ask for.
+  (a) The handover mark INTERRUPTS. The PreToolUse path that already runs
+  `context-fence-guard.mjs` denies a START action (agent, suite, new point, authoring) once
+  the measured reading is at or past the handover watermark, in BOTH fence modes, with the
+  boundary command in the refusal text. Finishing the step in flight, reading, and the
+  boundary/handover commands themselves stay allowed — point 881's list of session-ending
+  commands is the allow-list, and a test pins that each of them still passes above the mark.
+  (b) The brake has a production caller. `fenceRefusal` (scripts/context-fence-core.mjs) is
+  reached from the registered guard for the handover case; a test spawns the guard above the
+  mark and asserts a deny, not a decide()-level unit assertion (point 881 (2)).
+  (c) The read tools are MEASURED, not refused. The matcher records the read kind whose growth
+  p90 is largest (point 881 (4)) into the reading, so the next START action sees the true
+  level; reads themselves are never denied at the handover mark. The 150k ceiling, not the
+  122k mark, bounds read growth. The allow-list in (a) stays.
+  (d) The overshoot series gets a verdict command, not just a dump:
+  `context-incidents.mjs --trend` prints overshoots per day and median overshoot for the last
+  7 days, so the effect of the arming is measurable in one call.
+  (e) The handover path carries a refused session. A test takes a session above the mark with
+  a point in flight whose gate still needs a suite, asserts the suite is denied, and asserts
+  that the boundary/handover command starts the successor, which then runs the suite. The
+  fence is not armed while the launcher cannot start a successor (launcher record
+  dead/unknown); in that state it stays at observe and says so (user 24.09.2026: "Ist 1204
+  nicht riskannt? Kann es nicht vorkommen, dass die Einhaltung gar nicht erfüllbar ist und
+  dann haben wir eine Blockade?" — "Ja, passe das entsprechend an.").
+  NOT IN SCOPE: raising the ceiling, new ledger fields, a new guard script. This wires and
+  arms what is already built (points 700, 881, 932).
+  Criticality: high — real usage cost every night.
+  Bundle: Modell & Wächter.

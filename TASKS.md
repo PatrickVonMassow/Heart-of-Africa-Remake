@@ -77,40 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1204. Arm the handover watermark so it refuses instead of observing.
-  PROBLEM, user order 24.09.2026: "Du kommst immer wieder über die 150k und bringst danach eine
-  Begründung. … Aber das scheint nicht zu helfen, denn du scheinst nicht daraus zu lernen."
-  Measured that morning: 25 overshoots in the four days since 2026-09-20, median +99k, max +336k
-  past the 150k ceiling; `context-fence-guard.mjs --status` reports mode observe / armed false.
-  FINAL STATE: a session cannot pass the 122,000-token handover watermark without being
-  stopped, and the stop is not a status string it has to ask for.
-  (a) The handover mark INTERRUPTS. The PreToolUse path that already runs
-  `context-fence-guard.mjs` denies a START action (agent, suite, new point, authoring) once
-  the measured reading is at or past the handover watermark, in BOTH fence modes, with the
-  boundary command in the refusal text. Finishing the step in flight, reading, and the
-  boundary/handover commands themselves stay allowed — point 881's list of session-ending
-  commands is the allow-list, and a test pins that each of them still passes above the mark.
-  (b) The brake has a production caller. `fenceRefusal` (scripts/context-fence-core.mjs) is
-  reached from the registered guard for the handover case; a test spawns the guard above the
-  mark and asserts a deny, not a decide()-level unit assertion (point 881 (2)).
-  (c) The read tools are MEASURED, not refused. The matcher records the read kind whose growth
-  p90 is largest (point 881 (4)) into the reading, so the next START action sees the true
-  level; reads themselves are never denied at the handover mark. The 150k ceiling, not the
-  122k mark, bounds read growth. The allow-list in (a) stays.
-  (d) The overshoot series gets a verdict command, not just a dump:
-  `context-incidents.mjs --trend` prints overshoots per day and median overshoot for the last
-  7 days, so the effect of the arming is measurable in one call.
-  (e) The handover path carries a refused session. A test takes a session above the mark with
-  a point in flight whose gate still needs a suite, asserts the suite is denied, and asserts
-  that the boundary/handover command starts the successor, which then runs the suite. The
-  fence is not armed while the launcher cannot start a successor (launcher record
-  dead/unknown); in that state it stays at observe and says so (user 24.09.2026: "Ist 1204
-  nicht riskannt? Kann es nicht vorkommen, dass die Einhaltung gar nicht erfüllbar ist und
-  dann haben wir eine Blockade?" — "Ja, passe das entsprechend an.").
-  NOT IN SCOPE: raising the ceiling, new ledger fields, a new guard script. This wires and
-  arms what is already built (points 700, 881, 932).
-  Criticality: high — real usage cost every night.
-  Bundle: Modell & Wächter.
 - [ ] 1232. A receipt re-judges across a render-neutral commit, so only the missing backends run again
   ORDER (user 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."): this point stands DIRECTLY AFTER point 1185 in the work order.
   SPEC: when the only commits between a finished verify receipt and the current HEAD touch render-neutral paths (the charge ledger scripts/render-verify-charges.mjs, docs, TASKS.md/backlog/bookkeeping, tests of scripts; NOT src/, public/, assets, package/lockfile, vite/runner config, or the verify suites themselves), the receipt is re-judged against the current charge ledger instead of discarded. Its re-judged per-backend verdict counts for the new HEAD; only backends the receipt did not complete run again.
