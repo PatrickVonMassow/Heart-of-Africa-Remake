@@ -297,6 +297,8 @@ NO VILLAGER SPEAKS TO NOBODY. Every utterance has an addressee who reacts and a
 consequence the player sees; the teaching comes from the act that follows the
 word, never from a word spoken beside an act. With nobody free to send, the
 order is not given at all, and the errand simply waits for the next round.
+The one exception is the fisherman's direction call from his dugout: a call, not
+speech (user 29.09.2026), it needs no addressee; his heading is the act it names.
 
 THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as
 WATER. The chief's message carries just as well as `WATER · UPSTREAM · ROCK ·
