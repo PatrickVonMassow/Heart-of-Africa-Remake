@@ -65,7 +65,8 @@ import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spaw
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
 import { playRockFlank } from './playRockSurface'
-import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { BANK_WATER_DROP, bankGroundHeight, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { canoeLane, createCanoe, stepCanoe } from './villagerCanoe'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import {
   absorbSeparation,
@@ -3899,6 +3900,269 @@ function useUnplacedInhabitantWatch(placeId: string, anchors: readonly PlaceSpot
   })
 }
 
+// --- The villager's dugout canoe (work-order 1237) ----------------------------
+
+/** The speech-label id of the paddler's call. */
+const CANOE_SPEAKER_ID = 'village-canoe'
+/** How high the kneeling paddler sits over the water surface, in metres. */
+const CANOE_SEAT_Y = 0.1
+/** The hull's own rise over the water and its depth under the gunwale. */
+const CANOE_FREEBOARD = 0.18
+const CANOE_DEPTH = 0.28
+
+/**
+ * THE PADDLE STROKE, as an arm pose (work-order 1237). The lower hand (the
+ * figure's +x arm, which carries the paddle) reaches forward and down, pulls
+ * back along the hull, and lifts clear for the recovery; the upper hand rides
+ * high across the chest over the shaft. `u` counts strokes; its fraction is
+ * the phase of the current one.
+ */
+function paddlePose(u: number): FigurePose {
+  const f = u - Math.floor(u)
+  const power = f < 0.62
+  const t = power ? f / 0.62 : (f - 0.62) / 0.38
+  const bearing = power ? 0.35 + 1.0 * t : 1.35 - 1.0 * t
+  const elevation = power ? -0.45 - 0.2 * Math.sin(Math.PI * t) : -0.25 + 0.1 * Math.sin(Math.PI * t)
+  return {
+    left: armAim(bearing, elevation),
+    right: armAim(0.35 + 0.35 * (power ? t : 1 - t), 0.15),
+    lean: 0.18 + (power ? 0.12 * Math.sin(Math.PI * t) : 0),
+    turn: 0.15 * (power ? t : 1 - t),
+  }
+}
+
+/** A single-blade paddle, held in the lower hand and running on past it. */
+function CanoePaddle() {
+  return (
+    <group name="village-canoe-paddle">
+      <mesh position={[0, -0.25, 0]} castShadow>
+        <cylinderGeometry args={[0.02, 0.02, 1.3, 6]} />
+        <meshStandardMaterial color="#7a5a36" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, -0.98, 0]} castShadow>
+        <boxGeometry args={[0.16, 0.42, 0.025]} />
+        <meshStandardMaterial color="#6a4c2c" roughness={0.9} />
+      </mesh>
+    </group>
+  )
+}
+
+/**
+ * A LOCAL FISHERMAN IN HIS DUGOUT, beside the children's bank game (work-order
+ * 1237). The cycle is `villagerCanoe.ts`; this draws it and speaks its calls
+ * through the same §13.4 path as every other village voice: the atom through
+ * the hearing curve at the CALL register, the reading over his head, and the
+ * arm pointing the way he heads — one decision by distance (spokenGesture.ts).
+ * Direction words follow the listener's first ROCK hearing, as at the bank.
+ */
+function VillagerCanoe({ bank, cloth, seed }: { bank: PlaceRiverBank; cloth: string; seed: number }) {
+  const groundHeight = usePlaceGround()
+  const camera = useThree((state) => state.camera)
+  const floor = useContext(SpeechFloorContext)
+  const cfg = balance.villageLife.canoe
+  const lane = useMemo(() => canoeLane(bank, cfg), [bank, cfg])
+  const rand = useMemo(() => mulberry32((seed ^ 0x6d2b79f5) >>> 0), [seed])
+  const state = useMemo(() => createCanoe(lane, cfg), [lane, cfg])
+  const hull = useRef<THREE.Group>(null)
+  const kneeling = useRef<THREE.Group>(null)
+  const standing = useRef<THREE.Group>(null)
+  const paddle = useRef<THREE.Group>(null)
+  const kneelPose = useRef<FigurePose | null>(paddlePose(0))
+  const kneelLimbs = useRef<FigureLimbs | null>(null)
+  const standPose = useRef<FigurePose | null>(fillPose(0))
+  const standLimbs = useRef<FigureLimbs | null>(null)
+  const standSquat = useRef(1)
+  const gesture = useRef<GestureState>(restGesture())
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    const sources = () => [{ x: state.x, z: state.z, register: 'call' as const }]
+    const said = stepCanoe(
+      state,
+      lane,
+      {
+        mayCall: (word) => {
+          const game = useGame.getState()
+          if (!Object.hasOwn(game.communication.heard, game.vocabulary.ROCK)) return false
+          return !floor || floor.request({
+            situation: state,
+            name: 'canoe call',
+            word,
+            source: { x: state.x, z: state.z, register: 'call' },
+            sources,
+            step: dt,
+            ends: true,
+          })
+        },
+        drop: () => floor?.release(state),
+      },
+      dt,
+      cfg,
+      rand,
+    )
+
+    const g = hull.current
+    if (g) {
+      g.position.set(state.x, -BANK_WATER_DROP, state.z)
+      g.rotation.y = state.yaw
+    }
+    const p = state.paddler
+    if (kneeling.current) {
+      kneeling.current.visible = p.inBoat
+      kneeling.current.position.set(p.x, -BANK_WATER_DROP + CANOE_SEAT_Y, p.z)
+      kneeling.current.rotation.y = p.yaw
+    }
+    if (standing.current) {
+      standing.current.visible = !p.inBoat
+      standing.current.position.set(p.x, groundHeight(p.x, p.z), p.z)
+      standing.current.rotation.y = p.yaw
+      const squash = fillSquat(0.2 * p.reach)
+      standing.current.scale.set(1, squash, 1)
+      standSquat.current = squash
+    }
+
+    if (said) {
+      const at = { x: state.paddler.x, z: state.paddler.z }
+      const distance = placePlayerPosition.active
+        ? Math.hypot(at.x - placePlayerPosition.x, at.z - placePlayerPosition.z)
+        : Infinity
+      const options = registerOptions('call')
+      const { utterance, plan } = conceptSpeech(said, useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, at), ...options })
+      playSpeech(plan)
+      if (speechReach(distance, options.radius).audible) {
+        useGame.getState().hearUtterance(utterance)
+        if (kneeling.current) {
+          speakOverhead(CANOE_SPEAKER_ID, [utterance], kneeling.current, { floor: true, seconds: speechLabelSeconds(1), reach: options.radius })
+        }
+      }
+      // He points the way he is heading, far along the lane over the water.
+      const ahead = { x: at.x + Math.sin(state.yaw) * 12, y: 1, z: at.z + Math.cos(state.yaw) * 12 }
+      gesture.current = gestureIfHeard(
+        distance,
+        'point',
+        aimAt({ x: at.x, z: at.z, yaw: state.yaw }, ahead, CANOE_SEAT_Y + 0.55 * 0.75 * FIGURE_LIMBS.shoulderY),
+        options.radius,
+      )
+    }
+
+    // The arms: the call's point while it runs, the paddle stroke otherwise.
+    gesture.current = advanceGesture(gesture.current, dt)
+    const kp = kneelPose.current
+    if (kp) {
+      const next = isGesturing(gesture.current) ? gesturePose(gesture.current) : paddlePose(state.stroke)
+      kp.left = next.left
+      kp.right = next.right
+      kp.lean = next.lean
+      kp.turn = next.turn
+      applyFigurePose(kneelLimbs.current, kp)
+    }
+    if (paddle.current) paddle.current.visible = !isGesturing(gesture.current)
+    const sp = standPose.current
+    if (sp) {
+      const next = fillPose(0.2 * p.reach)
+      sp.left = next.left
+      sp.right = next.right
+      sp.lean = next.lean
+      sp.turn = next.turn
+      applyFigurePose(standLimbs.current, sp)
+    }
+  })
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2): the lane, the
+  // phase and where the canoe and its paddler are right now.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeCanoe = () => ({
+      phase: state.phase,
+      clock: state.clock,
+      s: state.s,
+      x: state.x,
+      z: state.z,
+      yaw: state.yaw,
+      calls: state.calls,
+      lastCall: state.lastCall,
+      owed: state.owed,
+      paddler: { ...state.paddler },
+      lane: {
+        ...lane,
+        start: { ...lane.start },
+        end: { ...lane.end },
+        berth: { ...lane.berth },
+        trap: { ...lane.trap },
+        checkStand: { ...lane.checkStand },
+      },
+    })
+    return () => {
+      delete w.__placeCanoe
+    }
+  }, [state, lane])
+
+  const beam = cfg.hullBeam / 2
+  const half = cfg.hullLength / 2
+  const trapY = groundHeight(lane.trap.x, lane.trap.z)
+  // Born where the cycle puts them, never at the settlement origin the first
+  // frame would only move them off (point 509's rule, which the unplaced-
+  // inhabitant watch enforces).
+  const born = useMemo(
+    () => ({
+      hull: [state.x, -BANK_WATER_DROP, state.z] as [number, number, number],
+      kneeling: [state.paddler.x, -BANK_WATER_DROP + CANOE_SEAT_Y, state.paddler.z] as [number, number, number],
+      standing: [lane.checkStand.x, bankGroundHeight(bank, lane.checkStand.x, lane.checkStand.z), lane.checkStand.z] as [number, number, number],
+    }),
+    // Read once at birth; the frame loop owns the transforms afterwards.
+    [state, lane, bank],
+  )
+  return (
+    <>
+      <group ref={hull} name="village-canoe" position={born.hull} userData={markActor({ kind: 'canoe', height: 0.6 })}>
+        {/* A dugout: one log, hollowed. The lower half of a long ellipsoid is
+            the hull; a darker lid just under the gunwale is its hollow. */}
+        <mesh position={[0, CANOE_FREEBOARD, 0]} scale={[beam, CANOE_DEPTH, half]} castShadow>
+          <sphereGeometry args={[1, 18, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+          <meshStandardMaterial color="#6b4a2b" roughness={0.9} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0, CANOE_FREEBOARD - 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[beam * 0.82, half * 0.9, 1]}>
+          <circleGeometry args={[1, 24]} />
+          <meshStandardMaterial color="#3a2616" roughness={1} />
+        </mesh>
+      </group>
+      <group ref={kneeling} name="village-canoe-paddler" position={born.kneeling}>
+        <Figure
+          cloth={cloth}
+          kneel
+          pose={kneelPose}
+          limbs={kneelLimbs}
+          handProp={
+            <group ref={paddle}>
+              <CanoePaddle />
+            </group>
+          }
+        />
+      </group>
+      <group ref={standing} name="village-canoe-fisher" position={born.standing} visible={false}>
+        <Figure cloth={cloth} pose={standPose} limbs={standLimbs} squat={standSquat} />
+      </group>
+      {/* His fish trap at the waterline: a conical basket lying in the shallows,
+          tied to a stake driven into the bank. */}
+      <group
+        name="village-canoe-trap"
+        position={[lane.trap.x, trapY + 0.1, lane.trap.z]}
+        rotation={[0, Math.atan2(lane.fx, lane.fz), 0]}
+      >
+        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <coneGeometry args={[0.24, 0.8, 10, 1, true]} />
+          <meshStandardMaterial color="#a88b52" roughness={1} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[-0.35, 0.2, -0.3]} castShadow>
+          <cylinderGeometry args={[0.025, 0.03, 0.8, 5]} />
+          <meshStandardMaterial color="#5a4128" roughness={1} />
+        </mesh>
+      </group>
+    </>
+  )
+}
+
 export function PlaceLife({
   kind,
   size = 1,
@@ -4236,6 +4500,8 @@ export function PlaceLife({
             onDigProgress={onDigProgress}
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
+          {/* The fisherman's dugout beside the children's bank game (work-order 1237). */}
+          {bank && <VillagerCanoe key={placeId} bank={bank} cloth={style.cloth[2 % style.cloth.length]} seed={localSeed} />}
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
           <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} />
           {/* Inhabitant/prop interactions (design.md §19). */}

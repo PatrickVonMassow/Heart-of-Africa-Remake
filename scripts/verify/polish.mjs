@@ -5373,6 +5373,253 @@ if (section('children-bank-game')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// THE VILLAGER'S DUGOUT BESIDE THE CHILDREN'S BANK GAME (work-order 1237).
+// Side by side with room enough that a player can stand where he sees EITHER
+// the children's game OR the boat (user 29.09.2026). Two standing places, each
+// judged by the rendered projection:
+//  - the boat standing place, s = +37 m on the waterline, looking out over the
+//    water: the canoe and its call's reading are in frame, no child and no play
+//    rock is;
+//  - behind the downstream play rock, looking upstream: the children's game is
+//    in frame, the canoe is not.
+// Spectator-time knobs only, put back afterwards: the roam is shortened as the
+// children-bank-game section does (so the children come down to the bank within
+// the wait), the reading is held long enough for a headless shutter, and ROCK is
+// marked heard — the direction words follow the listener's first ROCK, and a
+// player standing here has met the children's rocks already.
+if (section('villager-canoe')) {
+  const was = await page.evaluate(() => {
+    const b = window.__balance.villageLife.bankGame
+    const c = window.__balance.communication
+    const kept = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds, labelSeconds: c.labelSeconds }
+    b.roamSeconds = 8
+    b.roamGuardSeconds = 8
+    c.labelSeconds = 12
+    return kept
+  })
+  try {
+    await goToPlace('bambara-village')
+    const ready = await page
+      .waitForFunction(() => !!window.__placeCanoe && !!window.__placeLayout?.playRocks && !!window.__placeTag && !!window.__placePlayer, null, { timeout: 40000 })
+      .then(() => true)
+      .catch(() => false)
+    check('the river village carries the fisherman’s dugout beside the children’s bank game', ready)
+    if (ready) {
+      await page.evaluate(() => {
+        const g = window.__game.getState()
+        if (!Object.hasOwn(g.communication.heard, g.vocabulary.ROCK)) g.hearUtterance(g.vocabulary.ROCK)
+      })
+      // Where a world point lands in the rendered frame, and whether it does —
+      // installed once in the page, read by both standing places below.
+      await page.evaluate(() => {
+        const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+        window.__canoeFrameAt = (x, y, z) => {
+          const cam = window.__placeCamera
+          const eye = apply(cam.matrixWorldInverse.elements, [x, y, z, 1])
+          const clip = apply(cam.projectionMatrix.elements, eye)
+          const w = clip[3]
+          if (!(w > 0)) return { inFrame: false }
+          const n = { x: clip[0] / w, y: clip[1] / w, z: clip[2] / w }
+          return { inFrame: Math.abs(n.x) <= 1 && Math.abs(n.y) <= 1 && n.z < 1 }
+        }
+      })
+
+      // --- 1. The boat standing place -------------------------------------
+      const boatStand = await page.evaluate(() => {
+        const c = window.__placeCanoe()
+        const L = c.lane
+        const s = L.origin + 37
+        return { x: L.nx * L.waterline + L.fx * s, z: L.nz * L.waterline + L.fz * s, nx: L.nx, nz: L.nz }
+      })
+      const standAt = async (at, look) => {
+        await page.evaluate(({ at, look }) => {
+          const p = window.__placePlayer
+          p.x = at.x
+          p.z = at.z
+          p.pitch = 0
+          // Place-camera yaw 0 looks toward -Z: aim with the +PI complement.
+          p.yaw = Math.atan2(look.x - at.x, look.z - at.z) + Math.PI
+        }, { at, look })
+        await nextFrames(2)
+      }
+      // Facing the water while the canoe works its lane, until his call stands
+      // over his head on an upstream or downstream leg.
+      await standAt(boatStand, { x: boatStand.x + boatStand.nx * 10, z: boatStand.z + boatStand.nz * 10 })
+      // The call's own label, read in the frame it stands: its atoms against
+      // the vocabulary atom of the leg's word, not only the state's word.
+      // `notPhase`/`after` make the second wait take the OTHER leg's call.
+      const waitCall = (notPhase, after) => page
+        .waitForFunction(({ notPhase, after }) => {
+          const c = window.__placeCanoe?.()
+          if (!c || (c.phase !== 'up' && c.phase !== 'down') || c.phase === notPhase) return null
+          const l = (window.__speech?.labels() ?? []).find((x) => x.speakerId === 'village-canoe' && x.shownAt > after)
+          if (!l) return null
+          const vocabulary = window.__game.getState().vocabulary
+          return { phase: c.phase, atoms: l.atoms, shownAt: l.shownAt,
+            expected: vocabulary[c.phase === 'up' ? 'UPSTREAM' : 'DOWNSTREAM'] }
+        }, { notPhase, after }, { timeout: 300000, polling: 250 })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      const callNamesHeading = (call) =>
+        !!call && Array.isArray(call.atoms) && call.atoms.length === 1 && !!call.expected && call.atoms[0] === call.expected
+      const firstCall = await waitCall(null, -1)
+      const called = !!firstCall
+      const canoeState = await page.evaluate(() => window.__placeCanoe())
+      check('the paddler calls the direction word of his leg, and his reading stands over his head', called,
+        `phase ${canoeState.phase}, ${canoeState.calls} calls, last ${canoeState.lastCall}`)
+      check('the call names the way he is heading',
+        called && canoeState.lastCall === (firstCall.phase === 'up' ? 'UPSTREAM' : 'DOWNSTREAM'), `${firstCall?.phase}/${canoeState.lastCall}`)
+      check('the spoken call carries the direction word of that leg', callNamesHeading(firstCall), JSON.stringify(firstCall))
+      if (called) {
+        // Still on the standing place, still looking out over the water — he
+        // turns his head toward the boat, not his back to the river.
+        const target = { x: canoeState.x, z: canoeState.z }
+        await standAt(boatStand, target)
+        const seen = await page.evaluate(() => {
+          const at = window.__canoeFrameAt
+          const c = window.__placeCanoe()
+          const L = window.__placeLayout
+          const p = window.__placePlayer
+          const hull = at(c.x, 0, c.z)
+          const paddler = at(c.paddler.x, 0.5, c.paddler.z)
+          const label = window.__speech.anchorScreen('village-canoe')
+          const kids = (window.__placeTag().children ?? []).map((k) => at(k.x, 0.4, k.z))
+          const rocks = [L.playRocks.upstream, L.playRocks.downstream].map((r) => at(r.x, 0.5, r.z))
+          const cam = window.__placeCamera
+          const look = { x: -Math.sin(p.yaw), z: -Math.cos(p.yaw) }
+          const outward = look.x * c.lane.nx + look.z * c.lane.nz
+          return {
+            hull: hull.inFrame,
+            paddler: paddler.inFrame,
+            label: !!label && label.x >= 0 && label.x <= window.innerWidth && label.y >= 0 && label.y <= window.innerHeight,
+            labelAt: label,
+            kidsInFrame: kids.filter((k) => k.inFrame).length,
+            kids: kids.length,
+            rocksInFrame: rocks.filter((r) => r.inFrame).length,
+            outward,
+            cam: { x: cam.position.x, z: cam.position.z },
+          }
+        })
+        check('from the boat standing place the canoe and its paddler are in frame', seen.hull && seen.paddler, JSON.stringify(seen))
+        const paddlerRay = await page.evaluate(() => {
+          const c = window.__placeCanoe()
+          return window.__placeRayHit ? window.__placeRayHit(c.paddler.x, 0.2, c.paddler.z) : null
+        })
+        check('and nothing nearer hides the paddler', !paddlerRay || paddlerRay.hitDistance === null ||
+          paddlerRay.hitDistance >= paddlerRay.targetDistance - 0.8, JSON.stringify(paddlerRay))
+        check('and so is his call’s reading', seen.label, JSON.stringify(seen.labelAt))
+        check('and no child and no play rock is', seen.kidsInFrame === 0 && seen.rocksInFrame === 0,
+          `${seen.kidsInFrame}/${seen.kids} children, ${seen.rocksInFrame} rocks`)
+        check('the view looks out over the water, not inland', seen.outward > 0.2, seen.outward.toFixed(2))
+        await frame('1237-village-canoe-from-boat-stand', {
+          local: { x: canoeState.paddler.x, y: 0.5, z: canoeState.paddler.z },
+          label: `the fisherman in his dugout seen from the boat standing place (s = +37 m on the waterline) on his ${canoeState.phase === 'up' ? 'upstream' : 'downstream'} leg, his call ${canoeState.lastCall} over his head; no child and no play rock in the picture`,
+        })
+      }
+      if (called) {
+        // The other leg's call, heard from the same standing place.
+        const secondCall = await waitCall(firstCall.phase, firstCall.shownAt)
+        check('on his other leg he calls the other direction word', callNamesHeading(secondCall) &&
+          secondCall.phase !== firstCall.phase && secondCall.atoms[0] !== firstCall.atoms[0], JSON.stringify(secondCall))
+      }
+
+      // --- 2. Behind the downstream rock, looking upstream -----------------
+      const played = await page
+        .waitForFunction(() => {
+          const t = window.__placeTag?.()
+          return !!t && (t.phase === 'run' || t.phase === 'regroup')
+        }, null, { timeout: 300000, polling: 250 })
+        .then(() => true)
+        .catch(() => false)
+      check('the children come down to the bank and play their round', played)
+      if (played) {
+        const behind = await page.evaluate(() => {
+          const L = window.__placeLayout
+          const b = L.bank
+          const down = L.playRocks.downstream
+          const up = L.playRocks.upstream
+          const look = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2 }
+          // Downstream of the rock and a few paces inland of the lane, so the
+          // rock stands beside the sight line rather than across it — the first
+          // run stood a metre inland and the stone hid four of five children.
+          // The first stand the shipped colliders leave free is taken; a box
+          // counts at its circumscribed radius, the conservative reading.
+          const reach = (c) =>
+            c.kind === 'box' ? Math.hypot(c.hx, c.hz) : c.kind === 'segment' ? c.r + Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2 : c.r
+          const clearAt = (x, z) => {
+            let clear = Infinity
+            for (const c of window.__placeColliders ?? []) {
+              const m = c.kind === 'segment' ? { x: (c.x1 + c.x2) / 2, z: (c.z1 + c.z2) / 2 } : { x: c.x, z: c.z }
+              clear = Math.min(clear, Math.hypot(x - m.x, z - m.z) - reach(c))
+            }
+            return clear
+          }
+          for (const inland of [5, 4, 6, 3]) {
+            for (const along of [5, 6, 4]) {
+              const at = { x: down.x + b.fx * along - b.nx * inland, z: down.z + b.fz * along - b.nz * inland }
+              const clear = clearAt(at.x, at.z)
+              if (clear > 0.35) return { at, look, inland, along, clear }
+            }
+          }
+          return null
+        })
+        check('there is free ground to stand on behind the downstream rock', !!behind,
+          behind ? `${behind.along} m downstream of it, ${behind.inland} m inland, ${behind.clear.toFixed(2)} m clear` : 'no free stand')
+        if (behind) await standAt(behind.at, behind.look)
+        const held = !!behind && await page.evaluate(() => window.__game.getState().placeId === 'bambara-village' && !!window.__placeCamera)
+        check('the stand behind the downstream rock is inside the settlement', held)
+        if (held) {
+          // The children's round keeps moving: give it a few frames to spread
+          // along the lane rather than judging the one frame it bunched up in.
+          const seenOnce = () => page.evaluate(() => {
+            const at = window.__canoeFrameAt
+            const c = window.__placeCanoe()
+            const L = window.__placeLayout
+            // Seen = projected into the frame AND not hidden behind something
+            // nearer (the rock stands between the spectator and the lane).
+            const visible = (x, y, z) => {
+              if (!at(x, y, z).inFrame) return false
+              const ray = window.__placeRayHit ? window.__placeRayHit(x, y, z) : null
+              return !ray || ray.hitDistance === null || ray.hitDistance >= ray.targetDistance - 0.6
+            }
+            const kids = window.__placeTag().children ?? []
+            return {
+              hull: at(c.x, 0, c.z).inFrame,
+              paddler: at(c.paddler.x, 0.5, c.paddler.z).inFrame,
+              phase: c.phase,
+              upRock: at(L.playRocks.upstream.x, 0.5, L.playRocks.upstream.z).inFrame,
+              kidsSeen: kids.filter((k) => visible(k.x, 0.4, k.z)).length,
+              kids: kids.length,
+            }
+          })
+          let seen = await seenOnce()
+          for (let tries = 0; tries < 40 && seen.kidsSeen < 3; tries++) {
+            await nextFrames(3)
+            seen = await seenOnce()
+          }
+          check('from behind the downstream rock the children’s game is in frame, the children not hidden by the rock',
+            seen.upRock && seen.kidsSeen >= 3, `${seen.kidsSeen}/${seen.kids} children seen, upstream rock ${seen.upRock}`)
+          check('and the canoe is not', !seen.hull && !seen.paddler, `${seen.phase}: hull ${seen.hull}, paddler ${seen.paddler}`)
+          await frame('1237-village-children-from-behind-downstream-rock', {
+            local: { x: behind.look.x, y: 0.5, z: behind.look.z },
+            label: 'the children’s bank game seen from behind the downstream play rock, looking upstream; the fisherman’s canoe is behind the camera and not in the picture',
+          })
+        }
+      }
+    }
+  } finally {
+    await page.evaluate((kept) => {
+      const b = window.__balance.villageLife.bankGame
+      b.roamSeconds = kept.roamSeconds
+      b.roamGuardSeconds = kept.roamGuardSeconds
+      window.__balance.communication.labelSeconds = kept.labelSeconds
+      delete window.__canoeFrameAt
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    }, was)
+  }
+}
+
 // --- A child up on a stone ----------------------------------------------------
 // THE OFF-GAME ROCK HAS TO BE SEEN (work-order 1080). The children's spec asks
 // for ROCK to be spoken at a stone that is no part of the game, so the word
@@ -5975,6 +6222,10 @@ if (section('village-stations')) {
     })
     await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
     await page.evaluate(() => {
+      // Weaving is parked in the shipped game (user 29.09.2026); this section
+      // tests the kept station, so it lays the loom the way the switch would.
+      const parked = window.__balance?.villageLife?.loom
+      if (parked) parked.placed = true
       window.__game.setState({ seed: 1838110026 })
       window.__game.getState().enterPlace('bambara-village')
       window.__game.getState().setJournalOpen(false)
@@ -6106,6 +6357,8 @@ if (section('village-stations')) {
       const g = window.__game.getState()
       if (g.placeId) g.leavePlace()
       window.__game.setState({ seed })
+      const parked = window.__balance?.villageLife?.loom
+      if (parked) parked.placed = false
     }, bootSeed)
   }
 }
@@ -6138,6 +6391,10 @@ if (section('village-loom')) {
     })
     await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
     await page.evaluate(() => {
+      // Weaving is parked in the shipped game (user 29.09.2026); this section
+      // tests the kept station, so it lays the loom the way the switch would.
+      const parked = window.__balance?.villageLife?.loom
+      if (parked) parked.placed = true
       window.__game.setState({ seed: 394349866 })
       window.__game.getState().enterPlace('bambara-village')
       window.__game.getState().setJournalOpen(false)
@@ -6509,6 +6766,8 @@ if (section('village-loom')) {
       const g = window.__game.getState()
       if (g.placeId) g.leavePlace()
       window.__game.setState({ seed })
+      const parked = window.__balance?.villageLife?.loom
+      if (parked) parked.placed = false
     }, bootSeed)
   }
 }

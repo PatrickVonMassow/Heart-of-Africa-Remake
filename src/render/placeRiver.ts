@@ -83,14 +83,20 @@ export function buildGroundPlateGeometry(
  * the walk reads (work-order 584): the player wades down THIS ground, so a
  * second, drifting shape would be a bank that is not where it is drawn.
  */
-export function buildBankShoreGeometry(bank: PlaceRiverBank, halfLength: number): THREE.BufferGeometry {
+export function buildBankShoreGeometry(
+  bank: PlaceRiverBank,
+  halfLength: number,
+  downLength = halfLength,
+): THREE.BufferGeometry {
   const rows = bankShoreRows(bank)
   const cols = 2
   const positions: number[] = []
   const indices: number[] = []
   for (const [out, y] of rows) {
     for (let c = 0; c < cols; c++) {
-      const along = (c / (cols - 1) - 0.5) * 2 * halfLength
+      // Upstream end first, then the downstream one — which may run further,
+      // where the bank's walkable lobe does (work-order 1237).
+      const along = c === 0 ? -halfLength : downLength
       positions.push(bank.nx * out + bank.fx * along, y, bank.nz * out + bank.fz * along)
     }
   }
@@ -121,8 +127,11 @@ export function buildRiverSurfaceGeometry(
   bank: PlaceRiverBank,
   halfLength: number,
   segments: number,
+  downLength = halfLength,
 ): THREE.BufferGeometry {
-  const along = Math.max(1, Math.round(segments))
+  // The segment count is stated for the symmetric span, so a longer downstream
+  // reach keeps the same density along the bank (work-order 1237).
+  const along = Math.max(1, Math.round((segments * (halfLength + downLength)) / (2 * halfLength)))
   const across = 4
   const inner = bank.distance - BANK_SHORE_HALF
   const positions: number[] = []
@@ -132,7 +141,7 @@ export function buildRiverSurfaceGeometry(
   for (let r = 0; r <= across; r++) {
     const out = inner + (r / across) * (RIVER_REACH + BANK_SHORE_HALF)
     for (let c = 0; c <= along; c++) {
-      const u = (c / along - 0.5) * 2 * halfLength
+      const u = -halfLength + (c / along) * (halfLength + downLength)
       positions.push(bank.nx * out + bank.fx * u, -BANK_WATER_DROP, bank.nz * out + bank.fz * u)
       normals.push(0, 1, 0)
       uvs.push(u, out - bank.distance)

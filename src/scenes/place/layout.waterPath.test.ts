@@ -28,7 +28,7 @@ import {
 import { buildRiverBank, inBankPlayLane } from './riverBank'
 import { mulberry32 } from '../../world/noise'
 import { VILLAGE_SPOTS } from './lifeSpots'
-import { WARP_BODY_RADIUS, WEAVER_BODY_RADIUS } from './loom'
+import { WARP_BODY_RADIUS } from './loom'
 
 // The landmark boulder is placed against the REAL terrain (it refuses every wet
 // spot — work-order 585), so this file needs the elevation dataset the browser
@@ -157,18 +157,10 @@ describe('the village water path (work-order 688)', () => {
       // No well here: this village draws its water from the river (point 1092).
     ]
     for (const prop of props) expect(layout.colliders).toContainEqual(prop)
-    // The loom is no longer a circle at a constant (work-order 1157): the gate
-    // rebuild must carry its WARP — a segment from stake to stake — and the
-    // weaver beside its middle, both derived from the settled bank.
-    const loom = layout.loom
-    expect(loom).not.toBeNull()
-    expect(layout.colliders).toContainEqual({
-      kind: 'segment',
-      x1: loom!.upstream.x, z1: loom!.upstream.z,
-      x2: loom!.downstream.x, z2: loom!.downstream.z,
-      r: WARP_BODY_RADIUS,
-    })
-    expect(layout.colliders).toContainEqual({ x: loom!.weaver.x, z: loom!.weaver.z, r: WEAVER_BODY_RADIUS })
+    // Weaving is parked (user 29.09.2026): the shipped plan lays no loom, so
+    // the gate rebuild carries neither its warp nor its weaver.
+    expect(layout.loom).toBeNull()
+    expect(layout.colliders.some((c) => c.kind === 'segment' && c.r === WARP_BODY_RADIUS)).toBe(false)
     expect(layout.waterStand).not.toBeNull()
     expect(layout.colliders).toContainEqual({ ...layout.waterStand!, r: WATER_STAND_RADIUS })
 

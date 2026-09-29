@@ -460,7 +460,12 @@ export const DOC_BUDGETS = [
     // owes §13.4 and §19.10 (user 21.09.2026): "silent tag" meant no words and
     // no labels, never no sound, and the catcher is told apart by his body — a
     // reading the old text did not give, so a new decision, not a longer telling.
-    maxWords: 29563,
+    // RAISED by the 189 measured words work-order 1237 owes §11, §13.4 and
+    // §19.10 (user 29.09.2026, "Ergänze es dort"): the villager's dugout canoe
+    // was absent from the document — its lane, its distance from the children,
+    // its cycle and its call — and the weaving scene is recorded as parked. A
+    // new concept, not a longer telling.
+    maxWords: 29752,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

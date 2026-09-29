@@ -20,7 +20,7 @@ import {
 } from './riverBank'
 import { balance } from '../../config/balance'
 import { BACKDROP_SCALE, GROUND_DISC_OVERHANG } from './backdrop'
-import { insidePlace, isOutsidePlace, maxBoundaryRadius, groundPlateRadius, placeBoundaryRadius } from './boundary'
+import { bankDrawnReach, insidePlace, isOutsidePlace, maxBoundaryRadius, groundPlateRadius, placeBoundaryRadius } from './boundary'
 import { PLACE_RADIUS, WATER_STAND_WORK_RING } from './layout'
 import { sharedLayout } from './layoutHarness'
 import { resolveMove, PLAYER_RADIUS, WALKER_RADIUS, standingClear } from './collision'
@@ -238,8 +238,9 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
 
   it('the drawn ground reaches every walkable point — plate inland, shore at the water', () => {
     const discEdge = layout.radius + GROUND_DISC_OVERHANG
-    // Half-length of the drawn shore strip, as PlaceScene builds it.
-    const shoreHalf = Math.sqrt(Math.max(1, discEdge * discEdge - bank.walkEdge * bank.walkEdge))
+    // The drawn shore strip's reach up- and downstream, as PlaceScene builds it
+    // (work-order 1237: the downstream side runs on with the widened lobe).
+    const reach = bankDrawnReach(layout, discEdge)
     for (let j = 0; j < 720; j++) {
       const angle = (j / 720) * Math.PI * 2
       const plate = groundPlateRadius(layout, angle, discEdge)
@@ -256,7 +257,9 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
         expect(plate + 1e-9, `plate at ${angle.toFixed(3)}`).toBeGreaterThanOrEqual(edge)
       } else {
         expect(out, `shore at ${angle.toFixed(3)}`).toBeLessThanOrEqual(bank.distance + BANK_BED_REACH)
-        expect(Math.abs(dot(p, bank.fx, bank.fz)), `shore at ${angle.toFixed(3)}`).toBeLessThanOrEqual(shoreHalf)
+        const along = dot(p, bank.fx, bank.fz)
+        expect(along, `shore at ${angle.toFixed(3)}`).toBeGreaterThanOrEqual(-reach.up)
+        expect(along, `shore at ${angle.toFixed(3)}`).toBeLessThanOrEqual(reach.down)
       }
     }
   })

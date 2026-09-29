@@ -529,7 +529,12 @@ async function observations() {
       !e.villagers.some((v) => v.work?.siteIndex === index)
   }, { index: siteIndex, before: invitation.strikes }, 480000)
   await localFrame('03-finished-work', site, 'the completed pit, post or planting after the bout')
+  // Weaving is parked (user 29.09.2026): the shipped village lays no loom and
+  // this route changes no balance, so the loom frames run only if it returns.
   const loom = await d.read(() => window.__placeLayout.loom)
+  if (loom) await loomFrames(loom)
+}
+async function loomFrames(loom) {
   await d.walk({ x: loom.weaver.x - loom.ax * 3, z: loom.weaver.z - loom.az * 3 }); await d.aim({ ...loom.seat, y: 0.9 })
   for (const sign of [-1, 1]) {
     await d.wait((sign) => {

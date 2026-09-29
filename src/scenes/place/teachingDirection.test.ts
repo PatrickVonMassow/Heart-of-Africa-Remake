@@ -1,5 +1,6 @@
 import { beforeAll, expect, it } from 'vitest'
 import { Object3D, Vector3 } from 'three/webgpu'
+import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
 import { buildLayout } from './layout'
 import { wordToward } from './bankGame'
@@ -7,6 +8,11 @@ import { warpSign } from './loomWork'
 import { HELPER_SIDE_OFFSET } from './loom'
 
 beforeAll(setupGeodata)
+// Weaving is parked in the shipped game (user 29.09.2026); these cases test
+// the kept mechanism, so they lay the loom as a re-enabled village would.
+beforeAll(() => {
+  balance.villageLife.loom.placed = true
+})
 it.each([1, 42, 99])('aligns bank runs and the drawn loom helper with the river current (seed %i)', (seed) => {
   const { bank, playRocks, loom } = buildLayout('bambara-village', seed)
   expect(bank && playRocks && loom).toBeTruthy()

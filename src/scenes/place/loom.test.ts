@@ -19,6 +19,11 @@ import {
 } from './loom'
 
 beforeAll(setupGeodata)
+// Weaving is parked in the shipped game (user 29.09.2026); these cases test
+// the kept mechanism, so they lay the loom as a re-enabled village would.
+beforeAll(() => {
+  balance.villageLife.loom.placed = true
+})
 
 const VILLAGES = PLACES.filter((p) => p.kind === 'village').map((p) => p.id)
 const SEEDS = [7, 42, 1337, 394349866, 1838110026]
