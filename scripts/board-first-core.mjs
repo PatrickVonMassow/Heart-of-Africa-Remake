@@ -176,7 +176,7 @@ function writesOnlyOutsideCheckout({ toolName, command, filePath, resolvedFilePa
   return (
     !tooDeep &&
     mutating.length > 0 &&
-    mutating.every(({ segment, cwd: here }) => segmentWritesOnlyOutsideCheckout(segment, { cwd: here, checkoutRoot }))
+    mutating.every(({ segment, cwd: here }) => segmentWritesOnlyOutsideCheckout(segment, { cwd: here, checkoutRoot, realpath }))
   )
 }
 

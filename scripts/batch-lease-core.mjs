@@ -59,7 +59,7 @@
 // safe direction is the conservative one: the old string regexes saw through a
 // wrapper by accident, and losing that would let a dispossessed session push
 // shared history through any shell (four-eyes review, 30.07.2026).
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import {
   expandSegments,
   isMutatingSegment,
@@ -835,7 +835,7 @@ const FILE_TOOLS = new Set([
  * no path argument at all is NOT exempted, and one path inside the checkout
  * removes the exemption for the whole segment.
  */
-export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '' } = {}) {
+export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '', realpath } = {}) {
   if (!checkoutRoot) return false
   const { head, args } = headAndArgs(segment)
   if (!FILE_TOOLS.has(String(head))) return false
@@ -850,13 +850,35 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
   if (candidates.length === 0) return false
   // An unexpanded `$VAR`, command substitution or `~` names no knowable path (point 1207).
   if (candidates.some((text) => /[$`]|^~/.test(text))) return false
+  // An UNKNOWN directory (segmentCwds) leaves every relative target unknown too.
+  if (!cwd && candidates.some((text) => !isAbsolute(text))) return false
   return candidates.every(
     (target) =>
       !resolvedTargetInCheckout({
-        resolvedFilePath: resolve(cwd || checkoutRoot, target),
+        resolvedFilePath: canonicalTarget(resolve(cwd || checkoutRoot, target), realpath),
         checkoutRoot,
       }),
   )
+}
+
+/**
+ * The target with its deepest EXISTING ancestor canonicalised, so a symlink
+ * anywhere on the path into the checkout is seen as the checkout (point 1207).
+ * A missing leaf keeps its remaining lexical tail.
+ */
+function canonicalTarget(path, realpath = (p) => p) {
+  let head = path
+  let tail = ''
+  while (true) {
+    try {
+      return tail ? resolve(realpath(head), tail) : realpath(head)
+    } catch {
+      const parent = dirname(head)
+      if (parent === head) return path
+      tail = tail ? `${basename(head)}${sep}${tail}` : basename(head)
+      head = parent
+    }
+  }
 }
 
 /**
@@ -870,8 +892,8 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
  * between means the `cd` may have failed or run in a subshell. Everything it
  * cannot establish is UNKNOWN (''), and callers resolve an unknown directory
  * against the checkout root, the strict side: `cd` with no argument, `-`, `~`,
- * a variable, `pushd`/`popd`, and every nested segment once any nested segment
- * changes directory. `realpath` canonicalises the target so a symlink into the
+ * a variable, `pushd`/`popd`, and every segment of a call in which any nested
+ * segment changes directory. `realpath` canonicalises the target so a symlink into the
  * checkout is seen as the checkout; its failure also yields unknown.
  */
 export function segmentCwds(segments, cwd = '', { command = '', realpath = (path) => path } = {}) {
@@ -882,7 +904,10 @@ export function segmentCwds(segments, cwd = '', { command = '', realpath = (path
   let previous = null
   let caller = cwd
   return list.map((segment) => {
-    if ((segment?.depth ?? 0) !== 0) return nestedMoves ? '' : caller
+    // `eval`/`source` run a nested `cd` in THIS shell, `bash -c` in a child; the
+    // two are not told apart, so any nested move makes the whole call unknown.
+    if (nestedMoves) return ''
+    if ((segment?.depth ?? 0) !== 0) return caller
     if (moved && previous && String(command).slice(previous.end, segment.start).trim() !== '&&') current = ''
     previous = segment
     caller = current
@@ -931,7 +956,7 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
     if (directSegmentIntent(candidate) !== 'write') return false
     // A write that lands entirely OUTSIDE this checkout is not a main write
     // (point 749) — the session memory directory is the case that measured it.
-    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd: cwds[i], checkoutRoot })) return false
+    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd: cwds[i], checkoutRoot, realpath })) return false
     return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
   })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }

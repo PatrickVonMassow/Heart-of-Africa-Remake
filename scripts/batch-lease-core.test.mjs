@@ -534,6 +534,17 @@ describe('the main-write ownership fence', () => {
     expect(fromRoot('cd /tmp/gone && cat > x.md', { realpath: () => { throw new Error('ENOENT') } })).toBe(true)
     expect(fromRoot('cd /tmp/pad && cat > "$DEST"')).toBe(true)
     expect(fromRoot('cat > ~/x.md')).toBe(true)
+    // Review round 2: an unknown directory, `eval` and a symlink in the target.
+    expect(fromRoot('cd "$DEST" && cat > ../src/x.ts')).toBe(true)
+    expect(fromRoot('cd /tmp/pad && eval "cd /workspace/hoa" && cat > src/x.ts')).toBe(true)
+    const link = (p) => {
+      if (p === '/tmp/pad/link') return '/workspace/hoa'
+      if (p.startsWith('/tmp/pad/link/')) throw new Error('ENOENT')
+      return p
+    }
+    expect(fromRoot('cd /tmp/pad && cat > link/src/x.ts', { realpath: link })).toBe(true)
+    expect(fromRoot('cat > /tmp/pad/link/src/x.ts', { realpath: link })).toBe(true)
+    expect(fromRoot('cat > /tmp/pad/new/x.md', { realpath: link })).toBe(false)
     // The plain `&&` chain from the scratchpad still passes, nested write included.
     expect(fromRoot('cd /tmp/pad && cat > a.md && tee b.md')).toBe(false)
     expect(shell('git commit -F /tmp/message.txt').writes).toBe(true)
