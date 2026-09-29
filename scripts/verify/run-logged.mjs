@@ -48,7 +48,7 @@
 //                   appended — the record writer's argv must name its log; see
 //                   `commandNamesRun` in scripts/batch-in-flight.mjs)
 import { spawn } from 'node:child_process'
-import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
+import { createWriteStream, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { constants as osConstants } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -66,7 +66,14 @@ import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
 import { developmentRunRefusal, parseRunLoggedArgs } from './run-logged-args.mjs'
-import { cacheEnvironment, cleanWorktree, findGreenReceipt, formatCachedGreen } from './run-green-cache.mjs'
+import {
+  cacheEnvironment, cleanWorktree, findGreenReceipt, formatCachedGreen, formatRejudged, neutralDiffReader, readSuiteSink, rejudgeLarge,
+  snapshotSuiteRuns,
+} from './run-green-cache.mjs'
+import { parseArgs } from './tiers.mjs'
+import { SUITE_SINK_ENV } from '../render-verify-state.mjs'
+import { chargeablePoints } from '../render-verify-core.mjs'
+import { readTasksAll } from '../tasks-source.mjs'
 import { waitForLargeRun } from './large-run-wait.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
@@ -198,6 +205,11 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
       framesExpected: baseRecord.expectedFrames,
       framesWritten,
     })
+    // A LARGE keeps its own suite records, read from the run's own uncapped
+    // sink: the render-verify state holds fewer runs than one LARGE writes.
+    const suiteRuns = parseArgs(baseRecord.args ?? []).isLargeEquivalent
+      ? { suiteRuns: snapshotSuiteRuns(readSuiteSink(suiteSinkFor(baseRecord.log)), { head: baseRecord.head, startedAt: started, finishedAt: receipt.finishedAt }) }
+      : {}
     writeRecord(recordPath, {
       ...prior,
       status: 'finished',
@@ -205,6 +217,7 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
       exitCode,
       framesWritten,
       receipt,
+      ...suiteRuns,
     })
     emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_FINISH, {
       at: receipt.finishedAt,
@@ -340,7 +353,7 @@ function runVerify() {
     // THE LADDER WAS ALREADY ASKED, above, with the escape this wrapper
     // consumes and does not forward. run-all asks it too — it is the entrypoint
     // the README names — so the marker keeps it to ONE question per run.
-    env: { ...process.env, RVA_LADDER_ASKED: '1' },
+    env: { ...process.env, RVA_LADDER_ASKED: '1', [SUITE_SINK_ENV]: suiteSinkFor(logPath) },
   })
 
   const lines = []
@@ -578,6 +591,30 @@ function reexecWithLogPath() {
   })
 }
 
+/** Where one run's suite records are copied while it runs (beside its log). */
+function suiteSinkFor(logPath) {
+  return `${logPath}.suites.jsonl`
+}
+
+/** The run records in the log directory, newest file name first. */
+function recentRecords(dir) {
+  try {
+    return readdirSync(dir).filter((name) => name.endsWith('.run.json')).sort().reverse()
+      .map((name) => ({ path: join(dir, name), record: readRecord(join(dir, name)) }))
+  } catch {
+    return []
+  }
+}
+
+/** Today's chargeable points; unreadable means nothing is chargeable (strict). */
+function openPointsNow() {
+  try {
+    return chargeablePoints(readTasksAll())
+  } catch {
+    return []
+  }
+}
+
 const { own, forward } = parseRunLoggedArgs(process.argv.slice(2))
 if (own.show) process.exitCode = showLog(own.show)
 else {
@@ -592,8 +629,26 @@ else {
       environment: cacheEnvironment(),
       again: own.again, clean: cleanWorktree(ROOT),
     })
+    const rejudged = cached || !parseArgs(forward).isLargeEquivalent ? null : rejudgeLarge({
+      records: recentRecords(logDir()),
+      argv: forward, head: gitPosition().head, verifyGl: process.env.VERIFY_GL,
+      environment: cacheEnvironment(), again: own.again, clean: cleanWorktree(ROOT),
+      diffFor: neutralDiffReader(ROOT), openPoints: openPointsNow(),
+    })
+    for (const line of rejudged ? formatRejudged(rejudged, forDisplay) : []) console.log(line)
     if (cached) console.log(formatCachedGreen({ ...cached, path: forDisplay(cached.path) }))
-    else {
+    else if (rejudged?.covered.length && !rejudged.missing.length && !rejudged.docs) {
+      console.log('every backend is covered by a re-judged receipt — nothing to run (--again forces a fresh run)')
+    } else {
+      if (rejudged?.covered.length && rejudged.missing.length) {
+        // Only the backend the receipt did not cover runs: a pinned LARGE.
+        process.env.VERIFY_GL = rejudged.missing[0]
+        console.log(`running only ${rejudged.missing[0]}: VERIFY_GL=${rejudged.missing[0]} ${forward.join(' ')}`)
+      } else if (rejudged?.covered.length) {
+        // Both backends stand; a changed *.md is what the docs suite reads.
+        forward.splice(0, forward.length, 'docs')
+        console.log('both backends are covered; a *.md changed, so the docs suite runs fresh')
+      }
       await waitForLargeRun()
       if (own.logFile && isAbsolute(own.logFile)) runVerify()
       else reexecWithLogPath()
