@@ -1969,3 +1969,17 @@ the retry — one archived card is written twice. Decision records carry no iden
 text, so (1) loses only the multiplicity of a textually identical record and (2) only duplicates
 one card in the collapsed archive; nothing is lost. A real fix needs per-card identity (a new
 field under the infrastructure freeze). Backlog: no player impact, no information loss.
+
+## Mid-lake animal keeps a crossing target at its own position
+
+Found 29.09.2026 while fixing point 1234 (unreactive calf). An animal in open water with no
+land within reach still receives a crossing target at its own position. Since 1234 such a
+crossing resolves on its first frame and no longer suppresses the player-shy flee, but the
+animal can stay in the water. Backlog: no player impact measured.
+
+## Calf play bout falls into the river readily near a bend
+
+Found 29.09.2026 in the WebGL 2 run of point 1234. A calf whose parent stands across the
+water, outside every threat ring, fell into the river during a play bout 4.4 s in and started
+the §19.8 rescue drama. That accident is by design, but it may happen too often near river
+bends. Backlog: needs a frequency measurement before calibration.
