@@ -2487,6 +2487,24 @@ Where no seat near the plaza is affordable, the far seat of point 1190 stands.
 The chief's and trading huts and the landmarks stay. The teaching rules are in
 `docs/communication-poc-spec.md`, "The weaver's loom".
 
+**PARKED (user 29.09.2026, point 1237).** No village lays the loom any more.
+The station, its words and its tests stay in the game, and
+`balance.villageLife.loom.placed` switches it back on.
+
+### 8.2 The villager's dugout canoe (point 1237)
+
+At a riverside village a local fisherman paddles a dugout beside the children's
+bank game, as a second UPSTREAM/DOWNSTREAM picture. The regional reference is
+the Niger's specialist river people of 1890, the Bozo fishermen and the Somono
+boatmen, whose dugout pirogues worked the river beside the Bambara farming
+villages; the Bambara village keeps its own speaker lect. Adapted, and marked as
+such: a small fishing pirogue of about 5.5 m paddled kneeling with a single
+blade, a conical basket trap at the waterline, and paces chosen as an educated
+guess (about 1.3 m/s through the water against a dry-season current of about
+0.5 m/s). **IMPLEMENTATION.** `src/scenes/place/villagerCanoe.ts` lays the lane
+and runs the cycle; `VillagerCanoe` in `src/scenes/place/PlaceLife.tsx` draws
+it; every value is in `balance.villageLife.canoe`.
+
 ---
 
 ## 9. Keeping the cook-fire alight in the rains (TASKS point 256)
