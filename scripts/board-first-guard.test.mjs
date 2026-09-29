@@ -282,6 +282,13 @@ describe('board-first-guard (spawned)', () => {
       expect(reason).toContain('BATCH OWNERSHIP STAND-DOWN')
       expect(reason).toContain(`your session scratchpad \`${pad}\``)
       expect(reason).toContain('node scripts/finding.mjs --request "<title>" --stdin')
+
+      // The board stays the owner's: a real board Write and a real publish command are refused.
+      expect(allowed('Write', { file_path: resolve(repo, '.batch-dashboard.html') })).toBe(false)
+      expect(allowed('Write', { file_path: resolve(pad, 'hoa-batch-dashboard.html') })).toBe(false)
+      const publish = callGuard('Bash', { command: 'node scripts/dashboard-publish.mjs' })
+      expect(publish.decision?.hookSpecificOutput?.permissionDecisionReason ?? '').toContain('BATCH OWNERSHIP STAND-DOWN')
+      expect(allowed('Bash', { command: 'node scripts/board.mjs publish' })).toBe(false)
     } finally {
       rmSync(resolve(tmpdir(), `claude-${process.getuid?.()}`, repo.replace(/[^A-Za-z0-9]/g, '-')), { recursive: true, force: true })
     }

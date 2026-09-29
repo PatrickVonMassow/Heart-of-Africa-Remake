@@ -173,6 +173,24 @@ export function sessionScratchpad({ tmp = '/tmp', uid, projectDir = '', sessionI
   return `${String(tmp).replace(/[\\/]+$/, '')}/claude-${uid}/${project}/${session}/scratchpad`
 }
 
+/** Remedy scripts that only CHECK; a standing-down session may still run them. */
+const STAND_DOWN_CHECK_SCRIPTS = ['guard-preflight.mjs', 'dashboard-guard.mjs', 'board-first-guard.mjs']
+
+/**
+ * classifyCall for a session that does NOT own the batch. The gate's 'escape'
+ * (board writes, board.mjs, focus, publish) is the OWNER's remedy, so here it
+ * counts as a mutation — wherever the board file lies — except the pure checks.
+ */
+function standDownCall({ toolName, command, filePath }) {
+  const call = classifyCall({ toolName, command, filePath })
+  if (call.kind !== 'escape') return call
+  if (!SHELL_TOOLS.has(String(toolName ?? ''))) return { kind: 'mutating', segment: '' }
+  for (const seg of parseSegments(command)) {
+    if (isEscapeSegment(seg) && !segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS)) return { kind: 'mutating', segment: seg.raw }
+  }
+  return { kind: 'read-only', segment: '' }
+}
+
 /**
  * RE-CHECK BATCH OWNERSHIP BEFORE EVERY MUTATION. PURE.
  *
@@ -206,17 +224,21 @@ export function ownershipStandDownDecision({
     if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
       return { block: false, reason: '', standDown: heldByOtherLiveOwner === true }
     }
-    const call = classifyCall({ toolName, command, filePath })
+    const call = standDownCall({ toolName, command, filePath })
     if (call.kind !== 'mutating') return { block: false, reason: '', standDown: true }
     // The documented request handoff writes OUTSIDE the checkout — a file-tool
     // write to a resolved outside path, or the whitelisted shell shape (point 1207).
     const tool = String(toolName ?? '')
+    // The board is batch state wherever its file lies (the owner's scratchpad
+    // included), so it never rides on the outside-checkout admission.
+    const boardTouched = isBoardFile(filePath) || BOARD_FILE_HINTS.some((name) => String(command ?? '').includes(name))
     const outsideFile =
+      !boardTouched &&
       ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool) &&
       !!filePath && !String(filePath).split(/[\\/]/).includes('..') &&
       !!checkoutRoot && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })
     const outsideShell =
-      tool === 'Bash' && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })
+      !boardTouched && tool === 'Bash' && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })
     if (outsideFile || outsideShell) return { block: false, reason: '', standDown: true }
     const attempted = call.segment
       ? `the state-changing segment \`${call.segment}\``

@@ -365,6 +365,30 @@ describe('the stand-down leaves the session scratchpad and the carrier open', ()
     expect(write(`${pad}/x.md`, '').block).toBe(true)
   })
 
+  it('keeps every board mutation refused, wherever the board file lies, while checks and reads pass', () => {
+    expect(write(`${root}/.batch-dashboard.html`).block).toBe(true)
+    expect(at({ toolName: 'Edit', filePath: `${root}/.batch-dashboard.html`, resolvedFilePath: `${root}/.batch-dashboard.html` }).block).toBe(true)
+    // The owner's published copy lives in a scratchpad OUTSIDE the checkout.
+    const ownerCopy = '/tmp/claude-1000/-workspace-hoa/owner/scratchpad/hoa-batch-dashboard.html'
+    expect(write(ownerCopy).block).toBe(true)
+    expect(write(`${pad}/hoa-batch-dashboard.html`).block).toBe(true)
+    expect(at({ toolName: 'Bash', command: `cat > ${ownerCopy} <<'EOF'\nx\nEOF` }).block).toBe(true)
+    for (const command of [
+      'node scripts/dashboard-publish.mjs',
+      'node scripts/board.mjs publish',
+      'node scripts/board-publish.mjs',
+      'node scripts/focus.mjs 12 "x"',
+      'git status && node scripts/board.mjs done 1 --none "x"',
+    ]) {
+      const d = at({ toolName: 'Bash', command })
+      expect(d.block, command).toBe(true)
+      expect(d.reason).toContain('BATCH OWNERSHIP STAND-DOWN')
+    }
+    expect(at({ toolName: 'Bash', command: 'node scripts/guard-preflight.mjs --for commit --session s' }).block).toBe(false)
+    expect(at({ toolName: 'Read', filePath: `${root}/.batch-dashboard.html` }).block).toBe(false)
+    expect(at({ toolName: 'Bash', command: `cat ${root}/.batch-dashboard.html` }).block).toBe(false)
+  })
+
   it('refuses a climb out of the scratchpad back into the checkout', () => {
     const climb = `${pad}/../../../../../workspace/hoa/TASKS.md`
     expect(write(climb, `${root}/TASKS.md`).block).toBe(true)
