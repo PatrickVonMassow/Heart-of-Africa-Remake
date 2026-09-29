@@ -1948,3 +1948,11 @@ infrastructure freeze: no player impact and no lost work. Promote if it ever tak
 Also seen in the same closing: the closing guard reads any "commit <sha>" in the second
 regression's evidence as a run target, and a timestamp as older than cleanup steps re-recorded
 after a HEAD change; wording the evidence around it cost two retries.
+
+## `awk` is classified as a read, so its program can write unguarded
+
+Found 29.09.2026 in review of point 1207: `directSegmentIntent` classifies
+`awk '{print > "/workspace/hoa/x"}' /tmp/in` as read, so neither the main-write
+fence nor the ownership stand-down sees the write its program performs. Pre-existing
+classifier gap, not caused by 1207; no player impact. Backlog under the
+infrastructure freeze.
