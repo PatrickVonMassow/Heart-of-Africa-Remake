@@ -67,6 +67,7 @@ import {
   calfFollowAcrossWater,
   crossingTarget,
   crossingStep,
+  crossingYieldsToFlight,
   waterBetween,
   type BankThreat,
   waterDramaOwns,
@@ -4571,6 +4572,29 @@ function Herds() {
             atBody &&
             (lionActive ||
               elephantPos.some(([ex, ez]) => Math.hypot(ex - a.x, ez - a.z) < PREY_PANIC_RADIUS * PREY_PANIC_EXIT))
+          // A swim is no drama (design.md §19.5 (c)): a traveller inside the
+          // shy ring ends a crossing or swim-out, and the flight below — the
+          // calf's shy bolt or the adult block — takes the frame, into the
+          // water where the escape leads there. The crossing branch sets
+          // familyHeld and used to hold both off for its whole deadline.
+          if (
+            a.crossing !== undefined &&
+            crossingYieldsToFlight(
+              a.x,
+              a.z,
+              {
+                species: sp,
+                isJuvenile: !!a.young,
+                preyWeapon: balance.parentDefense.preyWeapon,
+                drama: dramaStateOf(a, false),
+                drinking: a.drink !== undefined,
+                stagedBankVictim: stagedBankVictim(a),
+              },
+              playerThreat,
+              PLAYER_SHY_RADIUS,
+            )
+          )
+            a.crossing = undefined
           if ((a.caught !== undefined && a.caught > 0) || a.fireTrapped !== undefined) {
             // Caught by a predator (resolved in the full-list pre-pass above)
             // — or by the grass-fire line (point 145a), same thrash:

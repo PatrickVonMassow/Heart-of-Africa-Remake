@@ -247,6 +247,24 @@ export function resolveFleeTarget(
 }
 
 /**
+ * A crossing or swim-out yields to the player-shy flight (design.md §19.5 (c)):
+ * a swim is ordinary behaviour, not a drama, so a traveller inside the shy ring
+ * ends it and the animal flees — into the water where the escape leads there.
+ * Every other drama flag still gates the flight exactly as resolveFleeTarget
+ * does; only the crossing itself no longer counts as one here.
+ */
+export function crossingYieldsToFlight(
+  x: number,
+  z: number,
+  s: FleeArbitrationState,
+  player: ReadonlyArray<readonly [number, number]>,
+  playerRing: number,
+): boolean {
+  const free = { ...s, drama: { ...s.drama, crossing: undefined } }
+  return resolveFleeTarget(x, z, free, [], player, 0, playerRing) !== null
+}
+
+/**
  * One frame of the crossing mover (points 192/312, invariant I4). The swim
  * steps straight for its bank target at `pace`; it ends when the animal stands
  * on land near the target, when it has ARRIVED (within `arriveUnits` — it is
