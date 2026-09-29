@@ -3,7 +3,8 @@
 // this project, so it lives in a pure module the Vitest layer
 // can hold to its shape and its size (point 436).
 //
-// WHY IT SHRANK, from 2153 characters to under 900. It used to restate the
+// WHY IT SHRANK, from 2153 characters to under 900, then to under 480 (the
+// context-load cut list, docs/context-cut-list-1209.md U155/U156). It used to restate the
 // board's whole structure contract: four sections, their order, the card shape,
 // the `open`-attribute ban, the queue card's header meta. Every one of those is
 // now REFUSED by a gate before the board can be published — `structureViolations`
@@ -59,7 +60,7 @@ export const REMINDER_COMMANDS = [`${EDIT_CMD} vdzk-add`, `${EDIT_CMD} <cmd>`, P
  * documents in doc-budget-core. Raising it needs a reason that is not "a longer
  * telling of something already here".
  */
-export const REMINDER_CHAR_BUDGET = 950
+export const REMINDER_CHAR_BUDGET = 480
 
 /**
  * The claims the PROMPT INJECTION as a whole no longer makes, because a gate
@@ -109,9 +110,8 @@ export const ATTENDED_CEILING_NOTICE_CHAR_BUDGET = 430
 /** The non-owner message is output through the same formatter as the owner's
  * reminder so the context level cannot disappear in stand-down sessions. */
 export const STAND_DOWN_TEXT =
-  '[batch-singleton] Eine ANDERE Session hält den Batch-Lock (lebendig geprüft). STAND DOWN: ' +
-  'Diese Session ist NICHT der Batch-Worker — keine Batch-Arbeit, kein Merge nach main, ' +
-  'kein TASKS.md-/Dashboard-Edit. Beantworte die Nutzer-Nachricht normal.'
+  '[batch-singleton] STAND DOWN: Eine andere lebende Session hält den Batch — keine Batch-Arbeit, ' +
+  'kein Merge nach main, kein TASKS.md-/Dashboard-Edit; Nutzer-Nachricht normal beantworten.'
 
 /** German thousands grouping, done here rather than through `toLocaleString`
  * so the string does not depend on the ICU data a given Node build carries. */
@@ -172,15 +172,11 @@ export function promptInjectionText(mtimeNote = '') {
  */
 export function boardReminderText(mtimeNote = '') {
   return (
-    '[dashboard-reminder] PFLICHT: Das Dashboard IMMER als erstes im Zug aktualisieren, wenn sich ' +
-    'der Batch-Zustand geändert hat. Die verbindliche Board-Struktur steht an EINER Stelle — Memory ' +
-    `\`${CONTRACT_MEMORY}\` — und eine verletzte Struktur weist der Publish-Gate von sich aus ` +
-    'zurück; dagegen musst du nicht anschreiben. Bei DIR liegt, was keine Maschine prüfen kann: ' +
-    'keine Infos in fremde Sektionen; Mobil-Hochformat muss gut aussehen; empfiehlst du dringend ' +
-    `eine Strukturänderung, schreibe sie als Karte in »Von dir zu klären« (${EDIT_CMD} vdzk-add ` +
-    '"<Titel>" "<Frage>") statt sie selbst zu machen. Bei JEDER Änderung: die GANZE Datei lesen, ' +
-    'jede Sektion gegen den Ist-Zustand prüfen (topaktuell, konsistent, redundanzfrei), dann ' +
-    `\`${EDIT_CMD} <cmd>\` (Edit und Publish in einem) oder \`${PUBLISH_CMD}\`.` +
+    '[dashboard-reminder] Batch-Zustand geändert → Dashboard zuerst: ganze Datei lesen, jede Sektion ' +
+    'gegen den Ist-Zustand prüfen (aktuell, konsistent, redundanzfrei; keine Infos in fremde Sektionen; ' +
+    'Mobil-Hochformat), dann ' +
+    `\`${EDIT_CMD} <cmd>\` oder \`${PUBLISH_CMD}\`. Strukturwunsch nur als Karte »Von dir zu klären« ` +
+    `(${EDIT_CMD} vdzk-add). Struktur: Memory \`${CONTRACT_MEMORY}\`.` +
     mtimeNote
   )
 }
