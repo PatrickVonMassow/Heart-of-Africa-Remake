@@ -1,8 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { cacheEnvironment, findGreenReceipt, formatCachedGreen, lastGreenReceipt } from './run-green-cache.mjs'
+import {
+  cacheEnvironment, findGreenReceipt, formatCachedGreen, isNeutralPath, lastGreenReceipt, neutralDiffReader, parseNameList, readSuiteSink, rejudgeBackend, rejudgeLarge, snapshotSuiteRuns,
+} from './run-green-cache.mjs'
+import { DEV_SUITES, SERVERLESS_SUITES, WEBGL_ONLY_SUITES } from './tiers.mjs'
+import { MAX_RUNS, SUITE_SINK_ENV, appendSuiteSink } from '../render-verify-state.mjs'
 
 const ARGS = ['polish', '--section=adult-errands']
 const green = (overrides = {}) => ({
@@ -69,6 +74,142 @@ describe('run-logged green receipts', () => {
       const found = findGreenReceipt({ ...request(), dir, clean: true })
       expect(found.path).toBe(join(dir, 'old.log.run.json'))
       expect(findGreenReceipt({ ...request(), dir, clean: true, again: true })).toBeNull()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('re-judging a LARGE receipt across a render-neutral diff', () => {
+  const BROWSER = DEV_SUITES.filter((s) => !SERVERLESS_SUITES.includes(s))
+  const suiteRun = (suite, backend, overrides = {}) => ({
+    suite, backend, head: 'old1234full', startedAt: 10, at: 20, exit: 0, asserted: true, terminalVerdict: true, ...overrides,
+  })
+  const passOf = (backend, overrides = {}) => BROWSER
+    .filter((s) => backend === 'webgl' || !WEBGL_ONLY_SUITES.includes(s))
+    .map((s) => suiteRun(s, backend, overrides[s] ?? {}))
+  const large = (suiteRuns, overrides = {}) => ({
+    path: 'large.log.run.json',
+    record: {
+      args: ['large'], head: 'old1234', verifyGl: null, status: 'finished', exitCode: 1, cleanAtStart: true,
+      finishedAt: 1000, receipt: { exitCode: 1, green: false, failing: [{ name: 'polish' }] }, suiteRuns, ...overrides,
+    },
+  })
+  // polish on WebGPU went red on a check TODAY's ledger does not charge.
+  const loose = { polish: { exit: 1, reds: [{ name: 'a red nobody owns', kind: 'check' }] } }
+  const receipt = () => large([...passOf('webgl'), ...passOf('webgpu', loose)])
+  const ask = (diff, overrides = {}) => rejudgeLarge({
+    records: [receipt()], argv: ['large'], head: 'new5678', verifyGl: undefined,
+    diffFor: () => diff, openPoints: [], ledger: [], ...overrides,
+  })
+
+  it('reuses the receipt across a neutral diff and runs only the backend it did not cover', () => {
+    const result = ask(['scripts/render-verify-charges.mjs', 'TASKS.md', 'scripts/verify/ladder-core.test.mjs'])
+    expect(result.covered.map((c) => [c.backend, c.range])).toEqual([['webgl', 'old1234..new5678']])
+    expect(result.missing).toEqual(['webgpu'])
+    expect(result.docs).toBe(true)
+  })
+
+  it('re-judges against the CURRENT ledger: a red charged today to an open point is covered', () => {
+    const ledger = [{ point: 42, suite: 'polish', match: /^a red nobody owns$/ }]
+    const result = ask(['scripts/render-verify-charges.mjs'], { openPoints: [42], ledger })
+    expect(result.covered.map((c) => c.backend)).toEqual(['webgl', 'webgpu'])
+    expect(result.missing).toEqual([])
+    expect(result.docs).toBe(false)
+  })
+
+  it('runs everything when the diff touches src/', () => {
+    expect(ask(['docs/backlog.md', 'src/game/store.ts']).missing).toEqual(['webgl', 'webgpu'])
+  })
+
+  it.each(['vite.config.ts', 'package-lock.json', 'public/favicon.svg', 'scripts/closing-guard-core.mjs', 'scripts/verify/polish.mjs'])(
+    'runs everything for a path outside the neutral set (fail closed): %s', (path) => {
+      expect(isNeutralPath(path)).toBe(false)
+      expect(ask([path]).missing).toEqual(['webgl', 'webgpu'])
+    })
+
+  it('does not re-judge a red whose run record is incomplete — that backend reruns', () => {
+    const ledger = [{ point: 42, suite: 'polish', match: /^a red nobody owns$/ }]
+    const incomplete = { polish: { ...loose.polish, truncated: true } }
+    const records = [large([...passOf('webgl'), ...passOf('webgpu', incomplete)])]
+    const result = ask([], { records, openPoints: [42], ledger })
+    expect(result.missing).toEqual(['webgpu'])
+    expect(rejudgeBackend(records[0].record, 'webgpu', { openPoints: [42], ledger }).reason).toMatch(/incomplete/)
+  })
+
+  it('never re-judges an old receipt without suite records, a missing suite, or a non-ancestor', () => {
+    expect(ask([], { records: [large(undefined)] }).missing).toEqual(['webgl', 'webgpu'])
+    const short = large(passOf('webgl').filter((r) => r.suite !== 'polish'))
+    expect(ask([], { records: [short] }).missing).toEqual(['webgl', 'webgpu'])
+    expect(ask(null).missing).toEqual(['webgl', 'webgpu'])
+  })
+
+  it('never re-judges when a non-browser step failed or the request is not an unfiltered LARGE', () => {
+    const lint = large(passOf('webgl'), { receipt: { exitCode: 1, failing: [{ name: 'lint' }] } })
+    expect(ask([], { records: [lint] }).missing).toEqual(['webgl', 'webgpu'])
+    expect(ask([], { argv: ['polish'] }).covered).toEqual([])
+    expect(ask([], { again: true }).covered).toEqual([])
+  })
+
+  it('answers a pinned request from the matching backend only', () => {
+    expect(ask([], { verifyGl: 'webgl' })).toMatchObject({ missing: [] })
+    expect(ask([], { verifyGl: 'webgpu' }).missing).toEqual(['webgpu'])
+  })
+
+  it('snapshots only the full-suite records the run itself wrote', () => {
+    const runs = [suiteRun('polish', 'webgl'), suiteRun('polish', 'webgl', { head: 'other' }),
+      suiteRun('polish', 'webgl', { partial: true }), suiteRun('polish', 'webgl', { startedAt: 1 })]
+    expect(snapshotSuiteRuns(runs, { head: 'old1234', startedAt: 5, finishedAt: 30 })).toEqual([runs[0]])
+  })
+
+  it('rejects an exit-zero record that carries an unowned red', () => {
+    const quiet = { polish: { exit: 0, reds: [{ name: 'a red nobody owns', kind: 'check' }] } }
+    const records = [large([...passOf('webgl'), ...passOf('webgpu', quiet)])]
+    expect(ask([], { records }).missing).toEqual(['webgpu'])
+    expect(rejudgeBackend(records[0].record, 'webgpu', { openPoints: [], ledger: [] }).reason).toMatch(/no open point owns/)
+  })
+
+  it('keeps every suite record of a run longer than the state history cap', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-rejudge-sink-'))
+    try {
+      const sink = join(dir, 'large.log.suites.jsonl')
+      const all = [...passOf('webgl'), ...passOf('webgpu'), ...passOf('webgl'), ...passOf('webgpu')]
+        .map((r, i) => ({ ...r, suite: `${r.suite}-${i}` }))
+      expect(all.length).toBeGreaterThan(MAX_RUNS)
+      for (const r of all) appendSuiteSink(r, { [SUITE_SINK_ENV]: sink })
+      appendSuiteSink(suiteRun('polish', 'webgl'), {})
+      const snap = snapshotSuiteRuns(readSuiteSink(sink), { head: 'old1234', startedAt: 5, finishedAt: 30 })
+      expect(snap).toEqual(all)
+      const full = [...passOf('webgl'), ...passOf('webgpu')]
+      const sink2 = join(dir, 'b.suites.jsonl')
+      for (const r of full) appendSuiteSink(r, { [SUITE_SINK_ENV]: sink2 })
+      const record = large(snapshotSuiteRuns(readSuiteSink(sink2), { head: 'old1234', startedAt: 5, finishedAt: 30 }))
+      expect(ask([], { records: [record] }).missing).toEqual([])
+      expect(readSuiteSink(join(dir, 'absent.jsonl'))).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('judges both sides of a rename: moving code out of src/ into docs/ is not neutral', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-rejudge-rename-'))
+    const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+    try {
+      git('init', '-q')
+      git('config', 'user.email', 't@example.invalid')
+      git('config', 'user.name', 'test')
+      mkdirSync(join(dir, 'src'))
+      writeFileSync(join(dir, 'src', 'a.ts'), 'export const a = 1\n'.repeat(20))
+      git('add', '.')
+      git('commit', '-q', '-m', 'base')
+      const base = git('rev-parse', 'HEAD').trim()
+      mkdirSync(join(dir, 'docs'))
+      git('mv', 'src/a.ts', 'docs/x.md')
+      git('commit', '-q', '-m', 'move')
+      const paths = neutralDiffReader(dir)(base)
+      expect(paths.sort()).toEqual(['docs/x.md', 'src/a.ts'])
+      expect(ask(paths).missing).toEqual(['webgl', 'webgpu'])
+      expect(parseNameList('src/a b.ts\0docs/x.md\0')).toEqual(['src/a b.ts', 'docs/x.md'])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

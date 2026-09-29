@@ -1983,3 +1983,13 @@ Found 29.09.2026 in the WebGL 2 run of point 1234. A calf whose parent stands ac
 water, outside every threat ring, fell into the river during a play bout 4.4 s in and started
 the §19.8 rescue drama. That accident is by design, but it may happen too often near river
 bends. Backlog: needs a frequency measurement before calibration.
+
+## Sketch: dugout canoe as a second upstream/downstream teaching picture
+
+Discussion sketch of 29.09.2026 (https://claude.ai/artifact/JS3wieo3W3zLxtNBZMtyAD), not a
+work order. Variant A puts a paddler lane on the near bank at least 7 m out, audible only
+while wading at the downstream plateau corner; variant B uses the far bank at about 107 m,
+beyond call reach, so a child on the near bank speaks and points instead. Values are derived
+from constants, not measured on a built layout. OPEN: villager canoes are absent from
+`design.md`; whether the place scene draws the far bank at 109 m is unverified; a calling
+paddler reaches the children's zone in every variant. Backlog: design concept missing.

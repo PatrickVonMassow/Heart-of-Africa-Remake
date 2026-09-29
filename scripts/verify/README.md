@@ -368,6 +368,37 @@ reuse a HEAD-only receipt. `--again` requests a fresh run. Reuse never creates
 coverage: a section receipt remains partial, and a full suite needs its own
 unfiltered receipt.
 
+**Re-judged LARGE receipts (user 28.09.2026).** While a run goes, every suite
+record is also appended to the run's own uncapped sink
+(`<log>.suites.jsonl`, named by `HOA_RUN_SUITE_SINK`); at close a LARGE copies
+them into its run record (`suiteRuns`). The render-verify state keeps fewer
+runs than one LARGE writes, so it cannot serve. When an unfiltered LARGE is
+launched on a clean tree, `rejudgeLarge` (`run-green-cache.mjs`) looks for a
+finished clean-tree LARGE receipt whose HEAD is an ancestor of this HEAD and
+whose diff to it is **render-neutral**: every path is outside the render set
+(`isRenderPath`) and is `scripts/render-verify-charges.mjs`, a `*.md` file, a
+`scripts/**/*.test.mjs` file or screenshot/board material. Any other path —
+`src/`, `public/`, package or lockfile, vite/runner config, a verify suite,
+anything unknown — is not neutral, and the run starts in full.
+Such a receipt is re-judged **per backend**. Each expected browser suite needs
+exactly one record that passes run-all's completeness test. It must not be a
+retry pass. Its reds must all be owned by an open point under **today's** charge
+ledger. A missing or incomplete record ("the run record is incomplete, so no
+charge may be accepted") is never re-judged, and that backend reruns. A receipt
+where build, lint, unit or a serverless suite failed is never re-judged. Receipts
+written before `suiteRuns` existed are never re-judged.
+The wrapper prints `re-judged receipt <path> covers <backend> on this HEAD —
+neutral diff <old>..<head>` and runs only what is left. If one backend is
+missing, it runs pinned (`VERIFY_GL=<backend>`). If both are covered but a
+`*.md` changed, the `docs` suite runs fresh. If nothing is left, nothing runs.
+`--again` always runs fresh.
+
+**Closing evidence for a re-judged LARGE.** `closing-guard` stays text-only. The
+`large-regression` (or `regression-after-cleanup`) evidence names both receipt
+paths and the neutral range, e.g. `LARGE both backends on <head>: re-judged
+receipt local/verify-logs/<a>.run.json (webgl, neutral diff <old>..<head>) +
+fresh receipt local/verify-logs/<b>.run.json (webgpu)`.
+
 Before launching a suite, the wrapper waits for a live LARGE wrapper in any
 worktree. It prints one line with that process's pid and command and resumes
 when the process exits. LARGE children (including nested baseline passes) do

@@ -77,19 +77,67 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1232. A receipt re-judges across a render-neutral commit, so only the missing backends run again
-  ORDER (user 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."): this point stands DIRECTLY AFTER point 1185 in the work order.
-  SPEC: when the only commits between a finished verify receipt and the current HEAD touch render-neutral paths (the charge ledger scripts/render-verify-charges.mjs, docs, TASKS.md/backlog/bookkeeping, tests of scripts; NOT src/, public/, assets, package/lockfile, vite/runner config, or the verify suites themselves), the receipt is re-judged against the current charge ledger instead of discarded. Its re-judged per-backend verdict counts for the new HEAD; only backends the receipt did not complete run again.
-  The render-neutral classification reuses the existing path classifier (isBackendSensitivePath / the ladder edit ageing) rather than a new list; unknown path -> not neutral -> full run (fail closed).
-  A receipt whose run record is incomplete for a red (the "run record is incomplete, so no charge may be accepted" case) is NOT re-judged for that red; it stays unresolved and the backend reruns.
-  The closing step large-regression accepts a re-judged receipt plus the fresh backend receipt(s) as "both backends green on the release HEAD", and its evidence names both receipts and the neutral diff.
-  FINAL STATE: (1) re-judge path in the verify wrapper/receipt reuse; (2) closing-guard accepts the combined evidence; (3) unit tests: neutral diff -> reuse + missing backend only; src/ touched -> full run; unknown path -> full run; incomplete record -> no reuse for that red; (4) scripts/verify/README.md receipt section updated.
-  Infrastructure freeze (CLAUDE.md §2): explicit user order; it SIMPLIFIES (removes a whole rerun) and adds no new ledger, router or planner.
+- [ ] 1237. Villager dugout canoe beside the children's bank game; weaving scene off
+  Queue position: NEXT point in the work order (user order 29.09.2026).
+  Sketch (discussion aid, not evidence): https://claude.ai/artifact/UTGoNYABwJmtMwX7hw3skB
+  (boards "Am Bootsplatz", "Bei den Kindern", "Grundriss"). Predecessor sketch: https://claude.ai/artifact/JS3wieo3W3zLxtNBZMtyAD
+  Final state:
+  1. design.md gains villager dugout canoes: at a riverside village a local fisherman paddles a dugout
+     (pirogue) on a lane of its own beside the children's bank game, as a second UPSTREAM/DOWNSTREAM
+     teaching picture. The Niger's Bozo/Somono river people of 1890 are the regional reference; the
+     Bambara village keeps its own speaker lect. Update §11 wording that today names only the
+     traveller's own canoe, and the relevant bank/children section.
+  2. Bank plateau becomes asymmetric: a separate downstream plateau angle so the walkable ground
+     reaches the water to about s = +45 m downstream; upstream stays at today's BANK_PLATEAU_ANGLE
+     (±16.2 m). The downstream fade grows by the same margin as today. The children's stretch
+     (BANK_STRETCH_ANGLE_FRAC × plateau) stays tied to the SMALLER (upstream) angle; the water path
+     stays where it is. Values in src/config/balance.ts or the bank module's constants, marked
+     calibratable.
+  3. The canoe's lane lies 7 m out from the waterline, only between s = +27 m and s = +47 m
+     downstream of the children's stretch centre. It never comes closer than 20 m to the children's
+     stretch (10 m hearing zone + 10 m hearing radius), so no standing place hears the SPOKEN words
+     of both. Invariant test: minimum lane-to-stretch distance ≥ 20 m on every riverside village.
+  4. Canoe cycle (regionally plausible, all timings calibratable in balance.ts):
+     - Upstream leg +47 → +27: kneeling paddler, paddle strokes, close to the bank where the current
+       is weakest; ground speed ≈ 0.8 m/s (dugout ≈ 1.3 m/s through the water against a dry-season
+       current of ≈ 0.5 m/s).
+     - Turn at +27: the bow swings out into the current, ≈ 6 s.
+     - Downstream leg +27 → +47: carried by the current with steering strokes, ≈ 1.5 m/s.
+     - Landing at the downstream end (+47, bank inside the extended plateau): the bow is run onto
+       the sand, the paddler checks a fish trap/net line at the waterline for ≈ 20–40 s, then pushes
+       off and starts the upstream leg. The canoe never leaves its range, never despawns.
+     - Once per leg, shortly after the canoe is visibly under way, the paddler CALLS the direction
+       word of his current heading (UPSTREAM while going up, DOWNSTREAM while going down) — a call,
+       not speech, so its reach is call.reach (34 m) and it is heard in the children's zone as well
+       (user decision 29.09.2026: "Ja, er soll rufen"). Speech label and gesture follow the existing
+       call rules (spokenGesture.ts), glossed like the other taught words.
+  5. Place-scene extent check: the plateau end lies ≈ 60 m from the village centre (standing place
+     at s = +37 m ≈ 55 m). Measure on the built layouts whether the drawn terrain, the bank bed and
+     collision reach that far for every riverside village; extend them if not. Record the measured
+     numbers in the point's evidence.
+  6. Weaving scene removed from every village: no village places the weaver/loom scene any more.
+     The weaving MECHANISM (code, tests, strings) stays in the game unused, so it can be re-enabled
+     later; mark the disabled placement with a brief comment. Update design.md so it no longer
+     promises a weaving scene in the villages (keep the concept recorded as parked).
+  7. Pictures: from the boat standing place (s = +37 on the waterline, facing the water) the canoe
+     and its call label are in frame and no child/rock is; from behind the downstream rock facing
+     upstream the children's game is in frame and the canoe is not. Looking downstream from the
+     children the small silent canoe may be visible (accepted by the user).
+  Tests: Vitest for the lane geometry, the ≥ 20 m invariant, the asymmetric plateau, the cycle state
+  machine and the weaving placement being off; Playwright pictures for the two standing places.
   USER, verbatim:
-  User 28.09.2026 19:37: "Warum muss die gesamte Regression von vorne laufen, wenn bestimmte Teil bereits erfolgreich durchgetestet wurden?"
-  User 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."
-  Refs: point 633; scripts/render-verify-charges.mjs; scripts/closing-guard-core.mjs large-regression; scripts/verify/README.md receipt reuse
-  Bundle: Testinfrastruktur.
+  user 29.09.2026: "Warum nicht einfach nebeneinander mit genug Abstand, sodass man sich jeweils so stellen kann, dass man entweder nur das Kinderspiel oder die Bootsfahrten sieht, und dadurch nicht irrigiert ist."
+  user 29.09.2026: "Ja, baue eine neue Skizze für Variante 1."
+  user 29.09.2026: "Reihe das so als nächsten Punkt in der Queue ein."
+  user 29.09.2026 (villager canoes missing from design.md): "Ergänze es dort."
+  user 29.09.2026 (asymmetric plateau, stretch on the smaller angle): "Einverstanden"
+  user 29.09.2026 (does the place scene reach 60 m): "Prüfe es und passe es an, falls notwendig"
+  user 29.09.2026 (canoe visible, silent, when looking downstream from the children): "Das ist in Ordnung."
+  user 29.09.2026 (ends of the range, paddling speed): "Denke dir etwas sinnvolles aus, was zum 1890er-Afrika (und am besten zu der Region) passt"
+  user 29.09.2026 (paddler calls, reach 34 m): "Ja, er soll rufen."
+  user 29.09.2026: "Im Zuge davon soll die Webe-Szene entfernt werden. Der Mechanismus zum Weben darf noch im Spiel bleiben - nur soll er aktuell in keinem Dorf genutzt werden. Vielleicht nehme ich ihn später wieder rein."
+  Bundle: Dorfleben.
+  Criticality: medium.
 
 - [ ] 1186. A standing-down session can file a finding without evading the guard (user order
   22.09.2026, 12:36, verbatim: »Ja, eine solche Blockade passiert oft. Reihe dafür einen
@@ -149,6 +197,20 @@ put it is the mistake this line exists to stop.
   measured in this session 22.09.2026 12:25–12:30, user order 22.09.2026 12:36
   Bundle: Modell & Wächter
 
+- [ ] 1238. Speech labels show whose they are
+  Speech labels show whose they are (user report 29.09.2026: with several figures visible it is not recognisable which speech label belongs to whom).
+  MEASURED 29.09.2026: the label (src/scenes/place/SpeechLabels.tsx, SpeechLabelCard, .speech-label in src/index.css) is a plain rectangle centred over the speaker's crown (drei <Html center>), with no tail and no other cue to its speaker. Seen obliquely or with two figures close together it floats between heads; nothing marks which of two labels in an exchange is the current one.
+  FINAL STATE.
+  1. TAIL. Every speech label carries a small tail (speech-bubble pointer) at its lower edge that points down at its own speaker's head; the label's anchor/offset is adjusted so the tail tip, not the box centre, sits just above the crown. Pure presentation (CSS/markup), no new system; the targeted style (.speech-label.targeted) keeps its highlight including the tail.
+  2. OLDER LABEL RECEDES. When a newer label appears while an older one is still shown (typically the reply in a two-figure exchange granted by the speech floor, src/communication/speechFloor.ts), the older label is visibly dimmed and slightly smaller, so the current speaker's label is always the most prominent. A targeted label is never dimmed (the player's guess target stays legible). Dim opacity/scale are calibratable values in src/config/balance.ts.
+  3. SPEAKING CUE ON THE FIGURE - CHECK, THEN DECIDE. Examine whether the speaking figure itself can show that it is speaking (e.g. a small head motion while its label is fresh), building on the existing gesture machinery (src/communication/spokenGesture.ts) rather than a new system. Constraint: the cue must never be readable as a concept gesture - gestures in this game teach meanings (docs/communication-poc-spec.md), so a speaking cue that resembles one would teach a false meaning. Implement it only if it is simple and robust on both children and adults; if it is complicated, error-prone, or collides with concept gestures, do NOT implement it and record the reason (one sentence in the commit message and a docs/backlog.md entry). Either outcome closes the point.
+  PROOF. Vitest for the recede logic (newer label dims older, targeted never dims, values from balance). Playwright picture on WebGPU in a settlement with two figures speaking close together, showing both tails pointing at their own speakers and the older label dimmed; if 3 is implemented, a check that the cue runs only while the figure speaks. Both backends if the change touches a backend-sensitive path.
+  Bundle: Kommunikation. Criticality: medium.
+  ORDER: directly after point 1186 (user order 29.09.2026).
+  USER, verbatim:
+  User 29.09.2026 18:02: »Aktuelle ist nicht erkennbar, zu wem eine Sprechblase gehört. Das ist irritierend, wenn mehrere Personen gleichzeitig sichtbar sind.«
+  User 29.09.2026 18:07: »Reihe einen neuen Task nach 1186 ein, der deine Vorschläge 1 und 2 umsetzt und 4 prüft. Sollte sich 4 gut umsetzen lassen, das miterledigen. Falls 4 zu kompliziert/fehleranfällig ist, nur 1 und 2 machen.«
+
 - [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
   (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
   run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the
@@ -175,6 +237,26 @@ put it is the mistake this line exists to stop.
   makes, and it did so twice unprompted.
   Refs: scripts/batch-doctor.mjs, scripts/batch-in-flight.mjs, points 1147, 1142
   Bundle: Testinfrastruktur
+
+- [ ] 1239. Caught children stand slumped instead of crouching (bank game and silent tag)
+  User report 29.09.2026: in the bank game, a caught child's crouch reads as falling over or as bowing. MEASURED 29.09.2026: `PlaceLife.tsx` squashes the WHOLE figure group to `CROUCH_SQUAT` = 0.66 (the head turns oval, the legs shrink to 0.25 body heights), folds the trunk by `CROUCH_POSE.lean` = 0.85 rad (49°) about the hip, and crosses both arms 77° forward. The crown ends at 0.56 body heights, 0.53 body heights ahead of the feet, which is a bow. The figure has no knee, so nothing says that the body meant to go down.
+  Sketch (discussion aid, not evidence): https://claude.ai/artifact/GYDdju8KpHHusst3LFi2Lx
+  FINAL STATE.
+  1. BANK GAME. A caught child (`BankChild.crouched`, which may be renamed) no longer squats. It stays standing where it was caught, at full scale (round head, full legs), in a frustrated slump: trunk leaned forward by `caughtSlumpLean` (start value 0.40 rad = 23°, marked calibratable), both arms hanging plumb in world space (the arm pitch compensates the trunk lean, so the hands hang straight down in front of the leaning body), arm roll reduced from the rest pose's 0.46 to `caughtSlumpArmRoll` (start value 0.20, calibratable) so the arms hang close to the body. It holds this pose for the rest of the run and through `endPauseSeconds`, then rises as today. The CROUCH_SQUAT y-scale and CROUCH_POSE are removed (no remaining user).
+  2. SILENT TAG. The freshly caught child's beat (`tagBody` = 'caught', `caughtPauseSeconds`) shows the same slump pose from the same constants instead of the plain dropped arms, then it gives chase as today.
+  3. The head is not posed separately (it is a sphere without a neck; no new head joint): "head hanging" is carried by the trunk lean alone. No idle micro-motion is added (not in design.md).
+  4. `caughtSlumpLean` and `caughtSlumpArmRoll` live in `src/config/balance.ts`, with en/de labels if the balance panel lists the neighbouring tag/bank values.
+  5. `docs/communication-poc-spec.md` (bank game: "caught children stay crouched") and the code comments that describe the crouch (bankGame.ts header, PlaceLife.tsx "A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY", gesture.ts FILL_SQUAT rationale that cites the crouching child) are updated in the same change. design.md §13.4 needs no change unless the wording "crouch" appears there.
+  READABILITY CONDITIONS (the point is not done until both are shown in the picture).
+  a) A slumped caught child must not read as a runner: sprint lean is `leanAtSprint` = 0.28 rad, only 0.12 rad less than the slump. If the picture does not separate them at 10-15 m, raise `caughtSlumpLean` within 0.45-0.50 rad and say so in the commit.
+  b) During the ROCK tap every child holds still, so standing caught children and standing free runners appear together. The caught ones must still be recognisably out of play (work-order 687 item 3). If the pose alone cannot carry that at 10-15 m, escalate instead of adding a marker (design.md forbids markers in the children's games).
+  Arm clearance (computed, to be kept by a test): hand about 0.24 body heights to the side, leg outer edge 0.144 body heights; no arm may penetrate trunk or legs in the slump pose (extend the existing figure clearance test).
+  PROOF. Vitest: the pose builder returns full scale, the configured lean and plumb arms for a caught bank child and for the tag child during its beat; clearance holds; the removed crouch path is gone. Playwright picture on WebGPU in the bank village during a run with at least one caught child standing and, separately, during the ROCK hold with caught and free children standing side by side (condition b), plus one silent-tag catch beat in a port or bankless village. Both backends if the change touches a backend-sensitive path.
+  Bundle: Dorfleben. Criticality: medium.
+  ORDER: directly after point 1150 (user order 29.09.2026).
+  USER, verbatim:
+  User 29.09.2026 18:17: »Uferfangspiel: Das Hinsetzen von Kindern, die gefangen wurden, sieht irritierend aus. Ich habe das Feedback bekommen, dass es entweder nach hinfallen oder nach verbeugen aussieht. Vorschlag: Gefangene Kinder bleiben stehen und sehen dadurch etwas frustriert aus, dass sie Arme und Oberkörper/Kopf etwas nach vorne hängen lassen.«
+  User 29.09.2026 18:26: »Reihe das wie vorgeschlagen nach 1150 ein. Das soll auch beim stollen Fangen umgesetzt werden.«
 
 - [ ] 1151. A water-coloured body stands in the SKY at the Maasai village, and only on
   WebGPU (found 18.09.2026 by point 1147's picture judgement). In
@@ -15955,3 +16037,10 @@ to land than a mechanism that needs a review.
   FINAL STATE: both causes are named and fixed (or (2) is shown to be load and not 1234, by a quiet re-run); `npm test -- enrichments --section=calf-crossing-flee` and `--section=channel-crossing` are green on both backends; the unrelated `dressing-growth` red of the same run is charged or filed on its own.
   Bundle: Tierverhalten.
   Criticality: medium.
+
+- [ ] 1240. Remove the transcript retention card
+  Remove the "Von dir zu klären" card "Transkript-Aufbewahrung: die 30 Tage kosten jetzt auch Laufzeit" from the board: node scripts/board.mjs vdzk-remove "Transkript-Aufbewahrung: die 30 Tage kosten jetzt auch Laufzeit". Its recommendation is already carried out: ~/.claude/settings.json now has "cleanupPeriodDays": 3650 (set 29.09.2026 15:58 with explicit user approval). Record the closure in the decision log (what: retention 10 years; why: transcripts carry citable user orders and review evidence; veto: user may lower the value).
+  USER, verbatim:
+  User 29.09.2026: »Deine Empfehlung umsetzen und die Karte löschen«
+  Bundle: Chat & Tafel.
+  Criticality: low.
