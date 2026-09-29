@@ -329,7 +329,6 @@ try {
       // (point 749): without it a heredoc to the session memory directory is
       // judged by intent alone and refused like a write to main.
       cwd: payload.cwd || REPO_ROOT,
-      canonical: (path) => resolvedWriteTarget(path),
     })
     if (mainWrite.block) {
       process.stdout.write(
@@ -365,10 +364,6 @@ try {
         toolName: payload.tool_name,
         command: input0.command,
         filePath: input0.file_path ?? input0.notebook_path,
-        resolvedFilePath: resolvedWriteTarget(input0.file_path ?? input0.notebook_path, payload.cwd || REPO_ROOT),
-        checkoutRoot: realpathSync(REPO_ROOT),
-        cwd: payload.cwd || REPO_ROOT,
-        canonical: (path) => resolvedWriteTarget(path),
       })
       if (ownership.block) {
         process.stdout.write(

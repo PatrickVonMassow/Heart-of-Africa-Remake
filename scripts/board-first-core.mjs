@@ -46,8 +46,7 @@ import { isPublishDue } from './board-currency-core.mjs'
 import { CLOSING_CARD_CMD, NONE_CARD_CMD, NOW_CARD_CMD, PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
 import { claimsNoCurrentWork } from './board-core.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
-import { parseSegments, expandSegments, segmentInvokesScript, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
-import { resolvedTargetInCheckout, segmentCwds, segmentWritesOnlyOutsideCheckout } from './batch-lease-core.mjs'
+import { parseSegments, segmentInvokesScript, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
 
 // The command classifier is SHARED with the fence chokepoint (point 473): both
 // gates judge a shell call the same way — per segment, on the command HEAD, with
@@ -160,26 +159,6 @@ export function classifyTool(call) {
   return classifyCall(call).kind
 }
 
-/** Does every mutating part of this call write only outside `checkoutRoot`? */
-function writesOnlyOutsideCheckout({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, canonical }) {
-  if (!checkoutRoot) return false
-  if (MUTATING_TOOLS.has(String(toolName ?? ''))) {
-    return !!filePath && !!resolvedFilePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })
-  }
-  if (!SHELL_TOOLS.has(String(toolName ?? ''))) return false
-  let tooDeep = false
-  const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
-  const cwds = segmentCwds(segments, cwd || checkoutRoot, { command, canonical })
-  const mutating = segments
-    .map((segment, i) => ({ segment, cwd: cwds[i] }))
-    .filter(({ segment }) => !isEscapeSegment(segment) && isMutatingSegment(segment))
-  return (
-    !tooDeep &&
-    mutating.length > 0 &&
-    mutating.every(({ segment, cwd: here }) => segmentWritesOnlyOutsideCheckout(segment, { cwd: here, checkoutRoot, canonical }))
-  )
-}
-
 /**
  * RE-CHECK BATCH OWNERSHIP BEFORE EVERY MUTATION. PURE.
  *
@@ -197,10 +176,6 @@ export function ownershipStandDownDecision({
   toolName,
   command,
   filePath,
-  resolvedFilePath = '',
-  checkoutRoot = '',
-  cwd = '',
-  canonical,
 } = {}) {
   try {
     if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
@@ -208,12 +183,6 @@ export function ownershipStandDownDecision({
     }
     const call = classifyCall({ toolName, command, filePath })
     if (call.kind !== 'mutating') return { block: false, reason: '', standDown: true }
-    // A write that lands only OUTSIDE the checkout — the documented
-    // `finding.mjs --request` handoff from the scratchpad — is not batch work
-    // (point 1207). Same exemption the main-write fence already grants.
-    if (writesOnlyOutsideCheckout({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, canonical })) {
-      return { block: false, reason: '', standDown: true }
-    }
     const attempted = call.segment
       ? `the state-changing segment \`${call.segment}\``
       : filePath

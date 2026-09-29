@@ -300,34 +300,6 @@ describe('ownership mutation stand-down', () => {
   it('does not constrain a session while no other live owner holds the lock', () => {
     expect(moved({ heldByOtherLiveOwner: false })).toEqual({ block: false, reason: '', standDown: false })
   })
-
-  // Point 1207: the documented `finding.mjs --request` handoff writes its text
-  // to the scratchpad first; that write is not batch work.
-  const root = '/workspace/hoa'
-  const pad = '/tmp/claude-1000/scratchpad'
-  const outside = (over) => moved({ checkoutRoot: root, cwd: root, ...over })
-
-  it('lets a stood-down session write files outside the checkout', () => {
-    expect(outside({ toolName: 'Write', command: undefined, filePath: `${pad}/why.md`, resolvedFilePath: `${pad}/why.md` }).block).toBe(false)
-    expect(outside({ command: `cat > ${pad}/x.md <<EOF\nbody\nEOF` }).block).toBe(false)
-    expect(outside({ command: `cd ${pad} && cat > why.md <<EOF\nbody\nEOF` }).block).toBe(false)
-  })
-
-  it('still refuses a stood-down write inside the checkout', () => {
-    expect(outside({ toolName: 'Write', command: undefined, filePath: 'TASKS.md', resolvedFilePath: `${root}/TASKS.md` }).block).toBe(true)
-    expect(outside({ toolName: 'Edit', command: undefined, filePath: `${root}/src/main.ts`, resolvedFilePath: `${root}/src/main.ts` }).block).toBe(true)
-    expect(outside({ command: 'cat > TASKS.md <<EOF\nx\nEOF' }).block).toBe(true)
-    expect(outside({ command: `cat > ${pad}/x.md && npm run build` }).block).toBe(true)
-    expect(outside({ cwd: pad, command: `cd ${root} && cat > TASKS.md` }).block).toBe(true)
-    expect(outside({ cwd: pad, command: 'cd ~ && cat > x.md' }).block).toBe(true)
-    // Any nested `cd` makes the call's directory unknown — `eval` would move this shell.
-    expect(outside({ cwd: pad, command: `bash -c "cd ${root}" && cat > x.md` }).block).toBe(true)
-    expect(outside({ command: `cd ${pad} && eval "cd ${root}" && cat > src/x.ts` }).block).toBe(true)
-    expect(outside({ command: `cd ${pad} && cat > link/src/x.ts`, canonical: (p) => { if (p === `${pad}/link`) return root; if (p.startsWith(`${pad}/link/`)) throw new Error('ENOENT'); return p } }).block).toBe(true)
-    expect(outside({ command: `cd ${pad} || cat > src/x.ts` }).block).toBe(true)
-    expect(outside({ command: `cd ${pad} && cat > "$DEST"` }).block).toBe(true)
-    expect(outside({ command: 'cd /tmp/link && cat > src/x.ts', canonical: (p) => (p === '/tmp/link' ? root : p) }).block).toBe(true)
-  })
 })
 
 describe('isPublished', () => {
