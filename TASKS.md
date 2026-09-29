@@ -77,6 +77,15 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1234. A young animal next to the traveller does not react — stuck in a crossing whose target is its own position
+  ORDER (user 29.09.2026 11:12: »Das oben in der Queue einreihen.«; 12:07: »Der Punkt ist nach wie vor nicht eingereiht. Stattdessen wurde nach Abschluss von 1209 ein anderer gezogen.«): this point stands FIRST in the work order.
+  REPORT (user 29.09.2026 11:11, F6 archive /backup/hoa/local/JungtierReagiertNicht.zip, copy into local/): »Kalb reagiert nicht auf mich«. Seed 2232886032, position x/z 316.02/-105.51 (lat/lon 10.5508/31.6024, region east), 16.03.1890 (day 74.25), travel mode, build production 0632fdc (contains the 1233 merge f2d549edc), WebGPU, medium.
+  MEASURED from the archive's "wildlife" section: the nearest animal is the juvenile antelope@317.18,-105.05 at dist 1.24 from the traveller — inside any shy ring — with state "crossing", target {kind: crossing, x 317.18, z -105.09} (0.04 from its own position), y 0.18, parentAt 319.78/-94.97 (about 10.4 away). It does not flee although the traveller stands next to it.
+  SUSPECT (to confirm, not assume): the 1233 change (0a6b34e39 / afe3d97f6 / afdedf16c) hands a flight swim over to a "crossing" and holds a calf at its bank while its parent is across water; a crossing whose target has collapsed onto the calf's own position appears never to finish and to outrank the player-shy flee.
+  FINAL STATE: reproduce from the archive state (seed/position and the wildlife section, not a freshly staged scene — the gap of 1233); a juvenile inside the traveller's shy ring reacts (flees, into water where the escape leads there, design.md §19.5 (c)); a crossing always resolves (no degenerate target at the animal's own position, invariant I4) and does not suppress the player-shy flee; also check the calf bank hold 1233 introduced for the same suppression. Unit test on that decision (crossing with collapsed target -> resolves; calf in crossing/bank-hold with the traveller inside the ring -> flees); a position check in the browser at the reported spot on the everyday backend.
+  Bundle: Tierverhalten.
+  Criticality: medium.
+
 - [ ] 1204. Arm the handover watermark so it refuses instead of observing.
   PROBLEM, user order 24.09.2026: "Du kommst immer wieder über die 150k und bringst danach eine
   Begründung. … Aber das scheint nicht zu helfen, denn du scheinst nicht daraus zu lernen."
@@ -15995,3 +16004,10 @@ to land than a mechanism that needs a review.
   User 28.09.2026 19:34: "Ja, reiche das als Auftrag ein."
   Refs: point 1230
   Bundle: Modell & Wächter.
+
+- [ ] 1235. Stop guards trap a releasing session while the free lock is reserved for a claimant
+  MEASURED 29.09.2026 ~12:17: after the hand-back (batch-claim status released-reserved for d882085f, lockHeld false, mine false), dashboard-card-topic, dashboard-sync, dashboard-guard and retro-currency blocked the Stop of the releasing session 4cbc5a69 in a loop, while every main write of that session was refused (MAIN WRITE REFUSED). It could neither repair nor end. The stand-down condition (heldByOtherLiveOwner) does not cover a free but reserved lock.
+  FINAL STATE: a session that released the lock for a claimant stands down in the Stop guards exactly as it does under another live owner (one shared predicate, no per-guard list); unit test: released-reserved for another window -> stand down; reserved for this window -> guards apply.
+  Infrastructure freeze (CLAUDE.md §2): admitted as a real blockade — every claim handover can trap the releasing session.
+  Bundle: Modell & Wächter.
+  Criticality: medium.
