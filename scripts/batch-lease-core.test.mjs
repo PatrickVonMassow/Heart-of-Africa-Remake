@@ -513,6 +513,14 @@ describe('the main-write ownership fence', () => {
     expect(shell('cat > TASKS.md').writes).toBe(true)
     // …and a command with no path at all is judged exactly as before.
     expect(shell('git push origin main').writes).toBe(true)
+    // A top-level `cd` moves where a relative target lands (point 1207)…
+    expect(shell('cd /tmp/pad && cat > why.md <<EOF').writes).toBe(false)
+    expect(
+      mainWritingAction({ toolName: 'Bash', command: 'cd /workspace/hoa && cat > TASKS.md', checkoutRoot, cwd: '/tmp/pad' }).writes,
+    ).toBe(true)
+    // …while an unreadable `cd` or `pushd` never earns the exemption.
+    expect(shell('cd /tmp/pad && cd - && cat > why.md').writes).toBe(true)
+    expect(shell('pushd /tmp/pad && cat > why.md').writes).toBe(true)
     expect(shell('git commit -F /tmp/message.txt').writes).toBe(true)
   })
 

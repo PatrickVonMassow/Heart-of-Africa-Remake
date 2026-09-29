@@ -574,6 +574,9 @@ export function expandSegments(command, { maxDepth = MAX_NESTING, onTruncate } =
       return
     }
     for (const seg of parseSegments(cmd)) {
+      // `depth` lets a caller follow a top-level `cd` without letting one inside
+      // a `bash -c` leak into the segments after it (point 1207).
+      seg.depth = depth
       out.push(seg)
       for (const nested of nestedCommands(seg)) walk(nested, depth + 1)
     }

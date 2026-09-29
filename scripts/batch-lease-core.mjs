@@ -858,6 +858,33 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
 }
 
 /**
+ * The directory each segment runs in, following top-level `cd`. PURE.
+ *
+ * MEASURED 24.09.2026 (point 1207): `cd <scratchpad> && cat > why.md` was
+ * refused because `why.md` was resolved against the SESSION cwd, the checkout.
+ * Only a plain top-level `cd <literal path>` moves the directory; `cd` with no
+ * argument, `-`, `~`, a variable, `pushd` or `popd` makes it UNKNOWN (''), and an
+ * unknown directory never earns the outside-checkout exemption. A nested segment
+ * inherits its caller's directory and its own `cd` is ignored, which only ever
+ * resolves against the stricter directory.
+ */
+export function segmentCwds(segments, cwd = '') {
+  let current = cwd
+  return (segments ?? []).map((segment) => {
+    const here = current
+    if ((segment?.depth ?? 0) !== 0) return here
+    const { head, args } = headAndArgs(segment)
+    if (head === 'pushd' || head === 'popd') current = ''
+    if (head === 'cd') {
+      const target = args.map((arg) => arg.text).filter((text) => text && text !== '--')
+      const literal = target.length === 1 && !/^[-~]|[$`*?]/.test(target[0])
+      current = literal && current ? resolve(current, target[0]) : ''
+    }
+    return here
+  })
+}
+
+/**
  * Is this call about to write the checkout whose current branch is `main`?
  * PURE. The PreToolUse matcher already narrows the possible tools; this second
  * classification keeps reads and repository gates open and treats an unreadably
@@ -875,14 +902,15 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
   if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
+  const cwds = segmentCwds(segments, cwd || checkoutRoot)
   // `expandSegments` already yields every carried command separately. Judge the
   // direct program so `bash -c "npm run build"` does not get denied at the shell
   // carrier before its build leaf can receive the narrow exception below.
-  const segment = segments.find((candidate) => {
+  const segment = segments.find((candidate, i) => {
     if (directSegmentIntent(candidate) !== 'write') return false
     // A write that lands entirely OUTSIDE this checkout is not a main write
     // (point 749) — the session memory directory is the case that measured it.
-    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot })) return false
+    if (cwds[i] && segmentWritesOnlyOutsideCheckout(candidate, { cwd: cwds[i], checkoutRoot })) return false
     return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
   })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }
