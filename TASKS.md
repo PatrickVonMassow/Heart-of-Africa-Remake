@@ -954,6 +954,9 @@ put it is the mistake this line exists to stop.
   own run concluded `success`. The handoff again opened the successor session with "concluded RED.
   This successor is the repair path", over a branch whose picture proof was green on both backends.
   Second measured occurrence, no new mechanism — it does not change the final state above.
+  RECURRED 30.09.2026: run 36634558080 on `d2306c1be` was cancelled by `cancel-in-progress` when
+  `f2100d3f7` and `1f9c00c63` followed on main; `1f9c00c63`'s run 36643095205 concluded `success`
+  while the handoff again ordered a repair. Third occurrence, same mechanism.
   Criticality: medium — it costs a whole session per occurrence and points it at work that does not
   exist, but never loses code.
   Bundle: Session- & Repo-Hygiene.
