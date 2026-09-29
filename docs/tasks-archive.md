@@ -32449,3 +32449,24 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   arms what is already built (points 700, 881, 932).
   Criticality: high — real usage cost every night.
   Bundle: Modell & Wächter.
+
+- [x] 1213. A young animal killed by a predator stays dead and becomes a carcass (user bug
+  report 25.09.2026, local/JungtierZombie.zip: the lion caught the young animal, the
+  parent stood mourning beside it, no vultures came, and then the young was alive again
+  and hopped around; seed 804048534, position x/z 305.26 / -311.2, north region,
+  day 42.14, build 6a5373c, WebGPU, medium).
+  The report's wildlife section lists 0 carcasses, the young antelope at 300.36 / -305.26
+  in state `separated` with `young: true`, and its parent at 304.88 / -313.6 wading with
+  `childAt` pointing at it — the killed young was restored instead of leaving a carcass.
+  Final state:
+
+  1. A young animal killed in a hunt leaves a carcass like an adult victim does, the
+     vultures come to it by the ordinary carcass mechanism, and the young is not
+     re-created alive at that spot or re-linked to its parent.
+  2. The parent's mourning ends with the parent released from the dead young (no
+     `childAt` to a carcass or a respawned young); a later new young, if the herd
+     mechanism creates one, is a distinct animal that does not appear at the kill.
+  3. Proof: a Vitest driving a hunt that kills a young animal and asserting a carcass,
+     a vulture flock that owns it, and no living young with that identity afterwards;
+     and a Playwright picture on WebGPU of the carcass with the vultures.
+  Bundle: Tierverhalten.
