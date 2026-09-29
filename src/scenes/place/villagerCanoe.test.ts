@@ -13,6 +13,7 @@ import { PLACE_RADIUS } from './layout'
 import { buildRiverBank } from './riverBank'
 import {
   CANOE_PHASES,
+  CANOE_SEAT_AFT,
   canoeCycleSeconds,
   canoeLane,
   canoeStretchGap,
@@ -235,5 +236,41 @@ describe('the canoe cycle (work-order 1237 item 4)', () => {
     expect(land.bx * -bank.nx + land.bz * -bank.nz).toBeGreaterThan(0.99)
     // The paddler is out at the trap while he checks it, and back aboard after.
     expect(state.paddler.inBoat || state.phase === 'trap').toBe(true)
+  })
+
+  it('turns the paddler smoothly out of the seat to the trap and back aboard', () => {
+    const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
+    const lane = canoeLane(bank)
+    const state = createCanoe(lane)
+    const dt = 0.02
+    // A heading may turn, never jump: 0.1 rad per 20 ms is a full turn in ~1.3 s.
+    const maxStep = 0.1
+    let prev: number | null = null
+    let worst = 0
+    let leftSeat = false
+    let sawTrap = false
+    for (let i = 0; i < 20000; i++) {
+      const before = state.phase
+      stepCanoe(state, lane, { mayCall: () => true }, dt, cfg, () => 0)
+      const inTrap = before === 'trap' || state.phase === 'trap'
+      if (inTrap || before === 'land' || state.phase === 'launch') {
+        if (prev !== null) {
+          let d = Math.abs(state.paddler.yaw - prev) % (Math.PI * 2)
+          if (d > Math.PI) d = Math.PI * 2 - d
+          worst = Math.max(worst, d)
+        }
+        prev = state.paddler.yaw
+      } else prev = null
+      if (state.phase === 'trap') {
+        sawTrap = true
+        const seatX = state.x - Math.sin(state.yaw) * CANOE_SEAT_AFT
+        const seatZ = state.z - Math.cos(state.yaw) * CANOE_SEAT_AFT
+        if (!state.paddler.inBoat && Math.hypot(state.paddler.x - seatX, state.paddler.z - seatZ) > 0.5) leftSeat = true
+      }
+      if (sawTrap && state.phase === 'up') break
+    }
+    expect(sawTrap).toBe(true)
+    expect(leftSeat).toBe(true)
+    expect(worst).toBeLessThan(maxStep)
   })
 })

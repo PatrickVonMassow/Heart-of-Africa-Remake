@@ -336,7 +336,10 @@ export function stepCanoe(
     state.paddler.inBoat = t < 0.5
     state.paddler.x = seatX + (lane.checkStand.x - seatX) * t
     state.paddler.z = seatZ + (lane.checkStand.z - seatZ) * t
-    state.paddler.yaw = yawOf(lane.trap.x - lane.checkStand.x, lane.trap.z - lane.checkStand.z)
+    // He turns from his seated heading toward the trap as he steps out, and
+    // back as he steps in, so boarding and leaving never snap his heading.
+    const trapYaw = yawOf(lane.trap.x - lane.checkStand.x, lane.trap.z - lane.checkStand.z)
+    state.paddler.yaw = state.yaw + wrap(trapYaw - state.yaw) * t
     // Down to the trap and up again, a slow haul-and-look while he is there.
     state.paddler.reach = t * (0.75 + 0.25 * Math.sin(state.clock * 1.3))
   } else {
