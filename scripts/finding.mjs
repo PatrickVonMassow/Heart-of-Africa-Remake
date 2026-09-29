@@ -20,6 +20,10 @@
 //        --why-file <path> [--constraints-file <path>] [--quotes-file <path>] \
 //        [--doc-impact-file <path>] [--open-questions-file <path>] \
 //        [--bundle "<German name>"] [--refs "<…>"] [--rev <sha>]
+//   Every *-file field also takes `-` (that one field from stdin), and
+//   `--stdin` reads ALL fields as one document of `--- <field> ---` parts
+//   (spec, why, constraints, quotes, doc-impact, open-questions, bundle, refs)
+//   — a standing-down session deposits without creating a file (point 1186).
 //   --once with --request deduplicates by exact normalized title in every state.
 //   node scripts/finding.mjs --requests                    list pending requests
 //   node scripts/finding.mjs --show "<title substring>"    the full spec to append
@@ -46,6 +50,7 @@ import {
   requestEntry,
   requestRoute,
   requestWarnings,
+  parseRequestDocument,
 } from './findings-request-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { withBoardEditLock as withCarrierLock } from './board-edit-lock.mjs'
@@ -121,9 +126,44 @@ function fail(message) {
   process.exit(1)
 }
 
-/** One field of a deposit: `--x "<text>"`, or `--x-file <path>` for the long ones. */
+/** All of stdin, once — a second field asking for it would read nothing. */
+let stdinTaker = ''
+function readStdin(taker) {
+  if (stdinTaker) fail(`${taker} and ${stdinTaker} both read stdin — only one may; put the rest in one --stdin document`)
+  stdinTaker = taker
+  if (process.stdin.isTTY) fail(`${taker} reads stdin, but stdin is a terminal — pipe or heredoc the text in`)
+  try {
+    return readFileSync(0, 'utf8')
+  } catch (e) {
+    fail(`${taker}: stdin could not be read (${e.code ?? e.message})`)
+  }
+}
+
+/** The `--stdin` document (point 1186), parsed on first use; null without the flag. */
+let stdinDocument
+function documentFields() {
+  if (stdinDocument !== undefined) return stdinDocument
+  stdinDocument = null
+  if (!has('--stdin')) return null
+  const parsed = parseRequestDocument(readStdin('--stdin'))
+  if (parsed.error) fail(`--stdin document refused: ${parsed.error}`)
+  stdinDocument = parsed.fields
+  return stdinDocument
+}
+
+/**
+ * One field of a deposit: `--x "<text>"`, `--x-file <path>` for the long ones,
+ * `--x-file -` for that field on stdin, or its `--- x ---` part of a `--stdin`
+ * document. A field given by two of these is refused, never silently merged.
+ */
 function field(name) {
+  const doc = documentFields()
   const path = flag(`--${name}-file`)
+  if (doc && name in doc) {
+    if (path || flag(`--${name}`) !== null) fail(`field "${name}" is given both in the --stdin document and as --${name}${path ? '-file' : ''}`)
+    return doc[name]
+  }
+  if (path === '-') return readStdin(`--${name}-file -`).replace(/\r\n/g, '\n').replace(/\s+$/, '')
   if (path) {
     try {
       return readFileSync(path, 'utf8').replace(/\r\n/g, '\n').replace(/\s+$/, '')
@@ -183,18 +223,18 @@ function listRequest(entry) {
 if (has('--request')) {
   const title = flag('--request')
   const spec = field('spec')
-  if (!title) fail('--request needs a title: --request "<title>" --spec-file <path>')
+  if (!title) fail('--request needs a title: --request "<title>" --spec-file <path|-> (or --stdin)')
   // The spec is the deposit. Without it the entry is the very note this
   // mechanism exists to replace — "the user wants something", unusable.
-  if (!spec.trim()) fail('--request needs the finished spec: --spec-file <path> (a TASKS-ready final state)')
+  if (!spec.trim()) fail('--request needs the finished spec: --spec-file <path|->, or a "--- spec ---" part on --stdin (a TASKS-ready final state)')
   const fields = {
     why: field('why'),
     spec,
     constraints: field('constraints'),
     userQuotes: field('quotes'),
     docImpact: field('doc-impact'),
-    bundle: flag('--bundle') ?? '',
-    refs: flag('--refs') ?? '',
+    bundle: field('bundle'),
+    refs: field('refs'),
     revision: flag('--rev') ?? headRevision(),
     openQuestions: field('open-questions'),
   }
@@ -379,7 +419,8 @@ if (!has('--drain') && !has('--requests')) {
   console.log('usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]')
   console.log('       node scripts/finding.mjs --none "<why this turn found nothing>"')
   console.log('       node scripts/finding.mjs --drain | --drained "<title>"')
-  console.log('       node scripts/finding.mjs --request "<title>" --spec-file <path> --why-file <path> [--once] […]')
+  console.log('       node scripts/finding.mjs --request "<title>" --spec-file <path|-> --why-file <path|-> [--once] […]')
+  console.log('       node scripts/finding.mjs --request "<title>" --stdin   (parts: --- spec ---, --- why ---, …)')
   console.log('       node scripts/finding.mjs --requests | --show "<title>"')
   console.log('       node scripts/finding.mjs --queued "<title>" --point <N> | --blocked "<title>" --why "<reason>"')
 }

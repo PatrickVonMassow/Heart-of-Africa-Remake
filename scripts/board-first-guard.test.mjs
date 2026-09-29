@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { sessionScratchpad } from './board-first-core.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const SID = 'board-first-test' // the session id callGuard sends
@@ -247,6 +248,52 @@ describe('board-first-guard (spawned)', () => {
     } finally {
       rmSync(pad, { recursive: true, force: true })
       rmSync(resolve(repo, 'inside.md'), { force: true })
+    }
+  })
+
+  // Point 1186: a REAL write into the real session scratchpad passes the real
+  // guard, and the refusal names that very path and the carrier's stdin form.
+  it('admits a real scratchpad write and names the scratchpad in the refusal', () => {
+    const now = Date.now()
+    writeJson(resolve(repo, '.claude', 'batch-lock.json'), {
+      v: 2,
+      sessionId: 'successor-session',
+      claimedAt: now,
+      leaseUntil: now + 60 * 60_000,
+      pid: process.pid,
+    })
+    const pad = sessionScratchpad({ tmp: tmpdir(), uid: process.getuid?.(), projectDir: repo, sessionId: SID })
+    expect(pad).not.toBe('')
+    try {
+      const allowed = (tool, input) => callGuard(tool, input).stdout.trim() === ''
+      expect(allowed('Bash', { command: `mkdir -p ${pad}` })).toBe(true)
+      mkdirSync(pad, { recursive: true })
+      const target = resolve(pad, 'spec.md')
+      expect(allowed('Write', { file_path: target })).toBe(true)
+      writeFileSync(target, 'spec')
+      expect(allowed('Write', { file_path: target })).toBe(true)
+      expect(allowed('Bash', { command: `cd ${pad} && cat > why.md <<'EOF'\nbody\nEOF` })).toBe(true)
+
+      // A checkout path merely NAMED scratchpad stays refused (here by the
+      // main-write fence, which judges file writes on main first).
+      expect(allowed('Write', { file_path: resolve(repo, 'scratchpad', 'x.md') })).toBe(false)
+      const refused = callGuard('Bash', { command: 'npm run build' })
+      const reason = refused.decision?.hookSpecificOutput?.permissionDecisionReason ?? ''
+      expect(reason).toContain('BATCH OWNERSHIP STAND-DOWN')
+      expect(reason).toContain(`your session scratchpad \`${pad}\``)
+      expect(reason).toContain('node scripts/finding.mjs --request "<title>" --stdin')
+
+      // The board stays the owner's: a real board Write and a real publish command are refused.
+      expect(allowed('Write', { file_path: resolve(repo, '.batch-dashboard.html') })).toBe(false)
+      expect(allowed('Write', { file_path: resolve(pad, 'hoa-batch-dashboard.html') })).toBe(false)
+      const publish = callGuard('Bash', { command: 'node scripts/dashboard-publish.mjs' })
+      expect(publish.decision?.hookSpecificOutput?.permissionDecisionReason ?? '').toContain('BATCH OWNERSHIP STAND-DOWN')
+      expect(allowed('Bash', { command: 'node scripts/board.mjs publish' })).toBe(false)
+      expect(allowed('Bash', { command: 'node scripts/board-first-guard.mjs --status > .batch-dashboard.html' })).toBe(false)
+      // A report in the scratchpad that merely names the board is no board write.
+      expect(allowed('Bash', { command: `cd ${pad} && cat > report.md <<'EOF'\nboard .batch-dashboard.html was stale\nEOF` })).toBe(true)
+    } finally {
+      rmSync(resolve(tmpdir(), `claude-${process.getuid?.()}`, repo.replace(/[^A-Za-z0-9]/g, '-')), { recursive: true, force: true })
     }
   })
 

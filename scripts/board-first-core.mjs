@@ -46,7 +46,7 @@ import { isPublishDue } from './board-currency-core.mjs'
 import { CLOSING_CARD_CMD, NONE_CARD_CMD, NOW_CARD_CMD, PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
 import { claimsNoCurrentWork } from './board-core.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
-import { parseSegments, segmentInvokesScript, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
+import { parseSegments, segmentInvokesScript, segmentMentionsFile, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
 import { handoffWritesOnlyOutsideCheckout, resolvedTargetInCheckout } from './batch-lease-core.mjs'
 
 // The command classifier is SHARED with the fence chokepoint (point 473): both
@@ -161,6 +161,51 @@ export function classifyTool(call) {
 }
 
 /**
+ * The harness-announced session scratchpad, `<tmp>/claude-<uid>/<project>/<session>/scratchpad`,
+ * where `<project>` is the project directory with every non-alphanumeric
+ * character turned into `-` (`/workspace/hoa` → `-workspace-hoa`). PURE; '' when
+ * the session id is unknown, so the refusal falls back to the placeholder.
+ */
+export function sessionScratchpad({ tmp = '/tmp', uid, projectDir = '', sessionId = '' } = {}) {
+  const session = String(sessionId ?? '')
+  if (!session || !/^[A-Za-z0-9._-]+$/.test(session) || uid === undefined || uid === null || !projectDir) return ''
+  const project = String(projectDir).replace(/[^A-Za-z0-9]/g, '-')
+  return `${String(tmp).replace(/[\\/]+$/, '')}/claude-${uid}/${project}/${session}/scratchpad`
+}
+
+/** Remedy scripts that only CHECK; a standing-down session may still run them. */
+const STAND_DOWN_CHECK_SCRIPTS = ['guard-preflight.mjs', 'dashboard-guard.mjs', 'board-first-guard.mjs']
+
+/**
+ * classifyCall for a session that does NOT own the batch. The gate's 'escape'
+ * (board writes, board.mjs, focus, publish) is the OWNER's remedy, so here it
+ * counts as a mutation — wherever the board file lies — except the pure checks.
+ */
+function standDownCall({ toolName, command, filePath }) {
+  const call = classifyCall({ toolName, command, filePath })
+  if (call.kind !== 'escape') return call
+  if (!SHELL_TOOLS.has(String(toolName ?? ''))) return { kind: 'mutating', segment: '' }
+  for (const seg of parseSegments(command)) {
+    if (!isEscapeSegment(seg)) continue
+    if (!segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS) || checkWritesFile(seg))
+      return { kind: 'mutating', segment: seg.raw }
+  }
+  return { kind: 'read-only', segment: '' }
+}
+
+/** Does a check script's output redirection write a file? Only `/dev/null` and
+ *  descriptor duplication pass: a named target — even in the scratchpad, where
+ *  a link may point at the board — could truncate batch state while the check
+ *  itself only reads. The output stays readable on stdout. */
+function checkWritesFile(seg) {
+  return (seg.redirects ?? []).some((r) => {
+    if (!String(r.op).includes('>') || !r.target) return false
+    if (String(r.op).endsWith('&') && /^(?:\d+|-)$/.test(r.target)) return false
+    return String(r.target) !== '/dev/null'
+  })
+}
+
+/**
  * RE-CHECK BATCH OWNERSHIP BEFORE EVERY MUTATION. PURE.
  *
  * The ordinary guard stand-down remains exactly that for reads, paused batches,
@@ -168,6 +213,12 @@ export function classifyTool(call) {
  * A top-level session which has lost the live owner lock, however, may not turn
  * "this guard stood down" into permission for the mutation itself. The wrapper
  * runs this decision on every PreToolUse call after measuring ownership again.
+ *
+ * Point 1186: the refusal names the write path that stays open — the session
+ * scratchpad (`scratchpad`, computed by the wrapper; a placeholder when absent)
+ * — and the stdin form of the findings carrier, so the standing-down session
+ * finds the sanctioned route instead of a shell trick. The scratchpad itself is
+ * admitted by the point-1207 outside-checkout rule above.
  */
 export function ownershipStandDownDecision({
   heldByOtherLiveOwner = false,
@@ -181,22 +232,32 @@ export function ownershipStandDownDecision({
   checkoutRoot = '',
   cwd = '',
   canonical,
+  scratchpad = '',
 } = {}) {
   try {
     if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
       return { block: false, reason: '', standDown: heldByOtherLiveOwner === true }
     }
-    const call = classifyCall({ toolName, command, filePath })
+    const call = standDownCall({ toolName, command, filePath })
     if (call.kind !== 'mutating') return { block: false, reason: '', standDown: true }
     // The documented request handoff writes OUTSIDE the checkout — a file-tool
     // write to a resolved outside path, or the whitelisted shell shape (point 1207).
     const tool = String(toolName ?? '')
+    // The board is batch state wherever its file lies (the owner's scratchpad
+    // included), so it never rides on the outside-checkout admission.
+    // Judged on the file's lexical AND resolved path (a link may hide the name),
+    // and on a command's words and redirection targets — never a heredoc body.
+    const boardTouched =
+      isBoardFile(filePath) ||
+      isBoardFile(resolvedFilePath) ||
+      parseSegments(command).some((seg) => segmentMentionsFile(seg, BOARD_FILE_HINTS))
     const outsideFile =
+      !boardTouched &&
       ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool) &&
       !!filePath && !String(filePath).split(/[\\/]/).includes('..') &&
       !!checkoutRoot && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })
     const outsideShell =
-      tool === 'Bash' && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })
+      !boardTouched && tool === 'Bash' && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })
     if (outsideFile || outsideShell) return { block: false, reason: '', standDown: true }
     const attempted = call.segment
       ? `the state-changing segment \`${call.segment}\``
@@ -204,15 +265,21 @@ export function ownershipStandDownDecision({
         ? `${String(toolName ?? 'write')} of \`${filePath}\``
         : `the ${String(toolName ?? 'state-changing')} tool call`
     const owner = typeof ownerSession === 'string' && ownerSession ? ` (${ownerSession})` : ''
+    const pad = typeof scratchpad === 'string' && scratchpad ? `\`${scratchpad}\`` : '`/tmp/claude-<uid>/<project>/<session>/scratchpad`'
     return {
       block: true,
       standDown: true,
       reason:
         `BATCH OWNERSHIP STAND-DOWN — another live session${owner} owns the batch lock. ` +
         `${attempted} was refused before it ran.\n` +
-        'STAND-DOWN PATH: stop all mutations in this top-level session; reads remain available so you can ' +
-        'inspect and report the state. The current owner continues the batch. To request ownership through ' +
-        'the sanctioned handoff, run `node scripts/batch-claim.mjs --session <this session id>`.',
+        'STAND-DOWN PATH: stop all mutations of the repository, board and batch in this top-level session; ' +
+        'reads remain available so you can inspect and report the state. The current owner continues the batch.\n' +
+        `ONE WRITE PATH STAYS OPEN: your session scratchpad ${pad} — the Write tool with an absolute path there, ` +
+        "or one `cd <scratchpad> && cat > <file> <<'EOF'` call; the repository stays refused.\n" +
+        'To hand the user\'s request or a finding to the owner, use the carrier, which needs no file: ' +
+        '`node scripts/finding.mjs --request "<title>" --stdin --session <this session id>` with the parts ' +
+        '`--- spec ---`, `--- why ---`, `--- quotes ---` … on stdin (or `--record "<title>" --detail "<…>"` for a finding).\n' +
+        'To request ownership through the sanctioned handoff, run `node scripts/batch-claim.mjs --session <this session id>`.',
     }
   } catch {
     return { block: false, reason: '', standDown: false }

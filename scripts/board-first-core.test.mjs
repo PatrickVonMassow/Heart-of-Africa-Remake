@@ -10,6 +10,7 @@ import {
   classifyTool,
   classifyCall,
   ownershipStandDownDecision,
+  sessionScratchpad,
   isEscapeSegment,
   isMutatingSegment,
   isBoardFile,
@@ -323,6 +324,119 @@ describe('ownership mutation stand-down', () => {
     expect(at({ toolName: 'PowerShell', command: `mkdir ${pad}/request,src/new` }).block).toBe(true)
     // `..` behind a link is collapsed before the resolver sees the link (review round 6).
     expect(at({ toolName: 'Write', command: undefined, filePath: `${pad}/link/../victim`, resolvedFilePath: `${pad}/victim` }).block).toBe(true)
+  })
+})
+
+// Point 1186: the stand-down names the write path that stays open and the
+// carrier's stdin form, and admits the session scratchpad by its real path.
+describe('the stand-down leaves the session scratchpad and the carrier open', () => {
+  const root = '/workspace/hoa'
+  const pad = sessionScratchpad({ tmp: '/tmp', uid: 1000, projectDir: root, sessionId: 'sess-1' })
+  const at = (over) => ownershipStandDownDecision({
+    heldByOtherLiveOwner: true, ownerSession: 'owner', checkoutRoot: root, cwd: root, scratchpad: pad, ...over,
+  })
+  const write = (filePath, resolvedFilePath = filePath) => at({ toolName: 'Write', filePath, resolvedFilePath })
+
+  it('derives the harness scratchpad path, and nothing from an unknown session', () => {
+    expect(pad).toBe('/tmp/claude-1000/-workspace-hoa/sess-1/scratchpad')
+    expect(sessionScratchpad({ tmp: '/tmp/', uid: 0, projectDir: root, sessionId: '' })).toBe('')
+    expect(sessionScratchpad({ tmp: '/tmp', uid: 0, projectDir: root, sessionId: '../x' })).toBe('')
+    expect(sessionScratchpad({ tmp: '/tmp', projectDir: root, sessionId: 's' })).toBe('')
+  })
+
+  it('lets a scratchpad write through, by the Write tool and the handoff shell shape', () => {
+    expect(write(`${pad}/notes/digest.md`)).toEqual({ block: false, reason: '', standDown: true })
+    expect(at({ toolName: 'Bash', command: `mkdir -p ${pad}/notes` }).block).toBe(false)
+    expect(at({ toolName: 'Bash', command: `cd ${pad} && cat > spec.md <<'EOF'\nbody\nEOF` }).block).toBe(false)
+  })
+
+  it('keeps the repository, the work order and the board refused', () => {
+    expect(write(`${root}/src/main.ts`).block).toBe(true)
+    expect(write('TASKS.md', `${root}/TASKS.md`).block).toBe(true)
+    expect(at({ toolName: 'Bash', command: 'node scripts/land-point.mjs 1 --model x' }).block).toBe(true)
+    expect(at({ toolName: 'Bash', command: 'git commit -m x' }).block).toBe(true)
+  })
+
+  it('judges the REAL path, not the word: a "scratchpad" inside the checkout stays refused', () => {
+    expect(write(`${root}/scratchpad/x.md`).block).toBe(true)
+    expect(write(`${root}/tmp/claude-1000/-workspace-hoa/sess-1/scratchpad/x.md`).block).toBe(true)
+    // A scratchpad-named path whose link resolves into the checkout.
+    expect(write(`${pad}/link.md`, `${root}/TASKS.md`).block).toBe(true)
+    expect(write(`${pad}/x.md`, '').block).toBe(true)
+  })
+
+  it('keeps every board mutation refused, wherever the board file lies, while checks and reads pass', () => {
+    expect(write(`${root}/.batch-dashboard.html`).block).toBe(true)
+    expect(at({ toolName: 'Edit', filePath: `${root}/.batch-dashboard.html`, resolvedFilePath: `${root}/.batch-dashboard.html` }).block).toBe(true)
+    // The owner's published copy lives in a scratchpad OUTSIDE the checkout.
+    const ownerCopy = '/tmp/claude-1000/-workspace-hoa/owner/scratchpad/hoa-batch-dashboard.html'
+    expect(write(ownerCopy).block).toBe(true)
+    expect(write(`${pad}/hoa-batch-dashboard.html`).block).toBe(true)
+    expect(at({ toolName: 'Bash', command: `cat > ${ownerCopy} <<'EOF'\nx\nEOF` }).block).toBe(true)
+    for (const command of [
+      'node scripts/dashboard-publish.mjs',
+      'node scripts/board.mjs publish',
+      'node scripts/board-publish.mjs',
+      'node scripts/focus.mjs 12 "x"',
+      'git status && node scripts/board.mjs done 1 --none "x"',
+    ]) {
+      const d = at({ toolName: 'Bash', command })
+      expect(d.block, command).toBe(true)
+      expect(d.reason).toContain('BATCH OWNERSHIP STAND-DOWN')
+    }
+    expect(at({ toolName: 'Bash', command: 'node scripts/guard-preflight.mjs --for commit --session s' }).block).toBe(false)
+    expect(at({ toolName: 'Read', filePath: `${root}/.batch-dashboard.html` }).block).toBe(false)
+    expect(at({ toolName: 'Bash', command: `cat ${root}/.batch-dashboard.html` }).block).toBe(false)
+  })
+
+  it('refuses a check script whose output redirection writes any file, the scratchpad included', () => {
+    for (const command of [
+      'node scripts/board-first-guard.mjs --status > .batch-dashboard.html',
+      `node scripts/guard-preflight.mjs --for commit >> ${root}/.batch-dashboard.html`,
+      'node scripts/dashboard-guard.mjs 1> notes.txt',
+      `node scripts/guard-preflight.mjs --for commit > ${pad}/../x.txt`,
+      `node scripts/guard-preflight.mjs --for commit > ${pad}/hoa-batch-dashboard.html`,
+      // A scratchpad name may be a link to the board; Bash writes `nul` as a file.
+      `node scripts/guard-preflight.mjs --for commit > ${pad}/preflight.txt`,
+      'node scripts/board-first-guard.mjs --status > nul',
+      'node scripts/board-first-guard.mjs --status > NUL:',
+      'node scripts/board-first-guard.mjs --status > /DEV/NULL',
+    ]) expect(at({ toolName: 'Bash', command }).block, command).toBe(true)
+    for (const command of [
+      'node scripts/guard-preflight.mjs --for commit > /dev/null 2>&1',
+      'node scripts/guard-preflight.mjs --for commit 2>&1',
+    ]) expect(at({ toolName: 'Bash', command }).block, command).toBe(false)
+  })
+
+  it('judges board identity on the resolved path too: a link outside the checkout cannot hide the board', () => {
+    expect(write('/tmp/pad/notes.md', '/tmp/claude-1000/-workspace-hoa/owner/scratchpad/hoa-batch-dashboard.html').block).toBe(true)
+    expect(write(`${pad}/notes.md`, `${root}/.batch-dashboard.html`).block).toBe(true)
+  })
+
+  it('lets a scratchpad report that merely NAMES the board through', () => {
+    const report = `cd ${pad} && cat > report.md <<'EOF'\nThe board .batch-dashboard.html and hoa-batch-dashboard.html were stale.\nEOF`
+    expect(at({ toolName: 'Bash', command: report }).block).toBe(false)
+    expect(at({ toolName: 'Bash', command: `cat > ${pad}/report.md <<'EOF'\nsee .batch-dashboard.html\nEOF` }).block).toBe(false)
+    expect(write(`${pad}/report.md`).block).toBe(false)
+  })
+
+  it('refuses a climb out of the scratchpad back into the checkout', () => {
+    const climb = `${pad}/../../../../../workspace/hoa/TASKS.md`
+    expect(write(climb, `${root}/TASKS.md`).block).toBe(true)
+    expect(at({ toolName: 'Bash', command: `cat > ${climb} <<'EOF'\nx\nEOF` }).block).toBe(true)
+    expect(at({ toolName: 'Bash', command: `cd ${pad} && cp spec.md ${root}/TASKS.md` }).block).toBe(true)
+  })
+
+  it('names the open write path and the carrier command in the refusal', () => {
+    const { reason } = write(`${root}/TASKS.md`)
+    expect(reason).toContain('reads remain available')
+    expect(reason).toContain(`ONE WRITE PATH STAYS OPEN: your session scratchpad \`${pad}\``)
+    expect(reason).toContain('node scripts/finding.mjs --request "<title>" --stdin')
+    expect(reason).toContain('`--- spec ---`')
+    expect(reason).toContain('batch-claim.mjs')
+    // Without a known scratchpad the path is still named, as the harness pattern.
+    expect(at({ toolName: 'Bash', command: 'npm run build', scratchpad: '' }).reason)
+      .toContain('`/tmp/claude-<uid>/<project>/<session>/scratchpad`')
   })
 })
 
