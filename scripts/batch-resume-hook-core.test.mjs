@@ -26,10 +26,11 @@ const userClaim = { v: 1, sessionId: 'user-window-1', pid: 55, pidStartedAt: now
 const liveLock = { sessionId: 'owner-1', pid: 42, claimedAt: now - 120_000 }
 
 describe('ownerRunbookContext — role-specific policy stays with the owner', () => {
-  it.each(['acquired-spawn', 'acquired', 'mine'])('serves the runbook to %s', (ownership) => {
+  it.each(['acquired-spawn', 'acquired', 'mine'])('points %s at the runbook without pasting it', (ownership) => {
     const text = ownerRunbookContext(ownership, '# Dispatch\nOwner duty.')
     expect(text).toContain('OWNER-ONLY BATCH RUNBOOK')
-    expect(text).toContain('Owner duty.')
+    expect(text).toContain('docs/batch-owner-runbook.md')
+    expect(text).not.toContain('Owner duty.')
   })
 
   it.each(['none', 'reserved', 'stand-down', undefined])('serves nothing to %s', (ownership) => {
