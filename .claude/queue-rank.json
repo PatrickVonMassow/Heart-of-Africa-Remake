@@ -1513,12 +1513,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1234": {
-      "at": "2026-09-29T10:53:56.287Z",
-      "why": "User 29.09.2026 11:12: »Das oben in der Queue einreihen.« — first in the work order",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1235": {
       "at": "2026-09-29T10:53:56.378Z",
       "why": "Real blockade of a claim handover, but it costs no game work; last is right",
@@ -1553,7 +1547,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-29T10:53:56.387Z",
+    "at": "2026-09-29T12:00:40.044Z",
     "points": [
       184,
       200,
@@ -1983,7 +1977,6 @@
       1229,
       1231,
       1232,
-      1234,
       1235
     ]
   }
