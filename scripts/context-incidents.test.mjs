@@ -270,6 +270,8 @@ describe('the files: appended, never rewritten', () => {
 
 describe('the reading command', () => {
   it('reads its arguments, and falls back on a nonsense quantile', () => {
+    expect(parseReadArgs(['--trend']).trend).toBe(true)
+    expect(parseReadArgs([]).trend).toBe(false)
     expect(parseReadArgs(['--since', '2026-08-19', '--json', '--file', 'a', '--file', 'b'])).toMatchObject({
       since: '2026-08-19',
       json: true,
@@ -334,6 +336,13 @@ describe('the reading command', () => {
 
     const json = run(['--json'])
     expect(JSON.parse(json.stdout)).toMatchObject({ count: 2 })
+
+    // THE VERDICT COMMAND: the fixture is older than seven days, so the window
+    // is quiet — and still a verdict, with all seven days listed.
+    const trend = run(['--trend'])
+    expect(trend.status).toBe(0)
+    expect(trend.stdout).toMatch(/VERDICT, last 7 days: 0 overshoot\(s\)/)
+    expect(JSON.parse(run(['--trend', '--json']).stdout)).toMatchObject({ days: 7, total: 0 })
 
     const bad = run(['--since', 'whenever'])
     expect(bad.status).toBe(2)
