@@ -15929,6 +15929,9 @@ to land than a mechanism that needs a review.
   VERIFICATION: a unit test over the resolved Vite config asserting both ignores; a `polish` run
   on WebGPU with a worktree created mid-run completes.
   Criticality: high — it silently voids the most expensive verification whenever delegation runs.
+  STATE 30.09.2026 01:45: branch at 49ea71151, Astra review merge-with-fixes recorded — anchor the
+  watch ignores to the config root (`**/.claude/**` also ignores a checkout served FROM a worktree)
+  and drop the undeclared `tinyglobby` import from the test.
   OWED AFTER LANDING: the full `polish` run on both backends that landed point 1238 still owes
   (render-verify-guard), which this crash voided.
   Refs: vite.config.ts, scripts/verify/polish.mjs, point 1150

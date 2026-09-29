@@ -2005,3 +2005,8 @@ with the same word, or itself read as one and teach a false meaning
 (`docs/communication-poc-spec.md`). The tail and the receding older label already answer whose
 note it is. Backlog: needs a separate, non-gestural channel (for example a mouth or face mark)
 that `design.md` does not describe.
+
+- 2026-09-30 `board-first-guard` refuses a delegated author's every mutation once the owner has set the
+  handover none-card that `batch-boundary --prepare --context` prescribes; a subagent inherits the
+  parent session id, so the guard's "repeat the call" escape did not help (1241's author, 01:43).
+  Workaround: prepare the boundary only after the authors have pushed.
