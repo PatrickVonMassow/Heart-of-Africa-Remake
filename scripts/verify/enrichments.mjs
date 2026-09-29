@@ -4957,7 +4957,9 @@ if (section('young-kill-carcass')) {
       if (ok) { flee = d; break }
     }
     const st = window.__lionHunt.state
-    st.mode = 'chase'; st.victim = calf; st.victimHunt = true
+    // A real victim hunt records the victim's kind as its prey — the remnant
+    // lands in that herd list (spawnRemnant).
+    st.mode = 'chase'; st.victim = calf; st.victimHunt = true; st.prey = 'zebra'
     st.lx = calf.x - flee.x * 10; st.lz = calf.z - flee.z * 10; st.px = calf.x; st.pz = calf.z; st.timer = 0
     await window.__pollSim(30, () => calf.caught !== undefined || calf.dead, 110000)
     if (calf.caught !== undefined && !calf.dead) {
@@ -4979,7 +4981,12 @@ if (section('young-kill-carcass')) {
       const c = parent.child
       if (c && !c.dead && Math.hypot(c.x - kill.x, c.z - kill.z) < 20) yk.relinked = true
       if (orphan.parent === parent) yk.orphanToKeeper = true
-      if (!yk.remnant) yk.remnant = h.zebra.find((a) => a.remnant && a.dead && Math.hypot(a.x - kill.x, a.z - kill.z) < 2) ?? null
+      if (!yk.remnant) {
+        for (const list of Object.values(h)) {
+          yk.remnant = list.find((a) => a.remnant && a.dead && Math.hypot(a.x - kill.x, a.z - kill.z) < 2) ?? null
+          if (yk.remnant) break
+        }
+      }
     }
     window.__ykWatch = watch
     // The kill flock lands on the remains once the keeper's vigil is over.
