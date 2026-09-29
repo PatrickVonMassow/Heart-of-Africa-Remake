@@ -439,7 +439,7 @@ describe('context-fence-guard, OBSERVING (spawned) — the default', () => {
     expect(r.status, r.stderr).toBe(0)
     expect(r.stdout).toContain('"mode": "observe"')
     expect(r.stdout).toContain('"armed": false')
-    expect(r.stdout).toContain('THE FENCE IS DISARMED')
+    expect(r.stdout).toContain('THE CEILING ADMISSION IS DISARMED')
     expect(r.stdout).toContain('refuses NOTHING')
     // The verdict line must not read like an ordinary allow — the reader has to
     // be able to see that an armed fence WOULD have denied this call.

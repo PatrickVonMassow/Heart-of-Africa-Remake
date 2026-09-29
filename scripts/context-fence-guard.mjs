@@ -214,7 +214,7 @@ if (process.argv.includes('--status')) {
   console.log(
     mode === 'armed'
       ? `\nfence mode: ARMED — a call that cannot fit below the ${CONTEXT_CEILING_TOKENS}-token ceiling is REFUSED.`
-      : `\nfence mode: OBSERVE — THE FENCE IS DISARMED and refuses NOTHING. It measures against the ` +
+      : `\nfence mode: OBSERVE — THE CEILING ADMISSION IS DISARMED and refuses NOTHING (the handover brake below is separate). It measures against the ` +
           `${CONTEXT_CEILING_TOKENS}-token ceiling and records what it would have refused to ` +
           `.claude/context-fence-observations.jsonl. Re-arming is point 747's decision; ` +
           `HOA_CONTEXT_FENCE_MODE=armed arms this session alone.`,
