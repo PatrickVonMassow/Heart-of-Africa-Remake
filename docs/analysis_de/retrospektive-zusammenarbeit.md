@@ -1720,7 +1720,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 29.09.2026, 03:25 · Quellen-Fingerprint: `e0caacaadb83…`
+Zuletzt aktualisiert: Dienstag, 29.09.2026, 08:22 · Quellen-Fingerprint: `fe1ba15d25af…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1763,9 +1763,9 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 102 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 103 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
-| Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5.5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1829,10 +1829,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 101 Feedback-/Projekt-/User-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 141 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
+Erfasste Quellen: 101 Feedback-/Projekt-/User-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 142 Prozess-/Meta-TASKS-Punkte (davon 67 offen).
 
-<!-- RETRO-FINGERPRINT: e0caacaadb83da29fb1bb8434347cb24fb75374ae410e85b026bdd6cc3fd1843 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-29T01:25:49.642Z -->
+<!-- RETRO-FINGERPRINT: fe1ba15d25af0580388f2647e1b7779e4c5c42ae8ea799f82f06fd0e0e94f226 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-29T06:22:48.943Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
