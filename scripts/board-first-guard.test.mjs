@@ -290,6 +290,8 @@ describe('board-first-guard (spawned)', () => {
       expect(publish.decision?.hookSpecificOutput?.permissionDecisionReason ?? '').toContain('BATCH OWNERSHIP STAND-DOWN')
       expect(allowed('Bash', { command: 'node scripts/board.mjs publish' })).toBe(false)
       expect(allowed('Bash', { command: 'node scripts/board-first-guard.mjs --status > .batch-dashboard.html' })).toBe(false)
+      // A report in the scratchpad that merely names the board is no board write.
+      expect(allowed('Bash', { command: `cd ${pad} && cat > report.md <<'EOF'\nboard .batch-dashboard.html was stale\nEOF` })).toBe(true)
     } finally {
       rmSync(resolve(tmpdir(), `claude-${process.getuid?.()}`, repo.replace(/[^A-Za-z0-9]/g, '-')), { recursive: true, force: true })
     }

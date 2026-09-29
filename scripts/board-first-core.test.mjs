@@ -408,6 +408,13 @@ describe('the stand-down leaves the session scratchpad and the carrier open', ()
     expect(write(`${pad}/notes.md`, `${root}/.batch-dashboard.html`).block).toBe(true)
   })
 
+  it('lets a scratchpad report that merely NAMES the board through', () => {
+    const report = `cd ${pad} && cat > report.md <<'EOF'\nThe board .batch-dashboard.html and hoa-batch-dashboard.html were stale.\nEOF`
+    expect(at({ toolName: 'Bash', command: report }).block).toBe(false)
+    expect(at({ toolName: 'Bash', command: `cat > ${pad}/report.md <<'EOF'\nsee .batch-dashboard.html\nEOF` }).block).toBe(false)
+    expect(write(`${pad}/report.md`).block).toBe(false)
+  })
+
   it('refuses a climb out of the scratchpad back into the checkout', () => {
     const climb = `${pad}/../../../../../workspace/hoa/TASKS.md`
     expect(write(climb, `${root}/TASKS.md`).block).toBe(true)

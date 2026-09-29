@@ -46,7 +46,7 @@ import { isPublishDue } from './board-currency-core.mjs'
 import { CLOSING_CARD_CMD, NONE_CARD_CMD, NOW_CARD_CMD, PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
 import { claimsNoCurrentWork } from './board-core.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
-import { parseSegments, segmentInvokesScript, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
+import { parseSegments, segmentInvokesScript, segmentMentionsFile, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
 import { handoffWritesOnlyOutsideCheckout, resolvedTargetInCheckout } from './batch-lease-core.mjs'
 
 // The command classifier is SHARED with the fence chokepoint (point 473): both
@@ -250,11 +250,12 @@ export function ownershipStandDownDecision({
     const tool = String(toolName ?? '')
     // The board is batch state wherever its file lies (the owner's scratchpad
     // included), so it never rides on the outside-checkout admission.
-    // Judged on the file's lexical AND resolved path (a link may hide the name).
+    // Judged on the file's lexical AND resolved path (a link may hide the name),
+    // and on a command's words and redirection targets — never a heredoc body.
     const boardTouched =
       isBoardFile(filePath) ||
       isBoardFile(resolvedFilePath) ||
-      BOARD_FILE_HINTS.some((name) => String(command ?? '').includes(name))
+      parseSegments(command).some((seg) => segmentMentionsFile(seg, BOARD_FILE_HINTS))
     const outsideFile =
       !boardTouched &&
       ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool) &&
