@@ -93,6 +93,19 @@ export const BANK_PLATEAU_ANGLE = 0.384
  *  corner. */
 export const BANK_FADE_ANGLE = 0.593
 
+/**
+ * THE BANK IS WIDER DOWNSTREAM (work-order 1237, user 29.09.2026). The villager's
+ * dugout plies a lane of its own downstream of the children's stretch and lands
+ * at its downstream end, so the walkable ground reaches the water that far: this
+ * plateau angle carries the walk edge to about s = +45 m on the shipped river
+ * villages (walk edge 40.0-40.9 m), where the upstream side keeps
+ * `BANK_PLATEAU_ANGLE` (±16.2 m). Calibratable. The children's stretch and the
+ * water path stay tied to the SMALLER, upstream angle.
+ */
+export const BANK_DOWNSTREAM_PLATEAU_ANGLE = 0.85
+/** ... and its fade grows by the same margin the upstream one has. */
+export const BANK_DOWNSTREAM_FADE_ANGLE = BANK_DOWNSTREAM_PLATEAU_ANGLE + (BANK_FADE_ANGLE - BANK_PLATEAU_ANGLE)
+
 /** How far inside the walkable edge the three named bank points sit, so a
  *  villager sent to one stands clear of the edge, on the flat plate. */
 export const BANK_STAND_INSET = 1.5

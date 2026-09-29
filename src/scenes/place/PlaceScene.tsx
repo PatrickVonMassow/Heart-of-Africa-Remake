@@ -127,7 +127,7 @@ import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS, CHIEF_BODY_RADIUS } from './collision'
 import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from '../../systems/unstuck'
-import { buildBoundaryLut, isOutsidePlace } from './boundary'
+import { bankDrawnReach, buildBoundaryLut, groundDiscShift, isOutsidePlace, type PlaceBounds } from './boundary'
 import {
   RIVER_HALF_LENGTH,
   buildBankShoreGeometry,
@@ -1513,6 +1513,7 @@ function PanoramaWildlife({
   placeId,
   seed,
   innerRadius,
+  bounds,
   lat,
   lon,
   skyHorizon,
@@ -1521,12 +1522,20 @@ function PanoramaWildlife({
   placeId: string
   seed: number
   innerRadius: number
+  /** Where the backdrop's rim is pushed out with the drawn disc (work-order
+   *  1237), so a silhouette's footing reads the surface actually built. */
+  bounds: PlaceBounds
   lat: number
   lon: number
   /** Sky horizon tone the far silhouettes haze toward (atmospheric perspective). */
   skyHorizon: string
 }) {
   const centerH = useMemo(() => sampleTerrain(lat, lon, seed).height, [lat, lon, seed])
+  // The backdrop's rim at a point's own bearing — the one the mesh was built on.
+  const rimAt = useCallback(
+    (x: number, z: number) => innerRadius + groundDiscShift(bounds, Math.atan2(z, x)),
+    [innerRadius, bounds],
+  )
   // Region-typical species aligned to the bird's-eye pool (point 102, part c).
   const builds = useMemo(() => PANORAMA_FAUNA[region].map((b) => b()), [region])
   // Azimuth arcs of this settlement's skyline landmarks: a silhouette drifting
@@ -1638,8 +1647,8 @@ function PanoramaWildlife({
       const fz = Math.cos(yaw) * half
       const camX = camera.position.x
       const camZ = camera.position.z
-      const frontY = panoramaStandY(x + fx, z + fz, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT)
-      const backY = panoramaStandY(x - fx, z - fz, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT)
+      const frontY = panoramaStandY(x + fx, z + fz, lat, lon, seed, centerH, rimAt(x + fx, z + fz), camX, camZ, EYE_HEIGHT)
+      const backY = panoramaStandY(x - fx, z - fz, lat, lon, seed, centerH, rimAt(x - fx, z - fz), camX, camZ, EYE_HEIGHT)
       const groundY = (frontY + backY) / 2 - pw.sinkEpsilon
       const pitch = groundPitch(frontY, backY, it.rig.wheelbase * it.scale)
       // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
@@ -1707,7 +1716,7 @@ function PanoramaWildlife({
           // touches), and re-aimed rather than merely lowered so its ground spot
           // does not move — a foot dragged fore/aft would be skating again.
           const standY =
-            panoramaStandY(x + off[0], z + off[2], lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT) -
+            panoramaStandY(x + off[0], z + off[2], lat, lon, seed, centerH, rimAt(x + off[0], z + off[2]), camX, camZ, EYE_HEIGHT) -
             pw.sinkEpsilon
           const targetY = standY + footHeight(phase, leg.phaseOffset, it.rig.legLength) * it.scale
           const seat = seatFootOnGround(swing, it.rig.legLength, targetY - (y + off[1]), pitch, it.scale)
@@ -1734,7 +1743,7 @@ function PanoramaWildlife({
             // hover over, the incline it stands on.
             info[i].footGap =
               foot.y -
-              (panoramaStandY(foot.x, foot.z, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT) -
+              (panoramaStandY(foot.x, foot.z, lat, lon, seed, centerH, rimAt(foot.x, foot.z), camX, camZ, EYE_HEIGHT) -
                 pw.sinkEpsilon)
           }
         }
@@ -1901,25 +1910,33 @@ function LandscapeBackdrop({
   seed,
   innerRadius,
   bank,
+  bounds,
 }: {
   lat: number
   lon: number
   seed: number
   innerRadius: number
   bank: PlaceRiverBank | null
+  /** The walkable bounds: where the drawn disc is pushed out (downstream of a
+   *  bank, work-order 1237) the rim moves out with it. */
+  bounds: PlaceBounds
 }) {
   const geometry = useMemo(() => {
-    const r0 = innerRadius
     const centerH = sampleTerrain(lat, lon, seed).height
     const positions: number[] = []
     const colors: number[] = []
     const water: number[] = []
     const indices: number[] = []
+    // Each column's rim follows the drawn disc at its own bearing: tucked under
+    // the plate and feathered up to it at the plate's edge, wherever that is.
+    const rims = Array.from({ length: BACKDROP_SEGS }, (_, si) =>
+      innerRadius + groundDiscShift(bounds, (si / BACKDROP_SEGS) * Math.PI * 2))
     for (let ri = 0; ri < BACKDROP_RINGS; ri++) {
-      // Logarithmic ring spacing with a ring pinned on the ground-disc edge.
-      const r = backdropRingRadius(ri, r0)
       for (let si = 0; si < BACKDROP_SEGS; si++) {
         const a = (si / BACKDROP_SEGS) * Math.PI * 2
+        const r0 = rims[si]
+        // Logarithmic ring spacing with a ring pinned on the ground-disc edge.
+        const r = backdropRingRadius(ri, r0)
         const x = Math.cos(a) * r
         const z = Math.sin(a) * r
         const smp = sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed)
@@ -1955,7 +1972,7 @@ function LandscapeBackdrop({
     // shade as hard flat facets (createBackdropMaterial keeps flat shading off).
     geo.computeVertexNormals()
     return geo
-  }, [lat, lon, seed, innerRadius])
+  }, [lat, lon, seed, innerRadius, bounds])
   const waterOctaves = useUi(effectiveWaterDetailOctaves)
   const backdrop = useMemo(() => createBackdropMaterial(waterOctaves), [waterOctaves])
   const material = backdrop.material
@@ -2012,10 +2029,13 @@ function LandscapeBackdrop({
  */
 function PlaceRiver({
   bank,
+  bounds,
   discEdge,
   groundMaterial,
 }: {
   bank: PlaceRiverBank
+  /** The settlement's walkable bounds, which the downstream reach is read from. */
+  bounds: PlaceBounds
   discEdge: number
   groundMaterial: THREE.Material
 }) {
@@ -2023,17 +2043,16 @@ function PlaceRiver({
   const foamCount = useUi(effectivePlaceRiverFoam)
   const waterOctaves = useUi(effectiveWaterDetailOctaves)
   const water = useMemo(() => createPlaceRiverMaterial(waterOctaves), [waterOctaves])
+  // Upstream the shore spans exactly the chord the ground plate's cut makes, so
+  // its inland edge ends where the plate's rim curves away from the waterline;
+  // downstream it runs on as far as the widened lobe's shifted disc does
+  // (work-order 1237), and the water with it.
+  const reach = useMemo(() => bankDrawnReach(bounds, discEdge), [bounds, discEdge])
   const surface = useMemo(
-    () => buildRiverSurfaceGeometry(bank, RIVER_HALF_LENGTH, segments),
-    [bank, segments],
+    () => buildRiverSurfaceGeometry(bank, RIVER_HALF_LENGTH, segments, Math.max(RIVER_HALF_LENGTH, reach.down)),
+    [bank, segments, reach],
   )
-  // The shore spans exactly the chord the ground plate's cut makes, so its
-  // inland edge ends where the plate's rim curves away from the waterline.
-  const shore = useMemo(() => {
-    const inland = bank.walkEdge
-    const half = Math.sqrt(Math.max(1, discEdge * discEdge - inland * inland))
-    return buildBankShoreGeometry(bank, half)
-  }, [bank, discEdge])
+  const shore = useMemo(() => buildBankShoreGeometry(bank, reach.up, reach.down), [bank, reach])
   const flecks = useMemo(() => buildRiverFlecks(foamCount), [foamCount])
   const foamGeometry = useMemo(() => new THREE.CircleGeometry(1, 10).rotateX(-Math.PI / 2), [])
   const foamMaterial = useMemo(
@@ -3165,11 +3184,11 @@ export function PlaceScene() {
       />
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
-      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bank={layout.bank ?? null} />
+      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bank={layout.bank ?? null} bounds={layout} />
       <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
       <GizaSkyline placeId={place.id} />
-      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
+      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bounds={layout} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
 
       {/* Ground plate with procedural mottling. Many segments, not 48: a
           48-gon around a 74 m plateau puts 9.7 m straight chords on the ground
@@ -3186,6 +3205,7 @@ export function PlaceScene() {
       {layout.bank && (
         <PlaceRiver
           bank={layout.bank}
+          bounds={layout}
           discEdge={layout.radius + GROUND_DISC_OVERHANG}
           groundMaterial={mats.ground}
         />

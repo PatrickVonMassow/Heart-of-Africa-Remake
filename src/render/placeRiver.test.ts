@@ -25,7 +25,7 @@ import {
   type PlaceRiverBank,
 } from '../scenes/place/riverBank'
 import { GROUND_DISC_OVERHANG } from '../scenes/place/backdrop'
-import { placeBoundaryRadius } from '../scenes/place/boundary'
+import { groundDiscShift, placeBoundaryRadius } from '../scenes/place/boundary'
 import { PLACE_RADIUS } from '../scenes/place/layout'
 import { placeById } from '../world/geo'
 import { ROCK_VILLAGE_ID } from '../world/communicationRock'
@@ -50,7 +50,10 @@ describe('the ground plate is cut at the top of the bank', () => {
   it('never reaches into the water', () => {
     for (const v of vertices(plate)) {
       expect(outward(v.x, v.z)).toBeLessThanOrEqual(bank.walkEdge + 1e-4)
-      expect(Math.hypot(v.x, v.z)).toBeLessThanOrEqual(discEdge + 1e-4)
+      // The disc edge at the vertex's own bearing: pushed out downstream of the
+      // bank with the widened lobe (work-order 1237), plain everywhere else.
+      const edge = discEdge + groundDiscShift(bounds, Math.atan2(v.z, v.x))
+      expect(Math.hypot(v.x, v.z)).toBeLessThanOrEqual(edge + 1e-4)
       expect(v.y).toBe(0)
     }
   })

@@ -17,7 +17,6 @@ import { CLIMB_ROCK_SCALE, deriveClimbRock, looseRockIsGround, looseRockRadius }
 import { pinchesPassage } from './wedgeCarve'
 import { ROCK_FOOTPRINT_UNITS } from '../../world/communicationRock'
 import {
-  BANK_FADE_ANGLE,
   BANK_PLAY_LANE_HALF,
   bankPlayRocks,
   bankFillSpot,
@@ -29,6 +28,7 @@ import {
   type BankPoint,
   type PlaceRiverBank,
 } from './riverBank'
+import { inBankArc } from './boundary'
 import { balance } from '../../config/balance'
 import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
@@ -654,7 +654,7 @@ export function pickWayOut(
     // Not over the water: the bank's own arc is where the ground stops being
     // ground, and the shore already carries the children's stretch and the
     // water path.
-    if (bank && Math.cos(b) * bank.nx + Math.sin(b) * bank.nz > Math.cos(BANK_FADE_ANGLE)) continue
+    if (bank && inBankArc(bank, b)) continue
     let room = Infinity
     for (let d = radius - WAY_OUT_INNER; d <= radius + WAY_OUT_OUTER; d += 1.5) {
       room = Math.min(room, clearanceAt(Math.cos(b) * d, Math.sin(b) * d))

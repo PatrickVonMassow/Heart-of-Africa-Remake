@@ -17,7 +17,14 @@
 // union is star-shaped about it — which is why the band's angular lookup
 // (`buildBoundaryLut`) needed no change at all to follow it.
 
-import { BANK_FADE_ANGLE, BANK_PLATEAU_ANGLE, type PlaceRiverBank } from './riverBank'
+import {
+  BANK_BED_REACH,
+  BANK_DOWNSTREAM_FADE_ANGLE,
+  BANK_DOWNSTREAM_PLATEAU_ANGLE,
+  BANK_FADE_ANGLE,
+  BANK_PLATEAU_ANGLE,
+  type PlaceRiverBank,
+} from './riverBank'
 
 /** How many angles the band's boundary lookup samples (see `buildBoundaryLut`).
  *  1024, not the historical 256: a plain circle needs one texel, but the bank
@@ -70,15 +77,36 @@ export function placeBoundaryRadius(bounds: PlaceBounds, angle = 0): number {
   const bank = bounds.bank
   if (!bank) return bounds.radius
   const delta = Math.abs(bearingDelta(angle, Math.atan2(bank.nz, bank.nx)))
-  if (delta >= BANK_FADE_ANGLE) return bounds.radius
-  // BANK_FADE_ANGLE < π/2, so cos stays well above zero past the early return.
+  const { plateau, fade } = bankLobeAngles(bank, angle)
+  if (delta >= fade) return bounds.radius
+  // Both fades stay < π/2, so cos stays well above zero past the early return.
   const cos = Math.cos(delta)
   // The wade limit at this bearing, and how much of the way out to it the lobe
   // reaches here (all of it across the plateau, none of it past the fade).
   const water = bank.wadeEdge / cos
-  const reach =
-    bounds.radius + (water - bounds.radius) * ramp(BANK_FADE_ANGLE, BANK_PLATEAU_ANGLE, delta)
+  const reach = bounds.radius + (water - bounds.radius) * ramp(fade, plateau, delta)
   return Math.max(bounds.radius, Math.min(water, reach))
+}
+
+/**
+ * The plateau and fade half-angles of the bank lobe on the side of the normal
+ * that `angle` lies on: the wider downstream pair where the bearing leans with
+ * the current, the upstream pair otherwise (work-order 1237).
+ */
+export function bankLobeAngles(
+  bank: Pick<PlaceRiverBank, 'fx' | 'fz'>,
+  angle: number,
+): { plateau: number; fade: number } {
+  return Math.cos(angle) * bank.fx + Math.sin(angle) * bank.fz > 0
+    ? { plateau: BANK_DOWNSTREAM_PLATEAU_ANGLE, fade: BANK_DOWNSTREAM_FADE_ANGLE }
+    : { plateau: BANK_PLATEAU_ANGLE, fade: BANK_FADE_ANGLE }
+}
+
+/** Whether a bearing lies inside the bank lobe's arc — plateau or fade, on
+ *  whichever side of the normal it falls. */
+export function inBankArc(bank: Pick<PlaceRiverBank, 'nx' | 'nz' | 'fx' | 'fz'>, angle: number): boolean {
+  const delta = Math.abs(bearingDelta(angle, Math.atan2(bank.nz, bank.nx)))
+  return delta < bankLobeAngles(bank, angle).fade
 }
 
 /** True once the traveller has walked out of the settlement (the leave check). */
@@ -96,8 +124,20 @@ export function insidePlace(bounds: PlaceBounds, x: number, z: number, margin = 
 /** The largest radius the boundary ever reaches — what the drawn ground has to
  *  cover, so the player never walks off the plate he is standing on. */
 export function maxBoundaryRadius(bounds: PlaceBounds): number {
-  if (!bounds.bank) return bounds.radius
-  return Math.max(bounds.radius, bounds.bank.wadeEdge / Math.cos(BANK_PLATEAU_ANGLE))
+  const bank = bounds.bank
+  if (!bank) return bounds.radius
+  // The downstream plateau's rim, and a sweep of the downstream fade: the lobe
+  // still reaches outward for a little past the plateau, where the wade line
+  // grows faster than the taper draws it in.
+  const normal = Math.atan2(bank.nz, bank.nx)
+  const side = Math.atan2(bank.fz, bank.fx) - normal
+  const toward = Math.sin(side) >= 0 ? 1 : -1
+  let widest = Math.max(bounds.radius, bank.wadeEdge / Math.cos(BANK_DOWNSTREAM_PLATEAU_ANGLE))
+  for (let i = 0; i <= 256; i++) {
+    const delta = BANK_DOWNSTREAM_PLATEAU_ANGLE + (i / 256) * (BANK_DOWNSTREAM_FADE_ANGLE - BANK_DOWNSTREAM_PLATEAU_ANGLE)
+    widest = Math.max(widest, placeBoundaryRadius(bounds, normal + toward * delta))
+  }
+  return widest
 }
 
 /**
@@ -109,10 +149,57 @@ export function maxBoundaryRadius(bounds: PlaceBounds): number {
  */
 export function groundPlateRadius(bounds: PlaceBounds, angle: number, discEdge: number): number {
   const bank = bounds.bank
-  if (!bank) return discEdge
+  const edge = discEdge + groundDiscShift(bounds, angle)
+  if (!bank) return edge
   const cos = Math.cos(bearingDelta(angle, Math.atan2(bank.nz, bank.nx)))
-  if (cos <= 1e-6) return discEdge
-  return Math.min(discEdge, bank.walkEdge / cos)
+  if (cos <= 1e-6) return edge
+  return Math.min(edge, bank.walkEdge / cos)
+}
+
+/**
+ * How far the drawn ground disc is pushed out past its plain edge at a bearing
+ * (work-order 1237). Zero everywhere except on the DOWNSTREAM side of a bank,
+ * where the walkable lobe reaches far past the plain radius: there the disc
+ * moves out by exactly that excess, so it keeps the same overhang beyond the
+ * last step as it has everywhere else. The backdrop's inner rim moves with it
+ * (`PlaceScene`'s `LandscapeBackdrop`), so the panorama starts where the drawn
+ * ground ends instead of standing on it.
+ */
+export function groundDiscShift(bounds: PlaceBounds, angle: number): number {
+  const bank = bounds.bank
+  if (!bank) return 0
+  if (Math.cos(angle) * bank.fx + Math.sin(angle) * bank.fz <= 0) return 0
+  // Eased in across the span the two sides share, so the rim does not jump at
+  // the bank's own bearing: out to the upstream plateau's angle the scene is
+  // drawn as before, and past it the shift is whole.
+  const delta = Math.abs(bearingDelta(angle, Math.atan2(bank.nz, bank.nx)))
+  return Math.max(0, placeBoundaryRadius(bounds, angle) - bounds.radius) * ramp(0, BANK_PLATEAU_ANGLE, delta)
+}
+
+/**
+ * How far along the bank, upstream and downstream of the normal, the drawn
+ * shore and water have to run (work-order 1237). Upstream it is the chord the
+ * plain disc cuts from the top of the bank, as before. Downstream it is the
+ * furthest along-bank reach of the shifted disc anywhere it passes the top of
+ * the bank, out to the drawn bed — so no strip of ground between the plate's
+ * cut and the backdrop's rim is left undrawn.
+ */
+export function bankDrawnReach(bounds: PlaceBounds, discEdge: number): { up: number; down: number } {
+  const bank = bounds.bank
+  if (!bank) return { up: 0, down: 0 }
+  const up = Math.sqrt(Math.max(1, discEdge * discEdge - bank.walkEdge * bank.walkEdge))
+  const normal = Math.atan2(bank.nz, bank.nx)
+  const toward = Math.sin(Math.atan2(bank.fz, bank.fx) - normal) >= 0 ? 1 : -1
+  let down = up
+  const steps = 360
+  for (let i = 1; i < steps; i++) {
+    const delta = (i / steps) * (Math.PI / 2)
+    const cos = Math.cos(delta)
+    const edge = discEdge + groundDiscShift(bounds, normal + toward * delta)
+    const r = Math.min(edge, (bank.distance + BANK_BED_REACH) / cos)
+    if (r * cos > bank.walkEdge) down = Math.max(down, r * Math.sin(delta))
+  }
+  return { up, down }
 }
 
 /**
