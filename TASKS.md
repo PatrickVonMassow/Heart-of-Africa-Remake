@@ -16002,3 +16002,10 @@ to land than a mechanism that needs a review.
   Infrastructure freeze (CLAUDE.md §2): admitted as a real blockade — every claim handover can trap the releasing session.
   Bundle: Modell & Wächter.
   Criticality: medium.
+- [ ] 1236. The calf crossing fix leaves two wildlife reds on WebGL 2
+  MEASURED 29.09.2026 ~14:33, full `VERIFY_GL=webgl node scripts/verify/run-all.mjs enrichments` on main after the 1234 landing (machine flagged UNDER LOAD, so timing verdicts are not authoritative; WebGPU full run: only the charged `72-water-victoria-falls` red). Reds:
+  (1) `calf-crossing-flee` arrival variant: `{"start":{"terrain":"water","dP":1.25},"crossingEndedAt":0.08,"maxDP":1.4,"atEnd":{"toTarget":0.094,"terrain":"mountain"}}`. The traveller was never moved outside the ring (dP stays ~1.3 instead of 12), and the calf ends 0.094 from its target rather than on it.
+  (2) `channel-crossing` (point 192): `{"staged":true,"sawOnWater":false,"sawLowY":false,"landed":true}`. The purposeful crossing lands without ever swimming; suspect the 1234 arrival snap (`waterCross.arriveUnits`) or the shy-ring interruption of a crossing.
+  FINAL STATE: both causes are named and fixed (or (2) is shown to be load and not 1234, by a quiet re-run); `npm test -- enrichments --section=calf-crossing-flee` and `--section=channel-crossing` are green on both backends; the unrelated `dressing-growth` red of the same run is charged or filed on its own.
+  Bundle: Tierverhalten.
+  Criticality: medium.
