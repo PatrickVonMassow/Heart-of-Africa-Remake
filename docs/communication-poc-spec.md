@@ -3,8 +3,9 @@
 This document governs the communication rebuild in work-order points 686–692
 and its landed follow-ups. The playable slice has one six-word tonal language,
 taught in four places: the children's bank game and the adults' water and
-digging work teach five words, the weaver's loom teaches UPSTREAM and
-DOWNSTREAM a second time, and the drummer teaches CHIEF. The errand is a
+digging work teach five words, the fisherman's dugout beside the bank game
+calls UPSTREAM and DOWNSTREAM a second time (the weaver's loom, which did so
+before, is parked), and the drummer teaches CHIEF. The errand is a
 four-word drum message.
 
 ## What the player does
@@ -13,8 +14,8 @@ In one village of the tonal West/Centre belt the player watches and listens.
 The inhabitants speak atomic utterances built from one syllable in two tones,
 and the player works out their meanings from visible situations. The new
 teaching is divided between four places: the children's bank game, including
-the village's play rocks, the adults' water and digging work, the weaver's loom
-("The weaver's loom" below), and the drummer. Those situations are built in
+the village's play rocks, the adults' water and digging work, the fisherman's
+dugout ("The fisherman's dugout" below), and the drummer. Those situations are built in
 their own work-order points.
 
 Later the chief sends a message on two drums in the same language. The player
@@ -316,7 +317,26 @@ its furniture leave the workers reachable. The water path reaches the bank
 through the settlement's actual huts and fence gates, across world seeds.
 
 
+## The fisherman's dugout
+
+A local fisherman paddles a dugout on a lane of his own 7 m out from the
+waterline, 27-47 m downstream of the children's stretch and never nearer than
+20 m to it (work-order 1237): the second picture of UPSTREAM and DOWNSTREAM, on
+ONE body working against the current and then riding it. Once per leg, shortly
+after he is under way, he CALLS the word of his heading at the call register,
+with the reading over his head and his arm pointing the way he heads, through
+the same distance gate as every village voice; the settlement's floor grants
+the call, and the direction words wait for the listener's first ROCK as at the
+bank. Because the lane keeps the talk hearing radius twice over from the
+stretch, a spectator hears the spoken words of one picture or the other, never
+both; the call alone carries into the children's zone. Values:
+`balance.villageLife.canoe`; cycle: `src/scenes/place/villagerCanoe.ts`.
+
 ## The weaver's loom
+
+PARKED (user 29.09.2026, work-order 1237): no village lays the loom any more;
+its mechanism stays and `balance.villageLife.loom.placed` re-enables it. The
+rules below describe it as it runs when switched on.
 
 UPSTREAM and DOWNSTREAM are taught in TWO places, and the loom is the second of
 them (work-order 1157). The two pictures share exactly one feature — the
