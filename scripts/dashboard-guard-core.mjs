@@ -177,7 +177,9 @@ export const ENTSCHEIDUNGEN_ON_BOARD = 20
 /** The two capped sections and their caps, judged alike by the audit. */
 export const CAPPED_SECTIONS = [
   { title: 'Erledigt', cap: ERLEDIGT_ON_BOARD },
-  { title: 'Entscheidungsprotokoll', cap: ENTSCHEIDUNGEN_ON_BOARD },
+  // The log's link must land on its OWN section of the archive page (board-core
+  // ARCHIVE_LOG_ANCHOR), not merely on the page.
+  { title: 'Entscheidungsprotokoll', cap: ENTSCHEIDUNGEN_ON_BOARD, fragment: '#entscheidungsprotokoll' },
 ]
 
 /** The meta a generated queue card carries while nobody has estimated the point
@@ -556,7 +558,7 @@ export function auditDashboard(html, input = {}) {
   // finished cards and links the rest. Both halves are checked — a board that
   // kept everything, and one that dropped the link and orphaned the archive.
   // The decision log is capped and linked the same way (user order 22.09.2026).
-  for (const { title, cap } of CAPPED_SECTIONS) {
+  for (const { title, cap, fragment = '' } of CAPPED_SECTIONS) {
     const section = sections[title] ?? ''
     const onBoard = parseCards(section).length
     if (onBoard > cap) {
@@ -567,7 +569,7 @@ export function auditDashboard(html, input = {}) {
     }
     // THE DESIGNATED LINK, not any link (cross-vendor review 29.09.2026): an
     // evidence URL inside a card must not stand in for a deleted archive link.
-    if (onBoard > 0 && !/<p class="archive-link">(?:(?!<\/p>)[\s\S])*<a\s[^>]*href="https?:\/\/[^"]+"[^>]*>/.test(section)) {
+    if (onBoard > 0 && !new RegExp(`<p class="archive-link">(?:(?!</p>)[\\s\\S])*<a\\s[^>]*href="https?://[^"#]+${fragment}"[^>]*>`).test(section)) {
       v.push({
         code: 'archive-link-missing',
         msg: `the ${title} section links no archive page — the moved cards would be unreachable`,

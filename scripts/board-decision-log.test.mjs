@@ -380,4 +380,16 @@ describe('cross-vendor review round 1 (29.09.2026)', () => {
     expect(inVdzk).toContain('transliterated-umlaut')
     expect(inLog).toContain('transliterated-umlaut')
   })
+
+  it('the decision-log link must land on the log section of the archive page', () => {
+    const records = record(1)
+    const good = auditDashboard(board({ log: `${records}${archiveLinkParagraph('log', 1, URL)}\n` }), {})
+    expect(good.map((v) => v.code)).not.toContain('archive-link-missing')
+    const noFragment = archiveLinkParagraph('log', 1, URL).replace(`#${ARCHIVE_LOG_ANCHOR}`, '')
+    const wrongFragment = archiveLinkParagraph('log', 1, URL).replace(`#${ARCHIVE_LOG_ANCHOR}`, '#erledigt')
+    for (const link of [noFragment, wrongFragment]) {
+      const codes = auditDashboard(board({ log: `${records}${link}\n` }), {}).map((v) => v.code)
+      expect(codes).toContain('archive-link-missing')
+    }
+  })
 })
