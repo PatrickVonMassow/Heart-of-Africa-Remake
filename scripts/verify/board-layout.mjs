@@ -716,8 +716,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     logSect('Warteschlange', '') +
     logSect('Erledigt', '<p class="archive-link">Die älteren 3 erledigten Punkte stehen im <a href="https://example.invalid/">Archiv der erledigten Punkte</a>.</p>') +
     `<footer>Stand</footer>\n</main>${RESTORE}</body></html>`
-  const logPages = [{ name: 'fixture', html: LOG_FIXTURE }]
-  if (existsSync(livePath)) logPages.push({ name: 'published board', html: readFileSync(livePath, 'utf8') })
+  const logPages = [{ name: 'fixture', html: LOG_FIXTURE, populated: true }]
+  // An EMPTY decision log is a valid board too and must pass (regression).
+  logPages.push({ name: 'empty-log fixture', html: LOG_FIXTURE.replace(`${logRecord(1)}${logRecord(2)}`, ''), populated: false })
+  // The published board may legitimately carry an EMPTY log (no card, no link),
+  // so only the fixture is required to be populated (cross-vendor review 29.09.2026).
+  if (existsSync(livePath)) logPages.push({ name: 'published board', html: readFileSync(livePath, 'utf8'), populated: false })
   const measureSections = (page) =>
     page.evaluate(() => {
       const sects = [...document.querySelectorAll('details.sect')]
@@ -730,6 +734,25 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         headRight: Math.max(...sects.map((d) => box(d.querySelector('summary')).right)),
         cardRight: Math.max(0, ...[...(sects.at(-1)?.querySelectorAll('details') ?? [])].map((d) => box(d).right)),
         linkRight: link ? box(link).right : 0,
+        cards: (sects.at(-1)?.querySelectorAll('details') ?? []).length,
+        // CLIPPED TEXT, measured on the descendants (cross-vendor review
+        // 29.09.2026): the cards clip with overflow:hidden, so their outer boxes
+        // stay inside the viewport while a title that did not wrap is cut off.
+        clipped: [...(sects.at(-1)?.querySelectorAll('details > summary > .t, .archive-link') ?? [])]
+          .filter((el) => {
+            const card = el.closest('details:not(.sect)') ?? el.parentElement
+            const range = document.createRange()
+            range.selectNodeContents(el)
+            const text = range.getBoundingClientRect()
+            const frame = card.getBoundingClientRect()
+            return (
+              el.scrollWidth > el.clientWidth + 1 ||
+              el.scrollHeight > el.clientHeight + 1 ||
+              text.right > frame.right + 1 ||
+              text.bottom > frame.bottom + 1
+            )
+          })
+          .map((el) => el.textContent.trim().slice(0, 40)),
         viewport: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
       }
@@ -738,7 +761,9 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   const archiveHtml = existsSync(archivePath)
     ? readFileSync(archivePath, 'utf8')
     : '<main>\n<h2>Erledigt (älter)</h2>\n<footer>Archiv</footer>\n</main>\n'
-  for (const { name, html } of logPages) {
+  // A title that may not wrap: the clipping control the text measurement must reject.
+  const NO_WRAP_TITLES = '<style>details:not(.sect)>summary>.t{white-space:nowrap}</style>'
+  for (const { name, html, populated } of logPages) {
     const migrated = rotateBoardArchives({ board: html, archive: archiveHtml }).board
     check(`${name}: the migration keeps the decision log closed in the restore script`, migrated.includes(RESTORE_CLOSED_AFTER) && !migrated.includes(RESTORE_CLOSED_BEFORE))
     for (const width of WIDTHS) {
@@ -762,13 +787,21 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       check(
         `${name} at ${width}px: the opened decision log stays inside the viewport`,
         opened.scrollWidth <= opened.viewport + 1 &&
-          opened.cardRight > 0 &&
+          (!populated || (opened.cards > 0 && opened.linkRight > 0)) &&
           opened.cardRight <= opened.viewport + 1 &&
-          opened.linkRight > 0 &&
-          opened.linkRight <= opened.viewport + 1,
-        `page ${opened.scrollWidth}/${opened.viewport}, cards r${Math.round(opened.cardRight)}, link r${Math.round(opened.linkRight)}`,
+          opened.linkRight <= opened.viewport + 1 &&
+          opened.clipped.length === 0,
+        `page ${opened.scrollWidth}/${opened.viewport}, ${opened.cards} cards r${Math.round(opened.cardRight)}, link r${Math.round(opened.linkRight)}, clipped [${opened.clipped.join(' | ')}]`,
       )
       await page.close()
+      if (width === 360 && opened.cards > 0) {
+        const clip = await browser.newPage({ viewport: { width, height: 900 } })
+        await clip.setContent(`${migrated}\n${NO_WRAP_TITLES}`, { waitUntil: 'load' })
+        await clip.evaluate(() => { const d = [...document.querySelectorAll('details.sect')].at(-1); d.open = true; d.querySelectorAll('details').forEach((c) => { c.open = true }) })
+        const clipped = await measureSections(clip)
+        check(`${name} at ${width}px: the text measurement rejects the no-wrap clipping control`, clipped.clipped.length > 0, `${clipped.clipped.length} clipped`)
+        await clip.close()
+      }
     }
     const control = await browser.newPage({ viewport: { width: 360, height: 900 } })
     await control.setContent(migrated.split(RESTORE_CLOSED_AFTER).join(RESTORE_CLOSED_BEFORE), { waitUntil: 'load' })
