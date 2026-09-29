@@ -22,13 +22,14 @@ import { REPO_ROOT } from './repo-paths.mjs'
 const SPEC = ['FINAL STATE: der Träger bekommt eine zweite Art.', '', '  - [ ] eine Zeile, die wie ein Kopf aussieht', 'Ende.'].join('\n')
 
 let dir
-const run = (args, expectFail = false, env = {}) => {
+const run = (args, expectFail = false, env = {}, input = undefined) => {
   try {
     return execFileSync(process.execPath, ['scripts/finding.mjs', ...args], {
       cwd: REPO_ROOT,
       encoding: 'utf8',
       windowsHide: true,
       env: { ...process.env, FINDINGS_MEMORY_DIR: dir, ...env },
+      ...(input === undefined ? {} : { input }),
     })
   } catch (e) {
     if (!expectFail) throw new Error(`finding.mjs ${args.join(' ')} failed: ${e.stderr || e.message}`)
@@ -230,5 +231,53 @@ describe('automatic requests are filed once by title', () => {
     expect(requestEntries(carrierText())).toHaveLength(1)
     deposit('Another red', ['--once'])
     expect(requestEntries(carrierText())).toHaveLength(2)
+  })
+})
+
+// Point 1186: a standing-down session may not create the files the long fields
+// need, so every field also travels on stdin — one field, or all in one document.
+describe('a deposit that never touches the filesystem', () => {
+  it('takes one long field from stdin with --spec-file -', () => {
+    const out = run(['--request', 'Spec auf stdin', '--spec-file', '-', '--why-file', join(dir, 'why.md'), '--session', 's'], false, {}, `${SPEC}\n`)
+    expect(out).toMatch(/request deposited \(1 waiting\)/)
+    const shown = run(['--show', 'Spec auf stdin'])
+    expect(shown).toContain(SPEC)
+    expect(shown).toContain('Eine Stunde lang')
+  })
+
+  it('takes every field in one delimited stdin document', () => {
+    const doc = [
+      '--- spec ---', SPEC, '', '--- why ---', 'Die Ablage war verweigert.',
+      '--- quotes ---', 'user 22.09.2026: „Reihe dafür einen Punkt ein.“',
+      '--- constraints ---', 'Kein neuer Wächter.', '--- bundle ---', 'Modell & Wächter', '--- refs ---', 'scripts/finding.mjs', '',
+    ].join('\n')
+    const out = run(['--request', 'Alles auf stdin', '--stdin', '--session', 's'], false, {}, doc)
+    expect(out).toMatch(/request deposited \(1 waiting\)/)
+    expect(out).not.toMatch(/WARNING/)
+    const shown = run(['--show', 'Alles auf stdin'])
+    for (const text of [SPEC, 'Die Ablage war verweigert.', '„Reihe dafür einen Punkt ein.“', 'Kein neuer Wächter.', 'Modell & Wächter', 'scripts/finding.mjs']) {
+      expect(shown).toContain(text)
+    }
+  })
+
+  it('keeps the file form exactly as it was', () => {
+    deposit('Dateiform')
+    const shown = run(['--show', 'Dateiform'])
+    expect(shown).toContain(SPEC)
+    expect(shown).toContain('user 30.07.2026')
+  })
+
+  it('refuses a malformed document with a line naming the accepted fields, and deposits nothing', () => {
+    const err = run(['--request', 'Kaputt', '--stdin', '--session', 's'], true, {}, 'Vorspann ohne Kopf\n--- spec ---\nx\n')
+    expect(err).toMatch(/--stdin document refused: line 1: text before the first part header/)
+    expect(err).toContain('--- spec ---, --- why ---')
+    expect(run(['--request', 'Kaputt', '--stdin'], true, {}, '--- spek ---\nx\n')).toMatch(/unknown field "spek"/)
+    expect(run(['--request', 'Kaputt', '--stdin'], true, {}, '--- spec ---\nx\n--- spec ---\ny\n')).toMatch(/"spec" given twice/)
+    expect(run(['--requests'])).toMatch(/no carrier yet|0 request\(s\) waiting/)
+  })
+
+  it('refuses two readers of one stdin and a field given twice', () => {
+    expect(run(['--request', 'x', '--spec-file', '-', '--why-file', '-'], true, {}, 'a\n')).toMatch(/both read stdin/)
+    expect(run(['--request', 'x', '--stdin', '--spec-file', join(dir, 'spec.md')], true, {}, '--- spec ---\na\n')).toMatch(/given both/)
   })
 })

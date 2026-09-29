@@ -15,6 +15,7 @@ import {
   markBlocked,
   markQueued,
   parseFields,
+  parseRequestDocument,
   pendingRequests,
   reapplyTransition,
   requestEntries,
@@ -356,5 +357,21 @@ describe('the gate is the point boundary, not every turn end', () => {
       atBoundary: true,
     })
     expect(v.violations.map((x) => x.kind).sort()).toEqual(['carrier-not-drained', 'request-not-queued'])
+  })
+})
+
+describe('parseRequestDocument — the whole deposit as one stdin document (point 1186)', () => {
+  it('splits the parts and keeps a body line that only looks like a separator', () => {
+    const { fields, error } = parseRequestDocument('\n--- spec ---\nA\n\n---\nB\n--- why ---\r\nweil\n\n')
+    expect(error).toBeUndefined()
+    expect(fields).toEqual({ spec: 'A\n\n---\nB', why: 'weil' })
+  })
+
+  it('refuses text before the first header, an unknown field, a duplicate and an empty document', () => {
+    expect(parseRequestDocument('x\n--- spec ---\ny').error).toMatch(/line 1: text before the first part header/)
+    expect(parseRequestDocument('--- title ---\ny').error).toMatch(/unknown field "title"/)
+    expect(parseRequestDocument('--- why ---\na\n--- why ---\nb').error).toMatch(/line 3: field "why" given twice/)
+    expect(parseRequestDocument('').error).toMatch(/no part header/)
+    expect(parseRequestDocument('').error).toContain('--- open-questions ---')
   })
 })

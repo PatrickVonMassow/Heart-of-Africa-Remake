@@ -327,3 +327,49 @@ export function formatRequest(entry) {
   if (warnings.length) out.push('', ...warnings.map((w) => `WARNING: ${w}`))
   return out.join('\n')
 }
+
+// ═══ Point 1186 — the whole deposit on STDIN ═════════════════════════════════
+//
+// A standing-down session may not create the files the long fields otherwise
+// need, so one `--stdin` call carries every field in a single delimited
+// document: each part opens with a line `--- <field> ---` and runs to the next
+// such line. Stdin satisfies the reason the fields are files (no quoting, no
+// length limit, umlauts intact) just as well.
+
+/** The fields a stdin document may carry, in the CLI's own spelling. */
+export const DOCUMENT_FIELDS = ['spec', 'why', 'constraints', 'quotes', 'doc-impact', 'open-questions', 'bundle', 'refs']
+
+const PART_HEADER = /^--- *([A-Za-z-]+) *---\s*$/
+
+/**
+ * Split a delimited request document into its fields. PURE.
+ * Returns `{ fields }` (field name → trimmed text) or `{ error }` naming what is
+ * wrong and the accepted fields. Text before the first header, an unknown
+ * field and a field given twice are refused rather than guessed at.
+ */
+export function parseRequestDocument(text = '') {
+  const accepted = `accepted part headers: ${DOCUMENT_FIELDS.map((f) => `--- ${f} ---`).join(', ')}`
+  const lines = String(text).replace(/\r\n/g, '\n').split('\n')
+  const fields = {}
+  let current = null
+  for (const [i, line] of lines.entries()) {
+    const header = PART_HEADER.exec(line)
+    if (header) {
+      const name = header[1].toLowerCase()
+      if (!DOCUMENT_FIELDS.includes(name)) return { error: `line ${i + 1}: unknown field "${header[1]}" — ${accepted}` }
+      if (name in fields) return { error: `line ${i + 1}: field "${name}" given twice — ${accepted}` }
+      fields[name] = []
+      current = name
+      continue
+    }
+    if (current === null) {
+      if (line.trim()) return { error: `line ${i + 1}: text before the first part header — ${accepted}` }
+      continue
+    }
+    fields[current].push(line)
+  }
+  if (current === null) return { error: `no part header found — ${accepted}` }
+  const out = {}
+  for (const [name, body] of Object.entries(fields)) out[name] = body.join('\n').replace(/^\n+/, '').replace(/\s+$/, '')
+  return { fields: out }
+}
