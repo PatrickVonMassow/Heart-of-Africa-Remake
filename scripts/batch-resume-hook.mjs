@@ -282,7 +282,7 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@aa7f5b05
+      // rule:model-policy@2f245cec
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'scripts/author-routing-core.mjs makes that cut from point text and recorded review history; ' +
       'a point\'s `Author lane:` tag stays an operator decision (ordinary-lane tags yield only to a ' +
