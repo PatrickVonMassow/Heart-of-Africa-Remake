@@ -59,7 +59,7 @@
 // safe direction is the conservative one: the old string regexes saw through a
 // wrapper by accident, and losing that would let a dispossessed session push
 // shared history through any shell (four-eyes review, 30.07.2026).
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import {
   expandSegments,
   isMutatingSegment,
@@ -816,8 +816,10 @@ export function resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot } = {}
  */
 const FILE_TOOLS = new Set([
   // `sed`, `awk` and `dd` are absent: a program or `of=` operand names its
-  // destination inside an argument no path test can read (point 1207).
-  'cat', 'tee', 'cp', 'mv', 'rm', 'rmdir', 'mkdir', 'touch', 'ln', 'chmod',
+  // destination inside an argument no path test can read; `cp`, `mv` and `ln`
+  // are absent because a directory operand hides the entry they write through
+  // (point 1207).
+  'cat', 'tee', 'rm', 'rmdir', 'mkdir', 'touch', 'chmod',
   'printf', 'echo', 'head', 'tail', 'sort',
 ])
 
@@ -827,6 +829,19 @@ const FILE_TOOLS = new Set([
  * filesystem in ways a lexical test cannot follow (point 1207, review round 3).
  */
 const plainPath = (text) => !/[$`*?[\]{}=\s'"\\]|^~/.test(text) && !text.split('/').includes('..')
+
+/**
+ * The path through the injected `canonical` resolver (the guard passes its
+ * symlink-following write-target resolver). '' or a throw means UNKNOWN, which
+ * the containment test treats as inside the checkout.
+ */
+function canonicalPath(path, canonical = (p) => p) {
+  try {
+    return canonical(path) || ''
+  } catch {
+    return ''
+  }
+}
 
 /**
  * Does this segment write ONLY outside the checkout? PURE (path resolution needs
@@ -844,7 +859,7 @@ const plainPath = (text) => !/[$`*?[\]{}=\s'"\\]|^~/.test(text) && !text.split('
  * no path argument at all is NOT exempted, and one path inside the checkout
  * removes the exemption for the whole segment.
  */
-export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '', realpath } = {}) {
+export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '', canonical } = {}) {
   if (!checkoutRoot) return false
   const { head, args } = headAndArgs(segment)
   if (!FILE_TOOLS.has(String(head))) return false
@@ -857,42 +872,24 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
     // sources as well only ever makes the test STRICTER, which is the safe side.
   ].filter((text) => typeof text === 'string' && text.trim())
   if (candidates.length === 0) return false
-    if (!candidates.every(plainPath)) return false
-  if (args.some((arg) => arg.text.startsWith('-') && arg.text.includes('='))) return false
+  if (!candidates.every(plainPath)) return false
+  // An option carrying a value (`--target-directory=…`, `-t/…`) may name the destination.
+  if (args.some((arg) => arg.text.startsWith('-') && /[=/]/.test(arg.text))) return false
   // An UNKNOWN directory (segmentCwds) leaves every relative target unknown too.
   if (!cwd && candidates.some((text) => !isAbsolute(text))) return false
   return candidates.every(
     (target) =>
       !resolvedTargetInCheckout({
-        resolvedFilePath: canonicalTarget(resolve(cwd || checkoutRoot, target), realpath),
+        resolvedFilePath: canonicalPath(resolve(cwd || checkoutRoot, target), canonical),
         checkoutRoot,
       }),
   )
 }
 
-/**
- * The target with its deepest EXISTING ancestor canonicalised, so a symlink
- * anywhere on the path into the checkout is seen as the checkout (point 1207).
- * A missing leaf keeps its remaining lexical tail.
- */
-function canonicalTarget(path, realpath = (p) => p) {
-  let head = path
-  let tail = ''
-  while (true) {
-    try {
-      return tail ? resolve(realpath(head), tail) : realpath(head)
-    } catch {
-      const parent = dirname(head)
-      if (parent === head) return path
-      tail = tail ? `${basename(head)}${sep}${tail}` : basename(head)
-      head = parent
-    }
-  }
-}
 
 /**
  * The directory each segment runs in, following top-level `cd`. PURE apart
- * from the injected `realpath`.
+ * from the injected `canonical` resolver.
  *
  * MEASURED 24.09.2026 (point 1207): `cd <scratchpad> && cat > why.md` was
  * refused because `why.md` was resolved against the SESSION cwd, the checkout.
@@ -902,10 +899,10 @@ function canonicalTarget(path, realpath = (p) => p) {
  * cannot establish is UNKNOWN (''), and callers resolve an unknown directory
  * against the checkout root, the strict side: `cd` with no argument, `-`, `~`,
  * a variable, `pushd`/`popd`, and every segment of a call in which any nested
- * segment changes directory. `realpath` canonicalises the target so a symlink into the
- * checkout is seen as the checkout; its failure also yields unknown.
+ * segment changes directory. `canonical` resolves the target so a symlink into
+ * the checkout is seen as the checkout; its failure also yields unknown.
  */
-export function segmentCwds(segments, cwd = '', { command = '', realpath = (path) => path } = {}) {
+export function segmentCwds(segments, cwd = '', { command = '', canonical } = {}) {
   const list = segments ?? []
   const nestedMoves = list.some((segment) => (segment?.depth ?? 0) !== 0 && ['cd', 'pushd', 'popd'].includes(headAndArgs(segment).head))
   let current = cwd
@@ -927,13 +924,7 @@ export function segmentCwds(segments, cwd = '', { command = '', realpath = (path
       moved = true
       const target = args.map((arg) => arg.text).filter((text) => text && text !== '--')
       const literal = target.length === 1 && !target[0].startsWith('-') && plainPath(target[0])
-      let next = ''
-      try {
-        next = literal && current ? realpath(resolve(current, target[0])) : ''
-      } catch {
-        next = ''
-      }
-      current = next
+      current = literal && current ? canonicalPath(resolve(current, target[0]), canonical) : ''
     }
     return here
   })
@@ -945,7 +936,7 @@ export function segmentCwds(segments, cwd = '', { command = '', realpath = (path
  * classification keeps reads and repository gates open and treats an unreadably
  * deep shell wrapper conservatively as a write.
  */
-export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '', realpath } = {}) {
+export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '', canonical } = {}) {
   const tool = String(toolName ?? '')
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
     if (filePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })) {
@@ -957,7 +948,7 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
   if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
-  const cwds = segmentCwds(segments, cwd || checkoutRoot, { command, realpath })
+  const cwds = segmentCwds(segments, cwd || checkoutRoot, { command, canonical })
   // `expandSegments` already yields every carried command separately. Judge the
   // direct program so `bash -c "npm run build"` does not get denied at the shell
   // carrier before its build leaf can receive the narrow exception below.
@@ -965,7 +956,7 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
     if (directSegmentIntent(candidate) !== 'write') return false
     // A write that lands entirely OUTSIDE this checkout is not a main write
     // (point 749) — the session memory directory is the case that measured it.
-    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd: cwds[i], checkoutRoot, realpath })) return false
+    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd: cwds[i], checkoutRoot, canonical })) return false
     return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
   })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }
@@ -994,13 +985,13 @@ export function mainWriteFenceDecision({
   resolvedFilePath,
   checkoutRoot,
   cwd = '',
-  realpath,
+  canonical,
 } = {}) {
   try {
     if (paused === true || worktree === true || branch !== 'main') {
       return { block: false, registerWriter: false, reason: '' }
     }
-    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, realpath })
+    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, canonical })
     if (!action.writes) return { block: false, registerWriter: false, reason: '' }
     if (ownsBatchLock === true) return { block: false, registerWriter: true, reason: '' }
     return {

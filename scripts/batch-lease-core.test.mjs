@@ -530,8 +530,8 @@ describe('the main-write ownership fence', () => {
     expect(fromRoot('cd /tmp/pad && true ; cat > src/x.ts')).toBe(true)
     expect(fromRoot('cd /tmp/pad | cat > src/x.ts')).toBe(true)
     expect(fromRoot('cd /tmp/pad && bash -c "cd /workspace/hoa && cat > src/x.ts"')).toBe(true)
-    expect(fromRoot('cd /tmp/link && cat > src/x.ts', { realpath: (p) => (p === '/tmp/link' ? '/workspace/hoa' : p) })).toBe(true)
-    expect(fromRoot('cd /tmp/gone && cat > x.md', { realpath: () => { throw new Error('ENOENT') } })).toBe(true)
+    expect(fromRoot('cd /tmp/link && cat > src/x.ts', { canonical: (p) => (p === '/tmp/link' ? '/workspace/hoa' : p) })).toBe(true)
+    expect(fromRoot('cd /tmp/gone && cat > x.md', { canonical: () => { throw new Error('ENOENT') } })).toBe(true)
     expect(fromRoot('cd /tmp/pad && cat > "$DEST"')).toBe(true)
     expect(fromRoot('cat > ~/x.md')).toBe(true)
     // Review round 2: an unknown directory, `eval` and a symlink in the target.
@@ -542,16 +542,21 @@ describe('the main-write ownership fence', () => {
       if (p.startsWith('/tmp/pad/link/')) throw new Error('ENOENT')
       return p
     }
-    expect(fromRoot('cd /tmp/pad && cat > link/src/x.ts', { realpath: link })).toBe(true)
-    expect(fromRoot('cat > /tmp/pad/link/src/x.ts', { realpath: link })).toBe(true)
-    expect(fromRoot('cat > /tmp/pad/new/x.md', { realpath: link })).toBe(false)
+    expect(fromRoot('cd /tmp/pad && cat > link/src/x.ts', { canonical: link })).toBe(true)
+    expect(fromRoot('cat > /tmp/pad/link/src/x.ts', { canonical: link })).toBe(true)
+    expect(fromRoot('cat > /tmp/pad/new/x.md', { canonical: link })).toBe(false)
     // Review round 3: `..`, a logical `cd ..`, a wildcard, a `--opt=` target and
     // a `dd of=` operand.
     expect(fromRoot('cat > /tmp/link/../src/x.ts')).toBe(true)
-    expect(fromRoot('cd /workspace/hoa/link && cd .. && cat > src/x.ts', { realpath: (p) => (p === '/workspace/hoa/link' ? '/tmp/pad' : p) })).toBe(true)
+    expect(fromRoot('cd /workspace/hoa/link && cd .. && cat > src/x.ts', { canonical: (p) => (p === '/workspace/hoa/link' ? '/tmp/pad' : p) })).toBe(true)
     expect(fromRoot('rm /tmp/pad/link*/src/x.ts')).toBe(true)
     expect(fromRoot('cp --target-directory=/workspace/hoa/src /tmp/a.ts')).toBe(true)
     expect(fromRoot('dd if=/tmp/a of=/workspace/hoa/x')).toBe(true)
+    // Review round 4: an attached option value, a dangling link, a directory operand.
+    expect(fromRoot('cd /tmp/pad && cp -t/workspace/hoa/src a.ts')).toBe(true)
+    expect(fromRoot('cd /tmp/pad && cat > link', { canonical: (p) => (p === '/tmp/pad/link' ? '/workspace/hoa/new.md' : p) })).toBe(true)
+    expect(fromRoot('cd /tmp/pad && cat > link', { canonical: (p) => (p === '/tmp/pad/link' ? '' : p) })).toBe(true)
+    expect(fromRoot('cd /tmp/pad && cp a.ts out')).toBe(true)
     // The plain `&&` chain from the scratchpad still passes, nested write included.
     expect(fromRoot('cd /tmp/pad && cat > a.md && tee b.md')).toBe(false)
     expect(shell('git commit -F /tmp/message.txt').writes).toBe(true)

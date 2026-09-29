@@ -323,10 +323,10 @@ describe('ownership mutation stand-down', () => {
     // Any nested `cd` makes the call's directory unknown — `eval` would move this shell.
     expect(outside({ cwd: pad, command: `bash -c "cd ${root}" && cat > x.md` }).block).toBe(true)
     expect(outside({ command: `cd ${pad} && eval "cd ${root}" && cat > src/x.ts` }).block).toBe(true)
-    expect(outside({ command: `cd ${pad} && cat > link/src/x.ts`, realpath: (p) => { if (p === `${pad}/link`) return root; if (p.startsWith(`${pad}/link/`)) throw new Error('ENOENT'); return p } }).block).toBe(true)
+    expect(outside({ command: `cd ${pad} && cat > link/src/x.ts`, canonical: (p) => { if (p === `${pad}/link`) return root; if (p.startsWith(`${pad}/link/`)) throw new Error('ENOENT'); return p } }).block).toBe(true)
     expect(outside({ command: `cd ${pad} || cat > src/x.ts` }).block).toBe(true)
     expect(outside({ command: `cd ${pad} && cat > "$DEST"` }).block).toBe(true)
-    expect(outside({ command: 'cd /tmp/link && cat > src/x.ts', realpath: (p) => (p === '/tmp/link' ? root : p) }).block).toBe(true)
+    expect(outside({ command: 'cd /tmp/link && cat > src/x.ts', canonical: (p) => (p === '/tmp/link' ? root : p) }).block).toBe(true)
   })
 })
 
