@@ -1518,6 +1518,12 @@
       "why": "Real blockade of a claim handover, but it costs no game work; last is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1236": {
+      "at": "2026-09-29T13:20:08.882Z",
+      "why": "WebGL-2-only reds from a loaded machine; CLAUDE.md §7.2 lets a WebGL-2-only defect wait for the next LARGE, and the reds are charged",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1547,7 +1553,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-29T12:00:40.044Z",
+    "at": "2026-09-29T13:20:08.891Z",
     "points": [
       184,
       200,
@@ -1977,7 +1983,8 @@
       1229,
       1231,
       1232,
-      1235
+      1235,
+      1236
     ]
   }
 }
