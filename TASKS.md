@@ -77,20 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1238. Speech labels show whose they are
-  Speech labels show whose they are (user report 29.09.2026: with several figures visible it is not recognisable which speech label belongs to whom).
-  MEASURED 29.09.2026: the label (src/scenes/place/SpeechLabels.tsx, SpeechLabelCard, .speech-label in src/index.css) is a plain rectangle centred over the speaker's crown (drei <Html center>), with no tail and no other cue to its speaker. Seen obliquely or with two figures close together it floats between heads; nothing marks which of two labels in an exchange is the current one.
-  FINAL STATE.
-  1. TAIL. Every speech label carries a small tail (speech-bubble pointer) at its lower edge that points down at its own speaker's head; the label's anchor/offset is adjusted so the tail tip, not the box centre, sits just above the crown. Pure presentation (CSS/markup), no new system; the targeted style (.speech-label.targeted) keeps its highlight including the tail.
-  2. OLDER LABEL RECEDES. When a newer label appears while an older one is still shown (typically the reply in a two-figure exchange granted by the speech floor, src/communication/speechFloor.ts), the older label is visibly dimmed and slightly smaller, so the current speaker's label is always the most prominent. A targeted label is never dimmed (the player's guess target stays legible). Dim opacity/scale are calibratable values in src/config/balance.ts.
-  3. SPEAKING CUE ON THE FIGURE - CHECK, THEN DECIDE. Examine whether the speaking figure itself can show that it is speaking (e.g. a small head motion while its label is fresh), building on the existing gesture machinery (src/communication/spokenGesture.ts) rather than a new system. Constraint: the cue must never be readable as a concept gesture - gestures in this game teach meanings (docs/communication-poc-spec.md), so a speaking cue that resembles one would teach a false meaning. Implement it only if it is simple and robust on both children and adults; if it is complicated, error-prone, or collides with concept gestures, do NOT implement it and record the reason (one sentence in the commit message and a docs/backlog.md entry). Either outcome closes the point.
-  PROOF. Vitest for the recede logic (newer label dims older, targeted never dims, values from balance). Playwright picture on WebGPU in a settlement with two figures speaking close together, showing both tails pointing at their own speakers and the older label dimmed; if 3 is implemented, a check that the cue runs only while the figure speaks. Both backends if the change touches a backend-sensitive path.
-  Bundle: Kommunikation. Criticality: medium.
-  ORDER: directly after point 1186 (user order 29.09.2026).
-  USER, verbatim:
-  User 29.09.2026 18:02: »Aktuelle ist nicht erkennbar, zu wem eine Sprechblase gehört. Das ist irritierend, wenn mehrere Personen gleichzeitig sichtbar sind.«
-  User 29.09.2026 18:07: »Reihe einen neuen Task nach 1186 ein, der deine Vorschläge 1 und 2 umsetzt und 4 prüft. Sollte sich 4 gut umsetzen lassen, das miterledigen. Falls 4 zu kompliziert/fehleranfällig ist, nur 1 und 2 machen.«
-
 - [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
   (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
   run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the
