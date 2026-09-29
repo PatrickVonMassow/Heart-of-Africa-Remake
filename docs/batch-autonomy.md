@@ -21,9 +21,9 @@ choice supported by the evidence, continues, and puts a card headed
 “Entscheidungsprotokoll” below “Erledigt” (user order 22.09.2026; `node
 scripts/board.mjs log-add`, and the card writer routes the prefix there, so it
 no longer floods “Von dir zu klären”). That card states the decision,
-evidence, consequence, and exact retroactive-veto action. It is a record for
-later veto, not an open question and not a lock on the queue; the section keeps
-its newest 20 and archives the rest on the archive page.
+evidence, consequence, and exact retroactive-veto action. A question card is a
+record for later veto, not a lock on the queue — and no open question: the
+section keeps its newest 20 and archives the rest on the archive page.
 
 **The card is SHORT and plainly understandable** (user 15.09.2026, after eight of
 them had grown into four dense paragraphs apiece): one or two short sentences per
