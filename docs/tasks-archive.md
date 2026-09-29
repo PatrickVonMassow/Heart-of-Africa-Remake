@@ -32226,3 +32226,17 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Test: unit tests of the switch core and routing; the off-machine probe recorded with its marker.
   Refs: scripts/fable-switch.mjs, scripts/astra-share.mjs, docs/harness-primitives-evaluation.md.
   Bundle: Modell & Wächter (the authoring-lane routing; worked directly behind 174 by user order).
+
+- [x] 1207. The stand-down fence refuses writes outside the checkout, so the documented request handoff cannot be used.
+  FINAL STATE: a stood-down session can deposit a request with `finding.mjs --request` using files it writes itself, with no workaround.
+
+  (a) ownershipStandDownDecision (scripts/board-first-core.mjs) does not block a Write/Edit whose file_path lies outside the main checkout, and does not block a Bash segment that segmentWritesOnlyOutsideCheckout (scripts/batch-lease-core.mjs) already clears - reuse that function, add no new classifier. A path inside the checkout stays refused exactly as today.
+
+  (b) Check why `cat > why.md` after `cd <scratchpad>` was refused by the lease fence although it writes outside the checkout (relative target resolved against the session cwd rather than the segment cwd?); fix so it passes.
+
+  (c) Tests: a stood-down Write to the session scratchpad and a stood-down `cat > <scratchpad>/x.md <<EOF` both pass; a stood-down Write to TASKS.md and to src/ still block.
+
+  NOT IN SCOPE: a new guard, a new flag on finding.mjs, or any loosening of in-checkout writes. This switches a rule off where it is in the way (CLAUDE.md section 2 freeze).
+  Criticality: medium.
+  PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
+  Bundle: Modell & Wächter.
