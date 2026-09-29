@@ -127,6 +127,15 @@ resilience layer on remote execution without re-probing first, and never infer
 from a successful `isolation: "remote"` call that the work is off this machine —
 ask the agent where it is (`uname -a`), which is what this probe did.
 
+Re-probe, 29.09.2026 (point 1230, the cloud offload switch): the Agent tool now
+documents `isolation: "remote"` as a cloud environment, yet the probe author again
+reported host `66a0eaaacb4b`, kernel `microsoft-standard-WSL2`, machine-id of this
+container and a path under `.claude/worktrees/agent-…` — **still local, still
+silent**. `node scripts/cloud-switch.mjs --on` therefore refuses: it demands a
+recorded marker whose host differs from this container (`--record-probe <ref>`)
+plus the user's confirmation that the cloud credit balance dropped. Until both
+stand, `--venue` routes every authoring delegation locally.
+
 ## 7. The volume of a verify run's output — BUILT (no primitive)
 
 Our gap, and the one both models named in the 30.07.2026 four-eyes review: a
