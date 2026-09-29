@@ -267,6 +267,19 @@ put it is the mistake this line exists to stop.
   scripts/vdzk-admissibility-core.mjs, user order 22.09.2026 12:25
   Bundle: Chat & Tafel
 
+- [ ] 1232. A receipt re-judges across a render-neutral commit, so only the missing backends run again
+  ORDER (user 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."): this point stands DIRECTLY AFTER point 1185 in the work order.
+  SPEC: when the only commits between a finished verify receipt and the current HEAD touch render-neutral paths (the charge ledger scripts/render-verify-charges.mjs, docs, TASKS.md/backlog/bookkeeping, tests of scripts; NOT src/, public/, assets, package/lockfile, vite/runner config, or the verify suites themselves), the receipt is re-judged against the current charge ledger instead of discarded. Its re-judged per-backend verdict counts for the new HEAD; only backends the receipt did not complete run again.
+  The render-neutral classification reuses the existing path classifier (isBackendSensitivePath / the ladder edit ageing) rather than a new list; unknown path -> not neutral -> full run (fail closed).
+  A receipt whose run record is incomplete for a red (the "run record is incomplete, so no charge may be accepted" case) is NOT re-judged for that red; it stays unresolved and the backend reruns.
+  The closing step large-regression accepts a re-judged receipt plus the fresh backend receipt(s) as "both backends green on the release HEAD", and its evidence names both receipts and the neutral diff.
+  FINAL STATE: (1) re-judge path in the verify wrapper/receipt reuse; (2) closing-guard accepts the combined evidence; (3) unit tests: neutral diff -> reuse + missing backend only; src/ touched -> full run; unknown path -> full run; incomplete record -> no reuse for that red; (4) scripts/verify/README.md receipt section updated.
+  Infrastructure freeze (CLAUDE.md §2): explicit user order; it SIMPLIFIES (removes a whole rerun) and adds no new ledger, router or planner.
+  USER, verbatim:
+  User 28.09.2026 19:37: "Warum muss die gesamte Regression von vorne laufen, wenn bestimmte Teil bereits erfolgreich durchgetestet wurden?"
+  User 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."
+  Refs: point 633; scripts/render-verify-charges.mjs; scripts/closing-guard-core.mjs large-regression; scripts/verify/README.md receipt reuse
+
 - [ ] 1213. A young animal killed by a predator stays dead and becomes a carcass (user bug
   report 25.09.2026, local/JungtierZombie.zip: the lion caught the young animal, the
   parent stood mourning beside it, no vultures came, and then the young was alive again
@@ -16125,3 +16138,14 @@ to land than a mechanism that needs a review.
   Test: unit case for the steal abort keeping the predator's position.
   Refs: src/scenes/travel/Wildlife.tsx.
   Bundle: Tierverhalten.
+
+- [ ] 1231. Cloud authoring may run during a local regression once the cloud offload switch is ON and proven
+  Point 1230 is closed, so this amendment stands as its own point.
+  Amend point 1230 (cloud offload switch): while the switch is ON and its step-3 proof of off-machine execution has passed, a running local regression / picture run no longer blocks cloud authoring. Cloud author sessions may be started, run, commit and push to their own feat/<point>-<slug> branches during the run.
+  Locally the quiet-machine rule stays unchanged: during the run the local steering session only reads and launches/polls cloud sessions. Still forbidden in the window: main pushes (full pre-push gate), writes to MEMORY.md or any budgeted document, batch-doctor --gate, local suites, picture checks, landing, and creating a local worktree for a finished cloud branch (npm install / disk load). Review of a pushed cloud branch is read-only and allowed. Everything local that follows (suites, picture, landing) waits for the run receipt.
+  While the switch is OFF, or step 3 has not passed, the quiet-machine rule applies as today (no parallel authoring during a run).
+  FINAL STATE: the rule stands in point 1230 spec and in the quiet-machine guidance the batch reads during a run; a unit test covers the routing decision: run in flight + switch ON + proof passed -> cloud launch allowed; otherwise -> wait.
+  USER, verbatim:
+  User 28.09.2026 19:30: "Wie wäre es mit folgendem Vorschlag: Bisher galt ja während eines Testlauf Maschine ruhig halten. Aber jetzt, mit der Option, Tätigkeiten in die Cloud auszulagern, könnten dort doch auch während einer auf meinem PC laufenden Regression andere Tasks bearbeitet werden, oder?"
+  User 28.09.2026 19:34: "Ja, reiche das als Auftrag ein."
+  Refs: point 1230
