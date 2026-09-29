@@ -78,8 +78,8 @@ export function SpeechLabelCard({
             debug concept view is not something to write a guess about. */}
         {targeted && !conceptLabels && <div className="speech-invite">{t.speechGuess.invite}</div>}
       </div>
-      <svg className="speech-tail" width="14" height="9" viewBox="0 0 14 9" aria-hidden="true">
-        <path d="M0 0 L7 9 L14 0" />
+      <svg className="speech-tail" width="18" height="11" viewBox="0 0 18 11" aria-hidden="true">
+        <path d="M0 0 L9 11 L18 0" />
       </svg>
     </div>
   )

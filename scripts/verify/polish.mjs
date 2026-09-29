@@ -988,12 +988,13 @@ if (section('speech-owner')) {
         if (d >= 1.2 && d <= 4) out.push({ a: i, b: j, d })
       }
     }
-    return out.sort((l, r) => l.d - r.d).slice(0, 12)
+    return out.sort((l, r) => l.d - r.d).slice(0, 24)
   })
-  // Stand OUTSIDE the talk reach (10 m) in front of the pair's midpoint, so
-  // neither note is the guess target — a targeted note never recedes, and that
-  // exception is Vitest's to prove, not this picture's.
-  const STAND_BACKS = [12, 11]
+  // Stand a few metres in front of the pair's midpoint. The notes are spoken
+  // with a tiny targeting reach, so neither is the guess target — a targeted
+  // note never recedes, and that exception is Vitest's to prove, not this
+  // picture's.
+  const STAND_BACKS = [6, 5, 4]
   const aimPair = (pair, back) =>
     page.evaluate(
       ({ a, b, back }) => {
@@ -1028,11 +1029,20 @@ if (section('speech-owner')) {
   const seen = (pair) =>
     page.evaluate(({ a, b }) => {
       const figs = window.__speechOwnerFigures
+      // Several heights up the body, the best one kept: a thin figure lets a
+      // single ray slip past an arm or between the legs, which is no occluder.
       return [figs[a], figs[b]].map((f) => {
         f.updateWorldMatrix(true, false)
         const e = f.matrixWorld.elements
-        const h = window.__placeRayHit(e[12], e[13] + Math.max(0.4, Math.hypot(e[4], e[5], e[6])), e[14])
-        return h.hitDistance == null ? null : h.hitDistance / h.targetDistance
+        const h = Math.max(0.5, Math.hypot(e[4], e[5], e[6]) * 1.45)
+        let best = null
+        for (const k of [0.35, 0.5, 0.65, 0.8, 0.92]) {
+          const hit = window.__placeRayHit(e[12], e[13] + h * k, e[14])
+          if (hit.hitDistance == null) continue
+          const ratio = hit.hitDistance / hit.targetDistance
+          if (best === null || Math.abs(ratio - 1) < Math.abs(best - 1)) best = ratio
+        }
+        return best
       })
     }, pair)
   let chosen = null
@@ -1069,7 +1079,7 @@ if (section('speech-owner')) {
           const say = (f, id) => {
             const name = f.name
             f.name = `${id}-figure`
-            const ok = window.__speech?.speak(id, [u], `${id}-figure`, 120) === true
+            const ok = window.__speech?.speak(id, [u], `${id}-figure`, 120, 0.1) === true
             f.name = name
             return ok
           }
@@ -1098,9 +1108,17 @@ if (section('speech-owner')) {
             width: bubble.getBoundingClientRect().width,
             receded: bubble.classList.contains('receded'),
             targeted: bubble.classList.contains('targeted'),
+            onScreen: tail.bottom > 0 && tail.bottom < window.innerHeight && tail.left > 0 && tail.right < window.innerWidth,
           }
         }
-        return { older: one('owner-older'), newer: one('owner-newer') }
+        const p = window.__placePlayer
+        const cam = window.__placeCamera
+        return {
+          older: one('owner-older'),
+          newer: one('owner-newer'),
+          player: p ? { x: +p.x.toFixed(2), z: +p.z.toFixed(2) } : null,
+          camera: cam ? { x: +cam.position.x.toFixed(2), z: +cam.position.z.toFixed(2) } : null,
+        }
       })
     await aimPair(chosen, chosen.back)
     const spoke = await speakPair()
@@ -1123,7 +1141,7 @@ if (section('speech-owner')) {
       JSON.stringify(r),
     )
     check(
-      'the older note recedes behind the newer one, and neither is targeted out of reach (point 1238)',
+      'the older note recedes behind the newer one, neither being the guess target (point 1238)',
       !!r.older && !!r.newer && r.older.receded && !r.newer.receded &&
         !r.older.targeted && !r.newer.targeted &&
         r.older.opacity < 0.9 && r.newer.opacity > 0.99,
@@ -1156,8 +1174,9 @@ if (section('speech-owner')) {
       },
     )
     check(
-      'at the shutter the older note is still the receded one (point 1238)',
-      !!atShutter?.older?.receded && atShutter?.newer?.receded === false,
+      'at the shutter both notes stand in the frame and the older is still the receded one (point 1238)',
+      !!atShutter?.older?.receded && atShutter?.newer?.receded === false &&
+        atShutter.older.onScreen && atShutter.newer.onScreen,
       JSON.stringify(atShutter),
     )
     await page.evaluate((u) => {

@@ -145,11 +145,13 @@ export function SpeechLabels() {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
     w.__speech = {
-      speak: (speakerId: string, atoms: Phrase, anchorName?: string, seconds?: number) => {
+      // `reach` narrows who may TARGET the note, so a picture can stage two
+      // notes near the player with neither being the guess target.
+      speak: (speakerId: string, atoms: Phrase, anchorName?: string, seconds?: number, reach?: number) => {
         const anchor = scene.getObjectByName(anchorName ?? speakerId) ??
           (anchorName === undefined ? speechAnchor(speakerId) : null)
         if (!anchor || scene.getObjectById(anchor.id) !== anchor) return false
-        speakOverhead(speakerId, atoms, anchor, { seconds })
+        speakOverhead(speakerId, atoms, anchor, { seconds, reach })
         return true
       },
       anchorScreen: (speakerId: string) => {
