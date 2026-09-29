@@ -193,7 +193,7 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
 
   it('judges both sides of a rename: moving code out of src/ into docs/ is not neutral', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-rejudge-rename-'))
-    const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
     try {
       git('init', '-q')
       git('config', 'user.email', 't@example.invalid')
