@@ -356,6 +356,33 @@ describe('cross-vendor review round 1 (29.09.2026)', () => {
     expect(titlesIn(boardAfter, DECISION_LOG_TITLE)).toHaveLength(ENTSCHEIDUNGEN_ON_BOARD)
   })
 
+  it('a retry that meets newer spill still archives only the new cards once', () => {
+    let archiveOnDisk = archivePage()
+    const first = overfull()
+    runArchiveRotation({ board: first, archive: archiveOnDisk, pageUrl: URL, writeArchive: (h) => { archiveOnDisk = h }, writeBoard: () => {} })
+    // The board write was lost, and a newer record arrived meanwhile.
+    const grown = addDecisionRecord(first, 'Entscheidungsprotokoll: Neu', RECORD_BODY)
+    const r = rotateBoardArchives({ board: grown, archive: archiveOnDisk, pageUrl: URL })
+    expect(r.archived.log).toBe(3)
+    for (const n of [20, 21, 22]) expect(r.archive.split(`Entscheidung ${n}<`).length - 1).toBe(1)
+  })
+
+  it('archives a repeated record whose older twin is already in the archive', () => {
+    const twin = record(7)
+    const archive = archivePage().replace(
+      '<footer>',
+      `<h2 id="${ARCHIVE_LOG_ANCHOR}">${DECISION_LOG_TITLE}</h2>\n${record(50)}${twin}<footer>`,
+    )
+    const r = rotateBoardArchives({
+      board: board({ log: `${records(100, ENTSCHEIDUNGEN_ON_BOARD)}${twin}` }),
+      archive,
+      pageUrl: URL,
+    })
+    expect(r.moved.log).toBe(1)
+    expect(r.archived.log).toBe(3)
+    expect(r.archive.split('Entscheidung 7<').length - 1).toBe(2)
+  })
+
   it('places archived cards inside their sections on a single-line archive page', () => {
     const inline = `<main><h2>Erledigt (älter)</h2>${doneCard(900).replace(/\n/g, '')}<h2 id="${ARCHIVE_LOG_ANCHOR}">${DECISION_LOG_TITLE}</h2><footer>x</footer></main>`
     const r = rotateBoardArchives({

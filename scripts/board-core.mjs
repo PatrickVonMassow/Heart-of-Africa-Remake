@@ -2439,11 +2439,18 @@ export function rotateBoardArchives({ board, archive, pageUrl = ARCHIVE_PAGE_URL
     for (const card of overflow) kept = kept.replace(card, '')
     b = b.slice(0, from) + kept + b.slice(end)
     // A RETRY AFTER AN INTERRUPTED ROTATION ADDS NOTHING TWICE: the archive is
-    // written first, so a card already standing in its archive section is the
-    // record of an earlier pass whose board write never landed.
+    // written first, so an earlier pass whose board write never landed left its
+    // overflow as the TOP block of the archive section, in the same order, and
+    // this pass's overflow ENDS with that block. Only that exact suffix/prefix
+    // overlap is skipped (cross-vendor review, fourth round): a text match
+    // anywhere in the archive would drop a legitimately repeated record, whose
+    // older twin was archived before the cards that stood between them.
     const span = archiveSpans(a)[key]
-    const archivedText = a.slice(span.at, span.end)
-    const fresh = overflow.filter((card) => !archivedText.includes(card.trimEnd()))
+    const top = (a.slice(span.at, span.end).match(ARCHIVE_CARD) ?? []).map((card) => card.trimEnd())
+    let overlap = Math.min(overflow.length, top.length)
+    const same = (k) => overflow.slice(overflow.length - k).every((card, i) => card.trimEnd() === top[i])
+    while (overlap > 0 && !same(overlap)) overlap -= 1
+    const fresh = overflow.slice(0, overflow.length - overlap)
     if (fresh.length) {
       a = a.slice(0, span.at) + fresh.map((card) => `${card.trimEnd()}\n`).join('') + a.slice(span.at)
     }
