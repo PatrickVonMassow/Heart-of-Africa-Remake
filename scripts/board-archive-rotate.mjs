@@ -9,11 +9,12 @@
 //
 // The two files are published artefacts, not sources (both are git-ignored):
 // rotate, then publish — board-publish.mjs pushes BOTH pages in one commit.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { ENTSCHEIDUNGEN_ON_BOARD, ERLEDIGT_ON_BOARD } from './dashboard-guard-core.mjs'
-import { rotateBoardArchives } from './board-core.mjs'
+import { rotateBoardArchives, runArchiveRotation } from './board-core.mjs'
+import { writeTextAtomic } from './atomic-write.mjs'
 import { REPUBLISH } from './board-remedy.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
@@ -29,19 +30,24 @@ const rawArchive = readFileSync(ARCHIVE, 'utf8')
 // BOTH CAPPED SECTIONS IN ONE PASS (user order 22.09.2026): Erledigt and the
 // decision log each keep their newest cards; the rest go to their own section
 // of the one archive page, and both link paragraphs are rewritten with counts.
-const r = rotateBoardArchives({ board: rawBoard, archive: rawArchive })
-const due = r.moved.done + r.moved.log
+const planned = rotateBoardArchives({ board: rawBoard, archive: rawArchive })
+const due = planned.moved.done + planned.moved.log
 
 if (check) {
   if (due) {
-    console.error(`board holds ${r.moved.done} done and ${r.moved.log} decision card(s) over the cap — due to move to the archive page`)
+    console.error(`board holds ${planned.moved.done} done and ${planned.moved.log} decision card(s) over the cap — due to move to the archive page`)
     process.exit(1)
   }
   console.log(`board is within its caps (${ERLEDIGT_ON_BOARD} done, ${ENTSCHEIDUNGEN_ON_BOARD} decisions) — nothing to rotate`)
   process.exit(0)
 }
-if (r.board !== rawBoard) writeFileSync(BOARD, r.board)
-if (r.archive !== rawArchive) writeFileSync(ARCHIVE, r.archive)
+// Archive first, board second, each atomically: no crash between them can lose a record.
+const r = runArchiveRotation({
+  board: rawBoard,
+  archive: rawArchive,
+  writeArchive: (html) => writeTextAtomic(ARCHIVE, html),
+  writeBoard: (html) => writeTextAtomic(BOARD, html),
+})
 if (!due) {
   console.log(`board within its caps (${ERLEDIGT_ON_BOARD} done, ${ENTSCHEIDUNGEN_ON_BOARD} decisions) — nothing to rotate`)
   process.exit(0)

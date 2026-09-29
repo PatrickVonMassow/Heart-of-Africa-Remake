@@ -20,6 +20,7 @@ import {
   removeDecisionRecord,
   removeVdzk,
   rotateBoardArchives,
+  runArchiveRotation,
 } from './board-core.mjs'
 import { REQUIRED_SECTIONS, structureViolations } from './board-structure-core.mjs'
 import {
@@ -281,5 +282,102 @@ describe('rotation of both capped sections in one pass', () => {
     })
     expect(titlesIn(r.board, DECISION_LOG_TITLE)).toHaveLength(2)
     expect(auditDashboard(r.board, {})).toEqual([])
+  })
+})
+
+describe('cross-vendor review round 1 (29.09.2026)', () => {
+  const doneCards = (from, n) => Array.from({ length: n }, (_, i) => doneCard(from + i)).join('')
+  const records = (from, n) => Array.from({ length: n }, (_, i) => record(from + i)).join('')
+  const overfull = () => board({ done: doneCards(1, 1), log: records(1, ENTSCHEIDUNGEN_ON_BOARD + 2) })
+
+  it('writes the archive BEFORE the board, so a failed archive write loses nothing', () => {
+    const order = []
+    expect(() =>
+      runArchiveRotation({
+        board: overfull(),
+        archive: archivePage(),
+        pageUrl: URL,
+        writeArchive: () => {
+          order.push('archive')
+          throw new Error('EACCES')
+        },
+        writeBoard: () => order.push('board'),
+      }),
+    ).toThrow(/EACCES/)
+    expect(order).toEqual(['archive'])
+  })
+
+  it('an interruption between the two writes keeps every record, and the retry archives none twice', () => {
+    let archiveOnDisk = archivePage()
+    const boardOnDisk = overfull()
+    expect(() =>
+      runArchiveRotation({
+        board: boardOnDisk,
+        archive: archiveOnDisk,
+        pageUrl: URL,
+        writeArchive: (html) => {
+          archiveOnDisk = html
+        },
+        writeBoard: () => {
+          throw new Error('killed')
+        },
+      }),
+    ).toThrow(/killed/)
+    // Both overflow records stand in the archive while the board is unchanged.
+    expect(archiveOnDisk).toContain('Entscheidung 21')
+    expect(archiveOnDisk).toContain('Entscheidung 22')
+    let boardAfter = null
+    const retry = runArchiveRotation({
+      board: boardOnDisk,
+      archive: archiveOnDisk,
+      pageUrl: URL,
+      writeArchive: (html) => {
+        archiveOnDisk = html
+      },
+      writeBoard: (html) => {
+        boardAfter = html
+      },
+    })
+    expect(retry.archived.log).toBe(2)
+    expect(archiveOnDisk.split('Entscheidung 21<').length - 1).toBe(1)
+    expect(titlesIn(boardAfter, DECISION_LOG_TITLE)).toHaveLength(ENTSCHEIDUNGEN_ON_BOARD)
+  })
+
+  it('places archived cards inside their sections on a single-line archive page', () => {
+    const inline = `<main><h2>Erledigt (älter)</h2>${doneCard(900).replace(/\n/g, '')}<h2 id="${ARCHIVE_LOG_ANCHOR}">${DECISION_LOG_TITLE}</h2><footer>x</footer></main>`
+    const r = rotateBoardArchives({
+      board: board({ done: doneCards(1, ERLEDIGT_ON_BOARD + 1), log: records(1, ENTSCHEIDUNGEN_ON_BOARD + 1) }),
+      archive: inline,
+      pageUrl: URL,
+    })
+    const main = r.archive.indexOf('<main>')
+    const doneHead = r.archive.indexOf('<h2>Erledigt (älter)</h2>')
+    const logHead = r.archive.indexOf(`<h2 id="${ARCHIVE_LOG_ANCHOR}">`)
+    expect(main).toBe(0)
+    expect(r.archive.indexOf('Fertig 21')).toBeGreaterThan(doneHead)
+    expect(r.archive.indexOf('Fertig 21')).toBeLessThan(logHead)
+    expect(r.archive.indexOf('Entscheidung 21')).toBeGreaterThan(logHead)
+    expect(r.archived).toEqual({ done: 2, log: 1 })
+  })
+
+  it('an evidence URL inside a record does not stand in for the archive link', () => {
+    const evidence = card('Entscheidungsprotokoll: Mit Beleg', '<p>Evidenz: <a href="https://example.invalid/beleg">Beleg</a>.</p>')
+    const codes = auditDashboard(board({ log: evidence }), {}).map((v) => v.code)
+    expect(codes).toContain('archive-link-missing')
+  })
+
+  it('an emptied LAST record fails the audit even with the archive link and footer after it', () => {
+    const emptied = `<details>\n  <summary><span class="t">Entscheidungsprotokoll: leer</span></summary>\n  <div class="body"></div>\n</details>\n`
+    const html = board({ log: `${record(1)}${emptied}${archiveLinkParagraph('log', 3, URL)}\n` })
+    expect(auditDashboard(html, {}).map((v) => v.code)).toContain('empty-body')
+  })
+
+  it('a record keeps its umlaut check after the move to the decision log', () => {
+    const translit = card('Entscheidungsprotokoll: Pruefung', '<p>Entscheidung: die Pruefung laeuft weiter.</p>')
+    const inVdzk = auditDashboard(board({ vdzk: translit }), {}).map((v) => v.code)
+    const moved = migrateDecisionLog(board({ withLog: false, vdzk: translit }))
+    const inLog = auditDashboard(rotateBoardArchives({ board: moved, archive: archivePage(), pageUrl: URL }).board, {}).map((v) => v.code)
+    expect(inVdzk).toContain('transliterated-umlaut')
+    expect(inLog).toContain('transliterated-umlaut')
   })
 })

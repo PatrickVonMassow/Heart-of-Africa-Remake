@@ -2356,6 +2356,20 @@ export const ARCHIVE_LINK_TEXT = {
   },
 }
 
+/**
+ * Rotate and PERSIST in the one order that cannot lose a record (cross-vendor
+ * review 29.09.2026): the archive is written first, the board second. A failure
+ * before or at the archive write leaves the board untouched; a failure between
+ * the two leaves the cards on BOTH pages, and the next pass removes them from
+ * the board without archiving them twice.
+ */
+export function runArchiveRotation({ board, archive, writeArchive, writeBoard, pageUrl = ARCHIVE_PAGE_URL }) {
+  const r = rotateBoardArchives({ board, archive, pageUrl })
+  if (r.archive !== archive) writeArchive(r.archive)
+  if (r.board !== board) writeBoard(r.board)
+  return r
+}
+
 /** One section's archive link paragraph, counting the cards the archive holds for it. */
 export function archiveLinkParagraph(key, archived, pageUrl = ARCHIVE_PAGE_URL) {
   const text = ARCHIVE_LINK_TEXT[key]
@@ -2365,15 +2379,18 @@ export function archiveLinkParagraph(key, archived, pageUrl = ARCHIVE_PAGE_URL) 
   return `<p class="archive-link">${lead} <a href="${href}">${text.label}</a>.</p>`
 }
 
-/** Where each of the archive page's two sections holds its cards. */
+/** Where each of the archive page's two sections holds its cards. Positions
+ *  are taken right after each closing `</h2>` (a newline there is skipped), so a
+ *  single-line archive places its cards inside their section too (cross-vendor
+ *  review 29.09.2026: a next-newline lookup returned 0 there). */
 function archiveSpans(archive) {
   const doneHead = archive.indexOf('<h2>')
   const logHead = archive.indexOf(ARCHIVE_LOG_HEAD)
-  const tail = [archive.indexOf('<footer'), archive.indexOf('</main>')].filter((i) => i > logHead)
-  const lineAfter = (at) => archive.indexOf('\n', at) + 1
+  const tail = [archive.indexOf('<footer', logHead), archive.indexOf('</main>', logHead)].filter((i) => i > logHead)
+  const after = (at) => (archive[at] === '\n' ? at + 1 : at)
   return {
-    done: { at: lineAfter(archive.indexOf('</h2>', doneHead)), end: logHead },
-    log: { at: lineAfter(logHead), end: tail.length ? Math.min(...tail) : archive.length },
+    done: { at: after(archive.indexOf('</h2>', doneHead) + '</h2>'.length), end: logHead },
+    log: { at: after(logHead + ARCHIVE_LOG_HEAD.length), end: tail.length ? Math.min(...tail) : archive.length },
   }
 }
 
@@ -2408,9 +2425,14 @@ export function rotateBoardArchives({ board, archive, pageUrl = ARCHIVE_PAGE_URL
     let kept = section
     for (const card of overflow) kept = kept.replace(card, '')
     b = b.slice(0, from) + kept + b.slice(end)
-    if (overflow.length) {
-      const span = archiveSpans(a)[key]
-      a = a.slice(0, span.at) + overflow.map((card) => `${card.trimEnd()}\n`).join('') + a.slice(span.at)
+    // A RETRY AFTER AN INTERRUPTED ROTATION ADDS NOTHING TWICE: the archive is
+    // written first, so a card already standing in its archive section is the
+    // record of an earlier pass whose board write never landed.
+    const span = archiveSpans(a)[key]
+    const archivedText = a.slice(span.at, span.end)
+    const fresh = overflow.filter((card) => !archivedText.includes(card.trimEnd()))
+    if (fresh.length) {
+      a = a.slice(0, span.at) + fresh.map((card) => `${card.trimEnd()}\n`).join('') + a.slice(span.at)
     }
     moved[key] = overflow.length
   }
