@@ -81,6 +81,8 @@ ${q}
 ${d}
 <p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>
 </details>
+<details class="sect"><summary><h2>Entscheidungsprotokoll</h2></summary>
+</details>
 </main>`
 }
 

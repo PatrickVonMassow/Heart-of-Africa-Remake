@@ -5,6 +5,7 @@ import { boardMissingPoints } from './board-currency-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
 import {
   dropStrayNowCards,
+  migrateDecisionLog,
   normaliseLineEndings,
   renderCardCriticalities,
   unwrapCardHeaderGroups,
@@ -48,7 +49,9 @@ export function runBoardEdit({
   stdout = () => {},
   stderr = () => {},
 } = {}) {
-  const swept = dropStrayNowCards(unwrapCardHeaderGroups(normaliseLineEndings(html)))
+  // The decision log is added and fed on the way in (user order 22.09.2026), so
+  // a record routed there by `addVdzk` always finds its section.
+  const swept = dropStrayNowCards(unwrapCardHeaderGroups(migrateDecisionLog(normaliseLineEndings(html))))
   const edited = dropStrayNowCards(
     renderCardCriticalities(
       derive(upgradeNowCards(normaliseLineEndings(transform(swept.html)))),

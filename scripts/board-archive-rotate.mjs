@@ -1,5 +1,6 @@
-// Keeps the board's Erledigt section at its cap (point 371) by moving the
-// oldest cards onto the archive page. Every tick adds a card, so without this
+// Keeps the board's Erledigt section and its decision log at their caps (point
+// 371; the log since the user order of 22.09.2026) by moving the oldest cards
+// onto the archive page. Every tick adds a card, so without this
 // the guard's `erledigt-overflow` would be a chore to fix by hand each time —
 // and a rule that is tedious to satisfy is a rule that gets waived.
 //
@@ -11,57 +12,39 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { ERLEDIGT_ON_BOARD } from './dashboard-guard-core.mjs'
-import { erledigtSectionStart, normaliseLineEndings } from './board-core.mjs'
+import { ENTSCHEIDUNGEN_ON_BOARD, ERLEDIGT_ON_BOARD } from './dashboard-guard-core.mjs'
+import { rotateBoardArchives } from './board-core.mjs'
 import { REPUBLISH } from './board-remedy.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const ARCHIVE = resolve(REPO_ROOT, '.batch-dashboard-archive.html')
-const CARD = /<details>\s*<summary>[\s\S]*?<\/details>\s*/g
-
-/** The Erledigt section's inner HTML, and where it sits in the board. */
-function erledigtSpan(html) {
-  const start = erledigtSectionStart(html)
-  if (start < 0) throw new Error('Erledigt section not found — did the board markup change?')
-  const footer = html.indexOf('<footer', start)
-  return { start, end: footer < 0 ? html.length : footer }
-}
 
 const check = process.argv.includes('--check')
-// NORMALISED BEFORE ANYTHING IS MEASURED (point 439). erledigtSectionStart's
-// anchor (board-core.mjs) is matched with a literal newline, so a board an editor wrote back in Windows text mode
-// made this script throw a stack trace mid-`attest` on a board that looked
-// perfect in the browser. The offsets below index THESE bytes, so the file is
-// written back normalised too — a mixed file cannot survive one rotation.
-const board = normaliseLineEndings(readFileSync(BOARD, 'utf8'))
-const { start, end } = erledigtSpan(board)
-const section = board.slice(start, end)
-const cards = section.match(CARD) ?? []
-const over = cards.length - ERLEDIGT_ON_BOARD
+// NORMALISED BEFORE ANYTHING IS MEASURED (point 439): a board an editor wrote
+// back in Windows text mode made the rotation throw mid-`attest`, so both files
+// are read and written back LF-normalised.
+const rawBoard = readFileSync(BOARD, 'utf8')
+if (!existsSync(ARCHIVE)) throw new Error(`archive page missing: ${ARCHIVE}`)
+const rawArchive = readFileSync(ARCHIVE, 'utf8')
+// BOTH CAPPED SECTIONS IN ONE PASS (user order 22.09.2026): Erledigt and the
+// decision log each keep their newest cards; the rest go to their own section
+// of the one archive page, and both link paragraphs are rewritten with counts.
+const r = rotateBoardArchives({ board: rawBoard, archive: rawArchive })
+const due = r.moved.done + r.moved.log
 
-if (over <= 0) {
-  // A file whose only defect was its line endings is still repaired here — the
-  // next rotation must not meet the same mixed bytes again.
-  if (board !== readFileSync(BOARD, 'utf8') && !check) writeFileSync(BOARD, board)
-  console.log(`board holds ${cards.length}/${ERLEDIGT_ON_BOARD} done cards — nothing to rotate`)
+if (check) {
+  if (due) {
+    console.error(`board holds ${r.moved.done} done and ${r.moved.log} decision card(s) over the cap — due to move to the archive page`)
+    process.exit(1)
+  }
+  console.log(`board is within its caps (${ERLEDIGT_ON_BOARD} done, ${ENTSCHEIDUNGEN_ON_BOARD} decisions) — nothing to rotate`)
   process.exit(0)
 }
-if (check) {
-  console.error(`board holds ${cards.length} done cards — ${over} due to move to the archive page`)
-  process.exit(1)
+if (r.board !== rawBoard) writeFileSync(BOARD, r.board)
+if (r.archive !== rawArchive) writeFileSync(ARCHIVE, r.archive)
+if (!due) {
+  console.log(`board within its caps (${ERLEDIGT_ON_BOARD} done, ${ENTSCHEIDUNGEN_ON_BOARD} decisions) — nothing to rotate`)
+  process.exit(0)
 }
-if (!existsSync(ARCHIVE)) throw new Error(`archive page missing: ${ARCHIVE}`)
-
-const moved = cards.slice(ERLEDIGT_ON_BOARD)
-let newSection = section
-for (const c of moved) newSection = newSection.replace(c, '')
-writeFileSync(BOARD, board.slice(0, start) + newSection + board.slice(end))
-
-// The archive lists newest first, like the board, so the overflow goes on top.
-const archive = normaliseLineEndings(readFileSync(ARCHIVE, 'utf8'))
-const anchor = archive.indexOf('<h2>')
-const at = archive.indexOf('\n', archive.indexOf('</h2>', anchor)) + 1
-writeFileSync(ARCHIVE, archive.slice(0, at) + moved.join('') + archive.slice(at))
-
-console.log(`moved ${moved.length} card(s) to the archive; board now holds ${cards.length - moved.length}`)
+console.log(`moved ${r.moved.done} done and ${r.moved.log} decision card(s) to the archive (archive: ${r.archived.done} done, ${r.archived.log} decisions)`)
 console.log(`${REPUBLISH} (the publisher pushes board and archive together)`)

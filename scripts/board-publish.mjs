@@ -49,6 +49,7 @@ import {
   projectNowForPublish,
   refreshFooter,
   renderCardCriticalities,
+  migrateDecisionLog,
   unwrapCardHeaderGroups,
   upgradeNowCards,
 } from './board-core.mjs'
@@ -242,7 +243,10 @@ const fail = (reason) => {
   const original = readFileSync(boardFile, 'utf8')
   const tasksText = readFileSync(tasksPath, 'utf8')
   const { open } = parseTasks(tasksText)
-  let repoBytes = unwrapCardHeaderGroups(original)
+  // THE DECISION LOG MIGRATES ON THE PUBLISH PATH (user order 22.09.2026): an
+  // idempotent pass that adds the fifth section and moves the records into it,
+  // so the structure gate below never meets a four-section board it could not publish.
+  let repoBytes = unwrapCardHeaderGroups(migrateDecisionLog(original))
 
   try {
     repoBytes = projectNowForPublish(repoBytes, gatherActiveWorkSource({ tasksText }), {

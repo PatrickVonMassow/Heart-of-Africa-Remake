@@ -9,7 +9,13 @@
 // module writes must satisfy those gates, and spelling a value a second time
 // here is how writer and readers would drift apart. None of the imported
 // modules reaches back to this one, so the direction is no cycle.
-import { QUEUE_STUB_META, parseNowCardPoints } from './dashboard-guard-core.mjs'
+import {
+  ENTSCHEIDUNGEN_ON_BOARD,
+  ERLEDIGT_ON_BOARD,
+  QUEUE_STUB_META,
+  parseNowCardPoints,
+} from './dashboard-guard-core.mjs'
+import { ARCHIVE_PAGE_URL } from './board-currency-core.mjs'
 import { pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 import { namesFollowOnWork } from './handover-card-contract.mjs'
 // The derived state card's vocabulary lives beside the derivation itself, so the
@@ -518,12 +524,16 @@ function insertAsFirstNowCard(html, card) {
   return `${html.slice(0, from)}\n${card}${html.slice(from).replace(/^\n/, '')}`
 }
 
-/** The four section headings, in the order the board fixes them. */
+/** The decision log's heading (user order 22.09.2026): the fifth section. */
+export const DECISION_LOG_TITLE = 'Entscheidungsprotokoll'
+
+/** The five section headings, in the order the board fixes them. */
 const HEAD = {
   now: '<summary><h2>Woran ich gerade arbeite</h2></summary>',
   vdzk: '<summary><h2>Von dir zu klären</h2></summary>',
   queue: '<summary><h2>Warteschlange</h2></summary>',
   done: '<summary><h2>Erledigt</h2></summary>',
+  log: `<summary><h2>${DECISION_LOG_TITLE}</h2></summary>`,
 }
 
 /** The wrapper every section heading lives directly inside. */
@@ -2187,15 +2197,23 @@ export function addVdzk(html, title, text) {
   // caller's text, not from the card.
   const body = renderCardBody(withoutCategoryLine(text), { escape: esc })
   if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
-  const { from, end } = sectionBounds(html, 'vdzk')
+  // THE ONE ROUTING CUT (user order 22.09.2026): a decision the batch already
+  // took is no open question, so its record goes to the decision log below
+  // Erledigt instead of flooding "Von dir zu klären". Decided here, at the
+  // lowest writer, by the title prefix alone — every producer keeps its text.
+  const key = isDecisionRecordTitle(title) ? 'log' : 'vdzk'
+  const { from, end } = sectionBounds(html, key)
   const section = html.slice(from, end)
   const standing = [...section.matchAll(/<details>\s*<summary><span class="t">[\s\S]*?<\/details>\s*/g)]
     .map((card) => titleOf(card[0]))
     .find((standingTitle) => standingTitle === head)
   if (standing) {
     throw new Error(
-      `board: open question "${standing}" already stands under "Von dir zu klären" — ` +
-        'a genuinely new question needs a distinguishable title',
+      key === 'log'
+        ? `board: decision record "${standing}" already stands under "${DECISION_LOG_TITLE}" — ` +
+          'a genuinely new record needs a distinguishable title'
+        : `board: open question "${standing}" already stands under "Von dir zu klären" — ` +
+          'a genuinely new question needs a distinguishable title',
     )
   }
   const card =
@@ -2204,23 +2222,208 @@ export function addVdzk(html, title, text) {
   return `${html.slice(0, from)}\n${card}${html.slice(from).replace(/^\n/, '')}`
 }
 
+/** The title prefix every decision record carries (the admissible shape of vdzk-admissibility-core). */
+export const DECISION_RECORD_PREFIX = `${DECISION_LOG_TITLE}:`
+
+/** Is this the title of a decision record rather than of an open question? */
+export function isDecisionRecordTitle(title) {
+  return /^Entscheidungsprotokoll:/i.test(String(title ?? '').trim())
+}
+
+/**
+ * Record a decision the batch took on its own in the decision log. The writer
+ * is `addVdzk`, so the admissibility judgement and the escaping are the same;
+ * this entry point only insists on the prefix that routes the card there.
+ */
+export function addDecisionRecord(html, title, text) {
+  if (!isDecisionRecordTitle(title)) {
+    throw new Error(
+      `board: a decision record's title begins "${DECISION_RECORD_PREFIX}" — an open question for the user ` +
+        'goes in with: node scripts/board.mjs vdzk-add "<Titel der Frage>" --text-stdin',
+    )
+  }
+  return addVdzk(html, title, text)
+}
+
+/**
+ * Remove a card from one section, matched on a fragment of its title. An
+ * ambiguous fragment throws with the candidates rather than deleting the wrong one.
+ */
+function removeTitledCard(html, key, fragment, noun) {
+  if (!fragment || !String(fragment).trim()) throw new Error('board: need a title fragment')
+  const { from, end } = sectionBounds(html, key)
+  const section = html.slice(from, end)
+  const cards = [...section.matchAll(/<details>\s*<summary><span class="t">[\s\S]*?<\/details>\s*/g)]
+  const needle = String(fragment).toLowerCase()
+  const hits = cards.filter((c) => titleOf(c[0]).toLowerCase().includes(needle))
+  if (hits.length === 0) throw new Error(`board: no ${noun} matching "${fragment}"`)
+  if (hits.length > 1) {
+    throw new Error(`board: "${fragment}" matches ${hits.length}: ${hits.map((h) => titleOf(h[0])).join(' | ')}`)
+  }
+  return html.slice(0, from) + section.replace(hits[0][0], '') + html.slice(end)
+}
+
+/** Remove a decision record from the decision log (a vetoed or superseded one). */
+export function removeDecisionRecord(html, fragment) {
+  return removeTitledCard(html, 'log', fragment, 'decision record')
+}
+
 /**
  * Remove a "Von dir zu klären" card the user has answered, matched on a
  * fragment of its title. An ambiguous fragment throws with the candidates
  * rather than deleting the wrong question.
  */
 export function removeVdzk(html, fragment) {
-  if (!fragment || !String(fragment).trim()) throw new Error('board: need a title fragment')
-  const { from, end } = sectionBounds(html, 'vdzk')
-  const section = html.slice(from, end)
-  const cards = [...section.matchAll(/<details>\s*<summary><span class="t">[\s\S]*?<\/details>\s*/g)]
-  const needle = String(fragment).toLowerCase()
-  const hits = cards.filter((c) => titleOf(c[0]).toLowerCase().includes(needle))
-  if (hits.length === 0) throw new Error(`board: no open question matching "${fragment}"`)
-  if (hits.length > 1) {
-    throw new Error(`board: "${fragment}" matches ${hits.length}: ${hits.map((h) => titleOf(h[0])).join(' | ')}`)
+  return removeTitledCard(html, 'vdzk', fragment, 'open question')
+}
+
+/** The empty decision log as the migration writes it: collapsed like every section. */
+const DECISION_LOG_SECTION = `<details class="sect">${HEAD.log}\n</details>\n`
+
+/** The board's own restore script opened every section but Erledigt on a first
+ *  visit; the decision log stays closed beside it (user order 22.09.2026). */
+export const RESTORE_CLOSED_BEFORE = '!/Erledigt/.test(k)'
+export const RESTORE_CLOSED_AFTER = '!/Erledigt|Entscheidungsprotokoll/.test(k)'
+
+/** Does the board carry this section? False when absent; throws on structural damage. */
+function hasSection(html, key) {
+  try {
+    sectionBounds(html, key)
+    return true
+  } catch (error) {
+    if (/section not found/.test(String(error?.message))) return false
+    throw error
   }
-  return html.slice(0, from) + section.replace(hits[0][0], '') + html.slice(end)
+}
+
+/** Every "Von dir zu klären"-shaped card of a section, as matched text in document order. */
+const titledCards = (section) => [...section.matchAll(/<details>\s*<summary><span class="t">[\s\S]*?<\/details>\s*/g)].map((m) => m[0])
+
+/**
+ * THE ONE-OFF MOVE, repeated harmlessly (user order 22.09.2026). Idempotent:
+ * adds the decision log below Erledigt when it is missing, moves every
+ * `Entscheidungsprotokoll:` card still standing under "Von dir zu klären" to the
+ * top of it in its current order and verbatim, and keeps the new section closed
+ * in the board's restore script. A board that already has all three comes back
+ * unchanged. Total on a damaged board: it returns the input rather than guess.
+ */
+export function migrateDecisionLog(html) {
+  const source = normaliseLineEndings(html)
+  let out = source
+  try {
+    if (!hasSection(out, 'log')) {
+      const { end } = sectionBounds(out, 'done')
+      const close = out.indexOf('</details>', end)
+      if (close < 0) return source
+      let after = close + '</details>'.length
+      if (out[after] === '\n') after += 1
+      out = `${out.slice(0, after)}${DECISION_LOG_SECTION}${out.slice(after)}`
+    }
+    const vdzk = sectionBounds(out, 'vdzk')
+    const section = out.slice(vdzk.from, vdzk.end)
+    const records = titledCards(section).filter((card) => isDecisionRecordTitle(titleOf(card)))
+    if (records.length) {
+      let left = section
+      for (const card of records) left = left.replace(card, '')
+      out = out.slice(0, vdzk.from) + left + out.slice(vdzk.end)
+      const { from } = sectionBounds(out, 'log')
+      const moved = records.map((card) => `${card.trimEnd()}\n`).join('')
+      out = `${out.slice(0, from)}\n${moved}${out.slice(from).replace(/^\n/, '')}`
+    }
+  } catch {
+    return source
+  }
+  return out.split(RESTORE_CLOSED_BEFORE).join(RESTORE_CLOSED_AFTER)
+}
+
+/** The archive page's own heading for the decision log, and its link anchor. */
+export const ARCHIVE_LOG_ANCHOR = 'entscheidungsprotokoll'
+const ARCHIVE_LOG_HEAD = `<h2 id="${ARCHIVE_LOG_ANCHOR}">${DECISION_LOG_TITLE}</h2>`
+
+/** The two archive links' German wording, in the phrasing of the done section. */
+export const ARCHIVE_LINK_TEXT = {
+  done: {
+    label: 'Archiv der erledigten Punkte',
+    many: (n) => `Die älteren ${n} erledigten Punkte stehen im`,
+    one: 'Der ältere erledigte Punkt steht im',
+    none: 'Die älteren erledigten Punkte stehen im',
+  },
+  log: {
+    label: 'Archiv des Entscheidungsprotokolls',
+    many: (n) => `Die älteren ${n} Entscheidungen stehen im`,
+    one: 'Die ältere Entscheidung steht im',
+    none: 'Die älteren Entscheidungen stehen im',
+  },
+}
+
+/** One section's archive link paragraph, counting the cards the archive holds for it. */
+export function archiveLinkParagraph(key, archived, pageUrl = ARCHIVE_PAGE_URL) {
+  const text = ARCHIVE_LINK_TEXT[key]
+  const n = Number(archived) || 0
+  const lead = n > 1 ? text.many(n) : n === 1 ? text.one : text.none
+  const href = key === 'log' ? `${pageUrl}#${ARCHIVE_LOG_ANCHOR}` : pageUrl
+  return `<p class="archive-link">${lead} <a href="${href}">${text.label}</a>.</p>`
+}
+
+/** Where each of the archive page's two sections holds its cards. */
+function archiveSpans(archive) {
+  const doneHead = archive.indexOf('<h2>')
+  const logHead = archive.indexOf(ARCHIVE_LOG_HEAD)
+  const tail = [archive.indexOf('<footer'), archive.indexOf('</main>')].filter((i) => i > logHead)
+  const lineAfter = (at) => archive.indexOf('\n', at) + 1
+  return {
+    done: { at: lineAfter(archive.indexOf('</h2>', doneHead)), end: logHead },
+    log: { at: lineAfter(logHead), end: tail.length ? Math.min(...tail) : archive.length },
+  }
+}
+
+const ARCHIVE_CARD = /<details>\s*<summary>[\s\S]*?<\/details>\s*/g
+
+/**
+ * Rotate BOTH capped sections in one pass (point 371, widened by the user order
+ * of 22.09.2026): the oldest cards beyond each cap move to the top of their own
+ * section on the archive page, newest first like the board, and each section's
+ * link paragraph is rewritten with the count its archive now holds. The decision
+ * log section is added to the archive page below the done cards when missing;
+ * the done cards keep going under the FIRST `<h2>`, so the two never mix.
+ * Pure; throws when a section cannot be found, as the rotation always did.
+ */
+export function rotateBoardArchives({ board, archive, pageUrl = ARCHIVE_PAGE_URL, caps } = {}) {
+  let b = migrateDecisionLog(board)
+  let a = normaliseLineEndings(archive)
+  if (a.indexOf('<h2>') < 0) throw new Error('archive page has no <h2> — did the archive markup change?')
+  if (!a.includes(ARCHIVE_LOG_HEAD)) {
+    const tail = [a.indexOf('<footer'), a.indexOf('</main>')].filter((i) => i >= 0)
+    const at = tail.length ? Math.min(...tail) : a.length
+    a = `${a.slice(0, at)}${ARCHIVE_LOG_HEAD}\n${a.slice(at)}`
+  }
+  const limits = { done: ERLEDIGT_ON_BOARD, log: ENTSCHEIDUNGEN_ON_BOARD, ...(caps ?? {}) }
+  const moved = { done: 0, log: 0 }
+  const archived = { done: 0, log: 0 }
+  for (const key of ['done', 'log']) {
+    const { from, end } = sectionBounds(b, key)
+    const section = b.slice(from, end)
+    const cards = section.match(ARCHIVE_CARD) ?? []
+    const overflow = cards.slice(limits[key])
+    let kept = section
+    for (const card of overflow) kept = kept.replace(card, '')
+    b = b.slice(0, from) + kept + b.slice(end)
+    if (overflow.length) {
+      const span = archiveSpans(a)[key]
+      a = a.slice(0, span.at) + overflow.map((card) => `${card.trimEnd()}\n`).join('') + a.slice(span.at)
+    }
+    moved[key] = overflow.length
+  }
+  for (const key of ['done', 'log']) {
+    const span = archiveSpans(a)[key]
+    archived[key] = (a.slice(span.at, span.end).match(ARCHIVE_CARD) ?? []).length
+    const { from, end } = sectionBounds(b, key)
+    const section = b.slice(from, end).replace(/\n?<p class="archive-link">[\s\S]*?<\/p>/g, '')
+    const hasCards = (section.match(ARCHIVE_CARD) ?? []).length > 0
+    const link = hasCards || archived[key] ? `\n${archiveLinkParagraph(key, archived[key], pageUrl)}` : ''
+    b = b.slice(0, from) + section.replace(/\n*$/, '') + link + b.slice(end)
+  }
+  return { board: b, archive: a, moved, archived }
 }
 
 /**

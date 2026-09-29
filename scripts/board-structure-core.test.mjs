@@ -50,6 +50,8 @@ const board = ({ now = [400], queue = [401] } = {}) =>
   sect(REQUIRED_SECTIONS[2], queue.map(queueCard).join('\n')) +
   '\n' +
   sect(REQUIRED_SECTIONS[3], queueCard(2)) +
+  '\n' +
+  sect(REQUIRED_SECTIONS[4]) +
   '\n</div>'
 
 const codes = (html) => structureViolations(html).map((v) => v.code)
@@ -188,6 +190,8 @@ describe('one kind of current-work card', () => {
     sect(REQUIRED_SECTIONS[2], queueCard(401)) +
     '\n' +
     sect(REQUIRED_SECTIONS[3], queueCard(2)) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[4]) +
     '\n</div>'
 
   it('accepts each kind standing alone', () => {
@@ -229,6 +233,8 @@ describe('one kind of current-work card', () => {
         `<details>\n  <summary><span class="num">543</span><span class="t">${CLOSING_WORK_TITLE}: X</span>` +
           `</summary>\n  <div class="body"><p>Text</p></div>\n</details>`,
       ) +
+      '\n' +
+      sect(REQUIRED_SECTIONS[4]) +
       '\n</div>'
     expect(structureViolations(archived)).toEqual([])
   })
@@ -259,6 +265,8 @@ describe('every current-work card names its point and its subject', () => {
     sect(REQUIRED_SECTIONS[2], queueCard(401)) +
     '\n' +
     sect(REQUIRED_SECTIONS[3], queueCard(2)) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[4]) +
     '\n</div>'
 
   it('accepts a card with the chip and a subject title', () => {
