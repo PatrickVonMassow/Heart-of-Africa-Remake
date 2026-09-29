@@ -28,7 +28,7 @@
 // session id cannot, and the deny it used to eat was one it could never act on.
 // A subagent running in the main tree still gets the deny, and its text still
 // tells it to repeat the call, which the once-per-turn stand-down lets through.
-import { readFileSync, existsSync, lstatSync, readlinkSync, realpathSync } from 'node:fs'
+import { readFileSync, existsSync, lstatSync, readlinkSync, realpathSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, relative, resolve } from 'node:path'
 import {
@@ -112,6 +112,22 @@ function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
       return ''
     }
   }
+}
+
+/**
+ * The write target as outside-checkout EVIDENCE (point 1207): the resolved
+ * path, or '' (unknown, so inside) when it is an existing file with a second
+ * hard link — a name outside the checkout may share its content with one inside.
+ */
+function exemptionTarget(filePath, cwd = REPO_ROOT) {
+  const target = resolvedWriteTarget(filePath, cwd)
+  try {
+    const entry = target ? statSync(target) : null
+    if (entry && entry.isFile() && entry.nlink > 1) return ''
+  } catch {
+    /* a missing target has no second link */
+  }
+  return target
 }
 
 /**
@@ -329,7 +345,7 @@ try {
       // (point 749): without it a heredoc to the session memory directory is
       // judged by intent alone and refused like a write to main.
       cwd: payload.cwd || REPO_ROOT,
-      canonical: (path) => resolvedWriteTarget(path),
+      canonical: (path) => exemptionTarget(path),
     })
     if (mainWrite.block) {
       process.stdout.write(
@@ -365,10 +381,10 @@ try {
         toolName: payload.tool_name,
         command: input0.command,
         filePath: input0.file_path ?? input0.notebook_path,
-        resolvedFilePath: resolvedWriteTarget(input0.file_path ?? input0.notebook_path, payload.cwd || REPO_ROOT),
+        resolvedFilePath: exemptionTarget(input0.file_path ?? input0.notebook_path, payload.cwd || REPO_ROOT),
         checkoutRoot: realpathSync(REPO_ROOT),
         cwd: payload.cwd || REPO_ROOT,
-        canonical: (path) => resolvedWriteTarget(path),
+        canonical: (path) => exemptionTarget(path),
       })
       if (ownership.block) {
         process.stdout.write(

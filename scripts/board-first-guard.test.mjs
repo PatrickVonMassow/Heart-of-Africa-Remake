@@ -12,7 +12,7 @@
 // promise that an unreadable state never costs the caller a tool call.
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
@@ -160,6 +160,35 @@ describe('board-first-guard (spawned)', () => {
     expect(reason).toContain('BATCH OWNERSHIP STAND-DOWN')
     expect(reason).toContain('STAND-DOWN PATH')
     expect(reason).toContain('npm run build')
+  })
+
+  // Point 1207: the request handoff writes outside the checkout, measured on the
+  // real filesystem — including a hard link that shares an inside file's content.
+  it('lets a stood-down session write its request outside the checkout, but not through a hard link', () => {
+    const now = Date.now()
+    writeJson(resolve(repo, '.claude', 'batch-lock.json'), {
+      v: 2,
+      sessionId: 'successor-session',
+      claimedAt: now,
+      leaseUntil: now + 60 * 60_000,
+      pid: process.pid,
+    })
+    const pad = mkdtempSync(resolve(tmpdir(), 'hoa-handoff-pad-'))
+    try {
+      const allowed = (tool, input) => callGuard(tool, input).stdout.trim() === ''
+      expect(allowed('Write', { file_path: resolve(pad, 'why.md') })).toBe(true)
+      expect(allowed('Bash', { command: `cd ${pad} && cat > why.md <<'EOF'\nbody\nEOF` })).toBe(true)
+      expect(allowed('Write', { file_path: resolve(repo, 'TASKS.md') })).toBe(false)
+      expect(allowed('Bash', { command: "cat > TASKS.md <<'EOF'\nx\nEOF" })).toBe(false)
+
+      writeFileSync(resolve(repo, 'inside.md'), 'inside')
+      linkSync(resolve(repo, 'inside.md'), resolve(pad, 'shared.md'))
+      expect(allowed('Write', { file_path: resolve(pad, 'shared.md') })).toBe(false)
+      expect(allowed('Bash', { command: `echo changed > ${resolve(pad, 'shared.md')}` })).toBe(false)
+    } finally {
+      rmSync(pad, { recursive: true, force: true })
+      rmSync(resolve(repo, 'inside.md'), { force: true })
+    }
   })
 
   it('still permits reads after ownership moves', () => {
