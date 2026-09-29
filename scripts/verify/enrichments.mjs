@@ -7465,10 +7465,14 @@ if (section('calf-crossing-flee')) {
     st.stage = (variant) => {
       st.clear()
       const herds = window.__wildlife.herdsRef.current
-      const parent = variant === 'crossing'
+      const archived = variant === 'crossing' || variant === 'arrival'
+      // The arrival case holds the traveller outside every ring, so only the
+      // crossing mover — not the flight — can end the swim.
+      st.holdAt = variant === 'arrival' ? { x: 304, z: -105.51 } : P
+      const parent = archived
         ? { x: 319.78, z: -94.97, y: 0.21, rot: 0, scale: 1, phase: 0.31 }
         : { x: 323.7, z: -104.05, y: 0.2, rot: 0, scale: 1, phase: 0.31 }
-      const calf = variant === 'crossing'
+      const calf = archived
         ? { x: 317.18, z: -105.05, y: 0.18, rot: 0, scale: 0.55, phase: 0.72, young: true, parent,
             crossing: { tx: 317.18, tz: -105.09, time: 0 } }
         : { x: 316.2, z: -104.2, y: 0.3, rot: 0, scale: 0.55, phase: 0.72, young: true, parent }
@@ -7478,7 +7482,7 @@ if (section('calf-crossing-flee')) {
       return calf
     }
     st.hold = () => {
-      window.__game.setState({ pos: { ...P } })
+      window.__game.setState({ pos: { ...(st.holdAt ?? P) } })
       if (window.__wildlife.lion) { window.__wildlife.lion.mode = 'idle'; window.__wildlife.lion.timer = 999 }
     }
   })
@@ -7495,7 +7499,11 @@ if (section('calf-crossing-flee')) {
     await window.__pollSim(5, () => {
       st.hold()
       const t = +(window.__simTime() - s0).toFixed(2)
-      if (out.crossingEndedAt === null && calf.crossing === undefined) out.crossingEndedAt = t
+      if (out.crossingEndedAt === null && calf.crossing === undefined) {
+        out.crossingEndedAt = t
+        out.atEnd = { toTarget: +Math.hypot(calf.x - 317.18, calf.z + 105.09).toFixed(3), terrain: st.T(calf.x, calf.z),
+          dH: +Math.hypot(calf.x - st.holdAt.x, calf.z - st.holdAt.z).toFixed(2) }
+      }
       if (out.fledAt === null && calf.dodgeHeading !== undefined) out.fledAt = t
       if (calf.dodgeHeading !== undefined && st.T(calf.x, calf.z) === 'water') out.wetInFlight = true
       // A flight swim taken for a fall-in is the defect; a later gambol bout
@@ -7512,6 +7520,12 @@ if (section('calf-crossing-flee')) {
     })
     return out
   }, variant)
+  const arrival = await runVariant('arrival')
+  check('with the traveller outside every ring the archived crossing arrives: set onto its bank target at once, never held to the deadline',
+    arrival.start.terrain === 'water' && arrival.crossingEndedAt !== null && arrival.crossingEndedAt < 1 &&
+      !!arrival.atEnd && arrival.atEnd.toTarget < 0.01 && arrival.atEnd.terrain !== 'water' && arrival.atEnd.dH > 9 &&
+      arrival.fledAt === null,
+    JSON.stringify(arrival))
   const crossing = await runVariant('crossing')
   check('calf-crossing-flee staging reproduces the archived calf on the water beside the traveller',
     crossing.start.terrain === 'water' && crossing.start.dP < 1.5, JSON.stringify(crossing))
