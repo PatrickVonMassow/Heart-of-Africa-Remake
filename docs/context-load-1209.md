@@ -69,3 +69,25 @@ Fixed load of a fresh session before its first tool call:
   project or user file; their enablement lives in the claude.ai account. Only
   Claude Docs contributes instructions at start; Drive tools are deferred
   (names only), Gmail/Calendar are unauthenticated.
+
+## Savings against this baseline (estimate)
+
+Estimated the same way as the baseline: measured characters of the old and new
+text, converted at 2.59 chars/token (chars/4 in brackets). No fresh-session
+reading after the change exists yet; these are estimates, not counts.
+
+| Step | Change | Saving |
+|---|---|---|
+| (b) tool surface | not applied — needs `.claude/settings.json` / account settings (attended-only) | 0 |
+| (c) UserPromptSubmit board reminder (owner) | 944 → 518 chars per prompt | ≈165 (107) tokens per prompt |
+| (c) UserPromptSubmit stand-down text | 302 → 241 chars per prompt | ≈24 (15) tokens per prompt |
+| (c) UserPromptSubmit timestamp (user scope) | not applied — `~/.claude/hooks` is attended-only | 0 |
+| (c) SessionStart batch-resume output | ≈14.7 KB → ≈3.3 KB (runbook pasted → pointer −9.7 KB; resume body 3,311 → 1,798; model policy 1,003 → 781) | at session start ≈0 while the harness still shows only a 2 KB preview; ≈4,400 (2,850) tokens whenever the full output is read |
+| (c) Stop "do not stop the batch" refusal | ≈2,560 → ≈1,450 chars per firing | ≈430 (280) tokens per firing |
+| (c) Stop "dashboard not registered" refusal | ≈2,750 → ≈330 chars per firing (open-point list capped at three) | ≈935 (605) tokens per firing |
+| (d) CLAUDE.md / MEMORY.md condensation | not applied — CLAUDE.md and the user's memory need the user's own go-ahead | 0 |
+
+Fixed-load saving of a fresh session so far: ≈0 of ≈40,900 tokens (the
+applied steps are all per-prompt, per-firing or read-on-demand text). The
+large fixed items (skill listing, connectors, CLAUDE.md, MEMORY.md) wait on the
+attended steps.
