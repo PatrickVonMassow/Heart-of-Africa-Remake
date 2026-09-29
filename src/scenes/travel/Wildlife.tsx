@@ -62,7 +62,11 @@ import {
   chaseFleeStep,
   swimBrakedPace,
   chaseSwimEscaped,
-  nearestBankTarget,
+  safeBankTarget,
+  calfWaterCause,
+  calfFollowAcrossWater,
+  crossingTarget,
+  type BankThreat,
   waterDramaOwns,
   waterExit,
   FLIGHT_GRACE_SECONDS,
@@ -384,11 +388,18 @@ interface Animal {
    *  flight that took it onto river/lake water keeps swimming and the
    *  backstop leaves it alone; once it lapses the swim-to-bank takes over. */
   fleeAt?: number
-  /** A hunted calf swam during its chase (design.md §19.5), holding the last
-   *  land spot before it went in: landing across the water from that spot ends
-   *  the chase (far bank), landing back on the entry bank does not, and a chase
-   *  that ends first sends it to the nearest bank. Cleared once it stands on land. */
+  /** A calf swam during its chase or its flight from the traveller (design.md
+   *  §19.5), holding the spot where it was first seen on the water: for the
+   *  hunted calf, landing across the water from that spot ends the chase (far
+   *  bank), landing back on the entry bank does not. Once the chase or flight
+   *  is over it swims out to the safe bank (safeBankTarget). Cleared once it
+   *  stands on land. */
   chaseSwim?: { x: number; z: number }
+  /** A calf holding its bank across the water from a parent that stands in a
+   *  threat ring (calfFollowAcrossWater): no play bout starts meanwhile — its
+   *  leash would pull the calf into the river toward the parent, a fall-in
+   *  every bout while the traveller stays. */
+  waterHold?: boolean
   /** The crocodile ambush (design.md §19.16, point 130), per-crocodile state:
    *  absent = hidden at its spot; set = lunging at / gripping a victim or
    *  slinking back home. Its own state — the scripted LION hunt is never
@@ -2278,6 +2289,28 @@ function Herds() {
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)
+    // The rings a swim-out bank keeps clear of (the water-edge flee fix): the
+    // traveller for a species that shies from it, an active predator for one
+    // that flees it, each widened by the calibratable clearance — so a swim
+    // never lands inside the ring it fled and re-triggers that flight at the
+    // waterline. The chosen bank becomes the crossing target and is held.
+    const bankClear = balance.waterCross.fleeBankClearance
+    const bankThreatsFor = (sp: Species, young: boolean): BankThreat[] => {
+      const out: BankThreat[] = []
+      if (fleesFromPlayer(sp, young, balance.parentDefense.preyWeapon))
+        out.push({ x: pos.x, z: pos.z, r: PLAYER_SHY_RADIUS * bankClear })
+      const predatorAbout = LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave'
+      if (predatorAbout && FLEES_LION[sp]) out.push({ x: LION_STATE.lx, z: LION_STATE.lz, r: FLEE_RADIUS * bankClear })
+      return out
+    }
+    const swimOutBank = (a: Animal, sp: Species) =>
+      safeBankTarget(
+        a.x,
+        a.z,
+        terrainTypeAtWorld,
+        CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds,
+        bankThreatsFor(sp, !!a.young),
+      )
 
     // Stream wildlife by chunk (design.md §19): keep every animal that may be on
     // screen alive — the kept radius scales with the bird's-eye zoom — and only
@@ -2661,26 +2694,35 @@ function Herds() {
               a.mired = undefined
             }
           }
-          // A calf that swam in its chase (design.md §19.5) is no fall-in: once
-          // the chase is over it swims for the NEAREST bank under the 312
-          // no-lingering rule (the crossing mover, deadline-bounded — I4)
-          // rather than starting the §19.8 struggle.
-          if (a.chaseSwim && !isChaseVictim && a.caught === undefined) {
+          // A calf that swam in its chase or its flight (design.md §19.5) is no
+          // fall-in: once the chase or flight is over it swims for the nearest
+          // bank clear of what it fled (safeBankTarget — the plain nearest bank
+          // was the traveller's own, and the calf shuttled back into the shy
+          // ring) under the 312 no-lingering rule (the crossing mover,
+          // deadline-bounded — I4) rather than starting the §19.8 struggle.
+          const fleeing = a.dodgeHeading !== undefined
+          if (a.chaseSwim && !isChaseVictim && a.caught === undefined && !fleeing) {
             const cty = terrainTypeAtWorld(a.x, a.z)
             if (cty !== 'water') a.chaseSwim = undefined
             else if (a.crossing === undefined) {
-              const bank = nearestBankTarget(
-                a.x, a.z, terrainTypeAtWorld, CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds,
-              )
+              const bank = swimOutBank(a, sp)
               const land = bank ? { x: bank.tx, z: bank.tz } : findLandNear(a.x, a.z, seed)
               a.crossing = { tx: land.x, tz: land.z, time: 0 }
-              a.dodgeHeading = undefined
             }
           }
           if (a.inWater === undefined && !a.rescued && a.caught === undefined && !isChaseVictim && !a.chaseSwim) {
             const ll = worldToLatLon(a.x, a.z)
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
-            if (ter.type === 'water') {
+            const inFlight =
+              fleeing || (a.fleeAt !== undefined && simTimeRef.current - a.fleeAt < FLIGHT_GRACE_SECONDS)
+            const cause =
+              ter.type === 'water'
+                ? calfWaterCause({ inFlight, crossing: a.crossing !== undefined, chaseSwim: false })
+                : null
+            // A flight that carried the calf in marks the swim; the hand-off
+            // above sends it to a bank once the flight is over.
+            if (cause === 'swim' && inFlight && a.crossing === undefined) a.chaseSwim = { x: a.x, z: a.z }
+            if (cause === 'fall-in') {
               // Fell in: start to struggle. A staged fall (the debug trigger)
               // already carries its entry point; otherwise probe for the
               // nearest bank.
@@ -3416,17 +3458,12 @@ function Herds() {
           }
           const inFlight = a.fleeAt !== undefined && simTimeRef.current - a.fleeAt < FLIGHT_GRACE_SECONDS
           const exit = waterExit(ter, false, inFlight)
-          const bank =
-            exit === 'swim-to-bank'
-              ? nearestBankTarget(
-                  a.x,
-                  a.z,
-                  terrainTypeAtWorld,
-                  CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds,
-                )
-              : null
+          // The nearest bank clear of what it fled (safeBankTarget): the plain
+          // nearest one was often the traveller's own, and the animal swam
+          // back into the shy ring and bolted into the water again.
+          const bank = exit === 'swim-to-bank' ? swimOutBank(a, sp) : null
           if (bank) {
-            // Shy, not barred: turn for the nearest bank and swim out — the
+            // Shy, not barred: turn for that bank and swim out — the
             // crossing mover carries it (chest-deep, deadline-bounded, I4).
             a.crossing = { tx: bank.tx, tz: bank.tz, time: 0 }
             a.dodgeHeading = undefined
@@ -4871,7 +4908,7 @@ function Herds() {
               // window the calf does not break into a gambol bout — the picture
               // that used to say nothing had happened.
               const canPlay = calfMayPlay(
-                !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp),
+                !lionActive && !a.playLock && !a.waterHold && (CALF_HUNT_SPECIES as readonly string[]).includes(sp),
                 a,
               )
               const bout = canPlay ? gambolState(t, a.phase, GAMBOL_PERIOD, GAMBOL_ACTIVE) : null
@@ -4933,8 +4970,32 @@ function Herds() {
               } else if (d > YOUNG_FOLLOW_RADIUS) {
                 a.hop = undefined
                 a.boutDetour = undefined
-                a.x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
-                a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
+                const fx = a.x + (toX / d) * YOUNG_FOLLOW_SPEED * dt
+                const fz = a.z + (toZ / d) * YOUNG_FOLLOW_SPEED * dt
+                // Water between the calf and the one it keeps to (the water-edge
+                // flee fix): it swims across (§19.5 — a juvenile returning to its
+                // parent crosses on the flight's freedom), never walks in as a
+                // §19.8 fall-in; while the parent stands inside a ring the calf
+                // fled across the water it holds its own bank instead.
+                const wetHere = terrainTypeAtWorld(a.x, a.z) === 'water'
+                const wetAhead = terrainTypeAtWorld(fx, fz) === 'water'
+                const across = wetHere || wetAhead ? calfFollowAcrossWater(keep.x, keep.z, bankThreatsFor(sp, true)) : null
+                a.waterHold = across === 'hold' ? true : undefined
+                if (across === null) {
+                  a.x = fx
+                  a.z = fz
+                } else if (across === 'swim') {
+                  // The far bank on the line to the parent, probed from the water.
+                  const far = crossingTarget(
+                    wetHere ? a.x : fx, wetHere ? a.z : fz, Math.atan2(toX, toZ),
+                    CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds, terrainTypeAtWorld, 0.5,
+                  )
+                  const bank = far ?? (wetHere ? swimOutBank(a, sp) : null)
+                  if (bank) a.crossing = { tx: bank.tx, tz: bank.tz, time: 0 }
+                } else if (wetHere) {
+                  const bank = swimOutBank(a, sp)
+                  if (bank) a.crossing = { tx: bank.tx, tz: bank.tz, time: 0 }
+                }
                 { // ground-follow (point 203(A)) — THE main calf mover: every
                   // background calf tails its drifting parent through this step,
                   // and without the height update they sank into every slope
@@ -4949,6 +5010,7 @@ function Herds() {
               } else {
                 a.hop = undefined
                 a.boutDetour = undefined
+                a.waterHold = undefined // back beside the one it keeps to
                 // At a living parent it nurses; at the spot its parent fell it
                 // holds the §19.8 vigil's lowered head instead (point 369).
                 pitch = keep === a.mournAt ? -0.15 : -0.22
