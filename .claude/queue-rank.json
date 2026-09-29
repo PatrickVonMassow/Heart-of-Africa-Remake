@@ -1417,12 +1417,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1207": {
-      "at": "2026-09-24T11:19:47.582Z",
-      "why": "User 24.09.2026 13:08: directly behind 174, not with 1195",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1209": {
       "at": "2026-09-24T11:30:41.284Z",
       "why": "User 24.09.2026 13:30: direkt vor 1204, Vier-Augen",
@@ -1518,6 +1512,12 @@
       "why": "visible-defect finding from the closing cleanup; its bundle runs after the closing, so last is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1231": {
+      "at": "2026-09-29T05:51:19.608Z",
+      "why": "Only relevant once the cloud offload switch is ON and proven; no urgency ahead of the release work",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1526,7 +1526,6 @@
       336,
       553,
       596,
-      633,
       660,
       663,
       708,
@@ -1548,9 +1547,8 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-28T10:35:57.549Z",
+    "at": "2026-09-29T06:22:33.971Z",
     "points": [
-      174,
       184,
       200,
       203,
@@ -1677,7 +1675,6 @@
       627,
       630,
       632,
-      633,
       635,
       636,
       637,
@@ -1964,7 +1961,6 @@
       1203,
       1204,
       1205,
-      1207,
       1209,
       1213,
       1214,
@@ -1980,7 +1976,10 @@
       1226,
       1227,
       1228,
-      1229
+      1229,
+      1231,
+      1232,
+      1233
     ]
   }
 }

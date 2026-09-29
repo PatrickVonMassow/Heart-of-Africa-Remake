@@ -32240,3 +32240,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium.
   PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
   Bundle: Modell & Wächter.
+
+- [x] 174. Tag the demo build `v0.3` and publish it at
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
+  GATE (user 10.08.2026, replacing the 19.07.2026 wording): v0.3 no longer waits for
+  EVERY open bugfix — that gate was unreachable and pushed the release out
+  indefinitely. What must be closed is exactly two classes:
+  1. the CRITICAL bugs (the tier-c block at the head of the work order — anything that
+     ends the player's session, loses the expedition, or voids a verification), and
+  2. everything on the COMMUNICATION MECHANIC, until the PoC is in a usable state —
+     that is the release's purpose.
+  Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
+  AND THE USER MUST HAVE GOT THROUGH THE MECHANIC ONCE (his decision 11.08.2026, 19:16:
+  "Wir sind weit von einem brauchbaren Stand der Kommunikationsmechanik entfernt. Wenn die
+  gemeldeten Bugs behoben sind, kann ich überhaupt mal anfangen, das eigentliche Feature zu
+  testen."). Green gates are not enough: as long as the reported defects keep him from
+  reaching the communication mechanic at all, nobody has tested what this release exists
+  for. So the gate also requires one completed play-through of the mechanic on the
+  deployed `main`, by the user. This tightens condition 2 above, it does not replace it.
+  THE CLOSING RUN IS ITS OWN POINT (user 11.08.2026, on the estimate: the ~1 h here was
+  true when this meant "tag and publish"). The SEQUENCE is binding and runs BEFORE this
+  point: full LARGE regression on both backends → the blind-parallel four-eyes cleanup of
+  legacy in ALL code and ALL documents (CLAUDE.md §6, closing step
+  `cleanup-blind-parallel`) → a SECOND full LARGE regression after the last cleanup commit
+  (`regression-after-cleanup`) → and only THEN the user's go for the tag. Point 633 carries
+  that run; point 631 anchored the order in the closing checklist, which refuses a tag
+  while the second regression does not stand after the cleanup. What
+  remains here is the irreversible last hour: the tag, the `poc` move, the deploy and the
+  check that the URLs serve the new state. No tag is cut on an unclosed state: this point
+  is never ticked without a complete closing run recorded at the very HEAD that carries
+  the tag, so the checklist gate holds here as much as it holds on 633.
+  FINAL TAG HELD FOR THE USER. The tag and the /v0.3/ publish are the one
+  irreversible, outward-facing step: do ALL the work up to it, then report "ready to
+  tag" and WAIT for the user's explicit go for that tag (`tags-only-on-request`).
+  When it comes, tag `v0.3` at that HEAD, MOVE the `poc` tag to the same commit, and
+  run the deploy via `workflow_dispatch` — the Pages workflow enumerates every `v*`
+  tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
+  that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
+  re-pointed.
+  DONE 29.09.2026 08:15 (user go 29.09.2026 07:58: "Zur Karte "Version 0.3 veröffentlichen?": Ja, als 0.3 und als poc veröffentlichen und über die jeweiligen URLs zugänglich machen."): annotated v0.3 and poc on 6475408 (closing 13/13 recorded on that commit), pushed; deploy run 36530176581 green; /v0.3/build-info.json and /poc/build-info.json both serve commit 6475408558523ba7c2144bd9776f44c1eb4db2d5.

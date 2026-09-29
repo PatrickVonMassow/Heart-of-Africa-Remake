@@ -77,43 +77,13 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 174. Tag the demo build `v0.3` and publish it at
-  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
-  GATE (user 10.08.2026, replacing the 19.07.2026 wording): v0.3 no longer waits for
-  EVERY open bugfix — that gate was unreachable and pushed the release out
-  indefinitely. What must be closed is exactly two classes:
-  1. the CRITICAL bugs (the tier-c block at the head of the work order — anything that
-     ends the player's session, loses the expedition, or voids a verification), and
-  2. everything on the COMMUNICATION MECHANIC, until the PoC is in a usable state —
-     that is the release's purpose.
-  Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
-  AND THE USER MUST HAVE GOT THROUGH THE MECHANIC ONCE (his decision 11.08.2026, 19:16:
-  "Wir sind weit von einem brauchbaren Stand der Kommunikationsmechanik entfernt. Wenn die
-  gemeldeten Bugs behoben sind, kann ich überhaupt mal anfangen, das eigentliche Feature zu
-  testen."). Green gates are not enough: as long as the reported defects keep him from
-  reaching the communication mechanic at all, nobody has tested what this release exists
-  for. So the gate also requires one completed play-through of the mechanic on the
-  deployed `main`, by the user. This tightens condition 2 above, it does not replace it.
-  THE CLOSING RUN IS ITS OWN POINT (user 11.08.2026, on the estimate: the ~1 h here was
-  true when this meant "tag and publish"). The SEQUENCE is binding and runs BEFORE this
-  point: full LARGE regression on both backends → the blind-parallel four-eyes cleanup of
-  legacy in ALL code and ALL documents (CLAUDE.md §6, closing step
-  `cleanup-blind-parallel`) → a SECOND full LARGE regression after the last cleanup commit
-  (`regression-after-cleanup`) → and only THEN the user's go for the tag. Point 633 carries
-  that run; point 631 anchored the order in the closing checklist, which refuses a tag
-  while the second regression does not stand after the cleanup. What
-  remains here is the irreversible last hour: the tag, the `poc` move, the deploy and the
-  check that the URLs serve the new state. No tag is cut on an unclosed state: this point
-  is never ticked without a complete closing run recorded at the very HEAD that carries
-  the tag, so the checklist gate holds here as much as it holds on 633.
-  FINAL TAG HELD FOR THE USER. The tag and the /v0.3/ publish are the one
-  irreversible, outward-facing step: do ALL the work up to it, then report "ready to
-  tag" and WAIT for the user's explicit go for that tag (`tags-only-on-request`).
-  When it comes, tag `v0.3` at that HEAD, MOVE the `poc` tag to the same commit, and
-  run the deploy via `workflow_dispatch` — the Pages workflow enumerates every `v*`
-  tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
-  that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
-  re-pointed.
+- [ ] 1233. Fleeing animals jitter at the water's edge instead of escaping into the water
+  ORDER (user 29.09.2026 08:05: "Das direkt als nächstes nach dem Veröffentlichen der 0,3 erledigen."): this point stands FIRST in the work order, directly after the v0.3 release.
+  REPORT (user 29.09.2026 07:51, F6 archive /backup/hoa/local/TiereFliehenNichtInsWasser.zip, copy into local/): "Die Tiere zucken am Wasser herum, anstatt vor mir ins Wasser zu fliehen". Seed 2877642954, position x/z -44.55/-138.16 (lat/lon 13.8165/-4.4553, region west, Niger), 28.02.1890, travel mode, build fb916b5, WebGPU, medium. The archive JSON's "wildlife" section holds all 80 animals nearby with state and target.
+  SPEC: reproduce from the archive state; find why fleeing animals pinned against a river/shore oscillate at the edge (flee target rejected by the water mask, re-picked each tick). Fix so a fleeing animal commits to a decision: species that swim/wade enter the water and cross or move along it; species that do not pick a stable escape along the bank. No per-frame direction flipping.
+  FINAL STATE: flee logic fixed; unit test on the water-edge flee decision (stable heading over consecutive ticks, water entry for a wading species); a picture/position check at the reported spot on the everyday backend.
+  Bundle: Tierverhalten.
+  Criticality: medium.
 
 - [ ] 1209. Every session starts and runs on a smaller fixed context load.
   USER ORDER 24.09.2026, 13:30: »Reihe die von dir vorgeschlagenen Maßnahmen zur Reduktion des
@@ -266,6 +236,20 @@ put it is the mistake this line exists to stop.
   scripts/dashboard-guard-core.mjs, scripts/board-archive-rotate.mjs, scripts/board-publish.mjs,
   scripts/vdzk-admissibility-core.mjs, user order 22.09.2026 12:25
   Bundle: Chat & Tafel
+
+- [ ] 1232. A receipt re-judges across a render-neutral commit, so only the missing backends run again
+  ORDER (user 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."): this point stands DIRECTLY AFTER point 1185 in the work order.
+  SPEC: when the only commits between a finished verify receipt and the current HEAD touch render-neutral paths (the charge ledger scripts/render-verify-charges.mjs, docs, TASKS.md/backlog/bookkeeping, tests of scripts; NOT src/, public/, assets, package/lockfile, vite/runner config, or the verify suites themselves), the receipt is re-judged against the current charge ledger instead of discarded. Its re-judged per-backend verdict counts for the new HEAD; only backends the receipt did not complete run again.
+  The render-neutral classification reuses the existing path classifier (isBackendSensitivePath / the ladder edit ageing) rather than a new list; unknown path -> not neutral -> full run (fail closed).
+  A receipt whose run record is incomplete for a red (the "run record is incomplete, so no charge may be accepted" case) is NOT re-judged for that red; it stays unresolved and the backend reruns.
+  The closing step large-regression accepts a re-judged receipt plus the fresh backend receipt(s) as "both backends green on the release HEAD", and its evidence names both receipts and the neutral diff.
+  FINAL STATE: (1) re-judge path in the verify wrapper/receipt reuse; (2) closing-guard accepts the combined evidence; (3) unit tests: neutral diff -> reuse + missing backend only; src/ touched -> full run; unknown path -> full run; incomplete record -> no reuse for that red; (4) scripts/verify/README.md receipt section updated.
+  Infrastructure freeze (CLAUDE.md §2): explicit user order; it SIMPLIFIES (removes a whole rerun) and adds no new ledger, router or planner.
+  USER, verbatim:
+  User 28.09.2026 19:37: "Warum muss die gesamte Regression von vorne laufen, wenn bestimmte Teil bereits erfolgreich durchgetestet wurden?"
+  User 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."
+  Refs: point 633; scripts/render-verify-charges.mjs; scripts/closing-guard-core.mjs large-regression; scripts/verify/README.md receipt reuse
+  Bundle: Testinfrastruktur.
 
 - [ ] 1213. A young animal killed by a predator stays dead and becomes a carcass (user bug
   report 25.09.2026, local/JungtierZombie.zip: the lion caught the young animal, the
@@ -16125,3 +16109,15 @@ to land than a mechanism that needs a review.
   Test: unit case for the steal abort keeping the predator's position.
   Refs: src/scenes/travel/Wildlife.tsx.
   Bundle: Tierverhalten.
+
+- [ ] 1231. Cloud authoring may run during a local regression once the cloud offload switch is ON and proven
+  Point 1230 is closed, so this amendment stands as its own point.
+  Amend point 1230 (cloud offload switch): while the switch is ON and its step-3 proof of off-machine execution has passed, a running local regression / picture run no longer blocks cloud authoring. Cloud author sessions may be started, run, commit and push to their own feat/<point>-<slug> branches during the run.
+  Locally the quiet-machine rule stays unchanged: during the run the local steering session only reads and launches/polls cloud sessions. Still forbidden in the window: main pushes (full pre-push gate), writes to MEMORY.md or any budgeted document, batch-doctor --gate, local suites, picture checks, landing, and creating a local worktree for a finished cloud branch (npm install / disk load). Review of a pushed cloud branch is read-only and allowed. Everything local that follows (suites, picture, landing) waits for the run receipt.
+  While the switch is OFF, or step 3 has not passed, the quiet-machine rule applies as today (no parallel authoring during a run).
+  FINAL STATE: the rule stands in point 1230 spec and in the quiet-machine guidance the batch reads during a run; a unit test covers the routing decision: run in flight + switch ON + proof passed -> cloud launch allowed; otherwise -> wait.
+  USER, verbatim:
+  User 28.09.2026 19:30: "Wie wäre es mit folgendem Vorschlag: Bisher galt ja während eines Testlauf Maschine ruhig halten. Aber jetzt, mit der Option, Tätigkeiten in die Cloud auszulagern, könnten dort doch auch während einer auf meinem PC laufenden Regression andere Tasks bearbeitet werden, oder?"
+  User 28.09.2026 19:34: "Ja, reiche das als Auftrag ein."
+  Refs: point 1230
+  Bundle: Modell & Wächter.
