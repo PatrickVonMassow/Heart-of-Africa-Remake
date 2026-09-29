@@ -836,7 +836,7 @@ const FILE_TOOLS = new Set([
  * no path argument at all is NOT exempted, and one path inside the checkout
  * removes the exemption for the whole segment.
  */
-export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '' } = {}) {
+export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '', canonical } = {}) {
   if (!checkoutRoot) return false
   const { head, args } = headAndArgs(segment)
   if (!FILE_TOOLS.has(String(head))) return false
@@ -849,13 +849,25 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
     // sources as well only ever makes the test STRICTER, which is the safe side.
   ].filter((text) => typeof text === 'string' && text.trim())
   if (candidates.length === 0) return false
-  return candidates.every(
-    (target) =>
-      !resolvedTargetInCheckout({
-        resolvedFilePath: resolve(cwd || checkoutRoot, target),
-        checkoutRoot,
-      }),
-  )
+  return candidates.every((target) => {
+    const lexical = resolve(cwd || checkoutRoot, target)
+    // With a resolver injected, the canonical path must lie outside TOO — a
+    // hard or symbolic link may share an inside file (point 1207, review round 8).
+    const resolved = typeof canonical === 'function' ? canonicalEvidence(lexical, canonical) : lexical
+    return (
+      !resolvedTargetInCheckout({ resolvedFilePath: lexical, checkoutRoot }) &&
+      !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
+    )
+  })
+}
+
+/** The injected resolver's answer; '' (unknown, so inside) on a throw. */
+function canonicalEvidence(path, canonical) {
+  try {
+    return canonical(path) || ''
+  } catch {
+    return ''
+  }
 }
 
 /**
@@ -898,12 +910,8 @@ export function handoffWritesOnlyOutsideCheckout(command, { cwd = '', checkoutRo
     if (segments.length !== expandSegments(src).length) return false
     if (segments.length < 1 || segments.length > 2) return false
     const outside = (path) => {
-      try {
-        const resolved = canonical(path)
-        return !!resolved && !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
-      } catch {
-        return false
-      }
+      const resolved = canonicalEvidence(path, canonical)
+      return !!resolved && !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
     }
     let dir = cwd
     if (segments.length === 2) {
@@ -976,7 +984,7 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
     if (directSegmentIntent(candidate) !== 'write') return false
     // A write that lands entirely OUTSIDE this checkout is not a main write
     // (point 749) — the session memory directory is the case that measured it.
-    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot })) return false
+    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot, canonical })) return false
     return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
   })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }

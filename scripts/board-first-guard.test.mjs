@@ -185,6 +185,16 @@ describe('board-first-guard (spawned)', () => {
       linkSync(resolve(repo, 'inside.md'), resolve(pad, 'shared.md'))
       expect(allowed('Write', { file_path: resolve(pad, 'shared.md') })).toBe(false)
       expect(allowed('Bash', { command: `echo changed > ${resolve(pad, 'shared.md')}` })).toBe(false)
+
+      // Review round 8: with no lock at all the main-write fence must see the link too.
+      rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
+      for (const [tool, input] of [
+        ['Write', { file_path: resolve(pad, 'shared.md') }],
+        ['Bash', { command: `cat > ${resolve(pad, 'shared.md')}` }],
+      ]) {
+        const reason = callGuard(tool, input).decision?.hookSpecificOutput?.permissionDecisionReason ?? ''
+        expect(reason, tool).toContain('MAIN WRITE REFUSED')
+      }
     } finally {
       rmSync(pad, { recursive: true, force: true })
       rmSync(resolve(repo, 'inside.md'), { force: true })

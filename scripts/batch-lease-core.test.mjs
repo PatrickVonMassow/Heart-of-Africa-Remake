@@ -899,5 +899,16 @@ describe('the request handoff shape (point 1207)', () => {
       mainWritingAction({ toolName: 'Bash', command: `cd ${pad} && cat > why.md <<'EOF'\nx\nEOF`, checkoutRoot, cwd: checkoutRoot }).writes,
     ).toBe(false)
     expect(mainWritingAction({ toolName: 'Bash', command: `cd ${pad} && cat > ${checkoutRoot}/TASKS.md`, checkoutRoot, cwd: checkoutRoot }).writes).toBe(true)
+    // Review round 8: the point-749 fallback honours the resolver too.
+    const hardLinked = (path) => (path === '/tmp/alias' ? '' : path)
+    expect(
+      mainWriteFenceDecision({ branch: 'main', toolName: 'Bash', command: 'cat > /tmp/alias', checkoutRoot, cwd: checkoutRoot, canonical: hardLinked }).block,
+    ).toBe(true)
+    expect(
+      mainWriteFenceDecision({ branch: 'main', toolName: 'Bash', command: 'rm /workspace/hoa/link', checkoutRoot, cwd: checkoutRoot, canonical: () => '/tmp/target' }).block,
+    ).toBe(true)
+    expect(
+      mainWriteFenceDecision({ branch: 'main', toolName: 'Bash', command: 'cat > /tmp/fresh.md', checkoutRoot, cwd: checkoutRoot, canonical: hardLinked }).block,
+    ).toBe(false)
   })
 })
