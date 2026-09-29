@@ -794,7 +794,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         `page ${opened.scrollWidth}/${opened.viewport}, ${opened.cards} cards r${Math.round(opened.cardRight)}, link r${Math.round(opened.linkRight)}, clipped [${opened.clipped.join(' | ')}]`,
       )
       await page.close()
-      if (width === 360 && opened.cards > 0) {
+      // The control runs on the deterministic fixture only: its titles are long
+      // by construction, while a live board of short titles legitimately fits
+      // unwrapped (cross-vendor review round 2).
+      if (width === 360 && populated) {
         const clip = await browser.newPage({ viewport: { width, height: 900 } })
         await clip.setContent(`${migrated}\n${NO_WRAP_TITLES}`, { waitUntil: 'load' })
         await clip.evaluate(() => { const d = [...document.querySelectorAll('details.sect')].at(-1); d.open = true; d.querySelectorAll('details').forEach((c) => { c.open = true }) })
