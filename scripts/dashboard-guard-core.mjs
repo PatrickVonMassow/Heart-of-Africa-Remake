@@ -863,7 +863,8 @@ export function evaluate(input) {
     return block(
       'BATCH DASHBOARD NOT REGISTERED. Bring all four dashboard sections in line with the real ' +
         `state, publish (${PUBLISH_CMD}), declare your focus (node scripts/focus.mjs set <N> ` +
-        `"<what>"), then run: ${SYNCED_CMD} <dashboard.html path>. Open points: ${open.join(', ')}.`,
+        `"<what>"), then run: ${SYNCED_CMD} <dashboard.html path>. Open points: ${open.length} ` +
+        `(${open.slice(0, 3).join(', ')}${open.length > 3 ? ', …' : ''}).`,
     )
   }
 
