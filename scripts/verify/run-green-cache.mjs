@@ -126,10 +126,11 @@ export function rejudgeBackend(record, backend, { openPoints = [], ledger } = {}
     const complete = r.asserted === true && r.terminalVerdict === true && !isCrashedRun(r) && !isIncompleteRecording(r)
     if (!complete) return { covered: false, reason: `the ${suite} record on ${backend} is incomplete, so no charge may be accepted for it` }
     if (r.suspect === true) return { covered: false, reason: `${suite} on ${backend} passed only on the retry` }
-    if (r.exit === 0) continue
+    // Reds are judged whatever the exit code: an exit-zero record carrying an
+    // unowned red is not clean.
     const reds = Array.isArray(r.reds) ? r.reds : []
     const loose = reds.filter((red) => !owned(red, suite, backend, r.featureLevel ?? null, openPoints, ledger))
-    if (reds.length === 0 || loose.length) {
+    if ((r.exit !== 0 && reds.length === 0) || loose.length) {
       return { covered: false, reason: `${suite} on ${backend} holds a red no open point owns${loose[0]?.name ? `: "${loose[0].name}"` : ''}` }
     }
   }

@@ -161,6 +161,13 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
     expect(snapshotSuiteRuns(runs, { head: 'old1234', startedAt: 5, finishedAt: 30 })).toEqual([runs[0]])
   })
 
+  it('rejects an exit-zero record that carries an unowned red', () => {
+    const quiet = { polish: { exit: 0, reds: [{ name: 'a red nobody owns', kind: 'check' }] } }
+    const records = [large([...passOf('webgl'), ...passOf('webgpu', quiet)])]
+    expect(ask([], { records }).missing).toEqual(['webgpu'])
+    expect(rejudgeBackend(records[0].record, 'webgpu', { openPoints: [], ledger: [] }).reason).toMatch(/no open point owns/)
+  })
+
   it('judges both sides of a rename: moving code out of src/ into docs/ is not neutral', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-rejudge-rename-'))
     const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
