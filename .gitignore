@@ -213,6 +213,8 @@ scripts/.tile-cache
 .claude/astra-share.json.tmp-*
 .claude/fable-switch.json
 .claude/fable-switch.json.tmp-*
+.claude/cloud-switch.json
+.claude/cloud-switch.json.tmp-*
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/
