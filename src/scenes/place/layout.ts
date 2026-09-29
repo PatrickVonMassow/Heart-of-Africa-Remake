@@ -2213,7 +2213,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // their ground is what the whole communication slice is arranged around.
   let loom: LoomStation | null = null
   const gaveWayToLoom = { households: 0, dwellings: 0, rebuilt: 0 }
-  if (place.kind === 'village') {
+  // WEAVING IS PARKED (user 29.09.2026): no village lays the loom. The
+  // mechanism stays whole; `balance.villageLife.loom.placed` re-enables it.
+  if (place.kind === 'village' && balance.villageLife.loom.placed) {
     // The stands a villager could look from are the same for every candidate
     // seat, so they are walked once rather than per trial (the sweep runs twice
     // over hundreds of seats, and the corridor test is the expensive half).

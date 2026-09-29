@@ -5975,6 +5975,10 @@ if (section('village-stations')) {
     })
     await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
     await page.evaluate(() => {
+      // Weaving is parked in the shipped game (user 29.09.2026); this section
+      // tests the kept station, so it lays the loom the way the switch would.
+      const parked = window.__balance?.villageLife?.loom
+      if (parked) parked.placed = true
       window.__game.setState({ seed: 1838110026 })
       window.__game.getState().enterPlace('bambara-village')
       window.__game.getState().setJournalOpen(false)
@@ -6106,6 +6110,8 @@ if (section('village-stations')) {
       const g = window.__game.getState()
       if (g.placeId) g.leavePlace()
       window.__game.setState({ seed })
+      const parked = window.__balance?.villageLife?.loom
+      if (parked) parked.placed = false
     }, bootSeed)
   }
 }
@@ -6138,6 +6144,10 @@ if (section('village-loom')) {
     })
     await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
     await page.evaluate(() => {
+      // Weaving is parked in the shipped game (user 29.09.2026); this section
+      // tests the kept station, so it lays the loom the way the switch would.
+      const parked = window.__balance?.villageLife?.loom
+      if (parked) parked.placed = true
       window.__game.setState({ seed: 394349866 })
       window.__game.getState().enterPlace('bambara-village')
       window.__game.getState().setJournalOpen(false)
@@ -6509,6 +6519,8 @@ if (section('village-loom')) {
       const g = window.__game.getState()
       if (g.placeId) g.leavePlace()
       window.__game.setState({ seed })
+      const parked = window.__balance?.villageLife?.loom
+      if (parked) parked.placed = false
     }, bootSeed)
   }
 }

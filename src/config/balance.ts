@@ -903,6 +903,10 @@ interface BalanceConfig {
      *  teaches UPSTREAM/DOWNSTREAM a second time, on a walking body instead of
      *  the children's running groups. */
     loom: {
+      /** Whether a village lays the loom at all. Off since the user parked the
+       *  weaving scene (29.09.2026); the station, its words and its tests stay
+       *  in the game so it can be switched back on. */
+      placed: boolean
       /** Metres from the weaver's seat to each warp stake — half the stretched
        *  warp. The seat is its MIDPOINT, so both calls send the helper away. */
       warpHalf: number
@@ -1710,6 +1714,7 @@ export const balance: BalanceConfig = {
     //    enough to catch in passing, rare enough that the speech labels do not
     //    become noise beside the children's.
     loom: {
+      placed: false, // weaving parked (user 29.09.2026); true re-enables the station
       warpHalf: 3.2,
       tendStand: 2.4,
       passSeconds: 2.6,
