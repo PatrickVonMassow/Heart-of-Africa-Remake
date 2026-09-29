@@ -32361,3 +32361,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   scripts/dashboard-guard-core.mjs, scripts/board-archive-rotate.mjs, scripts/board-publish.mjs,
   scripts/vdzk-admissibility-core.mjs, user order 22.09.2026 12:25
   Bundle: Chat & Tafel
+
+- [x] 1233. Fleeing animals jitter at the water's edge instead of escaping into the water
+  ORDER (user 29.09.2026 08:05: "Das direkt als nächstes nach dem Veröffentlichen der 0,3 erledigen."): this point stands FIRST in the work order, directly after the v0.3 release.
+  REPORT (user 29.09.2026 07:51, F6 archive /backup/hoa/local/TiereFliehenNichtInsWasser.zip, copy into local/): "Die Tiere zucken am Wasser herum, anstatt vor mir ins Wasser zu fliehen". Seed 2877642954, position x/z -44.55/-138.16 (lat/lon 13.8165/-4.4553, region west, Niger), 28.02.1890, travel mode, build fb916b5, WebGPU, medium. The archive JSON's "wildlife" section holds all 80 animals nearby with state and target.
+  SPEC: reproduce from the archive state; find why fleeing animals pinned against a river/shore oscillate at the edge (flee target rejected by the water mask, re-picked each tick). Fix so a fleeing animal commits to a decision: species that swim/wade enter the water and cross or move along it; species that do not pick a stable escape along the bank. No per-frame direction flipping.
+  FINAL STATE: flee logic fixed; unit test on the water-edge flee decision (stable heading over consecutive ticks, water entry for a wading species); a picture/position check at the reported spot on the everyday backend.
+  Bundle: Tierverhalten.
+  Criticality: medium.
