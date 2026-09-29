@@ -5489,6 +5489,12 @@ if (section('villager-canoe')) {
           }
         })
         check('from the boat standing place the canoe and its paddler are in frame', seen.hull && seen.paddler, JSON.stringify(seen))
+        const paddlerRay = await page.evaluate(() => {
+          const c = window.__placeCanoe()
+          return window.__placeRayHit ? window.__placeRayHit(c.paddler.x, 0.2, c.paddler.z) : null
+        })
+        check('and nothing nearer hides the paddler', !paddlerRay || paddlerRay.hitDistance === null ||
+          paddlerRay.hitDistance >= paddlerRay.targetDistance - 0.8, JSON.stringify(paddlerRay))
         check('and so is his call’s reading', seen.label, JSON.stringify(seen.labelAt))
         check('and no child and no play rock is', seen.kidsInFrame === 0 && seen.rocksInFrame === 0,
           `${seen.kidsInFrame}/${seen.kids} children, ${seen.rocksInFrame} rocks`)
@@ -5514,33 +5520,67 @@ if (section('villager-canoe')) {
           const b = L.bank
           const down = L.playRocks.downstream
           const up = L.playRocks.upstream
-          // Four metres downstream of the rock and a metre inland of it: the
-          // rock between the spectator and the game.
-          return {
-            at: { x: down.x + b.fx * 4 - b.nx * 1, z: down.z + b.fz * 4 - b.nz * 1 },
-            look: { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2 },
+          const look = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2 }
+          // Downstream of the rock and a few paces inland of the lane, so the
+          // rock stands beside the sight line rather than across it — the first
+          // run stood a metre inland and the stone hid four of five children.
+          // The first stand the shipped colliders leave free is taken; a box
+          // counts at its circumscribed radius, the conservative reading.
+          const reach = (c) =>
+            c.kind === 'box' ? Math.hypot(c.hx, c.hz) : c.kind === 'segment' ? c.r + Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2 : c.r
+          const clearAt = (x, z) => {
+            let clear = Infinity
+            for (const c of window.__placeColliders ?? []) {
+              const m = c.kind === 'segment' ? { x: (c.x1 + c.x2) / 2, z: (c.z1 + c.z2) / 2 } : { x: c.x, z: c.z }
+              clear = Math.min(clear, Math.hypot(x - m.x, z - m.z) - reach(c))
+            }
+            return clear
           }
+          for (const inland of [5, 4, 6, 3]) {
+            for (const along of [5, 6, 4]) {
+              const at = { x: down.x + b.fx * along - b.nx * inland, z: down.z + b.fz * along - b.nz * inland }
+              const clear = clearAt(at.x, at.z)
+              if (clear > 0.35) return { at, look, inland, along, clear }
+            }
+          }
+          return null
         })
-        await standAt(behind.at, behind.look)
-        const held = await page.evaluate(() => window.__game.getState().placeId === 'bambara-village' && !!window.__placeCamera)
+        check('there is free ground to stand on behind the downstream rock', !!behind,
+          behind ? `${behind.along} m downstream of it, ${behind.inland} m inland, ${behind.clear.toFixed(2)} m clear` : 'no free stand')
+        if (behind) await standAt(behind.at, behind.look)
+        const held = !!behind && await page.evaluate(() => window.__game.getState().placeId === 'bambara-village' && !!window.__placeCamera)
         check('the stand behind the downstream rock is inside the settlement', held)
         if (held) {
-          const seen = await page.evaluate(() => {
+          // The children's round keeps moving: give it a few frames to spread
+          // along the lane rather than judging the one frame it bunched up in.
+          const seenOnce = () => page.evaluate(() => {
             const at = window.__canoeFrameAt
             const c = window.__placeCanoe()
             const L = window.__placeLayout
-            const kids = (window.__placeTag().children ?? []).map((k) => at(k.x, 0.4, k.z))
+            // Seen = projected into the frame AND not hidden behind something
+            // nearer (the rock stands between the spectator and the lane).
+            const visible = (x, y, z) => {
+              if (!at(x, y, z).inFrame) return false
+              const ray = window.__placeRayHit ? window.__placeRayHit(x, y, z) : null
+              return !ray || ray.hitDistance === null || ray.hitDistance >= ray.targetDistance - 0.6
+            }
+            const kids = window.__placeTag().children ?? []
             return {
               hull: at(c.x, 0, c.z).inFrame,
               paddler: at(c.paddler.x, 0.5, c.paddler.z).inFrame,
               phase: c.phase,
               upRock: at(L.playRocks.upstream.x, 0.5, L.playRocks.upstream.z).inFrame,
-              kidsInFrame: kids.filter((k) => k.inFrame).length,
+              kidsSeen: kids.filter((k) => visible(k.x, 0.4, k.z)).length,
               kids: kids.length,
             }
           })
-          check('from behind the downstream rock the children’s game is in frame', seen.upRock && seen.kidsInFrame >= 2,
-            `${seen.kidsInFrame}/${seen.kids} children, upstream rock ${seen.upRock}`)
+          let seen = await seenOnce()
+          for (let tries = 0; tries < 40 && seen.kidsSeen < 3; tries++) {
+            await nextFrames(3)
+            seen = await seenOnce()
+          }
+          check('from behind the downstream rock the children’s game is in frame, the children not hidden by the rock',
+            seen.upRock && seen.kidsSeen >= 3, `${seen.kidsSeen}/${seen.kids} children seen, upstream rock ${seen.upRock}`)
           check('and the canoe is not', !seen.hull && !seen.paddler, `${seen.phase}: hull ${seen.hull}, paddler ${seen.paddler}`)
           await frame('1237-village-children-from-behind-downstream-rock', {
             local: { x: behind.look.x, y: 0.5, z: behind.look.z },
