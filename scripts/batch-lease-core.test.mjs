@@ -35,6 +35,7 @@ import {
   declaredWaitStale,
   dispossessionNotice,
   mainWritingAction,
+  handoffWritesOnlyOutsideCheckout,
   mainWriteFenceDecision,
   resolvedTargetInCheckout,
 } from './batch-lease-core.mjs'
@@ -799,5 +800,99 @@ describe('the takeover — the override is corroborated by OUTPUT and it is boun
     // The ladder stays monotone: renew < lease < the override cap's total.
     expect(LEASE_RENEW_INTERVAL_MS).toBeLessThan(LEASE_MS)
     expect(TAKEOVER_OVERRIDE_MAX_MS).toBeLessThanOrEqual(LEASE_MS)
+  })
+})
+
+describe('the request handoff shape (point 1207)', () => {
+  const checkoutRoot = '/workspace/hoa'
+  const pad = '/tmp/pad'
+  const links = {
+    '/tmp/pad/link': '/workspace/hoa',
+    '/tmp/pad/dangling': '/workspace/hoa/new.md',
+    '/tmp/link': '/workspace/hoa/subdir',
+  }
+  // Stand-in for the guard's resolver: follows a link at any depth.
+  const canonical = (path) => {
+    for (const [from, to] of Object.entries(links)) {
+      if (path === from || path.startsWith(`${from}/`)) return to + path.slice(from.length)
+    }
+    return path
+  }
+  const ok = (command, cwd = checkoutRoot) => handoffWritesOnlyOutsideCheckout(command, { cwd, checkoutRoot, canonical })
+
+  it('admits the documented handoff writes outside the checkout', () => {
+    expect(ok(`cd ${pad} && cat > why.md <<'EOF'\nbody with $(text) and \`ticks\`\nEOF`)).toBe(true)
+    expect(ok(`cat > ${pad}/x.md <<"EOF"\nbody\nEOF`)).toBe(true)
+    expect(ok(`cat > why.md <<'EOF'\nbody\nEOF`, pad)).toBe(true)
+    expect(ok(`mkdir -p ${pad}/req`)).toBe(true)
+    expect(ok(`echo hello > ${pad}/x.md`)).toBe(true)
+    expect(ok(`printf '%s' hi >> ${pad}/x.md`)).toBe(true)
+    expect(ok(`tee -a ${pad}/x.md < ${pad}/in`)).toBe(true)
+  })
+
+  it('refuses a write inside the checkout, direct or through the session cwd', () => {
+    expect(ok('cat > TASKS.md')).toBe(false)
+    expect(ok(`cd ${checkoutRoot} && cat > TASKS.md`, pad)).toBe(false)
+    expect(ok(`echo x > ${checkoutRoot}/src/main.ts`)).toBe(false)
+    expect(ok(`tee ${pad}/a.md ${checkoutRoot}/b.md`)).toBe(false)
+  })
+
+  it('refuses every shape the five review rounds found', () => {
+    const refused = [
+      // round 1: failed cd, nested cd, unexpanded destination
+      `cd ${pad} || cat > src/x.ts`,
+      `cd ${pad} ; cat > src/x.ts`,
+      `cd ${pad} && bash -c "cd ${checkoutRoot} && cat > src/x.ts"`,
+      `cd ${pad} && cat > "$DEST"`,
+      // round 2: unknown cwd, eval, symlink inside the destination
+      `cd "$DEST" && cat > ../src/x.ts`,
+      `cd ${pad} && eval "cd ${checkoutRoot}" && cat > src/x.ts`,
+      `cd ${pad} && cat > link/src/x.ts`,
+      // round 3: `..` through a link, logical cd .., wildcard, --opt=, dd, awk
+      'cat > /tmp/link/../src/x.ts',
+      `cd ${pad} && cd .. && cat > x.md`,
+      'touch /tmp/pad/link*/src/x.ts',
+      'tee --output=/workspace/hoa/x /tmp/a',
+      'dd if=/tmp/a of=/workspace/hoa/x',
+      `awk '{print > "/workspace/hoa/x"}' /tmp/in`,
+      // round 4: attached option, dangling link, directory operand
+      `cd ${pad} && cp -t/workspace/hoa/src a.ts`,
+      `cd ${pad} && cat > dangling`,
+      `cd ${pad} && cp a.ts out`,
+      // round 5: skipped cd, rm through a link, attached -o, relative cd, ancestor rm
+      `true || cd ${pad} && cat > TASKS.md`,
+      'rm /workspace/hoa/link',
+      `sort -oTASKS.md ${pad}/input > ${pad}/log`,
+      `cd ${pad} && cd src && cat > x.ts`,
+      'rm -rf /workspace',
+      // command-line expansion, unquoted heredoc body, process substitution, wrappers
+      `echo $(rm x) > ${pad}/f`,
+      `cat > ${pad}/f <<EOF\n$(rm -rf ${checkoutRoot})\nEOF`,
+      `cat <(rm x) > ${pad}/f`,
+      `env -C ${checkoutRoot} cat > x.md`,
+      `cat > ${pad}/f 2>&1`,
+      `cat > ${pad}/f\nrm -rf src`,
+    ]
+    for (const command of refused) expect(ok(command), command).toBe(false)
+  })
+
+  it('treats an unresolvable destination as inside', () => {
+    expect(handoffWritesOnlyOutsideCheckout(`cat > ${pad}/x.md`, { cwd: checkoutRoot, checkoutRoot, canonical: () => '' })).toBe(false)
+    expect(
+      handoffWritesOnlyOutsideCheckout(`cat > ${pad}/x.md`, {
+        cwd: checkoutRoot,
+        checkoutRoot,
+        canonical: () => {
+          throw new Error('EACCES')
+        },
+      }),
+    ).toBe(false)
+  })
+
+  it('lets the main-write fence pass the handoff it measured refusing', () => {
+    expect(
+      mainWritingAction({ toolName: 'Bash', command: `cd ${pad} && cat > why.md <<'EOF'\nx\nEOF`, checkoutRoot, cwd: checkoutRoot }).writes,
+    ).toBe(false)
+    expect(mainWritingAction({ toolName: 'Bash', command: `cd ${pad} && cat > ${checkoutRoot}/TASKS.md`, checkoutRoot, cwd: checkoutRoot }).writes).toBe(true)
   })
 })

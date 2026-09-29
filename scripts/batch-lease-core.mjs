@@ -62,6 +62,7 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import {
   expandSegments,
+  parseSegments,
   isMutatingSegment,
   directSegmentIntent,
   headAndArgs,
@@ -858,12 +859,100 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
 }
 
 /**
+ * THE REQUEST HANDOFF SHAPE (point 1207). PURE apart from the injected
+ * `canonical` resolver.
+ *
+ * A stood-down session deposits its request text outside the checkout, e.g.
+ * `cd <scratchpad> && cat > why.md <<'EOF' … EOF`, and both the ownership
+ * stand-down and the main-write fence refused it — the second because `why.md`
+ * was resolved against the session cwd rather than the `cd` target.
+ *
+ * A general shell reader proved unable to close (five review rounds, each
+ * finding new ways a write escapes lexical analysis), so this is a finite
+ * WHITELIST instead: the whole call is optionally `cd <plain absolute path> &&`
+ * followed by exactly ONE unwrapped `cat`, `tee`, `printf`, `echo`, `mkdir` or
+ * `touch`. Every destination (a `>`/`>>` target, a tee/mkdir/touch operand) is
+ * a plain path, resolved against the `cd` target or the session cwd and passed
+ * through `canonical` (the guard's symlink-following write-target resolver),
+ * and must land outside the checkout; '' or a throw counts as inside. The
+ * command line carries no expansion, and a heredoc body is admitted only
+ * behind a quoted delimiter, which keeps it literal.
+ */
+const HANDOFF_WRITERS = new Map([
+  ['cat', { options: [], operandsWrite: false }],
+  ['printf', { options: null, operandsWrite: false }],
+  ['echo', { options: null, operandsWrite: false }],
+  ['tee', { options: ['-a'], operandsWrite: true }],
+  ['mkdir', { options: ['-p'], operandsWrite: true }],
+  ['touch', { options: [], operandsWrite: true }],
+])
+
+const plainHandoffPath = (text) =>
+  typeof text === 'string' && text !== '' && !/[$`*?[\]{}=\s'"\\;&|<>()]|^[~-]/.test(text) && !text.split('/').includes('..')
+
+export function handoffWritesOnlyOutsideCheckout(command, { cwd = '', checkoutRoot = '', canonical = (p) => p } = {}) {
+  try {
+    const src = String(command ?? '')
+    if (!checkoutRoot || !src.trim()) return false
+    const [firstLine, ...rest] = src.split('\n')
+    const hasBody = rest.some((line) => line.trim())
+    if (/[$`]/.test(firstLine)) return false
+    const segments = parseSegments(src)
+    if (segments.length !== expandSegments(src).length) return false
+    if (segments.length < 1 || segments.length > 2) return false
+    const outside = (path) => {
+      try {
+        const resolved = canonical(path)
+        return !!resolved && !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
+      } catch {
+        return false
+      }
+    }
+    let dir = cwd
+    if (segments.length === 2) {
+      const [cd, writer] = segments
+      const words = cd.words.map((word) => word.text)
+      if (words.length !== 2 || words[0] !== 'cd' || cd.redirects.length) return false
+      if (!isAbsolute(words[1]) || !plainHandoffPath(words[1])) return false
+      if (src.slice(cd.end, writer.start).trim() !== '&&') return false
+      dir = words[1]
+    }
+    const writer = segments[segments.length - 1]
+    const [head, ...args] = writer.words.map((word) => word.text)
+    const rule = HANDOFF_WRITERS.get(head)
+    if (!rule) return false
+    // A heredoc body stays literal only behind a quoted delimiter.
+    if (hasBody && !writer.redirects.some((r) => r.op?.startsWith('<<'))) return false
+    const heredocs = firstLine.match(/<<-?\s*\S?/g) ?? []
+    if (hasBody && heredocs.some((h) => !/['"]$/.test(h))) return false
+    const destinations = []
+    for (const r of writer.redirects) {
+      if (r.op?.includes('&')) return false
+      if (r.op?.includes('>')) destinations.push(r.target)
+    }
+    const operands = []
+    for (const arg of args) {
+      if (arg.startsWith('-') && rule.options !== null) {
+        if (!rule.options.includes(arg)) return false
+      } else operands.push(arg)
+    }
+    if (rule.operandsWrite) destinations.push(...operands)
+    if (destinations.length === 0) return false
+    if (!destinations.every(plainHandoffPath)) return false
+    if (!isAbsolute(dir)) return false
+    return destinations.every((target) => outside(resolve(dir, target)))
+  } catch {
+    return false
+  }
+}
+
+/**
  * Is this call about to write the checkout whose current branch is `main`?
  * PURE. The PreToolUse matcher already narrows the possible tools; this second
  * classification keeps reads and repository gates open and treats an unreadably
  * deep shell wrapper conservatively as a write.
  */
-export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '' } = {}) {
+export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '', canonical } = {}) {
   const tool = String(toolName ?? '')
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
     if (filePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })) {
@@ -873,6 +962,9 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
   }
   if (tool === 'Agent') return { writes: true, what: `${tool} in the main checkout` }
   if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
+  if (handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })) {
+    return { writes: false, what: '' }
+  }
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
   // `expandSegments` already yields every carried command separately. Judge the
@@ -911,12 +1003,13 @@ export function mainWriteFenceDecision({
   resolvedFilePath,
   checkoutRoot,
   cwd = '',
+  canonical,
 } = {}) {
   try {
     if (paused === true || worktree === true || branch !== 'main') {
       return { block: false, registerWriter: false, reason: '' }
     }
-    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd })
+    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, canonical })
     if (!action.writes) return { block: false, registerWriter: false, reason: '' }
     if (ownsBatchLock === true) return { block: false, registerWriter: true, reason: '' }
     return {

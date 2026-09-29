@@ -47,6 +47,7 @@ import { CLOSING_CARD_CMD, NONE_CARD_CMD, NOW_CARD_CMD, PUBLISH_CMD, SYNCED_CMD 
 import { claimsNoCurrentWork } from './board-core.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
 import { parseSegments, segmentInvokesScript, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
+import { handoffWritesOnlyOutsideCheckout, resolvedTargetInCheckout } from './batch-lease-core.mjs'
 
 // The command classifier is SHARED with the fence chokepoint (point 473): both
 // gates judge a shell call the same way — per segment, on the command HEAD, with
@@ -176,6 +177,10 @@ export function ownershipStandDownDecision({
   toolName,
   command,
   filePath,
+  resolvedFilePath = '',
+  checkoutRoot = '',
+  cwd = '',
+  canonical,
 } = {}) {
   try {
     if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
@@ -183,6 +188,15 @@ export function ownershipStandDownDecision({
     }
     const call = classifyCall({ toolName, command, filePath })
     if (call.kind !== 'mutating') return { block: false, reason: '', standDown: true }
+    // The documented request handoff writes OUTSIDE the checkout — a file-tool
+    // write to a resolved outside path, or the whitelisted shell shape (point 1207).
+    const tool = String(toolName ?? '')
+    const outsideFile =
+      ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool) &&
+      !!filePath && !!checkoutRoot && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })
+    const outsideShell =
+      SHELL_TOOLS.has(tool) && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })
+    if (outsideFile || outsideShell) return { block: false, reason: '', standDown: true }
     const attempted = call.segment
       ? `the state-changing segment \`${call.segment}\``
       : filePath
