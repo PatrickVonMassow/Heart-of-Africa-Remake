@@ -91,7 +91,17 @@ export function parseMarker(text) {
   }
 }
 
+/** A plain branch name: no leading dash, no whitespace, no ref-spec or revision syntax. */
+export function isProbeRef(ref) {
+  const text = String(ref ?? '')
+  return (
+    /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(text) && !text.includes('..') && !text.endsWith('/') && !text.endsWith('.lock')
+  )
+}
+
 function recordProbeFrom(ref, creditConfirmed) {
+  // An option-like or malformed ref is refused before git sees it.
+  if (!isProbeRef(ref)) throw new Error(`not a branch name: ${JSON.stringify(ref)}`)
   const remoteRef = ref.startsWith('origin/') ? ref : `origin/${ref}`
   // The state is read AFTER the fetch and applied at once, so an OFF set meanwhile is not undone.
   const current = () => {
@@ -103,7 +113,7 @@ function recordProbeFrom(ref, creditConfirmed) {
     throw new Error(`probe not readable, switch set OFF — ${why}`)
   }
   // Read the commit just fetched (FETCH_HEAD), never a cached and possibly older remote-tracking ref.
-  const fetched = git(['fetch', '--quiet', 'origin', ref.replace(/^origin\//, '')])
+  const fetched = git(['fetch', '--quiet', '--', 'origin', ref.replace(/^origin\//, '')])
   if (fetched.status !== 0)
     fail(`fetch of ${remoteRef} failed: ${String(fetched.stderr ?? fetched.error ?? '').trim()}`)
   const shown = git(['show', `FETCH_HEAD:${PROBE_FILE}`])

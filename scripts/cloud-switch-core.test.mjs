@@ -10,7 +10,7 @@ import {
   venueInstruction,
   writeState,
 } from './cloud-switch-core.mjs'
-import { parseMarker } from './cloud-switch.mjs'
+import { isProbeRef, parseMarker } from './cloud-switch.mjs'
 
 const NOW = Date.parse('2026-09-29T02:00:00Z')
 const probe = (over = {}) => ({
@@ -199,5 +199,13 @@ describe('review fixes (Astra, 2cdaaae)', () => {
     expect(authoringVenue(on).venue).toBe('local')
     const cleared = readState(JSON.stringify(recordProbe(on, probe(), { by: 'b', now: NOW })))
     expect(authoringVenue(cleared).venue).toBe('cloud')
+  })
+})
+
+describe('review fix (Astra, 3ba3a08)', () => {
+  it('refuses option-like and malformed probe refs', () => {
+    for (const bad of ['--dry-run', '-n', 'a..b', 'x:y', 'a b', '', 'x/']) expect(isProbeRef(bad)).toBe(false)
+    expect(isProbeRef('probe/1230-cloud-marker')).toBe(true)
+    expect(isProbeRef('origin/probe/1230-cloud-marker')).toBe(true)
   })
 })
