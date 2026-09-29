@@ -320,7 +320,11 @@ describe('ownership mutation stand-down', () => {
     expect(outside({ command: `cat > ${pad}/x.md && npm run build` }).block).toBe(true)
     expect(outside({ cwd: pad, command: `cd ${root} && cat > TASKS.md` }).block).toBe(true)
     expect(outside({ cwd: pad, command: 'cd ~ && cat > x.md' }).block).toBe(true)
+    // A child shell's `cd` does not move the parent: its write still lands in the pad.
     expect(outside({ cwd: pad, command: `bash -c "cd ${root}" && cat > x.md` }).block).toBe(false)
+    expect(outside({ command: `cd ${pad} || cat > src/x.ts` }).block).toBe(true)
+    expect(outside({ command: `cd ${pad} && cat > "$DEST"` }).block).toBe(true)
+    expect(outside({ command: 'cd /tmp/link && cat > src/x.ts', realpath: (p) => (p === '/tmp/link' ? root : p) }).block).toBe(true)
   })
 })
 

@@ -521,6 +521,21 @@ describe('the main-write ownership fence', () => {
     // …while an unreadable `cd` or `pushd` never earns the exemption.
     expect(shell('cd /tmp/pad && cd - && cat > why.md').writes).toBe(true)
     expect(shell('pushd /tmp/pad && cat > why.md').writes).toBe(true)
+    // Review round 1: a `cd` that may have failed, a nested `cd`, a symlink into
+    // the checkout and an unexpanded variable all stay refused.
+    const fromRoot = (command, over = {}) =>
+      mainWritingAction({ toolName: 'Bash', command, checkoutRoot, cwd: '/workspace/hoa', ...over }).writes
+    expect(fromRoot('cd /tmp/nope || cat > src/x.ts')).toBe(true)
+    expect(fromRoot('cd /tmp/nope ; cat > src/x.ts')).toBe(true)
+    expect(fromRoot('cd /tmp/pad && true ; cat > src/x.ts')).toBe(true)
+    expect(fromRoot('cd /tmp/pad | cat > src/x.ts')).toBe(true)
+    expect(fromRoot('cd /tmp/pad && bash -c "cd /workspace/hoa && cat > src/x.ts"')).toBe(true)
+    expect(fromRoot('cd /tmp/link && cat > src/x.ts', { realpath: (p) => (p === '/tmp/link' ? '/workspace/hoa' : p) })).toBe(true)
+    expect(fromRoot('cd /tmp/gone && cat > x.md', { realpath: () => { throw new Error('ENOENT') } })).toBe(true)
+    expect(fromRoot('cd /tmp/pad && cat > "$DEST"')).toBe(true)
+    expect(fromRoot('cat > ~/x.md')).toBe(true)
+    // The plain `&&` chain from the scratchpad still passes, nested write included.
+    expect(fromRoot('cd /tmp/pad && cat > a.md && tee b.md')).toBe(false)
     expect(shell('git commit -F /tmp/message.txt').writes).toBe(true)
   })
 

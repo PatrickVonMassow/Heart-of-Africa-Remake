@@ -848,6 +848,8 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
     // sources as well only ever makes the test STRICTER, which is the safe side.
   ].filter((text) => typeof text === 'string' && text.trim())
   if (candidates.length === 0) return false
+  // An unexpanded `$VAR`, command substitution or `~` names no knowable path (point 1207).
+  if (candidates.some((text) => /[$`]|^~/.test(text))) return false
   return candidates.every(
     (target) =>
       !resolvedTargetInCheckout({
@@ -858,27 +860,46 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
 }
 
 /**
- * The directory each segment runs in, following top-level `cd`. PURE.
+ * The directory each segment runs in, following top-level `cd`. PURE apart
+ * from the injected `realpath`.
  *
  * MEASURED 24.09.2026 (point 1207): `cd <scratchpad> && cat > why.md` was
  * refused because `why.md` was resolved against the SESSION cwd, the checkout.
- * Only a plain top-level `cd <literal path>` moves the directory; `cd` with no
- * argument, `-`, `~`, a variable, `pushd` or `popd` makes it UNKNOWN (''), and an
- * unknown directory never earns the outside-checkout exemption. A nested segment
- * inherits its caller's directory and its own `cd` is ignored, which only ever
- * resolves against the stricter directory.
+ * A plain top-level `cd <literal path>` moves the directory only for the
+ * segments joined to it by `&&` alone — `||`, `;`, a pipe or a heredoc body in
+ * between means the `cd` may have failed or run in a subshell. Everything it
+ * cannot establish is UNKNOWN (''), and callers resolve an unknown directory
+ * against the checkout root, the strict side: `cd` with no argument, `-`, `~`,
+ * a variable, `pushd`/`popd`, and every nested segment once any nested segment
+ * changes directory. `realpath` canonicalises the target so a symlink into the
+ * checkout is seen as the checkout; its failure also yields unknown.
  */
-export function segmentCwds(segments, cwd = '') {
+export function segmentCwds(segments, cwd = '', { command = '', realpath = (path) => path } = {}) {
+  const list = segments ?? []
+  const nestedMoves = list.some((segment) => (segment?.depth ?? 0) !== 0 && ['cd', 'pushd', 'popd'].includes(headAndArgs(segment).head))
   let current = cwd
-  return (segments ?? []).map((segment) => {
+  let moved = false
+  let previous = null
+  let caller = cwd
+  return list.map((segment) => {
+    if ((segment?.depth ?? 0) !== 0) return nestedMoves ? '' : caller
+    if (moved && previous && String(command).slice(previous.end, segment.start).trim() !== '&&') current = ''
+    previous = segment
+    caller = current
     const here = current
-    if ((segment?.depth ?? 0) !== 0) return here
     const { head, args } = headAndArgs(segment)
     if (head === 'pushd' || head === 'popd') current = ''
     if (head === 'cd') {
+      moved = true
       const target = args.map((arg) => arg.text).filter((text) => text && text !== '--')
       const literal = target.length === 1 && !/^[-~]|[$`*?]/.test(target[0])
-      current = literal && current ? resolve(current, target[0]) : ''
+      let next = ''
+      try {
+        next = literal && current ? realpath(resolve(current, target[0])) : ''
+      } catch {
+        next = ''
+      }
+      current = next
     }
     return here
   })
@@ -890,7 +911,7 @@ export function segmentCwds(segments, cwd = '') {
  * classification keeps reads and repository gates open and treats an unreadably
  * deep shell wrapper conservatively as a write.
  */
-export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '' } = {}) {
+export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '', realpath } = {}) {
   const tool = String(toolName ?? '')
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
     if (filePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })) {
@@ -902,7 +923,7 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
   if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
-  const cwds = segmentCwds(segments, cwd || checkoutRoot)
+  const cwds = segmentCwds(segments, cwd || checkoutRoot, { command, realpath })
   // `expandSegments` already yields every carried command separately. Judge the
   // direct program so `bash -c "npm run build"` does not get denied at the shell
   // carrier before its build leaf can receive the narrow exception below.
@@ -910,7 +931,7 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
     if (directSegmentIntent(candidate) !== 'write') return false
     // A write that lands entirely OUTSIDE this checkout is not a main write
     // (point 749) — the session memory directory is the case that measured it.
-    if (cwds[i] && segmentWritesOnlyOutsideCheckout(candidate, { cwd: cwds[i], checkoutRoot })) return false
+    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd: cwds[i], checkoutRoot })) return false
     return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
   })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }
@@ -939,12 +960,13 @@ export function mainWriteFenceDecision({
   resolvedFilePath,
   checkoutRoot,
   cwd = '',
+  realpath,
 } = {}) {
   try {
     if (paused === true || worktree === true || branch !== 'main') {
       return { block: false, registerWriter: false, reason: '' }
     }
-    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd })
+    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, realpath })
     if (!action.writes) return { block: false, registerWriter: false, reason: '' }
     if (ownsBatchLock === true) return { block: false, registerWriter: true, reason: '' }
     return {

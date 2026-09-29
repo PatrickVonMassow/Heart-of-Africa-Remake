@@ -161,7 +161,7 @@ export function classifyTool(call) {
 }
 
 /** Does every mutating part of this call write only outside `checkoutRoot`? */
-function writesOnlyOutsideCheckout({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd }) {
+function writesOnlyOutsideCheckout({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, realpath }) {
   if (!checkoutRoot) return false
   if (MUTATING_TOOLS.has(String(toolName ?? ''))) {
     return !!filePath && !!resolvedFilePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })
@@ -169,14 +169,14 @@ function writesOnlyOutsideCheckout({ toolName, command, filePath, resolvedFilePa
   if (!SHELL_TOOLS.has(String(toolName ?? ''))) return false
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
-  const cwds = segmentCwds(segments, cwd || checkoutRoot)
+  const cwds = segmentCwds(segments, cwd || checkoutRoot, { command, realpath })
   const mutating = segments
     .map((segment, i) => ({ segment, cwd: cwds[i] }))
     .filter(({ segment }) => !isEscapeSegment(segment) && isMutatingSegment(segment))
   return (
     !tooDeep &&
     mutating.length > 0 &&
-    mutating.every(({ segment, cwd: here }) => !!here && segmentWritesOnlyOutsideCheckout(segment, { cwd: here, checkoutRoot }))
+    mutating.every(({ segment, cwd: here }) => segmentWritesOnlyOutsideCheckout(segment, { cwd: here, checkoutRoot }))
   )
 }
 
@@ -200,6 +200,7 @@ export function ownershipStandDownDecision({
   resolvedFilePath = '',
   checkoutRoot = '',
   cwd = '',
+  realpath,
 } = {}) {
   try {
     if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
@@ -210,7 +211,7 @@ export function ownershipStandDownDecision({
     // A write that lands only OUTSIDE the checkout — the documented
     // `finding.mjs --request` handoff from the scratchpad — is not batch work
     // (point 1207). Same exemption the main-write fence already grants.
-    if (writesOnlyOutsideCheckout({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd })) {
+    if (writesOnlyOutsideCheckout({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, realpath })) {
       return { block: false, reason: '', standDown: true }
     }
     const attempted = call.segment
