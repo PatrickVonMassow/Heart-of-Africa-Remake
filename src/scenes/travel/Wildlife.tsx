@@ -2311,9 +2311,6 @@ function Herds() {
         terrainTypeAtWorld,
         CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds,
         bankThreatsFor(sp, !!a.young),
-        16,
-        0.5,
-        a.rot, // a finished flight leaves its heading here: carry it on
       )
 
     // Stream wildlife by chunk (design.md §19): keep every animal that may be on

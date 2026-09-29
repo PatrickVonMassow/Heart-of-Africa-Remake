@@ -457,10 +457,8 @@ export interface BankThreat {
  * again, and repeated that at the waterline — the reported jitter. With no
  * threat in play this is exactly nearestBankTarget (same rings, same ray
  * order). Where every bank in reach is threatened, the landing farthest
- * outside the rings wins. Given the flight `heading`, a safe bank ahead of it
- * (within 90°) is taken first, so the swim carries the flight on instead of
- * turning back toward the side it fled. The caller stores the result as the
- * crossing target, so the choice is made once and held until the swim lands.
+ * outside the rings wins. The caller stores the result as the crossing target,
+ * so the choice is made once and held until the swim lands.
  */
 export function safeBankTarget(
   x: number,
@@ -470,32 +468,8 @@ export function safeBankTarget(
   threats: ReadonlyArray<BankThreat>,
   rays = 16,
   step = 0.5,
-  heading?: number,
 ): { tx: number; tz: number } | null {
-  if (heading !== undefined && threats.length > 0) {
-    const ahead = bankScan(x, z, terrainTypeAt, maxUnits, threats, rays, step, heading)
-    if (ahead && ahead.margin >= 0) return { tx: ahead.tx, tz: ahead.tz }
-  }
-  const any = bankScan(x, z, terrainTypeAt, maxUnits, threats, rays, step)
-  return any ? { tx: any.tx, tz: any.tz } : null
-}
-
-/** safeBankTarget's ring scan: the nearest bank clear of every threat, else the
- *  one farthest outside; with `heading`, only rays within 90° of it. */
-function bankScan(
-  x: number,
-  z: number,
-  terrainTypeAt: (x: number, z: number) => string,
-  maxUnits: number,
-  threats: ReadonlyArray<BankThreat>,
-  rays: number,
-  step: number,
-  heading?: number,
-): { tx: number; tz: number; margin: number } | null {
   const open = new Array<boolean>(rays).fill(true)
-  if (heading !== undefined) {
-    for (let k = 0; k < rays; k++) if (Math.cos((k / rays) * Math.PI * 2 - heading) < 0) open[k] = false
-  }
   let fallback: { tx: number; tz: number; margin: number } | null = null
   for (let i = 1; i * step <= maxUnits; i++) {
     const r = i * step
@@ -510,12 +484,12 @@ function bankScan(
         open[k] = false
         let margin = Infinity
         for (const th of threats) margin = Math.min(margin, Math.hypot(px - th.x, pz - th.z) - th.r)
-        if (margin >= 0) return { tx: px, tz: pz, margin }
+        if (margin >= 0) return { tx: px, tz: pz }
         if (!fallback || margin > fallback.margin) fallback = { tx: px, tz: pz, margin }
       }
     }
   }
-  return fallback
+  return fallback ? { tx: fallback.tx, tz: fallback.tz } : null
 }
 
 /**
