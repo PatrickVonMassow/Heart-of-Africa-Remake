@@ -552,6 +552,11 @@ interface BalanceConfig {
      *  drifted apart) is not mourned. Fear outranks it: every danger response
      *  takes the frame. Calibratable/debug-editable. */
     mourningSeconds: number
+    /** Bereaved parent (design.md §19.8, point 1213): how long (seconds) a parent
+     *  whose young a predator just killed adopts no other young. It outlasts the
+     *  vigil and the remains, so no adoptee walks up to it at the kill and reads
+     *  as the dead young come back to life. Calibratable. */
+    bereavedSeconds: number
   }
   /** Intraspecies combat (design.md §19.17, point 264): territorial/dominance
    *  fights WITHIN a species, on the researched species only
@@ -1302,6 +1307,10 @@ export const balance: BalanceConfig = {
     // hold 30 s at the bones). It outlives the body itself (a carcass dissolves
     // in ~9 s), so the later part of the watch is held at the spot it fell.
     mourningSeconds: 30,
+    // Calibratable (point 1213): above the 60 s vigil plus the kill flock's
+    // landing and the remnant's ~10 s dissolve, so the parent has left the kill
+    // site or the remains are gone before it may take in another young.
+    bereavedSeconds: 90,
   },
   // Intraspecies combat (point 264). All calibratable; the per-species rates
   // and lethalities they scale come from docs/intraspecies-combat-1890.md.

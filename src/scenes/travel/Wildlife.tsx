@@ -79,7 +79,6 @@ import {
   FLEE_COMMIT_MARGIN,
   crocodileTargetWeight,
   prefersJuvenilePrey,
-  killFlockMayDescend,
   killFlockActive,
   assignPerCarcassFlocks,
   pickOffscreenLandAnchor,
@@ -187,6 +186,7 @@ import {
   crocodileBodyY,
 } from '../../render/fauna'
 import { setGroundStains } from '../../render/groundStains'
+import { killFlockLands, killFlockRemnant, releaseBereavedParent, stepCaught } from './youngKill'
 
 const CHUNK_SIZE = 24
 
@@ -343,6 +343,9 @@ interface Animal {
    *  until balance.vigil.seconds or until the carcass is gone; then the field
    *  clears and the parent simply rejoins the herd. */
   vigil?: { x: number; z: number; carcass: Animal; time: number }
+  /** Seconds left in which this parent, whose young a predator just killed,
+   *  adopts no other young (point 1213; balance.family.bereavedSeconds). */
+  bereaved?: number
   /** The orphan's mourning window (design.md §19.8, point 369): seconds left in
    *  which a juvenile whose parent DIED keeps to the body and does NOT gambol —
    *  the same standing-by-a-body watch the §19.8 vigil holds, applied to a
@@ -2418,31 +2421,29 @@ function Herds() {
           // Caught calf: count down the struggle. Unrescued, the kill completes —
           // and a parent that charged in but only got close (too late) is taken
           // alongside it: both are eaten (§19).
-          a.caught -= dt
-          if (a.caught <= 0) {
-            a.caught = undefined
+          if (stepCaught(a, dt)) {
             // A crocodile drags its kill under — the river takes the body
             // (design.md §19.16); land predators leave the stained carcass.
             const croc = a.caughtBy === 'crocodile'
             takeAnimal(a, croc ? { sink: true } : { stain: true })
             const par = a.parent
-            if (par && !par.dead && Math.hypot(par.x - a.x, par.z - a.z) < PARENT_TOO_LATE_DIST) {
-              takeAnimal(par, croc ? { sink: true } : { stain: true })
-              par.child = undefined
-            } else if (par && !par.dead) {
-              // The vigil (design.md §19.8, point 121): a parent that stayed
-              // clear of the kill does not resume grazing — it walks to the
-              // carcass and stands over it (behaviour in the vigil pre-pass).
-              // A CROCODILE kill has been hauled into the river (point 383), so
-              // the keeper stands at the WATERLINE its calf was seized from —
-              // never out in the channel over a body the river has taken.
-              const seized = croc
-                ? herds.crocodile.find((k) => k.lunge?.victim === a)?.lunge
-                : undefined
-              par.vigil = { x: seized?.seizeX ?? a.x, z: seized?.seizeZ ?? a.z, carcass: a, time: 0 }
-              par.child = undefined
-              a.parent = undefined
-            }
+            // The vigil (design.md §19.8, point 121): a parent that stayed
+            // clear of the kill does not resume grazing — it walks to the
+            // carcass and stands over it (behaviour in the vigil pre-pass),
+            // released from the dead young and bereaved (point 1213), so no
+            // adoption hands it a living young at the kill.
+            // A CROCODILE kill has been hauled into the river (point 383), so
+            // the keeper stands at the WATERLINE its calf was seized from —
+            // never out in the channel over a body the river has taken.
+            const seized = croc
+              ? herds.crocodile.find((k) => k.lunge?.victim === a)?.lunge
+              : undefined
+            const fate = releaseBereavedParent(a, {
+              tooLateDist: PARENT_TOO_LATE_DIST,
+              bereavedSeconds: balance.family.bereavedSeconds,
+              vigilAt: { x: seized?.seizeX ?? a.x, z: seized?.seizeZ ?? a.z },
+            })
+            if (fate === 'taken' && par) takeAnimal(par, croc ? { sink: true } : { stain: true })
           }
         } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
           // A calf of ours is being eaten: charge the predator (at the calf). On
@@ -2987,6 +2988,7 @@ function Herds() {
         const predatorHerd = isPredatorSpecies(sp)
         for (const a of herds[sp]) {
           if (a.escape !== undefined) a.escape = tickEscapeRun(a.escape, dt)
+          if (a.bereaved !== undefined) a.bereaved = tickEscapeRun(a.bereaved, dt) // point 1213
           // The orphan's mourning window (point 369) runs on its OWN clock: it
           // is counted down here for EVERY animal — predator cubs included, so
           // the field can never linger unticked — and neither the adoption below
@@ -6021,27 +6023,23 @@ function Vultures() {
     // finishes it: the birds that circled the kill take the scrap, no new
     // scavenger flies in for it.
     if (killGroup.current) {
-      let remnant: Animal | null = null
-      if (ACTIVE_HERDS) {
-        outer: for (const sp of SPECIES) {
-          for (const a of ACTIVE_HERDS[sp]) {
-            if (a.remnant && a.dead && !a.gone && (a.dissolve === undefined || a.dissolve > 0)) {
-              remnant = a
-              break outer
-            }
-          }
-        }
-      }
+      const herdsNow = ACTIVE_HERDS
+      const remnant: Animal | null = herdsNow ? killFlockRemnant(SPECIES.map((sp) => herdsNow[sp])) : null
       // The flock lands as soon as the predator has cleared the site — not
       // only after its whole walk-off despawned (user report: too late).
       // lx/lz is the predator's actual position — during the walk-off px/pz
       // stays at the kill site and would keep the distance at zero forever.
       const toRemnant =
         remnant !== null &&
-        killFlockMayDescend(LION_STATE.mode, LION_STATE.lx, LION_STATE.lz, remnant.x, remnant.z) &&
         // The vigil (point 121): while a live keeper stands over the kill site
         // the flock does NOT land — it keeps circling until the vigil ends.
-        !(ACTIVE_HERDS !== null && vigilBlocksLanding(nearestVigilKeeperDist(ACTIVE_HERDS, remnant.x, remnant.z)))
+        killFlockLands(
+          LION_STATE.mode,
+          LION_STATE.lx,
+          LION_STATE.lz,
+          remnant,
+          herdsNow ? nearestVigilKeeperDist(herdsNow, remnant.x, remnant.z) : Infinity,
+        )
       const f = killFlight.current
       flightStep(
         f,

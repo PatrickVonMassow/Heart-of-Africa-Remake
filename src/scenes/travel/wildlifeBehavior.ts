@@ -2409,6 +2409,11 @@ export interface AdoptionAdult {
   /** The adult's current calf, if any: an adult already raising a LIVE young is
    *  skipped so the §19.8 parent↔child relation the dramas read stays 1:1. */
   child?: { dead?: boolean } | null
+  /** Standing vigil over its own killed young (point 121): never an adopter. */
+  vigil?: unknown
+  /** Seconds left in which a parent whose young was just killed adopts no
+   *  other young (point 1213) — an adoptee would walk to it at the kill. */
+  bereaved?: number
 }
 
 /** The escape run of a calf just freed by its parent's sacrifice (design.md
@@ -2593,7 +2598,8 @@ export function juvenileAnchor(young: {
  *  is a LIVE adult (not another juvenile) of the young's OWN species — the herds
  *  are single-species, so this is the nearest suitable herd-mate — that is NOT a
  *  predator, NOT the `killer` that just took the parent, NOT the juvenile itself,
- *  and NOT already raising a live calf (the 1:1 relation cap). Same-species,
+ *  NOT already raising a live calf (the 1:1 relation cap), and NOT a parent
+ *  mourning its own killed young (vigil or bereaved, point 1213). Same-species,
  *  live and non-predator together make re-linking safe: a returned adopter can
  *  always parent the young and drive its §19.8 defence/rescue/grief roles. The
  *  predator gate applies wherever the adult's `species` is known, the
@@ -2636,6 +2642,8 @@ export function findAdopter<A extends AdoptionAdult>(
       if (juvenile.species !== undefined && a.species !== juvenile.species) continue // own kind only
     }
     if (a.child && !a.child.dead) continue // already raising a live calf → keep 1:1
+    if (a.vigil !== undefined) continue // mourning its killed young at the kill site
+    if (a.bereaved !== undefined && a.bereaved > 0) continue // just lost its young (point 1213)
     const dx = a.x - juvenile.x
     const dz = a.z - juvenile.z
     const d2 = dx * dx + dz * dz
