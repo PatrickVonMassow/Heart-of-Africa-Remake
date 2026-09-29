@@ -1,13 +1,57 @@
 {
-  "commit": "00a276714a9553d6fb301e4a7ab894fe6046e40b",
+  "commit": "6475408558523ba7c2144bd9776f44c1eb4db2d5",
   "steps": {
+    "large-regression": {
+      "evidence": "FIRST LARGE ran on 53b168c14 (28.09.2026 18:09Z-21:14Z, 185 min, both backends, log local/verify-logs/2026-09-28T18-09-13-718-large.log, machine under load); 53b168c14 differs from the closed commit only by docs/acceptance-evidence.md and the charge ledger scripts/render-verify-charges.mjs (no src/ change). Exit 1; every red charged to an open point (514, 568, 603, 733, 927, 938, 1009, 1012, 1197, 1202, 1217) except: WebGPU communication dig-invitation lapse (continuous-route alone on WebGPU at 53b168c14 on a quiet machine GREEN, local/verify-logs/2026-09-28T21-24-49-760-communication.log; the point-200 load-flake charge was widened to both backends in the closed commit) and the WebGPU frame-subject misses 11-worldmodel-khartoum-confluence (world) and 72-water-victoria-falls (enrichments), whose records are incomplete because frameSubject throws -> open point 1145. 733 startup freeze red on WebGPU only; 1062 German position query PASSED on both lanes.",
+      "at": "2026-09-29T01:02:55.985Z"
+    },
     "lint-audit": {
-      "evidence": "npm run lint (oxlint) exit 0; scripts/audit-check.mjs OK, 1 known-accepted GHSA-82fw-gwwq-j7x9 (dev-only vitest mocker), on 00a276714",
-      "at": "2026-09-26T14:01:00.879Z"
+      "evidence": "npm run lint (oxlint) exit 0 and scripts/audit-check.mjs OK (1 known-accepted GHSA-82fw-gwwq-j7x9, dev-only vitest mocker) at 53b168c14; the closed commit adds no dependency change; pre-push full gate (build+lint+audit+unit) and GitHub CI green on the closed commit",
+      "at": "2026-09-29T01:02:56.027Z"
+    },
+    "dead-code": {
+      "evidence": "blind-parallel union in docs/blind-633 (A.txt = GPT-6 Astra, B.txt = Opus 5.5, merged by meaning by Fable 5.1 into 7158 union entries, decisions docs/blind-633/decisions/c01-c14.json; filed dc81edeab, merged 90593001d, contained in the closed commit): 4899 raw dead-code findings across both halves, decided within the union's 369 removals, 1277 kept with written reason, 1011 to docs/backlog.md, 4 filed as points",
+      "at": "2026-09-29T01:02:56.065Z"
+    },
+    "stale-doc": {
+      "evidence": "blind-parallel union in docs/blind-633 (A.txt = GPT-6 Astra, B.txt = Opus 5.5, merged by meaning by Fable 5.1 into 7158 union entries, decisions docs/blind-633/decisions/c01-c14.json; filed dc81edeab, merged 90593001d, contained in the closed commit): 2837 raw stale-doc findings; design.md, CLAUDE.md, README.md and docs/* rewritten in the merge (4497 union entries rewritten overall)",
+      "at": "2026-09-29T01:02:56.103Z"
+    },
+    "stale-comment": {
+      "evidence": "blind-parallel union in docs/blind-633 (A.txt = GPT-6 Astra, B.txt = Opus 5.5, merged by meaning by Fable 5.1 into 7158 union entries, decisions docs/blind-633/decisions/c01-c14.json; filed dc81edeab, merged 90593001d, contained in the closed commit): 5828 raw stale-comment findings, decided per entry (rewritten/removed/kept with reason/backlog)",
+      "at": "2026-09-29T01:02:56.136Z"
+    },
+    "md-audit": {
+      "evidence": "blind-parallel union in docs/blind-633 (A.txt = GPT-6 Astra, B.txt = Opus 5.5, merged by meaning by Fable 5.1 into 7158 union entries, decisions docs/blind-633/decisions/c01-c14.json; filed dc81edeab, merged 90593001d, contained in the closed commit): 3668 contradiction + 876 orphaned-prose raw findings over every .md, section numbers preserved, decided per entry",
+      "at": "2026-09-29T01:02:56.168Z"
+    },
+    "cleanup-blind-parallel": {
+      "evidence": "blind-parallel union in docs/blind-633 (A.txt = GPT-6 Astra, B.txt = Opus 5.5, merged by meaning by Fable 5.1 into 7158 union entries, decisions docs/blind-633/decisions/c01-c14.json; filed dc81edeab, merged 90593001d, contained in the closed commit): both halves worked blind from identical inputs (src/, scripts/, every .md; parts-manifest.json), neither saw the other before done; the third model merged by meaning, marking A-only/B-only/both, nothing dropped for being unusual; outcome rewritten 4497, removed 369, kept 1277, backlog 1011, point 4 (ranked in 6f4b3da99)",
+      "at": "2026-09-29T01:02:56.205Z"
+    },
+    "regression-after-cleanup": {
+      "evidence": "SECOND LARGE on 647540855, both backends (WebGL 2 then WebGPU), 187 min, run record local/verify-logs/2026-09-28T21-55-00-739-large.log.run.json (head 647540855); the cleanup union merge 90593001d is an ancestor of the run target; machine under load. Exit 1; communication GREEN on both backends; every red charged to an open point (514, 568, 603, 733, 927, 938, 1009, 1012, 1197, 1202, 1217) except the WebGPU frame-subject misses 11-worldmodel-khartoum-confluence (world) and 72-water-victoria-falls (enrichments, suite cut short at 45 checks), whose records are incomplete because frameSubject throws -> owned by open point 1145. Named per 633: 733 startup freeze red on WebGPU only (WebGL 2 startup green); 1062 German position query PASSED on both lanes. No red without an owning open point.",
+      "at": "2026-09-29T01:03:23.489Z"
+    },
+    "impl-sections": {
+      "evidence": "peoples-1890 §8 (51b4724c0) and climate-1890 §9 (15bae34e9) reconciled against the code on 28.09.2026 in the cleanup union; the only later src/ change (dfaa8f5a6, c11 chunk) is comment and dead-code cleanup, no rendering behavior; checked on 647540855",
+      "at": "2026-09-29T01:03:08.035Z"
+    },
+    "graphics-detail-doc": {
+      "evidence": "src/config/qualityDoc.test.ts (docs/graphics-detail-levels.md vs QUALITY_PRESETS sync) 3/3 pass on 647540855; doc reconciled in 78e5b61be",
+      "at": "2026-09-29T01:03:08.073Z"
     },
     "open-items": {
-      "evidence": "grep '// OPEN:' src on 00a276714: 6 items — balance.ts:1865 gift items undefined; chiefWalk.ts:151 chief walk only maasai-village; store.ts:1657 work-order place enumeration; speech.ts:16 German read-aloud pending voice; Effects.tsx:18 true water refraction absent; Hud.tsx:281 hiding under automation",
-      "at": "2026-09-26T14:01:06.520Z"
+      "evidence": "grep '// OPEN:' src on 647540855: 5 items — balance.ts:1870 purchasable gift items undefined in design.md; journal/speech.ts:16 German read-aloud awaits a German-capable TTS voice; render/water.ts:11 and render/Effects.tsx:19 true water refraction beyond the POC pipeline (one item, two sites); ui/Hud.tsx:282 hiding under automation. The chiefWalk.ts and store.ts markers of the 26.09 list no longer stand in src.",
+      "at": "2026-09-29T01:03:39.036Z"
+    },
+    "simplifications": {
+      "evidence": "On 647540855: placeholder values are the 45 entries marked calibratable in src/config/balance.ts (design.md §14 educated guesses, CLAUDE.md §2). Named simplifications: no true water refraction (screen-space approximation); journal read-aloud English-only (German text displayed, not voiced); gift items generic (no concrete purchasable list); benchmark GPU timings unavailable on adapters without timestamp-query (point 1012); WebGPU verification runs on the compatibility feature level of the host adapter.",
+      "at": "2026-09-29T01:03:33.448Z"
+    },
+    "acceptance-criteria": {
+      "evidence": "§7.1 against the second LARGE on 647540855 (both backends; screenshots under verification/, 252 frames written; per-criterion conditions and evidence in docs/acceptance-criteria-detail.md and docs/acceptance-evidence.md). FULFILLED with green suites: 2 two perspectives, 4 movement/time, 5 port city, 6 village/cultural contact, 7 language/communication (communication green both lanes), 8 chronicle/journal, 9 status bar, 10 goal scaffolding, 12 atmosphere, 14 lighting/post, 16 settlement collision, 17 localization, 18 lint/dependency hygiene, 19 journal voice, 20 comfort/audio settings, 22 health, 23 random events, 24 deadline/successor, 25 trade, 26 standing, 27 camps, 28 saving/loading, 29 animated handwriting, 31 orientation/panorama wildlife. NOT FULFILLED IN FULL (red, charged): 1 build/start — build green, loading freeze over the 4000 ms §21.2 budget on WebGPU (733); 3 world model and 13 real geodata — Khartoum and Victoria Falls landmark frames miss their subject on WebGPU (1145); 11 game graphics — first-person ground micro-detail (603 WebGL, 514 WebGPU); 15 lively settlements — spoil crossing (1202), loom sight assert (1197), streamed dressing growth (938); 21 water realism — plate-rim water seam (568); 30 gamepad/position query — gamepad A and touch prompt tap do not bring the chief out (1217), recorded in docs/acceptance-evidence.md §30; 32 render pipeline — benchmark GPU timestamps absent on the adapter (1012) and settings not restored after the benchmark (1009). F6 bug-report archive lacks its PNG (927). No criterion is reported fulfilled over a red.",
+      "at": "2026-09-29T01:03:46.763Z"
     }
   }
 }
