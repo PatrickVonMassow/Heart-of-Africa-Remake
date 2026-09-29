@@ -564,7 +564,7 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
   it('stays at OBSERVE while the launcher cannot start a successor — no blockade — and says so', () => {
     for (const setup of [
       () => rmSync(launcherPath(), { force: true }), // no record: unknown
-      () => armLauncher({ pid: spawnSync(process.execPath, ['-e', '']).pid }), // dead pid
+      () => armLauncher({ pid: spawnSync(process.execPath, ['-e', ''], { stdio: 'ignore', windowsHide: true }).pid }), // dead pid
       () => armLauncher({ stopped: true }), // deliberately stopped: disabled
     ]) {
       setup()
