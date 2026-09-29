@@ -2497,7 +2497,11 @@ At a riverside village a local fisherman paddles a dugout beside the children's
 bank game, as a second UPSTREAM/DOWNSTREAM picture. The regional reference is
 the Niger's specialist river people of 1890, the Bozo fishermen and the Somono
 boatmen, whose dugout pirogues worked the river beside the Bambara farming
-villages; the Bambara village keeps its own speaker lect. Adapted, and marked as
+villages; the Bambara village keeps its own speaker lect. **Provenance
+(29.09.2026): GAP — UNVERIFIED.** This anchor is general knowledge, not read
+from a source; a web search the same day did not confirm the Somono in Park's
+*Travels* (1799). Treat the Bozo/Somono attribution as a working assumption
+until a PERIOD source is read. Adapted, and marked as
 such: a small fishing pirogue of about 5.5 m paddled kneeling with a single
 blade, a conical basket trap at the waterline, and paces chosen as an educated
 guess (about 1.3 m/s through the water against a dry-season current of about
