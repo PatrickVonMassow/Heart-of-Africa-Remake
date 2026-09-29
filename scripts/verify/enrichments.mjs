@@ -7282,6 +7282,161 @@ if (section('water-shy-flight')) {
   }
 }
 
+// --- The water-edge flee (user report 29.09.2026, F6 archive) ----------------
+// At the reported Niger reach (lat/lon 13.8165/-4.4553, the traveller at world
+// x/z -44.55/-138.16) animals jittered at the waterline instead of fleeing into
+// it: a calf that bolted into the river was taken for a fall-in, rescued back
+// to the traveller's bank and bolted again, over and over. Staged there — an
+// adult and a mother with her calf at the bank beside the standing traveller —
+// each fleer enters the water ONCE, never starts the drowning drama, never
+// reverses its flight heading between samples, and ends on land outside the
+// shy ring.
+if (section('water-edge-flee')) {
+  await page.evaluate(() => window.__game.getState().debugJumpTo(13.8165, -4.4553))
+  await page.waitForFunction(() => window.__wildlife && window.__game.getState().mode === 'travel', null, { timeout: 15000 })
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
+  await page.evaluate(() => window.__game.setState({ pos: { x: -44.55, z: -138.16 } }))
+  await page.evaluate(() => window.__sleepSim(0.6))
+  // Stage at the reported spot: the bank point just short of the nearest water.
+  await page.evaluate(() => {
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const P = { x: -44.55, z: -138.16 }
+    let best = null
+    for (let k = 0; k < 64; k++) {
+      const h = (k / 64) * Math.PI * 2
+      for (let s = 0.25; s < 12; s += 0.1) {
+        if (T(P.x + Math.sin(h) * s, P.z + Math.cos(h) * s) === 'water') {
+          if (!best || s < best.s) best = { s, h }
+          break
+        }
+      }
+    }
+    window.__edgeFlee = { P, best }
+    if (!best) return
+    const { h, s } = best
+    const B = { x: P.x + Math.sin(h) * (s - 0.4), z: P.z + Math.cos(h) * (s - 0.4) }
+    window.__edgeFlee.B = B
+    window.__edgeFlee.stage = () => {
+      const herds = window.__wildlife.herdsRef.current
+      const st = window.__edgeFlee
+      if (st.staged) herds.antelope = herds.antelope.filter((a) => !st.staged.includes(a))
+      const adult = { x: B.x + Math.cos(h) * 1.2, z: B.z - Math.sin(h) * 1.2, y: 0.2, rot: h, scale: 1, phase: 0.37 }
+      const parent = { x: B.x - Math.cos(h) * 1.5, z: B.z + Math.sin(h) * 1.5, y: 0.2, rot: 0, scale: 1, phase: 0.31 }
+      const calf = { x: B.x, z: B.z, y: 0.2, rot: 0, scale: 0.55, phase: 0.72, young: true, parent }
+      parent.child = calf
+      herds.antelope.unshift(adult, parent, calf)
+      st.staged = [adult, parent, calf]
+      return { adult, calf }
+    }
+    window.__edgeFlee.hold = () => {
+      window.__game.setState({ pos: { ...P } })
+      if (window.__wildlife.lion) { window.__wildlife.lion.mode = 'idle'; window.__wildlife.lion.timer = 999 }
+    }
+  })
+  const run = await page.evaluate(async () => {
+    const st = window.__edgeFlee
+    if (!st.best) return { staged: false }
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const { adult, calf } = st.stage()
+    // Headings are measured from the actual displacement (not the requested
+    // dodge), across flight restarts: a reversal (> 90°) and an alternating
+    // left/right turn pair (each > 10°) are both jitter.
+    const track = (a) => ({
+      a, entries: 0, wet: false, dramas: 0, flips: 0, zigzags: 0, restarts: 0,
+      px: a.x, pz: a.z, last: undefined, lastTurn: 0, fleeing: false, samples: 0,
+    })
+    const ts = { adult: track(adult), calf: track(calf) }
+    await window.__pollSim(14, () => {
+      st.hold()
+      for (const k of Object.keys(ts)) {
+        const t = ts[k]
+        const a = t.a
+        t.samples++
+        const wet = T(a.x, a.z) === 'water'
+        if (wet && !t.wet) t.entries++
+        t.wet = wet
+        if (a.inWater !== undefined || a.rescued) t.dramas++
+        const fleeing = a.dodgeHeading !== undefined
+        if (fleeing && !t.fleeing) t.restarts++
+        t.fleeing = fleeing
+        const mx = a.x - t.px
+        const mz = a.z - t.pz
+        if (Math.hypot(mx, mz) > 0.02) {
+          const hd = Math.atan2(mx, mz)
+          if (typeof t.last === 'number') {
+            let d = hd - t.last
+            while (d > Math.PI) d -= Math.PI * 2
+            while (d < -Math.PI) d += Math.PI * 2
+            if (Math.abs(d) > Math.PI / 2) t.flips++
+            const big = Math.PI / 18
+            if (Math.abs(d) > big && Math.abs(t.lastTurn) > big && Math.sign(d) !== Math.sign(t.lastTurn)) t.zigzags++
+            t.lastTurn = d
+          }
+          t.last = hd
+          t.px = a.x
+          t.pz = a.z
+        }
+      }
+      return false
+    })
+    const out = { staged: true, B: st.B }
+    for (const k of Object.keys(ts)) {
+      const t = ts[k]
+      const a = t.a
+      out[k] = {
+        entries: t.entries, dramas: t.dramas, flips: t.flips, zigzags: t.zigzags, restarts: t.restarts, samples: t.samples,
+        end: T(a.x, a.z), crossing: a.crossing !== undefined,
+        dP: +Math.hypot(a.x - st.P.x, a.z - st.P.z).toFixed(2),
+      }
+    }
+    return out
+  })
+  check('water-edge-flee staging finds the reported bank', run.staged, JSON.stringify(run))
+  for (const k of ['adult', 'calf']) {
+    const r = run[k]
+    check(
+      `at the reported bank the fleeing ${k} enters the water once, flees once, never as a fall-in, and never flips or zigzags its heading`,
+      !!r && r.entries === 1 && r.restarts === 1 && r.dramas === 0 && r.flips === 0 && r.zigzags === 0,
+      JSON.stringify(r),
+    )
+    check(
+      `the fleeing ${k} ends on land outside the traveller's shy ring`,
+      !!r && r.end !== 'water' && r.end !== 'ocean' && !r.crossing && r.dP >= 6,
+      JSON.stringify(r),
+    )
+  }
+  if (run.staged) {
+    // The picture: the same staging again, caught with the calf mid-river.
+    const mid = await page.evaluate(() => {
+      const { P, best } = window.__edgeFlee
+      const r = best.s + 2
+      return { x: P.x + Math.sin(best.h) * r, z: P.z + Math.cos(best.h) * r }
+    })
+    await captureFrame(page, OUT, 'water-edge-flee-calf-swims', {
+      world: mid,
+      label: 'a calf fleeing the traveller swimming the Niger at the reported bank',
+    }, {
+      beforeCapture: () => page.evaluate(async () => {
+        const st = window.__edgeFlee
+        const seed = window.__game.getState().seed
+        const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+        const { calf } = st.stage()
+        await window.__pollSim(6, () => {
+          st.hold()
+          return T(calf.x, calf.z) === 'water' && Math.hypot(calf.x - st.P.x, calf.z - st.P.z) > st.best.s + 1.5
+        })
+      }),
+    })
+    await page.evaluate(() => {
+      const st = window.__edgeFlee
+      const herds = window.__wildlife.herdsRef.current
+      herds.antelope = herds.antelope.filter((a) => !st.staged.includes(a))
+    })
+  }
+}
+
 // --- Point 6: the predator never despawns in view (zoom-aware) ----------------
 // design.md §19: after the meal the predator trots off and leaves the stage
 // only well beyond the visible surroundings; a chase that strays aborts past

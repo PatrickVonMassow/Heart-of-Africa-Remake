@@ -477,6 +477,11 @@ interface BalanceConfig {
     /** Hard resolve deadline in seconds (invariant I4): a crossing that has
      *  not landed by then ends where it stands and the setback grounds it. */
     resolveSeconds: number
+    /** Swim-out after a flight: the landing bank must lie at least this
+     *  multiple of each threat's trigger ring (traveller shy ring, predator
+     *  flee radius) from that threat, so the animal never swims back into the
+     *  ring it just fled and re-triggers the flight at the waterline. */
+    fleeBankClearance: number
   }
   /** The scripted hunt (design.md §19.3). */
   hunt: {
@@ -1337,6 +1342,7 @@ export const balance: BalanceConfig = {
     maxUnits: 6, // calibratable: swimmable channel width (point 192) — the widened rivers span ~2-4 units
     chance: 0.3, // calibratable: how often a water-blocked roam crosses instead of turning
     resolveSeconds: 25, // calibratable: crossing hard deadline (I4) — a normal swim needs ~3-6 s
+    fleeBankClearance: 1.5, // calibratable: swim-out bank clearance as a multiple of the threat ring — 1.5 = the shy flight's exit ring
   },
   hunt: {
     leaveOvertimeSeconds: 45, // calibratable: walk-off overtime before an off-frame retire (point 188) — generous vs the ~20 s a clear walk-off needs

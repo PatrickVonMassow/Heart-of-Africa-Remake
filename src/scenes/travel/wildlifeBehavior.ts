@@ -440,6 +440,106 @@ export function nearestBankTarget(
   return null
 }
 
+/** A threat a swim-out bank must keep clear of: its position and the radius
+ *  (trigger ring × balance.waterCross.fleeBankClearance) the landing must lie
+ *  outside. */
+export interface BankThreat {
+  x: number
+  z: number
+  r: number
+}
+
+/**
+ * The swim-out bank after a flight (the water-edge flee fix): the NEAREST bank
+ * whose landing lies outside every threat's ring. The plain nearest bank sent
+ * an animal that fled the traveller into a river straight back to the bank the
+ * traveller stood on; it landed inside the shy ring, bolted into the water
+ * again, and repeated that at the waterline — the reported jitter. With no
+ * threat in play this is exactly nearestBankTarget (same rings, same ray
+ * order). Where every bank in reach is threatened, the landing farthest
+ * outside the rings wins. The caller stores the result as the crossing target,
+ * so the choice is made once and held until the swim lands.
+ */
+export function safeBankTarget(
+  x: number,
+  z: number,
+  terrainTypeAt: (x: number, z: number) => string,
+  maxUnits: number,
+  threats: ReadonlyArray<BankThreat>,
+  rays = 16,
+  step = 0.5,
+): { tx: number; tz: number } | null {
+  const open = new Array<boolean>(rays).fill(true)
+  let fallback: { tx: number; tz: number; margin: number } | null = null
+  for (let i = 1; i * step <= maxUnits; i++) {
+    const r = i * step
+    for (let k = 0; k < rays; k++) {
+      if (!open[k]) continue
+      const h = (k / rays) * Math.PI * 2
+      const px = x + Math.sin(h) * r
+      const pz = z + Math.cos(h) * r
+      const t = terrainTypeAt(px, pz)
+      if (t === 'ocean') open[k] = false
+      else if (t !== 'water') {
+        open[k] = false
+        let margin = Infinity
+        for (const th of threats) margin = Math.min(margin, Math.hypot(px - th.x, pz - th.z) - th.r)
+        if (margin >= 0) return { tx: px, tz: pz }
+        if (!fallback || margin > fallback.margin) fallback = { tx: px, tz: pz, margin }
+      }
+    }
+  }
+  return fallback ? { tx: fallback.tx, tz: fallback.tz } : null
+}
+
+/**
+ * Why a free calf is on river/lake water (the water-edge flee fix). Only an
+ * unintended step in — the gambol bout off the bank — is the §19.8 fall-in
+ * that starts the struggle and the rescue. A calf in flight, on a crossing
+ * swim, or swimming out of a chase went in on purpose (§19.5: under flight
+ * there is no water restriction, and a juvenile returning to its parent
+ * crosses on the same freedom). Classifying its flight swim as a fall-in
+ * flipped it between struggling, rescued and fleeing every few frames.
+ */
+export function calfWaterCause(s: { inFlight: boolean; crossing: boolean; chaseSwim: boolean }): 'fall-in' | 'swim' {
+  return s.inFlight || s.crossing || s.chaseSwim ? 'swim' : 'fall-in'
+}
+
+/**
+ * A following calf whose step toward its parent meets river/lake water (the
+ * water-edge flee fix). It swims across (§19.5) — unless the parent stands
+ * inside a threat ring, the one it fled across the water: then it holds on its
+ * own bank until the threat has gone, instead of swimming back into the ring,
+ * bolting again, and shuttling across the river.
+ */
+export function calfFollowAcrossWater(
+  parentX: number,
+  parentZ: number,
+  threats: ReadonlyArray<BankThreat>,
+): 'swim' | 'hold' {
+  for (const th of threats) if (Math.hypot(parentX - th.x, parentZ - th.z) < th.r) return 'hold'
+  return 'swim'
+}
+
+/** Whether river/lake water lies on the straight line between two points,
+ *  sampled every `step` units (the calf's bank hold asks this of the line to
+ *  its parent, at any distance). */
+export function waterBetween(
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  terrainTypeAt: (x: number, z: number) => string,
+  step = 1,
+): boolean {
+  const d = Math.hypot(bx - ax, bz - az)
+  const n = Math.max(1, Math.ceil(d / step))
+  for (let i = 0; i <= n; i++) {
+    if (terrainTypeAt(ax + ((bx - ax) * i) / n, az + ((bz - az) * i) / n) === 'water') return true
+  }
+  return false
+}
+
 /** The states under which a §19.8 water drama (or another scripted drive)
  *  owns an animal's position (point 312(d)) — keyed on the drama state, never
  *  on the species. */
