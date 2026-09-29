@@ -33,9 +33,12 @@
 // the mode first and says in words that a disarmed fence refuses nothing, so
 // nobody can mistake it for an armed one that happens never to fire.
 //
-// The old separately-derived REFUSAL threshold is gone from this path. The
-// HANDOVER threshold still belongs to the boundary/Stop chain; this guard owns
-// prospective admission against the ceiling and the reserved exit cost.
+// THE HANDOVER BRAKE (point 1204) is judged here too, FIRST and independent of
+// the mode above: at/past the handover watermark (reading + pending debit) a
+// START (classifyFenceCall) is denied with `fenceRefusal`, which names the
+// boundary. It is armed only while the launcher can start the successor; with a
+// dead/unknown launcher record it stays at observe, records, and `--status`
+// says so. Subagents are not bound (their gate is the step in flight).
 //
 // WHO IT BINDS: every session class. `agent_id` on the real hook payload marks
 // a subagent; without it, lock equality distinguishes the batch owner from an
@@ -53,7 +56,12 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { fenceMode, gatherWatermark, triggerTokens } from './context-watermark.mjs'
 import { CONTEXT_CEILING_TOKENS, watermarkDecision } from './context-watermark-core.mjs'
-import { resolveThroughAncestors } from './context-fence-core.mjs'
+import {
+  classifyFenceCall,
+  handoverBrakeDecision,
+  handoverRefusal,
+  resolveThroughAncestors,
+} from './context-fence-core.mjs'
 import { contextBudgetRefusal } from './context-budget-core.mjs'
 import { admitContextCall, inspectContextCall } from './context-budget.mjs'
 import { readSeries } from './context-incidents.mjs'
@@ -126,6 +134,35 @@ const costSeries = () => summarizeSeries(readSeries().records)
 // rule still judges.
 const resolveRealPath = (p) => resolveThroughAncestors(resolve(REPO_ROOT, p), { realpath: realpathSync })
 
+/** Can a successor start? The boundary's own launcher probe, loaded lazily so
+ *  the common below-the-mark call never pays for it. Any failure → 'unknown',
+ *  which keeps the brake at observe (fail-open). */
+async function probeLauncher() {
+  try {
+    const { probeLauncherState } = await import('./batch-boundary.mjs')
+    return probeLauncherState()
+  } catch {
+    return 'unknown'
+  }
+}
+
+/** The handover brake for one call. The launcher is probed only when a refusal
+ *  is actually in question. */
+async function judgeHandover({ tokens, pendingDebit, start, sessionClass }) {
+  const input = { tokens, pendingDebit, watermark: triggerTokens(), start, sessionClass }
+  const first = handoverBrakeDecision({ ...input, launcher: 'armed' })
+  if (!first.refused) return first
+  return handoverBrakeDecision({ ...input, launcher: await probeLauncher() })
+}
+
+const brakeModeLine = (launcher) =>
+  launcher === 'armed'
+    ? 'handover brake: ARMED — at/past the handover watermark a START (agent, suite, new point, authoring) is REFUSED; ' +
+      'finishing, reads and the boundary stay allowed.'
+    : `handover brake: OBSERVE — the launcher reads "${launcher}", so no successor could start; ` +
+      'STARTs past the handover watermark are recorded, NOT refused, until the launcher is armed ' +
+      '(`node scripts/batch-launcher.mjs --status`).'
+
 // ---- CLI: --status --------------------------------------------------------
 if (process.argv.includes('--status')) {
   const argv = process.argv.slice(2)
@@ -138,6 +175,7 @@ if (process.argv.includes('--status')) {
   })
   const handover = handoverStateOf(wm.tokens)
   const reading = wm.tokens === null ? null : { tokens: wm.tokens, at: wm.readingAt }
+  const launcher = await probeLauncher()
   const admission = inspectContextCall({
     sessionId: sid,
     reading,
@@ -159,6 +197,8 @@ if (process.argv.includes('--status')) {
         remainingAfterCall: admission.decision.remainingAfterCall,
         handoverWatermark: handover.watermark,
         handoverState: handover.state,
+        handoverBrake: launcher === 'armed' ? 'armed' : 'observe',
+        launcher,
       },
       null,
       2,
@@ -178,6 +218,7 @@ if (process.argv.includes('--status')) {
     `\nHANDOVER stays in force in BOTH modes: the boundary fires at ${handover.watermark} tokens ` +
       `(currently ${handover.state}).`,
   )
+  console.log(brakeModeLine(launcher))
   console.log(
     `verdict for an AGENT call: ${
       admission.decision.fits === false
@@ -226,6 +267,56 @@ try {
   const input = payload.tool_input ?? {}
   const reading = wm.tokens === null ? null : { tokens: wm.tokens, at: wm.readingAt }
   const point = currentPoint()
+  const start = classifyFenceCall({
+    toolName: payload.tool_name,
+    command: input.command,
+    filePath: input.file_path ?? input.notebook_path,
+    resolvePath: resolveRealPath,
+  })
+  // THE HANDOVER BRAKE, before admission: a refused call never runs, so it
+  // must not be booked as a pending debit either.
+  if (start.starts && reading) {
+    const pendingDebit = inspectContextCall({
+      sessionId: contextSessionId,
+      reading,
+      series: costSeries(),
+      toolName: payload.tool_name,
+      toolInput: input,
+      resolvePath: resolveRealPath,
+    }).ledger.pendingDebit
+    const brake = await judgeHandover({ tokens: wm.tokens, pendingDebit, start, sessionClass })
+    if (brake.refused || brake.observed) {
+      recordObservation({
+        at: new Date().toISOString(),
+        sessionId: sid,
+        contextSessionId,
+        sessionClass,
+        brake: 'handover',
+        mode: brake.mode,
+        launcher: brake.launcher,
+        refused: brake.refused,
+        tokens: wm.tokens,
+        level: brake.level,
+        handoverWatermark: brake.watermark,
+        what: start.what,
+        tool: payload.tool_name ?? null,
+        toolUseId: payload.tool_use_id ?? payload.toolUseId ?? null,
+      })
+    }
+    if (brake.refused) {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: handoverRefusal({ brake, start, sessionClass }),
+          },
+        }),
+      )
+      process.exit(0)
+    }
+    if (brake.observed) process.stderr.write(`CONTEXT FENCE: ${brakeModeLine(brake.launcher)}\n`)
+  }
   const verdict = admitContextCall({
     sessionId: contextSessionId,
     sessionClass,

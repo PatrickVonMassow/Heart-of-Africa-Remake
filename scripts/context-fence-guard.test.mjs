@@ -18,6 +18,9 @@ import {
   CONTEXT_TRIGGER_TOKENS,
 } from './context-watermark-core.mjs'
 import { contextLedgerPath } from './context-budget.mjs'
+import { FENCE_END_COMMAND } from './context-fence-core.mjs'
+import { LAUNCHER_RECORD_VERSION, ownershipSignal, releaseSpawnDecision } from './batch-launcher-core.mjs'
+import { probePid } from './batch-singleton.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const REPLAY = JSON.parse(readFileSync(
@@ -42,14 +45,18 @@ const writeJson = (path, value) => writeFileSync(path, JSON.stringify(value))
 // REFUSING fence must ask for it — exactly as a re-arming session would.
 const ARMED = { HOA_CONTEXT_FENCE_MODE: 'armed' }
 
-/** The observation records written since the last reset, newest last. */
-const observations = () =>
+/** Every observation record written since the last reset, newest last. */
+const allObservations = () =>
   existsSync(observationsPath())
     ? readFileSync(observationsPath(), 'utf8')
         .split('\n')
         .filter(Boolean)
         .map((l) => JSON.parse(l))
     : []
+/** The CEILING-admission records; the handover brake (point 1204) writes its
+ *  own, marked `brake: 'handover'`, into the same file. */
+const observations = () => allObservations().filter((r) => r.brake !== 'handover')
+const handoverObservations = () => allObservations().filter((r) => r.brake === 'handover')
 
 /** One JSONL transcript whose newest usage record reports `tokens` context. */
 const writeTranscript = (tokens) =>
@@ -441,5 +448,163 @@ describe('context-fence-guard, OBSERVING (spawned) — the default', () => {
     expect(r.stdout).toContain('HANDOVER stays in force in BOTH modes')
     expect(r.stdout).toContain(String(CONTEXT_TRIGGER_TOKENS))
     expect(r.stdout).toContain('"handoverState": "past"')
+  })
+})
+
+// THE HANDOVER BRAKE (point 1204), PROVEN BY RUNNING THE REGISTERED GUARD. The
+// ceiling admission stays at its default (observe) here unless a case asks for
+// armed: the brake must bind in BOTH modes, on its own.
+describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () => {
+  const DEFAULT = {} // no HOA_CONTEXT_FENCE_MODE: the ceiling admission observes
+  const PAST_HANDOVER = CONTEXT_TRIGGER_TOKENS + 8_000
+  const launcherPath = () => resolve(repo, '.claude', 'batch-launcher.json')
+  /** A launcher record for THIS (live) process — the successor can start. */
+  const armLauncher = (over = {}) => writeJson(launcherPath(), {
+    v: LAUNCHER_RECORD_VERSION,
+    pid: process.pid,
+    pidStartedAt: probePid(process.pid).startedAt ?? Date.now() - Math.round(process.uptime() * 1000),
+    startedAt: Date.now(),
+    lastTickAt: Date.now(),
+    tickMs: 15 * 60 * 1000,
+    ...over,
+  })
+  const call = (tool, input, opts = {}) => callGuard(tool, input, { env: DEFAULT, ...opts })
+
+  beforeEach(() => {
+    armLauncher()
+    writeTranscript(PAST_HANDOVER)
+  })
+  afterAll(() => rmSync(launcherPath(), { force: true }))
+
+  it('denies a START past the mark from the registered guard, naming the boundary — in BOTH fence modes', () => {
+    for (const env of [DEFAULT, ARMED]) {
+      for (const [tool, input] of [
+        ['Agent', { prompt: 'build point 1205' }],
+        ['Bash', { command: 'npm test -- world' }],
+        ['Bash', { command: 'node scripts/verify/run-logged.mjs --suite world' }],
+        ['Write', { file_path: 'TASKS.md', content: 'x' }],
+      ]) {
+        const r = call(tool, input, { env })
+        expect(r.status, r.stderr).toBe(0)
+        expect(r.decision?.hookSpecificOutput?.permissionDecision, `${tool} ${JSON.stringify(input)} ${JSON.stringify(env)}`)
+          .toBe('deny')
+        const reason = denial(r)
+        expect(reason).toContain('PAST THE CONTEXT WATERMARK')
+        expect(reason).toContain(String(PAST_HANDOVER))
+        expect(reason).toContain(String(CONTEXT_TRIGGER_TOKENS))
+        expect(reason).toContain(FENCE_END_COMMAND)
+      }
+    }
+    expect(handoverObservations().every((r) => r.refused === true && r.mode === 'armed')).toBe(true)
+  })
+
+  it('a refused START is not booked as a pending debit — it never runs', () => {
+    rmSync(ledgerPath(), { force: true })
+    expect(denial(call('Agent', {}))).toContain('PAST THE CONTEXT WATERMARK')
+    expect(existsSync(ledgerPath()) ? JSON.parse(readFileSync(ledgerPath(), 'utf8')).pendingDebit : 0).toBe(0)
+  })
+
+  it('below the mark the same STARTs pass', () => {
+    writeTranscript(CONTEXT_TRIGGER_TOKENS - 30_000)
+    expect(call('Agent', {}).stdout.trim()).toBe('')
+    expect(call('Bash', { command: 'npm test -- world' }).stdout.trim()).toBe('')
+  })
+
+  it("every session-ending command of point 881 still passes above the mark, and so do the reads", () => {
+    for (const [tool, input] of [
+      ['Bash', { command: 'node scripts/batch-boundary.mjs --prepare --context' }],
+      ['Bash', { command: 'node scripts/batch-boundary.mjs --commit --context' }],
+      ['Bash', { command: 'node scripts/land-point.mjs 1204 --model opus' }],
+      ['Bash', { command: 'node scripts/guard-preflight.mjs --for answer --session s' }],
+      ['Bash', { command: 'node scripts/finding.mjs --record "t" --detail "d"' }],
+      ['Bash', { command: 'node scripts/batch-claim.mjs --withdraw' }],
+      ['Bash', { command: 'git commit -m "finish"' }],
+      ['Bash', { command: 'git push' }],
+      ['Bash', { command: 'git status' }],
+      ['Bash', { command: 'npm run test:unit' }],
+      ['Bash', { command: 'npm run build && npm run lint' }],
+      ['Bash', { command: 'node scripts/board-publish.mjs' }],
+      ['Bash', { command: 'node scripts/focus.mjs set 1204' }],
+      ['Bash', { command: 'node scripts/verify/run-wait.mjs' }],
+      ['Read', { file_path: 'TASKS.md' }],
+      ['Grep', { pattern: 'x' }],
+      ['Glob', { pattern: '*.mjs' }],
+    ]) {
+      const r = call(tool, input)
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout.trim(), `${tool} ${JSON.stringify(input)} must pass above the handover mark`).toBe('')
+    }
+    expect(handoverObservations()).toEqual([])
+  })
+
+  it('reads are MEASURED into the level the next START is judged by, never refused themselves', () => {
+    rmSync(ledgerPath(), { force: true })
+    writeTranscript(CONTEXT_TRIGGER_TOKENS - 5_000)
+    expect(call('Agent', {}, { env: {} }).stdout.trim()).toBe('') // fits below the mark...
+    rmSync(ledgerPath(), { force: true })
+    expect(call('Read', { file_path: 'TASKS.md' }).stdout.trim()).toBe('') // ...a read books its p90 (10,956)
+    const r = call('Agent', {})
+    expect(denial(r)).toContain('PAST THE CONTEXT WATERMARK')
+    expect(denial(r)).toContain(String(CONTEXT_TRIGGER_TOKENS - 5_000 + 10_956))
+  })
+
+  it('does not bind a subagent — its spawn was the start, its gate is the step in flight', () => {
+    expect(call('Bash', { command: 'npm test -- world' }, { agentId: 'agent-1' }).stdout.trim()).toBe('')
+  })
+
+  it('binds an attended window too, and names /clear beside the boundary', () => {
+    writeJson(lockPath(), { v: 2, sessionId: 'someone-else', claimedAt: Date.now(), pid: process.pid })
+    const reason = denial(call('Agent', {}))
+    expect(reason).toContain(FENCE_END_COMMAND)
+    expect(reason).toContain('/clear')
+  })
+
+  it('stays at OBSERVE while the launcher cannot start a successor — no blockade — and says so', () => {
+    for (const setup of [
+      () => rmSync(launcherPath(), { force: true }), // no record: unknown
+      () => armLauncher({ pid: spawnSync(process.execPath, ['-e', '']).pid }), // dead pid
+      () => armLauncher({ stopped: true }), // deliberately stopped: disabled
+    ]) {
+      setup()
+      rmSync(observationsPath(), { force: true })
+      const r = call('Bash', { command: 'npm test -- world' })
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout.trim()).toBe('')
+      expect(r.stderr).toContain('handover brake: OBSERVE')
+      expect(handoverObservations()).toMatchObject([{ brake: 'handover', mode: 'observe', refused: false }])
+    }
+    const out = status().stdout
+    expect(out).toContain('"handoverBrake": "observe"')
+    expect(out).toContain('handover brake: OBSERVE')
+    armLauncher()
+    expect(status().stdout).toContain('handover brake: ARMED')
+  })
+
+  it('THE HANDOVER PATH CARRIES A REFUSED SESSION: suite denied, boundary allowed, successor runs the suite', () => {
+    // A point in flight whose gate still needs a suite, above the mark.
+    writeJson(focusPath(), { point: 1204, note: 'gate still needs a suite' })
+    const suite = { command: 'npm test -- world' }
+    expect(denial(call('Bash', suite))).toContain(FENCE_END_COMMAND)
+    // The refusal's own way out is allowed...
+    expect(call('Bash', { command: FENCE_END_COMMAND }).stdout.trim()).toBe('')
+    expect(call('Bash', { command: 'node scripts/batch-boundary.mjs --commit --context' }).stdout.trim()).toBe('')
+    // ...the boundary releases the lock, and the ARMED launcher (the brake's
+    // precondition) reacts to the release by starting the successor's tick.
+    const held = ownershipSignal({ lock: JSON.parse(readFileSync(lockPath(), 'utf8')), assessment: { alive: true } })
+    rmSync(lockPath(), { force: true })
+    expect(releaseSpawnDecision({ signal: ownershipSignal({ lock: null }), previous: held }).wake).toBe(true)
+    // The successor claims the batch in a fresh context and runs the suite.
+    const successor = 'context-fence-successor'
+    writeJson(lockPath(), { v: 2, sessionId: successor, claimedAt: Date.now(), pid: process.pid })
+    const fresh = resolve(repo, 'successor-transcript.jsonl')
+    writeFileSync(fresh, `${JSON.stringify({ message: { usage: { input_tokens: 40_000 } } })}\n`)
+    try {
+      const r = call('Bash', suite, { sessionId: successor, transcript: fresh })
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout.trim()).toBe('')
+    } finally {
+      rmSync(fresh, { force: true })
+      rmSync(ledgerPath(successor), { force: true })
+    }
   })
 })

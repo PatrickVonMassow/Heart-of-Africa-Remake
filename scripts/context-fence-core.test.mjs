@@ -8,32 +8,33 @@ import {
   authoringTarget,
   classifyFenceCall,
   fenceRefusal,
+  handoverBrakeDecision,
+  handoverRefusal,
   resolveThroughAncestors,
 } from './context-fence-core.mjs'
 
 const PAST = { state: 'past', tokens: 434_440, watermark: 150_000 }
 
-// Classification has no threshold of its own. These tests exercise its historic
-// deny/allow vocabulary by wrapping it in a measured-past fixture; prospective
-// arithmetic and mode routing live in context-budget*.test.mjs now.
+// The deny/allow vocabulary below runs through the SHIPPED handover brake
+// (point 1204): the same `handoverBrakeDecision` + `handoverRefusal` pair the
+// registered guard calls, with an armed launcher and the batch owner.
 const decide = (call, reading = PAST) => {
   const idle = { block: false, reason: null, observed: false, what: null, authoring: false }
-  if (reading.state !== 'past') return idle
-  const classified = classifyFenceCall(call)
-  if (!classified.starts) return idle
+  const start = classifyFenceCall(call)
+  const brake = handoverBrakeDecision({
+    tokens: reading.state === 'past' ? reading.tokens : null,
+    watermark: reading.watermark,
+    start,
+    launcher: 'armed',
+  })
+  if (!brake.refused) return idle
   return {
     ...idle,
     block: true,
     observed: true,
-    what: classified.what,
-    authoring: classified.authoring,
-    reason: fenceRefusal({
-      tokens: reading.tokens,
-      watermark: reading.watermark,
-      what: classified.what,
-      authoring: classified.authoring,
-      clearFirst: classified.clearFirst,
-    }),
+    what: start.what,
+    authoring: start.authoring,
+    reason: handoverRefusal({ brake, start }),
   }
 }
 
@@ -761,5 +762,44 @@ describe("the fence's claim is BOUNDED — a constructed escape is outside it (r
   it('an ln that has nothing to do with the verify tree stays allowed', () => {
     expect(decide({ toolName: 'Bash', command: 'ln -s ../hoa/docs docs-link' }).block).toBe(false)
     expect(decide({ toolName: 'Bash', command: 'ln -s scripts/verify-tools tools-link' }).block).toBe(false)
+  })
+})
+
+describe('handoverBrakeDecision — the handover brake, pure', () => {
+  const START = { starts: true, what: 'spawning a delegated agent', authoring: false }
+  const base = { tokens: 130_000, watermark: 122_000, start: START, launcher: 'armed' }
+
+  it('refuses a START at or past the mark with an armed launcher', () => {
+    expect(handoverBrakeDecision(base)).toMatchObject({ past: true, refused: true, observed: false, mode: 'armed' })
+    expect(handoverBrakeDecision({ ...base, tokens: 122_000 }).refused).toBe(true)
+    expect(handoverBrakeDecision({ ...base, tokens: 121_999 }).refused).toBe(false)
+  })
+
+  it('counts the pending debit into the level', () => {
+    const d = handoverBrakeDecision({ ...base, tokens: 115_000, pendingDebit: 10_956 })
+    expect(d.level).toBe(125_956)
+    expect(d.refused).toBe(true)
+  })
+
+  it('never refuses a non-start, an unreadable reading or a subagent', () => {
+    expect(handoverBrakeDecision({ ...base, start: { starts: false } }).refused).toBe(false)
+    expect(handoverBrakeDecision({ ...base, tokens: null })).toMatchObject({ refused: false, observed: false, level: null })
+    expect(handoverBrakeDecision({ ...base, sessionClass: 'subagent' })).toMatchObject({ refused: false, observed: false })
+  })
+
+  it('stays at OBSERVE while the launcher cannot start a successor', () => {
+    for (const launcher of ['unknown', 'disabled', undefined]) {
+      expect(handoverBrakeDecision({ ...base, launcher })).toMatchObject({ refused: false, observed: true, mode: 'observe' })
+    }
+  })
+
+  it('the refusal names the level, the mark and the boundary; an attended window also gets /clear', () => {
+    const brake = handoverBrakeDecision(base)
+    const owner = handoverRefusal({ brake, start: START })
+    expect(owner).toContain('130000')
+    expect(owner).toContain('122000')
+    expect(owner).toContain(FENCE_END_COMMAND)
+    expect(owner).not.toContain('/clear')
+    expect(handoverRefusal({ brake, start: START, sessionClass: 'attended' })).toContain('/clear')
   })
 })
