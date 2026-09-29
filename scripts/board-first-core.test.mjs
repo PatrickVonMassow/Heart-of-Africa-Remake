@@ -365,6 +365,13 @@ describe('the stand-down leaves the session scratchpad and the carrier open', ()
     expect(write(`${pad}/x.md`, '').block).toBe(true)
   })
 
+  it('refuses a climb out of the scratchpad back into the checkout', () => {
+    const climb = `${pad}/../../../../../workspace/hoa/TASKS.md`
+    expect(write(climb, `${root}/TASKS.md`).block).toBe(true)
+    expect(at({ toolName: 'Bash', command: `cat > ${climb} <<'EOF'\nx\nEOF` }).block).toBe(true)
+    expect(at({ toolName: 'Bash', command: `cd ${pad} && cp spec.md ${root}/TASKS.md` }).block).toBe(true)
+  })
+
   it('names the open write path and the carrier command in the refusal', () => {
     const { reason } = write(`${root}/TASKS.md`)
     expect(reason).toContain('reads remain available')
