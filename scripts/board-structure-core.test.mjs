@@ -50,6 +50,8 @@ const board = ({ now = [400], queue = [401] } = {}) =>
   sect(REQUIRED_SECTIONS[2], queue.map(queueCard).join('\n')) +
   '\n' +
   sect(REQUIRED_SECTIONS[3], queueCard(2)) +
+  '\n' +
+  sect(REQUIRED_SECTIONS[4]) +
   '\n</div>'
 
 const codes = (html) => structureViolations(html).map((v) => v.code)
@@ -116,8 +118,15 @@ describe('structureViolations — the remaining structural rules', () => {
       sect(REQUIRED_SECTIONS[2]) +
       '\n' +
       sect(REQUIRED_SECTIONS[3]) +
+      '\n' +
+      sect(REQUIRED_SECTIONS[4]) +
       '\n</div>'
+    // All five present, only the ORDER wrong — so the order comparison is what
+    // fires, not a missing section (cross-vendor review 29.09.2026).
+    const present = [...swapped.matchAll(/<h2>([^<]*)<\/h2>/g)].map((m) => m[1]).sort()
+    expect(present).toEqual([...REQUIRED_SECTIONS].sort())
     expect(codes(swapped)).toContain('sections-wrong')
+    expect(codes(swapped)).not.toContain('section-wrappers')
   })
 
   it('catches an unbalanced summary', () => {
@@ -188,6 +197,8 @@ describe('one kind of current-work card', () => {
     sect(REQUIRED_SECTIONS[2], queueCard(401)) +
     '\n' +
     sect(REQUIRED_SECTIONS[3], queueCard(2)) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[4]) +
     '\n</div>'
 
   it('accepts each kind standing alone', () => {
@@ -229,6 +240,8 @@ describe('one kind of current-work card', () => {
         `<details>\n  <summary><span class="num">543</span><span class="t">${CLOSING_WORK_TITLE}: X</span>` +
           `</summary>\n  <div class="body"><p>Text</p></div>\n</details>`,
       ) +
+      '\n' +
+      sect(REQUIRED_SECTIONS[4]) +
       '\n</div>'
     expect(structureViolations(archived)).toEqual([])
   })
@@ -259,6 +272,8 @@ describe('every current-work card names its point and its subject', () => {
     sect(REQUIRED_SECTIONS[2], queueCard(401)) +
     '\n' +
     sect(REQUIRED_SECTIONS[3], queueCard(2)) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[4]) +
     '\n</div>'
 
   it('accepts a card with the chip and a subject title', () => {

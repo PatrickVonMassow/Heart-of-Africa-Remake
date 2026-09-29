@@ -75,6 +75,8 @@ ${queue}
 <summary><h2>Erledigt</h2></summary>
 <p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>
 </details>
+<details class="sect"><summary><h2>Entscheidungsprotokoll</h2></summary>
+</details>
 </main>`
 
 // Occurrence-level reader for generator assertions. The production parser

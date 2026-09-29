@@ -144,6 +144,9 @@ export function topicViolations(html, known) {
     ...parseCards(sectionSlice(html, 'Woran ich gerade arbeite'), 'now', { knownPoints: known }),
     ...parseCards(sectionSlice(html, 'Von dir zu klären'), 'question', { knownPoints: known }),
     ...parseCards(sectionSlice(html, '<h2>Warteschlange'), 'queue', { knownPoints: known }),
+    // The decision records left "Von dir zu klären" for their own section (user
+    // order 22.09.2026); the topic rule that held them there follows them.
+    ...parseCards(sectionSlice(html, '<h2>Entscheidungsprotokoll'), 'record', { knownPoints: known }),
   ]
   const violations = []
   for (const card of cards) {

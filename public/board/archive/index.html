@@ -46,6 +46,11 @@
           document.open()
           document.write(html)
           document.close()
+          // The written document arrives after the browser looked for the
+          // fragment, so the board's link to the decision log section
+          // (#entscheidungsprotokoll) is followed here.
+          const target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)))
+          if (target) target.scrollIntoView()
         })
         .catch((e) => failed((e && e.message) || 'unbekannter Fehler'))
     </script>

@@ -149,23 +149,38 @@ export function parseKlaerungPoints(html, options = {}) {
 // is the pure check set; evaluate() blocks on it as invariant (8b), and the
 // wrapper refuses to record --synced while it fails.
 
-/** The four binding sections, in the user's mandated order (18.07.2026). */
-export const SECTION_TITLES = ['Woran ich gerade arbeite', 'Von dir zu klären', 'Warteschlange', 'Erledigt']
-
-/** Every section folds behind its own heading (user 27.07.2026); only Erledigt
- *  starts closed, and the `open` ban plus the board's script handle that. */
-export const COLLAPSIBLE_SECTIONS = [
+/** The five binding sections, in the user's mandated order (18.07.2026; the
+ *  fifth, the decision log below Erledigt, by user order 22.09.2026). */
+export const SECTION_TITLES = [
   'Woran ich gerade arbeite',
   'Von dir zu klären',
   'Warteschlange',
   'Erledigt',
+  'Entscheidungsprotokoll',
 ]
+
+/** Every section folds behind its own heading (user 27.07.2026); Erledigt and
+ *  the decision log start closed, and the `open` ban plus the board's script
+ *  handle that. */
+export const COLLAPSIBLE_SECTIONS = [...SECTION_TITLES]
 
 /** The board keeps only the newest finished cards; the rest live on their own
  *  published page (user 27.07.2026). Measured reason: at 214 cards the archive
  *  was three quarters of the file, so every review of the board grew with every
  *  closed point. */
 export const ERLEDIGT_ON_BOARD = 20
+
+/** The same cap for the decision log (user order 22.09.2026). ESTIMATE,
+ *  calibratable: the section is collapsed, so the number only governs page weight. */
+export const ENTSCHEIDUNGEN_ON_BOARD = 20
+
+/** The two capped sections and their caps, judged alike by the audit. */
+export const CAPPED_SECTIONS = [
+  { title: 'Erledigt', cap: ERLEDIGT_ON_BOARD },
+  // The log's link must land on its OWN section of the archive page (board-core
+  // ARCHIVE_LOG_ANCHOR), not merely on the page.
+  { title: 'Entscheidungsprotokoll', cap: ENTSCHEIDUNGEN_ON_BOARD, fragment: '#entscheidungsprotokoll' },
+]
 
 /** The meta a generated queue card carries while nobody has estimated the point
  *  (point 400, delta C). It lives HERE, beside the rule that exempts it, so the
@@ -341,7 +356,12 @@ export function parseCards(sectionHtml, options = {}) {
     const meta = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? null
     // The body slice must survive a container child, so take everything after
     // the body div's opening tag (the card ends at the next <details anyway).
-    const body = ((part.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? '')
+    // BOUNDED TO THE CARD (cross-vendor review 29.09.2026): the section's last
+    // card used to run on into the archive link and the footer, so an emptied
+    // last card still read as having a body. Cards do not nest, so the part's
+    // first closer is this card's own.
+    const own = part.split(/<\/details>/)[0]
+    const body = ((own.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
@@ -502,7 +522,7 @@ export function auditDashboard(html, input = {}) {
   const done = Array.isArray(input?.done) ? input.done : []
   const { order, sections } = sliceSections(html)
 
-  // STRUCTURE — exactly the four binding sections, in order.
+  // STRUCTURE — exactly the five binding sections, in order.
   if (order.length !== SECTION_TITLES.length || SECTION_TITLES.some((t, i) => order[i] !== t)) {
     v.push({
       code: 'structure',
@@ -537,19 +557,24 @@ export function auditDashboard(html, input = {}) {
   // THE ARCHIVE STAYS OUT (user 27.07.2026): the board carries the newest
   // finished cards and links the rest. Both halves are checked — a board that
   // kept everything, and one that dropped the link and orphaned the archive.
-  const erledigtSection = sections[SECTION_TITLES[3]] ?? ''
-  const doneOnBoard = parseCards(erledigtSection).length
-  if (doneOnBoard > ERLEDIGT_ON_BOARD) {
-    v.push({
-      code: 'erledigt-overflow',
-      msg: `the Erledigt section holds ${doneOnBoard} cards — the board keeps ${ERLEDIGT_ON_BOARD}, the older ones move to the archive page`,
-    })
-  }
-  if (doneOnBoard > 0 && !/<a\s[^>]*href="https?:\/\/[^"]+"[^>]*>/.test(erledigtSection)) {
-    v.push({
-      code: 'archive-link-missing',
-      msg: 'the Erledigt section links no archive page — the moved cards would be unreachable',
-    })
+  // The decision log is capped and linked the same way (user order 22.09.2026).
+  for (const { title, cap, fragment = '' } of CAPPED_SECTIONS) {
+    const section = sections[title] ?? ''
+    const onBoard = parseCards(section).length
+    if (onBoard > cap) {
+      v.push({
+        code: 'erledigt-overflow',
+        msg: `the ${title} section holds ${onBoard} cards — the board keeps ${cap}, the older ones move to the archive page`,
+      })
+    }
+    // THE DESIGNATED LINK, not any link (cross-vendor review 29.09.2026): an
+    // evidence URL inside a card must not stand in for a deleted archive link.
+    if (onBoard > 0 && !new RegExp(`<p class="archive-link">(?:(?!</p>)[\\s\\S])*<a\\s[^>]*href="https?://[^"#]+${fragment}"[^>]*>`).test(section)) {
+      v.push({
+        code: 'archive-link-missing',
+        msg: `the ${title} section links no archive page — the moved cards would be unreachable`,
+      })
+    }
   }
 
   // TASKS is the authority that distinguishes an uncapped four-digit legacy
@@ -564,6 +589,10 @@ export function auditDashboard(html, input = {}) {
   const vdzkCards = parseCards(sections[SECTION_TITLES[1]] ?? '', cardOptions)
   const queueCards = parseCards(sections[SECTION_TITLES[2]] ?? '', cardOptions)
   const erledigtCards = parseCards(sections[SECTION_TITLES[3]] ?? '', cardOptions)
+  // The decision log's records are CARDS like any other (empty body, duplicate
+  // title), but no open question: nothing below that counts or presses on open
+  // questions reads them (user order 22.09.2026).
+  const logCards = parseCards(sections[SECTION_TITLES[4]] ?? '', cardOptions)
 
   // DUPLICATE TITLE — a retry after a half-applied board command once put the
   // same question on the board twice. Point-number checks cannot catch an
@@ -574,6 +603,7 @@ export function auditDashboard(html, input = {}) {
     [SECTION_TITLES[1], vdzkCards],
     [SECTION_TITLES[2], queueCards],
     [SECTION_TITLES[3], erledigtCards],
+    [SECTION_TITLES[4], logCards],
   ]) {
     const seen = new Set()
     const duplicateTitles = new Set()
@@ -605,7 +635,7 @@ export function auditDashboard(html, input = {}) {
   // 472): the bundle-group card of point 452 was the only card that ever had
   // one, because its body held nothing but nested cards. With the grouping taken
   // back out, the rule bites for every card on the board again.
-  const empty = [nowCards, vdzkCards, queueCards, erledigtCards].flat().filter((c) => !c.body).length
+  const empty = [nowCards, vdzkCards, queueCards, erledigtCards, logCards].flat().filter((c) => !c.body).length
   if (empty) v.push({ code: 'empty-body', msg: `${empty} card(s) have an empty body` })
 
   // DUPLICATE NUMBER within one OPEN section (Erledigt is exempt — several
@@ -779,7 +809,7 @@ export function auditDashboard(html, input = {}) {
   // raw file: the viewer's script, a URL or a CSS class is none of the reader's
   // business, and only prose can be transliterated.
   const transliterated = []
-  for (const c of [nowCards, vdzkCards, queueCards, erledigtCards].flat()) {
+  for (const c of [nowCards, vdzkCards, queueCards, erledigtCards, logCards].flat()) {
     const hits = [...findTransliterations(c.title), ...findTransliterations(c.body)]
     if (hits.length) {
       transliterated.push(`"${c.title || c.points.join(', ') || '<untitled>'}" (${[...new Set(hits)].slice(0, 4).join(', ')})`)

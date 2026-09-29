@@ -23,6 +23,9 @@
 //                                                     # ask the user a decision
 //                                                     # (--automated: accepted, ignored)
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
+//   node scripts/board.mjs log-add "Entscheidungsprotokoll: <title>" "<record>"
+//                                                     # a decision taken, for veto
+//   node scripts/board.mjs log-remove "<title>"       # drop a vetoed record
 //   node scripts/board.mjs vdzk-keep "<title>" [...] # message did not answer it
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
 //   node scripts/board.mjs attest                     # rotate, audit (--synced), confirm prep
@@ -56,8 +59,11 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  DECISION_RECORD_PREFIX,
   TEXT_STDIN_FLAG,
+  addDecisionRecord,
   addVdzk,
+  isDecisionRecordTitle,
   berlinStamp,
   closeCard,
   parseClosingArgs,
@@ -65,6 +71,7 @@ import {
   pointSubject,
   promoteToNow,
   promotionEstimateWarning,
+  removeDecisionRecord,
   removeVdzk,
   resolveCardText,
   setCardStatus,
@@ -404,6 +411,14 @@ try {
     if (!title || (words.length === 0 && !stdinText.trim())) {
       throw new Error('usage: board.mjs vdzk-add [--automated] "<title>" "<question>"|--text-stdin')
     }
+    // A DECISION ALREADY TAKEN IS NO QUESTION (user order 22.09.2026): its
+    // record belongs in the decision log, which has its own command.
+    if (isDecisionRecordTitle(title)) {
+      throw new Error(
+        `vdzk-add REFUSED — "${title}" is a decision record, not an open question; it goes in the ` +
+          `decision log: node scripts/board.mjs log-add "${DECISION_RECORD_PREFIX} <Titel>" --text-stdin`,
+      )
+    }
     const question = textOf(words)
     const settled = settledRulingVerdict(`${title}\n${question}`)
     if (settled.block) throw new Error(`vdzk-add REFUSED — ${settled.reason}`)
@@ -412,6 +427,16 @@ try {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
     edit((html) => removeVdzk(html, fragment), `open question removed: ${fragment}`)
+  } else if (cmd === 'log-add') {
+    const [title, ...words] = rest.filter((arg) => arg !== '--automated')
+    if (!title || (words.length === 0 && !stdinText.trim())) {
+      throw new Error(`usage: board.mjs log-add "${DECISION_RECORD_PREFIX} <title>" "<record>"|--text-stdin`)
+    }
+    edit((html) => addDecisionRecord(html, title, textOf(words)), `decision record added: ${title}`)
+  } else if (cmd === 'log-remove') {
+    const fragment = textOf(rest)
+    if (!fragment) throw new Error('usage: board.mjs log-remove "<title>"|--text-stdin')
+    edit((html) => removeDecisionRecord(html, fragment), `decision record removed: ${fragment}`)
   } else if (cmd === 'vdzk-keep') {
     const whyAt = rest.indexOf('--why')
     const fragments = whyAt < 0 ? rest : rest.slice(0, whyAt)
@@ -483,6 +508,7 @@ try {
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
         'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
+        'log-add "Entscheidungsprotokoll: <title>" "<record>" | log-remove "<title>" | ' +
         'vdzk-keep "<title>" [...] [--why "<reason>"] | ' +
         'promote <point> "<times>" "<title>" "<status>" | merge-done | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,

@@ -21,7 +21,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 import { commonRepoPath, REPO_ROOT } from '../repo-paths.mjs'
-import { renderCardCriticalities } from '../board-core.mjs'
+import { RESTORE_CLOSED_AFTER, RESTORE_CLOSED_BEFORE, renderCardCriticalities, rotateBoardArchives } from '../board-core.mjs'
 import { applyLivenessBlock, livenessVerdict, progressLine, renderLivenessBlock } from '../board-liveness-core.mjs'
 
 // The portrait widths the complaint names, plus the narrowest phone the board
@@ -691,6 +691,126 @@ try {
     const control = await measureLiveness(page)
     check(`${name}: the portrait bound rejects the no-wrap control at 360px`, Boolean(control) && control.lines.some((l) => l.right > control.viewport + 1))
     await page.close()
+  }
+
+  // THE DECISION LOG (user order 22.09.2026): the fifth section renders BELOW
+  // Erledigt and is collapsed on a first visit, while the three sections above
+  // Erledigt stand open. Measured on a fixture that carries the board's own
+  // restore script (the published board carries it too, and is measured
+  // wherever it exists), each passed through the rotation every board edit runs,
+  // which migrates the board and writes the section's archive link.
+  // Negative control: the unmigrated script opens the new section.
+  const RESTORE = `<script>(function(){var KEY='hoa-dash-open';
+function keyFor(d){var s=d.querySelector('summary');return s?s.textContent.replace(/\\s+/g,' ').trim():'';}
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){return {};}}
+function restore(){var o=load();document.querySelectorAll('details').forEach(function(d){var k=keyFor(d);if(Object.prototype.hasOwnProperty.call(o,k)){d.open=o[k];}else if(d.classList.contains('sect')&&${RESTORE_CLOSED_BEFORE}){d.open=true;}});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',restore);else restore();})();</script>`
+  const logSect = (title, body) => `<details class="sect"><summary><h2>${title}</h2></summary>\n${body}\n</details>\n`
+  const logRecord = (i) =>
+    `<details>\n  <summary><span class="t">Entscheidungsprotokoll: Eine längere Entscheidung Nummer ${i}, die im Hochformat umbricht</span></summary>\n` +
+    `  <div class="body"><p>Entscheidung: ${i}.</p></div>\n</details>\n`
+  const LOG_FIXTURE =
+    `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">${BOARD_STYLE}</head><body><main>\n` +
+    logSect('Woran ich gerade arbeite', STRESS_CARDS.split('<details><summary>')[0]) +
+    logSect('Von dir zu klären', `${logRecord(1)}${logRecord(2)}`) +
+    logSect('Warteschlange', '') +
+    logSect('Erledigt', '<p class="archive-link">Die älteren 3 erledigten Punkte stehen im <a href="https://example.invalid/">Archiv der erledigten Punkte</a>.</p>') +
+    `<footer>Stand</footer>\n</main>${RESTORE}</body></html>`
+  const logPages = [{ name: 'fixture', html: LOG_FIXTURE, populated: true }]
+  // An EMPTY decision log is a valid board too and must pass (regression).
+  logPages.push({ name: 'empty-log fixture', html: LOG_FIXTURE.replace(`${logRecord(1)}${logRecord(2)}`, ''), populated: false })
+  // The published board may legitimately carry an EMPTY log (no card, no link),
+  // so only the fixture is required to be populated (cross-vendor review 29.09.2026).
+  if (existsSync(livePath)) logPages.push({ name: 'published board', html: readFileSync(livePath, 'utf8'), populated: false })
+  const measureSections = (page) =>
+    page.evaluate(() => {
+      const sects = [...document.querySelectorAll('details.sect')]
+      const box = (el) => el.getBoundingClientRect()
+      const link = sects.at(-1)?.querySelector('.archive-link')
+      return {
+        titles: sects.map((d) => d.querySelector('h2')?.textContent.trim()),
+        open: sects.map((d) => d.open),
+        tops: sects.map((d) => box(d).top + window.scrollY),
+        headRight: Math.max(...sects.map((d) => box(d.querySelector('summary')).right)),
+        cardRight: Math.max(0, ...[...(sects.at(-1)?.querySelectorAll('details') ?? [])].map((d) => box(d).right)),
+        linkRight: link ? box(link).right : 0,
+        cards: (sects.at(-1)?.querySelectorAll('details') ?? []).length,
+        // CLIPPED TEXT, measured on the descendants (cross-vendor review
+        // 29.09.2026): the cards clip with overflow:hidden, so their outer boxes
+        // stay inside the viewport while a title that did not wrap is cut off.
+        clipped: [...(sects.at(-1)?.querySelectorAll('details > summary > .t, .archive-link') ?? [])]
+          .filter((el) => {
+            const card = el.closest('details:not(.sect)') ?? el.parentElement
+            const range = document.createRange()
+            range.selectNodeContents(el)
+            const text = range.getBoundingClientRect()
+            const frame = card.getBoundingClientRect()
+            return (
+              el.scrollWidth > el.clientWidth + 1 ||
+              el.scrollHeight > el.clientHeight + 1 ||
+              text.right > frame.right + 1 ||
+              text.bottom > frame.bottom + 1
+            )
+          })
+          .map((el) => el.textContent.trim().slice(0, 40)),
+        viewport: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      }
+    })
+  const archivePath = commonRepoPath('.batch-dashboard-archive.html')
+  const archiveHtml = existsSync(archivePath)
+    ? readFileSync(archivePath, 'utf8')
+    : '<main>\n<h2>Erledigt (älter)</h2>\n<footer>Archiv</footer>\n</main>\n'
+  // A title that may not wrap: the clipping control the text measurement must reject.
+  const NO_WRAP_TITLES = '<style>details:not(.sect)>summary>.t{white-space:nowrap}</style>'
+  for (const { name, html, populated } of logPages) {
+    const migrated = rotateBoardArchives({ board: html, archive: archiveHtml }).board
+    check(`${name}: the migration keeps the decision log closed in the restore script`, migrated.includes(RESTORE_CLOSED_AFTER) && !migrated.includes(RESTORE_CLOSED_BEFORE))
+    for (const width of WIDTHS) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      await page.setContent(migrated, { waitUntil: 'load' })
+      const first = await measureSections(page)
+      const [now, vdzk, queue, done, log] = first.open
+      check(
+        `${name} at ${width}px: the decision log is the fifth section, below Erledigt`,
+        first.titles.length === 5 && first.titles[3] === 'Erledigt' && first.titles[4] === 'Entscheidungsprotokoll' && first.tops[4] > first.tops[3],
+        first.titles.join(' | '),
+      )
+      check(
+        `${name} at ${width}px: first visit — the decision log is collapsed, the three above Erledigt stand open`,
+        log === false && done === false && now && vdzk && queue,
+        first.open.join(','),
+      )
+      // Opened by the reader, it lays out inside a portrait viewport.
+      await page.evaluate(() => { const d = [...document.querySelectorAll('details.sect')].at(-1); d.open = true; d.querySelectorAll('details').forEach((c) => { c.open = true }) })
+      const opened = await measureSections(page)
+      check(
+        `${name} at ${width}px: the opened decision log stays inside the viewport`,
+        opened.scrollWidth <= opened.viewport + 1 &&
+          (!populated || (opened.cards > 0 && opened.linkRight > 0)) &&
+          opened.cardRight <= opened.viewport + 1 &&
+          opened.linkRight <= opened.viewport + 1 &&
+          opened.clipped.length === 0,
+        `page ${opened.scrollWidth}/${opened.viewport}, ${opened.cards} cards r${Math.round(opened.cardRight)}, link r${Math.round(opened.linkRight)}, clipped [${opened.clipped.join(' | ')}]`,
+      )
+      await page.close()
+      // The control runs on the deterministic fixture only: its titles are long
+      // by construction, while a live board of short titles legitimately fits
+      // unwrapped (cross-vendor review round 2).
+      if (width === 360 && populated) {
+        const clip = await browser.newPage({ viewport: { width, height: 900 } })
+        await clip.setContent(`${migrated}\n${NO_WRAP_TITLES}`, { waitUntil: 'load' })
+        await clip.evaluate(() => { const d = [...document.querySelectorAll('details.sect')].at(-1); d.open = true; d.querySelectorAll('details').forEach((c) => { c.open = true }) })
+        const clipped = await measureSections(clip)
+        check(`${name} at ${width}px: the text measurement rejects the no-wrap clipping control`, clipped.clipped.length > 0, `${clipped.clipped.length} clipped`)
+        await clip.close()
+      }
+    }
+    const control = await browser.newPage({ viewport: { width: 360, height: 900 } })
+    await control.setContent(migrated.split(RESTORE_CLOSED_AFTER).join(RESTORE_CLOSED_BEFORE), { waitUntil: 'load' })
+    const unmigrated = await measureSections(control)
+    check(`${name}: the unmigrated restore script would open the decision log (control)`, unmigrated.open[4] === true, unmigrated.open.join(','))
+    await control.close()
   }
 } finally {
   await browser.close()

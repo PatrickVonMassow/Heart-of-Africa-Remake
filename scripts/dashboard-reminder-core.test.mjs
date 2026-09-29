@@ -48,7 +48,7 @@ describe('the injected board reminder (point 436)', () => {
   it('the gates it defers to really do enforce those rules', () => {
     // The deletion is only safe while the gate exists; if one is ever removed,
     // this case fails and the sentence has to come back.
-    expect(REQUIRED_SECTIONS).toHaveLength(4)
+    expect(REQUIRED_SECTIONS).toHaveLength(5)
     const codes = structureViolations('<main><h2>Nur eine</h2></main>').map((v) => v.code)
     expect(codes).toContain('sections-wrong')
 
