@@ -5445,19 +5445,31 @@ if (section('villager-canoe')) {
       // Facing the water while the canoe works its lane, until his call stands
       // over his head on an upstream or downstream leg.
       await standAt(boatStand, { x: boatStand.x + boatStand.nx * 10, z: boatStand.z + boatStand.nz * 10 })
-      const called = await page
-        .waitForFunction(() => {
+      // The call's own label, read in the frame it stands: its atoms against
+      // the vocabulary atom of the leg's word, not only the state's word.
+      // `notPhase`/`after` make the second wait take the OTHER leg's call.
+      const waitCall = (notPhase, after) => page
+        .waitForFunction(({ notPhase, after }) => {
           const c = window.__placeCanoe?.()
-          const labels = window.__speech?.labels() ?? []
-          return !!c && (c.phase === 'up' || c.phase === 'down') && labels.some((l) => l.speakerId === 'village-canoe')
-        }, null, { timeout: 300000, polling: 250 })
-        .then(() => true)
-        .catch(() => false)
+          if (!c || (c.phase !== 'up' && c.phase !== 'down') || c.phase === notPhase) return null
+          const l = (window.__speech?.labels() ?? []).find((x) => x.speakerId === 'village-canoe' && x.shownAt > after)
+          if (!l) return null
+          const vocabulary = window.__game.getState().vocabulary
+          return { phase: c.phase, atoms: l.atoms, shownAt: l.shownAt,
+            expected: vocabulary[c.phase === 'up' ? 'UPSTREAM' : 'DOWNSTREAM'] }
+        }, { notPhase, after }, { timeout: 300000, polling: 250 })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      const callNamesHeading = (call) =>
+        !!call && Array.isArray(call.atoms) && call.atoms.length === 1 && !!call.expected && call.atoms[0] === call.expected
+      const firstCall = await waitCall(null, -1)
+      const called = !!firstCall
       const canoeState = await page.evaluate(() => window.__placeCanoe())
       check('the paddler calls the direction word of his leg, and his reading stands over his head', called,
         `phase ${canoeState.phase}, ${canoeState.calls} calls, last ${canoeState.lastCall}`)
       check('the call names the way he is heading',
-        called && canoeState.lastCall === (canoeState.phase === 'up' ? 'UPSTREAM' : 'DOWNSTREAM'), `${canoeState.phase}/${canoeState.lastCall}`)
+        called && canoeState.lastCall === (firstCall.phase === 'up' ? 'UPSTREAM' : 'DOWNSTREAM'), `${firstCall?.phase}/${canoeState.lastCall}`)
+      check('the spoken call carries the direction word of that leg', callNamesHeading(firstCall), JSON.stringify(firstCall))
       if (called) {
         // Still on the standing place, still looking out over the water — he
         // turns his head toward the boat, not his back to the river.
@@ -5503,6 +5515,12 @@ if (section('villager-canoe')) {
           local: { x: canoeState.paddler.x, y: 0.5, z: canoeState.paddler.z },
           label: `the fisherman in his dugout seen from the boat standing place (s = +37 m on the waterline) on his ${canoeState.phase === 'up' ? 'upstream' : 'downstream'} leg, his call ${canoeState.lastCall} over his head; no child and no play rock in the picture`,
         })
+      }
+      if (called) {
+        // The other leg's call, heard from the same standing place.
+        const secondCall = await waitCall(firstCall.phase, firstCall.shownAt)
+        check('on his other leg he calls the other direction word', callNamesHeading(secondCall) &&
+          secondCall.phase !== firstCall.phase && secondCall.atoms[0] !== firstCall.atoms[0], JSON.stringify(secondCall))
       }
 
       // --- 2. Behind the downstream rock, looking upstream -----------------
