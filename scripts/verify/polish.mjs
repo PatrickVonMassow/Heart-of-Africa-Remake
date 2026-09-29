@@ -2,7 +2,7 @@
 // orientation once the chief is met, distant panorama wildlife, speech, season,
 // travel capture, Giza and settlement life (design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
-import { frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
+import { captureFrame, frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { frameSpeakingDrums } from './drumFrame.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
@@ -794,9 +794,13 @@ if (section('speech-hypothesis')) {
         const v = new (Object.getPrototypeOf(cam.position).constructor)(e[12], e[13] + chest, e[14])
         v.project(cam)
         const r = el.getBoundingClientRect()
+        // The note stands on its TAIL's tip (point 1238): that tip, not the box
+        // centre, is what must land on the anchor over the speaker's crown.
+        const tail = el.parentElement?.querySelector('.speech-tail')?.getBoundingClientRect()
+        if (!tail) return null
         return {
-          dx: r.left + r.width / 2 - pt.x,
-          dy: r.top + r.height / 2 - pt.y,
+          dx: tail.left + tail.width / 2 - pt.x,
+          dy: tail.bottom - pt.y,
           height: r.height,
           bodyX: ((v.x + 1) / 2) * window.innerWidth,
           bodyY: ((1 - v.y) / 2) * window.innerHeight,
@@ -836,7 +840,7 @@ if (section('speech-hypothesis')) {
     // the world matrix in a frame callback of its OWN, so on a frame where it
     // runs first the note trails the walking figure by exactly one step (10 px
     // measured, against a body some 95 px wide at this range). Vertically the
-    // CSS lifts the box by 8 px, scaled the same way. What this rejects is the
+    // tail's tip stands on the anchor (point 1238). What this rejects is the
     // bug it exists for: a label left at the scene origin, hundreds of pixels
     // from its speaker or off the viewport altogether.
     const worstX = samples.length ? Math.max(...samples.map((s) => Math.abs(s.dx) - 0.5 * s.height)) : Infinity
@@ -845,7 +849,7 @@ if (section('speech-hypothesis')) {
       'the note rides on the figure that speaks, not on a world coordinate (point 485)',
       samples.length >= 6 && worstX <= 0 && worstY <= 0,
       samples.length >= 6
-        ? `worst sideways offset past half the label height ${worstX.toFixed(1)} px, worst vertical offset past the scaled lift ${worstY.toFixed(1)} px, over ${samples.length} frames`
+        ? `worst sideways offset past half the label height ${worstX.toFixed(1)} px, worst tail-tip vertical offset past its allowance ${worstY.toFixed(1)} px, over ${samples.length} frames`
         : `MEASURED NOTHING — only ${samples.length} frames carried both a label and its anchor`,
     )
     // And the picture must SHOW that: the speaker's own body stands inside the
@@ -938,6 +942,228 @@ if (section('speech-hypothesis')) {
       window.__game.getState().setUtteranceHypothesis(u, '')
       window.__speech?.clear()
       delete window.__speechProbeFigures
+    }, RIVER)
+  }
+  await page.evaluate((saved) => {
+    const p = window.__placePlayer
+    if (!p || !saved) return
+    p.x = saved.x
+    p.z = saved.z
+    p.yaw = saved.yaw
+    p.pitch = saved.pitch
+  }, pose)
+}
+// --- Whose a note is (point 1238) ---------------------------------------------
+// Two figures standing close together both speak. The picture must show each
+// note's tail pointing down at ITS OWN speaker, and the older note receded
+// behind the newer one, so the current speaker is never in doubt. The recede
+// rule itself is pinned in Vitest (speechLabelRecedes); this proves the drawn
+// tails land on their own crowns and the dimming reaches the screen.
+if (section('speech-owner')) {
+  await goToPlace('bambara-village')
+  const RIVER = 'ba-BA-ba-BA'
+  const pose = await page.evaluate(() => {
+    const p = window.__placePlayer
+    return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
+  })
+  // Every pair of named figures standing 1.2-4 m apart, closest first: close
+  // enough that an untailed note could float between the two heads.
+  const pairs = await page.evaluate(() => {
+    const scene = window.__placeScene
+    if (!scene) return []
+    const found = []
+    scene.traverse((o) => {
+      if (o.name === 'inhabitant' && found.length < 24) found.push(o)
+    })
+    window.__speechOwnerFigures = found
+    const at = found.map((o) => {
+      o.updateWorldMatrix(true, false)
+      const e = o.matrixWorld.elements
+      return { x: e[12], z: e[14] }
+    })
+    const out = []
+    for (let i = 0; i < at.length; i++) {
+      for (let j = i + 1; j < at.length; j++) {
+        const d = Math.hypot(at[i].x - at[j].x, at[i].z - at[j].z)
+        if (d >= 1.2 && d <= 4) out.push({ a: i, b: j, d })
+      }
+    }
+    return out.sort((l, r) => l.d - r.d).slice(0, 12)
+  })
+  // Stand OUTSIDE the talk reach (10 m) in front of the pair's midpoint, so
+  // neither note is the guess target — a targeted note never recedes, and that
+  // exception is Vitest's to prove, not this picture's.
+  const STAND_BACKS = [12, 11]
+  const aimPair = (pair, back) =>
+    page.evaluate(
+      ({ a, b, back }) => {
+        const figs = window.__speechOwnerFigures
+        const p = window.__placePlayer
+        if (!figs || !p || !window.__placeRayHit) return null
+        const pos = [figs[a], figs[b]].map((f) => {
+          f.updateWorldMatrix(true, false)
+          const e = f.matrixWorld.elements
+          return { x: e[12], y: e[13], z: e[14], h: Math.max(0.4, Math.hypot(e[4], e[5], e[6])) }
+        })
+        const mid = { x: (pos[0].x + pos[1].x) / 2, z: (pos[0].z + pos[1].z) / 2 }
+        // Look across the pair (perpendicular to the line joining them), from
+        // the settlement's inner side, so both figures stand side by side.
+        let px = -(pos[1].z - pos[0].z)
+        let pz = pos[1].x - pos[0].x
+        const n = Math.hypot(px, pz) || 1
+        px /= n
+        pz /= n
+        if (px * mid.x + pz * mid.z < 0) {
+          px = -px
+          pz = -pz
+        }
+        p.x = mid.x - px * back
+        p.z = mid.z - pz * back
+        p.pitch = 0
+        p.yaw = Math.atan2(mid.x - p.x, mid.z - p.z) + Math.PI
+        return pos
+      },
+      { a: pair.a, b: pair.b, back },
+    )
+  const seen = (pair) =>
+    page.evaluate(({ a, b }) => {
+      const figs = window.__speechOwnerFigures
+      return [figs[a], figs[b]].map((f) => {
+        f.updateWorldMatrix(true, false)
+        const e = f.matrixWorld.elements
+        const h = window.__placeRayHit(e[12], e[13] + Math.max(0.4, Math.hypot(e[4], e[5], e[6])), e[14])
+        return h.hitDistance == null ? null : h.hitDistance / h.targetDistance
+      })
+    }, pair)
+  let chosen = null
+  const probes = []
+  for (const pair of pairs) {
+    for (const back of STAND_BACKS) {
+      if (!(await aimPair(pair, back))) continue
+      await nextFrames(2)
+      const ratios = await seen(pair)
+      probes.push(ratios.map((r) => (r == null ? 'sky' : r.toFixed(2))).join('/'))
+      if (ratios.every((r) => r !== null && r >= 0.85 && r <= 1.15)) {
+        chosen = { ...pair, back }
+        break
+      }
+    }
+    if (chosen) break
+  }
+  check(
+    'the settlement offers two figures close together, both in clear view (point 1238)',
+    !!chosen,
+    `${pairs.length} pairs 1.2-4 m apart; sight lines [${probes.join(', ')}]`,
+  )
+  if (chosen) {
+    // The older note first, the newer a few frames later — exactly the order of
+    // an exchange. Both are held long so the expiry clock (pure-tested) plays no
+    // part; a village word raised in between would dim both, so the pair is
+    // spoken again right before the shutter too.
+    const speakPair = () =>
+      page.evaluate(
+        async ({ a, b, u }) => {
+          const figs = window.__speechOwnerFigures
+          const raf = () => new Promise((r) => requestAnimationFrame(() => r()))
+          window.__game.getState().hearUtterance(u)
+          const say = (f, id) => {
+            const name = f.name
+            f.name = `${id}-figure`
+            const ok = window.__speech?.speak(id, [u], `${id}-figure`, 120) === true
+            f.name = name
+            return ok
+          }
+          const older = say(figs[a], 'owner-older')
+          await raf()
+          await raf()
+          const newer = say(figs[b], 'owner-newer')
+          for (let i = 0; i < 3; i++) await raf()
+          return older && newer
+        },
+        { a: chosen.a, b: chosen.b, u: RIVER },
+      )
+    const read = () =>
+      page.evaluate(() => {
+        const one = (id) => {
+          const el = document.querySelector(`.speech-label[data-speaker="${id}"]`)
+          const bubble = el?.closest('.speech-bubble')
+          const tail = bubble?.querySelector('.speech-tail')?.getBoundingClientRect()
+          const pt = window.__speech?.anchorScreen(id)
+          if (!el || !bubble || !tail || !pt) return null
+          return {
+            tip: { x: tail.left + tail.width / 2, y: tail.bottom },
+            anchor: pt,
+            height: el.getBoundingClientRect().height,
+            opacity: Number(getComputedStyle(bubble).opacity),
+            width: bubble.getBoundingClientRect().width,
+            receded: bubble.classList.contains('receded'),
+            targeted: bubble.classList.contains('targeted'),
+          }
+        }
+        return { older: one('owner-older'), newer: one('owner-newer') }
+      })
+    await aimPair(chosen, chosen.back)
+    const spoke = await speakPair()
+    check('both figures can speak over their heads (point 1238)', spoke, `spoke ${spoke}`)
+    // The recede transition runs a quarter second; measure after it settles.
+    await page.waitForTimeout(400)
+    await aimPair(chosen, chosen.back)
+    await nextFrames(2)
+    const r = await read()
+    const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y)
+    check(
+      'each note’s tail tip stands on its own speaker’s anchor, nearer it than the other’s (point 1238)',
+      !!r.older && !!r.newer &&
+        [[r.older, r.newer], [r.newer, r.older]].every(
+          ([own, other]) =>
+            Math.abs(own.tip.x - own.anchor.x) <= 0.5 * own.height &&
+            Math.abs(own.tip.y - own.anchor.y) <= 0.35 * own.height &&
+            dist(own.tip, own.anchor) < dist(own.tip, other.anchor),
+        ),
+      JSON.stringify(r),
+    )
+    check(
+      'the older note recedes behind the newer one, and neither is targeted out of reach (point 1238)',
+      !!r.older && !!r.newer && r.older.receded && !r.newer.receded &&
+        !r.older.targeted && !r.newer.targeted &&
+        r.older.opacity < 0.9 && r.newer.opacity > 0.99,
+      JSON.stringify(r),
+    )
+    const pos = await aimPair(chosen, chosen.back)
+    const label = await page.evaluate(() => window.__speech?.labels().find((l) => l.speakerId === 'owner-newer'))
+    let atShutter = null
+    await captureFrame(
+      page,
+      OUT,
+      '1238-speech-owner-tails',
+      {
+        local: {
+          x: (pos[0].x + pos[1].x) / 2,
+          y: (pos[0].y + pos[1].y) / 2 + (label?.height ?? 1.6),
+          z: (pos[0].z + pos[1].z) / 2,
+        },
+        label: 'two close speakers, each note tailed to its own head, the older one receded',
+      },
+      {
+        beforeCapture: async () => {
+          await aimPair(chosen, chosen.back)
+          await speakPair()
+          await page.waitForTimeout(400)
+          await aimPair(chosen, chosen.back)
+          await nextFrames(2)
+          atShutter = await read()
+        },
+      },
+    )
+    check(
+      'at the shutter the older note is still the receded one (point 1238)',
+      !!atShutter?.older?.receded && atShutter?.newer?.receded === false,
+      JSON.stringify(atShutter),
+    )
+    await page.evaluate((u) => {
+      window.__game.getState().setUtteranceHypothesis(u, '')
+      window.__speech?.clear()
+      delete window.__speechOwnerFigures
     }, RIVER)
   }
   await page.evaluate((saved) => {
