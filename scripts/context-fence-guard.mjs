@@ -13,6 +13,11 @@
 //     "hooks": [{ "type": "command",
 //                 "command": "node \"$CLAUDE_PROJECT_DIR/scripts/context-fence-guard.mjs\"" }] }
 //
+// OPEN: point 1204 (c) needs `|Read` appended to that matcher — `read` is the
+// largest p90 kind, and only a routed read books its debit into the level the
+// handover brake judges. The guard already books it; the registration change is
+// the main session's (protected path).
+//
 // Modes:
 //   1. PreToolUse HOOK: reads the tool call on stdin, MEASURES the session's
 //      context from its own transcript (the payload's transcript_path, else

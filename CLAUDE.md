@@ -73,7 +73,7 @@ screenshots, and end-to-end. Strategy and suite map: `scripts/verify/README.md`.
   children block it. Delegates test, commit, push, and never merge.
 - Context fence (preventive text, not a pointer): at its refusal mark start no
   agents, suites, points, or authoring; finishing, reading, and the boundary
-  stay allowed. Default `observe` refuses nothing until its arming point lands.
+  stay allowed. Past 122k it refuses while the launcher is armed.
   Mechanics: `docs/batch-owner-runbook.md`.
 - **Model policy.** GPT-6 Astra authors difficult/complex/error-prone/HIGH
   points; Opus 5.5 authors points whose verification is the work; Fable 5.1

@@ -538,6 +538,8 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
   })
 
   it('reads are MEASURED into the level the next START is judged by, never refused themselves', () => {
+    // Holds in production once the registered matcher carries `Read` (the
+    // guard header's OPEN item); until then this proves the guard side only.
     rmSync(ledgerPath(), { force: true })
     writeTranscript(CONTEXT_TRIGGER_TOKENS - 5_000)
     expect(call('Agent', {}, { env: {} }).stdout.trim()).toBe('') // fits below the mark...

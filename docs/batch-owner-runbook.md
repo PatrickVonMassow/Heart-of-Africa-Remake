@@ -40,9 +40,15 @@ owner adopts them with `node scripts/batch-in-flight.mjs --adopt`; unpushed work
 drains first, while a recorded running verification may transfer.
 
 The context path uses the same boundary with `--context`. The handover mark is
-122k and the ceiling is 150k. The PreToolUse context fence observes at 110k but,
-until its arming point lands, its default mode is `observe` and it refuses
-nothing. Do not rely on it to prevent starting work.
+122k and the ceiling is 150k. The PreToolUse context fence carries a handover
+brake: at or past 122k (reading plus pending debit) it DENIES a start — agent,
+browser suite, new point, authoring — and names the boundary, in both fence
+modes; finishing, reads and the boundary stay allowed. The brake is armed only
+while the launcher is armed; with a dead, unknown or stopped launcher it stays
+at observe and `node scripts/context-fence-guard.mjs --status` says so. The
+ceiling admission keeps its own default mode, `observe`, and refuses nothing.
+`node scripts/context-incidents.mjs --trend` prints the seven-day overshoot
+verdict.
 
 Ownership is a lease in `.claude/batch-lock.json`, renewed before each tool call.
 An expired, non-advancing owner stops owning. The ownership fence refuses that
