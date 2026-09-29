@@ -313,8 +313,12 @@ if (isMainModule(import.meta.url)) {
   }
   const series = readSeries(opts.files.length ? opts.files : [SEED_PATH, INCIDENTS_PATH])
   if (opts.trend) {
-    const trend = overshootTrend(series.records)
-    console.log(opts.json ? JSON.stringify(trend, null, 2) : formatTrendReport(trend))
+    const trend = overshootTrend(series.records, { sinceMs: cut.sinceMs, sinceLabel: cut.label ?? '' })
+    console.log(
+      opts.json
+        ? JSON.stringify({ ...trend, malformed: series.malformed, sources: series.sources }, null, 2)
+        : formatTrendReport(trend, { malformed: series.malformed }),
+    )
     process.exit(0)
   }
   const summary = summarizeSeries(series.records, {

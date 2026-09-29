@@ -397,6 +397,18 @@ describe('overshootTrend — the verdict reading of the series', () => {
     expect(trend.median).toBe(50_000)
   })
 
+  it('drops records before a `--since` cutoff and names the cutoff', () => {
+    const trend = overshootTrend([
+      rec('2026-09-24T10:00:00.000Z', 70_000),
+      rec('2026-09-28T10:00:00.000Z', 10_000),
+    ], { nowMs: NOW, sinceMs: Date.parse('2026-09-26T00:00:00.000Z'), sinceLabel: '2026-09-26' })
+    expect(trend.total).toBe(1)
+    expect(trend.median).toBe(10_000)
+    expect(trend.since).toBe('2026-09-26')
+    expect(formatTrendReport(trend)).toContain('only records since 2026-09-26')
+    expect(overshootTrend([rec('2026-09-24T10:00:00.000Z', 70_000)], { nowMs: NOW }).since).toBeNull()
+  })
+
   it('an empty series is a verdict of zero, not an error', () => {
     const trend = overshootTrend([], { nowMs: NOW })
     expect(trend.total).toBe(0)

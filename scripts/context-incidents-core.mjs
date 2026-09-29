@@ -629,7 +629,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * reading is no overshoot. Days without a record are listed with 0, because a
  * quiet day is exactly the effect the arming is meant to produce.
  */
-export function overshootTrend(records = [], { nowMs = Date.now(), days = TREND_DAYS } = {}) {
+export function overshootTrend(records = [], { nowMs = Date.now(), days = TREND_DAYS, sinceMs = null, sinceLabel = '' } = {}) {
+  const cutoff = typeof sinceMs === 'number' && Number.isFinite(sinceMs) ? sinceMs : null
   const span = Number.isInteger(days) && days > 0 ? days : TREND_DAYS
   const today = Math.floor(Number(nowMs) / DAY_MS) * DAY_MS
   const fromMs = today - (span - 1) * DAY_MS
@@ -640,6 +641,7 @@ export function overshootTrend(records = [], { nowMs = Date.now(), days = TREND_
   for (const r of records ?? []) {
     if (!usableIncident(r) || (r.kind ?? INCIDENT_KINDS.OVERSHOOT) !== INCIDENT_KINDS.OVERSHOOT) continue
     if (typeof r.overshoot !== 'number' || !Number.isFinite(r.overshoot)) continue
+    if (cutoff !== null && r.atMs < cutoff) continue // `--since` / `--since-commit`
     const index = Math.floor((r.atMs - fromMs) / DAY_MS)
     if (index >= 0 && index < span) rows[index].values.push(r.overshoot)
   }
@@ -651,18 +653,23 @@ export function overshootTrend(records = [], { nowMs = Date.now(), days = TREND_
     perDay: rows.map((row) => ({ day: row.day, count: row.values.length, median: quantileOf(row.values, 0.5) })),
     total: all.length,
     median: quantileOf(all, 0.5),
+    since: cutoff === null ? null : sinceLabel || new Date(cutoff).toISOString(),
   }
 }
 
 /** The `--trend` text: one line per day, then the window's verdict line. */
-export function formatTrendReport(trend) {
-  const lines = [`CONTEXT OVERSHOOTS PER DAY, ${trend.from} .. ${trend.to} (UTC; overshoot = tokens past the ceiling):`]
+export function formatTrendReport(trend, { malformed = 0 } = {}) {
+  const lines = [
+    `CONTEXT OVERSHOOTS PER DAY, ${trend.from} .. ${trend.to} (UTC; overshoot = tokens past the ceiling)` +
+      `${trend.since ? `, only records since ${trend.since}` : ''}:`,
+  ]
   for (const row of trend.perDay) {
     lines.push(`  ${row.day}  ${String(row.count).padStart(3)} overshoot(s)  median ${row.median ?? '-'}`)
   }
   lines.push(
     `VERDICT, last ${trend.days} days: ${trend.total} overshoot(s), median overshoot ${trend.median ?? '-'} tokens.`,
   )
+  if (malformed) lines.push(`WARNING: ${malformed} unreadable line(s) skipped — the count is a LOWER bound`)
   lines.push('A session that dies without taking a boundary writes no record, so this UNDER-counts.')
   return lines.join('\n')
 }
