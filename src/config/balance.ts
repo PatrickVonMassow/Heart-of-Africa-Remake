@@ -899,6 +899,41 @@ interface BalanceConfig {
        *  effect on the next visit rather than mid-scene. */
       villagerCount: number
     }
+    /** The villager's dugout canoe beside the children's bank game (work-order
+     *  1237): a fisherman paddling his own lane up and down the river, calling
+     *  the direction word of each leg. Distances in metres along the bank (s,
+     *  downstream of the children's stretch centre) and out from the waterline. */
+    canoe: {
+      /** How far out from the waterline the lane lies. */
+      laneOut: number
+      /** The lane's upstream and downstream ends, as s. */
+      laneStart: number
+      laneEnd: number
+      /** The least distance the lane keeps from the children's stretch: a
+       *  10 m hearing zone round the stretch plus the 10 m hearing radius. */
+      stretchGapMin: number
+      /** Ground speed against the current, and carried with it (m/s). */
+      upstreamSpeed: number
+      downstreamSpeed: number
+      /** The bow swinging out into the current at the upstream end. */
+      turnSeconds: number
+      /** Running the bow onto the sand, and pushing back off to the lane. */
+      landSeconds: number
+      launchSeconds: number
+      /** How long he checks the fish trap at the landing: drawn per landing. */
+      trapMinSeconds: number
+      trapMaxSeconds: number
+      /** Stepping from his seat to the trap, and back. */
+      stepSeconds: number
+      /** Into a leg before he calls its direction — once visibly under way. */
+      callDelaySeconds: number
+      /** One paddle stroke against the current, and one steering stroke. */
+      strokeSeconds: number
+      steerStrokeSeconds: number
+      /** The dugout's length and beam. */
+      hullLength: number
+      hullBeam: number
+    }
     /** The weaver's loom (work-order 1157): the station that shows weaving AND
      *  teaches UPSTREAM/DOWNSTREAM a second time, on a walking body instead of
      *  the children's running groups. */
@@ -1713,6 +1748,35 @@ export const balance: BalanceConfig = {
     //  - A named tending every 18 s is "a few times a minute" (item 8): often
     //    enough to catch in passing, rare enough that the speech labels do not
     //    become noise beside the children's.
+    // THE VILLAGER'S DUGOUT (work-order 1237). Calibratable starting values
+    // (educated guess, CLAUDE.md §2), after the Niger's Bozo/Somono river
+    // fishermen of the 1890s: a small fishing pirogue of about 5.5 m, paddled
+    // kneeling. It makes about 1.3 m/s through the water; against a dry-season
+    // current of about 0.5 m/s that is 0.8 m/s over the ground, kept close in
+    // where the current is weakest, while the run back rides the current at
+    // about 1.5 m/s with steering strokes only. The lane lies 7 m out between
+    // s = +27 and +47 m, so it keeps 20 m from the children's stretch (10 m
+    // hearing zone + 10 m hearing radius) and no standing place hears the
+    // SPOKEN words of both; the call carries at the call register (34 m).
+    canoe: {
+      laneOut: 7,
+      laneStart: 27,
+      laneEnd: 47,
+      stretchGapMin: 20,
+      upstreamSpeed: 0.8,
+      downstreamSpeed: 1.5,
+      turnSeconds: 6,
+      landSeconds: 6,
+      launchSeconds: 6,
+      trapMinSeconds: 20,
+      trapMaxSeconds: 40,
+      stepSeconds: 1.5,
+      callDelaySeconds: 3,
+      strokeSeconds: 1.3,
+      steerStrokeSeconds: 3,
+      hullLength: 5.5,
+      hullBeam: 0.62,
+    },
     loom: {
       placed: false, // weaving parked (user 29.09.2026); true re-enables the station
       warpHalf: 3.2,
