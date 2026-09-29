@@ -94,7 +94,8 @@ seconds per new game, so a length bump should replace "enumerate all" with
 A second, meaningless mirror pair among RIVER, ROCK, DIG and CHIEF is
 unavoidable and accepted. In 8 of the 20 mappings both members still occur in
 the errand, but never adjacently. UPSTREAM and DOWNSTREAM are the meaningful
-opposites taught in the same bank-game round and at the weaver's loom.
+opposites taught in the same bank-game round and at the fisherman's
+dugout beside the children's bank game.
 
 CHIEF is taught the way every other word is: the use key at the drummer while
 the chief is in his hut makes him point his arm at the chief's hut and say it,
