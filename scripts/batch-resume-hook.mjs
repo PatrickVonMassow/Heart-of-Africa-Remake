@@ -222,46 +222,30 @@ try {
   /* an unreadable or unstartable launcher must never block session orientation */
 }
 
+// Condensed per docs/context-cut-list-1209.md (U158/U159): the workflow rules
+// CLAUDE.md §6/§9 and docs/batch-owner-runbook.md already carry are named, not
+// restated; what only this text carried stays in it.
 const RESUME_BODY =
-  'Continue the batch autonomously per CLAUDE.md/TASKS.md, ONE stretch of work per session (POINT ' +
-  'BOUNDARY below) — feature-branch workflow ' +
-  '(§6): each point on its OWN feat/<point>-<slug> branch off main; implement -> docs -> ' +
-  'tests -> atomic commit + push the BRANCH after every commit; merge to main ONLY when the ' +
-  'point is complete + verified (tests green; render/GUI changes picture-checked on BOTH ' +
-  'backends); TASKS.md is MAIN-only — tick the point on main at the merge; small cross-cutting ' +
-  'bookkeeping may land directly on main, a larger mechanism goes to its own worktree. MAXIMAL ' +
-  'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
-  'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
-  'the model policy stated above, whose lanes decide who authors each point ' +
-  '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
-  'session keeps only the picture-verification on both backends, the serial merge -> ' +
-  'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
-  'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
-  'TASKS point (append-and-defer) on main and delegated in turn — never fixed ad hoc or ' +
-  'dropped; the agent pool is capped at AT MOST 3 concurrent agents (user 26.07.2026 — ' +
-  'parallel strands multiply the RATE of consumption and the throughput together, not ' +
-  'the cost per finished point; the real surcharge is rework where two strands touch the ' +
-  'same code); throttle DOWN further if the report volume ' +
-  'threatens context (user grant 22.07.2026), never up, and delegate tightly-coupled ' +
-  'same-file points TOGETHER on ONE branch sequentially so shared files never collide. ' +
-  'CLOSING FREEZE (user decision 22.07.2026): during a closing run the code is FROZEN — ' +
-  'no parallel agent work lands/merges while the closing runs; merge or park in-flight ' +
-  'branches first, resume the pool only after. ' +
-  'POINT BOUNDARY (user 27.07.2026, two-phase since point 675): the context is the batch\'s ' +
-  'dominant cost, so a session carries ONE stretch of work, not point after point. Once the ' +
-  'point you were landing is LANDED (merged and ticked), hand over: `node scripts/batch-boundary.mjs ' +
-  '--prepare <point>`, its bookkeeping, then `--commit <point>` as the LAST repository action, and ' +
-  'END THE SESSION instead of starting the next point here. A delegated author still building does ' +
-  'NOT hold the boundary — with pushed checkpoints its declaration is transferred at the commit; ' +
-  'a PREDECESSOR may equally have left one for YOU: if `node scripts/batch-in-flight.mjs --status` ' +
-  'shows a transferred declaration, ADOPT it first (`node scripts/batch-in-flight.mjs --adopt`) and ' +
-  'act on that work before taking a new point. The context watermark ends a session the same way ' +
-  'even without a landed point (`--prepare --context` / `--commit --context`). The launcher brings ' +
-  'up a fresh session and this hook re-orients it; batch-progress-guard permits the stop only ' +
-  'against the verified condition and an armed launcher, and blocks every other end as before. ' +
-  'First check git status AND the checked-out branch above for work already underway, and ' +
-  'do not double-start regressions. This session now holds the batch lock ' +
-  '(.claude/batch-lock.json); the PostToolUse heartbeat keeps it fresh while you work.'
+  'Continue the batch autonomously per CLAUDE.md §6 and TASKS.md, ONE stretch of work per session ' +
+  '(POINT BOUNDARY below); branch workflow, landing and CLOSING FREEZE: CLAUDE.md §6/§9 and the ' +
+  'owner runbook. MAXIMAL DELEGATION: delegate implementation and infra/guard/doc/dashboard work to ' +
+  'at most 3 concurrent WORKTREE-ISOLATED agents on NON-OVERLAPPING files under the model policy ' +
+  '(throttle DOWN if report volume threatens context, never up; tightly-coupled same-file points go ' +
+  'TOGETHER on ONE branch sequentially); the main session keeps picture verification on both ' +
+  'backends, the serial merge -> fast-gate -> tick -> deploy -> cleanup, and the board publish. ' +
+  'Every defect the user reports on the deployed build is APPENDED as its own ready TASKS point on ' +
+  'main and delegated (append-and-defer), never fixed ad hoc or dropped. ' +
+  'POINT BOUNDARY: once the point you were landing is LANDED (merged and ticked), run ' +
+  '`node scripts/batch-boundary.mjs --prepare <point>`, its bookkeeping, then `--commit <point>` as ' +
+  'the LAST repository action, and END THE SESSION instead of starting the next point; the context ' +
+  'watermark ends it the same way (`--prepare --context` / `--commit --context`). A delegated author ' +
+  'still building does NOT hold the boundary — its pushed declaration transfers at the commit; if ' +
+  '`node scripts/batch-in-flight.mjs --status` shows one left for YOU, ADOPT it first ' +
+  '(`node scripts/batch-in-flight.mjs --adopt`) and act on it before taking a new point. ' +
+  'batch-progress-guard permits the stop only against that verified condition and an armed launcher. ' +
+  'First check git status AND the checked-out branch above for work already underway; do not ' +
+  'double-start regressions. This session now holds the batch lock (.claude/batch-lock.json); the ' +
+  'PostToolUse heartbeat keeps it fresh while you work.'
 
 try {
   const tasks = readFileSync(repoPath('TASKS.md'), 'utf8')
@@ -298,22 +282,16 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@aa7f5b05
+      // rule:model-policy@2f245cec
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
-      'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
-      'makes that cut from point text and recorded review history, while a point\'s own ' +
-      '`Author lane:` tag remains an operator decision (ordinary-lane tags yield only to a ' +
-      'reached §6 Fable escalation threshold). ' +
-      'scripts/astra-share.mjs --status says what the switch routes right now. An UNREACHABLE ' +
-      'Astra lane — exhausted OpenAI volume included — authors on Opus 5.5 instead of waiting. ' +
-      'REVIEW is ' +
-      'CROSS-VENDOR: Astra reads Anthropic-authored work (scripts/review-astra.mjs), Claude ' +
-      'reads Astra-authored work, and no model reviews its own. ' +
-      'AN ASTRA-LANE POINT IS COMMISSIONED, NOT WRITTEN HERE: run node ' +
-      'scripts/author-astra.mjs --point <N> in the point\'s worktree, then review, run the ' +
-      'suites, judge the picture and land it. Routing a point and then authoring it here ' +
-      'anyway is the measured failure of this lane (docs/astra-routing.md, "Routed and not ' +
-      'commissioned"). ' +
+      'scripts/author-routing-core.mjs makes that cut from point text and recorded review history; ' +
+      'a point\'s `Author lane:` tag stays an operator decision (ordinary-lane tags yield only to a ' +
+      'reached §6 Fable escalation threshold). scripts/astra-share.mjs --status says what routes now; ' +
+      'an UNREACHABLE Astra lane (exhausted OpenAI volume included) authors on Opus 5.5 instead of ' +
+      'waiting. REVIEW is CROSS-VENDOR (scripts/review-astra.mjs for Anthropic-authored work, Claude ' +
+      'for Astra-authored work); no model reviews its own. AN ASTRA-LANE POINT IS COMMISSIONED, NOT ' +
+      'WRITTEN HERE: node scripts/author-astra.mjs --point <N> in its worktree, then review, suites, ' +
+      'picture, landing (docs/astra-routing.md, "Routed and not commissioned"). ' +
       (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`) +
       // Where authoring delegations start (point 1230): the cloud switch's routing read.
       ` ${cloudVenueLine()}`

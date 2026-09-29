@@ -1,0 +1,800 @@
+{
+ "model": "Claude Opus 5.5",
+ "entries": [
+  {
+   "id": "A:B-MCP-DOCS",
+   "file": "claude.ai Claude Docs connector (8 deferred tools + ~1.9k-char instructions block every session)",
+   "defect": "cut — No project workflow uses Claude Docs; the board is GH-Pages HTML (`board-publish.mjs`). Account-level: disable via project `env` `ENABLE_CLAUDEAI_MCP_SERVERS=false` if the harness honours it; verify with a fresh-session reading, else record \"not switchable from project settings\"."
+  },
+  {
+   "id": "A:B-MCP-DRIVE",
+   "file": "claude.ai Google Drive (11 deferred tools)",
+   "defect": "cut — Unused by any script or memory; same switch as B-MCP-DOCS."
+  },
+  {
+   "id": "A:B-MCP-GMAIL",
+   "file": "claude.ai Gmail (unauthenticated; notice text in sessions)",
+   "defect": "cut — Unused; its auth notice costs text in every subagent. Same switch."
+  },
+  {
+   "id": "A:B-MCP-GCAL",
+   "file": "claude.ai Google Calendar (unauthenticated)",
+   "defect": "cut — Unused; same switch."
+  },
+  {
+   "id": "A:B-PLUGIN-MKT",
+   "file": "marketplace claude-plugins-official, no plugin enabled",
+   "defect": "keep — Contributes nothing to context; nothing to disable."
+  },
+  {
+   "id": "A:B-SK-sketch",
+   "file": "project skill sketch",
+   "defect": "keep — User order 21.09.2026."
+  },
+  {
+   "id": "A:B-SK-artifact-design",
+   "file": "artifact-design",
+   "defect": "keep — Required by sketch/Artifact publishing."
+  },
+  {
+   "id": "A:B-SK-artifact-diagramming",
+   "file": "artifact-diagramming",
+   "defect": "keep — Sketch plan views."
+  },
+  {
+   "id": "A:B-SK-artifact-capabilities",
+   "file": "artifact-capabilities",
+   "defect": "cut — No project page uses runtime capabilities (board is GH Pages)."
+  },
+  {
+   "id": "A:B-SK-dataviz",
+   "file": "dataviz",
+   "defect": "cut — No charts in the batch workflow; reports are tables/text."
+  },
+  {
+   "id": "A:B-SK-update-config",
+   "file": "update-config",
+   "defect": "keep — Settings/hook edits (attended) use it."
+  },
+  {
+   "id": "A:B-SK-keybindings-help",
+   "file": "keybindings-help",
+   "defect": "cut — Headless batch; never used."
+  },
+  {
+   "id": "A:B-SK-code-review",
+   "file": "code-review",
+   "defect": "keep — Claude reviews Astra-authored work."
+  },
+  {
+   "id": "A:B-SK-simplify",
+   "file": "simplify",
+   "defect": "cut — Review goes through the project's cross-vendor path; unused."
+  },
+  {
+   "id": "A:B-SK-fewer-permission-prompts",
+   "file": "fewer-permission-prompts",
+   "defect": "cut — Permissions are deliberately whole-tool broad (memory track-permission-prompts); the skill would narrow/allowlist."
+  },
+  {
+   "id": "A:B-SK-loop",
+   "file": "loop",
+   "defect": "keep — Polling waits (Monitor/Cron) may use it."
+  },
+  {
+   "id": "A:B-SK-schedule",
+   "file": "schedule",
+   "defect": "cut — Cloud agents; CLOUD SWITCH OFF, launcher schedules locally."
+  },
+  {
+   "id": "A:B-SK-claude-api",
+   "file": "claude-api",
+   "defect": "keep — Model ids/pricing questions recur (model policy, quota)."
+  },
+  {
+   "id": "A:B-SK-workflow-authoring",
+   "file": "workflow-authoring",
+   "defect": "keep — Workflow fan-outs are used (memory workflows-token-budget)."
+  },
+  {
+   "id": "A:B-SK-run",
+   "file": "run",
+   "defect": "keep — Launching the app for checks."
+  },
+  {
+   "id": "A:B-SK-init",
+   "file": "init",
+   "defect": "cut — CLAUDE.md exists and is governed; `init` would violate its budget."
+  },
+  {
+   "id": "A:B-SK-security-review",
+   "file": "security-review",
+   "defect": "keep — Security risk is a finding-intake class (CLAUDE §2)."
+  },
+  {
+   "id": "A:B-SK-docs",
+   "file": "anthropic-skills:docs",
+   "defect": "cut — No Claude Docs use (see B-MCP-DOCS)."
+  },
+  {
+   "id": "A:B-SK-docx",
+   "file": "anthropic-skills:docx",
+   "defect": "cut — No Word files."
+  },
+  {
+   "id": "A:B-SK-import-memory",
+   "file": "anthropic-skills:import-memory",
+   "defect": "cut — Never used."
+  },
+  {
+   "id": "A:B-SK-morning",
+   "file": "anthropic-skills:morning",
+   "defect": "cut — Not a project workflow."
+  },
+  {
+   "id": "A:B-SK-pdf",
+   "file": "anthropic-skills:pdf",
+   "defect": "cut — No PDFs in the project."
+  },
+  {
+   "id": "A:B-SK-pptx",
+   "file": "anthropic-skills:pptx",
+   "defect": "cut — No decks."
+  },
+  {
+   "id": "A:B-SK-skill-creator",
+   "file": "anthropic-skills:skill-creator",
+   "defect": "cut — Skill authoring is rare and attended."
+  },
+  {
+   "id": "A:B-SK-xlsx",
+   "file": "anthropic-skills:xlsx",
+   "defect": "cut — No spreadsheets."
+  },
+  {
+   "id": "A:B-SK-NOTE",
+   "file": "synced anthropic-skills:* are account-level",
+   "defect": "note — If no project setting can hide synced/built-in skills, record each cut as \"not switchable from project settings\" rather than inventing a mechanism."
+  },
+  {
+   "id": "A:B-AG-claude",
+   "file": "agent claude",
+   "defect": "keep — Default FleetView agent."
+  },
+  {
+   "id": "A:B-AG-general-purpose",
+   "file": "general-purpose",
+   "defect": "keep — Delegation."
+  },
+  {
+   "id": "A:B-AG-Explore",
+   "file": "Explore",
+   "defect": "keep — Read-only fan-out."
+  },
+  {
+   "id": "A:B-AG-Plan",
+   "file": "Plan",
+   "defect": "keep — Occasional design planning."
+  },
+  {
+   "id": "A:B-AG-trivial-task",
+   "file": "project agent trivial-task",
+   "defect": "keep — Project-defined delegation lane."
+  },
+  {
+   "id": "A:B-AG-claude-code-guide",
+   "file": "claude-code-guide",
+   "defect": "cut — Harness questions are rare; costs a long listing line every session. Built-in: cut only if a project deny hides it without narrowing a whole-tool allow; else keep."
+  },
+  {
+   "id": "A:B-AG-statusline-setup",
+   "file": "statusline-setup",
+   "defect": "cut — Never used headless; same constraint as above."
+  },
+  {
+   "id": "A:B-DT-Artifact",
+   "file": "ArtifactComments, ArtifactData",
+   "defect": "keep — Sketch artifacts."
+  },
+  {
+   "id": "A:B-DT-Cron",
+   "file": "CronCreate/Delete/List",
+   "defect": "keep — loop skill."
+  },
+  {
+   "id": "A:B-DT-DesignSync",
+   "file": "DesignSync",
+   "defect": "cut — No design-system work."
+  },
+  {
+   "id": "A:B-DT-Worktree",
+   "file": "EnterWorktree/ExitWorktree",
+   "defect": "keep — Worktree-isolated delegation."
+  },
+  {
+   "id": "A:B-DT-Monitor",
+   "file": "Monitor",
+   "defect": "keep — Wait-until loops (foreground sleep blocked)."
+  },
+  {
+   "id": "A:B-DT-NotebookEdit",
+   "file": "NotebookEdit",
+   "defect": "keep — In the whole-tool allow list; names cost ~5 tokens."
+  },
+  {
+   "id": "A:B-DT-PushNotification",
+   "file": "PushNotification",
+   "defect": "keep — agentPushNotifEnabled."
+  },
+  {
+   "id": "A:B-DT-RemoteTrigger",
+   "file": "RemoteTrigger",
+   "defect": "cut — Cloud switch off."
+  },
+  {
+   "id": "A:B-DT-SendMessage/TaskStop",
+   "file": "SendMessage, TaskStop",
+   "defect": "keep — Agent control."
+  },
+  {
+   "id": "A:B-DT-Web",
+   "file": "WebFetch, WebSearch",
+   "defect": "keep — In allow list; research."
+  },
+  {
+   "id": "A:B-PERM",
+   "file": "whole-tool allows (user + project)",
+   "defect": "keep — Memory track-permission-prompts: never narrow."
+  },
+  {
+   "id": "A:C-H1",
+   "file": "UserPromptSubmit berlin-timestamp.cjs (678 chars, every prompt)",
+   "defect": "shrink — One line: `Turn start **<stamp>** (Berlin). Lead the reply with it; re-measure if tools ran: <node -e … command>`. Drop the explanation (\"reading taken NOW… ages… guard compares exactly… over-estimated\"): timestamp-guard's refusal carries it. User-scope file (~/.claude/hooks) — attended edit."
+  },
+  {
+   "id": "A:C-H2a",
+   "file": "[context-level] header-suffix line",
+   "defect": "keep — Already one line."
+  },
+  {
+   "id": "A:C-H2b",
+   "file": "[dashboard-reminder] owner board paragraph (~850 chars, every prompt)",
+   "defect": "shrink — One line: `[board] Batch state changed → update the board first (node scripts/board.mjs <cmd>); structure: memory batch-dashboard-artifact; last edit ~N min ago.` Full paragraph only when the dashboard-guard last refused this session (existing state) — otherwise its content lives in memory batch-dashboard-artifact."
+  },
+  {
+   "id": "A:C-H2c",
+   "file": "stand-down text (non-owner only)",
+   "defect": "reword — Already conditional; terse: `[batch-singleton] STAND DOWN: another live session holds the batch — no batch work, no merge to main, no TASKS/board edit; answer normally.`"
+  },
+  {
+   "id": "A:C-H2d",
+   "file": "[context-ceiling] notice",
+   "defect": "keep — Already one-shot and conditional."
+  },
+  {
+   "id": "A:C-H3a",
+   "file": "SessionStart batch-resume first paragraph (~5.8k chars)",
+   "defect": "shrink — Keep only live facts (open count, first point, serving chain from fable-switch, cloud switch, branch, launcher/lock evidence, \"you hold the batch lock\"). Replace restated MODEL POLICY, feature-branch workflow, MAXIMAL DELEGATION, CLOSING FREEZE with one pointer each to CLAUDE.md §6/§9 and docs/batch-owner-runbook.md. Target < 2 KB so the whole text lands in context instead of a persisted-output preview."
+  },
+  {
+   "id": "A:C-H3b",
+   "file": "SessionStart POINT BOUNDARY paragraph",
+   "defect": "reword — Keep: one stretch per session; `batch-boundary.mjs --prepare/--commit` (+ `--context`); adopt transferred declaration first (`batch-in-flight.mjs --status/--adopt`). Drop the history (\"user 27.07.2026, two-phase since point 675\", launcher explanation)."
+  },
+  {
+   "id": "A:C-H3c",
+   "file": "SessionStart owner-only runbook dump (~9 KB)",
+   "defect": "move-to-docs/batch-owner-runbook.md — Replace with one line `Owner runbook: docs/batch-owner-runbook.md (read before dispatching)`. The file already exists verbatim; today only a 2 KB preview reaches context anyway, so the dump is paid as a later file read."
+  },
+  {
+   "id": "A:C-H4",
+   "file": "PreToolUse guards",
+   "defect": "keep — Silent on allow (358/358)."
+  },
+  {
+   "id": "A:C-H5",
+   "file": "PostToolUse lock-heartbeat notices",
+   "defect": "keep — Already one-shot and recorded."
+  },
+  {
+   "id": "A:C-H6a",
+   "file": "Stop \"BATCH DASHBOARD NOT REGISTERED\" refusal (2,753 chars, repeated)",
+   "defect": "shrink — ≤ 2 lines: what is missing + the one command. Fires only on violation, but repeated 6× in one session."
+  },
+  {
+   "id": "A:C-H6b",
+   "file": "Stop \"DO NOT STOP THE BATCH\" refusal (2,563 chars; lists 430 point numbers)",
+   "defect": "shrink — Print the count and first 3 points, not the whole list."
+  },
+  {
+   "id": "A:C-H6c",
+   "file": "Stop chat-timestamp refusal (771–873)",
+   "defect": "keep — Hands the exact line; already short enough."
+  },
+  {
+   "id": "A:D-CLAUDE-1-1",
+   "file": "Goal of this run",
+   "defect": "reword — \"POC of the core loop, not the full game; design.md = target, this file = how.\""
+  },
+  {
+   "id": "A:D-CLAUDE-2-1",
+   "file": "Single-player only",
+   "defect": "keep — Terse already."
+  },
+  {
+   "id": "A:D-CLAUDE-2-2",
+   "file": "No onboarding/tutorial",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-2-3",
+   "file": "No invented systems; missing concept = open item",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-2-4",
+   "file": "Numeric guesses in src/config/balance.ts",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-2-5",
+   "file": "§7.1 checklist, not a gate",
+   "defect": "reword — \"§7.1 is a checklist, never a gate; progress = playable output (01.09.2026).\""
+  },
+  {
+   "id": "A:D-CLAUDE-2-6",
+   "file": "Infrastructure freeze",
+   "defect": "reword — Keep all three clauses; drop \"(user decision …)\" prose into a date suffix."
+  },
+  {
+   "id": "A:D-CLAUDE-2-7",
+   "file": "Finding intake",
+   "defect": "reword — Same meaning, bullet form."
+  },
+  {
+   "id": "A:D-CLAUDE-3-1",
+   "file": "WebGPU primary / WebGL 2 fallback",
+   "defect": "reword — Keep the four constraints, drop explanation; pointer render-architecture.md."
+  },
+  {
+   "id": "A:D-CLAUDE-3-2",
+   "file": "kokoro-js read-aloud",
+   "defect": "move-to-docs/tts-architecture.md — Needed only in TTS work; keep a 1-line pointer \"TTS: docs/tts-architecture.md\"."
+  },
+  {
+   "id": "A:D-CLAUDE-3-3",
+   "file": "No runtime dependency without justification",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-4-1",
+   "file": "Design change updates design.md + CLAUDE.md + code together",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-4-2",
+   "file": "Organize by topic, no monolith",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-5-1",
+   "file": "Tier suites / LARGE per bundle",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-5-2",
+   "file": "Vitest vs Playwright layering",
+   "defect": "reword — One line + pointer scripts/verify/README.md."
+  },
+  {
+   "id": "A:D-CLAUDE-6-1",
+   "file": "feat branch, atomic commit + push, merge when green, picture on both backends if backend-sensitive",
+   "defect": "reword — Terse bullets, meaning unchanged."
+  },
+  {
+   "id": "A:D-CLAUDE-6-2",
+   "file": "Merge ends the branch",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-6-3",
+   "file": "Bookkeeping on main, mechanism in worktree",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-6-4",
+   "file": "TASKS.md main-only, tick after merge, archive, tasks-source.mjs",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-6-5",
+   "file": "Land via land-point.mjs; gate mandatory; re-verify after sync",
+   "defect": "move-to-docs/batch-owner-runbook.md — Owner-only operation (runbook already states it); keep 1-line \"Land only via land-point.mjs (owner)\"."
+  },
+  {
+   "id": "A:D-CLAUDE-6-6",
+   "file": "Delegated author uses point-brief, escalates",
+   "defect": "keep — Every delegate needs it."
+  },
+  {
+   "id": "A:D-CLAUDE-6-7",
+   "file": "Durable Astra authors daemon-owned; delegates never merge",
+   "defect": "reword — Keep \"Delegates test, commit, push, never merge\"; move daemon/handover detail to runbook."
+  },
+  {
+   "id": "A:D-CLAUDE-6-8",
+   "file": "Context fence preventive text, observe mode",
+   "defect": "move-to-docs/batch-owner-runbook.md — Runbook already states it (observe, refuses nothing); no behaviour for other sessions."
+  },
+  {
+   "id": "A:D-CLAUDE-6-9",
+   "file": "Model policy",
+   "defect": "reword — Keep lanes, cross-vendor review, fable-switch as sole answer, unreachable Astra → Opus, Co-Authored-By model, Reviewed-By trailer; bullet form."
+  },
+  {
+   "id": "A:D-CLAUDE-6-10",
+   "file": "Four eyes two modes",
+   "defect": "keep — Terse already."
+  },
+  {
+   "id": "A:D-CLAUDE-6-11",
+   "file": "Player text from language files; code English",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-6-12",
+   "file": "Journal §15 markup",
+   "defect": "move-to-docs/tts-architecture.md — Needed only when writing journal text; 1-line pointer stays."
+  },
+  {
+   "id": "A:D-CLAUDE-6-13",
+   "file": "Small command output; blocked action = project command",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-6-14",
+   "file": "Act on settled judgment; confirm outward/irreversible; VDZK authorization and its exceptions",
+   "defect": "keep — Reword only for length; every exception kept."
+  },
+  {
+   "id": "A:D-CLAUDE-6-15",
+   "file": "Comments brief; `// OPEN:`",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-7.1-0",
+   "file": "Criteria share numbers with detail/evidence docs",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-7.1-L",
+   "file": "The 32 criterion titles",
+   "defect": "move-to-docs/acceptance-criteria-detail.md — Titles already live there with their conditions; keep a 1-line pointer. CHECK: tests over CLAUDE.md may pin the list — keep if a test requires it."
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-1",
+   "file": "Build + lint always, unit per change, audit on lockfile",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-2",
+   "file": "Player-reachable states; screenshot declares subject",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-3",
+   "file": "WebGPU everyday lane; LARGE adds WebGL 2; backend assert",
+   "defect": "reword — Pointer scripts/verify/README.md."
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-4",
+   "file": "Red run closes only by fix/charge/new point; retry SUSPECT",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-5",
+   "file": "Dev-mode invariant assertions",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-6",
+   "file": "Before answering: board, batch, work order, finding, proof; ci-status-guard; hook inventory",
+   "defect": "move-to-docs/batch-owner-runbook.md — Owner duties enforced by Stop guards; delegates stand down. Keep 1 line \"Owner: Stop guards own the before-answer duties (.claude/settings.json)\"."
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-7",
+   "file": "Pre-action hooks are pointers",
+   "defect": "cut — DROPPED as restatement: the hooks themselves refuse with their text; no behaviour depends on this sentence."
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-8",
+   "file": "guard-preflight before a governed action; routine duties first",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-9",
+   "file": "Picture stability before golden-image use",
+   "defect": "move-to-docs/picture-check-levers.md — Needed only in picture work."
+  },
+  {
+   "id": "A:D-CLAUDE-7.2-10",
+   "file": "Fix deviations; never report unfulfilled as fulfilled",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-9-1",
+   "file": "Closing report contents",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-CLAUDE-9-2",
+   "file": "CLOSING_STEPS / closing-guard mechanics",
+   "defect": "move-to-docs/batch-owner-runbook.md — Runbook already carries it verbatim."
+  },
+  {
+   "id": "A:D-CLAUDE-9-3",
+   "file": "Code freeze during closing",
+   "defect": "keep — Also in runbook, but binds delegates (no landing)."
+  },
+  {
+   "id": "A:D-MEM-vscode-restart-kills-the-container",
+   "file": "memory:vscode-restart-kills-the-container",
+   "defect": "cut-index — Forensics only; not needed every session."
+  },
+  {
+   "id": "A:D-MEM-commit-proxy-misses-unlanded-work",
+   "file": "memory:commit-proxy-misses-unlanded-work",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-measure-dont-assume",
+   "file": "memory:measure-dont-assume",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-check-for-an-existing-branch-first",
+   "file": "memory:check-for-an-existing-branch-first",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-blocked-action-find-the-project-command",
+   "file": "memory:blocked-action-find-the-project-command",
+   "defect": "cut-index — Duplicates CLAUDE §6 \"blocked action means find the project command\"."
+  },
+  {
+   "id": "A:D-MEM-boundary-marker-is-fragile",
+   "file": "memory:boundary-marker-is-fragile",
+   "defect": "keep — Owner, but costly when missed."
+  },
+  {
+   "id": "A:D-MEM-protected-paths-always-prompt",
+   "file": "memory:protected-paths-always-prompt",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-use-1890-valid-names",
+   "file": "memory:use-1890-valid-names",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-bug-reports-land-in-local",
+   "file": "memory:bug-reports-land-in-local",
+   "defect": "cut-index — Situational (only when an F6 archive arrives)."
+  },
+  {
+   "id": "A:D-MEM-fable-sparingly",
+   "file": "memory:fable-sparingly",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-provider-volume-strategy",
+   "file": "memory:provider-volume-strategy",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-github-token",
+   "file": "memory:github-token",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-speak-as-part-of-the-team",
+   "file": "memory:speak-as-part-of-the-team",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-tags-only-on-request",
+   "file": "memory:tags-only-on-request",
+   "defect": "reword — Merge with version-release-process into one line: \"Release: closing → approval → vX.Y tag → poc → publish; tag only on explicit approval; a cut version is frozen\"."
+  },
+  {
+   "id": "A:D-MEM-version-release-process",
+   "file": "memory:version-release-process",
+   "defect": "reword — Merged into the line above."
+  },
+  {
+   "id": "A:D-MEM-watch-for-aesthetic-oddities",
+   "file": "memory:watch-for-aesthetic-oddities",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-webgpu-testable-headless",
+   "file": "memory:webgpu-testable-headless",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-verify-default-zoom-and-webgpu",
+   "file": "memory:verify-default-zoom-and-webgpu",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-track-permission-prompts",
+   "file": "memory:track-permission-prompts",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-implementation-sections-current",
+   "file": "memory:implementation-sections-current",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-push-to-main-directly-is-fine",
+   "file": "memory:push-to-main-directly-is-fine",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-language-german",
+   "file": "memory:language-german",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-commit-message-no-point-number",
+   "file": "memory:commit-message-no-point-number",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-bundle-names",
+   "file": "memory:bundle-names",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-verify-suites-need-a-quiet-machine",
+   "file": "memory:verify-suites-need-a-quiet-machine",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-findings-carrier",
+   "file": "memory:findings-carrier",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-residuals-hide-defects",
+   "file": "memory:residuals-hide-defects",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-workflows-token-budget",
+   "file": "memory:workflows-token-budget",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-release-order-communication-first",
+   "file": "memory:release-order-communication-first",
+   "defect": "reword — Drop point numbers that go stale (\"closing 633, tag 174\") only if the file carries them; else keep."
+  },
+  {
+   "id": "A:D-MEM-village-moves-allowed",
+   "file": "memory:village-moves-allowed",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-closing-runs",
+   "file": "memory:closing-runs",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-saves-are-irrelevant-in-the-poc",
+   "file": "memory:saves-are-irrelevant-in-the-poc",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-effort-high-for-implementation",
+   "file": "memory:effort-high-for-implementation",
+   "defect": "reword — Mixed German fragment; \"Effort: Medium everywhere, never High/xhigh\"."
+  },
+  {
+   "id": "A:D-MEM-overshoot-needs-a-brake",
+   "file": "memory:overshoot-needs-a-brake",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-analysis-and-execution-in-one-go",
+   "file": "memory:analysis-and-execution-in-one-go",
+   "defect": "reword — English only: \"never park a verdict; queue it first and hand it over\"."
+  },
+  {
+   "id": "A:D-MEM-forensics-need-a-command",
+   "file": "memory:forensics-need-a-command",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-rider-point-fold-and-push",
+   "file": "memory:rider-point-fold-and-push",
+   "defect": "cut-index — Situational (rider points only)."
+  },
+  {
+   "id": "A:D-MEM-vdzk-carrier-from-sdk-sessions",
+   "file": "memory:vdzk-carrier-from-sdk-sessions",
+   "defect": "cut-index — Situational (SDK sessions answering VDZK only)."
+  },
+  {
+   "id": "A:D-MEM-handing-over-is-not-stopping",
+   "file": "memory:handing-over-is-not-stopping",
+   "defect": "reword — Merge with batch-stops-only-on-explicit-order pointer into one line; meaning kept."
+  },
+  {
+   "id": "A:D-MEM-no-standstill-decide-and-record",
+   "file": "memory:no-standstill-decide-and-record",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-drills-must-call-the-thing",
+   "file": "memory:drills-must-call-the-thing",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-split-a-point-that-will-not-converge",
+   "file": "memory:split-a-point-that-will-not-converge",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-session-cwd-stays-in-main-tree",
+   "file": "memory:session-cwd-stays-in-main-tree",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-no-invented-user-instructions",
+   "file": "memory:no-invented-user-instructions",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-a-question-is-only-a-question",
+   "file": "memory:a-question-is-only-a-question",
+   "defect": "reword — English line; meaning kept."
+  },
+  {
+   "id": "A:D-MEM-stop-refusal-is-addressed-to-me",
+   "file": "memory:stop-refusal-is-addressed-to-me",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-detach-long-running-landings",
+   "file": "memory:detach-long-running-landings",
+   "defect": "cut-index — Owner landing only; move pointer to docs/batch-owner-runbook.md (\"Dispatch and landing\")."
+  },
+  {
+   "id": "A:D-MEM-umsteuerung-vereinfachungsplan",
+   "file": "memory:umsteuerung-vereinfachungsplan",
+   "defect": "keep — Keyword-triggered plan status."
+  },
+  {
+   "id": "A:D-MEM-main-push-runs-the-full-gate",
+   "file": "memory:main-push-runs-the-full-gate",
+   "defect": "reword — English line; keep \"never push during a picture run\"."
+  },
+  {
+   "id": "A:D-MEM-feature-tests-before-regression",
+   "file": "memory:feature-tests-before-regression",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-only-one-head-session",
+   "file": "memory:only-one-head-session",
+   "defect": "keep — "
+  },
+  {
+   "id": "A:D-MEM-HEADER",
+   "file": "\"# Memory Index\" header",
+   "defect": "keep — "
+  }
+ ]
+}

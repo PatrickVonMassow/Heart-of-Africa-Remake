@@ -40,9 +40,15 @@ owner adopts them with `node scripts/batch-in-flight.mjs --adopt`; unpushed work
 drains first, while a recorded running verification may transfer.
 
 The context path uses the same boundary with `--context`. The handover mark is
-122k and the ceiling is 150k. The PreToolUse context fence observes at 110k but,
-until its arming point lands, its default mode is `observe` and it refuses
-nothing. Do not rely on it to prevent starting work.
+122k and the ceiling is 150k. The PreToolUse context fence carries a handover
+brake: at or past 122k (reading plus pending debit) it DENIES a start — agent,
+browser suite, new point, authoring — and names the boundary, in both fence
+modes; finishing, reads and the boundary stay allowed. The brake is armed only
+while the launcher is armed; with a dead, unknown or stopped launcher it stays
+at observe and `node scripts/context-fence-guard.mjs --status` says so. The
+ceiling admission keeps its own default mode, `observe`, and refuses nothing.
+`node scripts/context-incidents.mjs --trend` prints the seven-day overshoot
+verdict.
 
 Ownership is a lease in `.claude/batch-lock.json`, renewed before each tool call.
 An expired, non-advancing owner stops owning. The ownership fence refuses that
@@ -152,8 +158,9 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
   `node scripts/finding.mjs --drained "<title>"`.
 - Use `scripts/board.mjs` serially; concurrent calls race on the dashboard file.
   The canonical source is `.batch-dashboard.html` at the repository root and
-  `scripts/board-publish.mjs` publishes it to Pages. Its four-section structure
-  changes only with explicit approval; never auto-open a card.
+  `scripts/board-publish.mjs` publishes it to Pages. Its five-section structure
+  (the collapsed “Entscheidungsprotokoll” last, below “Erledigt”) changes only
+  with explicit approval; never auto-open a card.
 - Keep one current-work card per active point, every open point in the queue,
   and only genuine user decisions under “Von dir zu klären”. The board may use a
   public HTTPS transport; privacy is not a constraint.

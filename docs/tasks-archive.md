@@ -32279,3 +32279,173 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
   DONE 29.09.2026 08:15 (user go 29.09.2026 07:58: "Zur Karte "Version 0.3 veröffentlichen?": Ja, als 0.3 und als poc veröffentlichen und über die jeweiligen URLs zugänglich machen."): annotated v0.3 and poc on 6475408 (closing 13/13 recorded on that commit), pushed; deploy run 36530176581 green; /v0.3/build-info.json and /poc/build-info.json both serve commit 6475408558523ba7c2144bd9776f44c1eb4db2d5.
+
+- [x] 1185. The decision protocol gets its own collapsed board section with an archive
+  (user order 22.09.2026, 12:25, verbatim: »Neuer Punkt nach 174: Das Entscheidungsprotokoll
+  flutet aktuell die Sektion 'Von dir zu klären'. In den seltensten Fällen lege ich da ein
+  Veto ein, deswegen ist mir das zu dominant. Es soll im Dashboard eine neue Sektion
+  'Entscheidungsprotokoll' geben, in dem diese Punkte landen. Die soll ganz unten (also
+  unterhalb von 'Erledigt') und standardmäßig zugeklappt sein. Außerdem soll es dafür eine
+  Archiv-Funktion geben, so wie bei den erledigten Punkten, mit einem Link in der Art 'Die
+  älteren ... Entscheidungen stehen im Archiv des Entscheidungsprotokolls.' Sonst wird das
+  schnell zu lang.«).
+  MEASURED on the live board 22.09.2026: twelve of the cards under "Von dir zu klären" are
+  `Entscheidungsprotokoll:` records — the section the user reads for what he must decide is
+  mostly things already decided. The record itself stays (the retroactive veto of
+  docs/batch-autonomy.md depends on it); it only moves out of the way.
+  FINAL STATE.
+  1. Five sections, in this order: "Woran ich gerade arbeite", "Von dir zu klären",
+     "Warteschlange", "Erledigt", "Entscheidungsprotokoll" — the new one LAST, below
+     "Erledigt". The three places that name the sections agree: `REQUIRED_SECTIONS`
+     (scripts/board-structure-core.mjs), `HEAD` (scripts/board-core.mjs, a new key beside
+     now/vdzk/queue/done) and `SECTION_TITLES` (scripts/dashboard-guard-core.mjs). The
+     structure gate expects five `<details class="sect">` wrappers and five `<h2>`s in that
+     order.
+  2. Every card whose title begins `Entscheidungsprotokoll:` lands in the new section, never
+     under "Von dir zu klären". The producers keep their texts unchanged
+     (alert-escalation-core.mjs, batch-autostart-core.mjs, batch-pause-core.mjs,
+     child-retry-core.mjs, model-handoff-core.mjs, user-gate-core.mjs, and the admissible
+     shape vdzk-admissibility-core.mjs demands); the ROUTING happens once, at the board's own
+     card writer, by title prefix. A protocol card is inserted newest-first at the top of its
+     section, exactly as `addVdzk` inserts today. `board.mjs` gains the add/remove pair for
+     the new section, and `vdzk-add` refuses a title starting with `Entscheidungsprotokoll:`
+     with a line naming the right command.
+  3. Collapsed by default. The board's restore script opens every `.sect` except "Erledigt"
+     when the reader has no stored toggle; the new section joins "Erledigt" in staying
+     closed. A reader who opens it keeps it open — the per-reader toggle memory is unchanged.
+  4. Archive, like the done cards. The section keeps at most `ENTSCHEIDUNGEN_ON_BOARD = 20`
+     cards (estimate, calibratable — the section is collapsed, so the number only governs
+     page weight); the older ones rotate out through scripts/board-archive-rotate.mjs, which
+     then rotates BOTH capped sections in one pass, and the publisher pushes board and
+     archive together as it does today. The section's foot carries the link, in the wording
+     of the done section: `<p class="archive-link">Die älteren N Entscheidungen stehen im <a
+     href="...">Archiv des Entscheidungsprotokolls</a>.</p>` The archive target is the
+     EXISTING archive page (`archive.html`), which gains its own second `<h2
+     id="entscheidungsprotokoll">Entscheidungsprotokoll</h2>` section below the done cards;
+     the link points at that anchor. No new published page and no new URL. The done-card
+     rotation keeps inserting under the FIRST `<h2>`, so the two sections cannot mix.
+  5. Guard reach, widened not rebuilt (infrastructure freeze, CLAUDE.md §2):
+     `erledigt-overflow` and `archive-link-missing` judge both capped sections; the card
+     checks that already cover every card — empty body, conciseness, card topic, title
+     length — cover the new section's cards too; the VDZK-SPECIFIC pressure stays on the four
+     old sections: a protocol card is NOT an open question, so it creates no Stop-hook demand
+     to answer it, no decision-card gate and no open-question count anywhere. That is the
+     point of the change.
+  6. Migration. The protocol cards standing under "Von dir zu klären" on the published board
+     move into the new section in their current order, verbatim (twelve of them on
+     22.09.2026). Board and archive are published artefacts, not sources (both git-ignored),
+     so the move happens once on the publish path; no card text changes.
+  CONSTRAINTS. Infrastructure freeze (CLAUDE.md §2): widen the existing section list, cap and
+  rotation. No new guard, no new published page, no new URL, no router abstraction beyond the
+  one title-prefix cut at the board's card writer. The board stays ONE HTML file with its own
+  viewport; the structure gate runs before the bytes leave (board-publish.mjs). Board and
+  archive are git-ignored published artefacts — the migration is a publish, not a commit of
+  content. The retroactive veto stays reachable: the record remains visible, dated and
+  archived, only no longer in the section for open questions.
+  WORDING: board text German; code, identifiers and filenames English.
+  Criticality: high — it edits the board structure gate, the card writer and the publish
+  path, and a malformed board reaches the user on his phone.
+  Four eyes: CONVERGENT mode (CLAUDE.md §6) — one author, then cross-vendor review of the
+  artefact before its rationale. The spec's own words (migration, lock, routing) hit the HARD
+  markers in scripts/author-routing-core.mjs, so the routing puts it in the Astra lane and
+  the Claude session reviews it; no model reviews its own work. The user asked on 22.09.2026,
+  12:36 whether the rebuild runs under four eyes; it does, and that stands here rather than
+  only in the chat.
+  Test: Vitest — title-prefix routing into the new section and the `vdzk-add` refusal; five
+  sections in board-structure-core including wrapper and orphan counts; guard reach over both
+  capped sections and the ABSENCE of open-question pressure for a protocol card; rotation of
+  both sections in one pass with the two link texts and their counts. Playwright (board
+  layout suite): the fifth section renders below "Erledigt" and is collapsed on a first visit
+  while the other three stand open.
+  Refs: scripts/board-core.mjs, scripts/board-structure-core.mjs,
+  scripts/dashboard-guard-core.mjs, scripts/board-archive-rotate.mjs, scripts/board-publish.mjs,
+  scripts/vdzk-admissibility-core.mjs, user order 22.09.2026 12:25
+  Bundle: Chat & Tafel
+
+- [x] 1233. Fleeing animals jitter at the water's edge instead of escaping into the water
+  ORDER (user 29.09.2026 08:05: "Das direkt als nächstes nach dem Veröffentlichen der 0,3 erledigen."): this point stands FIRST in the work order, directly after the v0.3 release.
+  REPORT (user 29.09.2026 07:51, F6 archive /backup/hoa/local/TiereFliehenNichtInsWasser.zip, copy into local/): "Die Tiere zucken am Wasser herum, anstatt vor mir ins Wasser zu fliehen". Seed 2877642954, position x/z -44.55/-138.16 (lat/lon 13.8165/-4.4553, region west, Niger), 28.02.1890, travel mode, build fb916b5, WebGPU, medium. The archive JSON's "wildlife" section holds all 80 animals nearby with state and target.
+  SPEC: reproduce from the archive state; find why fleeing animals pinned against a river/shore oscillate at the edge (flee target rejected by the water mask, re-picked each tick). Fix so a fleeing animal commits to a decision: species that swim/wade enter the water and cross or move along it; species that do not pick a stable escape along the bank. No per-frame direction flipping.
+  FINAL STATE: flee logic fixed; unit test on the water-edge flee decision (stable heading over consecutive ticks, water entry for a wading species); a picture/position check at the reported spot on the everyday backend.
+  Bundle: Tierverhalten.
+  Criticality: medium.
+
+- [x] 1209. Every session starts and runs on a smaller fixed context load.
+  USER ORDER 24.09.2026, 13:30: »Reihe die von dir vorgeschlagenen Maßnahmen zur Reduktion des
+  Token-Verbrauchs direkt vor 1204 ein. Das soll aber mit Vier-Augen-Prinzip umgesetzt werden.«
+  Earlier the same day, 13:10: »Wieso hast du eigentlich nur für diese Diskussion schon über 80k
+  Token verbraucht?« and 13:14: »Wäre es z. B. ein Ansatz Text wie die in CLAUDE.md … darauf zu
+  prüfen, ob wirklich alle diese Infos für jede Session notwendig sind und … ob sich der selbe
+  Inhalt nicht mit deutlich weniger Worten (z. B. stichpunktartig) darstellen lässt?«
+  PROBLEM: a discussion-only session reached 80k context. Measured: CLAUDE.md ~2.7k and MEMORY.md
+  ~1.7k tokens; the estimated remaining fixed load (tool schemas, MCP/skill listings, the
+  SessionStart text) was ~30k+ and is NOT yet measured. Per-turn hook texts (timestamp,
+  dashboard reminder, stand-down, context level) repeat several hundred tokens every turn.
+  FINAL STATE, strictly deletion and simplification (infrastructure freeze, CLAUDE.md §2):
+  (a) MEASURE first: the context reading of a fresh session before its first tool call, split by
+  source (system/tool schemas, MCP servers, skills, CLAUDE.md, MEMORY.md, hook texts), recorded
+  in the point's evidence. Every later step reports its saving against this baseline.
+  (b) Unused tool surface OFF: MCP servers, plugins and connectors no session of this project
+  uses are disabled in the project settings (keep whole-tool allowances broad, memory
+  `track-permission-prompts`).
+  (c) Per-turn hook texts shrink to one line when nothing is due; the full text appears only
+  when the condition actually applies (e.g. the stand-down text only in a standing-down session).
+  (d) CLAUDE.md and MEMORY.md are condensed: content no session needs every time moves to the
+  linked docs; the rest is terse bullet form written for sessions, not humans. No rule changes
+  meaning — a rule that is dropped is named as dropped.
+  FOUR EYES (user order): (d) and the keep/cut list of (b)/(c) are DIVERGENT work — Opus 5.5 and
+  GPT-6 Astra each produce the cut list blind-parallel from identical inputs, a third model
+  merges through scripts/blind-merge.mjs and every dropped or reworded rule is listed with its
+  reason. The implementation is reviewed cross-vendor (never by its author) before landing,
+  reading the diff before its rationale.
+  Test: the unit layer stays green over the documents (tests exist over CLAUDE.md/docs); a
+  fresh-session reading after the change is recorded beside the baseline of (a); every hook whose
+  text changed keeps its own test green.
+  Criticality: medium — cost, not correctness; but it is paid by every session.
+  Refs: CLAUDE.md, memory MEMORY.md, .claude/settings.json, scripts/*-hook.mjs,
+  scripts/*-guard.mjs, scripts/blind-merge.mjs, scripts/review-astra.mjs.
+  Bundle: Modell & Wächter
+
+- [x] 1234. A young animal next to the traveller does not react — stuck in a crossing whose target is its own position
+  ORDER (user 29.09.2026 11:12: »Das oben in der Queue einreihen.«; 12:07: »Der Punkt ist nach wie vor nicht eingereiht. Stattdessen wurde nach Abschluss von 1209 ein anderer gezogen.«): this point stands FIRST in the work order.
+  REPORT (user 29.09.2026 11:11, F6 archive /backup/hoa/local/JungtierReagiertNicht.zip, copy into local/): »Kalb reagiert nicht auf mich«. Seed 2232886032, position x/z 316.02/-105.51 (lat/lon 10.5508/31.6024, region east), 16.03.1890 (day 74.25), travel mode, build production 0632fdc (contains the 1233 merge f2d549edc), WebGPU, medium.
+  MEASURED from the archive's "wildlife" section: the nearest animal is the juvenile antelope@317.18,-105.05 at dist 1.24 from the traveller — inside any shy ring — with state "crossing", target {kind: crossing, x 317.18, z -105.09} (0.04 from its own position), y 0.18, parentAt 319.78/-94.97 (about 10.4 away). It does not flee although the traveller stands next to it.
+  SUSPECT (to confirm, not assume): the 1233 change (0a6b34e39 / afe3d97f6 / afdedf16c) hands a flight swim over to a "crossing" and holds a calf at its bank while its parent is across water; a crossing whose target has collapsed onto the calf's own position appears never to finish and to outrank the player-shy flee.
+  FINAL STATE: reproduce from the archive state (seed/position and the wildlife section, not a freshly staged scene — the gap of 1233); a juvenile inside the traveller's shy ring reacts (flees, into water where the escape leads there, design.md §19.5 (c)); a crossing always resolves (no degenerate target at the animal's own position, invariant I4) and does not suppress the player-shy flee; also check the calf bank hold 1233 introduced for the same suppression. Unit test on that decision (crossing with collapsed target -> resolves; calf in crossing/bank-hold with the traveller inside the ring -> flees); a position check in the browser at the reported spot on the everyday backend.
+  Bundle: Tierverhalten.
+  Criticality: medium.
+
+- [x] 1204. Arm the handover watermark so it refuses instead of observing.
+  PROBLEM, user order 24.09.2026: "Du kommst immer wieder über die 150k und bringst danach eine
+  Begründung. … Aber das scheint nicht zu helfen, denn du scheinst nicht daraus zu lernen."
+  Measured that morning: 25 overshoots in the four days since 2026-09-20, median +99k, max +336k
+  past the 150k ceiling; `context-fence-guard.mjs --status` reports mode observe / armed false.
+  FINAL STATE: a session cannot pass the 122,000-token handover watermark without being
+  stopped, and the stop is not a status string it has to ask for.
+  (a) The handover mark INTERRUPTS. The PreToolUse path that already runs
+  `context-fence-guard.mjs` denies a START action (agent, suite, new point, authoring) once
+  the measured reading is at or past the handover watermark, in BOTH fence modes, with the
+  boundary command in the refusal text. Finishing the step in flight, reading, and the
+  boundary/handover commands themselves stay allowed — point 881's list of session-ending
+  commands is the allow-list, and a test pins that each of them still passes above the mark.
+  (b) The brake has a production caller. `fenceRefusal` (scripts/context-fence-core.mjs) is
+  reached from the registered guard for the handover case; a test spawns the guard above the
+  mark and asserts a deny, not a decide()-level unit assertion (point 881 (2)).
+  (c) The read tools are MEASURED, not refused. The matcher records the read kind whose growth
+  p90 is largest (point 881 (4)) into the reading, so the next START action sees the true
+  level; reads themselves are never denied at the handover mark. The 150k ceiling, not the
+  122k mark, bounds read growth. The allow-list in (a) stays.
+  (d) The overshoot series gets a verdict command, not just a dump:
+  `context-incidents.mjs --trend` prints overshoots per day and median overshoot for the last
+  7 days, so the effect of the arming is measurable in one call.
+  (e) The handover path carries a refused session. A test takes a session above the mark with
+  a point in flight whose gate still needs a suite, asserts the suite is denied, and asserts
+  that the boundary/handover command starts the successor, which then runs the suite. The
+  fence is not armed while the launcher cannot start a successor (launcher record
+  dead/unknown); in that state it stays at observe and says so (user 24.09.2026: "Ist 1204
+  nicht riskannt? Kann es nicht vorkommen, dass die Einhaltung gar nicht erfüllbar ist und
+  dann haben wir eine Blockade?" — "Ja, passe das entsprechend an.").
+  NOT IN SCOPE: raising the ceiling, new ledger fields, a new guard script. This wires and
+  arms what is already built (points 700, 881, 932).
+  Criticality: high — real usage cost every night.
+  Bundle: Modell & Wächter.

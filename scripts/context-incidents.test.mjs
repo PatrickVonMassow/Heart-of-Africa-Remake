@@ -270,6 +270,8 @@ describe('the files: appended, never rewritten', () => {
 
 describe('the reading command', () => {
   it('reads its arguments, and falls back on a nonsense quantile', () => {
+    expect(parseReadArgs(['--trend']).trend).toBe(true)
+    expect(parseReadArgs([]).trend).toBe(false)
     expect(parseReadArgs(['--since', '2026-08-19', '--json', '--file', 'a', '--file', 'b'])).toMatchObject({
       since: '2026-08-19',
       json: true,
@@ -335,9 +337,44 @@ describe('the reading command', () => {
     const json = run(['--json'])
     expect(JSON.parse(json.stdout)).toMatchObject({ count: 2 })
 
+    // THE VERDICT COMMAND: the fixture is older than seven days, so the window
+    // is quiet — and still a verdict, with all seven days listed.
+    const trend = run(['--trend'])
+    expect(trend.status).toBe(0)
+    expect(trend.stdout).toMatch(/VERDICT, last 7 days: 0 overshoot\(s\)/)
+    expect(JSON.parse(run(['--trend', '--json']).stdout)).toMatchObject({ days: 7, total: 0 })
+
+    // --trend honours the cutoff: records on both sides of it, inside the window.
+    const day = 24 * 60 * 60 * 1000
+    const recent = (msAgo, tokens, point) => {
+      const r = rec(new Date(Date.now() - msAgo).toISOString(), tokens, point)
+      return JSON.stringify(r)
+    }
+    const windowPath = join(dir, 'window.jsonl')
+    writeFileSync(windowPath, `${[recent(3 * day, 180_000, 1), recent(1 * day, 200_000, 2)].join('\n')}\n`)
+    const runWindow = (args) =>
+      spawnSync(process.execPath, [CLI, '--file', windowPath, ...args], { encoding: 'utf8', windowsHide: true })
+    expect(runWindow(['--trend']).stdout).toMatch(/VERDICT, last 7 days: 2 overshoot\(s\)/)
+    const cutoff = new Date(Date.now() - 2 * day).toISOString()
+    const cutTrend = runWindow(['--trend', '--since', cutoff])
+    expect(cutTrend.stdout).toMatch(/VERDICT, last 7 days: 1 overshoot\(s\), median overshoot 50000 tokens/)
+    expect(cutTrend.stdout).toContain('only records since')
+    expect(JSON.parse(runWindow(['--trend', '--json', '--since', cutoff]).stdout)).toMatchObject({ total: 1, median: 50_000 })
+
     const bad = run(['--since', 'whenever'])
     expect(bad.status).toBe(2)
     expect(bad.stderr).toMatch(/cannot read date/)
+  })
+
+  it('--trend keeps the malformed-records warning, in text and JSON, over a corrupt-only file', () => {
+    const path = join(dir, 'corrupt.jsonl')
+    writeFileSync(path, 'not json\n{"half":\n')
+    const run = (args) =>
+      spawnSync(process.execPath, [CLI, '--file', path, '--trend', ...args], { encoding: 'utf8', windowsHide: true })
+    const text = run([])
+    expect(text.status).toBe(0)
+    expect(text.stdout).toMatch(/WARNING: 2 unreadable line\(s\) skipped/)
+    expect(JSON.parse(run(['--json']).stdout)).toMatchObject({ total: 0, malformed: 2 })
   })
 
   it('reads the SEED beside the live series by default, and the shipped seed is readable', () => {

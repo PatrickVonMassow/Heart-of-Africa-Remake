@@ -314,7 +314,7 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
     console.log(`note: integrity snapshots skipped (${e && e.message})`)
   }
 
-  // The re-sync IS the forced review of all four sections — when the reviewed
+  // The re-sync IS the forced review of all five sections — when the reviewed
   // now-card matches the declared focus it doubles as the focus confirmation.
   try {
     const focus = readJson(FOCUS_PATH)

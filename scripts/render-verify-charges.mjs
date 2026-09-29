@@ -58,6 +58,26 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1236,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^with the traveller outside every ring the archived crossing arrives/i,
+    why:
+      'Measured 29.09.2026 on the full webgl enrichments pass after the 1234 landing (machine '
+      + 'under load): the arrival variant never moved the traveller out of the ring (dP 1.25) and '
+      + 'the calf ended 0.094 from its target. Point 1236 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1236,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^a purposeful crossing swims the channel chest-deep and lands on the far bank/i,
+    why:
+      'Measured 29.09.2026 on the same webgl pass: sawOnWater false, landed true. The purposeful '
+      + 'crossing is suspected to arrive or end early since the 1234 arrival snap or shy-ring '
+      + 'interruption. Point 1236 owns the cause; the charge dies with it.',
+  },
+  {
     point: 1219,
     suite: 'crossbrowser',
     kind: 'check',

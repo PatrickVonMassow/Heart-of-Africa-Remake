@@ -1,4 +1,4 @@
-// THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@aa7f5b05
+// THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@2f245cec
 //
 // Astra (OpenAI, codex) is the default; `author-fable.mjs` drives the same core
 // with its own trailer, runtime, author model and command name.

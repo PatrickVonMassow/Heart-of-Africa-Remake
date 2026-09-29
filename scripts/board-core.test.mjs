@@ -256,9 +256,10 @@ describe('promoteToNow', () => {
 const sect = (name, body) =>
   `<details class="sect"><summary><h2>${name}</h2></summary>\n${body}</details>\n`
 
-const fullBoard = ({ now = '', vdzk = '', queue = '', done = '' } = {}) =>
+const fullBoard = ({ now = '', vdzk = '', queue = '', done = '', log = null } = {}) =>
   `<main>\n${sect('Woran ich gerade arbeite', now)}${sect('Von dir zu klären', vdzk)}` +
-  `${sect('Warteschlange', queue)}${sect('Erledigt', done)}</main>\n`
+  `${sect('Warteschlange', queue)}${sect('Erledigt', done)}` +
+  `${log === null ? '' : sect('Entscheidungsprotokoll', log)}</main>\n`
 
 const queueEntry = (n, title, meta) =>
   `<details>\n  <summary><span class="num">${n}</span><span class="t">${title}</span>` +
@@ -1353,7 +1354,7 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
 
   it('admits the point-864 decision record from an automated caller', () => {
     const out = addVdzk(
-      fullBoard({ vdzk: '' }),
+      fullBoard({ vdzk: '', log: '' }),
       'Entscheidungsprotokoll: Rasterung der Höhenkarte',
       'Entscheidung: Die Höhenkarte wird neu gerastert. Evidenz: Die Messung ist eindeutig. ' +
         'Folge: Die neue Rasterung wird bereits verwendet. Deine Möglichkeiten: die Entscheidung stehen lassen, ' +

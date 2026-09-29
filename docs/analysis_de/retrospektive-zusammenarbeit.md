@@ -137,6 +137,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 19.09. nachts | Der deckende Bildlauf wurde NACH der Landung gefahren statt davor, und das allein trug die Sitzung 52.000 Token über ihre Decke: Er lief zwanzig Minuten, brachte ein fremdes Rot mit, das erst eingeordnet werden musste, und jeder seiner Schritte stritt mit dem Tafel-Tor, weil der Punkt schon abgehakt war und keine Jetzt-Karte mehr tragen konnte. Auf WebGPU konnte er gar nicht decken — das seit dem 17.09. als vorbestehend eingereihte Bild der Victoria-Fälle beendet den Lauf nach 45 Prüfungen (Punkt 1145), also blieb nur die laute Zurückstellung |
 | 22.09. abends | Derselbe Stop-Hook wie am 14.09. verlangte nach einer Parallelsitzung `batch-doctor --gate` — nur war der Alarm diesmal eine neun Minuten alte Messung, und der Doktor hatte ihn 31 Sekunden zuvor bereits abgeräumt. Die geforderte Abhilfe dauert acht Minuten, der Alarm erhebt sich nach einunddreißig Sekunden: ein Rennen, das die sanktionierte Maßnahme nie gewinnen kann. Daneben meldete derselbe Zug „Dashboard nicht registriert", weil der Stop-Wächter den Merkerpfad gegen ein in einen Worktree gewandertes Arbeitsverzeichnis auflöst (§3.303, Wiedergänger von §3.271) |
 | 23.09. vormittags | 75 Minuten Stillstand, beendet von der Nutzerfrage, ob 1174 noch laufe: Eine Sitzung, die der Launcher für EINE Board-Nachricht gestartet hatte und deren eigener Auftrag ihr sagt, sie halte den Batch-Lock nicht, schrieb die GLOBALE uhrlose Stopp-Markierung — mit `type: user-stop` und einer Begründung, die sie selbst beschreibt („Chat-Antwort-Sitzung, kein Batch-Auftrag"), obwohl kein Nutzer gestoppt hatte. Der Launcher lehnte danach jeden Nachfolger ab, korrekt nach seiner eigenen Regel. Eine stehengelassene Sitzung darf den Zustand schreiben, der alle anderen anhält — und gesehen hat es niemand, weil die Jetzt-Karte die letzte Behauptung der toten Sitzung wiederholt statt ihr Alter zu nennen (§3.304, Wiedergänger der Stillstands-Familie §3.258; Punkte 1193, 1194, 1195) |
+| 29.09. mittags | Ein Nutzerauftrag (»oben in der Queue einreihen«) lag eine Stunde unbemerkt im Findings-Träger, weil `findings-guard` wartende Requests nur an `batch-boundary --commit` prüft, nicht beim Ziehen des nächsten Punkts; der Batch-Owner zog nach 1209 einen anderen. Das Nachholen per Claim kostete dann 30 Minuten Stillstand: Der Owner gab um 12:16 frei, aber die Warteschleife des Claim-Fensters wertete die GELÖSCHTE Lock-Datei als „noch belegt“ (der `require` warf, die Schleife lief weiter), und die Reservierung lief ungenutzt ab. Zusätzlich hielten vier Stop-Wächter die abgebende Sitzung in Schleife (Punkt 1235). Und der Vorschlag „Batch holen und danach weiterarbeiten“ kam erneut, obwohl die Regel seit 09.09. im Gedächtnis stand — vergraben im Eintrag über geparkte Analysen, jetzt eigener Eintrag. **Lehre:** Eine Warteschleife wertet jeden Fehlerfall ausdrücklich; eine Regel, die wiederholt übersehen wird, braucht ihre eigene Indexzeile. |
 
 | 15.09. nachmittags | Ein neu eingereihter Punkt erzaehlte der Maschine das Gegenteil von sich selbst: Seine Ueberschrift »has no covering picture run« las der Bildpflicht-Klassierer als VERNEINUNG, der Punkt, dessen einziger Zweck zwei Bildlaeufe sind, wies sich damit als bildfrei aus. Gefangen von einer angehefteten Pruefung, die die exakte Menge solcher Zeilen festhaelt statt ihrer Anzahl; die Korrektur war ein positiv formulierter Satz (§3.274) |
 | 15.09. nachmittags | Und derselbe Punkt trug eine falsche Tatsache: Die deckenden Laeufe lagen scheinbar zwei Stunden VOR dem Merge, den sie decken sollten — Laufstempel in UTC gegen Commit-Zeiten in +0200 gelesen. Beide liefen am Merge-HEAD selbst, mit je sechs Bildern auf beiden Bahnen. Aufgefallen beilaeufig, weil eine Wartequittung ihren HEAD mit ausdruckte. Wortwoertlich die Lehre aus §3.253, drei Tage alt und von mir wiederholt (§3.275) |
@@ -1720,7 +1721,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 29.09.2026, 08:22 · Quellen-Fingerprint: `fe1ba15d25af…`
+Zuletzt aktualisiert: Dienstag, 29.09.2026, 17:19 · Quellen-Fingerprint: `9faa0c2033d2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1746,6 +1747,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | before starting a point, list worktrees and branches — a live delegated author is invisible to the board and TASKS.md | 1 | niedrig | branch-hygiene-guard.mjs | ✔ Mechanismus |
+| A side window that claims the batch only queues the user's point and hands over at once — never propose or do further work after the claim | 2 | mittel | clear-claim-guard.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1763,7 +1765,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 103 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 104 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1829,10 +1831,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 101 Feedback-/Projekt-/User-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 142 Prozess-/Meta-TASKS-Punkte (davon 67 offen).
+Erfasste Quellen: 102 Feedback-/Projekt-/User-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 143 Prozess-/Meta-TASKS-Punkte (davon 68 offen).
 
-<!-- RETRO-FINGERPRINT: fe1ba15d25af0580388f2647e1b7779e4c5c42ae8ea799f82f06fd0e0e94f226 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-29T06:22:48.943Z -->
+<!-- RETRO-FINGERPRINT: 9faa0c2033d284e7231ba7a891db8abe78a4cc272a31225a86383048d66c0bfb -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-29T15:19:37.387Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

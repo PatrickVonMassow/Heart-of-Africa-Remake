@@ -145,7 +145,9 @@ const repeatedFlag = (args) => {
  * its promised card is the worse half-written state. */
 function recordDecisionCard(card) {
   try {
-    execFileSync(process.execPath, ['scripts/board.mjs', 'vdzk-add', '--automated', card.title, card.body], {
+    // Every card this command writes is a decision record, so it goes to the
+    // decision log (user order 22.09.2026) — `vdzk-add` refuses that prefix.
+    execFileSync(process.execPath, ['scripts/board.mjs', 'log-add', card.title, card.body], {
       cwd: repoPath('.'),
       encoding: 'utf8',
       windowsHide: true,
@@ -153,7 +155,7 @@ function recordDecisionCard(card) {
     })
     return
   } catch (error) {
-    if (/open question .* already stands under/i.test(String(error?.stderr ?? ''))) return
+    if (/(?:open question|decision record) .* already stands under/i.test(String(error?.stderr ?? ''))) return
     throw new Error(`decision card could not be recorded: ${String(error?.stderr ?? error?.message ?? error).trim()}`)
   }
 }

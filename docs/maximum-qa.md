@@ -90,7 +90,7 @@ must pass clean before any tag.
 ## Phase 5 — Code audit with model diversity
 - Sweep the subsystems (systems/state, travel/world, render/ui/i18n) of the
   rebuilt code for test gaps AND real bugs, reading it against the design.
-<!-- rule:model-policy@aa7f5b05 -->
+<!-- rule:model-policy@2f245cec -->
 - Mix in a **different model than the recent author** for a blind pass — the
   cross-vendor default, so Astra reads Anthropic-authored code and Claude reads
   Astra's (CLAUDE.md §6; memory `audit-with-model-diversity`). ONE pass,

@@ -551,10 +551,11 @@ describe('looksDoubleEncoded (mojibake detector)', () => {
 })
 
 describe('sliceSections / parseCards', () => {
-  it('slices exactly the four sections in document order, the last running to EOF', () => {
+  it('slices exactly the five sections in document order, the last running to EOF', () => {
     const { order, sections } = sliceSections(boardHtml() + '<footer>Stand</footer>')
     expect(order).toEqual(SECTION_TITLES)
-    expect(sections['Erledigt']).toMatch(/<footer>/)
+    expect(sections['Entscheidungsprotokoll']).toMatch(/<footer>/)
+    expect(sections['Erledigt']).not.toMatch(/<footer>/)
   })
   it('anchors on <h2>, so the words inside a card body steal no section', () => {
     const html = boardHtml({ nowCards: ['Audit der Warteschlange und der Erledigt-Liste'] })

@@ -1,4 +1,4 @@
-// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@aa7f5b05
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@2f245cec
 // On 24.07.2026 the session silently degraded to Haiku 4.5 and merged defective work.
 // The Co-Authored-By field in `git log` is the mechanical record of which MODEL
 // authored a commit. A reviewer uses the distinct Reviewed-By key and therefore

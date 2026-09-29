@@ -17,9 +17,13 @@ where their older wording says “wait for the user”, this inventory supersede
 The default is **continue with a recorded decision**. If the cause can be repaired
 or re-probed by the machine, it does that. Otherwise it makes the safest reversible
 choice supported by the evidence, continues, and puts a card headed
-`Entscheidungsprotokoll:` in “Von dir zu klären”. That card states the decision,
+`Entscheidungsprotokoll:` in the board's own collapsed section
+“Entscheidungsprotokoll” below “Erledigt” (user order 22.09.2026; `node
+scripts/board.mjs log-add`, and the card writer routes the prefix there, so it
+no longer floods “Von dir zu klären”). That card states the decision,
 evidence, consequence, and exact retroactive-veto action. A question card is a
-record for later veto, not a lock on the queue.
+record for later veto, not a lock on the queue — and no open question: the
+section keeps its newest 20 and archives the rest on the archive page.
 
 **The card is SHORT and plainly understandable** (user 15.09.2026, after eight of
 them had grown into four dense paragraphs apiece): one or two short sentences per
@@ -34,7 +38,7 @@ Only two classes may wait without a restart clock:
 1. the user explicitly ordered the batch to stop; and
 2. the next act is genuinely outward-facing or hard to reverse and has no durable
    authorization — today, creating/moving/pushing the version or `poc` tag and
-   dispatching its public release, or changing the published board's four-section
+   dispatching its public release, or changing the published board's five-section
    contract.
 
 Uncertainty is not a third class. Repository corruption, an unavailable provider,
@@ -77,7 +81,7 @@ not permission to fold their implementation into this policy-only point.
 | G3 | A disabled/unknown launcher blocks the point/context boundary; Linux can self-arm, Windows requires an elevated user command (`launcherRemedy` in `scripts/batch-launcher-core.mjs`, `block-launcher` in `scripts/batch-progress-guard.mjs`). | **Self-recovery where possible.** Linux starts its daemon. On Windows the current owner keeps working and does not take a boundary; the durable fix is an install-time, privilege-bearing watchdog that can re-arm the task without an attended batch turn. | Linux path **in place** (point 474). Windows path is **Follow-up point — Unattended launcher arming**. |
 | G4 | The document-budget guard can reject an over-budget governing file; historical policy asked the user before raising a ceiling (`scripts/doc-budget-core.mjs`, `scripts/doc-budget-guard.mjs`). | **Recorded default.** First cut or move material. If the decision genuinely belongs in the governed file, raise only by its measured net size with the justification in the same commit and file a veto card; a size ceiling is neither outward-facing nor hard to reverse. | Policy changes **in place here**; the existing guard already demands the measured ceiling and written reason. |
 | G5 | The closing guard blocks release tags until its machine-recorded checklist is complete; the runbook separately requires explicit approval for the tag/public release (`scripts/closing-guard-core.mjs`, `docs/batch-owner-runbook.md`). | **Retained confirm gate.** Prepare and verify everything, then wait only at the exact version/`poc` tag and public-deploy act. | **In place:** closing points 174/633 and the runbook. |
-| G6 | The board runbook requires explicit approval before changing the public four-section contract (`docs/batch-owner-runbook.md`). | **Retained confirm gate.** This changes the user's outward-facing control surface. Routine card additions, decision records, text corrections, and publishes inside the existing contract are durably authorized and continue. | **In place:** runbook policy. |
+| G6 | The board runbook requires explicit approval before changing the public five-section contract (`docs/batch-owner-runbook.md`). | **Retained confirm gate.** This changes the user's outward-facing control surface. Routine card additions, decision records, text corrections, and publishes inside the existing contract are durably authorized and continue. | **In place:** runbook policy. |
 
 ### Blind standstill sweep and composition check (26.08.2026, point 947)
 
@@ -2079,7 +2083,7 @@ the prose.
 once, in `scripts/board-remedy.mjs`, and every board guard imports them — until
 30.07.2026 each guard carried its own copy still pointing at the retired claude.ai
 mirror, and a remedy is read at the moment of a block and FOLLOWED. The board's
-CONTRACT — four sections, transport, update discipline — has its authoritative
+CONTRACT — five sections, transport, update discipline — has its authoritative
 statement in the memory `batch-dashboard-artifact`; the runbook and the sections
 below summarise it and defer to it. The
 canonical file is the git-ignored `.batch-dashboard.html` in the repo root,
@@ -2090,7 +2094,7 @@ is measured, and the reference count outside a labelled legacy note is zero.
 **The prompt-injected reminder states only what no gate can (point 436).** It is
 the most expensive text here — `scripts/dashboard-reminder-hook.mjs` puts it into
 EVERY user prompt — and most of it repeated rules the machine already refuses to
-break: the four sections, their order and the card wrappers (`structureViolations`,
+break: the five sections, their order and the card wrappers (`structureViolations`,
 before any publish), the `open`-attribute ban (`auto-open`) and the queue card's
 header meta (`queue-meta`). Measured, dropping those took it from 2153 to 843
 characters (−61 %), 283 to 112 words, and 31 concatenated source lines to a

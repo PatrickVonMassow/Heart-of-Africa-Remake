@@ -17,6 +17,9 @@ import { describe, it, expect } from 'vitest'
 import {
   CALL_KINDS,
   INCIDENT_KINDS,
+  TREND_DAYS,
+  formatTrendReport,
+  overshootTrend,
   MAX_KIND_SAMPLES,
   TOP_STEPS,
   buildIncident,
@@ -365,5 +368,58 @@ describe('the series: parse, filter, summarize, print', () => {
     const out = formatSeriesReport(summarizeSeries([], {}))
     expect(out).toMatch(/NO RECORDS/)
     expect(out).toMatch(/died without/)
+  })
+})
+
+describe('overshootTrend — the verdict reading of the series', () => {
+  const NOW = Date.parse('2026-09-29T15:00:00.000Z')
+  const rec = (at, overshoot, kind = INCIDENT_KINDS.OVERSHOOT) =>
+    ({ v: 1, kind, at, atMs: Date.parse(at), tokens: 150_000 + overshoot, overshoot })
+
+  it('counts overshoots per UTC day and their median over the last seven days, quiet days included', () => {
+    const trend = overshootTrend([
+      rec('2026-09-22T23:59:00.000Z', 999_999), // one day before the window
+      rec('2026-09-23T00:00:00.000Z', 40_000),
+      rec('2026-09-23T12:00:00.000Z', 60_000),
+      rec('2026-09-23T13:00:00.000Z', 100_000),
+      rec('2026-09-29T01:00:00.000Z', 30_000),
+      rec('2026-09-29T02:00:00.000Z', 5_000, INCIDENT_KINDS.STARTUP), // a startup reading is no overshoot
+      { at: 'x', atMs: NaN, tokens: 1, overshoot: 1 }, // unusable
+    ], { nowMs: NOW })
+    expect(trend.days).toBe(TREND_DAYS)
+    expect(trend.from).toBe('2026-09-23')
+    expect(trend.to).toBe('2026-09-29')
+    expect(trend.perDay).toHaveLength(7)
+    expect(trend.perDay[0]).toEqual({ day: '2026-09-23', count: 3, median: 60_000 })
+    expect(trend.perDay[3]).toEqual({ day: '2026-09-26', count: 0, median: null })
+    expect(trend.perDay[6]).toEqual({ day: '2026-09-29', count: 1, median: 30_000 })
+    expect(trend.total).toBe(4)
+    expect(trend.median).toBe(50_000)
+  })
+
+  it('drops records before a `--since` cutoff and names the cutoff', () => {
+    const trend = overshootTrend([
+      rec('2026-09-24T10:00:00.000Z', 70_000),
+      rec('2026-09-28T10:00:00.000Z', 10_000),
+    ], { nowMs: NOW, sinceMs: Date.parse('2026-09-26T00:00:00.000Z'), sinceLabel: '2026-09-26' })
+    expect(trend.total).toBe(1)
+    expect(trend.median).toBe(10_000)
+    expect(trend.since).toBe('2026-09-26')
+    expect(formatTrendReport(trend)).toContain('only records since 2026-09-26')
+    expect(overshootTrend([rec('2026-09-24T10:00:00.000Z', 70_000)], { nowMs: NOW }).since).toBeNull()
+  })
+
+  it('an empty series is a verdict of zero, not an error', () => {
+    const trend = overshootTrend([], { nowMs: NOW })
+    expect(trend.total).toBe(0)
+    expect(trend.median).toBeNull()
+    expect(formatTrendReport(trend)).toMatch(/VERDICT, last 7 days: 0 overshoot\(s\), median overshoot - tokens/)
+  })
+
+  it('prints one line per day and the verdict line', () => {
+    const text = formatTrendReport(overshootTrend([rec('2026-09-28T10:00:00.000Z', 12_345)], { nowMs: NOW }))
+    expect(text).toMatch(/2026-09-28 +1 overshoot\(s\) +median 12345/)
+    expect(text).toMatch(/VERDICT, last 7 days: 1 overshoot\(s\), median overshoot 12345 tokens/)
+    expect(text.split('\n').filter((l) => /^  2026-/.test(l))).toHaveLength(7)
   })
 })

@@ -7,9 +7,11 @@
 // wires it): one entry under `PreToolUse`, beside board-first-guard's. The
 // matcher carries `Task` because AGENT_TOOLS classifies it as a spawn — the
 // two must agree, or the fence never sees the very call it denies (Sol review
-// of d0aebb6, finding 4):
+// of d0aebb6, finding 4) — and `Read`, the largest p90 kind, so a read books
+// its debit into the level the handover brake judges (point 1204 (c)); a test
+// pins this registration:
 //
-//   { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell",
+//   { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell|Read",
 //     "hooks": [{ "type": "command",
 //                 "command": "node \"$CLAUDE_PROJECT_DIR/scripts/context-fence-guard.mjs\"" }] }
 //
@@ -18,9 +20,10 @@
 //      context from its own transcript (the payload's transcript_path, else
 //      located by session id) and asks whether THIS call's measured p90 cost
 //      still fits below the ceiling after pending debits and the handover
-//      reserve. Shell reads are admitted like every other growing call (the
-//      Read/Grep/Glob tools are not in the matcher); only the enumerated
-//      bounded controls are exempt. Any internal error → ALLOW.
+//      reserve. Reads (the Read tool and shell reads) are admitted and booked
+//      like every other growing call, never refused at the handover mark;
+//      Grep/Glob are not in the matcher; only the enumerated bounded controls
+//      are exempt. Any internal error → ALLOW.
 //   2. `--status`: the current measurement and what a starting call would get.
 //
 // OBSERVATION MODE IS THE DEFAULT (point 758, user 20.08.2026). The fence is
@@ -33,9 +36,12 @@
 // the mode first and says in words that a disarmed fence refuses nothing, so
 // nobody can mistake it for an armed one that happens never to fire.
 //
-// The old separately-derived REFUSAL threshold is gone from this path. The
-// HANDOVER threshold still belongs to the boundary/Stop chain; this guard owns
-// prospective admission against the ceiling and the reserved exit cost.
+// THE HANDOVER BRAKE (point 1204) is judged here too, FIRST and independent of
+// the mode above: at/past the handover watermark (reading + pending debit) a
+// START (classifyFenceCall) is denied with `fenceRefusal`, which names the
+// boundary. It is armed only while the launcher can start the successor; with a
+// dead/unknown launcher record it stays at observe, records, and `--status`
+// says so. Subagents are not bound (their gate is the step in flight).
 //
 // WHO IT BINDS: every session class. `agent_id` on the real hook payload marks
 // a subagent; without it, lock equality distinguishes the batch owner from an
@@ -53,7 +59,12 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { fenceMode, gatherWatermark, triggerTokens } from './context-watermark.mjs'
 import { CONTEXT_CEILING_TOKENS, watermarkDecision } from './context-watermark-core.mjs'
-import { resolveThroughAncestors } from './context-fence-core.mjs'
+import {
+  classifyFenceCall,
+  handoverBrakeDecision,
+  handoverRefusal,
+  resolveThroughAncestors,
+} from './context-fence-core.mjs'
 import { contextBudgetRefusal } from './context-budget-core.mjs'
 import { admitContextCall, inspectContextCall } from './context-budget.mjs'
 import { readSeries } from './context-incidents.mjs'
@@ -126,6 +137,35 @@ const costSeries = () => summarizeSeries(readSeries().records)
 // rule still judges.
 const resolveRealPath = (p) => resolveThroughAncestors(resolve(REPO_ROOT, p), { realpath: realpathSync })
 
+/** Can a successor start? The boundary's own launcher probe, loaded lazily so
+ *  the common below-the-mark call never pays for it. Any failure → 'unknown',
+ *  which keeps the brake at observe (fail-open). */
+async function probeLauncher() {
+  try {
+    const { probeLauncherState } = await import('./batch-boundary.mjs')
+    return probeLauncherState()
+  } catch {
+    return 'unknown'
+  }
+}
+
+/** The handover brake for one call. The launcher is probed only when a refusal
+ *  is actually in question. */
+async function judgeHandover({ tokens, pendingDebit, start, sessionClass }) {
+  const input = { tokens, pendingDebit, watermark: triggerTokens(), start, sessionClass }
+  const first = handoverBrakeDecision({ ...input, launcher: 'armed' })
+  if (!first.refused) return first
+  return handoverBrakeDecision({ ...input, launcher: await probeLauncher() })
+}
+
+const brakeModeLine = (launcher) =>
+  launcher === 'armed'
+    ? 'handover brake: ARMED — at/past the handover watermark a START (agent, suite, new point, authoring) is REFUSED; ' +
+      'finishing, reads and the boundary stay allowed.'
+    : `handover brake: OBSERVE — the launcher reads "${launcher}", so no successor could start; ` +
+      'STARTs past the handover watermark are recorded, NOT refused, until the launcher is armed ' +
+      '(`node scripts/batch-launcher.mjs --status`).'
+
 // ---- CLI: --status --------------------------------------------------------
 if (process.argv.includes('--status')) {
   const argv = process.argv.slice(2)
@@ -138,6 +178,7 @@ if (process.argv.includes('--status')) {
   })
   const handover = handoverStateOf(wm.tokens)
   const reading = wm.tokens === null ? null : { tokens: wm.tokens, at: wm.readingAt }
+  const launcher = await probeLauncher()
   const admission = inspectContextCall({
     sessionId: sid,
     reading,
@@ -145,6 +186,16 @@ if (process.argv.includes('--status')) {
     toolName: 'Agent',
     toolInput: {},
     resolvePath: resolveRealPath,
+  })
+  // The hook judges the handover brake BEFORE admission; the verdict below
+  // must say what the hook would do, so it includes the brake.
+  const agentStart = classifyFenceCall({ toolName: 'Agent' })
+  const brake = handoverBrakeDecision({
+    tokens: wm.tokens,
+    pendingDebit: admission.ledger.pendingDebit,
+    watermark: triggerTokens(),
+    start: agentStart,
+    launcher,
   })
   console.log(
     JSON.stringify(
@@ -159,6 +210,8 @@ if (process.argv.includes('--status')) {
         remainingAfterCall: admission.decision.remainingAfterCall,
         handoverWatermark: handover.watermark,
         handoverState: handover.state,
+        handoverBrake: launcher === 'armed' ? 'armed' : 'observe',
+        launcher,
       },
       null,
       2,
@@ -169,7 +222,7 @@ if (process.argv.includes('--status')) {
   console.log(
     mode === 'armed'
       ? `\nfence mode: ARMED — a call that cannot fit below the ${CONTEXT_CEILING_TOKENS}-token ceiling is REFUSED.`
-      : `\nfence mode: OBSERVE — THE FENCE IS DISARMED and refuses NOTHING. It measures against the ` +
+      : `\nfence mode: OBSERVE — THE CEILING ADMISSION IS DISARMED and refuses NOTHING (the handover brake below is separate). It measures against the ` +
           `${CONTEXT_CEILING_TOKENS}-token ceiling and records what it would have refused to ` +
           `.claude/context-fence-observations.jsonl. Re-arming is point 747's decision; ` +
           `HOA_CONTEXT_FENCE_MODE=armed arms this session alone.`,
@@ -178,14 +231,24 @@ if (process.argv.includes('--status')) {
     `\nHANDOVER stays in force in BOTH modes: the boundary fires at ${handover.watermark} tokens ` +
       `(currently ${handover.state}).`,
   )
-  console.log(
-    `verdict for an AGENT call: ${
-      admission.decision.fits === false
-        ? mode === 'armed' ? 'DENY' : 'allow (OBSERVED — an armed fence would DENY)'
-        : 'allow'
-    }`,
-  )
-  if (mode === 'armed' && admission.decision.fits === false) {
+  console.log(brakeModeLine(launcher))
+  const ceilingDenies = mode === 'armed' && admission.decision.fits === false
+  const observedNotes = [
+    brake.observed ? 'handover brake OBSERVED — an armed launcher would DENY' : null,
+    admission.decision.fits === false ? 'ceiling OBSERVED — an armed fence would DENY' : null,
+  ].filter(Boolean)
+  // A paused batch passes every call in hook mode, so the status says allow too.
+  const paused = existsSync(PAUSE)
+  const verdict = paused
+    ? 'allow (the batch is paused — the hook passes every call)'
+    : brake.refused
+      ? 'DENY (handover brake)'
+      : ceilingDenies
+        ? 'DENY'
+        : observedNotes.length ? `allow (${observedNotes.join('; ')})` : 'allow'
+  console.log(`verdict for an AGENT call: ${verdict}`)
+  if (!paused && brake.refused) console.log(handoverRefusal({ brake, start: agentStart }))
+  else if (!paused && ceilingDenies) {
     console.log(contextBudgetRefusal({ decision: admission.decision, reading, sessionId: sid, point: currentPoint() }))
   }
   process.exit(0)
@@ -226,6 +289,56 @@ try {
   const input = payload.tool_input ?? {}
   const reading = wm.tokens === null ? null : { tokens: wm.tokens, at: wm.readingAt }
   const point = currentPoint()
+  const start = classifyFenceCall({
+    toolName: payload.tool_name,
+    command: input.command,
+    filePath: input.file_path ?? input.notebook_path,
+    resolvePath: resolveRealPath,
+  })
+  // THE HANDOVER BRAKE, before admission: a refused call never runs, so it
+  // must not be booked as a pending debit either.
+  if (start.starts && reading) {
+    const pendingDebit = inspectContextCall({
+      sessionId: contextSessionId,
+      reading,
+      series: costSeries(),
+      toolName: payload.tool_name,
+      toolInput: input,
+      resolvePath: resolveRealPath,
+    }).ledger.pendingDebit
+    const brake = await judgeHandover({ tokens: wm.tokens, pendingDebit, start, sessionClass })
+    if (brake.refused || brake.observed) {
+      recordObservation({
+        at: new Date().toISOString(),
+        sessionId: sid,
+        contextSessionId,
+        sessionClass,
+        brake: 'handover',
+        mode: brake.mode,
+        launcher: brake.launcher,
+        refused: brake.refused,
+        tokens: wm.tokens,
+        level: brake.level,
+        handoverWatermark: brake.watermark,
+        what: start.what,
+        tool: payload.tool_name ?? null,
+        toolUseId: payload.tool_use_id ?? payload.toolUseId ?? null,
+      })
+    }
+    if (brake.refused) {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: handoverRefusal({ brake, start, sessionClass }),
+          },
+        }),
+      )
+      process.exit(0)
+    }
+    if (brake.observed) process.stderr.write(`CONTEXT FENCE: ${brakeModeLine(brake.launcher)}\n`)
+  }
   const verdict = admitContextCall({
     sessionId: contextSessionId,
     sessionClass,

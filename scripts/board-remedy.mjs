@@ -10,7 +10,7 @@
 //   - the publish and attest COMMANDS a remedy names live here, so a transport
 //     change is one edit (card-edit remedies elsewhere still spell
 //     `node scripts/board.mjs …` in place);
-//   - the board CONTRACT — the four-section structure, the transport, the update
+//   - the board CONTRACT — the five-section structure, the transport, the update
 //     discipline — is stated in prose exactly ONCE, in the memory
 //     `batch-dashboard-artifact`. Other places refer to it (CONTRACT below); the
 //     gates carry only the data they check (e.g. `REQUIRED_SECTIONS`).

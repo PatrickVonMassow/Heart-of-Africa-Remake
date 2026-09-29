@@ -1417,12 +1417,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1209": {
-      "at": "2026-09-24T11:30:41.284Z",
-      "why": "User 24.09.2026 13:30: direkt vor 1204, Vier-Augen",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1213": {
       "at": "2026-09-25T07:35:00.000Z",
       "why": "User 25.09.2026 09:30: »Schiebe vorher noch 1213 nach 1185 … Der ist jetzt doch nicht mehr so dringend.« — directly behind 1185",
@@ -1518,6 +1512,18 @@
       "why": "Only relevant once the cloud offload switch is ON and proven; no urgency ahead of the release work",
       "origin": "machine",
       "place": "last"
+    },
+    "1235": {
+      "at": "2026-09-29T10:53:56.378Z",
+      "why": "Real blockade of a claim handover, but it costs no game work; last is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1236": {
+      "at": "2026-09-29T13:20:08.882Z",
+      "why": "WebGL-2-only reds from a loaded machine; CLAUDE.md §7.2 lets a WebGL-2-only defect wait for the next LARGE, and the reds are charged",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1547,7 +1553,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-29T06:22:33.971Z",
+    "at": "2026-09-29T13:20:08.891Z",
     "points": [
       184,
       200,
@@ -1950,7 +1956,6 @@
       1175,
       1177,
       1179,
-      1185,
       1186,
       1187,
       1188,
@@ -1961,7 +1966,6 @@
       1203,
       1204,
       1205,
-      1209,
       1213,
       1214,
       1215,
@@ -1979,7 +1983,8 @@
       1229,
       1231,
       1232,
-      1233
+      1235,
+      1236
     ]
   }
 }

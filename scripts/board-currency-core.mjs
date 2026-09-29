@@ -59,6 +59,9 @@ export const ARCHIVE_CONTENT_URL = `https://raw.githubusercontent.com/${BOARD_OW
 /** What the USER opens: a viewer page on the Pages deploy this repo already runs. */
 export const BOARD_PAGE_URL = `https://${BOARD_OWNER.toLowerCase()}.github.io/${BOARD_REPO}/board/`
 
+/** The archive page the board's two archive links point at (public/board/archive/). */
+export const ARCHIVE_PAGE_URL = `${BOARD_PAGE_URL}archive/`
+
 /**
  * The floor of "current" (delta D sub-decision). raw.githubusercontent answers
  * with `cache-control: max-age=300`, so a reader can legitimately see content up

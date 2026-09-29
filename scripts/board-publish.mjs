@@ -49,6 +49,7 @@ import {
   projectNowForPublish,
   refreshFooter,
   renderCardCriticalities,
+  rotateForPublish,
   unwrapCardHeaderGroups,
   upgradeNowCards,
 } from './board-core.mjs'
@@ -242,7 +243,16 @@ const fail = (reason) => {
   const original = readFileSync(boardFile, 'utf8')
   const tasksText = readFileSync(tasksPath, 'utf8')
   const { open } = parseTasks(tasksText)
-  let repoBytes = unwrapCardHeaderGroups(original)
+  // THE DECISION LOG MIGRATES ON THE PUBLISH PATH (user order 22.09.2026): an
+  // idempotent pass that adds the fifth section and moves the records into it,
+  // so the structure gate below never meets a four-section board it could not publish.
+  // It ROTATES too, archive first: a first publish moving more records than the
+  // cap would otherwise go out with an oversized log.
+  let repoBytes = unwrapCardHeaderGroups(rotateForPublish({
+    board: original,
+    archive: existsSync(archiveFile) ? readFileSync(archiveFile, 'utf8') : null,
+    writeArchive: (html) => writeTextAtomic(archiveFile, html),
+  }))
 
   try {
     repoBytes = projectNowForPublish(repoBytes, gatherActiveWorkSource({ tasksText }), {

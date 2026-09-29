@@ -40,12 +40,14 @@ import {
 } from './board-core.mjs'
 import { DERIVED_STATE_KIND } from './board-state-core.mjs'
 
-/** The four sections, in the order the user's mandate fixes them. */
+/** The five sections, in the order the user's mandate fixes them — the decision
+ *  log last, below Erledigt (user order 22.09.2026). */
 export const REQUIRED_SECTIONS = [
   'Woran ich gerade arbeite',
   'Von dir zu klären',
   'Warteschlange',
   'Erledigt',
+  'Entscheidungsprotokoll',
 ]
 
 /** Count non-overlapping matches of a global regex. */
@@ -86,13 +88,13 @@ export function structureViolations(html) {
     if (o !== c) out.push({ code: `${tag}-unbalanced`, msg: `<${tag}> opened ${o}x, closed ${c}x` })
   }
 
-  // (2) Exactly the four sections, in order, each wrapped so it collapses.
+  // (2) Exactly the five sections, in order, each wrapped so it collapses.
   const seen = []
   for (const hit of m.matchAll(/<h2\b[^>]*>([^<]*)<\/h2>/g)) seen.push(hit[1].trim())
   if (seen.length !== REQUIRED_SECTIONS.length || seen.some((t, i) => t !== REQUIRED_SECTIONS[i])) {
     out.push({
       code: 'sections-wrong',
-      msg: `expected the four sections ${REQUIRED_SECTIONS.join(' | ')} - found ${seen.join(' | ') || '<none>'}`,
+      msg: `expected the five sections ${REQUIRED_SECTIONS.join(' | ')} - found ${seen.join(' | ') || '<none>'}`,
     })
   }
   const wrappers = count(m, /<details class="sect">/g)
@@ -103,13 +105,13 @@ export function structureViolations(html) {
     })
   }
 
-  // (3) An orphan wrapper: a section opener whose heading is not one of the four.
+  // (3) An orphan wrapper: a section opener whose heading is not one of the five.
   // This is the exact leftover a cut-and-paste reorder produced.
   for (const hit of m.matchAll(/<details class="sect"><summary><h2\b[^>]*>([^<]*)/g)) {
     if (!REQUIRED_SECTIONS.includes(hit[1].trim())) {
       out.push({
         code: 'orphan-section',
-        msg: `a section wrapper opens on "${hit[1].trim().slice(0, 40)}", which is not one of the four`,
+        msg: `a section wrapper opens on "${hit[1].trim().slice(0, 40)}", which is not one of the five`,
       })
     }
   }

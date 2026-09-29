@@ -199,7 +199,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell|Read",
         "hooks": [
           {
             "type": "command",

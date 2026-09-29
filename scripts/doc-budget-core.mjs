@@ -103,8 +103,10 @@ export const DOC_BUDGETS = [
     // three binding clauses — checklist role, infrastructure freeze, finding
     // intake — that every session must load, because they change what any later
     // point may be.
-    maxLines: 205,
-    maxWords: 1468,
+    // LOWERED to the 29.09.2026 four-eyes cut list (docs/context-cut-list-1209.md):
+    // 205 / 1468 became 197 / 1328; no rule dropped, §7.1 titles stay (tests pin them).
+    maxLines: 197,
+    maxWords: 1328,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.
@@ -194,8 +196,11 @@ export const DOC_BUDGETS = [
     // surviving lines say where work may run and who owns the batch, none of them
     // WHO CAN ANSWER. It cost this session two turns pointing at a message that
     // then expired undelivered. Its hook measures 17 words on this tokenizer.
-    maxLines: 53,
-    maxWords: 820,
+    // LOWERED to the 29.09.2026 four-eyes cut list (docs/context-cut-list-1209.md):
+    // 17 role-specific pointers moved to the memory leaf context-details.md, the
+    // rest reworded tersely; 53 / 820 became 37 / 523. No memory dropped.
+    maxLines: 37,
+    maxWords: 523,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a new entry measures 13–21
     // words — so the slack can hide at most a very short one, and re-wording an
