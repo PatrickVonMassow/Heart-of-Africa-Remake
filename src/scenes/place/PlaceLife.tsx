@@ -65,7 +65,7 @@ import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spaw
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
 import { playRockFlank } from './playRockSurface'
-import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { BANK_WATER_DROP, bankGroundHeight, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { canoeLane, createCanoe, stepCanoe } from './villagerCanoe'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import {
@@ -4101,9 +4101,21 @@ function VillagerCanoe({ bank, cloth, seed }: { bank: PlaceRiverBank; cloth: str
   const beam = cfg.hullBeam / 2
   const half = cfg.hullLength / 2
   const trapY = groundHeight(lane.trap.x, lane.trap.z)
+  // Born where the cycle puts them, never at the settlement origin the first
+  // frame would only move them off (point 509's rule, which the unplaced-
+  // inhabitant watch enforces).
+  const born = useMemo(
+    () => ({
+      hull: [state.x, -BANK_WATER_DROP, state.z] as [number, number, number],
+      kneeling: [state.paddler.x, -BANK_WATER_DROP + CANOE_SEAT_Y, state.paddler.z] as [number, number, number],
+      standing: [lane.checkStand.x, bankGroundHeight(bank, lane.checkStand.x, lane.checkStand.z), lane.checkStand.z] as [number, number, number],
+    }),
+    // Read once at birth; the frame loop owns the transforms afterwards.
+    [state, lane, bank],
+  )
   return (
     <>
-      <group ref={hull} name="village-canoe" userData={markActor({ kind: 'canoe', height: 0.6 })}>
+      <group ref={hull} name="village-canoe" position={born.hull} userData={markActor({ kind: 'canoe', height: 0.6 })}>
         {/* A dugout: one log, hollowed. The lower half of a long ellipsoid is
             the hull; a darker lid just under the gunwale is its hollow. */}
         <mesh position={[0, CANOE_FREEBOARD, 0]} scale={[beam, CANOE_DEPTH, half]} castShadow>
@@ -4115,7 +4127,7 @@ function VillagerCanoe({ bank, cloth, seed }: { bank: PlaceRiverBank; cloth: str
           <meshStandardMaterial color="#3a2616" roughness={1} />
         </mesh>
       </group>
-      <group ref={kneeling} name="village-canoe-paddler">
+      <group ref={kneeling} name="village-canoe-paddler" position={born.kneeling}>
         <Figure
           cloth={cloth}
           kneel
@@ -4128,7 +4140,7 @@ function VillagerCanoe({ bank, cloth, seed }: { bank: PlaceRiverBank; cloth: str
           }
         />
       </group>
-      <group ref={standing} name="village-canoe-fisher" visible={false}>
+      <group ref={standing} name="village-canoe-fisher" position={born.standing} visible={false}>
         <Figure cloth={cloth} pose={standPose} limbs={standLimbs} squat={standSquat} />
       </group>
       {/* His fish trap at the waterline: a conical basket lying in the shallows,
