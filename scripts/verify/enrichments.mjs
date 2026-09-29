@@ -7340,7 +7340,13 @@ if (section('water-edge-flee')) {
     const seed = window.__game.getState().seed
     const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
     const { adult, calf } = st.stage()
-    const track = (a) => ({ a, entries: 0, wet: false, dramas: 0, flips: 0, last: undefined, samples: 0 })
+    // Headings are measured from the actual displacement (not the requested
+    // dodge), across flight restarts: a reversal (> 90°) and an alternating
+    // left/right turn pair (each > 10°) are both jitter.
+    const track = (a) => ({
+      a, entries: 0, wet: false, dramas: 0, flips: 0, zigzags: 0, restarts: 0,
+      px: a.x, pz: a.z, last: undefined, lastTurn: 0, fleeing: false, samples: 0,
+    })
     const ts = { adult: track(adult), calf: track(calf) }
     await window.__pollSim(14, () => {
       st.hold()
@@ -7352,14 +7358,26 @@ if (section('water-edge-flee')) {
         if (wet && !t.wet) t.entries++
         t.wet = wet
         if (a.inWater !== undefined || a.rescued) t.dramas++
-        const hd = a.dodgeHeading
-        if (typeof hd === 'number' && typeof t.last === 'number') {
-          let d = hd - t.last
-          while (d > Math.PI) d -= Math.PI * 2
-          while (d < -Math.PI) d += Math.PI * 2
-          if (Math.abs(d) > Math.PI / 2) t.flips++
+        const fleeing = a.dodgeHeading !== undefined
+        if (fleeing && !t.fleeing) t.restarts++
+        t.fleeing = fleeing
+        const mx = a.x - t.px
+        const mz = a.z - t.pz
+        if (Math.hypot(mx, mz) > 0.02) {
+          const hd = Math.atan2(mx, mz)
+          if (typeof t.last === 'number') {
+            let d = hd - t.last
+            while (d > Math.PI) d -= Math.PI * 2
+            while (d < -Math.PI) d += Math.PI * 2
+            if (Math.abs(d) > Math.PI / 2) t.flips++
+            const big = Math.PI / 18
+            if (Math.abs(d) > big && Math.abs(t.lastTurn) > big && Math.sign(d) !== Math.sign(t.lastTurn)) t.zigzags++
+            t.lastTurn = d
+          }
+          t.last = hd
+          t.px = a.x
+          t.pz = a.z
         }
-        t.last = hd
       }
       return false
     })
@@ -7368,7 +7386,7 @@ if (section('water-edge-flee')) {
       const t = ts[k]
       const a = t.a
       out[k] = {
-        entries: t.entries, dramas: t.dramas, flips: t.flips, samples: t.samples,
+        entries: t.entries, dramas: t.dramas, flips: t.flips, zigzags: t.zigzags, restarts: t.restarts, samples: t.samples,
         end: T(a.x, a.z), crossing: a.crossing !== undefined,
         dP: +Math.hypot(a.x - st.P.x, a.z - st.P.z).toFixed(2),
       }
@@ -7379,8 +7397,8 @@ if (section('water-edge-flee')) {
   for (const k of ['adult', 'calf']) {
     const r = run[k]
     check(
-      `at the reported bank the fleeing ${k} enters the water once, never as a fall-in, and never flips its heading`,
-      !!r && r.entries === 1 && r.dramas === 0 && r.flips === 0,
+      `at the reported bank the fleeing ${k} enters the water once, flees once, never as a fall-in, and never flips or zigzags its heading`,
+      !!r && r.entries === 1 && r.restarts === 1 && r.dramas === 0 && r.flips === 0 && r.zigzags === 0,
       JSON.stringify(r),
     )
     check(
