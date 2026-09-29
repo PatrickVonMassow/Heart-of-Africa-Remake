@@ -117,7 +117,7 @@ guard still enforces the configured ceilings when those files are present.
 | document | current repository measurement | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 193 lines / 1,302 words / 9,867 B | 193 / 1,302 | none |
-| `MEMORY.md` | outside repository | 53 / 820 | not recorded |
+| `MEMORY.md` | outside repository | 37 / 523 | not recorded |
 | global `CLAUDE.md` | outside repository | 6 / 36 | not recorded |
 
 ### Historical measurements and budget decisions
