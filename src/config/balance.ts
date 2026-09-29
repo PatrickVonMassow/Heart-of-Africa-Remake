@@ -482,6 +482,10 @@ interface BalanceConfig {
      *  flee radius) from that threat, so the animal never swims back into the
      *  ring it just fled and re-triggers the flight at the waterline. */
     fleeBankClearance: number
+    /** Arrival radius of a swim: within this of its bank target the animal is
+     *  set onto the target and the swim ends, so a waterline a hair before the
+     *  target can never stall it until the deadline. */
+    arriveUnits: number
   }
   /** The scripted hunt (design.md §19.3). */
   hunt: {
@@ -1343,6 +1347,7 @@ export const balance: BalanceConfig = {
     chance: 0.3, // calibratable: how often a water-blocked roam crosses instead of turning
     resolveSeconds: 25, // calibratable: crossing hard deadline (I4) — a normal swim needs ~3-6 s
     fleeBankClearance: 1.5, // calibratable: swim-out bank clearance as a multiple of the threat ring — 1.5 = the shy flight's exit ring
+    arriveUnits: 0.1, // calibratable: swim arrival radius — above one frame's swim step (~0.04 at 60 fps), far below a body length
   },
   hunt: {
     leaveOvertimeSeconds: 45, // calibratable: walk-off overtime before an off-frame retire (point 188) — generous vs the ~20 s a clear walk-off needs
