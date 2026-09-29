@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { findAdopter } from './wildlifeBehavior'
-import { killFlockLands, killFlockRemnant, releaseBereavedParent, stepCaught } from './youngKill'
+import {
+  feedRemnant,
+  handVigilToRemains,
+  killFlockLands,
+  killFlockRemnant,
+  markKilled,
+  releaseBereavedParent,
+  stepCaught,
+} from './youngKill'
 
 // The body the herd lists hold, reduced to what the kill, the vigil, the
 // adoption and the kill flock read.
@@ -54,9 +62,7 @@ function driveYoungKill() {
   for (; t < 240; t += DT) {
     // The struggle and the kill.
     if (stepCaught(young, DT)) {
-      young.dead = true
-      young.lionFed = true
-      young.dissolve = CARCASS_SECONDS
+      markKilled(young, CARCASS_SECONDS)
       killedAt = { x: young.x, z: young.z }
       const fate = releaseBereavedParent(young, {
         tooLateDist: TOO_LATE,
@@ -72,7 +78,7 @@ function driveYoungKill() {
         feeding = false
         remnant = { id: 'remnant', x: young.x, z: young.z, dead: true, remnant: true }
         herd.push(remnant)
-        if (parent.vigil?.carcass === young) parent.vigil.carcass = remnant
+        handVigilToRemains([herd], young, remnant)
       }
     }
     // Consumed bodies leave the lists.
@@ -112,14 +118,14 @@ function driveYoungKill() {
     const served = killFlockRemnant([herd])
     if (served) {
       const keeperDist = parent.vigil ? Math.hypot(parent.x - served.x, parent.z - served.z) : Infinity
-      if (killFlockLands('leave', 500, 500, served, keeperDist)) {
-        owner = served
-        served.dissolve = (served.dissolve ?? CARCASS_SECONDS) - DT
-      }
+      const landed = killFlockLands('leave', 500, 500, served, keeperDist)
+      if (landed) owner = served
+      feedRemnant(served, DT, landed, CARCASS_SECONDS)
     }
     // What the player sees at the kill site.
     if (killedAt) {
-      if (young.dead !== true || herd.some((a) => a === young && !a.dead)) youngAliveAfterKill = true
+      // By identity, not object: a re-created body with the young's id counts too.
+      if (young.dead !== true || herd.some((a) => a.id === young.id && !a.dead)) youngAliveAfterKill = true
       const c = parent.child
       if (c && !c.dead && Math.hypot(c.x - killedAt.x, c.z - killedAt.z) < balance.family.adoptionRadius)
         parentChildAtKill = c
@@ -142,7 +148,7 @@ describe('a young animal killed by a predator stays dead (point 1213)', () => {
     expect(r.remnant!.gone).toBe(true)
     // No living young with the killed one's identity, ever again.
     expect(r.youngAliveAfterKill).toBe(false)
-    expect(r.herd.includes(r.young)).toBe(false)
+    expect(r.herd.some((a) => a.id === r.young.id)).toBe(false)
     expect(r.young.parent).toBeUndefined()
   })
 
@@ -189,5 +195,25 @@ describe('bereaved parents do not adopt (point 1213)', () => {
     expect(stepCaught(a, 0.1)).toBe(true)
     expect(a.caught).toBeUndefined()
     expect(stepCaught(a, 0.1)).toBe(false)
+  })
+})
+
+describe('the kill flock only eats once landed (point 1213)', () => {
+  it('circling birds leave the remnant whole; landed birds dissolve it', () => {
+    const rem: { dissolve?: number } = {}
+    feedRemnant(rem, 1, false, 10)
+    expect(rem.dissolve).toBeUndefined()
+    feedRemnant(rem, 1, true, 10)
+    expect(rem.dissolve).toBe(9)
+  })
+
+  it('hands only a living keeper vigil from the victim to the remains', () => {
+    const victim = { id: 'v' }
+    const remains = { id: 'r' }
+    const keeper = { vigil: { carcass: victim } }
+    const deadKeeper = { dead: true, vigil: { carcass: victim } }
+    handVigilToRemains([[keeper, deadKeeper]], victim, remains)
+    expect(keeper.vigil.carcass).toBe(remains)
+    expect(deadKeeper.vigil.carcass).toBe(victim)
   })
 })

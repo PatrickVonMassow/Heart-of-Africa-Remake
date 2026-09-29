@@ -14,6 +14,14 @@ export function stepCaught(a: { caught?: number }, dt: number): boolean {
   return true
 }
 
+/** The kill's own death (Wildlife takeAnimal): the body is the predator's
+ *  (lionFed, no ground scavenger) and dissolves over `dissolveSeconds`. */
+export function markKilled(a: { dead?: boolean; lionFed?: boolean; dissolve?: number }, dissolveSeconds: number): void {
+  a.dead = true
+  a.lionFed = true
+  a.dissolve = dissolveSeconds
+}
+
 /** The family fields the kill resolution reads and writes. */
 export interface KillFamilyMember<C = unknown> {
   x: number
@@ -48,6 +56,28 @@ export function releaseBereavedParent<A extends KillFamilyMember<A>>(
   par.bereaved = opts.bereavedSeconds
   young.parent = undefined
   return 'vigil'
+}
+
+/** The vigil follows the remains (point 121 (f)): every living keeper whose
+ *  vigil anchors on the consumed victim is handed the scrap the predator left. */
+export function handVigilToRemains<C>(
+  lists: Iterable<readonly { dead?: boolean; vigil?: { carcass: C } }[]>,
+  victim: C,
+  remains: C,
+): void {
+  for (const list of lists) {
+    for (const k of list) {
+      if (!k.dead && k.vigil !== undefined && k.vigil.carcass === victim) k.vigil.carcass = remains
+    }
+  }
+}
+
+/** One frame of the kill flock on its remnant: only landed birds eat, and
+ *  the scrap dissolves like a scavenged carcass. */
+export function feedRemnant(remnant: { dissolve?: number }, dt: number, landed: boolean, dissolveSeconds: number): void {
+  if (!landed) return
+  if (remnant.dissolve === undefined) remnant.dissolve = dissolveSeconds
+  remnant.dissolve -= dt
 }
 
 /** The remains the kill flock serves: the first hunt remnant still lying. */

@@ -193,7 +193,15 @@ import {
   crocodileBodyY,
 } from '../../render/fauna'
 import { setGroundStains } from '../../render/groundStains'
-import { killFlockLands, killFlockRemnant, releaseBereavedParent, stepCaught } from './youngKill'
+import {
+  feedRemnant,
+  handVigilToRemains,
+  killFlockLands,
+  killFlockRemnant,
+  markKilled,
+  releaseBereavedParent,
+  stepCaught,
+} from './youngKill'
 
 const CHUNK_SIZE = 24
 
@@ -1834,9 +1842,7 @@ function Herds() {
   // spelling. sink: a water victim sinks (no scavenger lands on open
   // water); stain: a land kill marks the ground.
   const takeAnimal = (a: Animal, opts: { sink?: boolean; stain?: boolean } = {}) => {
-    a.dead = true
-    a.lionFed = true
-    a.dissolve = CARCASS_DISSOLVE_SECONDS
+    markKilled(a, CARCASS_DISSOLVE_SECONDS)
     if (opts.sink) a.inWater = 0
     if (opts.stain) pushStain(a.x, a.z)
   }
@@ -5873,13 +5879,7 @@ function LionHunt() {
             // the flock may not land while it stands (§19.6 gate), so the
             // (e) resolve rule is unchanged: remains gone or window over.
             const keeperHerds = ACTIVE_HERDS
-            if (remains && keeperHerds) {
-              for (const csp of CALF_HUNT_SPECIES) {
-                for (const k of keeperHerds[csp]) {
-                  if (!k.dead && k.vigil !== undefined && k.vigil.carcass === v) k.vigil.carcass = remains
-                }
-              }
-            }
+            if (remains && keeperHerds) handVigilToRemains(CALF_HUNT_SPECIES.map((csp) => keeperHerds[csp]), v, remains)
           }
           s.mode = 'leave'
           s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
@@ -6170,10 +6170,7 @@ function Vultures() {
         f.x += (remnant.x - f.x) * Math.min(1, dt * 3)
         f.z += (remnant.z - f.z) * Math.min(1, dt * 3)
         // Only landed birds eat; the scrap dissolves like a scavenged carcass.
-        if (killDescend.current > 0.7) {
-          if (remnant.dissolve === undefined) remnant.dissolve = CARCASS_DISSOLVE_SECONDS
-          remnant.dissolve -= dt
-        }
+        feedRemnant(remnant, dt, killDescend.current > 0.7, CARCASS_DISSOLVE_SECONDS)
       }
       killDescend.current = Math.max(
         0,
