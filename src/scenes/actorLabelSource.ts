@@ -129,7 +129,10 @@ export function markedActorRise(root: MarkedNode | null | undefined): number | n
   if (!root || base === undefined) return null
   const found = firstMarked(root)
   if (!found) return null
-  const scale = Math.hypot(found.m[0], found.m[1], found.m[2])
+  // The VERTICAL scale (the matrix's Y column): a figure kneeling at its work
+  // is squashed in height only, and the horizontal scale left the speech
+  // label's tail pointing a third of a metre above its drawn head.
+  const scale = Math.hypot(found.m[4], found.m[5], found.m[6])
   return found.m[13] + found.mark.height * scale - base[13]
 }
 
