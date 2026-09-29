@@ -1,0 +1,1510 @@
+{
+ "model": "GPT-6 Astra",
+ "entries": [
+  {
+   "id": "B1",
+   "file": "local/1209/bundle.md",
+   "defect": "B-EVIDENCE — keep — Assess attached material only; no invocation history, hook source, memory bodies, or supported surface-disabling settings are supplied. Nothing is explicitly marked TRUNCATED; the recorded 2 KB SessionStart preview is distinguished from its supplied full output."
+  },
+  {
+   "id": "B2",
+   "file": ".claude/settings.json",
+   "defect": "B-PROJECT-SETTINGS — keep — Preserve hooks and broad permissions. No project MCP registrations, .mcp.json, enabledPlugins, or settings.local.json exist; do not invent configuration switches or create a disabling mechanism."
+  },
+  {
+   "id": "B3",
+   "file": "~/.claude/settings.json",
+   "defect": "B-PERMISSIONS — keep — Preserve all whole-tool allowances: Bash, Edit, Write, Read, Glob, Grep, NotebookEdit, WebFetch, WebSearch; preserve bypassPermissions. Disabling an unused integration must not narrow these allowances."
+  },
+  {
+   "id": "B4",
+   "file": "plugin marketplace registration",
+   "defect": "B-PLUGIN-CLAUDE-PLUGINS-OFFICIAL — keep — A known marketplace with no enabled plugins supplies no demonstrated active plugin overhead; removing its registration earns no evidenced token saving."
+  },
+  {
+   "id": "B5",
+   "file": "claude.ai account connectors",
+   "defect": "B-CONNECTOR-CLAUDE-DOCS — keep — No project use is demonstrated, but neither is non-use; distinguish living documents from sketch Artifacts. Account-managed; no project disabling control is established."
+  },
+  {
+   "id": "B6",
+   "file": "claude.ai account connectors",
+   "defect": "B-CONNECTOR-GOOGLE-DRIVE — keep — Research inputs might use Drive; the bundle contains no usage evidence establishing that nobody does. Account-managed; no project disabling control is established."
+  },
+  {
+   "id": "B7",
+   "file": "claude.ai account connectors",
+   "defect": "B-CONNECTOR-GMAIL — cut — Currently unauthenticated and supplying notices rather than usable project capability. Disable at account level; project settings cannot remove this account connection as described."
+  },
+  {
+   "id": "B8",
+   "file": "claude.ai account connectors",
+   "defect": "B-CONNECTOR-GOOGLE-CALENDAR — cut — Currently unauthenticated and supplying notices rather than usable project capability. Disable at account level; do not confuse it with repository batch scheduling."
+  },
+  {
+   "id": "B9",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SYNCED-SKILL-CONTAINER — keep — Evaluate individual skills below; this is account-synced skill exposure, not an enabled project plugin. No project-level suppression mechanism is supplied."
+  },
+  {
+   "id": "B10",
+   "file": ".claude/skills/sketch",
+   "defect": "B-SKILL-SKETCH — keep — Explicit user-established project workflow for seeing proposed features before implementation."
+  },
+  {
+   "id": "B11",
+   "file": "skill listing",
+   "defect": "B-SKILL-DATAVIZ — keep — Project dashboards and measurements plausibly exercise this surface; no invocation history proves non-use. Its unusually long description is overhead, not evidence of disuse."
+  },
+  {
+   "id": "B12",
+   "file": "skill listing",
+   "defect": "B-SKILL-ARTIFACT-DESIGN — keep — The retained sketch workflow publishes Artifacts; this is an explicitly declared prerequisite for Artifact authoring."
+  },
+  {
+   "id": "B13",
+   "file": "skill listing",
+   "defect": "B-SKILL-ARTIFACT-DIAGRAMMING — keep — Sketch includes a plan view; diagram guidance has a direct project use."
+  },
+  {
+   "id": "B14",
+   "file": "skill listing",
+   "defect": "B-SKILL-ARTIFACT-CAPABILITIES — keep — Static sketches do not establish runtime-capability use, but the bundle also does not establish non-use. Do not infer dependency merely from the word Artifact."
+  },
+  {
+   "id": "B15",
+   "file": "skill listing",
+   "defect": "B-SKILL-UPDATE-CONFIG — keep — Existing settings and hook maintenance are project work, including the proposed cuts; retain without authorizing new mechanisms."
+  },
+  {
+   "id": "B16",
+   "file": "skill listing",
+   "defect": "B-SKILL-KEYBINDINGS-HELP — keep — Peripheral to game work, but account/user configuration use is unknown; absence from repository rules is insufficient evidence for removal."
+  },
+  {
+   "id": "B17",
+   "file": "skill listing",
+   "defect": "B-SKILL-CODE-REVIEW — keep — Independent review is an explicit project requirement; retain the review capability and broad underlying tool permissions."
+  },
+  {
+   "id": "B18",
+   "file": "skill listing",
+   "defect": "B-SKILL-SIMPLIFY — keep — Deletion and simplification are explicitly permitted work under the infrastructure freeze."
+  },
+  {
+   "id": "B19",
+   "file": "skill listing",
+   "defect": "B-SKILL-FEWER-PERMISSION-PROMPTS — cut — Its proposed prioritized allowlist is redundant with existing whole-tool allowances and must not replace them. No supported project skill-disable control is supplied; remove exposure only through an existing host control, if available."
+  },
+  {
+   "id": "B20",
+   "file": "skill listing",
+   "defect": "B-SKILL-LOOP — keep — Repository-owned batch machinery does not prove nobody uses interactive polling; no use history or supported project suppression is supplied."
+  },
+  {
+   "id": "B21",
+   "file": "skill listing",
+   "defect": "B-SKILL-SCHEDULE — keep — Local batch operation does not establish account cloud-routine non-use. Do not cut on the assumption that all scheduling is the same feature."
+  },
+  {
+   "id": "B22",
+   "file": "skill listing",
+   "defect": "B-SKILL-CLAUDE-API — keep — Claude SDK sessions, model routing, and provider operations are present. The description’s broad triggers are not evidence that its capability is unused."
+  },
+  {
+   "id": "B23",
+   "file": "skill listing",
+   "defect": "B-SKILL-WORKFLOW-AUTHORING — keep — Workflow budgeting is explicitly remembered; this does not prove use of this particular tool, but prevents a confident unused classification."
+  },
+  {
+   "id": "B24",
+   "file": "skill listing",
+   "defect": "B-SKILL-RUN — keep — Running and visually inspecting the game is core project work."
+  },
+  {
+   "id": "B25",
+   "file": "skill listing",
+   "defect": "B-SKILL-INIT — keep — Initializing this repository again is unnecessary, but no evidence establishes that the listed capability is never used or independently suppressible."
+  },
+  {
+   "id": "B26",
+   "file": "skill listing",
+   "defect": "B-SKILL-SECURITY-REVIEW — keep — Security and data risks remain valid findings under the freeze; no evidence establishes that this review surface is unused."
+  },
+  {
+   "id": "B27",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SKILL-ANTHROPIC-DOCS — keep — Coupled to the retained account Docs connector; repository Markdown and sketch Artifacts alone neither require nor disprove its use."
+  },
+  {
+   "id": "B28",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SKILL-ANTHROPIC-DOCX — keep — No Word deliverables are shown, but no use history establishes project-wide non-use; account-synced, with no demonstrated project disable."
+  },
+  {
+   "id": "B29",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SKILL-ANTHROPIC-IMPORT-MEMORY — keep — Memory import use is unknown; existing memory files do not prove how they were created or whether imports recur."
+  },
+  {
+   "id": "B30",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SKILL-ANTHROPIC-MORNING — keep — A strong unused candidate, but no account/project usage history is supplied; do not equate lack of a game-development purpose with proven non-use."
+  },
+  {
+   "id": "B31",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SKILL-ANTHROPIC-PDF — keep — Historical/geographic research may involve PDFs; removing it solely because PDFs are absent from this bundle is unjustified."
+  },
+  {
+   "id": "B32",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SKILL-ANTHROPIC-PPTX — keep — No presentation use is shown, but the required “nobody uses it” finding is unsupported; account-synced surface."
+  },
+  {
+   "id": "B33",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SKILL-ANTHROPIC-SKILL-CREATOR — keep — An existing project skill may need simplification; the freeze forbids new mechanisms, not all maintenance of existing skills."
+  },
+  {
+   "id": "B34",
+   "file": "~/.claude/skills/synced",
+   "defect": "B-SKILL-ANTHROPIC-XLSX — keep — CSV/TSV research or spreadsheet work is possible; no usage evidence supports removal."
+  },
+  {
+   "id": "B35",
+   "file": "agent listing",
+   "defect": "B-AGENT-CLAUDE — keep — Listed FleetView default/catch-all; overlap with general-purpose does not establish that either registration is unused or project-disableable."
+  },
+  {
+   "id": "B36",
+   "file": "agent listing",
+   "defect": "B-AGENT-CLAUDE-CODE-GUIDE — keep — Harness, hook, and SDK questions occur in this project; no demonstrated project agent-disable switch is supplied."
+  },
+  {
+   "id": "B37",
+   "file": "agent listing",
+   "defect": "B-AGENT-EXPLORE — keep — Bounded repository search is useful and explicitly avoids full-file dumps."
+  },
+  {
+   "id": "B38",
+   "file": "agent listing",
+   "defect": "B-AGENT-GENERAL-PURPOSE — keep — Existing delegation requires general implementation/research capability; do not remove merely because another catch-all exists."
+  },
+  {
+   "id": "B39",
+   "file": "agent listing",
+   "defect": "B-AGENT-PLAN — keep — Complex game changes need planning; prohibiting new workflow abstractions does not prohibit implementation planning."
+  },
+  {
+   "id": "B40",
+   "file": "agent listing",
+   "defect": "B-AGENT-STATUSLINE-SETUP — keep — Usage is unknown; a context header is not evidence that this separate statusline agent is used or unused."
+  },
+  {
+   "id": "B41",
+   "file": ".claude/agents/trivial-task.md",
+   "defect": "B-AGENT-TRIVIAL-TASK — keep — Explicit project agent for tightly scoped points; Medium effort removes its budget distinction, not its scope distinction. Removing this file would be a project action, but non-use is not established."
+  },
+  {
+   "id": "B42",
+   "file": "deferred tools",
+   "defect": "B-TOOL-ARTIFACTCOMMENTS — keep — Artifact-related interaction may accompany the retained sketch workflow; no independent non-use evidence."
+  },
+  {
+   "id": "B43",
+   "file": "deferred tools",
+   "defect": "B-TOOL-ARTIFACTDATA — keep — Artifact data functionality is not shown in use, but cannot be classified unused from its name alone."
+  },
+  {
+   "id": "B44",
+   "file": "deferred tools",
+   "defect": "B-TOOL-CRONCREATE — keep — Interactive recurring work remains possible; distinguish this from the repository’s OS launcher."
+  },
+  {
+   "id": "B45",
+   "file": "deferred tools",
+   "defect": "B-TOOL-CRONDELETE — keep — Retain cancellation alongside retained recurring-task creation; no separate non-use finding."
+  },
+  {
+   "id": "B46",
+   "file": "deferred tools",
+   "defect": "B-TOOL-CRONLIST — keep — Retain inspection of recurring tasks; no evidence supports removing it."
+  },
+  {
+   "id": "B47",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DESIGNSYNC — keep — Only its name is supplied; purpose, dependency, usage, and disabling control are unknown."
+  },
+  {
+   "id": "B48",
+   "file": "deferred tools",
+   "defect": "B-TOOL-ENTERWORKTREE — keep — Worktree isolation is binding; repository scripts do not establish that this tool is unused."
+  },
+  {
+   "id": "B49",
+   "file": "deferred tools",
+   "defect": "B-TOOL-EXITWORKTREE — keep — Retain the counterpart of EnterWorktree; do not leave a deliberately incomplete capability pair."
+  },
+  {
+   "id": "B50",
+   "file": "deferred tools",
+   "defect": "B-TOOL-MONITOR — keep — Only a name is supplied; do not infer equivalence to repository monitoring scripts or classify it unused."
+  },
+  {
+   "id": "B51",
+   "file": "deferred tools",
+   "defect": "B-TOOL-NOTEBOOKEDIT — keep — Explicit whole-tool allowance must remain broad; notebook use and independent surface suppression are not established."
+  },
+  {
+   "id": "B52",
+   "file": "deferred tools",
+   "defect": "B-TOOL-PUSHNOTIFICATION — keep — Repository notify.mjs does not prove this distinct notification surface is unused; name-only evidence is insufficient."
+  },
+  {
+   "id": "B53",
+   "file": "deferred tools",
+   "defect": "B-TOOL-REMOTETRIGGER — keep — Trigger semantics and usage are not supplied; no safe unused classification."
+  },
+  {
+   "id": "B54",
+   "file": "deferred tools",
+   "defect": "B-TOOL-SENDMESSAGE — keep — Existing delegated/session-bound agents need communication; carrier rules restrict certain messages, not the entire tool."
+  },
+  {
+   "id": "B55",
+   "file": "deferred tools",
+   "defect": "B-TOOL-TASKSTOP — keep — Cancelling a task differs from stopping the autonomous batch; the batch rule does not make this tool unused."
+  },
+  {
+   "id": "B56",
+   "file": "deferred tools",
+   "defect": "B-TOOL-WEBFETCH — keep — Research and primary-source retrieval support historical, geographic, and technical work; preserve whole-tool allowance."
+  },
+  {
+   "id": "B57",
+   "file": "deferred tools",
+   "defect": "B-TOOL-WEBSEARCH — keep — Research is part of the game’s design and verification; preserve whole-tool allowance."
+  },
+  {
+   "id": "B58",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DOCS-BATCH — keep — Retained Docs connector capability; no call history establishes non-use."
+  },
+  {
+   "id": "B59",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DOCS-CREATE — keep — Retained Docs connector capability; do not infer a separate removable registration."
+  },
+  {
+   "id": "B60",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DOCS-DELETE — keep — Retained connector capability; do not narrow permissions by selectively removing mutation tools."
+  },
+  {
+   "id": "B61",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DOCS-EXPORT — keep — Retained connector capability; export use is unknown."
+  },
+  {
+   "id": "B62",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DOCS-GUIDE — keep — Instructions explicitly require this capability for some Docs operations."
+  },
+  {
+   "id": "B63",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DOCS-QUERY — keep — Retained connector capability; query use is unknown."
+  },
+  {
+   "id": "B64",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DOCS-READ — keep — Retained connector capability; reading is not equivalent to creating project Markdown."
+  },
+  {
+   "id": "B65",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DOCS-UPDATE — keep — Retained connector capability; update use is unknown."
+  },
+  {
+   "id": "B66",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-COPY-FILE — keep — Retained Drive connector capability; no separate non-use evidence or project disabling control."
+  },
+  {
+   "id": "B67",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-CREATE-FILE — keep — Retained Drive connector capability; do not narrow its mutation permissions."
+  },
+  {
+   "id": "B68",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-DOWNLOAD-FILE-CONTENT — keep — Potential research-input capability; usage is unknown."
+  },
+  {
+   "id": "B69",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-GET-FILE-METADATA — keep — Retained Drive connector capability; metadata may support other calls."
+  },
+  {
+   "id": "B70",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-GET-FILE-PERMISSIONS — keep — Retained Drive connector capability; do not presume independent disuse."
+  },
+  {
+   "id": "B71",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-LIST-RECENT-FILES — keep — Retained Drive connector capability; no usage evidence supports removal."
+  },
+  {
+   "id": "B72",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-READ-FILE-CONTENT — keep — Potential research-input capability; no non-use evidence."
+  },
+  {
+   "id": "B73",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-SEARCH-FILES — keep — Potential research-discovery capability; no non-use evidence."
+  },
+  {
+   "id": "B74",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-SHARE-FILE — keep — Retained connector capability; outward-action rules govern its use without narrowing whole-tool allowances."
+  },
+  {
+   "id": "B75",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-TRASH-FILE — keep — Retained connector capability; no permission tightening disguised as context reduction."
+  },
+  {
+   "id": "B76",
+   "file": "deferred tools",
+   "defect": "B-TOOL-DRIVE-UPDATE-FILE — keep — Retained connector capability; no separate non-use evidence or demonstrated project suppression."
+  },
+  {
+   "id": "B77",
+   "file": "MCP instructions block",
+   "defect": "B-MCP-DOCS-INSTRUCTIONS — keep — These are account-supplied connector instructions, not editable project prose. Their approximately 732 tokens are removable only if the connector is actually disabled; do not count them as saved here."
+  },
+  {
+   "id": "B78",
+   "file": "~/.claude/hooks/berlin-timestamp.cjs",
+   "defect": "C-H1 — shrink — One-line form: “Berlin-Zeit jetzt: <reading>; Antwort mit **<frisch gemessener Zeit>** beginnen; nach Tools unmittelbar vor Antwort neu messen, nie hochrechnen.” Timestamp duty applies every reply, so there is no ordinary “nothing due” exemption; retain the full command/example only for timestamp troubleshooting or a relevant refusal."
+  },
+  {
+   "id": "B79",
+   "file": "scripts/dashboard-reminder-hook.mjs",
+   "defect": "C-H2-OWNER — shrink — No-change line: “Batch-Eigentümer: Board bei Zustandsänderung zuerst aktualisieren; Verfahren: Memory batch-dashboard-artifact.” Full paragraph only when an owner’s board update is due; preserve whole-file review, section boundaries, mobile layout, approved structure changes, and edit/publish commands in that linked source."
+  },
+  {
+   "id": "B80",
+   "file": "scripts/dashboard-reminder-hook.mjs",
+   "defect": "C-H2-CONTEXT-HEADER — keep — Already one line: “[context-level] Kopfzeilen-Suffix: · Kontext: <gemessener Wert oder --> Tokens”; no longer form is needed and an unknown count must remain unknown."
+  },
+  {
+   "id": "B81",
+   "file": "scripts/dashboard-reminder-hook.mjs",
+   "defect": "C-H2-STAND-DOWN — shrink — Normal owner form: no stand-down text; if a status line is required, “Batch-Rolle: Eigentümer.” Full stand-down restriction only when another verified live session owns the lock; retain its prohibitions on batch work, main merges, TASKS edits, and dashboard edits."
+  },
+  {
+   "id": "B82",
+   "file": "scripts/dashboard-reminder-hook.mjs",
+   "defect": "C-H2-CONTEXT-CEILING — keep — No notice below the existing trigger; full existing one-shot notice only for an attended head window above the context ceiling. Exact notice body was not supplied, so no invented replacement text."
+  },
+  {
+   "id": "B83",
+   "file": "scripts/batch-resume-hook.mjs",
+   "defect": "C-H3-STATUS — shrink — Ordinary line: “Batch: <measured role>; branch <branch>; open points <count>; next <point>; transferred work <status>; procedure docs/batch-owner-runbook.md.” Full exceptional status only when ownership, adoption, model validity, or launch recovery requires action; never hard-code recorded point 174 or 430 open points."
+  },
+  {
+   "id": "B84",
+   "file": "scripts/batch-resume-hook.mjs",
+   "defect": "C-H3-REPEATED-POLICY — shrink — One-line form: “Owner: CLAUDE.md §6 and docs/batch-owner-runbook.md; inspect existing work and adopt transferred work before dispatch.” Move unique operational details into the linked runbook and remove repeated policy exposition; fuller instructions only for the operation being performed, not every owner startup."
+  },
+  {
+   "id": "B85",
+   "file": "scripts/batch-resume-hook.mjs; docs/batch-owner-runbook.md",
+   "defect": "C-H3-RUNBOOK-SCOPE — shrink — One-line form: “Owner procedure: docs/batch-owner-runbook.md; applies only to the proven batch owner.” Full relevant section only during its owner operation; never inject the complete owner manual into a delegate or stand-down session."
+  },
+  {
+   "id": "B86",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C-H3-DISPATCH-LANDING — shrink — Idle form: “Dispatch/landing: docs/batch-owner-runbook.md#dispatch-and-landing.” Full section when commissioning, scheduling verification, landing, or requesting aesthetic judgment; preserve three-lane cap, non-overlap, owner duties, brief regeneration, mandatory gate, quiet machine, and deployed-main judgment."
+  },
+  {
+   "id": "B87",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C-H3-BOUNDARY-LEASE — shrink — Idle form: “Boundary/ownership: docs/batch-owner-runbook.md#boundary-lease-claims-and-wake-up.” Full applicable passage when handing over, adopting, claiming, losing ownership, checking children, or handling watcher work; retain concise preventive context limits before they are crossed."
+  },
+  {
+   "id": "B88",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C-H3-STANDSTILL-REPORT — shrink — Idle form: “Standstill measurement: docs/batch-owner-runbook.md#standstill-journal-and-report.” Full section only when running or interpreting the report, fixtures, or journal; classification precedence and telemetry fields are not dispatch prerequisites."
+  },
+  {
+   "id": "B89",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C-H3-AUTHORING-REVIEW — shrink — Idle form: “Routing/review: CLAUDE.md §6; blind merge: docs/batch-owner-runbook.md#authoring-and-four-eyes.” Full applicable section when routing, reviewing, or merging blind outputs; preserve author exclusion and the existing two-model exception without duplicating stale model versions."
+  },
+  {
+   "id": "B90",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C-H3-RELEASE-CLOSING — shrink — Idle form: “Release/closing: docs/batch-owner-runbook.md#release-and-closing.” Full section only for closing, a version release, or a requested poc move; retain the asymmetric vX.Y→poc relationship and poc’s explicit closing exemption."
+  },
+  {
+   "id": "B91",
+   "file": "docs/batch-owner-runbook.md",
+   "defect": "C-H3-BOARD-OPERATIONS — shrink — Idle form: “Owner operations: docs/batch-owner-runbook.md#board-and-owner-only-operating-hooks.” Full relevant bullets when draining findings, publishing the board, recovering the batch, preparing during verification, or arming dormant guards; no new rule or guard."
+  },
+  {
+   "id": "B92",
+   "file": "PreToolUse board-first guard",
+   "defect": "C-H4-BOARD-FIRST — keep — Normal form: empty, already better than a one-line reminder; full refusal only when the existing current/published-focus requirement blocks the matched mutation."
+  },
+  {
+   "id": "B93",
+   "file": "PreToolUse worktree-reminder guard",
+   "defect": "C-H4-WORKTREE — keep — Normal form: empty; full text only on its existing matching refusal. Exact predicate/body were not supplied; do not guess them from the name."
+  },
+  {
+   "id": "B94",
+   "file": "PreToolUse commission guard",
+   "defect": "C-H4-COMMISSION — keep — Normal form: empty; full refusal only when the existing commission conditions fail, including the documented cap/explanation requirements where applicable."
+  },
+  {
+   "id": "B95",
+   "file": "PreToolUse path-scope guard",
+   "defect": "C-H4-PATH-SCOPE — keep — Normal form: empty; full text only on its existing scope refusal. No extra allow-path message."
+  },
+  {
+   "id": "B96",
+   "file": "PreToolUse point-proof guard",
+   "defect": "C-H4-POINT-PROOF — keep — Normal form: empty; full text only on its existing proof refusal. Exact predicate/body are not supplied."
+  },
+  {
+   "id": "B97",
+   "file": "PreToolUse context-fence guard",
+   "defect": "C-H4-CONTEXT-FENCE — keep — Normal form: empty; full warning/refusal only under existing mode and threshold behavior. Preserve observe-by-default; this task must not arm it or add enforcement."
+  },
+  {
+   "id": "B98",
+   "file": "PreToolUse closing guard",
+   "defect": "C-H4-CLOSING — keep — Normal form: empty; full refusal only for an existing incomplete-closing block. Preserve the documented poc exception rather than inventing a broader tag rule."
+  },
+  {
+   "id": "B99",
+   "file": "PreToolUse wait-command guard",
+   "defect": "C-H4-WAIT-COMMAND — keep — Normal form: empty; full text only on its existing matched refusal. Exact predicate/body are unavailable."
+  },
+  {
+   "id": "B100",
+   "file": "PreToolUse firewall guards",
+   "defect": "C-H4-FIREWALL — keep — Normal form: empty; full text only on the existing refusal condition. The bundle groups these guards and does not enumerate their individual identities."
+  },
+  {
+   "id": "B101",
+   "file": "scripts/lock-heartbeat-hook.mjs",
+   "defect": "C-H5-HEARTBEAT — keep — Normal form: empty; no success heartbeat prose. Existing notice-specific conditions remain as below."
+  },
+  {
+   "id": "B102",
+   "file": "scripts/lock-heartbeat-hook.mjs",
+   "defect": "C-H5-CHAT-DELIVERY — keep — Normal form: empty; full delivery notice only when an owner receives an actual queued user message, using existing delivery behavior."
+  },
+  {
+   "id": "B103",
+   "file": "scripts/lock-heartbeat-hook.mjs",
+   "defect": "C-H5-DISPOSSESSION — shrink — Normal form: empty; full existing one-shot notice only on actual dispossession under the existing fence. Preserve immediate loss-of-authority instructions; do not repeat 831–984 characters on subsequent successful calls."
+  },
+  {
+   "id": "B104",
+   "file": "scripts/lock-heartbeat-hook.mjs",
+   "defect": "C-H5-HAND-BACK — keep — Normal form: empty; full report only when an owner-loop hand-back actually occurs. Exact report text is not supplied."
+  },
+  {
+   "id": "B105",
+   "file": "scripts/prep-arm-hook.mjs",
+   "defect": "C-H5-PREP-ARM — keep — Normal form: empty, as recorded; any full text remains conditional on an existing applicable event, whose predicate/body are not supplied."
+  },
+  {
+   "id": "B106",
+   "file": "project Stop hooks",
+   "defect": "C-H6-PROJECT-GUARDS — keep — Normal form: empty for all 29 passing guards; full actionable refusal only for a currently violated existing rule. The 29 identities and individual bodies are not supplied, so claiming an individual rewrite of each would be fabricated."
+  },
+  {
+   "id": "B107",
+   "file": "Stop dashboard refusal",
+   "defect": "C-H6-DASHBOARD-UNREGISTERED — shrink — Normal form: empty; full diagnostic only when dashboard registration actually fails. Remove duplicated general board policy from the refusal in favor of its existing authoritative reference; preserve the concrete failure and remedy."
+  },
+  {
+   "id": "B108",
+   "file": "Stop batch-progress refusal",
+   "defect": "C-H6-DO-NOT-STOP — shrink — Normal form: empty; full diagnostic only when an owning batch session attempts an impermissible stop. Keep authorized boundary/stop distinctions; do not emit owner continuation instructions in stand-down sessions."
+  },
+  {
+   "id": "B109",
+   "file": "~/.claude/hooks/check-reply-timestamp.cjs",
+   "defect": "C-H6-TIMESTAMP-RULE — shrink — Normal form: empty; full timestamp rule/help only on an actual reply-timestamp failure. Corrective one-line form: “Zeitstempel ungültig: Berlin-Zeit jetzt neu messen und Antwortkopf korrigieren.”"
+  },
+  {
+   "id": "B110",
+   "file": "Stop batch-waiting message",
+   "defect": "C-H6-BATCH-WAITING — shrink — Normal form: empty; full waiting instruction only in the existing batch-waiting condition. Exact rule/predicate is not supplied; do not infer that all waits require a stop refusal."
+  },
+  {
+   "id": "B111",
+   "file": "Stop timestamp-violated message",
+   "defect": "C-H6-TIMESTAMP-VIOLATED — shrink — Normal form: empty; on violation use “Zeitstempel weicht von der Messung ab: unmittelbar neu messen und korrigieren.” Full diagnostic only if needed to explain the existing failed comparison; do not introduce a new comparison or tolerance."
+  },
+  {
+   "id": "B112",
+   "file": "H4–H6 hook inventory",
+   "defect": "C-HOOK-COVERAGE-LIMIT — keep — The 358/358 empty allows prove normal-path silence only; they do not establish complete guard coverage, refusal frequency, or tool use. Do not count empty hooks as additional savings."
+  },
+  {
+   "id": "B113",
+   "file": "H1–H6 text selection",
+   "defect": "C-CONDITIONING-LIMIT — keep — Use existing role/event/state information and linked documents only; if “board changed” is not already known to a hook, emit the concise conditional instruction rather than building a detector, cache, latch, or new guard."
+  },
+  {
+   "id": "B114",
+   "file": "CLAUDE.md title/headings",
+   "defect": "D-CLAUDE-title-1 — reword — Proposed: “# HoA POC — session rules”; retain section numbers and §7.1 anchors used elsewhere. Reason: decorative title wording is unnecessary; reference stability is necessary."
+  },
+  {
+   "id": "B115",
+   "file": "CLAUDE.md §1",
+   "defect": "D-CLAUDE-1-1 — reword — Proposed: “Build a runnable modern-remake POC demonstrating the core loop, not the complete game. design.md defines the target; this file defines build/verification policy.” Reason: preserves scope and authority."
+  },
+  {
+   "id": "B116",
+   "file": "CLAUDE.md §2",
+   "defect": "D-CLAUDE-2-1 — reword — Proposed: “Single-player only; no multiplayer, netcode, roles, or synchronization.” Reason: direct binding constraint."
+  },
+  {
+   "id": "B117",
+   "file": "CLAUDE.md §2",
+   "defect": "D-CLAUDE-2-2 — reword — Proposed: “No onboarding, tutorial, guided introduction, or lowered entry barrier.” Reason: already compact and binding."
+  },
+  {
+   "id": "B118",
+   "file": "CLAUDE.md §2",
+   "defect": "D-CLAUDE-2-3 — reword — Proposed: “Add/reintroduce no system absent from design.md; record missing design concepts as open items.” Reason: retains the prohibition and disposition."
+  },
+  {
+   "id": "B119",
+   "file": "CLAUDE.md §2",
+   "defect": "D-CLAUDE-2-4 — reword — Proposed: “Estimate unstated playable values under design.md §14; never override stated values. Centralize estimates, marked calibratable, in src/config/balance.ts.” Reason: preserves authority, labeling, and location."
+  },
+  {
+   "id": "B120",
+   "file": "CLAUDE.md §2",
+   "defect": "D-CLAUDE-2-5 — reword — Proposed: “§7.1 is an acceptance checklist, never a work-start gate; judge progress by playable output.” Reason: retains the 01.09.2026 decision without repeating its date in the prefix."
+  },
+  {
+   "id": "B121",
+   "file": "CLAUDE.md §2",
+   "defect": "D-CLAUDE-2-6 — reword — Proposed: “Infrastructure freeze: no new guards, ledger fields, routers, review planners, or workflow abstractions. Fix infrastructure only for a reproducible current-game blockade or possible false approval; defer the rest. Switch off obstructing rules; do not rebuild them.” Reason: retains every operative restriction."
+  },
+  {
+   "id": "B122",
+   "file": "CLAUDE.md §2",
+   "defect": "D-CLAUDE-2-7 — reword — Proposed: “Create finding points only for reproducible player impact, security/data risk, real blockade, or deletion/simplification. Otherwise collect in non-blocking docs/backlog.md; close duplicates without new machinery.” Reason: preserves intake and non-gating backlog."
+  },
+  {
+   "id": "B123",
+   "file": "CLAUDE.md §3",
+   "defect": "D-CLAUDE-3-1 — reword — Proposed: “WebGPU primary, automatic WebGL 2 fallback; import three/webgpu, use TSL, no Chrome-only game behavior. Fallback notice: localized and dismissible. Mechanics: docs/render-architecture.md.” Reason: keeps all implementation constraints."
+  },
+  {
+   "id": "B124",
+   "file": "CLAUDE.md §3",
+   "defect": "D-CLAUDE-3-2 — reword — Proposed: “Journal TTS: kokoro-js in a Web Worker; lazy-load outside startup chunks; currently English-only. Mechanics: docs/tts-architecture.md.” Reason: preserves loading, execution, and language constraints."
+  },
+  {
+   "id": "B125",
+   "file": "CLAUDE.md §3",
+   "defect": "D-CLAUDE-3-3 — reword — Proposed: “Add runtime dependencies only when necessary; justify each in its commit.” Reason: direct dependency rule."
+  },
+  {
+   "id": "B126",
+   "file": "CLAUDE.md §4",
+   "defect": "D-CLAUDE-4-1 — reword — Proposed: “Design changes update design.md, affected build-order rules here, and code together. Organize src/ by topic; no monolith.” Reason: preserves coordinated updates and structure."
+  },
+  {
+   "id": "B127",
+   "file": "CLAUDE.md §5",
+   "defect": "D-CLAUDE-5-1 — reword — Proposed: “Choose covering suites by changed behavior via scripts/verify/tiers.mjs; run both-backend LARGE once per bundle and at closing.” Reason: retains cadence and backend requirement."
+  },
+  {
+   "id": "B128",
+   "file": "CLAUDE.md §5",
+   "defect": "D-CLAUDE-5-2 — reword — Proposed: “Each feature adds the right-layer test: Vitest/jsdom for browserless logic/state/HUD; Playwright only for scene, geometry, CSS/layout, audio, screenshots, and end-to-end behavior. Map: scripts/verify/README.md.” Reason: preserves the testing boundary."
+  },
+  {
+   "id": "B129",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-1 — reword — Proposed: “Each point: feat/<point>-<slug> from main; small atomic self-contained commits; push every commit and report push failure. Merge only complete, tier-green, and picture-checked: both backends when isBackendSensitivePath applies, one otherwise. Retest code conflicts.” Reason: keeps all branch/verification obligations."
+  },
+  {
+   "id": "B130",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-2 — reword — Proposed: “After merge, delete local branch, remote branch, and worktree; branch-hygiene-guard is the backstop.” Reason: preserves the full cleanup set."
+  },
+  {
+   "id": "B131",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-3 — reword — Proposed: “Small cross-cutting bookkeeping may land on main; delegate larger mechanisms into isolated worktrees.” Reason: preserves the exception without broadening it."
+  },
+  {
+   "id": "B132",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-4 — reword — Proposed: “TASKS.md is main-only: append there; tick after merge; archive closed points verbatim to docs/tasks-archive.md. Read open+closed tasks through scripts/tasks-source.mjs.” Reason: preserves mutation order and consumer path."
+  },
+  {
+   "id": "B133",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-5 — reword — Proposed: “Land via node scripts/land-point.mjs <N> --model <m>; post-merge gate is mandatory. Keep branches short; reverify after substantial main sync. Owner procedure: docs/batch-owner-runbook.md.” Reason: retains command, gate, and freshness rule."
+  },
+  {
+   "id": "B134",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-6 — reword — Proposed: “Delegated authors generate point-brief.mjs <N>, read named sections as needed, regenerate stale-revision briefs, and escalate ambiguous/insufficient briefs.” Reason: keeps delegation scope and no-guessing requirement."
+  },
+  {
+   "id": "B135",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-7 — reword — Proposed: “Daemon-owned durable Astra authors survive handover; session-bound Agent children block it. Delegates test, commit, push; never merge.” Reason: prevents handover semantics from disappearing into a pointer."
+  },
+  {
+   "id": "B136",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-8 — reword — Proposed: “Context fence: at its refusal mark start no agents, suites, points, or authoring; finishing, reading, and boundary remain allowed. Default observe refuses nothing until arming lands. Mechanics: docs/batch-owner-runbook.md.” Reason: explicitly retains preventive text and current mode."
+  },
+  {
+   "id": "B137",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-9 — reword — Proposed: “Astra authors difficult/complex/error-prone/HIGH points; Opus 5.5 authors verification-as-work; Fable 5.1 authors tagged/escalated points. Unreachable Astra falls back to Opus 5.5. Review cross-vendor, never by a range author: review-astra.mjs for Claude work, Claude for Astra work. fable-switch.mjs --status alone determines Fable authoring/serving/trailer/blind-merge participation; serving outside its chain pauses batch. Every commit: author-model Co-Authored-By; optional distinct reviewer Reviewed-By: <allowed model> <model vendor no-reply address>, never reviewer Co-Authored-By.” Reason: retains model, fallback, exclusion, and trailer semantics."
+  },
+  {
+   "id": "B138",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-10 — reword — Proposed: “Divergent: blind parallel work from identical inputs; third model merges/counts IDs via blind-merge.mjs. Convergent: review artifact before rationale. Prefer cross-vendor; record and decorrelate weaker same-model fallback.” Reason: preserves both modes and fallback handling."
+  },
+  {
+   "id": "B139",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-11 — reword — Proposed: “All player text in language files: English default, German available; update both together; further languages require only a file. Code, identifiers, labels, comments, filenames: English.” Reason: preserves localization architecture and language policy."
+  },
+  {
+   "id": "B140",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-12 — reword — Proposed: “Every en/de journal text carries design.md §15 emotional markup; display strips it, TTS converts it to prosody. Mechanics: docs/tts-architecture.md.” Reason: preserves all text/render/voice responsibilities."
+  },
+  {
+   "id": "B141",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-13 — reword — Proposed: “Answer repository questions with small command output. For blocked actions find the project command; never assign manual container work to the user.” Reason: preserves bounded evidence and ownership of execution."
+  },
+  {
+   "id": "B142",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-14 — reword — Proposed: “Execute settled judgments. Confirm outward-facing/hard-to-reverse steps unless durably authorized. A stated recommendation on a ‘Von dir zu klären’ card authorizes decision, execution, and recorded what/why/veto-effect closure, except tags, publishes, force-pushes, user-data deletions, and unrecommended genuine choices. Report failures, skips, verified outcomes faithfully.” Reason: preserves authorization boundaries and all exceptions."
+  },
+  {
+   "id": "B143",
+   "file": "CLAUDE.md §6",
+   "defect": "D-CLAUDE-6-15 — reword — Proposed: “Comments brief/factual; mark placeholders. Unclear design: do not guess; add // OPEN: … and report at run end.” Reason: preserves placeholder and ambiguity handling."
+  },
+  {
+   "id": "B144",
+   "file": "CLAUDE.md §7.1 introduction",
+   "defect": "D-CLAUDE-7.1-1 — reword — Proposed: “POC checklist, not a gate: numbered conditions in docs/acceptance-criteria-detail.md; matching evidence in docs/acceptance-evidence.md. Preserve numbers and update affected copies together.” Reason: retains authoritative links and update obligations while removing the local title inventory."
+  },
+  {
+   "id": "B145",
+   "file": "CLAUDE.md §7.1 criterion 1",
+   "defect": "D-CLAUDE-7.1-2 — move-to-docs/acceptance-criteria-detail.md — Preserve “1. Build/start” and its existing conditions; a repeated title is not needed every session."
+  },
+  {
+   "id": "B146",
+   "file": "CLAUDE.md §7.1 criterion 2",
+   "defect": "D-CLAUDE-7.1-3 — move-to-docs/acceptance-criteria-detail.md — Preserve “2. Two perspectives”; retain criterion number and evidence mapping."
+  },
+  {
+   "id": "B147",
+   "file": "CLAUDE.md §7.1 criterion 3",
+   "defect": "D-CLAUDE-7.1-4 — move-to-docs/acceptance-criteria-detail.md — Preserve “3. World model”; no criterion is dropped."
+  },
+  {
+   "id": "B148",
+   "file": "CLAUDE.md §7.1 criterion 4",
+   "defect": "D-CLAUDE-7.1-5 — move-to-docs/acceptance-criteria-detail.md — Preserve “4. Movement and time”; consult with affected work."
+  },
+  {
+   "id": "B149",
+   "file": "CLAUDE.md §7.1 criterion 5",
+   "defect": "D-CLAUDE-7.1-6 — move-to-docs/acceptance-criteria-detail.md — Preserve “5. Port city”; title need not occupy the fixed prefix."
+  },
+  {
+   "id": "B150",
+   "file": "CLAUDE.md §7.1 criterion 6",
+   "defect": "D-CLAUDE-7.1-7 — move-to-docs/acceptance-criteria-detail.md — Preserve “6. Village and cultural contact”; retain existing conditions."
+  },
+  {
+   "id": "B151",
+   "file": "CLAUDE.md §7.1 criterion 7",
+   "defect": "D-CLAUDE-7.1-8 — move-to-docs/acceptance-criteria-detail.md — Preserve “7. Language and communication” including six tonal words, bank/work teaching, and silent tag; these details must not vanish with the title list."
+  },
+  {
+   "id": "B152",
+   "file": "CLAUDE.md §7.1 criterion 8",
+   "defect": "D-CLAUDE-7.1-9 — move-to-docs/acceptance-criteria-detail.md — Preserve “8. Chronicle/journal” and number."
+  },
+  {
+   "id": "B153",
+   "file": "CLAUDE.md §7.1 criterion 9",
+   "defect": "D-CLAUDE-7.1-10 — move-to-docs/acceptance-criteria-detail.md — Preserve “9. Status bar” and number."
+  },
+  {
+   "id": "B154",
+   "file": "CLAUDE.md §7.1 criterion 10",
+   "defect": "D-CLAUDE-7.1-11 — move-to-docs/acceptance-criteria-detail.md — Preserve “10. Goal scaffolding” and number."
+  },
+  {
+   "id": "B155",
+   "file": "CLAUDE.md §7.1 criterion 11",
+   "defect": "D-CLAUDE-7.1-12 — move-to-docs/acceptance-criteria-detail.md — Preserve “11. Game graphics” and number."
+  },
+  {
+   "id": "B156",
+   "file": "CLAUDE.md §7.1 criterion 12",
+   "defect": "D-CLAUDE-7.1-13 — move-to-docs/acceptance-criteria-detail.md — Preserve “12. Atmosphere” and number."
+  },
+  {
+   "id": "B157",
+   "file": "CLAUDE.md §7.1 criterion 13",
+   "defect": "D-CLAUDE-7.1-14 — move-to-docs/acceptance-criteria-detail.md — Preserve “13. Real geodata” and number."
+  },
+  {
+   "id": "B158",
+   "file": "CLAUDE.md §7.1 criterion 14",
+   "defect": "D-CLAUDE-7.1-15 — move-to-docs/acceptance-criteria-detail.md — Preserve “14. Lighting and post-processing” and number."
+  },
+  {
+   "id": "B159",
+   "file": "CLAUDE.md §7.1 criterion 15",
+   "defect": "D-CLAUDE-7.1-16 — move-to-docs/acceptance-criteria-detail.md — Preserve “15. Lively settlements” and number."
+  },
+  {
+   "id": "B160",
+   "file": "CLAUDE.md §7.1 criterion 16",
+   "defect": "D-CLAUDE-7.1-17 — move-to-docs/acceptance-criteria-detail.md — Preserve “16. Settlement collision” and number."
+  },
+  {
+   "id": "B161",
+   "file": "CLAUDE.md §7.1 criterion 17",
+   "defect": "D-CLAUDE-7.1-18 — move-to-docs/acceptance-criteria-detail.md — Preserve “17. Localization” and number."
+  },
+  {
+   "id": "B162",
+   "file": "CLAUDE.md §7.1 criterion 18",
+   "defect": "D-CLAUDE-7.1-19 — move-to-docs/acceptance-criteria-detail.md — Preserve “18. Lint and dependency hygiene” and number."
+  },
+  {
+   "id": "B163",
+   "file": "CLAUDE.md §7.1 criterion 19",
+   "defect": "D-CLAUDE-7.1-20 — move-to-docs/acceptance-criteria-detail.md — Preserve “19. Journal voice/read-aloud” and number."
+  },
+  {
+   "id": "B164",
+   "file": "CLAUDE.md §7.1 criterion 20",
+   "defect": "D-CLAUDE-7.1-21 — move-to-docs/acceptance-criteria-detail.md — Preserve “20. Comfort and audio settings” and number."
+  },
+  {
+   "id": "B165",
+   "file": "CLAUDE.md §7.1 criterion 21",
+   "defect": "D-CLAUDE-7.1-22 — move-to-docs/acceptance-criteria-detail.md — Preserve “21. Water realism” and number."
+  },
+  {
+   "id": "B166",
+   "file": "CLAUDE.md §7.1 criterion 22",
+   "defect": "D-CLAUDE-7.1-23 — move-to-docs/acceptance-criteria-detail.md — Preserve “22. Health and afflictions” and number."
+  },
+  {
+   "id": "B167",
+   "file": "CLAUDE.md §7.1 criterion 23",
+   "defect": "D-CLAUDE-7.1-24 — move-to-docs/acceptance-criteria-detail.md — Preserve “23. Random events” and number."
+  },
+  {
+   "id": "B168",
+   "file": "CLAUDE.md §7.1 criterion 24",
+   "defect": "D-CLAUDE-7.1-25 — move-to-docs/acceptance-criteria-detail.md — Preserve “24. Deadline and successor” and number."
+  },
+  {
+   "id": "B169",
+   "file": "CLAUDE.md §7.1 criterion 25",
+   "defect": "D-CLAUDE-7.1-26 — move-to-docs/acceptance-criteria-detail.md — Preserve “25. Trade economy” and number."
+  },
+  {
+   "id": "B170",
+   "file": "CLAUDE.md §7.1 criterion 26",
+   "defect": "D-CLAUDE-7.1-27 — move-to-docs/acceptance-criteria-detail.md — Preserve “26. Standing with the natives” and number."
+  },
+  {
+   "id": "B171",
+   "file": "CLAUDE.md §7.1 criterion 27",
+   "defect": "D-CLAUDE-7.1-28 — move-to-docs/acceptance-criteria-detail.md — Preserve “27. Camps” and number."
+  },
+  {
+   "id": "B172",
+   "file": "CLAUDE.md §7.1 criterion 28",
+   "defect": "D-CLAUDE-7.1-29 — move-to-docs/acceptance-criteria-detail.md — Preserve “28. Saving/loading”; the memory saying saves are disabled is not authorization to delete an acceptance criterion."
+  },
+  {
+   "id": "B173",
+   "file": "CLAUDE.md §7.1 criterion 29",
+   "defect": "D-CLAUDE-7.1-30 — move-to-docs/acceptance-criteria-detail.md — Preserve “29. Animated handwriting” and number."
+  },
+  {
+   "id": "B174",
+   "file": "CLAUDE.md §7.1 criterion 30",
+   "defect": "D-CLAUDE-7.1-31 — move-to-docs/acceptance-criteria-detail.md — Preserve “30. Gamepad and position query” and number."
+  },
+  {
+   "id": "B175",
+   "file": "CLAUDE.md §7.1 criterion 31",
+   "defect": "D-CLAUDE-7.1-32 — move-to-docs/acceptance-criteria-detail.md — Preserve “31. Orientation and panorama wildlife” and number."
+  },
+  {
+   "id": "B176",
+   "file": "CLAUDE.md §7.1 criterion 32",
+   "defect": "D-CLAUDE-7.1-33 — move-to-docs/acceptance-criteria-detail.md — Preserve “32. Render pipeline upgrades” and number; do not append a second duplicate inventory if the destination already contains it."
+  },
+  {
+   "id": "B177",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-1 — reword — Proposed: “Always build, lint, and unit-test every change; run scripts/audit-check.mjs on lockfile changes. Choose §5 layer/browser tier that asserts changed behavior.” Reason: retains the stated cadence; separate npm-audit memory conflict remains unresolved."
+  },
+  {
+   "id": "B178",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-2 — reword — Proposed: “Test player-reachable states; judge visibility by rendered projection, not assumed radius. Each screenshot declares and actually contains its world/local/place/HUD/general subject at shutter time.” Reason: preserves evidence validity."
+  },
+  {
+   "id": "B179",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-3 — reword — Proposed: “Daily browser lane: WebGPU; LARGE adds full WebGL 2 regression. Every suite asserts requested backend; touch/voice use WebGL 2. WebGL-2-only defects may wait until next LARGE. Operation: scripts/verify/README.md.” Reason: preserves lane routing and allowed deferral."
+  },
+  {
+   "id": "B180",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-4 — reword — Proposed: “Close red runs only by fixing cause, charging owning point, or filing a new point. Retries are SUSPECT and cover nothing.” Reason: retains failure accounting and retry semantics."
+  },
+  {
+   "id": "B181",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-5 — reword — Proposed: “Dev invariant assertions should detect defects in tests/manual sessions; fail soft for environment/staging transients, loud for product defects.” Reason: preserves the original ‘should’ strength and failure distinction."
+  },
+  {
+   "id": "B182",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-6 — reword — Proposed: “Before answering: BOARD published/current/concise/single-topic, decisions visible; BATCH advancing within model/context/CI/branch/timestamp/retro rules; WORK ORDER order/spec/split/budgets valid; FINDINGS durably filed; required render/mechanism PROOF supplied. ci-status-guard waits for concluded green CI on every pushed ref. Hook authority: .claude/settings.json.” Reason: reduces wording without silently deleting duties or inventing role exceptions."
+  },
+  {
+   "id": "B183",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-7 — reword — Proposed: “Before first mutation, board-first-guard requires current published focus. closing-guard owns §9; npm-install-installed versioned hooks own commit/push syntax.” Reason: retains concrete pre-action requirements and authority."
+  },
+  {
+   "id": "B184",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-8 — reword — Proposed: “Before governed actions: node scripts/guard-preflight.mjs --for <action> --session <id>. Finish routine duties before answering.” Reason: retains mandatory preflight and ordering."
+  },
+  {
+   "id": "B185",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-9 — reword — Proposed: “No screenshot-metric golden-image shortcut until picture-stability.mjs <suite> reports STABLE. Verdicts: docs/picture-check-levers.md.” Reason: preserves the exact prerequisite."
+  },
+  {
+   "id": "B186",
+   "file": "CLAUDE.md §7.2",
+   "defect": "D-CLAUDE-7.2-10 — reword — Proposed: “Fix deviations; never conceal them or claim unmet criteria fulfilled.” Reason: retains the evidence/truthfulness rule."
+  },
+  {
+   "id": "B187",
+   "file": "CLAUDE.md §9",
+   "defect": "D-CLAUDE-9-1 — reword — Proposed: “Closing report: fulfilled §7.1 criteria with screenshot evidence, collected // OPEN items, simplifications, placeholder values; no silent scope extension.” Reason: retains every report component."
+  },
+  {
+   "id": "B188",
+   "file": "CLAUDE.md §9",
+   "defect": "D-CLAUDE-9-2 — reword — Proposed: “Closing order: CLOSING_STEPS in scripts/closing-guard-core.mjs; drive --status then --step <id> --evidence <proof>. closing-guard blocks governed tags/delivery ticks until complete; tag scope: docs/batch-owner-runbook.md#release-and-closing.” Reason: retains authority and command while preserving the supplied poc exemption."
+  },
+  {
+   "id": "B189",
+   "file": "CLAUDE.md §9",
+   "defect": "D-CLAUDE-9-3 — reword — Proposed: “Freeze code during closing: merge/park in-flight branches first; land no agent work until completion. Owner procedure: docs/batch-owner-runbook.md.” Reason: keeps the freeze visible before closing begins."
+  },
+  {
+   "id": "B190",
+   "file": "MEMORY.md heading",
+   "defect": "D-MEM-index-header — reword — Proposed: “# Session memory” plus one compact link, “Role/task details: [context-details.md](context-details.md) — owner, QA, release, environment, research.” Reason: this linked document, beside MEMORY.md, receives moved index entries and retains their original leaf links; it adds no runtime mechanism or rule."
+  },
+  {
+   "id": "B191",
+   "file": "MEMORY.md; vscode-restart-kills-the-container.md frontmatter",
+   "defect": "D-MEM-vscode-restart-kills-the-container — move-to-context-details.md — Keep original leaf link under environment/recovery; preserve restart/container-death warning and listed death classes. Process-recovery detail is not universal session context."
+  },
+  {
+   "id": "B192",
+   "file": "MEMORY.md; commit-proxy-misses-unlanded-work.md frontmatter",
+   "defect": "D-MEM-commit-proxy-misses-unlanded-work — move-to-context-details.md — Keep under measurement/cost: commit trailers omit unlanded work and must not proxy model usage. Relevant during accounting, not every implementation turn."
+  },
+  {
+   "id": "B193",
+   "file": "MEMORY.md; measure-dont-assume.md frontmatter",
+   "defect": "D-MEM-measure-dont-assume — reword — Proposed: “[measure-dont-assume.md] Measure machine/repo/game state this turn before asserting it; include reading time.” Reason: broadly applicable evidence rule."
+  },
+  {
+   "id": "B194",
+   "file": "MEMORY.md; check-for-an-existing-branch-first.md frontmatter",
+   "defect": "D-MEM-check-for-an-existing-branch-first — reword — Proposed: “[check-for-an-existing-branch-first.md] Before starting a point, list worktrees and branches; board/TASKS omit live authors.” Reason: prevents duplicate work across roles."
+  },
+  {
+   "id": "B195",
+   "file": "MEMORY.md; blocked-action-find-the-project-command.md frontmatter",
+   "defect": "D-MEM-blocked-action-find-the-project-command — move-to-context-details.md — Preserve leaf under execution troubleshooting; CLAUDE.md §6 already retains the project-command/no-manual-container-work rule. This removes duplicate indexing, not the rule."
+  },
+  {
+   "id": "B196",
+   "file": "MEMORY.md; boundary-marker-is-fragile.md frontmatter",
+   "defect": "D-MEM-boundary-marker-is-fragile — move-to-context-details.md — Keep under owner handover: boundary last, bare commands, later repository actions invalidate it. Already linked through the owner procedure."
+  },
+  {
+   "id": "B197",
+   "file": "MEMORY.md; protected-paths-always-prompt.md frontmatter",
+   "defect": "D-MEM-protected-paths-always-prompt — move-to-context-details.md — Keep under harness maintenance: settings/hook edits are attended-only; versioned core.hooksPath. This analysis does not authorize bypassing harness protection."
+  },
+  {
+   "id": "B198",
+   "file": "MEMORY.md; use-1890-valid-names.md frontmatter",
+   "defect": "D-MEM-use-1890-valid-names — reword — Proposed: “[use-1890-valid-names.md] Game place/landmark/settlement names must be valid in 1890.” Reason: compact domain-wide constraint."
+  },
+  {
+   "id": "B199",
+   "file": "MEMORY.md; bug-reports-land-in-local.md frontmatter",
+   "defect": "D-MEM-bug-reports-land-in-local — move-to-context-details.md — Keep under bug intake: handed-over F6 archives belong in ignored local/; search there first. Needed for that input type only."
+  },
+  {
+   "id": "B200",
+   "file": "MEMORY.md; fable-sparingly.md frontmatter",
+   "defect": "D-MEM-fable-sparingly — move-to-context-details.md — Keep under owner/provider routing; preserve scarce-volume rationale and non-default status, while linking current participation to fable-switch status rather than duplicating a version claim."
+  },
+  {
+   "id": "B201",
+   "file": "MEMORY.md; provider-volume-strategy.md frontmatter",
+   "defect": "D-MEM-provider-volume-strategy — move-to-context-details.md — Keep under provider routing: measure both vendors’ quotas, account for opposite dashboard directions, and retain the ended-emergency history on demand."
+  },
+  {
+   "id": "B202",
+   "file": "MEMORY.md; github-token.md frontmatter",
+   "defect": "D-MEM-github-token — reword — Proposed: “[github-token.md] .secrets/github-token: use only for requested GitHub changes; export GH_TOKEN; never print.” Reason: retains authorization and non-disclosure restrictions wherever credentials might be encountered."
+  },
+  {
+   "id": "B203",
+   "file": "MEMORY.md; speak-as-part-of-the-team.md frontmatter",
+   "defect": "D-MEM-speak-as-part-of-the-team — reword — Proposed: “[speak-as-part-of-the-team.md] Project rules/mistakes: say wir/unser.” Reason: affects routine user-facing replies."
+  },
+  {
+   "id": "B204",
+   "file": "MEMORY.md; tags-only-on-request.md frontmatter",
+   "defect": "D-MEM-tags-only-on-request — reword — Proposed: “[tags-only-on-request.md] Version/release tags require explicit approval for that tag; cut vX.Y is frozen. poc exception: owner runbook.” Reason: preserves authorization while exposing, rather than erasing, the supplied non-version-tag distinction."
+  },
+  {
+   "id": "B205",
+   "file": "MEMORY.md; version-release-process.md frontmatter",
+   "defect": "D-MEM-version-release-process — move-to-context-details.md — Keep under release: closing → approval → version tag → poc → publish; preserve the index’s “new demo: Maximum QA first” detail and the runbook’s separate requested-poc operation."
+  },
+  {
+   "id": "B206",
+   "file": "MEMORY.md; watch-for-aesthetic-oddities.md frontmatter",
+   "defect": "D-MEM-watch-for-aesthetic-oddities — move-to-context-details.md — Keep under visual QA: judge whether the image looks right to a person, including functional-but-odd visuals. Not needed in unrelated sessions."
+  },
+  {
+   "id": "B207",
+   "file": "MEMORY.md; webgpu-testable-headless.md frontmatter",
+   "defect": "D-MEM-webgpu-testable-headless — move-to-context-details.md — Keep under browser setup: system Chrome channel with --headless=new supports WebGPU; bundled Chromium limitation differs. Preserve this supplied correction beside the contradictory zoom-memory description."
+  },
+  {
+   "id": "B208",
+   "file": "MEMORY.md; verify-default-zoom-and-webgpu.md frontmatter",
+   "defect": "D-MEM-verify-default-zoom-and-webgpu — move-to-context-details.md — Keep default-zoom and feature-dependent wide-zoom checks under visual QA; explicitly flag its frontmatter’s “headless WebGPU is impossible” conflict with webgpu-testable-headless. Do not delete the zoom rule or silently choose chronology."
+  },
+  {
+   "id": "B209",
+   "file": "MEMORY.md; track-permission-prompts.md frontmatter",
+   "defect": "D-MEM-track-permission-prompts — reword — Proposed: “[track-permission-prompts.md] Preserve maximally broad whole-tool allowances, including Bash, in both settings scopes; never narrow/tidy them.” Reason: directly constrains this cut list and future maintenance; the absent local settings file need not be created."
+  },
+  {
+   "id": "B210",
+   "file": "MEMORY.md; implementation-sections-current.md frontmatter",
+   "defect": "D-MEM-implementation-sections-current — reword — Proposed: “[implementation-sections-current.md] Climate/people rendering changes update research→game records in the same commit; see leaf for targets.” Reason: keep the obligation visible; flag index targets peoples-1890 §8/climate-1890 §9 versus frontmatter’s design.md §19.14/§19.15 and pointer distinction in the detailed entry."
+  },
+  {
+   "id": "B211",
+   "file": "MEMORY.md; push-to-main-directly-is-fine.md frontmatter",
+   "defect": "D-MEM-push-to-main-directly-is-fine — reword — Proposed: “[push-to-main-directly-is-fine.md] Authorized owner automation may push main directly; do not request a PR.” Reason: preserves approval without broadening CLAUDE.md’s main-versus-feature workflow."
+  },
+  {
+   "id": "B212",
+   "file": "MEMORY.md; language-german.md frontmatter",
+   "defect": "D-MEM-language-german — reword — Proposed: “[language-german.md] User replies: Deutsch, Du; code/commits: English.” Reason: routine communication preference belongs in the fixed prefix."
+  },
+  {
+   "id": "B213",
+   "file": "MEMORY.md; commit-message-no-point-number.md frontmatter",
+   "defect": "D-MEM-commit-message-no-point-number — reword — Proposed: “[commit-message-no-point-number.md] Commit messages describe changes; no work-order point number.” Reason: compact instruction relevant to authoring sessions."
+  },
+  {
+   "id": "B214",
+   "file": "MEMORY.md; bundle-names.md frontmatter",
+   "defect": "D-MEM-bundle-names — reword — Proposed: “[bundle-names.md] With the user, use German bundle names; letters are internal IDs.” Reason: routine communication rule."
+  },
+  {
+   "id": "B215",
+   "file": "MEMORY.md; verify-suites-need-a-quiet-machine.md frontmatter",
+   "defect": "D-MEM-verify-suites-need-a-quiet-machine — move-to-context-details.md — Keep under verification scheduling: quiet host; diagnose load before classifying rotating failures; preserve “Speichermessung” lookup cue. Do not convert historical load findings into a claim that every red is environmental."
+  },
+  {
+   "id": "B216",
+   "file": "MEMORY.md; findings-carrier.md frontmatter",
+   "defect": "D-MEM-findings-carrier — reword — Proposed: “[findings-carrier.md] Owner drains via scripts/finding.mjs; non-owner user orders use --request.” Reason: cross-role intake must remain discoverable; never move the 926,112-character carrier body into session context."
+  },
+  {
+   "id": "B217",
+   "file": "MEMORY.md; residuals-hide-defects.md frontmatter",
+   "defect": "D-MEM-residuals-hide-defects — reword — Proposed: “[residuals-hide-defects.md] Accept a residual only when genuinely missing information is named.” Reason: applies broadly to completion claims."
+  },
+  {
+   "id": "B218",
+   "file": "MEMORY.md; workflows-token-budget.md frontmatter",
+   "defect": "D-MEM-workflows-token-budget — reword — Proposed: “[workflows-token-budget.md] Keep fan-outs small; estimate/warn and obtain approval for large ones; verify inline and collect results, not transcripts.” Reason: preserve both index approval language and supplied frontmatter’s cost warning."
+  },
+  {
+   "id": "B219",
+   "file": "MEMORY.md; release-order-communication-first.md frontmatter",
+   "defect": "D-MEM-release-order-communication-first — move-to-context-details.md — Keep under owner queue priorities, preserving both supplied versions: index says communication → closing 633 → tag 174; frontmatter says token reduction → communication → rest, open branches first. Unresolved priority/state disagreement must not become a universal terse command."
+  },
+  {
+   "id": "B220",
+   "file": "MEMORY.md; village-moves-allowed.md frontmatter",
+   "defect": "D-MEM-village-moves-allowed — move-to-context-details.md — Keep under settlement research: movement/addition/removal license with other-requirement checks; preserve index’s climate/region/river/elevation checks. Domain-specific permission need not load everywhere."
+  },
+  {
+   "id": "B221",
+   "file": "MEMORY.md; closing-runs.md frontmatter",
+   "defect": "D-MEM-closing-runs — move-to-context-details.md — Keep under owner closing: autonomously insert full closing after warranted heavy/cumulative rework; keep Closing last in TASKS. Preserve regression, cleanup, and Markdown-audit scope."
+  },
+  {
+   "id": "B222",
+   "file": "MEMORY.md; saves-are-irrelevant-in-the-poc.md frontmatter",
+   "defect": "D-MEM-saves-are-irrelevant-in-the-poc — reword — Proposed: “[saves-are-irrelevant-in-the-poc.md] Save changes owe no migration; report a break in one line.” Reason: compact implementation constraint; preserve “currently disabled” context in the leaf without deleting saving/loading acceptance."
+  },
+  {
+   "id": "B223",
+   "file": "MEMORY.md; effort-high-for-implementation.md frontmatter",
+   "defect": "D-MEM-effort-high-for-implementation — reword — Proposed: “[effort-high-for-implementation.md] All work: Medium; never High/xhigh.” Reason: preserve current stated policy despite the misleading filename."
+  },
+  {
+   "id": "B224",
+   "file": "MEMORY.md; overshoot-needs-a-brake.md frontmatter",
+   "defect": "D-MEM-overshoot-needs-a-brake — move-to-context-details.md — Keep under context incidents with the infrastructure-freeze restriction adjacent; retain the lesson and indexed-memory alternative, but do not treat it as authority to build a new brake."
+  },
+  {
+   "id": "B225",
+   "file": "MEMORY.md; analysis-and-execution-in-one-go.md frontmatter",
+   "defect": "D-MEM-analysis-and-execution-in-one-go — move-to-context-details.md — Preserve index’s “never park a verdict; vorn einreihen und abgeben” and frontmatter’s narrower moving-set analysis condition under execution planning. Do not generalize either into overriding an explicitly read-only analysis."
+  },
+  {
+   "id": "B226",
+   "file": "MEMORY.md; forensics-need-a-command.md frontmatter",
+   "defect": "D-MEM-forensics-need-a-command — move-to-context-details.md — Keep under recurring investigations: use a command/script for recurring lookup, avoid raw transcript dumps; preserve alongside the freeze rather than authorizing new infrastructure here."
+  },
+  {
+   "id": "B227",
+   "file": "MEMORY.md; rider-point-fold-and-push.md frontmatter",
+   "defect": "D-MEM-rider-point-fold-and-push — move-to-context-details.md — Preserve closing-card-before-push requirement; record index’s fold-point --none versus frontmatter’s --delivered discrepancy verbatim. Do not nominate a flag without command/source evidence."
+  },
+  {
+   "id": "B228",
+   "file": "MEMORY.md; vdzk-carrier-from-sdk-sessions.md frontmatter",
+   "defect": "D-MEM-vdzk-carrier-from-sdk-sessions — move-to-context-details.md — Keep under SDK decision recording: CLI refuses SDK sessions; use exported functions with real transcript UUID. This is a role-specific workaround."
+  },
+  {
+   "id": "B229",
+   "file": "MEMORY.md; handing-over-is-not-stopping.md frontmatter",
+   "defect": "D-MEM-handing-over-is-not-stopping — move-to-context-details.md — Keep under handover, retaining both this leaf link and batch-stops-only-on-explicit-order.md: “abgeben” transfers to successor, never means pause/stop."
+  },
+  {
+   "id": "B230",
+   "file": "MEMORY.md; no-standstill-decide-and-record.md frontmatter",
+   "defect": "D-MEM-no-standstill-decide-and-record — move-to-context-details.md — Keep under owner operation: self-recover, decide and record for veto, no waiting decision card; preserve board-state-section destination from frontmatter."
+  },
+  {
+   "id": "B231",
+   "file": "MEMORY.md; drills-must-call-the-thing.md frontmatter",
+   "defect": "D-MEM-drills-must-call-the-thing — move-to-context-details.md — Keep under mechanism testing: exercise the action, not merely reconstruct its aftermath. No fixed-prefix benefit from repeating test-method explanations."
+  },
+  {
+   "id": "B232",
+   "file": "MEMORY.md; split-a-point-that-will-not-converge.md frontmatter",
+   "defect": "D-MEM-split-a-point-that-will-not-converge — move-to-context-details.md — Keep under owner work-order maintenance: split stuck points autonomously, no confirmation required. Preserve the authorization."
+  },
+  {
+   "id": "B233",
+   "file": "MEMORY.md; session-cwd-stays-in-main-tree.md frontmatter",
+   "defect": "D-MEM-session-cwd-stays-in-main-tree — reword — Proposed: “[session-cwd-stays-in-main-tree.md] Main-session shell cwd: /workspace/hoa; worktree cwd misleads Stop guards.” Reason: retain immediate operational warning; its scope versus worktree-based delegates needs source clarification, not silent expansion."
+  },
+  {
+   "id": "B234",
+   "file": "MEMORY.md; no-invented-user-instructions.md frontmatter",
+   "defect": "D-MEM-no-invented-user-instructions — reword — Proposed: “[no-invented-user-instructions.md] Scoped remarks are not standing orders; quote users verbatim only.” Reason: universal interpretation constraint."
+  },
+  {
+   "id": "B235",
+   "file": "MEMORY.md; a-question-is-only-a-question.md frontmatter",
+   "defect": "D-MEM-a-question-is-only-a-question — reword — Proposed: “[a-question-is-only-a-question.md] Chat questions neither claim nor stop/change the batch unless explicitly requested.” Reason: prevents ordinary head-window conversation from changing ownership or work."
+  },
+  {
+   "id": "B236",
+   "file": "MEMORY.md; stop-refusal-is-addressed-to-me.md frontmatter",
+   "defect": "D-MEM-stop-refusal-is-addressed-to-me — reword — Proposed: “[stop-refusal-is-addressed-to-me.md] On Stop refusal, remeasure blocking state; never repeat the same refused answer.” Reason: applicable to any governed session."
+  },
+  {
+   "id": "B237",
+   "file": "MEMORY.md; detach-long-running-landings.md frontmatter",
+   "defect": "D-MEM-detach-long-running-landings — move-to-context-details.md — Keep under owner landing/waits: setsid long gate/landing and prose every third turn. Preserve the unusual cadence rather than silently substituting another."
+  },
+  {
+   "id": "B238",
+   "file": "MEMORY.md; umsteuerung-vereinfachungsplan.md frontmatter",
+   "defect": "D-MEM-umsteuerung-vereinfachungsplan — move-to-context-details.md — Keep under “Umsteuerung”: 01.09 nine-point plan, recorded 1–3 done/4–9 open, veto paths. Label progress as recorded state, not newly verified fact."
+  },
+  {
+   "id": "B239",
+   "file": "MEMORY.md; main-push-runs-the-full-gate.md frontmatter",
+   "defect": "D-MEM-main-push-runs-the-full-gate — reword — Proposed: “[main-push-runs-the-full-gate.md] Main push runs build+lint+audit+unit; never push main during a browser picture run.” Reason: immediate scheduling restriction relevant to authoring and ownership."
+  },
+  {
+   "id": "B240",
+   "file": "MEMORY.md; feature-tests-before-regression.md frontmatter",
+   "defect": "D-MEM-feature-tests-before-regression — reword — Proposed: “[feature-tests-before-regression.md] Debug with the feature’s own test; full regression once at the end for evidence.” Reason: compact rule preventing unnecessary repeated verification cost."
+  },
+  {
+   "id": "B241",
+   "file": "MEMORY.md; only-one-head-session.md frontmatter",
+   "defect": "D-MEM-only-one-head-session — reword — Proposed: “[only-one-head-session.md] This chat is the only head session; all others are headless; never route the user through them.” Reason: routine interaction/ownership constraint."
+  },
+  {
+   "id": "B242",
+   "file": "always-prep-during-waits.md frontmatter",
+   "defect": "D-MEM-always-prep-during-waits — keep — Already on demand, absent from MEMORY.md; retain preparation-during-waits instruction without importing its mechanism demand into the prefix or implementing it under the freeze."
+  },
+  {
+   "id": "B243",
+   "file": "arm-dormant-guards-attended.md frontmatter",
+   "defect": "D-MEM-arm-dormant-guards-attended — keep — Already on demand; preserve recorded point-542 pending/attended-only status as historical operational material, not fresh authorization to arm guards."
+  },
+  {
+   "id": "B244",
+   "file": "audit-205-decisions.md frontmatter",
+   "defect": "D-MEM-audit-205-decisions — keep — Point-specific historical rulings belong on demand; no measured fixed-context saving from deletion."
+  },
+  {
+   "id": "B245",
+   "file": "audit-with-model-diversity.md frontmatter",
+   "defect": "D-MEM-audit-with-model-diversity — keep — Already on demand; different-author-model review rationale supports §6 without requiring another index line."
+  },
+  {
+   "id": "B246",
+   "file": "batch-autonomy-hardened.md frontmatter",
+   "defect": "D-MEM-batch-autonomy-hardened — keep — Existing owner recovery/failure policy remains on demand; no new hardening work is authorized."
+  },
+  {
+   "id": "B247",
+   "file": "batch-dashboard-artifact.md frontmatter",
+   "defect": "D-MEM-batch-dashboard-artifact — keep — Existing canonical four-section board source; retain on demand through H2’s compact pointer. Its 14,629-character body is not supplied and cannot be rewritten here."
+  },
+  {
+   "id": "B248",
+   "file": "batch-stops-only-on-explicit-order.md frontmatter",
+   "defect": "D-MEM-batch-stops-only-on-explicit-order — keep — On-demand leaf already discoverable through the handover index entry; retain explicit-stop distinction and scoped-conversation interpretation."
+  },
+  {
+   "id": "B249",
+   "file": "board-cli-is-not-parallel-safe.md frontmatter",
+   "defect": "D-MEM-board-cli-is-not-parallel-safe — keep — Preserve sequential board.mjs operation on demand; owner runbook already carries it."
+  },
+  {
+   "id": "B250",
+   "file": "board-transport-not-private.md frontmatter",
+   "defect": "D-MEM-board-transport-not-private — keep — Public board transport is an existing permission, not authority to publish every repository artifact; retain on demand."
+  },
+  {
+   "id": "B251",
+   "file": "brief-driven-delegation.md frontmatter",
+   "defect": "D-MEM-brief-driven-delegation — keep — On-demand operational detail for author-generated briefs, board CLI, and checkpointing; §6 retains the necessary short rule."
+  },
+  {
+   "id": "B252",
+   "file": "bundle-first-not-new-point.md frontmatter",
+   "defect": "D-MEM-bundle-first-not-new-point — keep — Preserve existing-bundle-first intake policy on demand; flag its scope against H3’s append-each-user-defect wording rather than silently merging them."
+  },
+  {
+   "id": "B253",
+   "file": "chat-timestamp.md frontmatter",
+   "defect": "D-MEM-chat-timestamp — keep — Preserve Berlin/DST-correct timestamp policy on demand; H1 keeps a concise per-turn operational reminder. Do not load its 5,909-character body every turn."
+  },
+  {
+   "id": "B254",
+   "file": "claude-71-reference-not-duplicate.md frontmatter",
+   "defect": "D-MEM-claude-71-reference-not-duplicate — keep — Supports reference-only §7.1; retain verifiable conditions, script mappings, numbering, and checked numbers at linked destinations."
+  },
+  {
+   "id": "B255",
+   "file": "container-work-is-mine.md frontmatter",
+   "defect": "D-MEM-container-work-is-mine — keep — Already on demand and duplicated by retained §6 behavior; no rule deletion."
+  },
+  {
+   "id": "B256",
+   "file": "dashboard-all-open-points-in-queue.md frontmatter",
+   "defect": "D-MEM-dashboard-all-open-points-in-queue — keep — Preserve all-open-points queue rule on demand; its interaction with active-card exclusivity is unresolved in the supplied text."
+  },
+  {
+   "id": "B257",
+   "file": "dashboard-card-single-topic.md frontmatter",
+   "defect": "D-MEM-dashboard-card-single-topic — keep — Preserve single-point card body rule; fixed prefix already retains concise single-topic duty."
+  },
+  {
+   "id": "B258",
+   "file": "dashboard-multiple-now-cards.md frontmatter",
+   "defect": "D-MEM-dashboard-multiple-now-cards — keep — Preserve one active card per point and prohibition on simultaneous queue/current placement; do not silently weaken it to reconcile another memory."
+  },
+  {
+   "id": "B259",
+   "file": "dashboard-no-auto-open.md frontmatter",
+   "defect": "D-MEM-dashboard-no-auto-open — keep — Preserve no hardcoded open attribute and user-controlled localStorage persistence; only board editing needs this detail."
+  },
+  {
+   "id": "B260",
+   "file": "dashboard-vdzk-only-decisions.md frontmatter",
+   "defect": "D-MEM-dashboard-vdzk-only-decisions — keep — Preserve genuine-user-decisions-only rule on demand; no done items or work announcements in that section."
+  },
+  {
+   "id": "B261",
+   "file": "doc-budget-shorten-dont-raise.md frontmatter",
+   "defect": "D-MEM-doc-budget-shorten-dont-raise — keep — Preserve shorten/merge first, limit increase only as reasoned last resort without asking user; no budget increase is proposed."
+  },
+  {
+   "id": "B262",
+   "file": "english-no-germanisms.md frontmatter",
+   "defect": "D-MEM-english-no-germanisms — keep — Preserve idiomatic English guidance on demand; language remains English where required."
+  },
+  {
+   "id": "B263",
+   "file": "hand-over-at-the-watermark.md frontmatter",
+   "defect": "D-MEM-hand-over-at-the-watermark — keep — Preserve historical 150k wording on demand; flag disagreement with runbook’s 122k handover/150k ceiling, and do not silently promote either to a new threshold."
+  },
+  {
+   "id": "B264",
+   "file": "hard-cases-go-to-sol.md frontmatter",
+   "defect": "D-MEM-hard-cases-go-to-sol — keep — Historical filename, current Astra routing description; §6 retains the live policy, so no new prefix entry."
+  },
+  {
+   "id": "B265",
+   "file": "hybrid-test-architecture.md frontmatter",
+   "defect": "D-MEM-hybrid-test-architecture — keep — On-demand explanation of the retained Vitest/Playwright split and feature-test requirement."
+  },
+  {
+   "id": "B266",
+   "file": "journal-voice-markup.md frontmatter",
+   "defect": "D-MEM-journal-voice-markup — keep — On-demand detail supporting retained bilingual markup and English Kokoro TTS rules."
+  },
+  {
+   "id": "B267",
+   "file": "lint-and-cve-clean-always.md frontmatter",
+   "defect": "D-MEM-lint-and-cve-clean-always — keep — Preserve zero lint warnings/errors and zero CVEs with audit-after-every-change wording; do not assume §7.2’s lockfile-triggered audit-check supersedes this separate instruction."
+  },
+  {
+   "id": "B268",
+   "file": "maximal-delegation.md frontmatter",
+   "defect": "D-MEM-maximal-delegation — keep — Preserve owner delegation policy on demand; removing repeated SessionStart exposition must not drop implementation/infra/doc/dashboard delegation or non-overlap requirements."
+  },
+  {
+   "id": "B269",
+   "file": "model-diverse-by-criticality.md frontmatter",
+   "defect": "D-MEM-model-diverse-by-criticality — keep — Preserve difficulty×criticality triage and different-model requirement for HIGH/critical work; §6 remains authority for review form."
+  },
+  {
+   "id": "B270",
+   "file": "never-stop-the-batch.md frontmatter",
+   "defect": "D-MEM-never-stop-the-batch — keep — Preserve owner continuation rule and supplied genuine-user-input exception on demand; flag its tension with no-standstill policy instead of silently choosing one."
+  },
+  {
+   "id": "B271",
+   "file": "new-tasks-append-and-defer.md frontmatter",
+   "defect": "D-MEM-new-tasks-append-and-defer — keep — Preserve append-at-end/defer/no-interleaving policy on demand; its relation to front-prioritized verdicts and existing-bundle intake is unresolved here."
+  },
+  {
+   "id": "B272",
+   "file": "no-other-window-to-close.md frontmatter",
+   "defect": "D-MEM-no-other-window-to-close — keep — On-demand incident explanation; retained head-session and owner-claim rules already prevent asking the user to close inaccessible sessions."
+  },
+  {
+   "id": "B273",
+   "file": "parallel-session-root-cause.md frontmatter",
+   "defect": "D-MEM-parallel-session-root-cause — keep — Historical root cause and “being built” status remain on demand; do not treat status as current or create another singleton mechanism."
+  },
+  {
+   "id": "B274",
+   "file": "pgrep-waiters-match-themselves.md frontmatter",
+   "defect": "D-MEM-pgrep-waiters-match-themselves — keep — Shell-specific troubleshooting belongs on demand; preserve self-matching warning and process anchoring."
+  },
+  {
+   "id": "B275",
+   "file": "point-boundary-always-autonomous.md frontmatter",
+   "defect": "D-MEM-point-boundary-always-autonomous — keep — Preserve autonomous boundary authorization; owner runbook carries operational sequence."
+  },
+  {
+   "id": "B276",
+   "file": "process-scoped-regression.md frontmatter",
+   "defect": "D-MEM-process-scoped-regression — keep — Preserve scoped QA and escaped-defect reporting; flag “flake-retry single suites” against §7.2’s retry-covers-nothing language rather than treating retry as accepted coverage."
+  },
+  {
+   "id": "B277",
+   "file": "push-after-every-commit.md frontmatter",
+   "defect": "D-MEM-push-after-every-commit — keep — Already on demand; retained §6 contains branch, push, completion, and verification rules."
+  },
+  {
+   "id": "B278",
+   "file": "queue-order-fixes-before-finders.md frontmatter",
+   "defect": "D-MEM-queue-order-fixes-before-finders — keep — Preserve fixes/requested extensions before bug-finding/QA-framework tickets under owner scheduling; no prefix duplication."
+  },
+  {
+   "id": "B279",
+   "file": "regression-tiers.md frontmatter",
+   "defect": "D-MEM-regression-tiers — keep — Preserve discretionary tier selection and closing LARGE requirement; retained §5 includes the separate once-per-bundle LARGE requirement."
+  },
+  {
+   "id": "B280",
+   "file": "retrospective-currency-mechanism.md frontmatter",
+   "defect": "D-MEM-retrospective-currency-mechanism — keep — Existing refresh/guard troubleshooting stays on demand; do not add or rebuild a mechanism."
+  },
+  {
+   "id": "B281",
+   "file": "serving-model-watch.md frontmatter",
+   "defect": "D-MEM-serving-model-watch — keep — Preserve serving-model verification and historical failure context on demand; live allowed chain remains fable-switch status."
+  },
+  {
+   "id": "B282",
+   "file": "sol-authors-by-default.md frontmatter",
+   "defect": "D-MEM-sol-authors-by-default — keep — Explicitly ended emergency is useful historical context, already off the fixed prefix; deleting it produces no session saving and can remove the explanation of supersession."
+  },
+  {
+   "id": "B283",
+   "file": "sort-visuals-into-detail-levels.md frontmatter",
+   "defect": "D-MEM-sort-visuals-into-detail-levels — keep — Preserve existing low/medium/high preset assignment and completeness-test requirement for new optical features; do not introduce a new guard."
+  },
+  {
+   "id": "B284",
+   "file": "stay-within-project-dir.md frontmatter",
+   "defect": "D-MEM-stay-within-project-dir — keep — Preserve strict-necessity exception for external paths and ignored local/ artifacts; already on demand."
+  },
+  {
+   "id": "B285",
+   "file": "tasks-spec-final-state-only.md frontmatter",
+   "defect": "D-MEM-tasks-spec-final-state-only — keep — Preserve final-target-only task specifications; historical corrections stay outside the spec."
+  },
+  {
+   "id": "B286",
+   "file": "test-coverage-err-on-more.md frontmatter",
+   "defect": "D-MEM-test-coverage-err-on-more — keep — Preserve additional-test preference, especially fast Vitest cases; no authority here to relax testing requirements."
+  },
+  {
+   "id": "B287",
+   "file": "test-realistic-zoom.md frontmatter",
+   "defect": "D-MEM-test-realistic-zoom — keep — Preserve player-achievable, non-debug zoom and supplied 0.125–0.5 range as recorded; do not conflate it with default/wide screenshot coverage."
+  },
+  {
+   "id": "B288",
+   "file": "update-docs-on-change-requests.md frontmatter",
+   "defect": "D-MEM-update-docs-on-change-requests — keep — On-demand source for coordinated design/build-rule changes already retained in §4."
+  },
+  {
+   "id": "B289",
+   "file": "user-orders-go-through-the-carrier.md frontmatter",
+   "defect": "D-MEM-user-orders-go-through-the-carrier — keep — Preserve --request carrier requirement when unable to write work order; SendMessage remains useful for other communication."
+  },
+  {
+   "id": "B290",
+   "file": "verify-before-merge-not-after.md frontmatter",
+   "defect": "D-MEM-verify-before-merge-not-after — keep — Preserve branch-before-merge browser verification timing; do not substitute post-merge testing for required pre-merge evidence."
+  },
+  {
+   "id": "B291",
+   "file": "verify-gui-on-both-backends.md frontmatter",
+   "defect": "D-MEM-verify-gui-on-both-backends — keep — Preserve both-backend GUI/render-fix requirement; flag possible scope disagreement with §6’s backend-sensitive-path distinction instead of weakening either."
+  },
+  {
+   "id": "B292",
+   "file": "verify-owner-really-dead.md frontmatter",
+   "defect": "D-MEM-verify-owner-really-dead — keep — Preserve process verification before resumed owner work; launcher or lock claims alone are insufficient."
+  },
+  {
+   "id": "B293",
+   "file": "withdraw-claim-when-leaving.md frontmatter",
+   "defect": "D-MEM-withdraw-claim-when-leaving — keep — Preserve unused-claim withdrawal; owner runbook already carries it, so no fixed-prefix duplication."
+  },
+  {
+   "id": "B294",
+   "file": "CLAUDE.md; H3; memory descriptions",
+   "defect": "D-CLAUDE-cross-source-1 — keep — Unresolved model/context conflicts: Fable 5 versus 5.1; hard-coded serving chain versus authoritative switch; 150k handover versus 122k handover/150k ceiling; heartbeat described as both PostToolUse and before each call. Link authorities and preserve disputed detail on demand; do not invent a merged operational rule."
+  },
+  {
+   "id": "B295",
+   "file": "CLAUDE.md; H3; memory descriptions",
+   "defect": "D-CLAUDE-cross-source-2 — keep — Unresolved workflow scopes: one branch per point versus coupled points together; all open points in queue versus active points never also queued; append/defer versus front-prioritization; owner duties versus stand-down; universal main cwd versus worktree authors. These are semantic issues, not text that can safely be “deduplicated” by picking a side."
+  },
+  {
+   "id": "B296",
+   "file": "CLAUDE.md; H3; memory descriptions",
+   "defect": "D-CLAUDE-cross-source-3 — keep — Preserve release distinction explicitly: version release needs closing and specific approval; requested poc movement may precede the latest version and needs neither an extra closing nor approval beyond that request. Generic “all tags” wording must not erase the supplied exception."
+  },
+  {
+   "id": "B297",
+   "file": "local/1209/bundle.md baseline",
+   "defect": "B-ACCOUNTING — keep — The 22,709-token shared prefix and approximately 18,180-token session subtotal are distinct; deferred names are not full schemas, character sizes are not token counts, and on-demand memory bodies—including the huge carrier—are not fixed session load."
+  },
+  {
+   "id": "B298",
+   "file": "proposed cut list",
+   "defect": "B-DROPPED-RULES — cut — Exhaustive dropped procedural instruction: the fewer-permission-prompts skill’s scan-and-add-prioritized-allowlist workflow, because whole-tool allowances already cover it. No CLAUDE.md, memory, acceptance, permission, authorization, or hook-enforced rule is dropped; repeated copies are moved/reworded. Gmail and Calendar cuts remove unauthenticated connector surfaces, not project rules."
+  },
+  {
+   "id": "B299",
+   "file": "part (b) estimate",
+   "defect": "B-SAVINGS — shrink — Rough evidenced saving: zero guaranteed from project settings; if the existing host can suppress fewer-permission-prompts, roughly 40–70 listing tokens per session, plus unquantified Gmail/Calendar subagent notices after account disconnection. Do not claim the full 5,006-token skill listing, 1,114-token agent listing, or 732-token Docs instructions as saved."
+  },
+  {
+   "id": "B300",
+   "file": "part (c) estimate",
+   "defect": "C-SAVINGS — shrink — Rough target: save 450–550 tokens per ordinary prompt from the measured 262+365 reminders, plus 700–800 tokens per session from the approximately 874-token SessionStart preview. Applicable notices and on-demand reads still cost tokens; the entire persisted 14.7 KB output is not a fixed-prefix saving."
+  },
+  {
+   "id": "B301",
+   "file": "part (d) estimate",
+   "defect": "D-CLAUDE-savings-1 — shrink — Rough target: save 1,000–1,500 of CLAUDE.md’s approximately 4,187 tokens and 900–1,300 of MEMORY.md’s approximately 2,510 tokens, net of retained links: about 1,900–2,800 tokens per session. These are estimates for the proposed wording, not tokenizer measurements; unchanged on-demand memory leaves save zero fixed tokens."
+  }
+ ]
+}
