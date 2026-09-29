@@ -29,17 +29,21 @@ import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 
 const OWNER_OWNERSHIP = new Set(['acquired-spawn', 'acquired', 'mine'])
 
+/** Where the dispatcher's runbook lives; the hook names it, it no longer pastes it. */
+export const OWNER_RUNBOOK_DOC = 'docs/batch-owner-runbook.md'
+
 /**
- * Content that belongs to the batch dispatcher is injected only after this
- * SessionStart has proved ownership. Keeping this decision pure prevents a
- * stand-down session from inheriting the runbook merely because the file is
- * readable on disk.
+ * The batch dispatcher is pointed at its runbook only after this SessionStart
+ * has proved ownership, so a stand-down session never inherits it. Only the
+ * pointer is injected: the pasted 9 KB body pushed the whole hook output past
+ * the harness's 2 KB preview, so it never reached context anyway
+ * (docs/context-cut-list-1209.md U160).
  */
 export function ownerRunbookContext(ownership, runbookText) {
   if (!OWNER_OWNERSHIP.has(ownership)) return ''
   const body = String(runbookText ?? '').trim()
   if (!body) return ''
-  return `\n\n--- OWNER-ONLY BATCH RUNBOOK ---\n${body}\n--- END OWNER-ONLY BATCH RUNBOOK ---`
+  return ` OWNER-ONLY BATCH RUNBOOK: read ${OWNER_RUNBOOK_DOC} before dispatching.`
 }
 
 /** At most a handful of numbers, then a count — the headline may not grow with the queue. */

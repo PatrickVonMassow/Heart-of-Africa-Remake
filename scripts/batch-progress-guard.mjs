@@ -825,7 +825,7 @@ try {
     )
   }
 
-  const list = open.slice(0, 12).join(', ') + (open.length > 12 ? ', …' : '')
+  const list = open.slice(0, 3).join(', ') + (open.length > 3 ? ', …' : '')
   const claim =
     bound.boundary && bound.boundary.reason !== 'no-marker' && !bound.boundary.valid
       ? `A boundary was claimed for point ${bound.boundary.point ?? '?'} but REFUSED (${bound.boundary.reason}) — ` +
@@ -833,30 +833,18 @@ try {
       : ''
   block(
     `DO NOT STOP THE BATCH. ${claim}${open.length} open TASKS point(s) remain (${list}) and the batch is not ` +
-      `paused. Continue the NEXT queue item now — on its own feat/<point>-<slug> branch off main: ` +
-      `implement it, commit + push the branch after every commit, merge to main only when it is ` +
-      `complete + verified, and tick it in TASKS.md on main at the merge (CLAUDE.md §6). If a validation ` +
-      `is running, AWAIT it within this turn — \`node scripts/verify/run-wait.mjs --await\` is ONE blocking ` +
-      `call that returns with the run's receipt — never a poll loop and never by ending the turn to idle. ` +
-      `Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
-      `stops; that must not recur. The legitimate ways to end this turn: (a) every point is done; ` +
-      `(a2) you are WAITING on work already handed out that you cannot poll further in this turn — a ` +
-      `delegated agent still building, a suite occupying the machine: DECLARE it with \`node ` +
-      `scripts/batch-in-flight.mjs --waiting-on "<what>" --branch <agent branch> --worktree <its worktree> ` +
-      `--pid <background run> --log <its log>\` and the stop is allowed while a probe still finds that work ` +
-      `alive (it expires, and one dead item ends it — so act as soon as the work lands); ` +
-      `(b) the user asked you to stop — then run \`node scripts/batch-pause.mjs --user-stop ` +
-      `"<the user's words, in quotation marks>"\` and stop; (c) you have just ` +
-      `MERGED AND TICKED a point — that is a POINT BOUNDARY, so ` +
-      `END THE SESSION instead of pulling the next point into this context (the context is the batch's ` +
-      `dominant cost): \`node scripts/batch-boundary.mjs --prepare <the landed point>\`, its bookkeeping, then ` +
-      `\`--commit <the landed point>\` as the last action, and stop. The OS launcher starts a fresh session and ` +
-      `batch-resume-hook re-orients it from TASKS.md. A delegated author still building is handed over WITH the ` +
-      `boundary and adopted by the successor when its checkpoints are pushed (point 675); only unpushed, ` +
-      `non-transferable work drains first — ending on it throws its work away. If you are blocked on a ` +
-      `user decision for EVERY open item, that is also a legitimate CLOCKED pause: run \`node ` +
-      `scripts/batch-pause.mjs --awaiting-user "<the decision every open item needs>"\`; its restart clock ` +
-      `is intentional. Add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.` +
+      `paused. Continue the NEXT queue item on its own feat/<point>-<slug> branch (CLAUDE.md §6). AWAIT a running ` +
+      `validation within this turn with ONE blocking \`node scripts/verify/run-wait.mjs --await\` — never a poll loop, ` +
+      `never idling by ending the turn. Keep the dashboard current. Legitimate ends: (a) every point is done; ` +
+      `(a2) WAITING on handed-out work you cannot poll further (agent still building, suite on the machine): declare ` +
+      `it with \`node scripts/batch-in-flight.mjs --waiting-on "<what>" --branch <b> --worktree <w> --pid <p> --log <l>\` ` +
+      `— allowed while a probe finds it alive; one dead item ends it, so act when it lands; (b) the user asked to stop: ` +
+      `\`node scripts/batch-pause.mjs --user-stop "<the user's words, quoted>"\`, then stop; (c) you just MERGED AND ` +
+      `TICKED a point — POINT BOUNDARY: \`node scripts/batch-boundary.mjs --prepare <point>\`, its bookkeeping, ` +
+      `\`--commit <point>\` as the last action, then END THE SESSION (a delegated author with pushed checkpoints is ` +
+      `handed over with the boundary; unpushed, non-transferable work drains first); (d) EVERY open item waits on ` +
+      `a user decision: \`node scripts/batch-pause.mjs --awaiting-user "<the decision>"\` (its restart clock is ` +
+      `intentional) plus a "Von dir zu klären" card. Otherwise pick a DIFFERENT open item.` +
       claimNote +
       watermarkNote,
   )
