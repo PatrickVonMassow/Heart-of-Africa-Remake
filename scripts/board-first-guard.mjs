@@ -28,7 +28,7 @@
 // session id cannot, and the deny it used to eat was one it could never act on.
 // A subagent running in the main tree still gets the deny, and its text still
 // tells it to repeat the call, which the once-per-turn stand-down lets through.
-import { readFileSync, existsSync, lstatSync, readlinkSync, realpathSync } from 'node:fs'
+import { readFileSync, existsSync, lstatSync, readlinkSync, realpathSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, relative, resolve } from 'node:path'
 import {
@@ -64,6 +64,24 @@ import { evaluate, isWorktreeCheckout, ownershipStandDownDecision } from './boar
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
 /**
+ * /proc and /dev name per-process objects: `/dev/stdin`, `/proc/self/cwd` and
+ * `/proc/<pid>/fd/<n>` resolve HERE to something other than what the writing
+ * shell will open, so nothing under them is evidence (point 1207, review round 11).
+ */
+const processLocalPath = (path) => /^\/(proc|dev)(\/|$)/.test(path)
+
+/** The shallowest symbolic link among a path's ancestors: '' for none, null when unreadable. */
+function shallowestLink(path) {
+  const ancestors = []
+  for (let dir = dirname(path); dir !== dirname(dir); dir = dirname(dir)) ancestors.unshift(dir)
+  try {
+    return ancestors.find((dir) => lstatSync(dir).isSymbolicLink()) ?? ''
+  } catch {
+    return null
+  }
+}
+
+/**
  * Resolve a write destination even when its leaf (or several parent directories)
  * does not exist yet. Entry existence matters here: `existsSync` follows a
  * symlink and therefore mistakes a link to a not-yet-created target for a
@@ -71,9 +89,10 @@ const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
  * its canonical containing directory, and repeat so dangling links and link
  * chains cannot disguise a checkout destination.
  *
- * An unreadable link, a link loop, or a path with no readable ancestor returns
- * the empty evidence sentinel. The pure fence deliberately treats that as
- * inside the checkout, which is the conservative direction for a write guard.
+ * An unreadable link, a link loop, a path with no readable ancestor, or a path
+ * that touches /proc or /dev at any hop returns the empty evidence sentinel.
+ * The pure fence deliberately treats that as inside the checkout, which is the
+ * conservative direction for a write guard.
  */
 function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
   if (typeof filePath !== 'string' || !filePath.trim()) return ''
@@ -81,6 +100,9 @@ function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
   const expandedLinks = new Set()
 
   while (true) {
+    // Checked at EVERY hop: a link may lead into /proc or /dev, where a name
+    // means something else in the writing process (point 1207, review round 11).
+    if (processLocalPath(candidate)) return ''
     let existing = candidate
     let entry
     while (true) {
@@ -95,9 +117,15 @@ function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
       }
     }
 
-    if (!entry.isSymbolicLink()) {
+    // `realpathSync` would follow a link in an ANCESTOR unseen, so the
+    // shallowest one is expanded here like a leaf link (review round 11).
+    const ancestorLink = shallowestLink(existing)
+    if (ancestorLink === null) return ''
+    if (ancestorLink) existing = ancestorLink
+    else if (!entry.isSymbolicLink()) {
       try {
-        return resolve(realpathSync(existing), relative(existing, candidate))
+        const target = resolve(realpathSync(existing), relative(existing, candidate))
+        return processLocalPath(target) ? '' : target
       } catch {
         return ''
       }
@@ -106,12 +134,37 @@ function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
     if (expandedLinks.has(existing)) return ''
     expandedLinks.add(existing)
     try {
-      const linkTarget = resolve(realpathSync(dirname(existing)), readlinkSync(existing))
+      const link = readlinkSync(existing)
+      // A `..` in the link text would be collapsed before the link it follows is
+      // expanded, so such a target proves nothing (point 1207, review round 10).
+      if (link.split(/[\\/]/).includes('..')) return ''
+      // The kernel's text for an unlinked open file is no path at all (review round 11).
+      if (link.endsWith(' (deleted)')) return ''
+      const linkTarget = resolve(realpathSync(dirname(existing)), link)
       candidate = resolve(linkTarget, relative(existing, candidate))
     } catch {
       return ''
     }
   }
+}
+
+/**
+ * The write target as outside-checkout EVIDENCE (point 1207): the resolved
+ * path, or '' (unknown, so inside) for a path with a `..` component or an
+ * existing file with a second hard link — a name outside the checkout may
+ * share its content with one inside.
+ */
+function exemptionTarget(filePath, cwd = REPO_ROOT) {
+  // `resolve` collapses `..` before any link is followed, so such a path proves nothing.
+  if (typeof filePath !== 'string' || filePath.split(/[\\/]/).includes('..')) return ''
+  const target = resolvedWriteTarget(filePath, cwd)
+  try {
+    const entry = target ? statSync(target) : null
+    if (entry && entry.isFile() && entry.nlink > 1) return ''
+  } catch {
+    /* a missing target has no second link */
+  }
+  return target
 }
 
 /**
@@ -323,12 +376,13 @@ try {
       toolName: payload.tool_name,
       command: input0.command,
       filePath,
-      resolvedFilePath: resolvedWriteTarget(filePath, payload.cwd || REPO_ROOT),
+      resolvedFilePath: exemptionTarget(filePath, payload.cwd || REPO_ROOT),
       checkoutRoot: realpathSync(REPO_ROOT),
       // The call's own directory, so a shell write can be located at all
       // (point 749): without it a heredoc to the session memory directory is
       // judged by intent alone and refused like a write to main.
       cwd: payload.cwd || REPO_ROOT,
+      canonical: (path) => exemptionTarget(path),
     })
     if (mainWrite.block) {
       process.stdout.write(
@@ -364,6 +418,10 @@ try {
         toolName: payload.tool_name,
         command: input0.command,
         filePath: input0.file_path ?? input0.notebook_path,
+        resolvedFilePath: exemptionTarget(input0.file_path ?? input0.notebook_path, payload.cwd || REPO_ROOT),
+        checkoutRoot: realpathSync(REPO_ROOT),
+        cwd: payload.cwd || REPO_ROOT,
+        canonical: (path) => exemptionTarget(path),
       })
       if (ownership.block) {
         process.stdout.write(

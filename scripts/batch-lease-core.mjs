@@ -62,6 +62,7 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import {
   expandSegments,
+  parseSegments,
   isMutatingSegment,
   directSegmentIntent,
   headAndArgs,
@@ -820,6 +821,14 @@ const FILE_TOOLS = new Set([
 ])
 
 /**
+ * /proc and /dev name per-process objects: `/dev/stdin`, `/dev/fd/<n>` and
+ * `/proc/self/cwd` mean one thing to the guard and another to the shell that
+ * writes, so a path under them is never outside-checkout evidence (point 1207,
+ * review round 11: `cat < inside > /dev/stdin` wrote the input file).
+ */
+const processLocalPath = (path) => /^\/(proc|dev)(\/|$)/.test(String(path))
+
+/**
  * Does this segment write ONLY outside the checkout? PURE (path resolution needs
  * no filesystem).
  *
@@ -835,12 +844,13 @@ const FILE_TOOLS = new Set([
  * no path argument at all is NOT exempted, and one path inside the checkout
  * removes the exemption for the whole segment.
  */
-export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '' } = {}) {
+export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '', canonical } = {}) {
   if (!checkoutRoot) return false
   const { head, args } = headAndArgs(segment)
   if (!FILE_TOOLS.has(String(head))) return false
   const candidates = [
-    ...(segment?.redirects ?? []).filter((r) => r.op?.includes('>')).map((r) => r.target),
+    // `/dev/null` alone is no destination: it discards, whoever opens it.
+    ...(segment?.redirects ?? []).filter((r) => r.op?.includes('>') && r.target !== '/dev/null').map((r) => r.target),
     ...args.map((arg) => arg.text).filter((text) => text && !text.startsWith('-') && text !== '--'),
     // EVERY positional counts, bare filenames included (measured while building
     // this: requiring a slash let `cp <outside> TASKS.md` pass as an outside-only
@@ -848,13 +858,123 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
     // sources as well only ever makes the test STRICTER, which is the safe side.
   ].filter((text) => typeof text === 'string' && text.trim())
   if (candidates.length === 0) return false
-  return candidates.every(
-    (target) =>
-      !resolvedTargetInCheckout({
-        resolvedFilePath: resolve(cwd || checkoutRoot, target),
-        checkoutRoot,
-      }),
-  )
+  // `resolve` collapses `..` before any link could be followed (point 1207, review round 10).
+  if (candidates.some((text) => text.split(/[\\/]/).includes('..'))) return false
+  return candidates.every((target) => {
+    const lexical = resolve(cwd || checkoutRoot, target)
+    // With a resolver injected, the canonical path must lie outside TOO — a
+    // hard or symbolic link may share an inside file (point 1207, review round 8).
+    const resolved = typeof canonical === 'function' ? canonicalEvidence(lexical, canonical) : lexical
+    return (
+      !processLocalPath(lexical) &&
+      !processLocalPath(resolved) &&
+      !resolvedTargetInCheckout({ resolvedFilePath: lexical, checkoutRoot }) &&
+      !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
+    )
+  })
+}
+
+/** The injected resolver's answer; '' (unknown, so inside) on a throw. */
+function canonicalEvidence(path, canonical) {
+  try {
+    return canonical(path) || ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * THE REQUEST HANDOFF SHAPE (point 1207). PURE apart from the injected
+ * `canonical` resolver.
+ *
+ * A stood-down session deposits its request text outside the checkout, e.g.
+ * `cd <scratchpad> && cat > why.md <<'EOF' … EOF`, and both the ownership
+ * stand-down and the main-write fence refused it — the second because `why.md`
+ * was resolved against the session cwd rather than the `cd` target.
+ *
+ * A general shell reader proved unable to close (five review rounds, each
+ * finding new ways a write escapes lexical analysis), so this is a finite
+ * WHITELIST instead, for Bash only (PowerShell reads `a,b` as two operands):
+ * the whole call is optionally `cd <plain absolute path> &&`
+ * followed by exactly ONE unwrapped `cat`, `tee`, `printf`, `echo`, `mkdir` or
+ * `touch`. Every destination (a `>`/`>>` target, a tee/mkdir/touch operand) is
+ * a plain path, resolved against the `cd` target or the session cwd and passed
+ * through `canonical` (the guard's symlink-following write-target resolver),
+ * and must land outside the checkout; '' or a throw counts as inside. No
+ * destination lies under /proc or /dev, before or after resolution, and the
+ * only input redirection is a heredoc, so no descriptor can be rebound to an
+ * inside file (review round 11). The command line carries no expansion, and a
+ * heredoc body is admitted only behind a quoted delimiter, which keeps it
+ * literal.
+ */
+const HANDOFF_WRITERS = new Map([
+  ['cat', { options: [], operandsWrite: false }],
+  ['printf', { options: null, operandsWrite: false }],
+  ['echo', { options: null, operandsWrite: false }],
+  ['tee', { options: ['-a'], operandsWrite: true }],
+  ['mkdir', { options: ['-p'], operandsWrite: true }],
+  ['touch', { options: [], operandsWrite: true }],
+])
+
+const plainHandoffPath = (text) =>
+  typeof text === 'string' && text !== '' && !/[$`*?[\]{}=\s'"\\;&|<>()]|^[~-]/.test(text) && !text.split('/').includes('..')
+
+export function handoffWritesOnlyOutsideCheckout(command, { cwd = '', checkoutRoot = '', canonical = (p) => p } = {}) {
+  try {
+    const src = String(command ?? '')
+    if (!checkoutRoot || !src.trim()) return false
+    const segments = parseSegments(src)
+    if (segments.length !== expandSegments(src).length) return false
+    if (segments.length < 1 || segments.length > 2) return false
+    const outside = (path) => {
+      if (processLocalPath(path)) return false
+      const resolved = canonicalEvidence(path, canonical)
+      return !!resolved && !processLocalPath(resolved) && !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
+    }
+    let dir = cwd
+    if (segments.length === 2) {
+      const [cd, writer] = segments
+      const words = cd.words.map((word) => word.text)
+      if (words.length !== 2 || words[0] !== 'cd' || cd.redirects.length) return false
+      if (!isAbsolute(words[1]) || !plainHandoffPath(words[1])) return false
+      if (src.slice(cd.end, writer.start).trim() !== '&&') return false
+      dir = words[1]
+    }
+    const writer = segments[segments.length - 1]
+    // The HEADER is everything up to the end of the writer's own line; what
+    // follows can only be its heredoc body (review round 6: a multi-line header).
+    const header = src.slice(0, writer.end)
+    const hasBody = src.slice(writer.end).trim() !== ''
+    if (/[$`]/.test(header)) return false
+    const [head, ...args] = writer.words.map((word) => word.text)
+    const rule = HANDOFF_WRITERS.get(head)
+    if (!rule) return false
+    // A heredoc body stays literal only behind a quoted delimiter.
+    if (hasBody && !writer.redirects.some((r) => r.op?.startsWith('<<'))) return false
+    const heredocs = writer.raw.match(/<<-?\s*\S?/g) ?? []
+    if (hasBody && heredocs.some((h) => !/['"]$/.test(h))) return false
+    const destinations = []
+    for (const r of writer.redirects) {
+      if (r.op?.includes('&')) return false
+      if (r.op === '<<' || r.op === '<<-') continue
+      if (r.op?.includes('<')) return false
+      if (r.op?.includes('>')) destinations.push(r.target)
+      else return false
+    }
+    const operands = []
+    for (const arg of args) {
+      if (arg.startsWith('-') && rule.options !== null) {
+        if (!rule.options.includes(arg)) return false
+      } else operands.push(arg)
+    }
+    if (rule.operandsWrite) destinations.push(...operands)
+    if (destinations.length === 0) return false
+    if (!destinations.every(plainHandoffPath)) return false
+    if (!isAbsolute(dir)) return false
+    return destinations.every((target) => outside(resolve(dir, target)))
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -863,7 +983,7 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
  * classification keeps reads and repository gates open and treats an unreadably
  * deep shell wrapper conservatively as a write.
  */
-export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '' } = {}) {
+export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '', canonical } = {}) {
   const tool = String(toolName ?? '')
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
     if (filePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })) {
@@ -873,6 +993,9 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
   }
   if (tool === 'Agent') return { writes: true, what: `${tool} in the main checkout` }
   if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
+  if (tool === 'Bash' && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })) {
+    return { writes: false, what: '' }
+  }
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
   // `expandSegments` already yields every carried command separately. Judge the
@@ -882,7 +1005,8 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
     if (directSegmentIntent(candidate) !== 'write') return false
     // A write that lands entirely OUTSIDE this checkout is not a main write
     // (point 749) — the session memory directory is the case that measured it.
-    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot })) return false
+    // PowerShell reads `a,b` as two operands, so only Bash earns it (point 1207).
+    if (tool === 'Bash' && segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot, canonical })) return false
     return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
   })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }
@@ -911,12 +1035,13 @@ export function mainWriteFenceDecision({
   resolvedFilePath,
   checkoutRoot,
   cwd = '',
+  canonical,
 } = {}) {
   try {
     if (paused === true || worktree === true || branch !== 'main') {
       return { block: false, registerWriter: false, reason: '' }
     }
-    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd })
+    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd, canonical })
     if (!action.writes) return { block: false, registerWriter: false, reason: '' }
     if (ownsBatchLock === true) return { block: false, registerWriter: true, reason: '' }
     return {
