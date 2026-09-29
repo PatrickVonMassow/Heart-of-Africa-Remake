@@ -187,6 +187,16 @@ if (process.argv.includes('--status')) {
     toolInput: {},
     resolvePath: resolveRealPath,
   })
+  // The hook judges the handover brake BEFORE admission; the verdict below
+  // must say what the hook would do, so it includes the brake.
+  const agentStart = classifyFenceCall({ toolName: 'Agent' })
+  const brake = handoverBrakeDecision({
+    tokens: wm.tokens,
+    pendingDebit: admission.ledger.pendingDebit,
+    watermark: triggerTokens(),
+    start: agentStart,
+    launcher,
+  })
   console.log(
     JSON.stringify(
       {
@@ -222,14 +232,19 @@ if (process.argv.includes('--status')) {
       `(currently ${handover.state}).`,
   )
   console.log(brakeModeLine(launcher))
-  console.log(
-    `verdict for an AGENT call: ${
-      admission.decision.fits === false
-        ? mode === 'armed' ? 'DENY' : 'allow (OBSERVED — an armed fence would DENY)'
-        : 'allow'
-    }`,
-  )
-  if (mode === 'armed' && admission.decision.fits === false) {
+  const ceilingDenies = mode === 'armed' && admission.decision.fits === false
+  const observedNotes = [
+    brake.observed ? 'handover brake OBSERVED — an armed launcher would DENY' : null,
+    admission.decision.fits === false ? 'ceiling OBSERVED — an armed fence would DENY' : null,
+  ].filter(Boolean)
+  const verdict = brake.refused
+    ? 'DENY (handover brake)'
+    : ceilingDenies
+      ? 'DENY'
+      : observedNotes.length ? `allow (${observedNotes.join('; ')})` : 'allow'
+  console.log(`verdict for an AGENT call: ${verdict}`)
+  if (brake.refused) console.log(handoverRefusal({ brake, start: agentStart }))
+  else if (ceilingDenies) {
     console.log(contextBudgetRefusal({ decision: admission.decision, reading, sessionId: sid, point: currentPoint() }))
   }
   process.exit(0)

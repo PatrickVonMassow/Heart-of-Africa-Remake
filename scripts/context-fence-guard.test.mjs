@@ -566,6 +566,18 @@ describe('the HANDOVER BRAKE (spawned) — the 122k mark refuses a START', () =>
     for (const tool of ['Read', 'Agent', 'Task', 'Bash']) expect(tools, tool).toContain(tool)
   })
 
+  it('--status in OBSERVE mode with an armed launcher above the mark says DENY, as the hook does', () => {
+    const verdictLine = (out) => out.split('\n').find((l) => l.startsWith('verdict for an AGENT call')) ?? ''
+    const r = status()
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout).toContain('fence mode: OBSERVE')
+    expect(verdictLine(r.stdout)).toBe('verdict for an AGENT call: DENY (handover brake)')
+    expect(r.stdout).toContain('PAST THE CONTEXT WATERMARK')
+    expect(call('Agent', {}).decision?.hookSpecificOutput?.permissionDecision).toBe('deny')
+    rmSync(launcherPath(), { force: true })
+    expect(verdictLine(status().stdout)).toMatch(/^verdict for an AGENT call: allow \(handover brake OBSERVED/)
+  })
+
   it('does not bind a subagent — its spawn was the start, its gate is the step in flight', () => {
     expect(call('Bash', { command: 'npm test -- world' }, { agentId: 'agent-1' }).stdout.trim()).toBe('')
   })
