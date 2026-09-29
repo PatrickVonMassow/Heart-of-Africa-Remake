@@ -194,9 +194,46 @@ describe('board-first-guard (spawned)', () => {
       expect(allowed('Write', { file_path: resolve(pad, 'shared.md') })).toBe(false)
       expect(allowed('Bash', { command: `echo changed > ${resolve(pad, 'shared.md')}` })).toBe(false)
 
+      // Review round 11: descriptor aliases and per-process names, direct, behind
+      // a leaf link, and behind a link in an ANCESTOR of an existing file.
+      symlinkSync('/dev/stdin', resolve(pad, 'stdin'))
+      symlinkSync('/proc/self/cwd', resolve(pad, 'cwd'))
+      symlinkSync(`${repo}/gone.md (deleted)`, resolve(pad, 'unlinked'))
+      const aliases = [
+        '/dev/stdin',
+        '/dev/fd/0',
+        '/proc/self/fd/0',
+        `/proc/${process.pid}/cwd/new.md`,
+        resolve(pad, 'stdin'),
+        resolve(pad, 'cwd', 'new.md'),
+        resolve(pad, 'cwd', 'package.json'),
+        resolve(pad, 'unlinked'),
+      ]
+      for (const path of aliases) {
+        expect(allowed('Write', { file_path: path }), path).toBe(false)
+        expect(allowed('Bash', { command: `echo x > ${path.replace(' (deleted)', '')}` }), path).toBe(false)
+      }
+      expect(allowed('Bash', { command: `cat < ${resolve(repo, 'TASKS.md')} > /dev/stdin` })).toBe(false)
+      expect(allowed('Bash', { command: `cat < ${resolve(pad, 'why.md')} > ${resolve(pad, 'copy.md')}` })).toBe(false)
+      // An ordinary link that stays outside is still followed and admitted.
+      const other = mkdtempSync(resolve(tmpdir(), 'hoa-handoff-other-'))
+      symlinkSync(other, resolve(pad, 'elsewhere'))
+      writeFileSync(resolve(other, 'kept.md'), 'kept')
+      expect(allowed('Write', { file_path: resolve(pad, 'elsewhere', 'kept.md') })).toBe(true)
+      expect(allowed('Write', { file_path: resolve(pad, 'elsewhere', 'new.md') })).toBe(true)
+      // The same existing outside file, reached through /proc in an ancestor.
+      symlinkSync('/proc/self/root', resolve(pad, 'root'))
+      expect(allowed('Write', { file_path: `${pad}/root${other}/kept.md` })).toBe(false)
+      expect(allowed('Bash', { command: `echo x > ${pad}/root${other}/kept.md` })).toBe(false)
+      rmSync(other, { recursive: true, force: true })
+
       // Review round 8: with no lock at all the main-write fence must see the link too.
       rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
       for (const [tool, input] of [
+        ['Write', { file_path: '/dev/stdin' }],
+        ['Write', { file_path: resolve(pad, 'cwd', 'package.json') }],
+        ['Bash', { command: `cat < ${resolve(repo, 'TASKS.md')} > /dev/stdin` }],
+        ['Bash', { command: `cp ${resolve(pad, 'why.md')} ${resolve(pad, 'stdin')}` }],
         ['Write', { file_path: resolve(pad, 'shared.md') }],
         ['Write', { file_path: `${pad}/link/../TASKS.md` }],
         ['Write', { file_path: resolve(pad, 'request') }],
