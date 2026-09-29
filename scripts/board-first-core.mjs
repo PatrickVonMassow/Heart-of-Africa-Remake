@@ -250,7 +250,11 @@ export function ownershipStandDownDecision({
     const tool = String(toolName ?? '')
     // The board is batch state wherever its file lies (the owner's scratchpad
     // included), so it never rides on the outside-checkout admission.
-    const boardTouched = isBoardFile(filePath) || BOARD_FILE_HINTS.some((name) => String(command ?? '').includes(name))
+    // Judged on the file's lexical AND resolved path (a link may hide the name).
+    const boardTouched =
+      isBoardFile(filePath) ||
+      isBoardFile(resolvedFilePath) ||
+      BOARD_FILE_HINTS.some((name) => String(command ?? '').includes(name))
     const outsideFile =
       !boardTouched &&
       ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool) &&

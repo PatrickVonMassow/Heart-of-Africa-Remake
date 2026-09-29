@@ -403,6 +403,11 @@ describe('the stand-down leaves the session scratchpad and the carrier open', ()
     ]) expect(at({ toolName: 'Bash', command }).block, command).toBe(false)
   })
 
+  it('judges board identity on the resolved path too: a link outside the checkout cannot hide the board', () => {
+    expect(write('/tmp/pad/notes.md', '/tmp/claude-1000/-workspace-hoa/owner/scratchpad/hoa-batch-dashboard.html').block).toBe(true)
+    expect(write(`${pad}/notes.md`, `${root}/.batch-dashboard.html`).block).toBe(true)
+  })
+
   it('refuses a climb out of the scratchpad back into the checkout', () => {
     const climb = `${pad}/../../../../../workspace/hoa/TASKS.md`
     expect(write(climb, `${root}/TASKS.md`).block).toBe(true)
