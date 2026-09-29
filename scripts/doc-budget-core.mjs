@@ -103,8 +103,10 @@ export const DOC_BUDGETS = [
     // three binding clauses — checklist role, infrastructure freeze, finding
     // intake — that every session must load, because they change what any later
     // point may be.
-    maxLines: 205,
-    maxWords: 1468,
+    // LOWERED to the 29.09.2026 four-eyes cut list (docs/context-cut-list-1209.md):
+    // 205 / 1468 became 193 / 1302; no rule dropped, §7.1 titles stay (tests pin them).
+    maxLines: 193,
+    maxWords: 1302,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.
