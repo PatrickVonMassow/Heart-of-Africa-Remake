@@ -181,6 +181,11 @@ describe('board-first-guard (spawned)', () => {
       expect(allowed('Write', { file_path: resolve(repo, 'TASKS.md') })).toBe(false)
       expect(allowed('Bash', { command: "cat > TASKS.md <<'EOF'\nx\nEOF" })).toBe(false)
 
+      // Review round 9: `..` behind a link into the checkout.
+      symlinkSync(resolve(repo, 'scripts'), resolve(pad, 'link'))
+      expect(allowed('Write', { file_path: `${pad}/link/../TASKS.md` })).toBe(false)
+      expect(allowed('Bash', { command: `echo x > ${pad}/link/../TASKS.md` })).toBe(false)
+
       writeFileSync(resolve(repo, 'inside.md'), 'inside')
       linkSync(resolve(repo, 'inside.md'), resolve(pad, 'shared.md'))
       expect(allowed('Write', { file_path: resolve(pad, 'shared.md') })).toBe(false)
@@ -190,6 +195,8 @@ describe('board-first-guard (spawned)', () => {
       rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
       for (const [tool, input] of [
         ['Write', { file_path: resolve(pad, 'shared.md') }],
+        ['Write', { file_path: `${pad}/link/../TASKS.md` }],
+        ['Bash', { command: `echo x > ${pad}/link/../TASKS.md` }],
         ['Bash', { command: `cat > ${resolve(pad, 'shared.md')}` }],
       ]) {
         const reason = callGuard(tool, input).decision?.hookSpecificOutput?.permissionDecisionReason ?? ''

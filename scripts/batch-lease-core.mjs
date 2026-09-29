@@ -881,7 +881,8 @@ function canonicalEvidence(path, canonical) {
  *
  * A general shell reader proved unable to close (five review rounds, each
  * finding new ways a write escapes lexical analysis), so this is a finite
- * WHITELIST instead: the whole call is optionally `cd <plain absolute path> &&`
+ * WHITELIST instead, for Bash only (PowerShell reads `a,b` as two operands):
+ * the whole call is optionally `cd <plain absolute path> &&`
  * followed by exactly ONE unwrapped `cat`, `tee`, `printf`, `echo`, `mkdir` or
  * `touch`. Every destination (a `>`/`>>` target, a tee/mkdir/touch operand) is
  * a plain path, resolved against the `cd` target or the session cwd and passed
@@ -972,7 +973,7 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
   }
   if (tool === 'Agent') return { writes: true, what: `${tool} in the main checkout` }
   if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
-  if (handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })) {
+  if (tool === 'Bash' && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })) {
     return { writes: false, what: '' }
   }
   let tooDeep = false

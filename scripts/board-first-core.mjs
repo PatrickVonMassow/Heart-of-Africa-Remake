@@ -196,7 +196,7 @@ export function ownershipStandDownDecision({
       !!filePath && !String(filePath).split(/[\\/]/).includes('..') &&
       !!checkoutRoot && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })
     const outsideShell =
-      SHELL_TOOLS.has(tool) && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })
+      tool === 'Bash' && handoffWritesOnlyOutsideCheckout(command, { cwd: cwd || checkoutRoot, checkoutRoot, canonical })
     if (outsideFile || outsideShell) return { block: false, reason: '', standDown: true }
     const attempted = call.segment
       ? `the state-changing segment \`${call.segment}\``

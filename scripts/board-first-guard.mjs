@@ -116,10 +116,13 @@ function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
 
 /**
  * The write target as outside-checkout EVIDENCE (point 1207): the resolved
- * path, or '' (unknown, so inside) when it is an existing file with a second
- * hard link — a name outside the checkout may share its content with one inside.
+ * path, or '' (unknown, so inside) for a path with a `..` component or an
+ * existing file with a second hard link — a name outside the checkout may
+ * share its content with one inside.
  */
 function exemptionTarget(filePath, cwd = REPO_ROOT) {
+  // `resolve` collapses `..` before any link is followed, so such a path proves nothing.
+  if (typeof filePath !== 'string' || filePath.split(/[\\/]/).includes('..')) return ''
   const target = resolvedWriteTarget(filePath, cwd)
   try {
     const entry = target ? statSync(target) : null

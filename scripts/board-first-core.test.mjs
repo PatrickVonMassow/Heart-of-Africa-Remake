@@ -319,6 +319,8 @@ describe('ownership mutation stand-down', () => {
     expect(at({ command: "cat > TASKS.md <<'EOF'\nx\nEOF" }).block).toBe(true)
     expect(at({ command: `cat > ${pad}/x.md && npm run build` }).block).toBe(true)
     expect(at({ command: 'rm -rf /workspace' }).block).toBe(true)
+    // PowerShell reads `a,b` as two operands; the whitelist is Bash only (review round 9).
+    expect(at({ toolName: 'PowerShell', command: `mkdir ${pad}/request,src/new` }).block).toBe(true)
     // `..` behind a link is collapsed before the resolver sees the link (review round 6).
     expect(at({ toolName: 'Write', command: undefined, filePath: `${pad}/link/../victim`, resolvedFilePath: `${pad}/victim` }).block).toBe(true)
   })
