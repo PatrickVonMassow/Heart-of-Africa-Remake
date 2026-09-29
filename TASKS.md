@@ -77,56 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 633. The release's closing run — two regressions with the cleanup between them (user
-  11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
-  zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
-  when it meant "tag and publish" and is false now that the closing run hangs off it.
-  Measured on this tree: one LARGE regression is ~42 min of runtime (the SMALL tier ~8),
-  and it is run TWICE with "flake-free" allowing repeats; the cleanup reads 761 code files
-  / ~240k lines and 39 documents / ~534k words, and it is read TWICE because both models
-  read blind of each other. So the work is a day or two, and it is not the tagging. This
-  point IS that work; 174 keeps the irreversible last hour.
-  ORDER: it runs AFTER point 631 (which anchors the sequence in the closing checklist) and
-  AFTER 634, so its cleanup already merges through the third model, and BEFORE 174. Running it before 631 would prove nothing — nothing would hold the order of
-  its own steps.
-  FINAL STATE, in this order, each step recorded through `scripts/closing-guard.mjs --step`:
-  1. FIRST full LARGE regression on BOTH backends at the HEAD to be released, flake-free,
-     plus lint and the dependency audit.
-  2. THE CLEANUP, as a BLIND-PARALLEL four-eyes stage (CLAUDE.md §6): GPT-5.6 Sol and
-     Opus 5 work from the same inputs — the whole of `src/`, `scripts/` and every `.md` —
-     to their own COMPLETE list of legacy cruft (dead code, stale docs, stale comments,
-     contradictory or orphaned prose), NEITHER seeing the other's result before both are
-     done. The two lists are then merged into a union deduplicated BY MEANING, keeping
-     both readings wherever it is unclear that one subsumes the other, MARKING what only
-     one side found, and dropping nothing for being unusual. Every entry is then decided:
-     removed, kept with a written reason, or filed as its own point.
-  3. SECOND full LARGE regression on BOTH backends, at a HEAD that includes the last
-     cleanup commit — this is the run 631's order check measures.
-  4. The remaining §9 steps: implementation sections, the graphics-detail doc, the §7.1
-     acceptance criteria with evidence, open items, simplifications.
-  THE TWO CHARGED REDS THIS RELEASE SHIPS WITH (user 07.09.2026, moving points 733 and 1062
-  behind 174). Both regressions will carry them, and the closing does not paper that over:
-  - The evidence of steps 1 and 3 NAMES both charged reds instead of claiming an exit-0 run:
-    the `startup` freeze against the §21.2 budget (point 733) and the German position-query
-    check of the `gamepad` suite (point 1062). Everything else stays a real red.
-  - Acceptance criterion 30 is reported in `docs/acceptance-evidence.md` with the German
-    position-query check named RED under point 1062 — gamepad and the English query fulfilled,
-    the localized query NOT. It is not filed green (CLAUDE.md §7.2 forbids reporting an
-    unfulfilled criterion as fulfilled).
-  - Point 733's charge is scoped to backend `webgpu`, featureLevel `compatibility`. If the
-    freeze reproduces on WebGL 2 or on a core adapter in either regression, that red is
-    UNACCOUNTED and the closing stops for it: it then takes the measurement that either widens
-    the charge with its evidence or names the lane the freeze does not reach — minutes, not the
-    whole of 733, which keeps owning the app-versus-backend question and the §21.2 budget.
-  THEN 174 takes over: report "ready to tag" and wait for the user's go.
-  VERIFIABLE: `node scripts/closing-guard.mjs --status` shows every step recorded with its
-  evidence, the second regression's evidence naming a commit younger than the youngest
-  cleanup commit; both regression runs on both backends carrying no red but the two charged
-  ones named above, each named in the evidence; and the cleanup's union documented with, per
-  entry, which model found it and what was decided.
-  Criticality: HIGH — it is what the tag certifies, and v0.2 shipped with these steps
-  skipped.
-
 - [ ] 174. Tag the demo build `v0.3` and publish it at
   https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
   GATE (user 10.08.2026, replacing the 19.07.2026 wording): v0.3 no longer waits for
