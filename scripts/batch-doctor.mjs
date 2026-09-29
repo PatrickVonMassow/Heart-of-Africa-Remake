@@ -22,7 +22,7 @@ import { liveRecordPaths } from './verify/run-record.mjs'
 import {
   planRemediation,
   declaredRunAlive,
-  quarantineStashArgs,
+  parsePorcelainZ,
   needsRepair,
   GATE_COMMANDS,
   judgeGateRun,
@@ -41,6 +41,8 @@ import {
   findWorktreeTrouble,
   killStrayProcesses,
   pruneWorktrees,
+  quarantineStash,
+  rescueAndReset,
   removeOrphanWorktrees,
   republishBoard,
   restoreTasksFromHead,
@@ -98,7 +100,7 @@ const git = (args, opts = {}) =>
     env: REPOSITORY_ENV,
     timeout: opts.timeout ?? 30000,
     stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim()
+  })[opts.raw ? 'toString' : 'trim']()
 
 // --- Gather the state ----------------------------------------------------------
 
@@ -151,14 +153,8 @@ try {
 const verificationWriterLive = liveVerifyRun || declaredVerifyRun
 let dirtyFiles = []
 try {
-  dirtyFiles = git(['status', '--porcelain'])
-    .split('\n')
-    .filter(Boolean)
-    // NOT slice(3): the git helper trims its whole output, so the leading space of
-    // an unstaged first line (" M path") is already gone and a fixed cut ate the
-    // path's first character — every dirty list started with a mangled name.
-    .map((l) => l.replace(/^[ MADRCU?!]{1,2} +/, ''))
-    .filter((f) => f !== WAIT_LEASE_PATH)
+  // Raw -z output: untrimmed status columns, unquoted paths, renames as two fields.
+  dirtyFiles = parsePorcelainZ(git(['status', '--porcelain=v1', '-z'], { raw: true })).filter((f) => f !== WAIT_LEASE_PATH)
 } catch {
   /* unreadable status */
 }
@@ -307,8 +303,9 @@ for (const a of plan) {
       log('EXECUTED abort-merge: half-done merge aborted, pre-merge state restored')
     } else if (a.action === 'quarantine-stash') {
       const name = `doctor-quarantine-${new Date().toISOString().replace(/[:.]/g, '-')}`
-      git(quarantineStashArgs(name, { excludeVerification: a.excludeVerification }))
-      log(`EXECUTED quarantine-stash: uncommitted concurrent edits moved to stash "${name}" (git stash list to inspect, git stash pop to restore)`)
+      const { created } = quarantineStash({ git, name, excludeVerification: a.excludeVerification })
+      if (created) log(`EXECUTED quarantine-stash: uncommitted concurrent edits moved to stash "${name}" (git stash list to inspect, git stash pop to restore)`)
+      else log('EXECUTED quarantine-stash: nothing eligible was dirty any more — no stash created')
       if (a.excludeVerification) log('kept verification/ out of the stash: a live verification run is writing it')
     } else if (a.action === 'rescue-and-reset') {
       if (branch !== 'main') {
@@ -317,8 +314,7 @@ for (const a of plan) {
         continue
       }
       const rescue = `rescue/parallel-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`
-      git(['branch', rescue, 'main'])
-      git(['reset', '--hard', 'origin/main'])
+      rescueAndReset({ git, rescue })
       log(`EXECUTED rescue-and-reset: local main preserved on "${rescue}", main hard-reset to origin/main. DISCARDED from main (recoverable on the rescue branch): the diverged local commits.`)
     } else if (a.action === 'fast-forward') {
       git(['merge', '--ff-only', 'origin/main'])

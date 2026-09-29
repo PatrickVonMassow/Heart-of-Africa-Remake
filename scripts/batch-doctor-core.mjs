@@ -99,7 +99,15 @@ export function planRemediation(state) {
     })
   }
 
-  if (div.ahead > 0 && div.behind > 0) {
+  if (div.ahead > 0 && div.behind > 0 && state.verificationWriterLive) {
+    // A hard reset would overwrite the live run's tracked frames unsaved.
+    plan.push({
+      action: 'alert-reset-deferred',
+      level: 'alert',
+      reason:
+        'Local main and origin/main DIVERGED, but a live verification run is writing verification/ — the hard reset is refused until it ends. Run the doctor again then.',
+    })
+  } else if (div.ahead > 0 && div.behind > 0) {
     plan.push({
       action: 'rescue-and-reset',
       level: 'repair',
@@ -585,17 +593,32 @@ export const alertNamesAnother = (args) => otherSessionsIn(args).length > 0
  * declared `polish` run lost 34 frames to two quarantine stashes). While a live
  * run writes `verification/`, the whole directory stays out of the stash — by a
  * pathspec exclusion, not a file list, so frames written after the status read
- * are spared too. Only an entry with a path outside it (either side of a rename)
- * makes a quarantine necessary then; without a live writer nothing changes.
+ * are spared too. Only a dirty path outside it makes a quarantine necessary
+ * then; without a live writer nothing changes. `dirtyFiles` is `parsePorcelainZ`'s.
  */
 export const VERIFICATION_DIR = 'verification'
 
 export function quarantineScope(dirtyFiles = [], { verificationWriterLive = false } = {}) {
-  const entries = dirtyFiles ?? []
-  if (!verificationWriterLive) return { needed: entries.length > 0, excludeVerification: false }
-  const inVerification = (path) => path.replace(/^"/, '').startsWith(`${VERIFICATION_DIR}/`)
-  const needed = entries.some((entry) => String(entry).split(' -> ').some((path) => !inVerification(path)))
+  const paths = dirtyFiles ?? []
+  if (!verificationWriterLive) return { needed: paths.length > 0, excludeVerification: false }
+  const needed = paths.some((path) => !String(path).startsWith(`${VERIFICATION_DIR}/`))
   return { needed, excludeVerification: true }
+}
+
+/**
+ * The paths of `git status --porcelain=v1 -z` output: unquoted, and both sides
+ * of a rename or copy (its origin is the next NUL-separated field).
+ */
+export function parsePorcelainZ(out = '') {
+  const fields = String(out).split('\0')
+  const paths = []
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i]
+    if (entry.length < 4) continue
+    paths.push(entry.slice(3))
+    if (/[RC]/.test(entry.slice(0, 2)) && i + 1 < fields.length && fields[i + 1]) paths.push(fields[++i])
+  }
+  return paths
 }
 
 /** The `git stash` arguments of a quarantine; `-u` takes untracked files too. */

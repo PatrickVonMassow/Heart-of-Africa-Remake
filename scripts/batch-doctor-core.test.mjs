@@ -4,15 +4,11 @@
 // named stash) instead of leaving a corrupted tree. The planner decides; the
 // wrapper executes and logs.
 import { describe, it, expect } from 'vitest'
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import {
   planRemediation,
   declaredRunAlive,
   quarantineScope,
-  quarantineStashArgs,
+  parsePorcelainZ,
   needsRepair,
   isConsistent,
   isEvidenceGrade,
@@ -721,41 +717,28 @@ describe('quarantine spares the frames of a live declared verification run', () 
     expect(planFor(dead).find((a) => a.action === 'quarantine-stash').excludeVerification).toBe(false)
   })
 
-  it('a rename crossing the verification/ boundary in either direction still needs a quarantine', () => {
+  it('-z porcelain parses renames structurally, both directions, and keeps arrows in names', () => {
     const live = { verificationWriterLive: true }
-    expect(quarantineScope(['src/old.png -> verification/new.png'], live).needed).toBe(true)
-    expect(quarantineScope(['verification/old.png -> src/new.png'], live).needed).toBe(true)
-    expect(quarantineScope(['verification/a.png -> verification/b.png', '"verification/\\303\\244.png"'], live).needed).toBe(false)
+    const z = (...fields) => fields.join('\0') + '\0'
+    expect(parsePorcelainZ(z('R  verification/new.png', 'src/old.png'))).toEqual(['verification/new.png', 'src/old.png'])
+    expect(quarantineScope(parsePorcelainZ(z('R  verification/new.png', 'src/old.png')), live).needed).toBe(true)
+    expect(quarantineScope(parsePorcelainZ(z('R  src/new.png', 'verification/old.png')), live).needed).toBe(true)
+    // an ordinary name containing " -> " and a non-ASCII name are single, unquoted paths
+    const onlyFrames = parsePorcelainZ(z(' M verification/a -> b.png', '?? verification/ä.png'))
+    expect(onlyFrames).toEqual(['verification/a -> b.png', 'verification/ä.png'])
+    expect(quarantineScope(onlyFrames, live).needed).toBe(false)
   })
 
-  it('executed in a git repo: a live writer keeps verification/ (even frames written after planning), otherwise all is stashed', () => {
-    const tmp = mkdtempSync(join(tmpdir(), 'doctor-quarantine-'))
-    const g = (dir, args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-    const run = (excludeVerification) => {
-      const dir = mkdtempSync(join(tmp, 'repo-'))
-      g(dir, ['init', '-q'])
-      g(dir, ['config', 'user.email', 't@example.invalid'])
-      g(dir, ['config', 'user.name', 't'])
-      mkdirSync(join(dir, 'src'))
-      mkdirSync(join(dir, 'verification'))
-      writeFileSync(join(dir, 'src', 'a.ts'), 'a\n')
-      writeFileSync(join(dir, 'verification', 'old.png'), 'old\n')
-      g(dir, ['add', '-A'])
-      g(dir, ['commit', '-qm', 'init'])
-      writeFileSync(join(dir, 'src', 'a.ts'), 'changed\n') // tracked, dirty
-      writeFileSync(join(dir, 'src', 'b.ts'), 'new\n') // untracked
-      // written AFTER the plan: the status the planner saw never named it
-      writeFileSync(join(dir, 'verification', 'new.png'), 'frame\n')
-      writeFileSync(join(dir, 'verification', 'old.png'), 'redrawn\n')
-      g(dir, quarantineStashArgs('q', { excludeVerification }))
-      return g(dir, ['status', '--porcelain', '-uall']).split('\n').filter(Boolean).sort()
-    }
-    try {
-      expect(run(true)).toEqual([' M verification/old.png', '?? verification/new.png'].sort())
-      expect(run(false)).toEqual([])
-    } finally {
-      rmSync(tmp, { recursive: true, force: true })
-    }
+  it('only verification/ dirty with a live writer: nothing is eligible, no quarantine planned', () => {
+    const plan = planRemediation({ ...clean, dirtyFiles: [frame], parallelDetected: true, verificationWriterLive: true })
+    expect(plan).toEqual([])
+  })
+
+  it('a diverged main with a live writer refuses the hard reset (alert), without one it is planned', () => {
+    const diverged = { ...clean, divergence: { ahead: 1, behind: 1 } }
+    const live = planRemediation({ ...diverged, verificationWriterLive: true }).map((a) => a.action)
+    expect(live).toEqual(['alert-reset-deferred'])
+    expect(planRemediation(diverged).map((a) => a.action)).toEqual(['rescue-and-reset'])
   })
 })
 

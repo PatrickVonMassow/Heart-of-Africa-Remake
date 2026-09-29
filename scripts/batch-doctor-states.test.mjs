@@ -14,6 +14,8 @@ import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import {
+  quarantineStash,
+  rescueAndReset,
   GIT_LOCK_STALE_MS,
   KILLABLE_STRAY_KINDS,
   PENDING_LOCK_STALE_MS,
@@ -39,6 +41,7 @@ import {
   tasksTextParses,
   writeMandateMarker,
 } from './batch-doctor-states.mjs'
+import { planRemediation } from './batch-doctor-core.mjs'
 
 const NOW = 1_800_000_000_000
 let tmp
@@ -691,3 +694,94 @@ describe('the harness', () => {
     expect(repo.startsWith(tmpdir())).toBe(true)
   })
 })
+
+describe('the git repairs keep a live run\'s verification/ frames (temp repo)', () => {
+  let tmp
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'doctor-git-repair-'))
+  })
+  afterEach(() => rmSync(tmp, { recursive: true, force: true }))
+
+  // main with a tracked src file and frame; origin/main diverged by one commit each side.
+  const repo = () => {
+    const dir = mkdtempSync(join(tmp, 'repo-'))
+    const git = gitIn(dir)
+    git(['init', '-q', '-b', 'main'])
+    git(['config', 'user.email', 't@example.invalid'])
+    git(['config', 'user.name', 't'])
+    mkdirSync(join(dir, 'src'))
+    mkdirSync(join(dir, 'verification'))
+    writeFileSync(join(dir, 'src', 'a.ts'), 'a\n')
+    writeFileSync(join(dir, 'verification', 'old.png'), 'old\n')
+    git(['add', '-A'])
+    git(['commit', '-qm', 'base'])
+    writeFileSync(join(dir, 'src', 'remote.ts'), 'r\n')
+    git(['add', '-A'])
+    git(['commit', '-qm', 'published'])
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD'])
+    git(['reset', '-q', '--hard', 'HEAD~1'])
+    writeFileSync(join(dir, 'src', 'local.ts'), 'l\n')
+    git(['add', '-A'])
+    git(['commit', '-qm', 'local'])
+    return { dir, git }
+  }
+  const status = (git) => git(['status', '--porcelain=v1', '-uall'], { encoding: 'utf8' }).split('\n').filter(Boolean).map((l) => l.trim()).sort()
+  const read = (dir, rel) => readFileSync(join(dir, rel), 'utf8')
+
+  it('live writer: src (tracked + untracked) is stashed, frames written after planning stay', () => {
+    const { dir, git } = repo()
+    writeFileSync(join(dir, 'src', 'a.ts'), 'changed\n')
+    writeFileSync(join(dir, 'src', 'b.ts'), 'new\n')
+    writeFileSync(join(dir, 'verification', 'old.png'), 'redrawn\n')
+    writeFileSync(join(dir, 'verification', 'new.png'), 'frame\n')
+    expect(quarantineStash({ git, name: 'q', excludeVerification: true }).created).toBe(true)
+    expect(status(git)).toEqual(['?? verification/new.png', 'M verification/old.png'])
+  })
+
+  it('no live writer: everything is stashed', () => {
+    const { dir, git } = repo()
+    writeFileSync(join(dir, 'src', 'a.ts'), 'changed\n')
+    writeFileSync(join(dir, 'verification', 'new.png'), 'frame\n')
+    expect(quarantineStash({ git, name: 'q' }).created).toBe(true)
+    expect(status(git)).toEqual([])
+  })
+
+  it('only verification/ dirty with a live writer: no stash is created or reported', () => {
+    const { dir, git } = repo()
+    writeFileSync(join(dir, 'verification', 'old.png'), 'redrawn\n')
+    expect(quarantineStash({ git, name: 'q', excludeVerification: true }).created).toBe(false)
+    expect(git(['stash', 'list'])).toBe('')
+    expect(read(dir, 'verification/old.png')).toBe('redrawn\n')
+  })
+
+  it('diverged main + dirty tracked frame + live writer: the planned repairs leave the frame intact', () => {
+    const { dir, git } = repo()
+    writeFileSync(join(dir, 'src', 'a.ts'), 'changed\n')
+    writeFileSync(join(dir, 'verification', 'old.png'), 'redrawn\n')
+    const plan = planRemediation({
+      branch: 'main',
+      mergeInProgress: false,
+      dirtyFiles: ['src/a.ts', 'verification/old.png'],
+      conflictMarkers: false,
+      divergence: { ahead: 1, behind: 1 },
+      tasksParses: true,
+      parallelDetected: true,
+      verificationWriterLive: true,
+    })
+    for (const a of plan) {
+      if (a.action === 'quarantine-stash') quarantineStash({ git, name: 'q', excludeVerification: a.excludeVerification })
+      if (a.action === 'rescue-and-reset') rescueAndReset({ git, rescue: 'rescue/t' })
+    }
+    expect(plan.map((a) => a.action)).toEqual(['quarantine-stash', 'alert-reset-deferred'])
+    expect(read(dir, 'verification/old.png')).toBe('redrawn\n')
+  })
+
+  it('without a live writer the reset runs and local main survives on the rescue branch', () => {
+    const { git } = repo()
+    const local = git(['rev-parse', 'HEAD'])
+    rescueAndReset({ git, rescue: 'rescue/t' })
+    expect(git(['rev-parse', 'HEAD'])).toBe(git(['rev-parse', 'origin/main']))
+    expect(git(['rev-parse', 'rescue/t'])).toBe(local)
+  })
+})
+
