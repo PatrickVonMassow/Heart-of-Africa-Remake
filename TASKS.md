@@ -249,6 +249,7 @@ put it is the mistake this line exists to stop.
   User 28.09.2026 19:37: "Warum muss die gesamte Regression von vorne laufen, wenn bestimmte Teil bereits erfolgreich durchgetestet wurden?"
   User 28.09.2026 19:41: "Reihe deinen Vorschlag als Task nach 1185 ein."
   Refs: point 633; scripts/render-verify-charges.mjs; scripts/closing-guard-core.mjs large-regression; scripts/verify/README.md receipt reuse
+  Bundle: Testinfrastruktur.
 
 - [ ] 1213. A young animal killed by a predator stays dead and becomes a carcass (user bug
   report 25.09.2026, local/JungtierZombie.zip: the lion caught the young animal, the
@@ -16119,3 +16120,4 @@ to land than a mechanism that needs a review.
   User 28.09.2026 19:30: "Wie wäre es mit folgendem Vorschlag: Bisher galt ja während eines Testlauf Maschine ruhig halten. Aber jetzt, mit der Option, Tätigkeiten in die Cloud auszulagern, könnten dort doch auch während einer auf meinem PC laufenden Regression andere Tasks bearbeitet werden, oder?"
   User 28.09.2026 19:34: "Ja, reiche das als Auftrag ein."
   Refs: point 1230
+  Bundle: Modell & Wächter.
