@@ -21,18 +21,14 @@ const repair = () =>
 const oneLine = (value) => String(value ?? '').trim()
 const validStamp = (value) => Number.isFinite(value) && value > 0 && value <= MAX_TIMESTAMP
 
-/** Decode the probe record; anything malformed reads as "no probe". */
+/** Decode the probe record; anything malformed — a non-string field included — reads as "no probe". */
 export function readProbe(value) {
   if (!value || typeof value !== 'object') return null
-  const probe = {
-    branch: oneLine(value.branch),
-    remoteHost: oneLine(value.remoteHost),
-    localHost: oneLine(value.localHost),
-    remoteMachineId: oneLine(value.remoteMachineId),
-    localMachineId: oneLine(value.localMachineId),
-    creditConfirmed: oneLine(value.creditConfirmed),
-    at: Number(value.at),
-  }
+  const text = (key) => (typeof value[key] === 'string' ? value[key].trim() : value[key] == null ? '' : null)
+  const fields = ['branch', 'remoteHost', 'localHost', 'remoteMachineId', 'localMachineId', 'creditConfirmed']
+  const probe = Object.fromEntries(fields.map((key) => [key, text(key)]))
+  if (Object.values(probe).some((field) => field === null)) return null
+  probe.at = typeof value.at === 'number' ? value.at : NaN
   if (!probe.branch || !probe.remoteHost || !probe.localHost || !validStamp(probe.at)) return null
   return probe
 }
@@ -107,6 +103,7 @@ export function readState(raw) {
     setBy,
     changedAt,
     probe: readProbe(value?.probe),
+    unreachable: typeof value?.unreachable === 'string' ? value.unreachable.trim() : '',
     problem: '',
   }
 }
@@ -131,14 +128,38 @@ export function writeState(previous, direction, { reason = '', by = '', now = Da
     setBy,
     changedAt: Number(now),
     probe: kept,
+    ...(dir === 'on' && oneLine(previous?.unreachable) ? { unreachable: oneLine(previous.unreachable) } : {}),
   }
+}
+
+/**
+ * Record a fresh probe. A passing probe keeps the direction and clears an outage; a failing one
+ * turns the switch OFF with its reason, so an older passing probe can never keep routing to cloud.
+ */
+export function recordProbe(previous, probe, { by = '', now = Date.now() } = {}) {
+  const decoded = readProbe(probe)
+  const verdict = probeVerdict(decoded)
+  if (verdict.offMachine && previous?.state === 'on') {
+    return writeState({ ...previous, unreachable: '' }, 'on', { reason: previous.reason, by, now, probe: decoded })
+  }
+  const reason = verdict.offMachine ? 'probe passed; switch left OFF' : `probe failed: ${verdict.why}`
+  return writeState(previous, 'off', { reason, by, now, probe: decoded })
+}
+
+/** Record that a cloud launch failed: routing falls back to local until a passing probe is recorded. */
+export function recordUnreachable(previous, what, { by = '', now = Date.now() } = {}) {
+  const detail = oneLine(what)
+  if (!previous?.ok) throw new Error('cloud-switch: the state is unusable; nothing to mark unreachable')
+  if (!detail || /[\r\n]/.test(detail)) throw new Error('cloud-switch: --unreachable needs one non-empty line')
+  const record = writeState({ ...previous, unreachable: '' }, previous.state, { reason: previous.reason, by, now })
+  return { ...record, unreachable: detail }
 }
 
 /**
  * THE ROUTING READ: where a Claude-lane authoring delegation starts. ON with a passing
  * probe and a reachable cloud → cloud; everything else → local, with the notice to show.
  */
-export function authoringVenue(value, { cloudReachable = true } = {}) {
+export function authoringVenue(value, { cloudReachable = !value?.unreachable } = {}) {
   if (!value?.ok)
     return {
       venue: 'local',
@@ -154,7 +175,7 @@ export function authoringVenue(value, { cloudReachable = true } = {}) {
   if (!cloudReachable)
     return {
       venue: 'local',
-      notice: 'cloud switch ON but the cloud is unreachable — authoring falls back to local',
+      notice: `cloud switch ON but the cloud is unreachable${value.unreachable ? ` (${value.unreachable})` : ''} — authoring falls back to local`,
     }
   return { venue: 'cloud', notice: '' }
 }

@@ -4,6 +4,7 @@
 //   node scripts/cloud-switch.mjs --status
 //   node scripts/cloud-switch.mjs --venue          the routing read: where authoring delegations start
 //   node scripts/cloud-switch.mjs --record-probe <ref> [--credit-confirmed "<user quote>"]
+//   node scripts/cloud-switch.mjs --unreachable "<what failed>"   a cloud launch failed: route local
 //   node scripts/cloud-switch.mjs --on  --reason "<user instruction>"
 //   node scripts/cloud-switch.mjs --off --reason "<user instruction>"
 //
@@ -22,6 +23,8 @@ import {
   STATE_FILE_NAME,
   authoringVenue,
   readState,
+  recordProbe,
+  recordUnreachable,
   statusReport,
   venueInstruction,
   writeState,
@@ -34,6 +37,8 @@ const git = (args) =>
     cwd: REPO_ROOT,
     encoding: 'utf8',
     windowsHide: true,
+    // Bounded: the session-start hook imports this module; a stuck git must not stall orientation.
+    timeout: 10000,
   })
 
 export const STATE_FILE =
@@ -76,7 +81,8 @@ function localMachineId() {
 
 /** Parse the `label: value` lines the cloud author wrote. */
 export function parseMarker(text) {
-  const field = (label) => (String(text ?? '').match(new RegExp(`^${label}:\\s*(.+)$`, 'm'))?.[1] ?? '').trim()
+  const field = (label) =>
+    (String(text ?? '').match(new RegExp(`^${label}:[ \\t]*(\\S[^\\r\\n]*)$`, 'm'))?.[1] ?? '').trim()
   const machineId = field('machine-id')
   return {
     remoteHost: field('hostname'),
@@ -84,11 +90,11 @@ export function parseMarker(text) {
   }
 }
 
-function recordProbe(ref, creditConfirmed) {
+function recordProbeFrom(ref, creditConfirmed) {
   const remoteRef = ref.startsWith('origin/') ? ref : `origin/${ref}`
   git(['fetch', '--quiet', 'origin', ref.replace(/^origin\//, '')])
   const shown = git(['show', `${remoteRef}:${PROBE_FILE}`])
-  if (shown.status !== 0) throw new Error(`no ${PROBE_FILE} on ${remoteRef}: ${shown.stderr.trim()}`)
+  if (shown.status !== 0) throw new Error(`no ${PROBE_FILE} on ${remoteRef}: ${String(shown.stderr ?? '').trim()}`)
   const current = currentCloudState()
   const probe = {
     branch: remoteRef,
@@ -98,15 +104,7 @@ function recordProbe(ref, creditConfirmed) {
     creditConfirmed,
     at: Date.now(),
   }
-  const base = current.ok ? current : { state: 'off' }
-  const reason = current.ok && current.setBy ? current.reason : 'probe recorded'
-  save(
-    writeState(base, base.state === 'on' ? 'on' : 'off', {
-      reason,
-      by: setterIdentity(),
-      probe,
-    }),
-  )
+  save(recordProbe(current.ok ? current : null, probe, { by: setterIdentity() }))
 }
 
 function save(record, file = STATE_FILE) {
@@ -116,7 +114,7 @@ function save(record, file = STATE_FILE) {
 
 export const usage = () =>
   'usage: node scripts/cloud-switch.mjs --status | --venue | --record-probe <ref> [--credit-confirmed "<user quote>"] | ' +
-  '--on --reason "<user instruction>" | --off --reason "<user instruction>"'
+  '--unreachable "<what failed>" | --on --reason "<user instruction>" | --off --reason "<user instruction>"'
 
 if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
@@ -139,7 +137,12 @@ if (isMainModule(import.meta.url)) {
       argv[1] &&
       (argv.length === 2 || (argv.length === 4 && argv[2] === '--credit-confirmed'))
     ) {
-      recordProbe(argv[1], argv[3] ?? '')
+      recordProbeFrom(argv[1], argv[3] ?? '')
+      console.log(statusReport(currentCloudState()))
+      process.exit(0)
+    }
+    if (argv.length === 2 && argv[0] === '--unreachable') {
+      save(recordUnreachable(currentCloudState(), argv[1], { by: setterIdentity() }))
       console.log(statusReport(currentCloudState()))
       process.exit(0)
     }

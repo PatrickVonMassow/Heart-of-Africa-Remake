@@ -56,6 +56,15 @@ import { currentFableState } from './fable-switch.mjs'
 import { servingPolicyLine } from './fable-switch-core.mjs'
 import { currentVenue } from './cloud-switch.mjs'
 import { venueInstruction } from './cloud-switch-core.mjs'
+
+/** The cloud switch's routing sentence; a failure to read it never costs the session start. */
+function cloudVenueLine() {
+  try {
+    return venueInstruction(currentVenue())
+  } catch (error) {
+    return `CLOUD SWITCH UNREADABLE (${error?.message ?? error}) — authoring delegations run locally.`
+  }
+}
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { noteHandoverAttributionSuccessorStart } from './handover-attribution.mjs'
 
@@ -307,7 +316,7 @@ try {
       'commissioned"). ' +
       (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`) +
       // Where authoring delegations start (point 1230): the cloud switch's routing read.
-      ` ${venueInstruction(currentVenue())}`
+      ` ${cloudVenueLine()}`
     const now = Date.now()
     if (isPaused()) {
       const why = pauseReason()

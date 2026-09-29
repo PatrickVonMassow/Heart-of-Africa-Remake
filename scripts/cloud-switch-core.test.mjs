@@ -3,6 +3,8 @@ import {
   authoringVenue,
   probeVerdict,
   readState,
+  recordProbe,
+  recordUnreachable,
   statusReport,
   venueInstruction,
   writeState,
@@ -139,5 +141,40 @@ describe('status and marker', () => {
       remoteHost: 'h1',
       remoteMachineId: '',
     })
+  })
+})
+
+describe('review fixes (Astra, 235e3c2)', () => {
+  it('a non-string credit confirmation is no confirmation', () => {
+    for (const bad of [false, 0, {}]) {
+      expect(readState(record('on', probe({ creditConfirmed: bad }))).probe).toBeNull()
+    }
+  })
+
+  it('an empty hostname line is not read from the next line', () => {
+    expect(parseMarker('hostname:\nuname -a: Linux\nmachine-id: absent\n').remoteHost).toBe('')
+  })
+
+  it('a failed probe recorded while ON turns the switch OFF', () => {
+    const on = readState(record('on'))
+    const next = readState(
+      JSON.stringify(recordProbe(on, probe({ remoteHost: '66a0eaaacb4b' }), { by: 'b', now: NOW })),
+    )
+    expect(next.state).toBe('off')
+    expect(next.reason).toMatch(/probe failed: .*ran locally/)
+    expect(authoringVenue(next).venue).toBe('local')
+  })
+
+  it('a passing probe recorded while ON stays ON and clears an outage', () => {
+    const on = readState(JSON.stringify({ ...JSON.parse(record('on')), unreachable: 'launch failed' }))
+    expect(recordProbe(on, probe(), { by: 'b', now: NOW })).not.toHaveProperty('unreachable')
+  })
+
+  it('a recorded outage routes the real read local until a passing probe', () => {
+    const on = readState(record('on'))
+    const down = readState(JSON.stringify(recordUnreachable(on, 'remote launch refused', { by: 'b', now: NOW })))
+    const route = authoringVenue(down)
+    expect(route.venue).toBe('local')
+    expect(route.notice).toMatch(/unreachable \(remote launch refused\)/)
   })
 })
