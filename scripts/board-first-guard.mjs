@@ -31,6 +31,7 @@
 import { readFileSync, existsSync, lstatSync, readlinkSync, realpathSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, relative, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
 import {
   REPO_ROOT,
   STATE_PATH,
@@ -59,7 +60,7 @@ import {
   sealedBoundaryDeny,
 } from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
-import { evaluate, isWorktreeCheckout, ownershipStandDownDecision } from './board-first-core.mjs'
+import { evaluate, isWorktreeCheckout, ownershipStandDownDecision, sessionScratchpad } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
@@ -422,6 +423,12 @@ try {
         checkoutRoot: realpathSync(REPO_ROOT),
         cwd: payload.cwd || REPO_ROOT,
         canonical: (path) => exemptionTarget(path),
+        scratchpad: sessionScratchpad({
+          tmp: tmpdir(),
+          uid: process.getuid?.(),
+          projectDir: REPO_ROOT,
+          sessionId: payload.session_id,
+        }),
       })
       if (ownership.block) {
         process.stdout.write(

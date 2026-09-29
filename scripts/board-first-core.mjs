@@ -161,6 +161,19 @@ export function classifyTool(call) {
 }
 
 /**
+ * The harness-announced session scratchpad, `<tmp>/claude-<uid>/<project>/<session>/scratchpad`,
+ * where `<project>` is the project directory with every non-alphanumeric
+ * character turned into `-` (`/workspace/hoa` → `-workspace-hoa`). PURE; '' when
+ * the session id is unknown, so the refusal falls back to the placeholder.
+ */
+export function sessionScratchpad({ tmp = '/tmp', uid, projectDir = '', sessionId = '' } = {}) {
+  const session = String(sessionId ?? '')
+  if (!session || !/^[A-Za-z0-9._-]+$/.test(session) || uid === undefined || uid === null || !projectDir) return ''
+  const project = String(projectDir).replace(/[^A-Za-z0-9]/g, '-')
+  return `${String(tmp).replace(/[\\/]+$/, '')}/claude-${uid}/${project}/${session}/scratchpad`
+}
+
+/**
  * RE-CHECK BATCH OWNERSHIP BEFORE EVERY MUTATION. PURE.
  *
  * The ordinary guard stand-down remains exactly that for reads, paused batches,
@@ -168,6 +181,12 @@ export function classifyTool(call) {
  * A top-level session which has lost the live owner lock, however, may not turn
  * "this guard stood down" into permission for the mutation itself. The wrapper
  * runs this decision on every PreToolUse call after measuring ownership again.
+ *
+ * Point 1186: the refusal names the write path that stays open — the session
+ * scratchpad (`scratchpad`, computed by the wrapper; a placeholder when absent)
+ * — and the stdin form of the findings carrier, so the standing-down session
+ * finds the sanctioned route instead of a shell trick. The scratchpad itself is
+ * admitted by the point-1207 outside-checkout rule above.
  */
 export function ownershipStandDownDecision({
   heldByOtherLiveOwner = false,
@@ -181,6 +200,7 @@ export function ownershipStandDownDecision({
   checkoutRoot = '',
   cwd = '',
   canonical,
+  scratchpad = '',
 } = {}) {
   try {
     if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
@@ -204,15 +224,21 @@ export function ownershipStandDownDecision({
         ? `${String(toolName ?? 'write')} of \`${filePath}\``
         : `the ${String(toolName ?? 'state-changing')} tool call`
     const owner = typeof ownerSession === 'string' && ownerSession ? ` (${ownerSession})` : ''
+    const pad = typeof scratchpad === 'string' && scratchpad ? `\`${scratchpad}\`` : '`/tmp/claude-<uid>/<project>/<session>/scratchpad`'
     return {
       block: true,
       standDown: true,
       reason:
         `BATCH OWNERSHIP STAND-DOWN — another live session${owner} owns the batch lock. ` +
         `${attempted} was refused before it ran.\n` +
-        'STAND-DOWN PATH: stop all mutations in this top-level session; reads remain available so you can ' +
-        'inspect and report the state. The current owner continues the batch. To request ownership through ' +
-        'the sanctioned handoff, run `node scripts/batch-claim.mjs --session <this session id>`.',
+        'STAND-DOWN PATH: stop all mutations of the repository, board and batch in this top-level session; ' +
+        'reads remain available so you can inspect and report the state. The current owner continues the batch.\n' +
+        `ONE WRITE PATH STAYS OPEN: your session scratchpad ${pad} — the Write tool with an absolute path there, ` +
+        "or one `cd <scratchpad> && cat > <file> <<'EOF'` call; the repository stays refused.\n" +
+        'To hand the user\'s request or a finding to the owner, use the carrier, which needs no file: ' +
+        '`node scripts/finding.mjs --request "<title>" --stdin --session <this session id>` with the parts ' +
+        '`--- spec ---`, `--- why ---`, `--- quotes ---` … on stdin (or `--record "<title>" --detail "<…>"` for a finding).\n' +
+        'To request ownership through the sanctioned handoff, run `node scripts/batch-claim.mjs --session <this session id>`.',
     }
   } catch {
     return { block: false, reason: '', standDown: false }
