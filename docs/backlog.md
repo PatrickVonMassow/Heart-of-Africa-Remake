@@ -1937,3 +1937,14 @@ exactly HEAD, but stop guards (retro currency, findings carrier, push arrival) f
 commits on main while that run is in flight. f2a30fcd0 was lost this way, and the run on
 40cfcea76 now trails doc-only commits. Candidate for a point if the closing cannot be recorded:
 treat commits after the run target that touch only docs/ as covered.
+
+## The standstill watchdog fires during a declared LARGE wait
+
+Found 29.09.2026 during closing 633: at 01:54 the watchdog reported "the batch has not moved
+for 126 min" and started a successor, while the owner held a live `batch-in-flight` declaration
+(pid, advancing log, re-declared every ~20 min) for a three-hour LARGE regression. The owner kept
+the lock; the only effect was an automatic-decision card on the board. Backlog under the
+infrastructure freeze: no player impact and no lost work. Promote if it ever takes a live lock.
+Also seen in the same closing: the closing guard reads any "commit <sha>" in the second
+regression's evidence as a run target, and a timestamp as older than cleanup steps re-recorded
+after a HEAD change; wording the evidence around it cost two retries.
