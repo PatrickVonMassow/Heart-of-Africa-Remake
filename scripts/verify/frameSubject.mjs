@@ -268,7 +268,9 @@ export async function jumpBeside(page, lat, lon, frame = `(${lat}, ${lon})`) {
     return i
   }, candidates)
   if (at < 0) {
-    console.log(`FAIL  frame ${frame} — no stand clear of the current within 0.3 degrees of lat ${lat}, lon ${lon}; the frame was not taken`)
+    const reason = `no stand clear of the current within 0.3 degrees of lat ${lat}, lon ${lon}; the frame was not taken`
+    console.log(`FAIL  frame ${frame} — ${reason}`)
+    recordRefusal(frame, reason)
     return null
   }
   return candidates[at]

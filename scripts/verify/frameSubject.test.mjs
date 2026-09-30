@@ -712,5 +712,8 @@ describe('standing beside a river subject (point 1145)', () => {
     }
     expect(stand).toBeNull()
     expect(lines.join('\n')).toMatch(/^FAIL {2}frame 11-worldmodel-khartoum-confluence — no stand clear of the current/m)
+    // The refusal reddens the run like a mis-aimed frame; otherwise a green run hides it.
+    expect(process.exitCode).toBe(1)
+    expect(expectRefusal('11-worldmodel-khartoum-confluence')).toMatch(/no stand clear of the current/)
   })
 })
