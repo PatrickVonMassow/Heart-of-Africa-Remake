@@ -186,7 +186,7 @@ const TAG_FIELDS: ReadonlyArray<{
  * glance, which is the point of the rule that every balance value is editable.
  */
 const BANK_GAME_FIELDS: ReadonlyArray<{
-  key: keyof typeof balance.villageLife.bankGame
+  key: Exclude<keyof typeof balance.villageLife.bankGame, 'visitOpensAtBank'>
   label: DebugLabelKey
   step: number
   min: number
@@ -693,6 +693,10 @@ export function DebugMenu() {
       // The children's game of tag (design.md §19.10, point 480/351).
       ...tableRows(TAG_FIELDS, (f) => balance.villageLife.tag[f.key], (f, v) => { balance.villageLife.tag[f.key] = v }),
       // The children's game at the river bank (point 687).
+      check(t.debug.bankVisitOpensAtBank, balance.villageLife.bankGame.visitOpensAtBank, (v) => {
+        balance.villageLife.bankGame.visitOpensAtBank = v
+        bump()
+      }),
       ...tableRows(BANK_GAME_FIELDS, (f) => balance.villageLife.bankGame[f.key],
         (f, v) => { balance.villageLife.bankGame[f.key] = v }),
       // What the ADULTS do at their errands (point 483).
