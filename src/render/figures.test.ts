@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import * as THREE from 'three/webgpu'
 import { FIGURE_LIMBS, TESSELLATION, TRAVELLER_PACK } from './figures'
 import { REST_POSE, armDirection } from './gesture'
+import { caughtSlumpPose } from '../scenes/place/tagGame'
+import { balance } from '../config/balance'
 
 describe('TESSELLATION floors', () => {
   it('figure bodies and heads are visibly round (old: 8-cone, 10x8 sphere)', () => {
@@ -187,6 +189,46 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
     expect(FIGURE_LIMBS.shoulderX - coneRadiusAt(FIGURE_LIMBS.shoulderY)).toBeLessThan(
       FIGURE_LIMBS.armRadius[0],
     )
+  })
+
+  it("a caught child's SLUMP keeps both arms clear of trunk and legs (work-order 1239)", () => {
+    // The slump leans the trunk about the hip and hangs the arms plumb, rolled in
+    // closer than at rest. Held to the resting arm's own standard: past the
+    // shoulder's first third the limb's surface stands off the trunk cone, and
+    // nowhere does it touch a leg. Pinned for the configured values and for the
+    // top of the lean's calibration range (0.50).
+    const L = FIGURE_LIMBS
+    const cfg = balance.villageLife.tag
+    const restHand = L.shoulderX + L.armLength * armDirection(REST_POSE.left)[0]
+    for (const lean of [cfg.caughtSlumpLean, 0.5]) {
+      const pose = caughtSlumpPose({ caughtSlumpLean: lean, caughtSlumpArmRoll: cfg.caughtSlumpArmRoll })
+      for (const [arm, side] of [[pose.left, 1], [pose.right, -1]] as const) {
+        const dir = armDirection(arm)
+        for (let i = 0; i <= 20; i++) {
+          const t = i / 20
+          const armRadius = L.armRadius[0] + (L.armRadius[1] - L.armRadius[0]) * t
+          // In the trunk's own frame, before the lean.
+          const x = side * L.shoulderX + L.armLength * dir[0] * t
+          const y = L.shoulderY + L.armLength * dir[1] * t
+          const z = L.armLength * dir[2] * t
+          // Trunk: a legged figure keeps the same taper, radius bodyRadius·(1 − y).
+          if (t >= 0.35 && y >= L.hipY) {
+            expect(Math.hypot(x, z) - L.bodyRadius * (1 - y), `trunk at t=${t}`).toBeGreaterThanOrEqual(armRadius)
+          }
+          // Legs: straight down from the hips, in the figure's frame after the lean.
+          const wy = L.hipY + (y - L.hipY) * Math.cos(lean) - z * Math.sin(lean)
+          const wz = (y - L.hipY) * Math.sin(lean) + z * Math.cos(lean)
+          if (wy <= L.hipY) {
+            const gap = Math.hypot(Math.abs(x) - L.hipX, wz) - L.legRadius[0] - armRadius
+            expect(gap, `leg at t=${t}`).toBeGreaterThan(0)
+          }
+        }
+        // The hand hangs outside the leg's outer edge, and closer in than at rest.
+        const hx = Math.abs(side * L.shoulderX + L.armLength * dir[0])
+        expect(hx - L.handRadius).toBeGreaterThan(L.hipX + L.legRadius[0])
+        expect(hx).toBeLessThan(restHand)
+      }
+    }
   })
 
   it('the shoulder line sits above the hip line, both inside the body', () => {

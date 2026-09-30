@@ -1520,11 +1520,13 @@ export const balance: BalanceConfig = {
       caughtPauseSeconds: 0.7,
       // Work-order 1239, calibratable estimates. A caught child stands in a
       // frustrated slump instead of squatting: the trunk leans forward (0.40 rad
-      // = 23°, clear of the sprint's 0.28) and both arms hang plumb, close to
-      // the body. Used by the tag round's beat and the bank round's caught
-      // children alike.
+      // = 23°, clear of the sprint's 0.28) and both arms hang plumb, closer to
+      // the body than at rest (0.46). The roll was specified at 0.20, but below
+      // about 0.34 the upper arm sinks into the trunk cone at this lean
+      // (src/render/figures.test.ts pins the clearance).
+      // OPEN: confirm 0.34 against the specified 0.20 in the picture.
       caughtSlumpLean: 0.4,
-      caughtSlumpArmRoll: 0.2,
+      caughtSlumpArmRoll: 0.34,
       // The chaser looks at its quarry within a modest trunk turn.
       gazeTurnMax: 0.6,
       // One wordless child cry on the catch: a short "ha!", varied a little per

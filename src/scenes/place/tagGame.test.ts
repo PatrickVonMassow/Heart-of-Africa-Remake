@@ -2038,7 +2038,7 @@ describe('a caught child stands slumped (work-order 1239)', () => {
       const [x, y, z] = worldArm(arm, p.lean)
       // Plumb: no forward or backward swing left once the trunk's tilt is added.
       expect(z).toBeCloseTo(0, 9)
-      expect(y).toBeLessThan(-0.95)
+      expect(y).toBeCloseTo(-Math.cos(CFG.caughtSlumpArmRoll), 9)
       // Close to the body, outward on its own side, by the configured roll.
       expect(Math.sign(x)).toBe(side)
       expect(Math.abs(arm.roll)).toBeCloseTo(CFG.caughtSlumpArmRoll, 9)
