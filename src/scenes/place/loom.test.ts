@@ -26,16 +26,6 @@ beforeAll(() => {
 })
 
 const VILLAGES = PLACES.filter((p) => p.kind === 'village').map((p) => p.id)
-
-// OPEN (work-order 1245): a NAMED RESIDUAL of the parked loom. Moving the
-// children's stretch ~28 m upstream moved the water path's foot with it, and the
-// path's head is swept round the foot's new bearing — onto the plaza's river
-// side of these Bambara plans, where it now stands within the talk reach of
-// every seat the plaza could see (measured: with the head's clearance lifted,
-// seeds 7 and 394349866 are seen again, with a household giving way). The loom
-// is parked (user 29.09.2026) and no village lays it; before it is re-enabled
-// the head search or the seat search has to answer this.
-const PARKED_LOOM_RESIDUAL = new Set(['bambara-village/7', 'bambara-village/42', 'bambara-village/1337'])
 const SEEDS = [7, 42, 1337, 394349866, 1838110026]
 
 /** Every shipped village layout the assertions below are made against. */
@@ -97,7 +87,6 @@ describe('the village plaza sees the loom (work-order 1190)', () => {
       .filter(({ id }) => id.startsWith('bambara'))
       .filter(({ layout }) => plazaViewOf(layout) <= 0)
       .map(({ id, seed }) => `${id}/${seed}`)
-      .filter((key) => !PARKED_LOOM_RESIDUAL.has(key))
     expect(blind).toEqual([])
   })
 
@@ -122,7 +111,6 @@ describe('a household gives way to the plaza’s view (work-order 1191)', () => 
     const unseen = [...VILLAGES.map((id) => [id, 42] as const), ['bambara-village', 394349866] as const]
       .filter(([id, seed]) => sharedLayout(id, seed).loom?.seenFromPlaza !== true)
       .map(([id, seed]) => `${id}/${seed}`)
-      .filter((key) => !PARKED_LOOM_RESIDUAL.has(key))
     expect(unseen).toEqual([])
   })
 
@@ -155,12 +143,12 @@ describe('a household gives way to the plaza’s view (work-order 1191)', () => 
   it('what was left unbuilt is named, and nothing is where the line was already open', () => {
     // Fang@42 keeps its nominal seat with the view open past every hut.
     expect(sharedLayout('fang-village', 42).gaveWayToLoom).toEqual({ households: 0, dwellings: 0, rebuilt: 0 })
-    // The shipped Bambara plan 394349866 no longer has a household give way
-    // since work-order 1245 moved the water path (PARKED_LOOM_RESIDUAL), so the
-    // compound plan that does is looked for rather than named.
-    const gave = shippedLooms().find(({ layout }) => layout.gaveWayToLoom.households > 0 && layout.fences.some((f) => f.kind === 'woven'))
-    expect(gave, 'some compound plan still has a household give way').toBeDefined()
-    const bambara = gave!.layout
+    // Seed 3: since work-order 1245 moved the children's stage upstream, the
+    // shipped plan 394349866 is seen without a household giving way, and 3 is
+    // the first Bambara plan that still needs one.
+    const bambara = sharedLayout('bambara-village', 3)
+    expect(bambara.loom?.seenFromPlaza).toBe(true)
+    expect(bambara.gaveWayToLoom.households).toBeGreaterThan(0)
     expect(bambara.gaveWayToLoom.dwellings).toBeGreaterThanOrEqual(bambara.gaveWayToLoom.households)
     // A compound goes whole, and the cluster keeps at least three of them.
     expect(bambara.fences.filter((f) => f.kind === 'woven').length).toBeGreaterThanOrEqual(3)

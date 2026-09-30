@@ -1919,7 +1919,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // `playRocks` through this closure, so they see the stage the settling leaves
   // rather than the one it started from.
   let clearRun: ((head: BankPoint, solids: readonly Collider[]) => boolean) | null = null
-  let findHead: ((solids: readonly Collider[]) => BankPoint | null) | null = null
+  let findHead: ((solids: readonly Collider[], reject?: (head: BankPoint) => boolean) => BankPoint | null) | null = null
   if (waterPath) {
     // Gate option (work-order 1045): prefer the existing clear walk. If only
     // compound walls prevent it, open their rings at the crossing. Buildings,
@@ -1954,6 +1954,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const findHeadHere = (
       solids: readonly Collider[],
       radii: readonly number[] = WATER_PATH_HEAD_INNER_RADII,
+      reject?: (head: BankPoint) => boolean,
     ): BankPoint | null => {
       for (let step = 0; step <= WATER_PATH_HEAD_SWEEP; step++) {
         for (const sign of step === 0 ? [1] : [-1, 1]) {
@@ -1962,6 +1963,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
             const cand = { x: Math.cos(a) * r, z: Math.sin(a) * r }
             if (!isFree(cand.x, cand.z, 2.0, WALKER_RADIUS)) continue
             if (inPlayEarshot(cand.x, cand.z)) continue
+            if (reject?.(cand)) continue
             if (clearRunHere(cand, solids)) return cand
           }
         }
@@ -1969,7 +1971,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       return null
     }
     clearRun = clearRunHere
-    findHead = (solids) => findHeadHere(solids) ?? findHeadHere(solids, WATER_PATH_HEAD_OUTER_RADII)
+    findHead = (solids, reject) =>
+      findHeadHere(solids, WATER_PATH_HEAD_INNER_RADII, reject) ?? findHeadHere(solids, WATER_PATH_HEAD_OUTER_RADII, reject)
     let head = findHeadHere(colliders)
     if (!head && compoundFences.size > 0) {
       const fixed = colliders.filter((c) => !compoundColliders.has(c))
@@ -2352,43 +2355,74 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // (GPT-6 Astra review, pass 7).
       !lanes.some((lane) => closestOnPolyline(lane.points, x, z).dist < lane.width / 2 + r) &&
       !onWayToWater(x, z, r)
-    loom = placeLoom({
-      bank,
-      nominal: LOOM_SPOT,
-      nominalWaterOff: bank
-        ? bank.distance - (LOOM_SPOT[0] * bank.nx + LOOM_SPOT[1] * bank.nz)
-        : Infinity,
-      walkRadius: radius - WALKER_RADIUS,
-      free: (x, z, r) => groundFree(x, z, r, colliders, paths),
-      freeGivingWay: (x, z, r) => groundFree(x, z, r, standingSolids, standingLanes),
-      givesWay: (station) => affordable(displacedBy(station)),
-      sightClear: (from, to, halfWidth) => clearCorridor(colliders, from, to, halfWidth),
-      // THE PLAZA'S OWN VIEW (work-order 1190). The ground the player stands on
-      // to look at the village's middle is not one spot, so the line is asked
-      // from each of a ring of stands over the plaza — the same disc the picture
-      // check walks — and one open line is enough. The corridor is a metre to
-      // each side: the shipped seat passed a 0.15 m line through a gap between
-      // two dwellings, and what arrived in the frame was two figures, not a loom.
-      plazaView: (seat, floor) => plazaLine(seat, floor).widest,
-      // The floor under both: the view from any distance with nothing but the
-      // outbuildings and the dressing giving way — the plaza's view as it was
-      // before a household could (work-order 1190).
-      plazaViewFar: (seat, floor) => plazaLine(seat, floor, lightSolids, Infinity).widest,
-      plazaReach: (seat) => plazaStands.some((stand) => {
-        const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
-        return dist >= PLAZA_SIGHT_MIN_DISTANCE && dist <= PLAZA_SIGHT_MAX_DISTANCE
-      }),
-      toChildren,
-      waterPathHead: waterPath ? waterPath.head : null,
-      onWaterLane: (x, z, r) => !!waterPath &&
-        closestOnPolyline(
-          [[waterPath.head.x, waterPath.head.z], [waterPath.foot.x, waterPath.foot.z]],
-          x,
-          z,
-        ).dist < WATER_PATH_WIDTH / 2 + r,
-      clearance: balance.communication.talk.reach,
-      geometry: balance.villageLife.loom,
-    })
+    /** The loom's placement, asked with the carriers' water path in the
+     *  village or, `withoutWater`, as if it had none (its head, its lane). */
+    const loomWith = (withoutWater: boolean) => {
+      const waterLane = withoutWater && waterPath ? paths.find((lane) => lane.points.at(-1)?.[0] === waterPath!.foot.x && lane.points.at(-1)?.[1] === waterPath!.foot.z) : undefined
+      const lanesFor = (lanes: readonly PathDef[]) => (waterLane ? lanes.filter((lane) => lane !== waterLane) : lanes)
+      return placeLoom({
+        bank,
+        nominal: LOOM_SPOT,
+        nominalWaterOff: bank
+          ? bank.distance - (LOOM_SPOT[0] * bank.nx + LOOM_SPOT[1] * bank.nz)
+          : Infinity,
+        walkRadius: radius - WALKER_RADIUS,
+        free: (x, z, r) => groundFree(x, z, r, colliders, lanesFor(paths)),
+        freeGivingWay: (x, z, r) => groundFree(x, z, r, standingSolids, lanesFor(standingLanes)),
+        givesWay: (station) => affordable(displacedBy(station)),
+        sightClear: (from, to, halfWidth) => clearCorridor(colliders, from, to, halfWidth),
+        // THE PLAZA'S OWN VIEW (work-order 1190). The ground the player stands on
+        // to look at the village's middle is not one spot, so the line is asked
+        // from each of a ring of stands over the plaza — the same disc the picture
+        // check walks — and one open line is enough. The corridor is a metre to
+        // each side: the shipped seat passed a 0.15 m line through a gap between
+        // two dwellings, and what arrived in the frame was two figures, not a loom.
+        plazaView: (seat, floor) => plazaLine(seat, floor).widest,
+        // The floor under both: the view from any distance with nothing but the
+        // outbuildings and the dressing giving way — the plaza's view as it was
+        // before a household could (work-order 1190).
+        plazaViewFar: (seat, floor) => plazaLine(seat, floor, lightSolids, Infinity).widest,
+        plazaReach: (seat) => plazaStands.some((stand) => {
+          const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
+          return dist >= PLAZA_SIGHT_MIN_DISTANCE && dist <= PLAZA_SIGHT_MAX_DISTANCE
+        }),
+        toChildren,
+        waterPathHead: waterPath && !withoutWater ? waterPath.head : null,
+        onWaterLane: (x, z, r) => !!waterPath && !withoutWater &&
+          closestOnPolyline(
+            [[waterPath.head.x, waterPath.head.z], [waterPath.foot.x, waterPath.foot.z]],
+            x,
+            z,
+          ).dist < WATER_PATH_WIDTH / 2 + r,
+        clearance: balance.communication.talk.reach,
+        geometry: balance.villageLife.loom,
+      })
+    }
+    loom = loomWith(false)
+    // THE WATER PATH GIVES WAY TO THE PLAZA'S VIEW (work-order 1245). The path's
+    // head is swept round its foot, and since the foot moved ~28 m upstream with
+    // the children's stretch the head can land on the very seats the plaza sees
+    // the loom from (Bambara 7 and 1337: within talk reach of the head, or under
+    // its lane). Where the plaza sees no seat with the path laid, the seat it
+    // would see without it is taken, and the head is searched again with that
+    // station's ground and its hearing clearance kept out of the walk. Where no
+    // such head exists the path stays and the loom keeps what it had.
+    if (loom && !loom.seenFromPlaza && waterPath && findHead) {
+      const seen = loomWith(true)
+      if (seen?.seenFromPlaza) {
+        const clearance = balance.communication.talk.reach
+        const station = seen
+        const stationBodies: Collider[] = stationGround(station, balance.villageLife.loom).map((g) => ({ x: g.x, z: g.z, r: g.r }))
+        const again = findHead([...colliders, ...stationBodies], (h) =>
+          [station.seat, station.weaver, station.upstream, station.downstream].some((on) => Math.hypot(on.x - h.x, on.z - h.z) < clearance))
+        const lane = paths.find((lane) => lane.points.at(-1)?.[0] === waterPath!.foot.x && lane.points.at(-1)?.[1] === waterPath!.foot.z)
+        if (again && lane) {
+          waterPath.head = again
+          lane.points[0] = [again.x, again.z]
+          loom = seen
+        }
+      }
+    }
     // THE LINE IS THEN CLEARED: whatever gave way in it is taken out of the
     // village, its body and its drawing both, so the view the placement counted
     // on is the view the finished layout holds. A line that needs only the

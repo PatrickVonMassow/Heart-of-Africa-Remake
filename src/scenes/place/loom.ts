@@ -85,8 +85,11 @@ const PLAZA_SWEEP_RADIUS_STRIDE = 1
  *  widest found. Every settlement lays a loom, and a plan with no full line
  *  otherwise measured every seat: layouts ran 2.4x slower, up to 5x in the
  *  bankless villages, and a layout test crossed its 20 s timeout. The shipped
- *  Bambara plan finds its full line at the 58th. */
-const PLAZA_SWEEP_VIEWED_SEATS = 120
+ *  Bambara plan finds its full line at the 58th. Raised from 120 by work-order
+ *  1245: the children's stage moved upstream and freed seats near the nominal
+ *  bearing that hold but are not seen, and bambara@42's seen seat lies past
+ *  the 240th; 480 takes it, and a full layout test run stays under 10 s. */
+const PLAZA_SWEEP_VIEWED_SEATS = 480
 
 interface LoomGeometry {
   /** Metres from the seat to each stake — half the stretched warp. */
