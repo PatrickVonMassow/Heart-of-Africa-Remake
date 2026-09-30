@@ -15886,26 +15886,3 @@ to land than a mechanism that needs a review.
   User 29.09.2026: »Deine Empfehlung umsetzen und die Karte löschen«
   Bundle: Chat & Tafel.
   Criticality: low.
-- [ ] 1241. Creating an author worktree reloads the page under a RUNNING picture run and kills it
-  (measured 30.09.2026). The WebGPU `polish` run owing point 1238's full coverage died after 11
-  passes with `page.evaluate: Execution context was destroyed, most likely because of a
-  navigation` in `recordGait` (`scripts/verify/polish.mjs:470`) at 01:21:44; `git worktree add
-  .claude/worktrees/point-1150` had written that worktree's `index.html` at 01:21:39. The Vite dev
-  server the suite starts serves `/workspace/hoa`, and `vite.config.ts` ignores nothing under
-  `.claude/worktrees/` or `local/`, so a worktree checkout (and an author's build there) sits
-  inside the watched root. The runbook asks for authors to be dispatched while the owner judges
-  pictures, so every dispatch during a run can turn it into a run that measured nothing. This is
-  the unthrottled occurrence the backlog entry of 06.09.2026 ("under a HARD throttle the browser
-  lane dies…") said would need an owner.
-  FINAL STATE: the dev server's watcher ignores `.claude/**` and `local/**`; a worktree created or
-  built during a run no longer reloads the page.
-  VERIFICATION: a unit test over the resolved Vite config asserting both ignores; a `polish` run
-  on WebGPU with a worktree created mid-run completes.
-  Criticality: high — it silently voids the most expensive verification whenever delegation runs.
-  STATE 30.09.2026 01:45: branch at 49ea71151, Astra review merge-with-fixes recorded — anchor the
-  watch ignores to the config root (`**/.claude/**` also ignores a checkout served FROM a worktree)
-  and drop the undeclared `tinyglobby` import from the test.
-  OWED AFTER LANDING: the full `polish` run on both backends that landed point 1238 still owes
-  (render-verify-guard), which this crash voided.
-  Refs: vite.config.ts, scripts/verify/polish.mjs, point 1150
-  Bundle: Testinfrastruktur
