@@ -1658,48 +1658,6 @@ export const RED_CHARGES = [
       + 'with it.',
   },
   {
-    point: 1145,
-    suite: 'world',
-    // Both backends: 1145 names a travel/camera-settling miss, not a renderer one
-    // (measured again on webgpu 28.09.2026 at f2a30fcd0).
-    kind: 'check',
-    // NO detailMatch here (other frame entries narrow on "subject is not in the
-    // rendered picture"): the printed detail is the fixed words naming which edges
-    // the subject left, and it carries no measurement to narrow on. The frame
-    // NAME is the scope — a different frame missing its subject is a different
-    // case and stays a real red, which is how the falls came to be filed.
-    match: /^frame 11-worldmodel-khartoum-confluence$/i,
-    why:
-      'FILED AS 1145 ON 17.09.2026 out of the landing of point 1140, together with the identical '
-      + 'Victoria Falls miss that 1145 also owns. MEASURED 16.09.2026 at 22:44:57Z on webgl/world '
-      + '(head 9a1f91ce6) and again on its automatic retry five seconds later: the subject projects '
-      + 'off the left and bottom edge of the frame, scripts/verify/frameSubject.mjs THROWS, and the '
-      + 'run dies rather than reports — both records are signed-off crashes, and this entry covers '
-      + 'the red they printed before dying so the next world pass on this lane can be read at all. '
-      + 'No kept log survives for either run (the worktree they were earned in is gone, which is '
-      + 'open point 1142), so the run records are the evidence. 1145 owns deciding FIRST whether '
-      + 'the travel stops short or the wait expires on a moving camera, and SECOND why one '
-      + 'mis-aimed frame costs a whole pass; the charge dies with it.',
-  },
-  {
-    point: 1145,
-    suite: 'enrichments',
-    kind: 'check',
-    // The check name is the frame alone; the miss wording is the printed detail.
-    match: /^frame 72-water-victoria-falls$/i,
-    detailMatch: /subject is not in the rendered picture/i,
-    why:
-      'POINT 1145 FILED THIS EXACT FRAME AND CLASSIFIED IT PRE-EXISTING. Measured again '
-      + '19.09.2026 on the covering enrichments pass (webgpu, 45 pass / 1 fail) at main dd1e6a6b, '
-      + 'wording unchanged from the 17.09.2026 filing: the subject sits at lat -17.92, lon 25.85 '
-      + 'and the projection lands off the left and bottom edge. The frame is written in the '
-      + '`rivers` section, which runs long before anything this branch touched, and two baseline '
-      + 'runs on f347b652d already classified the falls half PRE-EXISTING. NOT backend-scoped: '
-      + 'the miss is a travel/camera-settling question, not a renderer one. The charge dies with '
-      + 'point 1145, which decides by measurement whether the travel stops short or the settle '
-      + 'wait expires, and repairs that.',
-  },
-  {
     point: 1187,
     suite: 'polish',
     kind: 'check',
@@ -1710,15 +1668,15 @@ export const RED_CHARGES = [
       + 'section (12/12) on the same state and on main. The charge dies with point 1187.',
   },
   {
-    point: 1145,
+    point: 1244,
     suite: 'polish',
     kind: 'check',
     match: /^frame 648-village-children\b/i,
     why:
       'POINT 1145 TOOK THIS FRAME AS ITS THIRD on 22.09.2026: webgl polish at e1b7d1561 died '
       + 'twice identically on the frameSubject throw (subject off the bottom edge), while '
-      + '`--section=children-tag` is 16/16 on that state and on main. The charge dies with '
-      + 'point 1145, which turns the throw into a failed check and repairs the framing.',
+      + '`--section=children-tag` is 16/16 on that state and on main. Point 1145 turned the throw '
+      + 'into a failed check; point 1244, split out of it, owns the framing. The charge dies with it.',
   },
   {
     point: 1202,
