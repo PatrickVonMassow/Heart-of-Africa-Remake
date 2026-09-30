@@ -202,6 +202,18 @@ describe('the children play out of the adults’ earshot (point 481.4)', () => {
     expect(n.x).toBeLessThan(0)
   })
 
+  it('prefers a ground both near and in reach over one merely in reach (work-order 1245)', () => {
+    const middle: Array<[number, number]> = [[0, 0]]
+    // Near: the east half, whose best ground (on the east rim) is out of
+    // reach. In reach: the north rim, whose best ground lies in the WEST half.
+    // Only the north-east corner is both.
+    const near = { x: WALK, z: 0, within: WALK }
+    const reach = { x: 0, z: -WALK, within: 20 }
+    const g = childPlayGround(middle, WALK, PLAY, HEARING, { reach, near })
+    expect(Math.hypot(g.x - reach.x, g.z - reach.z) + g.radius).toBeLessThanOrEqual(reach.within + 1e-9)
+    expect(Math.hypot(g.x - near.x, g.z - near.z)).toBeLessThanOrEqual(near.within + 1e-9)
+  })
+
   it('prefers OPEN ground among the bearings that are far enough', () => {
     // One station in the middle, so every bearing is equally far — and half the
     // settlement a boulder field. The ground must land in the other half,

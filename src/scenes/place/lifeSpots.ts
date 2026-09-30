@@ -380,10 +380,11 @@ export function childPlayGround(
     both: PlayGround | null
     near: PlayGround | null
     inReach: PlayGround | null
+    nearInReach: PlayGround | null
     openInReach: PlayGround | null
     nearest: PlayGround | null
     nearestReach: number
-  } = { best: null, both: null, near: null, inReach: null, openInReach: null, nearest: null, nearestReach: Infinity }
+  } = { best: null, both: null, near: null, inReach: null, nearInReach: null, openInReach: null, nearest: null, nearestReach: Infinity }
   /** How far a ground's far rim lies from the reach point. */
   const rimFrom = (g: { x: number; z: number; radius: number }) => (reach ? Math.hypot(g.x - reach.x, g.z - reach.z) + g.radius : 0)
   eachCandidate((x, z, r, clearance) => {
@@ -402,6 +403,8 @@ export function childPlayGround(
     if (reach) {
       const rim = rimFrom(here)
       if (rim <= reach.within && (!picked.inReach || score(here) > score(picked.inReach))) picked.inReach = here
+      if (rim <= reach.within && near && Math.hypot(x - near.x, z - near.z) <= near.within &&
+        (!picked.nearInReach || score(here) > score(picked.nearInReach))) picked.nearInReach = here
       if (rim < picked.nearestReach) {
         picked.nearest = here
         picked.nearestReach = rim
@@ -412,6 +415,8 @@ export function childPlayGround(
   // nearest to the stand — each among the grounds that keep every floor.
   const preferred = picked.near ?? picked.both
   if (preferred && (!reach || rimFrom(preferred) <= reach.within)) return preferred
+  // A ground both beside the stage and in reach beats one merely in reach.
+  if (picked.nearInReach) return picked.nearInReach
   if (picked.inReach) return picked.inReach
   if (picked.openInReach) return picked.openInReach
   if (picked.nearest) return picked.nearest
