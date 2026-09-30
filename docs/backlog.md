@@ -2015,3 +2015,8 @@ that `design.md` does not describe.
   (the claimant's own gather returned `mine: false`) and passed alone and in a full Vitest run right
   after. Suspect: the real `probePid(process.pid)` start-time identity under full-suite load. Not
   reproduced; charge it if it reddens a gate again.
+
+## Board reads "BATCH STEHT" while the owner is landing (30.09.2026)
+
+Lock heartbeat seen frozen since the claim while the owner session was landing a point; the board
+then showed a stopped batch. Infrastructure under the freeze — collected here, not a work-order point.

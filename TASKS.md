@@ -122,6 +122,15 @@ put it is the mistake this line exists to stop.
   scripts/verify/enrichments.mjs, scripts/verify/world.mjs, scripts/render-verify-charges.mjs,
   point 375, point 1089, point 1115, point 1142.
   Bundle: Testinfrastruktur.
+  PROGRESS 30.09.2026 (branch feat/1145-frame-subject-miss-fails-check, 148379691 pushed): code done.
+  Question 1 MEASURED: the river current (design.md §11) swept the traveller 3.2-4.5 degrees
+  downstream from frames set down in the Zambezi and the Nile, a suite defect; `jumpBeside`
+  stands him on dry land or current-free water (FAIL and no jump otherwise). Question 2: the
+  shutter returns null and fails one check. Unrecorded direct runs green (rivers 5/5 WebGPU,
+  landmark-frames 7/7 on both backends), pictures judged. Astra review merge-with-fixes on
+  c0682c0d3, its three P2 fixed in 148379691 — a re-review of that commit is owed. LEFT: the
+  recorded section rungs, whole `world` (WebGL 2) and `enrichments` (WebGPU), full unit run,
+  landing. `648-village-children` split out as point 1244.
 
 - [ ] 1132. The chief's collision check was amended seven seconds after the last run of it, so
   no frame proves the check that guards him today, and four webgpu/flow records of 13./14.09.
@@ -15820,3 +15829,25 @@ to land than a mechanism that needs a review.
   Refs: src/render/placeRiver.ts, scripts/verify/polish.mjs, point 568, point 1151.
   Bundle: Dorfleben.
   Criticality: medium — visible at every village river on the WebGL 2 fallback.
+- [ ] 1243. Khartoum confluence: a straight-edged darker water wedge where the two Nile strips overlap
+  SEEN 30.09.2026 in `11-worldmodel-khartoum-confluence` (world, landmark-frames) on BOTH WebGPU and
+  WebGL 2, and in `126-clearance-khartoum`: from the junction two straight edges run outward and the
+  water between them is a flatter, darker tone than either arm — two translucent river strips drawn
+  over each other instead of one merged surface. Distinct from point 1242 (plate rim, WebGL 2 only).
+  FINAL STATE: the confluence reads as one continuous water surface with no straight tonal edge.
+  Test: `world --section=landmark-frames` picture on both backends; a Vitest on the layer the fix touches.
+  Refs: the world river strip builder, point 1145 (its frames), point 1242.
+  Bundle: Dorfleben.
+  Criticality: medium — visible at every river junction the player crosses in the bird's-eye view.
+- [ ] 1244. 648-village-children misses its subject off the bottom edge only inside a whole polish pass
+  Split out of point 1145. MEASURED 22.09.2026 at e1b7d1561: a whole `polish` pass on WebGL 2 refused
+  `648-village-children` off the BOTTOM edge twice in a row, while `polish --section=children-tag`
+  passed 16/16 on the same tree and on `main` 86c4babaf; the same wording appeared in a whole WebGPU
+  pass at 9259d6dd8. So an earlier polish section leaves the children or the camera displaced. Since
+  point 1145 the miss is one failed check, not a dead pass.
+  FINAL STATE: the frame is written with its subject inside a whole pass on both backends, or the
+  leaking section is named and its state restored.
+  Test: whole `polish` on WebGL 2; the section rung `children-tag`.
+  Refs: scripts/verify/polish.mjs, point 1145.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — one red check per polish pass until fixed.
