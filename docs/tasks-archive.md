@@ -32715,3 +32715,30 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: src/scenes/place/backdrop.ts, src/scenes/place/backdropMaterial.ts,
   src/world/terrain.ts, scripts/verify/polish.mjs, point 1147
   Bundle: Dorfleben.
+
+- [x] 1152. Flat, unshaded discs lie on the river surface at the Bambara village (found
+  18.09.2026 by point 1147's picture judgement, WebGPU frames of the run
+  2026-09-17T23:43:17Z, exit 0, ALL GREEN). In `verification/482-village-river-bank.png` two
+  pale low-poly ellipses lie on the water; the same shape recurs in
+  `1085-village-adult-fills-a-jar.png` and `1106-arriving-runner-hand-on-the-far-stone.png`.
+  Enlarged five times they are flat and uniformly lit, with visible facet edges, NO shading
+  gradient, NO specular, NO reflection and NO contact shadow, while the water around them
+  carries full specular streaks — they read as paper cut-outs rather than as anything in the
+  world.
+  WHAT IS NOT ESTABLISHED, AND MUST NOT BE GUESSED: what they are MEANT to be. Candidates
+  are a sandbank or shoal, a foam or lily patch, and a wildlife LOD. The first work of this
+  point is to NAME the object, because the fix differs completely between them.
+  BACKEND: ANSWERED, and the answer is BOTH. The covering WebGL 2 run
+  (2026-09-18T00:32:58Z, GREEN, exit 0, 58 frames) redrew
+  `verification/482-village-river-bank.png` with the SAME two discs in the same positions and
+  the same flat, unshaded appearance. So unlike point 1151 — filed the same hour and proven
+  WebGPU-only by exactly this comparison — this one is backend-independent and lives in the
+  scene or its geometry, not in a material path.
+  FINAL STATE: whatever lies on that water reads as part of the world — lit by the same
+  light as the water, or removed if it has no business being there.
+  VERIFICATION: the three named frames judged by eye on the backend(s) the diagnosis
+  implicates, plus a test on the layer the fix touches.
+  Criticality: medium — it is visible wherever the player walks to a village river, but it
+  misleads no mechanic.
+  Refs: src/scenes/place/riverBank.ts, scripts/verify/polish.mjs, point 1147
+  Bundle: Dorfleben.
