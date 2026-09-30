@@ -2033,8 +2033,8 @@ function stepHeld(s: BankState, dt: number, cfg: BankConfig, stage: BankStage, w
   }
 }
 
-/** After the caught children have stayed down long enough to read, the group
- *  rises and walks from wherever each child finished toward its roaming quarter. */
+/** After the caught children have stood slumped long enough to read, the group
+ *  straightens and walks from wherever each child finished toward its roaming quarter. */
 function stepPart(
   s: BankState,
   dt: number,

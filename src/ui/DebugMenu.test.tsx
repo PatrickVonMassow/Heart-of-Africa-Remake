@@ -261,6 +261,10 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.tagBreakOff, read: () => balance.villageLife.tag.breakOff, value: 0.25 },
     { label: en.debug.tagPressure, read: () => balance.villageLife.tag.pressureDistance, value: 7 },
     { label: en.debug.tagPlayRadius, read: () => balance.villageLife.tag.playRadius, value: 12 },
+    // The caught child's slump (work-order 1239): lean and arm roll write
+    // through to separate properties.
+    { label: en.debug.tagCaughtSlumpLean, read: () => balance.villageLife.tag.caughtSlumpLean, value: 0.5 },
+    { label: en.debug.tagCaughtSlumpArmRoll, read: () => balance.villageLife.tag.caughtSlumpArmRoll, value: 0.2 },
     // The children's round at the bank (point 687), one from each family its
     // nineteen controls fall into: a PHASE length, a DISTANCE, a PACE and one of
     // the roaming bounds. Until 29.08.2026 the nineteen were only ever asserted
