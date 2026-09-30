@@ -18,7 +18,7 @@
 // assuming it.
 
 import * as THREE from 'three/webgpu'
-import { positionLocal, uv, vec3 } from 'three/tsl'
+import { float, instanceIndex, mx_fractal_noise_float, positionLocal, smoothstep, time, uv, vec3 } from 'three/tsl'
 import {
   BANK_BED_REACH,
   BANK_SHORE_HALF,
@@ -27,7 +27,13 @@ import {
   type PlaceRiverBank,
 } from '../scenes/place/riverBank'
 import { groundPlateRadius, type PlaceBounds } from '../scenes/place/boundary'
-import { WATER_METALNESS, WATER_ROUGHNESS, riverWaterSurface } from './waterAppearance'
+import {
+  RIVER_WATER_TONES,
+  WATER_FOAM_ROUGHNESS,
+  WATER_METALNESS,
+  WATER_ROUGHNESS,
+  riverWaterSurface,
+} from './waterAppearance'
 
 /** How far out from the waterline the drawn water reaches. Enough to pass the
  *  ground plate's rim, where the panorama backdrop takes the river over. It is
@@ -199,6 +205,74 @@ export function createPlaceRiverMaterial(octaves: number): THREE.MeshStandardNod
   m.opacityNode = water.opacity
   m.roughnessNode = water.roughness
   riverMaterialCache.set(octaves, m)
+  return m
+}
+
+// --- The drifting foam patches ------------------------------------------------
+//
+// They used to be a 10-sided disc in a plain material of their own (matt, one
+// flat opacity, a tone no other water used), so at the bank they read as pale
+// paper cut-outs with facet corners lying ON the water. Now they are shaded as
+// the water's own foam: the shared tone, the water's foam roughness and
+// metalness, and an alpha that frays out at a ragged rim, so the water's sheen
+// shows through at the edge instead of a hard outline.
+
+/** Rim segments of a patch: enough that no corner survives the stretch. */
+export const FOAM_PATCH_SEGMENTS = 32
+/** Peak opacity at a patch's heart (art constant, calibratable). */
+export const FOAM_PATCH_OPACITY = 0.85
+/** Normalised radius where the fade to the rim begins, and how far the noise
+ *  pushes the rim in and out (art constants, calibratable). */
+export const FOAM_PATCH_CORE = 0.25
+export const FOAM_PATCH_FRAY = 0.3
+/** Width of the noise-free guard band inside the geometry rim, where the
+ *  opacity falls to exactly 0 however far the noise pushed the rim out. */
+export const FOAM_PATCH_RIM = 0.15
+
+function smoothstepJs(e0: number, e1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))
+  return t * t * (3 - 2 * t)
+}
+
+/** CPU mirror of the patch opacity node: `r` is the normalised distance from
+ *  the centre (1 = geometry rim), `churn` the noise sample. Both edge pairs
+ *  are ordered (edge0 < edge1), which GLSL ES requires on the WebGL 2 path. */
+export function foamPatchOpacity(r: number, churn: number): number {
+  const fray = 1 - smoothstepJs(FOAM_PATCH_CORE, 1, r + churn * FOAM_PATCH_FRAY)
+  const guard = 1 - smoothstepJs(1 - FOAM_PATCH_RIM, 1, r)
+  return fray * guard * FOAM_PATCH_OPACITY
+}
+
+/** The unit patch, lying flat and facing up like the water surface. */
+export function buildFoamPatchGeometry(): THREE.BufferGeometry {
+  return new THREE.CircleGeometry(1, FOAM_PATCH_SEGMENTS).rotateX(-Math.PI / 2)
+}
+
+let foamMaterial: THREE.MeshStandardNodeMaterial | null = null
+
+/** The foam patches' material, a module singleton like the river's (point 96). */
+export function createRiverFoamMaterial(): THREE.MeshStandardNodeMaterial {
+  if (foamMaterial) return foamMaterial
+  const m = new THREE.MeshStandardNodeMaterial()
+  m.transparent = true
+  m.depthWrite = false
+  m.color = new THREE.Color(RIVER_WATER_TONES.foam)
+  m.roughness = WATER_ROUGHNESS + WATER_FOAM_ROUGHNESS
+  m.metalness = WATER_METALNESS
+  // Normalised distance from the patch centre (CircleGeometry's UV centre is
+  // 0.5, its rim radius 0.5), pushed in and out by a noise that differs per
+  // patch and churns slowly, so no two patches share an outline.
+  const r = uv().sub(0.5).length().mul(2)
+  const churn = mx_fractal_noise_float(
+    vec3(uv().mul(3.5), float(instanceIndex).mul(1.37).add(time.mul(0.15))),
+    2,
+  )
+  const edge = r.add(churn.mul(FOAM_PATCH_FRAY))
+  // Same formula as foamPatchOpacity.
+  const fray = smoothstep(float(FOAM_PATCH_CORE), float(1), edge).oneMinus()
+  const guard = smoothstep(float(1 - FOAM_PATCH_RIM), float(1), r).oneMinus()
+  m.opacityNode = fray.mul(guard).mul(FOAM_PATCH_OPACITY)
+  foamMaterial = m
   return m
 }
 

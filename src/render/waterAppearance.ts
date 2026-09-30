@@ -43,7 +43,7 @@ export const RIVER_WATER_TONES = {
 
 /** Open water is glossy (the IBL sky reflects in it), foam is not. */
 export const WATER_ROUGHNESS = 0.11
-const WATER_FOAM_ROUGHNESS = 0.55
+export const WATER_FOAM_ROUGHNESS = 0.55
 export const WATER_METALNESS = 0.02
 
 /** Metres of view distance the moving detail is drawn at full strength within,
