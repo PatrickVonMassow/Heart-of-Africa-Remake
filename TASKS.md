@@ -77,26 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1239. Caught children stand slumped instead of crouching (bank game and silent tag)
-  User report 29.09.2026: in the bank game, a caught child's crouch reads as falling over or as bowing. MEASURED 29.09.2026: `PlaceLife.tsx` squashes the WHOLE figure group to `CROUCH_SQUAT` = 0.66 (the head turns oval, the legs shrink to 0.25 body heights), folds the trunk by `CROUCH_POSE.lean` = 0.85 rad (49°) about the hip, and crosses both arms 77° forward. The crown ends at 0.56 body heights, 0.53 body heights ahead of the feet, which is a bow. The figure has no knee, so nothing says that the body meant to go down.
-  Sketch (discussion aid, not evidence): https://claude.ai/artifact/GYDdju8KpHHusst3LFi2Lx
-  FINAL STATE.
-  1. BANK GAME. A caught child (`BankChild.crouched`, which may be renamed) no longer squats. It stays standing where it was caught, at full scale (round head, full legs), in a frustrated slump: trunk leaned forward by `caughtSlumpLean` (start value 0.40 rad = 23°, marked calibratable), both arms hanging plumb in world space (the arm pitch compensates the trunk lean, so the hands hang straight down in front of the leaning body), arm roll reduced from the rest pose's 0.46 to `caughtSlumpArmRoll` (start value 0.20, calibratable) so the arms hang close to the body. It holds this pose for the rest of the run and through `endPauseSeconds`, then rises as today. The CROUCH_SQUAT y-scale and CROUCH_POSE are removed (no remaining user).
-  2. SILENT TAG. The freshly caught child's beat (`tagBody` = 'caught', `caughtPauseSeconds`) shows the same slump pose from the same constants instead of the plain dropped arms, then it gives chase as today.
-  3. The head is not posed separately (it is a sphere without a neck; no new head joint): "head hanging" is carried by the trunk lean alone. No idle micro-motion is added (not in design.md).
-  4. `caughtSlumpLean` and `caughtSlumpArmRoll` live in `src/config/balance.ts`, with en/de labels if the balance panel lists the neighbouring tag/bank values.
-  5. `docs/communication-poc-spec.md` (bank game: "caught children stay crouched") and the code comments that describe the crouch (bankGame.ts header, PlaceLife.tsx "A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY", gesture.ts FILL_SQUAT rationale that cites the crouching child) are updated in the same change. design.md §13.4 needs no change unless the wording "crouch" appears there.
-  READABILITY CONDITIONS (the point is not done until both are shown in the picture).
-  a) A slumped caught child must not read as a runner: sprint lean is `leanAtSprint` = 0.28 rad, only 0.12 rad less than the slump. If the picture does not separate them at 10-15 m, raise `caughtSlumpLean` within 0.45-0.50 rad and say so in the commit.
-  b) During the ROCK tap every child holds still, so standing caught children and standing free runners appear together. The caught ones must still be recognisably out of play (work-order 687 item 3). If the pose alone cannot carry that at 10-15 m, escalate instead of adding a marker (design.md forbids markers in the children's games).
-  Arm clearance (computed, to be kept by a test): hand about 0.24 body heights to the side, leg outer edge 0.144 body heights; no arm may penetrate trunk or legs in the slump pose (extend the existing figure clearance test).
-  PROOF. Vitest: the pose builder returns full scale, the configured lean and plumb arms for a caught bank child and for the tag child during its beat; clearance holds; the removed crouch path is gone. Playwright picture on WebGPU in the bank village during a run with at least one caught child standing and, separately, during the ROCK hold with caught and free children standing side by side (condition b), plus one silent-tag catch beat in a port or bankless village. Both backends if the change touches a backend-sensitive path.
-  Bundle: Dorfleben. Criticality: medium.
-  ORDER: directly after point 1150 (user order 29.09.2026).
-  USER, verbatim:
-  User 29.09.2026 18:17: »Uferfangspiel: Das Hinsetzen von Kindern, die gefangen wurden, sieht irritierend aus. Ich habe das Feedback bekommen, dass es entweder nach hinfallen oder nach verbeugen aussieht. Vorschlag: Gefangene Kinder bleiben stehen und sehen dadurch etwas frustriert aus, dass sie Arme und Oberkörper/Kopf etwas nach vorne hängen lassen.«
-  User 29.09.2026 18:26: »Reihe das wie vorgeschlagen nach 1150 ein. Das soll auch beim stollen Fangen umgesetzt werden.«
-
 - [ ] 1151. A water-coloured body stands in the SKY at the Maasai village, and only on
   WebGPU (found 18.09.2026 by point 1147's picture judgement). In
   `verification/488-village-edge-band.png` drawn on WEBGPU a slate-blue, hard-edged
