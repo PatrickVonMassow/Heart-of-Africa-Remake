@@ -131,10 +131,12 @@ import { bankDrawnReach, buildBoundaryLut, groundDiscShift, isOutsidePlace, type
 import {
   RIVER_HALF_LENGTH,
   buildBankShoreGeometry,
+  buildFoamPatchGeometry,
   buildGroundPlateGeometry,
   buildRiverFlecks,
   buildRiverSurfaceGeometry,
   createPlaceRiverMaterial,
+  createRiverFoamMaterial,
   fleckPosition,
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
@@ -2054,15 +2056,12 @@ function PlaceRiver({
   )
   const shore = useMemo(() => buildBankShoreGeometry(bank, reach.up, reach.down), [bank, reach])
   const flecks = useMemo(() => buildRiverFlecks(foamCount), [foamCount])
-  const foamGeometry = useMemo(() => new THREE.CircleGeometry(1, 10).rotateX(-Math.PI / 2), [])
-  const foamMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#e8f1f3', roughness: 0.75, transparent: true, opacity: 0.8 }),
-    [],
-  )
+  const foamGeometry = useMemo(() => buildFoamPatchGeometry(), [])
+  // A module singleton like the water's, so it is never disposed here.
+  const foamMaterial = createRiverFoamMaterial()
   useEffect(() => () => surface.dispose(), [surface])
   useEffect(() => () => shore.dispose(), [shore])
   useEffect(() => () => foamGeometry.dispose(), [foamGeometry])
-  useEffect(() => () => foamMaterial.dispose(), [foamMaterial])
 
   const foamRef = useRef<THREE.InstancedMesh>(null)
   const phase = useRef(0)

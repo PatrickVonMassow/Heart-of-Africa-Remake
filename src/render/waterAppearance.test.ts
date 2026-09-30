@@ -20,8 +20,10 @@ vi.mock('./waterAppearance', async (importOriginal) => {
   return { ...actual, riverWaterSurface: vi.fn(actual.riverWaterSurface) }
 })
 
-const { RIVER_WATER_TONES, riverWaterSurface } = await import('./waterAppearance')
-const { createPlaceRiverMaterial } = await import('./placeRiver')
+const { RIVER_WATER_TONES, WATER_FOAM_ROUGHNESS, WATER_METALNESS, WATER_ROUGHNESS, riverWaterSurface } =
+  await import('./waterAppearance')
+const { FOAM_PATCH_SEGMENTS, buildFoamPatchGeometry, createPlaceRiverMaterial, createRiverFoamMaterial } =
+  await import('./placeRiver')
 const { createBackdropMaterial } = await import('../scenes/place/backdropMaterial')
 
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
@@ -99,5 +101,44 @@ describe('the detail field is one lever for both halves (the seam cannot come ba
   it('caches ONE drawn-surface material per level, so the F9 cycle re-links nothing', () => {
     expect(createPlaceRiverMaterial(3)).toBe(createPlaceRiverMaterial(3))
     expect(createPlaceRiverMaterial(1)).not.toBe(createPlaceRiverMaterial(3))
+  })
+})
+
+// The pale flat discs judged at the Bambara bank (frames 482 / 1085 / 1106)
+// were the drifting foam patches: a 10-sided disc in a matt material of its
+// own, one flat opacity and a hard rim, so they read as paper cut-outs on
+// water that carried full specular. They are the water's own foam now.
+describe('the drifting foam patches are shaded as the water they ride', () => {
+
+  it('takes the shared foam tone and the water foam roughness and metalness', () => {
+    const m = createRiverFoamMaterial()
+    expect(`#${m.color.getHexString()}`).toBe(RIVER_WATER_TONES.foam.toLowerCase())
+    expect(m.roughness).toBeCloseTo(WATER_ROUGHNESS + WATER_FOAM_ROUGHNESS, 6)
+    expect(m.metalness).toBe(WATER_METALNESS)
+    expect(createRiverFoamMaterial()).toBe(m)
+  })
+
+  it('frays out at its rim instead of ending on a hard outline', () => {
+    const m = createRiverFoamMaterial()
+    expect(m.transparent).toBe(true)
+    expect(m.depthWrite).toBe(false)
+    expect(m.opacityNode, 'a per-fragment rim fade, not one flat opacity').toBeTruthy()
+  })
+
+  it('is round enough that no facet corner shows, and faces up like the water', () => {
+    expect(FOAM_PATCH_SEGMENTS).toBeGreaterThanOrEqual(24)
+    const g = buildFoamPatchGeometry()
+    const n = g.getAttribute('normal')
+    for (let i = 0; i < n.count; i++) expect(n.getY(i)).toBeCloseTo(1, 6)
+    const uvs = g.getAttribute('uv')
+    expect(uvs.getX(0)).toBeCloseTo(0.5, 6)
+    expect(uvs.getY(0)).toBeCloseTo(0.5, 6)
+  })
+
+  it('the scene draws the patches with that material and keeps no foam material of its own', () => {
+    const scene = source('src/scenes/place/PlaceScene.tsx')
+    expect(scene).toContain('createRiverFoamMaterial()')
+    expect(scene).toContain('buildFoamPatchGeometry()')
+    expect(scene.toLowerCase()).not.toContain('#e8f1f3')
   })
 })
