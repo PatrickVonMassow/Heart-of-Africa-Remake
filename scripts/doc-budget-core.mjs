@@ -470,7 +470,10 @@ export const DOC_BUDGETS = [
     // catch a two-basket rotation to a fire with its carrier, griller, smoking
     // rack and eater, and the bank symmetric with the children's stretch moved
     // upstream — new concepts, while the old dugout text went.
-    maxWords: 29871,
+    // RAISED by the 14 measured words work-order 1246 owes §13.4 (user
+    // 30.09.2026): the bank children play three rounds in a row before they
+    // scatter — a new rule of the game, the old text said nothing of a series.
+    maxWords: 29885,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
