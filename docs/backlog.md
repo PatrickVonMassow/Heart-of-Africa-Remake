@@ -2020,3 +2020,9 @@ that `design.md` does not describe.
 
 Lock heartbeat seen frozen since the claim while the owner session was landing a point; the board
 then showed a stopped batch. Infrastructure under the freeze — collected here, not a work-order point.
+
+## Speech bubble crosses the viewport edge (30.09.2026)
+
+In the 1245 upstream-word frame (boat stand) the net man's head sits at the left picture edge and
+his bubble runs out of the viewport: readable on WebGPU, a few pixels clipped on WebGL 2
+("a-BA-BA", "…ess meaning"). The bubble is not clamped to the viewport; the frame passes its checks.
