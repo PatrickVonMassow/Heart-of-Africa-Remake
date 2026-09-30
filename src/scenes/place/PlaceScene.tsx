@@ -131,6 +131,7 @@ import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newSt
 import { bankDrawnReach, buildBoundaryLut, groundDiscShift, isOutsidePlace, type PlaceBounds } from './boundary'
 import {
   RIVER_HALF_LENGTH,
+  buildRiverFloorGeometry,
   buildBankShoreGeometry,
   buildFoamPatchGeometry,
   buildGroundPlateGeometry,
@@ -2097,12 +2098,18 @@ function PlaceRiver({
     [bank, segments, reach],
   )
   const shore = useMemo(() => buildBankShoreGeometry(bank, reach.up, reach.down), [bank, reach])
+  // The opaque underside of the transparent water (work-order 1250).
+  const floor = useMemo(
+    () => buildRiverFloorGeometry(bank, Math.max(RIVER_HALF_LENGTH, reach.up), Math.max(RIVER_HALF_LENGTH, reach.down)),
+    [bank, reach],
+  )
   const flecks = useMemo(() => buildRiverFlecks(foamCount), [foamCount])
   const foamGeometry = useMemo(() => buildFoamPatchGeometry(), [])
   // A module singleton like the water's, so it is never disposed here.
   const foamMaterial = createRiverFoamMaterial()
   useEffect(() => () => surface.dispose(), [surface])
   useEffect(() => () => shore.dispose(), [shore])
+  useEffect(() => () => floor.dispose(), [floor])
   useEffect(() => () => foamGeometry.dispose(), [foamGeometry])
 
   const foamRef = useRef<THREE.InstancedMesh>(null)
@@ -2152,6 +2159,7 @@ function PlaceRiver({
   return (
     <>
       <mesh name="place-river-shore" geometry={shore} material={groundMaterial} receiveShadow />
+      <mesh name="place-river-floor" geometry={floor} material={groundMaterial} />
       <mesh name="place-river" geometry={surface} material={water} />
       <instancedMesh
         name="place-river-foam"
@@ -2678,6 +2686,12 @@ export function PlaceScene() {
       const rc = new THREE.Raycaster(camera.position.clone(), dir, 0.1, 4000)
       const hits = rc.intersectObject(r3fScene, true)
       const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+      // Behind the transparent water: the first surface a sight line meets once
+      // it has passed under the drawn river (work-order 1250) — null for none.
+      const behind = hit?.object.name === 'place-river'
+        ? hits.find((h) => h.distance > hit.distance && h.object.name !== 'place-river' && h.object.name !== 'place-river-foam' &&
+          h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+        : undefined
       // Whether the surface hit is drawn as WATER: the backdrop's own mask at
       // the hit face (work-order 1250 — map land lay on the river as a band).
       const mask = hit?.face ? (hit.object as THREE.Mesh).geometry?.getAttribute('waterMask') : undefined
@@ -2693,6 +2707,8 @@ export function PlaceScene() {
         hitDistance: hit ? hit.distance : null,
         hitName: hit ? hit.object.name || (hit.object as THREE.Mesh).geometry?.type || 'mesh' : null,
         hitWater,
+        behindName: behind === undefined ? undefined : behind ? behind.object.name || 'mesh' : null,
+        behindDistance: behind ? behind.distance : null,
       }
     }
     w.__placeSeason = () => ({

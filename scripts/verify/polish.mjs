@@ -6374,7 +6374,7 @@ if (section('mute-shore-scene')) {
     await shore.reload()
     await shore.waitForFunction(() => window.__game && window.__balance && window.__renderer, null, { timeout: 90000 })
     await assertBackend(shore)
-    await shore.waitForTimeout(2500)
+    await nextFrames(30)
     await shore.evaluate(() => {
       window.__balance.randomEventsEnabled = false
       window.__game.getState().setJournalOpen(false)
@@ -6388,7 +6388,17 @@ if (section('mute-shore-scene')) {
     await shore.evaluate(() => window.__game.getState().leavePlace())
     await shore.waitForFunction(() => !!window.__rivers, null, { timeout: 60000 })
     await shore.evaluate(() => window.__game.getState().debugJumpTo(13.0635, -6.091))
-    await shore.waitForTimeout(1500)
+    // The travel panorama is captured before the traveller goes in: the band it
+    // draws is what showed through the river (see below), so it must be up.
+    const captured = await shore
+      .evaluate(async (seed) => {
+        window.__panoramaModule = await import('/src/scenes/travel/panoramaCapture.ts')
+        return seed
+      }, REPORT_SEED)
+      .then((seed) => shore.waitForFunction((s) => window.__panoramaModule.hasPanoramaCapture('bambara-village', s), seed, { timeout: 60000 }))
+      .then(() => true)
+      .catch(() => false)
+    check('the travel panorama around the Bambara village is captured before entry', captured)
     await shore.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
     const inside = await shore
       .waitForFunction(() => {
@@ -6399,6 +6409,8 @@ if (section('mute-shore-scene')) {
       .then(() => true)
       .catch(() => false)
     check('the Bambara village entered from travel carries the dugout and the children`s round', inside)
+    check('and its captured panorama band stands on the horizon, as in the report',
+      await shore.evaluate(() => window.__placePanoramaActive === true))
     if (inside) {
       // ONE STAND THAT HEARS BOTH, taken at once: on the bank between the play
       // rock nearer the dugout's lane and the lane's upstream end, inside the
@@ -6479,7 +6491,7 @@ if (section('mute-shore-scene')) {
         p.yaw = Math.atan2(lx, lz) + Math.PI
         return { s, x: p.x, z: p.z }
       })
-      await shore.waitForTimeout(1500)
+      await nextFrames(10)
       // Every point of the river surface between the near bank and the lane that
       // lands in the frame is probed: what the frame draws there must be water,
       // never land lying on it.
@@ -6503,10 +6515,18 @@ if (section('mute-shore-scene')) {
             const r = window.__placeRayHit(x, y, z)
             if (!r || r.hitDistance === null) continue
             probed++
-            // The band was the BACKDROP drawn as land over the drawn water; the
-            // near bank's own lip, the hull and the figures only stand in front.
-            if (r.hitName === 'landscape-backdrop' && r.hitWater !== null && r.hitWater < 0.5) {
-              land.push({ along, out: +(out - L.waterline).toFixed(1), name: r.hitName, water: +r.hitWater.toFixed(2) })
+            // Two ways land lay on the water: the BACKDROP drawn as land over
+            // the drawn river, and — the reported band — the panorama band's
+            // captured savanna seen THROUGH the transparent water where nothing
+            // opaque closed its underside. The near bank's lip, the hull and the
+            // figures only stand in front and are not counted.
+            const landOver = r.hitName === 'landscape-backdrop' && r.hitWater !== null && r.hitWater < 0.5
+            // Seen through = under the water the line reaches the horizon band,
+            // the sky, or nothing at all; a hull or a float in the water is not.
+            const seenThrough = r.hitName === 'place-river' &&
+              (r.behindName === 'panorama-band' || r.behindName === null || (r.behindDistance ?? 0) > 150)
+            if (landOver || seenThrough) {
+              land.push({ along, out: +(out - L.waterline).toFixed(1), name: r.hitName, behind: r.behindName, water: +(r.hitWater ?? 0).toFixed(2) })
             }
           }
         }
