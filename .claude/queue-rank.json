@@ -1531,12 +1531,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1245": {
-      "at": "2026-09-30T11:37:48.414Z",
-      "why": "user order 30.09.2026: next point after the in-flight 1145",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1246": {
       "at": "2026-09-30T11:37:48.507Z",
       "why": "user order 30.09.2026: directly after 1245",
@@ -1554,6 +1548,18 @@
       "why": "same failed user takeover as 1247; kept beside it",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1250": {
+      "at": "2026-09-30T21:32:47.561Z",
+      "why": "user order 30.09.2026: fatal bug report, queue directly next (before 1246)",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1251": {
+      "at": "2026-09-30T21:32:47.656Z",
+      "why": "user 30.09.2026: ordinary bug report, end of the order",
+      "origin": "user",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1583,7 +1589,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-30T13:08:39.804Z",
+    "at": "2026-09-30T21:32:47.666Z",
     "points": [
       184,
       200,
@@ -2011,11 +2017,12 @@
       1242,
       1243,
       1244,
-      1245,
       1246,
       1247,
       1248,
-      1249
+      1249,
+      1250,
+      1251
     ]
   }
 }
