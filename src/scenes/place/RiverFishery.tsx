@@ -36,7 +36,7 @@ import { markActor } from '../actorLabelSource'
 import { usePlaceGround } from './PlaceGroundContext'
 import { Figure } from './placeFigure'
 import { HEAD_CARRY_POSE, SpeechFloorContext, useStandingBody } from './placeFigureContext'
-import { carrierWalkPose, copyPose, ownPose, reachPose } from './fisheryPoses'
+import { carrierWalkPose, copyPose, netFishRotation, ownPose, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
 import { speechBearing } from './speechBearing'
@@ -488,7 +488,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
         const shoreSide = Math.cos(canoe.yaw) * lane.nx - Math.sin(canoe.yaw) * lane.nz >= 0 ? -1 : 1
         const fresh = Math.max(0, 1 - (t - came) / FISH_IN_NET_SECONDS)
         m.position.set(shoreSide * (cfg.hullBeam / 2 + 0.07), HULL_FLOOR_Y + 0.02 + 0.2 * fresh, CANOE_NETMAN_FORE - 0.3 * i)
-        m.rotation.set(-Math.PI / 2 + 0.35 * Math.sin(t * (10 + i) + i), 0.5 * Math.sin(t * (8 + i) + 2 * i), shoreSide * 0.25)
+        m.rotation.set(...netFishRotation(t, i, shoreSide))
         return
       }
       // Heaped on the hull's floor: some on their side, some flipped up on

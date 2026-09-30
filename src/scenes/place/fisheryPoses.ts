@@ -35,3 +35,10 @@ export function carrierWalkPose(phase: string, clock: number, liftSeconds: numbe
   const bend = phase === 'swap' ? Math.sin(Math.PI * Math.min(1, clock / liftSeconds)) : 0
   return bend > 0.02 ? reachPose(0, bend) : HEAD_CARRY_POSE.current
 }
+
+/** Euler angles (XYZ) of a fish still caught in the net at the gunwale: hanging
+ *  HEAD DOWN (the fish mesh's head is at local +Z, its tail at −Z), thrashing
+ *  about that pose, tilted out over the shore-side gunwale. */
+export function netFishRotation(t: number, i: number, shoreSide: number): [number, number, number] {
+  return [Math.PI / 2 + 0.35 * Math.sin(t * (10 + i) + i), 0.5 * Math.sin(t * (8 + i) + 2 * i), shoreSide * 0.25]
+}
