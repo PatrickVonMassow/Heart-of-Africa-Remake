@@ -629,6 +629,8 @@ export interface Strings {
     tagLean: string
     tagTurnRate: string
     tagCaughtPause: string
+    tagCaughtSlumpLean: string
+    tagCaughtSlumpArmRoll: string
     tagGazeTurn: string
     tagCrySeconds: string
     tagCryPitchSpread: string

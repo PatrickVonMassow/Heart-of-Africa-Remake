@@ -527,16 +527,17 @@ const REST_ELEVATION = -Math.PI / 2 - REST_POSE.left.pitch
  * 0.74 rad, and four re-aimed cameras all read it the same way: a man lying
  * face-down in the river. A villager is a legless cone, so a trunk past the
  * dig's own magnitude has nothing left to read as a bend — there is no knee to
- * say the body meant to go down. The crouching bank-game child (PlaceLife's
- * `CROUCH_POSE`) folds deeper
- * still and reads as a squat, because its HEIGHT and its ARMS move with the
- * fold. The fill borrows that shape: the fold is capped at `WORK_LEAN_MAX`, the
- * body sinks to `FILL_SQUAT` of its height, and the remaining reach is the arm's.
+ * say the body meant to go down. A fold reads as a bend only when the HEIGHT
+ * and the ARMS move with it, so the fill moves all three: the fold is capped at
+ * `WORK_LEAN_MAX`, the body sinks to `FILL_SQUAT` of its height, and the
+ * remaining reach is the arm's. (The bank game's caught children once squatted
+ * the same way; that deeper squat read as a fall or a bow and was replaced by a
+ * standing slump in work-order 1239 — the fill's shallower fold is its own.)
  *
  * The squat is not part of `FigurePose` because it is not an angle: it is the
- * y-squash the caller puts on the figure's own group, exactly as the crouching
- * child's is. `fillSquat` returns it off the same envelope as the pose, so the
- * sink and the fold can never come apart.
+ * y-squash the caller puts on the figure's own group. `fillSquat` returns it
+ * off the same envelope as the pose, so the sink and the fold can never come
+ * apart.
  */
 export const FILL_SQUAT = 0.72
 
@@ -607,8 +608,7 @@ export function fillPose(progress: number): FigurePose {
 /**
  * The y-squash that goes with `fillPose` at the same progress: 1 while the
  * figure stands, `FILL_SQUAT` at the bottom of the dip. The caller applies it to
- * the figure's group (`g.scale.set(1, fillSquat(p), 1)`), which is how the
- * crouching child is drawn too.
+ * the figure's group (`g.scale.set(1, fillSquat(p), 1)`).
  */
 export function fillSquat(progress: number): number {
   return 1 - fillDip(progress) * (1 - FILL_SQUAT)

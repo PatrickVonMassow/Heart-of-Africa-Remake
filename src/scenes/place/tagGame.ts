@@ -151,6 +151,11 @@ export interface TagConfig extends StaminaProfile {
    *  1176). Only the caught child pauses; the pause is clamped to
    *  `immunitySeconds`, which protects its catcher. */
   caughtPauseSeconds: number
+  /** Forward trunk lean (rad) of a caught child's slump — the tag round's beat
+   *  and the bank round's caught children alike (work-order 1239). */
+  caughtSlumpLean: number
+  /** Outward arm roll (rad) of that slump; the rest pose's is 0.46. */
+  caughtSlumpArmRoll: number
   /** Largest trunk turn (rad) the chaser's gaze takes toward its quarry. */
   gazeTurnMax: number
 }
@@ -1241,7 +1246,7 @@ function advanceTagGame(
 type TagBody = 'chaser' | 'caught' | 'runner'
 
 /** The chaser holds its arms forward; the freshly caught child stands out its
- *  beat with them dropped; everyone else runs as before. */
+ *  beat in the caught slump; everyone else runs as before. */
 export function tagBody(s: TagState, i: number): TagBody {
   if (!s.playing || i !== s.chaser) return 'runner'
   return s.pauseFor > 0 ? 'caught' : 'chaser'
@@ -1476,13 +1481,50 @@ export function steerGrab(g: GestureState, aim: { bearing: number; elevation: nu
 const GRAB_HOLD_AHEAD = 1
 
 /**
+ * A CAUGHT CHILD'S SLUMP (work-order 1239), shared by the tag round's beat and
+ * the bank round's caught children. It stands at full height with the trunk
+ * leaned forward and both arms hanging plumb in the world: the arm pitch is the
+ * negative of the lean, so the trunk's tilt and the shoulder's cancel and the
+ * hands hang straight down in front of the leaning body. The roll is smaller
+ * than the rest pose's, so the arms hang close to the body.
+ *
+ * It replaced a squat (y-squash 0.66, 0.85 rad fold, arms crossed) that read
+ * as falling over or as a bow. The head is not posed on its own: it is a sphere
+ * without a neck, so "head hanging" is carried by the trunk lean alone.
+ */
+export function caughtSlumpPose(cfg: Pick<TagConfig, 'caughtSlumpLean' | 'caughtSlumpArmRoll'>): FigurePose {
+  const lean = cfg.caughtSlumpLean
+  const roll = cfg.caughtSlumpArmRoll
+  return {
+    left: { pitch: -lean, yaw: 0, roll },
+    right: { pitch: -lean, yaw: 0, roll: -roll },
+    lean,
+    turn: 0,
+  }
+}
+
+/**
+ * The pose a bank-round child is drawn with: a caught one stands in the caught
+ * slump; any other shows its gesture on top of the run's lean.
+ */
+export function bankFigurePose(
+  slumped: boolean,
+  shown: FigurePose,
+  runLean: number,
+  cfg: Pick<TagConfig, 'caughtSlumpLean' | 'caughtSlumpArmRoll'>,
+): FigurePose {
+  if (slumped) return caughtSlumpPose(cfg)
+  return { left: shown.left, right: shown.right, lean: runLean + shown.lean, turn: shown.turn }
+}
+
+/**
  * The arms, lean and turn a tag child is drawn with. The runners keep exactly
  * what they had (the gesture's arms, the run's lean). The CHASER's arms rest
  * forward instead of at its sides — a grabbing posture, blended under whatever
  * gesture is playing so the grab grows out of it and fades back into it. The
- * caught child's arms hang through its beat, and its lean eases upright with
- * its pace. A reaching hand leans the body by the touch's own lean, not on top
- * of the run's — the stronger of the two.
+ * caught child stands its beat in the caught slump (`caughtSlumpPose`). A
+ * reaching hand leans the body by the touch's own lean, not on top of the
+ * run's — the stronger of the two.
  */
 export function tagFigurePose(
   body: TagBody,
@@ -1490,7 +1532,9 @@ export function tagFigurePose(
   envelope: number,
   runLean: number,
   turn: number,
+  cfg: Pick<TagConfig, 'caughtSlumpLean' | 'caughtSlumpArmRoll'>,
 ): FigurePose {
+  if (body === 'caught') return { ...caughtSlumpPose(cfg), turn }
   const lean = Math.max(runLean, shown.lean)
   if (body !== 'chaser') return { left: shown.left, right: shown.right, lean, turn }
   const keep = 1 - Math.max(0, Math.min(1, envelope))

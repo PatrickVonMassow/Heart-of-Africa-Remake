@@ -10,10 +10,11 @@
 // announced before each one, a catcher lays its hand on its own rock and says
 // ROCK while everybody holds (the run opens silently where the hand cannot reach
 // the stone), a runner who reaches the far rock and can touch it calls ROCK,
-// whoever is caught drops out where he stands, and the sides
-// swap every run so the announced direction alternates by construction. When no
-// free runner is left the caught children remain down long enough for the result
-// to read, then everybody walks back toward the roaming quarter.
+// whoever is caught drops out where he stands, slumped in frustration (trunk
+// forward, arms hanging), and the sides swap every run so the announced
+// direction alternates by construction. When no free runner is left the caught
+// children stay slumped long enough for the result to read, then everybody
+// walks back toward the roaming quarter.
 //
 // EVERY UTTERANCE FALLS AT A FIXED POINT OF THE ROUND. There is no situation
 // catalogue and no scheduler: the opening call, the boulder naming, the
@@ -135,9 +136,10 @@ export interface BankChild extends TagChild {
   arrived: boolean
   /** The last metre and contact hold survive the run's side swap. */
   arrival: { end: BankEnd; stand: { x: number; z: number }; approachFor: number; holdFor: number | null } | null
-  /** Tagged: crouched where it stood, arms folded, through the readable ending
-   *  when this is the cycle's last run. */
-  crouched: boolean
+  /** Tagged: standing slumped where it was caught (the tag round's caught
+   *  slump, `caughtSlumpPose`), through the readable ending when this is the
+   *  cycle's last run. */
+  slumped: boolean
   /**
    * THE HEADING IT IS ROAMING ON — not a point it is walking to. A fixed goal is
    * a wall to lean against: where one lies behind a hut the child walks at it,
@@ -290,7 +292,7 @@ interface BankRoundConfig {
   regroupSeconds: number
   /** How long the group walks toward its roaming quarter before roaming again. */
   partSeconds: number
-  /** How long the caught children remain crouched after the cycle's last run. */
+  /** How long the caught children stay slumped after the cycle's last run. */
   endPauseSeconds: number
   /** Arrival/safe radius from the rock's centre; hand contact is solved separately. */
   reachDistance: number
@@ -684,7 +686,7 @@ export function bankChildCanSeparate(c: BankChild, touching = false): boolean {
   // the separation works in the ground plane and knows nothing about the
   // boulder's height it stands at, so left in the set it would be shoved off
   // the boulder by whoever wandered past below.
-  return !c.crouched && !onStone(c) && !touching && !(c.arrival && c.arrival.holdFor !== null)
+  return !c.slumped && !onStone(c) && !touching && !(c.arrival && c.arrival.holdFor !== null)
 }
 
 /** A teaching contact is solved at standing height, even on its opening frame.
@@ -733,7 +735,7 @@ export function createBankGame(
       role: 'runner' as BankRole,
       arrived: false,
       arrival: null,
-      crouched: false,
+      slumped: false,
       roamHeading: heading,
       goalX: p.x,
       goalZ: p.z,
@@ -982,7 +984,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankW
   s.children.forEach((c, i) => {
     c.role = i === caller ? 'catcher' : 'runner'
     c.arrived = false
-    c.crouched = false
+    c.slumped = false
     endClimb(c)
     c.settled = false
   })
@@ -1046,7 +1048,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWor
   s.runs++
   for (const c of s.children) {
     c.arrived = false
-    c.crouched = c.role === 'out'
+    c.slumped = c.role === 'out'
     endClimb(c)
     c.settled = false
   }
@@ -1125,7 +1127,7 @@ function endRun(s: BankState, cfg: BankConfig): void {
   for (const c of s.children) {
     if (c.role !== 'out') continue
     c.role = 'catcher'
-    c.crouched = false
+    c.slumped = false
   }
   s.phase = 'regroup'
   s.phaseFor = cfg.regroupSeconds
@@ -1153,7 +1155,7 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   for (const c of s.children) {
     c.role = 'runner'
     c.arrived = false
-    c.crouched = false
+    c.slumped = false
     endClimb(c)
     c.settled = false
   }
@@ -1990,7 +1992,7 @@ function stepRun(
     if (!runner || runner.role !== 'runner' || runner.arrived) continue
     if (!catchReached(catcher, runner, cfg, world)) continue
     runner.role = 'out'
-    runner.crouched = true
+    runner.slumped = true
     runner.arrived = false
     // It stops in the same frame it is caught: from here it is a posture, not
     // a walker, until the run ends.
@@ -2031,8 +2033,8 @@ function stepHeld(s: BankState, dt: number, cfg: BankConfig, stage: BankStage, w
   }
 }
 
-/** After the caught children have stayed down long enough to read, the group
- *  rises and walks from wherever each child finished toward its roaming quarter. */
+/** After the caught children have stood slumped long enough to read, the group
+ *  straightens and walks from wherever each child finished toward its roaming quarter. */
 function stepPart(
   s: BankState,
   dt: number,
@@ -2046,7 +2048,7 @@ function stepPart(
     if (s.endFor === 0) {
       for (const c of s.children) {
         if (c.role === 'out') c.role = 'catcher'
-        c.crouched = false
+        c.slumped = false
       }
     }
     return
@@ -2055,7 +2057,7 @@ function stepPart(
     const c = s.children[i]
     if (stepArrival(s, i, dt, cfg, stage, world)) continue
     if (c.role === 'out') c.role = 'catcher'
-    c.crouched = false
+    c.slumped = false
     drive(s, i, stage.roam, false, dt, cfg, world)
   }
 }
@@ -2072,9 +2074,9 @@ function assertRoundSound(s: BankState, cfg: BankConfig): void {
     () => `a direction run is on with no direction announced (run ${s.runs})`,
   )
   devAssert(
-    s.phase === 'run' || (s.phase === 'part' && s.endFor > 0) || s.children.every((c) => !c.crouched),
-    'bank-crouched-outside-run',
-    () => `${s.children.filter((c) => c.crouched).length} children crouched in phase ${s.phase}`,
+    s.phase === 'run' || (s.phase === 'part' && s.endFor > 0) || s.children.every((c) => !c.slumped),
+    'bank-slumped-outside-run',
+    () => `${s.children.filter((c) => c.slumped).length} children slumped in phase ${s.phase}`,
   )
   devAssert(
     s.phaseFor <= Math.max(cfg.roamSeconds * (1 + cfg.roamSpread), cfg.gatherSeconds, cfg.runSeconds, cfg.regroupSeconds, cfg.partSeconds) + 1e-6 &&

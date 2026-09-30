@@ -489,10 +489,10 @@ describe('the children`s game at the bank (point 687)', () => {
     s.runsThisCycle = 1
     s.children[0].role = 'catcher'
     s.children[1].role = 'out'
-    s.children[1].crouched = true
+    s.children[1].slumped = true
     stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
     expect(s.phase).toBe('part')
-    expect(s.children[1].crouched).toBe(true)
+    expect(s.children[1].slumped).toBe(true)
     const before = s.children.map((c) => Math.hypot(c.x - STAGE.roam.x, c.z - STAGE.roam.z))
     const ending = s.children.map((c) => ({ x: c.x, z: c.z }))
     let heldFor = 0
@@ -500,7 +500,7 @@ describe('the children`s game at the bank (point 687)', () => {
       stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
       heldFor += 1 / 60
       if (s.endFor > 0) {
-        expect(s.children[1].crouched).toBe(true)
+        expect(s.children[1].slumped).toBe(true)
         s.children.forEach((c, i) => {
           expect(c.x).toBeCloseTo(ending[i].x, 9)
           expect(c.z).toBeCloseTo(ending[i].z, 9)
@@ -509,10 +509,10 @@ describe('the children`s game at the bank (point 687)', () => {
       }
     }
     expect(heldFor).toBeGreaterThanOrEqual(CFG.endPauseSeconds)
-    expect(s.children[1].crouched).toBe(false)
+    expect(s.children[1].slumped).toBe(false)
     for (let t = 0; t < 1; t += 1 / 60) stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
     s.children.forEach((c, i) => {
-      expect(c.crouched).toBe(false)
+      expect(c.slumped).toBe(false)
       expect(Math.hypot(c.x - STAGE.roam.x, c.z - STAGE.roam.z)).toBeLessThan(before[i])
     })
   })
@@ -889,8 +889,8 @@ describe('the children`s game at the bank (point 687)', () => {
   })
 
   it('holds a tagged child in its posture, and moves it only between runs', () => {
-    let crouchedFrames = 0
-    let movedWhileCrouched = 0
+    let slumpedFrames = 0
+    let movedWhileSlumped = 0
     let walkedAfterOut = 0
     for (const seed of SEEDS) {
     const rand = mulberry32(seed)
@@ -902,7 +902,7 @@ describe('the children`s game at the bank (point 687)', () => {
     addBodies(set, bodies)
     const at = s.children.map((c) => ({ x: c.x, z: c.z }))
     const wasOut = s.children.map(() => false)
-    // A child is judged on the frames it was ALREADY crouched at the start of:
+    // A child is judged on the frames it was ALREADY slumped at the start of:
     // the frame it is caught in it was still running, and it was running that
     // is caught.
     let was = s.children.map(() => false)
@@ -911,7 +911,7 @@ describe('the children`s game at the bank (point 687)', () => {
       const walkedBefore = s.children.map((c) => c.walked)
       stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
       // The scene's integration order: write every body, separate the group,
-      // then absorb the resolved positions. Crouched children remain in the set
+      // then absorb the resolved positions. Slumped children remain in the set
       // as obstacles, but are not candidates for movement themselves.
       bodies.forEach((body, i) => {
         body.x = s.children[i].x
@@ -925,10 +925,10 @@ describe('the children`s game at the bank (point 687)', () => {
         world,
       )
       bodies.forEach((body, i) => absorbSeparation(s.children[i], body))
-      was = s.children.map((c) => c.crouched)
+      was = s.children.map((c) => c.slumped)
       s.children.forEach((c, i) => {
         const moved = Math.hypot(c.x - at[i].x, c.z - at[i].z)
-        if (c.crouched) {
+        if (c.slumped) {
           wasOut[i] = true
           // It stands where it was tagged: no pace, and it is HELD, which is the
           // reading rather than a stall.
@@ -936,20 +936,20 @@ describe('the children`s game at the bank (point 687)', () => {
           expect(c.held).toBe(true)
           expect(s.phase === 'run' || (s.phase === 'part' && s.endFor > 0)).toBe(true)
           if (before[i]) {
-            crouchedFrames++
-            if (moved > 1e-9) movedWhileCrouched++
+            slumpedFrames++
+            if (moved > 1e-9) movedWhileSlumped++
           }
         }
         // …and once the readable ending is over, the same child walks home.
-        if (wasOut[i] && !c.crouched && s.phase !== 'run' && c.walked > walkedBefore[i]) {
+        if (wasOut[i] && !c.slumped && s.phase !== 'run' && c.walked > walkedBefore[i]) {
           walkedAfterOut++
         }
         at[i] = { x: c.x, z: c.z }
       })
     }
     }
-    expect(crouchedFrames).toBeGreaterThan(60)
-    expect(movedWhileCrouched).toBe(0)
+    expect(slumpedFrames).toBeGreaterThan(60)
+    expect(movedWhileSlumped).toBe(0)
     expect(walkedAfterOut).toBeGreaterThan(0)
   })
 
@@ -1554,7 +1554,7 @@ describe('catchers regroup together and share the tap', () => {
     s.children[0].role = 'catcher'
     s.children[0].madeTag = true
     s.children[1].role = 'out'
-    s.children[1].crouched = true
+    s.children[1].slumped = true
     stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
     expect(s.phase).toBe('regroup')
     expect(s.children[1].role).toBe('catcher')
