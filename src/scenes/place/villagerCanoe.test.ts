@@ -15,6 +15,7 @@ import { PLACE_RADIUS } from './layout'
 import { bankFillSpot, bankWaterFoot, buildRiverBank } from './riverBank'
 import { basketRingViolation, createBasketRing, type BasketRing } from './fishBaskets'
 import {
+  CANOE_NETMAN_FORE,
   CANOE_PHASES,
   canoeCycleSeconds,
   canoeLane,
@@ -400,16 +401,25 @@ describe('the drift-net cycle (work-order 1245 item 1)', () => {
     let prev: { x: number; z: number } | null = null
     let worst = 0
     let ashore = false
-    for (let i = 0; i < 20000; i++) {
+    // Measured over every step from the landing to the first stroke upstream
+    // again, so the boarding transitions themselves are inside the measure.
+    let done = false
+    for (let i = 0; i < 40000 && !done; i++) {
+      const before = state.phase
       stepCanoe(state, lane, ring, { say: () => 'said', obeyDelay: () => OBEY }, dt, cfg, () => 0)
-      if (state.phase === 'unload' || state.phase === 'callUp') {
+      const inRange = ['land', 'unload', 'callUp', 'launch'].includes(state.phase) || ['land', 'unload', 'callUp', 'launch'].includes(before)
+      if (inRange) {
         if (prev) worst = Math.max(worst, Math.hypot(state.netMan.x - prev.x, state.netMan.z - prev.z))
         prev = { x: state.netMan.x, z: state.netMan.z }
         if (!state.netMan.inBoat) ashore = true
       } else prev = null
-      if (ashore && state.phase === 'launch') break
+      if (ashore && before === 'launch' && state.phase === 'up') done = true
     }
     expect(ashore).toBe(true)
+    expect(done).toBe(true)
+    // Back aboard, on his seat forward of the hull's centre.
+    expect(state.netMan.inBoat).toBe(true)
+    expect(Math.hypot(state.netMan.x - (state.x + Math.sin(state.yaw) * CANOE_NETMAN_FORE), state.netMan.z - (state.z + Math.cos(state.yaw) * CANOE_NETMAN_FORE))).toBeLessThan(1e-6)
     // At most a brisk step's worth per 20 ms frame.
     expect(worst).toBeLessThan(0.1)
   })
