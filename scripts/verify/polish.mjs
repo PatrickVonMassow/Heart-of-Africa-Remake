@@ -6045,6 +6045,42 @@ if (section('villager-canoe')) {
       }
       const inPlace = () => page.evaluate(() => window.__game.getState().placeId === 'bambara-village' && !!window.__placeCamera)
 
+      // --- 0. The DOWNSTREAM word at the lane's upstream end -----------------
+      // Heard from the waterline near the lane's upstream end: the net man's
+      // word to the paddler, its reading over his head naming DOWNSTREAM, and
+      // the paddler's answer — he stops paddling and swings the bow out.
+      const upEnd = await page.evaluate(() => {
+        const L = window.__placeCanoe().lane
+        const s = 4
+        return {
+          at: { x: L.nx * (L.waterline - 0.6) + L.fx * s, z: L.nz * (L.waterline - 0.6) + L.fz * s },
+          look: { x: L.start.x, z: L.start.z },
+        }
+      })
+      await standAt(upEnd.at, upEnd.look)
+      const downWord = await page
+        .waitForFunction(() => {
+          const c = window.__placeCanoe?.()
+          if (!c || c.phase !== 'callDown' || !c.word || c.word.state !== 'said') return null
+          const l = (window.__speech?.labels() ?? []).find((x) => x.speakerId === 'village-canoe')
+          if (!l) return null
+          return { atoms: l.atoms, expected: window.__game.getState().vocabulary.DOWNSTREAM }
+        }, null, { timeout: 300000, polling: 100 })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      check('at the upstream end the net man says DOWNSTREAM to the paddler, the reading over his head',
+        !!downWord && downWord.atoms.length === 1 && downWord.atoms[0] === downWord.expected, JSON.stringify(downWord))
+      if (downWord) {
+        const swung = await page
+          .waitForFunction(() => {
+            const c = window.__placeCanoe?.()
+            return !!c && c.phase === 'turn' && c.paddlerAction === 'swing' && c.net > 0
+          }, null, { timeout: 20000, polling: 100 })
+          .then(() => true)
+          .catch(() => false)
+        check('and the paddler answers it: he stops paddling and swings the bow out as the net goes out', swung)
+      }
+
       // --- 1. The boat's standing place: the haul, then the UPSTREAM word ----
       const boat = await page.evaluate(() => {
         const c = window.__placeCanoe()
