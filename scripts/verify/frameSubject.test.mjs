@@ -29,9 +29,11 @@ import {
   captureFrame,
   capturePixels,
   expectRefusal,
+  jumpBeside,
   probeFrameSubject,
   refusedFrames,
   sampleSceneCounts,
+  standCandidates,
 } from './frameSubject.mjs'
 
 const lakeVictoria = () => normaliseDeclaration('12-worldmodel-lake-victoria', { world: { lat: -0.8, lon: 33 }, label: 'Lake Victoria' })
@@ -659,8 +661,10 @@ describe('a frame-subject miss is a failing check, not a crash', () => {
       log.mockRestore()
     }
     process.exit(0)
+    process.exit('0')
+    process.exit(null)
     process.exit(3)
-    expect(exit.mock.calls).toEqual([[1], [3]])
+    expect(exit.mock.calls).toEqual([[1], [1], [1], [3]])
   })
 
   it('lets a self-test take back the refusal it provoked, and the run is clean again', async () => {
@@ -678,5 +682,35 @@ describe('a frame-subject miss is a failing check, not a crash', () => {
     expect(expectRefusal('999-frame-subject-selftest')).toBeNull()
     expect(refusedFrames()).toEqual([])
     expect(process.exitCode).toBe(0)
+  })
+})
+
+describe('standing beside a river subject (point 1145)', () => {
+  it('tries the subject first, then rings outward to 0.3 degrees', () => {
+    const c = standCandidates(-17.92, 25.85)
+    expect(c[0]).toEqual([-17.92, 25.85])
+    expect(c.length).toBe(1 + 15 * 16)
+    const dist = ([a, o]) => Math.hypot(a + 17.92, o - 25.85)
+    expect(dist(c[1])).toBeCloseTo(0.02, 6)
+    expect(dist(c[c.length - 1])).toBeCloseTo(0.3, 6)
+    for (let i = 2; i < c.length; i++) expect(dist(c[i])).toBeGreaterThanOrEqual(dist(c[i - 1]) - 1e-9)
+  })
+
+  it('returns the still candidate the page chose', async () => {
+    const page = { evaluate: async () => 17 }
+    expect(await jumpBeside(page, -17.92, 25.85, '72-water-victoria-falls')).toEqual(standCandidates(-17.92, 25.85)[17])
+  })
+
+  it('refuses with a FAIL line instead of standing in the current when nothing is still', async () => {
+    const lines = []
+    const log = vi.spyOn(console, 'log').mockImplementation((line) => lines.push(String(line)))
+    let stand
+    try {
+      stand = await jumpBeside({ evaluate: async () => -1 }, 15.6, 32.6, '11-worldmodel-khartoum-confluence')
+    } finally {
+      log.mockRestore()
+    }
+    expect(stand).toBeNull()
+    expect(lines.join('\n')).toMatch(/^FAIL {2}frame 11-worldmodel-khartoum-confluence — no stand clear of the current/m)
   })
 })

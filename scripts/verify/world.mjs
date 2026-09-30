@@ -130,14 +130,14 @@ if (section('first-travel-frame')) {
     world: { lat: 30.0, lon: 31.3 },
     label: 'the Nile delta at Cairo',
   })
-  // A refused frame is its own red and reads as 0 bytes here (point 1145).
+  // A refused frame is its own red; its size is not measured (point 1145).
   const bytes = firstTravelFrame ? firstTravelFrame.length : 0
   const firstOk = bytes >= BLANK_FRAME_BYTES
-  console.log(
+  if (firstTravelFrame) console.log(
     `${firstOk ? 'PASS' : 'FAIL'}  the first world frame after the scene switch shows the terrain, not the background ` +
       `(${bytes} bytes, floor ${BLANK_FRAME_BYTES})${sections.tag()}`,
   )
-  if (!firstOk) {
+  if (firstTravelFrame && !firstOk) {
     errors.push(
       `the first travel frame is ${bytes} bytes — a blank or refused picture; the scene-readiness wait did not hold (point 489)`,
     )
@@ -514,7 +514,8 @@ if (section('landmark-frames')) {
   ]
   for (const [lat, lon, name, label] of shots) {
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-    await jumpBeside(page, lat, lon) // the shutter waits for the subject and the drawn scene
+    // The shutter waits for the subject and the drawn scene.
+    if (!(await jumpBeside(page, lat, lon, name))) continue // its FAIL line carries the red
     await shot(name, { world: { lat, lon }, label })
   }
 }

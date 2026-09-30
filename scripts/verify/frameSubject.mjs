@@ -228,30 +228,50 @@ export async function waitForSceneReady(page, opts = {}) {
 }
 
 /**
+ * The stand candidates around a subject, nearest ring first: the subject
+ * itself, then 16 bearings every 0.02 degrees out to 0.3. A sampled search —
+ * the first still candidate, not guaranteed the nearest one.
+ */
+export function standCandidates(lat, lon, { maxDeg = 0.3, stepDeg = 0.02, bearings = 16 } = {}) {
+  const out = [[lat, lon]]
+  for (let i = 1; i * stepDeg <= maxDeg + 1e-9; i++) {
+    for (let k = 0; k < bearings; k++) {
+      const t = (k / bearings) * 2 * Math.PI
+      out.push([lat + i * stepDeg * Math.sin(t), lon + i * stepDeg * Math.cos(t)])
+    }
+  }
+  return out
+}
+
+/**
  * Jump to stand BESIDE a water subject (point 1145). The current sweeps the
  * traveller only on water (store.driftCurrent, design.md §11): set down in the
  * Zambezi or the Nile he drifted 3-4.5 degrees downstream within the wait, the
- * camera followed, and the frame missed its subject. So he stands on the
- * nearest non-water point within 0.3 degrees; the subject stays the declared
- * water point. A land subject is jumped to unchanged. Returns the stand.
+ * camera followed, and the frame missed its subject. So he stands on the first
+ * candidate that is dry land or water without current (a lake); the subject
+ * stays the declared point. Returns the stand, or `null` after printing a FAIL
+ * line when no candidate is still — then it does NOT jump, and the caller
+ * skips the frame rather than photograph a drifting traveller.
  */
-export function jumpBeside(page, lat, lon) {
-  return page.evaluate(([a, o]) => {
+export async function jumpBeside(page, lat, lon, frame = `(${lat}, ${lon})`) {
+  const candidates = standCandidates(lat, lon)
+  const at = await page.evaluate(async (cs) => {
+    const current = await import('/src/systems/current.ts')
     const g = window.__game.getState()
-    const still = (la, lo) => !['water', 'ocean'].includes(window.__terrainType(la, lo, g.seed))
-    let stand = [a, o]
-    search: for (let r = 0.02; r <= 0.3 && !still(a, o); r += 0.02) {
-      for (let k = 0; k < 16; k++) {
-        const t = (k / 16) * 2 * Math.PI
-        if (still(a + r * Math.sin(t), o + r * Math.cos(t))) {
-          stand = [a + r * Math.sin(t), o + r * Math.cos(t)]
-          break search
-        }
-      }
+    const still = ([la, lo]) => {
+      if (!['water', 'ocean'].includes(window.__terrainType(la, lo, g.seed))) return true
+      const d = current.currentDriftDegPerSecond(la, lo, false)
+      return d.lat === 0 && d.lon === 0
     }
-    g.debugJumpTo(stand[0], stand[1])
-    return stand
-  }, [lat, lon])
+    const i = cs.findIndex(still)
+    if (i >= 0) g.debugJumpTo(cs[i][0], cs[i][1])
+    return i
+  }, candidates)
+  if (at < 0) {
+    console.log(`FAIL  frame ${frame} — no stand clear of the current within 0.3 degrees of lat ${lat}, lon ${lon}; the frame was not taken`)
+    return null
+  }
+  return candidates[at]
 }
 
 // A REFUSED FRAME IS ONE FAILED CHECK, NOT A DEAD RUN (point 1145). The shutter
@@ -292,7 +312,9 @@ function recordRefusal(frame, reason) {
   process.exitCode = 1
   if (process.exit.__frameRefusals) return
   const exit = process.exit.bind(process)
-  const guarded = (code) => exit(refused.length && !code ? 1 : code)
+  // Node reads `'0'`, `null` and `undefined` as success too: only an explicit
+  // failing code passes through unchanged.
+  const guarded = (code) => exit(refused.length && !(Number(code ?? 0) > 0) ? 1 : code)
   guarded.__frameRefusals = true
   process.exit = guarded
 }

@@ -794,9 +794,11 @@ if (section('traa-toggle')) {
     general: 'the travel scene after the TRAA rebuild; brightness is measured only in the interface-free scene crop',
     scene: 'travel',
   })
-  // A refused frame is its own red; NaN then fails the luma check too (point 1145).
-  const traaMean = traaShot ? await settingsSceneLuma(traaShot) : NaN
-  check('TRAA on: scene renders non-black', traaMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
+  // A refused frame is its own red; the luma it would carry is skipped (point 1145).
+  if (traaShot) {
+    const traaMean = await settingsSceneLuma(traaShot)
+    check('TRAA on: scene renders non-black', traaMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
+  }
   check('TRAA on: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
   const traaOnPipelines = await page.evaluate(settingsPipelineState)

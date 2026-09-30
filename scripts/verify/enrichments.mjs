@@ -677,7 +677,7 @@ if (section('rivers')) {
     ['126-clearance-khartoum', 15.6, 32.5],
     ['127-clearance-sudd', 8.0, 30.5],
   ]) {
-    await jumpBeside(page, lat, lon)
+    if (!(await jumpBeside(page, lat, lon, name))) continue
     await page.waitForTimeout(1500) // let the chunks and water surfaces stream in
     await shot(name, { world: { lat, lon }, label: name })
   }
