@@ -478,7 +478,8 @@ export function stepCanoe(
       if (state.clock >= cfg.landSeconds) enter(state, 'unload')
       break
     case 'unload':
-      if (state.clock >= unloadSeconds(state.catch, cfg)) {
+      // Done only once the catch is really in a basket set down on the bank.
+      if (state.clock >= unloadSeconds(state.catch, cfg) && state.inHull === 0 && !basketAt(ring, 'netman')) {
         state.rounds++
         seatMen(state)
         enter(state, 'callUp')
@@ -565,7 +566,9 @@ function stepUnload(state: CanoeState, lane: CanoeLane, ring: BasketRing, cfg: C
   const bend = (from: number) => Math.sin(Math.PI * Math.max(0, Math.min(1, (t - from) / lift)))
   nm.reach = t >= step && t < step + lift ? bend(step) : t >= fillEnd && t < setEnd ? bend(fillEnd) : 0
   // The basket changes hands at the bottom of each bend.
-  if (t >= step + lift / 2 && !basketAt(ring, 'netman') && state.inHull > 0 && t < fillEnd) netmanTakesEmpty(ring)
+  // Every crossed event is taken, however long the step: a frame that jumps
+  // the whole hand-over still lifts, fills and sets the basket down.
+  if (t >= step + lift / 2 && !basketAt(ring, 'netman') && state.inHull > 0) netmanTakesEmpty(ring)
   const handed = Math.max(0, Math.min(state.catch, Math.floor((t - step - lift) / cfg.fillSecondsPerFish)))
   const held = basketAt(ring, 'netman')
   while (held && held.fish < handed && state.inHull > 0) {
@@ -617,13 +620,15 @@ export function netFloats(state: Pick<CanoeState, 'net' | 'netMan' | 'x' | 'z' |
   const hand = netHand(state, lane, cfg)
   const out: BankPoint[] = []
   const n = Math.max(2, Math.round(cfg.netFloats))
-  // Each float keeps its own place on the line: paid out from the hand, and
-  // hauled in from the hand again — so while the net comes in, the floats
-  // still out on the water keep their spacing and the nearest one is taken in.
+  // Each float keeps its spacing on the line: paid out from the hand, and
+  // hauled in at the hand again, the nearest one taken aboard first.
   const hauling = state.phase === 'haul'
   for (let i = 1; i <= n; i++) {
-    const u = i / n
-    if (hauling ? u < 1 - state.net : u > state.net) continue
+    const own = i / n
+    if (hauling ? own < 1 - state.net : own > state.net) continue
+    // Hauled in from the hand: the floats still out draw toward the hull as
+    // the net shortens, the farthest ending where the line now ends.
+    const u = hauling ? own - (1 - state.net) : own
     const across = cfg.netReach * Math.sin((u * Math.PI) / 2)
     const back = cfg.netLength * u * 0.85
     out.push({ x: hand.x - lane.nx * across - lane.fx * back, z: hand.z - lane.nz * across - lane.fz * back })

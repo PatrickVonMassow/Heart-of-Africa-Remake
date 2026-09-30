@@ -24,6 +24,7 @@ import {
   createCanoe,
   lanePoint,
   netFloats,
+  netHand,
   stepCanoe,
   unloadSeconds,
   type CanoePhase,
@@ -303,6 +304,41 @@ describe('the drift-net cycle (work-order 1245 item 1)', () => {
       if (b.phase === 'turn') expect(b.net).toBeGreaterThanOrEqual(a.net)
       if (b.phase === 'haul') expect(b.net).toBeLessThanOrEqual(a.net)
     }
+  })
+
+  it('draws the float line in toward the hull while hauling', () => {
+    const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
+    const lane = canoeLane(bank)
+    const state = createCanoe(lane)
+    const ring = createBasketRing(0)
+    const extents: number[] = []
+    for (let i = 0; i < 40000; i++) {
+      stepCanoe(state, lane, ring, { say: () => 'said', obeyDelay: () => OBEY }, 0.05, cfg, () => 0.5)
+      if (state.phase === 'haul') {
+        const hand = netHand(state, lane)
+        const pts = netFloats(state, lane)
+        extents.push(pts.length ? Math.max(...pts.map((p) => Math.hypot(p.x - hand.x, p.z - hand.z))) : 0)
+      } else if (extents.length) break
+    }
+    expect(extents.length).toBeGreaterThan(20)
+    for (let i = 1; i < extents.length; i++) expect(extents[i]).toBeLessThanOrEqual(extents[i - 1] + 1e-9)
+    expect(extents[extents.length - 1]).toBeLessThan(extents[0] * 0.2)
+  })
+
+  it('completes the hand-over even when one step jumps the whole unload', () => {
+    const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
+    const lane = canoeLane(bank)
+    const state = createCanoe(lane)
+    const ring = createBasketRing(0)
+    const view = { say: () => 'said' as const, obeyDelay: () => OBEY }
+    for (let i = 0; i < 40000 && state.phase !== 'unload'; i++) stepCanoe(state, lane, ring, view, 0.05, cfg, () => 0.5)
+    const catchSize = state.inHull
+    expect(catchSize).toBeGreaterThan(0)
+    stepCanoe(state, lane, ring, view, unloadSeconds(state.catch, cfg) + 1, cfg, () => 0.5)
+    stepCanoe(state, lane, ring, view, 0.05, cfg, () => 0.5)
+    expect(state.inHull).toBe(0)
+    expect(ring.baskets.find((b) => b.at === 'bank' && b.fish === catchSize)).toBeTruthy()
+    expect(state.phase).toBe('callUp')
   })
 
   it('brings up a recognisable catch that lies in the hull until the landing, then fills the basket', () => {
