@@ -66,9 +66,11 @@ import { NILE_FLOOD, waterSurfaceY } from './waterSurface'
 import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
 import {
+  NATURAL_SITES_GROUP,
   PANORAMA_BAND_BY_KIND,
   PANORAMA_CHUNK_RADIUS,
   panoramaCaptureFar,
+  panoramaCaptureHideNames,
   panoramaCaptureReady,
 } from './panoramaMath'
 import {
@@ -1865,7 +1867,7 @@ function PanoramaCaptureTrigger() {
         { x: w.x, y: h + 1.2, z: w.z },
         p.id,
         s.seed,
-        ['traveller-root', `place-marker-${p.id}`, 'travel-sky', 'travel-climate', 'travel-dressing', 'travel-markers'],
+        panoramaCaptureHideNames(p.id),
         panoramaCaptureFar(PANORAMA_CHUNK_RADIUS, CHUNK_SIZE),
       )
       if (probe) {
@@ -3169,7 +3171,7 @@ export function TravelScene() {
       {/* Named for the panorama capture: the symbolic travel-scale dressing
           (trees the size of hills, animals, markers) would read absurd on
           the person-scale horizon — the capture keeps terrain, water,
-          mountains and the built landmarks. */}
+          mountains and the cultural landmarks. */}
       <group name="travel-dressing">
         <Vegetation />
         <Wildlife />
@@ -3182,7 +3184,10 @@ export function TravelScene() {
       <LandmarkLabels />
       <ElephantGraveyard />
       <CulturalLandmarks />
-      <NaturalSites />
+      {/* Map symbols, kept out of the panorama capture (panoramaCaptureHideNames). */}
+      <group name={NATURAL_SITES_GROUP}>
+        <NaturalSites />
+      </group>
       <group name="travel-markers">
         <CampMarkers />
         <GraveMarker />

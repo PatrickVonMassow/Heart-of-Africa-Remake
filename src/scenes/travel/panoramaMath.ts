@@ -204,3 +204,26 @@ export const PANORAMA_BAND_BY_KIND: Record<PlaceKind, boolean> = {
 export function panoramaBandShown(kind: PlaceKind, enteredFromTravel: boolean, captureReady: boolean): boolean {
   return PANORAMA_BAND_BY_KIND[kind] && enteredFromTravel && captureReady
 }
+
+/** Travel-scene group of the natural-site map symbols (crater, volcano, delta, wetland). */
+export const NATURAL_SITES_GROUP = 'travel-natural-sites'
+
+/**
+ * Travel-scene objects hidden while the settlement panorama band is shot.
+ * The traveller and the entered place's marker stand at the capture point;
+ * sky, climate, dressing and markers are travel-scale symbols. The
+ * natural-site symbols are hidden too: the Ol Doinyo Lengai volcano icon
+ * (a cone with floating smoke cones) otherwise hung in the Maasai village's
+ * sky. Cultural landmarks (Giza at Cairo) stay in the band.
+ */
+export function panoramaCaptureHideNames(placeId: string): string[] {
+  return [
+    'traveller-root',
+    `place-marker-${placeId}`,
+    'travel-sky',
+    'travel-climate',
+    'travel-dressing',
+    'travel-markers',
+    NATURAL_SITES_GROUP,
+  ]
+}
