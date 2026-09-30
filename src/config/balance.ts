@@ -63,6 +63,10 @@ interface BalanceConfig {
   /** How long the jar stays under, in seconds (work-order 1087) — the readable
    *  hold between the dip going down and the jar coming up full. */
   bankFillSeconds: number
+  /** How far past the settlement's waterline the landscape backdrop turns map
+   *  LAND into water, filling the gap between the drawn river and the map's
+   *  own river course (work-order 1250), in place metres. */
+  backdropRiverFillReach: number
   /** How many filled jars the village water stand holds before a new delivery
    *  replaces the oldest (work-order 1087). */
   waterStandCapacity: number
@@ -1169,6 +1173,10 @@ export const balance: BalanceConfig = {
   // looking for it to see the jar go down and come up, short enough that the
   // errand's own timing backstops are untouched.
   bankFillSeconds: 1.4,
+  // Calibratable (work-order 1250): at the Bambara village the map's Niger
+  // begins 5-29 m past the drawn waterline along the visible bank; 40 m covers
+  // that gap with room, and a map river further off is left alone.
+  backdropRiverFillReach: 40,
   // Calibratable: three standing jars. The fourth delivery replaces the oldest,
   // which is what lets the stand need no consumer.
   waterStandCapacity: 3,

@@ -53,6 +53,7 @@ import {
   groundDiscSegments,
   panoramaStandY,
 } from './backdrop'
+import { BACKDROP_RIVER_Y, backdropRiverFill, mapWaterAt } from './backdropRiver'
 import { createBackdropMaterial } from './backdropMaterial'
 import { mulberry32 } from '../../world/noise'
 import {
@@ -179,6 +180,8 @@ import {
   panoramaGaitDistance,
   excludedAzimuthSpan,
   isAzimuthExcluded,
+  dryRingAngle,
+  stepRingWalk,
   type AzimuthSpan,
 } from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
@@ -1538,6 +1541,13 @@ function PanoramaWildlife({
     (x: number, z: number) => innerRadius + groundDiscShift(bounds, Math.atan2(z, x)),
     [innerRadius, bounds],
   )
+  // Water as the backdrop draws it — the map's, and the settlement's river
+  // carried on (work-order 1250) — so no silhouette stands in it.
+  const wetAt = useMemo(() => {
+    const map = mapWaterAt(lat, lon, seed)
+    const river = backdropRiverFill(bounds.bank ?? null, map, drawnRiverAlong(bounds))
+    return (x: number, z: number) => river(x, z) || map(x, z)
+  }, [lat, lon, seed, bounds])
   // Region-typical species aligned to the bird's-eye pool (point 102, part c).
   const builds = useMemo(() => PANORAMA_FAUNA[region].map((b) => b()), [region])
   // Azimuth arcs of this settlement's skyline landmarks: a silhouette drifting
@@ -1600,6 +1610,17 @@ function PanoramaWildlife({
     () => () => items.forEach((it) => it.material.dispose()),
     [items],
   )
+  // Where each silhouette walks its ring now, and which way: it starts on the
+  // nearest dry ground and turns back at the water (work-order 1250). Null
+  // where its whole ring is water — that one is never shown.
+  const walks = useMemo(
+    () => items.map((it) => {
+      const wet = (a: number) => wetAt(Math.cos(a) * it.radius, Math.sin(a) * it.radius)
+      const angle = dryRingAngle(it.angle, wet)
+      return angle === null ? null : { angle, drift: it.drift, wet }
+    }),
+    [items, wetAt],
+  )
   const refs = useRef<Array<THREE.Group | null>>([])
   // Per-silhouette leg-pivot groups, so the stride swings them about the hips.
   const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
@@ -1619,12 +1640,21 @@ function PanoramaWildlife({
     }
   }, [items, exclusionSpans])
 
-  useFrame(({ clock, camera }) => {
+  useFrame(({ clock, camera }, rawDt) => {
     const t = clock.elapsedTime
+    const dt = Math.min(rawDt, 0.1)
     items.forEach((it, i) => {
       const g = refs.current[i]
       if (!g) return
-      const a = it.angle + t * it.drift
+      const walk = walks[i]
+      if (!walk) {
+        g.visible = false
+        return
+      }
+      const stepped = stepRingWalk(walk.angle, walk.drift, dt, walk.wet)
+      walk.angle = stepped.angle
+      walk.drift = stepped.drift
+      const a = walk.angle
       // Azimuth on the ring; hide a silhouette that has drifted into a skyline
       // landmark's arc so it never crosses the monument (point 102, part a).
       const azimuth = Math.atan2(Math.sin(a), Math.cos(a))
@@ -1635,7 +1665,7 @@ function PanoramaWildlife({
       // Point 286: face where it MOVES along the ring tangent (derived from the
       // velocity), so a silhouette can never walk backward — the former
       // `−a + (drift>0 ? π : 0)` was exactly π off and moonwalked every one.
-      const yaw = panoramaDriftYaw(a, it.drift)
+      const yaw = panoramaDriftYaw(a, walk.drift)
       // Point 181: the feet go on the ground the frame DRAWS under them — the
       // higher of this spot's relief and the ground line over the town's disc
       // edge, seen from the live camera — never the hard EYE_HEIGHT horizon at
@@ -1899,6 +1929,13 @@ function TravelPanorama({ placeId }: { placeId: string }) {
   return <mesh name="panorama-band" geometry={geometry} material={material} position={[0, EYE_HEIGHT, 0]} />
 }
 
+/** How far the drawn river runs upstream and downstream of the bank normal —
+ *  one answer for the drawn water and the backdrop that continues it. */
+function drawnRiverAlong(bounds: PlaceBounds): { up: number; down: number } {
+  const reach = bankDrawnReach(bounds, bounds.radius + GROUND_DISC_OVERHANG)
+  return { up: Math.max(RIVER_HALF_LENGTH, reach.up), down: Math.max(RIVER_HALF_LENGTH, reach.down) }
+}
+
 /**
  * Panorama of the real surroundings (design.md §2): an annulus heightfield
  * sampled from the actual travel terrain around the place's map position, so
@@ -1933,6 +1970,9 @@ function LandscapeBackdrop({
     // the plate and feathered up to it at the plate's edge, wherever that is.
     const rims = Array.from({ length: BACKDROP_SEGS }, (_, si) =>
       innerRadius + groundDiscShift(bounds, (si / BACKDROP_SEGS) * Math.PI * 2))
+    // The settlement's own river, carried on where the map's lies further out
+    // (work-order 1250): map land there lay on the drawn water as a band.
+    const riverFill = backdropRiverFill(bank, mapWaterAt(lat, lon, seed), drawnRiverAlong(bounds))
     for (let ri = 0; ri < BACKDROP_RINGS; ri++) {
       for (let si = 0; si < BACKDROP_SEGS; si++) {
         const a = (si / BACKDROP_SEGS) * Math.PI * 2
@@ -1947,13 +1987,16 @@ function LandscapeBackdrop({
         // capped to a distant range, and the fall is clamped at that same plane
         // so the horizon can never tear open (point 381). Shared with
         // backdropHeightAt so mesh, sampler and silhouette footing agree.
-        const y = backdropSurfaceY(r, r0, (smp.height - centerH) * BACKDROP_HEIGHT)
+        const river = riverFill(x, z)
+        const surface = backdropSurfaceY(r, r0, (smp.height - centerH) * BACKDROP_HEIGHT)
+        // The settlement's river lies just under the drawn water, never above it.
+        const y = river ? Math.min(surface, BACKDROP_RIVER_Y) : surface
         positions.push(x, y, z)
         colors.push(smp.color[0], smp.color[1], smp.color[2])
         // River and lake water carries the ONE water appearance instead of the
         // rock shading (work-order 525) — the same source the drawn surface at
         // the bank reads, so the two meet with no seam at the plate's rim.
-        water.push(smp.type === 'water' ? 1 : 0)
+        water.push(smp.type === 'water' || river ? 1 : 0)
       }
     }
     for (let ri = 0; ri < BACKDROP_RINGS - 1; ri++) {
@@ -1974,7 +2017,7 @@ function LandscapeBackdrop({
     // shade as hard flat facets (createBackdropMaterial keeps flat shading off).
     geo.computeVertexNormals()
     return geo
-  }, [lat, lon, seed, innerRadius, bounds])
+  }, [lat, lon, seed, innerRadius, bounds, bank])
   const waterOctaves = useUi(effectiveWaterDetailOctaves)
   const backdrop = useMemo(() => createBackdropMaterial(waterOctaves), [waterOctaves])
   const material = backdrop.material
@@ -2635,10 +2678,21 @@ export function PlaceScene() {
       const rc = new THREE.Raycaster(camera.position.clone(), dir, 0.1, 4000)
       const hits = rc.intersectObject(r3fScene, true)
       const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+      // Whether the surface hit is drawn as WATER: the backdrop's own mask at
+      // the hit face (work-order 1250 — map land lay on the river as a band).
+      const mask = hit?.face ? (hit.object as THREE.Mesh).geometry?.getAttribute('waterMask') : undefined
+      const hitWater = !hit
+        ? null
+        : hit.object.name === 'place-river'
+          ? 1
+          : mask && hit.face
+            ? (mask.getX(hit.face.a) + mask.getX(hit.face.b) + mask.getX(hit.face.c)) / 3
+            : 0
       return {
         targetDistance: target.distanceTo(camera.position),
         hitDistance: hit ? hit.distance : null,
         hitName: hit ? hit.object.name || (hit.object as THREE.Mesh).geometry?.type || 'mesh' : null,
+        hitWater,
       }
     }
     w.__placeSeason = () => ({

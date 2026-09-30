@@ -13,6 +13,8 @@ import {
   panoramaDriftVelocity,
   panoramaDriftYaw,
   panoramaGaitDistance,
+  dryRingAngle,
+  stepRingWalk,
 } from './panoramaWildlife'
 import { buildElephantParts, GAIT_MAX_PITCH, GAIT_SWING, gaitBodyLift, gaitPhase, gaitRig, groundPitch } from '../../render/fauna'
 
@@ -278,5 +280,40 @@ describe('skyline landmark azimuth exclusion (point 102)', () => {
 
   it('is empty-safe (no spans excludes nothing)', () => {
     expect(isAzimuthExcluded(1.2, [])).toBe(false)
+  })
+})
+
+// A camel stood in the river at the far waterline (work-order 1250): a
+// silhouette now starts on dry ground and turns back at the water.
+describe('panorama silhouettes keep to dry ground (work-order 1250)', () => {
+  // Water across the ring between 1 and 2 rad.
+  const wet = (a: number) => {
+    const w = ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+    return w > 1 && w < 2
+  }
+
+  it('starts where it stands when that is dry, and on the nearest dry ground otherwise', () => {
+    expect(dryRingAngle(0.5, wet)).toBe(0.5)
+    const near1 = dryRingAngle(1.1, wet)!
+    expect(wet(near1)).toBe(false)
+    expect(Math.abs(near1 - 1)).toBeLessThan(0.02)
+    const near2 = dryRingAngle(1.9, wet)!
+    expect(wet(near2)).toBe(false)
+    expect(Math.abs(near2 - 2)).toBeLessThan(0.02)
+    expect(dryRingAngle(1, () => true)).toBeNull()
+  })
+
+  it('walks on over dry ground and turns round, never stepping in, at the water', () => {
+    let walk = { angle: 0.5, drift: 0.01 }
+    let turned = 0
+    for (let i = 0; i < 20000; i++) {
+      const next = stepRingWalk(walk.angle, walk.drift, 0.5, wet)
+      if (Math.sign(next.drift) !== Math.sign(walk.drift)) turned++
+      expect(Math.abs(next.drift)).toBe(0.01)
+      walk = next
+      expect(wet(walk.angle)).toBe(false)
+    }
+    // It meets the water from both sides of the dry arc.
+    expect(turned).toBeGreaterThanOrEqual(2)
   })
 })
