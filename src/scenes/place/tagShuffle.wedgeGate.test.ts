@@ -107,7 +107,7 @@ interface PenEvidence {
  *  replays it WITHOUT the pen, to measure what a healthy child of this same
  *  village walks. */
 const PEN_VILLAGE = 'bambara-village'
-const PEN_SEED = 17
+const PEN_SEED = 23
 
 describe('and the gate SEES a child that is wedged (point 656)', () => {
   /** The reported settlement with one child penned: a wall thrown up round it
@@ -150,7 +150,8 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // taken. All assertion thresholds stay unchanged.
     // A FIFTH move: work-order 1245 moved the bank stage upstream and seated the
     // quarter beside it, and seed 59 no longer produces a refused re-pen.
-    // Re-scanned from 12: seed 17 is the first to retain every comparison.
+    // Re-scanned from 12: seed 23 is the first to retain every comparison
+    // once the quarter is also held within call reach of the stage's stand.
     // Thresholds unchanged.
     const v = village(PEN_VILLAGE, PEN_SEED, undefined, { pen: { r, carry } })
     const paths: Track[][] = v.children.map(() => [])

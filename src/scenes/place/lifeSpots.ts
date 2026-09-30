@@ -210,6 +210,16 @@ export const MIN_FABRIC = 0.5
 export const MIN_OPENNESS = 0.7
 
 /**
+ * The openness a ground needs where it gives up the fabric floor to stay in
+ * call reach of the bank stage's stand (work-order 1245). Measured over 600
+ * river layouts: at `MIN_OPENNESS` every one found such a ground, but the
+ * children's motion gates failed in quarters squeezed between the last huts
+ * (bambara@236333330 rescued a child, @9 shuffled 0.36 %); at 0.9 every one
+ * still finds a ground in reach.
+ */
+export const REACH_OPENNESS = 0.9
+
+/**
  * What the search is trading off among the grounds that keep their distance.
  * Standing against the village outweighs everything — a chase nobody can place
  * in a settlement teaches nothing — a clear ground outweighs a big one, and
@@ -273,13 +283,19 @@ export function childPlayGround(
     fabric?: ReadonlyArray<readonly [number, number]>
     bearings?: number
     /** A point the ground should lie NEAR (work-order 1245 — the bank
-     *  village's quarter lies BESIDE its bank stage, design.md §13.4, wherever
-     *  the stage is put): among the grounds that meet every floor, one whose
-     *  centre lies within `within` of it wins. Never bought with a floor. */
+     *  village's quarter lies BESIDE its bank stage, design.md §13.4): among
+     *  the grounds that meet every floor, the best whose centre lies within
+     *  `within` of it is preferred. Never bought with a floor. */
     near?: { x: number; z: number; within: number }
+    /** A point the ground's CALLS must reach (work-order 1245 — the stand the
+     *  bank stage is watched from): a ground whose far rim lies beyond `within`
+     *  of it is taken only when no floor-keeping ground is in reach, and then
+     *  the nearest one is. Never bought with a floor. */
+    reach?: { x: number; z: number; within: number }
   } = {},
 ): PlayGround {
   const near = options.near ?? null
+  const reach = options.reach ?? null
   const bearings = options.bearings ?? 64
   const rMax = Math.max(1, Math.min(playRadius, walkRadius))
   const rMin = Math.min(rMax, MIN_PLAY_RADIUS)
@@ -357,19 +373,48 @@ export function childPlayGround(
   // ground does the openness floor give way — never the separation, which is
   // what the whole placement exists for.
   //
-  // A `near` point is a PREFERENCE inside this rank only (work-order 1245): a
-  // ground that meets both floors AND lies near it wins over a better-scoring
-  // one further off, and no floor is ever given up to be near.
-  const picked: { best: PlayGround | null; both: PlayGround | null; near: PlayGround | null } = { best: null, both: null, near: null }
+  // The `near` and `reach` points are PREFERENCES inside this rank only
+  // (work-order 1245): no floor is ever given up for either.
+  const picked: {
+    best: PlayGround | null
+    both: PlayGround | null
+    near: PlayGround | null
+    inReach: PlayGround | null
+    openInReach: PlayGround | null
+    nearest: PlayGround | null
+    nearestReach: number
+  } = { best: null, both: null, near: null, inReach: null, openInReach: null, nearest: null, nearestReach: Infinity }
+  /** How far a ground's far rim lies from the reach point. */
+  const rimFrom = (g: { x: number; z: number; radius: number }) => (reach ? Math.hypot(g.x - reach.x, g.z - reach.z) + g.radius : 0)
   eachCandidate((x, z, r, clearance) => {
     if (clearance < minClearance) return
     const here = measure(x, z, r, clearance)
     if (!picked.best || score(here) > score(picked.best)) picked.best = here
+    // In reach of the stage's stand, the FABRIC floor gives way before the
+    // call does (work-order 1245): the bank village's ground lies beside its
+    // bank stage (design.md §13.4). Separation still holds, and the ground has
+    // to be nearly clear (`REACH_OPENNESS`), not merely open enough.
+    if (reach && here.openness >= REACH_OPENNESS && rimFrom(here) <= reach.within &&
+      (!picked.openInReach || score(here) > score(picked.openInReach))) picked.openInReach = here
     if (here.fabric < MIN_FABRIC || here.openness < MIN_OPENNESS) return
     if (!picked.both || score(here) > score(picked.both)) picked.both = here
     if (near && Math.hypot(x - near.x, z - near.z) <= near.within && (!picked.near || score(here) > score(picked.near))) picked.near = here
+    if (reach) {
+      const rim = rimFrom(here)
+      if (rim <= reach.within && (!picked.inReach || score(here) > score(picked.inReach))) picked.inReach = here
+      if (rim < picked.nearestReach) {
+        picked.nearest = here
+        picked.nearestReach = rim
+      }
+    }
   })
-  if (picked.near) return picked.near
+  // Beside the stage and in reach of its stand; else in reach; else the
+  // nearest to the stand — each among the grounds that keep every floor.
+  const preferred = picked.near ?? picked.both
+  if (preferred && (!reach || rimFrom(preferred) <= reach.within)) return preferred
+  if (picked.inReach) return picked.inReach
+  if (picked.openInReach) return picked.openInReach
+  if (picked.nearest) return picked.nearest
   if (picked.both) return picked.both
   const separated = picked.best
   if (separated && separated.fabric >= MIN_FABRIC) return separated

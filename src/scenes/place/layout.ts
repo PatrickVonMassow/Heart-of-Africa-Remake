@@ -20,6 +20,7 @@ import {
   BANK_PLAY_LANE_HALF,
   bankPlayRocks,
   bankFillSpot,
+  bankPlayRocksView,
   bankWaterFoot,
   buildRiverBank,
   inBankPlayLane,
@@ -364,6 +365,12 @@ export const WATER_PATH_HEAD_RADII = [...WATER_PATH_HEAD_INNER_RADII, ...WATER_P
 /** How far to either side of the water's own bearing the head may be swept, in
  *  degrees, to find a straight walk that clears the settlement's buildings. */
 const WATER_PATH_HEAD_SWEEP = 60
+/** ... and the WIDER sweep asked last of all (work-order 1245): with the
+ *  children's quarter held within call reach of the moved stage, a few layouts
+ *  (mandinka 67, 75, 115 of 600) found every head within 60 deg in the
+ *  children's earshot. Asked only after every other search failed, so no
+ *  layout that found its head before moves. */
+const WATER_PATH_HEAD_WIDE_SWEEP = 90
 
 /** Width of the water path, in metres: a walked footpath, narrower than the
  *  village's own lanes. */
@@ -1840,9 +1847,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // BESIDE THE BANK STAGE (design.md §13.4, work-order 1245): the stage
       // moved upstream off the bank normal, and a quarter left among the huts
       // on the far side called RIVER from 47 m off the stand the game is
-      // photographed from, past the CALL register's reach. A preference only:
-      // no floor of the search is given up for it.
+      // photographed from, past the CALL register's reach. So the quarter is
+      // sought within call reach of that stand (less a margin); a preference
+      // only: no floor of the search is given up for it.
       near: bank ? { x: bank.bank.x, z: bank.bank.z, within: balance.villageLife.bankGame.quarterWithin } : undefined,
+      reach: bank && playRocks
+        ? { ...bankPlayRocksView(playRocks), within: balance.communication.call.reach - balance.villageLife.bankGame.quarterCallMargin }
+        : undefined,
     },
   )
   /** Whether a body of radius `r` would stand in the children's quarter. */
@@ -1955,8 +1966,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       solids: readonly Collider[],
       radii: readonly number[] = WATER_PATH_HEAD_INNER_RADII,
       reject?: (head: BankPoint) => boolean,
+      sweep = WATER_PATH_HEAD_SWEEP,
     ): BankPoint | null => {
-      for (let step = 0; step <= WATER_PATH_HEAD_SWEEP; step++) {
+      for (let step = 0; step <= sweep; step++) {
         for (const sign of step === 0 ? [1] : [-1, 1]) {
           const a = base + sign * step * (Math.PI / 180)
           for (const r of radii) {
@@ -1972,7 +1984,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
     clearRun = clearRunHere
     findHead = (solids, reject) =>
-      findHeadHere(solids, WATER_PATH_HEAD_INNER_RADII, reject) ?? findHeadHere(solids, WATER_PATH_HEAD_OUTER_RADII, reject)
+      findHeadHere(solids, WATER_PATH_HEAD_INNER_RADII, reject) ??
+      findHeadHere(solids, WATER_PATH_HEAD_OUTER_RADII, reject) ??
+      findHeadHere(solids, WATER_PATH_HEAD_RADII, reject, WATER_PATH_HEAD_WIDE_SWEEP)
     let head = findHeadHere(colliders)
     if (!head && compoundFences.size > 0) {
       const fixed = colliders.filter((c) => !compoundColliders.has(c))
@@ -1999,6 +2013,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // Only where neither the inner ladder nor a gate gives a lane are the outer
     // rungs asked (work-order 1245).
     if (!head) head = findHeadHere(colliders, WATER_PATH_HEAD_OUTER_RADII)
+    if (!head) head = findHeadHere(colliders, WATER_PATH_HEAD_RADII, undefined, WATER_PATH_HEAD_WIDE_SWEEP)
     devAssert(head !== null, 'water-path-missing', () => `${place.id}@${seed}: no clear water lane, even with compound gates`)
     if (!head) {
       // Fail closed if a future plan breaks the invariant: never draw through
@@ -2403,13 +2418,15 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // head is swept round its foot, and since the foot moved ~28 m upstream with
     // the children's stretch the head can land on the very seats the plaza sees
     // the loom from (Bambara 7 and 1337: within talk reach of the head, or under
-    // its lane). Where the plaza sees no seat with the path laid, the seat it
-    // would see without it is taken, and the head is searched again with that
+    // its lane). Where the plaza sees no seat with the path laid (or the path
+    // leaves no seat at all), the seat it would have without it is taken, and
+    // the head is searched again with that
     // station's ground and its hearing clearance kept out of the walk. Where no
     // such head exists the path stays and the loom keeps what it had.
-    if (loom && !loom.seenFromPlaza && waterPath && findHead) {
+    if ((!loom || !loom.seenFromPlaza) && waterPath && findHead) {
       const seen = loomWith(true)
-      if (seen?.seenFromPlaza) {
+      // Taken where the plaza sees it, or where the path left no seat at all.
+      if (seen && (seen.seenFromPlaza || !loom)) {
         const clearance = balance.communication.talk.reach
         const station = seen
         const stationBodies: Collider[] = stationGround(station, balance.villageLife.loom).map((g) => ({ x: g.x, z: g.z, r: g.r }))

@@ -30,6 +30,7 @@ import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 import { balance } from '../../config/balance'
 import { PLACE_RADIUS, buildLayout, builtFabric } from './layout'
 import { standingClear, WALKER_RADIUS } from './collision'
+import { bankPlayRocksView } from './riverBank'
 import { PLACES } from '../../world/geo'
 import { isWithinHearing } from '../../communication/heard'
 
@@ -182,6 +183,23 @@ describe('the children play out of the adults’ earshot (point 481.4)', () => {
     const crowded = childPlayGround([[g.x, g.z]], WALK, PLAY, HEARING)
     expect(crowded.radius).toBeLessThanOrEqual(PLAY)
     expect(Math.hypot(crowded.x - g.x, crowded.z - g.z)).toBeGreaterThan(HEARING)
+  })
+
+  it('seats the ground within reach of a `reach` point, or at the nearest keeping every floor (work-order 1245)', () => {
+    const middle: Array<[number, number]> = [[0, 0]]
+    const reachOf = (g: { x: number; z: number; radius: number }, p: { x: number; z: number }) => Math.hypot(g.x - p.x, g.z - p.z) + g.radius
+    // A point on the west rim: a floor-keeping ground within 16 m of it exists.
+    const west = { x: -WALK, z: 0, within: 16 }
+    const g = childPlayGround(middle, WALK, PLAY, HEARING, { reach: west })
+    expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
+    expect(reachOf(g, west)).toBeLessThanOrEqual(west.within + 1e-9)
+    // Out of every ground's reach: the nearest one is taken, and no floor given up.
+    const far = { x: -200, z: 0, within: 5 }
+    const n = childPlayGround(middle, WALK, PLAY, HEARING, { reach: far })
+    expect(n.clearance).toBeGreaterThanOrEqual(HEARING)
+    const plain = childPlayGround(middle, WALK, PLAY, HEARING)
+    expect(reachOf(n, far)).toBeLessThanOrEqual(reachOf(plain, far) + 1e-9)
+    expect(n.x).toBeLessThan(0)
   })
 
   it('prefers OPEN ground among the bearings that are far enough', () => {
@@ -384,4 +402,19 @@ describe('port playgrounds clear their own vignettes', () => {
       expect(free / samples).toBeCloseTo(g.openness, 6)
     }
   })
+})
+
+describe('the bank village seats its children within call reach of the stage (work-order 1245)', () => {
+  const RIVER = ['nubian-village', 'bambara-village', 'mandinka-village']
+  it.each(RIVER.flatMap((id) => [7, 42, 1337, 2972259115, 1425108822, 3791639114].map((seed) => [id, seed] as const)))(
+    '%s @%i: the quarter’s far rim lies within the CALL reach of the stage’s stand, 10 m clear of the adults',
+    (id, seed) => {
+      const layout = buildLayout(id, seed)
+      const g = layout.playGround!
+      const stand = bankPlayRocksView(layout.playRocks!)
+      expect(Math.hypot(g.x - stand.x, g.z - stand.z) + g.radius).toBeLessThanOrEqual(balance.communication.call.reach)
+      expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
+      expect(g.openness).toBeGreaterThanOrEqual(MIN_OPENNESS)
+    },
+  )
 })

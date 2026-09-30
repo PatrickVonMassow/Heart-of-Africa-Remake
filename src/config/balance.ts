@@ -878,6 +878,10 @@ interface BalanceConfig {
       /** How far the children's roaming quarter's centre may lie from the
        *  middle of their bank stretch (work-order 1245), in metres. */
       quarterWithin: number
+      /** How far inside the CALL register's reach of the stage's photographing
+       *  stand the children's roaming quarter's far rim is sought (m;
+       *  work-order 1245). */
+      quarterCallMargin: number
     }
     /** The adults' water errands and paired digging, which teach RIVER and DIG
      *  (work-order point 483). */
@@ -1778,13 +1782,12 @@ export const balance: BalanceConfig = {
       // of 900 (three villages, 2 x 150 seeds).
       stretchCentre: -28,
       // Calibratable (work-order 1245): the quarter lies BESIDE the stage
-      // (design.md §13.4) wherever a ground that keeps every floor lies this
-      // near; measured on the three river villages at five seeds, 40 m seats 12
-      // of 15 near (RIVER from the quarter within 26 m of the stage's stand),
-      // and the other three keep their village ground 52-56 m off.
-      // OPEN: those three cannot be seated near without giving up the adults'
-      // hearing separation; their RIVER call is not heard at the stand.
+      // (design.md §13.4) — preferably within 40 m of the stretch's middle,
+      // and in any case where its far rim lies within the CALL reach of the
+      // stage's photographing stand less a 2 m margin, so its RIVER call is
+      // heard there; where no ground keeping every floor is, the nearest one.
       quarterWithin: 40,
+      quarterCallMargin: 2,
     },
     // The adults' errands (work-order point 483). Calibratable starting values
     // (educated guess, CLAUDE.md §2): slower than the children's chatter,

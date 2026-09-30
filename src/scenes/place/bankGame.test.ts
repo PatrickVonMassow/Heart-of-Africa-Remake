@@ -1503,21 +1503,12 @@ describe('the call register reaches the documented spectator stand', () => {
     const { log, s: state } = replay(600, { stage, seed: 3791639114, world: { ...openWorld(), radius: 100 } })
     expect(state.cycles).toBeGreaterThan(0)
     const heard = new Set<string>()
-    // OPEN (work-order 1245): a NAMED RESIDUAL. The stage moved ~28 m upstream,
-    // and the quarter is seated beside it only where a ground keeping every
-    // floor lies within `quarterWithin` of the stretch's middle. Mandinka at
-    // this seed has none (its separated grounds all lie on the village's far
-    // side), so its RIVER call from the quarter — the 'call' moment, not the
-    // direction words — falls ~50 m from the stand and is not heard there.
-    const quarterNear = Math.hypot(layout.playGround!.x - bank.bank.x, layout.playGround!.z - bank.bank.z) <=
-      balance.villageLife.bankGame.quarterWithin
-    expect(quarterNear || id === 'mandinka-village', `${id}: its quarter is not seated beside the stage`).toBe(true)
+    // THE QUARTER IS SEATED WITHIN CALL REACH OF THIS STAND (work-order 1245),
+    // so the round's RIVER call from it is heard here too.
+    const g = layout.playGround!
+    expect(dist(stand, g) + g.radius).toBeLessThanOrEqual(balance.communication.call.reach)
     for (const { u, speakerX: x, speakerZ: z } of log.when) {
       if (bankVoiceRegister(u.moment) !== 'call') continue
-      if (!quarterNear && u.moment === 'call') {
-        heard.add(u.concept)
-        continue
-      }
       const distance = dist(stand, { x, z })
       const plan = utterancePlan(utteranceOf(u.concept, SHIPPED_VOCABULARY), distance, { ...registerOptions('call'), voice: 'child', volume: 1 })
       expect(plan.gain, `${id} ${u.moment} ${distance.toFixed(2)} m`).toBeGreaterThanOrEqual(0.2)
