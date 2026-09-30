@@ -12,7 +12,8 @@ import { expect, it } from 'vitest'
 
 const source = readFileSync('scripts/verify/polish.mjs', 'utf8')
 const start = source.indexOf('    // ARRIVAL CONTACT (work-order 1106).')
-const end = source.indexOf('\n  }\n\n  // The world goes back', start)
+// The block ends at the first section-level close after it, whatever follows.
+const end = source.indexOf('\n  }\n\n  // ', start)
 if (start < 0 || end < 0) throw new Error('Arrival sampler block missing')
 const runSampler = new (Object.getPrototypeOf(async function () {}).constructor)(
   'page', 'restoreEarshotStance', 'check', 'frame', 'aimAtTap', 'nextFrames', 'contactBar',
