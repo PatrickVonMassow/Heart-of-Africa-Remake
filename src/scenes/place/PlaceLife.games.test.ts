@@ -17,7 +17,7 @@ import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, villageHasWell } fro
 const source = readFileSync('src/scenes/place/PlaceLife.tsx', 'utf8')
 const component = source.slice(source.indexOf('export function PlaceLife(')).replace('export function', 'function').replaceAll('import.meta.env.DEV', 'true')
 const devAssert = vi.fn()
-const components = ['Kids', 'Porters', 'Traders', 'Talkers', 'Walkers', 'Cook', 'Loom', 'VillagerCanoe',
+const components = ['Kids', 'Porters', 'Traders', 'Talkers', 'Walkers', 'Cook', 'Loom', 'RiverFishery',
   'ErrandVillagers', 'Goats', 'FireTender', 'Pounder', 'Drummer', 'Well', 'TaskWalker']
 const contexts = ['ColdCloaksContext', 'LimbDetailContext', 'InhabitantBodiesContext', 'SpeechFloorContext']
 const deps = {

@@ -89,7 +89,7 @@ describe('smooth shading (point 214 — the shading half of the same goal)', () 
     // settlement scenes; three.js defaults to smooth (per-vertex) shading, so
     // the pure guard is that no organic-scene material opts INTO flat shading
     // — which would collapse the tessellation floors above back into facets.
-    for (const rel of ['../scenes/place/PlaceScene.tsx', '../scenes/place/PlaceLife.tsx']) {
+    for (const rel of ['../scenes/place/PlaceScene.tsx', '../scenes/place/PlaceLife.tsx', '../scenes/place/placeFigure.tsx', '../scenes/place/RiverFishery.tsx']) {
       const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
       expect(src.includes('flatShading'), `${rel} must stay smooth-shaded`).toBe(false)
     }
@@ -262,8 +262,9 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
   it('the scene builds the trunk cone from the shared radius, not a literal', () => {
     // A legged figure shortens the cone; scaling its base radius by the same
     // factor keeps the TAPER identical, which is what makes the clearance above
-    // hold for the children too.
-    const rel = '../scenes/place/PlaceLife.tsx'
+    // hold for the children too. (The Figure lives in placeFigure.tsx since
+    // work-order 1245.)
+    const rel = '../scenes/place/placeFigure.tsx'
     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
     expect(src.includes('L.bodyRadius * (trunkH / bodyH)')).toBe(true)
     expect(src.includes('coneGeometry args={[trunkRadius')).toBe(true)

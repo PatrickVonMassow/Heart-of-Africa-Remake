@@ -176,17 +176,6 @@ const AIM_CLEARANCE = 1.2
 export const JOIN_STAND_OFF = 2.4
 const JOIN_BEARINGS = 12
 
-function joinSpot(view: AdultWorkView, site: ErrandPoint, rand: () => number): ErrandPoint | null {
-  const start = rand() * Math.PI * 2
-  for (let k = 0; k < JOIN_BEARINGS; k++) {
-    const a = start + (k / JOIN_BEARINGS) * Math.PI * 2
-    const x = site.x + Math.cos(a) * JOIN_STAND_OFF
-    const z = site.z + Math.sin(a) * JOIN_STAND_OFF
-    if (view.standable(x, z)) return { x, z }
-  }
-  return null
-}
-
 export function createAdultWork(count: number, cfg: AdultWorkConfig, progress: readonly DigSiteProgress[] = []): AdultWorkState {
   return {
     clock: 0,
@@ -724,7 +713,16 @@ export function stepAdultWork(
       // is a solid body: a man sent to its centre stalls a walker's width off it
       // and never counts as arrived. Both stand BESIDE it, far enough apart not
       // to block each other.
-      const senderSpot = joinSpot(view, stand, rand)
+      // THE SENDER STANDS LANDWARD, THE CARRIER ON THE WATER SIDE (work-order
+      // 1245). The carrier comes back from the water, so a sender drawn on the
+      // water side stood in the way of the return: once the water path moved
+      // upstream with the children's stretch, the carrier of the reported
+      // Bambara errand (seed 1239784450) walked up behind the sender, never
+      // reached his spot and was let go by the stall watch. The sender now takes
+      // the side away from the water and points past the stand at the river.
+      // One draw is still taken, so every later draw of the stream is unchanged.
+      rand()
+      const senderSpot = facingSpot(view, stand, g.waterFoot)
       if (!senderSpot) continue
       // The carrier takes the FAR side, swept from straight opposite the sender:
       // drawing a second spot at random gave the same one wherever the caller's

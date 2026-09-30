@@ -1,5 +1,7 @@
-// THE VILLAGER'S DUGOUT (work-order 1237): its lane beside the children's bank
-// game, the 20 m it keeps from their stretch, and the cycle it paddles.
+// THE FISHERMEN'S DUGOUT (work-order 1237, rebuilt by 1245): its lane beside
+// the children's bank game, the 20 m it keeps from their stretch and from the
+// adults' water work, and the two-man drift-net cycle — every word from the net
+// man to the paddler, every word followed by the paddler's changed action.
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
@@ -10,18 +12,23 @@ import { BACKDROP_INNER_OFFSET, GROUND_DISC_OVERHANG } from './backdrop'
 import { bankDrawnReach, groundDiscShift, insidePlace } from './boundary'
 import { sharedLayout } from './layoutHarness'
 import { PLACE_RADIUS } from './layout'
-import { buildRiverBank } from './riverBank'
+import { bankFillSpot, bankWaterFoot, buildRiverBank } from './riverBank'
+import { basketRingViolation, createBasketRing, type BasketRing } from './fishBaskets'
 import {
   CANOE_PHASES,
-  CANOE_SEAT_AFT,
   canoeCycleSeconds,
   canoeLane,
+  canoeRangeGap,
   canoeStretchGap,
   createCanoe,
   lanePoint,
+  netFloats,
   stepCanoe,
+  unloadSeconds,
   type CanoePhase,
+  type CanoeState,
   type CanoeWord,
+  type PaddlerAction,
 } from './villagerCanoe'
 
 beforeAll(setupGeodata)
@@ -29,54 +36,57 @@ beforeAll(setupGeodata)
 const cfg = balance.villageLife.canoe
 const RIVER_VILLAGES = PLACES.filter((p) => p.kind === 'village' && buildRiverBank(p, PLACE_RADIUS)).map((p) => p.id)
 const SEEDS = [7, 4711, 394349866, 1425108822, 1838110026]
+const OBEY = 2.2
 
-describe('the canoe lane (work-order 1237 item 3)', () => {
+describe('the canoe lane (work-order 1245 items 9 and 10)', () => {
   it('has riverside villages to lay it at', () => {
     expect(RIVER_VILLAGES.length).toBeGreaterThanOrEqual(3)
   })
 
-  it.each(RIVER_VILLAGES)('%s: lies 7 m out, from s = +27 to +47 m downstream of the stretch centre', (id) => {
+  it.each(RIVER_VILLAGES)('%s: lies 7 m out, from s = −1 to +47 m downstream of the bank normal', (id) => {
     const layout = sharedLayout(id, 4711)
     const bank = layout.bank!
     const lane = canoeLane(bank)
-    const along = (p: { x: number; z: number }) => p.x * bank.fx + p.z * bank.fz - lane.origin
+    const along = (p: { x: number; z: number }) => p.x * bank.fx + p.z * bank.fz
     const out = (p: { x: number; z: number }) => p.x * bank.nx + p.z * bank.nz
-    const mid = { x: (bank.upstream.x + bank.downstream.x) / 2, z: (bank.upstream.z + bank.downstream.z) / 2 }
-    expect(along(mid)).toBeCloseTo(0, 9)
     expect(along(lane.start)).toBeCloseTo(cfg.laneStart, 9)
     expect(along(lane.end)).toBeCloseTo(cfg.laneEnd, 9)
     expect(out(lane.start) - bank.distance).toBeCloseTo(cfg.laneOut, 9)
     expect(out(lane.end) - bank.distance).toBeCloseTo(cfg.laneOut, 9)
-    expect(cfg.laneStart).toBe(27)
+    expect(cfg.laneStart).toBe(-1)
     expect(cfg.laneEnd).toBe(47)
     expect(cfg.laneOut).toBe(7)
     // Downstream of the children: the lane runs WITH the current from start to end.
     expect(along(lane.end)).toBeGreaterThan(along(lane.start))
+    // ... and downstream of their stretch altogether.
+    expect(along(lane.start)).toBeGreaterThan(along(bank.downstream))
   })
 
   it.each(RIVER_VILLAGES.flatMap((id) => SEEDS.map((seed) => [id, seed] as const)))(
-    '%s @%i: keeps at least 20 m from the children`s stretch',
+    '%s @%i: keeps at least 20 m from the children`s stretch AND from the adults` water work',
     (id, seed) => {
       const layout = sharedLayout(id, seed)
-      const lane = canoeLane(layout.bank!)
+      const bank = layout.bank!
+      const lane = canoeLane(bank)
       expect(layout.playRocks).not.toBeNull()
       expect(cfg.stretchGapMin).toBe(20)
       expect(canoeStretchGap(lane, layout.playRocks!)).toBeGreaterThanOrEqual(cfg.stretchGapMin)
+      // The water work: where the path lands, where the jar is filled, and
+      // the stand in the village where both of its words fall.
+      const sites = [bankWaterFoot(bank), bankFillSpot(bank), ...(layout.waterStand ? [layout.waterStand] : [])]
+      if (layout.waterPath) sites.push(layout.waterPath.head)
+      for (const p of sites) expect(canoeRangeGap(lane, p), JSON.stringify(p)).toBeGreaterThanOrEqual(cfg.stretchGapMin)
     },
   )
 
-  it.each(RIVER_VILLAGES)('%s: the landing, the trap and the boat standing place are walkable, drawn ground', (id) => {
+  it.each(RIVER_VILLAGES)('%s: the landing, the basket and the ashore stand are walkable, drawn ground', (id) => {
     const layout = sharedLayout(id, 4711)
     const bank = layout.bank!
     const lane = canoeLane(bank)
-    const stand = {
-      x: bank.nx * bank.distance + bank.fx * (lane.origin + 37),
-      z: bank.nz * bank.distance + bank.fz * (lane.origin + 37),
+    for (const [name, p] of [['basket', lane.basketSpot], ['ashore', lane.ashore]] as const) {
+      expect(insidePlace(layout, p.x, p.z, 0.3), name).toBe(true)
     }
-    for (const [name, p] of [['stand', stand], ['check', lane.checkStand]] as const) {
-      expect(insidePlace(layout, p.x, p.z), name).toBe(true)
-    }
-    // The bow on the sand lies inside the extended plateau, at the waterline.
+    // The bow on the sand lies inside the walkable lobe, at the waterline.
     const bow = {
       x: lane.berth.x - bank.nx * (cfg.hullLength / 2),
       z: lane.berth.z - bank.nz * (cfg.hullLength / 2),
@@ -84,53 +94,116 @@ describe('the canoe lane (work-order 1237 item 3)', () => {
     expect(insidePlace(layout, bow.x, bow.z)).toBe(true)
   })
 
-  it.each(RIVER_VILLAGES)('%s: the whole lane floats on drawn water, clear of the backdrop`s rim', (id) => {
+  it.each(RIVER_VILLAGES)('%s: the whole lane and the net float on drawn water, clear of the backdrop`s rim', (id) => {
     const layout = sharedLayout(id, 4711)
     const bank = layout.bank!
     const lane = canoeLane(bank)
     const discEdge = layout.radius + GROUND_DISC_OVERHANG
     const reach = bankDrawnReach(layout, discEdge)
     const half = cfg.hullLength / 2
-    for (let s = cfg.laneStart - half; s <= cfg.laneEnd + half; s += 0.5) {
-      const p = lanePoint(lane, s)
+    const onWater = (p: { x: number; z: number }, what: string, body: number) => {
       const along = p.x * bank.fx + p.z * bank.fz
-      expect(along).toBeLessThanOrEqual(Math.max(RIVER_HALF_LENGTH, reach.down))
-      expect(lane.out - bank.distance).toBeLessThan(RIVER_REACH)
+      const out = p.x * bank.nx + p.z * bank.nz
+      expect(along, what).toBeLessThanOrEqual(Math.max(RIVER_HALF_LENGTH, reach.down))
+      expect(along, what).toBeGreaterThanOrEqual(-Math.max(RIVER_HALF_LENGTH, reach.up))
+      expect(out - bank.distance, what).toBeLessThan(RIVER_REACH - 0.3)
+      expect(out - bank.distance, what).toBeGreaterThan(0.5)
       const rim = layout.radius + BACKDROP_INNER_OFFSET + groundDiscShift(layout, Math.atan2(p.z, p.x))
-      expect(Math.hypot(p.x, p.z) + cfg.hullBeam, `s=${s}`).toBeLessThan(rim)
+      expect(Math.hypot(p.x, p.z) + body, what).toBeLessThan(rim)
     }
+    for (let s = cfg.laneStart - half; s <= cfg.laneEnd + half; s += 0.5) onWater(lanePoint(lane, s), `s=${s}`, cfg.hullBeam)
+    // The net's floats at every point of a whole cycle.
+    const { states } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 1.2, { village: id })
+    for (const st of states) for (const f of st.floats) onWater(f, `${st.phase} float`, 0.1)
   })
 })
 
-/** Runs the canoe for `seconds` at a fixed step, recording each phase entry and every call. */
-function run(seconds: number, mayCall: (word: CanoeWord, t: number) => boolean = () => true, dt = 0.05) {
-  const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
-  const lane = canoeLane(bank)
-  const state = createCanoe(lane)
-  const phases: Array<{ phase: CanoePhase; t: number }> = [{ phase: state.phase, t: 0 }]
-  const calls: Array<{ word: CanoeWord; t: number; phase: CanoePhase; clock: number }> = []
-  const drops: number[] = []
-  const positions: Array<{ s: number; x: number; z: number; t: number; phase: CanoePhase }> = []
-  let t = 0
-  let draws = 0
-  const rand = () => [0.2, 0.9, 0.5][draws++ % 3]
-  while (t < seconds) {
-    const before = state.phase
-    const clock = state.clock + dt
-    const said = stepCanoe(state, lane, { mayCall: (w) => mayCall(w, t), drop: () => drops.push(t) }, dt, cfg, rand)
-    t += dt
-    if (said) calls.push({ word: said, t, phase: before, clock })
-    if (state.phase !== before) phases.push({ phase: state.phase, t })
-    positions.push({ s: state.s, x: state.x, z: state.z, t, phase: state.phase })
-  }
-  return { lane, bank, state, phases, calls, drops, positions }
+interface Sample {
+  t: number
+  phase: CanoePhase
+  s: number
+  x: number
+  z: number
+  yaw: number
+  paddler: PaddlerAction
+  net: number
+  inHull: number
+  floats: Array<{ x: number; z: number }>
 }
 
-describe('the canoe cycle (work-order 1237 item 4)', () => {
-  it('runs up, turn, down, land, trap, launch — and round again', () => {
-    const { phases } = run(canoeCycleSeconds(cfg, cfg.trapMaxSeconds) * 3)
+/**
+ * Runs the canoe for `seconds` at a fixed step, recording each phase entry and
+ * every word. The basket ring gets its empty basket back from a stand-in
+ * carrier `carrierDelay` seconds after each full one is set down.
+ */
+function run(
+  seconds: number,
+  options: {
+    say?: (word: CanoeWord, t: number) => 'said' | 'held' | 'silent'
+    dt?: number
+    village?: string
+    carrierDelay?: number
+    rand?: () => number
+  } = {},
+) {
+  const dt = options.dt ?? 0.05
+  const bank = buildRiverBank(PLACES.find((p) => p.id === (options.village ?? 'bambara-village'))!, PLACE_RADIUS)!
+  const lane = canoeLane(bank)
+  const state = createCanoe(lane)
+  const ring: BasketRing = createBasketRing(0)
+  const phases: Array<{ phase: CanoePhase; t: number }> = [{ phase: state.phase, t: 0 }]
+  const calls: Array<{ word: CanoeWord; t: number; phase: CanoePhase }> = []
+  const drops: number[] = []
+  const states: Sample[] = []
+  const actions: Array<{ t: number; action: PaddlerAction }> = []
+  let t = 0
+  let fullSince: number | null = null
+  let draws = 0
+  const rand = options.rand ?? (() => [0.2, 0.9, 0.5][draws++ % 3])
+  while (t < seconds) {
+    const before = state.phase
+    const said = stepCanoe(
+      state,
+      lane,
+      ring,
+      { say: (w) => (options.say ? options.say(w, t) : 'said'), drop: () => drops.push(t), obeyDelay: () => OBEY },
+      dt,
+      cfg,
+      rand,
+    )
+    t += dt
+    // The stand-in carrier: the full basket goes, an empty one comes back.
+    const full = ring.baskets.find((b) => b.at === 'bank' && b.fish > 0)
+    if (full && fullSince === null) fullSince = t
+    if (full && fullSince !== null && t - fullSince >= (options.carrierDelay ?? 0)) {
+      full.fish = 0
+      fullSince = null
+    }
+    expect(basketRingViolation(ring)).toBeNull()
+    if (said) calls.push({ word: said, t, phase: before })
+    if (state.phase !== before) phases.push({ phase: state.phase, t })
+    if (!actions.length || actions[actions.length - 1].action !== state.paddlerAction) actions.push({ t, action: state.paddlerAction })
+    states.push({
+      t,
+      phase: state.phase,
+      s: state.s,
+      x: state.x,
+      z: state.z,
+      yaw: state.yaw,
+      paddler: state.paddlerAction,
+      net: state.net,
+      inHull: state.inHull,
+      floats: netFloats(state, lane),
+    })
+  }
+  return { lane, bank, state, ring, phases, calls, drops, states, actions }
+}
+
+describe('the drift-net cycle (work-order 1245 item 1)', () => {
+  it('runs up, the DOWNSTREAM word, turn, down, haul, land, unload, the UPSTREAM word, launch — and round again', () => {
+    const { phases } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 3)
     const order = phases.map((p) => p.phase)
-    expect(order.length).toBeGreaterThan(12)
+    expect(order.length).toBeGreaterThan(20)
     for (let i = 1; i < order.length; i++) {
       const prev = CANOE_PHASES.indexOf(order[i - 1])
       expect(order[i]).toBe(CANOE_PHASES[(prev + 1) % CANOE_PHASES.length])
@@ -138,7 +211,7 @@ describe('the canoe cycle (work-order 1237 item 4)', () => {
   })
 
   it('takes the calibrated time over every leg', () => {
-    const { phases } = run(canoeCycleSeconds(cfg, cfg.trapMaxSeconds) * 2)
+    const { phases } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 2)
     const span = cfg.laneEnd - cfg.laneStart
     const lengths = new Map<CanoePhase, number[]>()
     for (let i = 0; i + 1 < phases.length; i++) {
@@ -146,68 +219,150 @@ describe('the canoe cycle (work-order 1237 item 4)', () => {
       list.push(phases[i + 1].t - phases[i].t)
       lengths.set(phases[i].phase, list)
     }
+    // The first up leg starts at the lane's end, so every up leg is whole.
     for (const up of lengths.get('up')!) expect(up).toBeCloseTo(span / cfg.upstreamSpeed, 0)
     for (const turn of lengths.get('turn')!) expect(turn).toBeCloseTo(cfg.turnSeconds, 0)
     for (const down of lengths.get('down')!) expect(down).toBeCloseTo(span / cfg.downstreamSpeed, 0)
+    for (const haul of lengths.get('haul')!) expect(haul).toBeCloseTo(cfg.haulSeconds, 0)
     for (const land of lengths.get('land')!) expect(land).toBeCloseTo(cfg.landSeconds, 0)
-    for (const trap of lengths.get('trap')!) {
-      expect(trap).toBeGreaterThanOrEqual(cfg.trapMinSeconds - 0.1)
-      expect(trap).toBeLessThanOrEqual(cfg.trapMaxSeconds + 0.1)
+    for (const unload of lengths.get('unload')!) {
+      expect(unload).toBeGreaterThanOrEqual(unloadSeconds(cfg.catchMin, cfg) - 0.1)
+      expect(unload).toBeLessThanOrEqual(unloadSeconds(cfg.catchMax, cfg) + 0.1)
     }
+    for (const call of [...lengths.get('callDown')!, ...lengths.get('callUp')!]) expect(call).toBeCloseTo(OBEY, 0)
     for (const launch of lengths.get('launch')!) expect(launch).toBeCloseTo(cfg.launchSeconds, 0)
-    // Regionally plausible paces: 0.8 m/s against the current, 1.5 m/s with it.
+    // A 49 m lane instead of 20 m (item 9), at regionally plausible paces.
+    expect(span).toBe(48)
     expect(cfg.upstreamSpeed).toBeCloseTo(0.8, 9)
     expect(cfg.downstreamSpeed).toBeCloseTo(1.5, 9)
-    expect(cfg.turnSeconds).toBeCloseTo(6, 9)
-    expect(cfg.trapMinSeconds).toBe(20)
-    expect(cfg.trapMaxSeconds).toBe(40)
   })
 
-  it('calls the direction of each leg once, shortly after it is under way', () => {
-    const { calls, phases } = run(canoeCycleSeconds(cfg, cfg.trapMaxSeconds) * 3)
-    const legs = phases.filter((p) => p.phase === 'up' || p.phase === 'down')
-    // Every leg that ran past its call delay called exactly once, its own word.
-    let judged = 0
-    for (let i = 0; i < legs.length; i++) {
-      const start = legs[i].t
-      const next = phases.find((p) => p.t > start)
+  it('the net man says DOWNSTREAM at the upstream end and UPSTREAM after the landing, each once per round', () => {
+    const { calls, phases } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 3)
+    const downs = calls.filter((c) => c.word === 'DOWNSTREAM')
+    const ups = calls.filter((c) => c.word === 'UPSTREAM')
+    expect(downs.length).toBeGreaterThanOrEqual(3)
+    expect(ups.length).toBeGreaterThanOrEqual(2)
+    expect(downs.every((c) => c.phase === 'callDown')).toBe(true)
+    expect(ups.every((c) => c.phase === 'callUp')).toBe(true)
+    // Exactly one word per call phase.
+    for (const p of phases.filter((q) => q.phase === 'callDown' || q.phase === 'callUp')) {
+      const next = phases.find((q) => q.t > p.t)
       if (!next) continue
-      const inLeg = calls.filter((c) => c.t > start && c.t <= next.t)
-      expect(inLeg).toHaveLength(1)
-      expect(inLeg[0].word).toBe(legs[i].phase === 'up' ? 'UPSTREAM' : 'DOWNSTREAM')
-      expect(inLeg[0].t - start).toBeGreaterThanOrEqual(cfg.callDelaySeconds - 1e-6)
-      expect(inLeg[0].t - start).toBeLessThan(cfg.callDelaySeconds + 0.2)
-      judged++
+      expect(calls.filter((c) => c.t > p.t && c.t <= next.t)).toHaveLength(1)
     }
-    expect(judged).toBeGreaterThanOrEqual(4)
-    // Nothing else speaks: no call while turning, landing, at the trap or launching.
-    expect(calls.every((c) => c.phase === 'up' || c.phase === 'down')).toBe(true)
+    // Nothing is said anywhere else in the cycle.
+    expect(calls.every((c) => c.phase === 'callDown' || c.phase === 'callUp')).toBe(true)
   })
 
-  it('waits for the floor, and gives the word up when the leg ends unspoken', () => {
-    // The floor is never granted on the down leg.
-    const held = run(canoeCycleSeconds(cfg, cfg.trapMaxSeconds) * 2, (w) => w === 'UPSTREAM')
-    const downLegs = held.phases.filter((p) => p.phase === 'land').length
-    expect(held.drops.length).toBeGreaterThanOrEqual(downLegs)
-    expect(held.calls.some((c) => c.word === 'DOWNSTREAM')).toBe(false)
-    // A late grant is still one call, no more.
+  it('every word is followed by the paddler`s changed action, and by nothing else first', () => {
+    const { calls, actions } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 3)
+    const after = (t: number) => actions.find((a) => a.t > t + 1e-9 && a.action !== 'hold')
+    for (const c of calls) {
+      const next = after(c.t)
+      if (!next) continue
+      // DOWNSTREAM: he stops paddling and swings the bow out. UPSTREAM: he takes
+      // up hard strokes again.
+      expect(next.action).toBe(c.word === 'DOWNSTREAM' ? 'swing' : 'hard')
+      // ... once the word has been said and heard out, not before.
+      expect(next.t - c.t).toBeGreaterThanOrEqual(OBEY - 0.1)
+      expect(next.t - c.t).toBeLessThan(OBEY + 0.2)
+    }
+    // And while the word is owed he only holds the boat.
+    const { states } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY))
+    for (let i = 1; i < states.length; i++) {
+      const s = states[i]
+      // (The step a phase is entered on still shows the action it ended.)
+      if ((s.phase === 'callDown' || s.phase === 'callUp') && states[i - 1].phase === s.phase) expect(s.paddler).toBe('hold')
+    }
+    // The legs themselves: hard strokes up, steering only down, both hauling.
+    for (const s of states) {
+      if (s.phase === 'up') expect(s.paddler).toBe('hard')
+      if (s.phase === 'down') expect(s.paddler).toBe('steer')
+      if (s.phase === 'haul') expect(s.paddler).toBe('haul')
+    }
+  })
+
+  it('pays the net out on the turn, holds it in the water downstream, hauls it in at the end', () => {
+    const { states } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 1.5)
+    for (const s of states) {
+      if (s.phase === 'up' || s.phase === 'callDown' || s.phase === 'land' || s.phase === 'unload') {
+        expect(s.net).toBe(0)
+        expect(s.floats).toHaveLength(0)
+      }
+      if (s.phase === 'down') {
+        expect(s.net).toBe(1)
+        expect(s.floats).toHaveLength(cfg.netFloats)
+      }
+    }
+    // Out while turning, in while hauling — within each turn and each haul.
+    for (let i = 1; i < states.length; i++) {
+      const [a, b] = [states[i - 1], states[i]]
+      if (a.phase !== b.phase) continue
+      if (b.phase === 'turn') expect(b.net).toBeGreaterThanOrEqual(a.net)
+      if (b.phase === 'haul') expect(b.net).toBeLessThanOrEqual(a.net)
+    }
+  })
+
+  it('brings up a recognisable catch that lies in the hull until the landing, then fills the basket', () => {
+    const { states, ring } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 1.05, { carrierDelay: 1e9 })
+    const haulEnd = states.filter((s) => s.phase === 'land')[0]
+    expect(haulEnd.inHull).toBeGreaterThanOrEqual(cfg.catchMin)
+    expect(haulEnd.inHull).toBeLessThanOrEqual(cfg.catchMax)
+    // Never vanish: from the haul's end to the unload the count stands.
+    for (const s of states.filter((q) => q.phase === 'land')) expect(s.inHull).toBe(haulEnd.inHull)
+    // Handed over into the basket, which stands on the bank full afterwards.
+    const full = ring.baskets.find((b) => b.at === 'bank' && b.fish > 0)
+    expect(full?.fish).toBe(haulEnd.inHull)
+    expect(states[states.length - 1].inHull).toBe(0)
+    // Fish of a hand to a forearm.
+    expect(cfg.fishLengthMin).toBeGreaterThanOrEqual(0.25)
+    expect(cfg.fishLengthMax).toBeLessThanOrEqual(0.4)
+  })
+
+  it('waits at the landing for an empty basket rather than conjuring one', () => {
+    const { state, ring } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 2.2, { carrierDelay: 1e9 })
+    // The stand-in carrier never came: one full basket on the bank, the other
+    // with nobody — the boat stands at the landing with its second catch.
+    expect(state.phase).toBe('unload')
+    expect(state.basketWait).toBeGreaterThan(0)
+    expect(state.inHull).toBeGreaterThanOrEqual(cfg.catchMin)
+    expect(ring.baskets.filter((b) => b.fish > 0)).toHaveLength(1)
+  })
+
+  it('waits for the floor, and goes on unspoken when the word is held too long or may not be said', () => {
+    // Held for ever: the boat waits `wordWaitSeconds`, drops the word, goes on.
+    const held = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 2, { say: () => 'held' })
+    expect(held.calls).toHaveLength(0)
+    expect(held.drops.length).toBeGreaterThanOrEqual(3)
+    const waits = held.phases.filter((p) => p.phase === 'callDown').map((p) => {
+      const next = held.phases.find((q) => q.t > p.t)
+      return next ? next.t - p.t : null
+    }).filter((w): w is number => w !== null)
+    for (const w of waits) expect(w).toBeCloseTo(cfg.wordWaitSeconds, 0)
+    // Not to be said at all (ROCK not yet heard): on at once.
+    const silent = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY), { say: () => 'silent' })
+    expect(silent.calls).toHaveLength(0)
+    const pause = silent.phases.find((p) => p.phase === 'callDown')!
+    const next = silent.phases.find((q) => q.t > pause.t)!
+    expect(next.t - pause.t).toBeLessThan(0.2)
+    // A late grant is still one word, no more.
     let grantAfter = 0
-    const late = run(canoeCycleSeconds(cfg, cfg.trapMaxSeconds), (w, t) => {
-      if (w !== 'UPSTREAM') return true
-      grantAfter ||= t + 8
-      return t >= grantAfter
+    const late = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY), {
+      say: (w, t) => {
+        if (w !== 'DOWNSTREAM') return 'said'
+        grantAfter ||= t + 5
+        return t >= grantAfter ? 'said' : 'held'
+      },
     })
-    const firstTurn = late.phases.find((p) => p.phase === 'turn')!.t
-    const ups = late.calls.filter((c) => c.word === 'UPSTREAM' && c.t <= firstTurn)
-    expect(ups).toHaveLength(1)
-    expect(ups[0].clock).toBeGreaterThan(cfg.callDelaySeconds + 7)
+    expect(late.calls.filter((c) => c.word === 'DOWNSTREAM')).toHaveLength(1)
   })
 
   it('never leaves its range and never despawns', () => {
-    const { positions, lane, bank } = run(canoeCycleSeconds(cfg, cfg.trapMaxSeconds) * 4)
-    const along = (p: { x: number; z: number }) => p.x * bank.fx + p.z * bank.fz - lane.origin
+    const { states, lane, bank } = run(canoeCycleSeconds(cfg, cfg.catchMax, OBEY) * 4)
+    const along = (p: { x: number; z: number }) => p.x * bank.fx + p.z * bank.fz
     const out = (p: { x: number; z: number }) => p.x * bank.nx + p.z * bank.nz
-    for (const p of positions) {
+    for (const p of states) {
       expect(Number.isFinite(p.x) && Number.isFinite(p.z)).toBe(true)
       expect(along(p)).toBeGreaterThanOrEqual(cfg.laneStart - 1e-6)
       expect(along(p)).toBeLessThanOrEqual(cfg.laneEnd + 1e-6)
@@ -219,11 +374,11 @@ describe('the canoe cycle (work-order 1237 item 4)', () => {
   it('heads against the current going up and with it going down; bow to the shore at the landing', () => {
     const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
     const lane = canoeLane(bank)
-    const state = createCanoe(lane)
+    const state: CanoeState = createCanoe(lane)
+    const ring = createBasketRing(0)
     const seen = new Map<CanoePhase, { bx: number; bz: number }>()
-    for (let i = 0; i < 4000 && seen.size < CANOE_PHASES.length; i++) {
-      stepCanoe(state, lane, { mayCall: () => true }, 0.05, cfg, () => 0)
-      // Sample the middle of a phase, where the heading has settled.
+    for (let i = 0; i < 8000 && seen.size < CANOE_PHASES.length; i++) {
+      stepCanoe(state, lane, ring, { say: () => 'said', obeyDelay: () => OBEY }, 0.05, cfg, () => 0)
       if (!seen.has(state.phase) && state.clock > 1 && (state.phase !== 'land' || state.clock >= cfg.landSeconds - 0.1)) {
         seen.set(state.phase, { bx: Math.sin(state.yaw), bz: Math.cos(state.yaw) })
       }
@@ -234,43 +389,28 @@ describe('the canoe cycle (work-order 1237 item 4)', () => {
     expect(up.bx * bank.fx + up.bz * bank.fz).toBeCloseTo(-1, 6)
     expect(down.bx * bank.fx + down.bz * bank.fz).toBeCloseTo(1, 6)
     expect(land.bx * -bank.nx + land.bz * -bank.nz).toBeGreaterThan(0.99)
-    // The paddler is out at the trap while he checks it, and back aboard after.
-    expect(state.paddler.inBoat || state.phase === 'trap').toBe(true)
   })
 
-  it('turns the paddler smoothly out of the seat to the trap and back aboard', () => {
+  it('moves the net man smoothly ashore and back aboard, never jumping', () => {
     const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
     const lane = canoeLane(bank)
     const state = createCanoe(lane)
+    const ring = createBasketRing(0)
     const dt = 0.02
-    // A heading may turn, never jump: 0.1 rad per 20 ms is a full turn in ~1.3 s.
-    const maxStep = 0.1
-    let prev: number | null = null
+    let prev: { x: number; z: number } | null = null
     let worst = 0
-    let leftSeat = false
-    let sawTrap = false
+    let ashore = false
     for (let i = 0; i < 20000; i++) {
-      const before = state.phase
-      stepCanoe(state, lane, { mayCall: () => true }, dt, cfg, () => 0)
-      const inTrap = before === 'trap' || state.phase === 'trap'
-      if (inTrap || before === 'land' || state.phase === 'launch') {
-        if (prev !== null) {
-          let d = Math.abs(state.paddler.yaw - prev) % (Math.PI * 2)
-          if (d > Math.PI) d = Math.PI * 2 - d
-          worst = Math.max(worst, d)
-        }
-        prev = state.paddler.yaw
+      stepCanoe(state, lane, ring, { say: () => 'said', obeyDelay: () => OBEY }, dt, cfg, () => 0)
+      if (state.phase === 'unload' || state.phase === 'callUp') {
+        if (prev) worst = Math.max(worst, Math.hypot(state.netMan.x - prev.x, state.netMan.z - prev.z))
+        prev = { x: state.netMan.x, z: state.netMan.z }
+        if (!state.netMan.inBoat) ashore = true
       } else prev = null
-      if (state.phase === 'trap') {
-        sawTrap = true
-        const seatX = state.x - Math.sin(state.yaw) * CANOE_SEAT_AFT
-        const seatZ = state.z - Math.cos(state.yaw) * CANOE_SEAT_AFT
-        if (!state.paddler.inBoat && Math.hypot(state.paddler.x - seatX, state.paddler.z - seatZ) > 0.5) leftSeat = true
-      }
-      if (sawTrap && state.phase === 'up') break
+      if (ashore && state.phase === 'launch') break
     }
-    expect(sawTrap).toBe(true)
-    expect(leftSeat).toBe(true)
-    expect(worst).toBeLessThan(maxStep)
+    expect(ashore).toBe(true)
+    // At most a brisk step's worth per 20 ms frame.
+    expect(worst).toBeLessThan(0.1)
   })
 })

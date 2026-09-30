@@ -2045,13 +2045,12 @@ function PlaceRiver({
   const foamCount = useUi(effectivePlaceRiverFoam)
   const waterOctaves = useUi(effectiveWaterDetailOctaves)
   const water = useMemo(() => createPlaceRiverMaterial(waterOctaves), [waterOctaves])
-  // Upstream the shore spans exactly the chord the ground plate's cut makes, so
-  // its inland edge ends where the plate's rim curves away from the waterline;
-  // downstream it runs on as far as the widened lobe's shifted disc does
-  // (work-order 1237), and the water with it.
+  // The shore runs on, upstream and downstream alike, as far as the widened
+  // lobe's shifted disc does (work-order 1237, symmetric since 1245), and the
+  // water with it.
   const reach = useMemo(() => bankDrawnReach(bounds, discEdge), [bounds, discEdge])
   const surface = useMemo(
-    () => buildRiverSurfaceGeometry(bank, RIVER_HALF_LENGTH, segments, Math.max(RIVER_HALF_LENGTH, reach.down)),
+    () => buildRiverSurfaceGeometry(bank, Math.max(RIVER_HALF_LENGTH, reach.up), segments, Math.max(RIVER_HALF_LENGTH, reach.down)),
     [bank, segments, reach],
   )
   const shore = useMemo(() => buildBankShoreGeometry(bank, reach.up, reach.down), [bank, reach])

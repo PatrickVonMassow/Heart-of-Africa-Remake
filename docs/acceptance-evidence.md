@@ -273,6 +273,30 @@ hand against the instanced stone's own flank at that height and bearing
 that shot — the same code path at a longer configured value — and put back
 afterwards.
 
+THE FISHERMEN AND THE MOVED STRETCH (work-order 1245). The bank is walkable
+to the water about ±45 m of the bank normal, the children's stretch lies about
+28 m upstream and the fishermen's lane runs from about 1 to 47 m downstream,
+20 m clear of the stretch and of the water work. Pure Vitest:
+`src/scenes/place/bankLobe.test.ts` (symmetric plateau; the extent check —
+plate, shore, water, routing and backdrop rim reach the upstream plateau end on
+every river village, which a failing village is named by),
+`src/scenes/place/villagerCanoe.test.ts` (the two-man drift-net cycle, every word
+from the net man to the paddler followed by the paddler's changed action, the
+catch, both 20 m gaps) and `src/scenes/place/fishFire.test.ts` (two baskets that
+never become more or get lost, the wait budgets, the rack's steady fill, the
+eater's cadence, the fire's stands). Browser: `polish.mjs` section
+`villager-canoe` photographs the three standing places
+(`1245-fishers-haul-from-boat-stand`, `1245-fishers-upstream-word-from-boat-stand`,
+`1245-village-children-from-behind-upstream-rock`, `1245-fishers-fire`); the
+stage's own photo stand (`bankPlayRocksView`, 0.8 of the stretch back) moved
+with the stretch, so `collision.mjs` `54-collision-play-rocks` and the
+`communication.mjs` stand are retaken there. Extent measured at the three river
+villages (walk edge 40.0-40.9 m): the top of the bank is walkable 45.6-46.6 m
+to each side of the normal (46.9-47.9 m at the waterline), the upstream plateau
+end lies 60.6-62.0 m from the centre at the top of the bank (67.2-68.5 m at the
+wade line), terrain, shore, water and routing reach past it on all three, and
+the stretch keeps its full 21 m span on each.
+
 THE CHIEF'S MESSAGE ON THE DRUMS (§13.4, docs/communication-poc-spec.md,
 point 486). Asked for outside his hut — in his village alone, with no
 precondition left since the gift/goodwill state retired (§12) — the chief has

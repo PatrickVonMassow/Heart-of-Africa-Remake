@@ -350,9 +350,16 @@ export const WATER_PATH_HEAD_RADIUS = 15
  *  with no head at all, so it steps half a metre at a time now. The first clear
  *  run still wins, and a candidate whose own head is occupied dies on the first
  *  sample, so the finer ladder costs little. */
-export const WATER_PATH_HEAD_RADII = [
+const WATER_PATH_HEAD_INNER_RADII = [
   15, 14.5, 15.5, 14, 16, 13.5, 16.5, 13, 17, 12.5, 17.5, 12, 18, 11.5, 18.5, 11, 19, 19.5, 20, 20.5, 21,
 ] as const
+/** The OUTER rungs (work-order 1245), tried only once the inner ladder has
+ *  failed with and without compound gates, so no layout that found its head
+ *  before moves: since the water path lands beyond the children's stretch,
+ *  ~28 m upstream, the walk from the inner rungs is long enough that a dense
+ *  plan left 4 of 3000 river layouts without any clear straight lane. */
+const WATER_PATH_HEAD_OUTER_RADII = [21.5, 22, 22.5, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27] as const
+export const WATER_PATH_HEAD_RADII = [...WATER_PATH_HEAD_INNER_RADII, ...WATER_PATH_HEAD_OUTER_RADII] as const
 
 /** How far to either side of the water's own bearing the head may be swept, in
  *  degrees, to find a straight walk that clears the settlement's buildings. */
@@ -1830,6 +1837,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     {
       free: (px, pz) => standingClear(standableAt(px, pz), px, pz, WALKER_RADIUS),
       fabric: fabricOf(dwellings, interactives),
+      // BESIDE THE BANK STAGE (design.md §13.4, work-order 1245): the stage
+      // moved upstream off the bank normal, and a quarter left among the huts
+      // on the far side called RIVER from 47 m off the stand the game is
+      // photographed from, past the CALL register's reach. A preference only:
+      // no floor of the search is given up for it.
+      near: bank ? { x: bank.bank.x, z: bank.bank.z, within: balance.villageLife.bankGame.quarterWithin } : undefined,
     },
   )
   /** Whether a body of radius `r` would stand in the children's quarter. */
@@ -1938,11 +1951,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // steps, and at each bearing a little nearer and a little further out — the
     // first head that gives a clear walk wins, so the track stays as near the
     // direct line as the plan and the children's lane allow.
-    const findHeadHere = (solids: readonly Collider[]): BankPoint | null => {
+    const findHeadHere = (
+      solids: readonly Collider[],
+      radii: readonly number[] = WATER_PATH_HEAD_INNER_RADII,
+    ): BankPoint | null => {
       for (let step = 0; step <= WATER_PATH_HEAD_SWEEP; step++) {
         for (const sign of step === 0 ? [1] : [-1, 1]) {
           const a = base + sign * step * (Math.PI / 180)
-          for (const r of WATER_PATH_HEAD_RADII) {
+          for (const r of radii) {
             const cand = { x: Math.cos(a) * r, z: Math.sin(a) * r }
             if (!isFree(cand.x, cand.z, 2.0, WALKER_RADIUS)) continue
             if (inPlayEarshot(cand.x, cand.z)) continue
@@ -1953,7 +1969,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       return null
     }
     clearRun = clearRunHere
-    findHead = findHeadHere
+    findHead = (solids) => findHeadHere(solids) ?? findHeadHere(solids, WATER_PATH_HEAD_OUTER_RADII)
     let head = findHeadHere(colliders)
     if (!head && compoundFences.size > 0) {
       const fixed = colliders.filter((c) => !compoundColliders.has(c))
@@ -1977,6 +1993,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         }
       }
     }
+    // Only where neither the inner ladder nor a gate gives a lane are the outer
+    // rungs asked (work-order 1245).
+    if (!head) head = findHeadHere(colliders, WATER_PATH_HEAD_OUTER_RADII)
     devAssert(head !== null, 'water-path-missing', () => `${place.id}@${seed}: no clear water lane, even with compound gates`)
     if (!head) {
       // Fail closed if a future plan breaks the invariant: never draw through

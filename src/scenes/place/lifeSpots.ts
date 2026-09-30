@@ -272,8 +272,14 @@ export function childPlayGround(
      *  standing against the village. */
     fabric?: ReadonlyArray<readonly [number, number]>
     bearings?: number
+    /** A point the ground should lie NEAR (work-order 1245 — the bank
+     *  village's quarter lies BESIDE its bank stage, design.md §13.4, wherever
+     *  the stage is put): among the grounds that meet every floor, one whose
+     *  centre lies within `within` of it wins. Never bought with a floor. */
+    near?: { x: number; z: number; within: number }
   } = {},
 ): PlayGround {
+  const near = options.near ?? null
   const bearings = options.bearings ?? 64
   const rMax = Math.max(1, Math.min(playRadius, walkRadius))
   const rMin = Math.min(rMax, MIN_PLAY_RADIUS)
@@ -350,14 +356,20 @@ export function childPlayGround(
   // that meets BOTH floors wins, and only where the settlement offers no such
   // ground does the openness floor give way — never the separation, which is
   // what the whole placement exists for.
-  const picked: { best: PlayGround | null; both: PlayGround | null } = { best: null, both: null }
+  //
+  // A `near` point is a PREFERENCE inside this rank only (work-order 1245): a
+  // ground that meets both floors AND lies near it wins over a better-scoring
+  // one further off, and no floor is ever given up to be near.
+  const picked: { best: PlayGround | null; both: PlayGround | null; near: PlayGround | null } = { best: null, both: null, near: null }
   eachCandidate((x, z, r, clearance) => {
     if (clearance < minClearance) return
     const here = measure(x, z, r, clearance)
     if (!picked.best || score(here) > score(picked.best)) picked.best = here
     if (here.fabric < MIN_FABRIC || here.openness < MIN_OPENNESS) return
     if (!picked.both || score(here) > score(picked.both)) picked.both = here
+    if (near && Math.hypot(x - near.x, z - near.z) <= near.within && (!picked.near || score(here) > score(picked.near))) picked.near = here
   })
+  if (picked.near) return picked.near
   if (picked.both) return picked.both
   const separated = picked.best
   if (separated && separated.fabric >= MIN_FABRIC) return separated

@@ -871,6 +871,13 @@ interface BalanceConfig {
       /** Dev-mode alarm (point 589): a round that could speak and has said
        *  nothing for this long raises `bank-speech-silent`. */
       roundSilenceSeconds: number
+      /** Where the children's stretch is centred along the bank, in metres
+       *  DOWNSTREAM of the settlement's bank normal (negative: upstream;
+       *  work-order 1245). */
+      stretchCentre: number
+      /** How far the children's roaming quarter's centre may lie from the
+       *  middle of their bank stretch (work-order 1245), in metres. */
+      quarterWithin: number
     }
     /** The adults' water errands and paired digging, which teach RIVER and DIG
      *  (work-order point 483). */
@@ -901,41 +908,104 @@ interface BalanceConfig {
        *  settlement is entered (like the children's count), so an edit takes
        *  effect on the next visit rather than mid-scene. */
       villagerCount: number
+      /** How far beyond the upstream end of the children's stretch the water
+       *  path lands, in metres along the bank (work-order 1245). */
+      waterFootBeyond: number
     }
-    /** The villager's dugout canoe beside the children's bank game (work-order
-     *  1237): a fisherman paddling his own lane up and down the river, calling
-     *  the direction word of each leg. Distances in metres along the bank (s,
-     *  downstream of the children's stretch centre) and out from the waterline. */
+    /** The fishermen's dugout beside the children's bank game (work-order
+     *  1237, two men and a drift net since 1245). Distances in metres along
+     *  the bank (s, downstream of the settlement's bank normal) and out from
+     *  the waterline. */
     canoe: {
       /** How far out from the waterline the lane lies. */
       laneOut: number
       /** The lane's upstream and downstream ends, as s. */
       laneStart: number
       laneEnd: number
-      /** The least distance the lane keeps from the children's stretch: a
-       *  10 m hearing zone round the stretch plus the 10 m hearing radius. */
+      /** The least distance the range keeps from the children's stretch and
+       *  from the adults' water-work sites: a 10 m hearing zone round each
+       *  plus the 10 m hearing radius. */
       stretchGapMin: number
       /** Ground speed against the current, and carried with it (m/s). */
       upstreamSpeed: number
       downstreamSpeed: number
-      /** The bow swinging out into the current at the upstream end. */
+      /** The bow swinging out into the current at the upstream end, while the
+       *  net is paid out. */
       turnSeconds: number
+      /** Both men hauling the net in at the downstream end. */
+      haulSeconds: number
       /** Running the bow onto the sand, and pushing back off to the lane. */
       landSeconds: number
       launchSeconds: number
-      /** How long he checks the fish trap at the landing: drawn per landing. */
-      trapMinSeconds: number
-      trapMaxSeconds: number
-      /** Stepping from his seat to the trap, and back. */
+      /** The net man stepping between his seat and the bank, lifting or
+       *  setting down the basket, and one fish handed over into it. */
       stepSeconds: number
-      /** Into a leg before he calls its direction — once visibly under way. */
-      callDelaySeconds: number
-      /** One paddle stroke against the current, and one steering stroke. */
+      liftSeconds: number
+      fillSecondsPerFish: number
+      /** The longest a word waits for the settlement's floor before the boat
+       *  goes on unspoken (the floor then forgets it). */
+      wordWaitSeconds: number
+      /** Fish per haul, drawn per haul, and their length (m). */
+      catchMin: number
+      catchMax: number
+      fishLengthMin: number
+      fishLengthMax: number
+      /** The drift net's float line: its length trailing behind, its reach
+       *  out into the river, and how many floats show it. */
+      netLength: number
+      netReach: number
+      netFloats: number
+      /** One paddle stroke against the current, one steering stroke, and one
+       *  pull of the net hand over hand. */
       strokeSeconds: number
       steerStrokeSeconds: number
+      haulStrokeSeconds: number
       /** The dugout's length and beam. */
       hullLength: number
       hullBeam: number
+    }
+    /** The fishermen's own fire by the landing (work-order 1245): the carrier,
+     *  the griller, the smoking rack and the eater. */
+    fishFire: {
+      /** The fire: this far upstream of the landing and inland of the top of
+       *  the bank (m). */
+      fireBack: number
+      fireInland: number
+      /** Walking paces (m/s). */
+      carrierPace: number
+      eaterPace: number
+      /** Setting down or taking up a basket or a fish. */
+      liftSeconds: number
+      /** How long before the full basket is set down the carrier is meant to
+       *  be back at the bank. */
+      carrierLeadSeconds: number
+      /** The least time one fish takes to gut. */
+      gutMinSecondsPerFish: number
+      /** Fish at the carrier's fire at the start, still to be gutted. */
+      startFish: number
+      /** Fish over the embers at once, and how long each grills. */
+      grillSlots: number
+      grillSeconds: number
+      /** The griller's handling: a fish off the board, a turn, onto the
+       *  rack, and the driest into the storage basket. */
+      takeSeconds: number
+      turnSeconds: number
+      laySeconds: number
+      packSeconds: number
+      /** The fill the rack is kept at. */
+      rackFill: number
+      /** Smoked fish in the storage basket at the start. */
+      storageStart: number
+      /** The eater: how often he comes (s, with a spread 0..1), how long a
+       *  fish takes to eat and one bite, and how far toward the village he
+       *  goes back to. */
+      eaterIntervalSeconds: number
+      eaterIntervalSpread: number
+      eatSeconds: number
+      biteSeconds: number
+      eaterHomeBack: number
+      /** The wait budget per round, boat and carrier alike (s, averaged). */
+      waitBudgetSeconds: number
     }
     /** The weaver's loom (work-order 1157): the station that shows weaving AND
      *  teaches UPSTREAM/DOWNSTREAM a second time, on a walking body instead of
@@ -1698,6 +1768,23 @@ export const balance: BalanceConfig = {
       // cycle whose boulder proves unreachable says nothing at all. Roughly
       // half again over that, so only a round that has genuinely stopped speaking trips it.
       roundSilenceSeconds: 180,
+      // THE STRETCH MOVED UPSTREAM (work-order 1245, user 30.09.2026),
+      // calibratable: with the symmetric ±45 m bank the stretch's upstream reach
+      // matches the dugout's downstream one, and its span (21 m) stays inside
+      // the upstream plateau with `BANK_STRETCH_PLATEAU_MARGIN` to spare. The
+      // spec's ≈ −29 measured one metre short: at −29 the water path beyond the
+      // stretch found no clear straight lane in 1 of ~450 river layouts
+      // (mandinka-village@1479265250); at −28 with `waterFootBeyond` 8.5, none
+      // of 900 (three villages, 2 x 150 seeds).
+      stretchCentre: -28,
+      // Calibratable (work-order 1245): the quarter lies BESIDE the stage
+      // (design.md §13.4) wherever a ground that keeps every floor lies this
+      // near; measured on the three river villages at five seeds, 40 m seats 12
+      // of 15 near (RIVER from the quarter within 26 m of the stage's stand),
+      // and the other three keep their village ground 52-56 m off.
+      // OPEN: those three cannot be seated near without giving up the adults'
+      // hearing separation; their RIVER call is not heard at the stand.
+      quarterWithin: 40,
     },
     // The adults' errands (work-order point 483). Calibratable starting values
     // (educated guess, CLAUDE.md §2): slower than the children's chatter,
@@ -1736,7 +1823,11 @@ export const balance: BalanceConfig = {
       // walk word unspoken". 300 s is 3.6x the measured straight line, and a
       // genuinely stuck villager is still let go by `stallSeconds` below long
       // before it. Calibratable (CLAUDE.md §2).
-      errandSeconds: 300,
+      // RE-SIZED AGAIN BY WORK-ORDER 1245: the water path moved upstream with the
+      // children's stretch, and the worst stand-to-fill leg grew to about 62 m
+      // (bambara-village seed 1: 150.6 s of straight round trip, 327 s once
+      // doubled for bends and given its dwell and stall). 360 s covers it.
+      errandSeconds: 360,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
       // without shortening the straight line, and a fifteenth of the backstop
@@ -1745,6 +1836,14 @@ export const balance: BalanceConfig = {
       stallSeconds: 20,
       pace: 1.25, // an unhurried working walk
       villagerCount: 4,
+      // Calibratable (work-order 1245). The landing used to lie about 4.25 m
+      // beyond the upstream rock, but at a clearly different BEARING from the
+      // centre, since the stretch sat on the normal. Moved upstream, the
+      // stretch's upstream rock lies almost on the foot's radial line, so the
+      // straight track from the village to the foot runs past the rock unless
+      // the foot sits further out: at 4 m no river layout found a clear lane,
+      // at 8.5 all 900 measured did, with the fill spot still walkable.
+      waterFootBeyond: 8.5,
     },
     // THE LOOM (work-order 1157). Calibratable starting values (CLAUDE.md §2),
     // each stated against what it has to hold:
@@ -1773,24 +1872,77 @@ export const balance: BalanceConfig = {
     // s = +27 and +47 m, so it keeps 20 m from the children's stretch (10 m
     // hearing zone + 10 m hearing radius) and no standing place hears the
     // SPOKEN words of both; the call carries at the call register (34 m).
+    // THE FISHERMEN (work-order 1237, rebuilt by 1245). Calibratable starting
+    // values (educated guess, CLAUDE.md §2). The lane runs 7 m out from s = −2
+    // to s = +47 (49 m), 20 m clear of the children's stretch (centre −28, down
+    // to −17.5) and of the water work (−46.5). Paces: a dugout paddled against
+    // the Niger's current near the bank, and carried by it. One round comes to
+    // about 139 s (61 s up, 33 s down, the rest turning, hauling, landing and
+    // handing the catch over), which the carrier's round is timed against.
     canoe: {
       laneOut: 7,
-      laneStart: 27,
+      laneStart: -1,
       laneEnd: 47,
       stretchGapMin: 20,
       upstreamSpeed: 0.8,
       downstreamSpeed: 1.5,
       turnSeconds: 6,
+      haulSeconds: 10,
       landSeconds: 6,
       launchSeconds: 6,
-      trapMinSeconds: 20,
-      trapMaxSeconds: 40,
       stepSeconds: 1.5,
-      callDelaySeconds: 3,
+      liftSeconds: 0.8,
+      fillSecondsPerFish: 0.9,
+      // Well inside the floor's own 240 s hold, so a held word is let go by
+      // the boat rather than forced out by the floor.
+      wordWaitSeconds: 12,
+      // A drift net of the middle Niger brings a handful of fish per drift,
+      // Nile perch young and tilapia of a hand to a forearm (user 30.09.2026:
+      // "recognisable, not stylised").
+      catchMin: 4,
+      catchMax: 8,
+      fishLengthMin: 0.25,
+      fishLengthMax: 0.4,
+      // The drawn water reaches 10 m out from the waterline; the lane is 7 m
+      // out, so the float line reaches 2.2 m further and trails behind.
+      netLength: 8,
+      netReach: 2,
+      netFloats: 10,
       strokeSeconds: 1.3,
       steerStrokeSeconds: 3,
+      haulStrokeSeconds: 1.6,
       hullLength: 5.5,
       hullBeam: 0.62,
+    },
+    // THE FISHERMEN'S FIRE (work-order 1245). Calibratable (CLAUDE.md §2). The
+    // carrier's gutting fills his round up to the boat's (`gutSecondsFor`), so
+    // with about six fish a round he spends ~20 s on each; the griller keeps
+    // four on the embers for 50 s each, far more than the ~6 fish a round
+    // bring, so the board never backs up; the eater comes about every three
+    // minutes and takes one fish, which the next laid fish replaces.
+    fishFire: {
+      fireBack: 8,
+      fireInland: 6.5,
+      carrierPace: 1.25,
+      eaterPace: 1.1,
+      liftSeconds: 0.8,
+      carrierLeadSeconds: 6,
+      gutMinSecondsPerFish: 6,
+      startFish: 3,
+      grillSlots: 4,
+      grillSeconds: 50,
+      takeSeconds: 1.2,
+      turnSeconds: 1,
+      laySeconds: 1.2,
+      packSeconds: 1.2,
+      rackFill: 8,
+      storageStart: 4,
+      eaterIntervalSeconds: 180,
+      eaterIntervalSpread: 0.3,
+      eatSeconds: 24,
+      biteSeconds: 3,
+      eaterHomeBack: 12,
+      waitBudgetSeconds: 15,
     },
     loom: {
       placed: false, // weaving parked (user 29.09.2026); true re-enables the station

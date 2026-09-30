@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { standingClear, WALKER_RADIUS, spawnPointFree, type CircleCollider } from './collision'
+import { insidePlace } from './boundary'
 import { PLAY_ROCK_SCALE } from './layout'
 import { sharedLayout } from './layoutHarness'
 import { BANK_PLAY_LANE_HALF, bankPlayRocksView, inBankPlayLane, standsOnGroundPlate } from './riverBank'
@@ -114,15 +115,19 @@ describe('the children`s play stage on the bank (point 687)', () => {
       const layout = sharedLayout(id, 42)
       const rocks = layout.playRocks!
       const bank = layout.bank!
-      // The pair is the bank's own mirror pair pulled inland by one fixed inset,
-      // so the two stand equally far from the centre — the mirror is what the
-      // UPSTREAM/DOWNSTREAM teaching rests on.
-      const up = Math.hypot(rocks.upstream.x, rocks.upstream.z)
-      const down = Math.hypot(rocks.downstream.x, rocks.downstream.z)
+      // The pair is the bank's own mirror pair pulled straight inland by one
+      // fixed inset, so the two stand equally far from the stretch's middle and
+      // equally far in from the water — the mirror is what the UPSTREAM/
+      // DOWNSTREAM teaching rests on (work-order 1245 moved it off the normal).
+      const out = (p: { x: number; z: number }) => p.x * bank.nx + p.z * bank.nz
+      const mid = { x: (bank.upstream.x + bank.downstream.x) / 2, z: (bank.upstream.z + bank.downstream.z) / 2 }
+      const up = Math.hypot(rocks.upstream.x - mid.x, rocks.upstream.z - mid.z)
+      const down = Math.hypot(rocks.downstream.x - mid.x, rocks.downstream.z - mid.z)
       expect(Math.abs(up - down)).toBeLessThan(1e-6)
-      // And each sits inland of the bank stop on its own bearing, so the adults'
-      // stops stay ground a villager can be SENT to (point 155).
-      expect(Math.hypot(bank.upstream.x, bank.upstream.z)).toBeGreaterThan(up)
+      expect(out(rocks.upstream)).toBeCloseTo(out(rocks.downstream), 9)
+      // And each sits inland of the bank stop, so the adults' stops stay ground
+      // a villager can be SENT to (point 155).
+      expect(out(bank.upstream)).toBeGreaterThan(out(rocks.upstream))
       expect(spawnPointFree(layout.colliders, bank.upstream.x, bank.upstream.z, WALKER_RADIUS)).toBe(true)
       expect(spawnPointFree(layout.colliders, bank.downstream.x, bank.downstream.z, WALKER_RADIUS)).toBe(true)
       // Both stand on the flat ground plate, clear of the shore (point 584/585).
@@ -210,7 +215,7 @@ describe('the children`s play stage on the bank (point 687)', () => {
               if (
                 !standingClear(layout.colliders, sx, sz, WALKER_RADIUS) ||
                 !standsOnGroundPlate(layout.bank, sx, sz, WALKER_RADIUS) ||
-                Math.hypot(sx, sz) > layout.radius + 12
+                !insidePlace(layout, sx, sz, WALKER_RADIUS)
               ) {
                 break
               }
