@@ -122,7 +122,124 @@ put it is the mistake this line exists to stop.
   scripts/verify/enrichments.mjs, scripts/verify/world.mjs, scripts/render-verify-charges.mjs,
   point 375, point 1089, point 1115, point 1142.
   Bundle: Testinfrastruktur.
+  PROGRESS 30.09.2026 (branch feat/1145-frame-subject-miss-fails-check, 148379691 pushed): code done.
+  Question 1 MEASURED: the river current (design.md §11) swept the traveller 3.2-4.5 degrees
+  downstream from frames set down in the Zambezi and the Nile, a suite defect; `jumpBeside`
+  stands him on dry land or current-free water (FAIL and no jump otherwise). Question 2: the
+  shutter returns null and fails one check. Unrecorded direct runs green (rivers 5/5 WebGPU,
+  landmark-frames 7/7 on both backends), pictures judged. Astra review merge-with-fixes on
+  c0682c0d3, its three P2 fixed in 148379691 — a re-review of that commit is owed. LEFT: the
+  recorded section rungs, whole `world` (WebGL 2) and `enrichments` (WebGPU), full unit run,
+  landing. `648-village-children` split out as point 1244.
 
+- [ ] 1245. Two fishermen with a drift net, basket rotation to a fish fire, children's game moved upstream
+  Queue position: NEXT point in the work order (user order 30.09.2026).
+  Final state:
+  1. TWO FISHERMEN, DRIFT-NET CYCLE. The riverside village's dugout carries two men (Bozo/Somono reference as before; the Bambara village keeps its lect): a PADDLER and a NET MAN. Cycle, all timings calibratable in src/config/balance.ts:
+     - Upstream leg: the paddler paddles hard close in where the current is weakest; the net man sits with the folded net before him.
+     - Upstream end: the net man says DOWNSTREAM to the paddler; the paddler stops paddling and swings the bow out into the current, and the net man pays the net out. Visible consequence of the word: the paddler's changed action.
+     - Downstream leg: the net man holds the net in the water (a visible line of floats on the surface); the paddler steers only.
+     - Downstream end: BOTH men haul the net into the hull together; visible catch comes up in it (see 3).
+     - Landing and hand-over (see 4), then the net man says UPSTREAM to the paddler, who takes up hard strokes again.
+     Both words come from the net man, each addressed to the paddler, each followed by the paddler's visible action. They stay in the CALL register and call reach (user: "Beim Rufen bleiben passt").
+  2. The design.md exception is removed: the fisherman's call now has an addressee, so "every utterance but the fisherman's call" becomes "every utterance" (design.md §13.4, line 412) and the "a call, not speech … needs no addressee" sentence goes. §13.4 describes the two-man drift-net cycle; the speech section (line 422) keeps the fisherman's calls in the CALL register; the vignette list (line 723) names the fishers, carrier, griller, smoking rack and eater.
+  3. RECOGNISABLE CATCH, not stylised: several single fish (≈ 4–8 per haul, calibratable) of realistic size (≈ 25–40 cm), silvery with a sheen that catches the light, flapping while the net comes in and afterwards in the hull and in the basket. Fish do not vanish after the haul; they lie in the hull until the landing.
+  4. THE BASKET ROTATION (exactly two woven baskets, always circulating):
+     - Every round ends at the landing: the fishermen run the bow onto the sand, take the EMPTY basket standing on the bank, fill it with the fish from the hull, set the FULL basket on the bank, and push off.
+     - A CARRIER sets the empty basket down at the bank and takes the full one; if the boat has not landed yet he waits at the bank.
+     - At the fire he sets the full basket down, picks up the empty one of the previous round and walks directly back to the bank.
+     - The fire is the fishers' OWN fire near the bank at the downstream landing (not the existing village fire pit, whose vignettes stay untouched). Its route never crosses the children's stretch.
+     - Timing balance: the carrier fills the gap by GUTTING the fish at the fire before the griller takes them over, the amount tuned so he is back at the bank about when the boat lands. Neither the boat nor the carrier waits more than ≈ 15 s per round on average (calibratable; Vitest over the cycle state machines). Waiting is the fallback, never the normal case.
+  5. THE GRILLER AND THE SMOKING RACK: a second villager at that fire grills the gutted fish over the embers, turns them, and lays them on a smoking rack beside the fire. The rack stays at a roughly constant fill: when he lays fresh fish on, he packs the driest smoked fish into a storage basket beside the rack.
+  6. THE EATER: every few minutes (calibratable) a villager comes to the rack, takes one fish and VISIBLY eats it (hand to mouth, the fish diminishing), then goes back. Wordless — nobody speaks to nobody.
+  7. The fish trap cone and the lone paddler's trap check are removed (mesh, phase, balance values, tests).
+  8. SYMMETRIC BANK, GAME MOVED UPSTREAM: the walkable bank reaches the water equally far on both sides of the settlement's bank normal (≈ 45 m each; the upstream plateau angle equals the downstream one, fades likewise). The children's stretch moves ≈ 29 m upstream (centre ≈ s = −29, span within the existing 14–21 m limits) so that its upstream reach matches the downstream one. The adults' water path moves upstream with the stretch so it keeps its relation to the game and its distance from the lane. Values calibratable.
+  9. LONGER LANE: the lane keeps its 7 m offset and its ≥ 20 m minimum from the children's stretch AND from the adults' water-work sites (no standing place hears the spoken words of the water work and the boat's words together); it now runs from ≈ s = −2 to s = +47 (≈ 49 m instead of 20 m). The invariant test covers both gaps on every riverside village.
+  10. EXTENT CHECK UPSTREAM: measure on every shipped riverside village that terrain, bank bed and collision reach the new upstream plateau end (≈ 60 m from the centre), and that the moved stretch lies on straight enough bank to keep its span in [14, 21] m; a failing village is named by the test. Extend where needed. Record the numbers in the evidence.
+  11. PICTURES: new standing places — the boat's (its haul/call in frame, no child or rock), the children's game (game in frame, the boat's spoken exchange not audible there), and the fire (carrier, griller, rack with fish readable). Criterion 7 evidence retaken from the moved stretch; its photo stand moves with it.
+  Tests: Vitest for the two-man cycle and word→action consequences, the basket rotation (two baskets, never more, never lost), wait budgets, rack fill steady state, eater cadence, the symmetric plateau, the moved stretch and water path, both ≥ 20 m gaps; Playwright pictures for the three standing places, both backends (backend-sensitive scene).
+  Observed at 1968fb546 (why): the lone paddler of point 1237 calls UPSTREAM/DOWNSTREAM to nobody
+  (design.md §13.4 exemption), his up-and-down cycle has no purpose, and he bends over an open
+  0.8 m sand-coloured cone (PlaceLife.tsx:4134, "fish trap") with no result; the walkable bank is
+  ≈ 45 m downstream (BANK_DOWNSTREAM_PLATEAU_ANGLE 0.85) against ≈ 16.2 m upstream
+  (BANK_PLATEAU_ANGLE 0.384), frontages A/B on the user's sketch unequal.
+  Implied doc changes: design.md §13.4 (lines 412, 422, 723); riverBank.ts comment "THE BANK IS
+  WIDER DOWNSTREAM" rewritten; docs/acceptance-criteria-detail.md / docs/acceptance-evidence.md
+  criterion 7 (moved photo stand).
+  Refs: src/scenes/place/villagerCanoe.ts, src/scenes/place/PlaceLife.tsx (canoe ~4080-4150),
+  src/scenes/place/riverBank.ts, src/scenes/place/adultWork.ts, src/config/balance.ts
+  (villageLife.canoe); predecessor point 1237. Spec cut from git revision 1968fb546.
+  USER, verbatim:
+  user 30.09.2026: "Der Bootsfahrer fährt jetzt hin und her. Aber: Wo ist derjenige, der ihm Anweisungen gibt? Aktuell kommentiert er selbst seine Tätigkeiten - offensichtlich nur, um die Worte dem Zuschauer zu zeigen. Das ist ein Muster, das wir algemein als Faux Pas abgelehnt haben, weil es nicht organisch aus seinen Tätigkeiten hervorgeht. Und warum fährt er überhaupt hin und her? Das sieht nach einer Tätigkeit zum Selbstzweck aus. Und: Warum steigt er zwischendurch aus und was stellt dieser Kegel dar? Was macht er damit?"
+  user 30.09.2026: "Wie wäre es, wenn der Steuermann das Netz auswirft? Einer paddelt, der andere sagt, wann umzukehren ist und hält beim Zurücktreiben das Netz ins Wasser. Am Ende ziehen es beide Männer gemeinsam ins Boot und darin ist sichtbarer Fischfang (nicht zu stilistisch - es muss als solcher erkennbar sein)."
+  user 30.09.2026: "Am Ende jeder Runden legen die Fischer am Ufer an und stellen dort ein Behältnismit zappelnden Fischen ans Ufer. Dieser wird von einer anderen Person abgeholt, zum Feuer gebracht und dort gebracht. Dort grillt eine weitere Person. Der Abholer geht direkt zurück zum Ufer und tauscht dort leeres Behältnis gegen ein volles, mit Fischen befülltes. Es gibt also zwei Behältnisse, die immer durchrotieren. Beim Rufen bleiben passt."
+  user 30.09.2026: "Wohin mit den Fischen: Es soll ein Räuchergestell geben. Ab und zu soll sich zusätzlich jemand davon einen Fisch holen und ihn sichtbar essen. Welches Feuer: eigenes Feuer in Ufernähe. Das erledigt auch die Probleme "Weg des Abholers" und "Takt". Du musst die Abstände passen ausbalancieren, sodass die Szene zum einen plausibel wirkt und zum anderen niemand zu lange auf den anderen wartet. Behälter: geflochtener Korb"
+  user 30.09.2026: "Außerdem soll das Kinderspiel weiter flussaufwärts geschoben werden - zum einen, um die Bootsstrecke zu verlängern, zum anderen, um die aktuell vorhandene Asymmetrie des begehbaren Uferbereichs zu beseitigen. [...] Strecke A und die Strecke B in der angehängten Skizze nicht gleich lang sind. Das Kinderspiel soll so weit flussaufwärts verschoben werden, dass das der Fall ist. Die Boots-Strecke soll entsprechend verlängert werden."
+  user 30.09.2026 (on the proposals: carrier guts fish to fill the wait, rack kept at constant fill via a storage basket, water path moves with the game, upstream extent check, pictures retaken): "Deine Vorschläge passen alle - keine Rückfrage notwendig, sonder so in die Queue einreihen, direkt als nächsten Punkt."
+  Bundle: Dorfleben.
+  Criticality: medium — the rejected fisherman scene is live in every riverside village.
+- [ ] 1246. Children's bank game plays three rounds in a row before scattering
+  Queue position: directly AFTER point 1245 "Two fishermen with a drift net, basket rotation to a fish fire, children's game moved upstream" (user order 30.09.2026).
+  Final state:
+  1. A play session of the bank game is a SERIES of three complete cycles (count calibratable in src/config/balance.ts, default 3) before the children part and roam.
+  2. When cycle 1 or 2 ends (every runner caught, or the existing one-run-per-child backstop), the children do NOT part and roam: after the existing short end pause (endPauseSeconds) the next cycle opens directly the way a cycle opens today (openCycle: runners take the nearer rock, the child nearest the far rock becomes caller and first catcher, the RIVER call when ROCK is known, the gather). All caught children are runners again.
+  3. Only after the third completed cycle do the children enter 'part' and 'roam' as today (roamSeconds, the off-game ROCK boulder climb, the next series afterwards).
+  4. Everything a cycle does today stays unchanged inside each cycle: calls, word gating, floor/one-exchange rule, taps, catches, regroup, the backstop. An interruption that today ends the game (e.g. hush, player intrusion) ends the whole series in the same way; the next series starts again at cycle 1.
+  5. design.md: the bank game section (§13.4) states that the children play three rounds in a row before they scatter.
+  Tests: Vitest on the bank-game state machine — three cycles run back to back with no 'part'/'roam' between them, 'part' after the third, the counter resets for the next series, an interruption resets it, the backstop cycle end counts as a completed cycle; the existing bank-game picture/timing checks stay green (adjust a picture timing that assumed roam after one cycle).
+  Observed at 1968fb546 (why): endRun (src/scenes/place/bankGame.ts:1107) moves to 'part' as soon
+  as no runner is left, then the children roam roamSeconds 55 s ±25 % before a new gather (up to
+  60 s) — one round is too little to observe and the next takes minutes.
+  Refs: src/scenes/place/bankGame.ts (endRun ~1107, openCycle ~962, openRoam ~1142),
+  src/config/balance.ts (villageLife.bankGame), design.md §13.4. Spec cut from git revision b9c21c8fd.
+  USER, verbatim:
+  user 30.09.2026: "Noch einen weiteren Punkt danach einreihen: Aktuell ziehen die Kinder wieder ab, wenn alle gefangen wurden. Ich nenne das mal: Sie spielen nur eine Runde. Das gibt dem Spieler zu wenig Zeit zum Beobachten und er muss immer erst Minuten lang warten, bis die Kinder wieder spielen. Deswegen soll es stattdessen insgesamt 3 komplette Spielrunden geben, bevor sie alle wieder abziehen."
+  Bundle: Dorfleben.
+  Criticality: medium — the player waits minutes between single rounds of the game.
+- [ ] 1247. A user request waits in the carrier for hours because the request gate never fires
+  MEASURED 30.09.2026, 13:00: two requests (deposited 08:18 and 09:38, now points 1245 and 1246)
+  sat pending through two batch-owner boundaries (b67374e1 at 11:18, 69d1cdc6 at 12:27) and the
+  whole next owner turn series (aa5bc325), without one refusal. Two causes, both in
+  `scripts/findings-core.mjs` auditFindings:
+  1. The request gate fires ONLY on the turn that runs `batch-boundary.mjs --commit`
+     (`ownsBatch && atBoundary`, point 462). Between boundaries — a whole long point — a
+     deposited request waits unseen. The stated reason ("only the boundary may write TASKS.md")
+     does not hold: appending to TASKS.md is main-only bookkeeping the owner does mid-point
+     (e.g. commit "File the confluence water wedge…", 11:51, while 1145 was in flight).
+  2. At the boundary itself the gate is dead: `--commit` hands the lock over BEFORE the Stop
+     hook runs, so `ownsBatch` reads false at exactly the turn the gate is scoped to.
+     Reproduced: replaying both boundary turns' transcripts through auditFindings with
+     ownsBatch=true yields `request-not-queued`; the fence log shows 69d1cdc6 flipping from
+     `batch-owner` to `attended` 6 s after its commit.
+  FINAL STATE (a simplification): the request gate is judged like the finding-carrier duty —
+  on EVERY batch-owner turn end, scoped by the context fence (`scopeMandatoryDuty`), with the
+  `atBoundary` condition and `turnTakesBoundary` removed if nothing else uses them; and
+  `batch-boundary.mjs --commit` refuses while requests wait (before it hands the lock over), so
+  a boundary can never carry one past the handover.
+  Test: Vitest in findings-core.test.mjs — owner turn end with a pending request blocks without
+  a boundary; fence-closed defers; boundary commit refuses with a pending request.
+  Refs: scripts/findings-core.mjs (auditFindings, request gate), scripts/findings-guard.mjs,
+  scripts/batch-boundary.mjs (context and point commit paths), point 462.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — a user's order silently waits hours; qualifies under the freeze as a
+  real blockade of user work (CLAUDE.md §2).
+- [ ] 1248. The supervisor's immediate successor spawn ignores a pending batch claim when the owner exits
+  MEASURED 30.09.2026: the user ordered a takeover in an open window (c3fd94cf); `batch-claim.mjs`
+  recorded the claim at 12:53 against the live owner aa5bc325 (assessment `honour`). When that
+  owner's process 3042532 exited, the supervisor "requested its successor immediately" and the
+  launcher tick at 13:35:58 logged "no owner lock — taking over" and spawned 07cf378c. The NEXT
+  tick, 13:36:26, logged "already RELEASED to c3fd94cf … held for its PICK-UP" — the reservation
+  existed, but the immediate-successor path had not consulted it. The claimant window was alive
+  throughout; it got the lock only by re-running the claim afterwards.
+  FINAL STATE: a pending claim (honour or reserved) from a live claimant window keeps every
+  automated acquirer — the supervisor's immediate successor request included — off the lock,
+  exactly like the tick path already does; one shared check, not a second copy.
+  Test: Vitest on the launcher/supervisor decision: owner exits with a live honoured claim → no
+  spawn, lock left for the claimant; dead claimant → spawn as today.
+  Refs: scripts/batch-autostart.mjs (successor request, "no owner lock — taking over"),
+  scripts/batch-claim.mjs, scripts/batch-singleton.mjs, points 434, 461.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — an explicit user takeover order loses to an automated acquirer.
 - [ ] 1132. The chief's collision check was amended seven seconds after the last run of it, so
   no frame proves the check that guards him today, and four webgpu/flow records of 13./14.09.
   still owe a verdict (verification debt of point 1076). THIS POINT DEMANDS RENDERED PROOF:
@@ -9297,6 +9414,10 @@ to land than a mechanism that needs a review.
   names `scopeMandatoryDuty`, so the mutual block is intact in the code and returns the moment
   the arming point lands. Verify this point against the guard cores, never by re-running the
   incident.
+  THIRD INCIDENT 30.09.2026 (session c3fd94cf, past the watermark after `batch-boundary --commit
+  --context`): `bundle-first-guard`, `push-arrival-guard` and `retro-currency-guard` blocked six
+  Stop attempts in a row while the fence denied the bundle-line and memory edits they demanded;
+  `push-arrival-guard` joins the list of guards to scope.
   VERIFIABLE: Vitest over each of the three guard cores — past the fence each returns the
   handover verdict rather than a block, and below it blocks exactly as today — plus one case
   that ENUMERATES the mandatory Stop guards from `.claude/settings.json` and fails if any of
@@ -15820,3 +15941,25 @@ to land than a mechanism that needs a review.
   Refs: src/render/placeRiver.ts, scripts/verify/polish.mjs, point 568, point 1151.
   Bundle: Dorfleben.
   Criticality: medium — visible at every village river on the WebGL 2 fallback.
+- [ ] 1243. Khartoum confluence: a straight-edged darker water wedge where the two Nile strips overlap
+  SEEN 30.09.2026 in `11-worldmodel-khartoum-confluence` (world, landmark-frames) on BOTH WebGPU and
+  WebGL 2, and in `126-clearance-khartoum`: from the junction two straight edges run outward and the
+  water between them is a flatter, darker tone than either arm — two translucent river strips drawn
+  over each other instead of one merged surface. Distinct from point 1242 (plate rim, WebGL 2 only).
+  FINAL STATE: the confluence reads as one continuous water surface with no straight tonal edge.
+  Test: `world --section=landmark-frames` picture on both backends; a Vitest on the layer the fix touches.
+  Refs: the world river strip builder, point 1145 (its frames), point 1242.
+  Bundle: Dorfleben.
+  Criticality: medium — visible at every river junction the player crosses in the bird's-eye view.
+- [ ] 1244. 648-village-children misses its subject off the bottom edge only inside a whole polish pass
+  Split out of point 1145. MEASURED 22.09.2026 at e1b7d1561: a whole `polish` pass on WebGL 2 refused
+  `648-village-children` off the BOTTOM edge twice in a row, while `polish --section=children-tag`
+  passed 16/16 on the same tree and on `main` 86c4babaf; the same wording appeared in a whole WebGPU
+  pass at 9259d6dd8. So an earlier polish section leaves the children or the camera displaced. Since
+  point 1145 the miss is one failed check, not a dead pass.
+  FINAL STATE: the frame is written with its subject inside a whole pass on both backends, or the
+  leaking section is named and its state restored.
+  Test: whole `polish` on WebGL 2; the section rung `children-tag`.
+  Refs: scripts/verify/polish.mjs, point 1145.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — one red check per polish pass until fixed.
