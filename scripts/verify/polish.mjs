@@ -5702,7 +5702,7 @@ if (section('children-bank-game')) {
   //
   // A caught child now stands where it was caught, trunk leaned and arms hanging.
   // The pose is pinned in Vitest; what only the picture can settle is whether it
-  // reads at 10-15 m: not as a runner mid-sprint (lean 0.28 rad against 0.40), and
+  // reads at 10-14 m: not as a runner mid-sprint (lean 0.28 rad against 0.48), and
   // not as a free child when the whole group stands still.
   //
   // THE STILL MOMENT IS THE END HOLD, NOT THE ROCK TAP. The tap opens each run,
@@ -5715,17 +5715,20 @@ if (section('children-bank-game')) {
   // Shot LAST in the section: the end hold leaves the round at the start of a
   // new cycle, which would shift the timing the tap and charge frames wait on.
   if (staged) {
-    const SLUMP_RANGE = [9.5, 15.5]
-    // A stance 10-15 m off the subject, broadside to the pair when there is one,
+    const SLUMP_RANGE = [10, 14]
+    // No other child may stand within this of the sight line to the caught one,
+    // in front of it or behind: the frame shows the caught child on its own.
+    const SLUMP_CLEAR = 0.7
+    // A stance 10-14 m off the subject, broadside to the pair when there is one,
     // inside the settlement's base circle (the boundary is star-shaped about the
     // centre, so that circle is always walkable) and clear of the colliders.
-    const standOff = async (caught, other) => {
+    const standOff = async (caught, other, others) => {
       const mid = other ? { x: (caught.x + other.x) / 2, z: (caught.z + other.z) / 2 } : caught
       const base = other ? Math.atan2(other.z - caught.z, other.x - caught.x) + Math.PI / 2 : 0
       const angles = other
         ? [0, Math.PI, 0.5, -0.5, Math.PI + 0.5, Math.PI - 0.5].map((a) => base + a)
         : Array.from({ length: 12 }, (_, k) => (k * Math.PI) / 6)
-      for (const back of [12, 11, 13]) {
+      for (const back of [11, 12, 10.5]) {
         for (const a of angles) {
           const placed = await page.evaluate(
             ({ mid, a, back, caught }) => {
@@ -5771,9 +5774,29 @@ if (section('children-bank-game')) {
           if (seen?.lost) return seen
           if (!seen || seen.distance < SLUMP_RANGE[0] || seen.distance > SLUMP_RANGE[1]) continue
           await nextFrames(3)
-          const hit = await page.evaluate((q) => window.__placeRayHit?.(q.x, 0.4, q.z) ?? null, caught)
-          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) {
-            return { distance: hit.targetDistance }
+          const hit = await page.evaluate(
+            ({ q, others }) => {
+              const r = window.__placeRayHit?.(q.x, 0.4, q.z)
+              const cam = window.__placeCamera?.position
+              if (!r || !cam) return null
+              // The nearest other child to the sight line, measured across it.
+              const dx = q.x - cam.x
+              const dz = q.z - cam.z
+              const len = Math.hypot(dx, dz) || 1
+              let across = Infinity
+              for (const o of others) across = Math.min(across, Math.abs(dz * (o.x - cam.x) - dx * (o.z - cam.z)) / len)
+              return { ...r, across }
+            },
+            { q: caught, others: others ?? [] },
+          )
+          if (
+            hit &&
+            hit.targetDistance >= SLUMP_RANGE[0] &&
+            hit.targetDistance <= SLUMP_RANGE[1] &&
+            hit.across >= SLUMP_CLEAR &&
+            (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)
+          ) {
+            return { distance: hit.targetDistance, across: hit.across }
           }
         }
       }
@@ -5788,10 +5811,8 @@ if (section('children-bank-game')) {
           c: t.children.map((k, i) => ({ i, x: k.x, z: k.z, slumped: k.slumped, pace: k.pace })),
         }
       })
-    const nearestTo = (kid, pool) =>
-      pool.reduce((best, k) => (!best || Math.hypot(k.x - kid.x, k.z - kid.z) < Math.hypot(best.x - kid.x, best.z - kid.z) ? k : best), null)
 
-    // (1) IN THE RUN: a caught child standing out the run, a free one moving past.
+    // (1) IN THE RUN: a caught child standing out the run on its own, in the clear.
     // Bounded twice: by the game's own clock (two whole cycles) and by an
     // iteration cap as a runaway backstop.
     let runShot = null
@@ -5800,18 +5821,22 @@ if (section('children-bank-game')) {
     for (let i = 0; i < 12000 && !runShot && !lost; i++) {
       const s = await readKids()
       if (s.clock - runFirst > 2 * cycleWaitSeconds) break
-      const caught = s.phase === 'run' ? s.c.find((k) => k.slumped) : null
+      // A caught child standing ON ITS OWN, at least 2 m from every other one.
+      const caught =
+        s.phase === 'run'
+          ? s.c.find((k) => k.slumped && s.c.every((o) => o === k || Math.hypot(o.x - k.x, o.z - k.z) >= 2))
+          : null
       if (caught) {
-        const moving = s.c.filter((k) => !k.slumped && k.pace > 0)
-        const other = nearestTo(caught, moving)
-        const at = await standOff(caught, other && Math.hypot(other.x - caught.x, other.z - caught.z) < 8 ? other : null)
+        const at = await standOff(caught, null, s.c.filter((o) => o !== caught))
         if (at?.lost) lost = true
         const before = await readKids()
         const still = before.phase === 'run' && before.c[caught.i].slumped
         if (at && still) {
           await frame('1239-caught-child-standing-in-the-run', {
             local: { x: before.c[caught.i].x, y: 0.4, z: before.c[caught.i].z },
-            label: `a caught child standing slumped where it was caught while the run goes on, ${at.distance.toFixed(1)} m from the camera`,
+            label:
+              `a caught child standing slumped on its own where it was caught while the run goes on, ` +
+              `${at.distance.toFixed(1)} m from the camera, no other child within ${at.across.toFixed(1)} m of the sight line`,
             settle: false,
           })
           const after = await readKids()
@@ -5820,6 +5845,7 @@ if (section('children-bank-game')) {
               distance: at.distance,
               drift: Math.hypot(after.c[caught.i].x - before.c[caught.i].x, after.c[caught.i].z - before.c[caught.i].z),
               moving: after.c.filter((k) => !k.slumped && k.pace > 0).length,
+              across: at.across,
             }
           }
         }
@@ -5828,10 +5854,11 @@ if (section('children-bank-game')) {
     }
     check('the settlement stays mounted while the camera stands off the caught child', !lost)
     check(
-      'a caught child was photographed standing slumped in the run, 10-15 m off (work-order 1239)',
+      'a caught child was photographed standing slumped on its own in the run, 10-14 m off (work-order 1239)',
       !!runShot && runShot.drift < 0.02,
       runShot
-        ? `${runShot.distance.toFixed(1)} m, drifted ${(runShot.drift * 100).toFixed(1)} cm across the shutter, ${runShot.moving} free child(ren) moving`
+        ? `${runShot.distance.toFixed(1)} m, drifted ${(runShot.drift * 100).toFixed(1)} cm across the shutter, ${runShot.moving} free child(ren) moving, ` +
+          `sight line ${runShot.across.toFixed(1)} m clear of the others`
         : 'no caught child could be photographed inside the window',
     )
 
@@ -5851,15 +5878,17 @@ if (section('children-bank-game')) {
       if (s.clock - holdFirst > 2 * cycleWaitSeconds + 20) break
       const caughtKids = s.phase === 'part' ? s.c.filter((k) => k.slumped) : []
       const free = s.phase === 'part' ? s.c.filter((k) => !k.slumped) : []
-      if (caughtKids.length && free.length) {
-        // The closest caught/free pair: "side by side" is a statement about them.
+      if (caughtKids.length && free.length && caughtKids.some((c) => free.some((f) => Math.hypot(f.x - c.x, f.z - c.z) >= 1))) {
+        // The closest caught/free pair at least 1 m apart, so neither hides the
+        // other: "side by side" is a statement about them.
         let pair = null
         for (const c of caughtKids) {
-          const f = nearestTo(c, free)
-          const d = Math.hypot(f.x - c.x, f.z - c.z)
-          if (!pair || d < pair.d) pair = { c, f, d }
+          for (const f of free) {
+            const d = Math.hypot(f.x - c.x, f.z - c.z)
+            if (d >= 1 && (!pair || d < pair.d)) pair = { c, f, d }
+          }
         }
-        const at = await standOff(pair.c, pair.f)
+        const at = await standOff(pair.c, pair.f, s.c.filter((o) => o !== pair.c && o !== pair.f))
         if (at?.lost) lost = true
         const before = await readKids()
         if (at && before.phase === 'part' && before.c[pair.c.i].slumped) {
@@ -5898,7 +5927,7 @@ if (section('children-bank-game')) {
     }, shippedEnd)
     check('the settlement stays mounted through the end-hold stance', !lost)
     check(
-      'a caught and a free child were photographed standing still side by side in the end hold, 10-15 m off (work-order 1239)',
+      'a caught and a free child were photographed standing still side by side in the end hold, 10-14 m off (work-order 1239)',
       !!holdShot && holdShot.drift < 0.02,
       holdShot
         ? `${holdShot.distance.toFixed(1)} m, pair ${holdShot.apart.toFixed(1)} m apart, pair drift ${(holdShot.drift * 100).toFixed(1)} cm, group ${(holdShot.groupDrift * 100).toFixed(1)} cm across the shutter`
