@@ -22,7 +22,7 @@ vi.mock('./waterAppearance', async (importOriginal) => {
 
 const { RIVER_WATER_TONES, WATER_FOAM_ROUGHNESS, WATER_METALNESS, WATER_ROUGHNESS, riverWaterSurface } =
   await import('./waterAppearance')
-const { FOAM_PATCH_SEGMENTS, buildFoamPatchGeometry, createPlaceRiverMaterial, createRiverFoamMaterial } =
+const { FOAM_PATCH_OPACITY, FOAM_PATCH_SEGMENTS, foamPatchOpacity, buildFoamPatchGeometry, createPlaceRiverMaterial, createRiverFoamMaterial } =
   await import('./placeRiver')
 const { createBackdropMaterial } = await import('../scenes/place/backdropMaterial')
 
@@ -123,6 +123,26 @@ describe('the drifting foam patches are shaded as the water they ride', () => {
     expect(m.transparent).toBe(true)
     expect(m.depthWrite).toBe(false)
     expect(m.opacityNode, 'a per-fragment rim fade, not one flat opacity').toBeTruthy()
+  })
+
+  it('is opaque at the heart, frays with the noise, and is gone at the geometry rim', () => {
+    expect(foamPatchOpacity(0, 0)).toBeCloseTo(FOAM_PATCH_OPACITY, 6)
+    // The noise moves the outline: the same radius differs between samples.
+    expect(foamPatchOpacity(0.6, -0.5)).toBeGreaterThan(foamPatchOpacity(0.6, 0.5) + 0.2)
+    // However far the noise pulls the rim out, the mesh edge itself is clear.
+    for (const churn of [-1, -0.5, 0, 0.5, 1]) expect(foamPatchOpacity(1, churn)).toBe(0)
+    for (let r = 0; r <= 1; r += 0.05) {
+      const a = foamPatchOpacity(r, -1)
+      expect(a).toBeGreaterThanOrEqual(0)
+      expect(a).toBeLessThanOrEqual(FOAM_PATCH_OPACITY)
+    }
+  })
+
+  it('builds the opacity node with ordered smoothstep edges (undefined in GLSL ES otherwise)', () => {
+    const src = source('src/render/placeRiver.ts')
+    expect(src).not.toMatch(/smoothstep\(float\(1\),/)
+    expect(src).toContain('smoothstep(float(FOAM_PATCH_CORE), float(1), edge).oneMinus()')
+    expect(src).toContain('smoothstep(float(1 - FOAM_PATCH_RIM), float(1), r).oneMinus()')
   })
 
   it('is round enough that no facet corner shows, and faces up like the water', () => {

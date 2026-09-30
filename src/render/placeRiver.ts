@@ -225,6 +225,23 @@ export const FOAM_PATCH_OPACITY = 0.85
  *  pushes the rim in and out (art constants, calibratable). */
 export const FOAM_PATCH_CORE = 0.25
 export const FOAM_PATCH_FRAY = 0.3
+/** Width of the noise-free guard band inside the geometry rim, where the
+ *  opacity falls to exactly 0 however far the noise pushed the rim out. */
+export const FOAM_PATCH_RIM = 0.15
+
+function smoothstepJs(e0: number, e1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))
+  return t * t * (3 - 2 * t)
+}
+
+/** CPU mirror of the patch opacity node: `r` is the normalised distance from
+ *  the centre (1 = geometry rim), `churn` the noise sample. Both edge pairs
+ *  are ordered (edge0 < edge1), which GLSL ES requires on the WebGL 2 path. */
+export function foamPatchOpacity(r: number, churn: number): number {
+  const fray = 1 - smoothstepJs(FOAM_PATCH_CORE, 1, r + churn * FOAM_PATCH_FRAY)
+  const guard = 1 - smoothstepJs(1 - FOAM_PATCH_RIM, 1, r)
+  return fray * guard * FOAM_PATCH_OPACITY
+}
 
 /** The unit patch, lying flat and facing up like the water surface. */
 export function buildFoamPatchGeometry(): THREE.BufferGeometry {
@@ -251,7 +268,10 @@ export function createRiverFoamMaterial(): THREE.MeshStandardNodeMaterial {
     2,
   )
   const edge = r.add(churn.mul(FOAM_PATCH_FRAY))
-  m.opacityNode = smoothstep(float(1), float(FOAM_PATCH_CORE), edge).mul(FOAM_PATCH_OPACITY)
+  // Same formula as foamPatchOpacity.
+  const fray = smoothstep(float(FOAM_PATCH_CORE), float(1), edge).oneMinus()
+  const guard = smoothstep(float(1 - FOAM_PATCH_RIM), float(1), r).oneMinus()
+  m.opacityNode = fray.mul(guard).mul(FOAM_PATCH_OPACITY)
   foamMaterial = m
   return m
 }
