@@ -16,6 +16,8 @@ import {
   panoramaCaptureReady,
   panoramaCaptureFar,
   panoramaBandShown,
+  panoramaCaptureHideNames,
+  NATURAL_SITES_GROUP,
   PANORAMA_BAND_BY_KIND,
   PANORAMA_CHUNK_RADIUS,
 } from './panoramaMath'
@@ -267,5 +269,18 @@ describe('the buffer stores each direction where its own camera looked', () => {
       expect(u).toBeCloseTo((k + 0.5) / CAPTURE_SECTORS)
       expect(compass[dir.toLowerCase() as 'n' | 'e' | 's' | 'w']).toBe(fractions[k])
     }
+  })
+})
+
+describe('panoramaCaptureHideNames', () => {
+  // The Ol Doinyo Lengai map symbol was baked into the Maasai village band and
+  // hung in its sky as a cone with floating smoke cones.
+  it('keeps the natural-site map symbols out of the settlement band', () => {
+    expect(panoramaCaptureHideNames('maasai-village')).toContain(NATURAL_SITES_GROUP)
+  })
+  it('hides the entered place marker and keeps cultural landmarks in', () => {
+    const names = panoramaCaptureHideNames('cairo')
+    expect(names).toContain('place-marker-cairo')
+    expect(names.some((n) => /cultural|landmark/i.test(n))).toBe(false)
   })
 })

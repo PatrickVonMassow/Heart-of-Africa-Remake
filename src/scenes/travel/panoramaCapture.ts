@@ -122,8 +122,9 @@ export function capturePanorama(
   current = null
   const { band: target, sector, width } = captureTargets(renderer)
   // Near plane 3: close terrain belongs to the settlement's own scene, but
-  // nearby landmarks must stay in (Giza stands ~4 units west of Cairo); the
-  // oversized symbolic dressing is hidden by the caller (hideNames). The FAR plane is bounded by
+  // nearby CULTURAL landmarks must stay in (Giza stands ~4 units west of
+  // Cairo); the oversized symbolic dressing and the natural-site map symbols
+  // are hidden by the caller (hideNames, panoramaCaptureHideNames). The FAR plane is bounded by
   // the streamed terrain window (point 335, panoramaCaptureFar): past it only
   // the unbounded water sheets would draw, floating with no ground behind them.
   const cam = new THREE.PerspectiveCamera(BAND_V_FOV_DEG, Math.tan((SECTOR_H_FOV_DEG / 2) * (Math.PI / 180)) / Math.tan((BAND_V_FOV_DEG / 2) * (Math.PI / 180)), 3, far)
