@@ -17,7 +17,7 @@
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
 import { FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
-import { frameShutter, captureFrame, capturePixels, waitForSceneReady } from './frameSubject.mjs'
+import { frameShutter, captureFrame, capturePixels, waitForSceneReady, jumpBeside } from './frameSubject.mjs'
 import { snowFraction } from './snowMetric.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
@@ -677,7 +677,7 @@ if (section('rivers')) {
     ['126-clearance-khartoum', 15.6, 32.5],
     ['127-clearance-sudd', 8.0, 30.5],
   ]) {
-    await page.evaluate(([a, o]) => window.__game.getState().debugJumpTo(a, o), [lat, lon])
+    await jumpBeside(page, lat, lon)
     await page.waitForTimeout(1500) // let the chunks and water surfaces stream in
     await shot(name, { world: { lat, lon }, label: name })
   }

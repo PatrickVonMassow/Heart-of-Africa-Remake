@@ -6,7 +6,7 @@
 // live checks (the erratic's seating, the digs, the chief's hand-over, the clay
 // mould and the inventory clicks). Dev server only.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
-import { frameShutter, expectRefusal } from './frameSubject.mjs'
+import { frameShutter, expectRefusal, jumpBeside } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import { installTtsCache } from './ttsCache.mjs'
@@ -513,7 +513,9 @@ if (section('landmark-frames')) {
     [13.2, 14.2, '17-worldmodel-lake-chad', 'Lake Chad'],
   ]
   for (const [lat, lon, name, label] of shots) {
-    await jump(lat, lon)
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await jumpBeside(page, lat, lon)
+    await page.waitForTimeout(2500)
     await shot(name, { world: { lat, lon }, label })
   }
 }

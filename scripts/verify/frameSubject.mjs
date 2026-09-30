@@ -227,6 +227,33 @@ export async function waitForSceneReady(page, opts = {}) {
   })
 }
 
+/**
+ * Jump to stand BESIDE a water subject (point 1145). The current sweeps the
+ * traveller only on water (store.driftCurrent, design.md §11): set down in the
+ * Zambezi or the Nile he drifted 3-4.5 degrees downstream within the wait, the
+ * camera followed, and the frame missed its subject. So he stands on the
+ * nearest non-water point within 0.3 degrees; the subject stays the declared
+ * water point. A land subject is jumped to unchanged. Returns the stand.
+ */
+export function jumpBeside(page, lat, lon) {
+  return page.evaluate(([a, o]) => {
+    const g = window.__game.getState()
+    const still = (la, lo) => !['water', 'ocean'].includes(window.__terrainType(la, lo, g.seed))
+    let stand = [a, o]
+    search: for (let r = 0.02; r <= 0.3 && !still(a, o); r += 0.02) {
+      for (let k = 0; k < 16; k++) {
+        const t = (k / 16) * 2 * Math.PI
+        if (still(a + r * Math.sin(t), o + r * Math.cos(t))) {
+          stand = [a + r * Math.sin(t), o + r * Math.cos(t)]
+          break search
+        }
+      }
+    }
+    g.debugJumpTo(stand[0], stand[1])
+    return stand
+  }, [lat, lon])
+}
+
 // A REFUSED FRAME IS ONE FAILED CHECK, NOT A DEAD RUN (point 1145). The shutter
 // used to THROW, so one mis-aimed frame killed the node process: the run
 // reported nothing, covered no backend, and left a crash record only a
