@@ -4,6 +4,7 @@
 // (recoverably: rescue branch + stash, everything logged) over leaving a
 // corrupted tree. Pure and Vitest-covered (scripts/batch-doctor-core.test.mjs);
 // the wrapper gathers the git state and executes the plan.
+import { checkEvidence } from './batch-in-flight-core.mjs'
 
 /**
  * Plan the remediation for the observed repo state.
@@ -28,6 +29,7 @@
  *   ownerAlive,                              // a live owner forbids the process sweep
  *   privateBatchLock: { path },              // forbidden worktree-local authority
  *   tornOwnerSession: { recordedSessionId, sessionId }, // same process, wrong id
+ *   verificationWriterLive,                  // a live run writes verification/ (see below)
  * }
  * Returns an ordered list of actions:
  *   { action, level: 'auto' | 'repair' | 'alert', reason, targets? }
@@ -85,16 +87,27 @@ export function planRemediation(state) {
     })
   }
 
-  if ((state.dirtyFiles?.length ?? 0) > 0 && (state.parallelDetected || state.conflictMarkers)) {
+  const quarantine = quarantineScope(state.dirtyFiles, { verificationWriterLive: state.verificationWriterLive })
+  if (quarantine.needed && (state.parallelDetected || state.conflictMarkers)) {
     plan.push({
       action: 'quarantine-stash',
       level: 'repair',
+      excludeVerification: quarantine.excludeVerification,
       reason:
-        'Uncommitted changes exist in the shared tree during/after a parallel-session window — they cannot be attributed to one author. Quarantine them in a stash (recoverable, named, logged) rather than build on them.',
+        'Uncommitted changes exist in the shared tree during/after a parallel-session window — they cannot be attributed to one author. Quarantine them in a stash (recoverable, named, logged) rather than build on them.' +
+        (quarantine.excludeVerification ? ' verification/ stays: a live verification run is writing it.' : ''),
     })
   }
 
-  if (div.ahead > 0 && div.behind > 0) {
+  if (div.ahead > 0 && div.behind > 0 && state.verificationWriterLive) {
+    // A hard reset would overwrite the live run's tracked frames unsaved.
+    plan.push({
+      action: 'alert-reset-deferred',
+      level: 'alert',
+      reason:
+        'Local main and origin/main DIVERGED, but a live verification run is writing verification/ — the hard reset is refused until it ends. Run the doctor again then.',
+    })
+  } else if (div.ahead > 0 && div.behind > 0) {
     plan.push({
       action: 'rescue-and-reset',
       level: 'repair',
@@ -574,3 +587,54 @@ export function otherSessionsIn({ alert, readerSid = '', ownerSid = '' } = {}) {
 
 /** Is this alert evidence of a second writer? PURE. */
 export const alertNamesAnother = (args) => otherSessionsIn(args).length > 0
+
+/**
+ * A LIVE VERIFICATION'S FRAMES ARE NOT UNATTRIBUTABLE (measured 18.09.2026: a
+ * declared `polish` run lost 34 frames to two quarantine stashes). While a live
+ * run writes `verification/`, the whole directory stays out of the stash — by a
+ * pathspec exclusion, not a file list, so frames written after the status read
+ * are spared too. Only a dirty path outside it makes a quarantine necessary
+ * then; without a live writer nothing changes. `dirtyFiles` is `parsePorcelainZ`'s.
+ */
+export const VERIFICATION_DIR = 'verification'
+
+export function quarantineScope(dirtyFiles = [], { verificationWriterLive = false } = {}) {
+  const paths = dirtyFiles ?? []
+  if (!verificationWriterLive) return { needed: paths.length > 0, excludeVerification: false }
+  const needed = paths.some((path) => !String(path).startsWith(`${VERIFICATION_DIR}/`))
+  return { needed, excludeVerification: true }
+}
+
+/**
+ * The paths of `git status --porcelain=v1 -z` output: unquoted, and both sides
+ * of a rename or copy (its origin is the next NUL-separated field).
+ */
+export function parsePorcelainZ(out = '') {
+  const fields = String(out).split('\0')
+  const paths = []
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i]
+    if (entry.length < 4) continue
+    paths.push(entry.slice(3))
+    if (/[RC]/.test(entry.slice(0, 2)) && i + 1 < fields.length && fields[i + 1]) paths.push(fields[++i])
+  }
+  return paths
+}
+
+/** The `git stash` arguments of a quarantine; `-u` takes untracked files too. */
+export function quarantineStashArgs(name, { excludeVerification = false } = {}) {
+  const args = ['stash', 'push', '-u', '-m', name]
+  return excludeVerification ? [...args, '--', '.', `:(exclude)${VERIFICATION_DIR}`] : args
+}
+
+/**
+ * Does the `batch-in-flight` declaration name a run whose process is still
+ * alive? Only `pid` evidence answers, with the same identity check (start time,
+ * pid reuse) the declaration itself uses; a declaration whose processes are all
+ * gone protects nothing. `probePid` is batch-singleton's `probePid` shape.
+ */
+export function declaredRunAlive({ declaration = null, probePid = null, now = Date.now() } = {}) {
+  if (!declaration || typeof declaration !== 'object' || typeof probePid !== 'function') return false
+  const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
+  return evidence.some((item) => item?.kind === 'pid' && checkEvidence(item, { now, probePid }).ok)
+}

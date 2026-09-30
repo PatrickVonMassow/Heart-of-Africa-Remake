@@ -77,33 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
-  (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
-  run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the
-  wait was declared through `batch-in-flight`), and `batch-doctor` classified the
-  `verification/*.png` IT had just written as "uncommitted changes during/after a
-  parallel-session window — they cannot be attributed to one author" and stashed them: 31
-  frames first, three more nine minutes later.
-  WHY IT IS WRONG: the attribution is measurable, not ambiguous. The tree was clean when the
-  run started, the run is declared, and the files that appeared since are exactly its frames.
-  IMPACT: the picture series of a running COVERAGE measurement is scattered over two
-  quarantine stashes and the working tree. Whoever does not notice judges half a series or
-  none, and may sign a coverage whose frames nobody ever looked at — a false approval, which
-  is why this is filed under the infrastructure freeze rather than deferred to the backlog.
-  It was survived here only by copying all 34 frames out of the repository before the second
-  quarantine.
-  FINAL STATE: a quarantine no longer touches files that a LIVE, DECLARED verification is
-  writing itself. The decision has both halves available to it in the tree: the
-  `batch-in-flight` declaration naming the run, and that run's pid still alive. Everything
-  else it quarantines as before; a declaration whose process is gone protects nothing.
-  VERIFICATION: a unit test over the doctor's decision core — a dirty `verification/` file
-  plus a live declared run is NOT planned for quarantine, the same file without a live
-  declaration still is.
-  Criticality: high — it destroys the evidence of the most expensive measurement the batch
-  makes, and it did so twice unprompted.
-  Refs: scripts/batch-doctor.mjs, scripts/batch-in-flight.mjs, points 1147, 1142
-  Bundle: Testinfrastruktur
-
 - [ ] 1239. Caught children stand slumped instead of crouching (bank game and silent tag)
   User report 29.09.2026: in the bank game, a caught child's crouch reads as falling over or as bowing. MEASURED 29.09.2026: `PlaceLife.tsx` squashes the WHOLE figure group to `CROUCH_SQUAT` = 0.66 (the head turns oval, the legs shrink to 0.25 body heights), folds the trunk by `CROUCH_POSE.lean` = 0.85 rad (49°) about the hip, and crosses both arms 77° forward. The crown ends at 0.56 body heights, 0.53 body heights ahead of the feet, which is a bow. The figure has no knee, so nothing says that the body meant to go down.
   Sketch (discussion aid, not evidence): https://claude.ai/artifact/GYDdju8KpHHusst3LFi2Lx
@@ -15929,5 +15902,10 @@ to land than a mechanism that needs a review.
   VERIFICATION: a unit test over the resolved Vite config asserting both ignores; a `polish` run
   on WebGPU with a worktree created mid-run completes.
   Criticality: high — it silently voids the most expensive verification whenever delegation runs.
+  STATE 30.09.2026 01:45: branch at 49ea71151, Astra review merge-with-fixes recorded — anchor the
+  watch ignores to the config root (`**/.claude/**` also ignores a checkout served FROM a worktree)
+  and drop the undeclared `tinyglobby` import from the test.
+  OWED AFTER LANDING: the full `polish` run on both backends that landed point 1238 still owes
+  (render-verify-guard), which this crash voided.
   Refs: vite.config.ts, scripts/verify/polish.mjs, point 1150
   Bundle: Testinfrastruktur

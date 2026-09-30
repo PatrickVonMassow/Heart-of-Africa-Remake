@@ -24,7 +24,7 @@ import { REFUSALS, judgeTarget, normPath } from './worktree-cleanup-core.mjs'
 import { cleanupWorktree } from './worktree-cleanup.mjs'
 import { strayProcesses, STRAY_KIND } from './verify/machine-load-core.mjs'
 import { processStartTime } from './batch-singleton.mjs'
-import { MANDATE_MAX_AGE_MS, mandateMarkerVerdict } from './batch-doctor-core.mjs'
+import { MANDATE_MAX_AGE_MS, mandateMarkerVerdict, quarantineStashArgs } from './batch-doctor-core.mjs'
 
 /** A git runner bound to one checkout. Injectable everywhere below. */
 export const gitIn =
@@ -557,3 +557,31 @@ export function clearMandateMarker({ path } = {}) {
   rmSync(path, { force: true })
   return true
 }
+
+// ---------------------------------------------------------------------------
+// THE GIT REPAIRS OF A PARALLEL WINDOW — quarantine and rescue-and-reset
+// ---------------------------------------------------------------------------
+
+const stashTip = (git) => {
+  try {
+    return git(['rev-parse', '-q', '--verify', 'refs/stash'])
+  } catch {
+    return ''
+  }
+}
+
+/** Quarantine into a named stash. `created` is false when nothing eligible was
+ *  dirty (git then makes no stash at all). */
+export function quarantineStash({ git, name, excludeVerification = false } = {}) {
+  const before = stashTip(git)
+  git(quarantineStashArgs(name, { excludeVerification }))
+  const after = stashTip(git)
+  return { created: after !== '' && after !== before }
+}
+
+/** Keep local main on `rescue`, then hard-reset main to origin/main. */
+export function rescueAndReset({ git, rescue } = {}) {
+  git(['branch', rescue, 'main'])
+  git(['reset', '--hard', 'origin/main'])
+}
+

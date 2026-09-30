@@ -32618,3 +32618,30 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   USER, verbatim:
   User 29.09.2026 18:02: »Aktuelle ist nicht erkennbar, zu wem eine Sprechblase gehört. Das ist irritierend, wenn mehrere Personen gleichzeitig sichtbar sind.«
   User 29.09.2026 18:07: »Reihe einen neuen Task nach 1186 ein, der deine Vorschläge 1 und 2 umsetzt und 4 prüft. Sollte sich 4 gut umsetzen lassen, das miterledigen. Falls 4 zu kompliziert/fehleranfällig ist, nur 1 und 2 machen.«
+
+- [x] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
+  (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
+  run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the
+  wait was declared through `batch-in-flight`), and `batch-doctor` classified the
+  `verification/*.png` IT had just written as "uncommitted changes during/after a
+  parallel-session window — they cannot be attributed to one author" and stashed them: 31
+  frames first, three more nine minutes later.
+  WHY IT IS WRONG: the attribution is measurable, not ambiguous. The tree was clean when the
+  run started, the run is declared, and the files that appeared since are exactly its frames.
+  IMPACT: the picture series of a running COVERAGE measurement is scattered over two
+  quarantine stashes and the working tree. Whoever does not notice judges half a series or
+  none, and may sign a coverage whose frames nobody ever looked at — a false approval, which
+  is why this is filed under the infrastructure freeze rather than deferred to the backlog.
+  It was survived here only by copying all 34 frames out of the repository before the second
+  quarantine.
+  FINAL STATE: a quarantine no longer touches files that a LIVE, DECLARED verification is
+  writing itself. The decision has both halves available to it in the tree: the
+  `batch-in-flight` declaration naming the run, and that run's pid still alive. Everything
+  else it quarantines as before; a declaration whose process is gone protects nothing.
+  VERIFICATION: a unit test over the doctor's decision core — a dirty `verification/` file
+  plus a live declared run is NOT planned for quarantine, the same file without a live
+  declaration still is.
+  Criticality: high — it destroys the evidence of the most expensive measurement the batch
+  makes, and it did so twice unprompted.
+  Refs: scripts/batch-doctor.mjs, scripts/batch-in-flight.mjs, points 1147, 1142
+  Bundle: Testinfrastruktur
