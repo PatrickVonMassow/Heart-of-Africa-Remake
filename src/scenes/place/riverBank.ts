@@ -211,8 +211,12 @@ export const BANK_PLAY_LANE_HALF = 1.5
 // the stretch wherever it is put (work-order 1245) — still inside the plateau,
 // where the walkable ground reaches the water (`riverBank.test.ts` measures it).
 
-/** The water path's bearing off the bank normal: toward the point
- *  `waterFootBeyond` metres upstream of the stretch's upstream end. */
+/** The water path's BEARING off the bank normal: toward the point on the
+ *  stand line `waterFootBeyond` metres upstream of the stretch's upstream end.
+ *  The landing itself lies on that bearing, inset radially from the top of the
+ *  bank as it always has (work-order 688), so its along-bank distance past the
+ *  stretch is about 1.2 m short of `waterFootBeyond` (~7.3 m at 8.5); the fill
+ *  spot shares the bearing, which keeps the carrier's walk one straight line. */
 function waterPathAngle(walkEdge: number): number {
   const stretch = bankStretch(walkEdge)
   const along = stretch.centre - stretch.half - balance.villageLife.adultErrands.waterFootBeyond
