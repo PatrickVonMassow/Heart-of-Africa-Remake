@@ -161,6 +161,22 @@ describe('the timing: nobody waits long for the other (work-order 1245 item 4)',
     expect(mean(roundWaits)).toBeLessThanOrEqual(cfg.waitBudgetSeconds)
   })
 
+  it('the carrier is first back at the bank the planned lead before the first full basket', () => {
+    const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
+    const lane = canoeLane(bank)
+    const sites = fisherySites(bank, lane)
+    const ring = createFisheryRing()
+    const untilFull = 140
+    const fire = createFishFire(sites, ring, untilFull, cfg, mulberry32(3))
+    const dt = 0.05
+    let t = 0
+    while (fire.carrier.phase !== 'waitBank' && t < 400) {
+      stepFishFire(fire, sites, ring, dt, 139, cfg, mulberry32(3))
+      t += dt
+    }
+    expect(t).toBeCloseTo(untilFull - cfg.carrierLeadSeconds, 0)
+  })
+
   it('gutting fills the gap, and never falls below a readable minimum per fish', () => {
     const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
     const lane = canoeLane(bank)

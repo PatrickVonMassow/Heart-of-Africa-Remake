@@ -202,7 +202,8 @@ export function createFishFire(
     clock: 0,
     ...sites.carrierAtFire,
     walked: 0,
-    gutSeconds: Math.max(0, untilFull - cfg.carrierLeadSeconds - walk - cfg.liftSeconds),
+    // The gut phase charges a set-down lift before and a take-up lift after.
+    gutSeconds: Math.max(0, untilFull - cfg.carrierLeadSeconds - walk - 2 * cfg.liftSeconds),
     gutOf,
     gutted: 0,
     waiting: 0,
