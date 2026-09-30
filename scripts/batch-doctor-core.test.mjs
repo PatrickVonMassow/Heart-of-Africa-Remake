@@ -6,6 +6,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   planRemediation,
+  declaredRunAlive,
+  quarantineScope,
+  parsePorcelainZ,
   needsRepair,
   isConsistent,
   isEvidenceGrade,
@@ -663,3 +666,79 @@ describe('resumeRepairMandate — the same seam, checked from the session side',
     expect(resumeRepairMandate({ ran: false, code: null })).toBeNull()
   })
 })
+
+describe('quarantine spares the frames of a live declared verification run', () => {
+  const RUN_PID = 661900
+  const RUN_STARTED = 1_000_000
+  const declaration = {
+    v: 1,
+    waitingOn: 'polish picture run',
+    evidence: [{ kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'polish' }],
+  }
+  const alive = (pid) => (pid === RUN_PID ? { exists: true, startedAt: RUN_STARTED } : { exists: false, startedAt: null })
+  const dead = () => ({ exists: false, startedAt: null })
+  const reused = () => ({ exists: true, startedAt: RUN_STARTED + 60_000 })
+  const frame = 'verification/105-cairo-panorama-giza-clear.png'
+  const planFor = (probePid, decl = declaration) =>
+    planRemediation({
+      ...clean,
+      dirtyFiles: [frame],
+      parallelDetected: true,
+      verificationWriterLive: declaredRunAlive({ declaration: decl, probePid }),
+    })
+
+  it('a dirty verification/ file plus a live declared run is NOT planned for quarantine', () => {
+    expect(planFor(alive).map((a) => a.action)).not.toContain('quarantine-stash')
+  })
+
+  it('the same file without a declaration is still quarantined', () => {
+    expect(planFor(alive, null).map((a) => a.action)).toContain('quarantine-stash')
+  })
+
+  it('a declaration whose run pid is gone (or reused) protects nothing', () => {
+    expect(planFor(dead).map((a) => a.action)).toContain('quarantine-stash')
+    expect(planFor(reused).map((a) => a.action)).toContain('quarantine-stash')
+  })
+
+  it('a declaration with only log evidence names no live run', () => {
+    const logOnly = { ...declaration, evidence: [{ kind: 'log', path: 'local/run.log' }] }
+    expect(declaredRunAlive({ declaration: logOnly, probePid: alive })).toBe(false)
+  })
+
+  it('other dirty files are still quarantined, with verification/ excluded while the run lives', () => {
+    const plan = planRemediation({
+      ...clean,
+      dirtyFiles: [frame, 'src/x.ts'],
+      parallelDetected: true,
+      verificationWriterLive: declaredRunAlive({ declaration, probePid: alive }),
+    })
+    const q = plan.find((a) => a.action === 'quarantine-stash')
+    expect(q.excludeVerification).toBe(true)
+    expect(planFor(dead).find((a) => a.action === 'quarantine-stash').excludeVerification).toBe(false)
+  })
+
+  it('-z porcelain parses renames structurally, both directions, and keeps arrows in names', () => {
+    const live = { verificationWriterLive: true }
+    const z = (...fields) => fields.join('\0') + '\0'
+    expect(parsePorcelainZ(z('R  verification/new.png', 'src/old.png'))).toEqual(['verification/new.png', 'src/old.png'])
+    expect(quarantineScope(parsePorcelainZ(z('R  verification/new.png', 'src/old.png')), live).needed).toBe(true)
+    expect(quarantineScope(parsePorcelainZ(z('R  src/new.png', 'verification/old.png')), live).needed).toBe(true)
+    // an ordinary name containing " -> " and a non-ASCII name are single, unquoted paths
+    const onlyFrames = parsePorcelainZ(z(' M verification/a -> b.png', '?? verification/ä.png'))
+    expect(onlyFrames).toEqual(['verification/a -> b.png', 'verification/ä.png'])
+    expect(quarantineScope(onlyFrames, live).needed).toBe(false)
+  })
+
+  it('only verification/ dirty with a live writer: nothing is eligible, no quarantine planned', () => {
+    const plan = planRemediation({ ...clean, dirtyFiles: [frame], parallelDetected: true, verificationWriterLive: true })
+    expect(plan).toEqual([])
+  })
+
+  it('a diverged main with a live writer refuses the hard reset (alert), without one it is planned', () => {
+    const diverged = { ...clean, divergence: { ahead: 1, behind: 1 } }
+    const live = planRemediation({ ...diverged, verificationWriterLive: true }).map((a) => a.action)
+    expect(live).toEqual(['alert-reset-deferred'])
+    expect(planRemediation(diverged).map((a) => a.action)).toEqual(['rescue-and-reset'])
+  })
+})
+
