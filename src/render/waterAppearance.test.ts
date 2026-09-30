@@ -143,6 +143,8 @@ describe('the drifting foam patches are shaded as the water they ride', () => {
     expect(src).not.toMatch(/smoothstep\(float\(1\),/)
     expect(src).toContain('smoothstep(float(FOAM_PATCH_CORE), float(1), edge).oneMinus()')
     expect(src).toContain('smoothstep(float(1 - FOAM_PATCH_RIM), float(1), r).oneMinus()')
+    // Both factors must reach the node the material draws with.
+    expect(src).toContain('m.opacityNode = fray.mul(guard).mul(FOAM_PATCH_OPACITY)')
   })
 
   it('is round enough that no facet corner shows, and faces up like the water', () => {
