@@ -32742,3 +32742,58 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   misleads no mechanic.
   Refs: src/scenes/place/riverBank.ts, scripts/verify/polish.mjs, point 1147
   Bundle: Dorfleben.
+
+- [x] 1145. A frame-subject miss KILLS the whole run instead of failing one check, and two
+  frames now do it on `main` itself (filed 17.09.2026 from point 1140's covering passes;
+  the falls half classified PRE-EXISTING by two baseline runs on f347b652d).
+  TWO FRAMES, ONE SHAPE. `72-water-victoria-falls` (enrichments): the subject sits at
+  lat -17.92, lon 25.85, the traveller stood 4.52 degrees away, the projection landed at
+  ndc (-4.26, -3.70) off the left and bottom edge, and the camera had NOT settled after
+  15010 ms of polling. `11-worldmodel-khartoum-confluence` (world, WebGL 2, 16.09.2026):
+  the same wording, off the same two edges. Both times `frameSubject.mjs` THROWS, node
+  exits, and the run dies rather than reports — so it covers no backend, no red in it can
+  be charged, and only a hand-signed crash sign-off gets it off the guard's list. Three
+  such crashed records stood on `main` when 1140 landed.
+  A THIRD FRAME, AND THE FIRST THAT IS REPRODUCIBLE ON DEMAND (measured 22.09.2026 during the
+  covering runs of point 1182): `648-village-children` (polish, WebGL 2) misses its subject off
+  the BOTTOM edge and takes the pass with it — twice in a row, at 166 checks and 36 frames after
+  19m 41s and 19m 35s, on the same tree e1b7d1561. Its OWN section is green on both sides:
+  `polish --section=children-tag` passes 16/16 at e1b7d1561 AND at `main` 86c4babaf, WebGL 2,
+  minutes apart. So the frame misses only INSIDE the pass — something earlier in the run leaves
+  the children or the camera where the section never finds them — and the same wording was
+  already recorded inside a full WebGPU pass on `main` at 9259d6dd8 earlier that day, with its
+  section green right after. That makes this the cheapest reproduction of both questions below:
+  the miss has a section-versus-pass difference to measure, and the throw costs a whole pass
+  every time it happens.
+  SO THERE ARE TWO QUESTIONS, and the second is the expensive one:
+  1. WHY THESE TWO FRAMES MISS. A travel that stops short is a game defect; a wait that
+     expires on a camera still moving is a suite defect. The printed evidence names both
+     (4.52 degrees away AND not settled), so decide it by measurement before repairing —
+     the two have opposite repairs.
+  2. WHY ONE MIS-AIMED FRAME COSTS A WHOLE PASS. Point 375 rightly refuses to write a frame
+     that does not show what its name claims; killing the process is not part of that
+     ruling, and it converts a one-check failure into an unownable crash record that every
+     later session has to sign off by hand.
+  Final state:
+  - Both frames are written and contain their subject, or each is declared a general view
+    with its measured reason (point 375 allows exactly that, and nothing else).
+  - A frame-subject miss FAILS ITS CHECK and lets the suite finish, so the run reports,
+    covers its backend where the rest is green, and its red can be charged like any other.
+  Test: Playwright — `enrichments --section=rivers` and `world` as the rungs, then each
+  whole suite on the affected backend; plus a Vitest case over the frame-subject verdict
+  proving a miss returns a failing check rather than throwing.
+  Criticality: medium for the picture, high for the evidence — no player sees these frames,
+  but each miss destroys a whole pass's coverage, which is how point 1065 lost 23 LARGE runs.
+  Refs: scripts/verify/frameSubject.mjs (the throw at the end of captureFrame),
+  scripts/verify/enrichments.mjs, scripts/verify/world.mjs, scripts/render-verify-charges.mjs,
+  point 375, point 1089, point 1115, point 1142.
+  Bundle: Testinfrastruktur.
+  PROGRESS 30.09.2026 (branch feat/1145-frame-subject-miss-fails-check, 148379691 pushed): code done.
+  Question 1 MEASURED: the river current (design.md §11) swept the traveller 3.2-4.5 degrees
+  downstream from frames set down in the Zambezi and the Nile, a suite defect; `jumpBeside`
+  stands him on dry land or current-free water (FAIL and no jump otherwise). Question 2: the
+  shutter returns null and fails one check. Unrecorded direct runs green (rivers 5/5 WebGPU,
+  landmark-frames 7/7 on both backends), pictures judged. Astra review merge-with-fixes on
+  c0682c0d3, its three P2 fixed in 148379691 — a re-review of that commit is owed. LEFT: the
+  recorded section rungs, whole `world` (WebGL 2) and `enrichments` (WebGPU), full unit run,
+  landing. `648-village-children` split out as point 1244.
