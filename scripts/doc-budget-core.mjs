@@ -470,7 +470,9 @@ export const DOC_BUDGETS = [
     // catch a two-basket rotation to a fire with its carrier, griller, smoking
     // rack and eater, and the bank symmetric with the children's stretch moved
     // upstream — new concepts, while the old dugout text went.
-    maxWords: 29871,
+    // RAISED by 16 measured words (work-order 1250): the dugout's start short of
+    // the upstream end and its words no longer waiting for ROCK — a new decision.
+    maxWords: 29887,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

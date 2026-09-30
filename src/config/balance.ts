@@ -949,6 +949,9 @@ interface BalanceConfig {
       /** The longest a word waits for the settlement's floor before the boat
        *  goes on unspoken (the floor then forgets it). */
       wordWaitSeconds: number
+      /** Seconds after a visit opens until the net man's first word: the
+       *  dugout is found this far short of the lane's upstream end. */
+      firstCallSeconds: number
       /** Fish per haul, drawn per haul, and their length (m). */
       catchMin: number
       catchMax: number
@@ -1899,6 +1902,10 @@ export const balance: BalanceConfig = {
       // Well inside the floor's own 240 s hold, so a held word is let go by
       // the boat rather than forced out by the floor.
       wordWaitSeconds: 12,
+      // Calibratable (work-order 1250): long enough that the boat is seen
+      // under way before the word, short enough that a player walking in from
+      // the entrance hears the first DOWNSTREAM within a few seconds.
+      firstCallSeconds: 4,
       // A drift net of the middle Niger brings a handful of fish per drift,
       // Nile perch young and tilapia of a hand to a forearm (user 30.09.2026:
       // "recognisable, not stylised").

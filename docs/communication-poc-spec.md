@@ -332,8 +332,10 @@ ONE body working against the current and then riding it. Once per leg, shortly
 after he is under way, he CALLS the word of his heading at the call register,
 with the reading over his head and his arm pointing the way he heads, through
 the same distance gate as every village voice; the settlement's floor grants
-the call, and the direction words wait for the listener's first ROCK as at the
-bank. Because the lane keeps the talk hearing radius twice over from the
+the call. Unlike the bank's, these direction words do not wait for the
+listener's first ROCK: they name the current, not a rock, and a spectator at the
+boat hears no ROCK (work-order 1250). A visit finds the dugout a few seconds
+short of its upstream end, so the first word falls as the player arrives. Because the lane keeps the talk hearing radius twice over from the
 stretch, a spectator hears the spoken words of one picture or the other, never
 both; the call alone carries into the children's zone. Values:
 `balance.villageLife.canoe`; cycle: `src/scenes/place/villagerCanoe.ts`.
