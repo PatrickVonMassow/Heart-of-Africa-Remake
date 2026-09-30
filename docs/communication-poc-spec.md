@@ -225,9 +225,12 @@ catcher waits at the other, the direction is announced before each run, the
 catcher steps to his stone, LAYS HIS HAND ON IT and names `ROCK` while everybody
 holds at the stones. The catcher then steps back into his group before the run;
 whoever reaches the far rock calls `ROCK`, and whoever is
-caught drops out where he stands. Sides swap every run, so the announced word alternates by construction.
-When no free runner is left, the caught children stay crouched for a readable
-ending before everybody rises and walks back toward the roaming quarter.
+caught drops out where he stands and stays standing there in a frustrated
+slump: full height, trunk leaned forward by `caughtSlumpLean`, both arms hanging
+plumb close to the body (`caughtSlumpArmRoll`). The silent tag round's caught
+child stands out its beat in the same pose. Sides swap every run, so the announced word alternates by construction.
+When no free runner is left, the caught children stay slumped for a readable
+ending before everybody straightens and walks back toward the roaming quarter.
 
 `ROCK` is grounded beyond arrival at a target. It cannot be learned as "made it",
 because the catcher taps his own rock and names it at the start of a run with

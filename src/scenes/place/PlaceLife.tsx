@@ -79,6 +79,7 @@ import {
   steerGrab,
   tagBody,
   tagFigurePose,
+  bankFigurePose,
   takeCries,
   type TagChild,
 } from './tagGame'
@@ -867,22 +868,6 @@ function speakLoomCall(
 /** Height factor of a child figure against a grown one. */
 const KID_SCALE = CHILD_FIGURE_SCALE
 
-/**
- * A TAGGED CHILD'S POSTURE (work-order 687 item 3): squatted to about two thirds
- * of its height, trunk folded well over and both arms crossed in front of the
- * chest. It must never be confusable with a walking child, which is why all
- * three read at once — the height, the fold and the arms — and why the legs go
- * still by themselves (a child that walks nowhere adds nothing to `walked`, and
- * the gait rides that).
- */
-const CROUCH_SQUAT = 0.66
-const CROUCH_POSE: FigurePose = {
-  left: { pitch: -1.35, yaw: 0.55, roll: -0.95 },
-  right: { pitch: -1.35, yaw: -0.55, roll: 0.95 },
-  lean: 0.85,
-  turn: 0,
-}
-
 /** The catch frame as the drawn hands show it (work-order 1176, dev read-back). */
 interface TagCatchShot {
   clock: number
@@ -1431,12 +1416,13 @@ function Kids({
       const gaitLift = gaitBodyLift(phase, legLength)
       const lift = round.bank ? bankChildBodyLift(c as BankChild, gaitLift, bankChildTouching(round.bank, i)) : gaitLift
       g.position.set(c.x, groundHeight(c.x, c.z) + lift, c.z)
-      // A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY (work-order 687 item 3):
-      // squatted down, trunk folded over and both arms crossed in front of it.
-      // Written here rather than as a prop, because the state changes inside the
-      // frame loop and a re-render per tag would be the wrong tool.
-      const crouched = (c as BankChild).crouched === true
-      g.scale.set(1, crouched ? CROUCH_SQUAT : 1, 1)
+      // A TAGGED CHILD IS OUT OF PLAY (work-order 687 item 3, redrawn in 1239):
+      // it stands at full height in the caught slump — trunk leaned forward,
+      // arms hanging plumb — rather than the former squat, which read as a fall
+      // or a bow. Written in the pose below rather than as a prop, because the
+      // state changes inside the frame loop and a re-render per tag would be
+      // the wrong tool.
+      const slumped = (c as BankChild).slumped === true
       // The eased FACING, not the raw travel heading: the body turns into a new
       // direction rather than snapping about-face inside one frame.
       g.rotation.y = c.facing
@@ -1481,17 +1467,17 @@ function Kids({
         const reach = gesture.current.kind === 'touch' ? gestureEnvelope(gesture.current) : 0
         const gaze = i === game.chaser ? chaserGaze(game, tagCfg) : 0
         const turn = (grabTurns.current[i] ?? 0) * reach + gaze * (1 - reach)
-        const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn)
+        const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn, tagCfg)
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
         pose.lean = drawn.lean
       } else {
-        const shown = gesturePose(gesture.current)
-        pose.left = crouched ? CROUCH_POSE.left : shown.left
-        pose.right = crouched ? CROUCH_POSE.right : shown.right
-        pose.turn = shown.turn
-        pose.lean = crouched ? CROUCH_POSE.lean : c.lean + shown.lean
+        const drawn = bankFigurePose(slumped, gesturePose(gesture.current), c.lean, tagCfg)
+        pose.left = drawn.left
+        pose.right = drawn.right
+        pose.turn = drawn.turn
+        pose.lean = drawn.lean
       }
       applyFigurePose(limbs.current[i]?.current ?? null, pose)
       // THE CATCH FRAME, read off the drawn hands (work-order 1176, the same
@@ -1596,9 +1582,8 @@ function Kids({
       if (!g) return null
       g.updateWorldMatrix(true, true)
       return worldHands(g).map((h) => {
-        // The outer group is unscaled (metres) apart from a tagged child's crouch
-        // squash in the bank round; the figure inside it is drawn at the child's
-        // scale, so body heights are metres over that scale.
+        // The outer group is unscaled (metres); the figure inside it is drawn at
+        // the child's scale, so body heights are metres over that scale.
         const local = g.worldToLocal(new THREE.Vector3(h.x, h.y, h.z)).divideScalar(KID_SCALE)
         return { ...h, local: { x: local.x, y: local.y, z: local.z } }
       })
@@ -3443,8 +3428,7 @@ function ErrandVillagers({
         if (facing !== null) yaws.current[i] = facing
         g.rotation.y = yaws.current[i]
         // THE SINK, which is half of what makes a fill read as fetching rather
-        // than as falling: a y-squash on the figure's own group, exactly as the
-        // crouching child's is drawn (work-order 1085).
+        // than as falling: a y-squash on the figure's own group (work-order 1085).
         const squash = filling === null ? 1 : fillSquat(filling)
         g.scale.set(1, squash, 1)
         const squatRef = squats.current[i]

@@ -153,7 +153,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    * children whose catcher swept the line: one run of 2.4-3.3 s closed the
    * cycle. Work-order 1047 made the round watchable instead — a fifth child,
    * a catcher that holds at its one tag, a held tap before each run and a
-   * readable crouch at the end — so a cycle now takes three or four runs and
+   * readable slump at the end — so a cycle now takes three or four runs and
    * the gather walks one more body down to the bank. Re-measured over 400 s of
    * each of the four layouts, the first full cycle closes at 105.1 s
    * (nubian@42), 108.3 s (bambara@2972259115), 164.7 s (mandinka@99) and

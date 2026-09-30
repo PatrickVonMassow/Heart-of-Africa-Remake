@@ -26,6 +26,8 @@ import {
   steerGrab,
   tagBody,
   tagFigurePose,
+  bankFigurePose,
+  caughtSlumpPose,
   takeCries,
   type TagChild,
   type TagConfig,
@@ -49,7 +51,10 @@ import {
   restGesture,
   startGesture,
   TOUCH_LEAN,
+  type ArmPose,
+  type FigurePose,
 } from '../../render/gesture'
+import { readFileSync } from 'node:fs'
 import { CHILD_FIGURE_SCALE, FIGURE_LIMBS } from '../../render/figures'
 import { cryPlan } from '../../communication/speaking'
 import { SpeechFloor } from '../../communication/speechFloor'
@@ -1872,9 +1877,9 @@ describe('the tag round reads at a glance (work-order 1176)', () => {
     const s = pairAt(3)
     expect(tagBody(s, 0)).toBe('chaser')
     expect(tagBody(s, 1)).toBe('runner')
-    const rest = tagFigurePose('runner', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0.1, 0)
+    const rest = tagFigurePose('runner', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0.1, 0, CFG)
     expect(rest.left).toEqual(REST_POSE.left)
-    const forward = tagFigurePose('chaser', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0.1, 0)
+    const forward = tagFigurePose('chaser', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0.1, 0, CFG)
     expect(forward.left).toEqual(CHASER_ARMS.left)
     expect(forward.right).toEqual(CHASER_ARMS.right)
     // Both hands in front of the body at chest height, not at its sides.
@@ -1883,9 +1888,8 @@ describe('the tag round reads at a glance (work-order 1176)', () => {
       expect(d[2]).toBeGreaterThan(0.8)
       expect(FIGURE_LIMBS.shoulderY + d[1] * FIGURE_LIMBS.armLength).toBeGreaterThan(0.45)
     }
-    const caught = tagFigurePose('caught', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0, 0)
-    expect(caught.left).toEqual(REST_POSE.left)
-    expect(caught.right).toEqual(REST_POSE.right)
+    const caught = tagFigurePose('caught', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0, 0, CFG)
+    expect(caught).toEqual(caughtSlumpPose(CFG))
   })
 
   it("the catcher's head bearing tracks its quarry, within the gaze limit", () => {
@@ -2016,5 +2020,72 @@ describe('the tag round reads at a glance (work-order 1176)', () => {
     const t = pairAt(CFG.catchDistance * 0.5)
     stepTagGame(t, 1e-6, CFG, OPEN)
     expect(takeCries(t, held)).toEqual([0])
+  })
+})
+
+describe('a caught child stands slumped (work-order 1239)', () => {
+  const MOVING: FigurePose = { left: { pitch: -1, yaw: 0.3, roll: 0.1 }, right: { ...REST_POSE.right }, lean: 0.1, turn: 0.2 }
+
+  /** The arm's direction in the figure's own frame once the trunk has leaned. */
+  function worldArm(arm: ArmPose, lean: number): [number, number, number] {
+    const [x, y, z] = armDirection(arm)
+    return [x, y * Math.cos(lean) - z * Math.sin(lean), y * Math.sin(lean) + z * Math.cos(lean)]
+  }
+
+  function expectSlump(p: FigurePose): void {
+    expect(p.lean).toBe(CFG.caughtSlumpLean)
+    for (const [arm, side] of [[p.left, 1], [p.right, -1]] as const) {
+      const [x, y, z] = worldArm(arm, p.lean)
+      // Plumb: no forward or backward swing left once the trunk's tilt is added.
+      expect(z).toBeCloseTo(0, 9)
+      expect(y).toBeLessThan(-0.95)
+      // Close to the body, outward on its own side, by the configured roll.
+      expect(Math.sign(x)).toBe(side)
+      expect(Math.abs(arm.roll)).toBeCloseTo(CFG.caughtSlumpArmRoll, 9)
+      expect(Math.abs(arm.roll)).toBeLessThan(Math.abs(REST_POSE.left.roll))
+    }
+  }
+
+  it('the slump leans the configured amount, clearly more than a sprint', () => {
+    expect(CFG.caughtSlumpLean).toBeGreaterThan(CFG.leanAtSprint + 0.1)
+    expect(CFG.caughtSlumpLean).toBeLessThan(0.6)
+    expectSlump(caughtSlumpPose(CFG))
+  })
+
+  it('a caught bank child is drawn in it, whatever gesture or run lean it had', () => {
+    expectSlump(bankFigurePose(true, MOVING, CFG.leanAtSprint, CFG))
+    const free = bankFigurePose(false, MOVING, 0.2, CFG)
+    expect(free.left).toEqual(MOVING.left)
+    expect(free.lean).toBeCloseTo(0.3, 9)
+  })
+
+  it('the tag child during its caught beat is drawn in the same pose', () => {
+    const s = game([
+      [0, 0],
+      [3, 0],
+    ])
+    s.chaser = 0
+    s.playing = true
+    s.target = 1
+    s.pauseFor = CFG.caughtPauseSeconds
+    expect(tagBody(s, s.chaser)).toBe('caught')
+    expectSlump(tagFigurePose(tagBody(s, s.chaser), MOVING, 0, CFG.leanAtSprint, 0, CFG))
+  })
+
+  it('the constants are read, not hardcoded', () => {
+    const p = caughtSlumpPose({ caughtSlumpLean: 0.47, caughtSlumpArmRoll: 0.15 })
+    expect(p.lean).toBe(0.47)
+    expect(p.left.roll).toBe(0.15)
+    expect(p.right.roll).toBe(-0.15)
+    expect(worldArm(p.left, p.lean)[2]).toBeCloseTo(0, 9)
+  })
+
+  it('the squat path is gone: no y-squash and no crouch pose on a child', () => {
+    const src = readFileSync('src/scenes/place/PlaceLife.tsx', 'utf8')
+    expect(src).not.toMatch(/CROUCH_SQUAT|CROUCH_POSE|\.crouched\b/)
+    expect(src).toMatch(/bankFigurePose\(slumped, /)
+    // The only y-scale a settlement figure still takes is the adult's jar fill.
+    expect(src.match(/\bg\.scale\.set\(1, /g) ?? []).toHaveLength(1)
+    expect(src).toMatch(/g\.scale\.set\(1, squash, 1\)/)
   })
 })

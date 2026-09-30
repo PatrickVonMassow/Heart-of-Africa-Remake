@@ -167,6 +167,8 @@ const TAG_FIELDS: ReadonlyArray<{
   { key: 'leanAtSprint', label: 'tagLean', step: 0.02, min: 0 },
   { key: 'turnRate', label: 'tagTurnRate', step: 0.2, min: 0.1 },
   { key: 'caughtPauseSeconds', label: 'tagCaughtPause', step: 0.1, min: 0 },
+  { key: 'caughtSlumpLean', label: 'tagCaughtSlumpLean', step: 0.02, min: 0, max: 1.2 },
+  { key: 'caughtSlumpArmRoll', label: 'tagCaughtSlumpArmRoll', step: 0.02, min: 0, max: 1 },
   { key: 'gazeTurnMax', label: 'tagGazeTurn', step: 0.05, min: 0 },
   { key: 'crySeconds', label: 'tagCrySeconds', step: 0.02, min: 0.05 },
   { key: 'cryPitchSpread', label: 'tagCryPitchSpread', step: 0.02, min: 0, max: 0.5 },

@@ -781,6 +781,9 @@ interface BalanceConfig {
       /** Seconds the freshly caught child stands before it chases (work-order
        *  1176); never longer than `immunitySeconds`. */
       caughtPauseSeconds: number
+      /** A caught child's slump (work-order 1239): trunk lean and arm roll (rad). */
+      caughtSlumpLean: number
+      caughtSlumpArmRoll: number
       /** Largest trunk turn (rad) the chaser's gaze takes toward its quarry. */
       gazeTurnMax: number
       /** The catcher's wordless cry: length (s), per-cry pitch spread (±
@@ -822,7 +825,7 @@ interface BalanceConfig {
       regroupSeconds: number
       /** How long the group walks toward its roaming quarter before roaming again. */
       partSeconds: number
-      /** How long caught children stay down after the cycle's last run. */
+      /** How long caught children stay slumped after the cycle's last run. */
       endPauseSeconds: number
       /** Arrival (safe) radius around a rock's centre, outside its collider;
        *  the runner walks on from here before its hand names the stone. */
@@ -1515,6 +1518,13 @@ export const balance: BalanceConfig = {
       // Work-order 1176, calibratable estimates. The caught child's beat of
       // frustration; the tag-back window (1.4 s) covers it plus a first step.
       caughtPauseSeconds: 0.7,
+      // Work-order 1239, calibratable estimates. A caught child stands in a
+      // frustrated slump instead of squatting: the trunk leans forward (0.40 rad
+      // = 23°, clear of the sprint's 0.28) and both arms hang plumb, close to
+      // the body. Used by the tag round's beat and the bank round's caught
+      // children alike.
+      caughtSlumpLean: 0.4,
+      caughtSlumpArmRoll: 0.2,
       // The chaser looks at its quarry within a modest trunk turn.
       gazeTurnMax: 0.6,
       // One wordless child cry on the catch: a short "ha!", varied a little per
