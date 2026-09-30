@@ -77,52 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1245. Two fishermen with a drift net, basket rotation to a fish fire, children's game moved upstream
-  Queue position: NEXT point in the work order (user order 30.09.2026).
-  Final state:
-  1. TWO FISHERMEN, DRIFT-NET CYCLE. The riverside village's dugout carries two men (Bozo/Somono reference as before; the Bambara village keeps its lect): a PADDLER and a NET MAN. Cycle, all timings calibratable in src/config/balance.ts:
-     - Upstream leg: the paddler paddles hard close in where the current is weakest; the net man sits with the folded net before him.
-     - Upstream end: the net man says DOWNSTREAM to the paddler; the paddler stops paddling and swings the bow out into the current, and the net man pays the net out. Visible consequence of the word: the paddler's changed action.
-     - Downstream leg: the net man holds the net in the water (a visible line of floats on the surface); the paddler steers only.
-     - Downstream end: BOTH men haul the net into the hull together; visible catch comes up in it (see 3).
-     - Landing and hand-over (see 4), then the net man says UPSTREAM to the paddler, who takes up hard strokes again.
-     Both words come from the net man, each addressed to the paddler, each followed by the paddler's visible action. They stay in the CALL register and call reach (user: "Beim Rufen bleiben passt").
-  2. The design.md exception is removed: the fisherman's call now has an addressee, so "every utterance but the fisherman's call" becomes "every utterance" (design.md §13.4, line 412) and the "a call, not speech … needs no addressee" sentence goes. §13.4 describes the two-man drift-net cycle; the speech section (line 422) keeps the fisherman's calls in the CALL register; the vignette list (line 723) names the fishers, carrier, griller, smoking rack and eater.
-  3. RECOGNISABLE CATCH, not stylised: several single fish (≈ 4–8 per haul, calibratable) of realistic size (≈ 25–40 cm), silvery with a sheen that catches the light, flapping while the net comes in and afterwards in the hull and in the basket. Fish do not vanish after the haul; they lie in the hull until the landing.
-  4. THE BASKET ROTATION (exactly two woven baskets, always circulating):
-     - Every round ends at the landing: the fishermen run the bow onto the sand, take the EMPTY basket standing on the bank, fill it with the fish from the hull, set the FULL basket on the bank, and push off.
-     - A CARRIER sets the empty basket down at the bank and takes the full one; if the boat has not landed yet he waits at the bank.
-     - At the fire he sets the full basket down, picks up the empty one of the previous round and walks directly back to the bank.
-     - The fire is the fishers' OWN fire near the bank at the downstream landing (not the existing village fire pit, whose vignettes stay untouched). Its route never crosses the children's stretch.
-     - Timing balance: the carrier fills the gap by GUTTING the fish at the fire before the griller takes them over, the amount tuned so he is back at the bank about when the boat lands. Neither the boat nor the carrier waits more than ≈ 15 s per round on average (calibratable; Vitest over the cycle state machines). Waiting is the fallback, never the normal case.
-  5. THE GRILLER AND THE SMOKING RACK: a second villager at that fire grills the gutted fish over the embers, turns them, and lays them on a smoking rack beside the fire. The rack stays at a roughly constant fill: when he lays fresh fish on, he packs the driest smoked fish into a storage basket beside the rack.
-  6. THE EATER: every few minutes (calibratable) a villager comes to the rack, takes one fish and VISIBLY eats it (hand to mouth, the fish diminishing), then goes back. Wordless — nobody speaks to nobody.
-  7. The fish trap cone and the lone paddler's trap check are removed (mesh, phase, balance values, tests).
-  8. SYMMETRIC BANK, GAME MOVED UPSTREAM: the walkable bank reaches the water equally far on both sides of the settlement's bank normal (≈ 45 m each; the upstream plateau angle equals the downstream one, fades likewise). The children's stretch moves ≈ 29 m upstream (centre ≈ s = −29, span within the existing 14–21 m limits) so that its upstream reach matches the downstream one. The adults' water path moves upstream with the stretch so it keeps its relation to the game and its distance from the lane. Values calibratable.
-  9. LONGER LANE: the lane keeps its 7 m offset and its ≥ 20 m minimum from the children's stretch AND from the adults' water-work sites (no standing place hears the spoken words of the water work and the boat's words together); it now runs from ≈ s = −2 to s = +47 (≈ 49 m instead of 20 m). The invariant test covers both gaps on every riverside village.
-  10. EXTENT CHECK UPSTREAM: measure on every shipped riverside village that terrain, bank bed and collision reach the new upstream plateau end (≈ 60 m from the centre), and that the moved stretch lies on straight enough bank to keep its span in [14, 21] m; a failing village is named by the test. Extend where needed. Record the numbers in the evidence.
-  11. PICTURES: new standing places — the boat's (its haul/call in frame, no child or rock), the children's game (game in frame, the boat's spoken exchange not audible there), and the fire (carrier, griller, rack with fish readable). Criterion 7 evidence retaken from the moved stretch; its photo stand moves with it.
-  Tests: Vitest for the two-man cycle and word→action consequences, the basket rotation (two baskets, never more, never lost), wait budgets, rack fill steady state, eater cadence, the symmetric plateau, the moved stretch and water path, both ≥ 20 m gaps; Playwright pictures for the three standing places, both backends (backend-sensitive scene).
-  Observed at 1968fb546 (why): the lone paddler of point 1237 calls UPSTREAM/DOWNSTREAM to nobody
-  (design.md §13.4 exemption), his up-and-down cycle has no purpose, and he bends over an open
-  0.8 m sand-coloured cone (PlaceLife.tsx:4134, "fish trap") with no result; the walkable bank is
-  ≈ 45 m downstream (BANK_DOWNSTREAM_PLATEAU_ANGLE 0.85) against ≈ 16.2 m upstream
-  (BANK_PLATEAU_ANGLE 0.384), frontages A/B on the user's sketch unequal.
-  Implied doc changes: design.md §13.4 (lines 412, 422, 723); riverBank.ts comment "THE BANK IS
-  WIDER DOWNSTREAM" rewritten; docs/acceptance-criteria-detail.md / docs/acceptance-evidence.md
-  criterion 7 (moved photo stand).
-  Refs: src/scenes/place/villagerCanoe.ts, src/scenes/place/PlaceLife.tsx (canoe ~4080-4150),
-  src/scenes/place/riverBank.ts, src/scenes/place/adultWork.ts, src/config/balance.ts
-  (villageLife.canoe); predecessor point 1237. Spec cut from git revision 1968fb546.
-  USER, verbatim:
-  user 30.09.2026: "Der Bootsfahrer fährt jetzt hin und her. Aber: Wo ist derjenige, der ihm Anweisungen gibt? Aktuell kommentiert er selbst seine Tätigkeiten - offensichtlich nur, um die Worte dem Zuschauer zu zeigen. Das ist ein Muster, das wir algemein als Faux Pas abgelehnt haben, weil es nicht organisch aus seinen Tätigkeiten hervorgeht. Und warum fährt er überhaupt hin und her? Das sieht nach einer Tätigkeit zum Selbstzweck aus. Und: Warum steigt er zwischendurch aus und was stellt dieser Kegel dar? Was macht er damit?"
-  user 30.09.2026: "Wie wäre es, wenn der Steuermann das Netz auswirft? Einer paddelt, der andere sagt, wann umzukehren ist und hält beim Zurücktreiben das Netz ins Wasser. Am Ende ziehen es beide Männer gemeinsam ins Boot und darin ist sichtbarer Fischfang (nicht zu stilistisch - es muss als solcher erkennbar sein)."
-  user 30.09.2026: "Am Ende jeder Runden legen die Fischer am Ufer an und stellen dort ein Behältnismit zappelnden Fischen ans Ufer. Dieser wird von einer anderen Person abgeholt, zum Feuer gebracht und dort gebracht. Dort grillt eine weitere Person. Der Abholer geht direkt zurück zum Ufer und tauscht dort leeres Behältnis gegen ein volles, mit Fischen befülltes. Es gibt also zwei Behältnisse, die immer durchrotieren. Beim Rufen bleiben passt."
-  user 30.09.2026: "Wohin mit den Fischen: Es soll ein Räuchergestell geben. Ab und zu soll sich zusätzlich jemand davon einen Fisch holen und ihn sichtbar essen. Welches Feuer: eigenes Feuer in Ufernähe. Das erledigt auch die Probleme "Weg des Abholers" und "Takt". Du musst die Abstände passen ausbalancieren, sodass die Szene zum einen plausibel wirkt und zum anderen niemand zu lange auf den anderen wartet. Behälter: geflochtener Korb"
-  user 30.09.2026: "Außerdem soll das Kinderspiel weiter flussaufwärts geschoben werden - zum einen, um die Bootsstrecke zu verlängern, zum anderen, um die aktuell vorhandene Asymmetrie des begehbaren Uferbereichs zu beseitigen. [...] Strecke A und die Strecke B in der angehängten Skizze nicht gleich lang sind. Das Kinderspiel soll so weit flussaufwärts verschoben werden, dass das der Fall ist. Die Boots-Strecke soll entsprechend verlängert werden."
-  user 30.09.2026 (on the proposals: carrier guts fish to fill the wait, rack kept at constant fill via a storage basket, water path moves with the game, upstream extent check, pictures retaken): "Deine Vorschläge passen alle - keine Rückfrage notwendig, sonder so in die Queue einreihen, direkt als nächsten Punkt."
-  Bundle: Dorfleben.
-  Criticality: medium — the rejected fisherman scene is live in every riverside village.
 - [ ] 1246. Children's bank game plays three rounds in a row before scattering
   Queue position: directly AFTER point 1245 "Two fishermen with a drift net, basket rotation to a fish fire, children's game moved upstream" (user order 30.09.2026).
   Final state:
