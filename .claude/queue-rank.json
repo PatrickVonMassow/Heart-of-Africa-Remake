@@ -1518,6 +1518,12 @@
       "why": "Pure board bookkeeping without a user-named position; it blocks nothing, so last is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1242": {
+      "at": "2026-09-30T08:24:34.750Z",
+      "why": "A WebGL-2-only visual seam (CLAUDE.md §7.2: may wait until the next LARGE); it blocks no point, so it stays behind the ranked Dorfleben work.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1547,7 +1553,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-30T06:31:07.835Z",
+    "at": "2026-09-30T08:24:34.759Z",
     "points": [
       184,
       200,
@@ -1937,7 +1943,6 @@
       1132,
       1144,
       1145,
-      1152,
       1153,
       1163,
       1164,
@@ -1973,7 +1978,8 @@
       1231,
       1235,
       1236,
-      1240
+      1240,
+      1242
     ]
   }
 }
