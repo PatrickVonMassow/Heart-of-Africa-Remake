@@ -894,7 +894,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.tagIdle', 'debug.tagTrendTau', 'debug.tagTrendEnter', 'debug.tagTrendLeave',
     'debug.tagVariation', 'debug.tagUnstuck', 'debug.tagEdge', 'debug.tagSilence',
     'debug.tagLean', 'debug.tagTurnRate',
-    'debug.tagCaughtPause', 'debug.tagGazeTurn', 'debug.tagCrySeconds', 'debug.tagCryPitchSpread',
+    'debug.tagCaughtPause', 'debug.tagCaughtSlumpLean', 'debug.tagCaughtSlumpArmRoll', 'debug.tagGazeTurn', 'debug.tagCrySeconds', 'debug.tagCryPitchSpread',
     'debug.tagCryReach', 'debug.tagCryGain',
     'debug.tagPlayRadius',
     'debug.bankCatch', 'debug.bankRoam', 'debug.bankRoamSpread', 'debug.bankGather', 'debug.bankRun',
@@ -998,12 +998,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 211 controls in total, and none twice', () => {
+  it('carries all 213 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(211)
+    expect(labels.length).toBe(213)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1050,7 +1050,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(211)
+    expect(rows.length).toBe(213)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1104,7 +1104,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(211)
+    expect(renderedRowLabels().length).toBe(213)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1152,7 +1152,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(211)
+    expect(renderedRowLabels().length).toBe(213)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 
