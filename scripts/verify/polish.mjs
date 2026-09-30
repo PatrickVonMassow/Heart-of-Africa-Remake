@@ -262,7 +262,8 @@ if (section('giza-skyline')) {
   // light many up. The sky is
   // warm haze (r≈g≈b-ish) and the pyramids are tawny (r>g>b but not RED), so a
   // true red band (r well above BOTH g and b) is the error signature.
-  {
+  // A refused frame is its own red and leaves nothing to measure (point 1145).
+  if (skyBuf) {
     const { data, info } = await sharp(skyBuf).raw().toBuffer({ resolveWithObject: true })
     let redBand = 0
     let total = 0
@@ -2214,7 +2215,7 @@ if (section('giza-site')) {
   // ground) and assert the mean is a warm sand tone: clearly warm (r > g > b, a
   // real r−b spread) and not the washed-out pale grey the old port-earth ground
   // showed on the open disc.
-  {
+  if (siteBuf) {
     const meta = await sharp(siteBuf).metadata()
     const W = meta.width
     const H = meta.height
@@ -7118,18 +7119,21 @@ if (section('village-loom')) {
         local: { x: stand.weaver.x, y: 0.8, z: stand.weaver.z },
         label: 'the same weaver half a pass later, her arms and the shuttle at the other side of the warp',
       })
-      const a = await readCrop(first)
-      const b = await readCrop(second)
-      let moved = 0
-      for (let i = 0; i < a.data.length; i += a.info.channels) {
-        if (Math.abs(a.data[i] - b.data[i]) > 8) moved++
+      // A refused frame is its own red and leaves nothing to compare (point 1145).
+      if (first && second) {
+        const a = await readCrop(first)
+        const b = await readCrop(second)
+        let moved = 0
+        for (let i = 0; i < a.data.length; i += a.info.channels) {
+          if (Math.abs(a.data[i] - b.data[i]) > 8) moved++
+        }
+        const share = moved / (a.info.width * a.info.height)
+        // The reported defect was a figure that did not move at all, so the bar is
+        // the difference between "nothing changed" and "a body worked" — not a
+        // tuned pixel count. Anything from a hand crossing the warp clears it.
+        check('two frames half a pass apart differ where the weaver works', share > 0.002,
+          `${(share * 100).toFixed(2)} % of the crop changed`)
       }
-      const share = moved / (a.info.width * a.info.height)
-      // The reported defect was a figure that did not move at all, so the bar is
-      // the difference between "nothing changed" and "a body worked" — not a
-      // tuned pixel count. Anything from a hand crossing the warp clears it.
-      check('two frames half a pass apart differ where the weaver works', share > 0.002,
-        `${(share * 100).toFixed(2)} % of the crop changed`)
       check('the shuttle is at another place on the warp half a pass later',
         Math.hypot(shuttleA.x - shuttleB.x, shuttleA.z - shuttleB.z) + Math.abs(shuttleA.y - shuttleB.y) > 0.01,
         JSON.stringify({ shuttleA, shuttleB }))
@@ -7245,16 +7249,19 @@ if (section('village-loom')) {
         // the projected water points, not assumed from the stand. Water is the
         // one blue-dominant ground in this village; sand, cloth and a body in
         // the way are not.
-        const { data, info } = await sharp(third).raw().toBuffer({ resolveWithObject: true })
-        const blueAt = (px, py) => {
-          if (px < 0 || py < 0 || px >= info.width || py >= info.height) return false
-          const i = (py * info.width + px) * info.channels
-          const r = data[i], g = data[i + 1], b = data[i + 2]
-          return b > r + 15 && b >= g - 10
+        // A refused frame is its own red and leaves nothing to read (point 1145).
+        if (third) {
+          const { data, info } = await sharp(third).raw().toBuffer({ resolveWithObject: true })
+          const blueAt = (px, py) => {
+            if (px < 0 || py < 0 || px >= info.width || py >= info.height) return false
+            const i = (py * info.width + px) * info.channels
+            const r = data[i], g = data[i + 1], b = data[i + 2]
+            return b > r + 15 && b >= g - 10
+          }
+          const waterSeen = teaching.water.filter(w => w.inFrame && blueAt(w.px, w.py))
+          check('the river is in the captured frame, read at the projected water points',
+            waterSeen.length > 0, JSON.stringify(teaching.water))
         }
-        const waterSeen = teaching.water.filter(w => w.inFrame && blueAt(w.px, w.py))
-        check('the river is in the captured frame, read at the projected water points',
-          waterSeen.length > 0, JSON.stringify(teaching.water))
       }
 
       // FROM THE PLAZA (point 1183): the user's criterion is that the station

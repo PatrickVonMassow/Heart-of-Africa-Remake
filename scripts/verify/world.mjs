@@ -6,7 +6,7 @@
 // live checks (the erratic's seating, the digs, the chief's hand-over, the clay
 // mould and the inventory clicks). Dev server only.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
-import { frameShutter } from './frameSubject.mjs'
+import { frameShutter, expectRefusal } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import { installTtsCache } from './ttsCache.mjs'
@@ -88,15 +88,12 @@ if (process.env.FRAME_SUBJECT_SELFTEST) {
   const misaimed = `${OUT}999-frame-subject-selftest.png`
   rmSync(misaimed, { force: true })
   await jump(30.0, 31.3) // the traveller stands at the Nile delta …
-  let refusal = null
-  try {
-    // … while the frame claims a lake 3600 km away.
-    await probeShot('999-frame-subject-selftest', { world: { lat: -0.8, lon: 33.0 }, label: 'Lake Victoria' })
-  } catch (e) {
-    refusal = String(e.message ?? e)
-  }
+  // … while the frame claims a lake 3600 km away. The refusal returns null and
+  // reddens the run (point 1145); the self-test takes back the one it provoked.
+  const shotResult = await probeShot('999-frame-subject-selftest', { world: { lat: -0.8, lon: 33.0 }, label: 'Lake Victoria' })
+  const refusal = expectRefusal('999-frame-subject-selftest')
   const written = existsSync(misaimed)
-  const ok = !!refusal && !written
+  const ok = !!refusal && !written && shotResult === null
   console.log(ok ? 'PASS  the shutter refuses a mis-aimed frame' : 'FAIL  the shutter refuses a mis-aimed frame')
   console.log(`      refusal: ${refusal ?? 'NONE — the frame was accepted'}; file written: ${written}`)
   await browser.close()
@@ -133,14 +130,16 @@ if (section('first-travel-frame')) {
     world: { lat: 30.0, lon: 31.3 },
     label: 'the Nile delta at Cairo',
   })
-  const firstOk = firstTravelFrame.length >= BLANK_FRAME_BYTES
+  // A refused frame is its own red and reads as 0 bytes here (point 1145).
+  const bytes = firstTravelFrame ? firstTravelFrame.length : 0
+  const firstOk = bytes >= BLANK_FRAME_BYTES
   console.log(
     `${firstOk ? 'PASS' : 'FAIL'}  the first world frame after the scene switch shows the terrain, not the background ` +
-      `(${firstTravelFrame.length} bytes, floor ${BLANK_FRAME_BYTES})${sections.tag()}`,
+      `(${bytes} bytes, floor ${BLANK_FRAME_BYTES})${sections.tag()}`,
   )
   if (!firstOk) {
     errors.push(
-      `the first travel frame is ${firstTravelFrame.length} bytes — a blank picture; the scene-readiness wait did not hold (point 489)`,
+      `the first travel frame is ${bytes} bytes — a blank or refused picture; the scene-readiness wait did not hold (point 489)`,
     )
   }
 }

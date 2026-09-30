@@ -56,6 +56,8 @@ export async function frameSpeakingDrums(page, outDir, name, declaration, messag
     },
   })
   const buffer = await capture(name, declaration)
+  // A refused frame is its own red; the performance was never started for it.
+  if (!buffer) return { buffer, before, after: null }
   // The SAME uninterrupted performance must outlast the screenshot itself;
   // an expired or replaced one cannot cover the image, even on a slow backend.
   const after = await page.evaluate(readDrumWindow)
