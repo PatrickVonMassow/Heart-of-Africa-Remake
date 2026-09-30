@@ -6,7 +6,7 @@
  * sampler block — and that code reads `window`/`document` directly. It needs a DOM,
  * so it keeps jsdom per file instead of dragging the other tooling tests back into one.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
@@ -24,7 +24,17 @@ import {
   findUnbudgetedCaptures,
   formatUnbudgetedCaptureFindings,
 } from './frameSubject-core.mjs'
-import { CAPTURE_BUDGET_MS, captureFrame, capturePixels, probeFrameSubject, sampleSceneCounts } from './frameSubject.mjs'
+import {
+  CAPTURE_BUDGET_MS,
+  captureFrame,
+  capturePixels,
+  expectRefusal,
+  jumpBeside,
+  probeFrameSubject,
+  refusedFrames,
+  sampleSceneCounts,
+  standCandidates,
+} from './frameSubject.mjs'
 
 const lakeVictoria = () => normaliseDeclaration('12-worldmodel-lake-victoria', { world: { lat: -0.8, lon: 33 }, label: 'Lake Victoria' })
 
@@ -372,14 +382,15 @@ describe('captureFrame waits for the picture to be drawn (point 489)', () => {
     const calls = []
     const climbing = () =>
       Array.from({ length: 15 }, (_, i) => ({ t: Date.now() - (14 - i) * 500, drawCalls: 99 + i * 8, triangles: 5500 + i * 50000 }))
-    await expect(
-      captureFrame(fakePage(calls, { scene: climbing }), 'out/', '18-worldmodel-bambara-village-niger', {
-        world: { lat: 12.6, lon: -8.0 },
-        label: 'the Bambara village',
-        // A zero budget makes the timeout path immediate; the wait itself is
-        // pinned with a fake clock in sceneReady.test.mjs.
-      }, { scene: { timeoutMs: 0 } }),
-    ).rejects.toThrow(/never finished drawing/)
+    const result = await captureFrame(fakePage(calls, { scene: climbing }), 'out/', '18-worldmodel-bambara-village-niger', {
+      world: { lat: 12.6, lon: -8.0 },
+      label: 'the Bambara village',
+      // A zero budget makes the timeout path immediate; the wait itself is
+      // pinned with a fake clock in sceneReady.test.mjs.
+    }, { scene: { timeoutMs: 0 } })
+    // A refusal is a failed check, not a throw (point 1145).
+    expect(result).toBeNull()
+    expect(expectRefusal('18-worldmodel-bambara-village-niger')).toMatch(/never finished drawing/)
     expect(calls.some((c) => c.via === 'page' || c.via === 'locator')).toBe(false)
   })
 
@@ -589,5 +600,120 @@ describe('a live action at the shutter', () => {
       local: { x: 1, z: 2 }, label: 'the drummer answering beside the chief',
     }, { beforeCapture: async () => { throw new Error('drumPerformance has ended') } })).rejects.toThrow(/drumPerformance/)
     expect(calls.some((c) => c.via === 'page')).toBe(false)
+  })
+})
+
+// A MISS FAILS ITS CHECK AND LETS THE SUITE FINISH (point 1145). The shutter used
+// to throw, which killed the node process and turned one mis-aimed frame into a
+// crashed run that covered no backend.
+describe('a frame-subject miss is a failing check, not a crash', () => {
+  const realExit = process.exit
+  const realExitCode = process.exitCode
+  afterEach(() => {
+    for (const { frame } of refusedFrames()) expectRefusal(frame)
+    process.exit = realExit
+    process.exitCode = realExitCode
+  })
+
+  /** The `72-water-victoria-falls` shape: the wait expires and the report says
+   *  the subject projected off the left and bottom edge, camera still moving. */
+  const missingPage = (calls) => ({
+    evaluate: async () => ({
+      ok: false, available: true, mode: 'travel', placeId: null,
+      ndc: { x: -4.26, y: -3.7, z: 0.99 }, onScreen: false, settled: false, player: { x: 300, z: 140 },
+    }),
+    waitForFunction: async () => { throw new Error('Timeout 15000ms exceeded.') },
+    screenshot: async (options) => { calls.push({ via: 'page', options }); return Buffer.alloc(0) },
+  })
+
+  it('returns null, prints the FAIL line, writes nothing and marks the run red', async () => {
+    const calls = []
+    const lines = []
+    const log = vi.spyOn(console, 'log').mockImplementation((line) => lines.push(String(line)))
+    process.exit = vi.fn()
+    let result
+    try {
+      result = await captureFrame(missingPage(calls), 'out/', '72-water-victoria-falls', {
+        world: { lat: -17.92, lon: 25.85 },
+        label: 'Victoria Falls',
+      })
+    } finally {
+      log.mockRestore()
+    }
+    expect(result).toBeNull()
+    expect(calls).toEqual([])
+    expect(lines.join('\n')).toMatch(/^FAIL {2}frame 72-water-victoria-falls — its subject is not in the rendered picture: off the left and bottom edge/m)
+    expect(lines.join('\n')).toMatch(/the camera had NOT settled/)
+    expect(refusedFrames().map((r) => r.frame)).toEqual(['72-water-victoria-falls'])
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('keeps a suite that ends with process.exit(0) from reporting the refused frame green', async () => {
+    const exit = vi.fn()
+    process.exit = exit
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await captureFrame(missingPage([]), 'out/', '11-worldmodel-khartoum-confluence', {
+        world: { lat: 15.6, lon: 32.6 },
+        label: 'the Nile confluence at Khartoum',
+      })
+    } finally {
+      log.mockRestore()
+    }
+    process.exit(0)
+    process.exit('0')
+    process.exit(null)
+    process.exit(3)
+    expect(exit.mock.calls).toEqual([[1], [1], [1], [3]])
+  })
+
+  it('lets a self-test take back the refusal it provoked, and the run is clean again', async () => {
+    process.exit = vi.fn()
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await captureFrame(missingPage([]), 'out/', '999-frame-subject-selftest', {
+        world: { lat: -0.8, lon: 33 },
+        label: 'Lake Victoria',
+      })
+    } finally {
+      log.mockRestore()
+    }
+    expect(expectRefusal('999-frame-subject-selftest')).toMatch(/not in the rendered picture/)
+    expect(expectRefusal('999-frame-subject-selftest')).toBeNull()
+    expect(refusedFrames()).toEqual([])
+    expect(process.exitCode).toBe(0)
+  })
+})
+
+describe('standing beside a river subject (point 1145)', () => {
+  it('tries the subject first, then rings outward to 0.3 degrees', () => {
+    const c = standCandidates(-17.92, 25.85)
+    expect(c[0]).toEqual([-17.92, 25.85])
+    expect(c.length).toBe(1 + 15 * 16)
+    const dist = ([a, o]) => Math.hypot(a + 17.92, o - 25.85)
+    expect(dist(c[1])).toBeCloseTo(0.02, 6)
+    expect(dist(c[c.length - 1])).toBeCloseTo(0.3, 6)
+    for (let i = 2; i < c.length; i++) expect(dist(c[i])).toBeGreaterThanOrEqual(dist(c[i - 1]) - 1e-9)
+  })
+
+  it('returns the still candidate the page chose', async () => {
+    const page = { evaluate: async () => 17 }
+    expect(await jumpBeside(page, -17.92, 25.85, '72-water-victoria-falls')).toEqual(standCandidates(-17.92, 25.85)[17])
+  })
+
+  it('refuses with a FAIL line instead of standing in the current when nothing is still', async () => {
+    const lines = []
+    const log = vi.spyOn(console, 'log').mockImplementation((line) => lines.push(String(line)))
+    let stand
+    try {
+      stand = await jumpBeside({ evaluate: async () => -1 }, 15.6, 32.6, '11-worldmodel-khartoum-confluence')
+    } finally {
+      log.mockRestore()
+    }
+    expect(stand).toBeNull()
+    expect(lines.join('\n')).toMatch(/^FAIL {2}frame 11-worldmodel-khartoum-confluence — no stand clear of the current/m)
+    // The refusal reddens the run like a mis-aimed frame; otherwise a green run hides it.
+    expect(process.exitCode).toBe(1)
+    expect(expectRefusal('11-worldmodel-khartoum-confluence')).toMatch(/no stand clear of the current/)
   })
 })

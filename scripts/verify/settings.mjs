@@ -794,8 +794,11 @@ if (section('traa-toggle')) {
     general: 'the travel scene after the TRAA rebuild; brightness is measured only in the interface-free scene crop',
     scene: 'travel',
   })
-  const traaMean = await settingsSceneLuma(traaShot)
-  check('TRAA on: scene renders non-black', traaMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
+  // A refused frame is its own red; the luma it would carry is skipped (point 1145).
+  if (traaShot) {
+    const traaMean = await settingsSceneLuma(traaShot)
+    check('TRAA on: scene renders non-black', traaMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
+  }
   check('TRAA on: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
   const traaOnPipelines = await page.evaluate(settingsPipelineState)
@@ -1036,8 +1039,11 @@ if (section('graphics-levels')) {
     general: 'the travel scene at LOW after rendered TRAA on/off cycles; brightness is measured only in the interface-free scene crop',
     scene: 'travel',
   })
-  const lowMean = await settingsSceneLuma(lowShot)
-  check('F9 low: scene still renders non-black', lowMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${lowMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
+  // A refused frame is its own red; the luma it would carry is skipped (point 1145).
+  if (lowShot) {
+    const lowMean = await settingsSceneLuma(lowShot)
+    check('F9 low: scene still renders non-black', lowMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${lowMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
+  }
   // F9 #2: low → high (wraps to the top; SSAO on, sharper shadows).
   const atHigh = await cycleF9()
   check('F9 → high (wraps from the bottom): SSAO on, 4096 shadows, campfire on',

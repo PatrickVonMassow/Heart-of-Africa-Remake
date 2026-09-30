@@ -228,9 +228,103 @@ export async function waitForSceneReady(page, opts = {}) {
 }
 
 /**
+ * The stand candidates around a subject, nearest ring first: the subject
+ * itself, then 16 bearings every 0.02 degrees out to 0.3. A sampled search —
+ * the first still candidate, not guaranteed the nearest one.
+ */
+export function standCandidates(lat, lon, { maxDeg = 0.3, stepDeg = 0.02, bearings = 16 } = {}) {
+  const out = [[lat, lon]]
+  for (let i = 1; i * stepDeg <= maxDeg + 1e-9; i++) {
+    for (let k = 0; k < bearings; k++) {
+      const t = (k / bearings) * 2 * Math.PI
+      out.push([lat + i * stepDeg * Math.sin(t), lon + i * stepDeg * Math.cos(t)])
+    }
+  }
+  return out
+}
+
+/**
+ * Jump to stand BESIDE a water subject (point 1145). The current sweeps the
+ * traveller only on water (store.driftCurrent, design.md §11): set down in the
+ * Zambezi or the Nile he drifted 3-4.5 degrees downstream within the wait, the
+ * camera followed, and the frame missed its subject. So he stands on the first
+ * candidate that is dry land or water without current (a lake); the subject
+ * stays the declared point. Returns the stand, or `null` after printing a FAIL
+ * line when no candidate is still — then it does NOT jump, and the caller
+ * skips the frame rather than photograph a drifting traveller.
+ */
+export async function jumpBeside(page, lat, lon, frame = `(${lat}, ${lon})`) {
+  const candidates = standCandidates(lat, lon)
+  const at = await page.evaluate(async (cs) => {
+    const current = await import('/src/systems/current.ts')
+    const g = window.__game.getState()
+    const still = ([la, lo]) => {
+      if (!['water', 'ocean'].includes(window.__terrainType(la, lo, g.seed))) return true
+      const d = current.currentDriftDegPerSecond(la, lo, false)
+      return d.lat === 0 && d.lon === 0
+    }
+    const i = cs.findIndex(still)
+    if (i >= 0) g.debugJumpTo(cs[i][0], cs[i][1])
+    return i
+  }, candidates)
+  if (at < 0) {
+    const reason = `no stand clear of the current within 0.3 degrees of lat ${lat}, lon ${lon}; the frame was not taken`
+    console.log(`FAIL  frame ${frame} — ${reason}`)
+    recordRefusal(frame, reason)
+    return null
+  }
+  return candidates[at]
+}
+
+// A REFUSED FRAME IS ONE FAILED CHECK, NOT A DEAD RUN (point 1145). The shutter
+// used to THROW, so one mis-aimed frame killed the node process: the run
+// reported nothing, covered no backend, and left a crash record only a
+// hand-signed sign-off could clear. Now the refusal prints its `FAIL` line,
+// writes no file, returns `null`, and marks the run red — the suite finishes
+// and every other check still counts. A caller that measures the returned
+// buffer skips that measurement on `null`; the frame's own FAIL already
+// carries the red.
+const refused = []
+
+/** The frames this process refused so far (name and reason). */
+export function refusedFrames() {
+  return refused.slice()
+}
+
+/**
+ * Take back a refusal a SELF-TEST provoked on purpose, so it does not redden the
+ * run. Returns the reason it was refused for, or `null` when it was not refused.
+ */
+export function expectRefusal(frame) {
+  const at = refused.findIndex((r) => r.frame === frame)
+  if (at < 0) return null
+  const [{ reason }] = refused.splice(at, 1)
+  if (!refused.length) process.exitCode = 0
+  return reason
+}
+
+/**
+ * Mark the run red for a refused frame. Suites end with an explicit
+ * `process.exit(<own verdict>)`, which would override `process.exitCode`, so
+ * `process.exit` is wrapped once to keep a clean-looking exit from turning a
+ * refused frame green (the run recorder parses the reds only of a non-zero exit).
+ */
+function recordRefusal(frame, reason) {
+  refused.push({ frame, reason })
+  process.exitCode = 1
+  if (process.exit.__frameRefusals) return
+  const exit = process.exit.bind(process)
+  // Node reads `'0'`, `null` and `undefined` as success too: only an explicit
+  // failing code passes through unchanged.
+  const guarded = (code) => exit(refused.length && !(Number(code ?? 0) > 0) ? 1 : code)
+  guarded.__frameRefusals = true
+  process.exit = guarded
+}
+
+/**
  * Capture one frame. Refuses — loudly, without writing the file — when the
  * declared subject is not in the picture, or when the scene never finished
- * drawing.
+ * drawing. A refusal returns `null` and fails its check; it does not throw.
  */
 export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT_TIMEOUT, scene = {}, beforeCapture } = {}) {
   const d = normaliseDeclaration(name, decl)
@@ -250,9 +344,9 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
   if (probe) probe.waitedMs = Date.now() - started
   const verdict = judgeFrameSubject(d, probe)
   if (!verdict.ok) {
-    const message = formatFrameFailure(d, probe, verdict)
-    console.log(message)
-    throw new Error(`frame ${d.frame}: its subject is not in the rendered picture — ${verdict.reason}`)
+    console.log(formatFrameFailure(d, probe, verdict))
+    recordRefusal(d.frame, `its subject is not in the rendered picture — ${verdict.reason}`)
+    return null
   }
   // The AIM is judged first and the picture second, in that order on purpose: a
   // mis-aimed frame is refused in seconds instead of after the (deliberately
@@ -265,7 +359,8 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
     sceneVerdict = await waitForSceneReady(page, { mode, ...scene })
     if (sceneVerdict.timedOut) {
       console.log(formatSceneReadyFailure(d.frame, sceneVerdict, scene))
-      throw new Error(`frame ${d.frame}: the scene never finished drawing — ${sceneVerdict.reason}`)
+      recordRefusal(d.frame, `the scene never finished drawing — ${sceneVerdict.reason}`)
+      return null
     }
   }
   // A short live action starts only after readiness, so the readiness wait
