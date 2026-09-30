@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { BUILD_INFO_FILE, buildInfoJson, buildInfoPayload, resolveBuildCommit } from './scripts/build-info.mjs'
@@ -43,6 +44,10 @@ function buildInfoPlugin(): Plugin {
   }
 }
 
+/** Directories under the root the dev server must neither watch nor scan. */
+export const DEV_IGNORED_DIRS = ['.claude', 'local']
+const configRoot = fileURLToPath(new URL('.', import.meta.url))
+
 // https://vite.dev/config/
 export default defineConfig({
   // On GitHub Pages the project site is served under /<repo>/, so the CI build
@@ -55,9 +60,27 @@ export default defineConfig({
     // so a measurement sent back from the deployed build can be tied to it.
     'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(buildCommit().slice(0, 7)),
   },
+  // Author worktrees (`.claude/worktrees/`) and scratch output (`local/`) sit
+  // under the served root; a change there must not reload a running picture run.
+  // Vite prepends its own defaults (.git, node_modules, test-results, cache).
+  server: {
+    // Anchored to this config's root, so a checkout served from a worktree
+    // (itself under .claude/) still watches its own sources.
+    watch: { ignored: DEV_IGNORED_DIRS.map((dir) => `${configRoot}${dir}/**`) },
+  },
   // The TTS stack resolves its WASM/worker assets at runtime; esbuild
   // pre-bundling breaks those URLs in dev.
   optimizeDeps: {
+    // Vite's default scan globs every **/*.html under the root; it skips dot
+    // dirs but crawls local/ (which holds html). Keep the default minus those
+    // dirs (an explicit list drops Vite's __tests__/coverage ignores, restated).
+    // Entries resolve against the root, so the ignored dirs are root-anchored.
+    entries: [
+      '**/*.html',
+      '!**/__tests__/**',
+      '!**/coverage/**',
+      ...DEV_IGNORED_DIRS.map((dir) => `!${dir}/**`),
+    ],
     exclude: ['kokoro-js', '@huggingface/transformers', 'onnxruntime-web'],
   },
   build: {
