@@ -514,8 +514,7 @@ if (section('landmark-frames')) {
   ]
   for (const [lat, lon, name, label] of shots) {
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-    await jumpBeside(page, lat, lon)
-    await page.waitForTimeout(2500)
+    await jumpBeside(page, lat, lon) // the shutter waits for the subject and the drawn scene
     await shot(name, { world: { lat, lon }, label })
   }
 }
