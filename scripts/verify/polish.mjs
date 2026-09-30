@@ -6053,9 +6053,12 @@ if (section('villager-canoe')) {
         // close enough that the float line and the fish read at their size.
         // The net is set on the hull's shore side and trails upstream behind
         // it, so the stand is upstream too, looking out between the two.
-        const s = 40
-        const stand = { x: L.nx * (L.waterline - 0.6) + L.fx * s, z: L.nz * (L.waterline - 0.6) + L.fz * s }
-        const look = { x: L.nx * (L.out - 2.2) + L.fx * 43.5, z: L.nz * (L.out - 2.2) + L.fz * 43.5 }
+        // Waded out ankle-to-knee deep, about 5 m from the hull's shore side and
+        // a little DOWNSTREAM of it: the float line trails upstream, so the
+        // floats still out lie beyond the hull rather than under the lens.
+        const s = 49
+        const stand = { x: L.nx * (L.waterline + 2.4) + L.fx * s, z: L.nz * (L.waterline + 2.4) + L.fz * s }
+        const look = { x: L.nx * (L.out - 1) + L.fx * 46, z: L.nz * (L.out - 1) + L.fz * 46 }
         return { stand, look }
       })
       await standAt(boat.stand, boat.look)
@@ -6070,6 +6073,7 @@ if (section('villager-canoe')) {
           phase: c.phase,
           net: c.net,
           inHull: c.inHull,
+          catch: c.catch,
           paddlerAction: c.paddlerAction,
           hull: at(c.x, 0, c.z).inFrame,
           paddler: seen(c.paddler.x, 0.4, c.paddler.z, 0.8),
@@ -6083,7 +6087,8 @@ if (section('villager-canoe')) {
         .waitForFunction(() => {
           const c = window.__placeCanoe?.()
           // Mid-haul: the float line still out on the water, fish coming up.
-          return !!c && c.phase === 'haul' && c.inHull >= 2 && c.net > 0.45 && c.net < 0.75
+          // Late in the haul: several fish up in the net, the last floats still out.
+          return !!c && c.phase === 'haul' && c.inHull >= 3 && c.net > 0.3
         }, null, { timeout: 300000, polling: 100 })
         .then(() => true)
         .catch(() => false)
@@ -6091,7 +6096,26 @@ if (section('villager-canoe')) {
       const atBoat = await inPlace()
       check('the boat’s standing place is inside the settlement', atBoat)
       if (hauling && atBoat) {
+        await page.evaluate(() => { window.__placePlayer.pitch = -0.12 })
+        await nextFrames(2)
         const seen = await boatView()
+        // THE CATCH READS: at least three fish in the frame, each drawn long
+        // enough on screen to be a fish and not a speck.
+        const fish = await page.evaluate(() => {
+          const scene = window.__placeScene
+          const cam = window.__placeCamera
+          scene.updateMatrixWorld(true)
+          const out = []
+          scene.traverseVisible((o) => {
+            if (o.name !== 'village-canoe-fish' || !o.visible) return
+            const head = cam.position.clone().set(0, 0, 0.5).applyMatrix4(o.matrixWorld).project(cam)
+            const tail = cam.position.clone().set(0, 0, -0.5).applyMatrix4(o.matrixWorld).project(cam)
+            if ([head, tail].some((p) => Math.abs(p.x) > 1 || Math.abs(p.y) > 1 || p.z >= 1)) return
+            out.push(Math.hypot((head.x - tail.x) * window.innerWidth / 2, (head.y - tail.y) * window.innerHeight / 2))
+          })
+          return out
+        })
+        check('at least three fish are in the frame, each at least 25 px long', fish.filter((px) => px >= 25).length >= 3, JSON.stringify(fish.map((px) => Math.round(px))))
         check('from the boat’s standing place the hull and both men are in frame, nothing hiding them',
           seen.hull && seen.paddler && seen.netMan, JSON.stringify(seen))
         check('both haul, and there are fish in the hull', seen.paddlerAction === 'haul' && seen.inHull >= 2, JSON.stringify(seen))

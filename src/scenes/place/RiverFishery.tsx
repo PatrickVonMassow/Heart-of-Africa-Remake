@@ -276,7 +276,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const fishGeometry = useMemo(() => buildFishGeometry(), [])
   const materials = useMemo(
     () => ({
-      fresh: new THREE.MeshStandardMaterial({ color: FISH_TONES.fresh, metalness: 0.35, roughness: 0.3, emissive: '#39434a', side: THREE.DoubleSide }),
+      fresh: new THREE.MeshStandardMaterial({ color: FISH_TONES.fresh, metalness: 0.3, roughness: 0.22, emissive: '#56646c', side: THREE.DoubleSide }),
       gutted: new THREE.MeshStandardMaterial({ color: FISH_TONES.gutted, metalness: 0.2, roughness: 0.55, side: THREE.DoubleSide }),
       grilled: new THREE.MeshStandardMaterial({ color: FISH_TONES.grilled, metalness: 0.05, roughness: 0.8, side: THREE.DoubleSide }),
       smoked: new THREE.MeshStandardMaterial({ color: FISH_TONES.smoked, metalness: 0.05, roughness: 0.85, side: THREE.DoubleSide }),
@@ -497,12 +497,14 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       const flap = Math.sin(t * (9 + i) + i * 1.7) * lively * (Math.sin(t * 0.7 + i) > 0.2 ? 1 : 0.2)
       m.scale.setScalar(len)
       const came = landedAt.current[i]
-      if (canoe.phase === 'haul' && came !== undefined && t - came < FISH_IN_NET_SECONDS) {
-        // In the net at the gunwale on the shore side, head down, thrashing.
+      if (canoe.phase === 'haul' && came !== undefined) {
+        // Still caught in the net as it comes over the shore-side gunwale:
+        // hanging down the hull's side, head down, thrashing, until the haul
+        // ends and the men shake them out into the hull.
         const shoreSide = Math.cos(canoe.yaw) * lane.nx - Math.sin(canoe.yaw) * lane.nz >= 0 ? -1 : 1
-        const lift = 1 - (t - came) / FISH_IN_NET_SECONDS
-        m.position.set(shoreSide * (cfg.hullBeam / 2 + 0.05), HULL_FLOOR_Y + 0.12 + 0.25 * lift, CANOE_NETMAN_FORE - 0.1 * i)
-        m.rotation.set(-Math.PI / 2 + 0.5 * Math.sin(t * 14 + i), 0.6 * Math.sin(t * 11 + i), 0.3 * Math.sin(t * 9 + i))
+        const fresh = Math.max(0, 1 - (t - came) / FISH_IN_NET_SECONDS)
+        m.position.set(shoreSide * (cfg.hullBeam / 2 + 0.07), HULL_FLOOR_Y + 0.02 + 0.2 * fresh, CANOE_NETMAN_FORE - 0.3 * i)
+        m.rotation.set(-Math.PI / 2 + 0.35 * Math.sin(t * (10 + i) + i), 0.5 * Math.sin(t * (8 + i) + 2 * i), shoreSide * 0.25)
         return
       }
       // Heaped on the hull's floor: some on their side, some flipped up on
@@ -637,6 +639,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       net: canoe.net,
       inHull: canoe.inHull,
       rounds: canoe.rounds,
+      catch: canoe.catch,
       basketWait: canoe.basketWait,
       floats: netFloats(canoe, lane, cfg),
       lane: { ...lane, start: { ...lane.start }, end: { ...lane.end }, berth: { ...lane.berth } },
@@ -724,7 +727,8 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
           visible={false}
           castShadow
         >
-          <sphereGeometry args={[0.11, 10, 8]} />
+          {/* A gourd float, ~12 cm across. */}
+          <sphereGeometry args={[0.06, 10, 8]} />
         </mesh>
       ))}
       {Array.from({ length: Math.round(cfg.netFloats) }, (_, i) => (
