@@ -5990,10 +5990,14 @@ if (section('villager-canoe')) {
   const was = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
     const c = window.__balance.communication
-    const kept = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds, labelSeconds: c.labelSeconds }
+    const k = window.__balance.villageLife.canoe
+    const kept = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds, labelSeconds: c.labelSeconds, haulSeconds: k.haulSeconds }
     b.roamSeconds = 8
     b.roamGuardSeconds = 8
     c.labelSeconds = 12
+    // A slow haul, so the headless shutter finds the net still half out on
+    // the water: the same code path at a longer configured value.
+    k.haulSeconds = 60
     return kept
   })
   try {
@@ -6045,10 +6049,13 @@ if (section('villager-canoe')) {
       const boat = await page.evaluate(() => {
         const c = window.__placeCanoe()
         const L = c.lane
-        const s = 36
+        // A few paces upstream of where the haul happens (s = +47, 7 m out):
+        // close enough that the float line and the fish read at their size.
+        // The net is set on the hull's shore side and trails upstream behind
+        // it, so the stand is upstream too, looking out between the two.
+        const s = 40
         const stand = { x: L.nx * (L.waterline - 0.6) + L.fx * s, z: L.nz * (L.waterline - 0.6) + L.fz * s }
-        // Looking out toward where the net comes in and the bow lands.
-        const look = { x: L.nx * (L.out - 1) + L.fx * (s + 10), z: L.nz * (L.out - 1) + L.fz * (s + 10) }
+        const look = { x: L.nx * (L.out - 2.2) + L.fx * 43.5, z: L.nz * (L.out - 2.2) + L.fz * 43.5 }
         return { stand, look }
       })
       await standAt(boat.stand, boat.look)
@@ -6075,8 +6082,9 @@ if (section('villager-canoe')) {
       const hauling = await page
         .waitForFunction(() => {
           const c = window.__placeCanoe?.()
-          return !!c && c.phase === 'haul' && c.inHull >= 2
-        }, null, { timeout: 300000, polling: 200 })
+          // Mid-haul: the float line still out on the water, fish coming up.
+          return !!c && c.phase === 'haul' && c.inHull >= 2 && c.net > 0.45 && c.net < 0.75
+        }, null, { timeout: 300000, polling: 100 })
         .then(() => true)
         .catch(() => false)
       check('the two men haul the net in at the downstream end, the catch coming up', hauling)
@@ -6087,6 +6095,7 @@ if (section('villager-canoe')) {
         check('from the boat’s standing place the hull and both men are in frame, nothing hiding them',
           seen.hull && seen.paddler && seen.netMan, JSON.stringify(seen))
         check('both haul, and there are fish in the hull', seen.paddlerAction === 'haul' && seen.inHull >= 2, JSON.stringify(seen))
+        check('the float line is on the water in the frame', seen.floats >= 3, JSON.stringify(seen))
         check('and no child and no play rock is in the picture', seen.kidsInFrame === 0 && seen.rocksInFrame === 0,
           `${seen.kidsInFrame} children, ${seen.rocksInFrame} rocks`)
         const c = await page.evaluate(() => window.__placeCanoe())
@@ -6110,6 +6119,9 @@ if (section('villager-canoe')) {
       check('at the landing the net man says UPSTREAM to the paddler, and the reading stands over his head',
         !!word && word.atoms.length === 1 && word.atoms[0] === word.expected, JSON.stringify(word))
       if (word && atBoat) {
+        // Turned toward the landing, where the boat now lies.
+        const at = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: (c.netMan.x + c.paddler.x) / 2, z: (c.netMan.z + c.paddler.z) / 2 } })
+        await standAt(boat.stand, at)
         const label = await page.evaluate(() => {
           const l = window.__speech.anchorScreen('village-canoe')
           return !!l && l.x >= 0 && l.x <= window.innerWidth && l.y >= 0 && l.y <= window.innerHeight ? l : null
@@ -6124,7 +6136,9 @@ if (section('villager-canoe')) {
         const answered = await page
           .waitForFunction(() => {
             const c = window.__placeCanoe?.()
-            return !!c && c.phase === 'launch' && c.paddlerAction === 'hard'
+            // The word obeyed: pushing off, or already back on the lane, with
+            // hard strokes either way.
+            return !!c && (c.phase === 'launch' || c.phase === 'up') && c.paddlerAction === 'hard'
           }, null, { timeout: 20000, polling: 100 })
           .then(() => true)
           .catch(() => false)
@@ -6220,7 +6234,7 @@ if (section('villager-canoe')) {
         // rack: obliquely, so the kneeling griller does not stand between the
         // camera and his own embers (the first run's frame).
         const look = { x: (s.fire.x + s.rack.x) / 2, z: (s.fire.z + s.rack.z) / 2 }
-        return { at: { x: look.x - b.nx * 4.5 + b.fx * 3, z: look.z - b.nz * 4.5 + b.fz * 3 }, look }
+        return { at: { x: look.x - b.nx * 5.5 + b.fx * 2, z: look.z - b.nz * 5.5 + b.fz * 2 }, look }
       })
       const gutting = await page
         .waitForFunction(() => window.__placeFishFire?.().carrier.phase === 'gut', null, { timeout: 200000, polling: 250 })
@@ -6259,6 +6273,7 @@ if (section('villager-canoe')) {
       b.roamSeconds = kept.roamSeconds
       b.roamGuardSeconds = kept.roamGuardSeconds
       window.__balance.communication.labelSeconds = kept.labelSeconds
+      window.__balance.villageLife.canoe.haulSeconds = kept.haulSeconds
       delete window.__canoeFrameAt
       delete window.__canoeSeen
       const g = window.__game.getState()

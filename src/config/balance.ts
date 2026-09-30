@@ -1906,9 +1906,9 @@ export const balance: BalanceConfig = {
       catchMax: 8,
       fishLengthMin: 0.25,
       fishLengthMax: 0.4,
-      // The drawn water reaches 10 m out from the waterline; the lane is 7 m
-      // out, so the float line reaches 2.2 m further and trails behind.
-      netLength: 8,
+      // The net is set on the hull's shore side (seen from the village): the
+      // float line reaches 2 m in toward the bank and trails ~4 m upstream.
+      netLength: 4.5,
       netReach: 2,
       netFloats: 10,
       strokeSeconds: 1.3,

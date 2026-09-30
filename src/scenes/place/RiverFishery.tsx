@@ -56,6 +56,7 @@ import {
   canoeLane,
   createCanoe,
   netFloats,
+  netHand,
   stepCanoe,
   unloadSeconds,
   yawOf,
@@ -77,6 +78,11 @@ const HULL_FLOOR_Y = 0.04
 /** A woven basket: its radius at the rim and its height. */
 const BASKET_R = 0.26
 const BASKET_H = 0.34
+/** The rope's own axis and a scratch direction for orienting it. */
+const ROPE_UP = new THREE.Vector3(0, 1, 0)
+const ROPE_DIR = new THREE.Vector3()
+/** How long a fish hangs in the net at the gunwale as it comes up. */
+const FISH_IN_NET_SECONDS = 1.4
 
 // --- Poses -------------------------------------------------------------------
 
@@ -274,7 +280,8 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       gutted: new THREE.MeshStandardMaterial({ color: FISH_TONES.gutted, metalness: 0.2, roughness: 0.55, side: THREE.DoubleSide }),
       grilled: new THREE.MeshStandardMaterial({ color: FISH_TONES.grilled, metalness: 0.05, roughness: 0.8, side: THREE.DoubleSide }),
       smoked: new THREE.MeshStandardMaterial({ color: FISH_TONES.smoked, metalness: 0.05, roughness: 0.85, side: THREE.DoubleSide }),
-      float: new THREE.MeshStandardMaterial({ color: '#d8c48a', roughness: 0.8 }),
+      float: new THREE.MeshStandardMaterial({ color: '#e2cf92', roughness: 0.7 }),
+      rope: new THREE.MeshStandardMaterial({ color: '#8a7350', roughness: 1 }),
     }),
     [],
   )
@@ -301,6 +308,10 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const gesture = useRef<GestureState>(restGesture())
   const foldedNet = useRef<THREE.Mesh>(null)
   const floats = useRef<Array<THREE.Mesh | null>>([])
+  const ropes = useRef<Array<THREE.Mesh | null>>([])
+  /** When each fish of this haul came up over the gunwale (scene seconds). */
+  const landedAt = useRef<number[]>([])
+  const lastLanded = useRef(0)
   const hullFish = useRef<Array<THREE.Mesh | null>>([])
   const basketGroups = useRef<Array<THREE.Group | null>>([])
   const basketFish = useRef<Array<Array<THREE.Mesh | null>>>([[], []])
@@ -417,15 +428,16 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
     }
     if (paddle.current) paddle.current.visible = canoe.paddlerAction !== 'haul' && canoe.paddlerAction !== 'hand'
     // The net man's.
-    const riverSide = bearingIn(nm, { x: nm.x + lane.nx, z: nm.z + lane.nz })
+    // The net is set on the hull's shore side.
+    const netSide = bearingIn(nm, { x: nm.x - lane.nx, z: nm.z - lane.nz })
     const sp = netSeatPose.current
     if (sp) {
       const next = isGesturing(gesture.current)
         ? gesturePose(gesture.current)
         : nm.action === 'haul'
-          ? haulPose(canoe.stroke, riverSide)
+          ? haulPose(canoe.stroke, netSide)
           : nm.action === 'payOut' || nm.action === 'holdNet'
-            ? { left: armAim(riverSide + 0.15, -0.35 + (nm.action === 'payOut' ? 0.15 * Math.sin(t * 5) : 0)), right: armAim(riverSide - 0.2, -0.55), lean: 0.2, turn: Math.max(-0.7, Math.min(0.7, riverSide * 0.5)) }
+            ? { left: armAim(netSide + 0.15, -0.35 + (nm.action === 'payOut' ? 0.15 * Math.sin(t * 5) : 0)), right: armAim(netSide - 0.2, -0.55), lean: 0.2, turn: Math.max(-0.7, Math.min(0.7, netSide * 0.5)) }
             : { left: armAim(0.25, -1.0), right: armAim(-0.25, -1.0), lean: 0.12, turn: 0 }
       copyPose(sp, next)
       applyFigurePose(netSeatLimbs.current, sp)
@@ -437,15 +449,41 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       applyFigurePose(netShoreLimbs.current, shore)
     }
 
-    // The net: folded in the hull, or a line of floats on the water.
-    if (foldedNet.current) foldedNet.current.visible = canoe.net <= 1e-3
+    // The net: folded in the hull, or a headline of floats on the water — and
+    // while it is hauled, heaping up in the hull again as the line shortens.
+    if (foldedNet.current) {
+      const heap = canoe.phase === 'haul' ? Math.max(0.25, 1 - canoe.net) : canoe.net <= 1e-3 ? 1 : 0
+      foldedNet.current.visible = heap > 0
+      foldedNet.current.scale.set(0.24 * heap + 0.04, 0.1 * heap + 0.02, 0.32 * heap + 0.05)
+    }
     const pts = netFloats(canoe, lane, cfg)
+    const line = pts.length ? [netHand(canoe, lane, cfg), ...pts] : []
+    const waterY = -BANK_WATER_DROP + 0.02
     floats.current.forEach((m, i) => {
       if (!m) return
       const q = pts[i]
       m.visible = !!q
-      if (q) m.position.set(q.x, -BANK_WATER_DROP + 0.02 + 0.015 * Math.sin(t * 2 + i), q.z)
+      if (q) m.position.set(q.x, waterY + 0.015 * Math.sin(t * 2 + i), q.z)
     })
+    // The headline rope between the floats, lying on the water.
+    ropes.current.forEach((m, i) => {
+      if (!m) return
+      const a = line[i]
+      const b = line[i + 1]
+      m.visible = !!a && !!b
+      if (!a || !b) return
+      const len = Math.hypot(b.x - a.x, b.z - a.z)
+      const rise = i === 0 ? 0.25 : 0
+      m.position.set((a.x + b.x) / 2, waterY + rise / 2, (a.z + b.z) / 2)
+      ROPE_DIR.set(b.x - a.x, -rise, b.z - a.z).normalize()
+      m.quaternion.setFromUnitVectors(ROPE_UP, ROPE_DIR)
+      m.scale.set(1, Math.hypot(len, rise), 1)
+    })
+    // Each fish as it comes up: held a moment in the net at the gunwale,
+    // flapping, before it drops into the hull.
+    if (canoe.landed < lastLanded.current) landedAt.current = []
+    while (landedAt.current.length < canoe.landed) landedAt.current.push(t)
+    lastLanded.current = canoe.landed
 
     // The catch in the hull: flapping as it comes up, and now and then after.
     hullFish.current.forEach((m, i) => {
@@ -458,8 +496,20 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       const lively = canoe.phase === 'haul' ? 1 : 0.35
       const flap = Math.sin(t * (9 + i) + i * 1.7) * lively * (Math.sin(t * 0.7 + i) > 0.2 ? 1 : 0.2)
       m.scale.setScalar(len)
-      m.position.set(across, HULL_FLOOR_Y + 0.03, along + 0.1 * (i >= 4 ? 1 : 0))
-      m.rotation.set(0.12 * flap, 0.3 * (i % 3) + 0.25 * flap, Math.PI / 2 + 0.35 * flap)
+      const came = landedAt.current[i]
+      if (canoe.phase === 'haul' && came !== undefined && t - came < FISH_IN_NET_SECONDS) {
+        // In the net at the gunwale on the shore side, head down, thrashing.
+        const shoreSide = Math.cos(canoe.yaw) * lane.nx - Math.sin(canoe.yaw) * lane.nz >= 0 ? -1 : 1
+        const lift = 1 - (t - came) / FISH_IN_NET_SECONDS
+        m.position.set(shoreSide * (cfg.hullBeam / 2 + 0.05), HULL_FLOOR_Y + 0.12 + 0.25 * lift, CANOE_NETMAN_FORE - 0.1 * i)
+        m.rotation.set(-Math.PI / 2 + 0.5 * Math.sin(t * 14 + i), 0.6 * Math.sin(t * 11 + i), 0.3 * Math.sin(t * 9 + i))
+        return
+      }
+      // Heaped on the hull's floor: some on their side, some flipped up on
+      // their bellies as they thrash — so the catch reads from the bank too.
+      const upright = i % 2 === 1
+      m.position.set(across, HULL_FLOOR_Y + (upright ? 0.07 : 0.03), along + 0.1 * (i >= 4 ? 1 : 0))
+      m.rotation.set(0.12 * flap, 0.3 * (i % 3) + 0.25 * flap, (upright ? 0.15 : Math.PI / 2) + 0.35 * flap)
     })
 
     // THE TWO BASKETS, wherever the ring says they are.
@@ -672,8 +722,22 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
           }}
           material={materials.float}
           visible={false}
+          castShadow
         >
-          <sphereGeometry args={[0.07, 8, 6]} />
+          <sphereGeometry args={[0.11, 10, 8]} />
+        </mesh>
+      ))}
+      {Array.from({ length: Math.round(cfg.netFloats) }, (_, i) => (
+        <mesh
+          key={i}
+          name="village-canoe-net-rope"
+          ref={(el) => {
+            ropes.current[i] = el
+          }}
+          material={materials.rope}
+          visible={false}
+        >
+          <cylinderGeometry args={[0.012, 0.012, 1, 5]} />
         </mesh>
       ))}
       <group ref={paddlerG} name="village-canoe-paddler" position={born.paddler}>
@@ -714,39 +778,44 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
         </group>
       ))}
 
-      {/* THE FISHERS' FIRE: a ring of stones, embers, a small flame and a grate
-          of green sticks on two forked posts, the grilling fish on it. */}
+      {/* THE FISHERS' FIRE, drawn as the village fire pit is (PlaceScene's
+          FirePit): a dark hearth, a ring of stones, two crossed logs and a
+          flickering flame cone — with a grate of green sticks on two forked
+          posts over it, the grilling fish on the grate. */}
       <group name="fish-fire" position={[sites.fire.x, fireY, sites.fire.z]} rotation={[0, along, 0]}>
+        <pointLight position={[0, 0.6, 0]} color="#ff9a4a" intensity={6} distance={6} decay={2} />
         <mesh position={[0, 0.02, 0]} receiveShadow>
-          <cylinderGeometry args={[0.55, 0.55, 0.04, 12]} />
+          <cylinderGeometry args={[0.8, 0.8, 0.05, 14]} />
           <meshStandardMaterial color="#3a3128" roughness={1} />
         </mesh>
-        {Array.from({ length: 6 }, (_, i) => {
-          const a = (i / 6) * Math.PI * 2
+        {Array.from({ length: 7 }, (_, i) => {
+          const a = (i / 7) * Math.PI * 2
           return (
-            <mesh key={i} position={[Math.cos(a) * 0.6, 0.08, Math.sin(a) * 0.6]} castShadow>
-              <dodecahedronGeometry args={[0.11, 0]} />
+            <mesh key={i} position={[Math.cos(a) * 0.85, 0.12, Math.sin(a) * 0.85]} castShadow>
+              <dodecahedronGeometry args={[0.15, 0]} />
               <meshStandardMaterial color="#79706a" roughness={1} />
             </mesh>
           )
         })}
-        <mesh position={[0, 0.07, 0]}>
-          <sphereGeometry args={[0.32, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshStandardMaterial color="#5a1e08" emissive="#ff4a00" emissiveIntensity={1.4} roughness={0.9} />
-        </mesh>
-        <mesh ref={flame} position={[0, 0.24, 0]}>
-          <coneGeometry args={[0.16, 0.36, 7]} />
-          <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.2} roughness={0.4} />
-        </mesh>
-        {[-0.62, 0.62].map((x, i) => (
-          <mesh key={i} position={[0, 0.3, x]} castShadow>
-            <cylinderGeometry args={[0.025, 0.03, 0.6, 5]} />
+        {[0.5, -0.6].map((ry, i) => (
+          <mesh key={i} position={[0, 0.14, 0]} rotation={[0.08, ry, 0]} castShadow>
+            <cylinderGeometry args={[0.07, 0.08, 1.1, 6]} />
             <meshStandardMaterial color="#4a3018" roughness={1} />
           </mesh>
         ))}
-        {[-0.14, -0.05, 0.05, 0.14].map((x, i) => (
-          <mesh key={i} position={[x, 0.58, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.012, 0.012, 1.3, 4]} />
+        <mesh ref={flame} position={[0, 0.42, 0]}>
+          <coneGeometry args={[0.28, 0.7, 8]} />
+          <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
+        </mesh>
+        {[-0.95, 0.95].map((x, i) => (
+          <mesh key={i} position={[0, 0.48, x]} castShadow>
+            <cylinderGeometry args={[0.03, 0.035, 0.96, 5]} />
+            <meshStandardMaterial color="#4a3018" roughness={1} />
+          </mesh>
+        ))}
+        {[-0.16, -0.05, 0.05, 0.16].map((x, i) => (
+          <mesh key={i} position={[x, 0.92, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.012, 0.012, 1.95, 4]} />
             <meshStandardMaterial color="#6b7a3a" roughness={1} />
           </mesh>
         ))}
@@ -759,7 +828,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
             }}
             geometry={fishGeometry}
             material={materials.gutted}
-            position={[0, 0.62, -0.42 + i * 0.28]}
+            position={[0, 0.96, -0.6 + i * 0.4]}
             scale={fishLength(i + 30)}
             visible={false}
             castShadow
@@ -767,7 +836,9 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
         ))}
       </group>
       {/* THE SMOKING RACK: four posts, two rails and slats, the fish across them. */}
-      <group name="fish-rack" position={[sites.rack.x, rackY, sites.rack.z]} rotation={[0, along, 0]}>
+      {/* Turned so its rails run along the bank: seen from the village, the fish
+          hang side by side. */}
+      <group name="fish-rack" position={[sites.rack.x, rackY, sites.rack.z]} rotation={[0, along + Math.PI / 2, 0]}>
         {[[-0.5, -0.35], [0.5, -0.35], [-0.5, 0.35], [0.5, 0.35]].map(([x, z], i) => (
           <mesh key={i} position={[x, 0.45, z]} castShadow>
             <cylinderGeometry args={[0.03, 0.035, 0.9, 5]} />
@@ -789,8 +860,9 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
             }}
             geometry={fishGeometry}
             material={materials.smoked}
-            position={[-0.45 + (i % 4) * 0.3, 0.92, i < 4 ? -0.12 : 0.14]}
-            rotation={[0, 0, Math.PI / 2]}
+            // Hung head down from the rails by the tail, broad side out.
+            position={[-0.42 + (i % 4) * 0.28 + (i < 4 ? 0 : 0.14), 0.88 - 0.5 * fishLength(i + 50), i < 4 ? -0.35 : 0.35]}
+            rotation={[Math.PI / 2, Math.PI / 2, 0, 'YXZ']}
             scale={fishLength(i + 50)}
             visible={false}
             castShadow
@@ -902,7 +974,7 @@ function paddlerAction(action: PaddlerAction, canoe: CanoeState, lane: CanoeLane
     case 'steer':
       return steerPose(canoe.stroke)
     case 'haul':
-      return haulPose(canoe.stroke, bearingIn(canoe.paddler, { x: canoe.paddler.x + lane.nx, z: canoe.paddler.z + lane.nz }))
+      return haulPose(canoe.stroke, bearingIn(canoe.paddler, { x: canoe.paddler.x - lane.nx, z: canoe.paddler.z - lane.nz }))
     case 'hand':
       return handPose(canoe.clock)
   }

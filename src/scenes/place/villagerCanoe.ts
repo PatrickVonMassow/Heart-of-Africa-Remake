@@ -598,27 +598,35 @@ export function canoeCycleSeconds(cfg: CanoeConfig = balance.villageLife.canoe, 
 
 /**
  * The drift net's float line, as the picture draws it: `count` floats from the
- * net man's hand out into the river and trailing upstream behind the hull,
+ * net man's hand in toward the bank and trailing upstream behind the hull,
  * `net` of the way out. Empty while the net is folded.
  */
-export function netFloats(state: Pick<CanoeState, 'net' | 'netMan' | 'x' | 'z'>, lane: Pick<CanoeLane, 'nx' | 'nz' | 'fx' | 'fz'>, cfg: CanoeConfig = balance.villageLife.canoe): BankPoint[] {
-  if (state.net <= 1e-3) return []
-  // The headline leaves the hull's river side level with the net man, at the
-  // hull's own distance out — so a bow swung out into the current does not
-  // carry the net further out than the water is drawn.
+/** Where the net's headline leaves the hull: its SHORE side (set between the
+ *  hull and the bank, where the current is slack and the net is seen from the
+ *  village), level with the
+ *  net man, at the hull's own distance out — so a bow swung out into the
+ *  current does not carry the net further out than the water is drawn. */
+export function netHand(state: Pick<CanoeState, 'netMan' | 'x' | 'z'>, lane: Pick<CanoeLane, 'nx' | 'nz' | 'fx' | 'fz'>, cfg: CanoeConfig = balance.villageLife.canoe): BankPoint {
   const along = (state.netMan.x - state.x) * lane.fx + (state.netMan.z - state.z) * lane.fz
   const side = cfg.hullBeam / 2 + 0.25
-  const hand = {
-    x: state.x + lane.fx * along + lane.nx * side,
-    z: state.z + lane.fz * along + lane.nz * side,
-  }
+  return { x: state.x + lane.fx * along - lane.nx * side, z: state.z + lane.fz * along - lane.nz * side }
+}
+
+export function netFloats(state: Pick<CanoeState, 'net' | 'netMan' | 'x' | 'z' | 'phase'>, lane: Pick<CanoeLane, 'nx' | 'nz' | 'fx' | 'fz'>, cfg: CanoeConfig = balance.villageLife.canoe): BankPoint[] {
+  if (state.net <= 1e-3) return []
+  const hand = netHand(state, lane, cfg)
   const out: BankPoint[] = []
   const n = Math.max(2, Math.round(cfg.netFloats))
+  // Each float keeps its own place on the line: paid out from the hand, and
+  // hauled in from the hand again — so while the net comes in, the floats
+  // still out on the water keep their spacing and the nearest one is taken in.
+  const hauling = state.phase === 'haul'
   for (let i = 1; i <= n; i++) {
-    const u = (i / n) * state.net
+    const u = i / n
+    if (hauling ? u < 1 - state.net : u > state.net) continue
     const across = cfg.netReach * Math.sin((u * Math.PI) / 2)
     const back = cfg.netLength * u * 0.85
-    out.push({ x: hand.x + lane.nx * across - lane.fx * back, z: hand.z + lane.nz * across - lane.fz * back })
+    out.push({ x: hand.x - lane.nx * across - lane.fx * back, z: hand.z - lane.nz * across - lane.fz * back })
   }
   return out
 }
