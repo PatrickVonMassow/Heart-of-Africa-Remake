@@ -1668,6 +1668,10 @@ function Kids({
         // roaming quarter and hoping.
         climb: (c as BankChild).climb ?? 'none',
         lift: (c as BankChild).lift ?? 0,
+        // Caught in the bank round and standing out the run in the slump, so a
+        // picture check can aim at a caught child rather than at any held one.
+        // Null in the tag round.
+        slumped: bank ? (c as BankChild).slumped : null,
         walked: c.walked,
         // And how much of that walking happened while the round was ON — the
         // settlement's own counter, for the same reason (point 656).
