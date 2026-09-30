@@ -203,7 +203,9 @@ describe('the children`s game at the bank (point 687)', () => {
   })
 
   it('runs the cycle in order: roam, gather, runs with their swaps, parting, roam again', () => {
-    const { s, log } = replay(400)
+    // One cycle per series, so the cycle's own order is what is asked here;
+    // the series is asked in its own block below.
+    const { s, log } = replay(400, { cfg: { ...CFG, seriesCycles: 1 } })
     expect(s.cycles).toBeGreaterThan(0)
     expect(log.phases[0]).toBe('roam')
     // Every transition is one the state machine allows — no phase reached from
@@ -344,6 +346,9 @@ describe('the children`s game at the bank (point 687)', () => {
       roamSpread: 0,
       roamGoalSeconds: 0.05,
       utteranceGapSeconds: 0,
+      // Every call here opens from roaming; a series' later cycles open
+      // straight after the last one and have no boulder before them.
+      seriesCycles: 1,
     }
     // Two cycles include the longer gather/regroup backstops.
     const { log } = replay(300, { seed: 23, cfg })
@@ -611,6 +616,7 @@ describe('the children`s game at the bank (point 687)', () => {
       tapReturnSeconds: 0.1,
       partSeconds: 0.1,
       catchDistance: -1,
+      seriesCycles: 1,
     }
     const { s, log } = replay(30, { seed: 17, cfg })
 
@@ -1049,6 +1055,132 @@ describe('the children`s game at the bank (point 687)', () => {
  * could no longer produce anything at all. The bank round is what speaks now, so
  * the window is judged against the round's own longest legitimate quiet spell.
  */
+describe('a play session is a series of cycles before the children scatter', () => {
+  /** Fast phases, and nobody ever caught: every cycle ends on the
+   *  one-run-per-child backstop. */
+  const FAST: BankConfig = {
+    ...CFG,
+    roamSeconds: 0.1,
+    roamSpread: 0,
+    gatherSeconds: 0.1,
+    runSeconds: 0.1,
+    regroupSeconds: 0.1,
+    tapReturnSeconds: 0.1,
+    partSeconds: 0.1,
+    catchDistance: -1,
+  }
+
+  /** Every phase change, with the round's counters as they stood after it. */
+  function transitions(seconds: number, cfg: BankConfig, seed = 17) {
+    const seen: Array<{ from: string; to: string; cycles: number; series: number }> = []
+    let before = ''
+    replay(seconds, {
+      seed,
+      cfg,
+      observe: (s) => {
+        if (before && s.phase !== before) {
+          seen.push({ from: before, to: s.phase, cycles: s.cycles, series: s.seriesPlayed })
+        }
+        before = s.phase
+      },
+    })
+    return seen
+  }
+
+  it('ships three cycles to a series', () => {
+    expect(balance.villageLife.bankGame.seriesCycles).toBe(3)
+  })
+
+  it('plays three cycles back to back, parts only after the third, and starts the next series at one', () => {
+    const seen = transitions(240, FAST)
+    const roams = seen.filter((t) => t.to === 'roam')
+    // Two whole series came round, so the reset is seen as well as the series.
+    expect(roams.length).toBeGreaterThanOrEqual(2)
+    // Parting ends in roaming only after every third cycle, and roaming always
+    // starts a series afresh.
+    for (const t of roams) {
+      expect(t.from).toBe('part')
+      expect(t.cycles % 3).toBe(0)
+      expect(t.series).toBe(0)
+    }
+    // Between two roaming phases: exactly three cycles, the first two of them
+    // opening the next cycle straight from their end — no 'roam' between.
+    const firstRoam = seen.indexOf(roams[0])
+    const secondRoam = seen.indexOf(roams[1])
+    const series = seen.slice(firstRoam + 1, secondRoam + 1)
+    expect(series.filter((t) => t.to === 'part').map((t) => t.series)).toEqual([1, 2, 3])
+    expect(series.filter((t) => t.from === 'part' && t.to === 'gather').map((t) => t.series)).toEqual([1, 2])
+    expect(series.filter((t) => t.to === 'roam')).toHaveLength(1)
+  })
+
+  it('counts a cycle ended by the one-run-per-child backstop as completed', () => {
+    const seen = transitions(60, FAST)
+    const firstPart = seen.find((t) => t.to === 'part')
+    expect(firstPart).toBeDefined()
+    expect(firstPart!.series).toBe(1)
+    // Nobody was caught, so it was the backstop that ended it.
+    expect(seen.find((t) => t.from === 'part')?.to).toBe('gather')
+  })
+
+  it('reopens the next cycle with every child a runner but its caller', () => {
+    let checked = 0
+    let before = ''
+    replay(60, {
+      cfg: FAST,
+      seed: 17,
+      observe: (s) => {
+        if (before === 'part' && s.phase === 'gather') {
+          checked++
+          expect(s.children.filter((c) => c.role === 'catcher')).toHaveLength(1)
+          expect(s.children[s.caller].role).toBe('catcher')
+          expect(s.children.filter((c) => c.role === 'runner')).toHaveLength(s.children.length - 1)
+          expect(s.children.some((c) => c.slumped)).toBe(false)
+        }
+        before = s.phase
+      },
+    })
+    expect(checked).toBeGreaterThan(0)
+  })
+
+  it('opens a later cycle of the series only after the end pause', () => {
+    const cfg: BankConfig = { ...FAST, endPauseSeconds: 2 }
+    let partFor = 0
+    let before = ''
+    let checked = 0
+    replay(60, {
+      cfg,
+      seed: 17,
+      observe: (s, _u, dt) => {
+        if (s.phase === 'part') partFor += dt
+        if (before === 'part' && s.phase === 'gather') {
+          checked++
+          expect(partFor).toBeGreaterThanOrEqual(cfg.endPauseSeconds - 1e-9)
+        }
+        if (s.phase !== 'part') partFor = 0
+        before = s.phase
+      },
+    })
+    expect(checked).toBeGreaterThan(0)
+  })
+
+  it('starts a rebuilt round, the one interruption the game has, at the first cycle', () => {
+    // The round has no hush or intrusion of its own (the traveller is an
+    // obstacle, never a stop); what ends a series early is the group being
+    // built afresh, as on leaving and re-entering the settlement.
+    const cfg: BankConfig = { ...FAST, seriesCycles: 99 }
+    const { s } = replay(60, { cfg, seed: 17 })
+    expect(s.seriesPlayed).toBeGreaterThan(0)
+    const again = createBankGame(s.children.map((c) => ({ x: c.x, z: c.z })), mulberry32(3), cfg)
+    expect(again.seriesPlayed).toBe(0)
+    expect(again.phase).toBe('roam')
+  })
+
+  it('keeps one cycle per session at a series of one', () => {
+    const seen = transitions(60, { ...FAST, seriesCycles: 1 })
+    expect(seen.filter((t) => t.from === 'part').every((t) => t.to === 'roam')).toBe(true)
+  })
+})
+
 describe('the round is watched for going silent (point 589)', () => {
   beforeEach(() => {
     resetDevAsserts()
@@ -1428,8 +1560,11 @@ describe('arriving runners name the far stone by contact', () => {
     expect(bankChildCanSeparate(c)).toBe(true)
   })
 
-  it('finishes a last-run arrival hold before the parting phase can return to roaming', () => {
-    const cfg = { ...CFG, partSeconds: 0.1, endPauseSeconds: 0.1, arrivalHoldSeconds: 2 }
+  it.each([
+    [1, 'roam'],
+    [3, 'gather'],
+  ] as const)('finishes a last-run arrival hold before the series of %i moves on to %s', (seriesCycles, next) => {
+    const cfg = { ...CFG, partSeconds: 0.1, endPauseSeconds: 0.1, arrivalHoldSeconds: 2, seriesCycles }
     const { s, rand } = arriving([{ x: 8, z: 0 }], cfg)
     s.runsThisCycle = s.children.length
     let word: BankUtterance | null = null
@@ -1445,7 +1580,7 @@ describe('arriving runners name the far stone by contact', () => {
       if (c.arrival) expect({ x: c.x, z: c.z }).toEqual(at)
     }
     stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
-    expect(s.phase).toBe('roam')
+    expect(s.phase).toBe(next)
   })
 
   it('gives up a newly obstructed approach silently without freezing the next run', () => {

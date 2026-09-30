@@ -13,8 +13,10 @@
 // whoever is caught drops out where he stands, slumped in frustration (trunk
 // forward, arms hanging), and the sides swap every run so the announced
 // direction alternates by construction. When no free runner is left the caught
-// children stay slumped long enough for the result to read, then everybody
-// walks back toward the roaming quarter.
+// children stay slumped long enough for the result to read. A session is a
+// SERIES of `seriesCycles` such cycles: after each but the last the next one
+// opens right there; only after the last does everybody walk back toward the
+// roaming quarter.
 //
 // EVERY UTTERANCE FALLS AT A FIXED POINT OF THE ROUND. There is no situation
 // catalogue and no scheduler: the opening call, the boulder naming, the
@@ -294,6 +296,10 @@ interface BankRoundConfig {
   partSeconds: number
   /** How long the caught children stay slumped after the cycle's last run. */
   endPauseSeconds: number
+  /** Complete cycles a play session runs back to back: after each but the last
+   *  the next cycle opens straight after the end pause; only the last one parts
+   *  and roams. */
+  seriesCycles: number
   /** Arrival/safe radius from the rock's centre; hand contact is solved separately. */
   reachDistance: number
   /** Where a child waits: how far off the rock's centre its station stands. */
@@ -407,6 +413,9 @@ export interface BankState {
   runsThisCycle: number
   runs: number
   cycles: number
+  /** Cycles completed in the current series. Back to 0 when the group roams;
+   *  a new round (the group rebuilt) starts a new series too. */
+  seriesPlayed: number
   /** Children tagged so far — the round's own "something happened" counter, read
    *  by the live check exactly as the tag game's catches are. */
   tags: number
@@ -775,6 +784,7 @@ export function createBankGame(
     runsThisCycle: 0,
     runs: 0,
     cycles: 0,
+    seriesPlayed: 0,
     tags: 0,
     clock: 0,
     playedClock: 0,
@@ -1122,6 +1132,7 @@ function endRun(s: BankState, cfg: BankConfig): void {
     s.phaseFor = cfg.partSeconds
     s.endFor = cfg.endPauseSeconds
     s.cycles++
+    s.seriesPlayed++
     return
   }
   for (const c of s.children) {
@@ -1149,6 +1160,7 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   s.returnFor = null
   s.endFor = 0
   s.caller = -1
+  s.seriesPlayed = 0
   s.namedBoulder = false
   s.abandonedBoulder = false
   s.failedClimbers.length = 0
@@ -1288,7 +1300,14 @@ function advanceBankGame(
       openedRun = openRun(s, stage, cfg, world)
     }
   }
-  if (s.phase === 'part' && s.phaseFor <= 0 && !s.children.some((c) => c.arrival)) {
+  // A cycle short of the series' last one does not part: once the caught
+  // children have stood their end pause the next cycle opens where the group
+  // stands, and it holds there while the floor withholds the RIVER call.
+  const seriesGoesOn = s.phase === 'part' && s.seriesPlayed < cfg.seriesCycles
+  if (seriesGoesOn && s.endFor <= 0 && !s.children.some((c) => c.arrival)) {
+    openCycle(s, stage, cfg, world)
+  }
+  if (s.phase === 'part' && !seriesGoesOn && s.phaseFor <= 0 && !s.children.some((c) => c.arrival)) {
     world.floor?.release(s)
     openRoam(s, cfg, rand)
   }
@@ -1308,7 +1327,7 @@ function advanceBankGame(
       else stepRun(s, dt, cfg, stage, world)
       break
     case 'part':
-      stepPart(s, dt, cfg, stage, world, holdsEndThisStep)
+      stepPart(s, dt, cfg, stage, world, holdsEndThisStep || seriesGoesOn)
       break
   }
   assertPlaced(s, world)

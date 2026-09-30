@@ -827,6 +827,9 @@ interface BalanceConfig {
       partSeconds: number
       /** How long caught children stay slumped after the cycle's last run. */
       endPauseSeconds: number
+      /** Complete cycles one play session runs back to back before the
+       *  children part and roam. */
+      seriesCycles: number
       /** Arrival (safe) radius around a rock's centre, outside its collider;
        *  the runner walks on from here before its hand names the stone. */
       reachDistance: number
@@ -1653,6 +1656,9 @@ export const balance: BalanceConfig = {
       regroupSeconds: 60,
       partSeconds: 8,
       endPauseSeconds: 3,
+      // Calibratable: one cycle was too short to watch and the next came minutes
+      // later, so a session plays this many cycles in a row (user 30.09.2026).
+      seriesCycles: 3,
       // Arrival/safe radius from the centre, outside the collider and footprint.
       // The runner walks on from here before its hand can name the stone.
       reachDistance: 2.2,
