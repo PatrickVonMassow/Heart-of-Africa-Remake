@@ -1303,12 +1303,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1145": {
-      "at": "2026-09-17T12:44:32.014Z",
-      "why": "Hinter die Veroeffentlichung gerueckt: der Punkt ist maschinell eingereiht und seine Dringlichkeit ist mittel — die Bilder sieht kein Spieler, und der Verlust trifft nur die Beweisfuehrung, die sich mit Freizeichnungen von Hand weiterschleppen laesst.",
-      "origin": "machine",
-      "place": "last"
-    },
     "1153": {
       "at": "2026-09-18T05:28:45.689Z",
       "why": "Low criticality and no player impact: it costs the operator calls at a landing, and every open point ahead of it is closer to the picture.",
@@ -1562,8 +1556,34 @@
       "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-30T11:37:48.422Z",
+    "at": "2026-09-30T13:08:39.804Z",
     "points": [
       184,
       200,
@@ -1952,7 +1972,6 @@
       1129,
       1132,
       1144,
-      1145,
       1153,
       1163,
       1164,
@@ -1995,33 +2014,8 @@
       1245,
       1246,
       1247,
-      1248
+      1248,
+      1249
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
