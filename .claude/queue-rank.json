@@ -1518,12 +1518,6 @@
       "why": "Pure board bookkeeping without a user-named position; it blocks nothing, so last is right",
       "origin": "machine",
       "place": "last"
-    },
-    "1241": {
-      "at": "2026-09-29T23:36:04.101Z",
-      "why": "Commissioned out of turn (commission-guard override): blocks the owed both-backend polish run beside delegation",
-      "origin": "machine",
-      "place": "last"
     }
   },
   "boundary": {
@@ -1553,7 +1547,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-29T23:36:04.114Z",
+    "at": "2026-09-30T00:38:49.261Z",
     "points": [
       184,
       200,
@@ -1943,7 +1937,6 @@
       1132,
       1144,
       1145,
-      1150,
       1151,
       1152,
       1153,
@@ -1982,8 +1975,7 @@
       1235,
       1236,
       1239,
-      1240,
-      1241
+      1240
     ]
   }
 }
