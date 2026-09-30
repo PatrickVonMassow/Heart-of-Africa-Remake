@@ -26,6 +26,9 @@ export function buildFishGeometry(): THREE.BufferGeometry {
     const r = Math.sin(Math.PI * Math.pow(t, 0.75)) * (FISH_DEPTH / 2) * (t < 0.95 ? 1 : 0.6)
     profile.push(new THREE.Vector2(Math.max(0.004, r), 0.42 - t * 0.84))
   }
+  // Ascending along the lathe axis, so the faces wind outward (a descending
+  // profile turns every normal inward).
+  profile.reverse()
   const body = new THREE.LatheGeometry(profile, 10)
   // Lathe axis is Y; lay it along Z (head forward) and flatten it sideways.
   body.rotateX(Math.PI / 2)
