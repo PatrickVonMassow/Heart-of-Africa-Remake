@@ -5813,7 +5813,7 @@ if (section('children-bank-game')) {
         }
       })
 
-    // (1) IN THE RUN: a caught child standing out the run on its own, in the clear.
+    // (1) IN THE RUN: a caught child standing out the run, clear of the others.
     // Bounded twice: by the game's own clock (two whole cycles) and by an
     // iteration cap as a runaway backstop.
     let runShot = null
@@ -5824,15 +5824,27 @@ if (section('children-bank-game')) {
     for (let i = 0; i < 12000 && !runShot && !lost; i++) {
       const s = await readKids()
       if (s.clock - runFirst > 2 * cycleWaitSeconds) break
-      // A caught child standing ON ITS OWN, at least 2 m from every other one.
       if (s.phase === 'run' && s.c.some((k) => k.slumped)) runWhy.caughtMoments++
-      const caught =
-        s.phase === 'run'
-          ? s.c.find((k) => k.slumped && s.c.every((o) => o === k || Math.hypot(o.x - k.x, o.z - k.z) >= 2))
-          : null
+      // A caught child standing clear of the run: at least 2 m from every child
+      // but its own catcher, which stops beside its catch for the rest of the
+      // run (`madeTag`), so "2 m from all" never happens. The stance is then
+      // broadside to that pair, so the catcher stands beside it, not over it.
+      let caught = null
+      let catcher = null
+      if (s.phase === 'run') {
+        for (const k of s.c) {
+          if (!k.slumped) continue
+          const near = s.c.filter((o) => o !== k).sort((a, b) => Math.hypot(a.x - k.x, a.z - k.z) - Math.hypot(b.x - k.x, b.z - k.z))
+          if (near.length > 1 && Math.hypot(near[1].x - k.x, near[1].z - k.z) >= 2) {
+            caught = k
+            catcher = near[0]
+            break
+          }
+        }
+      }
       if (caught) {
         runWhy.alone++
-        const at = await standOff(caught, null, s.c.filter((o) => o !== caught), runWhy)
+        const at = await standOff(caught, catcher, s.c.filter((o) => o !== caught), runWhy)
         if (at?.lost) lost = true
         const before = await readKids()
         const still = before.phase === 'run' && before.c[caught.i].slumped
@@ -5840,8 +5852,9 @@ if (section('children-bank-game')) {
           await frame('1239-caught-child-standing-in-the-run', {
             local: { x: before.c[caught.i].x, y: 0.4, z: before.c[caught.i].z },
             label:
-              `a caught child standing slumped on its own where it was caught while the run goes on, ` +
-              `${at.distance.toFixed(1)} m from the camera, no other child within ${at.across.toFixed(1)} m of the sight line`,
+              `a caught child standing slumped where it was caught while the run goes on, its stopped catcher ` +
+              `beside it and every other child 2 m or more away, ${at.distance.toFixed(1)} m from the camera, ` +
+              `no other child within ${at.across.toFixed(1)} m of its sight line`,
             settle: false,
           })
           const after = await readKids()
@@ -5859,7 +5872,7 @@ if (section('children-bank-game')) {
     }
     check('the settlement stays mounted while the camera stands off the caught child', !lost)
     check(
-      'a caught child was photographed standing slumped on its own in the run, 10-14 m off (work-order 1239)',
+      'a caught child was photographed standing slumped clear of the run, 10-14 m off (work-order 1239)',
       !!runShot && runShot.drift < 0.02,
       runShot
         ? `${runShot.distance.toFixed(1)} m, drifted ${(runShot.drift * 100).toFixed(1)} cm across the shutter, ${runShot.moving} free child(ren) moving, ` +
