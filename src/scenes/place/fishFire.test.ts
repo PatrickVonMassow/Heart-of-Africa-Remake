@@ -142,7 +142,7 @@ describe('the timing: nobody waits long for the other (work-order 1245 item 4)',
     // A third of the words held for five seconds before they are said.
     let heldUntil = -1
     let n = 0
-    const { fire, roundWaits } = simulate({
+    const { fire, roundWaits, canoe } = simulate({
       rounds: 12,
       held: (_w, t) => {
         if (heldUntil < 0 || t > heldUntil + 20) {
@@ -151,7 +151,12 @@ describe('the timing: nobody waits long for the other (work-order 1245 item 4)',
         return t < heldUntil
       },
     })
-    const mean = (a: number[]) => a.reduce((s, x) => s + x, 0) / Math.max(1, a.length)
+    // The rounds really ran — a word held for ever would stall the boat and
+    // leave the averages below over empty samples.
+    expect(canoe.rounds).toBe(12)
+    expect(fire.carrier.waits.length).toBeGreaterThanOrEqual(10)
+    expect(roundWaits.length).toBe(12)
+    const mean = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length
     expect(mean(fire.carrier.waits.slice(1))).toBeLessThanOrEqual(cfg.waitBudgetSeconds)
     expect(mean(roundWaits)).toBeLessThanOrEqual(cfg.waitBudgetSeconds)
   })

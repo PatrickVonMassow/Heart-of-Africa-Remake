@@ -36,7 +36,7 @@ import {
 import { BACKDROP_INNER_OFFSET, GROUND_DISC_OVERHANG } from './backdrop'
 import { PLACE_RADIUS } from './layout'
 import { sharedLayout } from './layoutHarness'
-import { RIVER_HALF_LENGTH } from '../../render/placeRiver'
+import { RIVER_HALF_LENGTH, buildRiverSurfaceGeometry } from '../../render/placeRiver'
 
 beforeAll(setupGeodata)
 
@@ -166,7 +166,21 @@ describe('the drawn scene reaches the bank on both sides (work-order 1245 item 1
     expect(reach.up).toBeCloseTo(reach.down, 6)
     const plateauEnd = bank.walkEdge * Math.tan(BANK_PLATEAU_ANGLE)
     expect(reach.up).toBeGreaterThan(plateauEnd)
-    expect(Math.max(RIVER_HALF_LENGTH, reach.up)).toBeGreaterThan(plateauEnd)
+    // The water mesh as the scene builds it (PlaceScene's PlaceRiver) runs
+    // along the bank at least as far as the shore does, on both sides.
+    const surface = buildRiverSurfaceGeometry(bank, Math.max(RIVER_HALF_LENGTH, reach.up), 8, Math.max(RIVER_HALF_LENGTH, reach.down))
+    const pos = surface.getAttribute('position')
+    let lo = Infinity
+    let hi = -Infinity
+    for (let i = 0; i < pos.count; i++) {
+      const a = pos.getX(i) * bank.fx + pos.getZ(i) * bank.fz
+      lo = Math.min(lo, a)
+      hi = Math.max(hi, a)
+    }
+    surface.dispose()
+    expect(lo).toBeLessThanOrEqual(-reach.up + 1e-6)
+    expect(hi).toBeGreaterThanOrEqual(reach.down - 1e-6)
+    expect(-lo).toBeGreaterThan(plateauEnd)
     // Routing (the villagers' collision grid) covers the whole lobe.
     const upEnd = onBank(bank, -plateauEnd, bank.wadeEdge)
     expect(maxBoundaryRadius(layout)).toBeGreaterThanOrEqual(Math.hypot(upEnd.x, upEnd.z) - 1e-6)
