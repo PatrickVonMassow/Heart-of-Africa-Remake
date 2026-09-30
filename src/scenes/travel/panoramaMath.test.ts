@@ -1,6 +1,8 @@
 // Panorama band geometry (point 81): sector sweep, direction-true texture
 // mapping (incl. the per-sector tan correction of the perspective shots) and
 // the cylinder band height.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   CAPTURE_SECTORS,
@@ -16,6 +18,8 @@ import {
   panoramaCaptureReady,
   panoramaCaptureFar,
   panoramaBandShown,
+  panoramaCaptureHideNames,
+  NATURAL_SITES_GROUP,
   PANORAMA_BAND_BY_KIND,
   PANORAMA_CHUNK_RADIUS,
 } from './panoramaMath'
@@ -267,5 +271,24 @@ describe('the buffer stores each direction where its own camera looked', () => {
       expect(u).toBeCloseTo((k + 0.5) / CAPTURE_SECTORS)
       expect(compass[dir.toLowerCase() as 'n' | 'e' | 's' | 'w']).toBe(fractions[k])
     }
+  })
+})
+
+describe('panoramaCaptureHideNames', () => {
+  // The Ol Doinyo Lengai map symbol was baked into the Maasai village band and
+  // hung in its sky as a cone with floating smoke cones.
+  it('keeps the natural-site map symbols out of the settlement band', () => {
+    expect(panoramaCaptureHideNames('maasai-village')).toContain(NATURAL_SITES_GROUP)
+  })
+  it('hides the entered place marker and keeps cultural landmarks in', () => {
+    const names = panoramaCaptureHideNames('cairo')
+    expect(names).toContain('place-marker-cairo')
+    expect(names.some((n) => /cultural|landmark/i.test(n))).toBe(false)
+  })
+  it('wraps the natural sites in the hidden group inside the travel scene', () => {
+    // The hide list only works if TravelScene mounts the symbols under that name.
+    const scene = readFileSync(resolve(__dirname, 'TravelScene.tsx'), 'utf8')
+    expect(scene.match(/<NaturalSites \/>/g)).toHaveLength(1)
+    expect(scene).toMatch(/<group name=\{NATURAL_SITES_GROUP\}>\s*<NaturalSites \/>\s*<\/group>/)
   })
 })
