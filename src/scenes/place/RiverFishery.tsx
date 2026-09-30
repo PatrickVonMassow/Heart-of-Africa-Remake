@@ -36,6 +36,7 @@ import { markActor } from '../actorLabelSource'
 import { usePlaceGround } from './PlaceGroundContext'
 import { Figure } from './placeFigure'
 import { HEAD_CARRY_POSE, SpeechFloorContext, useStandingBody } from './placeFigureContext'
+import { carrierWalkPose, copyPose, ownPose, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
 import { speechBearing } from './speechBearing'
@@ -152,16 +153,6 @@ function handPose(t: number): FigurePose {
   }
 }
 
-/** Both arms reaching toward a bearing and down, for lifting or setting down. */
-function reachPose(bearing: number, down: number): FigurePose {
-  return {
-    left: armAim(bearing + 0.2, -0.3 - 0.9 * down),
-    right: armAim(bearing - 0.2, -0.3 - 0.9 * down),
-    lean: 0.15 + 0.45 * down,
-    turn: Math.max(-0.6, Math.min(0.6, bearing * 0.5)),
-  }
-}
-
 /** A bearing in a figure's own frame (0 ahead, positive to its left). */
 function bearingIn(figure: { x: number; z: number; yaw: number }, to: { x: number; z: number }): number {
   const dx = to.x - figure.x
@@ -169,13 +160,6 @@ function bearingIn(figure: { x: number; z: number; yaw: number }, to: { x: numbe
   const c = Math.cos(figure.yaw)
   const s = Math.sin(figure.yaw)
   return Math.atan2(dx * c - dz * s, dx * s + dz * c)
-}
-
-function copyPose(into: FigurePose, from: FigurePose): void {
-  into.left = from.left
-  into.right = from.right
-  into.lean = from.lean
-  into.turn = from.turn
 }
 
 // --- Props -------------------------------------------------------------------
@@ -318,7 +302,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
 
   // The fire's people.
   const carrierWalk = useRef<THREE.Group>(null)
-  const carrierWalkPose = useRef<FigurePose | null>(HEAD_CARRY_POSE.current)
+  const carrierWalkPoseRef = useRef<FigurePose | null>(ownPose(HEAD_CARRY_POSE.current))
   const carrierWalkLimbs = useRef<FigureLimbs | null>(null)
   const carrierGait = useRef(0)
   const carrierKneel = useRef<THREE.Group>(null)
@@ -544,10 +528,9 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       carrierWalk.current.position.set(c.x, groundHeight(c.x, c.z), c.z)
       carrierWalk.current.rotation.y = c.yaw
     }
-    const cw = carrierWalkPose.current
+    const cw = carrierWalkPoseRef.current
     if (cw) {
-      const bend = c.phase === 'swap' ? Math.sin(Math.PI * Math.min(1, c.clock / fireCfg.liftSeconds)) : 0
-      copyPose(cw, bend > 0.02 ? reachPose(0, bend) : HEAD_CARRY_POSE.current)
+      copyPose(cw, carrierWalkPose(c.phase, c.clock, fireCfg.liftSeconds))
       applyFigurePose(carrierWalkLimbs.current, cw)
     }
     if (carrierKneel.current) carrierKneel.current.visible = kneeling
@@ -930,7 +913,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
 
       {/* THE CARRIER: walking with the basket on his head, kneeling to gut. */}
       <group ref={carrierWalk} name="fish-carrier" position={born.carrier}>
-        <Figure cloth={clothOf(2)} legs pose={carrierWalkPose} limbs={carrierWalkLimbs} gait={carrierGait} />
+        <Figure cloth={clothOf(2)} legs pose={carrierWalkPoseRef} limbs={carrierWalkLimbs} gait={carrierGait} />
       </group>
       <group ref={carrierKneel} name="fish-carrier-gutting" position={[sites.carrierAtFire.x, groundHeight(sites.carrierAtFire.x, sites.carrierAtFire.z), sites.carrierAtFire.z]} rotation={[0, sites.carrierAtFire.yaw, 0]} visible={false}>
         <Figure
