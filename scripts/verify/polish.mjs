@@ -1018,10 +1018,12 @@ if (section('speech-owner')) {
   const STAND_BACKS = [6, 5]
   const aimPair = (pair, back) =>
     page.evaluate(
-      ({ a, b, back }) => {
+      async ({ a, b, back }) => {
+        const { insidePlace } = await import('/src/scenes/place/boundary.ts')
         const figs = window.__speechOwnerFigures
         const p = window.__placePlayer
-        if (!figs || !p || !window.__placeRayHit) return null
+        const layout = window.__placeLayout
+        if (!figs || !p || !layout || !window.__placeRayHit) return null
         const pos = [figs[a], figs[b]].map((f) => {
           f.updateWorldMatrix(true, false)
           const e = f.matrixWorld.elements
@@ -1039,8 +1041,15 @@ if (section('speech-owner')) {
           px = -px
           pz = -pz
         }
-        p.x = mid.x - px * back
-        p.z = mid.z - pz * back
+        // A stand beyond the settlement's edge is no stand: putting the player
+        // there LEAVES the place (`isOutsidePlace`), and a pair on the bank
+        // lobe — the fishermen at the waterline — offers exactly that. The
+        // pair is skipped; the function that decides leaving decides it here.
+        const x = mid.x - px * back
+        const z = mid.z - pz * back
+        if (!insidePlace(layout, x, z, 1)) return null
+        p.x = x
+        p.z = z
         p.pitch = 0
         p.yaw = Math.atan2(mid.x - p.x, mid.z - p.z) + Math.PI
         return pos
@@ -1238,6 +1247,12 @@ if (section('speech-owner')) {
       continue
     }
     const pos = await aimPair(cand, cand.back)
+    if (!pos) {
+      // The pair walked on until its stand fell outside the settlement.
+      attempts.push({ pair: cand, at: 'stand-outside' })
+      await page.evaluate(() => window.__speech?.clear())
+      continue
+    }
     const label = await page.evaluate(() => window.__speech?.labels().find((l) => l.speakerId === 'owner-newer'))
     let atShutter = null
     await captureFrame(
