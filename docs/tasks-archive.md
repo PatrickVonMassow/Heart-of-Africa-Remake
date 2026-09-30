@@ -32689,3 +32689,29 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   USER, verbatim:
   User 29.09.2026 18:17: »Uferfangspiel: Das Hinsetzen von Kindern, die gefangen wurden, sieht irritierend aus. Ich habe das Feedback bekommen, dass es entweder nach hinfallen oder nach verbeugen aussieht. Vorschlag: Gefangene Kinder bleiben stehen und sehen dadurch etwas frustriert aus, dass sie Arme und Oberkörper/Kopf etwas nach vorne hängen lassen.«
   User 29.09.2026 18:26: »Reihe das wie vorgeschlagen nach 1150 ein. Das soll auch beim stollen Fangen umgesetzt werden.«
+
+- [x] 1151. A water-coloured body stands in the SKY at the Maasai village, and only on
+  WebGPU (found 18.09.2026 by point 1147's picture judgement). In
+  `verification/488-village-edge-band.png` drawn on WEBGPU a slate-blue, hard-edged
+  truncated cone with a dark top rim stands in the gap between two mountains, about as tall
+  as they are. It OCCLUDES the mountain behind it and is OCCLUDED by the one in front, so it
+  is real geometry at mid-distance, not haze or a cloud, and its colour matches the water
+  colour `[0.2, 0.42, 0.6]` in `src/world/terrain.ts`.
+  WHAT THE SECOND BACKEND SETTLES: the SAME frame redrawn on WEBGL 2 shows CLEAR SKY in that
+  gap, with the mountains identical in shape and position. So this is NOT a world-model,
+  elevation or backdrop-height defect — either of those would draw on both backends — but a
+  defect of the WebGPU material/TSL path. It sits on the EVERYDAY backend, the one the
+  player actually gets (§7.2), while the regression lane is clean.
+  WHY NO RUN CAUGHT IT: both runs reported ALL GREEN. No check looks at that part of the
+  sky; the edge-band probe measures the swept ground, not the horizon above it.
+  FINAL STATE: the gap between the mountains at the Maasai village carries sky on WebGPU as
+  it does on WebGL 2. The CAUSE is named in the commit rather than the symptom hidden — do
+  not simply move the camera or the probe.
+  VERIFICATION: the WebGPU `488-village-edge-band` frame shows no such body, judged by eye,
+  and a check that would have caught it — a Vitest assertion over whatever the diagnosis
+  names, or a frame check that reads the sky band above the horizon.
+  Criticality: high — a large wrong object in the sky of a place the player walks to, on the
+  backend the player uses, which every green run so far has failed to see.
+  Refs: src/scenes/place/backdrop.ts, src/scenes/place/backdropMaterial.ts,
+  src/world/terrain.ts, scripts/verify/polish.mjs, point 1147
+  Bundle: Dorfleben.
