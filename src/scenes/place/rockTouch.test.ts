@@ -125,22 +125,30 @@ describe('the tapping child reaches the stone it names, in every river village',
     // a fallback which nothing was asking for any more. So the blockage is
     // PLACED here: the direct stand is computed, then fenced off, and the search
     // has to come back with a neighbouring facet on the same side.
-    const { stage, layout } = stageOf('bambara-village')
-    const real = (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS)
-    const rock = rockAt(stage, 'downstream')
-    const far = rockAt(stage, 'upstream')
-    const direct = Math.atan2(far.x - rock.x, far.z - rock.z)
-    const straight = touchStand(stage, 'downstream', real, direct)
-    expect(straight, 'the direct bearing reaches this stone on open ground').not.toBeNull()
+    // The stone whose direct bearing reaches open ground: which one that is
+    // follows the stage (work-order 1245 moved it upstream), so it is looked
+    // for over the river villages rather than named — the drill is the same.
+    const drill = RIVER_VILLAGES.flatMap((id) => {
+      const { stage, layout } = stageOf(id)
+      const real = (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS)
+      return ENDS.map((end) => {
+        const rock = rockAt(stage, end)
+        const far = rockAt(stage, end === 'upstream' ? 'downstream' : 'upstream')
+        const direct = Math.atan2(far.x - rock.x, far.z - rock.z)
+        return { stage, real, end, direct, straight: touchStand(stage, end, real, direct) }
+      })
+    }).find((d) => d.straight !== null)
+    expect(drill, 'the direct bearing reaches one of the stones on open ground').toBeDefined()
+    const { stage, real, end, direct, straight } = drill!
     // Fence exactly the ground the direct approach would have used.
     const blocked = (x: number, z: number) =>
       real(x, z) || Math.hypot(x - straight!.x, z - straight!.z) <= WALKER_RADIUS * 2
-    expect(touchStand(stage, 'downstream', blocked, direct)).toBeNull()
-    const stand = touchStand(stage, 'downstream', blocked)!
+    expect(touchStand(stage, end, blocked, direct)).toBeNull()
+    const stand = touchStand(stage, end, blocked)!
     expect(stand).not.toBeNull()
     expect(Math.abs(stand.bearing - direct)).toBeLessThanOrEqual(Math.PI / 2)
     expect(blocked(stand.x, stand.z)).toBe(false)
-    expect(Math.abs(touchReach(stage, 'downstream', stand)!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+    expect(Math.abs(touchReach(stage, end, stand)!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
   })
 
   it('is solved at the height the renderer DRAWS the body at, dip included', () => {

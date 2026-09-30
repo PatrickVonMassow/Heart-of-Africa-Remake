@@ -43,7 +43,13 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       // and it is the stress case: less time inside the phase means the guard
       // spends more of it in overtime.
       BANK_CFG.roamSeconds = 8
-      const cap = BANK_CFG.roamSeconds * (1 + BANK_CFG.roamSpread) + BANK_CFG.roamGuardSeconds
+      // ... plus the one hold the phase is allowed past its guard (work-order
+      // 1080): a child still up on the stone comes down first — its hold at the
+      // top and a descent capped at four sink lengths. Work-order 1245 moved
+      // bambara@21's quarter beside the moved stage, and its roam ended 2.5 s
+      // past the bare cap on exactly that hold.
+      const cap = BANK_CFG.roamSeconds * (1 + BANK_CFG.roamSpread) + BANK_CFG.roamGuardSeconds +
+        BANK_CFG.climbHoldSeconds + 4 * BANK_CFG.climbSinkSeconds
       // The budget the browser check gives a run to start, in played seconds.
       const RUN_BUDGET_S = 150
       for (const [placeId, seed] of CASES) {

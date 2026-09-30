@@ -157,8 +157,9 @@ describe('buildWedgeCarve in the quarter the reported village places today (seed
     // The corridor the compound's fence arc pinches shut against the rim.
     // Re-taken by point 1173: the settlement grew, the quarter moved with it,
     // and this probe went with it — which is the drift the guards below exist
-    // to catch, and did.
-    const pinch = { x: 5.05, z: -15.2 }
+    // to catch, and did. Re-taken again by work-order 1245: the quarter now
+    // lies beside the moved bank stage, and the pinch is one of its carved cells.
+    const pinch = { x: -18.14, z: 16.89 }
     // ... and it is a point of THIS quarter's own free ground, not a coordinate
     // that happens to still be classified. A pinned probe that has drifted
     // outside the disc, or under a body, would answer without meaning anything
@@ -170,7 +171,7 @@ describe('buildWedgeCarve in the quarter the reported village places today (seed
     expect(standingClear(layout.colliders, pinch.x, pinch.z, NPC_RADIUS), 'the pinch is not free ground').toBe(true)
     expect(carve(pinch.x, pinch.z)).toBe(true)
     // The open middle of the quarter, well inside it:
-    expect(carve(5.59, -12.21)).toBe(false)
+    expect(carve(-14.64, 14.64)).toBe(false)
   })
 
   it('takes only a small share of the statically free ground', () => {

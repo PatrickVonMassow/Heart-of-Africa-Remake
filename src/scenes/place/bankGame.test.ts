@@ -1169,10 +1169,12 @@ describe('arriving runners name the far stone by contact', () => {
   // BOTH CADENCES, ONE ANSWER. The pair used to straddle the hearing radius —
   // the same approach came out audible at a tenth of a second and inaudible at
   // a sixtieth — and the case recorded that split. Point 1173 moved the stage,
-  // the fixture's arrival now lands the same side of the radius at both, and
+  // the fixture's arrival now lands the same side of the radius at both (since
+  // work-order 1245 the outside: the rocks keep the stretch's full 21 m span
+  // once pulled straight inland rather than toward the centre), and
   // that AGREEMENT is the stronger property: what the listener hears must not
   // depend on how fast frames arrive. It is asserted as such below.
-  it.each([{ dt: 1 / 60, audible: true }, { dt: 0.1, audible: true }])('resolves the same arrival approach to an audible=$audible hold at dt=$dt', ({ dt, audible }) => {
+  it.each([{ dt: 1 / 60, audible: false }, { dt: 0.1, audible: false }])('resolves the same arrival approach to an audible=$audible hold at dt=$dt', ({ dt, audible }) => {
     const layout = buildLayout('bambara-village', 3791639114)
     const rocks = layout.playRocks!
     const stage: BankStage = { ...STAGE, ...rocks, flank: playRockFlank(rocks) }
@@ -1223,7 +1225,9 @@ describe('arriving runners name the far stone by contact', () => {
           FIGURE_LIMBS.handRadius * CHILD_FIGURE_SCALE
         if (gesture.kind === 'touch') expect(Math.abs(gap)).toBeLessThanOrEqual(TOUCH_GAP)
         else {
-          expect(gap).toBeGreaterThan(0.64)
+          // The arm at rest, plainly off the stone (0.55-0.59 m on the stage
+          // work-order 1245 moved; 0.64-0.69 m before).
+          expect(gap).toBeGreaterThan(0.5)
           expect(gap).toBeLessThan(0.69)
         }
       }
@@ -1499,6 +1503,10 @@ describe('the call register reaches the documented spectator stand', () => {
     const { log, s: state } = replay(600, { stage, seed: 3791639114, world: { ...openWorld(), radius: 100 } })
     expect(state.cycles).toBeGreaterThan(0)
     const heard = new Set<string>()
+    // THE QUARTER IS SEATED WITHIN CALL REACH OF THIS STAND (work-order 1245),
+    // so the round's RIVER call from it is heard here too.
+    const g = layout.playGround!
+    expect(dist(stand, g) + g.radius).toBeLessThanOrEqual(balance.communication.call.reach)
     for (const { u, speakerX: x, speakerZ: z } of log.when) {
       if (bankVoiceRegister(u.moment) !== 'call') continue
       const distance = dist(stand, { x, z })

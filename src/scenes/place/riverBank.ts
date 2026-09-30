@@ -84,74 +84,68 @@ export const BANK_BED_DEPTH = 1.6
  *  face: `bankShoreRows` is pinned against this. */
 export const BANK_MAX_STEP = 0.05
 
-/** Angular half-width of the bank lobe's plateau: inside it the walkable
- *  region reaches all the way to the water. ~22°. */
-export const BANK_PLATEAU_ANGLE = 0.384
+/**
+ * Angular half-width of the bank lobe's plateau: inside it the walkable region
+ * reaches all the way to the water.
+ *
+ * THE BANK IS SYMMETRIC (work-order 1245, user 30.09.2026). Work-order 1237 had
+ * widened only the DOWNSTREAM side (to 0.85, for the dugout's landing) and left
+ * the upstream side at 0.384 (±16.2 m), so the walkable frontage was about
+ * 45 m downstream of the settlement's bank normal against 16 m upstream. Both
+ * sides now carry the same plateau: on the shipped river villages (walk edge
+ * 40.0-40.9 m) the top of the bank is walkable to about s = ±45 m, and the
+ * children's stretch sits in the upstream half (`bankStretch`), the dugout's
+ * lane in the downstream half. Calibratable.
+ */
+export const BANK_PLATEAU_ANGLE = 0.85
 /** ... and where the lobe has faded back to the plain walkable radius. The
  *  region between the two tapers, so walking along the bank draws the player
  *  gently back inland instead of dropping him out of the settlement at a
- *  corner. */
-export const BANK_FADE_ANGLE = 0.593
-
-/**
- * THE BANK IS WIDER DOWNSTREAM (work-order 1237, user 29.09.2026). The villager's
- * dugout plies a lane of its own downstream of the children's stretch and lands
- * at its downstream end, so the walkable ground reaches the water that far: this
- * plateau angle carries the walk edge to about s = +45 m on the shipped river
- * villages (walk edge 40.0-40.9 m), where the upstream side keeps
- * `BANK_PLATEAU_ANGLE` (±16.2 m). Calibratable. The children's stretch and the
- * water path stay tied to the SMALLER, upstream angle.
- */
-export const BANK_DOWNSTREAM_PLATEAU_ANGLE = 0.85
-/** ... and its fade grows by the same margin the upstream one has. */
-export const BANK_DOWNSTREAM_FADE_ANGLE = BANK_DOWNSTREAM_PLATEAU_ANGLE + (BANK_FADE_ANGLE - BANK_PLATEAU_ANGLE)
+ *  corner. The margin (0.209 rad) is the one the bank has always faded over. */
+export const BANK_FADE_ANGLE = BANK_PLATEAU_ANGLE + 0.209
+/** Across this bearing off the bank normal the drawn ground disc eases into
+ *  its bank-side shift (`groundDiscShift`), so the rim does not jump at the
+ *  normal. It is the former upstream plateau angle, where the shift used to
+ *  start. */
+export const BANK_DISC_SHIFT_EASE_ANGLE = 0.384
 
 /** How far inside the walkable edge the three named bank points sit, so a
  *  villager sent to one stands clear of the edge, on the flat plate. */
 export const BANK_STAND_INSET = 1.5
-/** The two stretches lie at most at this fraction of the plateau angle to each
- *  side (`bankStretchAngle` pulls them in where the span would pass its cap) —
- *  inside the plateau by construction, so they can never fall outside the
- *  walkable region however the calibratable river width moves the waterline. */
-export const BANK_STRETCH_ANGLE_FRAC = 0.8
+/** The least distance the stretch's ends keep inside the plateau's reach along
+ *  the stand line (`bankStretch` pulls the span in where it would pass it), so
+ *  they can never fall outside the walkable region however the calibratable
+ *  river width moves the waterline. */
+export const BANK_STRETCH_PLATEAU_MARGIN = 2
 
 /**
  * THE LONGEST the stretch may be, and the shortest it may be (point 1173 item
- * 4), measured between the two bank points the play rocks are set from; the
- * rocks themselves, pulled inland, stand a little closer. The stretch used to be a pure ANGLE on the bank, so it
- * grew with the waterline: pushing the village off the water stretched the
- * children's run from 19.7 m to 26 m, which is a march rather than a game —
- * past the frame the start line sees both rocks in (point 687 §6) and past the
- * register a called word carries at (688).
- *
- * So the SPAN is the named quantity now and the angle follows it. The angle can
- * only ever be pulled IN from `BANK_STRETCH_ANGLE_FRAC`, never pushed out past
- * the plateau, so a bank too tight to give the minimum reports a stretch below
- * it and fails a test with its settlement named — it never silently borrows
- * ground the plateau does not have.
+ * 4), measured between the two bank points the play rocks are set from. The
+ * SPAN is the named quantity: a bank too tight to give the minimum reports a
+ * stretch below it and fails a test with its settlement named — it never
+ * silently borrows ground the plateau does not have.
  */
 export const BANK_STRETCH_MAX_SPAN = 21
 /** ... and below this the run is a scuffle rather than a run (point 687 §6). */
 export const BANK_STRETCH_MIN_SPAN = 14
 
 /**
- * The bearing each play rock sits at, solved so the chord between the two stays
- * within `BANK_STRETCH_MAX_SPAN`. The chord grows monotonically with the angle,
- * so a bisection on (0, max] is exact to within its tolerance; a bank whose
- * widest permitted angle is already short enough keeps that angle unchanged.
+ * The children's stretch on a bank (work-order 1245): its centre `centre` metres
+ * DOWNSTREAM of the bank normal (negative: upstream; `balance.villageLife.
+ * bankGame.stretchCentre`), on the stand line `BANK_STAND_INSET` inland of the
+ * top of the bank, and its half-span — `BANK_STRETCH_MAX_SPAN / 2`, pulled in
+ * where the far end would pass the plateau's reach less
+ * `BANK_STRETCH_PLATEAU_MARGIN`.
  */
-export function bankStretchAngle(walkEdge: number): number {
-  const widest = BANK_PLATEAU_ANGLE * BANK_STRETCH_ANGLE_FRAC
-  const spanAt = (a: number): number => 2 * (walkEdge / Math.cos(a) - BANK_STAND_INSET) * Math.sin(a)
-  if (spanAt(widest) <= BANK_STRETCH_MAX_SPAN) return widest
-  let lo = 0
-  let hi = widest
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2
-    if (spanAt(mid) > BANK_STRETCH_MAX_SPAN) hi = mid
-    else lo = mid
-  }
-  return lo
+export function bankStretch(walkEdge: number, centre = balance.villageLife.bankGame.stretchCentre): {
+  centre: number
+  half: number
+  out: number
+} {
+  const out = walkEdge - BANK_STAND_INSET
+  const reach = out * Math.tan(BANK_PLATEAU_ANGLE) - BANK_STRETCH_PLATEAU_MARGIN
+  const half = Math.max(0, Math.min(BANK_STRETCH_MAX_SPAN / 2, reach - Math.abs(centre)))
+  return { centre, half, out }
 }
 
 /** The smallest stand-off any object keeps from the top of the bank, whatever
@@ -168,13 +162,14 @@ export const BANK_DRESSING_CLEARANCE = 0.9
 // be wide enough that a child can pass an adult — or the traveller — without
 // being shoved into the water or into a wall.
 //
-// The stretch is the settlement's own: the two rocks stand on the bearings of
-// `upstream`/`downstream`, drawn `BANK_PLAY_ROCK_INSET` inland of those points
+// The stretch is the settlement's own: the two rocks stand at `upstream`/
+// `downstream`, drawn `BANK_PLAY_ROCK_INSET` straight inland of those points
 // so the adults' bank stops stay free ground (a villager is SENT to them, point
 // 155). Measured on the three river villages that carry a bank — nubian,
 // bambara and mandinka — before point 1173 moved the waterline, the rocks stood
 // 19.7 m apart (the bank points 21.2 m); the bank-point span is now capped at
-// `BANK_STRETCH_MAX_SPAN`, and `riverBank.test.ts` pins the pair.
+// `BANK_STRETCH_MAX_SPAN`, and `riverBank.test.ts` pins the pair. Since
+// work-order 1245 the stretch lies about 29 m upstream of the bank normal.
 //
 // BOTH ROCKS IN ONE FRAME. At the reference viewport of the verification
 // (1440x900) and the default field of view (50 deg vertical, App.tsx), a
@@ -211,16 +206,24 @@ export const BANK_PLAY_LANE_HALF = 1.5
 //
 // It lands UPSTREAM of the stretch, not downstream, and that is not a coin toss:
 // a settlement draws its drinking water above the water it plays, washes and
-// wades in. The landing therefore sits beyond the upstream rock, at
-// `BANK_WATER_PATH_ANGLE_FRAC` of the plateau angle — still inside the plateau,
-// where the walkable ground reaches the water, and beyond the upstream rock
-// (`riverBank.test.ts` measures it).
+// wades in. The landing therefore sits `balance.villageLife.adultErrands.
+// waterFootBeyond` metres beyond the upstream end of the stretch, and moves with
+// the stretch wherever it is put (work-order 1245) — still inside the plateau,
+// where the walkable ground reaches the water (`riverBank.test.ts` measures it).
 
-/** Angular offset of the water path's landing from the bank normal, as a
- *  fraction of the plateau angle. Below 1 so the landing stays inside the
- *  plateau however the calibratable river width moves the waterline; above
- *  `BANK_STRETCH_ANGLE_FRAC` so it lies beyond the upstream rock. */
-export const BANK_WATER_PATH_ANGLE_FRAC = 0.95
+/** The water path's BEARING off the bank normal: toward the point on the
+ *  stand line `waterFootBeyond` metres upstream of the stretch's upstream end.
+ *  The landing itself lies on that bearing, projected out to `walkEdge` and
+ *  then inset radially (work-order 688), so it sits a little FARTHER upstream
+ *  than the stand-line target: its along-bank distance past the stretch
+ *  exceeds `waterFootBeyond` by `BANK_STAND_INSET · |along| · (1/out − 1/hypot)`.
+ *  The fill spot shares the bearing, which keeps the carrier's walk one
+ *  straight line. */
+function waterPathAngle(walkEdge: number): number {
+  const stretch = bankStretch(walkEdge)
+  const along = stretch.centre - stretch.half - balance.villageLife.adultErrands.waterFootBeyond
+  return Math.atan2(along, stretch.out)
+}
 
 /**
  * Where the village's water path meets the bank: on the UPSTREAM side, beyond
@@ -230,7 +233,7 @@ export const BANK_WATER_PATH_ANGLE_FRAC = 0.95
 export function bankWaterFoot(
   bank: Pick<PlaceRiverBank, 'nx' | 'nz' | 'fx' | 'fz' | 'walkEdge'>,
 ): BankPoint {
-  const a = -BANK_PLATEAU_ANGLE * BANK_WATER_PATH_ANGLE_FRAC
+  const a = waterPathAngle(bank.walkEdge)
   return alongBank(bank, a, bank.walkEdge / Math.cos(a) - BANK_STAND_INSET)
 }
 
@@ -251,23 +254,29 @@ export function bankWaterFoot(
 export function bankFillSpot(
   bank: Pick<PlaceRiverBank, 'nx' | 'nz' | 'fx' | 'fz' | 'distance' | 'walkEdge'>,
 ): BankPoint {
-  const a = -BANK_PLATEAU_ANGLE * BANK_WATER_PATH_ANGLE_FRAC
+  const a = waterPathAngle(bank.walkEdge)
   return alongBank(bank, a, outAtDepth(bank, balance.bankFillDepth) / Math.cos(a))
 }
 
 /** The two play rocks of a bank: the ends of the children's stretch, upstream
- *  and downstream, mirrored exactly as the bank's own stretch points are. */
+ *  and downstream, each drawn `BANK_PLAY_ROCK_INSET` straight inland along the
+ *  bank normal — so the pair keeps the stretch's own along-bank span wherever
+ *  the stretch lies (work-order 1245 moved it off the normal). */
 export function bankPlayRocks(
-  bank: Pick<PlaceRiverBank, 'upstream' | 'downstream'>,
+  bank: Pick<PlaceRiverBank, 'nx' | 'nz' | 'upstream' | 'downstream'>,
 ): { upstream: BankPoint; downstream: BankPoint } {
-  const pull = (p: BankPoint): BankPoint => {
-    const r = Math.hypot(p.x, p.z)
-    if (r <= 1e-6) return { ...p }
-    const f = Math.max(0, (r - BANK_PLAY_ROCK_INSET) / r)
-    return { x: p.x * f, z: p.z * f }
-  }
-  return { upstream: pull(bank.upstream), downstream: pull(bank.downstream) }
+  return { upstream: inland(bank, bank.upstream, BANK_PLAY_ROCK_INSET), downstream: inland(bank, bank.downstream, BANK_PLAY_ROCK_INSET) }
 }
+
+/** `p` drawn `by` metres straight inland, against the bank normal. */
+function inland(bank: Pick<PlaceRiverBank, 'nx' | 'nz'>, p: BankPoint, by: number): BankPoint {
+  return { x: p.x - bank.nx * by, z: p.z - bank.nz * by }
+}
+
+/** The stand-off of the stage's photographing stand, as a fraction of the
+ *  stretch's length: at 0.8 each rock lies 32° off the line of sight, inside
+ *  the 36.7° half-frame of the verification viewport. */
+export const BANK_VIEW_STANDOFF = 0.8
 
 /**
  * WHERE TO STAND TO SEE BOTH PLAY ROCKS AT ONCE, and which way to look.
@@ -275,9 +284,11 @@ export function bankPlayRocks(
  * A spectator on the stretch's own AXIS sees the near rock and the far one on
  * one line: the near one hides the far one, and a picture taken from there shows
  * a rock, singular, however honestly it is labelled. The stage is photographed —
- * and judged — from a stand off the axis instead: out from the middle by the
- * stretch's own length, perpendicular to it on the settlement's side, looking
- * at the middle.
+ * and judged — from a stand off the axis instead: out from the middle by
+ * `BANK_VIEW_STANDOFF` of the stretch's own length, perpendicular to it on the
+ * settlement's side, looking at the middle. (A whole length, as before work-
+ * order 1245, put the stand outside the settlement once the stretch moved
+ * upstream, past the bank lobe's fade.)
  *
  * It lives here, beside the rocks themselves, because the browser suite that
  * takes that picture and the unit case that proves both rocks fall inside the
@@ -307,8 +318,8 @@ export function bankPlayRocksView(rocks: { upstream: BankPoint; downstream: Bank
     px = -px
     pz = -pz
   }
-  const x = mx + px * len
-  const z = mz + pz * len
+  const x = mx + px * len * BANK_VIEW_STANDOFF
+  const z = mz + pz * len * BANK_VIEW_STANDOFF
   return { x, z, yaw: Math.atan2(-(mx - x), -(mz - z)), look: { x: mx, z: mz } }
 }
 
@@ -389,7 +400,8 @@ export interface PlaceRiverBank {
   /** Distance from the centre to the nearest river axis, in degrees — the
    *  world figure the rest is derived from. */
   axisDeg: number
-  /** Where a villager stands at the water. */
+  /** Where a villager stands at the water: the middle of the children's
+   *  stretch, on its stand line (work-order 1245 moved it with the stretch). */
   bank: BankPoint
   /** The far end of the walkable stretch AGAINST the current. */
   upstream: BankPoint
@@ -531,8 +543,10 @@ export function buildRiverBank(place: PlaceDef, radius: number): PlaceRiverBank 
   // of the bank however the depth is set.
   const wadeEdge = Math.max(walkEdge, outAtDepth({ distance, walkEdge }, balance.bankWadeDepth))
   const frame = { nx, nz, fx, fz }
-  const stretchAngle = bankStretchAngle(walkEdge)
-  const stretchR = walkEdge / Math.cos(stretchAngle) - BANK_STAND_INSET
+  // The children's stretch (work-order 1245): off the normal, in the upstream
+  // half of the symmetric bank, its three points on one stand line.
+  const stretch = bankStretch(walkEdge)
+  const onStand = (along: number): BankPoint => ({ x: nx * stretch.out + fx * along, z: nz * stretch.out + fz * along })
   return {
     riverId,
     ...frame,
@@ -540,9 +554,9 @@ export function buildRiverBank(place: PlaceDef, radius: number): PlaceRiverBank 
     walkEdge,
     wadeEdge,
     axisDeg: bestD,
-    bank: alongBank(frame, 0, walkEdge - BANK_STAND_INSET),
-    upstream: alongBank(frame, -stretchAngle, stretchR),
-    downstream: alongBank(frame, stretchAngle, stretchR),
+    bank: onStand(stretch.centre),
+    upstream: onStand(stretch.centre - stretch.half),
+    downstream: onStand(stretch.centre + stretch.half),
   }
 }
 
@@ -559,8 +573,8 @@ const BANK_SETTLE_MAX = 3
  * the water's edge by one seed left the downstream stretch inside a collider,
  * a place no villager sent there could ever reach).
  *
- * They are drawn straight INLAND along their own radius, so each stays on its
- * own bearing off the bank, and the two stretches move TOGETHER by the same
+ * They are drawn straight INLAND along the bank normal, so each keeps its own
+ * place along the bank, and the two stretches move TOGETHER by the same
  * amount — the mirror between them is what the UPSTREAM/DOWNSTREAM teaching
  * rests on, and a stretch nudged on its own would break it. `free` decides what
  * is standable; the layout passes its full collider set.
@@ -569,12 +583,7 @@ export function settleBankPoints(
   bank: PlaceRiverBank,
   free: (x: number, z: number) => boolean,
 ): void {
-  const pull = (p: BankPoint, by: number): BankPoint => {
-    const r = Math.hypot(p.x, p.z)
-    if (r <= 1e-6) return p
-    const f = Math.max(0, (r - by) / r)
-    return { x: p.x * f, z: p.z * f }
-  }
+  const pull = (p: BankPoint, by: number): BankPoint => inland(bank, p, by)
   const steps = Math.round(BANK_SETTLE_MAX / BANK_SETTLE_STEP)
   for (let s = 0; s <= steps; s++) {
     const p = pull(bank.bank, s * BANK_SETTLE_STEP)

@@ -9,7 +9,7 @@
 // hearUtterance, the loom's cloth record) go through the store.
 
 import { usePlaceGround } from './PlaceGroundContext'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
@@ -29,7 +29,7 @@ import {
 } from '../../render/fauna'
 import { CHILD_FIGURE_SCALE, FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import { RIVER_WATER_TONES, WATER_METALNESS } from '../../render/waterAppearance'
-import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
+import { applyFigurePose, type FigureLimbs } from '../../render/figurePose'
 import {
   advanceGesture,
   aimAt,
@@ -50,11 +50,9 @@ import {
   type GestureState,
 } from '../../render/gesture'
 import { effectiveFigureLimbSegments, useUi } from '../../state/ui'
-import { cloakForCloth, wearsByRank } from '../../systems/dress'
-import { useColdCloaks, type ColdDress } from './useColdCloaks'
+import { useColdCloaks } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
 import { devAssert } from '../../systems/devAssert'
-import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
@@ -65,8 +63,8 @@ import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spaw
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
 import { playRockFlank } from './playRockSurface'
-import { BANK_WATER_DROP, bankGroundHeight, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
-import { canoeLane, createCanoe, stepCanoe } from './villagerCanoe'
+import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { RiverFishery } from './RiverFishery'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import {
   absorbSeparation,
@@ -131,16 +129,12 @@ import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import {
-  addBodies,
-  createBodies,
   createInhabitantSet,
   groundOccupied,
-  releaseBodies,
   separateBody,
   separateGroup,
   stepRoundBodies,
   type InhabitantBody,
-  type InhabitantSet,
 } from './inhabitantBodies'
 import {
   drumHeadY,
@@ -168,335 +162,20 @@ import { DRUMMER_SPEAKER_ID } from './chiefPresence'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
+import { Figure } from './placeFigure'
+import {
+  ColdCloaksContext,
+  HEAD_CARRY_POSE,
+  InhabitantBodiesContext,
+  LimbDetailContext,
+  SpeechFloorContext,
+  useInhabitantBodies,
+  useStandingBodies,
+  useStandingBody,
+} from './placeFigureContext'
 
 /** Collision radius of inhabitants (WALKER_RADIUS; the player's own is PLAYER_RADIUS). */
 const NPC_RADIUS = WALKER_RADIUS
-
-/** The settlement's speech floor (who may speak next), shared by every vignette. */
-const SpeechFloorContext = createContext<SpeechFloor | null>(null)
-
-/**
- * The cold-weather cloaks this settlement's people wear today (design.md
- * §19.13), or null for the everyday dress. A context rather than a prop: every
- * life vignette builds its own Figures, and only the Figure itself cares.
- */
-const ColdCloaksContext = createContext<ColdDress | null>(null)
-
-/**
- * Radial segments of the limb primitives at the current graphics level (point
- * 479, `QUALITY_PRESETS.figureLimbSegments`). A context rather than a per-figure
- * store subscription: a settlement mounts a couple of dozen Figures and they all
- * read the same number, so PlaceLife subscribes once and hands it down.
- */
-const LimbDetailContext = createContext<number>(8)
-
-/**
- * The settlement's inhabitant bodies (work-order point 578). A context for the
- * reason the contexts above are: the life vignettes are a dozen separate components,
- * and every one of them has to see EVERY other one's figures — the defect was
- * exactly that none of them did. PlaceLife owns one set per settlement; each
- * component claims its slots, writes them where it moved its figures, and
- * separates them there.
- */
-const InhabitantBodiesContext = createContext<InhabitantSet>(createInhabitantSet())
-
-/** Claims `count` bodies from the settlement's set for the lifetime of the
- *  component. The owner writes each body's position and radius per frame.
- *  The bodies are BUILT while rendering but JOINED to the set in an effect:
- *  React StrictMode mounts an effect, tears it down and mounts it again, and a
- *  set joined during render would have kept only the teardown. */
-function useInhabitantBodies(
-  count: number,
-  options: { fixed?: boolean; x?: number; z?: number; scale?: number } = {},
-): InhabitantBody[] {
-  const set = useContext(InhabitantBodiesContext)
-  const { fixed, x, z, scale } = options
-  const bodies = useMemo(
-    () => createBodies(count, { fixed, x, z, scale }),
-    [count, fixed, x, z, scale],
-  )
-  useEffect(() => {
-    addBodies(set, bodies)
-    return () => releaseBodies(set, bodies)
-  }, [set, bodies])
-  return bodies
-}
-
-/** One body for a vignette figure standing at its station: it pushes the
- *  passers-by aside and never gives way itself. */
-function useStandingBody(x: number, z: number, scale = 1): void {
-  useInhabitantBodies(1, { fixed: true, x, z, scale })
-}
-
-/** The same for a vignette of SEVERAL standing figures (a conversing pair, the
- *  traders on the plaza). */
-function useStandingBodies(spots: ReadonlyArray<{ x: number; z: number }>, scale = 1): void {
-  const bodies = useInhabitantBodies(spots.length, { fixed: true, scale })
-  useEffect(() => {
-    spots.forEach((s, i) => {
-      const b = bodies[i]
-      if (!b) return
-      b.x = s.x
-      b.z = s.z
-    })
-  }, [bodies, spots])
-}
-
-/** The two shoulder pivots in render order: index 0 is the figure's LEFT arm
- *  (local +x), index 1 its RIGHT (local −x, because forward is +z and up is +y). */
-const REST_POSE_ARMS = [REST_POSE.left, REST_POSE.right] as const
-
-/**
- * One hand up steadying a load carried on the head, the other hanging — the
- * period-true carrying posture, and the pose the figures with a basket or a
- * bundle on their heads take now that they have arms (point 479). A shared,
- * never-written constant: every head-carrier holds it identically, so one
- * object serves them all.
- */
-const HEAD_CARRY_POSE: { current: FigurePose } = {
-  current: { left: armAim(0.16, 1.3), right: { ...REST_POSE.right }, lean: 0.02, turn: 0 },
-}
-
-/**
- * Simple primitive human figure; `kneel` folds it down for sitting work.
- *
- * Since point 479 the figure has ARMS — a cone with a sphere head cannot show
- * what it is talking about, and the pointing gesture is the anchor the
- * communication's direction words hang on. LEGS are opt-in: a floor-length wrap
- * is the period dress for most adults and legs under it would draw nothing, so
- * they go on the figures whose stride must read (the running children, the
- * walking loom helper).
- *
- * The gesture itself is driven from outside through `gesture`, a ref the caller
- * owns and this figure advances — one state per figure, which is why two
- * gestures can never run on one body. `pose` is the direct alternative for a
- * caller that computes the whole pose itself (the drummer, the porter's carry,
- * the children, whose round combines their gestures with the run).
- */
-function Figure({
-  cloth,
-  skin = '#5c3317',
-  scale = 1,
-  kneel = false,
-  legs = false,
-  role = 'villager',
-  gesture,
-  pose,
-  limbs,
-  gait,
-  squat,
-  handProp,
-}: {
-  cloth: string
-  skin?: string
-  scale?: number
-  kneel?: boolean
-  /** What this inhabitant IS, for the hold-Ctrl layer (design.md §17.8): it
-   *  names people by their role, and every figure in a settlement is one. */
-  role?: ActorRoleKind
-  /** Draw legs and let `gait` swing them (ignored while kneeling). */
-  legs?: boolean
-  /** The figure's own gesture state; this figure advances and applies it. */
-  gesture?: RefObject<GestureState>
-  /** A pose written by the caller each frame; wins over `gesture` when set. */
-  pose?: RefObject<FigurePose | null>
-  /** The y-squash the CALLER is applying to this figure's own group, read every
-   *  frame so the head can be kept round through it (work-order 1085). A squat
-   *  shortens a man; it does not flatten his skull, and a sphere squashed to
-   *  seven tenths reads as a deflated ball hovering over a traffic cone — which
-   *  is what the first two frames of the fill showed. */
-  squat?: RefObject<number>
-  /** Where to publish this figure's own pivots. A caller that supplies BOTH
-   *  this and `pose` owns the application and applies it itself, in the frame
-   *  it writes it — see `applyFigurePose` (work-order 1065). */
-  limbs?: RefObject<FigureLimbs | null>
-  /** Gait phase (rad) driving the leg swing — the caller accumulates the
-   *  distance walked, because only it knows this figure's world scale. */
-  gait?: RefObject<number>
-  /**
-   * Something CARRIED IN A HAND, mounted inside the arm pivot so it rides
-   * whatever that arm does.
-   *
-   * A prop hung on the figure's own group instead sits at a fixed spot beside
-   * the trunk: the water carrier's jar floated at his hip while his arm went up
-   * to indicate the river (GPT-5.6 Sol, first cross-vendor round, C2). The arm
-   * is the +x one, which is the side the jar was drawn on.
-   */
-  handProp?: ReactNode
-}) {
-  const bodyH = kneel ? 0.55 : 1.0
-  const cold = useContext(ColdCloaksContext)
-  const segments = useContext(LimbDetailContext)
-  const L = FIGURE_LIMBS
-  // Legs only on a standing figure — a kneeling one has folded them away.
-  const withLegs = legs && !kneel
-  const hipY = withLegs ? bodyH * L.hipY : 0
-  const trunkH = bodyH - hipY
-  // Shrinking the cone's base radius by the same factor as its height keeps the
-  // TAPER identical, so a legged figure is not a fatter one at shoulder height —
-  // and the arm clearance pinned in figures.test.ts holds for every figure.
-  const trunkRadius = L.bodyRadius * (trunkH / bodyH)
-  const trunk = useRef<THREE.Group>(null)
-  const head = useRef<THREE.Mesh>(null)
-  const arms = useRef<Array<THREE.Group | null>>([])
-  const legPivots = useRef<Array<THREE.Group | null>>([])
-  // A PIVOT IS PUT AT REST WHEN IT IS BORN, NOT AT EVERY RENDER (work-order
-  // 1065). Held for this figure's lifetime, because an inline ref callback is a
-  // new function every render and React would re-attach it each time —
-  // `restingArmRefs` says what that cost the tapping child's hand.
-  const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
-
-  // The caller that owns the pose is given the pivots to write it onto. The
-  // effect runs once the refs are filled, and the object it publishes is read
-  // every frame, so nothing is allocated per frame.
-  const owned = !!(pose && limbs)
-  // Its OWN pivots, in one object that outlives the frame — `arms.current` is a
-  // stable array, only the trunk arrives later.
-  const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null })
-  useEffect(() => {
-    if (!limbs) return
-    limbs.current = { arms: arms.current, trunk: trunk.current }
-    return () => {
-      limbs.current = null
-    }
-  }, [limbs])
-
-  useFrame((_, rawDt) => {
-    const dt = Math.min(rawDt, 0.1)
-    let shown = pose?.current ?? null
-    if (!shown && gesture?.current) {
-      gesture.current = advanceGesture(gesture.current, dt)
-      shown = gesturePose(gesture.current)
-    }
-    // An OWNED pose is applied by whoever writes it, in that same frame;
-    // applying last frame's copy here would only draw it one frame stale.
-    if (shown && !owned) {
-      selfLimbs.current.trunk = trunk.current
-      applyFigurePose(selfLimbs.current, shown)
-    }
-    // THE HEAD, KEPT ROUND THROUGH THE CALLER'S SQUASH (work-order 1085).
-    // A y-scale of its own CANNOT undo it: the squash sits on the figure's group,
-    // ABOVE the trunk, and the trunk is rotated by the lean, so the head's local
-    // y is not the axis being squashed. Measured on the drawn head: 0.720 with
-    // the lean standing and the scale alone applied — the full squash, straight
-    // through. The parent chain contributes `diag(1,s,1) · Rx(lean)` at the head,
-    // and a three.js mesh's own linear part is `R · S`, so the exact inverse IS
-    // expressible there: `Rx(-lean) · diag(1,1/s,1)`, which is a counter-rotation
-    // and a stretch. The head is a smooth sphere, so its counter-rotation is
-    // invisible; only its roundness survives. `turn` needs no answer — a rotation
-    // about y commutes with a scale along y.
-    if (head.current) {
-      const squash = squat?.current ?? 1
-      const flattened = squash > 0.01 && Math.abs(squash - 1) > 1e-4
-      head.current.scale.y = flattened ? 1 / squash : 1
-      head.current.rotation.x = flattened ? -(trunk.current?.rotation.x ?? 0) : 0
-    }
-    if (withLegs && gait) {
-      const phase = gait.current
-      const a = legPivots.current[0]
-      const b = legPivots.current[1]
-      if (a) a.rotation.x = legSwingAngle(phase, 0)
-      if (b) b.rotation.x = legSwingAngle(phase, Math.PI)
-    }
-  })
-  // The wrap this figure actually wears — null when the season is off, and null
-  // for most figures when the record gates the garment on RANK. Barth on the
-  // Hausa zenne: "Only the wealthier amongst them can afford" it, while his
-  // schoolboys sat at a pre-dawn fire "with scarcely a rag of a shirt on"; his
-  // Tuareg chief ENVIED the bernus rather than owning one. So a village in the
-  // cold shows a few draped figures among many bare ones — the cold is a class
-  // experience here, and rendering everyone in a plaid would erase the finding.
-  const wrap = cold && (!cold.rankOnly || wearsByRank(cloth, cold.palette))
-    ? cloakForCloth(cold.cloaks, cold.palette, cloth)
-    : null
-  const armLen = bodyH * L.armLength
-  return (
-    // Named so a speaking figure can be found in the scene graph — the overhead
-    // speech label rides on this object (design.md §13.4).
-    <group
-      name="inhabitant"
-      scale={[scale, scale * (kneel ? 0.75 : 1), scale]}
-      userData={markActor({ kind: role, height: bodyH + 0.45 })}
-    >
-      {/* The trunk pivots at the hip so a lean or a shake carries the arms and
-          the head with it, and the legs (below) stay planted. */}
-      <group ref={trunk} position={[0, hipY, 0]}>
-        <mesh position={[0, trunkH * 0.5, 0]} castShadow>
-          <coneGeometry args={[trunkRadius, trunkH, TESSELLATION.figureBody]} />
-          <meshStandardMaterial color={cloth} roughness={0.95} />
-        </mesh>
-        {/* The seasonal wrap goes OVER the everyday dress (Mayr): a shell around
-            the shoulders, leaving the dress showing below. Where the record says
-            the head is muffled in it (the Somali tobe in the karif), the shell
-            rises past the head instead — that is the one head-wear case, and the
-            shape difference IS the finding. */}
-        {wrap && (
-          <mesh position={[0, bodyH * (cold!.wear === 'head' ? 0.82 : 0.66) - hipY, 0]} castShadow>
-            <coneGeometry
-              args={[0.355, bodyH * (cold!.wear === 'head' ? 1.0 : 0.68), TESSELLATION.figureBody]}
-            />
-            <meshStandardMaterial
-              color={wrap}
-              roughness={0.8} // every wrap, hide or woven, sits a touch glossier than the body cloth
-            />
-          </mesh>
-        )}
-        {/* The head shows unless the wrap is drawn over it. */}
-        {!(wrap && cold!.wear === 'head') && (
-          <mesh name="figure-head" ref={head} position={[0, bodyH + 0.18 - hipY, 0]} castShadow>
-            <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
-            <meshStandardMaterial color={skin} roughness={0.85} />
-          </mesh>
-        )}
-        {/* Arms (point 479). One pivot per shoulder, the limb hanging down its
-            local −y, so a rotation IS the gesture. `YXZ` order because the pose
-            is stated as (bearing, elevation): yaw must apply to an arm that is
-            already raised, or it would spin a vertical limb about its own axis
-            and move nothing (see `armDirection` in render/gesture.ts). */}
-        {[0, 1].map((i) => (
-          <group
-            key={i}
-            position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]}
-            ref={armRef[i]}
-          >
-            <mesh position={[0, -armLen * 0.5, 0]} castShadow>
-              <cylinderGeometry args={[L.armRadius[0], L.armRadius[1], armLen, segments]} />
-              <meshStandardMaterial color={skin} roughness={0.88} />
-            </mesh>
-            {/* Named so the verification can read where the hand ACTUALLY ended
-                up, rather than re-deriving it: a touch is judged by the drawn
-                hand meeting the drawn surface (work-order 1065). */}
-            <mesh name={i === 0 ? 'hand-left' : 'hand-right'} position={[0, -armLen, 0]} castShadow>
-              <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
-              <meshStandardMaterial color={skin} roughness={0.85} />
-            </mesh>
-            {/* What this hand is carrying, at the hand rather than beside it. */}
-            {i === 0 && handProp && <group position={[0, -armLen, 0]}>{handProp}</group>}
-          </group>
-        ))}
-      </group>
-      {/* Legs, on the figures whose stride must read (point 479/480). They
-          swing about their hips on the DISTANCE-driven gait phase the fauna and the §2.5
-          silhouettes already use, so a faster child steps faster and a stopped
-          one stands still — never a wall-clock bob. */}
-      {withLegs &&
-        [0, 1].map((i) => (
-          <group
-            key={i}
-            position={[(i === 0 ? 1 : -1) * bodyH * L.hipX, hipY, 0]}
-            ref={(el) => {
-              legPivots.current[i] = el
-            }}
-          >
-            <mesh position={[0, -hipY * 0.5, 0]} castShadow>
-              <cylinderGeometry args={[L.legRadius[0], L.legRadius[1], hipY, segments]} />
-              <meshStandardMaterial color={skin} roughness={0.88} />
-            </mesh>
-          </group>
-        ))}
-    </group>
-  )
-}
 
 /** Kneeling cook with a three-stick pot beside the village fire. */
 function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
@@ -3888,269 +3567,6 @@ function useUnplacedInhabitantWatch(placeId: string, anchors: readonly PlaceSpot
   })
 }
 
-// --- The villager's dugout canoe (work-order 1237) ----------------------------
-
-/** The speech-label id of the paddler's call. */
-const CANOE_SPEAKER_ID = 'village-canoe'
-/** How high the kneeling paddler sits over the water surface, in metres. */
-const CANOE_SEAT_Y = 0.1
-/** The hull's own rise over the water and its depth under the gunwale. */
-const CANOE_FREEBOARD = 0.18
-const CANOE_DEPTH = 0.28
-
-/**
- * THE PADDLE STROKE, as an arm pose (work-order 1237). The lower hand (the
- * figure's +x arm, which carries the paddle) reaches forward and down, pulls
- * back along the hull, and lifts clear for the recovery; the upper hand rides
- * high across the chest over the shaft. `u` counts strokes; its fraction is
- * the phase of the current one.
- */
-function paddlePose(u: number): FigurePose {
-  const f = u - Math.floor(u)
-  const power = f < 0.62
-  const t = power ? f / 0.62 : (f - 0.62) / 0.38
-  const bearing = power ? 0.35 + 1.0 * t : 1.35 - 1.0 * t
-  const elevation = power ? -0.45 - 0.2 * Math.sin(Math.PI * t) : -0.25 + 0.1 * Math.sin(Math.PI * t)
-  return {
-    left: armAim(bearing, elevation),
-    right: armAim(0.35 + 0.35 * (power ? t : 1 - t), 0.15),
-    lean: 0.18 + (power ? 0.12 * Math.sin(Math.PI * t) : 0),
-    turn: 0.15 * (power ? t : 1 - t),
-  }
-}
-
-/** A single-blade paddle, held in the lower hand and running on past it. */
-function CanoePaddle() {
-  return (
-    <group name="village-canoe-paddle">
-      <mesh position={[0, -0.25, 0]} castShadow>
-        <cylinderGeometry args={[0.02, 0.02, 1.3, 6]} />
-        <meshStandardMaterial color="#7a5a36" roughness={0.9} />
-      </mesh>
-      <mesh position={[0, -0.98, 0]} castShadow>
-        <boxGeometry args={[0.16, 0.42, 0.025]} />
-        <meshStandardMaterial color="#6a4c2c" roughness={0.9} />
-      </mesh>
-    </group>
-  )
-}
-
-/**
- * A LOCAL FISHERMAN IN HIS DUGOUT, beside the children's bank game (work-order
- * 1237). The cycle is `villagerCanoe.ts`; this draws it and speaks its calls
- * through the same §13.4 path as every other village voice: the atom through
- * the hearing curve at the CALL register, the reading over his head, and the
- * arm pointing the way he heads — one decision by distance (spokenGesture.ts).
- * Direction words follow the listener's first ROCK hearing, as at the bank.
- */
-function VillagerCanoe({ bank, cloth, seed }: { bank: PlaceRiverBank; cloth: string; seed: number }) {
-  const groundHeight = usePlaceGround()
-  const camera = useThree((state) => state.camera)
-  const floor = useContext(SpeechFloorContext)
-  const cfg = balance.villageLife.canoe
-  const lane = useMemo(() => canoeLane(bank, cfg), [bank, cfg])
-  const rand = useMemo(() => mulberry32((seed ^ 0x6d2b79f5) >>> 0), [seed])
-  const state = useMemo(() => createCanoe(lane, cfg), [lane, cfg])
-  const hull = useRef<THREE.Group>(null)
-  const kneeling = useRef<THREE.Group>(null)
-  const standing = useRef<THREE.Group>(null)
-  const paddle = useRef<THREE.Group>(null)
-  const kneelPose = useRef<FigurePose | null>(paddlePose(0))
-  const kneelLimbs = useRef<FigureLimbs | null>(null)
-  const standPose = useRef<FigurePose | null>(fillPose(0))
-  const standLimbs = useRef<FigureLimbs | null>(null)
-  const standSquat = useRef(1)
-  const gesture = useRef<GestureState>(restGesture())
-
-  useFrame((_, rawDt) => {
-    const dt = Math.min(rawDt, 0.1)
-    const sources = () => [{ x: state.x, z: state.z, register: 'call' as const }]
-    const said = stepCanoe(
-      state,
-      lane,
-      {
-        mayCall: (word) => {
-          const game = useGame.getState()
-          if (!Object.hasOwn(game.communication.heard, game.vocabulary.ROCK)) return false
-          return !floor || floor.request({
-            situation: state,
-            name: 'canoe call',
-            word,
-            source: { x: state.x, z: state.z, register: 'call' },
-            sources,
-            step: dt,
-            ends: true,
-          })
-        },
-        drop: () => floor?.release(state),
-      },
-      dt,
-      cfg,
-      rand,
-    )
-
-    const g = hull.current
-    if (g) {
-      g.position.set(state.x, -BANK_WATER_DROP, state.z)
-      g.rotation.y = state.yaw
-    }
-    const p = state.paddler
-    if (kneeling.current) {
-      kneeling.current.visible = p.inBoat
-      kneeling.current.position.set(p.x, -BANK_WATER_DROP + CANOE_SEAT_Y, p.z)
-      kneeling.current.rotation.y = p.yaw
-    }
-    if (standing.current) {
-      standing.current.visible = !p.inBoat
-      standing.current.position.set(p.x, groundHeight(p.x, p.z), p.z)
-      standing.current.rotation.y = p.yaw
-      const squash = fillSquat(0.2 * p.reach)
-      standing.current.scale.set(1, squash, 1)
-      standSquat.current = squash
-    }
-
-    if (said) {
-      const at = { x: state.paddler.x, z: state.paddler.z }
-      const distance = placePlayerPosition.active
-        ? Math.hypot(at.x - placePlayerPosition.x, at.z - placePlayerPosition.z)
-        : Infinity
-      const options = registerOptions('call')
-      const { utterance, plan } = conceptSpeech(said, useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, at), ...options })
-      playSpeech(plan)
-      if (speechReach(distance, options.radius).audible) {
-        useGame.getState().hearUtterance(utterance)
-        if (kneeling.current) {
-          speakOverhead(CANOE_SPEAKER_ID, [utterance], kneeling.current, { floor: true, seconds: speechLabelSeconds(1), reach: options.radius })
-        }
-      }
-      // He points the way he is heading, far along the lane over the water.
-      const ahead = { x: at.x + Math.sin(state.yaw) * 12, y: 1, z: at.z + Math.cos(state.yaw) * 12 }
-      gesture.current = gestureIfHeard(
-        distance,
-        'point',
-        aimAt({ x: at.x, z: at.z, yaw: state.yaw }, ahead, CANOE_SEAT_Y + 0.55 * 0.75 * FIGURE_LIMBS.shoulderY),
-        options.radius,
-      )
-    }
-
-    // The arms: the call's point while it runs, the paddle stroke otherwise.
-    gesture.current = advanceGesture(gesture.current, dt)
-    const kp = kneelPose.current
-    if (kp) {
-      const next = isGesturing(gesture.current) ? gesturePose(gesture.current) : paddlePose(state.stroke)
-      kp.left = next.left
-      kp.right = next.right
-      kp.lean = next.lean
-      kp.turn = next.turn
-      applyFigurePose(kneelLimbs.current, kp)
-    }
-    if (paddle.current) paddle.current.visible = !isGesturing(gesture.current)
-    const sp = standPose.current
-    if (sp) {
-      const next = fillPose(0.2 * p.reach)
-      sp.left = next.left
-      sp.right = next.right
-      sp.lean = next.lean
-      sp.turn = next.turn
-      applyFigurePose(standLimbs.current, sp)
-    }
-  })
-
-  // Dev hook for the headless verification (CLAUDE.md §7.2): the lane, the
-  // phase and where the canoe and its paddler are right now.
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    const w = window as unknown as Record<string, unknown>
-    w.__placeCanoe = () => ({
-      phase: state.phase,
-      clock: state.clock,
-      s: state.s,
-      x: state.x,
-      z: state.z,
-      yaw: state.yaw,
-      calls: state.calls,
-      lastCall: state.lastCall,
-      owed: state.owed,
-      paddler: { ...state.paddler },
-      lane: {
-        ...lane,
-        start: { ...lane.start },
-        end: { ...lane.end },
-        berth: { ...lane.berth },
-        trap: { ...lane.trap },
-        checkStand: { ...lane.checkStand },
-      },
-    })
-    return () => {
-      delete w.__placeCanoe
-    }
-  }, [state, lane])
-
-  const beam = cfg.hullBeam / 2
-  const half = cfg.hullLength / 2
-  const trapY = groundHeight(lane.trap.x, lane.trap.z)
-  // Born where the cycle puts them, never at the settlement origin the first
-  // frame would only move them off (point 509's rule, which the unplaced-
-  // inhabitant watch enforces).
-  const born = useMemo(
-    () => ({
-      hull: [state.x, -BANK_WATER_DROP, state.z] as [number, number, number],
-      kneeling: [state.paddler.x, -BANK_WATER_DROP + CANOE_SEAT_Y, state.paddler.z] as [number, number, number],
-      standing: [lane.checkStand.x, bankGroundHeight(bank, lane.checkStand.x, lane.checkStand.z), lane.checkStand.z] as [number, number, number],
-    }),
-    // Read once at birth; the frame loop owns the transforms afterwards.
-    [state, lane, bank],
-  )
-  return (
-    <>
-      <group ref={hull} name="village-canoe" position={born.hull} userData={markActor({ kind: 'canoe', height: 0.6 })}>
-        {/* A dugout: one log, hollowed. The lower half of a long ellipsoid is
-            the hull; a darker lid just under the gunwale is its hollow. */}
-        <mesh position={[0, CANOE_FREEBOARD, 0]} scale={[beam, CANOE_DEPTH, half]} castShadow>
-          <sphereGeometry args={[1, 18, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-          <meshStandardMaterial color="#6b4a2b" roughness={0.9} side={THREE.DoubleSide} />
-        </mesh>
-        <mesh position={[0, CANOE_FREEBOARD - 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[beam * 0.82, half * 0.9, 1]}>
-          <circleGeometry args={[1, 24]} />
-          <meshStandardMaterial color="#3a2616" roughness={1} />
-        </mesh>
-      </group>
-      <group ref={kneeling} name="village-canoe-paddler" position={born.kneeling}>
-        <Figure
-          cloth={cloth}
-          kneel
-          pose={kneelPose}
-          limbs={kneelLimbs}
-          handProp={
-            <group ref={paddle}>
-              <CanoePaddle />
-            </group>
-          }
-        />
-      </group>
-      <group ref={standing} name="village-canoe-fisher" position={born.standing} visible={false}>
-        <Figure cloth={cloth} pose={standPose} limbs={standLimbs} squat={standSquat} />
-      </group>
-      {/* His fish trap at the waterline: a conical basket lying in the shallows,
-          tied to a stake driven into the bank. */}
-      <group
-        name="village-canoe-trap"
-        position={[lane.trap.x, trapY + 0.1, lane.trap.z]}
-        rotation={[0, Math.atan2(lane.fx, lane.fz), 0]}
-      >
-        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <coneGeometry args={[0.24, 0.8, 10, 1, true]} />
-          <meshStandardMaterial color="#a88b52" roughness={1} side={THREE.DoubleSide} />
-        </mesh>
-        <mesh position={[-0.35, 0.2, -0.3]} castShadow>
-          <cylinderGeometry args={[0.025, 0.03, 0.8, 5]} />
-          <meshStandardMaterial color="#5a4128" roughness={1} />
-        </mesh>
-      </group>
-    </>
-  )
-}
-
 export function PlaceLife({
   kind,
   size = 1,
@@ -4489,7 +3905,7 @@ export function PlaceLife({
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
           {/* The fisherman's dugout beside the children's bank game (work-order 1237). */}
-          {bank && <VillagerCanoe key={placeId} bank={bank} cloth={style.cloth[2 % style.cloth.length]} seed={localSeed} />}
+          {bank && <RiverFishery key={placeId} bank={bank} cloth={[2, 0, 1, 3, 4].map((k) => style.cloth[k % style.cloth.length])} seed={localSeed} />}
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
           <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} />
           {/* Inhabitant/prop interactions (design.md §19). */}

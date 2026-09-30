@@ -89,7 +89,7 @@ describe('smooth shading (point 214 — the shading half of the same goal)', () 
     // settlement scenes; three.js defaults to smooth (per-vertex) shading, so
     // the pure guard is that no organic-scene material opts INTO flat shading
     // — which would collapse the tessellation floors above back into facets.
-    for (const rel of ['../scenes/place/PlaceScene.tsx', '../scenes/place/PlaceLife.tsx']) {
+    for (const rel of ['../scenes/place/PlaceScene.tsx', '../scenes/place/PlaceLife.tsx', '../scenes/place/placeFigure.tsx', '../scenes/place/RiverFishery.tsx']) {
       const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
       expect(src.includes('flatShading'), `${rel} must stay smooth-shaded`).toBe(false)
     }
@@ -262,8 +262,9 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
   it('the scene builds the trunk cone from the shared radius, not a literal', () => {
     // A legged figure shortens the cone; scaling its base radius by the same
     // factor keeps the TAPER identical, which is what makes the clearance above
-    // hold for the children too.
-    const rel = '../scenes/place/PlaceLife.tsx'
+    // hold for the children too. (The Figure lives in placeFigure.tsx since
+    // work-order 1245.)
+    const rel = '../scenes/place/placeFigure.tsx'
     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
     expect(src.includes('L.bodyRadius * (trunkH / bodyH)')).toBe(true)
     expect(src.includes('coneGeometry args={[trunkRadius')).toBe(true)
@@ -278,12 +279,20 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
     // Same pure guard as the traveller pack above: a constant proven correct
     // buys nothing if the scene hardcodes its own numbers. The limb tessellation
     // must come from the graphics level (point 479.5), never from a literal.
+    // The Figure that builds the limbs lives in placeFigure.tsx (work-order
+    // 1245); PlaceLife.tsx reads the quality lever and hands it down.
+    const figureRel = '../scenes/place/placeFigure.tsx'
+    const figure = readFileSync(fileURLToPath(new URL(figureRel, import.meta.url)), 'utf8')
+    expect(figure.includes('FIGURE_LIMBS')).toBe(true)
+    expect(figure.includes('LimbDetailContext')).toBe(true)
+    expect(figure.includes('cylinderGeometry args={[L.armRadius[0], L.armRadius[1], armLen, segments]}')).toBe(true)
     const rel = '../scenes/place/PlaceLife.tsx'
     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
-    expect(src.includes('FIGURE_LIMBS')).toBe(true)
     expect(src.includes('effectiveFigureLimbSegments')).toBe(true)
     // The gesture machine drives the arms — the scene never poses them by hand.
     expect(src.includes('gesturePose')).toBe(true)
     expect(src.includes('advanceGesture')).toBe(true)
+    expect(figure.includes('gesturePose')).toBe(true)
+    expect(figure.includes('advanceGesture')).toBe(true)
   })
 })

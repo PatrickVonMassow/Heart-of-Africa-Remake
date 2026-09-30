@@ -465,7 +465,12 @@ export const DOC_BUDGETS = [
     // was absent from the document — its lane, its distance from the children,
     // its cycle and its call — and the weaving scene is recorded as parked. A
     // new concept, not a longer telling.
-    maxWords: 29752,
+    // RAISED by the 119 measured words work-order 1245 owes §13.4 (user
+    // 30.09.2026): the lone fisherman became two men with a drift net, the
+    // catch a two-basket rotation to a fire with its carrier, griller, smoking
+    // rack and eater, and the bank symmetric with the children's stretch moved
+    // upstream — new concepts, while the old dugout text went.
+    maxWords: 29871,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

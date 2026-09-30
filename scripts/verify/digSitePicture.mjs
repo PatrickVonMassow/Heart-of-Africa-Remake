@@ -5,8 +5,10 @@
 // walkable radius, so a larger disc spread the pair well past the 6–9 m span
 // this was first composed for. Seed 58 is the one candidate in the first 600 that keeps the
 // whole composition — both holes, their furniture and the walkable spoil lane —
-// inside the frame at the widened stand-off, at a span of 11.8 m.
-export const DIG_PICTURE = { placeId: 'bambara-village', seed: 58 }
+// inside the frame at the widened stand-off, at a span of 11.8 m. Re-picked by
+// work-order 1245 (the children's stage and quarter moved upstream, and the dig
+// sites with them): seed 1691 is the first of 4000 that keeps it again.
+export const DIG_PICTURE = { placeId: 'bambara-village', seed: 1691 }
 
 export function digPictureUnmounted() {
   return !window.__game.getState().placeId && !window.__placeWalkers && !window.__placeErrands

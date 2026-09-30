@@ -94,7 +94,7 @@ there (§9).
 
 The decided slice (`design.md` §13.4, `docs/communication-poc-spec.md`) teaches
 six four-syllable tonal words: RIVER, UPSTREAM, DOWNSTREAM, ROCK, DIG and CHIEF.
-Bank-game children teach four, adults teach RIVER through a dispatched water
+Bank-game children teach four (the fishermen's net man two), adults teach RIVER through a dispatched water
 round trip and DIG through paired work, and the drummer names CHIEF at his hut.
 A bank village stages only the bank game; ports and bankless villages stage
 only silent tag, each on its own ground clear of its adult vignettes.

@@ -19,6 +19,7 @@ import {
 } from './layout'
 import { boxCollider, standingClear, WALKER_RADIUS } from './collision'
 import { closestOnPolyline } from './lanePlan'
+import { insidePlace } from './boundary'
 import { PLACES, placeById } from '../../world/geo'
 import {
   ROCK_VILLAGE_ID,
@@ -82,7 +83,12 @@ describe('no settlement carries a lone teaching stone any more (work-order 688)'
     expect(ROCK_FOOTPRINT_UNITS * rocks.scale).toBeCloseTo(PLAY_ROCK_SPAN, 6)
     expect(rocks.r).toBeLessThan(ROCK_FOOTPRINT_UNITS * rocks.scale)
     // Distance: the play rocks are a walk down the bank, the erratic a journey.
-    expect(Math.hypot(rocks.upstream.x, rocks.upstream.z)).toBeLessThan(layout.radius + 12)
+    // Since work-order 1245 the stretch lies ~28 m upstream on the symmetric
+    // bank: still walkable ground of the settlement, within a minute's walk.
+    for (const p of [rocks.upstream, rocks.downstream]) {
+      expect(insidePlace(layout, p.x, p.z)).toBe(true)
+      expect(Math.hypot(p.x, p.z)).toBeLessThan(60)
+    }
     expect(Math.hypot(rock.lat - village.lat, rock.lon - village.lon)).toBeGreaterThan(1)
   })
 })
@@ -144,8 +150,10 @@ describe('the village water path (work-order 688)', () => {
   // the settlement grew, the carriers' lane more often finds a way round the
   // compounds, and the four seeds that used to need a gate stopped needing one —
   // which made every case below pass while testing nothing. These two are what
-  // a sweep of the first 2000 seeds still routes through a wall.
-  const gatedSeeds = [330, 762]
+  // a sweep of the first 2000 seeds still routes through a wall. Re-picked by
+  // work-order 1245: with the water path moved upstream, 330 finds its lane on
+  // the outer head rungs instead; 661, 673 and 762 still route through a wall.
+  const gatedSeeds = [661, 762]
 
   it.each(gatedSeeds)('seed %i: gate rebuilding preserves village props and exactly two settled rock colliders', (seed) => {
     const layout = buildLayout('bambara-village', seed)

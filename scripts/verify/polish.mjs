@@ -5970,44 +5970,50 @@ if (section('children-bank-game')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
-// THE VILLAGER'S DUGOUT BESIDE THE CHILDREN'S BANK GAME (work-order 1237).
-// Side by side with room enough that a player can stand where he sees EITHER
-// the children's game OR the boat (user 29.09.2026). Two standing places, each
-// judged by the rendered projection:
-//  - the boat standing place, s = +37 m on the waterline, looking out over the
-//    water: the canoe and its call's reading are in frame, no child and no play
-//    rock is;
-//  - behind the downstream play rock, looking upstream: the children's game is
-//    in frame, the canoe is not.
+// THE FISHERMEN BESIDE THE CHILDREN'S BANK GAME (work-order 1237, rebuilt by
+// 1245). Two men work a drift net from their dugout; the net man's words go to
+// the paddler, the catch goes in a woven basket to their own fire. Three
+// standing places, each judged by the rendered projection:
+//  - the boat's, s = +36 m on the waterline looking out toward the landing:
+//    the haul and then the UPSTREAM word over the net man's head are in frame,
+//    no child and no play rock is;
+//  - behind the UPSTREAM play rock, looking downstream along the moved stretch:
+//    the children's game is in frame, and the boat's words cannot be heard
+//    there (the stand lies beyond the CALL reach of every place they fall);
+//  - inland of the fishers' fire: the carrier, the griller and the smoking rack
+//    with its fish are in frame.
 // Spectator-time knobs only, put back afterwards: the roam is shortened as the
-// children-bank-game section does (so the children come down to the bank within
-// the wait), the reading is held long enough for a headless shutter, and ROCK is
-// marked heard — the direction words follow the listener's first ROCK, and a
-// player standing here has met the children's rocks already.
+// children-bank-game section does, the reading is held long enough for a
+// headless shutter, and ROCK is marked heard — the direction words follow the
+// listener's first ROCK, and a player standing here has met the rocks already.
 if (section('villager-canoe')) {
   const was = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
     const c = window.__balance.communication
-    const kept = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds, labelSeconds: c.labelSeconds }
+    const k = window.__balance.villageLife.canoe
+    const kept = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds, labelSeconds: c.labelSeconds, haulSeconds: k.haulSeconds }
     b.roamSeconds = 8
     b.roamGuardSeconds = 8
     c.labelSeconds = 12
+    // A slow haul, so the headless shutter finds the net still half out on
+    // the water: the same code path at a longer configured value.
+    k.haulSeconds = 60
     return kept
   })
   try {
     await goToPlace('bambara-village')
     const ready = await page
-      .waitForFunction(() => !!window.__placeCanoe && !!window.__placeLayout?.playRocks && !!window.__placeTag && !!window.__placePlayer, null, { timeout: 40000 })
+      .waitForFunction(() => !!window.__placeCanoe && !!window.__placeFishFire && !!window.__placeLayout?.playRocks && !!window.__placeTag && !!window.__placePlayer, null, { timeout: 40000 })
       .then(() => true)
       .catch(() => false)
-    check('the river village carries the fisherman’s dugout beside the children’s bank game', ready)
+    check('the river village carries the fishermen’s dugout and their fire beside the children’s bank game', ready)
     if (ready) {
       await page.evaluate(() => {
         const g = window.__game.getState()
         if (!Object.hasOwn(g.communication.heard, g.vocabulary.ROCK)) g.hearUtterance(g.vocabulary.ROCK)
       })
       // Where a world point lands in the rendered frame, and whether it does —
-      // installed once in the page, read by both standing places below.
+      // installed once in the page, read by all three standing places below.
       await page.evaluate(() => {
         const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
         window.__canoeFrameAt = (x, y, z) => {
@@ -6019,14 +6025,12 @@ if (section('villager-canoe')) {
           const n = { x: clip[0] / w, y: clip[1] / w, z: clip[2] / w }
           return { inFrame: Math.abs(n.x) <= 1 && Math.abs(n.y) <= 1 && n.z < 1 }
         }
-      })
-
-      // --- 1. The boat standing place -------------------------------------
-      const boatStand = await page.evaluate(() => {
-        const c = window.__placeCanoe()
-        const L = c.lane
-        const s = L.origin + 37
-        return { x: L.nx * L.waterline + L.fx * s, z: L.nz * L.waterline + L.fz * s, nx: L.nx, nz: L.nz }
+        // Seen = in the frame AND not hidden behind something nearer.
+        window.__canoeSeen = (x, y, z, slack = 0.6) => {
+          if (!window.__canoeFrameAt(x, y, z).inFrame) return false
+          const ray = window.__placeRayHit ? window.__placeRayHit(x, y, z) : null
+          return !ray || ray.hitDistance === null || ray.hitDistance >= ray.targetDistance - slack
+        }
       })
       const standAt = async (at, look) => {
         await page.evaluate(({ at, look }) => {
@@ -6039,88 +6043,177 @@ if (section('villager-canoe')) {
         }, { at, look })
         await nextFrames(2)
       }
-      // Facing the water while the canoe works its lane, until his call stands
-      // over his head on an upstream or downstream leg.
-      await standAt(boatStand, { x: boatStand.x + boatStand.nx * 10, z: boatStand.z + boatStand.nz * 10 })
-      // The call's own label, read in the frame it stands: its atoms against
-      // the vocabulary atom of the leg's word, not only the state's word.
-      // `notPhase`/`after` make the second wait take the OTHER leg's call.
-      const waitCall = (notPhase, after) => page
-        .waitForFunction(({ notPhase, after }) => {
+      const inPlace = () => page.evaluate(() => window.__game.getState().placeId === 'bambara-village' && !!window.__placeCamera)
+
+      // --- 0. The DOWNSTREAM word at the lane's upstream end -----------------
+      // Heard from the waterline near the lane's upstream end: the net man's
+      // word to the paddler, its reading over his head naming DOWNSTREAM, and
+      // the paddler's answer — he stops paddling and swings the bow out.
+      const upEnd = await page.evaluate(() => {
+        const L = window.__placeCanoe().lane
+        const s = 4
+        return {
+          at: { x: L.nx * (L.waterline - 0.6) + L.fx * s, z: L.nz * (L.waterline - 0.6) + L.fz * s },
+          look: { x: L.start.x, z: L.start.z },
+        }
+      })
+      await standAt(upEnd.at, upEnd.look)
+      const downWord = await page
+        .waitForFunction(() => {
           const c = window.__placeCanoe?.()
-          if (!c || (c.phase !== 'up' && c.phase !== 'down') || c.phase === notPhase) return null
-          const l = (window.__speech?.labels() ?? []).find((x) => x.speakerId === 'village-canoe' && x.shownAt > after)
+          if (!c || c.phase !== 'callDown' || !c.word || c.word.state !== 'said') return null
+          const l = (window.__speech?.labels() ?? []).find((x) => x.speakerId === 'village-canoe')
           if (!l) return null
-          const vocabulary = window.__game.getState().vocabulary
-          return { phase: c.phase, atoms: l.atoms, shownAt: l.shownAt,
-            expected: vocabulary[c.phase === 'up' ? 'UPSTREAM' : 'DOWNSTREAM'] }
-        }, { notPhase, after }, { timeout: 300000, polling: 250 })
+          return { atoms: l.atoms, expected: window.__game.getState().vocabulary.DOWNSTREAM }
+        }, null, { timeout: 300000, polling: 100 })
         .then((h) => h.jsonValue())
         .catch(() => null)
-      const callNamesHeading = (call) =>
-        !!call && Array.isArray(call.atoms) && call.atoms.length === 1 && !!call.expected && call.atoms[0] === call.expected
-      const firstCall = await waitCall(null, -1)
-      const called = !!firstCall
-      const canoeState = await page.evaluate(() => window.__placeCanoe())
-      check('the paddler calls the direction word of his leg, and his reading stands over his head', called,
-        `phase ${canoeState.phase}, ${canoeState.calls} calls, last ${canoeState.lastCall}`)
-      check('the call names the way he is heading',
-        called && canoeState.lastCall === (firstCall.phase === 'up' ? 'UPSTREAM' : 'DOWNSTREAM'), `${firstCall?.phase}/${canoeState.lastCall}`)
-      check('the spoken call carries the direction word of that leg', callNamesHeading(firstCall), JSON.stringify(firstCall))
-      if (called) {
-        // Still on the standing place, still looking out over the water — he
-        // turns his head toward the boat, not his back to the river.
-        const target = { x: canoeState.x, z: canoeState.z }
-        await standAt(boatStand, target)
-        const seen = await page.evaluate(() => {
-          const at = window.__canoeFrameAt
-          const c = window.__placeCanoe()
-          const L = window.__placeLayout
-          const p = window.__placePlayer
-          const hull = at(c.x, 0, c.z)
-          const paddler = at(c.paddler.x, 0.5, c.paddler.z)
-          const label = window.__speech.anchorScreen('village-canoe')
-          const kids = (window.__placeTag().children ?? []).map((k) => at(k.x, 0.4, k.z))
-          const rocks = [L.playRocks.upstream, L.playRocks.downstream].map((r) => at(r.x, 0.5, r.z))
-          const cam = window.__placeCamera
-          const look = { x: -Math.sin(p.yaw), z: -Math.cos(p.yaw) }
-          const outward = look.x * c.lane.nx + look.z * c.lane.nz
-          return {
-            hull: hull.inFrame,
-            paddler: paddler.inFrame,
-            label: !!label && label.x >= 0 && label.x <= window.innerWidth && label.y >= 0 && label.y <= window.innerHeight,
-            labelAt: label,
-            kidsInFrame: kids.filter((k) => k.inFrame).length,
-            kids: kids.length,
-            rocksInFrame: rocks.filter((r) => r.inFrame).length,
-            outward,
-            cam: { x: cam.position.x, z: cam.position.z },
-          }
-        })
-        check('from the boat standing place the canoe and its paddler are in frame', seen.hull && seen.paddler, JSON.stringify(seen))
-        const paddlerRay = await page.evaluate(() => {
-          const c = window.__placeCanoe()
-          return window.__placeRayHit ? window.__placeRayHit(c.paddler.x, 0.2, c.paddler.z) : null
-        })
-        check('and nothing nearer hides the paddler', !paddlerRay || paddlerRay.hitDistance === null ||
-          paddlerRay.hitDistance >= paddlerRay.targetDistance - 0.8, JSON.stringify(paddlerRay))
-        check('and so is his call’s reading', seen.label, JSON.stringify(seen.labelAt))
-        check('and no child and no play rock is', seen.kidsInFrame === 0 && seen.rocksInFrame === 0,
-          `${seen.kidsInFrame}/${seen.kids} children, ${seen.rocksInFrame} rocks`)
-        check('the view looks out over the water, not inland', seen.outward > 0.2, seen.outward.toFixed(2))
-        await frame('1237-village-canoe-from-boat-stand', {
-          local: { x: canoeState.paddler.x, y: 0.5, z: canoeState.paddler.z },
-          label: `the fisherman in his dugout seen from the boat standing place (s = +37 m on the waterline) on his ${canoeState.phase === 'up' ? 'upstream' : 'downstream'} leg, his call ${canoeState.lastCall} over his head; no child and no play rock in the picture`,
-        })
-      }
-      if (called) {
-        // The other leg's call, heard from the same standing place.
-        const secondCall = await waitCall(firstCall.phase, firstCall.shownAt)
-        check('on his other leg he calls the other direction word', callNamesHeading(secondCall) &&
-          secondCall.phase !== firstCall.phase && secondCall.atoms[0] !== firstCall.atoms[0], JSON.stringify(secondCall))
+      check('at the upstream end the net man says DOWNSTREAM to the paddler, the reading over his head',
+        !!downWord && downWord.atoms.length === 1 && downWord.atoms[0] === downWord.expected, JSON.stringify(downWord))
+      if (downWord) {
+        const swung = await page
+          .waitForFunction(() => {
+            const c = window.__placeCanoe?.()
+            return !!c && c.phase === 'turn' && c.paddlerAction === 'swing' && c.net > 0
+          }, null, { timeout: 20000, polling: 100 })
+          .then(() => true)
+          .catch(() => false)
+        check('and the paddler answers it: he stops paddling and swings the bow out as the net goes out', swung)
       }
 
-      // --- 2. Behind the downstream rock, looking upstream -----------------
+      // --- 1. The boat's standing place: the haul, then the UPSTREAM word ----
+      const boat = await page.evaluate(() => {
+        const c = window.__placeCanoe()
+        const L = c.lane
+        // A few paces upstream of where the haul happens (s = +47, 7 m out):
+        // close enough that the float line and the fish read at their size.
+        // The net is set on the hull's shore side and trails upstream behind
+        // it, so the stand is upstream too, looking out between the two.
+        // Waded out ankle-to-knee deep, about 5 m from the hull's shore side and
+        // a little DOWNSTREAM of it: the float line trails upstream, so the
+        // floats still out lie beyond the hull rather than under the lens.
+        const s = 49
+        const stand = { x: L.nx * (L.waterline + 2.4) + L.fx * s, z: L.nz * (L.waterline + 2.4) + L.fz * s }
+        const look = { x: L.nx * (L.out - 1) + L.fx * 46, z: L.nz * (L.out - 1) + L.fz * 46 }
+        return { stand, look }
+      })
+      await standAt(boat.stand, boat.look)
+      const boatView = () => page.evaluate(() => {
+        const seen = window.__canoeSeen
+        const at = window.__canoeFrameAt
+        const c = window.__placeCanoe()
+        const L = window.__placeLayout
+        const kids = (window.__placeTag().children ?? []).map((k) => at(k.x, 0.4, k.z))
+        const rocks = [L.playRocks.upstream, L.playRocks.downstream].map((r) => at(r.x, 0.5, r.z))
+        return {
+          phase: c.phase,
+          net: c.net,
+          inHull: c.inHull,
+          catch: c.catch,
+          paddlerAction: c.paddlerAction,
+          hull: at(c.x, 0, c.z).inFrame,
+          paddler: seen(c.paddler.x, 0.4, c.paddler.z, 0.8),
+          netMan: seen(c.netMan.x, 0.4, c.netMan.z, 0.8),
+          floats: (c.floats ?? []).filter((f) => at(f.x, -0.2, f.z).inFrame).length,
+          kidsInFrame: kids.filter((k) => k.inFrame).length,
+          rocksInFrame: rocks.filter((r) => r.inFrame).length,
+        }
+      })
+      const hauling = await page
+        .waitForFunction(() => {
+          const c = window.__placeCanoe?.()
+          // Mid-haul: the float line still out on the water, fish coming up.
+          // Late in the haul: several fish up in the net, the last floats still out.
+          return !!c && c.phase === 'haul' && c.inHull >= 3 && c.net > 0.3
+        }, null, { timeout: 300000, polling: 100 })
+        .then(() => true)
+        .catch(() => false)
+      check('the two men haul the net in at the downstream end, the catch coming up', hauling)
+      const atBoat = await inPlace()
+      check('the boat’s standing place is inside the settlement', atBoat)
+      if (hauling && atBoat) {
+        await page.evaluate(() => { window.__placePlayer.pitch = -0.12 })
+        await nextFrames(2)
+        const seen = await boatView()
+        // THE CATCH READS: at least three fish in the frame and not hidden,
+        // each drawn long enough on screen to be a fish and not a speck. A
+        // fish counts only when the camera's ray to its centre first strikes
+        // a fish surface within its half-thickness of that centre — a fish
+        // behind the hull, a man or the bank does not.
+        const fish = await page.evaluate(() => {
+          const scene = window.__placeScene
+          const cam = window.__placeCamera
+          scene.updateMatrixWorld(true)
+          const out = []
+          scene.traverseVisible((o) => {
+            if (o.name !== 'village-canoe-fish' || !o.visible) return
+            const head = cam.position.clone().set(0, 0, 0.5).applyMatrix4(o.matrixWorld).project(cam)
+            const tail = cam.position.clone().set(0, 0, -0.5).applyMatrix4(o.matrixWorld).project(cam)
+            if ([head, tail].some((p) => Math.abs(p.x) > 1 || Math.abs(p.y) > 1 || p.z >= 1)) return
+            const centre = cam.position.clone().set(0, 0, 0).applyMatrix4(o.matrixWorld)
+            const ray = window.__placeRayHit(centre.x, centre.y, centre.z)
+            const unhidden = ray.hitName === 'village-canoe-fish' && ray.hitDistance !== null && ray.targetDistance - ray.hitDistance <= 0.12
+            out.push({ px: Math.hypot((head.x - tail.x) * window.innerWidth / 2, (head.y - tail.y) * window.innerHeight / 2), unhidden, hit: ray.hitName })
+          })
+          return out
+        })
+        check('at least three unhidden fish are in the frame, each at least 25 px long',
+          fish.filter((f) => f.unhidden && f.px >= 25).length >= 3,
+          JSON.stringify(fish.map((f) => ({ px: Math.round(f.px), seen: f.unhidden, hit: f.hit }))))
+        check('from the boat’s standing place the hull and both men are in frame, nothing hiding them',
+          seen.hull && seen.paddler && seen.netMan, JSON.stringify(seen))
+        check('both haul, and there are fish in the hull', seen.paddlerAction === 'haul' && seen.inHull >= 2, JSON.stringify(seen))
+        check('the float line is on the water in the frame', seen.floats >= 3, JSON.stringify(seen))
+        check('and no child and no play rock is in the picture', seen.kidsInFrame === 0 && seen.rocksInFrame === 0,
+          `${seen.kidsInFrame} children, ${seen.rocksInFrame} rocks`)
+        const c = await page.evaluate(() => window.__placeCanoe())
+        await frame('1245-fishers-haul-from-boat-stand', {
+          local: { x: c.x, y: 0.3, z: c.z },
+          label: 'the two fishermen hauling the drift net into their dugout at the downstream end, silvery fish in the hull, seen from the boat’s standing place on the waterline; no child and no play rock in the picture',
+        })
+      }
+      // The net man's word to the paddler once the basket is set down, and the
+      // paddler's hard strokes that answer it.
+      const word = await page
+        .waitForFunction(() => {
+          const c = window.__placeCanoe?.()
+          if (!c || c.phase !== 'callUp' || !c.word || c.word.state !== 'said') return null
+          const l = (window.__speech?.labels() ?? []).find((x) => x.speakerId === 'village-canoe')
+          if (!l) return null
+          return { atoms: l.atoms, expected: window.__game.getState().vocabulary.UPSTREAM }
+        }, null, { timeout: 120000, polling: 200 })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      check('at the landing the net man says UPSTREAM to the paddler, and the reading stands over his head',
+        !!word && word.atoms.length === 1 && word.atoms[0] === word.expected, JSON.stringify(word))
+      if (word && atBoat) {
+        // Turned toward the landing, where the boat now lies.
+        const at = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: (c.netMan.x + c.paddler.x) / 2, z: (c.netMan.z + c.paddler.z) / 2 } })
+        await standAt(boat.stand, at)
+        const label = await page.evaluate(() => {
+          const l = window.__speech.anchorScreen('village-canoe')
+          return !!l && l.x >= 0 && l.x <= window.innerWidth && l.y >= 0 && l.y <= window.innerHeight ? l : null
+        })
+        const seen = await boatView()
+        check('the word and both men are in the frame from the boat’s standing place', !!label && seen.paddler && seen.netMan, JSON.stringify({ label, seen }))
+        const c = await page.evaluate(() => window.__placeCanoe())
+        await frame('1245-fishers-upstream-word-from-boat-stand', {
+          local: { x: c.netMan.x, y: 0.6, z: c.netMan.z },
+          label: 'at the landing, back aboard after the full basket is set on the bank, the net man says UPSTREAM to the paddler — the reading over his head; no child and no play rock in the picture',
+        })
+        const answered = await page
+          .waitForFunction(() => {
+            const c = window.__placeCanoe?.()
+            // The word obeyed: pushing off, or already back on the lane, with
+            // hard strokes either way.
+            return !!c && (c.phase === 'launch' || c.phase === 'up') && c.paddlerAction === 'hard'
+          }, null, { timeout: 20000, polling: 100 })
+          .then(() => true)
+          .catch(() => false)
+        check('and the paddler answers it with hard strokes, pushing off', answered)
+      }
+
+      // --- 2. Behind the upstream rock, looking downstream ------------------
       const played = await page
         .waitForFunction(() => {
           const t = window.__placeTag?.()
@@ -6128,7 +6221,7 @@ if (section('villager-canoe')) {
         }, null, { timeout: 300000, polling: 250 })
         .then(() => true)
         .catch(() => false)
-      check('the children come down to the bank and play their round', played)
+      check('the children come down to the moved stretch and play their round', played)
       if (played) {
         const behind = await page.evaluate(() => {
           const L = window.__placeLayout
@@ -6136,11 +6229,6 @@ if (section('villager-canoe')) {
           const down = L.playRocks.downstream
           const up = L.playRocks.upstream
           const look = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2 }
-          // Downstream of the rock and a few paces inland of the lane, so the
-          // rock stands beside the sight line rather than across it — the first
-          // run stood a metre inland and the stone hid four of five children.
-          // The first stand the shipped colliders leave free is taken; a box
-          // counts at its circumscribed radius, the conservative reading.
           const reach = (c) =>
             c.kind === 'box' ? Math.hypot(c.hx, c.hz) : c.kind === 'segment' ? c.r + Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2 : c.r
           const clearAt = (x, z) => {
@@ -6151,41 +6239,29 @@ if (section('villager-canoe')) {
             }
             return clear
           }
-          for (const inland of [5, 4, 6, 3]) {
-            for (const along of [5, 6, 4]) {
-              const at = { x: down.x + b.fx * along - b.nx * inland, z: down.z + b.fz * along - b.nz * inland }
+          for (const inland of [4, 3, 5, 6]) {
+            for (const along of [4, 3, 5]) {
+              // UPSTREAM of the rock: against the flow direction.
+              const at = { x: up.x - b.fx * along - b.nx * inland, z: up.z - b.fz * along - b.nz * inland }
               const clear = clearAt(at.x, at.z)
               if (clear > 0.35) return { at, look, inland, along, clear }
             }
           }
           return null
         })
-        check('there is free ground to stand on behind the downstream rock', !!behind,
-          behind ? `${behind.along} m downstream of it, ${behind.inland} m inland, ${behind.clear.toFixed(2)} m clear` : 'no free stand')
+        check('there is free ground to stand on behind the upstream rock', !!behind,
+          behind ? `${behind.along} m upstream of it, ${behind.inland} m inland, ${behind.clear.toFixed(2)} m clear` : 'no free stand')
         if (behind) await standAt(behind.at, behind.look)
-        const held = !!behind && await page.evaluate(() => window.__game.getState().placeId === 'bambara-village' && !!window.__placeCamera)
-        check('the stand behind the downstream rock is inside the settlement', held)
+        const held = !!behind && await inPlace()
+        check('the stand behind the upstream rock is inside the settlement', held)
         if (held) {
-          // The children's round keeps moving: give it a few frames to spread
-          // along the lane rather than judging the one frame it bunched up in.
           const seenOnce = () => page.evaluate(() => {
             const at = window.__canoeFrameAt
-            const c = window.__placeCanoe()
             const L = window.__placeLayout
-            // Seen = projected into the frame AND not hidden behind something
-            // nearer (the rock stands between the spectator and the lane).
-            const visible = (x, y, z) => {
-              if (!at(x, y, z).inFrame) return false
-              const ray = window.__placeRayHit ? window.__placeRayHit(x, y, z) : null
-              return !ray || ray.hitDistance === null || ray.hitDistance >= ray.targetDistance - 0.6
-            }
             const kids = window.__placeTag().children ?? []
             return {
-              hull: at(c.x, 0, c.z).inFrame,
-              paddler: at(c.paddler.x, 0.5, c.paddler.z).inFrame,
-              phase: c.phase,
-              upRock: at(L.playRocks.upstream.x, 0.5, L.playRocks.upstream.z).inFrame,
-              kidsSeen: kids.filter((k) => visible(k.x, 0.4, k.z)).length,
+              downRock: at(L.playRocks.downstream.x, 0.5, L.playRocks.downstream.z).inFrame,
+              kidsSeen: kids.filter((k) => window.__canoeSeen(k.x, 0.4, k.z)).length,
               kids: kids.length,
             }
           })
@@ -6194,14 +6270,69 @@ if (section('villager-canoe')) {
             await nextFrames(3)
             seen = await seenOnce()
           }
-          check('from behind the downstream rock the children’s game is in frame, the children not hidden by the rock',
-            seen.upRock && seen.kidsSeen >= 3, `${seen.kidsSeen}/${seen.kids} children seen, upstream rock ${seen.upRock}`)
-          check('and the canoe is not', !seen.hull && !seen.paddler, `${seen.phase}: hull ${seen.hull}, paddler ${seen.paddler}`)
-          await frame('1237-village-children-from-behind-downstream-rock', {
+          check('from behind the upstream rock the children’s game is in frame, the children not hidden',
+            seen.downRock && seen.kidsSeen >= 3, `${seen.kidsSeen}/${seen.kids} children seen, downstream rock ${seen.downRock}`)
+          // The boat's words fall at the lane's upstream end and at the landing:
+          // both beyond the CALL register's reach of this stand.
+          const apart = await page.evaluate((at) => {
+            const c = window.__placeCanoe()
+            const L = c.lane
+            const reach = window.__balance.communication.call.reach
+            const nearest = Math.min(
+              Math.hypot(at.x - L.start.x, at.z - L.start.z),
+              Math.hypot(at.x - L.berth.x, at.z - L.berth.z),
+            )
+            return { nearest, reach }
+          }, behind.at)
+          check('the boat’s spoken exchange cannot be heard there', apart.nearest > apart.reach,
+            `${apart.nearest.toFixed(1)} m to the nearest word against a ${apart.reach} m CALL reach`)
+          await frame('1245-village-children-from-behind-upstream-rock', {
             local: { x: behind.look.x, y: 0.5, z: behind.look.z },
-            label: 'the children’s bank game seen from behind the downstream play rock, looking upstream; the fisherman’s canoe is behind the camera and not in the picture',
+            label: 'the children’s bank game on its moved stretch, seen from behind the upstream play rock looking downstream; the fishermen’s words do not carry here',
           })
         }
+      }
+
+      // --- 3. The fishers' fire ---------------------------------------------
+      const fireStand = await page.evaluate(() => {
+        const f = window.__placeFishFire()
+        const b = window.__placeLayout.bank
+        const s = f.sites
+        // Inland of the fire and well downstream of it, looking across at the
+        // rack: obliquely, so the kneeling griller does not stand between the
+        // camera and his own embers (the first run's frame).
+        const look = { x: (s.fire.x + s.rack.x) / 2, z: (s.fire.z + s.rack.z) / 2 }
+        return { at: { x: look.x - b.nx * 5.5 + b.fx * 2, z: look.z - b.nz * 5.5 + b.fz * 2 }, look }
+      })
+      const gutting = await page
+        .waitForFunction(() => window.__placeFishFire?.().carrier.phase === 'gut', null, { timeout: 200000, polling: 250 })
+        .then(() => true)
+        .catch(() => false)
+      check('the carrier guts the catch at the fishers’ fire', gutting)
+      await standAt(fireStand.at, fireStand.look)
+      const atFire = await inPlace()
+      check('the fire’s standing place is inside the settlement', atFire)
+      if (gutting && atFire) {
+        const seen = await page.evaluate(() => {
+          const f = window.__placeFishFire()
+          const s = f.sites
+          const seen = window.__canoeSeen
+          return {
+            carrier: seen(f.carrier.x, 0.4, f.carrier.z, 0.8),
+            griller: seen(s.griller.x, 0.4, s.griller.z, 0.8),
+            rack: seen(s.rack.x, 0.9, s.rack.z, 0.8),
+            rackFish: f.rack.length,
+            fire: seen(s.fire.x, 0.2, s.fire.z, 0.8),
+          }
+        })
+        check('the carrier, the griller, the fire and the smoking rack are in frame, nothing hiding them',
+          seen.carrier && seen.griller && seen.rack && seen.fire, JSON.stringify(seen))
+        check('and the rack carries fish', seen.rackFish >= 3, JSON.stringify(seen))
+        const f = await page.evaluate(() => window.__placeFishFire().sites.fire)
+        await frame('1245-fishers-fire', {
+          local: { x: f.x, y: 0.4, z: f.z },
+          label: 'the fishers’ own fire by the landing: the carrier gutting the catch at the board, the griller turning fish over the embers, the smoking rack with its fish and the storage basket beside it',
+        })
       }
     }
   } finally {
@@ -6210,7 +6341,9 @@ if (section('villager-canoe')) {
       b.roamSeconds = kept.roamSeconds
       b.roamGuardSeconds = kept.roamGuardSeconds
       window.__balance.communication.labelSeconds = kept.labelSeconds
+      window.__balance.villageLife.canoe.haulSeconds = kept.haulSeconds
       delete window.__canoeFrameAt
+      delete window.__canoeSeen
       const g = window.__game.getState()
       if (g.placeId) g.leavePlace()
     }, was)
