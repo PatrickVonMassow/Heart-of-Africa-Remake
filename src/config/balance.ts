@@ -808,6 +808,9 @@ interface BalanceConfig {
       /** The bank round's own catch ring (m): it overrides the tag round's,
        *  which shrank to a hand's reach in work-order 1176. */
       catchDistance: number
+      /** Whether a visit finds the group at its rocks, its first cycle opening
+       *  at once (work-order 1250); off, a visit opens with a roaming phase. */
+      visitOpensAtBank: boolean
       /** How long the group roams its own quarter between two cycles. */
       roamSeconds: number
       /** Per-cycle spread of that length, 0..1 (0 = a metronome). */
@@ -1636,6 +1639,9 @@ export const balance: BalanceConfig = {
       // The pre-1176 ring, kept for the bank round: its catch has no reaching
       // hand and its landed pictures must not change. Calibratable.
       catchDistance: 0.8,
+      // A player at the river must not wait out a whole roam for the first word
+      // (work-order 1250). A switch, like `loom.placed`.
+      visitOpensAtBank: true,
       roamSeconds: 55,
       roamSpread: 0.25,
       // Calibratable backstops: allow a full-stretch walk plus a hut detour.
