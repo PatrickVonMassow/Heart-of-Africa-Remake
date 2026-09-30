@@ -6135,8 +6135,11 @@ if (section('villager-canoe')) {
         await page.evaluate(() => { window.__placePlayer.pitch = -0.12 })
         await nextFrames(2)
         const seen = await boatView()
-        // THE CATCH READS: at least three fish in the frame, each drawn long
-        // enough on screen to be a fish and not a speck.
+        // THE CATCH READS: at least three fish in the frame and not hidden,
+        // each drawn long enough on screen to be a fish and not a speck. A
+        // fish counts only when the camera's ray to its centre first strikes
+        // a fish surface within its half-thickness of that centre — a fish
+        // behind the hull, a man or the bank does not.
         const fish = await page.evaluate(() => {
           const scene = window.__placeScene
           const cam = window.__placeCamera
@@ -6147,11 +6150,16 @@ if (section('villager-canoe')) {
             const head = cam.position.clone().set(0, 0, 0.5).applyMatrix4(o.matrixWorld).project(cam)
             const tail = cam.position.clone().set(0, 0, -0.5).applyMatrix4(o.matrixWorld).project(cam)
             if ([head, tail].some((p) => Math.abs(p.x) > 1 || Math.abs(p.y) > 1 || p.z >= 1)) return
-            out.push(Math.hypot((head.x - tail.x) * window.innerWidth / 2, (head.y - tail.y) * window.innerHeight / 2))
+            const centre = cam.position.clone().set(0, 0, 0).applyMatrix4(o.matrixWorld)
+            const ray = window.__placeRayHit(centre.x, centre.y, centre.z)
+            const unhidden = ray.hitName === 'village-canoe-fish' && ray.hitDistance !== null && ray.targetDistance - ray.hitDistance <= 0.12
+            out.push({ px: Math.hypot((head.x - tail.x) * window.innerWidth / 2, (head.y - tail.y) * window.innerHeight / 2), unhidden, hit: ray.hitName })
           })
           return out
         })
-        check('at least three fish are in the frame, each at least 25 px long', fish.filter((px) => px >= 25).length >= 3, JSON.stringify(fish.map((px) => Math.round(px))))
+        check('at least three unhidden fish are in the frame, each at least 25 px long',
+          fish.filter((f) => f.unhidden && f.px >= 25).length >= 3,
+          JSON.stringify(fish.map((f) => ({ px: Math.round(f.px), seen: f.unhidden, hit: f.hit }))))
         check('from the boat’s standing place the hull and both men are in frame, nothing hiding them',
           seen.hull && seen.paddler && seen.netMan, JSON.stringify(seen))
         check('both haul, and there are fish in the hull', seen.paddlerAction === 'haul' && seen.inHull >= 2, JSON.stringify(seen))
