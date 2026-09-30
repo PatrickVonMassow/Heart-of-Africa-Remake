@@ -33,6 +33,7 @@ import {
   bankLabelSeconds,
   createBankGame,
   insideStrangerBerth,
+  openVisitAtBank,
   otherEnd,
   rockAt,
   stationAt,
@@ -1784,5 +1785,85 @@ describe('the bank teaches from the live heard set', () => {
     expect(rocks).toBeGreaterThanOrEqual(3)
     expect(log.said.some((u) => u.concept === 'UPSTREAM')).toBe(true)
     expect(log.said.some((u) => u.concept === 'DOWNSTREAM')).toBe(true)
+  })
+})
+
+// THE VISIT OPENS AT THE BANK (work-order 1250). A fresh round began with a
+// ~55 s silent roam and the walk down; the player at the river heard nothing for
+// over a minute. The visit now finds the group at its rocks.
+describe('a visit finds the children playing at the bank (work-order 1250)', () => {
+  function visit(seed: number, hasHeard?: BankWorld['hasHeard']) {
+    const count = balance.villageLife.tag.childCount
+    const rand = mulberry32(seed)
+    const spots = Array.from({ length: count }, (_, i) => ({
+      x: STAGE.roam.x + Math.cos((i / count) * Math.PI * 2) * 2.4,
+      z: STAGE.roam.z + Math.sin((i / count) * Math.PI * 2) * 2.4,
+    }))
+    const s = createBankGame(spots, rand, CFG)
+    const world: BankWorld = { ...openWorld(), hasHeard }
+    openVisitAtBank(s, STAGE, CFG, world)
+    return { s, world, rand, spots }
+  }
+
+  it('places the group at its rocks: the runners at the near stations, the first catcher at the far rock', () => {
+    const { s, spots } = visit(7)
+    // The runners' rock is the one nearer the quarter the group was spawned in.
+    const mid = { x: spots.reduce((a, p) => a + p.x, 0) / spots.length, z: spots.reduce((a, p) => a + p.z, 0) / spots.length }
+    const from: BankEnd = dist(STAGE.upstream, mid) <= dist(STAGE.downstream, mid) ? 'upstream' : 'downstream'
+    const far = touchStand(STAGE, otherEnd(from))!
+    expect(dist(s.children[0], far)).toBeLessThan(1e-9)
+    for (let i = 1; i < s.children.length; i++) {
+      expect(dist(s.children[i], stationAt(STAGE, from, i - 1, CFG))).toBeLessThan(1e-9)
+    }
+    // Every child keeps its quarter spot as the anchor of the roam to come.
+    s.children.forEach((c, i) => {
+      expect(c.anchorX).toBe(spots[i].x)
+      expect(c.anchorZ).toBe(spots[i].z)
+    })
+  })
+
+  it('opens the first run on its first step and taps ROCK at once for a listener who has not heard it', () => {
+    const { s, world, rand } = visit(7, () => false)
+    const said: BankUtterance[] = []
+    const dt = 1 / 60
+    let t = 0
+    for (; t < 3 && said.length === 0; t += dt) {
+      const u = stepBankGame(s, dt, CFG, STAGE, world, rand)
+      if (u) said.push(u)
+    }
+    expect(s.phase).toBe('run')
+    expect(said[0]?.concept).toBe('ROCK')
+    expect(said[0]?.moment).toBe('tap')
+    expect(t).toBeLessThan(0.5)
+  })
+
+  it('calls RIVER at once for a listener who knows ROCK, then plays the round as ever', () => {
+    const { s, world, rand } = visit(13, () => true)
+    const said: BankUtterance[] = []
+    const phases: string[] = []
+    const dt = 1 / 60
+    for (let t = 0; t < 400; t += dt) {
+      const u = stepBankGame(s, dt, CFG, STAGE, world, rand)
+      if (u) said.push(u)
+      if (phases[phases.length - 1] !== s.phase) phases.push(s.phase)
+    }
+    expect(said[0]?.concept).toBe('RIVER')
+    expect(phases[0]).toBe('gather')
+    // The roam, and the boulder named in it, follow the first cycle.
+    expect(phases).toContain('part')
+    expect(phases.slice(1)).toContain('roam')
+    expect(said.some((u) => u.moment === 'boulder')).toBe(true)
+  })
+
+  it('never speaks later than a few seconds after the visit opens, over several seeds', () => {
+    for (const seed of SEEDS) {
+      const { s, world, rand } = visit(seed, () => false)
+      const dt = 1 / 60
+      let first = Infinity
+      for (let t = 0; t < 10 && first === Infinity; t += dt) {
+        if (stepBankGame(s, dt, CFG, STAGE, world, rand)) first = t
+      }
+      expect(first).toBeLessThan(3)
+    }
   })
 })

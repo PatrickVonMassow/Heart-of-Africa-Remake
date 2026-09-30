@@ -218,7 +218,10 @@ The children play ONE game, at the river bank, and it teaches four of the six
 words without a staged lesson (work-order 687). They roam their own quarter out
 of earshot of the adults; at the end of that phase one of them calls `RIVER`,
 points at the water and the group runs to the bank, and that caller is the first
-catcher. Until ROCK has been heard, a round omits the RIVER call and the
+catcher. A visit finds the group already at its rocks, its first cycle opening
+at once; the roam and its boulder climb follow that cycle (work-order 1250: the
+opening roam kept a player at the river waiting over a minute for a word).
+Until ROCK has been heard, a round omits the RIVER call and the
 direction announcement and offers rock-only contact and climb lessons instead. Two rocks stand at the ends of a stretch of bank, one upstream and one
 downstream, in the play rocks' own size. The runners gather at one, the
 catcher waits at the other, the direction is announced before each run, the

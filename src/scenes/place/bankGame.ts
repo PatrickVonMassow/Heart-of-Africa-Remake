@@ -790,6 +790,67 @@ export function createBankGame(
   }
 }
 
+/**
+ * THE VISIT OPENS AT THE BANK (work-order 1250). A fresh round used to begin
+ * with a whole roaming phase (`roamSeconds`, ~55 s) in its own quarter, whose
+ * one word — the boulder's ROCK — fell in the first seconds while the player was
+ * still at the entrance; then the walk down to the bank. A player who went to
+ * the river heard the children say nothing for well over a minute: the
+ * reported "the children do not speak".
+ *
+ * So a visit finds the group already at its rocks: the first catcher at his
+ * touch spot on the far rock, the runners at the stations of the rock nearer
+ * their quarter. The roaming phase is closed at once, and marked as finished
+ * without a naming — the same state `roamGuardSeconds` leaves — so the first
+ * step opens the cycle there and the first run follows as soon as everybody
+ * stands in place. A listener who has not heard ROCK gets the rock-only run,
+ * exactly as one who missed a climb does; every later roaming phase carries its
+ * boulder climb as before. Each child keeps its quarter spot as its anchor for
+ * the roam that follows.
+ */
+export function openVisitAtBank(
+  s: BankState,
+  stage: BankStage,
+  cfg: BankRoundConfig,
+  world: Pick<BankWorld, 'blocked' | 'nudge'>,
+): void {
+  const n = s.children.length
+  if (n === 0) return
+  let cx = 0
+  let cz = 0
+  for (const c of s.children) {
+    cx += c.x
+    cz += c.z
+  }
+  const middle = { x: cx / n, z: cz / n }
+  // The same choice `openCycle` makes: the runners take the rock nearer the group.
+  const from: BankEnd = dist(stage.upstream, middle) <= dist(stage.downstream, middle) ? 'upstream' : 'downstream'
+  const wait = otherEnd(from)
+  const touch = touchStand(stage, wait, world.blocked)
+  const place = (c: BankChild, p: { x: number; z: number }, face: { x: number; z: number }) => {
+    const q = world.blocked(p.x, p.z) ? world.nudge(p.x, p.z) : { x: p.x, z: p.z }
+    c.x = q.x
+    c.z = q.z
+    c.footX = q.x
+    c.footZ = q.z
+    c.goalX = q.x
+    c.goalZ = q.z
+    c.goalFor = 0
+    c.heading = Math.atan2(face.x - q.x, face.z - q.z)
+    c.facing = c.heading
+    c.roamHeading = c.heading
+  }
+  s.children.forEach((c, i) => {
+    if (i === 0) place(c, touch ?? stationAt(stage, wait, 0, cfg), rockAt(stage, wait))
+    else place(c, stationAt(stage, from, i - 1, cfg), rockAt(stage, wait))
+  })
+  s.phase = 'roam'
+  s.phaseFor = 0
+  s.namedBoulder = false
+  s.abandonedBoulder = true
+  s.climber = -1
+}
+
 /** The rock at one end of the stretch. */
 export function rockAt(stage: Pick<BankStage, 'upstream' | 'downstream'>, end: BankEnd): { x: number; z: number } {
   return end === 'upstream' ? stage.upstream : stage.downstream
