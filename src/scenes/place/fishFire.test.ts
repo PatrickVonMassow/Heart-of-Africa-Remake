@@ -238,3 +238,35 @@ describe('where the fire stands (work-order 1245 item 4)', () => {
     },
   )
 })
+
+describe('nothing at the fire stands inside anything else (work-order 1245)', () => {
+  it.each(RIVER_VILLAGES)('%s: figures, baskets, the hearth, the rack and the board keep apart', (id) => {
+    const bank = buildRiverBank(PLACES.find((p) => p.id === id)!, PLACE_RADIUS)!
+    const lane = canoeLane(bank)
+    const s = fisherySites(bank, lane)
+    // Footprints: a figure 0.3 m, a basket 0.26 m, the hearth with its stones
+    // 1.0 m, the rack 0.6 m round its middle, the board 0.5 m, storage 0.3 m.
+    const bodies: Array<[string, { x: number; z: number }, number]> = [
+      ['carrierAtFire', s.carrierAtFire, 0.3],
+      ['griller', s.griller, 0.3],
+      ['eaterAtRack', s.eaterAtRack, 0.3],
+      ['carrierAtBank', s.carrierAtBank, 0.3],
+      ['fireBasket', s.fireBasket, 0.26],
+      ['basketSpot', s.basketSpot, 0.26],
+      ['ashore', lane.ashore, 0.3],
+      ['fire', s.fire, 1.0],
+      ['rack', s.rack, 0.6],
+      ['board', s.board, 0.45],
+      ['storage', s.storage, 0.3],
+    ]
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const [an, a, ar] = bodies[i]
+        const [bn, b, br] = bodies[j]
+        // The carrier works AT his board: he may touch it, never stand in it.
+        const allowed = (an === 'carrierAtFire' && bn === 'board') ? 0.2 : 0
+        expect(Math.hypot(a.x - b.x, a.z - b.z) + allowed, `${an} / ${bn}`).toBeGreaterThanOrEqual(ar + br)
+      }
+    }
+  })
+})

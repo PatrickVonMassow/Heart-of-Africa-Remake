@@ -90,14 +90,16 @@ export function fisherySites(
     rack,
     storage: on(fs - 3.7, fo - 0.4),
     board,
-    fireBasket: on(fs + 1.5, fo - 0.7),
+    // Beside the kneeling carrier, not under him.
+    fireBasket: on(fs + 2.4, fo - 0.35),
     carrierAtFire: stand(fs + 1.5, fo - 0.55, toWater),
     carrierAtBank: stand(
       lane.basketSpot.x * bank.fx + lane.basketSpot.z * bank.fz - 0.2,
       lane.basketSpot.x * bank.nx + lane.basketSpot.z * bank.nz - 0.85,
       toWater,
     ),
-    griller: stand(fs, fo - 1.1, toWater),
+    // Kneeling just clear of the hearth's ring of stones (radius 1 m).
+    griller: stand(fs, fo - 1.4, toWater),
     eaterAtRack: stand(fs - 2.3, fo - 0.75, toWater),
     eaterHome: { ...home, yaw: faceRack },
     basketSpot: lane.basketSpot,
