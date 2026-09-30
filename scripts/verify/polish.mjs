@@ -5720,85 +5720,86 @@ if (section('children-bank-game')) {
     // in front of it or behind: the frame shows the caught child on its own.
     const SLUMP_CLEAR = 0.7
     // A stance 10-14 m off the subject, broadside to the pair when there is one,
-    // inside the settlement's base circle (the boundary is star-shaped about the
-    // centre, so that circle is always walkable) and clear of the colliders.
-    const standOff = async (caught, other, others) => {
+    // inside the settlement's own boundary (`insidePlace`, the function that
+    // decides leaving) and clear of the colliders. The place camera is the eye,
+    // so the stance is also where the sight line starts; candidates are sifted
+    // in one page call, and `why` tallies what turned them down for a red.
+    const standOff = async (caught, other, others, why) => {
       const mid = other ? { x: (caught.x + other.x) / 2, z: (caught.z + other.z) / 2 } : caught
-      const base = other ? Math.atan2(other.z - caught.z, other.x - caught.x) + Math.PI / 2 : 0
-      const angles = other
-        ? [0, Math.PI, 0.5, -0.5, Math.PI + 0.5, Math.PI - 0.5].map((a) => base + a)
-        : Array.from({ length: 12 }, (_, k) => (k * Math.PI) / 6)
-      for (const back of [11, 12, 10.5]) {
-        for (const a of angles) {
-          const placed = await page.evaluate(
-            ({ mid, a, back, caught }) => {
-              const p = window.__placePlayer
-              const L = window.__placeLayout
-              if (!p || !L) return false
+      const picks = await page.evaluate(
+        async ({ caught, mid, other, others, range, clear }) => {
+          const { insidePlace } = await import('/src/scenes/place/boundary.ts')
+          const L = window.__placeLayout
+          if (!L) return { picks: [], tally: { layout: 1 } }
+          const tally = {}
+          const no = (k) => ((tally[k] = (tally[k] ?? 0) + 1), false)
+          const reach = (c) =>
+            c.kind === 'box' ? Math.hypot(c.hx, c.hz) : c.kind === 'segment' ? c.r + Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2 : c.r
+          const base = other ? Math.atan2(other.z - caught.z, other.x - caught.x) + Math.PI / 2 : 0
+          const picks = []
+          for (const back of [11, 12, 10.5, 13]) {
+            for (let k = 0; k < 24; k++) {
+              const a = base + (k * Math.PI) / 12
               const x = mid.x + Math.cos(a) * back
               const z = mid.z + Math.sin(a) * back
-              if (Math.hypot(x, z) > L.radius - 1.5) return false
-              const reach = (c) =>
-                c.kind === 'box' ? Math.hypot(c.hx, c.hz) : c.kind === 'segment' ? c.r + Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2 : c.r
+              const d = Math.hypot(caught.x - x, caught.z - z)
+              if (d < range[0] + 0.3 || d > range[1] - 0.3) { no('range'); continue }
+              if (!insidePlace(L, x, z, 1)) { no('outside'); continue }
+              let blocked = false
               for (const c of window.__placeColliders ?? []) {
                 const m = c.kind === 'segment' ? { x: (c.x1 + c.x2) / 2, z: (c.z1 + c.z2) / 2 } : { x: c.x, z: c.z }
-                if (Math.hypot(x - m.x, z - m.z) - reach(c) < 0.5) return false
+                if (Math.hypot(x - m.x, z - m.z) - reach(c) < 0.5) { blocked = true; break }
               }
-              p.x = x
-              p.z = z
-              // Place-camera yaw 0 looks toward -Z, hence the +PI.
-              p.yaw = Math.atan2(caught.x - x, caught.z - z) + Math.PI
-              p.pitch = -0.1
-              return true
-            },
-            { mid, a, back, caught },
-          )
-          if (!placed) continue
-          await nextFrames(3)
-          // Re-aimed from where the camera really stands, at the pair's middle so
-          // both figures are in frame; judged by the drawn ray to the caught child.
-          const seen = await page.evaluate(
-            ({ caught, mid }) => {
-              if (window.__game.getState().placeId !== 'bambara-village') return { lost: true }
-              const p = window.__placePlayer
-              const probe = window.__placeRayHit?.(caught.x, 0.4, caught.z)
-              if (!p || !probe) return null
-              const h = Math.hypot(caught.x - p.x, caught.z - p.z)
-              const dy = Math.sqrt(Math.max(0, probe.targetDistance ** 2 - h ** 2))
-              p.yaw = Math.atan2(mid.x - p.x, mid.z - p.z) + Math.PI
-              p.pitch = -Math.atan2(dy, probe.targetDistance)
-              return { distance: probe.targetDistance }
-            },
-            { caught, mid },
-          )
-          if (seen?.lost) return seen
-          if (!seen || seen.distance < SLUMP_RANGE[0] || seen.distance > SLUMP_RANGE[1]) continue
-          await nextFrames(3)
-          const hit = await page.evaluate(
-            ({ q, others }) => {
-              const r = window.__placeRayHit?.(q.x, 0.4, q.z)
-              const cam = window.__placeCamera?.position
-              if (!r || !cam) return null
-              // The nearest other child to the sight line, measured across it.
-              const dx = q.x - cam.x
-              const dz = q.z - cam.z
-              const len = Math.hypot(dx, dz) || 1
+              if (blocked) { no('collider'); continue }
               let across = Infinity
-              for (const o of others) across = Math.min(across, Math.abs(dz * (o.x - cam.x) - dx * (o.z - cam.z)) / len)
-              return { ...r, across }
-            },
-            { q: caught, others: others ?? [] },
-          )
-          if (
-            hit &&
-            hit.targetDistance >= SLUMP_RANGE[0] &&
-            hit.targetDistance <= SLUMP_RANGE[1] &&
-            hit.across >= SLUMP_CLEAR &&
-            (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)
-          ) {
-            return { distance: hit.targetDistance, across: hit.across }
+              for (const o of others) across = Math.min(across, Math.abs((caught.z - z) * (o.x - x) - (caught.x - x) * (o.z - z)) / d)
+              if (across < clear) { no('crowded'); continue }
+              // Broadside to the pair first; otherwise the widest clearance.
+              picks.push({ x, z, score: (other ? -Math.abs(Math.sin(a - base)) * 2 : 0) - Math.min(across, 3) })
+            }
           }
-        }
+          picks.sort((p, q) => p.score - q.score)
+          return { picks: picks.slice(0, 4), tally }
+        },
+        { caught, mid, other, others: others ?? [], range: SLUMP_RANGE, clear: SLUMP_CLEAR },
+      )
+      for (const [k, n] of Object.entries(picks.tally)) why[k] = (why[k] ?? 0) + n
+      for (const pick of picks.picks) {
+        await page.evaluate(
+          ({ pick, mid }) => {
+            const p = window.__placePlayer
+            p.x = pick.x
+            p.z = pick.z
+            // Place-camera yaw 0 looks toward -Z, hence the +PI; level, the
+            // children are at eye distance and the frame needs no tilt.
+            p.yaw = Math.atan2(mid.x - pick.x, mid.z - pick.z) + Math.PI
+            p.pitch = -0.06
+          },
+          { pick, mid },
+        )
+        await nextFrames(3)
+        // Judged again from where the camera really stands, by the drawn ray.
+        const hit = await page.evaluate(
+          ({ q, others }) => {
+            if (window.__game.getState().placeId !== 'bambara-village') return { lost: true }
+            const r = window.__placeRayHit?.(q.x, 0.4, q.z)
+            const cam = window.__placeCamera?.position
+            if (!r || !cam) return null
+            const dx = q.x - cam.x
+            const dz = q.z - cam.z
+            const len = Math.hypot(dx, dz) || 1
+            let across = Infinity
+            for (const o of others) across = Math.min(across, Math.abs(dz * (o.x - cam.x) - dx * (o.z - cam.z)) / len)
+            return { ...r, across }
+          },
+          { q: caught, others: others ?? [] },
+        )
+        if (hit?.lost) return hit
+        if (!hit) { why.probe = (why.probe ?? 0) + 1; continue }
+        if (hit.targetDistance < SLUMP_RANGE[0] || hit.targetDistance > SLUMP_RANGE[1]) { why.drawnRange = (why.drawnRange ?? 0) + 1; continue }
+        if (hit.across < SLUMP_CLEAR) { why.drawnCrowded = (why.drawnCrowded ?? 0) + 1; continue }
+        if (hit.hitDistance != null && hit.hitDistance < hit.targetDistance * 0.9) { why.occluded = (why.occluded ?? 0) + 1; continue }
+        return { distance: hit.targetDistance, across: hit.across }
       }
       return null
     }
@@ -5817,17 +5818,21 @@ if (section('children-bank-game')) {
     // iteration cap as a runaway backstop.
     let runShot = null
     let lost = false
+    // What the window offered, for a red that names why nothing was shot.
+    const runWhy = { caughtMoments: 0, alone: 0 }
     const runFirst = (await readKids()).clock
     for (let i = 0; i < 12000 && !runShot && !lost; i++) {
       const s = await readKids()
       if (s.clock - runFirst > 2 * cycleWaitSeconds) break
       // A caught child standing ON ITS OWN, at least 2 m from every other one.
+      if (s.phase === 'run' && s.c.some((k) => k.slumped)) runWhy.caughtMoments++
       const caught =
         s.phase === 'run'
           ? s.c.find((k) => k.slumped && s.c.every((o) => o === k || Math.hypot(o.x - k.x, o.z - k.z) >= 2))
           : null
       if (caught) {
-        const at = await standOff(caught, null, s.c.filter((o) => o !== caught))
+        runWhy.alone++
+        const at = await standOff(caught, null, s.c.filter((o) => o !== caught), runWhy)
         if (at?.lost) lost = true
         const before = await readKids()
         const still = before.phase === 'run' && before.c[caught.i].slumped
@@ -5859,7 +5864,7 @@ if (section('children-bank-game')) {
       runShot
         ? `${runShot.distance.toFixed(1)} m, drifted ${(runShot.drift * 100).toFixed(1)} cm across the shutter, ${runShot.moving} free child(ren) moving, ` +
           `sight line ${runShot.across.toFixed(1)} m clear of the others`
-        : 'no caught child could be photographed inside the window',
+        : `no caught child could be photographed inside the window — ${JSON.stringify(runWhy)}`,
     )
 
     // (2) IN THE END HOLD: caught and free children standing side by side. The
@@ -5872,6 +5877,7 @@ if (section('children-bank-game')) {
       return was
     })
     let holdShot = null
+    const holdWhy = { pairMoments: 0 }
     const holdFirst = (await readKids()).clock
     for (let i = 0; i < 12000 && !holdShot && !lost; i++) {
       const s = await readKids()
@@ -5888,7 +5894,8 @@ if (section('children-bank-game')) {
             if (d >= 1 && (!pair || d < pair.d)) pair = { c, f, d }
           }
         }
-        const at = await standOff(pair.c, pair.f, s.c.filter((o) => o !== pair.c && o !== pair.f))
+        holdWhy.pairMoments++
+        const at = await standOff(pair.c, pair.f, s.c.filter((o) => o !== pair.c && o !== pair.f), holdWhy)
         if (at?.lost) lost = true
         const before = await readKids()
         if (at && before.phase === 'part' && before.c[pair.c.i].slumped) {
@@ -5931,7 +5938,7 @@ if (section('children-bank-game')) {
       !!holdShot && holdShot.drift < 0.02,
       holdShot
         ? `${holdShot.distance.toFixed(1)} m, pair ${holdShot.apart.toFixed(1)} m apart, pair drift ${(holdShot.drift * 100).toFixed(1)} cm, group ${(holdShot.groupDrift * 100).toFixed(1)} cm across the shutter`
-        : 'no end hold with a caught and a free child could be photographed inside the window',
+        : `no end hold with a caught and a free child could be photographed inside the window — ${JSON.stringify(holdWhy)}`,
     )
   }
 
