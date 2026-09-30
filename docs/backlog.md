@@ -2010,3 +2010,8 @@ that `design.md` does not describe.
   handover none-card that `batch-boundary --prepare --context` prescribes; a subagent inherits the
   parent session id, so the guard's "repeat the call" escape did not help (1241's author, 01:43).
   Workaround: prepare the boundary only after the authors have pushed.
+
+- 2026-09-30 `scripts/batch-claim-core.test.mjs:1176` failed once inside the 1239 landing gate
+  (the claimant's own gather returned `mine: false`) and passed alone and in a full Vitest run right
+  after. Suspect: the real `probePid(process.pid)` start-time identity under full-suite load. Not
+  reproduced; charge it if it reddens a gate again.
