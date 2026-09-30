@@ -6080,7 +6080,9 @@ if (section('villager-canoe')) {
         .then(() => true)
         .catch(() => false)
       check('the two men haul the net in at the downstream end, the catch coming up', hauling)
-      if (hauling && await inPlace()) {
+      const atBoat = await inPlace()
+      check('the boat’s standing place is inside the settlement', atBoat)
+      if (hauling && atBoat) {
         const seen = await boatView()
         check('from the boat’s standing place the hull and both men are in frame, nothing hiding them',
           seen.hull && seen.paddler && seen.netMan, JSON.stringify(seen))
@@ -6107,7 +6109,7 @@ if (section('villager-canoe')) {
         .catch(() => null)
       check('at the landing the net man says UPSTREAM to the paddler, and the reading stands over his head',
         !!word && word.atoms.length === 1 && word.atoms[0] === word.expected, JSON.stringify(word))
-      if (word && await inPlace()) {
+      if (word && atBoat) {
         const label = await page.evaluate(() => {
           const l = window.__speech.anchorScreen('village-canoe')
           return !!l && l.x >= 0 && l.x <= window.innerWidth && l.y >= 0 && l.y <= window.innerHeight ? l : null
@@ -6214,10 +6216,11 @@ if (section('villager-canoe')) {
         const f = window.__placeFishFire()
         const b = window.__placeLayout.bank
         const s = f.sites
-        // Inland of the fire and a pace downstream, looking across it at the
-        // rack: the griller, the gutting board and the rack in one frame.
+        // Inland of the fire and well downstream of it, looking across at the
+        // rack: obliquely, so the kneeling griller does not stand between the
+        // camera and his own embers (the first run's frame).
         const look = { x: (s.fire.x + s.rack.x) / 2, z: (s.fire.z + s.rack.z) / 2 }
-        return { at: { x: look.x - b.nx * 5.5 + b.fx * 1.5, z: look.z - b.nz * 5.5 + b.fz * 1.5 }, look }
+        return { at: { x: look.x - b.nx * 4.5 + b.fx * 3, z: look.z - b.nz * 4.5 + b.fz * 3 }, look }
       })
       const gutting = await page
         .waitForFunction(() => window.__placeFishFire?.().carrier.phase === 'gut', null, { timeout: 200000, polling: 250 })
@@ -6225,7 +6228,9 @@ if (section('villager-canoe')) {
         .catch(() => false)
       check('the carrier guts the catch at the fishers’ fire', gutting)
       await standAt(fireStand.at, fireStand.look)
-      if (gutting && await inPlace()) {
+      const atFire = await inPlace()
+      check('the fire’s standing place is inside the settlement', atFire)
+      if (gutting && atFire) {
         const seen = await page.evaluate(() => {
           const f = window.__placeFishFire()
           const s = f.sites

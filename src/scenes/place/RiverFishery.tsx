@@ -270,7 +270,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const fishGeometry = useMemo(() => buildFishGeometry(), [])
   const materials = useMemo(
     () => ({
-      fresh: new THREE.MeshStandardMaterial({ color: FISH_TONES.fresh, metalness: 0.65, roughness: 0.28, side: THREE.DoubleSide }),
+      fresh: new THREE.MeshStandardMaterial({ color: FISH_TONES.fresh, metalness: 0.35, roughness: 0.3, emissive: '#39434a', side: THREE.DoubleSide }),
       gutted: new THREE.MeshStandardMaterial({ color: FISH_TONES.gutted, metalness: 0.2, roughness: 0.55, side: THREE.DoubleSide }),
       grilled: new THREE.MeshStandardMaterial({ color: FISH_TONES.grilled, metalness: 0.05, roughness: 0.8, side: THREE.DoubleSide }),
       smoked: new THREE.MeshStandardMaterial({ color: FISH_TONES.smoked, metalness: 0.05, roughness: 0.85, side: THREE.DoubleSide }),
@@ -645,7 +645,9 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
           <sphereGeometry args={[1, 10, 6]} />
           <meshStandardMaterial color="#4b4336" roughness={1} />
         </mesh>
-        <group position={[0, CANOE_FREEBOARD - HULL_FLOOR_Y - 0.05, 0]}>
+        {/* Heaped high enough in the hollow to show over the gunwale (the
+            first picture check read them as white specks). */}
+        <group position={[0, CANOE_FREEBOARD - HULL_FLOOR_Y + 0.02, 0]}>
           {Array.from({ length: cfg.catchMax }, (_, i) => (
             <mesh
               key={i}
