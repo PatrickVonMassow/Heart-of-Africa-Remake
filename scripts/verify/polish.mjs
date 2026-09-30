@@ -5038,7 +5038,7 @@ if (section('children-bank-game')) {
       // samples. Being on the positive side of the lane axis says nothing about
       // which way a child is going: the run reverses at every side swap, a
       // runner that got past him is walking away down the same axis, and a
-      // tagged one holds its crouch where it fell. Without this the frame could
+      // tagged one stands slumped where it was caught. Without this the frame could
       // be written of any of the three under the label "coming at the
       // traveller".
       const LANE_SHOT_CLOSING = 0.05
@@ -5062,7 +5062,7 @@ if (section('children-bank-game')) {
             px: p.x,
             pz: p.z,
             // `held` is the settlement's own word for a stillness that was ORDERED —
-            // the tagged child holding its crouch — as against one that just happened.
+            // the tagged child standing slumped — as against one that just happened.
             // The starvation check below cannot be written without it.
             c: t.children.map((k) => ({ x: k.x, z: k.z, walked: k.walked, held: k.held })),
           }
@@ -5123,7 +5123,7 @@ if (section('children-bank-game')) {
       const perChildMinute = played > 0 && kids > 0 ? groupWalked / kids / (played / 60) : 0
       // AND NOT ONE CHILD STARVED INSIDE THAT AVERAGE (cross-vendor review,
       // 29.08.2026). The floor above is asked of the GROUP, for the good reason
-      // that a tagged child legitimately holds its crouch — but that reason
+      // that a tagged child legitimately stands slumped — but that reason
       // excuses a child the round HELD, not every child, and a group average
       // hides one standing at zero while the others carry it. The settlement
       // says which stillness was ordered, so the two are told apart here rather
@@ -5147,7 +5147,7 @@ if (section('children-bank-game')) {
           `child-minute (floor ${CHILD_MOTION.walkFloor}), ${tail.tags - head.tags} tagged` +
           (starved.length
             ? ` — STARVED: child(ren) ${starved.join(', ')} walked at most ${LANE_STARVED_M} m and were never held, ` +
-              `so their stillness was not the crouch`
+              `so their stillness was not the caught slump`
             : ''),
       )
       // WALKED AROUND, not merely near: a child counts as having passed him when
