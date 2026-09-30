@@ -9414,6 +9414,10 @@ to land than a mechanism that needs a review.
   names `scopeMandatoryDuty`, so the mutual block is intact in the code and returns the moment
   the arming point lands. Verify this point against the guard cores, never by re-running the
   incident.
+  THIRD INCIDENT 30.09.2026 (session c3fd94cf, past the watermark after `batch-boundary --commit
+  --context`): `bundle-first-guard`, `push-arrival-guard` and `retro-currency-guard` blocked six
+  Stop attempts in a row while the fence denied the bundle-line and memory edits they demanded;
+  `push-arrival-guard` joins the list of guards to scope.
   VERIFIABLE: Vitest over each of the three guard cores — past the fence each returns the
   handover verdict rather than a block, and below it blocks exactly as today — plus one case
   that ENUMERATES the mandatory Stop guards from `.claude/settings.json` and fails if any of
