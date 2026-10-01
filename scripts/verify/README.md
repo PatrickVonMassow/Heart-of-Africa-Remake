@@ -354,9 +354,9 @@ stall the suite, are pinned by `src/test/vitestConfig.test.ts`.
 
 `run-logged.mjs` refuses multiple named suites without a section by default unless
 the command explicitly names `small` or `large`. During development, use one suite,
-or `npm test -- polish --section=adult-errands`. The section name attaches to
+or `npm test -- polish-villagers --section=adult-errands`. The section name attaches to
 `--section=`; `adult-errands --section=` is refused before starting a run.
-For a covering proof, use e.g. `npm test -- polish settings enrichments collision
+For a covering proof, use e.g. `npm test -- polish-settlement settings enrichments collision
 --no-ladder "final covering proof"`. This admits the multi-suite run with one shared
 dev server and records the reason in its run record. The reason must be nonblank.
 
@@ -424,7 +424,7 @@ its measurement and its falsification criterion. The tiers:
 | Tier | Command | Backend | Browser suites | Preview | What it really costs |
 |------|---------|---------|----------------|---------|----------------------|
 | **SMALL** (everyday gate) | `npm run test:small` | WebGPU (`voice` routed to WebGL 2) | `docs, board-layout, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/board/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no | planned 7m 49s; not separately re-measured in September |
-| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 20** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, communication, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes | planned 80m 48s, **measured 115–121 min** (n=5, 09.09.2026) |
+| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 24** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting`, the five `polish-*` theme suites, `communication, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes | planned 80m 48s, **measured 115–121 min** (n=5, 09.09.2026) |
 
 **Read the price before you start one.** `node scripts/verify/run-wait.mjs --plan
 large` prints the planned expectation AND the observed band under it. The plan
@@ -596,10 +596,10 @@ the repair loop is cheap and the acceptance run stays whole.
 ### The ladder is ENFORCED where runs start (point 1086)
 
 ```
-npm test -- polish                       # refused while polish.mjs carries an edit
-npm test -- polish --section=town-plan   # the rung — never refused
-npm test -- polish                       # admitted once that rung is green
-npm test -- polish --no-ladder "<why>"   # the escape, recorded with the run
+npm test -- polish-settlement                       # refused while its file carries an edit
+npm test -- polish-settlement --section=town-plan   # the rung — never refused
+npm test -- polish-settlement                       # admitted once that rung is green
+npm test -- polish-settlement --no-ladder "<why>"   # the escape, recorded with the run
 ```
 
 Point 595 wrote the ladder down, so it was climbed by whoever remembered it.
@@ -774,13 +774,28 @@ CI free.
   section; where they do not, the section repeats the jump itself. Prove it by
   running every section alone once and diffing its checks against the whole
   run's — that sweep is how `calf-jitter` and `elephant-trampling` were caught.
+- **`polish` is split by THEME (point 1129).** Its sections live in five suites —
+  `polish-panorama` (Giza skyline, panorama wildlife and footing, port skylines,
+  travel capture, Sphinx, Giza site), `polish-speech` (speech notes, guessing,
+  Ctrl labels, chief and drummer, the given artefact), `polish-settlement` (town
+  plan, orientation, season, fabric, dress, fire shadows, edge, stone step,
+  eaves), `polish-children` (tag, catch, motion, bank round, boulder) and
+  `polish-villagers` (gestures, canoe, mute shore, wedged adults, well,
+  stations, loom, errands) — so a red costs only its own theme's pass. Every
+  section kept its name, its checks and its frames. The boot, the frame shutter,
+  the console-error gate and the helpers two themes share (`check`,
+  `nextFrames`, `stepUntil`, `goToPlace`, `probeSilhouetteFooting`) live in
+  `_polish.mjs`, whose top-level await boots the page; each theme calls
+  `finishPolishSuite()` last. An edit to `_polish.mjs` is prologue for all five
+  themes. All five together are the whole former `polish`, and need
+  `--no-ladder "<why>"` as any multi-suite run does.
 
 ### A red repeats its OWN rung, never the whole proof (point 1126)
 
 ```
-npm test -- polish                       # refused while polish's last whole run is red
-npm test -- polish --section=town-plan   # the block that red named — the rung
-npm test -- polish                       # admitted once that block is green again
+npm test -- polish-settlement                       # refused while its last whole run is red
+npm test -- polish-settlement --section=town-plan   # the block that red named — the rung
+npm test -- polish-settlement                       # admitted once that block is green again
 ```
 
 The rule above ages a rung by EDITS and merges. That leaves the case measured on
@@ -996,7 +1011,7 @@ is a serialised device: another client's steady fifth is queue time our frames
 wait behind. Where no such counter exists the probe SAYS so and the machine is
 `unknown` — never quiet on an unmeasured device.
 
-| Level | When | Effect on a pick containing `settings, enrichments, polish, startup, voice, benchmark` |
+| Level | When | Effect on a pick containing `settings, enrichments, polish-*, startup, voice, benchmark` |
 |---|---|---|
 | `quiet` | CPU below 35 %, GPU below 20 %, nothing of ours running | run; its verdict is evidence |
 | `busy` | CPU ≥ 35 %, GPU ≥ 20 %, or ANY leftover — an idle dev server counts, its damage is invisible to a CPU reading | run + FLAG (default), or defer |
@@ -1371,7 +1386,7 @@ in doubt.
 
 ```
 node scripts/verify/baseline-classify.mjs enrichments          # one suite, on demand
-node scripts/verify/baseline-classify.mjs polish --ref HEAD~1  # against a named commit
+node scripts/verify/baseline-classify.mjs polish-children --ref HEAD~1  # against a named commit
 ```
 
 It re-runs the failing checks' blocks — the whole suite where `narrowDiagnosis`
@@ -1549,7 +1564,7 @@ ported asserts now live in Vitest:
 | `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), the cold-load main-thread liveness gate (see `liveness.mjs`), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx`, `scripts/verify/liveness.test.mjs` |
 | `touch.mjs` | touch/tablet layer (`hasTouch` context, real CDP touch): guard mounts the overlay on first touch + mobile quality preset, virtual-stick walk, right-half look drag, tappable prompt, two-finger pinch zoom | `src/systems/touchInput.test.ts`, `src/state/ui.test.ts`, `src/ui/Hud.test.tsx` (touch absence/presence), `src/ui/DebugMenu.test.tsx` (SSAO/shadow checkboxes) |
 
-### `polish.mjs`: the checks that need a POPULATION, not an instant
+### The `polish-*` suites: the checks that need a POPULATION, not an instant
 
 Four of its checks measure something that only happens SOMETIMES, so each is a
 SERIES over the walk rather than one sampled frame, and each fails loudly when
@@ -1598,7 +1613,7 @@ its own subject never occurred:
   frame `146-speech-hypothesis-label`.
 
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +
-buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,
+buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs` (split by theme since point 1129),
 `handwriting.mjs` (the writing animation is timing/DOM-sensitive and stays
 here; consumes the `.cache/tts/` replay cache because adding an entry
 auto-narrates — voice.mjs owns and primes that cache), `docs.mjs` (pure Node
@@ -1614,7 +1629,7 @@ Every browser suite launches through `launchVerifyBrowser()` and calls
 a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
 `webgl` run that came up on WebGPU) fails LOUD instead of giving false
 confidence. Covered: benchmark, collision, enrichments, events, flow, gamepad,
-communication, handwriting, health, i18n, invariants, polish, report, settings,
+communication, handwriting, health, i18n, invariants, the five polish-* themes, report, settings,
 startup, touch, voice, world — every suite in the tier map except `docs` and
 `board-layout`, which the table below exempts together with `preview`. `visualsweep`
 asserts the backend too, but it rides in no tier: it is the on-demand capture
@@ -1645,7 +1660,7 @@ failure there stops before WebGPU.
 
 **The everyday lane is WebGPU; WebGL 2 is the regression lane.** With no
 `VERIFY_GL` pinned, `npm run test:small` and a bare suite filter
-(`npm test -- polish`) come up on WebGPU — the PLAYER's backend. WebGL 2 is what
+(`npm test -- polish-children`) come up on WebGPU — the PLAYER's backend. WebGL 2 is what
 every LARGE run covers: run it once per bundle and before every closing.
 
 The evidence for the direction: the work order records **no** defect that showed
@@ -1684,9 +1699,9 @@ Per-backend commands (what the render-verify gate uses to clear a GUI change on
 both backends):
 
 ```
-VERIFY_GL=webgl  node scripts/verify/run-all.mjs polish   # WebGL 2 pass of one suite
-VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish   # WebGPU pass of one suite
-npm test -- large polish                                  # the same suite on BOTH, preflighted
+VERIFY_GL=webgl  node scripts/verify/run-all.mjs polish-speech   # WebGL 2 pass of one suite
+VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish-speech   # WebGPU pass of one suite
+npm test -- large polish-speech                                  # the same suite on BOTH, preflighted
 ```
 
 ### A run whose reds are ACCOUNTED FOR still counts (point 550)

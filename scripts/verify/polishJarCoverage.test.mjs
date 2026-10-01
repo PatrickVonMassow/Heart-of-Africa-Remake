@@ -15,8 +15,12 @@ import { allChecks, failedChecks } from './baseline-classify-core.mjs'
 import { chargeReds } from '../render-verify-core.mjs'
 import { makeSectionGate } from './sections.mjs'
 
-const source = readFileSync('scripts/verify/polish.mjs', 'utf8')
-const checkBody = source.slice(source.indexOf('let failures = 0'), source.indexOf('\n/**', source.indexOf('let failures = 0')))
+const source = readFileSync('scripts/verify/polish-villagers.mjs', 'utf8')
+// `check` lives in the shared module of the polish theme suites (point 1129).
+const shared = readFileSync('scripts/verify/_polish.mjs', 'utf8')
+const checkBody = shared
+  .slice(shared.indexOf('let failures = 0'), shared.indexOf('\n/**', shared.indexOf('let failures = 0')))
+  .replace(/^export /gm, '')
 const jarStart = source.indexOf('    // HOW MANY WATER ERRANDS THE WINDOW REALLY SAW')
 const jarBody = source.slice(jarStart, source.indexOf('    // BOTH WORDS', jarStart))
 const JAR = 'and the jar goes down EMPTY and comes back FULL'
@@ -51,7 +55,7 @@ describe('the jar assertion once its subject is created rather than hoped for', 
     expect(failures).toBe(1)
     expect(failedChecks(out).map((c) => c.name)).toEqual([JAR])
     // And the red is chargeable, unlike the declared reading it replaces.
-    expect(chargeReds(failedChecks(out), { suite: 'polish', backend: 'webgl' }).length).toBe(1)
+    expect(chargeReds(failedChecks(out), { suite: 'polish-villagers', backend: 'webgl' }).length).toBe(1)
   })
 
   it('reds a broken DIGGING animation whatever the water errands did', () => {
@@ -73,7 +77,7 @@ describe('the jar assertion once its subject is created rather than hoped for', 
     expect(allChecks(out).map((c) => c.name)).not.toContain(JAR)
     const reds = failedChecks(out).map((c) => c.name)
     expect(reds).not.toContain(JAR)
-    expect(chargeReds(failedChecks(out), { suite: 'polish', backend: 'webgl' }).map((r) => r.check ?? r.name))
+    expect(chargeReds(failedChecks(out), { suite: 'polish-villagers', backend: 'webgl' }).map((r) => r.check ?? r.name))
       .not.toContain(JAR)
     expect(notCovering.map((n) => n.check)).toEqual([JAR])
     // The window saying nothing about the jar is not itself a green run: the

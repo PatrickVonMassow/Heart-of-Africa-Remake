@@ -2,14 +2,14 @@
  * @vitest-environment jsdom
  *
  * EXCEPTION to the tooling project's Node environment: this file runs browser-page
- * code here — a function Playwright serializes into the page, or a `polish.mjs`
+ * code here — a function Playwright serializes into the page, or a `polish-*.mjs`
  * sampler block — and that code reads `window`/`document` directly. It needs a DOM,
  * so it keeps jsdom per file instead of dragging the other tooling tests back into one.
  */
 import { readFileSync } from 'node:fs'
 import { afterEach, expect, it, vi } from 'vitest'
 
-const source = readFileSync('scripts/verify/polish.mjs', 'utf8')
+const source = readFileSync('scripts/verify/polish-villagers.mjs', 'utf8')
 const start = source.indexOf("if (section('village-stations')) {")
 // The loom's OWN picture section follows this one and is driven by its own
 // test; this slice stops where it begins.

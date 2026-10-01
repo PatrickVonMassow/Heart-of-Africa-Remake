@@ -158,7 +158,10 @@ describe('the seed REACHES every suite the map says is seeded', () => {
   })
 
   it.each(seeded)('%s opens its browser through the seeding launcher', (suite) => {
-    const src = suiteSource(suite)
+    // A polish theme suite boots through its shared module (point 1129), whose
+    // own launch is what applies the seed.
+    const shared = /from '\.\/_polish\.mjs'/.test(suiteSource(suite)) ? readFileSync(repoPath('scripts/verify', '_polish.mjs'), 'utf8') : ''
+    const src = suiteSource(suite) + shared
     const viaLauncher = /launchVerifyBrowser\s*\(/.test(src) || /bootGame\s*\(/.test(src)
     expect(viaLauncher, `${suite}.mjs must open its browser via launchVerifyBrowser/bootGame — that is where the seed is applied`).toBe(true)
   })

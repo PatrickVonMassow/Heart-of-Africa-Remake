@@ -58,6 +58,7 @@ import {
 } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { checkKey, failedChecks } from './verify/baseline-classify-core.mjs'
+import { DEV_SUITES, POLISH_THEME_SUITES } from './verify/tiers.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 /** The retry marker's bare names — what a message prints. */
 const parseSuspectEnv = (value) => parseSuspectReds(value).map((r) => r.name)
@@ -185,7 +186,7 @@ describe('coveringRun', () => {
 
 describe('suggestSuite', () => {
   it('names the most recently run suite', () => {
-    expect(suggestSuite([run('webgl', 1, { suite: 'flow' }), run('webgpu', 2, { suite: 'polish' })])).toBe('polish')
+    expect(suggestSuite([run('webgl', 1, { suite: 'flow' }), run('webgpu', 2, { suite: 'polish-children' })])).toBe('polish-children')
   })
   it('falls back to enrichments on no usable record', () => {
     expect(suggestSuite([])).toBe('enrichments')
@@ -202,9 +203,9 @@ describe('suggestSuite', () => {
     expect(suggestSuite([], ['src/ui/Hud.tsx', 'src/ui/DebugMenu.tsx'])).toBe('flow')
   })
   it('does not narrow when any changed path can render per backend', () => {
-    const runs = [run('webgl', 1, { suite: 'polish' })]
-    expect(suggestSuite(runs, ['src/ui/Hud.tsx', 'src/render/water.ts'])).toBe('polish')
-    expect(suggestSuite(runs, ['src/scenes/travel/TravelScene.tsx'])).toBe('polish')
+    const runs = [run('webgl', 1, { suite: 'polish-children' })]
+    expect(suggestSuite(runs, ['src/ui/Hud.tsx', 'src/render/water.ts'])).toBe('polish-children')
+    expect(suggestSuite(runs, ['src/scenes/travel/TravelScene.tsx'])).toBe('polish-children')
     // The general path→suite map was REJECTED by the replay; travel-scene code
     // must keep the old suggestion, not acquire a new one.
     expect(suggestSuite([], ['src/scenes/travel/TravelScene.tsx'])).toBe('enrichments')
@@ -276,8 +277,8 @@ describe('evaluate — the dual-backend gate', () => {
     expect(r.reason).toMatch(/WEBGPU/)
   })
   it('suggests the most recently run suite in the command', () => {
-    const r = evaluate(renderChange({ runs: [run('webgl', 2000, { suite: 'polish' })] }))
-    expect(r.reason).toContain('VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish')
+    const r = evaluate(renderChange({ runs: [run('webgl', 2000, { suite: 'polish-children' })] }))
+    expect(r.reason).toContain('VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish-children')
   })
   it('caps the listed paths but still blocks on many changes', () => {
     const paths = Array.from({ length: 9 }, (_, i) => `src/render/f${i}.ts`)
@@ -390,7 +391,7 @@ describe('isBackendSensitivePath — where two pictures are actually needed', ()
       'src/App.tsx',
       'src/scenes/travel/waterSurface.ts',
       'src/scenes/place/PlaceScene.tsx',
-      'scripts/verify/polish.mjs',
+      'scripts/verify/polish-children.mjs',
     ]) {
       expect(isBackendSensitivePath(p)).toBe(true)
     }
@@ -646,7 +647,7 @@ const truncationMarker = (dropped, kind) => ({
 /** A RED run carrying reds — the shape evaluate()/coveringRun() judge. */
 const redRun = (backend, at, reds, overrides = {}) => ({
   backend,
-  suite: 'polish',
+  suite: 'polish-children',
   startedAt: at - 10,
   at,
   exit: 1,
@@ -710,7 +711,7 @@ describe('owned — shared open-point ownership', () => {
   })
 
   it('keeps scope restrictions and refuses lost or unreadable reds', () => {
-    expect(owned(red, 'polish', 'webgl', null, [603], ledger)).toBe(false)
+    expect(owned(red, 'polish-children', 'webgl', null, [603], ledger)).toBe(false)
     expect(owned(red, 'settings', 'webgpu', null, [603], ledger)).toBe(false)
     expect(owns({ ...red, kind: TRUNCATED_KIND, point: 603 }, [603])).toBe(false)
     expect(owns(null, [603])).toBe(false)
@@ -719,13 +720,13 @@ describe('owned — shared open-point ownership', () => {
 
 describe('chargeFor — the ledger charges NARROWLY', () => {
   const ledger = [
-    { point: 506, suite: 'polish', backend: 'webgpu', kind: 'check', match: /goat/i, why: 'x' },
+    { point: 506, suite: 'polish-children', backend: 'webgpu', kind: 'check', match: /goat/i, why: 'x' },
     { point: 546, kind: 'console', match: /render-resource-leak/i, why: 'y' },
   ]
 
   it('charges a matching red to its point', () => {
     const hit = chargeFor(red('settlement walker (goat): the planted foot holds'), {
-      suite: 'polish',
+      suite: 'polish-children',
       backend: 'webgpu',
       ledger,
     })
@@ -734,7 +735,7 @@ describe('chargeFor — the ledger charges NARROWLY', () => {
 
   it('does not charge across the backend the evidence was taken on', () => {
     expect(
-      chargeFor(red('settlement walker (goat): the planted foot holds'), { suite: 'polish', backend: 'webgl', ledger }),
+      chargeFor(red('settlement walker (goat): the planted foot holds'), { suite: 'polish-children', backend: 'webgl', ledger }),
     ).toBeNull()
   })
 
@@ -915,7 +916,7 @@ describe('runVerdict — the run that passed only on the RETRY (point 640)', () 
    *  attempt failed on. */
   const suspectRun = (backend, at, names = ['the goat stance — worst travel 0.967'], overrides = {}) => ({
     ...run(backend, at),
-    suite: 'polish',
+    suite: 'polish-children',
     suspect: true,
     suspectOf: names,
     ...overrides,
@@ -976,7 +977,7 @@ describe('runVerdict — the run that passed only on the RETRY (point 640)', () 
 
 describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 640)', () => {
   const openPoints = [506, 546]
-  const suspectRun = (backend, at) => ({ ...run(backend, at), suite: 'polish', suspect: true, suspectOf: ['the goat stance'] })
+  const suspectRun = (backend, at) => ({ ...run(backend, at), suite: 'polish-children', suspect: true, suspectOf: ['the goat stance'] })
   const unfiled = (backend, at) => redRun(backend, at, [red('a NEW check nobody filed')])
 
   it('BLOCKS although a later clean run of both backends exists — the whole fourth route', () => {
@@ -1014,14 +1015,14 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(reason).toMatch(/CAUSE is named and FIXED/)
     expect(reason).toMatch(/CHARGED in scripts\/render-verify-charges\.mjs/)
     expect(reason).toMatch(/becomes an OPEN point/)
-    expect(reason).toMatch(/throttle-probe\.mjs polish --section=<name> --runs 8/)
+    expect(reason).toMatch(/throttle-probe\.mjs polish-children --section=<name> --runs 8/)
     expect(reason).toMatch(/--defer/)
   })
 
   it('lets the FIX through — but only once the suite that reddened is shown green on the new code', () => {
     // The red is in `polish`; the two clean runs below are `polish` too, after
     // an edit that came after the red. That is a fix demonstrated, not asserted.
-    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish-children' })
     const result = evaluate(
       renderChange({
         latestChangeAt: 3000,
@@ -1048,7 +1049,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
   })
 
   it('does NOT let a green of the same suite on the SAME code drop it — that is repetition', () => {
-    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish-children' })
     const result = evaluate(
       renderChange({ runs: [unfiled('webgpu', 1500), green('webgpu', 2000), green('webgl', 2100)], openPoints }),
     )
@@ -1091,7 +1092,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
   it('names both reds of a SUSPECT run, which runVerdict summarises into one sentence', () => {
     const twoNames = {
       ...run('webgpu', 1500),
-      suite: 'polish',
+      suite: 'polish-children',
       suspect: true,
       suspectOf: [{ name: 'the goat stance', kind: 'check' }, { name: 'the eaves column', kind: 'check' }],
     }
@@ -1185,7 +1186,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
   it('quotes the red that is STILL open, not the one a charge has taken over', () => {
     const ledger = [{ point: 506, match: /the goat stance/, why: 'the software lane cannot draw fast enough' }]
     const mixed = redRun('webgpu', 1500, [red('the goat stance'), red('a NEW check nobody filed')])
-    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish-children' })
     const result = evaluate(renderChange({ runs: [mixed, green('webgpu', 2000), green('webgl', 2100)], openPoints, ledger }))
     expect(result.decision).toBe('block')
     expect(result.reason).toMatch(/1 unaccounted red\(s\) — "a NEW check nobody filed"/)
@@ -1198,7 +1199,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     const firstAttempt = redRun('webgpu', 1500, [red('the goat stance')])
     const retry = {
       ...run('webgpu', 1600),
-      suite: 'polish',
+      suite: 'polish-children',
       suspect: true,
       suspectOf: [{ name: 'the goat stance', kind: 'check' }],
     }
@@ -1313,9 +1314,9 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       'FAIL  no child walks without getting anywhere — worst child 1 at 0.29 % of its own judged ' +
       'time — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m  [--section=children-motion]'
     // Recorded when NO ledger owned it, exactly as a run written before the entry.
-    const reds = chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgpu', ledger: [] })
+    const reds = chargeReds(failedChecks(line), { suite: 'polish-children', backend: 'webgpu', ledger: [] })
     expect(reds.map((r) => r.point)).toEqual([null])
-    const stored = redRun('webgpu', 1500, reds, { suite: 'polish' })
+    const stored = redRun('webgpu', 1500, reds, { suite: 'polish-children' })
 
     // Without the entry the run blocks, and the gate blocks with it.
     expect(unexplainedRuns([stored], 1000, { openPoints, ledger: [] })).toHaveLength(1)
@@ -1324,7 +1325,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     // The entry written TODAY reaches the record written yesterday.
     const ledger = [{
       point: 506,
-      suite: 'polish',
+      suite: 'polish-children',
       backend: 'webgpu',
       kind: 'check',
       match: /no child walks without getting anywhere/i,
@@ -1357,7 +1358,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     const sibling = 'FAIL  the goat stance holds — worst goat 2 at 3.00 m'
     const siblingLedger = [{
       point: 546,
-      suite: 'polish',
+      suite: 'polish-children',
       backend: 'webgpu',
       kind: 'check',
       match: /the goat stance holds/i,
@@ -1369,7 +1370,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     // and ONLY that identity.
     const varied = new Set(failedChecks(`${check}9.1s, 0.02 m walked inside 0.44 m`).map((c) => `${c.kind}:${c.key}`))
     const reds = chargeReds(markVariedDetails(failedChecks(first), varied), {
-      suite: 'polish',
+      suite: 'polish-children',
       backend: 'webgpu',
       ledger: [],
     })
@@ -1381,12 +1382,12 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     const [movedRed, stableRed] = reds
     expect(movedRed.detailVaried).toBe(true)
     expect(stableRed.detailVaried).toBeUndefined()
-    expect(chargeFor(stableRed, { suite: 'polish', backend: 'webgpu', ledger: siblingLedger })?.point).toBe(546)
-    const stored = redRun('webgpu', 1500, reds, { suite: 'polish' })
+    expect(chargeFor(stableRed, { suite: 'polish-children', backend: 'webgpu', ledger: siblingLedger })?.point).toBe(546)
+    const stored = redRun('webgpu', 1500, reds, { suite: 'polish-children' })
     const runs = [stored, run('webgpu', 2000), run('webgl', 2100)]
     const narrow = [{
       point: 506,
-      suite: 'polish',
+      suite: 'polish-children',
       backend: 'webgpu',
       kind: 'check',
       match: /no child walks without getting anywhere/i,
@@ -1394,7 +1395,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       why: 'the one reading that survived the capture',
     }]
     // The narrow entry matches the kept reading exactly, and still owns nothing.
-    expect(chargeFor(movedRed, { suite: 'polish', backend: 'webgpu', ledger: narrow })).toBeNull()
+    expect(chargeFor(movedRed, { suite: 'polish-children', backend: 'webgpu', ledger: narrow })).toBeNull()
     const withSibling = [...narrow, ...siblingLedger]
     const still = unexplainedRuns([stored], 1000, { openPoints, ledger: withSibling })
     expect(still).toHaveLength(1)
@@ -1404,7 +1405,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
 
     // The CONTROL: the very same entry owns the very same red once the record
     // no longer says the measurement moved — so it is the mark that refuses it.
-    const held = redRun('webgpu', 1500, chargeReds(failedChecks(first), { suite: 'polish', backend: 'webgpu', ledger: [] }), { suite: 'polish' })
+    const held = redRun('webgpu', 1500, chargeReds(failedChecks(first), { suite: 'polish-children', backend: 'webgpu', ledger: [] }), { suite: 'polish-children' })
     expect(evaluate(renderChange({ runs: [held, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger: [...narrow, ...siblingLedger] })).decision).toBe('allow')
 
     // And a BROAD entry is unaffected: it never claimed to read a measurement.
@@ -1546,7 +1547,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
         '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
         '[run×16 part×72 roam×307] over 45s played, 3 tagged'
       expect(measured.length).toBeGreaterThan(200)
-      const shipped = { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }
+      const shipped = { suite: 'polish-children', backend: 'webgpu', featureLevel: 'compatibility' }
       const [crossing] = chargeReds(
         [{ name: 'the children walk PAST the traveller — from one side of him to the other', kind: 'check', detail: measured }],
         shipped,
@@ -1683,7 +1684,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
   it('carries a red from a run that STRADDLED the edit until that suite is shown green', () => {
     const straddling = { ...unfiled('webgpu', 2000), startedAt: 500 }
     expect(unexplainedRuns([straddling], 1000, { openPoints })).toHaveLength(1)
-    const shownGone = { ...run('webgpu', 3000), suite: 'polish' }
+    const shownGone = { ...run('webgpu', 3000), suite: 'polish-children' }
     expect(unexplainedRuns([straddling, shownGone], 1000, { openPoints })).toEqual([])
   })
 
@@ -1750,7 +1751,7 @@ describe('runIdentity — the content identity a closure names one record by', (
   })
 
   it('separates records that share a stamp but differ anywhere else', () => {
-    const otherSuite = { ...fixture, suite: 'polish' }
+    const otherSuite = { ...fixture, suite: 'polish-children' }
     const otherBackend = { ...fixture, backend: 'webgl' }
     const startedInstead = { ...fixture, at: undefined, startedAt: 1500 }
     // THE CLOSURE-CRITICAL FIELDS BELONG IN THIS SET (review finding,
@@ -2093,12 +2094,12 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     const undated = { ...truncatedLegacy('webgpu', 1500), at: undefined, startedAt: undefined }
     expect(incompleteClosureFor(undated, [closureOf(undated)])).not.toBeNull()
     // And a closure that names no identity closes nothing, whatever its stamps.
-    expect(incompleteClosureFor(byAt, [{ backend: 'webgpu', suite: 'polish', at: 100, evidence: 'signed' }])).toBeNull()
+    expect(incompleteClosureFor(byAt, [{ backend: 'webgpu', suite: 'polish-children', at: 100, evidence: 'signed' }])).toBeNull()
   })
 
   it('cannot be RE-RECORDED either without a readable timestamp of its own', () => {
     const undated = { ...truncatedLegacy('webgpu', 1500), at: null, startedAt: null }
-    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const again = { ...run('webgpu', 2000), suite: 'polish-children' }
     expect(unexplainedRuns([undated, again], 1000, { openPoints })).toHaveLength(1)
   })
 
@@ -2115,8 +2116,8 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // The advertised first remedy has to WORK, or the signature is the only exit
   // and the mechanism is a waiver after all (review finding, 19.08.2026).
   it('a real RE-RECORDING closes it — a covering run of the same suite and backend, later, on this code', () => {
-    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish' }
-    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish-children' }
+    const again = { ...run('webgpu', 2000), suite: 'polish-children' }
     expect(unexplainedRuns([broken], 1000, { openPoints })).toHaveLength(1)
     expect(unexplainedRuns([broken, again], 1000, { openPoints })).toEqual([])
   })
@@ -2129,9 +2130,9 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // the candidate run stops BLOCKING through `owned()` all the same, so the two
   // readings stay different questions rather than contradicting answers.
   it('a candidate run owned only by TODAY\u2019s ledger does not re-record a truncation', () => {
-    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish' }
+    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish-children' }
     // Recorded uncharged (point: null), the way a run written before the entry is.
-    const candidate = redRun('webgpu', 2000, [red('the goat stance', null)], { suite: 'polish' })
+    const candidate = redRun('webgpu', 2000, [red('the goat stance', null)], { suite: 'polish-children' })
     const ledger = [{ point: 506, match: /the goat stance/, why: 'written after both runs were recorded' }]
 
     // The candidate covers on neither reading — its own charge stamp is null.
@@ -2149,8 +2150,8 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // LOST part, never a red the run really recorded. Letting it skip the
   // accounting laundered every red in a truncated run (review, 19.08.2026).
   it('but a RE-RECORDING launders nothing — a red the truncated run recorded still blocks', () => {
-    const broken = { ...truncatedWithRed('webgpu', 1500), suite: 'polish' }
-    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const broken = { ...truncatedWithRed('webgpu', 1500), suite: 'polish-children' }
+    const again = { ...run('webgpu', 2000), suite: 'polish-children' }
     const still = unexplainedRuns([broken, again], 1000, { openPoints })
     expect(still).toHaveLength(1)
     expect(still[0].status).toBe('red')
@@ -2164,7 +2165,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // observed reds and covers nothing once the truncation is answered.
   it('keeps a PRODUCTION-shaped record\'s observed reds through both routes, and covers nothing', () => {
     const broken = truncatedNow('webgpu', 1500)
-    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const again = { ...run('webgpu', 2000), suite: 'polish-children' }
     expect(runVerdict(broken, { openPoints }).status).toBe('incomplete')
     for (const [runs, closures] of [
       [[broken, again], null],
@@ -2192,7 +2193,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
 
   it('...and that observed red closes the ordinary way on a production-shaped record too', () => {
     const broken = truncatedNow('webgpu', 1500, [red('the drummer struck without a message')])
-    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const again = { ...run('webgpu', 2000), suite: 'polish-children' }
     const ledger = [{ point: 546, kind: 'check', match: /the drummer struck/, why: 'filed as the point that owns it' }]
     expect(unexplainedRuns([broken, again], 1000, { openPoints })).toHaveLength(1)
     expect(unexplainedRuns([broken, again], 1000, { openPoints, ledger })).toEqual([])
@@ -2205,7 +2206,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // the run left the list silently: the retry laundered what the flood could not.
   const truncatedRetry = (backend, at, first = 'a NEW check nobody filed', overrides = {}) => ({
     backend,
-    suite: 'polish',
+    suite: 'polish-children',
     startedAt: at - 10,
     at,
     exit: 0,
@@ -2219,7 +2220,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
 
   it('keeps a truncated RETRY suspect once the truncation is lifted — by either route', () => {
     const broken = truncatedRetry('webgpu', 1500)
-    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const again = { ...run('webgpu', 2000), suite: 'polish-children' }
     // Route (1), the re-recording, and route (2), the signature: both close the
     // lost measurement and neither may close the first attempt.
     for (const [runs, closures] of [
@@ -2235,18 +2236,18 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
 
   it('...and lets that first attempt close the ordinary ways, once it is CHARGED', () => {
     const broken = truncatedRetry('webgpu', 1500, 'the drummer struck without a message')
-    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const again = { ...run('webgpu', 2000), suite: 'polish-children' }
     const ledger = [{ point: 506, kind: 'check', match: /the drummer struck/, why: 'the software lane cannot answer a rate question' }]
     expect(unexplainedRuns([broken, again], 1000, { openPoints })).toHaveLength(1)
     expect(unexplainedRuns([broken, again], 1000, { openPoints, ledger })).toEqual([])
   })
 
   it('but only that pair: another suite, another backend, or an older run proves nothing', () => {
-    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish' }
+    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish-children' }
     const otherSuite = { ...run('webgpu', 2000), suite: 'settings' }
-    const otherBackend = { ...run('webgl', 2000), suite: 'polish' }
-    const earlier = { ...run('webgpu', 1200), suite: 'polish' }
-    const alsoTruncated = { ...run('webgpu', 2000), suite: 'polish', truncated: true, droppedLines: 3 }
+    const otherBackend = { ...run('webgl', 2000), suite: 'polish-children' }
+    const earlier = { ...run('webgpu', 1200), suite: 'polish-children' }
+    const alsoTruncated = { ...run('webgpu', 2000), suite: 'polish-children', truncated: true, droppedLines: 3 }
     for (const other of [otherSuite, otherBackend, earlier, alsoTruncated]) {
       // The broken run is STILL listed. (`alsoTruncated` brings its own entry —
       // a run that truncated cannot re-record anything for anybody.)
@@ -2258,7 +2259,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // and no later green un-observes it (point 640).
   it('does NOT extend the re-run route to an ordinary red', () => {
     const unfiled = redRun('webgpu', 1500, [red('a NEW check nobody filed')])
-    expect(unexplainedRuns([unfiled, { ...run('webgpu', 2000), suite: 'polish' }], 1000, { openPoints })).toHaveLength(1)
+    expect(unexplainedRuns([unfiled, { ...run('webgpu', 2000), suite: 'polish-children' }], 1000, { openPoints })).toHaveLength(1)
   })
 
   // The closure discards a RECORD; it never says the picture was fine. A backend
@@ -2282,7 +2283,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(runVerdict(crashedToo, { openPoints }).status).toBe('red')
     expect(runVerdict(crashedToo, { openPoints }).unaccounted[0].name).toMatch(/crash/)
     const closures = [closureOf(crashedToo)]
-    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const again = { ...run('webgpu', 2000), suite: 'polish-children' }
     for (const runs of [[crashedToo], [crashedToo, again]]) {
       expect(unexplainedRuns(runs, 1000, { openPoints, incompleteClosures: closures })).toHaveLength(1)
     }
@@ -2315,7 +2316,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     // `Number(Symbol())` THROWS, and these records come off disk (review
     // finding, 19.08.2026) — total means total.
     expect(() => droppedLinesOf({ droppedLines: Symbol('x') })).not.toThrow()
-    expect(() => incompleteClosureFor({ backend: 'webgpu', suite: 'polish', at: Symbol('x') }, [{ backend: 'webgpu', suite: 'polish', at: 1, evidence: 'e' }])).not.toThrow()
+    expect(() => incompleteClosureFor({ backend: 'webgpu', suite: 'polish-children', at: Symbol('x') }, [{ backend: 'webgpu', suite: 'polish-children', at: 1, evidence: 'e' }])).not.toThrow()
   })
 
   // The gate's own totality, judged where it costs most: an exception inside the
@@ -2329,7 +2330,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // `null` merely reads as absent. The point is the totality of the decision
   // path, so the hostile value is the one that would take the gate down.
   it('never throws on a record or a point set, whatever a caller hands it', () => {
-    const nasty = { backend: 'webgpu', suite: 'polish', at: Symbol('t'), startedAt: Symbol('s'), exit: Symbol('e'), reds: [red('x')] }
+    const nasty = { backend: 'webgpu', suite: 'polish-children', at: Symbol('t'), startedAt: Symbol('s'), exit: Symbol('e'), reds: [red('x')] }
     expect(() => runVerdict(nasty, { openPoints })).not.toThrow()
     expect(() => unexplainedRuns([nasty], 1000, { openPoints })).not.toThrow()
     for (const bad of [{}, 7, 'nope', true]) {
@@ -2339,7 +2340,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     // An unreadable exit code is a FAILED run, never a clean pass — and `null`,
     // `''` and `false` are unreadable, though Number() calls each of them 0.
     for (const exit of [Symbol('e'), null, '', false, 'nope', undefined]) {
-      expect(runVerdict({ backend: 'webgpu', suite: 'polish', at: 1500, exit }, { openPoints }).status).toBe('red')
+      expect(runVerdict({ backend: 'webgpu', suite: 'polish-children', at: 1500, exit }, { openPoints }).status).toBe('red')
     }
   })
 
@@ -2783,7 +2784,7 @@ describe('the retry marker travels in the environment (point 640)', () => {
     const openPoints = [506]
     const suspectConsole = {
       ...run('webgpu', 1500),
-      suite: 'polish',
+      suite: 'polish-children',
       suspect: true,
       suspectOf: [{ name: 'console error: the label layer threw', kind: 'console' }],
     }
@@ -2817,7 +2818,7 @@ describe('the retry marker travels in the environment (point 640)', () => {
   it('a truncated first attempt cannot be charged away', () => {
     const openPoints = [506]
     const marker = formatSuspectEnv(Array.from({ length: 12 }, (_, i) => ({ name: `red number ${i}` })))
-    const suspectMany = { ...run('webgpu', 1500), suite: 'polish', suspect: true, suspectOf: parseSuspectReds(marker) }
+    const suspectMany = { ...run('webgpu', 1500), suite: 'polish-children', suspect: true, suspectOf: parseSuspectReds(marker) }
     // A DELIBERATELY BROAD charge: even one that matches the truncation entry's
     // wording cannot own it, because what was never carried is not chargeable.
     const ledger = [{ point: 506, match: /red|further|first attempt/, why: 'as broad as a ledger entry gets' }]
@@ -2874,6 +2875,15 @@ describe('coveringRun / evaluate — the accounted-for run clears the gate', () 
 })
 
 describe('the shipped charge ledger', () => {
+  // `polish` was split by theme (point 1129): no entry may name the retired
+  // suite, and a console charge spread over the themes names real ones only.
+  it('names no retired suite, and spreads the polish console charges over real themes', () => {
+    expect(RED_CHARGES.filter((c) => c.suite === 'polish')).toEqual([])
+    const spread = RED_CHARGES.filter((c) => c.point === 939 && c.kind === 'console' && String(c.suite).startsWith('polish-'))
+    expect(new Set(spread.map((c) => c.suite))).toEqual(new Set(POLISH_THEME_SUITES))
+    for (const c of RED_CHARGES.filter((x) => String(x.suite ?? '').startsWith('polish'))) expect(DEV_SUITES).toContain(c.suite)
+  })
+
   it('carries a well-formed entry for every known red', () => {
     expect(RED_CHARGES.length).toBeGreaterThan(0)
     for (const c of RED_CHARGES) {
@@ -2926,22 +2936,22 @@ describe('the shipped charge ledger', () => {
     // than the bound, so the cut is genuine. A shared sample would only prove
     // that one entry reads a prefix and would say nothing about the others.
     const measuredFor = {
-      '698/polish/webgpu':
+      '698/polish-children/webgpu':
         'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
         '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
         '[run×16 part×72 roam×307] over 45s played, 3 tagged',
-      '698/polish/webgl':
+      '698/polish-children/webgl':
         'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
         '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
         '[run×16 part×72 roam×307] over 45s played, 3 tagged',
-      '1068/polish/webgl':
+      '1068/polish-children/webgl':
         'worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5805 1s windows, ' +
         '151.4 judged child-seconds). Least judgeable child 4 at 96.9 %, group 96.9 % of 156.3 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 153.8 judged ' +
         'child-seconds, least judgeable child 4 at 98.5 %. Bad = over 1 m walked inside 0.35 m',
       // The real WebGPU text, from the run that earned the entry
       // (local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log).
-      '1068/polish/webgpu':
+      '1068/polish-children/webgpu':
         'worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5880 1s windows, ' +
         '263.5 judged child-seconds). Least judgeable child 4 at 98.1 %, group 98.1 % of 268.5 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 266.1 judged ' +
@@ -2996,7 +3006,7 @@ describe('the shipped charge ledger', () => {
     const one = { ...red('the goat stance again'), detail: 'the planted foot slid' }
     const two = { ...red('the goat stance once more'), detail: 'the planted foot slid' }
     for (const r of [one, two, one, two]) {
-      expect(chargeFor(r, { suite: 'polish', backend: 'webgpu', ledger })?.point).toBe(506)
+      expect(chargeFor(r, { suite: 'polish-children', backend: 'webgpu', ledger })?.point).toBe(506)
     }
   })
 
@@ -3009,7 +3019,7 @@ describe('the shipped charge ledger', () => {
     [603, 'settings', 'first-person ground shows micro-detail (edge energy)', 'laplacian mean 1.01'],
     [938, 'enrichments', 'the streamed dressing does not grow over a session at a fixed anchor (point 278)', '{"samples":[0,0,0,0,0],"min":0,"max":0,"spread":0}'],
     [521, 'enrichments', 'frame 72-water-victoria-falls', 'subject is not in the rendered picture'],
-    [1102, 'polish', 'the drums were still speaking when the picture was taken', 'the drums had stopped'],
+    [1102, 'polish-speech', 'the drums were still speaking when the picture was taken', 'the drums had stopped'],
   ])('keeps the measured WebGL red owned by open point %i: %s / %s', (point, suite, name, detail) => {
     const scope = { suite, backend: 'webgl' }
     const [red] = failedChecks(`FAIL  ${name} — ${detail}`)
@@ -3053,12 +3063,12 @@ describe('the shipped charge ledger', () => {
 
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(642)
+    expect(chargeFor(goat, { suite: 'polish-panorama', backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(642)
     // THE LANE MUST BE THE ONLY THING THAT DIFFERS (cross-vendor review, GPT-5.6
     // Sol, 30.08.2026): without the level this observation was null for TWO
     // reasons at once — the next case already proves a missing level alone does
     // it — so 642 could have been widened across lanes with this pin still green.
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl', featureLevel: 'compatibility' })).toBeNull()
+    expect(chargeFor(goat, { suite: 'polish-panorama', backend: 'webgl', featureLevel: 'compatibility' })).toBeNull()
   })
 
   // THE ENTRY RESTS ON THE LANE IT MEASURED (review finding, 28.08.2026). Its
@@ -3067,8 +3077,8 @@ describe('the shipped charge ledger', () => {
   // measured, and the same check there is a red nobody has explained.
   it('leaves the goat stance a real red on the core adapter and on a run that recorded no level', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu', featureLevel: 'core' })).toBeNull()
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+    expect(chargeFor(goat, { suite: 'polish-panorama', backend: 'webgpu', featureLevel: 'core' })).toBeNull()
+    expect(chargeFor(goat, { suite: 'polish-panorama', backend: 'webgpu' })).toBeNull()
   })
 
   // THE STARTUP FREEZE CARRIED NEITHER BACKEND NOR LEVEL (review finding,
@@ -3105,7 +3115,7 @@ describe('the shipped charge ledger', () => {
   // under the same label is a red nobody has measured, and it must stay a red.
   it('leaves another check under the same goat label uncharged', () => {
     const neighbour = red('settlement walker (goat): stays out of the compound fence (point 413)')
-    expect(chargeFor(neighbour, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+    expect(chargeFor(neighbour, { suite: 'polish-panorama', backend: 'webgpu' })).toBeNull()
   })
 
   it('charges only the measured children composition and leaves every other red uncovered', () => {
@@ -3119,15 +3129,15 @@ describe('the shipped charge ledger', () => {
     // The owner is 694, not the point that delivered the acceptance: an entry
     // charged to 666 would have expired at 666's own tick, taking the
     // acceptance with it on the very landing that made it.
-    expect(chargeFor(measured, { suite: 'polish', backend: 'webgl' }).point).toBe(694)
+    expect(chargeFor(measured, { suite: 'polish-children', backend: 'webgl' }).point).toBe(694)
 
     // The player-reported permanent shiver has the same check label, but not
     // the accepted single-event signature. Missing details are equally unsafe,
     // and the evidence names WebGL 2 only: all three remain real reds.
     const shiver = child('worst child 3 at 99.89 % — worst child 3 at 0.1s, 3.41 m walked inside 0.14 m')
-    expect(chargeFor(shiver, { suite: 'polish', backend: 'webgl' })).toBeNull()
-    expect(chargeFor(red('no child walks without getting anywhere'), { suite: 'polish', backend: 'webgl' })).toBeNull()
-    expect(chargeFor(measured, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+    expect(chargeFor(shiver, { suite: 'polish-children', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(red('no child walks without getting anywhere'), { suite: 'polish-children', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(measured, { suite: 'polish-children', backend: 'webgpu' })).toBeNull()
   })
 
   it('a detailMatch charge reaches a red that was RECORDED BEFORE its entry existed', () => {
@@ -3148,7 +3158,7 @@ describe('the shipped charge ledger', () => {
     expect(parsed.detail).toContain('1.42 m walked inside 0.31 m')
 
     // At record time the charge sees the detail and stamps the owner.
-    const [stored] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' })
+    const [stored] = chargeReds([parsed], { suite: 'polish-children', backend: 'webgpu', featureLevel: 'compatibility' })
     expect(stored.point).toBe(694)
 
     // AND THE MEASUREMENT SURVIVES INTO THE RECORD, which is what makes the
@@ -3159,7 +3169,7 @@ describe('the shipped charge ledger', () => {
     // uncharged then, because the ledger of that day owned nothing. Reading the
     // ledger over the STORED red today now reaches it, and that is the
     // retroactivity point 734 promises.
-    const lane = { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }
+    const lane = { suite: 'polish-children', backend: 'webgpu', featureLevel: 'compatibility' }
     const [beforeTheRule] = chargeReds([parsed], { ...lane, ledger: [] })
     expect(beforeTheRule.point).toBeNull()
     expect(beforeTheRule.detail).toContain('1.42 m walked inside 0.31 m')
@@ -3182,7 +3192,7 @@ describe('the shipped charge ledger', () => {
     // instead, a signature sitting past the bound would stamp a point at record
     // time that the stored red could never reproduce — the record would claim an
     // owner nothing can re-derive. Both readings say the same thing here.
-    const ledger = [{ point: 694, suite: 'polish', kind: 'check', match: /flooded check/i, detailMatch: /BURIED SIGNATURE/ }]
+    const ledger = [{ point: 694, suite: 'polish-children', kind: 'check', match: /flooded check/i, detailMatch: /BURIED SIGNATURE/ }]
     const red = {
       name: 'flooded check',
       key: 'flooded check',
@@ -3190,11 +3200,11 @@ describe('the shipped charge ledger', () => {
       detail: `${'x'.repeat(300)} BURIED SIGNATURE`,
     }
     // The parse would match; the record cannot keep the signature.
-    expect(chargeFor(red, { suite: 'polish', backend: 'webgpu', ledger })?.point).toBe(694)
-    const [stored] = chargeReds([red], { suite: 'polish', backend: 'webgpu', ledger })
+    expect(chargeFor(red, { suite: 'polish-children', backend: 'webgpu', ledger })?.point).toBe(694)
+    const [stored] = chargeReds([red], { suite: 'polish-children', backend: 'webgpu', ledger })
     expect(stored.detail).toHaveLength(200)
     expect(stored.point).toBeNull()
-    expect(chargeFor(stored, { suite: 'polish', backend: 'webgpu', ledger })).toBeNull()
+    expect(chargeFor(stored, { suite: 'polish-children', backend: 'webgpu', ledger })).toBeNull()
   })
 
   it('charges the same composition on the OTHER backend to the same owner, by its own signature', () => {
@@ -3204,11 +3214,11 @@ describe('the shipped charge ledger', () => {
     // 694 must replace them both with a rule about the SHAPE.
     const child = (detail) => ({ ...red('no child walks without getting anywhere'), detail })
     const onWebgpu = child('worst child 1 at 0.29 % — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m')
-    const lane = { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' }
+    const lane = { suite: 'polish-children', backend: 'webgpu', featureLevel: 'compatibility' }
     expect(chargeFor(onWebgpu, lane).point).toBe(694)
     // Not on the other backend, not on the core adapter, and no blanket over the
     // check itself.
-    expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(onWebgpu, { suite: 'polish-children', backend: 'webgl' })).toBeNull()
     expect(chargeFor(onWebgpu, { ...lane, featureLevel: 'core' })).toBeNull()
     expect(
       chargeFor(child('worst child 2 at 18.4 % — worst child 2 at 3.0s, 9.10 m walked inside 0.12 m'), lane),
@@ -3233,7 +3243,7 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(cascade, { ...scoped, featureLevel: 'core' })).toBeNull()
     expect(chargeFor(cascade, scoped)).toBeNull()
     // And still not another suite, backend or kind.
-    expect(chargeFor(cascade, { suite: 'polish', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
+    expect(chargeFor(cascade, { suite: 'polish-children', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
     expect(chargeFor(cascade, { suite: 'settings', backend: 'webgl', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
   })
 
@@ -3492,7 +3502,7 @@ describe('the shipped charge ledger', () => {
           '-11..16@1] m, walked [67, 67, 68, 66] m, phases [run×39 part×161 roam×695] over 45s ' +
           'played, 3 tagged',
         'children-bank-game',
-        { suite: 'polish', backend: 'webgl' },
+        { suite: 'polish-children', backend: 'webgl' },
       ),
       store(
         'first-person ground shows micro-detail (edge energy)',
@@ -3540,7 +3550,7 @@ describe('the shipped charge ledger', () => {
     expect(enrichments({ backend: 'webgpu' })).toBeNull()
     // THE SCOPE IS ASSERTED, NOT ASSUMED: dropping the suite or the kind, or
     // letting text ride in front of the name, must not leave this case green.
-    expect(at(dressing, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(at(dressing, { suite: 'polish-children', backend: 'webgl' })).toBeNull()
     expect(at(dressing, { suite: 'enrichments', backend: 'webgl' }, 'console')).toBeNull()
     expect(at(`also ${dressing}`, { suite: 'enrichments', backend: 'webgl' })).toBeNull()
 
@@ -3551,7 +3561,7 @@ describe('the shipped charge ledger', () => {
     expect(settings({ backend: 'webgl' }).point).toBe(603)
     expect(settings({ backend: 'webgpu', featureLevel: 'compatibility' }).point).toBe(514)
     expect(settings({ backend: 'webgpu', featureLevel: 'core' })).toBeNull()
-    expect(at(ground, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(at(ground, { suite: 'polish-children', backend: 'webgl' })).toBeNull()
     expect(at(ground, { suite: 'settings', backend: 'webgl' }, 'console')).toBeNull()
     // AND THE DETAIL IS READ VERBATIM, TAG AND ALL (cross-vendor review, GPT-5.6
     // Sol, 8f3f23d): these two entries are name-only, so a tagged detail must
@@ -3906,7 +3916,7 @@ describe('the shipped charge ledger', () => {
   })
 
   it('charges the crossing to 698 only while the round actually opens runs', () => {
-    const scoped = { suite: 'polish', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
+    const scoped = { suite: 'polish-children', backend: 'webgpu', kind: 'check', featureLevel: 'compatibility' }
     const density =
       'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
       '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
@@ -3921,7 +3931,7 @@ describe('the shipped charge ledger', () => {
   })
 
   it('charges the label fusion to 1010 only in the single-frame shape it measured', () => {
-    const scoped = { suite: 'polish', backend: 'webgl', kind: 'check' }
+    const scoped = { suite: 'polish-speech', backend: 'webgl', kind: 'check' }
     const withDetail = (name, detail) => ({ ...red(name), detail })
     const name = 'no two Ctrl labels fuse in the village crowd (point 628)'
     // WHAT 1010 MEASURED: one frame of ninety, deeper than the unreadable bar,
@@ -3992,7 +4002,7 @@ describe('the shipped charge ledger', () => {
         '0 of 4 crossed his line; along the lane (0 = his line) [-11..26@1, -15..16@1, -11..22@1, ' +
         '-11..16@1] m, walked [67, 67, 68, 66] m, phases [run×39 part×161 roam×695] over 45s played, 3 tagged',
     }
-    const webglPolish = { suite: 'polish', backend: 'webgl', kind: 'check' }
+    const webglPolish = { suite: 'polish-children', backend: 'webgl', kind: 'check' }
     expect(chargeFor({ ...red(crossing.name), detail: crossing.detail }, webglPolish).point).toBe(698)
     // AND A ROUND THAT NEVER RAN STAYS RED ON THIS LANE TOO — the narrowing the
     // WebGPU half carries is not weakened by widening the backend.
@@ -4053,7 +4063,7 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(anchor, scoped)?.point).toBe(514)
     expect(chargeFor(anchor, { ...scoped, featureLevel: 'core' })).toBeNull()
     expect(chargeFor(anchor, { ...scoped, backend: 'webgl' })).toBeNull()
-    expect(chargeFor(anchor, { ...scoped, suite: 'polish' })).toBeNull()
+    expect(chargeFor(anchor, { ...scoped, suite: 'polish-children' })).toBeNull()
     expect(chargeFor({ ...anchor, kind: 'check' }, { ...scoped, kind: 'check' })).toBeNull()
 
     for (const { measured, neighbour } of cases) {
@@ -4117,8 +4127,8 @@ describe('the shipped charge ledger', () => {
       null,
       'console',
     )
-    expect(chargeFor(leak, { suite: 'polish', backend: 'webgl' })).toBeNull()
-    expect(chargeFor(leak, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+    expect(chargeFor(leak, { suite: 'polish-children', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(leak, { suite: 'polish-children', backend: 'webgpu' })).toBeNull()
   })
 })
 
@@ -4133,6 +4143,6 @@ describe('DELETED_NON_RENDER_VERIFY — a deletion is a change too (point 1135)'
   })
 
   it('still sends a real suite to both backends', () => {
-    expect(isRenderPath('scripts/verify/polish.mjs')).toBe(true)
+    expect(isRenderPath('scripts/verify/polish-children.mjs')).toBe(true)
   })
 })

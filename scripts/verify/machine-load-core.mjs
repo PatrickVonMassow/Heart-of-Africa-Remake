@@ -30,6 +30,8 @@
 // unknown machine proceeds, loudly labelled unknown; it never blocks and never
 // claims quiet.
 
+import { POLISH_THEME_SUITES } from './tiers.mjs'
+
 /** The three levels a machine can be in, plus the honest fourth. */
 export const LEVEL = { quiet: 'quiet', busy: 'busy', loaded: 'loaded', unknown: 'unknown' }
 
@@ -37,13 +39,14 @@ export const LEVEL = { quiet: 'quiet', busy: 'busy', loaded: 'loaded', unknown: 
  * The suites whose verdict is a TIMING verdict — the ones a busy machine can
  * turn red on its own. `settings`, `enrichments` and `polish` are the three the
  * point names (in-scene walk measures and audio fades; the RAF wildlife staging
- * that carries the rotating family flakes; the staged polish checks). The other
+ * that carries the rotating family flakes; the staged polish checks, which since point 1129 run as the five
+ * `polish-*` theme suites). The other
  * three are here because their PASS CONDITION is a measured wall clock, which
  * load moves directly rather than incidentally: `startup` gates
  * `balance.startup.pictureFreezeBudgetMs`, `voice` gates the TTS cold-load
  * liveness stall, and `benchmark` reports frame timings as its result.
  */
-export const TIMING_SENSITIVE_SUITES = ['settings', 'enrichments', 'polish', 'startup', 'voice', 'benchmark']
+export const TIMING_SENSITIVE_SUITES = ['settings', 'enrichments', ...POLISH_THEME_SUITES, 'startup', 'voice', 'benchmark']
 
 /** Is this suite one whose red is a timing verdict? */
 export const isTimingSensitive = (suite) => TIMING_SENSITIVE_SUITES.includes(String(suite))

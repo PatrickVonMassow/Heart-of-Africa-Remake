@@ -56,7 +56,7 @@ names it. The leave transition stays FLUID: the
 travel scene's shared materials/meshes survive remounts as module
 singletons (surgical dispose opt-outs — a full remount used to re-link
 the whole travel program set synchronously, freezing the main thread
-10-16 s after several visits), gated in `scripts/verify/polish.mjs`
+10-16 s after several visits), gated in `scripts/verify/polish-panorama.mjs`
 (leave after several settlement visits completes in under 3 s).
 
 ## 3. World model.
@@ -70,7 +70,7 @@ exploration map's explored area reads lighter (cleared) than the
 unexplored area (under fog) with a screenshot (92)
 (`scripts/verify/enrichments.mjs`); inside a settlement the map opens
 as a town plan naming the functional buildings instead of the atlas
-(`src/ui/MapOverlay.test.tsx`; `scripts/verify/polish.mjs`,
+(`src/ui/MapOverlay.test.tsx`; `scripts/verify/polish-settlement.mjs`,
 screenshot 98); the opened map sits bottom-left clear of the inventory
 bar and the bottom-right buttons and shows a live "you are here" marker
 in both the atlas and the town plan (§19.11) — the marker presence and
@@ -260,7 +260,7 @@ browser sections judge the drawn teaching, motion, interaction and sound:
 - `src/ui/JournalPanel.test.tsx` — the journal's observation section is the same
   note the label shows, and names the village of the first hearing (point 579).
 
-In the browser, `scripts/verify/polish.mjs` proves what the picture owes: section
+In the browser, `scripts/verify/polish-speech.mjs` proves what the picture owes: section
 `speech-hypothesis` speaks over a figure the scene really drew and measures the
 note against that figure's own head (`146-speech-hypothesis-label`), and section
 `speech-guess` the E invitation and the opened dialog
@@ -284,7 +284,7 @@ every river village, which a failing village is named by),
 from the net man to the paddler followed by the paddler's changed action, the
 catch, both 20 m gaps) and `src/scenes/place/fishFire.test.ts` (two baskets that
 never become more or get lost, the wait budgets, the rack's steady fill, the
-eater's cadence, the fire's stands). Browser: `polish.mjs` section
+eater's cadence, the fire's stands). Browser: `polish-villagers.mjs` section
 `villager-canoe` photographs the three standing places
 (`1245-fishers-haul-from-boat-stand`, `1245-fishers-upstream-word-from-boat-stand`,
 `1245-village-children-from-behind-upstream-rock`, `1245-fishers-fire`); the
@@ -344,11 +344,11 @@ drummer in every phase, the hut inert while he is outside, the drummer's CHIEF
 in any village and in no port, and the three resets;
 `src/communication/lexicon.test.ts` and `src/i18n/parity.test.ts` the new word
 in the table and in both language files. In the browser, `scripts/verify/
-polish.mjs` section `chief-to-drummer` proves he is SEEN walking — part of the
+polish-speech.mjs` section `chief-to-drummer` proves he is SEEN walking — part of the
 path behind him, part still in front — and then standing abreast of the drummer
 where the scene really drew him; `scripts/verify/collision.mjs` that his door
 answers its use key from a collision-free standpoint, with the reset to his hut
-checked before the press; the same `polish.mjs` section photographs the pair
+checked before the press; the same `polish-speech.mjs` section photographs the pair
 in `151-chief-beside-his-drummer.png`, with the drums still speaking at the
 shutter. Only Bambara's chief walks out: `scripts/verify/flow.mjs` shows the
 Nubian head man answering from his hut in `04-chief-hut-meeting.png`, with no
@@ -369,7 +369,7 @@ Verifiable: `src/world/communicationRock.test.ts` pins the rendered dig site;
 `src/state/store.communication.test.ts` covers message memory and repeats;
 `src/state/store.mould.test.ts` and `src/world/forms.test.ts` cover the reward,
 its matching socket and the journal observation in both languages.
-Browser `world` covers the travel errand, and `polish` sections `artefact-give`
+Browser `world` covers the travel errand, and `polish-speech` sections `artefact-give`
 and `chief-to-drummer` cover the outdoor giving and drum staging. Browser
 verdicts belong to the reviewing run; these references describe what is tested.
 
@@ -438,7 +438,7 @@ both hint texts from both language files), `src/systems/input.test.ts`
 (the exact-modifier match, the pad press that is no held key),
 `src/systems/keyboardGuard.test.ts` (the digits are game keys while
 Ctrl+digit stays the browser's), and the bar's digits stand in the
-picture (`scripts/verify/polish.mjs`, `149-artefact-in-the-bar`).
+picture (`scripts/verify/polish-speech.mjs`, `149-artefact-in-the-bar`).
 The map is NOT an inventory item (point 93):
 the bottom-right button row holds camp / map / journal in that order,
 the always-present MAP button opens the overview without any
@@ -478,7 +478,7 @@ labels the animals in view with every label on an ON-SCREEN subject
 (projected through the live camera) and no plant named, and the release
 clears every one — `scripts/verify/enrichments.mjs`
 (`147-ctrl-actor-labels.png`) for the bird's-eye view and
-`scripts/verify/polish.mjs` (`148-ctrl-actor-labels-village.png`) for
+`scripts/verify/polish-speech.mjs` (`148-ctrl-actor-labels-village.png`) for
 the settlement. The roster in every STATE (point 600): the kind x state
 cross product runs over the SOURCES, not only the predicate — every
 species named while idle, walking, fleeing, drinking, crossing, seized,
@@ -507,7 +507,7 @@ draw pass and standing in the picture, and the hunt's own two figures,
 reach the raw candidate set (`scripts/verify/enrichments.mjs`), and
 every inhabitant figure the settlement draws carries its mark, is
 offered, and is still named where it now stands after it has walked
-(`scripts/verify/polish.mjs`). The roster's usable objects are exercised
+(`scripts/verify/polish-speech.mjs`). The roster's usable objects are exercised
 too, and with them what the layer must NOT say (point 628): a camp
 pitched where the traveller stands reaches the layer as a candidate yet
 carries exactly ONE name in the whole scene — the permanent one it draws
@@ -522,7 +522,7 @@ no row left, yields entirely (`src/systems/actorLabels.test.ts`,
 rectangles the browser really laid out, sampled over many frames rather
 than one instant, in BOTH scenes — the open savanna
 (`scripts/verify/enrichments.mjs`) and the crowded village at the very
-frame that once showed the defect (`scripts/verify/polish.mjs`; the bar:
+frame that once showed the defect (`scripts/verify/polish-speech.mjs`; the bar:
 `scripts/verify/labelFusion.mjs`). Every inventory slot answers a press by
 click AND by its digit key, with the expected toast and an unchanged
 journal, for the rifle, rope, machete, canoe, canteen, shovel, a carried
@@ -954,7 +954,7 @@ Verifiable (`scripts/verify/settings.mjs`,
   never thin (asserted); the village fire burns harder under the
   place's own cold/harmattan/karif; the Sahel stall's grain shrinks in
   the hungry rains and refills at the harvest — pure-tested in
-  `src/systems/seasonalLife.test.ts`, live in `scripts/verify/polish.mjs`;
+  `src/systems/seasonalLife.test.ts`, live in `scripts/verify/polish-settlement.mjs`;
   the ice of 1890 (§19.13, point 141) caps exactly the three glaciated
   massifs while the four named near misses stay bare — the list swept in
   a pure test (`inIceMassif`) AND live over the terrain colours; the
@@ -984,7 +984,7 @@ Verifiable (`scripts/verify/settings.mjs`,
   ground and flora with the shared per-zone tint — so the §19.10
   firelight carries further under the overcast and a desert port
   (Cairo) stays rainless in every month, all live-checked via
-  `__placeSeason`/`__placeDress` in `scripts/verify/polish.mjs`
+  `__placeSeason`/`__placeDress` in `scripts/verify/polish-settlement.mjs`
   (screenshots 110/111/114). The inhabitants' seasonal dress is
   evidence-gated per `docs/peoples-1890.md` §7: SIX peoples change on
   their own driver — the three drivers being cold, harmattan and
@@ -997,7 +997,7 @@ Verifiable (`scripts/verify/settings.mjs`,
   evidence; the Pedi highveld crosses the threshold and is NOT, the
   blanket being a people the game lacks) are pure-tested in
   `src/systems/dress.test.ts`; the live half is `__placeDress` in
-  `scripts/verify/polish.mjs` (screenshots 112/113).
+  `scripts/verify/polish-settlement.mjs` (screenshots 112/113).
 
 - The crocodile ambush (§19.16, point 130): crocodiles exist only ON
   river/lake water in every region's home systems (pure-tested:
@@ -1137,7 +1137,7 @@ building standing on a lane, winding port lanes with a square and six
 lane-fronting trade houses, each village matching its plan, the spawn
 corridor clear, Cairo outscaling Boma); the town-plan screenshots show
 the fabric difference (98 masai ring, 101 street village, 102 Cairo
-lanes, `scripts/verify/polish.mjs`); screenshots of a port city and a village show
+lanes, `scripts/verify/polish-settlement.mjs`); screenshots of a port city and a village show
 dense building fabric with paths and several non-functional buildings;
 inhabitants move about and use their dwellings; Cairo's walkable
 radius and dwelling count exceed Boma's; the backdrop mesh is present
@@ -1164,7 +1164,7 @@ gated, `scripts/verify/settings.mjs`) and no panorama silhouette
 stands sunken below the settlement ground plane — the clamp and the
 backdrop heightfield bounds pure-tested in
 `src/scenes/place/backdrop.test.ts`, the live standing heights via
-the dev hook (`scripts/verify/polish.mjs`); the §2.5 travel-scene panorama holds — entering from the bird's-eye
+the dev hook (`scripts/verify/polish-panorama.mjs`); the §2.5 travel-scene panorama holds — entering from the bird's-eye
 view shows the captured, direction-true surroundings: each sector is
 shot square and copied to its own band column (`sectorRect`), the
 buffer therefore holds every direction where its own camera looked
@@ -1177,7 +1177,7 @@ which had been calibrated against a band drawn but wrongly cut, every
 sector covering the full width (point 545, WebGL 2: the
 pillar lands at u 0.875, dead centre of the west-looking slice); a
 direct place-to-place enter falls back to the
-geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99). THREE
+geometry backdrop (`scripts/verify/polish-panorama.mjs`, screenshot 99). THREE
 gates keep that band honest, and every one of them applies to EVERY
 place kind: the band/no-band decision runs through one rule
 (`panoramaBandShown`) keyed on a map TOTAL over `PlaceKind` — and
@@ -1218,7 +1218,7 @@ terrain (bottom-quarter opacity), and at the Giza site the band is
 asserted to hold no floating strip over a HOLE in its surroundings —
 per pixel row, a column's opaque rows must form ONE run, which real
 surroundings always do and the far-field artefact never did
-(`scripts/verify/polish.mjs`, screenshots 141); the §4.4 port skyline landmarks
+(`scripts/verify/polish-panorama.mjs`, screenshots 141); the §4.4 port skyline landmarks
 hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
 its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
 Cairo mounts the Giza pyramids as its western skyline (point 82) —
@@ -1226,7 +1226,7 @@ the field's Sphinx modelled as a recognizable couchant lion under the
 nemes (proportions and part count pure-tested via `buildSphinx` in
 `src/render/landmarks.test.ts`; travel-scale screenshot 103) — and
 Timbuktu builds the Djinguereber mosque as a collidable dwelling
-(`scripts/verify/polish.mjs`, screenshots 96/97/100); and the Giza
+(`scripts/verify/polish-panorama.mjs`, screenshots 96/97/100); and the Giza
 plateau is an ENTERABLE first-person monument site (§4.4, point 273):
 its own map point west of Cairo across the Nile, known from the start and
 reached with the SPACE use key like a settlement (the enter candidate + the
@@ -1253,7 +1253,7 @@ Thomas-Cook-era ambient anchors (guides, cameleer, donkey-boy,
 tourists) for a free standing spot they can also leave — and the live
 enter-with-SPACE, the three pyramids + buried Sphinx rendering, the
 collidable site with neither trade nor chief, and the warm desert-sand ground
-gated in `scripts/verify/polish.mjs` (screenshot 139);
+gated in `scripts/verify/polish-panorama.mjs` (screenshot 139);
 the same period casing cap and half-buried Sphinx carry into Cairo's
 western skyline (point 82).
 The walkable ground of an OPEN-PLAIN place reaches to where the picture
@@ -1281,7 +1281,7 @@ arrival distance and the desert left past the monuments are pure-tested in
 the new disc radius and the chord bound pinned in
 `src/scenes/place/backdrop.test.ts`; and the picture — from beside the
 monument row looking outward and from the walkable edge, ground running to
-where the backdrop takes over — is gated in `scripts/verify/polish.mjs`
+where the backdrop takes over — is gated in `scripts/verify/polish-panorama.mjs`
 (screenshots 390-giza-sand-open / 390-giza-sand-edge, both backends). The
 outward standpoint is deliberately NOT the geometric centre: Khafre stands
 on (0, 0), so a camera there is inside the pyramid.
@@ -1298,7 +1298,7 @@ user's real hardware.
 Verifiable: with the toggle ON the ground directly behind a fire-ring
 stone reads measurably darker in pixels than its lit twin at the same
 radius, and with it OFF that contrast stays flat
-(`scripts/verify/polish.mjs`, screenshot 138, both backends); the
+(`scripts/verify/polish-settlement.mjs`, screenshot 138, both backends); the
 toggle default and write-through are pure-tested
 (`src/state/ui.test.ts`, `src/ui/DebugMenu.test.tsx`).
 
@@ -1329,7 +1329,7 @@ scene's use of the shared constants and the quality lever in
 conversational distance on a ray-probed clear standpoint, with the live gesture
 sampled across frames — every gesture ends by itself, none overruns its own
 duration, the conversing pair takes turns and a figure between gestures stands
-exactly at rest (`scripts/verify/polish.mjs`, screenshots
+exactly at rest (`scripts/verify/polish-villagers.mjs`, screenshots
 479-gesture-beckon / -point / -refuse / -indicate).
 
 THE SETTLEMENT EDGE ON THE GROUND (§2.6, points 352/488/581): where the inhabited
@@ -1369,7 +1369,7 @@ with its calibratable strength at 0, and the RATIO of the two must fall inside,
 half-fall at the boundary and be 1 outside — in a village, a port and at the
 monument site, each in a dry and a wet month; walking straight out is then stepped
 in the real walk loop and the place is left within 1.5 m of the drawn line
-(`scripts/verify/polish.mjs`, screenshots 488-village-edge-band /
+(`scripts/verify/polish-settlement.mjs`, screenshots 488-village-edge-band /
 488-port-edge-band / 488-monument-edge-band).
 
 THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351) EVERYWHERE BUT IN A
@@ -1427,7 +1427,7 @@ of such an occluder; the standpoints fan out from the bearing that
 looks INTO the village, and the shutter's subject is the child who is IT, never
 the empty midpoint between the two), while the play ground itself is derived
 against the built fabric (`src/scenes/place/lifeSpots.test.ts` pins that for
-every shipped village) (`scripts/verify/polish.mjs`, screenshot
+every shipped village) (`scripts/verify/polish-children.mjs`, screenshot
 480-village-tag).
 
 CLASSIC TAG CARRIES NO WORDS in every port and every bankless village (only a wordless catch cry). A bank village
@@ -1471,7 +1471,7 @@ caught child at the catch frame in a port at default zoom, and
 `verification/1176-tag-beat.png` the caught child standing out its beat with the
 catcher-that-was already away; the drawn hand pivots are read back and judged
 against the caught child's body, and the catcher's forward arms against the
-runners' (`scripts/verify/polish.mjs`, section `tag-catch`); the wordless catch
+runners' (`scripts/verify/polish-children.mjs`, section `tag-catch`); the wordless catch
 cry plays under the voice volume and is silent at 0 on the WebGL 2 audio lane
 (`scripts/verify/voice.mjs`, section `tag-cry`); beat, gaze, grab window, hand
 reach, the single cry and its drop under a held floor are pinned in
@@ -1491,7 +1491,7 @@ sweep spawn-free across seeds (`src/scenes/place/layout.test.ts`); live,
 no walker stays pinned past the window (`scripts/verify/collision.mjs`);
 a stone below the step height holds no collider and raises the walking surface
 instead, with the live camera riding up onto one and back down
-(`scripts/verify/polish.mjs` section `stone-step`,
+(`scripts/verify/polish-settlement.mjs` section `stone-step`,
 `verification/1149-village-stone-step.png`);
 the application runs without console errors (`scripts/verify/collision.mjs`).
 
@@ -1511,7 +1511,7 @@ mutual separation (two animals released onto one spot end apart) and the
 reported case itself — an animal driven at a real village fence for 60 frames
 never ends up on the far side; the pre-fix code ends 1.5 m inside in hausa-,
 maasai- and tuareg-village, which is what makes that test a witness rather than
-a restatement. Live: the goats in `scripts/verify/polish.mjs`.
+a restatement. Live: the goats in `scripts/verify/polish-panorama.mjs`.
 
 The clearance holds UPWARD too (point 349): the rule kept the camera out of a
 building's side, but a roof overhangs ground the player may stand on, and a
@@ -1524,7 +1524,7 @@ every building type and three seeds: no spot the player can stand on has less
 than eye height + near-plane reach + margin overhead — and the witness replays
 the same sweep against the pre-349 wall-only colliders, which finds the low
 eaves again (48 973 sample points, worst 1.27 m), plus a deliberately lowered
-rim on a roof that clears today. Live in `scripts/verify/polish.mjs`: the player
+rim on a roof that clears today. Live in `scripts/verify/polish-settlement.mjs`: the player
 walks into the eaves of a hut in zulu-village and of a Cairo trade house under
 the game's own resolver, and the rendered scene is asked what hangs over the eye
 (`349-eaves-village`, `349-eaves-port`); the cook-shelter over the village fire
@@ -1967,7 +1967,7 @@ reproduce in that run.
 
 ## 31. Settlement orientation and panorama wildlife.
 
-Verifiable: `scripts/verify/polish.mjs`
+Verifiable: `scripts/verify/polish-settlement.mjs` (orientation) and `scripts/verify/polish-panorama.mjs` (panorama wildlife)
 asserts no markers before and markers after the chief comes out plus the toast,
 their persistence across re-entry, and the panorama wildlife count via
 the dev hook, with a screenshot of the highlighted village; plus that
@@ -2036,7 +2036,7 @@ the disc edge — the log ladder cleared it (74.4 against Giza's 74), so the str
 interpolated the join a third of a unit low. The walkable disc's `circleGeometry`
 also gets `GROUND_DISC_SEGS` segments instead of 48: a 48-gon put 9.7 m straight
 chords on the ground line of the largest disc, which from a few metres away IS a
-hard straight edge. In the rendered frame, `scripts/verify/polish.mjs` sweeps the
+hard straight edge. In the rendered frame, `scripts/verify/polish-panorama.mjs` sweeps the
 elevation through the horizon at the Giza site from the centre and two rim
 standpoints over 72 bearings and asserts the surfaces read
 `ground-disc → landscape-backdrop → band/sky`, never disc → band or disc →

@@ -8,14 +8,22 @@
 // run-all.mjs imports them; keep scripts/verify/README.md in lockstep.
 
 /**
+ * The THEME suites `polish` was split into (point 1129). One suite per theme, so
+ * a red costs only its own theme's pass; their boot and shared helpers live in
+ * scripts/verify/_polish.mjs. Every section kept its name and its checks.
+ */
+export const POLISH_THEME_SUITES = ['polish-panorama', 'polish-speech', 'polish-settlement', 'polish-children', 'polish-villagers']
+
+/**
  * Every browser/data suite of the LARGE tier, in run order. `docs` is a pure
  * Node check that rides along for a single report.
  */
 export const DEV_SUITES = [
   'docs', 'board-layout', 'startup', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
-  'polish', 'communication', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
+  ...POLISH_THEME_SUITES, 'communication', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
   'benchmark', 'report',
 ]
+
 
 /**
  * The SMALL everyday gate (point 173): fast, low-flake core coverage — doc/i18n

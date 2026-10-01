@@ -25,8 +25,11 @@ const MAP = parseDiffSuiteMap(
     '',
     'Diff → browser-suite mapping: `src/i18n/` → i18n · store/systems logic → Vitest',
     'only (flow if the core loop is touched) · `src/scenes/place/` → collision,',
-    'polish, settings · `src/render/` → settings, enrichments, polish ·',
-    '`scripts/verify/X.mjs` → X itself · `*.md` → docs. When unsure,',
+    'polish-panorama, polish-speech, polish-settlement, polish-children,',
+    'polish-villagers, settings · `src/render/` → settings, enrichments,',
+    'polish-panorama, polish-speech, polish-settlement, polish-children, polish-villagers ·',
+    '`scripts/verify/_polish.mjs` → polish-panorama, polish-speech, polish-settlement,',
+    'polish-children, polish-villagers · `scripts/verify/X.mjs` → X itself · `*.md` → docs. When unsure,',
     'include the suite.',
     '',
     'rest',
@@ -36,15 +39,15 @@ const MAP = parseDiffSuiteMap(
 const HOUR = 3_600_000
 const T0 = 1_800_000_000_000
 
-/** A full `npm test -- polish` on the everyday lane. */
-const fullPolish = () => classifyLadderRun({ argv: ['polish'] })
+/** A full `npm test -- polish-villagers` on the everyday lane. */
+const fullPolish = () => classifyLadderRun({ argv: ['polish-villagers'] })
 
 const edit = (path, at) => ({ path, editedAt: at })
-const ledgerRun = (over) => ({ suite: 'polish', exit: 0, startedAt: T0, ...over })
+const ledgerRun = (over) => ({ suite: 'polish-villagers', exit: 0, startedAt: T0, ...over })
 
 describe('what shape of run the ladder is looking at', () => {
   it('never refuses the cheap rung itself', () => {
-    const run = classifyLadderRun({ argv: ['polish', '--section=adult-errands'] })
+    const run = classifyLadderRun({ argv: ['polish-villagers', '--section=adult-errands'] })
     expect(run.kind).toBe('section')
     const verdict = ladderVerdict({
       run,
@@ -67,7 +70,7 @@ describe('what shape of run the ladder is looking at', () => {
   it('reads a tier and the bare default as full runs', () => {
     expect(classifyLadderRun({ argv: ['large'] }).kind).toBe('full')
     expect(classifyLadderRun({ argv: [] }).kind).toBe('full')
-    expect(fullPolish().browser).toEqual(['polish'])
+    expect(fullPolish().browser).toEqual(['polish-villagers'])
   })
 })
 
@@ -81,14 +84,14 @@ describe('the refusal, and what lifts it', () => {
     })
     expect(verdict.ok).toBe(false)
     expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
-    expect(verdict.suites).toEqual(['polish'])
+    expect(verdict.suites).toEqual(['polish-villagers'])
     expect(verdict.commands).toEqual([
-      'npm test -- polish --section=town-plan   # the section polish last ran',
-      'npm test -- polish --section=list   # every section polish declares',
+      'npm test -- polish-villagers --section=town-plan   # the section polish-villagers last ran',
+      'npm test -- polish-villagers --section=list   # every section polish-villagers declares',
     ])
     expect(verdict.threshold).toBe(T0 + HOUR)
     expect(formatLadderRefusal(verdict)).toContain('RUN THIS INSTEAD:')
-    expect(formatLadderRefusal(verdict)).toContain('npm test -- polish --section=town-plan')
+    expect(formatLadderRefusal(verdict)).toContain('npm test -- polish-villagers --section=town-plan')
   })
 
   it('offers only the name list when no section run is recorded to copy', () => {
@@ -98,7 +101,7 @@ describe('the refusal, and what lifts it', () => {
       changes: [edit('src/scenes/place/village.ts', T0 + HOUR)],
       runs: [],
     })
-    expect(verdict.commands).toEqual(['npm test -- polish --section=list   # every section polish declares'])
+    expect(verdict.commands).toEqual(['npm test -- polish-villagers --section=list   # every section polish-villagers declares'])
     expect(verdict.reason).toContain(LADDER_ESCAPE_FLAG)
   })
 
@@ -111,7 +114,7 @@ describe('the refusal, and what lifts it', () => {
     })
     expect(verdict.ok).toBe(true)
     expect(verdict.status).toBe(LADDER_STATUS.CLIMBED)
-    expect(verdict.suites).toEqual(['polish'])
+    expect(verdict.suites).toEqual(['polish-villagers'])
   })
 
   it('refuses on the suite whose rung is missing while another suite is green', () => {
@@ -120,12 +123,13 @@ describe('the refusal, and what lifts it', () => {
       map: MAP,
       changes: [edit('src/scenes/place/village.ts', T0 + HOUR)],
       runs: [
-        ledgerRun({ suite: 'polish', startedAt: T0 + HOUR, partial: true, section: 'adult-errands' }),
+        ledgerRun({ suite: 'polish-villagers', startedAt: T0 + HOUR, partial: true, section: 'adult-errands' }),
         ledgerRun({ suite: 'collision', startedAt: T0 - HOUR, partial: true, section: 'huts' }),
       ],
     })
     expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
-    expect(verdict.suites).toEqual(['collision', 'settings'])
+    // Every other polish theme is a suite of its own and still owes its rung.
+    expect(verdict.suites).toEqual(['collision', 'polish-children', 'polish-panorama', 'polish-settlement', 'polish-speech', 'settings'])
   })
 
   it('does not credit a RED narrow run', () => {
@@ -181,7 +185,7 @@ describe('an edit the suite does not cover', () => {
   })
 
   it('sends a suite file to the suite that IS the file', () => {
-    expect(suitesCovering('scripts/verify/polish.mjs', MAP)).toEqual(['polish'])
+    expect(suitesCovering('scripts/verify/polish-villagers.mjs', MAP)).toEqual(['polish-villagers'])
     // "store/systems logic → Vitest only" names no browser suite, so nothing
     // the ladder can gate on comes back for it.
     expect(suitesCovering('scripts/verify/ladder-core.mjs', MAP)).toEqual([])
@@ -239,16 +243,16 @@ describe('one suite’s threshold is its own', () => {
     // One threshold across every covered suite let an unrelated edit invalidate
     // a rung that was green for its own material — a FALSE refusal, which is
     // the costly direction: it blocks an author who DID climb the ladder.
-    const run = { kind: 'full', browser: ['collision', 'polish'], suites: ['collision', 'polish'], section: null }
+    const run = { kind: 'full', browser: ['collision', 'polish-villagers'], suites: ['collision', 'polish-villagers'], section: null }
     const verdict = ladderVerdict({
       run,
       map: MAP,
       changes: [
-        edit('scripts/verify/polish.mjs', T0),
+        edit('scripts/verify/polish-villagers.mjs', T0),
         edit('scripts/verify/collision.mjs', T0 + 2 * HOUR),
       ],
       runs: [
-        { suite: 'polish', exit: 0, startedAt: T0 + HOUR, partial: true, section: 'town-plan' },
+        { suite: 'polish-villagers', exit: 0, startedAt: T0 + HOUR, partial: true, section: 'town-plan' },
         { suite: 'collision', exit: 0, startedAt: T0 + 3 * HOUR, partial: true, section: 'huts' },
       ],
     })
@@ -259,7 +263,7 @@ describe('one suite’s threshold is its own', () => {
 
 describe('a check that declares itself non-predictive', () => {
   const nonPredictive = {
-    polish: [
+    'polish-villagers': [
       {
         section: 'adult-errands',
         check: 'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
@@ -282,7 +286,7 @@ describe('a check that declares itself non-predictive', () => {
     // confidence instead of time.
     expect(verdict.ok).toBe(true)
     expect(verdict.reason).toContain('NON-PREDICTIVE')
-    expect(verdict.record.lying[0].checks).toEqual([nonPredictive.polish[0].check])
+    expect(verdict.record.lying[0].checks).toEqual([nonPredictive['polish-villagers'][0].check])
   })
 
   it('leaves an honest rung of the same suite counting', () => {
@@ -317,7 +321,7 @@ describe('a narrow run answers only for the material it RAN', () => {
   // section cannot stand in for it. Edit the `adult-errands` block, run only
   // `town-plan`, and the full pass used to count as climbed although the edited
   // material was never checked once (four-eyes review, GPT-6 Astra).
-  const editedBlock = { path: 'scripts/verify/polish.mjs', editedAt: T0, sections: ['adult-errands'] }
+  const editedBlock = { path: 'scripts/verify/polish-villagers.mjs', editedAt: T0, sections: ['adult-errands'] }
 
   it('does not credit a green run of a DIFFERENT section', () => {
     const verdict = ladderVerdict({
@@ -339,7 +343,7 @@ describe('a narrow run answers only for the material it RAN', () => {
     })
     expect(verdict.status).toBe(LADDER_STATUS.CLIMBED)
     expect(verdict.reason).toContain('--section=adult-errands')
-    expect(verdict.record.credited).toEqual([{ suite: 'polish', section: 'adult-errands' }])
+    expect(verdict.record.credited).toEqual([{ suite: 'polish-villagers', section: 'adult-errands' }])
   })
 
   it('still credits any narrow green where the link cannot be read', () => {
@@ -353,7 +357,7 @@ describe('a narrow run answers only for the material it RAN', () => {
       runs: [ledgerRun({ startedAt: T0 + HOUR, partial: true, section: 'town-plan' })],
     })
     expect(verdict.status).toBe(LADDER_STATUS.CLIMBED)
-    expect(verdict.record.credited).toEqual([{ suite: 'polish', section: 'town-plan' }])
+    expect(verdict.record.credited).toEqual([{ suite: 'polish-villagers', section: 'town-plan' }])
   })
 })
 
@@ -372,7 +376,7 @@ describe('the deliberate escape', () => {
     expect(verdict.record).toMatchObject({
       status: LADDER_STATUS.WAIVED_ESCAPE,
       why: 'the defect only appears with every section staged together',
-      suites: ['polish'],
+      suites: ['polish-villagers'],
       at: T0 + 2 * HOUR,
     })
   })
@@ -392,7 +396,7 @@ describe('the deliberate escape', () => {
 describe('when a file was really last edited', () => {
   it('dates a CLEAN file by the commit it carries, not by its mtime', () => {
     // Measured the first time the ladder was used in anger: switching to `main`
-    // and back rewrote polish.mjs, moved its mtime past every green rung, and
+    // and back rewrote polish-villagers.mjs, moved its mtime past every green rung, and
     // refused the covering run of the point that built the ladder — without one
     // byte of the file changing. An mtime is not an edit.
     expect(editTimeFor({ dirty: false, mtime: T0 + HOUR, committedAt: T0 })).toBe(T0)
@@ -446,54 +450,54 @@ describe('every entrypoint answers to the ladder', () => {
 describe('unrepairedReds', () => {
   const T = 1_000_000
   const wholeRed = (reds, over = {}) => ({
-    suite: 'polish', backend: 'webgpu', partial: undefined, section: undefined,
+    suite: 'polish-villagers', backend: 'webgpu', partial: undefined, section: undefined,
     startedAt: T, at: T + 1000, exit: 1, terminalVerdict: true, crashed: false, reds, ...over,
   })
   const rung = (section, over = {}) => ({
-    suite: 'polish', backend: 'webgpu', partial: true, section,
+    suite: 'polish-villagers', backend: 'webgpu', partial: true, section,
     startedAt: T + 5000, at: T + 6000, exit: 0, terminalVerdict: true, crashed: false, reds: [], ...over,
   })
   const red = (name, section, over = {}) => ({ name, key: name, kind: 'check', section, ...over })
 
   it('names the block a red sat in, and the command that re-runs it', () => {
-    const out = unrepairedReds({ suites: ['polish'], runs: [wholeRed([red('a plan is drawn', 'town-plan')])] })
-    expect(out).toEqual([{ suite: 'polish', sections: ['town-plan'], at: T + 1000 }])
+    const out = unrepairedReds({ suites: ['polish-villagers'], runs: [wholeRed([red('a plan is drawn', 'town-plan')])] })
+    expect(out).toEqual([{ suite: 'polish-villagers', sections: ['town-plan'], at: T + 1000 }])
   })
 
   it('steps aside once that block has been re-run green', () => {
     const runs = [wholeRed([red('a plan is drawn', 'town-plan')]), rung('town-plan')]
-    expect(unrepairedReds({ suites: ['polish'], runs })).toBe(null)
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs })).toBe(null)
   })
 
   it('does not credit a green rung of a DIFFERENT block', () => {
     const runs = [wholeRed([red('a plan is drawn', 'town-plan')]), rung('adult-errands')]
-    expect(unrepairedReds({ suites: ['polish'], runs })?.[0].sections).toEqual(['town-plan'])
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs })?.[0].sections).toEqual(['town-plan'])
   })
 
   it('does not credit a rung climbed BEFORE the red', () => {
     const runs = [rung('town-plan', { startedAt: T - 5000, at: T - 4000 }), wholeRed([red('a plan is drawn', 'town-plan')])]
-    expect(unrepairedReds({ suites: ['polish'], runs })?.[0].sections).toEqual(['town-plan'])
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs })?.[0].sections).toEqual(['town-plan'])
   })
 
   it('does not credit a RED rung', () => {
     const runs = [wholeRed([red('a plan is drawn', 'town-plan')]), rung('town-plan', { exit: 1 })]
-    expect(unrepairedReds({ suites: ['polish'], runs })?.[0].sections).toEqual(['town-plan'])
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs })?.[0].sections).toEqual(['town-plan'])
   })
 
   it('is silent once a later WHOLE run of the suite went green', () => {
     const runs = [wholeRed([red('a plan is drawn', 'town-plan')]), wholeRed([], { startedAt: T + 9000, exit: 0 })]
-    expect(unrepairedReds({ suites: ['polish'], runs })).toBe(null)
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs })).toBe(null)
   })
 
   it('fails open on a red that names no block, on a crash and on a run with no verdict', () => {
-    expect(unrepairedReds({ suites: ['polish'], runs: [wholeRed([red('console error: 504', undefined)])] })).toBe(null)
-    expect(unrepairedReds({ suites: ['polish'], runs: [wholeRed([red('a plan', 'town-plan')], { crashed: true })] })).toBe(null)
-    expect(unrepairedReds({ suites: ['polish'], runs: [wholeRed([red('a plan', 'town-plan')], { terminalVerdict: false })] })).toBe(null)
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs: [wholeRed([red('console error: 504', undefined)])] })).toBe(null)
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs: [wholeRed([red('a plan', 'town-plan')], { crashed: true })] })).toBe(null)
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs: [wholeRed([red('a plan', 'town-plan')], { terminalVerdict: false })] })).toBe(null)
   })
 
   it('fails open on a red already charged to a work-order point — no rung could clear it', () => {
     const runs = [wholeRed([red('a plan is drawn', 'town-plan', { point: 939 })])]
-    expect(unrepairedReds({ suites: ['polish'], runs })).toBe(null)
+    expect(unrepairedReds({ suites: ['polish-villagers'], runs })).toBe(null)
   })
 
   it('ignores suites this run does not cover, and is total on nothing', () => {
@@ -506,16 +510,16 @@ describe('unrepairedReds', () => {
 describe('ladderVerdict — the red rung', () => {
   const T = 1_000_000
   const runs = [{
-    suite: 'polish', partial: undefined, startedAt: T, at: T + 1000, exit: 1,
+    suite: 'polish-villagers', partial: undefined, startedAt: T, at: T + 1000, exit: 1,
     terminalVerdict: true, crashed: false, reds: [{ name: 'a plan is drawn', key: 'a plan is drawn', kind: 'check', section: 'town-plan' }],
   }]
-  const run = { kind: 'full', tier: null, suites: ['polish'], browser: ['polish'], section: null }
+  const run = { kind: 'full', tier: null, suites: ['polish-villagers'], browser: ['polish-villagers'], section: null }
 
   it('refuses the whole pass a red left behind, and prints the block to run', () => {
     const verdict = ladderVerdict({ run, changes: [], merges: [], runs, map: MAP })
     expect(verdict.ok).toBe(false)
     expect(verdict.status).toBe(LADDER_STATUS.RED_RUNG)
-    expect(verdict.commands).toEqual(['npm test -- polish --section=town-plan'])
+    expect(verdict.commands).toEqual(['npm test -- polish-villagers --section=town-plan'])
     expect(formatLadderRefusal(verdict)).toContain('point 1126')
   })
 
@@ -527,7 +531,7 @@ describe('ladderVerdict — the red rung', () => {
 
   it('never refuses the rung run itself', () => {
     const verdict = ladderVerdict({
-      run: { kind: 'section', tier: null, suites: ['polish'], browser: ['polish'], section: 'town-plan' },
+      run: { kind: 'section', tier: null, suites: ['polish-villagers'], browser: ['polish-villagers'], section: 'town-plan' },
       changes: [], merges: [], runs, map: MAP,
     })
     expect(verdict.ok).toBe(true)

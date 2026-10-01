@@ -61,7 +61,7 @@ afterEach(() => {
 
 /** Arm a FRESH recorder instance (the module keeps one armed run per process)
  *  under a chosen suite name, and return the record its exit handler writes. */
-async function armed(suite = 'polish', featureLevel = null) {
+async function armed(suite = 'polish-panorama', featureLevel = null) {
   vi.resetModules()
   const mod = await import('./render-verify-recorder.mjs')
   const sectionMod = await import('./verify/sections.mjs')
@@ -138,11 +138,15 @@ function verifySuiteSources() {
   return readdirSync(verifyDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.mjs') && !entry.name.endsWith('.test.mjs'))
     .flatMap((entry) => {
-      const source = readFileSync(join(verifyDir, entry.name), 'utf8')
+      const own = readFileSync(join(verifyDir, entry.name), 'utf8')
+      // A polish theme suite (point 1129) boots and reports through its shared
+      // module, so the module's terminal report is the theme's own.
+      const viaPolish = /from ['"]\.\/_polish\.mjs['"]/.test(own)
+      const source = viaPolish ? `${own}\n${readFileSync(join(verifyDir, '_polish.mjs'), 'utf8')}` : own
       const browserEntrypoint =
         !entry.name.startsWith('_') &&
         !/(?:-check|-probe)\.mjs$/.test(entry.name) &&
-        /from ['"](?:\.\/_browser\.mjs|playwright)['"]/.test(source)
+        /from ['"](?:\.\/_browser\.mjs|\.\/_polish\.mjs|playwright)['"]/.test(own)
       const directNodeSuite = /import\.meta\.url === pathToFileURL\(process\.argv\[1\]\)\.href/.test(source)
       return browserEntrypoint || directNodeSuite ? [{ name: entry.name, source }] : []
     })
@@ -763,7 +767,7 @@ describe('tapOutput — observe-only', () => {
   // record came out looking complete — no reds, no crash flag, nothing dropped —
   // which is the silent half-recording this point exists to end.
   it('records an exit-0 run whose overlong crash frame was cut as INCOMPLETE', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     const before = process.stderr.write
     const wrapper = process.stderr.write
     process.stderr.write = (chunk, ...rest) => {
@@ -1020,7 +1024,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     out.write('FAIL  a NEW check nobody has filed — 3 of 4\n')
     flush()
     const reds = chargeReds(failedChecks(state.lines.join('\n')), {
-      suite: 'polish',
+      suite: 'polish-panorama',
       backend: 'webgpu',
       featureLevel: 'compatibility',
     })
@@ -1038,7 +1042,7 @@ describe('the captured lines charge the way the guard reads them', () => {
   // would pass even if the recorder dropped the detail on its way to the record
   // — which is the exact defect this whole section is about.
   it('writes the printed measurement into the RECORD, through the real exit handler', async () => {
-    const run = await armed('polish', 'compatibility')
+    const run = await armed('polish-children', 'compatibility')
     process.stdout.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
     const record = run.exit(1)
     expect(record.reds).toHaveLength(1)
@@ -1046,7 +1050,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(record.reds[0].point).toBe(694)
     // And the stored red is chargeable again when it is RE-READ from the record,
     // which is the retroactivity the detail exists for.
-    expect(chargeFor(record.reds[0], { suite: 'polish', backend: 'webgpu', featureLevel: 'compatibility' })?.point).toBe(694)
+    expect(chargeFor(record.reds[0], { suite: 'polish-children', backend: 'webgpu', featureLevel: 'compatibility' })?.point).toBe(694)
   })
 
   it('writes the measurement and section as separate fields through the real exit handler', async () => {
@@ -1075,7 +1079,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     out.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
     flush()
     const [stored] = chargeReds(failedChecks(state.lines.join('\n')), {
-      suite: 'polish',
+      suite: 'polish-children',
       backend: 'webgpu',
       featureLevel: 'compatibility',
     })
@@ -1099,7 +1103,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(state.variedKeys.size).toBe(1)
     const output = state.lines.join('\n')
     const [stored] = chargeReds(markVariedDetails(failedChecks(output), state.variedKeys), {
-      suite: 'polish',
+      suite: 'polish-children',
       backend: 'webgpu',
       featureLevel: 'compatibility',
     })
@@ -1107,7 +1111,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(stored.point).toBeNull()
     // The mark survives to the RE-READ, or owned() would charge afterwards what
     // the recorder refused.
-    expect(chargeFor(stored, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+    expect(chargeFor(stored, { suite: 'polish-children', backend: 'webgpu' })).toBeNull()
 
     // One measurement, one reading: the ordinary case is untouched.
     const single = tapped()
@@ -1115,7 +1119,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     single.flush()
     const one = single.state.lines.join('\n')
     const [ok] = chargeReds(markVariedDetails(failedChecks(one), single.state.variedKeys), {
-      suite: 'polish',
+      suite: 'polish-children',
       backend: 'webgpu',
       featureLevel: 'compatibility',
     })
@@ -1133,7 +1137,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     // when 506 was folded away — a charge to a ticked point expires. Only the
     // number changed; the lane split this case pins did not.
     const lines = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
-    const reds = chargeReds(failedChecks(lines), { suite: 'polish', backend: 'webgl' })
+    const reds = chargeReds(failedChecks(lines), { suite: 'polish-panorama', backend: 'webgl' })
     expect(reds.map((r) => r.point)).toEqual([null])
   })
 
@@ -1143,7 +1147,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     // it is a red the change under review has to answer for.
     for (const place of ['maasai-village|medium', 'cairo']) {
       const line = `ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:${place}: 19 -> 22 (+3, allowed +2)`
-      expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgl' }).map((r) => r.point)).toEqual([null])
+      expect(chargeReds(failedChecks(line), { suite: 'polish-panorama', backend: 'webgl' }).map((r) => r.point)).toEqual([null])
     }
   })
 
@@ -1151,10 +1155,10 @@ describe('the captured lines charge the way the guard reads them', () => {
     const line = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
     const lane = { backend: 'webgpu', featureLevel: 'compatibility' }
     expect(chargeReds(failedChecks(line), { suite: 'flow', ...lane }).map((r) => r.point)).toEqual([null])
-    expect(chargeReds(failedChecks(line), { suite: 'polish', ...lane }).map((r) => r.point)).toEqual([642])
+    expect(chargeReds(failedChecks(line), { suite: 'polish-panorama', ...lane }).map((r) => r.point)).toEqual([642])
     // Nor outside the LANE it was taken on: the entry rests on the measured
     // compatibility adapter, so the core one the player runs stays red.
-    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgpu', featureLevel: 'core' }).map((r) => r.point)).toEqual([null])
+    expect(chargeReds(failedChecks(line), { suite: 'polish-panorama', backend: 'webgpu', featureLevel: 'core' }).map((r) => r.point)).toEqual([null])
   })
 })
 
@@ -1162,7 +1166,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   const openPoints = [642]
 
   it('records a red run with its charged reds, and the run then accounts', async () => {
-    const run = await armed('polish', 'compatibility')
+    const run = await armed('polish-panorama', 'compatibility')
     process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
     const record = run.exit(1)
     expect(record.exit).toBe(1)
@@ -1177,7 +1181,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // it excuses there is unexplained on core — end to end through the real tap,
   // not only through chargeFor.
   it('leaves the same red unaccounted when the run came up on the core adapter', async () => {
-    const run = await armed('polish', 'core')
+    const run = await armed('polish-panorama', 'core')
     process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
     const record = run.exit(1)
     expect(record.featureLevel).toBe('core')
@@ -1192,7 +1196,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // so the record blocks as a crash and still owes the second signature for the
   // lines nobody read.
   it('records a run that refused a line AND then died as a crash that also lost output', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
     process.stdout.write(`ERR: ${'z'.repeat(MAX_LINE_CHARS + 10)}\n`)
     process.emit('uncaughtExceptionMonitor', new Error('page.waitForFunction: Timeout 300000ms exceeded'))
@@ -1212,7 +1216,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // the crash frames arrive, which is the one signal the crash class rests on.
   it('captures a stack trace written to the REAL stderr, and the reds beside it', async () => {
     const before = process.stderr.write
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     const stderrWasWrapped = process.stderr.write !== before
     const wrapper = process.stderr.write
     // The sink goes UNDER the tap, exactly as armed() does for stdout, so the
@@ -1300,7 +1304,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // otherwise it is indistinguishable from the clean record pinned below and
   // can cover the backend whose picture it never finished judging.
   it('records an exit-0 stderr crash with its reds and refuses it as coverage', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     process.stderr.write(
       'TimeoutError: page.waitForFunction: Timeout 300000ms exceeded\n    at run (/x/polish.mjs:89:7)\n',
     )
@@ -1314,7 +1318,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   })
 
   it('marks a run whose process raised an uncaught exception, and that run never accounts (F1)', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
     // What node does to a suite that dies at a top-level await: the monitor
     // fires, the exit handler runs afterwards. Emitted here rather than thrown,
@@ -1334,7 +1338,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // the cases above pin that; "no record is ever incomplete" stopped being true
   // when the budgets were added in round 13.)
   it('keeps every observed red under a per-frame flood — no truncation, no marker (point 734)', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     for (let i = 0; i < 420; i++) {
       process.stdout.write(
         'ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village: 19 -> 22\n',
@@ -1361,7 +1365,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // reds into a crash record that a signature can then close. The bound is the
   // red's IDENTITY, which the parser normalises the counter out of.
   it('bounds the buffer by the red\'s identity, not by the line, under a counting flood', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     for (let i = 0; i < 500; i++) {
       process.stdout.write(
         `ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village: ${19 + i} -> ${22 + i}\n`,
@@ -1380,7 +1384,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   })
 
   it('records a run that hit the ceiling as an INCOMPLETE RECORDING with its way out', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
       process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
     }
@@ -1404,7 +1408,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // actually have been paid for: `record.reds` is re-parsed from the kept lines,
   // so a fat line kept past the ceiling would put every red it carried on disk.
   it('keeps record.reds under the ceiling when the reds arrive on fat summary lines', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     const chunk = (from, n) => Array.from({ length: n }, (_, i) => `'error ${tag(from + i)}'`).join(', ')
     process.stdout.write(`console errors: [${chunk(0, 400)}]\n`)
     process.stdout.write(`console errors: [${chunk(400, 400)}]\n`)
@@ -1424,7 +1428,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // lines nobody read. Calling that clean made it count as picture COVERAGE,
   // which is the worst thing an unread recording can be taken for.
   it('calls an exit-0 run that dropped RESULT lines an incomplete recording', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
       process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
     }
@@ -1442,7 +1446,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // and COVER its backend — while the lines the cap ate are exactly the ones
   // nobody could charge, which is the whole reason this class exists.
   it('calls a run whose recorded reds are all charged incomplete, not accounted for', async () => {
-    const run = await armed('polish', 'compatibility')
+    const run = await armed('polish-panorama', 'compatibility')
     process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
     // ONE refused line, and EVERY recorded red charged — otherwise the verdict
     // would be red for the uncharged ones and the boundary would never be
@@ -1469,7 +1473,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // own ordering by hand — charge, then mark — and would pass even if the real
   // handler charged before applying the mark. Only the armed run can say.
   it('stores a NARROW charge as unowned when the check printed two measurements', async () => {
-    const run = await armed('polish', 'compatibility')
+    const run = await armed('polish-panorama', 'compatibility')
     process.stdout.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
     process.stdout.write('FAIL  no child walks without getting anywhere — worst child 4 at 51.0s, 0.02 m walked inside 0.30 m\n')
     const record = run.exit(1)
@@ -1484,7 +1488,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // its lost part was signed off the reds it DID capture were gone —
   // unchargeable, unfileable, blocking nothing.
   it('keeps the reds an exit-0 truncation captured, so the signed-off run still owes them', async () => {
-    const run = await armed('polish', 'compatibility')
+    const run = await armed('polish-panorama', 'compatibility')
     process.stdout.write('ERR: a console error the suite tolerated\n')
     for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
       process.stdout.write(`ERR: page error in span ${tag(i)}\n`)
@@ -1515,7 +1519,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // record that must stay red, so nothing here showed a matching disposition
   // RELEASING an incomplete-only run — the promise this point makes.
   it('releases an already-recorded incomplete-only run once its lost part is signed', async () => {
-    const run = await armed('polish', 'compatibility')
+    const run = await armed('polish-panorama', 'compatibility')
     process.stdout.write(`ERR: ${'z'.repeat(MAX_LINE_CHARS + 10)}\n`)
     const record = run.exit(1)
     expect(record.truncated).toBe(true)
@@ -1537,7 +1541,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // And the other half of that rule, unchanged: a genuinely green run prints no
   // result line at all, so it can never reach a budget and is never marked.
   it('leaves a green run whose chatter never reached a budget completely clean', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     for (let i = 0; i < MAX_RED_IDENTITIES + 7; i++) {
       process.stdout.write(`PASS  a check that held ${tag(i)}\n`)
     }
@@ -1554,7 +1558,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // the record carries the whole set. (Distinct in LETTERS, because checkKey
   // folds digits.)
   it('stores hundreds of DISTINCT observed reds whole — no cap discards one', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     const name = (i) => `check ${String(i).replace(/\d/g, (d) => 'abcdefghij'[Number(d)])} broke`
     for (let i = 0; i < 401; i++) process.stdout.write(`FAIL  ${name(i)} — detail\n`)
     const record = run.exit(1)
@@ -1572,7 +1576,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // with nothing dropped there is nothing unread — the run is a clean pass, as
   // it always was for a tolerated error below the old cap.
   it('leaves an exit-0 run clean under the same flood — nothing was dropped, nothing is unread', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     for (let i = 0; i < 420; i++) process.stdout.write('ERR: something the suite decided to tolerate\n')
     const record = run.exit(0)
     expect(record.truncated).toBeUndefined()
@@ -1584,7 +1588,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // printed as the process dies carries no newline, and it must reach the record
   // like any other — there is no cap left for it to overflow.
   it('records a red whose line never got its newline, beyond where the old cap ended', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     for (let i = 0; i < 400; i++) process.stdout.write(`ERR: a tolerated console error #${i}\n`)
     process.stdout.write('FAIL  the line the old cap would have eaten — and it never got its newline')
     const record = run.exit(1)
@@ -1594,7 +1598,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   })
 
   it('leaves a green run with no accounting at all', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     const record = run.exit(0)
     expect(record.exit).toBe(0)
     expect(record.crashed).toBeUndefined()
@@ -1627,7 +1631,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // Point 595: the record names the TREE it was taken on, so "the full proof ran
   // on the exact merge candidate" is checkable instead of claimed.
   it('records the git HEAD the run was taken on, and whether that tree was dirty', async () => {
-    const run = await armed('polish')
+    const run = await armed('polish-panorama')
     const record = run.exit(0)
     const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim()
     expect(record.head).toBe(head)
@@ -1657,7 +1661,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     const before = process.env[RETRY_ENV]
     process.env[RETRY_ENV] = formatSuspectEnv(['settlement walker (goat): the planted foot holds its ground spot'])
     try {
-      const run = await armed('polish')
+      const run = await armed('polish-panorama')
       const record = run.exit(0)
       expect(record.suspect).toBe(true)
       expect(record.suspectOf).toEqual([
@@ -1676,7 +1680,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     const before = process.env[RETRY_ENV]
     process.env[RETRY_ENV] = ''
     try {
-      const run = await armed('polish')
+      const run = await armed('polish-panorama')
       const record = run.exit(0)
       expect(record.suspect).toBeUndefined()
       expect(runVerdict(record, { openPoints }).covers).toBe(true)

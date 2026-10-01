@@ -7,7 +7,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
-import { COUNTED_SUITE_FRAMES } from './run-wait-core.mjs'
+import { COUNTED_SUITE_FRAMES, SUITE_FRAMES } from './run-wait-core.mjs'
+import { POLISH_THEME_SUITES } from './tiers.mjs'
+
+// The measured `polish` row gave way to its five counted theme suites (point 1129).
+const POLISH_FRAMES = POLISH_THEME_SUITES.reduce((n, s) => n + COUNTED_SUITE_FRAMES[s], 0)
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CLI = join(HERE, 'run-wait.mjs')
@@ -73,7 +77,7 @@ describe('--plan: the decision that belongs BEFORE the run', () => {
     expect(res.status).toBe(0)
     expect(res.stdout).toMatch(/BACKGROUND/)
     expect(res.stdout).toMatch(/notification/)
-    expect(res.stdout).toContain(`${94 + COUNTED_SUITE_FRAMES.communication} expected`)
+    expect(res.stdout).toContain(`${94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication} expected`)
   })
 
   it('lets a single measured suite be one blocking foreground call', () => {

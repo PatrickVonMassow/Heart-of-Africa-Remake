@@ -66,7 +66,7 @@ export function developmentRunRefusal(argv, { noLadder = null } = {}) {
   const hasReason = typeof noLadder === 'string' && noLadder.trim().length > 0
   if (section === '' || (tier === null && filter.length > 1 && section === null && !hasReason)) {
     return 'Refused: name one suite during development, or use small/large for a tier run. ' +
-      'For one section: npm test -- polish --section=adult-errands (the name attaches to --section=). ' +
+      'For one section: npm test -- polish-villagers --section=adult-errands (the name attaches to --section=). ' +
       'For a covering multi-suite proof, use --no-ladder "<why>"; the reason is recorded with the run.'
   }
   return null

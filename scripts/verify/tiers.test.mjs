@@ -5,7 +5,7 @@
 import { readFile } from 'node:fs/promises'
 import { describe, it, expect } from 'vitest'
 import {
-  DEFAULT_BACKEND, DEV_SUITES, SMALL_SUITES, WEBGL_ONLY_SUITES,
+  DEFAULT_BACKEND, DEV_SUITES, POLISH_THEME_SUITES, SMALL_SUITES, WEBGL_ONLY_SUITES,
   laneFor, needsDevServer, needsGpuBackendProbe, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor,
 } from './tiers.mjs'
 
@@ -20,9 +20,15 @@ describe('tier sets (point 173)', () => {
     expect(new Set(DEV_SUITES).size).toBe(DEV_SUITES.length)
     // The pixel/screenshot-heavy suites are exactly what the WebGPU pass exists
     // for — they must be in the LARGE set, not only in someone's manual run.
-    for (const s of ['enrichments', 'polish', 'settings', 'invariants', 'handwriting', 'gamepad', 'startup']) {
+    for (const s of ['enrichments', 'polish-children', 'settings', 'invariants', 'handwriting', 'gamepad', 'startup']) {
       expect(DEV_SUITES).toContain(s)
     }
+  })
+
+  it('runs every polish theme suite in LARGE, each once (point 1129)', () => {
+    expect(POLISH_THEME_SUITES).toHaveLength(5)
+    for (const s of POLISH_THEME_SUITES) expect(DEV_SUITES.filter((d) => d === s)).toHaveLength(1)
+    expect(DEV_SUITES).not.toContain('polish')
   })
 
   it('keeps the WebGL2-only exception to the two documented suites', () => {
@@ -72,13 +78,13 @@ describe('argument parsing', () => {
   })
 
   it('reads a bare suite filter as a quick single run (no preflight, not LARGE)', () => {
-    const a = parseArgs(['flow', 'polish'])
-    expect(a).toEqual({ tier: null, filter: ['flow', 'polish'], flags: [], section: null, baseline: false, fullRun: false, isLargeEquivalent: false })
+    const a = parseArgs(['flow', 'polish-children'])
+    expect(a).toEqual({ tier: null, filter: ['flow', 'polish-children'], flags: [], section: null, baseline: false, fullRun: false, isLargeEquivalent: false })
   })
 
   it('reads an explicit `large` WITH a filter as a preflighted both-backends run of that suite', () => {
-    const a = parseArgs(['large', 'polish'])
-    expect(a).toEqual({ tier: 'large', filter: ['polish'], flags: [], section: null, baseline: false, fullRun: true, isLargeEquivalent: true })
+    const a = parseArgs(['large', 'polish-children'])
+    expect(a).toEqual({ tier: 'large', filter: ['polish-children'], flags: [], section: null, baseline: false, fullRun: true, isLargeEquivalent: true })
   })
 
   it('reads --baseline as a flag, never as a suite filter (point 294)', () => {
@@ -89,8 +95,8 @@ describe('argument parsing', () => {
     expect(a.filter).toEqual([])
     expect(a.fullRun).toBe(true)
     expect(a.isLargeEquivalent).toBe(true)
-    expect(parseArgs(['large', '--baseline', 'polish']).filter).toEqual(['polish'])
-    expect(parseArgs(['polish']).baseline).toBe(false)
+    expect(parseArgs(['large', '--baseline', 'polish-children']).filter).toEqual(['polish-children'])
+    expect(parseArgs(['polish-children']).baseline).toBe(false)
   })
 
   it('reads --section=<name> as a value flag, never as a suite filter (point 566)', () => {
@@ -133,7 +139,7 @@ describe('the WebGL2-only suites keep a real lane (point 571)', () => {
       expect(laneFor(s, 'webgpu')).toBe('webgl')
       expect(laneFor(s, 'webgl')).toBe('webgl')
     }
-    for (const s of ['polish', 'flow', 'collision']) {
+    for (const s of ['polish-children', 'flow', 'collision']) {
       expect(laneFor(s, 'webgpu')).toBe('webgpu')
       expect(laneFor(s, 'webgl')).toBe('webgl')
     }
@@ -191,7 +197,7 @@ describe('suite selection per tier and backend', () => {
   })
 
   it('honours a suite filter and ignores unknown names', () => {
-    expect(suitesFor({ tier: null, filter: ['polish', 'flow'], backend: 'webgl' })).toEqual(['flow', 'polish'])
+    expect(suitesFor({ tier: null, filter: ['polish-children', 'flow'], backend: 'webgl' })).toEqual(['flow', 'polish-children'])
     expect(suitesFor({ tier: null, filter: ['build', 'lint', 'unit'], backend: 'webgl' })).toEqual([])
     // A filtered WebGPU run KEEPS the WebGL2-only suite it named — it runs it on
     // WebGL 2 (laneFor). Dropping it would answer `npm test -- voice` with nothing.
@@ -221,11 +227,11 @@ describe('both-backends LARGE wiring (point 204b)', () => {
     expect(planBackends({ ...parseArgs(['flow']), verifyGl: undefined })).toEqual([])
   })
 
-  it('runs an explicitly-LARGE single suite on both backends (`npm test -- large polish`)', () => {
-    const a = parseArgs(['large', 'polish'])
+  it('runs an explicitly-LARGE single suite on both backends (`npm test -- large polish-children`)', () => {
+    const a = parseArgs(['large', 'polish-children'])
     expect(planBackends({ ...a, verifyGl: undefined }).map((p) => p.backend)).toEqual(['webgl', 'webgpu'])
     for (const p of planBackends({ ...a, verifyGl: undefined })) {
-      expect(suitesFor({ tier: a.tier, filter: a.filter, backend: p.backend })).toEqual(['polish'])
+      expect(suitesFor({ tier: a.tier, filter: a.filter, backend: p.backend })).toEqual(['polish-children'])
     }
   })
 
@@ -251,7 +257,7 @@ describe('both-backends LARGE wiring (point 204b)', () => {
 
   it('sends the everyday commands to WebGPU while LARGE keeps both lanes (point 571)', () => {
     // The everyday gate and a per-point suite pick: one pass, on the player's backend.
-    for (const argv of [['small'], ['polish'], ['flow', 'collision']]) {
+    for (const argv of [['small'], ['polish-children'], ['flow', 'collision']]) {
       const a = parseArgs(argv)
       expect(planBackends({ ...a, verifyGl: undefined })).toEqual([])
       expect(selectBackend(process.env.VERIFY_GL_UNSET_FOR_TEST)).toBe('webgpu')
