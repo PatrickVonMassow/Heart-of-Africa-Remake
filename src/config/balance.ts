@@ -1673,9 +1673,9 @@ export const balance: BalanceConfig = {
       regroupSeconds: 60,
       partSeconds: 8,
       endPauseSeconds: 3,
-      // Calibratable: one cycle was too short to watch and the next came minutes
+      // Calibratable: one cycle may be too short to watch and the next comes minutes
       // later, so a session plays this many cycles in a row (user 30.09.2026).
-      seriesCycles: 3,
+      seriesCycles: 1,
       // Arrival/safe radius from the centre, outside the collider and footprint.
       // The runner walks on from here before its hand can name the stone.
       reachDistance: 2.2,
