@@ -36,6 +36,8 @@
 import { readFileSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
+import { boundaryRequestRefusal, parseCarrier } from './findings-core.mjs'
+import { carrierPath } from './findings-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { readTasksOpen, TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
 import { markHandover, readOwnerLock } from './batch-singleton.mjs'
@@ -667,6 +669,19 @@ if (isMain) {
   const fail = (msg) => {
     console.error(msg)
     process.exit(1)
+  }
+
+  // Waiting user requests are queued BEFORE any commit hands the lock over:
+  // after the handover no owner turn end would see them.
+  if (arg === '--commit') {
+    let carrierText = ''
+    try {
+      carrierText = readFileSync(carrierPath(), 'utf8')
+    } catch {
+      /* no carrier — nothing waits */
+    }
+    const refusal = boundaryRequestRefusal(parseCarrier(carrierText).requests.length)
+    if (refusal) fail(refusal)
   }
 
   if (durableBatchId && (arg === '--prepare' || arg === '--commit')) {
