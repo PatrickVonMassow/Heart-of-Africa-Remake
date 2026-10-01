@@ -1855,6 +1855,29 @@ describe('a visit finds the children playing at the bank (work-order 1250)', () 
     expect(said.some((u) => u.moment === 'boulder')).toBe(true)
   })
 
+  it('announces the first run after the opening RIVER for a listener who knows ROCK, without a floor', () => {
+    for (const seed of [13, ...SEEDS]) {
+      const { s, world, rand } = visit(seed, () => true)
+      expect(world.floor).toBeUndefined()
+      const said: BankUtterance[] = []
+      const dt = 1 / 60
+      for (let t = 0; t < 30 && s.phase !== 'run'; t += dt) {
+        const u = stepBankGame(s, dt, CFG, STAGE, world, rand)
+        if (u) said.push(u)
+      }
+      // The run's opening step speaks its tap; take it as well.
+      for (let k = 0; k < 3 && said.length < 3; k++) {
+        const u = stepBankGame(s, dt, CFG, STAGE, world, rand)
+        if (u) said.push(u)
+      }
+      expect(said.slice(0, 3).map((u) => `${u.concept}:${u.moment}`)).toEqual([
+        'RIVER:call',
+        `${s.direction}:announce`,
+        'ROCK:tap',
+      ])
+    }
+  })
+
   it('never speaks later than a few seconds after the visit opens, over several seeds', () => {
     for (const seed of SEEDS) {
       const { s, world, rand } = visit(seed, () => false)

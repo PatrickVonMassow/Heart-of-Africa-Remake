@@ -1343,7 +1343,9 @@ function advanceBankGame(
       // A listener who missed the climb gets a rock-only touch/run. Never
       // introduce a direction alongside an as-yet unheard object.
       openedRun = openRun(s, stage, cfg, world)
-    } else if (s.direction === null && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
+    } else if (s.direction === null && s.pending.length === 0 && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
+      // Not in the step that already called the river: `drain` speaks one
+      // word per step, and the run must not open on a dropped announcement.
       announceRun(s, stage, world)
     } else if (s.direction !== null && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
       openedRun = openRun(s, stage, cfg, world)
