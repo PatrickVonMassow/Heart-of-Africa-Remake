@@ -638,6 +638,7 @@ export interface Strings {
     tagCryGain: string
     bankCatch: string
     tagPlayRadius: string
+    bankVisitOpensAtBank: string
     bankRoam: string
     bankRoamSpread: string
     bankGather: string

@@ -86,6 +86,7 @@ import {
   bankChildTouching,
   bankChildBodyLift,
   createBankGame,
+  openVisitAtBank,
   otherEnd,
   rockAt,
   stationAt,
@@ -862,6 +863,8 @@ function Kids({
     })
     if (stage) {
       const bank = createBankGame(spots, rand, { ...balance.villageLife.tag, ...balance.villageLife.bankGame })
+      // The group is found at its rocks, not in a silent roam (work-order 1250).
+      if (balance.villageLife.bankGame.visitOpensAtBank) openVisitAtBank(bank, stage, balance.villageLife.bankGame, world)
       return { bank, game: null, children: bank.children as TagChild[], rand }
     }
     const game = createTagGame(spots, rand, balance.villageLife.tag)

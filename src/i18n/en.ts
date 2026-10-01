@@ -615,6 +615,7 @@ export const en: Strings = {
     tagCryGain: 'Tag: catch cry level',
     bankCatch: 'Bank game: catch distance (m)',
     tagPlayRadius: 'Tag: play ground radius',
+    bankVisitOpensAtBank: 'Bank game: a visit opens at the rocks',
     bankRoam: 'Bank game: roaming lasts (s)',
     bankRoamSpread: 'Bank game: spread of the roaming',
     bankGather: 'Bank game: run to the bank, backstop (s)',

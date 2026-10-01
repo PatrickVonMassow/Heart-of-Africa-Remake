@@ -6350,6 +6350,235 @@ if (section('villager-canoe')) {
   }
 }
 
+// --- The mute shore scene (work-order 1250) ----------------------------------
+// The user's report `SzeneStummUndGrafikfehler`: at seed 2425147265, the Bambara
+// village entered from travel, the boatmen and the children said nothing for a
+// long while, a large flat yellow band lay on the river between the dugout and
+// the near bank, and a camel stood in the water at the far waterline. This
+// section enters THAT world — the page is reloaded on the report's seed and
+// booted back onto the suite's own world afterwards, so no other section's world
+// changes — and, with no knob turned (ROCK is NOT marked heard, the roam is not
+// shortened), asserts on the round's own clock that a boatman's and a child's
+// reading appear within a few seconds of entry, then photographs the water in
+// front of the shore and probes the drawn surface over it for land.
+if (section('mute-shore-scene')) {
+  const REPORT_SEED = 2425147265
+  const shore = page
+  const shoreFrame = frame
+  // A fresh game on `seed` (the suite's own boot, above, with the seed named).
+  const bootOn = async (seed) => {
+    const url = new URL(BASE)
+    if (seed !== null) url.searchParams.set('seed', String(seed))
+    await shore.goto(url.toString())
+    await shore.evaluate(() => localStorage.clear())
+    await shore.reload()
+    await shore.waitForFunction(() => window.__game && window.__balance && window.__renderer, null, { timeout: 90000 })
+    await assertBackend(shore)
+    await nextFrames(30)
+    await shore.evaluate(() => {
+      window.__balance.randomEventsEnabled = false
+      window.__game.getState().setJournalOpen(false)
+    })
+  }
+  try {
+    await bootOn(REPORT_SEED)
+    check('the shore page runs the reported world', (await shore.evaluate(() => window.__game.getState().seed)) === REPORT_SEED)
+    // Entered FROM TRAVEL, as the report was: out of the start place, to the
+    // reported position, and in by the use key's own action.
+    await shore.evaluate(() => window.__game.getState().leavePlace())
+    await shore.waitForFunction(() => !!window.__rivers, null, { timeout: 60000 })
+    await shore.evaluate(() => window.__game.getState().debugJumpTo(13.0635, -6.091))
+    // The travel panorama is captured before the traveller goes in: the band it
+    // draws is what showed through the river (see below), so it must be up.
+    const captured = await shore
+      .evaluate(async (seed) => {
+        window.__panoramaModule = await import('/src/scenes/travel/panoramaCapture.ts')
+        return seed
+      }, REPORT_SEED)
+      .then((seed) => shore.waitForFunction((s) => window.__panoramaModule.hasPanoramaCapture('bambara-village', s), seed, { timeout: 60000 }))
+      .then(() => true)
+      .catch(() => false)
+    check('the travel panorama around the Bambara village is captured before entry', captured)
+    await shore.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+    const inside = await shore
+      .waitForFunction(() => {
+        const g = window.__game.getState()
+        return g.placeId === 'bambara-village' && g.enteredFromTravel && !!window.__placeCanoe && !!window.__placeTag &&
+          !!window.__placePlayer && !!window.__placeLayout?.playRocks
+      }, null, { timeout: 60000 })
+      .then(() => true)
+      .catch(() => false)
+    check('the Bambara village entered from travel carries the dugout and the children`s round', inside)
+    check('and its captured panorama band stands on the horizon, as in the report',
+      await shore.evaluate(() => window.__placePanoramaActive === true))
+    if (inside) {
+      // ONE STAND THAT HEARS BOTH, taken at once: on the bank between the play
+      // rock nearer the dugout's lane and the lane's upstream end, inside the
+      // CALL reach of both (the net man's words and the round's calls are CALL).
+      const stand = await shore.evaluate(() => {
+        const L = window.__placeCanoe().lane
+        const R = window.__placeLayout.playRocks
+        const d = (a) => Math.hypot(a.x - L.start.x, a.z - L.start.z)
+        const rock = d(R.upstream) <= d(R.downstream) ? R.upstream : R.downstream
+        let x = (rock.x + L.start.x) / 2
+        let z = (rock.z + L.start.z) / 2
+        const out = x * L.nx + z * L.nz
+        const inland = L.waterline - 3
+        if (out > inland) {
+          x -= L.nx * (out - inland)
+          z -= L.nz * (out - inland)
+        }
+        const p = window.__placePlayer
+        p.x = x
+        p.z = z
+        p.pitch = 0
+        p.yaw = Math.atan2(L.nx, L.nz) + Math.PI
+        return { x, z, toLane: d({ x, z }), toRock: Math.hypot(rock.x - x, rock.z - z), reach: window.__balance.communication.call.reach }
+      })
+      check('the stand lies within call reach of the dugout`s upstream end and of the near play rock',
+        stand.toLane < stand.reach && stand.toRock < stand.reach, JSON.stringify(stand))
+      const firstCall = await shore.evaluate(() => window.__balance.villageLife.canoe.firstCallSeconds)
+      // The round's own clock is the visit's age; the readings are sampled on
+      // every animation frame so a short one cannot fall between two polls.
+      const heard = await shore
+        .waitForFunction(() => {
+          const t = window.__placeTag()
+          const seen = (window.__shoreSeen = window.__shoreSeen ?? {})
+          for (const l of window.__speech?.labels() ?? []) {
+            if (l.speakerId === 'village-canoe' && seen.boat === undefined) {
+              seen.boat = t.clock
+              // Whether ROCK was already heard at the boat's first reading.
+              const g = window.__game.getState()
+              seen.rockAtBoat = Object.hasOwn(g.communication.heard, g.vocabulary.ROCK)
+            }
+            if (/^kid-/.test(l.speakerId) && seen.child === undefined) seen.child = t.clock
+          }
+          seen.clock = t.clock
+          return (seen.boat !== undefined && seen.child !== undefined) || t.clock > 40 ? { ...seen } : null
+        }, null, { timeout: 300000, polling: 'raf' })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      const rockHeard = await shore.evaluate(() => {
+        const g = window.__game.getState()
+        return Object.hasOwn(g.communication.heard, g.vocabulary.ROCK)
+      })
+      check('a boatman`s reading appears within a few seconds of entry, without ROCK marked heard',
+        !!heard && heard.boat !== undefined && heard.boat <= firstCall + 3 && heard.rockAtBoat === false,
+        JSON.stringify({ heard, firstCall }))
+      check('a child`s reading appears within a few seconds of entry',
+        !!heard && heard.child !== undefined && heard.child <= 15, JSON.stringify({ heard, rockHeard }))
+      console.log(`# mute-shore-scene: first readings at round clock ${JSON.stringify(heard)} (ROCK heard by then: ${rockHeard})`)
+
+      // THE WATER IN FRONT OF THE SHORE. The report's view: from the bank
+      // downstream of the normal, across the river and a little downstream,
+      // where the band lay between the dugout and the near bank — taken, as the
+      // report was, while the dugout drifts down with its net out.
+      await shore
+        .waitForFunction(() => {
+          const c = window.__placeCanoe?.()
+          return !!c && c.phase === 'down' && c.s >= 12
+        }, null, { timeout: 180000, polling: 250 })
+        .catch(() => {})
+      const view = await shore.evaluate(() => {
+        window.__game.getState().setJournalOpen(false)
+        const c = window.__placeCanoe()
+        const L = c.lane
+        // A little upstream of the dugout, so it stands in the frame as in the
+        // report, looking across the river and on downstream past the plateau.
+        const s = Math.max(5, Math.min(30, c.s - 6))
+        const back = 7
+        const turn = 0.45
+        const p = window.__placePlayer
+        p.x = L.nx * (L.waterline - back) + L.fx * s
+        p.z = L.nz * (L.waterline - back) + L.fz * s
+        p.pitch = 0
+        const lx = L.nx * Math.cos(turn) + L.fx * Math.sin(turn)
+        const lz = L.nz * Math.cos(turn) + L.fz * Math.sin(turn)
+        p.yaw = Math.atan2(lx, lz) + Math.PI
+        return { s, x: p.x, z: p.z }
+      })
+      await nextFrames(10)
+      // Every point of the river surface between the near bank and the lane that
+      // lands in the frame is probed: what the frame draws there must be water,
+      // never land lying on it.
+      const probe = await shore.evaluate(({ s }) => {
+        const L = window.__placeCanoe().lane
+        const cam = window.__placeCamera
+        const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+        const inFrame = (x, y, z) => {
+          const clip = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [x, y, z, 1]))
+          if (!(clip[3] > 0)) return false
+          return Math.abs(clip[0] / clip[3]) <= 1 && Math.abs(clip[1] / clip[3]) <= 1
+        }
+        let probed = 0
+        const land = []
+        for (let along = s - 20; along <= s + 90; along += 2) {
+          for (let out = L.waterline + 0.5; out <= L.out + 3; out += 1) {
+            const x = L.nx * out + L.fx * along
+            const z = L.nz * out + L.fz * along
+            const y = -0.25
+            if (!inFrame(x, y, z)) continue
+            const r = window.__placeRayHit(x, y, z)
+            if (!r || r.hitDistance === null) continue
+            probed++
+            // Two ways land lay on the water: the BACKDROP drawn as land over
+            // the drawn river, and — the reported band — the panorama band's
+            // captured savanna seen THROUGH the transparent water where nothing
+            // opaque closed its underside. The near bank's lip, the hull and the
+            // figures only stand in front and are not counted.
+            const landOver = r.hitName === 'landscape-backdrop' && r.hitWater !== null && r.hitWater < 0.5
+            // Seen through = under the water the line reaches the horizon band,
+            // the sky, or nothing at all; a hull or a float in the water is not.
+            const seenThrough = r.hitName === 'place-river' &&
+              (r.behindName === 'panorama-band' || r.behindName === null || (r.behindDistance ?? 0) > 150)
+            if (landOver || seenThrough) {
+              land.push({ along, out: +(out - L.waterline).toFixed(1), name: r.hitName, behind: r.behindName, water: +(r.hitWater ?? 0).toFixed(2) })
+            }
+          }
+        }
+        return { probed, land: land.slice(0, 8), landCount: land.length }
+      }, view)
+      check('the river in front of the shore is drawn as water: no land surface lies on it',
+        probe.probed >= 40 && probe.landCount === 0, JSON.stringify(probe))
+      console.log(`# mute-shore-scene: ${probe.probed} river points probed from s = ${view.s.toFixed(1)}, ${probe.landCount} drawn as land`)
+      // The camel: every horizon silhouette stands on dry drawn ground.
+      const feet = await shore.evaluate(() => {
+        const info = Object.values(window.__placePanoramaWildlifeInfo ?? {})
+        return info.filter((w) => w.visible).map((w) => {
+          // Probed straight down: a far silhouette's feet often stand behind a
+          // ridge the camera's sight line hits first, which proves nothing.
+          const r = window.__placeRayHit(w.x, w.visibleY - 0.05, w.z, [w.x, w.visibleY + 50, w.z])
+          // The hit point lies on the same line as the feet, so the two
+          // distances differ by the gap between them.
+          const gap = r && r.hitDistance !== null ? Math.abs(r.targetDistance - r.hitDistance) : null
+          return {
+            x: +w.x.toFixed(1), z: +w.z.toFixed(1), name: r?.hitName ?? null, water: r?.hitWater ?? null,
+            gap: gap === null ? null : +gap.toFixed(2), near: gap !== null && gap <= Math.max(2, 0.1 * r.targetDistance),
+          }
+        })
+      })
+      // Only the ground the feet stand on proves dry footing: a missed ray, a
+      // hut or the panorama band in the way proves nothing.
+      const ground = ['landscape-backdrop', 'ground-disc', 'place-river-shore']
+      check('no panorama silhouette stands in the water',
+        feet.length > 0 && feet.every((f) => ground.includes(f.name) && f.near && !(f.water !== null && f.water >= 0.5)), JSON.stringify(feet))
+      const subject = await shore.evaluate(({ s }) => {
+        const L = window.__placeCanoe().lane
+        const along = s + 18
+        const out = (L.waterline + L.out) / 2
+        return { x: L.nx * out + L.fx * along, y: -0.25, z: L.nz * out + L.fz * along }
+      }, view)
+      await shoreFrame('1250-shore-water-without-band', {
+        local: subject,
+        label: 'the Bambara village shore at the reported seed, entered from travel: the river between the near bank and the dugout lane, looking across and downstream — water all the way to the far bank, no yellow band lying on it',
+      })
+    }
+  } finally {
+    // Back onto the suite's own world (the seed route pins a bare URL).
+    await bootOn(null)
+  }
+}
+
 // --- A child up on a stone ----------------------------------------------------
 // THE OFF-GAME ROCK HAS TO BE SEEN (work-order 1080). The children's spec asks
 // for ROCK to be spoken at a stone that is no part of the game, so the word
@@ -6384,12 +6613,19 @@ if (section('children-boulder-climb')) {
   // shipped values. The stand is now the shipped one, the readiness wait is taken
   // BEFORE the climb rather than during it, and the frame is declared as the
   // moment it is (`settle: false`), as other moment frames in this file are.
+  // A visit now opens at the rocks (work-order 1250), which puts the first
+  // roaming phase a whole cycle later; this section photographs the roam, so it
+  // turns that opening off for its own visit — a spectator knob like the roam.
   const shippedClimbRoam = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
-    const was = { roamSeconds: b.roamSeconds }
+    const was = { roamSeconds: b.roamSeconds, visitOpensAtBank: b.visitOpensAtBank }
     b.roamSeconds = 8
+    b.visitOpensAtBank = false
+    const g = window.__game.getState()
+    if (g.placeId === 'bambara-village') g.leavePlace()
     return was
   })
+  await page.waitForFunction(() => window.__game.getState().placeId !== 'bambara-village', null, { timeout: 30000 }).catch(() => {})
   await goToPlace('bambara-village')
   const staged = await page
     .waitForFunction(() => !!window.__placeTag && !!window.__placeTag().boulder, null, { timeout: 40000 })
@@ -6608,6 +6844,7 @@ if (section('children-boulder-climb')) {
   }
   await page.evaluate((was) => {
     window.__balance.villageLife.bankGame.roamSeconds = was.roamSeconds
+    window.__balance.villageLife.bankGame.visitOpensAtBank = was.visitOpensAtBank
   }, shippedClimbRoam)
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })

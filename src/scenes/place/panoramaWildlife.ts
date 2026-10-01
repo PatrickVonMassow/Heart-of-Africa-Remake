@@ -115,6 +115,18 @@ export function panoramaGaitDistance(
   return panoramaDriftDistance(radius, driftRate, elapsedSeconds) / s
 }
 
+/**
+ * The gait distance one walk step covers, in the silhouette's own rendered
+ * frame (÷ scale, as `panoramaGaitDistance`): the arc between the angles
+ * BEFORE and AFTER the step. Accumulated per frame, the legs ride exactly the
+ * ground the body moved — a capped long frame, or a turn at the water, moves
+ * both alike, so the legs never outrun the body.
+ */
+export function panoramaGaitStep(angleBefore: number, angleAfter: number, radius: number, scale: number): number {
+  const s = scale > 0 ? scale : 1
+  return Math.abs((angleAfter - angleBefore) * radius) / s
+}
+
 // The silhouettes' body-level stride motion used to be two cosmetic fudges: a
 // |sin| bob of the body height and a |sin| fore/aft nod (point 255,
 // `panoramaGaitBob` / `panoramaGaitNod`). Point 300 replaced both with the
@@ -159,4 +171,43 @@ export function isAzimuthExcluded(azimuth: number, spans: readonly AzimuthSpan[]
     if (Math.abs(d) <= s.half) return true
   }
   return false
+}
+
+// --- Keeping to dry ground (work-order 1250) ---------------------------------
+//
+// A silhouette walked its ring straight across the river the settlement stands
+// on: the report showed a camel standing in the water at the far waterline. An
+// animal on the horizon now keeps to dry ground: it starts on the nearest dry
+// stretch of its ring and turns back where its next step would be water.
+
+/** Ring angle's search step for the nearest dry ground (rad, ~0.6°). */
+const DRY_SEARCH_STEP = 0.01
+
+/**
+ * The dry ring angle nearest `angle` — `angle` itself when it is dry — searched
+ * both ways round; null when the whole ring is water.
+ */
+export function dryRingAngle(angle: number, wet: (a: number) => boolean): number | null {
+  if (!wet(angle)) return angle
+  for (let k = 1; k * DRY_SEARCH_STEP <= Math.PI; k++) {
+    const d = k * DRY_SEARCH_STEP
+    if (!wet(angle + d)) return angle + d
+    if (!wet(angle - d)) return angle - d
+  }
+  return null
+}
+
+/**
+ * One step of a silhouette's walk along its ring: on by `drift · dt`, or — where
+ * that step would put it in the water — turned round where it stands, to walk
+ * back the way it came. The drift's size never changes, only its sign.
+ */
+export function stepRingWalk(
+  angle: number,
+  drift: number,
+  dt: number,
+  wet: (a: number) => boolean,
+): { angle: number; drift: number } {
+  const next = angle + drift * dt
+  return wet(next) ? { angle, drift: -drift } : { angle: next, drift }
 }

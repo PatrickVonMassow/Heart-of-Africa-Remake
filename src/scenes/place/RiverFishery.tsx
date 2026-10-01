@@ -60,6 +60,7 @@ import {
   netHand,
   stepCanoe,
   unloadSeconds,
+  visitStartS,
   yawOf,
   type CanoeLane,
   type CanoeState,
@@ -248,12 +249,14 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const sites = useMemo(() => fisherySites(bank, lane, cfg.laneEnd, fireCfg), [bank, lane, cfg.laneEnd, fireCfg])
   const rand = useMemo(() => mulberry32((seed ^ 0x6d2b79f5) >>> 0), [seed])
   const ring = useMemo<BasketRing>(() => createFisheryRing(fireCfg), [fireCfg])
-  const canoe = useMemo(() => createCanoe(lane, cfg), [lane, cfg])
+  // A visit finds the dugout just short of the upstream end, so its first word
+  // falls a few seconds in (work-order 1250).
+  const canoe = useMemo(() => createCanoe(lane, cfg, visitStartS(cfg)), [lane, cfg])
   const round = useMemo(() => canoeCycleSeconds(cfg), [cfg])
   const fire = useMemo<FishFireState>(() => {
     // The carrier is due back as the boat sets its first full basket down.
     const span = cfg.laneEnd - cfg.laneStart
-    const first = span / cfg.upstreamSpeed + 2.2 + cfg.turnSeconds + span / cfg.downstreamSpeed + cfg.haulSeconds +
+    const first = (visitStartS(cfg) - cfg.laneStart) / cfg.upstreamSpeed + 2.2 + cfg.turnSeconds + span / cfg.downstreamSpeed + cfg.haulSeconds +
       cfg.landSeconds + unloadSeconds((cfg.catchMin + cfg.catchMax) / 2, cfg)
     return createFishFire(sites, ring, first, fireCfg, rand)
   }, [sites, ring, cfg, fireCfg, rand])
@@ -337,8 +340,9 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       {
         say: (word) => {
           const game = useGame.getState()
-          // Direction words follow the listener's first ROCK hearing, as at the bank.
-          if (!Object.hasOwn(game.communication.heard, game.vocabulary.ROCK)) return 'silent'
+          // No ROCK gate here (work-order 1250): at the bank a direction runs
+          // between two rocks, so ROCK comes first; the dugout's words name the
+          // current, and a player at the boat would otherwise never hear them.
           if (!floor) return 'said'
           return floor.request({
             situation: canoe,

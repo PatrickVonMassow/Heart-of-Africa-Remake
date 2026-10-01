@@ -13,6 +13,9 @@ import {
   panoramaDriftVelocity,
   panoramaDriftYaw,
   panoramaGaitDistance,
+  panoramaGaitStep,
+  dryRingAngle,
+  stepRingWalk,
 } from './panoramaWildlife'
 import { buildElephantParts, GAIT_MAX_PITCH, GAIT_SWING, gaitBodyLift, gaitPhase, gaitRig, groundPitch } from '../../render/fauna'
 
@@ -237,6 +240,42 @@ describe('panorama silhouette gait rate (point 286 — consistent with rendered 
   })
 })
 
+describe('panorama silhouette gait follows the body it moves (no skating on long frames)', () => {
+  const dry = () => false
+  /** Walks a silhouette for `seconds` of frames of `frame` s, each capped at 0.1 s
+   *  as the scene caps it; returns the ring arc moved (÷ scale) and the gait. */
+  const walk = (frame: number, seconds: number, wet: (a: number) => boolean = dry) => {
+    const radius = 120
+    const scale = 3
+    let angle = 0
+    let drift = 0.006
+    let gait = 0
+    let moved = 0
+    for (let t = 0; t < seconds - 1e-9; t += frame) {
+      const stepped = stepRingWalk(angle, drift, Math.min(frame, 0.1), wet)
+      gait += panoramaGaitStep(angle, stepped.angle, radius, scale)
+      moved += Math.abs(stepped.angle - angle) * radius / scale
+      angle = stepped.angle
+      drift = stepped.drift
+    }
+    return { gait, moved, wallClock: panoramaGaitDistance(radius, 0.006, scale, seconds) }
+  }
+
+  it('advances the legs only as far as the capped body moved below 10 FPS', () => {
+    const slow = walk(0.25, 10) // 4 FPS: the body moves 0.1 s per 0.25 s frame
+    expect(slow.gait).toBeCloseTo(slow.moved, 9)
+    expect(slow.gait).toBeCloseTo(slow.wallClock * 0.4, 9) // the wall clock would outrun it 2.5×
+    const smooth = walk(1 / 60, 10)
+    expect(smooth.gait).toBeCloseTo(smooth.wallClock, 6)
+  })
+
+  it('holds the legs still while the body only turns round at the water', () => {
+    const r = walk(0.05, 2, () => true)
+    expect(r.gait).toBe(0)
+    expect(panoramaGaitStep(0.4, 0.5, 120, 0)).toBeCloseTo(12, 9) // scale ≤ 0 falls back to 1
+  })
+})
+
 describe('skyline landmark azimuth exclusion (point 102)', () => {
   const DEG = Math.PI / 180
 
@@ -278,5 +317,40 @@ describe('skyline landmark azimuth exclusion (point 102)', () => {
 
   it('is empty-safe (no spans excludes nothing)', () => {
     expect(isAzimuthExcluded(1.2, [])).toBe(false)
+  })
+})
+
+// A camel stood in the river at the far waterline (work-order 1250): a
+// silhouette now starts on dry ground and turns back at the water.
+describe('panorama silhouettes keep to dry ground (work-order 1250)', () => {
+  // Water across the ring between 1 and 2 rad.
+  const wet = (a: number) => {
+    const w = ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+    return w > 1 && w < 2
+  }
+
+  it('starts where it stands when that is dry, and on the nearest dry ground otherwise', () => {
+    expect(dryRingAngle(0.5, wet)).toBe(0.5)
+    const near1 = dryRingAngle(1.1, wet)!
+    expect(wet(near1)).toBe(false)
+    expect(Math.abs(near1 - 1)).toBeLessThan(0.02)
+    const near2 = dryRingAngle(1.9, wet)!
+    expect(wet(near2)).toBe(false)
+    expect(Math.abs(near2 - 2)).toBeLessThan(0.02)
+    expect(dryRingAngle(1, () => true)).toBeNull()
+  })
+
+  it('walks on over dry ground and turns round, never stepping in, at the water', () => {
+    let walk = { angle: 0.5, drift: 0.01 }
+    let turned = 0
+    for (let i = 0; i < 20000; i++) {
+      const next = stepRingWalk(walk.angle, walk.drift, 0.5, wet)
+      if (Math.sign(next.drift) !== Math.sign(walk.drift)) turned++
+      expect(Math.abs(next.drift)).toBe(0.01)
+      walk = next
+      expect(wet(walk.angle)).toBe(false)
+    }
+    // It meets the water from both sides of the dry arc.
+    expect(turned).toBeGreaterThanOrEqual(2)
   })
 })

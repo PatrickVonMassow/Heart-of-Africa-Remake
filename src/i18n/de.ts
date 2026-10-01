@@ -614,6 +614,7 @@ export const de: Strings = {
     tagCryGain: 'Fangen: Lautstärke des Fangrufs',
     bankCatch: 'Uferspiel: Fangabstand (m)',
     tagPlayRadius: 'Fangen: Radius des Spielplatzes',
+    bankVisitOpensAtBank: 'Uferspiel: ein Besuch beginnt an den Felsen',
     bankRoam: 'Uferspiel: Streifzug dauert (s)',
     bankRoamSpread: 'Uferspiel: Streuung des Streifzugs',
     bankGather: 'Uferspiel: Lauf zum Ufer, Notbremse (s)',
