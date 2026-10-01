@@ -1071,6 +1071,8 @@ describe('a play session is a series of cycles before the children scatter', () 
     tapReturnSeconds: 0.1,
     partSeconds: 0.1,
     catchDistance: -1,
+    // The series mechanism is proven at three, independent of the shipped length.
+    seriesCycles: 3,
   }
 
   /** Every phase change, with the round's counters as they stood after it. */
@@ -1090,8 +1092,8 @@ describe('a play session is a series of cycles before the children scatter', () 
     return seen
   }
 
-  it('ships three cycles to a series', () => {
-    expect(balance.villageLife.bankGame.seriesCycles).toBe(3)
+  it('ships one cycle to a series', () => {
+    expect(balance.villageLife.bankGame.seriesCycles).toBe(1)
   })
 
   it('plays three cycles back to back, parts only after the third, and starts the next series at one', () => {
