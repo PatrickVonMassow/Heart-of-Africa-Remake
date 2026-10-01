@@ -6546,11 +6546,12 @@ if (section('mute-shore-scene')) {
         const info = Object.values(window.__placePanoramaWildlifeInfo ?? {})
         return info.filter((w) => w.visible).map((w) => {
           const r = window.__placeRayHit(w.x, w.visibleY - 0.05, w.z)
-          return { x: +w.x.toFixed(1), z: +w.z.toFixed(1), name: r?.hitName ?? null, water: r?.hitWater ?? null }
+          return { x: +w.x.toFixed(1), z: +w.z.toFixed(1), hit: !!r && r.hitDistance !== null, name: r?.hitName ?? null, water: r?.hitWater ?? null }
         })
       })
+      // A missed ground ray proves nothing: each silhouette needs a ground hit.
       check('no panorama silhouette stands in the water',
-        feet.length > 0 && feet.every((f) => f.name !== 'place-river' && !(f.water !== null && f.water >= 0.5)), JSON.stringify(feet))
+        feet.length > 0 && feet.every((f) => f.hit && f.name !== 'place-river' && !(f.water !== null && f.water >= 0.5)), JSON.stringify(feet))
       const subject = await shore.evaluate(({ s }) => {
         const L = window.__placeCanoe().lane
         const along = s + 18
