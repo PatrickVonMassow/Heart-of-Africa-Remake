@@ -230,6 +230,7 @@ export const en: Strings = {
     findTooltip: 'Click it before the chief to lay it in his hands',
     webglFallback: 'Graphics notice: WebGPU is unavailable — the game is running in WebGL 2 compatibility mode.',
     webglFallbackDismiss: 'Got it',
+    rendererUnavailable: 'Graphics notice: this device or browser offers neither WebGPU nor WebGL 2 — the game world cannot be drawn.',
     fps: (fps) => `${fps} FPS`,
     healthBar: 'Health',
     movementPenalty: {

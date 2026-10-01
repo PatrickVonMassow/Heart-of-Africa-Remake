@@ -28,11 +28,11 @@ beforeEach(() => {
   // newGame() does not reset hasCheckpoint, and the UI store is a singleton —
   // clear both so overlays/prompts from a prior test never leak in.
   useGame.setState({ hasCheckpoint: false })
-  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, touchActive: false })
+  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, rendererUnavailable: false, rendererUnavailableDismissed: false, touchActive: false })
 })
 afterEach(() => {
   useLocale.getState().setLang('en')
-  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, touchActive: false })
+  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, rendererUnavailable: false, rendererUnavailableDismissed: false, touchActive: false })
 })
 
 const invClass = (eq: string) => document.querySelector(`[data-eq="${eq}"]`)?.className ?? ''
@@ -313,6 +313,22 @@ describe('renderer warning (CLAUDE.md §3)', () => {
     fireEvent.click(dismiss!)
     rerender(<Hud />)
     expect(document.querySelector('.renderer-warning')).not.toBeInTheDocument()
+  })
+
+  it('shows the no-renderer notice in both languages and hides it once dismissed', () => {
+    useUi.getState().setRendererUnavailable(true)
+    useLocale.getState().setLang('de')
+    const { rerender } = render(<Hud />)
+    expect(document.querySelector('.renderer-unavailable')?.textContent).toContain(de.hud.rendererUnavailable)
+    useLocale.getState().setLang('en')
+    rerender(<Hud />)
+    const notice = document.querySelector('.renderer-unavailable')
+    expect(notice?.textContent).toContain(en.hud.rendererUnavailable)
+    expect(notice?.getAttribute('role')).toBe('alert')
+    const dismiss = [...notice!.querySelectorAll('button')].find((b) => b.textContent === en.hud.webglFallbackDismiss)
+    fireEvent.click(dismiss!)
+    rerender(<Hud />)
+    expect(document.querySelector('.renderer-unavailable')).not.toBeInTheDocument()
   })
 })
 

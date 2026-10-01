@@ -362,6 +362,23 @@ function RendererWarning() {
   )
 }
 
+/** Dismissible notice when the device can draw on no backend at all
+ *  (src/render/renderSupport.ts) — shown instead of a crashed start. */
+function RendererUnavailableNotice() {
+  const t = useStrings()
+  const unavailable = useUi((s) => s.rendererUnavailable)
+  const dismissed = useUi((s) => s.rendererUnavailableDismissed)
+  if (!unavailable || dismissed) return null
+  return (
+    <div className="renderer-warning renderer-unavailable" role="alert">
+      <span>{t.hud.rendererUnavailable}</span>
+      <button onClick={() => useUi.getState().dismissRendererUnavailable()}>
+        {t.hud.webglFallbackDismiss}
+      </button>
+    </div>
+  )
+}
+
 function Prompt() {
   const prompt = useUi((s) => s.prompt)
   const dialog = useUi((s) => s.dialog)
@@ -779,6 +796,7 @@ export function Hud() {
       {/* Above panels and dialogs (the renderer warning stays clickable); below the modal overlays. */}
       <SunblindVeil />
       <RendererWarning />
+      <RendererUnavailableNotice />
       <StartOverlay />
       <VictoryOverlay />
       <DefeatOverlay />
