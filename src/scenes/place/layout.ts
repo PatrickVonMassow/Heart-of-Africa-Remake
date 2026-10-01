@@ -29,7 +29,8 @@ import {
   type BankPoint,
   type PlaceRiverBank,
 } from './riverBank'
-import { inBankArc } from './boundary'
+import { inBankArc, type ObservedGround } from './boundary'
+import { CHIEF_DOOR_REACH, sceneGrounds } from './sceneGrounds'
 import { balance } from '../../config/balance'
 import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
@@ -102,6 +103,9 @@ interface Household {
 export interface PlaceLayout {
   /** Walkable radius; leaving it exits the place (larger for big cities). */
   radius: number
+  /** The scene grounds the boundary keeps observer room around (`sceneGrounds`,
+   *  work-order 1252). Empty outside villages. */
+  observed: ObservedGround[]
   /** Distance south of the centre at which the traveller arrives, facing north
    *  (design.md §2.3). Normally just inside the walkable edge; an open-plain
    *  monument site keeps its own approach distance, so a disc widened for the
@@ -923,7 +927,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // (2.9) hut bodies — a roof stand-off can widen either collider.
     const hutDoor = (p: [number, number]): [number, number] => {
       const facing = Math.atan2(p[0], p[1]) + Math.PI
-      return [p[0] + Math.sin(facing) * 3.9, p[1] + Math.cos(facing) * 3.9]
+      return [p[0] + Math.sin(facing) * CHIEF_DOOR_REACH, p[1] + Math.cos(facing) * CHIEF_DOOR_REACH]
     }
     interactives.push({ type: 'chief', pos: chiefPos, door: hutDoor(chiefPos) })
     // The trading post's spot follows the people's plan (design.md §4.5) so
@@ -2662,5 +2666,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, climbRock, digSites, bank, playRocks, waterPath, waterStand, loom, gaveWayToLoom, playGround, wayOut, pen, errands, colliders }
+  const chief = interactives.find((i) => i.type === 'chief')
+  const observed = place.kind === 'village'
+    ? sceneGrounds({ playGround, playRocks, digSites, waterPath, waterStand, loom, chief: chief?.pos ?? null })
+    : []
+  return { radius, observed, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, climbRock, digSites, bank, playRocks, waterPath, waterStand, loom, gaveWayToLoom, playGround, wayOut, pen, errands, colliders }
 }

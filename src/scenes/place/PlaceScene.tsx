@@ -3389,6 +3389,7 @@ export function PlaceScene() {
           pen={layout.pen}
           colliders={layout.colliders}
           radius={layout.radius}
+          observed={layout.observed}
           onDigProgress={onDigProgress}
         />
       )}

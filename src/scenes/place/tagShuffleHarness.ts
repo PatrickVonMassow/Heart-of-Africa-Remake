@@ -398,7 +398,7 @@ export function village(
   // included, because the two play rocks stand on it — and is kept off the
   // sloping shore. The tag round keeps its circle. Replaying the bank round
   // inside the plain circle put its whole stage out of reach.
-  const bounds = { radius: layout.radius, bank: layout.bank }
+  const bounds = { radius: layout.radius, bank: layout.bank, observed: layout.observed }
   const onGround = hasBank
     ? (x: number, z: number) =>
         insidePlace(bounds, x, z, NPC_RADIUS * 2) && standsOnGroundPlate(layout.bank, x, z, NPC_RADIUS)

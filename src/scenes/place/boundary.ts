@@ -16,8 +16,15 @@
 // radius per bearing — both shapes it is built from contain the centre, so their
 // union is star-shaped about it — which is why the band's angular lookup
 // (`buildBoundaryLut`) needed no change at all to follow it.
+//
+// It also GROWS AROUND THE WATCHED SCENES (work-order 1252): every scene ground
+// the layout names (`observed`) keeps `balance.observerMargin` of walkable room
+// around it, so stepping aside to watch never leaves the village. The bulge is
+// the far side of the margin disc along each ray, which still contains the
+// centre, so the region stays star-shaped and one radius per bearing.
 
 import { BACKDROP_INNER_OFFSET } from './backdrop'
+import { balance } from '../../config/balance'
 import {
   BANK_BED_REACH,
   BANK_DISC_SHIFT_EASE_ANGLE,
@@ -34,11 +41,19 @@ import {
  *  lies. Four kilobytes of lookup buy the angular resolution back. */
 export const BOUNDARY_LUT_SIZE = 1024
 
-/** What the boundary is read from: the plain walkable radius, and the river
- *  bank where the settlement has one. */
+/** A scene ground the player watches: a disc enclosing its whole extent. */
+export interface ObservedGround {
+  x: number
+  z: number
+  r: number
+}
+
+/** What the boundary is read from: the plain walkable radius, the river bank
+ *  where the settlement has one, and the scene grounds it keeps room around. */
 export interface PlaceBounds {
   radius: number
   bank?: PlaceRiverBank | null
+  observed?: readonly ObservedGround[]
 }
 
 /** Smoothstep, with the edges given in either order. */
@@ -74,6 +89,38 @@ function bearingDelta(a: number, b: number): number {
  * river he wades into is the one the bird's-eye view lets him swim.
  */
 export function placeBoundaryRadius(bounds: PlaceBounds, angle = 0): number {
+  const lobe = lobeRadius(bounds, angle)
+  const observed = bounds.observed
+  if (!observed || observed.length === 0) return lobe
+  let reach = 0
+  for (const g of observed) reach = Math.max(reach, observerReach(g, angle))
+  if (reach <= lobe) return lobe
+  // Never past the wade limit: toward the river the water is the edge, and an
+  // observer stands on the shore.
+  const bank = bounds.bank
+  if (bank) {
+    const cos = Math.cos(bearingDelta(angle, Math.atan2(bank.nz, bank.nx)))
+    if (cos > 1e-6) reach = Math.min(reach, bank.wadeEdge / cos)
+  }
+  return Math.max(lobe, reach)
+}
+
+/**
+ * How far along a ray from the centre the observer disc around a scene ground
+ * reaches — its far side where the ray crosses it, else the projection of its
+ * centre, which joins the far side at the tangent, so the result is continuous
+ * over the full turn.
+ */
+function observerReach(g: ObservedGround, angle: number): number {
+  const d = Math.hypot(g.x, g.z)
+  const big = g.r + balance.observerMargin
+  const delta = bearingDelta(angle, Math.atan2(g.z, g.x))
+  const across = d * Math.sin(delta)
+  return Math.max(0, d * Math.cos(delta) + Math.sqrt(Math.max(0, big * big - across * across)))
+}
+
+/** The plain radius with the bank lobe — the boundary before the scene room. */
+function lobeRadius(bounds: PlaceBounds, angle: number): number {
   const bank = bounds.bank
   if (!bank) return bounds.radius
   const delta = Math.abs(bearingDelta(angle, Math.atan2(bank.nz, bank.nx)))
@@ -111,8 +158,11 @@ export function insidePlace(bounds: PlaceBounds, x: number, z: number, margin = 
 /** The largest radius the boundary ever reaches — what the drawn ground has to
  *  cover, so the player never walks off the plate he is standing on. */
 export function maxBoundaryRadius(bounds: PlaceBounds): number {
+  // A scene's room reaches at most its far side; an upper bound is enough here.
+  let observed = 0
+  for (const g of bounds.observed ?? []) observed = Math.max(observed, Math.hypot(g.x, g.z) + g.r + balance.observerMargin)
   const bank = bounds.bank
-  if (!bank) return bounds.radius
+  if (!bank) return Math.max(bounds.radius, observed)
   // The plateau's rim, and a sweep of the fade: the lobe still reaches outward
   // for a little past the plateau, where the wade line grows faster than the
   // taper draws it in. The lobe is symmetric, so one side answers for both.
@@ -120,9 +170,9 @@ export function maxBoundaryRadius(bounds: PlaceBounds): number {
   let widest = Math.max(bounds.radius, bank.wadeEdge / Math.cos(BANK_PLATEAU_ANGLE))
   for (let i = 0; i <= 256; i++) {
     const delta = BANK_PLATEAU_ANGLE + (i / 256) * (BANK_FADE_ANGLE - BANK_PLATEAU_ANGLE)
-    widest = Math.max(widest, placeBoundaryRadius(bounds, normal + delta))
+    widest = Math.max(widest, lobeRadius(bounds, normal + delta))
   }
-  return widest
+  return Math.max(widest, observed)
 }
 
 /**
@@ -143,16 +193,18 @@ export function groundPlateRadius(bounds: PlaceBounds, angle: number, discEdge: 
 
 /**
  * How far the drawn ground disc is pushed out past its plain edge at a bearing
- * (work-order 1237, both sides since 1245). Zero everywhere except across a
- * bank, where the walkable lobe reaches far past the plain radius: there the
- * disc moves out by exactly that excess, so it keeps the same overhang beyond
+ * (work-order 1237, both sides since 1245). Zero everywhere except where the
+ * boundary reaches past the plain radius — across a bank's lobe, and around a
+ * watched scene's room: there the disc moves out by exactly that excess, so it keeps the same overhang beyond
  * the last step as it has everywhere else. The backdrop's inner rim moves with it
  * (`PlaceScene`'s `LandscapeBackdrop`), so the panorama starts where the drawn
  * ground ends instead of standing on it.
  */
 export function groundDiscShift(bounds: PlaceBounds, angle: number): number {
   const bank = bounds.bank
-  if (!bank) return 0
+  // Around a watched scene's room the disc moves out the same way (work-order
+  // 1252), so the drawn overhang past the last step stays the same width.
+  if (!bank) return Math.max(0, placeBoundaryRadius(bounds, angle) - bounds.radius)
   // Eased in off the bank's own bearing, where the plate is cut at the top of
   // the bank anyway: out to `BANK_DISC_SHIFT_EASE_ANGLE` the scene is drawn as
   // it always was there, and past it the shift is whole.

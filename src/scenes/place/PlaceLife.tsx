@@ -61,7 +61,7 @@ import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
-import { insidePlace } from './boundary'
+import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { RiverFishery } from './RiverFishery'
@@ -678,6 +678,7 @@ function Kids({
   radius,
   stage,
   bank,
+  observed,
   childBodies,
 }: {
   x: number
@@ -698,6 +699,8 @@ function Kids({
   /** The settlement's river bank, where it has one: what makes its walkable
    *  region a lobe rather than a circle, and where the shore begins. */
   bank: PlaceRiverBank | null
+  /** Scene grounds the boundary keeps observer room around (work-order 1252). */
+  observed?: readonly ObservedGround[]
   /** Where the settlement can find the children (work-order 688). The adults'
    *  own work reads it to keep DIG out of a passing child's ear; the bodies are
    *  the live ones this component moves, so nothing is copied per frame. */
@@ -771,7 +774,7 @@ function Kids({
     // That is the round the traveller frame photographed empty. So the bank
     // round walks the SAME shape the player does — inset by its own footprint —
     // and is kept off the shore, which is ground that slopes into the water.
-    const bounds = { radius, bank }
+    const bounds = { radius, bank, observed }
     const onGround = stage
       ? (px: number, pz: number) =>
           insidePlace(bounds, px, pz, NPC_RADIUS * 2) && standsOnGroundPlate(bank, px, pz, NPC_RADIUS)
@@ -851,7 +854,7 @@ function Kids({
         return { x: r.pos[0], z: r.pos[1], found: r.found }
       },
     }
-  }, [colliders, radius, x, z, playRadius, bodySet, kidIndex, stage, bank])
+  }, [colliders, radius, x, z, playRadius, bodySet, kidIndex, stage, bank, observed])
 
   // Each visit spawns one game on validated ground inside its own quarter.
   const round = useMemo(() => {
@@ -2360,6 +2363,7 @@ function Walkers({
   colliders,
   radius,
   bank,
+  observed,
 }: {
   seed: number
   homes: HomeDef[]
@@ -2369,12 +2373,14 @@ function Walkers({
   colliders: Collider[]
   radius: number
   bank: PlaceRiverBank | null
+  /** Scene grounds the boundary keeps observer room around (work-order 1252). */
+  observed?: readonly ObservedGround[]
 }) {
   const groundHeight = usePlaceGround()
   // Used only to place a wedged body; ordinary walker routes stay unchanged.
   const nav = useMemo(
-    () => buildPlaceNavGrid({ radius, bank }, colliders, NPC_RADIUS),
-    [radius, bank, colliders],
+    () => buildPlaceNavGrid({ radius, bank, observed }, colliders, NPC_RADIUS),
+    [radius, bank, observed, colliders],
   )
   const defs = useMemo(() => {
     const rand = mulberry32((seed + 60601) >>> 0)
@@ -2636,6 +2642,7 @@ function ErrandVillagers({
   colliders,
   radius,
   bank,
+  observed,
   geography,
   playGround,
   playRocks,
@@ -2651,6 +2658,8 @@ function ErrandVillagers({
   /** The settlement's river bank (work-order 482) — part of the walkable shape
    *  these villagers keep to, since the errands send them out onto it. */
   bank: PlaceRiverBank | null
+  /** Scene grounds the boundary keeps observer room around (work-order 1252). */
+  observed?: readonly ObservedGround[]
   geography: AdultWorkGeography
   playGround: PlayGround | null
   playRocks: { upstream: ErrandPoint; downstream: ErrandPoint } | null
@@ -2726,8 +2735,8 @@ function ErrandVillagers({
   // same colliders the movement below obeys, so a route can never lead where
   // the step is then refused.
   const nav = useMemo(
-    () => buildPlaceNavGrid({ radius, bank }, colliders, NPC_RADIUS),
-    [radius, bank, colliders],
+    () => buildPlaceNavGrid({ radius, bank, observed }, colliders, NPC_RADIUS),
+    [radius, bank, observed, colliders],
   )
 
   // Per-villager scene state: where it is strolling on its own, how long it has
@@ -2796,9 +2805,9 @@ function ErrandVillagers({
   // never arrived while the joined situation counted as shown.
   const standable = useMemo(
     () => (px: number, pz: number) =>
-      insidePlace({ radius, bank }, px, pz, NPC_RADIUS * 2) &&
+      insidePlace({ radius, bank, observed }, px, pz, NPC_RADIUS * 2) &&
       standingClear(colliders, px, pz, NPC_RADIUS),
-    [colliders, radius, bank],
+    [colliders, radius, bank, observed],
   )
 
   // Would a child hear a word spoken here? The radius is the settlement's own
@@ -2961,7 +2970,7 @@ function ErrandVillagers({
           // The WALKABLE SHAPE, not a circle of its own (work-order 482): the
           // errands send a villager out onto the bank lobe, and a circular rim
           // would have frozen it at the plain radius short of the water.
-          const inside = insidePlace({ radius, bank }, wantX, wantZ, NPC_RADIUS * 2)
+          const inside = insidePlace({ radius, bank, observed }, wantX, wantZ, NPC_RADIUS * 2)
           const [nx, nz] = inside
             ? resolveMove(colliders, wantX, wantZ, NPC_RADIUS, [me.x, me.z])
             : [me.x, me.z]
@@ -3592,6 +3601,7 @@ export function PlaceLife({
   pen,
   colliders,
   radius,
+  observed,
   onDigProgress,
 }: {
   kind: 'port' | 'village'
@@ -3643,6 +3653,8 @@ export function PlaceLife({
   /** The settlement's walkable radius, for navigation and movement (point 480);
    *  the children's tag ground is `playGround`. */
   radius: number
+  /** Scene grounds the boundary keeps observer room around (work-order 1252). */
+  observed?: readonly ObservedGround[]
   /** Publishes strike-quantized progress to the site meshes in PlaceScene. */
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
@@ -3850,11 +3862,12 @@ export function PlaceLife({
               radius={radius}
               stage={null}
               bank={bank}
+              observed={observed}
             />
             <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
             <Traders seed={localSeed} cloth={style.cloth} />
             <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
-            <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} radius={radius} bank={bank} />
+            <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
         </LimbDetailContext.Provider>
@@ -3890,6 +3903,7 @@ export function PlaceLife({
               radius={radius}
               stage={bankStage}
               bank={bank}
+              observed={observed}
             />
           )}
           {/* Adults teach RIVER and DIG through water errands and paired digging. */}
@@ -3901,6 +3915,7 @@ export function PlaceLife({
             colliders={colliders}
             radius={radius}
             bank={bank}
+            observed={observed}
             geography={workGeography}
             playGround={playGround}
             playRocks={playRocks}
@@ -3910,7 +3925,7 @@ export function PlaceLife({
           {/* The fisherman's dugout beside the children's bank game (work-order 1237). */}
           {bank && <RiverFishery key={placeId} bank={bank} cloth={[2, 0, 1, 3, 4].map((k) => style.cloth[k % style.cloth.length])} seed={localSeed} />}
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
-          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} />
+          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           {/* Inhabitant/prop interactions (design.md §19). */}
           <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
           <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
