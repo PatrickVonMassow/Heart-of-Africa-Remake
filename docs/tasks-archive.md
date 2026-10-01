@@ -32938,3 +32938,21 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   paths already share the claim check in `batch-autostart.mjs`. The 13:35:58 takeover was the
   regular tick after the deliberate 30-minute pick-up cap (points 446/461) expired. Whether a
   live claimant should outlast that cap is filed in docs/backlog.md, not decided here.
+
+- [x] 1252. Bambara-village: the walkable area barely exceeds the observed scenes, so watching walks the player out
+  Source: user report 01.10.2026, bambara-village. In places the settlement's walkable boundary lies only
+  marginally outside the grounds where the scenes to be watched play (children's bank game, adult work,
+  loom, chief); stepping aside to find a viewing stand easily crosses the boundary and leaves the village.
+  Final state: every scene ground in bambara-village has a clearly walkable observer margin around it before
+  the boundary (calibratable value in `src/config/balance.ts`, not scattered in code), measured from the
+  scene grounds' actual extents and the boundary per bearing (including the river-bank lobe); the edge band,
+  the leave check and the inhabitants keep reading the one boundary in `boundary.ts`. Check other villages
+  that share the layout code for the same shortfall.
+  Tests: Vitest asserting the minimum distance from every scene ground to the boundary across seeds;
+  Playwright picture only if the edge band or backdrop placement visibly changes.
+  Refs: src/scenes/place/boundary.ts, src/scenes/place/layout.ts (walkRadius), src/scenes/place/lifeSpots.ts,
+  src/scenes/place/backdrop.ts.
+  USER, verbatim:
+  user 01.10.2026: "Der betretbare Bereich innerhalb vom Bambara Village ist aktuell stellenweise nur minimal größer als der, in dem die zu beobachtenden Szenen ablaufen. Dadurch passiert es leicht, dass man aus versehen das Dorf verlässt, wenn man sich zum Beobachten irgendwo hinstellen möchte. Vergrößere den Bereich entsprechend."
+  Bundle: Dorfleben.
+  Criticality: medium — the player leaves the village by accident while trying to watch (§7.1 no. 6/15/16).
