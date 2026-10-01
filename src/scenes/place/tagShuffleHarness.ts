@@ -129,9 +129,11 @@ export function crowd(
 ): Crowd {
   const colliders = layout.colliders
   const rim = Math.max(1, layout.radius - NPC_RADIUS * 2)
+  // The settlement's own boundary, as `ErrandVillagers` keeps to it — the lobe
+  // and the scenes' room included, not a circle of the harness's own.
   const world = {
     blocked: (x: number, z: number) =>
-      Math.hypot(x, z) > rim || !standingClear(colliders, x, z, NPC_RADIUS),
+      !insidePlace(layout, x, z, NPC_RADIUS * 2) || !standingClear(colliders, x, z, NPC_RADIUS),
     nudge: (x: number, z: number) => {
       const free = nudgeToFree(colliders, x, z, NPC_RADIUS)
       return { x: free[0], z: free[1], found: true }
