@@ -15794,4 +15794,18 @@ to land than a mechanism that needs a review.
   Assistant 01.10.2026: "Die Lehre daraus: Wenn ein Testknopf Zeit spart, darf er keine Spiellogik überspringen, sonst sieht der Test nicht mehr, was der Spieler erlebt. Jedes Mal, wenn ein Test eine Spielbedingung per Knopf setzt, muss es zusätzlich einen Lauf geben, der die Szene so betritt wie der Spieler. Soll ich das als Befund für den Batch einreichen?"
   user 01.10.2026: "Ja, mach das."
   Bundle: Testinfrastruktur.
-  Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.
+  Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.- [ ] 1261. Let the answering window remove an answered board card; drop point 1240
+  Source: request of session 829c2a2a, deposited 01.10.2026 20:51 through the findings carrier.
+  Observed problem: Point 1240 shows the cost: the user answered the card on 29.09. in a non-owner window; that window could only deposit a --request, the owner's drain knows only "TASKS append" or "decision card", so a one-command removal became a queued point and the answered card stood on the board for two days. A whole point (spec, commit, rank, brief, tick, archive) costs more than the single idempotent call it guards against.
+  FINAL STATE:
+  1. A session that does NOT hold the batch lock may run `node scripts/board.mjs vdzk-remove "<title>"` for a "Von dir zu klären" card the user has just answered in that session. The stand-down (batch-singleton STAND DOWN text, and any guard that refuses a board write from a non-owner) no longer covers this one call; every other board/TASKS.md write stays owner-only. This is switching off an obstructing rule, not a new mechanism: no new guard, ledger field or route. The removal already runs under board-edit-lock, so it cannot interleave with the owner's publish.
+  2. The STAND DOWN text and docs/batch-owner-runbook.md say so in one line each.
+  3. Remove the card now: node scripts/board.mjs vdzk-remove "Transkript-Aufbewahrung: die 30 Tage kosten jetzt auch Laufzeit". Its recommendation is already carried out (~/.claude/settings.json "cleanupPeriodDays": 3650, set 29.09.2026 15:58). Record the closure in the decision log (what: retention 10 years; why: transcripts carry citable user orders and review evidence; veto: user may lower the value).
+  4. DELETE open point 1240 "Remove the transcript retention card" from TASKS.md (not tick, not archive as done): this point supersedes it, the user ordered its deletion.
+  Test: a Vitest on the guard/stand-down layer proving vdzk-remove is allowed from a non-owner session and another board write (e.g. vdzk-add) still is not.
+  Files: scripts/board.mjs (vdzk-remove), scripts/batch-singleton.mjs, scripts/finding.mjs, TASKS.md point 1240, commit f2a76cd0f. Spec cut from 5a325dcc9.
+  USER, verbatim:
+  User 01.10.2026: »Ja, gib das als Aufrag in die Batch-Session. Und sie soll die Karte dann entfernen und den damit hinfälligen Task 1240 löschen.«
+  User 01.10.2026 (on the cause): »Ein eigener Task für so eine winzige Aufgabe erzeugt doch mehr Overhead, als die forcierte Einhaltung der 150k-Grenze einspart.«
+  Bundle: Chat & Tafel.
+  Criticality: medium — an answered card stays on the board until a whole point is worked.
