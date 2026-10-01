@@ -1531,12 +1531,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1247": {
-      "at": "2026-09-30T11:37:48.600Z",
-      "why": "user order 30.09.2026: the request-gate fix queued after the fishermen and children points",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1248": {
       "at": "2026-09-30T11:37:48.694Z",
       "why": "same failed user takeover as 1247; kept beside it",
@@ -1577,7 +1571,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-01T03:05:18.999Z",
+    "at": "2026-10-01T03:45:11.891Z",
     "points": [
       184,
       200,
@@ -2005,7 +1999,6 @@
       1242,
       1243,
       1244,
-      1247,
       1248,
       1249,
       1251
