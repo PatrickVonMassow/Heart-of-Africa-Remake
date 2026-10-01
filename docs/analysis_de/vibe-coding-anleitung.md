@@ -121,6 +121,9 @@ Füllstand empfiehlt ein leeres Modell.
    > Er greift, **bevor** die Arbeit beginnt, nicht erst am Ende — sonst ist die Stunde
    > ungesichert, in der ich hinsehe — und merkt auch, wenn der Text steht, während die
    > Arbeit weiterlief."
+   Und: Jede Karte beschreibt genau **eine** Arbeit. Braucht ein Auftrag eine Karte, die es
+   noch nicht gibt, bekommt er einen eigenen Eintrag — eine geliehene Karte stellt die Tafel
+   formal zufrieden und zeigt dir doch das Falsche.
 
 ---
 
@@ -701,4 +704,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 1c417c8c501ba634cf1798c5c48323c42cda1f63847b7813c019c8532c2d0d71 -->
+<!-- GUIDE-FINGERPRINT: 0972723ff4fda74329d1174bb022cb92f70291f32555f15be3f49b2381364842 -->
