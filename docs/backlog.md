@@ -9,6 +9,11 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-10-01 point 1246 picture check — `687-bank-play-rocks.png` shows the caller's
+  speech bubble anchored at the near rock while the calling child itself stands hidden
+  behind that rock from the camera; the bubble reads as spoken by the stone. No occlusion
+  rule hides or re-anchors a bubble whose speaker is out of sight. Promote only if it
+  recurs in play as a confusing speaker attribution.
 - 2026-09-25 point 659 round 6, R6-N1 — the frame shutter checks subject projection but
   did not detect hut occlusion: `05-chief-walks-out.png` was accepted from inside the hut
   although the chief himself was absent from the visible picture. WebGPU continuous-route
