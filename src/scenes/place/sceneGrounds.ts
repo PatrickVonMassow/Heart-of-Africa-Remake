@@ -4,7 +4,7 @@
 // Pure data, derived from the finished layout — never a second position.
 
 import type { ObservedGround } from './boundary'
-import type { BankPoint } from './riverBank'
+import { BANK_PLAY_LANE_HALF, type BankPoint } from './riverBank'
 import { stationGround, type LoomStation } from './loom'
 import { digLocalToWorld, DIG_RIM_DISTANCE, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
@@ -38,9 +38,10 @@ export function sceneGrounds(src: SceneGroundSource): ObservedGround[] {
   const out: ObservedGround[] = []
   // The children's roaming quarter.
   if (src.playGround) out.push({ x: src.playGround.x, z: src.playGround.z, r: src.playGround.radius })
-  // The bank game's stage: both rocks and the lane between them.
+  // The bank game's stage: both rocks and the lane run between them.
   if (src.playRocks) {
-    const { upstream: u, downstream: d, r } = src.playRocks
+    const { upstream: u, downstream: d } = src.playRocks
+    const r = Math.max(src.playRocks.r, BANK_PLAY_LANE_HALF)
     out.push(enclose((u.x + d.x) / 2, (u.z + d.z) / 2, [{ ...u, r }, { ...d, r }]))
   }
   // Adult work: each dig site with its spoil, furniture and the diggers' ring.
