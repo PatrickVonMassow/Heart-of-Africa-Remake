@@ -12,8 +12,9 @@
 // So a backdrop spot counts as water where it lies on the river side of the
 // drawn waterline and short of the map's own first water along that line of the
 // bank (sought within `backdropRiverFillReach`), and anywhere inside the drawn
-// band while the drawn river runs alongside. The far bank beyond the map's
-// river is never touched. The same predicate keeps the §2.5 panorama
+// band while the drawn river runs alongside — short of the far shore of a map
+// river that ends inside the band. The far bank beyond the map's river is
+// never touched. The same predicate keeps the §2.5 panorama
 // silhouettes out of the water.
 //
 // Pure and three-free, so it is unit-testable.
@@ -52,22 +53,36 @@ export function backdropRiverFill(
   if (!bank) return () => false
   // From the drawn waterline out; the shore slope above it stays ground.
   const near = bank.distance
-  const firstWater = new Map<number, number | null>()
-  // The first map water out from the waterline along one line of the bank.
-  const first = (along: number): number | null => {
+  const bandEnd = bank.distance + BANK_BED_REACH
+  const lines = new Map<number, { first: number | null; far: number | null }>()
+  // Along one line of the bank: the first map water out from the waterline,
+  // and the first map land beyond it (its far shore) when that lies within
+  // the drawn band.
+  const line = (along: number): { first: number | null; far: number | null } => {
     const key = Math.round(along / STEP)
-    const known = firstWater.get(key)
+    const known = lines.get(key)
     if (known !== undefined) return known
     const a = key * STEP
-    let found: number | null = null
+    const water = (out: number) => mapWater(bank.nx * out + bank.fx * a, bank.nz * out + bank.fz * a)
+    let first: number | null = null
     for (let k = 0; k * STEP <= reach; k++) {
       const out = near + k * STEP
-      if (mapWater(bank.nx * out + bank.fx * a, bank.nz * out + bank.fz * a)) {
-        found = out
+      if (water(out)) {
+        first = out
         break
       }
     }
-    firstWater.set(key, found)
+    let far: number | null = null
+    if (first !== null) {
+      for (let out = first + STEP; out <= bandEnd; out += STEP) {
+        if (!water(out)) {
+          far = out
+          break
+        }
+      }
+    }
+    const found = { first, far }
+    lines.set(key, found)
     return found
   }
   return (x, z) => {
@@ -75,8 +90,8 @@ export function backdropRiverFill(
     if (out < near - 1e-6) return false
     const along = x * bank.fx + z * bank.fz
     const alongside = along >= -drawn.up && along <= drawn.down
-    if (alongside && out <= bank.distance + BANK_BED_REACH) return true
-    const w = first(along)
-    return w !== null && out < w
+    const { first, far } = line(along)
+    if (alongside && out <= bandEnd) return far === null || out < far
+    return first !== null && out < first
   }
 }

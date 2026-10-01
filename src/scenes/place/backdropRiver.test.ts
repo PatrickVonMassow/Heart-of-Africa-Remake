@@ -44,6 +44,15 @@ describe('the backdrop continues the settlement river (work-order 1250)', () => 
     expect(fill(-DRAWN.up - 10, BANK.distance + 1)).toBe(false)
   })
 
+  it('keeps the far bank of a narrow map river that ends inside the drawn band', () => {
+    // The map's river runs from 42 to 46 m out, wholly inside the drawn band.
+    const fill = backdropRiverFill(BANK, (_x, z) => z >= 42 && z <= 46, DRAWN)
+    expect(fill(0, 41)).toBe(true)
+    expect(fill(0, 44)).toBe(true)
+    expect(fill(0, 47)).toBe(false) // the far shore beyond the map river
+    expect(fill(0, BANK.distance + BANK_BED_REACH)).toBe(false)
+  })
+
   it('answers false everywhere without a bank', () => {
     const fill = backdropRiverFill(null, () => true, DRAWN)
     expect(fill(0, 45)).toBe(false)
