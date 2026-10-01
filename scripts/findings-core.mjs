@@ -18,8 +18,8 @@
 //      transport for a locked-out session, never the resting place; without
 //      this the carrier becomes what pending-queue-work-29-07.md already
 //      was — a note nothing drains.
-//   3. An owner taking the boundary while deposited requests wait blocks
-//      (point 462).
+//   3. An owner with deposited requests waiting blocks on every turn end,
+//      scoped by the same fence (point 462).
 //
 // Side-effect free; the wrapper (findings-guard.mjs) reads the tree and is
 // fail-open, so a bug in here can never trap a session.
@@ -276,32 +276,6 @@ export function turnCalls(transcriptText, turnStartedAt) {
 }
 
 /**
- * Does this turn TAKE the session boundary? (point 462; two-phase since 675)
- *
- * `batch-boundary.mjs --commit …` records the boundary; `--prepare`, the bare
- * `<point>` (now a prepare alias), `--status` and `--clear` only read or
- * withdraw. The distinction matters because the request gate below fires at the
- * boundary and nowhere else: it is the one moment an owner may write TASKS.md,
- * and a gate that fired on every turn end would demand something a mid-branch
- * owner cannot do.
- */
-export function turnTakesBoundary(calls = []) {
-  for (const call of Array.isArray(calls) ? calls : []) {
-    if (!SHELL_TOOLS.has(String(call?.name ?? ''))) continue
-    for (const segment of segments(call.command)) {
-      if (!/^(?:\S*node\s+)?\S*batch-boundary\.mjs\b/.test(segment)) continue
-      const words = segment.split(/\s+/).filter(Boolean)
-      const at = words.findIndex((w) => /batch-boundary\.mjs$/.test(w))
-      // The quotes come off first: a PowerShell caller writes `… "--commit"`,
-      // and a gate that stood down on that would be silently off for half the
-      // shells (four-eyes finding 3, Fable 5).
-      if (words.slice(at + 1).some((w) => w.replace(/^["']|["']$/g, '') === '--commit')) return true
-    }
-  }
-  return false
-}
-
-/**
  * Judge the turn.
  *
  * Inputs (all plain data):
@@ -309,7 +283,6 @@ export function turnTakesBoundary(calls = []) {
  *   ownsBatch       does this session hold the batch lock
  *   carrierPending  how many FINDINGS still sit in the memory carrier
  *   carrierRequests how many REQUESTS still sit there (point 462)
- *   atBoundary      is this turn taking the session boundary
  *   fence, sessionId  context-fence state and owner id for scopeMandatoryDuty
  *   declarationWrittenAt, turnStartedAt  the delegation exemption's file proof
  *   threshold       override for DEFAULT_THRESHOLD (tests inject their own)
@@ -321,7 +294,6 @@ export function auditFindings({
   ownsBatch = false,
   carrierPending = 0,
   carrierRequests = 0,
-  atBoundary = false,
   fence = null,
   sessionId = '',
   declarationWrittenAt = null,
@@ -403,25 +375,50 @@ export function auditFindings({
     })
   }
 
-  // THE REQUEST GATE IS THE POINT BOUNDARY (point 462). A request is a FINISHED
-  // spec deposited by a window the user talked to; only the owner may append it,
-  // and only where it may write TASKS.md at all — which is the boundary, not
-  // every turn end. Demanding it mid-branch would block a session for something
-  // the workflow forbids it to do, and that is how a guard gets routed around.
-  if (ownsBatch && atBoundary && Number(carrierRequests) > 0) {
+  // THE REQUEST GATE BINDS EVERY OWNER TURN END (point 462, simplified). It was
+  // once scoped to the boundary turn, where `--commit` had already handed the
+  // lock over, so it never fired; appending to TASKS.md is ordinary main-only
+  // bookkeeping. `--commit` refuses while requests wait (boundaryRequestRefusal).
+  const requestDuty = scopeMandatoryDuty({
+    owed: ownsBatch && Number(carrierRequests) > 0,
+    fence,
+    guardId: 'findings-guard',
+    sessionId,
+    duty: `${carrierRequests} deposited request(s) must be queued into the work order`,
+  })
+  if (requestDuty.deferred) deferred.push({ kind: 'request-not-queued', detail: requestDuty.message })
+  if (requestDuty.owed) {
     violations.push({
       kind: 'request-not-queued',
-      detail:
-        `${carrierRequests} Anfrage(n) eines anderen Fensters liegen im Träger, und diese Sitzung nimmt gerade ` +
-        'die Grenze. Der Nutzer hat sie einem Fenster gesagt, das den Stapel nicht hielt — ohne Übernahme ' +
-        'sterben sie hier. Spec ansehen: node scripts/finding.mjs --show "<Titel>", dann VERBATIM in ' +
-        'TASKS.md anhängen und node scripts/finding.mjs --queued "<Titel>" --point <N>. Offene Fragen ' +
-        'gehen NIE in den Arbeitsauftrag, sondern als Karte an den Nutzer; undurchführbar: ' +
-        'node scripts/finding.mjs --blocked "<Titel>" --why "<Grund>". Danach die Grenze erneut nehmen.',
+      detail: requestQueueRemedy(carrierRequests, 'diese Sitzung hält den Batch'),
     })
   }
 
   return { ok: violations.length === 0, violations, deferred }
+}
+
+function requestQueueRemedy(count, context) {
+  return (
+    `${count} Anfrage(n) eines anderen Fensters liegen im Träger, und ${context}. ` +
+    'Der Nutzer hat sie einem Fenster gesagt, das den Stapel nicht hielt — ohne Übernahme ' +
+    'warten sie unbemerkt. Spec ansehen: node scripts/finding.mjs --show "<Titel>", dann VERBATIM in ' +
+    'TASKS.md anhängen und node scripts/finding.mjs --queued "<Titel>" --point <N>. Offene Fragen ' +
+    'gehen NIE in den Arbeitsauftrag, sondern als Karte an den Nutzer; undurchführbar: ' +
+    'node scripts/finding.mjs --blocked "<Titel>" --why "<Grund>".'
+  )
+}
+
+/**
+ * `batch-boundary.mjs --commit` asks this BEFORE it hands the lock over: a
+ * boundary must never carry a waiting request past the handover. Returns the
+ * refusal text, or null when nothing waits.
+ */
+export function boundaryRequestRefusal(carrierRequests = 0) {
+  if (!(Number(carrierRequests) > 0)) return null
+  return (
+    requestQueueRemedy(carrierRequests, 'die Grenze würde den Batch jetzt übergeben') +
+    ' Danach die Grenze erneut nehmen. Nothing recorded.'
+  )
 }
 
 /** Render the audit as the guard's block message. */
@@ -511,9 +508,8 @@ export function parseCarrier(text = '') {
 /**
  * A FINDING TITLE MAY NOT OPEN WITH THE REQUEST MARKER (four-eyes finding 3,
  * Fable 5, 31.07.2026). `- [ ] <at> · <s> · [request] · pending · X` parses back
- * as a REQUEST, and requests are gated only on the turn that TAKES the point
- * boundary — so such a finding would slip past the every-turn-end findings gate
- * altogether. The marker is neutralised rather than refused: dropping a recorded
+ * as a REQUEST, which the findings gate does not count as a finding — so it
+ * would slip past it altogether. The marker is neutralised rather than refused: dropping a recorded
  * finding is the one thing this carrier may never do, and `(request)` keeps the
  * title readable while it can no longer be a kind.
  */

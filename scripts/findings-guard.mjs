@@ -10,7 +10,7 @@
 // ("was there something worth keeping?"), and a guard that blocks on its own
 // blindness would train the reader to route around it.
 import { readFileSync, statSync } from 'node:fs'
-import { auditFindings, formatFindings, parseCarrier, tallyTurn, turnCalls, turnTakesBoundary } from './findings-core.mjs'
+import { auditFindings, formatFindings, parseCarrier, tallyTurn, turnCalls } from './findings-core.mjs'
 import { carrierPath, ownsBatch } from './findings-paths.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -82,15 +82,10 @@ export function gatherFindingsInputs({ sessionId = '', transcriptPath = null } =
   // arbitrary slice of history, so condition 1 stands down; condition 2 does
   // not depend on the turn at all and still applies.
   let tally = { investigative: 0, agents: 0, records: [] }
-  // Whether this turn TAKES the boundary is read from the same calls (point
-  // 462) — the request gate fires there and nowhere else. No stamp, no calls,
-  // no boundary: the gate then simply stands down, like condition 1.
-  let atBoundary = false
   if (Number.isFinite(resolved.turnStartedAt) && resolved.turnStartedAt > 0 && resolved.transcriptPath) {
     try {
       const calls = turnCalls(readFileSync(resolved.transcriptPath, 'utf8'), resolved.turnStartedAt)
       tally = tallyTurn(calls)
-      atBoundary = turnTakesBoundary(calls)
     } catch {
       /* unreadable transcript — fail open on condition 1 */
     }
@@ -108,7 +103,6 @@ export function gatherFindingsInputs({ sessionId = '', transcriptPath = null } =
       fence,
       carrierPending: carrier.pending.length,
       carrierRequests: carrier.requests.length,
-      atBoundary,
       // WHEN the declaration was last WRITTEN, so the delegation exemption can
       // be earned rather than claimed (point 437 G): a turn that ran the command
       // and had it REFUSED — no lock, no evidence, dead evidence — leaves this
@@ -138,7 +132,7 @@ function main() {
     transcriptPath: (input && (input.transcript_path || input.transcriptPath)) || null,
   })
   const { sessionId, owner, carrier } = gathered
-  const { tally, atBoundary } = gathered.inputs
+  const { tally } = gathered.inputs
   const verdict = auditFindings(gathered.inputs)
 
   if (status) {
@@ -147,7 +141,6 @@ function main() {
     console.log(
       `owns the batch : ${sessionId ? (owner ? 'yes' : 'no') : 'unbekannt — keine session_id (--session <id> nachreichen)'}`,
     )
-    console.log(`at the boundary: ${atBoundary ? 'yes' : 'no'}`)
     console.log(`context fence  : ${gathered.inputs.fence.closed ? 'closed — duties pass to successor' : 'open'}`)
     console.log(
       `carrier        : ${carrier.pending.length} waiting, ${carrier.requests.length} request(s), ${carrier.drained} landed`,
