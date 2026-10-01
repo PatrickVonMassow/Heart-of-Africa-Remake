@@ -24,7 +24,6 @@ import { createHash } from 'node:crypto'
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { isSectionName } from './section-tag-core.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
-import { DEV_SUITES } from './verify/tiers.mjs'
 
 /** Both renderer backends the game ships; each needs a COVERING verify run —
  *  clean or accounted for (runVerdict) — unless the change is DOM-only. */
@@ -1727,6 +1726,11 @@ export function baselineFor(state, branch) {
  *
  * Anything else keeps the old behaviour exactly.
  */
+/** Suite names old records still carry that no longer run: `polish` was split by
+ *  theme in point 1129. Kept local — the isolated guard harness cannot import
+ *  scripts/verify/. */
+const RETIRED_SUITES = ['polish']
+
 export function suggestSuite(runs, changedRenderPaths) {
   if (
     Array.isArray(changedRenderPaths) &&
@@ -1738,8 +1742,7 @@ export function suggestSuite(runs, changedRenderPaths) {
   if (Array.isArray(runs)) {
     for (let i = runs.length - 1; i >= 0; i--) {
       const s = runs[i] && runs[i].suite
-      // A retired name (`polish`, split by theme in point 1129) is no runnable suite.
-      if (typeof s === 'string' && DEV_SUITES.includes(s)) return s
+      if (typeof s === 'string' && s !== '' && s !== 'unknown' && !RETIRED_SUITES.includes(s)) return s
     }
   }
   return 'enrichments'
