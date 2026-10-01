@@ -184,6 +184,7 @@ export const RED_CHARGES = [
     point: 939,
     suite: 'flow',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'console',
     // THE SAME VITE TRANSIENT ON THE FLOW LANE; every entry here excuses only
     // the lane its evidence measured.
