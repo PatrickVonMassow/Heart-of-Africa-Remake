@@ -19,9 +19,9 @@
 //
 // It also GROWS AROUND THE WATCHED SCENES (work-order 1252): every scene ground
 // the layout names (`observed`) keeps `balance.observerMargin` of walkable room
-// around it, so stepping aside to watch never leaves the village. The bulge is
-// the far side of the margin disc along each ray, which still contains the
-// centre, so the region stays star-shaped and one radius per bearing.
+// around it, so stepping aside to watch never leaves the village. Each bulge is
+// still one radius per bearing (`observerExcess`), so the band's lookup follows
+// it unchanged.
 
 import { BACKDROP_INNER_OFFSET } from './backdrop'
 import { balance } from '../../config/balance'
@@ -38,8 +38,10 @@ import {
  *  lobe's edge climbs from the walkable radius out to the wade edge across ~12°,
  *  and at 256 texels one step of the lookup already moved the painted edge by
  *  most of a metre — a band that misplaces itself by a stride is a band that
- *  lies. Four kilobytes of lookup buy the angular resolution back. */
-export const BOUNDARY_LUT_SIZE = 1024
+ *  lies. Four kilobytes of lookup buy the angular resolution back. 4096 since
+ *  work-order 1252: where a scene's room meets the wade limit the edge turns a
+ *  corner, and at 1024 the lookup cut it by more than a decimetre. */
+export const BOUNDARY_LUT_SIZE = 4096
 
 /** A scene ground the player watches: a disc enclosing its whole extent. */
 export interface ObservedGround {
@@ -92,9 +94,17 @@ export function placeBoundaryRadius(bounds: PlaceBounds, angle = 0): number {
   const lobe = lobeRadius(bounds, angle)
   const observed = bounds.observed
   if (!observed || observed.length === 0) return lobe
-  let reach = 0
-  for (const g of observed) reach = Math.max(reach, observerReach(g, angle))
-  if (reach <= lobe) return lobe
+  // The scenes' bumps joined by a soft maximum rather than a max: a max of two
+  // crossing bumps leaves a corner the band's lookup cannot follow. This one
+  // is exact for a lone bump and overshoots by at most ln 2 / k where two meet.
+  const k = 2
+  let sum = 0
+  for (const g of observed) {
+    const e = observerExcess(g, angle, lobe, bounds.radius)
+    if (e > 0) sum += Math.expm1(k * e)
+  }
+  if (sum === 0) return lobe
+  let reach = lobe + Math.log1p(sum) / k
   // Never past the wade limit: toward the river the water is the edge, and an
   // observer stands on the shore.
   const bank = bounds.bank
@@ -106,17 +116,34 @@ export function placeBoundaryRadius(bounds: PlaceBounds, angle = 0): number {
 }
 
 /**
- * How far along a ray from the centre the observer disc around a scene ground
- * reaches — its far side where the ray crosses it, else the projection of its
- * centre, which joins the far side at the tangent, so the result is continuous
- * over the full turn.
+ * How far past the lobe a scene's room pushes the boundary at a bearing. Over
+ * the bearings on which the margin disc reaches past the plain radius the
+ * boundary stands at the disc's far side (`d + r + margin`), which holds the
+ * disc there; beyond them it smooth-steps back to the lobe over an arc of one
+ * margin, or of the bump's height where that is more. No tangent, no corner: the exact far side of the disc turns infinitely
+ * steep at its tangent, which the band's linear lookup would cut by half a
+ * metre.
  */
-function observerReach(g: ObservedGround, angle: number): number {
+function observerExcess(g: ObservedGround, angle: number, lobe: number, radius: number): number {
   const d = Math.hypot(g.x, g.z)
   const big = g.r + balance.observerMargin
-  const delta = bearingDelta(angle, Math.atan2(g.z, g.x))
-  const across = d * Math.sin(delta)
-  return Math.max(0, d * Math.cos(delta) + Math.sqrt(Math.max(0, big * big - across * across)))
+  const far = d + big
+  if (far <= lobe) return 0
+  // A disc centred inside the plain circle reaches past it only between the two
+  // points its rim crosses it (law of cosines); one centred outside, across its
+  // whole tangent span. A disc that holds the centre spans the full turn.
+  let span = Math.PI
+  if (d > big) {
+    span = d > radius
+      ? Math.asin(big / d)
+      : Math.acos(Math.max(-1, Math.min(1, (radius * radius + d * d - big * big) / (2 * radius * d))))
+  }
+  const delta = Math.abs(bearingDelta(angle, Math.atan2(g.z, g.x)))
+  if (delta <= span) return far - lobe
+  // The fade's arc is at least the bump's own height, so even a tall bump out
+  // on the river lobe falls no steeper than the lookup can follow.
+  const fade = Math.max(balance.observerMargin, far - radius) / far
+  return (far - lobe) * ramp(span + fade, span, delta)
 }
 
 /** The plain radius with the bank lobe — the boundary before the scene room. */
@@ -158,9 +185,11 @@ export function insidePlace(bounds: PlaceBounds, x: number, z: number, margin = 
 /** The largest radius the boundary ever reaches — what the drawn ground has to
  *  cover, so the player never walks off the plate he is standing on. */
 export function maxBoundaryRadius(bounds: PlaceBounds): number {
-  // A scene's room reaches at most its far side; an upper bound is enough here.
+  // The scenes' room, swept: two overlapping bumps may reach past either one.
   let observed = 0
-  for (const g of bounds.observed ?? []) observed = Math.max(observed, Math.hypot(g.x, g.z) + g.r + balance.observerMargin)
+  if (bounds.observed?.length) {
+    for (let j = 0; j < 2048; j++) observed = Math.max(observed, placeBoundaryRadius(bounds, (j / 2048) * Math.PI * 2))
+  }
   const bank = bounds.bank
   if (!bank) return Math.max(bounds.radius, observed)
   // The plateau's rim, and a sweep of the fade: the lobe still reaches outward

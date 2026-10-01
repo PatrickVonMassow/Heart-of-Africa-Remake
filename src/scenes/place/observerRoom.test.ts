@@ -10,7 +10,7 @@
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import { sharedLayout } from './layoutHarness'
-import { placeBoundaryRadius, type PlaceBounds } from './boundary'
+import { BOUNDARY_LUT_SIZE, buildBoundaryLut, placeBoundaryRadius, type PlaceBounds } from './boundary'
 import { digLocalToWorld, DIG_RIM_DISTANCE, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
 import { stationGround } from './loom'
@@ -141,3 +141,47 @@ describe('every watched scene keeps an observer margin before the boundary', () 
     for (const p of PLACES.filter((q) => q.kind !== 'village')) expect(sharedLayout(p.id, 42).observed).toEqual([])
   })
 })
+
+/** The band's lookup as the GPU filters it: texel centres at (j + ½) / size,
+ *  linear between them, wrapping round the turn. */
+function lutAt(lut: Float32Array, angle: number): number {
+  const n = lut.length
+  const u = (((angle / (Math.PI * 2)) % 1) + 1) % 1
+  const f = u * n - 0.5
+  const j = Math.floor(f)
+  const t = f - j
+  return lut[((j % n) + n) % n] * (1 - t) + lut[(((j + 1) % n) + n) % n] * t
+}
+
+/** Largest gap between the painted edge (the lookup) and the leave check. */
+function bandMismatch(bounds: PlaceBounds): { gap: number; at: number } {
+  const lut = buildBoundaryLut(bounds)
+  let worst = { gap: 0, at: 0 }
+  for (let k = 0; k < BOUNDARY_LUT_SIZE * 8; k++) {
+    const a = (k / (BOUNDARY_LUT_SIZE * 8)) * Math.PI * 2
+    const gap = Math.abs(lutAt(lut, a) - placeBoundaryRadius(bounds, a))
+    if (gap > worst.gap) worst = { gap, at: a }
+  }
+  return worst
+}
+
+describe('the painted edge and the leave check agree round a scene\'s room', () => {
+  it('at a lone scene whose room grazes the circle (the review case)', () => {
+    const bounds = { radius: 32, observed: [{ x: 50, z: 0, r: 0 }] }
+    // The room is there at all, and holds the scene's whole margin disc.
+    expect(placeBoundaryRadius(bounds, 0)).toBeCloseTo(50 + margin, 9)
+    const { gap } = bandMismatch(bounds)
+    expect(gap).toBeLessThan(0.1)
+  })
+
+  it.each(SEEDS)('seed %i: in every village', (seed) => {
+    for (const id of VILLAGES) {
+      const l = sharedLayout(id, seed)
+      const scenes = bandMismatch(l)
+      const lobe = bandMismatch({ radius: l.radius, bank: l.bank })
+      // Never worse than the river lobe alone already is, and never a stride.
+      expect(scenes.gap, `${id} at ${scenes.at.toFixed(3)} rad`).toBeLessThanOrEqual(Math.max(0.1, lobe.gap + 1e-6))
+    }
+  })
+})
+
