@@ -77,6 +77,24 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1256. A RIVER order falls 6.2 m from the children's roaming quarter
+  Source: covering WebGPU passes of point 1254 (01.10.2026).
+  THE RED. `polish --section=adult-errands`: "and no adult word ever falls inside the
+  children`s earshot — nearest utterance to the children: RIVER at 6.2 m from the roaming
+  quarter's rim" (limit > 10 m; log `local/verify-logs/2026-10-01T16-19-01-472-polish.log`,
+  feat/1254 7c497edd1).
+  IT IS NOT POINT 1254'S: the same reading stood before the key fix (6.2 m on feat/1129
+  78ea39b at 14:41Z, 6.3 m at 15:18Z). No log before 01.10 records this check's value.
+  Likely the water stand or the roaming quarter moved with the bank game's move upstream
+  (0bd2d2992) or the boundary growth (22ec01c17).
+  Final state:
+  - The cause is named with its measurement; no adult word falls within 10 m of the
+    roaming quarter's rim (the earshot rule itself unchanged).
+  - `polish(-villagers) --section=adult-errands` reads the earshot check green on WebGPU.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
+  Bundle: Dorfleben.
+  Criticality: medium — an adult order is spoken inside the children's game.
 - [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
   point 1126 on 15.09.2026, which delivered its other three parts the same day).
   MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
@@ -15575,19 +15593,6 @@ to land than a mechanism that needs a review.
   Test: gamepad --section=interact-chief and touch --section=prompt-tap green.
   Refs: scripts/verify/gamepad.mjs, scripts/verify/touch.mjs, scripts/render-verify-charges.mjs.
   Bundle: Kommunikation.
-- [ ] 1219. The renderer no longer starts in the mobile Chromium emulation.
-  PROBLEM, measured 26.09.2026: crossbrowser `chromium-mobile` reds "the renderer initialises
-  on mobile" with `TypeError: Cannot read properties of null (reading 'getSupportedExtensions')`
-  — in the closing LARGE on main 5dff420 and again alone on 80081b15c; earlier LARGE runs
-  were 4 pass, 0 fail. A null GL context reaches code that assumes one.
-  FINAL STATE: the cause is found (host/emulation context loss vs. an app path that reads a
-  null context) and fixed or, if the host lacks the context, the app shows the compatibility
-  notice instead of throwing; crossbrowser is green. Remove this point's charges from
-  scripts/render-verify-charges.mjs when it lands.
-  Criticality: medium — a mobile start may crash instead of degrading.
-  Test: crossbrowser green.
-  Refs: scripts/verify/crossbrowser.mjs, the renderer bring-up.
-  Bundle: Steuerung & Performance.
 - [ ] 1220. The WebGL 2 notice no longer covers the start journal's title.
   PROBLEM, measured 26.09.2026 on main 96f8c1e: flow frame `verification/06-start-journal.png`
   (WebGL 2) shows the dismissible compatibility notice drawn OVER the open journal panel, its
@@ -15598,6 +15603,9 @@ to land than a mechanism that needs a review.
   Criticality: low — the journal title is hidden at every WebGL 2 start until dismissal.
   Test: a Playwright layout check in the flow or layout suite asserting the notice's box does
   not intersect the journal header on WebGL 2; picture check of 06-start-journal.
+  Also measured 01.10.2026 on feat/1219 (local/1219-no-context.png, mobile emulation): the
+  no-backend notice added by point 1219 sits over the journal heading and its tabs the same
+  way; the fix covers both notices.
   Refs: the compatibility notice component, the journal panel, verification/06-start-journal.png.
   Bundle: Steuerung & Performance.
 - [ ] 1221. The Cairo place ground is no longer flat white at the start.

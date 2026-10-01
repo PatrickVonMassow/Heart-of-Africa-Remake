@@ -24,6 +24,7 @@
 import { chromium, firefox, webkit } from 'playwright'
 import { applySeedRoute } from './verify-seed.mjs'
 import { splitConsoleErrors } from './vite-reload-signal.mjs'
+import { webglLaunchOptions } from './launch-args-core.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const DEPTH = ['minimal', 'standard', 'thorough'].includes(process.env.CROSSBROWSER_DEPTH ?? '')
@@ -43,7 +44,12 @@ async function launchOrSkip(label, engine) {
   try {
     // The world seed by the shared route (point 557) — one engine must not meet a
     // different settlement layout than the next, or an engine-specific red is a draw.
-    return applySeedRoute(await engine.launch())
+    // Chromium gets the host's WebGL 2 lane options, as every other suite does: a bare
+    // launch inherits the container's stale DISPLAY, its GPU process exits and the page
+    // has no GL context at all (measured 01.10.2026 — the mobile renderer then never
+    // starts). Gecko/WebKit keep their defaults.
+    const options = engine === chromium ? webglLaunchOptions(process.platform, process.env.VERIFY_ANGLE, process.env, process.env.VERIFY_GALLIUM) : undefined
+    return applySeedRoute(await engine.launch(options))
   } catch (e) {
     const msg = String(e.message)
     if (/Executable doesn't exist|not found|install/i.test(msg)) {

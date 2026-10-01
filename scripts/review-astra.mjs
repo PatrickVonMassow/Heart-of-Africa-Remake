@@ -278,7 +278,11 @@ function gatherRange(sha, base, onlyPaths = null) {
   // per-path external driver REPLACES git's own patch generation, so a helper
   // emitting plausible `diff --git` sections could deliver transformed or
   // incomplete content the section accounting accepts as the real patch.
-  const patch = git(['diff', '--no-textconv', '--no-ext-diff', range, ...pathspec], { raw: true })
+  // `--irreversible-delete` (point 1129): a deleted file's section names the
+  // deletion without its preimage. A split of a 10k-line suite otherwise made
+  // the old file's body one section larger than a whole round — uncoverable —
+  // while its content is reviewed where it now lives.
+  const patch = git(['diff', '--no-textconv', '--no-ext-diff', '--irreversible-delete', range, ...pathspec], { raw: true })
   // Binary bodies are a named absence, never a decode attempt. The ordinary
   // patch marker identifies Git's binary section without carrying the bytes.
   const binaryPaths = new Set(

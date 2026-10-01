@@ -78,15 +78,6 @@ export const RED_CHARGES = [
       + 'interruption. Point 1236 owns the cause; the charge dies with it.',
   },
   {
-    point: 1219,
-    suite: 'crossbrowser',
-    kind: 'check',
-    match: /^chromium-mobile (the renderer initialises on mobile|no console errors on mobile)/i,
-    why:
-      'FILED AS 1219 ON 26.09.2026: getSupportedExtensions on a null context, red in the closing '
-      + 'LARGE on 5dff420 and alone on 80081b15c; green in earlier LARGE runs. The charge dies with 1219.',
-  },
-  {
     point: 1217,
     suite: 'gamepad',
     kind: 'check',
