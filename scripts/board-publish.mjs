@@ -77,6 +77,7 @@ import {
   openFingerprintOfTasks,
   pagesFailurePatch,
   pagesPublishPatch,
+  stampFileHash,
   stampFingerprint,
 } from './board-currency-core.mjs'
 
@@ -170,11 +171,28 @@ if (args.includes('--check')) {
     fetchError = (e && e.message) || 'fetch failed'
   }
   const publishedAt = Number(state.pagesPublishedAt) || 0
-  const v = liveBoardVerdict({ liveHtml, fetchError, expected, publishedAt, graceMs: LIVE_GRACE_MS })
+  // The open-point set alone misses a stale status line or "Stand" time, so the
+  // local board's file hash is compared beside it.
+  let expectedFile = null
+  try {
+    expectedFile = sha256(readFileSync(boardFile, 'utf8'))
+  } catch {
+    expectedFile = null
+  }
+  const v = liveBoardVerdict({
+    liveHtml,
+    fetchError,
+    expected,
+    publishedAt,
+    graceMs: LIVE_GRACE_MS,
+    expectedFile,
+    publishedFile: state.pagesPublishedHash ?? null,
+  })
   console.log(`live board : ${BOARD_CONTENT_URL}`)
   console.log(`viewer     : ${BOARD_PAGE_URL}`)
   console.log(`work order : ${expected ?? '<unreadable>'}`)
   console.log(`live page  : ${v.live ?? '<none>'}`)
+  console.log(`local file : ${expectedFile ? expectedFile.slice(0, 16) : '<unreadable>'}`)
   console.log(`verdict    : ${v.verdict.toUpperCase()}${v.reason ? ` — ${v.reason}` : ''}`)
   // 'settling' and 'unknown' are not faults: the first is the deploy/CDN floor
   // this check exists to tolerate, the second says honestly that there was
@@ -383,7 +401,7 @@ try {
 // The fingerprint is stamped on the way OUT, never into the repo file: the repo
 // bytes are what every publish record attests, and moving them under that record
 // would make the board look stale on every publish.
-let published = stampFingerprint(repoBytes, fingerprint)
+let published = stampFileHash(stampFingerprint(repoBytes, fingerprint), sha256(repoBytes))
 // THE LIVENESS AND PROGRESS LINES are measured HERE, on the way out, like the
 // fingerprint: they change on every publish, so writing them into the repo file
 // would move the bytes every publish record attests. No session writes them —

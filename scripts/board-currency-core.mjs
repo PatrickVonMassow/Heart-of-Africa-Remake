@@ -112,12 +112,11 @@ export function openFingerprintOfTasks(tasksText) {
   return openSetFingerprint(parseTasks(String(tasksText ?? '')).open)
 }
 
-/** Write (or replace) the fingerprint meta in a board document. Idempotent. */
-export function stampFingerprint(html, fingerprint) {
+/** Write (or replace) one named meta in a board document. Idempotent. */
+function stampMeta(html, name, value) {
   const doc = typeof html === 'string' ? html : ''
-  const fp = String(fingerprint ?? '')
-  const tag = `<meta name="${FINGERPRINT_META}" content="${fp}">`
-  const existing = new RegExp(`<meta name="${FINGERPRINT_META}" content="[^"]*">\\n?`)
+  const tag = `<meta name="${name}" content="${String(value ?? '')}">`
+  const existing = new RegExp(`<meta name="${name}" content="[^"]*">\\n?`)
   if (existing.test(doc)) return doc.replace(existing, `${tag}\n`)
   const titleEnd = doc.indexOf('</title>')
   if (titleEnd < 0) return `${tag}\n${doc}`
@@ -125,10 +124,37 @@ export function stampFingerprint(html, fingerprint) {
   return `${doc.slice(0, at)}\n${tag}${doc.slice(at)}`
 }
 
+function readMeta(html, name) {
+  const m = String(html ?? '').match(new RegExp(`<meta name="${name}" content="([^"]*)">`))
+  return m ? m[1] : null
+}
+
+/** Write (or replace) the fingerprint meta in a board document. Idempotent. */
+export function stampFingerprint(html, fingerprint) {
+  return stampMeta(html, FINGERPRINT_META, fingerprint)
+}
+
 /** The fingerprint a board document carries, or null. */
 export function readFingerprint(html) {
-  const m = String(html ?? '').match(new RegExp(`<meta name="${FINGERPRINT_META}" content="([^"]*)">`))
-  return m ? m[1] : null
+  return readMeta(html, FINGERPRINT_META)
+}
+
+// THE FILE HASH. The open-point set alone is blind to the status line, the
+// "Stand" time, every card's text and the queue's order (found 12.09.2026: the
+// live page showed "Stand 14:24" against a local 15:13 and --check said
+// CURRENT). The publish therefore also stamps sha256 of the repo bytes it sent —
+// the same hash it records as `pagesPublishedHash` — so --check can compare what
+// the reader actually sees.
+const FILE_HASH_META = 'hoa-board-file'
+
+/** Write (or replace) the repo-file hash meta in a board document. Idempotent. */
+export function stampFileHash(html, fileHash) {
+  return stampMeta(html, FILE_HASH_META, fileHash)
+}
+
+/** The repo-file hash a board document carries, or null. */
+export function readFileHash(html) {
+  return readMeta(html, FILE_HASH_META)
 }
 
 // ── Delta A: the due mark ──────────────────────────────────────────────────
@@ -320,8 +346,10 @@ export function publishCapability({ state, sessionId = '', transport = null } = 
  * Compare the fetched board against the work order.
  *
  * `verdict` is one of:
- *   'current'     — the live page carries the expected fingerprint;
- *   'behind'      — it carries a different one, for longer than the grace;
+ *   'current'     — the live page carries the expected fingerprint (and, when
+ *                   `expectedFile` is given, the local board's file hash);
+ *   'behind'      — either differs, for longer than the grace, or the local
+ *                   board changed since the last publish;
  *   'settling'    — it differs, but within the deploy/CDN grace: not an alarm;
  *   'unreachable' — the fetch failed, or the page carries no fingerprint at all;
  *   'unknown'     — no expected fingerprint was computed.
@@ -337,6 +365,10 @@ export function liveBoardVerdict({
   publishedAt = 0,
   now = Date.now(),
   graceMs = LIVE_GRACE_MS,
+  // Optional: sha256 of the LOCAL repo board, and the hash the last publish
+  // recorded. Without `expectedFile` only the open-point set is compared.
+  expectedFile = null,
+  publishedFile = null,
 } = {}) {
   if (fetchError || typeof liveHtml !== 'string' || !liveHtml.trim()) {
     return { verdict: 'unreachable', live: null, expected, reason: String(fetchError ?? 'the live board could not be fetched') }
@@ -346,12 +378,23 @@ export function liveBoardVerdict({
     return { verdict: 'unreachable', live: null, expected, reason: 'the live board carries no open-point fingerprint' }
   }
   if (!expected) return { verdict: 'unknown', live, expected, reason: 'no expected fingerprint was computed' }
-  if (live === expected) return { verdict: 'current', live, expected, reason: '' }
+  const liveFile = expectedFile ? readFileHash(liveHtml) : null
+  const fileDiffers = Boolean(expectedFile) && liveFile !== expectedFile
+  if (live === expected && !fileDiffers) return { verdict: 'current', live, expected, reason: '' }
+  const reason =
+    live !== expected
+      ? `the live board shows ${live}, the work order ${expected}`
+      : `the live board's file hash is ${liveFile ? liveFile.slice(0, 12) : '<none>'}, the local board's ${expectedFile.slice(0, 12)} — its status line, "Stand" time or card text differ`
+  // A local board edited since the last publish was never sent: no CDN grace
+  // can make it appear, so it is behind at once.
+  if (fileDiffers && publishedFile && publishedFile !== expectedFile) {
+    return { verdict: 'behind', live, expected, reason: `${reason}; the local board changed since the last publish` }
+  }
   const age = Number.isFinite(publishedAt) && publishedAt > 0 ? now - publishedAt : Infinity
   if (age <= graceMs) {
     return { verdict: 'settling', live, expected, reason: `published ${Math.round(age / 1000)} s ago — inside the deploy/CDN grace` }
   }
-  return { verdict: 'behind', live, expected, reason: `the live board shows ${live}, the work order ${expected}` }
+  return { verdict: 'behind', live, expected, reason }
 }
 
 /**

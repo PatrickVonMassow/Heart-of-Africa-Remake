@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
@@ -19,7 +20,9 @@ import {
   pagesPublishPatch,
   publishCapability,
   publishDuePatch,
+  readFileHash,
   readFingerprint,
+  stampFileHash,
   stampFingerprint,
   syncedPublishPatch,
   watchdogDecision,
@@ -223,6 +226,74 @@ describe('delta D/E — judging the LIVE page', () => {
 
   it('says so honestly when there is nothing to compare against', () => {
     expect(liveBoardVerdict({ liveHtml: live(expected), expected: null }).verdict).toBe('unknown')
+  })
+})
+
+describe('delta D/E — the live page is compared by what the reader sees', () => {
+  // The open-point set is the same on both sides; only the status line or the
+  // "Stand" time moved (the 12.09.2026 case: live 14:24, local 15:13, CURRENT).
+  const expected = 'sha256:aaaa'
+  const sha = (t) => createHash('sha256').update(Buffer.from(t)).digest('hex')
+  const repoAt = (stand, status = 'Batch läuft') =>
+    board(`<section class="now"><p class="status">${status}</p><p>Stand ${stand}</p></section>\n`)
+  const publish = (repo) => stampFileHash(stampFingerprint(repo, expected), sha(repo))
+  const old = repoAt('14:24')
+  const longAgo = { publishedAt: 1000, now: 1000 + LIVE_GRACE_MS + 1 }
+
+  it('stamps and reads back the repo-file hash beside the fingerprint', () => {
+    const page = publish(old)
+    expect(readFileHash(page)).toBe(sha(old))
+    expect(readFingerprint(page)).toBe(expected)
+    expect(stampFileHash(page, sha(old))).toBe(page)
+  })
+
+  it('calls the board current when the local file is the one that was published', () => {
+    const v = liveBoardVerdict({ liveHtml: publish(old), expected, expectedFile: sha(old), ...longAgo })
+    expect(v.verdict).toBe('current')
+  })
+
+  it('reports a board that differs only in its "Stand" time as BEHIND, not CURRENT', () => {
+    const local = repoAt('15:13')
+    const v = liveBoardVerdict({ liveHtml: publish(old), expected, expectedFile: sha(local), ...longAgo })
+    expect(v.verdict).toBe('behind')
+    expect(v.reason).toMatch(/file hash/)
+  })
+
+  it('reports a board that differs only in its status line as BEHIND, not CURRENT', () => {
+    const local = repoAt('14:24', 'Batch pausiert')
+    const v = liveBoardVerdict({ liveHtml: publish(old), expected, expectedFile: sha(local), ...longAgo })
+    expect(v.verdict).toBe('behind')
+  })
+
+  it('gives no CDN grace to a local edit that was never published', () => {
+    const local = repoAt('15:13')
+    const v = liveBoardVerdict({
+      liveHtml: publish(old),
+      expected,
+      expectedFile: sha(local),
+      publishedFile: sha(old),
+      publishedAt: 1000,
+      now: 1000 + 60_000,
+    })
+    expect(v.verdict).toBe('behind')
+  })
+
+  it('keeps the grace for a publish of the local file that is still settling', () => {
+    const local = repoAt('15:13')
+    const v = liveBoardVerdict({
+      liveHtml: publish(old),
+      expected,
+      expectedFile: sha(local),
+      publishedFile: sha(local),
+      publishedAt: 1000,
+      now: 1000 + 60_000,
+    })
+    expect(v.verdict).toBe('settling')
+  })
+
+  it('does not call a page without a file hash current once a local hash is known', () => {
+    const v = liveBoardVerdict({ liveHtml: stampFingerprint(old, expected), expected, expectedFile: sha(old), ...longAgo })
+    expect(v.verdict).toBe('behind')
   })
 })
 
