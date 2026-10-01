@@ -7494,6 +7494,9 @@ if (section('water-edge-flee')) {
     // flight — measured (point 1249), its first hop was the whole-pass flip at
     // 13.8 s, and an earlier bout hopped the settled calf into the river as
     // the designed §19.8 play fall-in. Everything up to the bout stays watched.
+    // Residual (review of point 1249): the game may end the flight and step
+    // the first bout in one frame, so the last poll interval (~80 ms) before
+    // the bout is unwatched; separating it needs a per-frame trace.
     const track = (a) => ({
       a, entries: 0, wet: false, dramas: 0, flips: 0, zigzags: 0, restarts: 0, settled: undefined,
       px: a.x, pz: a.z, last: undefined, lastTurn: 0, fleeing: false, samples: 0, hist: [], at: undefined,
