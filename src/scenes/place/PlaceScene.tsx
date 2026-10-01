@@ -2681,10 +2681,13 @@ export function PlaceScene() {
     // Ray probe for the §2.5 silhouette gate: what surface does the frame
     // actually draw at a world point, and how far away is it? Excludes the
     // silhouettes themselves so a float reports the surface BEHIND them.
-    w.__placeRayHit = (x: number, y: number, z: number) => {
+    // `from` replaces the camera as the ray origin (a straight-down probe of a
+    // point the camera's sight line cannot reach).
+    w.__placeRayHit = (x: number, y: number, z: number, from?: [number, number, number]) => {
       const target = new THREE.Vector3(x, y, z)
-      const dir = target.clone().sub(camera.position).normalize()
-      const rc = new THREE.Raycaster(camera.position.clone(), dir, 0.1, 4000)
+      const origin = from ? new THREE.Vector3(...from) : camera.position.clone()
+      const dir = target.clone().sub(origin).normalize()
+      const rc = new THREE.Raycaster(origin, dir, 0.1, 4000)
       const hits = rc.intersectObject(r3fScene, true)
       const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
       // Behind the transparent water: the first surface a sight line meets once
@@ -2711,7 +2714,7 @@ export function PlaceScene() {
               mask.getX(hit.face.a), mask.getX(hit.face.b), mask.getX(hit.face.c))
             : 0
       return {
-        targetDistance: target.distanceTo(camera.position),
+        targetDistance: target.distanceTo(origin),
         hitDistance: hit ? hit.distance : null,
         hitName: hit ? hit.object.name || (hit.object as THREE.Mesh).geometry?.type || 'mesh' : null,
         hitWater,

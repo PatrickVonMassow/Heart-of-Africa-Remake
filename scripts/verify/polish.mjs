@@ -6545,10 +6545,11 @@ if (section('mute-shore-scene')) {
       const feet = await shore.evaluate(() => {
         const info = Object.values(window.__placePanoramaWildlifeInfo ?? {})
         return info.filter((w) => w.visible).map((w) => {
-          const r = window.__placeRayHit(w.x, w.visibleY - 0.05, w.z)
-          // The hit point lies on the same sight line as the feet, so the two
-          // distances differ by the gap between them. A grazing line enters the
-          // ground ahead of a point 5 cm under it, hence the 10 % allowance.
+          // Probed straight down: a far silhouette's feet often stand behind a
+          // ridge the camera's sight line hits first, which proves nothing.
+          const r = window.__placeRayHit(w.x, w.visibleY - 0.05, w.z, [w.x, w.visibleY + 50, w.z])
+          // The hit point lies on the same line as the feet, so the two
+          // distances differ by the gap between them.
           const gap = r && r.hitDistance !== null ? Math.abs(r.targetDistance - r.hitDistance) : null
           return {
             x: +w.x.toFixed(1), z: +w.z.toFixed(1), name: r?.hitName ?? null, water: r?.hitWater ?? null,
