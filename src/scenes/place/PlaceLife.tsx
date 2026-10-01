@@ -3882,7 +3882,7 @@ export function PlaceLife({
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
           {loom && (
             <Loom
-              key={placeId}
+              key={`loom-${placeId}`}
               placeId={placeId}
               station={loom}
               cloth={style.cloth[1 % style.cloth.length]}
@@ -3923,7 +3923,7 @@ export function PlaceLife({
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
           {/* The fisherman's dugout beside the children's bank game (work-order 1237). */}
-          {bank && <RiverFishery key={placeId} bank={bank} cloth={[2, 0, 1, 3, 4].map((k) => style.cloth[k % style.cloth.length])} seed={localSeed} />}
+          {bank && <RiverFishery key={`fishery-${placeId}`} bank={bank} cloth={[2, 0, 1, 3, 4].map((k) => style.cloth[k % style.cloth.length])} seed={localSeed} />}
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
           <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           {/* Inhabitant/prop interactions (design.md §19). */}
