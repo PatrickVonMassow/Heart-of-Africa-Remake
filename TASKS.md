@@ -135,6 +135,19 @@ put it is the mistake this line exists to stop.
   Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
   Bundle: Dorfleben.
   Criticality: medium — an adult order is spoken inside the children's game.
+- [ ] 1257. On WebGL 2 the loom helper never walks the warp inside the section's waits
+  Source: covering WebGL 2 pass of point 1254 (01.10.2026, log
+  `local/verify-logs/2026-10-01T16-54-15-528-polish.log`, feat/1254 7c497edd1).
+  THE RED. `VERIFY_GL=webgl npm test -- polish --section=village-loom`: "the weaver's call sends
+  her helper part-way along the warp, and he is walking it OUT under her reading" (60 s wait)
+  and "once the helper has tended an end, the two warp ends differ" (90 s wait) both time out.
+  On WebGPU the same commit read both green (log `2026-10-01T16-15-27-118-polish.log`), and
+  1254 changes only two React keys, so this is a WebGL-2-only moment-catcher, not 1254's.
+  Final state: the cause is named with its measurement (frame rate, loom clock or wait
+  width) and both checks are green on WebGL 2, or reclassified under point 642.
+  Tests: the existing Playwright checks; no new mechanism.
+  Bundle: Dorfleben.
+  Criticality: low — WebGL-2-only, may wait for the next LARGE (CLAUDE.md §7.2).
 - [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
   point 1126 on 15.09.2026, which delivered its other three parts the same day).
   MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
