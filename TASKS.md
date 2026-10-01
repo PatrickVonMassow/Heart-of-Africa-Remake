@@ -98,6 +98,30 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: medium — villagers stay silent for the player's sake, which the user rejects as unnatural.
 
+- [ ] 1261. No water carrier sets out with an empty jar in the continuous route's adult step
+  Source: covering WebGPU passes of point 1260 (01.-02.10.2026).
+  THE RED. `communication --section=continuous-route`, WebGPU: `FAIL continuous route at
+  3-adult-work-and-loom: page.waitForFunction: Timeout 480000ms exceeded`, twice on
+  feat/1260 (d6dd8adf9, log `local/verify-logs/2026-10-01T21-08-19-119-…`; 343cc7b1e,
+  `…2026-10-01T22-19-05-530-…`). No `03-empty-jar` frame was written, so the first wait of the
+  step — some villager with `carry === 'emptyJar'` within 480 s of standing at
+  `geography.waterStand` — never came true.
+  NOT 1260'S: its diff touches only the bank game, the loom's ROCK gate and their feeds. Main
+  itself cannot reach step 3: at 54809a1c3 the same section reds earlier, at
+  `2-childrens-bank-game: ROCK precedes the child call, and the first RIVER hearing in
+  words-first` (log `…2026-10-01T22-39-32-337-…`) — the gate 1260 removes. Last green of the
+  section on main: 53b168c14 (28.09.2026); main changed the settlement boundary, the replayed
+  adults' bounds and the water path since.
+  Final state:
+  - The cause is named with its measurement (are no adults cast to the water errand, or do
+    they never reach `emptyJar` while the player stands at the stand?).
+  - A water carrier sets out with the empty jar within the step's budget on both backends; the
+    wait is not lengthened and the step not skipped.
+  - `communication --section=continuous-route` passes step 3 on WebGPU.
+  Tests: Vitest for an errand-assignment cause; the existing Playwright step is the scene check.
+  Bundle: Dorfleben.
+  Criticality: medium — the water errand is part of the lively settlement (§7.1 no. 15) and the
+  red blocks every covering communication proof.
 - [ ] 1256. A RIVER order falls 6.2 m from the children's roaming quarter
   Source: covering WebGPU passes of point 1254 (01.10.2026).
   THE RED. `polish --section=adult-errands`: "and no adult word ever falls inside the
