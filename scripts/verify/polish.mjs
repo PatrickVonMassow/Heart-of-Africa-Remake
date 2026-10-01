@@ -1018,10 +1018,12 @@ if (section('speech-owner')) {
   const STAND_BACKS = [6, 5]
   const aimPair = (pair, back) =>
     page.evaluate(
-      ({ a, b, back }) => {
+      async ({ a, b, back }) => {
+        const { insidePlace } = await import('/src/scenes/place/boundary.ts')
         const figs = window.__speechOwnerFigures
         const p = window.__placePlayer
-        if (!figs || !p || !window.__placeRayHit) return null
+        const layout = window.__placeLayout
+        if (!figs || !p || !layout || !window.__placeRayHit) return null
         const pos = [figs[a], figs[b]].map((f) => {
           f.updateWorldMatrix(true, false)
           const e = f.matrixWorld.elements
@@ -1039,8 +1041,15 @@ if (section('speech-owner')) {
           px = -px
           pz = -pz
         }
-        p.x = mid.x - px * back
-        p.z = mid.z - pz * back
+        // A stand beyond the settlement's edge is no stand: putting the player
+        // there LEAVES the place (`isOutsidePlace`), and a pair on the bank
+        // lobe — the fishermen at the waterline — offers exactly that. The
+        // pair is skipped; the function that decides leaving decides it here.
+        const x = mid.x - px * back
+        const z = mid.z - pz * back
+        if (!insidePlace(layout, x, z, 1)) return null
+        p.x = x
+        p.z = z
         p.pitch = 0
         p.yaw = Math.atan2(mid.x - p.x, mid.z - p.z) + Math.PI
         return pos
@@ -1238,6 +1247,12 @@ if (section('speech-owner')) {
       continue
     }
     const pos = await aimPair(cand, cand.back)
+    if (!pos) {
+      // The pair walked on until its stand fell outside the settlement.
+      attempts.push({ pair: cand, at: 'stand-outside' })
+      await page.evaluate(() => window.__speech?.clear())
+      continue
+    }
     const label = await page.evaluate(() => window.__speech?.labels().find((l) => l.speakerId === 'owner-newer'))
     let atShutter = null
     await captureFrame(
@@ -5285,17 +5300,21 @@ if (section('children-bank-game')) {
         p.yaw = Math.atan2(far.x - p.x, far.z - p.z)
         return {
           radius: window.__balance.communication.hearingRadius,
+          rockR: L.playRocks.r,
           toNear: Math.hypot(near.x - p.x, near.z - p.z),
           toFar: Math.hypot(far.x - p.x, far.z - p.z),
         }
       })
     const earshot = await restoreEarshotStance()
+    // The tapper stands at the stone's flank on the lane side, a rock's radius
+    // nearer than its centre; a stretch longer than twice the hearing radius
+    // (21 m since 1245) still leaves both tappers in earshot.
     check(
-      'the traveller stands within earshot of BOTH play rocks, so a tap has an arm at all',
-      !!earshot && Math.max(earshot.toNear, earshot.toFar) <= earshot.radius,
+      'the traveller stands within earshot of BOTH tappers, so a tap has an arm at all',
+      !!earshot && Math.max(earshot.toNear, earshot.toFar) - earshot.rockR <= earshot.radius,
       earshot
-        ? `${earshot.toNear.toFixed(1)} m and ${earshot.toFar.toFixed(1)} m from the two rocks, ` +
-          `hearing radius ${earshot.radius} m — the tapper stands a rock's radius nearer still`
+        ? `${earshot.toNear.toFixed(1)} m and ${earshot.toFar.toFixed(1)} m from the two rock centres, ` +
+          `${earshot.rockR} m less to the tapper at the flank, hearing radius ${earshot.radius} m`
         : 'the layout or the player was not readable',
     )
     let bestTouch = null
