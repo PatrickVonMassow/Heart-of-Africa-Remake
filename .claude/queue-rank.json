@@ -1536,6 +1536,12 @@
       "why": "user 30.09.2026: ordinary bug report, end of the order",
       "origin": "user",
       "place": "last"
+    },
+    "1252": {
+      "at": "2026-10-01T05:49:11.014Z",
+      "why": "User order 01.10.2026: queue directly after the seriesCycles commit, i.e. at the front of the work order",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1565,7 +1571,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-01T04:51:38.673Z",
+    "at": "2026-10-01T05:49:11.025Z",
     "points": [
       184,
       200,
@@ -1994,7 +2000,8 @@
       1243,
       1244,
       1249,
-      1251
+      1251,
+      1252
     ]
   }
 }
