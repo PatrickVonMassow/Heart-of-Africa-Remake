@@ -242,8 +242,12 @@ interface BalanceConfig {
    * errand, loom, chief's hut) — `boundary.ts` grows the boundary per bearing
    * until it holds; the layout does not move. CALIBRATABLE (work-order 1252):
    * framing a ground of ~6 m radius at the reference viewport needs ~4 m past
-   * its rim, the edge band's inner half takes 1.5 m and two strides of room to
-   * step back make up the rest. Toward the river the wade limit stays the edge.
+   * its rim. The edge band (`placeEdgeBand.widthM` 8, centred on the boundary)
+   * reaches 4 m (+0.4 wander) inside, but its visible fall is only the last
+   * ~1.4 m (measured in polish settlement-edge); inside that the ground reads
+   * as the village's own. 8 m thus leaves ~6 m before the visible edge and
+   * 3.6 m clear of the band's nominal extent. Toward the river the wade limit
+   * stays the edge.
    */
   observerMargin: number
   /**
