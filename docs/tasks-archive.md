@@ -32887,3 +32887,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   user 30.09.2026: "Noch einen weiteren Punkt danach einreihen: Aktuell ziehen die Kinder wieder ab, wenn alle gefangen wurden. Ich nenne das mal: Sie spielen nur eine Runde. Das gibt dem Spieler zu wenig Zeit zum Beobachten und er muss immer erst Minuten lang warten, bis die Kinder wieder spielen. Deswegen soll es stattdessen insgesamt 3 komplette Spielrunden geben, bevor sie alle wieder abziehen."
   Bundle: Dorfleben.
   Criticality: medium — the player waits minutes between single rounds of the game.
+
+- [x] 1247. A user request waits in the carrier for hours because the request gate never fires
+  MEASURED 30.09.2026, 13:00: two requests (deposited 08:18 and 09:38, now points 1245 and 1246)
+  sat pending through two batch-owner boundaries (b67374e1 at 11:18, 69d1cdc6 at 12:27) and the
+  whole next owner turn series (aa5bc325), without one refusal. Two causes, both in
+  `scripts/findings-core.mjs` auditFindings:
+  1. The request gate fires ONLY on the turn that runs `batch-boundary.mjs --commit`
+     (`ownsBatch && atBoundary`, point 462). Between boundaries — a whole long point — a
+     deposited request waits unseen. The stated reason ("only the boundary may write TASKS.md")
+     does not hold: appending to TASKS.md is main-only bookkeeping the owner does mid-point
+     (e.g. commit "File the confluence water wedge…", 11:51, while 1145 was in flight).
+  2. At the boundary itself the gate is dead: `--commit` hands the lock over BEFORE the Stop
+     hook runs, so `ownsBatch` reads false at exactly the turn the gate is scoped to.
+     Reproduced: replaying both boundary turns' transcripts through auditFindings with
+     ownsBatch=true yields `request-not-queued`; the fence log shows 69d1cdc6 flipping from
+     `batch-owner` to `attended` 6 s after its commit.
+  FINAL STATE (a simplification): the request gate is judged like the finding-carrier duty —
+  on EVERY batch-owner turn end, scoped by the context fence (`scopeMandatoryDuty`), with the
+  `atBoundary` condition and `turnTakesBoundary` removed if nothing else uses them; and
+  `batch-boundary.mjs --commit` refuses while requests wait (before it hands the lock over), so
+  a boundary can never carry one past the handover.
+  Test: Vitest in findings-core.test.mjs — owner turn end with a pending request blocks without
+  a boundary; fence-closed defers; boundary commit refuses with a pending request.
+  Refs: scripts/findings-core.mjs (auditFindings, request gate), scripts/findings-guard.mjs,
+  scripts/batch-boundary.mjs (context and point commit paths), point 462.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — a user's order silently waits hours; qualifies under the freeze as a
+  real blockade of user work (CLAUDE.md §2).

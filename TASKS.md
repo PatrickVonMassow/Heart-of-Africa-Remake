@@ -77,33 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1247. A user request waits in the carrier for hours because the request gate never fires
-  MEASURED 30.09.2026, 13:00: two requests (deposited 08:18 and 09:38, now points 1245 and 1246)
-  sat pending through two batch-owner boundaries (b67374e1 at 11:18, 69d1cdc6 at 12:27) and the
-  whole next owner turn series (aa5bc325), without one refusal. Two causes, both in
-  `scripts/findings-core.mjs` auditFindings:
-  1. The request gate fires ONLY on the turn that runs `batch-boundary.mjs --commit`
-     (`ownsBatch && atBoundary`, point 462). Between boundaries — a whole long point — a
-     deposited request waits unseen. The stated reason ("only the boundary may write TASKS.md")
-     does not hold: appending to TASKS.md is main-only bookkeeping the owner does mid-point
-     (e.g. commit "File the confluence water wedge…", 11:51, while 1145 was in flight).
-  2. At the boundary itself the gate is dead: `--commit` hands the lock over BEFORE the Stop
-     hook runs, so `ownsBatch` reads false at exactly the turn the gate is scoped to.
-     Reproduced: replaying both boundary turns' transcripts through auditFindings with
-     ownsBatch=true yields `request-not-queued`; the fence log shows 69d1cdc6 flipping from
-     `batch-owner` to `attended` 6 s after its commit.
-  FINAL STATE (a simplification): the request gate is judged like the finding-carrier duty —
-  on EVERY batch-owner turn end, scoped by the context fence (`scopeMandatoryDuty`), with the
-  `atBoundary` condition and `turnTakesBoundary` removed if nothing else uses them; and
-  `batch-boundary.mjs --commit` refuses while requests wait (before it hands the lock over), so
-  a boundary can never carry one past the handover.
-  Test: Vitest in findings-core.test.mjs — owner turn end with a pending request blocks without
-  a boundary; fence-closed defers; boundary commit refuses with a pending request.
-  Refs: scripts/findings-core.mjs (auditFindings, request gate), scripts/findings-guard.mjs,
-  scripts/batch-boundary.mjs (context and point commit paths), point 462.
-  Bundle: Testinfrastruktur.
-  Criticality: medium — a user's order silently waits hours; qualifies under the freeze as a
-  real blockade of user work (CLAUDE.md §2).
 - [ ] 1248. The supervisor's immediate successor spawn ignores a pending batch claim when the owner exits
   MEASURED 30.09.2026: the user ordered a takeover in an open window (c3fd94cf); `batch-claim.mjs`
   recorded the claim at 12:53 against the live owner aa5bc325 (assessment `honour`). When that
