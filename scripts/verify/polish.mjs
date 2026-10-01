@@ -5300,17 +5300,21 @@ if (section('children-bank-game')) {
         p.yaw = Math.atan2(far.x - p.x, far.z - p.z)
         return {
           radius: window.__balance.communication.hearingRadius,
+          rockR: L.playRocks.r,
           toNear: Math.hypot(near.x - p.x, near.z - p.z),
           toFar: Math.hypot(far.x - p.x, far.z - p.z),
         }
       })
     const earshot = await restoreEarshotStance()
+    // The tapper stands at the stone's flank on the lane side, a rock's radius
+    // nearer than its centre; a stretch longer than twice the hearing radius
+    // (21 m since 1245) still leaves both tappers in earshot.
     check(
-      'the traveller stands within earshot of BOTH play rocks, so a tap has an arm at all',
-      !!earshot && Math.max(earshot.toNear, earshot.toFar) <= earshot.radius,
+      'the traveller stands within earshot of BOTH tappers, so a tap has an arm at all',
+      !!earshot && Math.max(earshot.toNear, earshot.toFar) - earshot.rockR <= earshot.radius,
       earshot
-        ? `${earshot.toNear.toFixed(1)} m and ${earshot.toFar.toFixed(1)} m from the two rocks, ` +
-          `hearing radius ${earshot.radius} m — the tapper stands a rock's radius nearer still`
+        ? `${earshot.toNear.toFixed(1)} m and ${earshot.toFar.toFixed(1)} m from the two rock centres, ` +
+          `${earshot.rockR} m less to the tapper at the flank, hearing radius ${earshot.radius} m`
         : 'the layout or the player was not readable',
     )
     let bestTouch = null
