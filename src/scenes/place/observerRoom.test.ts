@@ -10,7 +10,7 @@
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import { sharedLayout } from './layoutHarness'
-import { BOUNDARY_LUT_SIZE, buildBoundaryLut, placeBoundaryRadius, type PlaceBounds } from './boundary'
+import { BOUNDARY_LUT_SIZE, buildBoundaryLut, isOutsidePlace, placeBoundaryRadius, type PlaceBounds } from './boundary'
 import { digLocalToWorld, DIG_RIM_DISTANCE, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
 import { stationGround } from './loom'
@@ -97,14 +97,17 @@ function toSegment(x: number, z: number, [ax, az, bx, bz]: [number, number, numb
   return Math.hypot(x - (ax + dx * t), z - (az + dz * t))
 }
 
-/** The scene part nearest the land boundary, and its walkable room. */
+/** The scene part nearest the land boundary, and its walkable room — SIGNED:
+ *  a part whose centre lies outside the settlement has negative room, however
+ *  far it stands from the edge. */
 function tightest(bounds: PlaceBounds, parts: Part[]): { part: Part; room: number } {
   const segs = landSegments(bounds)
   let best = { part: parts[0], room: Infinity }
   for (const part of parts) {
     let d = Infinity
     for (const s of segs) d = Math.min(d, toSegment(part.x, part.z, s))
-    if (d - part.r < best.room) best = { part, room: d - part.r }
+    const room = isOutsidePlace(bounds, part.x, part.z) ? -d - part.r : d - part.r
+    if (room < best.room) best = { part, room }
   }
   return best
 }
@@ -129,6 +132,13 @@ describe('every watched scene keeps an observer margin before the boundary', () 
     expect(l.bank, 'the Bambara village stands on its river').not.toBeNull()
     const { part, room } = tightest(l, sceneParts(l))
     expect(room, `${part.what} at (${part.x.toFixed(1)}, ${part.z.toFixed(1)})`).toBeGreaterThanOrEqual(margin - 0.02)
+  })
+
+  it('counts a scene outside the settlement as no room at all (signed)', () => {
+    const outside = tightest({ radius: 10 }, [{ what: 'stray', x: 30, z: 0, r: 1 }])
+    expect(outside.room).toBeLessThan(0)
+    const inside = tightest({ radius: 30 }, [{ what: 'inner', x: 10, z: 0, r: 1 }])
+    expect(inside.room).toBeCloseTo(19, 1)
   })
 
   it('was short without the scene room — the reported shortfall', () => {
