@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
 import { PLACES } from '../../world/geo'
-import { BACKDROP_RIVER_Y, backdropRiverFill, mapWaterAt } from './backdropRiver'
+import { BACKDROP_RIVER_Y, backdropRiverFill, barycentricValue, mapWaterAt } from './backdropRiver'
 import { PLACE_RADIUS } from './layout'
 import { BANK_BED_REACH, BANK_WATER_DROP, buildRiverBank } from './riverBank'
 
@@ -51,6 +51,21 @@ describe('the backdrop continues the settlement river (work-order 1250)', () => 
     expect(fill(0, 44)).toBe(true)
     expect(fill(0, 47)).toBe(false) // the far shore beyond the map river
     expect(fill(0, BANK.distance + BANK_BED_REACH)).toBe(false)
+  })
+
+  it('reads the water mask at the probed point of a mixed face, not its corner average', () => {
+    // One water corner (a) and two land corners: the average would say 1/3 everywhere.
+    const a = [0, 0, 0] as const
+    const b = [4, 0, 0] as const
+    const c = [0, 0, 4] as const
+    const at = (x: number, z: number) => barycentricValue([x, 0, z], a, b, c, 1, 0, 0)
+    expect(at(0, 0)).toBeCloseTo(1, 9)
+    expect(at(0.4, 0.4)).toBeCloseTo(0.8, 9) // near the water corner: water
+    expect(at(2, 2)).toBeCloseTo(0, 9) // on the land edge: land
+    expect(at(1, 0)).toBeCloseTo(0.75, 9)
+    expect(at(4 / 3, 4 / 3)).toBeCloseTo(1 / 3, 9) // only the centroid equals the average
+    // A degenerate face falls back to the average.
+    expect(barycentricValue([1, 0, 0], a, a, a, 1, 0, 0)).toBeCloseTo(1 / 3, 9)
   })
 
   it('answers false everywhere without a bank', () => {

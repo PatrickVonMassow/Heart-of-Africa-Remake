@@ -53,7 +53,7 @@ import {
   groundDiscSegments,
   panoramaStandY,
 } from './backdrop'
-import { BACKDROP_RIVER_Y, backdropRiverFill, mapWaterAt } from './backdropRiver'
+import { BACKDROP_RIVER_Y, backdropRiverFill, barycentricValue, mapWaterAt } from './backdropRiver'
 import { createBackdropMaterial } from './backdropMaterial'
 import { mulberry32 } from '../../world/noise'
 import {
@@ -2695,13 +2695,20 @@ export function PlaceScene() {
         : undefined
       // Whether the surface hit is drawn as WATER: the backdrop's own mask at
       // the hit face (work-order 1250 — map land lay on the river as a band).
-      const mask = hit?.face ? (hit.object as THREE.Mesh).geometry?.getAttribute('waterMask') : undefined
+      // Interpolated at the hit point within its face, as the GPU draws it.
+      const geom = hit?.face ? (hit.object as THREE.Mesh).geometry : undefined
+      const mask = geom?.getAttribute('waterMask')
+      const pos = geom?.getAttribute('position')
+      const vert = (at: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, k: number) =>
+        [at.getX(k), at.getY(k), at.getZ(k)] as const
+      const local = hit && mask ? hit.object.worldToLocal(hit.point.clone()) : undefined
       const hitWater = !hit
         ? null
         : hit.object.name === 'place-river'
           ? 1
-          : mask && hit.face
-            ? (mask.getX(hit.face.a) + mask.getX(hit.face.b) + mask.getX(hit.face.c)) / 3
+          : mask && pos && hit.face && local
+            ? barycentricValue([local.x, local.y, local.z], vert(pos, hit.face.a), vert(pos, hit.face.b), vert(pos, hit.face.c),
+              mask.getX(hit.face.a), mask.getX(hit.face.b), mask.getX(hit.face.c))
             : 0
       return {
         targetDistance: target.distanceTo(camera.position),

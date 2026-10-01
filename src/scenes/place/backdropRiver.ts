@@ -95,3 +95,28 @@ export function backdropRiverFill(
     return first !== null && out < first
   }
 }
+
+type Vec3 = readonly [number, number, number]
+
+/**
+ * A per-vertex value (the backdrop's water mask) at point `p` on triangle
+ * a-b-c, interpolated by p's barycentric coordinates — what the GPU draws
+ * there, not the triangle's plain average. A degenerate triangle averages.
+ */
+export function barycentricValue(p: Vec3, a: Vec3, b: Vec3, c: Vec3, va: number, vb: number, vc: number): number {
+  const sub = (u: Vec3, v: Vec3) => [u[0] - v[0], u[1] - v[1], u[2] - v[2]] as const
+  const dot = (u: Vec3, v: Vec3) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
+  const e0 = sub(b, a)
+  const e1 = sub(c, a)
+  const e2 = sub(p, a)
+  const d00 = dot(e0, e0)
+  const d01 = dot(e0, e1)
+  const d11 = dot(e1, e1)
+  const d20 = dot(e2, e0)
+  const d21 = dot(e2, e1)
+  const den = d00 * d11 - d01 * d01
+  if (Math.abs(den) < 1e-12) return (va + vb + vc) / 3
+  const v = (d11 * d20 - d01 * d21) / den
+  const w = (d00 * d21 - d01 * d20) / den
+  return (1 - v - w) * va + v * vb + w * vc
+}
