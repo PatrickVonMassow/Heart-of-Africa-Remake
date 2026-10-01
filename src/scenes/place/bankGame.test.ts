@@ -329,15 +329,17 @@ describe('the children`s game at the bank (point 687)', () => {
         expect(Math.hypot(b.u.aim.x - r.x, b.u.aim.z - r.z)).toBeGreaterThan(10)
       }
     }
-    // And ROCK is called on ARRIVAL too, which is the reading the two guards
-    // above exist to keep from being the only one.
-    const arrivals = replayAll(600, { cfg: { ...CFG, utteranceGapSeconds: 0 } }).log.when
-      .filter((w) => w.u.moment === 'arrival')
-    expect(arrivals.length).toBeGreaterThan(0)
     // The boulder is named at most once per roaming phase — a child that stood
     // at it would otherwise chant.
     const roams = log.phases.filter((p) => p === 'roam').length
     expect(boulders.length).toBeLessThanOrEqual(roams)
+  })
+
+  it('calls ROCK on arrival too, not only at the tap and the boulder', () => {
+    // Its own test: both replays in one test exceeded 20 seconds on CI.
+    const arrivals = replayAll(600, { cfg: { ...CFG, utteranceGapSeconds: 0 } }).log.when
+      .filter((w) => w.u.moment === 'arrival')
+    expect(arrivals.length).toBeGreaterThan(0)
   })
 
   it('does not leave roaming until the ordinary boulder has been climbed and named', () => {
