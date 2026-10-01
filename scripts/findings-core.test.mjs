@@ -229,9 +229,22 @@ describe('condition 3 — a waiting request binds every owner turn end', () => {
   })
 
   it('boundary commit refuses while a request waits, and passes once none does', () => {
-    expect(boundaryRequestRefusal(1)).toMatch(/--queued/)
-    expect(boundaryRequestRefusal(1)).toMatch(/Nothing recorded/)
-    expect(boundaryRequestRefusal(0)).toBeNull()
+    const withRequest = '- [ ] 2026-10-01T00:00 · s1 · [request] · pending · Probe'
+    expect(parseCarrier(withRequest).requests.length).toBe(1)
+    expect(boundaryRequestRefusal(() => withRequest)).toMatch(/--queued/)
+    expect(boundaryRequestRefusal(() => withRequest)).toMatch(/Nothing recorded/)
+    expect(boundaryRequestRefusal(() => '')).toBeNull()
+  })
+
+  it('boundary commit treats only a missing carrier as empty and fails closed on any other read error', () => {
+    const missing = () => {
+      throw Object.assign(new Error('no such file'), { code: 'ENOENT' })
+    }
+    const unreadable = () => {
+      throw Object.assign(new Error('permission denied'), { code: 'EACCES' })
+    }
+    expect(boundaryRequestRefusal(missing)).toBeNull()
+    expect(boundaryRequestRefusal(unreadable)).toMatch(/could not be read \(permission denied\).*Nothing recorded/)
   })
 })
 

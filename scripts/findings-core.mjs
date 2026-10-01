@@ -410,13 +410,29 @@ function requestQueueRemedy(count, context) {
 
 /**
  * `batch-boundary.mjs --commit` asks this BEFORE it hands the lock over: a
- * boundary must never carry a waiting request past the handover. Returns the
- * refusal text, or null when nothing waits.
+ * boundary must never carry a waiting request past the handover. `read`
+ * returns the carrier text; only a missing file (ENOENT) means nothing waits,
+ * any other read or parse error fails closed. Returns the refusal text, or null.
  */
-export function boundaryRequestRefusal(carrierRequests = 0) {
-  if (!(Number(carrierRequests) > 0)) return null
+export function boundaryRequestRefusal(read) {
+  let requests
+  try {
+    let text = ''
+    try {
+      text = read()
+    } catch (e) {
+      if (e?.code !== 'ENOENT') throw e
+    }
+    requests = parseCarrier(text).requests.length
+  } catch (e) {
+    return (
+      `The findings carrier could not be read (${e?.message ?? e}), so waiting user requests cannot be ruled out. ` +
+      'Fix the carrier file, then commit again. Nothing recorded.'
+    )
+  }
+  if (!(requests > 0)) return null
   return (
-    requestQueueRemedy(carrierRequests, 'die Grenze würde den Batch jetzt übergeben') +
+    requestQueueRemedy(requests, 'die Grenze würde den Batch jetzt übergeben') +
     ' Danach die Grenze erneut nehmen. Nothing recorded.'
   )
 }
