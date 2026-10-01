@@ -34,6 +34,9 @@ export const BACKDROP_RIVER_Y = -(BANK_WATER_DROP + BACKDROP_RIVER_SINK)
 /** The sampling step along and across the bank (metres). */
 const STEP = 1
 
+/** Bisection steps that place a far shore inside the drawn band (STEP / 2^12). */
+const FAR_EDGE_BISECTIONS = 12
+
 /** Whether the map shows water at a place-frame spot around (lat, lon). */
 export function mapWaterAt(lat: number, lon: number, seed: number): (x: number, z: number) => boolean {
   return (x, z) => sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed).type === 'water'
@@ -76,7 +79,16 @@ export function backdropRiverFill(
     if (first !== null) {
       for (let out = first + STEP; out <= bandEnd; out += STEP) {
         if (!water(out)) {
-          far = out
+          // Bisected between the last wet and first dry sample to the map's
+          // own edge, so no land between two samples is drawn as water.
+          let wet = out - STEP
+          let dry = out
+          for (let k = 0; k < FAR_EDGE_BISECTIONS; k++) {
+            const mid = (wet + dry) / 2
+            if (water(mid)) wet = mid
+            else dry = mid
+          }
+          far = dry
           break
         }
       }

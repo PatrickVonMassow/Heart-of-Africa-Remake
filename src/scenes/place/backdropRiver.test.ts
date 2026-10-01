@@ -49,6 +49,8 @@ describe('the backdrop continues the settlement river (work-order 1250)', () => 
     const fill = backdropRiverFill(BANK, (_x, z) => z >= 42 && z <= 46, DRAWN)
     expect(fill(0, 41)).toBe(true)
     expect(fill(0, 44)).toBe(true)
+    expect(fill(0, 46)).toBe(true)
+    expect(fill(0, 46.5)).toBe(false) // land between two samples is land too
     expect(fill(0, 47)).toBe(false) // the far shore beyond the map river
     expect(fill(0, BANK.distance + BANK_BED_REACH)).toBe(false)
   })
