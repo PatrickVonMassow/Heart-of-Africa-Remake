@@ -13,6 +13,7 @@ import {
   panoramaDriftVelocity,
   panoramaDriftYaw,
   panoramaGaitDistance,
+  panoramaGaitStep,
   dryRingAngle,
   stepRingWalk,
 } from './panoramaWildlife'
@@ -236,6 +237,42 @@ describe('panorama silhouette gait rate (point 286 — consistent with rendered 
     // Scale ≤ 0 is safe (falls back to 1 → the raw arc).
     expect(panoramaGaitDistance(120, 0.006, 0, 2)).toBeCloseTo(panoramaDriftDistance(120, 0.006, 2), 12)
     expect(panoramaGaitDistance(120, 0.006, -3, 2)).toBeCloseTo(panoramaDriftDistance(120, 0.006, 2), 12)
+  })
+})
+
+describe('panorama silhouette gait follows the body it moves (no skating on long frames)', () => {
+  const dry = () => false
+  /** Walks a silhouette for `seconds` of frames of `frame` s, each capped at 0.1 s
+   *  as the scene caps it; returns the ring arc moved (÷ scale) and the gait. */
+  const walk = (frame: number, seconds: number, wet: (a: number) => boolean = dry) => {
+    const radius = 120
+    const scale = 3
+    let angle = 0
+    let drift = 0.006
+    let gait = 0
+    let moved = 0
+    for (let t = 0; t < seconds - 1e-9; t += frame) {
+      const stepped = stepRingWalk(angle, drift, Math.min(frame, 0.1), wet)
+      gait += panoramaGaitStep(angle, stepped.angle, radius, scale)
+      moved += Math.abs(stepped.angle - angle) * radius / scale
+      angle = stepped.angle
+      drift = stepped.drift
+    }
+    return { gait, moved, wallClock: panoramaGaitDistance(radius, 0.006, scale, seconds) }
+  }
+
+  it('advances the legs only as far as the capped body moved below 10 FPS', () => {
+    const slow = walk(0.25, 10) // 4 FPS: the body moves 0.1 s per 0.25 s frame
+    expect(slow.gait).toBeCloseTo(slow.moved, 9)
+    expect(slow.gait).toBeCloseTo(slow.wallClock * 0.4, 9) // the wall clock would outrun it 2.5×
+    const smooth = walk(1 / 60, 10)
+    expect(smooth.gait).toBeCloseTo(smooth.wallClock, 6)
+  })
+
+  it('holds the legs still while the body only turns round at the water', () => {
+    const r = walk(0.05, 2, () => true)
+    expect(r.gait).toBe(0)
+    expect(panoramaGaitStep(0.4, 0.5, 120, 0)).toBeCloseTo(12, 9) // scale ≤ 0 falls back to 1
   })
 })
 

@@ -178,7 +178,7 @@ import {
   hazeColor,
   luminance,
   panoramaDriftYaw,
-  panoramaGaitDistance,
+  panoramaGaitStep,
   excludedAzimuthSpan,
   isAzimuthExcluded,
   dryRingAngle,
@@ -1618,7 +1618,7 @@ function PanoramaWildlife({
     () => items.map((it) => {
       const wet = (a: number) => wetAt(Math.cos(a) * it.radius, Math.sin(a) * it.radius)
       const angle = dryRingAngle(it.angle, wet)
-      return angle === null ? null : { angle, drift: it.drift, wet }
+      return angle === null ? null : { angle, drift: it.drift, wet, gait: 0 }
     }),
     [items, wetAt],
   )
@@ -1641,8 +1641,7 @@ function PanoramaWildlife({
     }
   }, [items, exclusionSpans])
 
-  useFrame(({ clock, camera }, rawDt) => {
-    const t = clock.elapsedTime
+  useFrame(({ camera }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     items.forEach((it, i) => {
       const g = refs.current[i]
@@ -1653,6 +1652,7 @@ function PanoramaWildlife({
         return
       }
       const stepped = stepRingWalk(walk.angle, walk.drift, dt, walk.wet)
+      walk.gait += panoramaGaitStep(walk.angle, stepped.angle, it.radius, it.scale)
       walk.angle = stepped.angle
       walk.drift = stepped.drift
       const a = walk.angle
@@ -1697,7 +1697,8 @@ function PanoramaWildlife({
       // exactly as far as the planted foot sweeps — no skating — and the body
       // dips onto the stance leg (the walk's real rise and fall, in the
       // silhouette's frame, hence × scale) instead of the old cosmetic bob.
-      const phase = gaitPhase(panoramaGaitDistance(it.radius, it.drift, it.scale, t), it.rig.cadence) + it.phase
+      // The distance is the one the body actually moved (capped frames included).
+      const phase = gaitPhase(walk.gait, it.rig.cadence) + it.phase
       const lift = gaitBodyLift(phase, it.rig.legLength) * it.scale
       const y = groundY + lift
       if (import.meta.env.DEV) {

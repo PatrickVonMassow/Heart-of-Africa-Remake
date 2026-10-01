@@ -115,6 +115,18 @@ export function panoramaGaitDistance(
   return panoramaDriftDistance(radius, driftRate, elapsedSeconds) / s
 }
 
+/**
+ * The gait distance one walk step covers, in the silhouette's own rendered
+ * frame (÷ scale, as `panoramaGaitDistance`): the arc between the angles
+ * BEFORE and AFTER the step. Accumulated per frame, the legs ride exactly the
+ * ground the body moved — a capped long frame, or a turn at the water, moves
+ * both alike, so the legs never outrun the body.
+ */
+export function panoramaGaitStep(angleBefore: number, angleAfter: number, radius: number, scale: number): number {
+  const s = scale > 0 ? scale : 1
+  return Math.abs((angleAfter - angleBefore) * radius) / s
+}
+
 // The silhouettes' body-level stride motion used to be two cosmetic fudges: a
 // |sin| bob of the body height and a |sin| fore/aft nod (point 255,
 // `panoramaGaitBob` / `panoramaGaitNod`). Point 300 replaced both with the
