@@ -1473,7 +1473,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
   // own ordering by hand — charge, then mark — and would pass even if the real
   // handler charged before applying the mark. Only the armed run can say.
   it('stores a NARROW charge as unowned when the check printed two measurements', async () => {
-    const run = await armed('polish-panorama', 'compatibility')
+    const run = await armed('polish-children', 'compatibility')
     process.stdout.write('FAIL  no child walks without getting anywhere — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m\n')
     process.stdout.write('FAIL  no child walks without getting anywhere — worst child 4 at 51.0s, 0.02 m walked inside 0.30 m\n')
     const record = run.exit(1)

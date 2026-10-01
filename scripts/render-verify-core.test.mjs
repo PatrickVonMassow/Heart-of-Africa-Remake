@@ -188,6 +188,10 @@ describe('suggestSuite', () => {
   it('names the most recently run suite', () => {
     expect(suggestSuite([run('webgl', 1, { suite: 'flow' }), run('webgpu', 2, { suite: 'polish-children' })])).toBe('polish-children')
   })
+  it('skips a retired suite name an old record still carries', () => {
+    expect(suggestSuite([run('webgl', 1, { suite: 'flow' }), run('webgpu', 2, { suite: 'polish' })])).toBe('flow')
+    expect(suggestSuite([run('webgpu', 2, { suite: 'polish' })], ['src/render/water.ts'])).toBe('enrichments')
+  })
   it('falls back to enrichments on no usable record', () => {
     expect(suggestSuite([])).toBe('enrichments')
     expect(suggestSuite([run('webgl', 1, { suite: 'unknown' })])).toBe('enrichments')
