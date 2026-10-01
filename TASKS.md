@@ -77,24 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1246. Children's bank game plays three rounds in a row before scattering
-  Queue position: directly AFTER point 1245 "Two fishermen with a drift net, basket rotation to a fish fire, children's game moved upstream" (user order 30.09.2026).
-  Final state:
-  1. A play session of the bank game is a SERIES of three complete cycles (count calibratable in src/config/balance.ts, default 3) before the children part and roam.
-  2. When cycle 1 or 2 ends (every runner caught, or the existing one-run-per-child backstop), the children do NOT part and roam: after the existing short end pause (endPauseSeconds) the next cycle opens directly the way a cycle opens today (openCycle: runners take the nearer rock, the child nearest the far rock becomes caller and first catcher, the RIVER call when ROCK is known, the gather). All caught children are runners again.
-  3. Only after the third completed cycle do the children enter 'part' and 'roam' as today (roamSeconds, the off-game ROCK boulder climb, the next series afterwards).
-  4. Everything a cycle does today stays unchanged inside each cycle: calls, word gating, floor/one-exchange rule, taps, catches, regroup, the backstop. An interruption that today ends the game (e.g. hush, player intrusion) ends the whole series in the same way; the next series starts again at cycle 1.
-  5. design.md: the bank game section (§13.4) states that the children play three rounds in a row before they scatter.
-  Tests: Vitest on the bank-game state machine — three cycles run back to back with no 'part'/'roam' between them, 'part' after the third, the counter resets for the next series, an interruption resets it, the backstop cycle end counts as a completed cycle; the existing bank-game picture/timing checks stay green (adjust a picture timing that assumed roam after one cycle).
-  Observed at 1968fb546 (why): endRun (src/scenes/place/bankGame.ts:1107) moves to 'part' as soon
-  as no runner is left, then the children roam roamSeconds 55 s ±25 % before a new gather (up to
-  60 s) — one round is too little to observe and the next takes minutes.
-  Refs: src/scenes/place/bankGame.ts (endRun ~1107, openCycle ~962, openRoam ~1142),
-  src/config/balance.ts (villageLife.bankGame), design.md §13.4. Spec cut from git revision b9c21c8fd.
-  USER, verbatim:
-  user 30.09.2026: "Noch einen weiteren Punkt danach einreihen: Aktuell ziehen die Kinder wieder ab, wenn alle gefangen wurden. Ich nenne das mal: Sie spielen nur eine Runde. Das gibt dem Spieler zu wenig Zeit zum Beobachten und er muss immer erst Minuten lang warten, bis die Kinder wieder spielen. Deswegen soll es stattdessen insgesamt 3 komplette Spielrunden geben, bevor sie alle wieder abziehen."
-  Bundle: Dorfleben.
-  Criticality: medium — the player waits minutes between single rounds of the game.
 - [ ] 1247. A user request waits in the carrier for hours because the request gate never fires
   MEASURED 30.09.2026, 13:00: two requests (deposited 08:18 and 09:38, now points 1245 and 1246)
   sat pending through two batch-owner boundaries (b67374e1 at 11:18, 69d1cdc6 at 12:27) and the
