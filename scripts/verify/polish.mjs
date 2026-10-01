@@ -7374,8 +7374,17 @@ if (section('village-loom')) {
   /** The loom station's projected height from the plaza stand, in pixels of a
    *  900-high viewport (work-order 1191). Measured 23.09.2026: 94.9 px from
    *  16.4 m on the shipped Bambara plan; the 27.7 m seat it replaced scales to
-   *  ~56 px. Calibratable. */
-  const LOOM_PLAZA_MIN_PX = 70
+   *  ~56 px, and that "cone and a stick" is what the bar must still refuse.
+   *  70 px assumed the 16.4 m seat. Since the bank game moved upstream
+   *  (0bd2d2992, 30.09.2026) the children's quarter lies 3.6 m from that seat,
+   *  inside talk reach, and the loom yields to the children by rule. Measured on
+   *  the layout's own rules, no seat the plaza sees through a full metre lies
+   *  nearer than ~20.4 m: the seats to the south stand behind the chief's
+   *  house and the market, which do not give way. The station now reads
+   *  64.4 px from 21.3 m, so the bar sits at 60 px, between that seat and the
+   *  refused 27.7 m one.
+   *  Calibratable. */
+  const LOOM_PLAZA_MIN_PX = 60
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   try {
     await page.evaluate(() => {
