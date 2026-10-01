@@ -7491,15 +7491,28 @@ if (section('water-edge-flee')) {
     // left/right turn pair (each > 10°) are both jitter.
     const track = (a) => ({
       a, entries: 0, wet: false, dramas: 0, flips: 0, zigzags: 0, restarts: 0,
-      px: a.x, pz: a.z, last: undefined, lastTurn: 0, fleeing: false, samples: 0,
+      px: a.x, pz: a.z, last: undefined, lastTurn: 0, fleeing: false, samples: 0, hist: [], at: undefined,
     })
     const ts = { adult: track(adult), calf: track(calf) }
+    const s0 = window.__simTime()
     await window.__pollSim(14, () => {
+      const pre = window.__game.getState().pos
       st.hold()
       for (const k of Object.keys(ts)) {
         const t = ts[k]
         const a = t.a
         t.samples++
+        // DIAG (point 1249): a short history so a red names its own cause.
+        const lion = window.__wildlife.lion
+        t.hist.push({
+          t: +(window.__simTime() - s0).toFixed(2), x: +a.x.toFixed(2), z: +a.z.toFixed(2),
+          dodge: a.dodgeHeading === undefined ? null : +a.dodgeHeading.toFixed(2),
+          wet: T(a.x, a.z) === 'water', hold: !!a.waterHold, hop: a.hop !== undefined, play: !!a.playLock,
+          cross: a.crossing !== undefined, par: a.parent ? [+a.parent.x.toFixed(2), +a.parent.z.toFixed(2)] : null,
+          trav: [+(pre.x - st.P.x).toFixed(2), +(pre.z - st.P.z).toFixed(2)],
+          lion: lion ? `${lion.mode}@${Math.hypot(lion.lx - a.x, lion.lz - a.z).toFixed(1)}` : null,
+        })
+        if (t.hist.length > 8) t.hist.shift()
         const wet = T(a.x, a.z) === 'water'
         if (wet && !t.wet) t.entries++
         t.wet = wet
@@ -7515,7 +7528,7 @@ if (section('water-edge-flee')) {
             let d = hd - t.last
             while (d > Math.PI) d -= Math.PI * 2
             while (d < -Math.PI) d += Math.PI * 2
-            if (Math.abs(d) > Math.PI / 2) t.flips++
+            if (Math.abs(d) > Math.PI / 2) { t.flips++; t.at ??= { d: +d.toFixed(2), hist: t.hist.slice() } }
             const big = Math.PI / 18
             if (Math.abs(d) > big && Math.abs(t.lastTurn) > big && Math.sign(d) !== Math.sign(t.lastTurn)) t.zigzags++
             t.lastTurn = d
@@ -7535,6 +7548,7 @@ if (section('water-edge-flee')) {
         entries: t.entries, dramas: t.dramas, flips: t.flips, zigzags: t.zigzags, restarts: t.restarts, samples: t.samples,
         end: T(a.x, a.z), crossing: a.crossing !== undefined,
         dP: +Math.hypot(a.x - st.P.x, a.z - st.P.z).toFixed(2),
+        ...(t.at ? { flipAt: t.at } : {}),
       }
     }
     return out
