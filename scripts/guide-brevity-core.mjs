@@ -607,7 +607,10 @@ export const LIMITS = {
   // It got no entry of its own: it is the headline and one clause on "Der Wächter tritt zurück",
   // whose subject is already a retreat that goes too far. SHORTEN-BEFORE-RAISE was applied to
   // the hold bullet beside it, which gave back a line. Net: -1 line / 0 words. 704 -> 703.
-  maxLines: 703,
+  // 01.10.2026, a genuinely new tip: one card per piece of work — a borrowed card satisfies the
+  // board and shows the wrong thing (retrospective, borrowed-card class). Shortened from three
+  // lines to two before raising. Net: +2 lines. 703 -> 705.
+  maxLines: 705,
   // 18.09.2026, second fold of the day: the lesson that a check the test environment CANNOT
   // perform is measured and filed as its own visible task, not carried as a footnote, reached
   // the guide as one clause on "Gruener Test, falsches Bild" and was paid for inside the same
@@ -935,7 +938,8 @@ export const LIMITS = {
   // stops everyone, and a display that must name its own age — were folded into the bullets they
   // belong to, and the freshness bullet gave back more filler than they took. Net: -3 words.
   // 6900 -> 6897.
-  maxWords: 6897,
+  // 01.10.2026: the borrowed-card tip justified beside maxLines measures 19 words: 6897 -> 6916.
+  maxWords: 6916,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

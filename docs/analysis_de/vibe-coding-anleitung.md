@@ -121,9 +121,8 @@ Füllstand empfiehlt ein leeres Modell.
    > Er greift, **bevor** die Arbeit beginnt, nicht erst am Ende — sonst ist die Stunde
    > ungesichert, in der ich hinsehe — und merkt auch, wenn der Text steht, während die
    > Arbeit weiterlief."
-   Und: Jede Karte beschreibt genau **eine** Arbeit. Braucht ein Auftrag eine Karte, die es
-   noch nicht gibt, bekommt er einen eigenen Eintrag — eine geliehene Karte stellt die Tafel
-   formal zufrieden und zeigt dir doch das Falsche.
+   Und: **eine** Karte je Arbeit — eine geliehene Karte stellt die Tafel zufrieden
+   und zeigt dir doch das Falsche.
 
 ---
 
