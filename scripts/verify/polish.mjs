@@ -6445,7 +6445,12 @@ if (section('mute-shore-scene')) {
           const t = window.__placeTag()
           const seen = (window.__shoreSeen = window.__shoreSeen ?? {})
           for (const l of window.__speech?.labels() ?? []) {
-            if (l.speakerId === 'village-canoe' && seen.boat === undefined) seen.boat = t.clock
+            if (l.speakerId === 'village-canoe' && seen.boat === undefined) {
+              seen.boat = t.clock
+              // Whether ROCK was already heard at the boat's first reading.
+              const g = window.__game.getState()
+              seen.rockAtBoat = Object.hasOwn(g.communication.heard, g.vocabulary.ROCK)
+            }
             if (/^kid-/.test(l.speakerId) && seen.child === undefined) seen.child = t.clock
           }
           seen.clock = t.clock
@@ -6458,7 +6463,8 @@ if (section('mute-shore-scene')) {
         return Object.hasOwn(g.communication.heard, g.vocabulary.ROCK)
       })
       check('a boatman`s reading appears within a few seconds of entry, without ROCK marked heard',
-        !!heard && heard.boat !== undefined && heard.boat <= firstCall + 3, JSON.stringify({ heard, firstCall }))
+        !!heard && heard.boat !== undefined && heard.boat <= firstCall + 3 && heard.rockAtBoat === false,
+        JSON.stringify({ heard, firstCall }))
       check('a child`s reading appears within a few seconds of entry',
         !!heard && heard.child !== undefined && heard.child <= 15, JSON.stringify({ heard, rockHeard }))
       console.log(`# mute-shore-scene: first readings at round clock ${JSON.stringify(heard)} (ROCK heard by then: ${rockHeard})`)
