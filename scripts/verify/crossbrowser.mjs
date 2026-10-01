@@ -23,6 +23,7 @@
 //   BASE_URL=http://localhost:5173/ CROSSBROWSER_DEPTH=standard node scripts/verify/crossbrowser.mjs
 import { chromium, firefox, webkit } from 'playwright'
 import { applySeedRoute } from './verify-seed.mjs'
+import { splitConsoleErrors } from './vite-reload-signal.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const DEPTH = ['minimal', 'standard', 'thorough'].includes(process.env.CROSSBROWSER_DEPTH ?? '')
@@ -52,6 +53,13 @@ async function launchOrSkip(label, engine) {
     check(label, 'engine launches', false, msg.slice(0, 120))
     return null
   }
+}
+// Console errors minus vite's optimize-dep reload signal (a dev-server cache
+// state, not a game error); the signals are still printed so the record shows them.
+const consoleCheck = (label, name, errors) => {
+  const { failures, reloadSignals } = splitConsoleErrors(errors)
+  if (reloadSignals.length > 0) console.log(`NOTE  ${label.padEnd(15)} vite optimize-dep reload signal (504) seen ${reloadSignals.length}x — not a console error`)
+  check(label, name, failures.length === 0, failures.slice(0, 3).join(' | '))
 }
 const boot = async (page) => {
   await page.goto(BASE, { waitUntil: 'domcontentloaded' })
@@ -127,7 +135,7 @@ for (const [label, engine] of [['firefox', firefox], ['webkit', webkit]]) {
       check(label, 'the map overlay opens', flows.mapOpen === true, JSON.stringify(flows))
       check(label, 'the journal opens', flows.journalOpen === true, JSON.stringify(flows))
     }
-    check(label, 'no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
+    consoleCheck(label, 'no console errors', errors)
   } catch (e) {
     check(label, 'smoke completes without a thrown error', false, String(e.message).slice(0, 160))
   } finally {
@@ -176,7 +184,7 @@ if (at('standard')) {
         })
         check(label, 'the mobile quality preset applied (TRAA/SSAO off, half shadows)', preset.traaOff && preset.ssaoOff && preset.halfShadows, JSON.stringify(preset))
       }
-      check(label, 'no console errors on mobile', errors.length === 0, errors.slice(0, 3).join(' | '))
+      consoleCheck(label, 'no console errors on mobile', errors)
     } catch (e) {
       check(label, 'mobile smoke completes without a thrown error', false, String(e.message).slice(0, 160))
     } finally {
