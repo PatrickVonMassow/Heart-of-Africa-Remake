@@ -366,8 +366,10 @@ export function liveBoardVerdict({
   now = Date.now(),
   graceMs = LIVE_GRACE_MS,
   // Optional: sha256 of the LOCAL repo board, and the hash the last publish
-  // recorded. Without `expectedFile` only the open-point set is compared.
-  expectedFile = null,
+  // recorded. `expectedFile` left UNDEFINED compares only the open-point set
+  // (the watchdog); an explicit null means the local board could not be read,
+  // which is 'unknown' and never 'current'.
+  expectedFile = undefined,
   publishedFile = null,
 } = {}) {
   if (fetchError || typeof liveHtml !== 'string' || !liveHtml.trim()) {
@@ -378,6 +380,9 @@ export function liveBoardVerdict({
     return { verdict: 'unreachable', live: null, expected, reason: 'the live board carries no open-point fingerprint' }
   }
   if (!expected) return { verdict: 'unknown', live, expected, reason: 'no expected fingerprint was computed' }
+  if (expectedFile === null || expectedFile === '') {
+    return { verdict: 'unknown', live, expected, reason: 'the local board could not be read' }
+  }
   const liveFile = expectedFile ? readFileHash(liveHtml) : null
   const fileDiffers = Boolean(expectedFile) && liveFile !== expectedFile
   if (live === expected && !fileDiffers) return { verdict: 'current', live, expected, reason: '' }
@@ -395,6 +400,34 @@ export function liveBoardVerdict({
     return { verdict: 'settling', live, expected, reason: `published ${Math.round(age / 1000)} s ago — inside the deploy/CDN grace` }
   }
   return { verdict: 'behind', live, expected, reason }
+}
+
+/**
+ * One consistent view of the local board and the last publish record for
+ * --check, read AFTER the live fetch. A publish completing between the two
+ * reads would pair the new record with the old file (or the reverse) and cost
+ * a settling page its grace, so the record is read again and, if it moved, the
+ * file is re-read under the newer record. `readBoardHash` may throw: an
+ * unreadable board yields `fileHash: null`.
+ */
+export function checkSnapshot({ readState, readBoardHash }) {
+  const hash = () => {
+    try {
+      return readBoardHash() || null
+    } catch {
+      return null
+    }
+  }
+  const record = (st) => [st?.pagesPublishedHash ?? null, Number(st?.pagesPublishedAt) || 0]
+  let state = readState() ?? {}
+  let fileHash = hash()
+  const again = readState() ?? {}
+  if (record(again).join() !== record(state).join()) {
+    state = again
+    fileHash = hash()
+  }
+  const [publishedFile, publishedAt] = record(state)
+  return { fileHash, publishedFile, publishedAt }
 }
 
 /**

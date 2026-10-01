@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import {
   ARCHIVE_CONTENT_URL,
   BOARD_CONTENT_URL,
   boardMissingPoints,
+  checkSnapshot,
   BOARD_PAGE_URL,
   BOARD_REF,
   LIVE_GRACE_MS,
@@ -294,6 +297,88 @@ describe('delta D/E — the live page is compared by what the reader sees', () =
   it('does not call a page without a file hash current once a local hash is known', () => {
     const v = liveBoardVerdict({ liveHtml: stampFingerprint(old, expected), expected, expectedFile: sha(old), ...longAgo })
     expect(v.verdict).toBe('behind')
+  })
+})
+
+describe('--check never calls a board current over an unread local board', () => {
+  const expected = 'sha256:aaaa'
+  const page = stampFileHash(stampFingerprint(board(), expected), 'f'.repeat(64))
+
+  it('judges an unreadable local board unknown, not current', () => {
+    expect(liveBoardVerdict({ liveHtml: page, expected, expectedFile: null }).verdict).toBe('unknown')
+    expect(liveBoardVerdict({ liveHtml: page, expected, expectedFile: '' }).verdict).toBe('unknown')
+  })
+
+  it('still compares only the open-point set when no local hash is asked for (the watchdog)', () => {
+    expect(liveBoardVerdict({ liveHtml: page, expected }).verdict).toBe('current')
+  })
+
+  it('the CLI exits non-zero with UNKNOWN when the local board is missing, without fetching', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'hoa-board-check-'))
+    try {
+      writeFileSync(resolve(root, 'TASKS.md'), '# Tasks\n')
+      let out = ''
+      let status = 0
+      try {
+        out = execFileSync(process.execPath, [resolve(__dirname, 'board-publish.mjs'), '--check'], {
+          cwd: root,
+          env: { ...process.env, HOA_REPO_ROOT: root },
+          encoding: 'utf8',
+          timeout: 20000,
+        })
+      } catch (e) {
+        status = e.status
+        out = String(e.stdout ?? '')
+      }
+      expect(status).toBe(1)
+      expect(out).toMatch(/verdict\s*: UNKNOWN — the local board could not be read/)
+      expect(out).not.toMatch(/CURRENT/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 30000)
+})
+
+describe('--check reads the local board and the publish record as one snapshot', () => {
+  it('re-reads the board under the newer record when a publish lands between the reads', () => {
+    // Publish A is recorded; publish B rewrites the file and then its record
+    // while --check is reading. The snapshot must pair B with B.
+    let file = 'A'
+    let reads = 0
+    const states = [{ pagesPublishedHash: 'A', pagesPublishedAt: 1 }, { pagesPublishedHash: 'B', pagesPublishedAt: 2 }]
+    const snap = checkSnapshot({
+      readState: () => states[Math.min(reads++, 1)],
+      readBoardHash: () => {
+        const h = file
+        file = 'B' // the concurrent publish writes its file right after the first read
+        return h
+      },
+    })
+    expect(snap).toEqual({ fileHash: 'B', publishedFile: 'B', publishedAt: 2 })
+  })
+
+  it('keeps the settling grace for that concurrent publish while the CDN still serves A', () => {
+    const snap = { fileHash: 'b'.repeat(64), publishedFile: 'b'.repeat(64), publishedAt: 1000 }
+    const cached = stampFileHash(stampFingerprint(board(), 'sha256:aaaa'), 'a'.repeat(64))
+    const v = liveBoardVerdict({
+      liveHtml: cached,
+      expected: 'sha256:aaaa',
+      expectedFile: snap.fileHash,
+      publishedFile: snap.publishedFile,
+      publishedAt: snap.publishedAt,
+      now: 1000 + 30_000,
+    })
+    expect(v.verdict).toBe('settling')
+  })
+
+  it('reports an unreadable board as a null hash', () => {
+    const snap = checkSnapshot({
+      readState: () => ({}),
+      readBoardHash: () => {
+        throw new Error('ENOENT')
+      },
+    })
+    expect(snap.fileHash).toBeNull()
   })
 })
 

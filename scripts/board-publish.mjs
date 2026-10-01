@@ -72,6 +72,7 @@ import {
   BOARD_REF,
   LIVE_GRACE_MS,
   boardMissingPoints,
+  checkSnapshot,
   liveBoardVerdict,
   liveCheckUrl,
   openFingerprintOfTasks,
@@ -159,35 +160,44 @@ function expectedFingerprint() {
 // unread board is the one outcome this must not be able to produce.
 if (args.includes('--check')) {
   const expected = expectedFingerprint()
+  // The open-point set alone misses a stale status line or "Stand" time, so the
+  // local board's file hash is compared beside it. State and file are read as
+  // ONE snapshot after the fetch, so a publish finishing meanwhile keeps its grace.
+  const snapshot = () =>
+    checkSnapshot({
+      readState: () => readJson(STATE_PATH),
+      readBoardHash: () => {
+        const st = readJson(STATE_PATH) ?? {}
+        return sha256(readFileSync(resolve(REPO_ROOT, st.dashboardPath ?? '.batch-dashboard.html'), 'utf8'))
+      },
+    })
   let liveHtml = null
   let fetchError = null
-  try {
-    const res = await fetchWithTimeout(liveCheckUrl(BOARD_CONTENT_URL))
-    // The body is consumed either way, so no socket is left half-read.
-    const body = await res.text()
-    if (!res.ok) fetchError = `HTTP ${res.status} ${res.statusText}`
-    else liveHtml = body
-  } catch (e) {
-    fetchError = (e && e.message) || 'fetch failed'
+  // An unreadable local board can never be judged current: refuse before the
+  // network is touched at all.
+  if (snapshot().fileHash) {
+    try {
+      const res = await fetchWithTimeout(liveCheckUrl(BOARD_CONTENT_URL))
+      // The body is consumed either way, so no socket is left half-read.
+      const body = await res.text()
+      if (!res.ok) fetchError = `HTTP ${res.status} ${res.statusText}`
+      else liveHtml = body
+    } catch (e) {
+      fetchError = (e && e.message) || 'fetch failed'
+    }
   }
-  const publishedAt = Number(state.pagesPublishedAt) || 0
-  // The open-point set alone misses a stale status line or "Stand" time, so the
-  // local board's file hash is compared beside it.
-  let expectedFile = null
-  try {
-    expectedFile = sha256(readFileSync(boardFile, 'utf8'))
-  } catch {
-    expectedFile = null
-  }
-  const v = liveBoardVerdict({
-    liveHtml,
-    fetchError,
-    expected,
-    publishedAt,
-    graceMs: LIVE_GRACE_MS,
-    expectedFile,
-    publishedFile: state.pagesPublishedHash ?? null,
-  })
+  const { fileHash: expectedFile, publishedFile, publishedAt } = snapshot()
+  const v = expectedFile
+    ? liveBoardVerdict({
+        liveHtml,
+        fetchError,
+        expected,
+        publishedAt,
+        graceMs: LIVE_GRACE_MS,
+        expectedFile,
+        publishedFile,
+      })
+    : { verdict: 'unknown', live: null, reason: `the local board could not be read (${boardFile})` }
   console.log(`live board : ${BOARD_CONTENT_URL}`)
   console.log(`viewer     : ${BOARD_PAGE_URL}`)
   console.log(`work order : ${expected ?? '<unreadable>'}`)
@@ -204,7 +214,8 @@ if (args.includes('--check')) {
   // very first `--check` did exactly that, turning an honest "the board is
   // unreachable" (exit 1) into a crash a caller cannot read. The sockets are
   // unref'd, so the process ends by itself once the loop drains.
-  process.exitCode = v.verdict === 'behind' || v.verdict === 'unreachable' ? 1 : 0
+  // An unreadable LOCAL board is a failed check, not an honest 'unknown'.
+  process.exitCode = v.verdict === 'behind' || v.verdict === 'unreachable' || !expectedFile ? 1 : 0
 } else {
   if (args.length > 0 && !lockedByCaller) {
     console.error('usage: node scripts/board-publish.mjs [--check | --url]')
