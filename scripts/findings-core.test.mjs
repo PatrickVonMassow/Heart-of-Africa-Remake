@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_THRESHOLD,
   auditFindings,
+  boundaryRequestRefusal,
   delegationExemption,
   carrierEntry,
   classifyCall,
@@ -204,6 +205,46 @@ describe('condition 2 — the carrier must not rest', () => {
     })
     expect(kinds(v)).toEqual(['carrier-not-drained'])
     expect(v.violations[0].detail).toContain('successor-1')
+  })
+})
+
+describe('condition 3 — a waiting request binds every owner turn end', () => {
+  it('blocks the owner turn end with a pending request, no boundary involved', () => {
+    const v = auditFindings({ tally: tallyTurn([]), ownsBatch: true, sessionId: 'owner-1', carrierRequests: 1 })
+    expect(kinds(v)).toEqual(['request-not-queued'])
+    expect(v.violations[0].detail).toMatch(/--queued/)
+  })
+
+  it('defers the request duty to the successor once the context fence is closed', () => {
+    const v = auditFindings({
+      tally: tallyTurn([]),
+      ownsBatch: true,
+      sessionId: 'closing-owner',
+      carrierRequests: 2,
+      fence: { closed: true, successor: 'the successor session' },
+    })
+    expect(v.ok).toBe(true)
+    expect(v.deferred.map((d) => d.kind)).toEqual(['request-not-queued'])
+    expect(v.deferred[0].detail).toContain('successor session')
+  })
+
+  it('boundary commit refuses while a request waits, and passes once none does', () => {
+    const withRequest = '- [ ] 2026-10-01T00:00 · s1 · [request] · pending · Probe'
+    expect(parseCarrier(withRequest).requests.length).toBe(1)
+    expect(boundaryRequestRefusal(() => withRequest)).toMatch(/--queued/)
+    expect(boundaryRequestRefusal(() => withRequest)).toMatch(/Nothing recorded/)
+    expect(boundaryRequestRefusal(() => '')).toBeNull()
+  })
+
+  it('boundary commit treats only a missing carrier as empty and fails closed on any other read error', () => {
+    const missing = () => {
+      throw Object.assign(new Error('no such file'), { code: 'ENOENT' })
+    }
+    const unreadable = () => {
+      throw Object.assign(new Error('permission denied'), { code: 'EACCES' })
+    }
+    expect(boundaryRequestRefusal(missing)).toBeNull()
+    expect(boundaryRequestRefusal(unreadable)).toMatch(/could not be read \(permission denied\).*Nothing recorded/)
   })
 })
 

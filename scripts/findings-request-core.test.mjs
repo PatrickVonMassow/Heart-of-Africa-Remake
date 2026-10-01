@@ -7,7 +7,6 @@ import {
   parseCarrier,
   parseHead,
   tallyTurn,
-  turnTakesBoundary,
 } from './findings-core.mjs'
 import {
   escapeBodyLine,
@@ -309,53 +308,23 @@ describe('depositing and retiring a request are durable records', () => {
   })
 })
 
-describe('the gate is the point boundary, not every turn end', () => {
-  const boundary = (command) => turnTakesBoundary([{ name: 'Bash', command }])
-
-  it('recognises the turn that TAKES the boundary — the COMMIT phase (point 675)', () => {
-    expect(boundary('node scripts/batch-boundary.mjs --commit 462')).toBe(true)
-    expect(boundary('node scripts/batch-boundary.mjs --commit --context')).toBe(true)
-    // A PowerShell caller quotes it (four-eyes finding 3, Fable 5).
-    expect(boundary('node scripts/batch-boundary.mjs "--commit" 462')).toBe(true)
-    expect(boundary('node C:/repo/scripts/batch-boundary.mjs --commit 462')).toBe(true)
-  })
-
-  it('does not read the read-only forms as taking it', () => {
-    expect(boundary('node scripts/batch-boundary.mjs --status')).toBe(false)
-    expect(boundary('node scripts/batch-boundary.mjs --clear')).toBe(false)
-    expect(boundary('node scripts/batch-boundary.mjs')).toBe(false)
-    expect(boundary('node scripts/guard-preflight.mjs --for boundary --session x')).toBe(false)
-    // The prepare phase and the bare point (now a prepare alias) record nothing.
-    expect(boundary('node scripts/batch-boundary.mjs --prepare 462')).toBe(false)
-    expect(boundary('node scripts/batch-boundary.mjs 462')).toBe(false)
-  })
-
-  it('never blocks an owner mid-branch — it cannot write the work order at all', () => {
-    expect(auditFindings({ tally: tallyTurn([]), ownsBatch: true, carrierRequests: 3 }).ok).toBe(true)
-  })
-
-  it('blocks the owner that takes the boundary with requests still waiting', () => {
-    const v = auditFindings({ tally: tallyTurn([]), ownsBatch: true, carrierRequests: 1, atBoundary: true })
+describe('the request gate binds every owner turn end', () => {
+  it('blocks the owner with requests still waiting', () => {
+    const v = auditFindings({ tally: tallyTurn([]), ownsBatch: true, carrierRequests: 1 })
     expect(v.violations.map((x) => x.kind)).toEqual(['request-not-queued'])
     expect(v.violations[0].detail).toMatch(/--queued/)
   })
 
   it('never judges a session that does not own the batch', () => {
-    expect(auditFindings({ tally: tallyTurn([]), carrierRequests: 5, atBoundary: true }).ok).toBe(true)
+    expect(auditFindings({ tally: tallyTurn([]), carrierRequests: 5 }).ok).toBe(true)
   })
 
-  it('passes the boundary once every request is queued or blocked', () => {
-    expect(auditFindings({ tally: tallyTurn([]), ownsBatch: true, carrierRequests: 0, atBoundary: true }).ok).toBe(true)
+  it('passes once every request is queued or blocked', () => {
+    expect(auditFindings({ tally: tallyTurn([]), ownsBatch: true, carrierRequests: 0 }).ok).toBe(true)
   })
 
   it('keeps the findings rule independent of the request rule', () => {
-    const v = auditFindings({
-      tally: tallyTurn([]),
-      ownsBatch: true,
-      carrierPending: 1,
-      carrierRequests: 1,
-      atBoundary: true,
-    })
+    const v = auditFindings({ tally: tallyTurn([]), ownsBatch: true, carrierPending: 1, carrierRequests: 1 })
     expect(v.violations.map((x) => x.kind).sort()).toEqual(['carrier-not-drained', 'request-not-queued'])
   })
 })
