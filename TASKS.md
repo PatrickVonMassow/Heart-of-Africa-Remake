@@ -15843,3 +15843,17 @@ to land than a mechanism that needs a review.
   user 30.09.2026: "Der Bewohner steht nur untätig herum."
   Bundle: Dorfleben.
   Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
+- [ ] 1253. Picture sections that set a game condition by knob need a player-path counterpart
+  Source: request deposited 01.10.2026 05:28 by session d17af0dd (findings carrier), cut from e9515346d.
+  Lesson from point 1250: the 1245 polish section `villager-canoe` (scripts/verify/polish.mjs at 733e920) marked ROCK as heard (`g.hearUtterance(g.vocabulary.ROCK)`, justified as "a player standing here has met the rocks already") and cut the children's `roamSeconds` from 55 s to 8 s. Those two "spectator-time knobs" skipped exactly the two gates that left the boatmen and the children mute for over a minute after entry, so the suite was green while the player met a silent scene.
+  Rule to record: a knob that only saves waiting time may stay, but whenever a test sets a GAME CONDITION by knob (a heard word, a skipped phase, a pre-seeded state, a shortened phase whose length decides what the player meets), the same behaviour also has a run that enters the scene the way the player does, with no knob turned — like the 1250 section at seed 2425147265.
+  Final state:
+  1. Audit the browser suites (polish, communication, and the others that write window.__balance or call store actions such as hearUtterance before measuring) and list every section that sets a game condition by knob.
+  2. For each one, name its existing untouched player-path counterpart, or add one (an untouched entry plus a time-bounded assertion that the player meets the behaviour), or charge the gap to an open point.
+  3. Write the rule once into scripts/verify/README.md (test strategy), next to the knob convention.
+  Infrastructure freeze (CLAUDE.md §2) applies: NO new guard, hook or ledger field — this is test coverage plus one documentation rule.
+  USER, verbatim:
+  Assistant 01.10.2026: "Die Lehre daraus: Wenn ein Testknopf Zeit spart, darf er keine Spiellogik überspringen, sonst sieht der Test nicht mehr, was der Spieler erlebt. Jedes Mal, wenn ein Test eine Spielbedingung per Knopf setzt, muss es zusätzlich einen Lauf geben, der die Szene so betritt wie der Spieler. Soll ich das als Befund für den Batch einreichen?"
+  user 01.10.2026: "Ja, mach das."
+  Bundle: Testinfrastruktur.
+  Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.
