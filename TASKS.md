@@ -15598,6 +15598,9 @@ to land than a mechanism that needs a review.
   Criticality: low — the journal title is hidden at every WebGL 2 start until dismissal.
   Test: a Playwright layout check in the flow or layout suite asserting the notice's box does
   not intersect the journal header on WebGL 2; picture check of 06-start-journal.
+  Also measured 01.10.2026 on feat/1219 (local/1219-no-context.png, mobile emulation): the
+  no-backend notice added by point 1219 sits over the journal heading and its tabs the same
+  way; the fix covers both notices.
   Refs: the compatibility notice component, the journal panel, verification/06-start-journal.png.
   Bundle: Steuerung & Performance.
 - [ ] 1221. The Cairo place ground is no longer flat white at the start.
