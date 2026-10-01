@@ -3086,7 +3086,11 @@ if (section('settlement-edge')) {
   const clearBearing = () =>
     page.evaluate(() => {
       const L = window.__placeLayout
-      const r = L.radius
+      // The boundary per bearing (work-order 1252): it bulges round watched
+      // scenes, so the corridor is laid across the edge where it really is, and
+      // only where that edge runs square to the ray — a slanted edge would put
+      // both sides of the band into one crop.
+      const edgeAt = window.__placeBoundaryRadius
       const near = (x, z, ax, az, d) => Math.hypot(x - ax, z - az) < d
       const blocked = (ax, az) => {
         for (const c of L.colliders ?? []) {
@@ -3100,6 +3104,9 @@ if (section('settlement-edge')) {
       }
       for (let i = 0; i < 180; i++) {
         const b = (i / 180) * Math.PI * 2
+        const r = edgeAt(b)
+        const span = 6 / r
+        if (Math.abs(edgeAt(b - span) - r) > 0.5 || Math.abs(edgeAt(b + span) - r) > 0.5) continue
         let ok = true
         for (let d = r - 9; d <= r + 6 && ok; d += 1.5) {
           if (blocked(Math.cos(b) * d, Math.sin(b) * d)) ok = false
@@ -3310,7 +3317,7 @@ if (section('settlement-edge')) {
       check(`${id} (${seasonName}): a clear ground corridor across the edge exists`, false, 'every bearing blocked')
       return null
     }
-    const radius = await page.evaluate(() => window.__placeLayout.radius)
+    const radius = await page.evaluate((b) => window.__placeBoundaryRadius(b), bearing)
     // One standing spot for all three crops, so only the aim moves between them.
     const stand = radius - 6
     const out = {}
@@ -3423,12 +3430,12 @@ if (section('settlement-edge')) {
     const bearing = (await clearBearing()) ?? 0
     const crossing = await page.evaluate(async (b) => {
       const p = window.__placePlayer
-      const L = window.__placeLayout
-      p.x = Math.cos(b) * (L.radius - 3)
-      p.z = Math.sin(b) * (L.radius - 3)
+      // The boundary at this bearing — no circle (work-order 1252).
+      const radius = window.__placeBoundaryRadius(b)
+      p.x = Math.cos(b) * (radius - 3)
+      p.z = Math.sin(b) * (radius - 3)
       p.yaw = Math.atan2(-Math.cos(b), -Math.sin(b))
       p.pitch = 0
-      const radius = L.radius
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
       const started = Date.now()
       let last = Math.hypot(p.x, p.z)
@@ -3597,8 +3604,8 @@ if (section('children-tag')) {
     const pinned = samples.filter((s) => s.children.some((c) => c.pinned > 3))
     check('no child is pinned against geometry', pinned.length === 0, `${pinned.length} samples`)
     const outside = await page.evaluate(() => {
-      const L = window.__placeLayout
-      return window.__placeTag().children.filter((c) => Math.hypot(c.x, c.z) > L.radius).length
+      const edgeAt = window.__placeBoundaryRadius
+      return window.__placeTag().children.filter((c) => Math.hypot(c.x, c.z) > edgeAt(Math.atan2(c.z, c.x))).length
     })
     check('every child stays inside the walkable settlement', outside === 0, `${outside} outside`)
     const reserves = samples.flatMap((s) => s.children.map((c) => c.reserve))

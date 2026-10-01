@@ -93,7 +93,9 @@ async function enterBuilding(type) {
 async function leaveByWalking() {
   await page.evaluate(() => {
     const p = window.__placePlayer
-    p.z = window.__placeLayout.radius + 5
+    // Past the boundary at THIS bearing (+Z), which bulges round watched scenes.
+    p.x = 0
+    p.z = window.__placeBoundaryRadius(Math.PI / 2) + 5
   })
   await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 30000 })
   await page.waitForTimeout(400)

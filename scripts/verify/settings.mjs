@@ -429,7 +429,8 @@ if (section('pitched-frames')) {
 
   // Looking down over the walkable disc edge: the §2.5 seam from above.
   const edge = await page.evaluate(() => {
-    const r = window.__placeLayout.radius
+    // The boundary straight ahead (+Z), which bulges round watched scenes.
+    const r = window.__placeBoundaryRadius(Math.PI / 2)
     const p = window.__placePlayer
     p.x = 0
     p.z = r - 6
