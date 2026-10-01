@@ -15575,19 +15575,6 @@ to land than a mechanism that needs a review.
   Test: gamepad --section=interact-chief and touch --section=prompt-tap green.
   Refs: scripts/verify/gamepad.mjs, scripts/verify/touch.mjs, scripts/render-verify-charges.mjs.
   Bundle: Kommunikation.
-- [ ] 1219. The renderer no longer starts in the mobile Chromium emulation.
-  PROBLEM, measured 26.09.2026: crossbrowser `chromium-mobile` reds "the renderer initialises
-  on mobile" with `TypeError: Cannot read properties of null (reading 'getSupportedExtensions')`
-  — in the closing LARGE on main 5dff420 and again alone on 80081b15c; earlier LARGE runs
-  were 4 pass, 0 fail. A null GL context reaches code that assumes one.
-  FINAL STATE: the cause is found (host/emulation context loss vs. an app path that reads a
-  null context) and fixed or, if the host lacks the context, the app shows the compatibility
-  notice instead of throwing; crossbrowser is green. Remove this point's charges from
-  scripts/render-verify-charges.mjs when it lands.
-  Criticality: medium — a mobile start may crash instead of degrading.
-  Test: crossbrowser green.
-  Refs: scripts/verify/crossbrowser.mjs, the renderer bring-up.
-  Bundle: Steuerung & Performance.
 - [ ] 1220. The WebGL 2 notice no longer covers the start journal's title.
   PROBLEM, measured 26.09.2026 on main 96f8c1e: flow frame `verification/06-start-journal.png`
   (WebGL 2) shows the dismissible compatibility notice drawn OVER the open journal panel, its

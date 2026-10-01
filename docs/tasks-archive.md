@@ -33016,3 +33016,17 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — it certifies nothing false today, but the check that guards the chief
   has never itself been run.
   Bundle: Dorfleben.
+
+- [x] 1219. The renderer no longer starts in the mobile Chromium emulation.
+  PROBLEM, measured 26.09.2026: crossbrowser `chromium-mobile` reds "the renderer initialises
+  on mobile" with `TypeError: Cannot read properties of null (reading 'getSupportedExtensions')`
+  — in the closing LARGE on main 5dff420 and again alone on 80081b15c; earlier LARGE runs
+  were 4 pass, 0 fail. A null GL context reaches code that assumes one.
+  FINAL STATE: the cause is found (host/emulation context loss vs. an app path that reads a
+  null context) and fixed or, if the host lacks the context, the app shows the compatibility
+  notice instead of throwing; crossbrowser is green. Remove this point's charges from
+  scripts/render-verify-charges.mjs when it lands.
+  Criticality: medium — a mobile start may crash instead of degrading.
+  Test: crossbrowser green.
+  Refs: scripts/verify/crossbrowser.mjs, the renderer bring-up.
+  Bundle: Steuerung & Performance.
