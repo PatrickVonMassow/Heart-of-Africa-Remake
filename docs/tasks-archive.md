@@ -32956,3 +32956,19 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   user 01.10.2026: "Der betretbare Bereich innerhalb vom Bambara Village ist aktuell stellenweise nur minimal größer als der, in dem die zu beobachtenden Szenen ablaufen. Dadurch passiert es leicht, dass man aus versehen das Dorf verlässt, wenn man sich zum Beobachten irgendwo hinstellen möchte. Vergrößere den Bereich entsprechend."
   Bundle: Dorfleben.
   Criticality: medium — the player leaves the village by accident while trying to watch (§7.1 no. 6/15/16).
+
+- [x] 1249. The fleeing calf flips its heading once at the water edge, only inside a whole enrichments pass
+  MEASURED 30.09.2026 (whole `enrichments`, WebGPU, HEAD 689a1c23e of point 1145, machine quiet
+  not verifiable): "at the reported bank the fleeing calf enters the water once, flees once, never
+  as a fall-in, and never flips or zigzags its heading" FAILED with
+  {"entries":1,"dramas":0,"flips":1,"zigzags":0,"restarts":1,"samples":174,"end":"savanna"}.
+  The section alone (`npm test -- enrichments --section=water-edge-flee`) was GREEN minutes
+  later on the same tree, and 1145 touches no animal code — so it is a pass-only red with no
+  owner, filed so the red can be charged. A `restarts`:1 beside the flip suggests the flee was
+  re-triggered mid-run (earlier section state or a load stall), which decides game-vs-suite.
+  FINAL STATE: the flip is explained by measurement and either fixed in the flee steering (game)
+  or the section isolates its staging from earlier sections (suite); the check stays as strict.
+  Test: Playwright `enrichments --section=water-edge-flee`, then a whole `enrichments` pass.
+  Refs: scripts/verify/enrichments.mjs (section water-edge-flee), point 1208, point 312.
+  Bundle: Tierverhalten.
+  Criticality: low for the player, medium for evidence — an unowned red holds every enrichments pass.
