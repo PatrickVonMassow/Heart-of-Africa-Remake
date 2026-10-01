@@ -33051,3 +33051,9 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
   Bundle: Dorfleben.
   Criticality: medium — a dropped sibling can lose the loom or the fishery from the scene.
+- [x] 1258. Move 1255 and 1257 to the backlog while the loom is off
+  Source: request deposited 01.10.2026 17:28 (findings carrier), cut from 0e296fba9.
+  Work on a disabled feature costs batch time without player impact (CLAUDE.md §2 finding intake). Explicit user approval of the stated recommendation.
+  User approved (chat 01.10.2026 19:24, "Ja") the recommendation: points 1255 (loom plaza distance) and 1257 (WebGL 2 loom helper wait reds) have no in-game effect because the loom is disabled since the user decision of 29.09.2026 (`loom.placed: false`; only the test enables it). Move both points from the open work order to docs/backlog.md, to be reopened when the loom is switched on again. Park/close the in-flight branch feat/1255-loom-plaza-distance and its worktree per branch hygiene; land nothing from it. 1256 stays open.
+  Bundle: Dorfleben.
+  Criticality: low — work-order bookkeeping; no player-visible change.
