@@ -177,6 +177,7 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
   const errands = GIZA_AMBIENT.map((a) => nudgeToFree(colliders, a.x, a.z, WALKER_RADIUS))
   return {
     radius: GIZA_SITE_RADIUS,
+    observed: [],
     spawnZ: GIZA_SPAWN_Z,
     interactives: [],
     dwellings: [],

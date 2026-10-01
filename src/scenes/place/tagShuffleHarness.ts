@@ -129,9 +129,11 @@ export function crowd(
 ): Crowd {
   const colliders = layout.colliders
   const rim = Math.max(1, layout.radius - NPC_RADIUS * 2)
+  // The settlement's own boundary, as `ErrandVillagers` keeps to it — the lobe
+  // and the scenes' room included, not a circle of the harness's own.
   const world = {
     blocked: (x: number, z: number) =>
-      Math.hypot(x, z) > rim || !standingClear(colliders, x, z, NPC_RADIUS),
+      !insidePlace(layout, x, z, NPC_RADIUS * 2) || !standingClear(colliders, x, z, NPC_RADIUS),
     nudge: (x: number, z: number) => {
       const free = nudgeToFree(colliders, x, z, NPC_RADIUS)
       return { x: free[0], z: free[1], found: true }
@@ -398,7 +400,7 @@ export function village(
   // included, because the two play rocks stand on it — and is kept off the
   // sloping shore. The tag round keeps its circle. Replaying the bank round
   // inside the plain circle put its whole stage out of reach.
-  const bounds = { radius: layout.radius, bank: layout.bank }
+  const bounds = { radius: layout.radius, bank: layout.bank, observed: layout.observed }
   const onGround = hasBank
     ? (x: number, z: number) =>
         insidePlace(bounds, x, z, NPC_RADIUS * 2) && standsOnGroundPlate(layout.bank, x, z, NPC_RADIUS)

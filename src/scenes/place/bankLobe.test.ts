@@ -161,11 +161,14 @@ describe('the drawn scene reaches the bank on both sides (work-order 1245 item 1
         }
       }
     }
-    // The two sides are drawn alike, out past the plateau's end (≈ 60 m from
-    // the centre at the waterline), and the water runs as far as the shore.
-    expect(reach.up).toBeCloseTo(reach.down, 6)
+    // The lobe itself is drawn alike on both sides, out past the plateau's end
+    // (≈ 60 m from the centre at the waterline); the room round a watched scene
+    // (work-order 1252) may carry one side further. The water runs as far as
+    // the shore.
+    const lobeReach = bankDrawnReach({ radius: layout.radius, bank }, discEdge)
+    expect(lobeReach.up).toBeCloseTo(lobeReach.down, 6)
     const plateauEnd = bank.walkEdge * Math.tan(BANK_PLATEAU_ANGLE)
-    expect(reach.up).toBeGreaterThan(plateauEnd)
+    expect(Math.min(reach.up, reach.down)).toBeGreaterThan(plateauEnd)
     // The water mesh as the scene builds it (PlaceScene's PlaceRiver) runs
     // along the bank at least as far as the shore does, on both sides.
     const surface = buildRiverSurfaceGeometry(bank, Math.max(RIVER_HALF_LENGTH, reach.up), 8, Math.max(RIVER_HALF_LENGTH, reach.down))

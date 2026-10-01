@@ -121,7 +121,7 @@ describe('settlement plan (design.md §6.1, point 79)', () => {
     )
   })
 
-  it('a village with no river keeps a plain round edge', () => {
+  it('a village with no river keeps a round edge, grown only round its watched scenes', () => {
     useGame.setState({ placeId: 'maasai-village' })
     useUi.getState().toggleMap()
     render(<MapOverlay />)
@@ -133,7 +133,12 @@ describe('settlement plan (design.md §6.1, point 79)', () => {
       .map((p) => p.trim().split(/\s+/).map(Number))
       .filter((p) => p.length === 2 && p.every(Number.isFinite))
       .map(([x, y]) => Math.hypot(x, y))
-    expect(Math.max(...radii) - Math.min(...radii)).toBeLessThan(0.5)
+    // Round wherever no scene asks for room (work-order 1252)…
+    const min = Math.min(...radii)
+    expect(radii.filter((r) => r - min < 0.5).length).toBeGreaterThan(radii.length / 2)
+    // …and grown exactly as far as the boundary the leave check reads.
+    const layout = buildLayout('maasai-village', useGame.getState().seed)
+    expect(Math.max(...radii) / min).toBeCloseTo(maxBoundaryRadius(layout) / layout.radius, 1)
   })
 
   it('inside a village the plan names the chief hut and the market', () => {

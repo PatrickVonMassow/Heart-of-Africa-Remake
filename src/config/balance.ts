@@ -237,6 +237,20 @@ interface BalanceConfig {
    */
   settlementRoom: number
   /**
+   * Walkable room, in metres, the settlement boundary keeps around every scene
+   * ground the player watches (children's quarter, bank stage, dig sites, water
+   * errand, loom, chief's hut) — `boundary.ts` grows the boundary per bearing
+   * until it holds; the layout does not move. CALIBRATABLE (work-order 1252):
+   * framing a ground of ~6 m radius at the reference viewport needs ~4 m past
+   * its rim. The edge band (`placeEdgeBand.widthM` 8, centred on the boundary)
+   * reaches 4 m (+0.4 wander) inside, but its visible fall is only the last
+   * ~1.4 m (measured in polish settlement-edge); inside that the ground reads
+   * as the village's own. 8 m thus leaves ~6 m before the visible edge and
+   * 3.6 m clear of the band's nominal extent. Toward the river the wade limit
+   * stays the edge.
+   */
+  observerMargin: number
+  /**
    * Settlement collision radius as a SHARE of `placeEnterRadius` (design.md
    * §11): the bird's-eye traveller cannot walk through a settlement's
    * footprint. Must stay <= 1 so the "Space to enter" prompt always arms at or
@@ -1269,6 +1283,7 @@ export const balance: BalanceConfig = {
   digRadius: 3,
   placeEnterRadius: 2.5,
   settlementRoom: 1.1,
+  observerMargin: 8, // calibratable (work-order 1252): room around a watched scene before the boundary
   // 0.6 → a 1.5-unit collider around the marker: it matches the drawn cluster
   // (the port's main house plus annex reaches ~1.3 units past the anchor, the
   // village huts ~1.45) and stays inside the river clearance every place keeps

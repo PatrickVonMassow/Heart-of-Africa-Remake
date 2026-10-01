@@ -128,7 +128,7 @@ import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS, CHIEF_BODY_RADIUS } from './collision'
 import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from '../../systems/unstuck'
-import { bankDrawnReach, buildBoundaryLut, groundDiscShift, isOutsidePlace, type PlaceBounds } from './boundary'
+import { bankDrawnReach, buildBoundaryLut, groundDiscShift, isOutsidePlace, placeBoundaryRadius, type PlaceBounds } from './boundary'
 import {
   RIVER_HALF_LENGTH,
   buildRiverFloorGeometry,
@@ -2657,6 +2657,10 @@ export function PlaceScene() {
     const w = window as unknown as Record<string, unknown>
     w.__placePlayer = player.current
     w.__placeLayout = layout
+    // The walkable boundary per bearing (`atan2(z, x)`), read from the one
+    // source: it is no circle, so a suite aiming at the edge must not use
+    // `radius` (work-order 1252).
+    w.__placeBoundaryRadius = (angle: number) => (layout ? placeBoundaryRadius(layout, angle) : null)
     // WHERE TO STAND TO PHOTOGRAPH BOTH PLAY ROCKS. Handed over rather than
     // transcribed into the suite: the collision suite used to place its camera
     // on the stretch's own axis, which puts the far rock exactly behind the near
@@ -3389,6 +3393,7 @@ export function PlaceScene() {
           pen={layout.pen}
           colliders={layout.colliders}
           radius={layout.radius}
+          observed={layout.observed}
           onDigProgress={onDigProgress}
         />
       )}
