@@ -1766,7 +1766,7 @@ export const RED_CHARGES = [
       + 'was green. The charge dies with 200.',
   },
   {
-    point: 1261,
+    point: 1262,
     suite: 'communication',
     backend: 'webgpu',
     featureLevel: 'compatibility',
@@ -1775,6 +1775,6 @@ export const RED_CHARGES = [
     why:
       'MEASURED 01./02.10.2026 twice on feat/1260 (d6dd8adf9, 343cc7b1e), webgpu: no carrier took '
       + 'the empty jar within 480 s; the branch does not touch the water errand, and main at 54809a1c3 '
-      + 'reds earlier at step 2 (the gate 1260 removes). The charge dies with 1261.',
+      + 'reds earlier at step 2 (the gate 1260 removes). The charge dies with 1262.',
   },
 ]

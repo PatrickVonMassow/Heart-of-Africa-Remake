@@ -98,7 +98,7 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: medium — villagers stay silent for the player's sake, which the user rejects as unnatural.
 
-- [ ] 1261. No water carrier sets out with an empty jar in the continuous route's adult step
+- [ ] 1262. No water carrier sets out with an empty jar in the continuous route's adult step
   Source: covering WebGPU passes of point 1260 (01.-02.10.2026).
   THE RED. `communication --section=continuous-route`, WebGPU: `FAIL continuous route at
   3-adult-work-and-loom: page.waitForFunction: Timeout 480000ms exceeded`, twice on
@@ -15818,7 +15818,8 @@ to land than a mechanism that needs a review.
   Assistant 01.10.2026: "Die Lehre daraus: Wenn ein Testknopf Zeit spart, darf er keine Spiellogik überspringen, sonst sieht der Test nicht mehr, was der Spieler erlebt. Jedes Mal, wenn ein Test eine Spielbedingung per Knopf setzt, muss es zusätzlich einen Lauf geben, der die Szene so betritt wie der Spieler. Soll ich das als Befund für den Batch einreichen?"
   user 01.10.2026: "Ja, mach das."
   Bundle: Testinfrastruktur.
-  Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.- [ ] 1261. Let the answering window remove an answered board card; drop point 1240
+  Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.
+- [ ] 1261. Let the answering window remove an answered board card; drop point 1240
   Source: request of session 829c2a2a, deposited 01.10.2026 20:51 through the findings carrier.
   Observed problem: Point 1240 shows the cost: the user answered the card on 29.09. in a non-owner window; that window could only deposit a --request, the owner's drain knows only "TASKS append" or "decision card", so a one-command removal became a queued point and the answered card stood on the board for two days. A whole point (spec, commit, rank, brief, tick, archive) costs more than the single idempotent call it guards against.
   FINAL STATE:
