@@ -77,29 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1250. Bambara-village shore scene: boatmen and children are mute on entry, a yellow band lies on the water
-  Queue position: FIRST — directly BEFORE point 1246 (user order 30.09.2026: "fatal ... direkt als nächstes einreihen").
-  Source: bug report `local/SzeneStummUndGrafikfehler.zip` (reachable via /backup/hoa/local), build production 733e920
-  (right after point 1245, drift-net fishers), WebGPU, nvidia lovelace, quality medium, 2752x1152 @dpr 1.25, language en;
-  seed 2425147265, place bambara-village entered from travel, pos x/z -60.91/-130.63, day 2.00.
-  Final state:
-  1. The drift-net boatmen and the village children speak from the moment the player can see and hear them after
-     entering the place, like the other inhabitants; today they stay silent for a while and only "eventually" start.
-     Find what withholds the first utterances (a start timer or cooldown seeded at entry, a gate on a not-yet-ready
-     state, a speaker registry filled late) and remove the delay.
-  2. No yellow surface floats on the water: the report picture shows a large flat yellow band on the river between the
-     canoe and the near bank (image centre to right edge), with a pale band along the bank. Identify the mesh/material
-     (sandbank, shore strip, net or haul prop, fish-fire/basket prop, decal) and fix its placement or colour.
-  3. Same picture: a camel stands at the far waterline — confirm it stands on land; if it stands in the water, fix it here.
-  Tests: Playwright scene check at this seed/place on both backends (backend-sensitive): a boatman and a child show a
-  speech bubble within a few seconds of entry; picture check of the water in front of the shore without the yellow band.
-  Vitest for any speech-timing logic touched.
-  Refs: point 1245 (drift-net fishers), src/scenes/place/ (village life, fishers, bank game), the place river renderer.
-  USER, verbatim:
-  user 30.09.2026: "Bootsleute sprechen nicht - ebenso nicht die Kinder. Nach einiger Zeit fangen sie aber irgendwann an zu sprechen. Außerdem ist da ein großer, gelber Grafikfehler im Wasser."
-  user 30.09.2026: "SzeneStummUndGrafikfehler.zip ist fatal - Batch holen und das direkt als nächstes einreihen."
-  Bundle: Dorfleben.
-  Criticality: high — user-rated fatal; the scene the latest point was built for is mute on entry and visibly broken.
 - [ ] 1246. Children's bank game plays three rounds in a row before scattering
   Queue position: directly AFTER point 1245 "Two fishermen with a drift net, basket rotation to a fish fire, children's game moved upstream" (user order 30.09.2026).
   Final state:
