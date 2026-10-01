@@ -95,6 +95,17 @@ put it is the mistake this line exists to stop.
   Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
   Bundle: Dorfleben.
   Criticality: medium — an adult order is spoken inside the children's game.
+- [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
+  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
+  bambara-village, same session as point 1250.
+  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
+  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
+  blocked activity, unreachable workstation) and fix it.
+  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
+  USER, verbatim:
+  user 30.09.2026: "Der Bewohner steht nur untätig herum."
+  Bundle: Dorfleben.
+  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
 - [ ] 1259. The river-bank frame loses its subject off the bottom edge on WebGPU every pass
   Source: covering WebGPU passes of point 1256 (01.10.2026).
   THE RED. `polish --section=adult-errands`, WebGPU: `FAIL frame 482-village-river-bank — its
@@ -15749,17 +15760,6 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs, point 1145.
   Bundle: Testinfrastruktur.
   Criticality: medium — one red check per polish pass until fixed.
-- [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
-  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
-  bambara-village, same session as point 1250.
-  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
-  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
-  blocked activity, unreachable workstation) and fix it.
-  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
-  USER, verbatim:
-  user 30.09.2026: "Der Bewohner steht nur untätig herum."
-  Bundle: Dorfleben.
-  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
 - [ ] 1253. Picture sections that set a game condition by knob need a player-path counterpart
   Source: request deposited 01.10.2026 05:28 by session d17af0dd (findings carrier), cut from e9515346d.
   Lesson from point 1250: the 1245 polish section `villager-canoe` (scripts/verify/polish.mjs at 733e920) marked ROCK as heard (`g.hearUtterance(g.vocabulary.ROCK)`, justified as "a player standing here has met the rocks already") and cut the children's `roamSeconds` from 55 s to 8 s. Those two "spectator-time knobs" skipped exactly the two gates that left the boatmen and the children mute for over a minute after entry, so the suite was green while the player met a silent scene.
@@ -15774,3 +15774,23 @@ to land than a mechanism that needs a review.
   user 01.10.2026: "Ja, mach das."
   Bundle: Testinfrastruktur.
   Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.
+- [ ] 1260. Villagers speak by their own activity, never gated on what the player has heard
+  Source: user order 01.10.2026 22:12, after the explanation of the bank game's ROCK gate.
+  Final state: no villager utterance, gesture or activity depends on what the player has heard. Remove every
+  "X is not said/done before the listener has heard Y" rule:
+  1. `src/scenes/place/bankGame.ts`: the opening RIVER call and the direction announcement fall in every cycle
+     regardless of ROCK being heard; drop `BankWorld.hasHeard`, the `rockKnown` branch in the cycle opening, the
+     `rockOnly` run mode and the rock-only branch before `announceRun`.
+  2. `src/scenes/place/loomWork.ts`: the loom's directions no longer wait for the first ROCK hearing; drop
+     `rockHeard` from the view and its two uses.
+  3. `src/scenes/place/PlaceLife.tsx`: stop feeding the heard set into both (`hasHeard`, `rockHeard`).
+  4. Sweep `src/` for any further speaker-side read of `communication.heard` (the journal/label side, which
+     records what the player heard, stays) and remove each gate found.
+  5. Update `docs/communication-poc-spec.md` (bank game paragraph), `docs/communication-playthrough.md` (rows 2
+     and B3) and `design.md` where they state the teaching-order gate; adjust or delete the tests that pin it.
+  Tests: Vitest on bankGame/loomWork (RIVER and a direction are spoken in the first cycle with an empty heard set);
+  a Playwright communication/polish section only where an existing one asserted the gate.
+  USER, verbatim:
+  user 01.10.2026: "Diese Regel finde ich unsinnig. Das würde bedeuten, dass die Kinder extra für den Spieler reden bzw. schweigen. Sie sollen ganz normal ihren Tätigkeiten nachgehen (wozu auch ihre Äußerungen gehören), unabgängig davon, ob der Spieler zuhört. Entferne alle Regeln in der Art "X nicht hören, bevor Y gehört wurde"."
+  Bundle: Dorfleben.
+  Criticality: medium — villagers stay silent for the player's sake, which the user rejects as unnatural.
