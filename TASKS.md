@@ -15773,6 +15773,7 @@ to land than a mechanism that needs a review.
   Bundle: Modell & Wächter.
   Criticality: medium.
 - [ ] 1236. The calf crossing fix leaves two wildlife reds on WebGL 2
+  MEASURED 01.10.2026 ~12:19, whole `enrichments` on WebGPU (HEAD 933352068 of point 1249, suite-only change): `channel-crossing` red there too with the same `{"staged":true,"sawOnWater":false,"sawLowY":false,"landed":true}` — not WebGL-2-only.
   MEASURED 29.09.2026 ~14:33, full `VERIFY_GL=webgl node scripts/verify/run-all.mjs enrichments` on main after the 1234 landing (machine flagged UNDER LOAD, so timing verdicts are not authoritative; WebGPU full run: only the charged `72-water-victoria-falls` red). Reds:
   (1) `calf-crossing-flee` arrival variant: `{"start":{"terrain":"water","dP":1.25},"crossingEndedAt":0.08,"maxDP":1.4,"atEnd":{"toTarget":0.094,"terrain":"mountain"}}`. The traveller was never moved outside the ring (dP stays ~1.3 instead of 12), and the calf ends 0.094 from its target rather than on it.
   (2) `channel-crossing` (point 192): `{"staged":true,"sawOnWater":false,"sawLowY":false,"landed":true}`. The purposeful crossing lands without ever swimming; suspect the 1234 arrival snap (`waterCross.arriveUnits`) or the shy-ring interruption of a crossing.
