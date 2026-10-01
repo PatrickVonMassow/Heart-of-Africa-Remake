@@ -182,6 +182,22 @@ export const RED_CHARGES = [
   },
   {
     point: 939,
+    suite: 'flow',
+    backend: 'webgpu',
+    kind: 'console',
+    // THE SAME VITE TRANSIENT ON THE FLOW LANE; every entry here excuses only
+    // the lane its evidence measured.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 01.10.2026 from the kept logs local/verify-logs/2026-09-13T16-43-25-607-flow.log '
+      + '(88e6aec92) and 2026-09-14T05-20-32-478-flow.log (1eaa499f8), the two webgpu/flow reds '
+      + 'point 1132 had to judge: each reported 36 pass, 0 fail and exactly two console errors, '
+      + 'both this 504, and each retry ran 36/0 clean. A cold Vite optimize-dep cache re-bundled '
+      + 'while the suite page was open, the environment transient point 939 owns on the other '
+      + 'lanes named here; no check failed on any attempt. The charge dies with point 939.',
+  },
+  {
+    point: 939,
     suite: 'startup',
     backend: 'webgl',
     kind: 'console',
