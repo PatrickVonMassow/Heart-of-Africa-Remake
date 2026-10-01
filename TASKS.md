@@ -77,23 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1248. The supervisor's immediate successor spawn ignores a pending batch claim when the owner exits
-  MEASURED 30.09.2026: the user ordered a takeover in an open window (c3fd94cf); `batch-claim.mjs`
-  recorded the claim at 12:53 against the live owner aa5bc325 (assessment `honour`). When that
-  owner's process 3042532 exited, the supervisor "requested its successor immediately" and the
-  launcher tick at 13:35:58 logged "no owner lock — taking over" and spawned 07cf378c. The NEXT
-  tick, 13:36:26, logged "already RELEASED to c3fd94cf … held for its PICK-UP" — the reservation
-  existed, but the immediate-successor path had not consulted it. The claimant window was alive
-  throughout; it got the lock only by re-running the claim afterwards.
-  FINAL STATE: a pending claim (honour or reserved) from a live claimant window keeps every
-  automated acquirer — the supervisor's immediate successor request included — off the lock,
-  exactly like the tick path already does; one shared check, not a second copy.
-  Test: Vitest on the launcher/supervisor decision: owner exits with a live honoured claim → no
-  spawn, lock left for the claimant; dead claimant → spawn as today.
-  Refs: scripts/batch-autostart.mjs (successor request, "no owner lock — taking over"),
-  scripts/batch-claim.mjs, scripts/batch-singleton.mjs, points 434, 461.
-  Bundle: Testinfrastruktur.
-  Criticality: medium — an explicit user takeover order loses to an automated acquirer.
 - [ ] 1249. The fleeing calf flips its heading once at the water edge, only inside a whole enrichments pass
   MEASURED 30.09.2026 (whole `enrichments`, WebGPU, HEAD 689a1c23e of point 1145, machine quiet
   not verifiable): "at the reported bank the fleeing calf enters the water once, flees once, never

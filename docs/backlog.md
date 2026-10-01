@@ -2031,3 +2031,10 @@ then showed a stopped batch. Infrastructure under the freeze — collected here,
 In the 1245 upstream-word frame (boat stand) the net man's head sits at the left picture edge and
 his bubble runs out of the viewport: readable on WebGPU, a few pixels clipped on WebGL 2
 ("a-BA-BA", "…ess meaning"). The bubble is not clamped to the viewport; the frame passes its checks.
+
+## A live claimant loses the released lock after the 30-minute pick-up cap (01.10.2026)
+
+From closing 1248: on 30.09.2026 the lock released to c3fd94cf was taken by the regular launcher
+tick at 13:35:58 although the claimant window was alive, because the pick-up cap
+(`HOA_CLAIM_MAX_MIN`, 30 min = 2 ticks, points 446/461) had expired. Open question, no change made:
+should a live claimant outlast the cap, renew its `activityAt`, or should the cap be recalibrated?
