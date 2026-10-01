@@ -33030,3 +33030,24 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Test: crossbrowser green.
   Refs: scripts/verify/crossbrowser.mjs, the renderer bring-up.
   Bundle: Steuerung & Performance.
+
+- [x] 1254. Loom and river fishery share one React key in a village with both
+  Source: finding of 01.10.2026, measured on the covering WebGPU pass of point 1129
+  (feat/1129-polish-theme-split at 78ea39b, log
+  `local/verify-logs/2026-10-01T14-41-12-659-polish-children-polish-villagers.log`).
+  `src/scenes/place/PlaceLife.tsx` renders `<Loom key={placeId}>` and
+  `<RiverFishery key={placeId}>` as siblings since 0bd2d2992 (30.09.2026). In
+  bambara-village, which has both a loom and a bank, React logs "Encountered two children
+  with the same key … bambara-village" eight times and may drop or duplicate one of the two.
+  The same pass read two reds no earlier log holds: village-loom "the station stands at
+  least 70 px tall" (63.8 px) and adult-errands "no adult word inside the children's
+  earshot" (RIVER at 6.2 m).
+  Final state:
+  - Loom and RiverFishery carry distinct keys; no duplicate-key console error in any village.
+  - `polish-villagers --section=village-loom` and `--section=adult-errands` re-run on
+    WebGPU: the two reds above are either gone or charged to their own cause with the
+    measurement that separates them from this key.
+  Tests: the suite's console-error gate (Playwright) is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
+  Bundle: Dorfleben.
+  Criticality: medium — a dropped sibling can lose the loom or the fishery from the scene.
