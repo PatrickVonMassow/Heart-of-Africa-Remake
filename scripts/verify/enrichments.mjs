@@ -7488,9 +7488,14 @@ if (section('water-edge-flee')) {
     const { adult, calf } = st.stage()
     // Headings are measured from the actual displacement (not the requested
     // dodge), across flight restarts: a reversal (> 90°) and an alternating
-    // left/right turn pair (each > 10°) are both jitter.
+    // left/right turn pair (each > 10°) are both jitter. A fleer's watch ENDS
+    // at its first play bout after the flight (`hop` set, no dodge): the bout
+    // is ordinary family life, timed by the scene clock (page age), not by the
+    // flight — measured (point 1249), its first hop was the whole-pass flip at
+    // 13.8 s, and an earlier bout hopped the settled calf into the river as
+    // the designed §19.8 play fall-in. Everything up to the bout stays watched.
     const track = (a) => ({
-      a, entries: 0, wet: false, dramas: 0, flips: 0, zigzags: 0, restarts: 0,
+      a, entries: 0, wet: false, dramas: 0, flips: 0, zigzags: 0, restarts: 0, settled: undefined,
       px: a.x, pz: a.z, last: undefined, lastTurn: 0, fleeing: false, samples: 0, hist: [], at: undefined,
     })
     const ts = { adult: track(adult), calf: track(calf) }
@@ -7501,6 +7506,7 @@ if (section('water-edge-flee')) {
       for (const k of Object.keys(ts)) {
         const t = ts[k]
         const a = t.a
+        if (t.settled) continue
         t.samples++
         // DIAG (point 1249): a short history so a red names its own cause.
         const lion = window.__wildlife.lion
@@ -7513,13 +7519,17 @@ if (section('water-edge-flee')) {
           lion: lion ? `${lion.mode}@${Math.hypot(lion.lx - a.x, lion.lz - a.z).toFixed(1)}` : null,
         })
         if (t.hist.length > 8) t.hist.shift()
+        const fleeing = a.dodgeHeading !== undefined
+        if (fleeing && !t.fleeing) t.restarts++
+        t.fleeing = fleeing
+        if (t.restarts > 0 && !fleeing && a.hop !== undefined) {
+          t.settled = { t: +(window.__simTime() - s0).toFixed(2), x: t.px, z: t.pz, crossing: a.crossing !== undefined }
+          continue
+        }
         const wet = T(a.x, a.z) === 'water'
         if (wet && !t.wet) t.entries++
         t.wet = wet
         if (a.inWater !== undefined || a.rescued) t.dramas++
-        const fleeing = a.dodgeHeading !== undefined
-        if (fleeing && !t.fleeing) t.restarts++
-        t.fleeing = fleeing
         const mx = a.x - t.px
         const mz = a.z - t.pz
         if (Math.hypot(mx, mz) > 0.02) {
@@ -7546,8 +7556,9 @@ if (section('water-edge-flee')) {
       const a = t.a
       out[k] = {
         entries: t.entries, dramas: t.dramas, flips: t.flips, zigzags: t.zigzags, restarts: t.restarts, samples: t.samples,
-        end: T(a.x, a.z), crossing: a.crossing !== undefined,
-        dP: +Math.hypot(a.x - st.P.x, a.z - st.P.z).toFixed(2),
+        playAt: t.settled?.t ?? null,
+        end: T(t.settled?.x ?? a.x, t.settled?.z ?? a.z), crossing: t.settled?.crossing ?? a.crossing !== undefined,
+        dP: +Math.hypot((t.settled?.x ?? a.x) - st.P.x, (t.settled?.z ?? a.z) - st.P.z).toFixed(2),
         ...(t.at ? { flipAt: t.at } : {}),
       }
     }
