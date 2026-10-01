@@ -97,6 +97,44 @@ put it is the mistake this line exists to stop.
   Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
   Bundle: Dorfleben.
   Criticality: medium — a dropped sibling can lose the loom or the fishery from the scene.
+- [ ] 1255. The loom's nearest open plaza stand moved from 16.4 m to 21.3 m, so it reads 64 px
+  Source: covering WebGPU passes of point 1254 (01.10.2026).
+  THE RED. `polish --section=village-loom`: "from the plaza the station stands at least 70 px
+  tall on the screen" — {"px":64.36,"viewport":900,"dist":21.285} (log
+  `local/verify-logs/2026-10-01T16-15-27-118-polish.log`, feat/1254 7c497edd1).
+  IT IS NOT POINT 1254'S, and that is measured: before the key fix (feat/1129 78ea39b, log
+  `2026-10-01T14-41-12-659-polish-children-polish-villagers.log`) the stand sat at the
+  identical 21.285 m and read 63.8 px. On 23.09.2026 (log `2026-09-23T11-16-36-279-polish.log`)
+  the same search found 16.4 m and 94.9 px. A layout change between 24.09 and 01.10 moved the
+  nearest plaza stand with a 1 m clear sight line outward; candidates in
+  `src/scenes/place/` include 0bd2d2992, a1f26c86c and 22ec01c17.
+  Final state:
+  - The commit that moved the stand is named with the reading on either side of it.
+  - Either the loom again reads from the plaza (>= 70 px from the nearest open stand), or the
+    threshold's premise is revised with the reason recorded.
+  - `polish(-villagers) --section=village-loom` green on WebGPU; frame 1183 picture-checked.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
+  Bundle: Dorfleben.
+  Criticality: medium — the plaza view shows the loom as a small figure, not a station.
+- [ ] 1256. A RIVER order falls 6.2 m from the children's roaming quarter
+  Source: covering WebGPU passes of point 1254 (01.10.2026).
+  THE RED. `polish --section=adult-errands`: "and no adult word ever falls inside the
+  children`s earshot — nearest utterance to the children: RIVER at 6.2 m from the roaming
+  quarter's rim" (limit > 10 m; log `local/verify-logs/2026-10-01T16-19-01-472-polish.log`,
+  feat/1254 7c497edd1).
+  IT IS NOT POINT 1254'S: the same reading stood before the key fix (6.2 m on feat/1129
+  78ea39b at 14:41Z, 6.3 m at 15:18Z). No log before 01.10 records this check's value.
+  Likely the water stand or the roaming quarter moved with the bank game's move upstream
+  (0bd2d2992) or the boundary growth (22ec01c17).
+  Final state:
+  - The cause is named with its measurement; no adult word falls within 10 m of the
+    roaming quarter's rim (the earshot rule itself unchanged).
+  - `polish(-villagers) --section=adult-errands` reads the earshot check green on WebGPU.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
+  Bundle: Dorfleben.
+  Criticality: medium — an adult order is spoken inside the children's game.
 - [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
   point 1126 on 15.09.2026, which delivered its other three parts the same day).
   MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
