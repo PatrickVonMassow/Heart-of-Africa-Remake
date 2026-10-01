@@ -63,6 +63,10 @@ interface BalanceConfig {
   /** How long the jar stays under, in seconds (work-order 1087) — the readable
    *  hold between the dip going down and the jar coming up full. */
   bankFillSeconds: number
+  /** How far past the settlement's waterline the landscape backdrop turns map
+   *  LAND into water, filling the gap between the drawn river and the map's
+   *  own river course (work-order 1250), in place metres. */
+  backdropRiverFillReach: number
   /** How many filled jars the village water stand holds before a new delivery
    *  replaces the oldest (work-order 1087). */
   waterStandCapacity: number
@@ -804,6 +808,9 @@ interface BalanceConfig {
       /** The bank round's own catch ring (m): it overrides the tag round's,
        *  which shrank to a hand's reach in work-order 1176. */
       catchDistance: number
+      /** Whether a visit finds the group at its rocks, its first cycle opening
+       *  at once (work-order 1250); off, a visit opens with a roaming phase. */
+      visitOpensAtBank: boolean
       /** How long the group roams its own quarter between two cycles. */
       roamSeconds: number
       /** Per-cycle spread of that length, 0..1 (0 = a metronome). */
@@ -952,6 +959,9 @@ interface BalanceConfig {
       /** The longest a word waits for the settlement's floor before the boat
        *  goes on unspoken (the floor then forgets it). */
       wordWaitSeconds: number
+      /** Seconds after a visit opens until the net man's first word: the
+       *  dugout is found this far short of the lane's upstream end. */
+      firstCallSeconds: number
       /** Fish per haul, drawn per haul, and their length (m). */
       catchMin: number
       catchMax: number
@@ -1169,6 +1179,10 @@ export const balance: BalanceConfig = {
   // looking for it to see the jar go down and come up, short enough that the
   // errand's own timing backstops are untouched.
   bankFillSeconds: 1.4,
+  // Calibratable (work-order 1250): at the Bambara village the map's Niger
+  // begins 5-29 m past the drawn waterline along the visible bank; 40 m covers
+  // that gap with room, and a map river further off is left alone.
+  backdropRiverFillReach: 40,
   // Calibratable: three standing jars. The fourth delivery replaces the oldest,
   // which is what lets the stand need no consumer.
   waterStandCapacity: 3,
@@ -1628,6 +1642,9 @@ export const balance: BalanceConfig = {
       // The pre-1176 ring, kept for the bank round: its catch has no reaching
       // hand and its landed pictures must not change. Calibratable.
       catchDistance: 0.8,
+      // A player at the river must not wait out a whole roam for the first word
+      // (work-order 1250). A switch, like `loom.placed`.
+      visitOpensAtBank: true,
       roamSeconds: 55,
       roamSpread: 0.25,
       // Calibratable backstops: allow a full-stretch walk plus a hut detour.
@@ -1905,6 +1922,10 @@ export const balance: BalanceConfig = {
       // Well inside the floor's own 240 s hold, so a held word is let go by
       // the boat rather than forced out by the floor.
       wordWaitSeconds: 12,
+      // Calibratable (work-order 1250): long enough that the boat is seen
+      // under way before the word, short enough that a player walking in from
+      // the entrance hears the first DOWNSTREAM within a few seconds.
+      firstCallSeconds: 4,
       // A drift net of the middle Niger brings a handful of fish per drift,
       // Nile perch young and tilapia of a hand to a forearm (user 30.09.2026:
       // "recognisable, not stylised").

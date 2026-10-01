@@ -252,7 +252,8 @@ export interface CanoeView {
   /**
    * Asks for the net man's word to the paddler: `said` when it is spoken now,
    * `held` while the settlement's floor keeps it waiting, `silent` when it may
-   * not be said at all (the listener has not heard ROCK yet, as at the bank).
+   * not be said at all. The scene no longer answers `silent` for an unheard
+   * ROCK (work-order 1250): the dugout's words name the current, not a rock.
    */
   say: (word: CanoeWord) => 'said' | 'held' | 'silent'
   /** A word given up unspoken: the floor forgets it. */
@@ -275,14 +276,27 @@ function seatMen(state: CanoeState): void {
   state.netMan.reach = 0
 }
 
-/** The canoe as it starts: at the downstream end, just pushed off upstream. */
-export function createCanoe(lane: CanoeLane, cfg: CanoeConfig = balance.villageLife.canoe): CanoeState {
+/**
+ * WHERE A VISIT FINDS THE DUGOUT (work-order 1250): on its upstream leg,
+ * `firstCallSeconds` short of the upstream end, so the net man's first word
+ * falls a few seconds after the player arrives. Starting at the downstream end
+ * left the men mute for the whole 60 s leg — the reported "boatmen do not
+ * speak". Never past the downstream end.
+ */
+export function visitStartS(cfg: CanoeConfig = balance.villageLife.canoe): number {
+  return Math.min(cfg.laneEnd, cfg.laneStart + cfg.upstreamSpeed * Math.max(0, cfg.firstCallSeconds))
+}
+
+/** The canoe as it starts: on the lane at `s` (the downstream end unless
+ *  given), paddling upstream. */
+export function createCanoe(lane: CanoeLane, cfg: CanoeConfig = balance.villageLife.canoe, s = cfg.laneEnd): CanoeState {
+  const start = lanePoint(lane, s)
   const state: CanoeState = {
     phase: 'up',
     clock: 0,
-    s: cfg.laneEnd,
-    x: lane.end.x,
-    z: lane.end.z,
+    s,
+    x: start.x,
+    z: start.z,
     yaw: yawOf(-lane.fx, -lane.fz),
     stroke: 0,
     paddlerAction: 'hard',

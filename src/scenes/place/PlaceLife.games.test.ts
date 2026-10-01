@@ -9,7 +9,7 @@ import { sharedLayout } from './layoutHarness'
 import { climbBoulder } from './looseRocks'
 import { playRockFlank } from './playRockSurface'
 import { createTagGame, stepTagGame } from './tagGame'
-import { createBankGame } from './bankGame'
+import { createBankGame, openVisitAtBank } from './bankGame'
 import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, villageHasWell } from './lifeSpots'
 
 // Execute the production component's composition without mounting the WebGPU
@@ -58,10 +58,10 @@ function render(id: string, kind: 'port' | 'village', seed = 7) {
 // Run exactly the initialization used by Kids, not a copy of its branch rule.
 const start = source.indexOf('  const round = useMemo(() => {')
 const end = source.indexOf('\n  const game = round.game', start)
-const roundDeps = { useMemo: (fn: () => unknown) => fn(), mulberry32, balance, createTagGame, createBankGame }
+const roundDeps = { useMemo: (fn: () => unknown) => fn(), mulberry32, balance, createTagGame, createBankGame, openVisitAtBank }
 const makeRound = new Function(...Object.keys(roundDeps), 'props', `
   const { x, z, count, seed, stage } = props;
-  const world = { nudge: (x, z) => ({ x, z }) };
+  const world = { nudge: (x, z) => ({ x, z }), blocked: () => false };
   ${ts.transpile(source.slice(start, end), { target: ts.ScriptTarget.ES2022 })}
   return round;
 `)

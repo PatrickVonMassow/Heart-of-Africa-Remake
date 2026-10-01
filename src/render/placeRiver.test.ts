@@ -13,6 +13,8 @@ import {
   buildGroundPlateGeometry,
   buildRiverFlecks,
   buildRiverSurfaceGeometry,
+  buildRiverFloorGeometry,
+  RIVER_FLOOR_REACH,
   fleckPosition,
 } from './placeRiver'
 import {
@@ -253,4 +255,34 @@ it('keeps half of the current markers within four metres of the teaching bank', 
     expect(flecks.filter((f) => f.across < 4).length).toBeGreaterThanOrEqual(count / 2)
     expect(flecks.every((f) => f.size >= 0.35)).toBe(true)
   }
+})
+
+// THE RIVER'S FLOOR (work-order 1250): the transparent water had no opaque
+// underside past the bed's edge, and the panorama band's savanna showed through.
+describe('the river floor closes the underside of the drawn water', () => {
+  const floor = buildRiverFloorGeometry(bank, 42, 60)
+  const pos = floor.getAttribute('position')
+  const pts = Array.from({ length: pos.count }, (_, i) => ({ x: pos.getX(i), y: pos.getY(i), z: pos.getZ(i) }))
+  const out = (p: { x: number; z: number }) => p.x * bank.nx + p.z * bank.nz
+  const along = (p: { x: number; z: number }) => p.x * bank.fx + p.z * bank.fz
+
+  it('lies flat under the deepest bed row, so the sloping bed stays on top of it', () => {
+    const bed = bankShoreHeight(bank, bank.distance + BANK_BED_REACH)
+    for (const p of pts) expect(p.y).toBeLessThan(bed)
+    expect(new Set(pts.map((p) => p.y.toFixed(6))).size).toBe(1)
+  })
+
+  it('runs from the waterline far out past the drawn water, and far along past both of its ends', () => {
+    const outs = pts.map(out)
+    const alongs = pts.map(along)
+    expect(Math.min(...outs)).toBeCloseTo(bank.distance, 3)
+    expect(Math.max(...outs)).toBeGreaterThanOrEqual(bank.distance + RIVER_REACH + RIVER_FLOOR_REACH - 1e-3)
+    expect(Math.min(...alongs)).toBeLessThanOrEqual(-42 - RIVER_FLOOR_REACH + 1e-3)
+    expect(Math.max(...alongs)).toBeGreaterThanOrEqual(60 + RIVER_FLOOR_REACH - 1e-3)
+  })
+
+  it('faces up, so it is drawn and lit from above', () => {
+    const n = floor.getAttribute('normal')
+    for (let i = 0; i < n.count; i++) expect(n.getY(i)).toBeGreaterThan(0.99)
+  })
 })

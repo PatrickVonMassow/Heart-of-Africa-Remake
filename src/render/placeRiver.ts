@@ -20,6 +20,7 @@
 import * as THREE from 'three/webgpu'
 import { float, instanceIndex, mx_fractal_noise_float, positionLocal, smoothstep, time, uv, vec3 } from 'three/tsl'
 import {
+  BANK_BED_DEPTH,
   BANK_BED_REACH,
   BANK_SHORE_HALF,
   BANK_WATER_DROP,
@@ -119,6 +120,37 @@ export function buildBankShoreGeometry(
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
   g.setIndex(indices)
+  g.computeVertexNormals()
+  return g
+}
+
+/** How far the river floor runs past the drawn water, out and along (m). Far
+ *  enough that no sight line under the transparent water escapes it. */
+export const RIVER_FLOOR_REACH = 400
+/** The floor lies this far under the deepest bed row, so the bed stays on top. */
+export const RIVER_FLOOR_SINK = 0.05
+
+/**
+ * THE RIVER'S FLOOR (work-order 1250). The drawn water is transparent and writes
+ * no depth, and the bed under it ends `BANK_BED_REACH` out, at the ends of the
+ * drawn shore. A sight line that dipped under the surface and passed the bed's
+ * edge met nothing opaque until the §2.5 panorama band 200 m off, whose low rows
+ * hold the captured savanna — the reported flat yellow band on the river
+ * between the dugout and the near bank. One flat opaque quad at bed depth, from
+ * the waterline far out and far along, closes the underside; the sloping bed
+ * and every surface above it cover it wherever they are drawn.
+ */
+export function buildRiverFloorGeometry(bank: PlaceRiverBank, halfLength: number, downLength = halfLength): THREE.BufferGeometry {
+  const y = -BANK_WATER_DROP - BANK_BED_DEPTH - RIVER_FLOOR_SINK
+  const near = bank.distance
+  const far = bank.distance + BANK_BED_REACH + RIVER_FLOOR_REACH
+  const up = -(halfLength + RIVER_FLOOR_REACH)
+  const down = downLength + RIVER_FLOOR_REACH
+  const at = (out: number, along: number) => [bank.nx * out + bank.fx * along, y, bank.nz * out + bank.fz * along]
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([...at(near, up), ...at(near, down), ...at(far, up), ...at(far, down)]), 3))
+  // Wound face-up, as the shore is: column (downstream) × row (outward).
+  g.setIndex([0, 1, 2, 1, 3, 2])
   g.computeVertexNormals()
   return g
 }

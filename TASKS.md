@@ -15877,3 +15877,14 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs, point 1145.
   Bundle: Testinfrastruktur.
   Criticality: medium — one red check per polish pass until fixed.
+- [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
+  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
+  bambara-village, same session as point 1250.
+  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
+  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
+  blocked activity, unreachable workstation) and fix it.
+  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
+  USER, verbatim:
+  user 30.09.2026: "Der Bewohner steht nur untätig herum."
+  Bundle: Dorfleben.
+  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).

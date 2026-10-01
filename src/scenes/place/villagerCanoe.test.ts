@@ -27,6 +27,7 @@ import {
   netHand,
   stepCanoe,
   unloadSeconds,
+  visitStartS,
   type CanoePhase,
   type CanoeState,
   type CanoeWord,
@@ -458,5 +459,47 @@ describe('the drift-net cycle (work-order 1245 item 1)', () => {
     expect(Math.hypot(state.netMan.x - (state.x + Math.sin(state.yaw) * CANOE_NETMAN_FORE), state.netMan.z - (state.z + Math.cos(state.yaw) * CANOE_NETMAN_FORE))).toBeLessThan(1e-6)
     // At most a brisk step's worth per 20 ms frame.
     expect(worst).toBeLessThan(0.1)
+  })
+})
+
+// THE MEN SPEAK AS THE VISIT OPENS (work-order 1250). A visit used to find the
+// dugout at the downstream end, a whole 60 s leg short of its first word; now
+// it is found `firstCallSeconds` short of the upstream end.
+describe('the first word of a visit (work-order 1250)', () => {
+  const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
+  const lane = canoeLane(bank)
+
+  it('finds the dugout on the lane, paddling upstream, firstCallSeconds short of the upstream end', () => {
+    const s0 = visitStartS(cfg)
+    expect(s0).toBeCloseTo(cfg.laneStart + cfg.upstreamSpeed * cfg.firstCallSeconds, 9)
+    expect(s0).toBeGreaterThan(cfg.laneStart)
+    expect(s0).toBeLessThanOrEqual(cfg.laneEnd)
+    const state = createCanoe(lane, cfg, s0)
+    const p = lanePoint(lane, s0)
+    expect(state.phase).toBe('up')
+    expect(state.x).toBeCloseTo(p.x, 9)
+    expect(state.z).toBeCloseTo(p.z, 9)
+  })
+
+  it('says DOWNSTREAM to the paddler within a few seconds of the visit opening', () => {
+    const state = createCanoe(lane, cfg, visitStartS(cfg))
+    const ring = createBasketRing(0)
+    const dt = 0.05
+    let t = 0
+    let first: CanoeWord | null = null
+    while (t < 30 && !first) {
+      first = stepCanoe(state, lane, ring, { say: () => 'said', obeyDelay: () => OBEY }, dt, cfg, () => 0.5)
+      t += dt
+    }
+    expect(first).toBe('DOWNSTREAM')
+    expect(t).toBeLessThanOrEqual(cfg.firstCallSeconds + 0.5)
+    expect(cfg.firstCallSeconds).toBeLessThanOrEqual(6)
+  })
+
+  it('keeps the old downstream-end start as the default for a bare canoe', () => {
+    const state = createCanoe(lane)
+    expect(state.s).toBe(cfg.laneEnd)
+    expect(state.x).toBeCloseTo(lane.end.x, 9)
+    expect(state.z).toBeCloseTo(lane.end.z, 9)
   })
 })
