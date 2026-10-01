@@ -278,7 +278,9 @@ describe('the landmark boulder is nowhere near the settlement (work-order 482 it
       const x = (rock.lon - village.lon) / BACKDROP_SCALE
       const z = -(rock.lat - village.lat) / BACKDROP_SCALE
       expect(isOutsidePlace(layout, x, z)).toBe(true)
-      expect(Math.hypot(x, z)).toBeGreaterThan(maxBoundaryRadius(layout) * 5)
+      // 4.5, not 5: the room round the water errand (work-order 1252) carries
+      // the shore 6 m further upstream; the nearest rock stays at ~4.8.
+      expect(Math.hypot(x, z)).toBeGreaterThan(maxBoundaryRadius(layout) * 4.5)
       // And it stands on the same river the bank belongs to.
       expect(rock.upstreamDeg).toBeGreaterThan(1)
     }
