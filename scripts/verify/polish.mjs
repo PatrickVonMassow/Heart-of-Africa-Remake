@@ -6546,12 +6546,21 @@ if (section('mute-shore-scene')) {
         const info = Object.values(window.__placePanoramaWildlifeInfo ?? {})
         return info.filter((w) => w.visible).map((w) => {
           const r = window.__placeRayHit(w.x, w.visibleY - 0.05, w.z)
-          return { x: +w.x.toFixed(1), z: +w.z.toFixed(1), hit: !!r && r.hitDistance !== null, name: r?.hitName ?? null, water: r?.hitWater ?? null }
+          // The hit point lies on the same sight line as the feet, so the two
+          // distances differ by the gap between them. A grazing line enters the
+          // ground ahead of a point 5 cm under it, hence the 10 % allowance.
+          const gap = r && r.hitDistance !== null ? Math.abs(r.targetDistance - r.hitDistance) : null
+          return {
+            x: +w.x.toFixed(1), z: +w.z.toFixed(1), name: r?.hitName ?? null, water: r?.hitWater ?? null,
+            gap: gap === null ? null : +gap.toFixed(2), near: gap !== null && gap <= Math.max(2, 0.1 * r.targetDistance),
+          }
         })
       })
-      // A missed ground ray proves nothing: each silhouette needs a ground hit.
+      // Only the ground the feet stand on proves dry footing: a missed ray, a
+      // hut or the panorama band in the way proves nothing.
+      const ground = ['landscape-backdrop', 'ground-disc', 'place-river-shore']
       check('no panorama silhouette stands in the water',
-        feet.length > 0 && feet.every((f) => f.hit && f.name !== 'place-river' && !(f.water !== null && f.water >= 0.5)), JSON.stringify(feet))
+        feet.length > 0 && feet.every((f) => ground.includes(f.name) && f.near && !(f.water !== null && f.water >= 0.5)), JSON.stringify(feet))
       const subject = await shore.evaluate(({ s }) => {
         const L = window.__placeCanoe().lane
         const along = s + 18
