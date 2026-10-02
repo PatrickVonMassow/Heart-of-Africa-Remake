@@ -325,6 +325,7 @@ describe('--check never calls a board current over an unread local board', () =>
           env: { ...process.env, HOA_REPO_ROOT: root },
           encoding: 'utf8',
           timeout: 20000,
+          windowsHide: true,
         })
       } catch (e) {
         status = e.status
