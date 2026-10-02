@@ -2299,7 +2299,9 @@ if (section('adult-errands')) {
                 p.x = v.x + Math.sin(bearing) * 3
                 p.z = v.z + Math.cos(bearing) * 3
                 p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
-                p.pitch = -0.12
+                // Down onto the water: the dip's tipped jar and its ring sit at
+                // the surface, below the frame at a level look (work-order 1117).
+                p.pitch = -0.3
                 // IN PROFILE, CARRYING SIDE TOWARD THE LENS. Profile is the
                 // only view that shows both halves at once — the trunk's fold as
                 // a silhouette, and the arm reaching down in front of it rather
