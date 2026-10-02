@@ -1825,4 +1825,15 @@ export const RED_CHARGES = [
       + 'side-on stand after the held catch beat — first occurrence in all recorded logs, the section '
       + 'alone green on the same head; point 1269 owns the standpoint search. The charge dies with point 1269.',
   },
+  {
+    point: 1270,
+    suite: 'polish-speech',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^two close speakers are shot unobstructed, each tail on its own speaker.s anchor, the older note receded and neither targeted \(point \d+\)$/i,
+    why:
+      'MEASURED 02.10.2026 on feat/1129 001ef76f1, webgl/polish-speech (speech-owner): 16 close pairs '
+      + 'tried, sight clear but every tail off its anchor — first occurrence since point 1238 landed, the '
+      + 'section alone green on the same head; point 1270 owns the pair staging. The charge dies with point 1270.',
+  },
 ]

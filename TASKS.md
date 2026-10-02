@@ -15828,3 +15828,22 @@ to land than a mechanism that needs a review.
   Bundle: Testinfrastruktur.
   Criticality: low — test-frame staging only, no player impact; it blocks the green of
   `polish-children` on WebGL 2.
+
+- [ ] 1270. The two-close-speakers shot finds no pair whose tails sit on their own anchors on WebGL 2
+  Source: measured 02.10.2026 ~18:40 in the WebGL 2 covering run of point 1129 on 001ef76f1
+  (`polish-speech`, section `speech-owner`, log
+  `local/verify-logs/2026-10-02T16-39-56-622-polish-panorama-polish-speech-polish-settlement-polish-children-polish-villagers.log`);
+  the check came with point 1238 and was last red during its own development on 29.09.2026;
+  the section alone was green on the same head 27 min later, which does not close it.
+  THE RED. "two close speakers are shot unobstructed, each tail on its own speaker's anchor, the
+  older note receded and neither targeted (point 1238)": 16 pairs 1.2-4 m apart were tried; sight
+  was clear (0.97-0.99) but every attempt read `tails false`, and one was rejected at the shutter.
+  Final state:
+  - The cause is measured over repeated `--section=speech-owner` runs on WebGL 2 on a quiet
+    machine (which pairs, what each tail anchor read); a staging that gives up while an honest
+    pair exists is fixed in the staging, and a real tail-anchor defect is fixed in the speech
+    labels, with no check weakened.
+  - `polish-speech --section=speech-owner` green on WebGPU and WebGL 2; its frame picture-checked.
+  Tests: the existing Playwright section; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low — no player impact measured; it blocks the green of `polish-speech` on WebGL 2.
