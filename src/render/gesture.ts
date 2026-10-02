@@ -560,7 +560,7 @@ export const FILL_CARRY_SIDE: ArmSide = 'left'
  * dab — the readable moment the jar is filling — and it is the only part of the
  * motion a screenshot can be expected to catch.
  */
-function fillDip(progress: number): number {
+export function fillDip(progress: number): number {
   const p = Math.max(0, Math.min(1, progress))
   if (p < 0.2) return smoothstep(p / 0.2)
   if (p > 0.76) return 1 - smoothstep((p - 0.76) / 0.24)
@@ -624,12 +624,39 @@ export function fillSquat(progress: number): number {
  * one arm (work-order 1065's lesson, paid for in centimetres).
  */
 export function fillHandAt(progress: number, pivotY = 0): [number, number, number] {
+  return fillHandPoint(progress, [0, 0, 0], pivotY)
+}
+
+/**
+ * Any point given in the filling HAND's own frame (the pivot the jar hangs in),
+ * carried through the same chain as `fillHandAt` into the figure's frame, squat
+ * included. It is how the tipped jar's mouth is asserted at the water surface
+ * (work-order 1117) without a scene graph.
+ */
+export function fillHandPoint(
+  progress: number,
+  local: readonly [number, number, number],
+  pivotY = 0,
+): [number, number, number] {
   const pose = fillPose(progress)
   const arm = FILL_CARRY_SIDE === 'left' ? pose.left : pose.right
-  const [dx, dy, dz] = armDirection(arm)
-  const x = (FILL_CARRY_SIDE === 'left' ? FIGURE_LIMBS.shoulderX : -FIGURE_LIMBS.shoulderX) + FIGURE_LIMBS.armLength * dx
-  const y = FIGURE_LIMBS.shoulderY + FIGURE_LIMBS.armLength * dy
-  const z = FIGURE_LIMBS.armLength * dz
+  // three.js `YXZ` on the arm pivot: R = Ry(yaw)·Rx(pitch)·Rz(roll), applied to
+  // the hand offset (0, -armLength) plus the local point.
+  const [lx, ly0, lz] = local
+  const ly = ly0 - FIGURE_LIMBS.armLength
+  const sr = Math.sin(arm.roll)
+  const cr = Math.cos(arm.roll)
+  const ax = lx * cr - ly * sr
+  const ay = lx * sr + ly * cr
+  const sp = Math.sin(arm.pitch)
+  const cp = Math.cos(arm.pitch)
+  const by = ay * cp - lz * sp
+  const bz = ay * sp + lz * cp
+  const sy = Math.sin(arm.yaw)
+  const cy = Math.cos(arm.yaw)
+  const x = (FILL_CARRY_SIDE === 'left' ? FIGURE_LIMBS.shoulderX : -FIGURE_LIMBS.shoulderX) + ax * cy + bz * sy
+  const y = FIGURE_LIMBS.shoulderY + by
+  const z = -ax * sy + bz * cy
   const cl = Math.cos(pose.lean)
   const sl = Math.sin(pose.lean)
   const squat = fillSquat(progress)

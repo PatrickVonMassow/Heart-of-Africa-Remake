@@ -200,6 +200,8 @@ export function workArrivalRadius(task: AdultTask): number {
   if (task.standSpot && (task.phase === 'send' || task.phase === 'wait' || task.situation === 'water-back')) {
     return balance.waterStandArrivalRadius
   }
+  // The fill is dipped where the water stands ankle-deep, not a metre short.
+  if (task.phase === 'fetch' && !task.via) return balance.bankFillArrivalRadius
   return task.siteIndex !== null && (task.phase === 'site' || task.phase === 'dig')
     ? DIG_ARRIVE_RADIUS : WORK_ARRIVE_RADIUS
 }
