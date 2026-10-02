@@ -63,6 +63,29 @@ interface BalanceConfig {
   /** How long the jar stays under, in seconds (work-order 1087) — the readable
    *  hold between the dip going down and the jar coming up full. */
   bankFillSeconds: number
+  /** The jar's tip through the fill (work-order 1117, design.md §13.4): its
+   *  MOUTH goes into the water, never the vessel. Angles and offsets are in the
+   *  carrying hand's own frame, reached at the bottom of the dip. */
+  bankFillJar: {
+    /** Tip about the hand's x axis, mouth forward and down (rad). */
+    tilt: number
+    /** Jar centre's distance from the grip toward the mouth (m): the hand holds it near the base. */
+    reach: number
+    /** How far up the arm the grip sits during the tip (m). */
+    lift: number
+  }
+  /** The ring the surface answers the dip with (work-order 1117), at the jar's
+   *  mouth for as long as the fill phase runs. */
+  bankFillRing: {
+    /** Rings drawn at once, evenly staggered in phase. */
+    count: number
+    /** Seconds one ring takes to spread from `startRadius` to `endRadius`. */
+    period: number
+    startRadius: number
+    endRadius: number
+    /** Opacity of a newborn ring at the full dip; it fades as it spreads. */
+    opacity: number
+  }
   /** How far past the settlement's waterline the landscape backdrop turns map
    *  LAND into water, filling the gap between the drawn river and the map's
    *  own river course (work-order 1250), in place metres. */
@@ -1197,6 +1220,15 @@ export const balance: BalanceConfig = {
   // looking for it to see the jar go down and come up, short enough that the
   // errand's own timing backstops are untouched.
   bankFillSeconds: 1.4,
+  // Calibratable (work-order 1117): solved against the dip's own hand, which
+  // sits at the surface. 2.2 rad lays the jar base-up with its axis about 35°
+  // under level; held near the base and slid 0.15 m up the arm, the mouth's
+  // centre stands ~3 cm under the water and the jar's centre ~4 cm above it.
+  bankFillJar: { tilt: 2.2, reach: 0.12, lift: 0.15 },
+  // Calibratable (work-order 1117): two rings at once, each spreading from the
+  // mouth's own size to about a metre across in 0.9 s, so the 1.4 s fill shows
+  // a ring born and a ring spreading.
+  bankFillRing: { count: 2, period: 0.9, startRadius: 0.16, endRadius: 0.55, opacity: 0.55 },
   // Calibratable (work-order 1250): at the Bambara village the map's Niger
   // begins 5-29 m past the drawn waterline along the visible bank; 40 m covers
   // that gap with room, and a map river further off is left alone.
