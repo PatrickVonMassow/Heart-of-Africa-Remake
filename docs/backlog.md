@@ -2085,3 +2085,10 @@ From the landing of 1262 (02.10.2026): `land-point.mjs` runs its fast gate befor
 `render-verify-core.test.mjs` ("charges only points the work order still holds OPEN") in the
 pre-push gate of main. Repaired by hand (5066489a2). The tick step could drop the landed point's
 charges. Infrastructure freeze: deferred.
+
+From the cross-vendor review of 1129 (02.10.2026, carried verbatim from the old `polish.mjs`):
+in `polish-children`, `heldToTheEnd = holdTrace.length >= 6` accepts six samples taken anywhere
+before a contact hold ends, so a hold read from mid-way still passes "the whole hold was read";
+and the end-hold camera scores `-|sin(a - base)| * 2`, which favours bearings along the pair's
+axis, while the free partner is left out of the clearance check. Possible false approval of a
+frame check, no player impact. Infrastructure freeze: deferred.
