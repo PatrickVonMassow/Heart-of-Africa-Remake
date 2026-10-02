@@ -22,7 +22,6 @@ import { balance } from '../../config/balance'
 import { BACKDROP_SCALE, GROUND_DISC_OVERHANG } from './backdrop'
 import { bankDrawnReach, insidePlace, isOutsidePlace, maxBoundaryRadius, groundPlateRadius, placeBoundaryRadius } from './boundary'
 import { PLACE_RADIUS, WATER_STAND_WORK_RING } from './layout'
-import { WORK_ARRIVE_RADIUS } from './adultWork'
 import { sharedLayout } from './layoutHarness'
 import { resolveMove, PLAYER_RADIUS, WALKER_RADIUS, standingClear } from './collision'
 import { buildPlaceNavGrid, findPlaceRoute } from './routing'
@@ -550,45 +549,6 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
           }
         }
       }
-    }
-  })
-
-  // THE STAND'S WORDS FALL CLEAR OF THE BANK CHILDREN (design.md §13.4,
-  // work-order 1262). Both RIVERs of the water errand are spoken from the ring
-  // round the stand and wait while a child can hear. Before this point 60 of
-  // these 60 layouts put that ring inside the adult speech margin of the
-  // children's quarter, rocks or descent — bambara-village@42, the verify
-  // lane's own seed, at 6.2 m — and with the player at the stand the sender's
-  // order was held 240 s until the floor forced it. The few layouts whose fire
-  // offers no clear spot keep the clearest one the search found.
-  it('keeps the working ring out of the earshot of every place the children belong', () => {
-    const margin = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
-    const ringClear = (layout: ReturnType<typeof sharedLayout>): number => {
-      const stand = layout.waterStand!
-      const ground = layout.playGround!
-      let near = Math.hypot(stand.x - ground.x, stand.z - ground.z) - ground.radius
-      for (const p of layout.playRocks ? [layout.playRocks.upstream, layout.playRocks.downstream] : []) {
-        near = Math.min(near, Math.hypot(stand.x - p.x, stand.z - p.z))
-      }
-      if (layout.bank) near = Math.min(near, Math.hypot(stand.x - layout.bank.bank.x, stand.z - layout.bank.bank.z))
-      return near - WATER_STAND_WORK_RING
-    }
-    const inEarshot: string[] = []
-    let checked = 0
-    for (const id of riverVillages) {
-      for (let seed = 1; seed <= 20; seed++) {
-        const layout = sharedLayout(id, seed)
-        if (!layout.waterStand || !layout.playGround) continue
-        checked++
-        const clear = ringClear(layout)
-        if (clear < margin) inEarshot.push(`${id}@${seed} ${clear.toFixed(1)} m`)
-      }
-    }
-    expect(checked).toBe(riverVillages.length * 20)
-    expect(inEarshot.length, inEarshot.join(', ')).toBeLessThanOrEqual(checked * 0.1)
-    // The seeds the browser route and the children's replays are judged on.
-    for (const seed of [42, 2972259115, 9, 23]) {
-      expect(ringClear(sharedLayout(ROCK_VILLAGE_ID, seed)), `${ROCK_VILLAGE_ID}@${seed}`).toBeGreaterThanOrEqual(margin)
     }
   })
 

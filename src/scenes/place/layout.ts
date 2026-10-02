@@ -1770,21 +1770,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // THE VILLAGE WATER STAND (work-order 1087). It goes in beside the fire, on
   // the bearing that faces the water so the man who says RIVER at it points past
   // it at the river, and it steps round the ring if that bearing is taken. It is
-  // placed BEFORE the children's quarter is searched, so the quarter's search
-  // avoids its body; once the quarter stands, it is re-seated out of the
-  // children's earshot (below, work-order 1262).
+  // placed BEFORE the children's quarter is searched, so the quarter is fitted
+  // around it exactly as it is around the other adult places.
   let waterStand: PlaceLayout['waterStand'] = null
   /** Retain the stand's body across fence splices, so it can be removed if
    *  the water path it was placed for is discarded further down. */
   let standCollider: Collider | null = null
-  /** Every place the stand may go, in the order it is tried — the fire gaps
-   *  outward, and round each the bearings alternating out from the water's.
-   *  `accept` is offered each one that stands clear, is off every lane and can
-   *  be approached on the ground the colliders leave NOW; returning true stops
-   *  the walk. Shared by the first placement and the re-seat below, so both
-   *  ask exactly the same questions of the ground. */
-  const walkStandSpots = (accept: (x: number, z: number) => boolean): void => {
-    if (!bank) return
+  if (place.kind === 'village' && waterPath && bank) {
     const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
     const walkClear = colliderBuckets(colliders, WALKER_RADIUS)
     const facing = Math.atan2(bank.nz, bank.nx)
@@ -1805,7 +1797,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       return open >= WATER_STAND_APPROACHES_NEEDED
     }
     for (const gap of WATER_STAND_FIRE_GAPS) {
-      for (let k = 0; k < WATER_STAND_BEARINGS; k++) {
+      for (let k = 0; k < WATER_STAND_BEARINGS && !waterStand; k++) {
         // Alternating out from the water's own bearing, so the first bearing
         // tried is the one that reads and the fallbacks stay as near it as
         // possible.
@@ -1820,15 +1812,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         // of a drawn path. The same exclusion the other village places use.
         if (onLane(x, z, WATER_STAND_RADIUS)) continue
         if (!approachable(x, z)) continue
-        if (accept(x, z)) return
+        waterStand = { x, z }
       }
+      if (waterStand) break
     }
-  }
-  if (place.kind === 'village' && waterPath && bank) {
-    walkStandSpots((x, z) => {
-      waterStand = { x, z }
-      return true
-    })
     if (waterStand) {
       standCollider = { x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS }
       colliders.push(standCollider)
@@ -1932,39 +1919,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     return best
   }
   const inPlayEarshot = (x: number, z: number) => toChildren(x, z) < ADULT_SPEECH_MARGIN
-
-  // THE STAND'S WORDS FALL CLEAR OF THE BANK CHILDREN (design.md §13.4,
-  // work-order 1262). Both RIVERs of the water errand are spoken from the ring
-  // round the stand and wait while a child can hear, so a stand whose ring lies
-  // in the earshot of a place the children BELONG holds its order for as long
-  // as they play there. Measured: 57 of 60 village layouts (three peoples,
-  // seeds 1-20) put the quarter's rim within the hearing radius of the ring,
-  // bambara-village@42 at 6.2 m; with the player at the stand the sender's word
-  // was held 240 s until the floor forced it (`adult-atom-lost`), and on a
-  // slower frame rate the continuous route's step 3 saw no empty jar in 480 s.
-  // The stand is placed before the quarter, so it is RE-SEATED here — the
-  // adults move, as everywhere else — on the first spot the same search offers
-  // whose whole ring keeps the adult speech margin; where none does, on the one
-  // that keeps the most.
-  if (waterStand && standCollider) {
-    const ringClear = (x: number, z: number) => toChildren(x, z) - WATER_STAND_WORK_RING
-    if (ringClear(waterStand.x, waterStand.z) < ADULT_SPEECH_MARGIN) {
-      const own = standCollider
-      const at = colliders.indexOf(own)
-      colliders.splice(at, 1)
-      let best: { x: number; z: number; clear: number } = { ...waterStand, clear: ringClear(waterStand.x, waterStand.z) }
-      walkStandSpots((x, z) => {
-        if (inPlayGround(x, z, WATER_STAND_WORK_RING) || onWayToWater(x, z, WATER_STAND_WORK_RING)) return false
-        const clear = ringClear(x, z)
-        if (clear > best.clear) best = { x, z, clear }
-        return clear >= ADULT_SPEECH_MARGIN
-      })
-      waterStand = { x: best.x, z: best.z }
-      own.x = best.x
-      own.z = best.z
-      colliders.splice(at, 0, own)
-    }
-  }
 
   // THE WATER PATH IS LAID AFTER THE PLAN IS BUILT (work-order 688). A
   // lane forced through the house band BEFORE the plan costs it a dwelling
