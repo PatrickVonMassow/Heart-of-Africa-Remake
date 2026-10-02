@@ -9,7 +9,7 @@ import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } fr
 import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
-import { BASE, section, check, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
+import { BASE, section, check, page, frame, nextFrames, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
@@ -2657,6 +2657,10 @@ if (section('adult-errands')) {
           for (let i = 0; i < v.length; i++) {
             if (v[i].carry !== 'fullJar' || v[i].work?.situation !== 'water-back') continue
             if (Math.hypot(v[i].x - stand.x, v[i].z - stand.z) > 15) continue
+            // AND NOBODY AT HIS ELBOW (work-order 1108): a neighbour walking
+            // beside him stands in every line to him, and the shutter-time
+            // check refused all 24 placements for one such companion.
+            if (v.some((o, j) => j !== i && Math.hypot(o.x - v[i].x, o.z - v[i].z) < 2.5)) continue
             return { who: i, x: v[i].x, z: v[i].z }
           }
           return null
@@ -2679,43 +2683,60 @@ if (section('adult-errands')) {
       // Side-on and close, a little above the jar rather than below it: the water
       // surface at the rim is the subject, and it is an ELLIPSE that closes as
       // the lens drops toward the jar's own height.
-      // No bearing sweep: a search around a man on the bank keeps offering spots
-      // on the water side, and a lens there tears the scene down.
-      // ACROSS his path, not along it. He walks INLAND, so a lens set inland
-      // of him is a lens he walks into — the frame came back filled by the
-      // shadowed flank of his own cone. Both sides of the radial lie on the
-      // ground he is walking on; the side nearer the settlement's middle is
-      // tried first, the other is the fallback.
+      // NEVER ON THE WATER SIDE: a lens there lies outside the walkable region
+      // and the leave check tears the scene down. So only bearings no further
+      // from the settlement's middle than he stands are tried (the river lies
+      // outward; a proxy, not the bank normal), SIDE-ON first: he walks
+      // inland, so a lens along his path is one he walks into — the frame came
+      // back filled by the shadowed flank of his own cone.
       // JUDGED AT THE SHUTTER (work-order 1108): a fence panel in the near
       // field or a neighbour across his line spoiled the frame on WebGL 2
       // while every check passed, because none asked. So each candidate is
       // placed, re-aimed, and judged from the lens read back against where
       // everyone stands at the exposure; a spoiled one is re-chosen, and only
       // an exhausted search reds.
-      const RETURN_TRIES = [[0, 5], [1, 5], [0, 6], [1, 6]]
+      // Two rounds: the neighbours walk on at the held pace, so a search that
+      // ran out is tried once more after they have had time to move.
+      const RETURN_TRIES = [0, 1].flatMap((round) =>
+        [0, 1, 2, 3, 4, 5].flatMap((k) => [[k, 5, round], [k, 6.5, round]]))
+      const RETURN_OFF_AXIS = 0.4
       let still = null
       let atShutter = null
-      let spoiledBy = null
+      let spoiledBy = 'no placement inland of him'
       let tries = 0
-      for (const [side, dist] of RETURN_TRIES) {
+      const refused = []
+      for (const [rank, dist, round] of RETURN_TRIES) {
         tries++
-        await page.evaluate(([w, side, dist]) => {
+        if (round && !rank && dist === 5) await nextFrames(60)
+        const placed = await page.evaluate(([w, rank, dist]) => {
           const v = window.__placeErrands().villagers[w]
           const p = window.__placePlayer
-          const len = Math.max(0.001, Math.hypot(v.x, v.z))
-          const nx = v.x / len
-          const nz = v.z / len
-          const pick = (sx, sz) => Math.hypot(v.x + sx * dist, v.z + sz * dist)
-          const near = pick(-nz, nx) <= pick(nz, -nx) ? [-nz, nx] : [nz, -nx]
-          const a = side === 0 ? near : [-near[0], -near[1]]
-          p.x = v.x + a[0] * dist
-          p.z = v.z + a[1] * dist
+          const r = Math.max(0.001, Math.hypot(v.x, v.z))
+          const ok = []
+          for (let i = 0; i < 12; i++) {
+            const a = (i / 12) * Math.PI * 2
+            const sx = Math.sin(a)
+            const sz = Math.cos(a)
+            if (Math.hypot(v.x + sx * dist, v.z + sz * dist) > r) continue
+            // |cos| to the radial: 0 is side-on.
+            ok.push({ sx, sz, along: Math.abs((sx * v.x + sz * v.z) / r) })
+          }
+          ok.sort((a, b) => a.along - b.along)
+          const c = ok[rank]
+          if (!c) return false
+          p.x = v.x + c.sx * dist
+          p.z = v.z + c.sz * dist
           p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
           // Slightly DOWN, so the jar on his head is met from a little above
           // and the water standing at its rim is an ellipse rather than an edge.
           p.pitch = -0.04
-        }, [returning.who, side, dist])
+          return true
+        }, [returning.who, rank, dist])
+        if (!placed) continue
         await nextFrames(2)
+        // The new view's shader pipelines are waited for HERE, before the aim:
+        // the shutter's own wait took seconds at 20 FPS while he walked on.
+        await awaitPlaceDrawn('the return shot')
         still = await page.evaluate((w) => {
           const v = window.__placeErrands().villagers[w]
           const p = window.__placePlayer
@@ -2728,28 +2749,47 @@ if (section('adult-errands')) {
             gap: Math.hypot(v.x - p.x, v.z - p.z),
           }
         }, returning.who)
-        await nextFrames(1)
-        // READ AT THE SHUTTER, not off the sample above: a carrier who delivers
-        // his jar between that sample and the exposure would be photographed
-        // empty-handed while a check of the sample passed.
+        // READ AT THE SHUTTER, not off the sample above: the shutter itself
+        // waits for the scene to finish drawing, he walks on meanwhile, and a
+        // reading taken before it judged a frame with him at its edge and a
+        // neighbour in front of the lens. So the frame is written first and
+        // the state it was taken in is read straight after; a spoiled one is
+        // shot again from the next placement, overwriting the file.
+        await frame('1087-village-carrier-returns-with-water', {
+          local: { x: still.x, y: 1.5, z: still.z },
+          label: 'the water carrier walking back to the village under a full jar, the water surface at its rim',
+        })
         atShutter = await page.evaluate((w) => {
           const vs = window.__placeErrands().villagers
-          const e = window.__placeCamera.matrixWorld.elements
+          const cam = window.__placeCamera
+          const e = cam.matrixWorld.elements
+          const apply = (m, v) => [0, 1, 2, 3].map((r) => m[r] * v[0] + m[r + 4] * v[1] + m[r + 8] * v[2] + m[r + 12] * v[3])
+          const clip = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [vs[w].x, 1.2, vs[w].z, 1]))
           return {
             x: vs[w].x, z: vs[w].z, carry: vs[w].carry,
             lens: { x: e[12], z: e[14] },
+            ndcX: clip[0] / clip[3],
             unseen: window.__errandUnseen({
               who: [w],
-              points: [{ name: 'his jar', x: vs[w].x, y: 1.9, z: vs[w].z }],
+              points: [
+                { name: 'his jar', x: vs[w].x, y: 1.9, z: vs[w].z },
+                { name: 'his lower body', x: vs[w].x, y: 0.6, z: vs[w].z },
+              ],
             }),
             others: vs.map((p, j) => ({ who: j, x: p.x, z: p.z })).filter((o) => o.who !== w),
           }
         }, returning.who)
         const over = lineOverlapFrom(atShutter.lens, atShutter, atShutter.others)
-        spoiledBy = atShutter.unseen.length
+        // In the middle of the frame, not at its edge: the aim is taken at
+        // him, so a subject that drifted off it is a lens that moved.
+        spoiledBy = !(still.gap > 2.5 && still.gap < 7)
+          ? `the lens landed ${still.gap.toFixed(2)} m off him`
+          : atShutter.unseen.length
           ? `out of sight: ${atShutter.unseen.join(', ')}`
-          : over ? describeOverlap(over) : null
+          : over ? describeOverlap(over)
+            : Math.abs(atShutter.ndcX) > RETURN_OFF_AXIS ? `${atShutter.ndcX.toFixed(2)} off the frame's middle` : null
         if (!spoiledBy || atShutter.carry !== 'fullJar') break
+        refused.push(`${tries}: ${spoiledBy}`)
       }
       // THE SUBJECT IS WHERE THE LENS IS, not merely somewhere in the picture.
       // Three aimings in a row came back showing an empty river with the carrier
@@ -2757,25 +2797,21 @@ if (section('adult-errands')) {
       // time: "inside the frustum" is not "readable".
       check(
         'and the carrier stands at reading distance from the lens, neither on it nor lost in it',
-        still.gap > 2.5 && still.gap < 7,
-        `${still.gap.toFixed(2)} m from the lens — subject (${still.x.toFixed(1)}, ${still.z.toFixed(1)}), ` +
+        !!still && still.gap > 2.5 && still.gap < 7,
+        !still ? 'no placement inland of him' : `${still.gap.toFixed(2)} m from the lens — subject (${still.x.toFixed(1)}, ${still.z.toFixed(1)}), ` +
           `lens (${still.px.toFixed(1)}, ${still.pz.toFixed(1)}) yaw ${still.yaw.toFixed(2)} pitch ${still.pitch.toFixed(2)}`,
       )
       check(
         'and nothing stands between him and the lens at the shutter',
         !spoiledBy,
-        spoiledBy ? `${spoiledBy}, after ${tries} of ${RETURN_TRIES.length} placements` : `clear on placement ${tries}`,
+        spoiledBy ? `after ${tries} of ${RETURN_TRIES.length} placements — ${refused.join('; ')}` : `clear on placement ${tries}, ${atShutter?.ndcX.toFixed(2)} off the middle`,
       )
       check(
         'and he is still under it at the shutter, rather than having set it down',
-        atShutter.carry === 'fullJar',
-        `carrying ${atShutter.carry}, ${Math.hypot(atShutter.x - returning.x, atShutter.z - returning.z).toFixed(2)} m on, ` +
+        atShutter?.carry === 'fullJar',
+        !atShutter ? 'never placed' : `carrying ${atShutter.carry}, ${Math.hypot(atShutter.x - returning.x, atShutter.z - returning.z).toFixed(2)} m on, ` +
           `${Math.hypot(atShutter.x - still.x, atShutter.z - still.z).toFixed(2)} m since the aim`,
       )
-      await frame('1087-village-carrier-returns-with-water', {
-        local: { x: still.x, y: 1.5, z: still.z },
-        label: 'the water carrier walking back to the village under a full jar, side-on, the water surface at its rim',
-      })
     }
     await letThemWalk()
 
