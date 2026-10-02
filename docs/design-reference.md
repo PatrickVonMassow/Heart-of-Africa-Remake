@@ -34,7 +34,7 @@ changes; the research documents point here. Code sources of truth:
 per-position field), `src/scenes/travel/Climate.tsx` and
 `src/scenes/place/PlaceScene.tsx` (the display); verification lives in
 `src/systems/season.test.ts` and the pixel/live blocks of
-`scripts/verify/enrichments.mjs` and `scripts/verify/polish.mjs`.
+`scripts/verify/enrichments.mjs` and the `scripts/verify/polish-*.mjs` theme suites.
 
 | Research finding (§) | In the game | Verified by |
 |---|---|---|
@@ -74,7 +74,7 @@ stays current whenever the people rendering changes; the research documents
 point here. The source of truth in code is
 `src/systems/dress.ts` (the rules), `src/systems/season.ts` (the three
 drivers) and `src/scenes/place/` (the figures); the live proof is
-`scripts/verify/polish.mjs` (screenshots 112/113).
+`scripts/verify/polish-settlement.mjs` (screenshots 112/113).
 
 | Region | Settlements (alphabetical) | Implemented aspect (the research finding) | In-game rendering | Driver · gate · source |
 |---|---|---|---|---|

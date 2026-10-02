@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * EXCEPTION to the tooling project's Node environment: this file runs browser-page
- * code here — a function Playwright serializes into the page, or a `polish.mjs`
+ * code here — a function Playwright serializes into the page, or a `polish-*.mjs`
  * sampler block — and that code reads `window`/`document` directly. It needs a DOM,
  * so it keeps jsdom per file instead of dragging the other tooling tests back into one.
  */
@@ -14,7 +14,7 @@ import sharp from 'sharp'
 // browser stubbed out: the arithmetic that chooses the stand, measures the
 // motion and judges the teaching frame is the part a browser cannot cheaply
 // re-test, and it is all here.
-const source = readFileSync('scripts/verify/polish.mjs', 'utf8')
+const source = readFileSync('scripts/verify/polish-villagers.mjs', 'utf8')
 const start = source.indexOf("if (section('village-loom')) {")
 const end = source.indexOf("\nif (section('adult-errands'))", start)
 if (start < 0 || end < 0) throw new Error('Village loom section missing')

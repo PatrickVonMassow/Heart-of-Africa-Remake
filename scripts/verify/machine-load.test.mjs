@@ -18,7 +18,7 @@ const cpuSample = (busy, idle, cores = 4) =>
 
 describe('timing-sensitive suite set', () => {
   it('names the three suites the point names, and only real suites', () => {
-    for (const s of ['settings', 'enrichments', 'polish']) expect(TIMING_SENSITIVE_SUITES).toContain(s)
+    for (const s of ['settings', 'enrichments', 'polish-children']) expect(TIMING_SENSITIVE_SUITES).toContain(s)
     for (const s of TIMING_SENSITIVE_SUITES) expect(DEV_SUITES).toContain(s)
     expect(new Set(TIMING_SENSITIVE_SUITES).size).toBe(TIMING_SENSITIVE_SUITES.length)
   })
@@ -377,7 +377,7 @@ describe('classifyLoad — the GPU signal (point 386)', () => {
 })
 
 describe('decideRun', () => {
-  const timingPick = ['docs', 'polish', 'enrichments']
+  const timingPick = ['docs', 'polish-children', 'enrichments']
 
   it('proceeds on a quiet machine', () => {
     expect(decideRun({ suites: timingPick, level: LEVEL.quiet }).action).toBe('proceed')
@@ -386,7 +386,7 @@ describe('decideRun', () => {
   it('FLAGS a loaded run by default instead of blocking it', () => {
     const d = decideRun({ suites: timingPick, level: LEVEL.loaded })
     expect(d.action).toBe('flag')
-    expect(d.timing).toEqual(['polish', 'enrichments'])
+    expect(d.timing).toEqual(['polish-children', 'enrichments'])
   })
 
   it('DEFERS only when the caller asked for it, with its own exit code', () => {
@@ -428,7 +428,7 @@ describe('forcedLevel — the wiring self-test hook', () => {
 
 describe('annotateResult — the asymmetry', () => {
   it('says nothing at all on a quiet machine', () => {
-    expect(annotateResult({ level: LEVEL.quiet, redSuites: ['polish'] })).toEqual([])
+    expect(annotateResult({ level: LEVEL.quiet, redSuites: ['polish-children'] })).toEqual([])
   })
 
   it('lets a GREEN under load stand — load makes false reds, not false greens', () => {
@@ -438,9 +438,9 @@ describe('annotateResult — the asymmetry', () => {
   })
 
   it('labels a timing-sensitive RED under load as not authoritative, with the re-run command', () => {
-    const lines = annotateResult({ level: LEVEL.loaded, redSuites: ['enrichments', 'polish'] }).join('\n')
+    const lines = annotateResult({ level: LEVEL.loaded, redSuites: ['enrichments', 'polish-children'] }).join('\n')
     expect(lines).toMatch(/NOT AUTHORITATIVE/)
-    expect(lines).toMatch(/npm test -- enrichments polish/)
+    expect(lines).toMatch(/npm test -- enrichments polish-children/)
     expect(lines).toMatch(/QUIET machine/)
   })
 
@@ -457,7 +457,7 @@ describe('annotateResult — the asymmetry', () => {
   it('names the leftovers to shut down, only ours', () => {
     const lines = annotateResult({
       level: LEVEL.busy,
-      redSuites: ['polish'],
+      redSuites: ['polish-children'],
       strays: [{ pid: 4242, kind: STRAY_KIND.devServer, fromThisRepo: true }, { pid: 7, kind: STRAY_KIND.devServer, fromThisRepo: false }],
     }).join('\n')
     expect(lines).toMatch(/4242/)
@@ -493,7 +493,7 @@ describe('killAdvice', () => {
 describe('formatLoadReport', () => {
   it('reports a quiet machine in one readable block', () => {
     const load = classifyLoad({ cpuBusyFraction: 0.03, cpuCount: 8, strays: [] })
-    const out = formatLoadReport({ load, decision: decideRun({ suites: ['polish'], level: load.level }) }).join('\n')
+    const out = formatLoadReport({ load, decision: decideRun({ suites: ['polish-children'], level: load.level }) }).join('\n')
     expect(out).toMatch(/QUIET MACHINE/)
     expect(out).not.toMatch(/--on-load=defer/)
   })
@@ -513,7 +513,7 @@ describe('formatLoadReport', () => {
       pid: 100 + i, kind: STRAY_KIND.browser, cmd: 'x'.repeat(300), fromThisRepo: i === MAX_LISTED_STRAYS + 2,
     }))
     const load = classifyLoad({ cpuBusyFraction: 0.1, cpuCount: 8, strays })
-    const out = formatLoadReport({ load, decision: decideRun({ suites: ['polish'], level: load.level }) })
+    const out = formatLoadReport({ load, decision: decideRun({ suites: ['polish-children'], level: load.level }) })
     const listed = out.filter((l) => l.includes('leftover pid'))
     expect(listed).toHaveLength(MAX_LISTED_STRAYS)
     expect(listed[0]).toMatch(/FROM THIS CHECKOUT/) // ours is never the one cut off
@@ -537,7 +537,7 @@ describe('formatLoadReport', () => {
   it('is deterministic — the same input prints the same lines', () => {
     const mk = () => {
       const load = classifyLoad({ cpuBusyFraction: 0.8, cpuCount: 8, strays: [{ pid: 3, kind: STRAY_KIND.unitRun, cmd: 'vitest' }] })
-      return formatLoadReport({ load, decision: decideRun({ suites: ['polish'], level: load.level }) }).join('\n')
+      return formatLoadReport({ load, decision: decideRun({ suites: ['polish-children'], level: load.level }) }).join('\n')
     }
     expect(mk()).toBe(mk())
   })

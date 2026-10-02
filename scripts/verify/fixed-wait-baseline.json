@@ -1,5 +1,6 @@
 {
   "_boot.mjs": 4,
+  "_polish.mjs": 1,
   "_server.mjs": 1,
   "benchmark.mjs": 2,
   "collision.mjs": 11,
@@ -12,7 +13,8 @@
   "health.mjs": 5,
   "i18n.mjs": 9,
   "invariants.mjs": 1,
-  "polish.mjs": 30,
+  "polish-panorama.mjs": 16,
+  "polish-settlement.mjs": 13,
   "preview.mjs": 1,
   "settings.mjs": 24,
   "speechSampler.mjs": 1,

@@ -12,7 +12,7 @@
 //
 //   node scripts/verify/machine-load.mjs            # report; exit 0 quiet or unknown, 2 measurably not quiet
 //   node scripts/verify/machine-load.mjs --json     # the same as machine-readable JSON
-//   node scripts/verify/machine-load.mjs --suites=enrichments,polish
+//   node scripts/verify/machine-load.mjs --suites=enrichments,polish-children
 //
 // FAIL-OPEN: every step is guarded. A probe that cannot read the machine returns
 // `ok: false`, which classifies as UNKNOWN — reported, never mistaken for quiet,
@@ -23,6 +23,7 @@ import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isMainModule } from '../is-main.mjs'
+import { POLISH_THEME_SUITES } from './tiers.mjs'
 import {
   LEVEL, classifyLoad, cpuBusyFraction, decideRun, forcedLevel, formatLoadReport, gpuEngineUtilisation,
   onLoadMode, parseGpuCounterJson, parsePercentUtilisation, parsePsOutput, parseWindowsProcessJson,
@@ -268,7 +269,7 @@ export async function readMachine(options = {}) {
 if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
   const suitesArg = (argv.find((a) => a.startsWith('--suites=')) ?? '').split('=')[1]
-  const suites = suitesArg ? suitesArg.split(',').map((s) => s.trim()).filter(Boolean) : ['enrichments', 'polish', 'settings']
+  const suites = suitesArg ? suitesArg.split(',').map((s) => s.trim()).filter(Boolean) : ['enrichments', ...POLISH_THEME_SUITES, 'settings']
   const load = await readMachine()
   const decision = decideRun({ suites, level: load.level, mode: onLoadMode({ flags: argv, env: process.env.VERIFY_ON_LOAD }) })
   if (argv.includes('--json')) {

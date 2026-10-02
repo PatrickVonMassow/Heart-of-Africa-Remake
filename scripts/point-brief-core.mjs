@@ -840,7 +840,7 @@ const RENDER_WORDS =
 /** The browser suites (scripts/verify/*.mjs that drive a page). `docs` is the
  *  one pure-Node check and is not one, so naming it is no render signal. */
 const RENDER_SUITE =
-  /\b(?:startup|world|i18n|flow|health|events|collision|handwriting|polish|gamepad|touch|voice|settings|enrichments|invariants|benchmark|report)\.mjs\b/i
+  /\b(?:startup|world|i18n|flow|health|events|collision|handwriting|_?polish(?:-[a-z]+)?|communication|gamepad|touch|voice|settings|enrichments|invariants|benchmark|report)\.mjs\b/i
 
 /** Does this spec describe work that can move the rendered picture? Total. */
 export function isRenderPoint(spec) {

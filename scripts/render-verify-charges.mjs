@@ -33,6 +33,13 @@
 //
 // The Vitest sweep (render-verify-core.test.mjs) pins the shape of every entry
 // and that each one still names a point the work order holds open.
+//
+// `polish` WAS SPLIT BY THEME (point 1129). A charge of a polish CHECK moved to
+// the theme suite that prints it; a console charge, which any page of the old
+// suite could raise, is spread over the themes whose sections can raise it, so
+// the sum of the entries excuses exactly what the one `polish` entry did.
+// The theme names are written out here (this file is data and imports nothing);
+// render-verify-core.test.mjs holds them to tiers.mjs's POLISH_THEME_SUITES.
 
 /**
  * @typedef {object} RedCharge
@@ -132,7 +139,7 @@ export const RED_CHARGES = [
   },
   {
     point: 642,
-    suite: 'polish',
+    suite: 'polish-settlement',
     kind: 'check',
     match: /^the (dry|wet) settlement season reading settles before it is read/i,
     // NO detailMatch, deliberately. The check has exactly ONE failing mode —
@@ -155,7 +162,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1043,
-    suite: 'polish',
+    suite: 'polish-speech',
     kind: 'check',
     match: /the settlement offers a figure in clear view to speak over/i,
     why:
@@ -209,9 +216,9 @@ export const RED_CHARGES = [
       + 'touches the HUD, the keyboard map and the settlement pointer lock and cannot produce a '
       + 'dev-server 504. The charge dies with point 939.',
   },
-  {
+  ...['polish-panorama', 'polish-speech', 'polish-settlement', 'polish-children', 'polish-villagers'].map((suite) => ({
     point: 939,
-    suite: 'polish',
+    suite,
     backend: 'webgl',
     kind: 'console',
     // THE SAME VITE TRANSIENT ON THE OTHER LANE, and it needs its own entry
@@ -226,10 +233,10 @@ export const RED_CHARGES = [
       + 'and the identical red point 939 already owns on webgpu/polish, webgpu/startup and '
       + 'webgpu/report. Nothing about the code under test reaches this reading: no check failed on '
       + 'either attempt. The charge dies with point 939.',
-  },
-  {
+  })),
+  ...['polish-panorama', 'polish-speech', 'polish-settlement', 'polish-children', 'polish-villagers'].map((suite) => ({
     point: 939,
-    suite: 'polish',
+    suite,
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'console',
@@ -244,7 +251,7 @@ export const RED_CHARGES = [
       + 'checks were green on both runs, so the verdict tracked cache temperature rather than the '
       + 'code under test. The same environment transient point 939 was opened for on the startup '
       + 'lane, charged here for the lane this evidence measured; the charge dies with that point.',
-  },
+  })),
   {
     point: 939,
     suite: 'voice',
@@ -326,7 +333,7 @@ export const RED_CHARGES = [
   },
   {
     point: 694,
-    suite: 'polish',
+    suite: 'polish-children',
     backend: 'webgl',
     kind: 'check',
     match: /no child walks without getting anywhere/i,
@@ -368,7 +375,7 @@ export const RED_CHARGES = [
   },
   {
     point: 694,
-    suite: 'polish',
+    suite: 'polish-children',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
@@ -398,7 +405,7 @@ export const RED_CHARGES = [
     // RE-POINTED 20.08.2026: point 506 was folded into 642, and a charge to a ticked point
     // expires. 642 carries 506's mechanism, so it owns this red now.
     point: 642,
-    suite: 'polish',
+    suite: 'polish-panorama',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
@@ -649,7 +656,7 @@ export const RED_CHARGES = [
   },
   {
     point: 568,
-    suite: 'polish',
+    suite: 'polish-villagers',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
@@ -663,7 +670,7 @@ export const RED_CHARGES = [
   },
   {
     point: 568,
-    suite: 'polish',
+    suite: 'polish-villagers',
     backend: 'webgl',
     kind: 'check',
     match: /handover zone itself carries neither band.s edge/i,
@@ -677,7 +684,7 @@ export const RED_CHARGES = [
   },
   {
     point: 568,
-    suite: 'polish',
+    suite: 'polish-villagers',
     backend: 'webgl',
     kind: 'check',
     match: /water beyond the plate.s rim is the SAME water/i,
@@ -689,7 +696,7 @@ export const RED_CHARGES = [
   },
   {
     point: 568,
-    suite: 'polish',
+    suite: 'polish-villagers',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
@@ -708,7 +715,7 @@ export const RED_CHARGES = [
   },
   {
     point: 570,
-    suite: 'polish',
+    suite: 'polish-children',
     backend: 'webgl',
     kind: 'check',
     match: /both children read whole, apart and at least/i,
@@ -928,7 +935,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1119,
-    suite: 'polish',
+    suite: 'polish-children',
     backend: 'webgl',
     kind: 'check',
     match: /^the arriving runner/i,
@@ -949,7 +956,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1102,
-    suite: 'polish',
+    suite: 'polish-speech',
     kind: 'check',
     match: /^the drums were still speaking when the picture was taken/i,
     why:
@@ -1085,7 +1092,7 @@ export const RED_CHARGES = [
   },
   {
     point: 698,
-    suite: 'polish',
+    suite: 'polish-children',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
@@ -1136,7 +1143,7 @@ export const RED_CHARGES = [
   },
   {
     point: 698,
-    suite: 'polish',
+    suite: 'polish-children',
     backend: 'webgl',
     kind: 'check',
     match: /^the children walk PAST the traveller/i,
@@ -1338,7 +1345,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1068,
-    suite: 'polish',
+    suite: 'polish-children',
     backend: 'webgl',
     kind: 'check',
     match: /^no child walks without getting anywhere$/i,
@@ -1420,7 +1427,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1068,
-    suite: 'polish',
+    suite: 'polish-children',
     backend: 'webgpu',
     // LEVEL-SCOPED because the measurement was taken at that level and only
     // there: .claude/render-verify-state.json records every WebGPU run at
@@ -1473,7 +1480,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1010,
-    suite: 'polish',
+    suite: 'polish-speech',
     backend: 'webgl',
     kind: 'check',
     match: /^no two Ctrl labels fuse in the village crowd/i,
@@ -1520,7 +1527,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1050,
-    suite: 'polish',
+    suite: 'polish-settlement',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
@@ -1546,7 +1553,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1050,
-    suite: 'polish',
+    suite: 'polish-panorama',
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
@@ -1592,7 +1599,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1172,
-    suite: 'polish',
+    suite: 'polish-villagers',
     backend: 'webgpu',
     // Measured on this host, whose WebGPU lane launches with --force-webgpu-compat
     // and an opengles adapter, so the reading belongs to the compatibility level
@@ -1618,7 +1625,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1121,
-    suite: 'polish',
+    suite: 'polish-villagers',
     backend: 'webgl',
     // SHAPE-SCOPED, not measurement-scoped: the frame's subject is a DRIFTING
     // fleck picked six frames before the shutter, so which edge it leaves by is
@@ -1640,7 +1647,7 @@ export const RED_CHARGES = [
   },
   {
     point: 642,
-    suite: 'polish',
+    suite: 'polish-settlement',
     backend: 'webgl',
     kind: 'check',
     // NO detailMatch. The printed measurement is one lit-minus-shadow number per
@@ -1667,7 +1674,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1187,
-    suite: 'polish',
+    suite: 'polish-villagers',
     kind: 'check',
     match: /BOTH her hands are elsewhere half a pass later/i,
     why:
@@ -1677,7 +1684,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1244,
-    suite: 'polish',
+    suite: 'polish-children',
     kind: 'check',
     match: /^frame 648-village-children\b/i,
     why:
@@ -1688,7 +1695,7 @@ export const RED_CHARGES = [
   },
   {
     point: 1202,
-    suite: 'polish',
+    suite: 'polish-villagers',
     kind: 'check',
     match: /the spoil crossing starts on flat ground/i,
     why:
@@ -1697,19 +1704,19 @@ export const RED_CHARGES = [
       + 'so the scene leaves the place and the route reads place null. Pure layout geometry, '
       + 'so no backend is excluded. The charge dies with point 1202.',
   },
-  {
+  ...['polish-settlement', 'polish-villagers'].map((suite) => ({
     point: 1197,
-    suite: 'polish',
+    suite,
     kind: 'console',
     match: /^console error: \[ASSERT\] loom-unseen-from-plaza — hausa-village@1838110026:/i,
     why:
       'MEASURED 24.09.2026 on main 7804a0fce, webgpu/polish: the dev assert fires for the '
       + 'hausa-village plan seed 1838110026, one of the seeds point 1197 names as still firing '
       + 'loom-unseen-from-plaza. Pure layout, so no backend is excluded. The charge dies with point 1197.',
-  },
+  })),
   {
     point: 642,
-    suite: 'polish',
+    suite: 'polish-villagers',
     backend: 'webgl',
     kind: 'check',
     match: /^the order at the stand can be photographed: a sender still there and a carrier already going\b/i,
@@ -1751,6 +1758,40 @@ export const RED_CHARGES = [
       'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl): deadAfter 2 with the calf alive — '
       + 'the global dead-count flake point 200 already documents (24.07). The section alone at 487ad8d4f '
       + 'was green. The charge dies with 200.',
+  },
+  {
+    point: 1265,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^a boatman`s reading appears within a few seconds of entry, without ROCK marked heard$/i,
+    why:
+      'FILED AS 1265 ON 02.10.2026: `--section=mute-shore-scene` reds identically on main fe28c8bde '
+      + '(unsplit polish, boat at 9.69 s against firstCall 4 + 3) and on feat/1129 14d11f2ca, so the '
+      + 'split did not cause it. Pure scene timing, so no backend is excluded. The charge dies with 1265.',
+  },
+  {
+    point: 1266,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^from the plaza the station stands at least \d+ px tall on the screen$/i,
+    why:
+      'REOPENED AS 1266 ON 02.10.2026 from the backlog park of point 1255: the parked loom reads '
+      + '64 px from its 21.285 m plaza stand on main and on feat/1129 alike (backlog entry of '
+      + '01.10.2026 measures the same 63.8-64.4 px before the split). Pure layout, so no backend '
+      + 'is excluded. The charge dies with 1266.',
+  },
+  {
+    point: 1050,
+    suite: 'polish-panorama',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^leaving after several settlement visits stays fluid \(point \d+\)$/i,
+    detailMatch: /^\d+ ms$/i,
+    why:
+      'MEASURED 02.10.2026 on WebGL 2, section `travel-panorama-capture` alone: 5175 ms on main '
+      + 'c281e950c (unsplit polish) and 5200 ms on feat/1129 038c7ff70, so the split did not cause '
+      + 'it; the same duration signature point 1050 owns on the WebGPU compatibility lane. The '
+      + 'charge dies with 1050.',
   },
   {
     point: 1267,
