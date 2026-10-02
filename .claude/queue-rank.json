@@ -1530,6 +1530,12 @@
       "why": "Test-coverage lesson from 1250; no player-visible change, so it waits behind the user-ordered front",
       "origin": "machine",
       "place": "last"
+    },
+    "1263": {
+      "at": "2026-10-02T06:55:05.825Z",
+      "why": "WebGL-2-only red, which may wait for the next LARGE (CLAUDE.md §7.2); no player report behind it",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1559,7 +1565,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-02T04:24:53.967Z",
+    "at": "2026-10-02T06:55:05.834Z",
     "points": [
       184,
       200,
@@ -1988,7 +1994,7 @@
       1253,
       1259,
       1261,
-      1262
+      1263
     ]
   }
 }
