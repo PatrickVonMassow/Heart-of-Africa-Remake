@@ -24,7 +24,6 @@ function view(over: Partial<LoomWorkView> = {}): LoomWorkView {
   return {
     vocabulary: SHIPPED_VOCABULARY,
     teaches: true,
-    rockHeard: true,
     helper: true,
     seat: { x: 0, z: 0 },
     childrenHear: () => false,
@@ -98,20 +97,12 @@ describe('the weaver works, in a cycle the clock drives (items 1-3)', () => {
 })
 
 describe('the word sits on a body that moves that way (item 7)', () => {
-  it('holds an owed direction until ROCK actually enters the listener memory', () => {
+  it('says an owed direction at once, with no hearing of the listener asked for', () => {
     const state = createLoomWork(cfg, mulberry32(11))
     state.untilCall = 0
-    const heard = new Set<string>([SHIPPED_VOCABULARY.DIG])
-    // Read live memory each frame, just as the scene builds its view.
-    const step = () => stepLoomWork(state, view({ rockHeard: heard.has(SHIPPED_VOCABULARY.ROCK) }), 0.1, cfg, () => 0.75)
-    for (let i = 0; i < 1200; i++) expect(step()).toBeNull()
-    expect(state.owed).toBe('DOWNSTREAM')
-    expect(state.owedFor).toBe(0)
-    expect(state.errand).toBeNull()
-    expect(state.passes).toBeGreaterThan(0)
-    // Emitting ROCK out of earshot does not change heard; only a hearing does.
-    heard.add(SHIPPED_VOCABULARY.ROCK)
-    expect(step()).toBe('DOWNSTREAM')
+    // The view carries no listener memory at all: the weaver speaks by her own
+    // work, whatever the player has or has not heard.
+    expect(stepLoomWork(state, view(), 0.1, cfg, () => 0.75)).toBe('DOWNSTREAM')
     expect(state.errand?.phase).toBe('hold')
   })
 

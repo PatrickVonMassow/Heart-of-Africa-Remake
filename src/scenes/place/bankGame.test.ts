@@ -1865,42 +1865,35 @@ it('starts natural first and follow-up charges with the whole catcher group off 
   expect(groupCharges).toBeGreaterThan(0)
 })
 
-describe('the bank teaches from the live heard set', () => {
+// THE CHILDREN PLAY BY THEIR OWN GAME, NEVER BY WHAT THE PLAYER HAS HEARD: the
+// round takes no listener memory, so every cycle opens with its RIVER call and
+// every run with its announced direction.
+describe('the bank plays by its own activity, not by the listener', () => {
   beforeEach(() => resetDevAsserts())
   afterEach(() => vi.restoreAllMocks())
 
-  it('keeps cycles rock-only when the listener has missed every rock naming', () => {
-    const errors = vi.spyOn(console, 'error')
-    const { s, log } = replay(360, { world: { ...openWorld(), hasHeard: () => false } })
-    expect(s.cycles).toBeGreaterThan(0)
-    expect(log.said.length).toBeGreaterThan(2)
-    expect(log.said.every((u) => u.concept === 'ROCK')).toBe(true)
-    expect(log.said.some((u) => u.moment === 'tap')).toBe(true)
-    expect(errors).not.toHaveBeenCalled()
-  })
-  it('keeps the rock-only exception through the tap that teaches ROCK, then announces the next run', () => {
-    const errors = vi.spyOn(console, 'error')
-    let heard = false
-    let lessonRun = -1
-    let continued = false
-    const { log } = replay(240, {
-      world: { ...openWorld(), hasHeard: () => heard },
-      observe: (s, u) => {
-        if (!heard && u?.moment === 'tap') { heard = true; lessonRun = s.runs }
-        if (heard && s.phase === 'run' && s.runs === lessonRun) {
-          expect(s.rockOnly).toBe(true)
-          expect(s.direction).toBeNull()
-          continued = true
+  it('calls RIVER in every cycle and announces every run, with nothing heard', () => {
+    for (const seed of SEEDS) {
+      const errors = vi.spyOn(console, 'error')
+      const { s, log } = replay(360, { seed })
+      expect(s.cycles).toBeGreaterThan(1)
+      const calls = log.said.filter((u) => u.concept === 'RIVER' && u.moment === 'call')
+      expect(calls.length).toBeGreaterThan(1)
+      let announced = false
+      let taps = 0
+      for (const u of log.said) {
+        if (u.moment === 'announce') announced = true
+        if (u.moment === 'tap') {
+          // Every run's tap follows its own direction announcement.
+          expect(announced).toBe(true)
+          announced = false
+          taps++
         }
-        if (s.phase === 'run' && s.runs > lessonRun && heard) {
-          expect(s.rockOnly).toBe(false)
-          expect(s.direction).not.toBeNull()
-        }
-      },
-    })
-    expect(continued).toBe(true)
-    expect(log.said.some((u) => u.moment === 'announce')).toBe(true)
-    expect(errors).not.toHaveBeenCalled()
+      }
+      expect(taps).toBeGreaterThan(1)
+      expect(errors).not.toHaveBeenCalled()
+      vi.restoreAllMocks()
+    }
   })
   it('still reports a direction run whose announcement is missing', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -1909,29 +1902,13 @@ describe('the bank teaches from the live heard set', () => {
     } })
     expect(errors).toHaveBeenCalledWith(expect.stringContaining('[ASSERT] bank-run-unannounced'))
   })
-  it('admits directions only after a rock naming actually enters the listener memory', () => {
-    const heard = new Set<string>()
-    let rocks = 0
-    const { log } = replay(240, {
-      world: { ...openWorld(), hasHeard: (concept) => heard.has(concept) },
-      observe: (_s, u) => {
-        if (!u) return
-        if (u.concept === 'UPSTREAM' || u.concept === 'DOWNSTREAM') expect(heard.has('ROCK')).toBe(true)
-        // The first two namings are out of earshot: emitted is not heard.
-        if (u.concept === 'ROCK' && ++rocks >= 3) heard.add('ROCK')
-      },
-    })
-    expect(rocks).toBeGreaterThanOrEqual(3)
-    expect(log.said.some((u) => u.concept === 'UPSTREAM')).toBe(true)
-    expect(log.said.some((u) => u.concept === 'DOWNSTREAM')).toBe(true)
-  })
 })
 
 // THE VISIT OPENS AT THE BANK (work-order 1250). A fresh round began with a
 // ~55 s silent roam and the walk down; the player at the river heard nothing for
 // over a minute. The visit now finds the group at its rocks.
 describe('a visit finds the children playing at the bank (work-order 1250)', () => {
-  function visit(seed: number, hasHeard?: BankWorld['hasHeard']) {
+  function visit(seed: number) {
     const count = balance.villageLife.tag.childCount
     const rand = mulberry32(seed)
     const spots = Array.from({ length: count }, (_, i) => ({
@@ -1939,7 +1916,7 @@ describe('a visit finds the children playing at the bank (work-order 1250)', () 
       z: STAGE.roam.z + Math.sin((i / count) * Math.PI * 2) * 2.4,
     }))
     const s = createBankGame(spots, rand, CFG)
-    const world: BankWorld = { ...openWorld(), hasHeard }
+    const world: BankWorld = openWorld()
     openVisitAtBank(s, STAGE, CFG, world)
     return { s, world, rand, spots }
   }
@@ -1961,23 +1938,8 @@ describe('a visit finds the children playing at the bank (work-order 1250)', () 
     })
   })
 
-  it('opens the first run on its first step and taps ROCK at once for a listener who has not heard it', () => {
-    const { s, world, rand } = visit(7, () => false)
-    const said: BankUtterance[] = []
-    const dt = 1 / 60
-    let t = 0
-    for (; t < 3 && said.length === 0; t += dt) {
-      const u = stepBankGame(s, dt, CFG, STAGE, world, rand)
-      if (u) said.push(u)
-    }
-    expect(s.phase).toBe('run')
-    expect(said[0]?.concept).toBe('ROCK')
-    expect(said[0]?.moment).toBe('tap')
-    expect(t).toBeLessThan(0.5)
-  })
-
-  it('calls RIVER at once for a listener who knows ROCK, then plays the round as ever', () => {
-    const { s, world, rand } = visit(13, () => true)
+  it('calls RIVER at once with nothing heard, then plays the round as ever', () => {
+    const { s, world, rand } = visit(13)
     const said: BankUtterance[] = []
     const phases: string[] = []
     const dt = 1 / 60
@@ -1994,9 +1956,9 @@ describe('a visit finds the children playing at the bank (work-order 1250)', () 
     expect(said.some((u) => u.moment === 'boulder')).toBe(true)
   })
 
-  it('announces the first run after the opening RIVER for a listener who knows ROCK, without a floor', () => {
+  it('announces the first run after the opening RIVER with nothing heard, without a floor', () => {
     for (const seed of [13, ...SEEDS]) {
-      const { s, world, rand } = visit(seed, () => true)
+      const { s, world, rand } = visit(seed)
       expect(world.floor).toBeUndefined()
       const said: BankUtterance[] = []
       const dt = 1 / 60
@@ -2019,7 +1981,7 @@ describe('a visit finds the children playing at the bank (work-order 1250)', () 
 
   it('never speaks later than a few seconds after the visit opens, over several seeds', () => {
     for (const seed of SEEDS) {
-      const { s, world, rand } = visit(seed, () => false)
+      const { s, world, rand } = visit(seed)
       const dt = 1 / 60
       let first = Infinity
       for (let t = 0; t < 10 && first === Infinity; t += dt) {
