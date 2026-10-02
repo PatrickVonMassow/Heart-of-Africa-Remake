@@ -144,6 +144,7 @@ export const NON_RENDER_VERIFY = new Set([
   'tiers.mjs',
   'ttsCache.mjs',
   'verify-seed.mjs', // builds the seeded URL a suite opens; it never opens one itself
+  'vite-reload-signal.mjs', // classifies a console error text; crossbrowser.mjs collects them
 ])
 
 /**

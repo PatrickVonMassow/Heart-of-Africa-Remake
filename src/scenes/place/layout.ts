@@ -35,6 +35,7 @@ import { balance } from '../../config/balance'
 import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
 import { JOIN_STAND_OFF, WORK_ARRIVE_RADIUS } from './adultWork'
+import { chiefBesideDrummerSpot } from './chiefWalk'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
 import type { UseCandidate } from './useKeyTarget'
@@ -320,6 +321,11 @@ const WAY_OUT_BEARINGS = 180
 // was never counted as arrived, and circled it until the errand's backstop
 // expired. The gap is set so a walker passes between the two on EVERY bearing.
 export const WATER_STAND_FIRE_GAPS = [3.4, 4.2, 5.0, 5.8] as const
+/** Further out, tried only when every gap above leaves the stand's words in
+ *  the children's earshot: the ring round the fire is crowded with the core's
+ *  vignettes and lanes, and measured over 393 bank-village layouts 28 found no
+ *  clear stand within 5.8 m and every one found it by 7.4 m. */
+export const WATER_STAND_EARSHOT_GAPS = [6.6, 7.4, 8.2] as const
 /** How many bearings of the working ring around the stand are tested, and how
  *  many of them must be open ground for the stand to count as reachable. */
 const WATER_STAND_APPROACHES = 16
@@ -1776,10 +1782,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   /** Retain the stand's body across fence splices, so it can be removed if
    *  the water path it was placed for is discarded further down. */
   let standCollider: Collider | null = null
-  if (place.kind === 'village' && waterPath && bank) {
+  /** The first stand spot round the fire, the water's bearing first, that
+   *  `reject` does not refuse; null where none is. */
+  const findStand = (facingBank: NonNullable<typeof bank>, reject?: (x: number, z: number) => boolean, gaps: readonly number[] = WATER_STAND_FIRE_GAPS) => {
     const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
     const walkClear = colliderBuckets(colliders, WALKER_RADIUS)
-    const facing = Math.atan2(bank.nz, bank.nx)
+    const facing = Math.atan2(facingBank.nz, facingBank.nx)
     // A SPOT NOBODY CAN REACH IS NOT A PLACE. Measured 12.09.2026: a stand whose
     // own footprint was clear still left the carrier stalled 4.2 m away, because
     // the ring he had to stand on lay inside the fire's keep-out and the gap
@@ -1796,8 +1804,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       }
       return open >= WATER_STAND_APPROACHES_NEEDED
     }
-    for (const gap of WATER_STAND_FIRE_GAPS) {
-      for (let k = 0; k < WATER_STAND_BEARINGS && !waterStand; k++) {
+    for (const gap of gaps) {
+      for (let k = 0; k < WATER_STAND_BEARINGS; k++) {
         // Alternating out from the water's own bearing, so the first bearing
         // tried is the one that reads and the fallbacks stay as near it as
         // possible.
@@ -1812,10 +1820,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         // of a drawn path. The same exclusion the other village places use.
         if (onLane(x, z, WATER_STAND_RADIUS)) continue
         if (!approachable(x, z)) continue
-        waterStand = { x, z }
+        if (reject?.(x, z)) continue
+        return { x, z }
       }
-      if (waterStand) break
     }
+    return null
+  }
+  if (place.kind === 'village' && waterPath && bank) {
+    waterStand = findStand(bank)
     if (waterStand) {
       standCollider = { x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS }
       colliders.push(standCollider)
@@ -1829,7 +1841,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // ADULTS move. The children's words hang on where they stand — at the rocks,
   // at the water — so the quarter is fixed first and the adults' own places, the
   // water path's head and the dig sites, are fitted around it. (The water stand,
-  // placed just before, is the one adult place the quarter's search avoids.)
+  // placed just before, is the one adult place the quarter's search avoids as a
+  // body; where its WORDS then fall in the children's earshot it moves, below.)
   //
   // It is decided in the LAYOUT rather than in the scene because those places are
   // placed against it, and a quarter derived once there and once here would be
@@ -1919,6 +1932,46 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     return best
   }
   const inPlayEarshot = (x: number, z: number) => toChildren(x, z) < ADULT_SPEECH_MARGIN
+
+  // THE STAND MOVES OUT OF THE CHILDREN'S EARSHOT TOO (work-order 688 item 6:
+  // where the teaching areas cannot all clear each other, the adults move). Both
+  // RIVER words fall on its work ring, not at its centre, so the ring plus a
+  // walker's arrival radius has to clear every place the children speak by the
+  // hearing radius. Measured at bambara-village seed 42: once the bank game
+  // moved upstream (0bd2d2992) the quarter came to rest 8.6 m from the stand's
+  // centre — 20.2 m before — and the sender's spot 6.2 m from the quarter's rim.
+  // The stand is placed before the quarter so the quarter can avoid its body;
+  // only a stand the quarter then lands beside is searched again, round the
+  // same fire and a little further out where the core is crowded, so every
+  // other village keeps the stand it had.
+  const standEarshot = (x: number, z: number) => toChildren(x, z) < ADULT_SPEECH_MARGIN + WATER_STAND_WORK_RING
+  if (bank && waterStand && standCollider && standEarshot(waterStand.x, waterStand.z)) {
+    const held = standCollider
+    // Its own body is no obstacle to where it moves.
+    held.r = 0
+    // Out past the first gaps it can reach the line the chief walks to the
+    // drummer, which resolves no colliders and so has to stay open.
+    const chiefHut = interactives.find((i) => i.type === 'chief')
+    const chiefLine = chiefHut
+      ? [chiefStandingSpot(chiefHut), chiefBesideDrummerSpot(balance.communication.chiefBesideDrummer)]
+      : null
+    const onChiefLine = (x: number, z: number) =>
+      !!chiefLine && closestOnPolyline(chiefLine, x, z).dist < WATER_STAND_RADIUS + PLAYER_RADIUS
+    const moved = findStand(
+      bank,
+      (x, z) => standEarshot(x, z) || onChiefLine(x, z),
+      [...WATER_STAND_FIRE_GAPS, ...WATER_STAND_EARSHOT_GAPS],
+    )
+    held.r = WATER_STAND_RADIUS
+    devAssert(moved !== null, 'water-stand-earshot',
+      () => `${place.id}@${seed}: no water stand round the fire whose words clear the children's earshot`)
+    if (moved) {
+      // Moved IN PLACE: the collider array is read by index further down.
+      held.x = moved.x
+      held.z = moved.z
+      waterStand = moved
+    }
+  }
 
   // THE WATER PATH IS LAID AFTER THE PLAN IS BUILT (work-order 688). A
   // lane forced through the house band BEFORE the plan costs it a dwelling

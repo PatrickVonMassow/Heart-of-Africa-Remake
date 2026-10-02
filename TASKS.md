@@ -117,44 +117,6 @@ put it is the mistake this line exists to stop.
   paragraph), docs/acceptance-evidence.md
   Bundle: Testinfrastruktur.
 
-- [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
-  mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
-  rule; the user ordered these three reds filed at once on 10.09.2026).
-  MEASURED 12.09.2026, and it corrects this point's own first draft. Against the dev
-  server the crossbrowser suite uses (run-all launches `npm run dev`, not preview), at
-  standard depth, on a COLD vite dependency cache:
-    PASS  chromium-mobile the app boots on a mobile viewport
-    PASS  chromium-mobile the renderer initialises on mobile
-    PASS  chromium-mobile the touch layer arms on the first touch (stick + look)
-    FAIL  chromium-mobile no console errors on mobile
-          — Failed to load resource: the server responded with a status of
-            504 (Outdated Optimize Dep)   (twice)
-  The IMMEDIATELY following run, same command, warm cache: ALL GREEN, exit 0.
-  So the cause is NOT a renderer crash and NOT getSupportedExtensions on null — that
-  reading was wrong. Mobile boots, the renderer initialises and the touch layer arms.
-  The single red is vite's dev-server dependency pre-bundling race: when the optimizer
-  re-bundles mid-load, in-flight requests for the superseded chunks answer 504, the page
-  logs them as resource errors, and the no-console-errors assertion trips. A production
-  build has no optimized-dep chunks at all, so NO PLAYER can meet this.
-  Final state: the crossbrowser pass no longer reds on the optimizer's own 504. Settle
-  vite's dependency optimization before the browser pass (or let the harness treat a
-  504 "Outdated Optimize Dep" as the reload signal vite means it to be), so that a cold
-  cache and a warm one give the same verdict. Prove it by running the suite at standard
-  depth TWICE FROM A COLD CACHE (delete node_modules/.vite between runs) and getting
-  the same green both times — a single warm run proves nothing here.
-  Test. Vitest: the console-error filter classifies a 504 "Outdated Optimize Dep" as the
-  optimizer's reload signal and a genuine resource error as a failure.
-  Criticality: LOW, corrected from HIGH on the measurement above. It is a cold-cache
-  flake in the verify harness, not a mobile lane that fails to boot. It still has to be
-  fixed rather than tolerated: it is one of the reds that held point 1065 across 23 LARGE
-  runs, and a gate that reds on its own server's cache state teaches the batch to ignore
-  reds.
-  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
-  touching its change. This point owns it.
-  Refs: scripts/verify/crossbrowser.mjs, scripts/verify/run-all.mjs (the dev server the
-  pass uses), point 1089, point 1065.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1117. The fill's decided surface reading was never built (found 12.09.2026 while building
   point 1087).
   design.md §13.4 states two things about the dip that NO code produces: the jar's MOUTH is
@@ -15747,17 +15709,6 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs, point 1145.
   Bundle: Testinfrastruktur.
   Criticality: medium — one red check per polish pass until fixed.
-- [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
-  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
-  bambara-village, same session as point 1250.
-  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
-  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
-  blocked activity, unreachable workstation) and fix it.
-  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
-  USER, verbatim:
-  user 30.09.2026: "Der Bewohner steht nur untätig herum."
-  Bundle: Dorfleben.
-  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
 - [ ] 1253. Picture sections that set a game condition by knob need a player-path counterpart
   Source: request deposited 01.10.2026 05:28 by session d17af0dd (findings carrier), cut from e9515346d.
   Lesson from point 1250: the 1245 polish section `villager-canoe` (scripts/verify/polish.mjs at 733e920) marked ROCK as heard (`g.hearUtterance(g.vocabulary.ROCK)`, justified as "a player standing here has met the rocks already") and cut the children's `roamSeconds` from 55 s to 8 s. Those two "spectator-time knobs" skipped exactly the two gates that left the boatmen and the children mute for over a minute after entry, so the suite was green while the player met a silent scene.
@@ -15772,3 +15723,46 @@ to land than a mechanism that needs a review.
   user 01.10.2026: "Ja, mach das."
   Bundle: Testinfrastruktur.
   Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.
+- [ ] 1261. Let the answering window remove an answered board card; drop point 1240
+  Source: request of session 829c2a2a, deposited 01.10.2026 20:51 through the findings carrier.
+  Observed problem: Point 1240 shows the cost: the user answered the card on 29.09. in a non-owner window; that window could only deposit a --request, the owner's drain knows only "TASKS append" or "decision card", so a one-command removal became a queued point and the answered card stood on the board for two days. A whole point (spec, commit, rank, brief, tick, archive) costs more than the single idempotent call it guards against.
+  FINAL STATE:
+  1. A session that does NOT hold the batch lock may run `node scripts/board.mjs vdzk-remove "<title>"` for a "Von dir zu klären" card the user has just answered in that session. The stand-down (batch-singleton STAND DOWN text, and any guard that refuses a board write from a non-owner) no longer covers this one call; every other board/TASKS.md write stays owner-only. This is switching off an obstructing rule, not a new mechanism: no new guard, ledger field or route. The removal already runs under board-edit-lock, so it cannot interleave with the owner's publish.
+  2. The STAND DOWN text and docs/batch-owner-runbook.md say so in one line each.
+  3. Remove the card now: node scripts/board.mjs vdzk-remove "Transkript-Aufbewahrung: die 30 Tage kosten jetzt auch Laufzeit". Its recommendation is already carried out (~/.claude/settings.json "cleanupPeriodDays": 3650, set 29.09.2026 15:58). Record the closure in the decision log (what: retention 10 years; why: transcripts carry citable user orders and review evidence; veto: user may lower the value).
+  4. DELETE open point 1240 "Remove the transcript retention card" from TASKS.md (not tick, not archive as done): this point supersedes it, the user ordered its deletion.
+  Test: a Vitest on the guard/stand-down layer proving vdzk-remove is allowed from a non-owner session and another board write (e.g. vdzk-add) still is not.
+  Files: scripts/board.mjs (vdzk-remove), scripts/batch-singleton.mjs, scripts/finding.mjs, TASKS.md point 1240, commit f2a76cd0f. Spec cut from 5a325dcc9.
+  USER, verbatim:
+  User 01.10.2026: »Ja, gib das als Aufrag in die Batch-Session. Und sie soll die Karte dann entfernen und den damit hinfälligen Task 1240 löschen.«
+  User 01.10.2026 (on the cause): »Ein eigener Task für so eine winzige Aufgabe erzeugt doch mehr Overhead, als die forcierte Einhaltung der 150k-Grenze einspart.«
+  Bundle: Chat & Tafel.
+  Criticality: medium — an answered card stays on the board until a whole point is worked.
+- [ ] 1263. The continuous route's river invitation never targets a speech label on WebGL 2
+  Source: covering WebGL 2 pass of point 1262 (02.10.2026).
+  THE RED. `VERIFY_GL=webgl npm test -- communication --section=continuous-route` on feat/1262 at
+  7f3ad701a (main 543689b21 merged): steps 1-3 green, then `FAIL frame
+  communication-webgl-1790917974739-04-river-invitation — its subject is not in the rendered
+  picture: no element matches .speech-label.targeted` and `FAIL continuous route at 4-guesses:
+  locator.waitFor: Timeout 30000ms exceeded` (log
+  `local/verify-logs/2026-10-02T05-12-50-731-communication.log`). Machine quiet unverified. The
+  same HEAD ran the section GREEN on WebGPU (log `…2026-10-02T04-58-15-452-…`).
+  Final state:
+  - The cause is named with its measurement (no RIVER speaker reaches the stand, or the label
+    exists but is never targeted on WebGL 2?).
+  - `communication --section=continuous-route` passes step 4 on WebGL 2 without a lengthened wait.
+  Tests: Vitest for a logic cause; the existing Playwright step is the scene check.
+  Bundle: Dorfleben.
+  Criticality: medium — a WebGL-2-only red; it blocks the covering WebGL 2 communication proof
+  in the next LARGE.
+- [ ] 1264. The village pounder's pestle pounds the air above its mortar
+  Source: cross-vendor review of point 1251 (02.10.2026), same geometry as the fishers' eater.
+  `src/scenes/place/PlaceLife.tsx` `Pounder`: the 1.05 m pestle's centre rests at 1.05 m, so its
+  foot stops at 0.525 m while the mortar is 0.42 m tall — every stroke ends 10 cm above the rim.
+  Final state:
+  - At the bottom of the stroke the pestle's foot is inside the mortar (point 1251 uses a rest of
+    mortar height − 0.12 m + half the pestle), and the pounder's hands still ride the shaft.
+  - A browser check samples the pestle height and asserts the foot reaches the mortar.
+  Tests: the existing village Playwright section that photographs the pounder gains the assertion.
+  Bundle: Dorfleben.
+  Criticality: low — visible at every pounding village, no mechanic affected.
