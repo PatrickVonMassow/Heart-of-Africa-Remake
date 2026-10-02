@@ -1035,6 +1035,10 @@ interface BalanceConfig {
       eatSeconds: number
       biteSeconds: number
       eaterHomeBack: number
+      /** At home he pounds grain: his mortar this far to his side (m) and the
+       *  pestle's stroke rate (rad/s). */
+      eaterMortarOffset: number
+      eaterPoundRate: number
       /** The wait budget per round, boat and carrier alike (s, averaged). */
       waitBudgetSeconds: number
     }
@@ -1987,6 +1991,8 @@ export const balance: BalanceConfig = {
       eatSeconds: 24,
       biteSeconds: 3,
       eaterHomeBack: 12,
+      eaterMortarOffset: 0.6, // calibratable
+      eaterPoundRate: 2.4, // calibratable; the village pounder's rate (rad/s)
       waitBudgetSeconds: 15,
     },
     loom: {

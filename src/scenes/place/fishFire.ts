@@ -54,7 +54,10 @@ export interface FisherySites {
   carrierAtBank: FisheryStand
   griller: FisheryStand
   eaterAtRack: FisheryStand
+  /** Where the eater pounds grain between his visits, facing his mortar. */
   eaterHome: FisheryStand
+  /** The eater's mortar, beside his walk to the rack (work-order 1251). */
+  eaterMortar: BankPoint
   /** Where the basket stands at the landing (`CanoeLane.basketSpot`). */
   basketSpot: BankPoint
 }
@@ -84,7 +87,13 @@ export function fisherySites(
   const r = Math.hypot(rack.x, rack.z)
   const k = Math.max(0, (r - cfg.eaterHomeBack) / r)
   const home = { x: rack.x * k, z: rack.z * k }
-  const faceRack = yawOf(rack.x - home.x, rack.z - home.z)
+  // His mortar stands to his side of that bearing, so his walk to the rack
+  // never crosses it, and he faces it while he pounds.
+  const toRack = Math.hypot(rack.x - home.x, rack.z - home.z) || 1
+  const mortar = {
+    x: home.x + ((rack.z - home.z) / toRack) * cfg.eaterMortarOffset,
+    z: home.z - ((rack.x - home.x) / toRack) * cfg.eaterMortarOffset,
+  }
   return {
     fire,
     rack,
@@ -101,7 +110,8 @@ export function fisherySites(
     // Kneeling just clear of the hearth's ring of stones (radius 1 m).
     griller: stand(fs, fo - 1.4, toWater),
     eaterAtRack: stand(fs - 2.3, fo - 0.75, toWater),
-    eaterHome: { ...home, yaw: faceRack },
+    eaterHome: { ...home, yaw: yawOf(mortar.x - home.x, mortar.z - home.z) },
+    eaterMortar: mortar,
     basketSpot: lane.basketSpot,
   }
 }
@@ -463,6 +473,31 @@ function stepEater(state: FishFireState, sites: FisherySites, dt: number, cfg: F
       }
       break
   }
+}
+
+/** What the eater visibly does in each phase; none of them is standing idle
+ *  (work-order 1251: between visits he pounds grain at his mortar). */
+export type EaterOccupation = 'pound' | 'walk' | 'take' | 'eat'
+
+export function eaterOccupation(eater: Pick<FishEater, 'phase'>): EaterOccupation {
+  switch (eater.phase) {
+    case 'home':
+      return 'pound'
+    case 'toRack':
+    case 'back':
+      return 'walk'
+    case 'take':
+      return 'take'
+    case 'eat':
+      return 'eat'
+  }
+}
+
+/** The pestle's lift at home, 0 down in the mortar to 1 at the top of the
+ *  stroke; 0 while he is away, so the pestle rests in the mortar. */
+export function eaterPoundStroke(eater: Pick<FishEater, 'phase' | 'clock'>, cfg: FireConfig = balance.villageLife.fishFire): number {
+  if (eater.phase !== 'home') return 0
+  return Math.abs(Math.sin(eater.clock * cfg.eaterPoundRate))
 }
 
 /** Where his hand is in a bite: 0 at the fish held low, 1 at the mouth. */

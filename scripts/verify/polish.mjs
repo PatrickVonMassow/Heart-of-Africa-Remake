@@ -6360,6 +6360,50 @@ if (section('villager-canoe')) {
           label: 'the fishers’ own fire by the landing: the carrier gutting the catch at the board, the griller turning fish over the embers, the smoking rack with its fish and the storage basket beside it',
         })
       }
+
+      // --- 4. The eater between his visits (work-order 1251) ---------------
+      // The report `UntaetigerErwachsener`: he stood idle on the beach. At home
+      // he now pounds grain at his mortar; photographed from beside him.
+      const atHome = await page
+        .waitForFunction(() => window.__placeFishFire?.().eater.phase === 'home', null, { timeout: 200000, polling: 250 })
+        .then(() => true)
+        .catch(() => false)
+      check('the eater is at home between his visits', atHome)
+      if (atHome) {
+        const eaterStand = await page.evaluate(() => {
+          const s = window.__placeFishFire().sites
+          const h = s.eaterHome
+          const m = s.eaterMortar
+          // Across the mortar from him, a few metres back, so both are in frame.
+          const dx = m.x - h.x
+          const dz = m.z - h.z
+          const d = Math.hypot(dx, dz) || 1
+          return { at: { x: m.x + (dx / d) * 4 + (dz / d) * 1.5, z: m.z + (dz / d) * 4 - (dx / d) * 1.5 }, look: { x: (h.x + m.x) / 2, z: (h.z + m.z) / 2 } }
+        })
+        await standAt(eaterStand.at, eaterStand.look)
+        const inside = await inPlace()
+        check('the eater’s standing place is inside the settlement', inside)
+        const pestle = []
+        for (let i = 0; i < 20; i++) {
+          pestle.push(await page.evaluate(() => window.__placeScene?.getObjectByName('eater-pestle')?.position.y ?? null))
+          await nextFrames(4)
+        }
+        const ys = pestle.filter((y) => typeof y === 'number')
+        check('at home he pounds: the pestle rises and falls', ys.length >= 10 && Math.max(...ys) - Math.min(...ys) > 0.15, JSON.stringify(ys.map((y) => +y.toFixed(2))))
+        // Its foot (half its 1.05 m below the centre) lands inside the 0.42 m mortar.
+        check('the pestle lands in the mortar, not in the air above it', ys.length >= 10 && Math.min(...ys) - 0.525 < 0.42, JSON.stringify(ys.map((y) => +y.toFixed(2))))
+        const seen = await page.evaluate(() => {
+          const f = window.__placeFishFire()
+          const seen = window.__canoeSeen
+          return { phase: f.eater.phase, eater: seen(f.eater.x, 0.9, f.eater.z, 0.8), mortar: seen(f.sites.eaterMortar.x, 0.3, f.sites.eaterMortar.z, 0.5) }
+        })
+        check('the eater and his mortar are in frame, nothing hiding them', inside && seen.phase === 'home' && seen.eater && seen.mortar, JSON.stringify(seen))
+        const m = await page.evaluate(() => window.__placeFishFire().sites.eaterMortar)
+        await frame('1251-eater-pounds', {
+          local: { x: m.x, y: 0.6, z: m.z },
+          label: 'the fishers’ eater between his visits to the smoking rack: pounding grain with pestle and mortar at his place on the shore, not standing idle',
+        })
+      }
     }
   } finally {
     await page.evaluate((kept) => {
