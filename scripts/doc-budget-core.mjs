@@ -476,7 +476,10 @@ export const DOC_BUDGETS = [
     // RAISED by the 14 measured words work-order 1246 owes §13.4 (user
     // 30.09.2026): the bank children play three rounds in a row before they
     // scatter — a new rule of the game, the old text said nothing of a series.
-    maxWords: 29911,
+    // RAISED by the 4 measured words work-order 1251 owes §13.4 (user
+    // 30.09.2026): the fishers' eater pounds grain between his visits — a new
+    // routine; the old text left him idle.
+    maxWords: 29915,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
