@@ -63,7 +63,8 @@ import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spaw
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
-import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
 import { RiverFishery } from './RiverFishery'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import {
@@ -2673,6 +2674,11 @@ function ErrandVillagers({
   // per-frame visibility in this scene.
   const headJars = useRef<Array<THREE.Object3D | null>>([])
   const handJars = useRef<Array<THREE.Object3D | null>>([])
+  /** Each hand jar's mouth, where the fill's ring is centred (work-order 1117). */
+  const jarMouths = useRef<Array<THREE.Object3D | null>>([])
+  /** The fill's rings on the water, and whether they are up (read by the probe). */
+  const fillRingMeshes = useRef<Array<THREE.Mesh | null>>([])
+  const fillRingShown = useRef(false)
   const digTools = useRef<Array<THREE.Object3D | null>>([])
   /** A villager PINNED into the fill, by index and progress — the dev route the
    *  verification poses one by. The errand's own fill phase drives the live dip;
@@ -2869,6 +2875,10 @@ function ErrandVillagers({
       if (jar) jar.visible = k < work.standJars
     }
 
+    // The first filling carrier's ring: its fill progress and the mouth's spot.
+    let ringFill: number | null = null
+    let ringX = 0
+    let ringZ = 0
     for (let i = 0; i < people.length; i++) {
       const me = people[i]
       const task = taskOf(work, i)
@@ -3054,13 +3064,20 @@ function ErrandVillagers({
       if (headJar) headJar.visible = carry === 'fullJar'
       if (handJar) handJar.visible = carry === 'emptyJar'
       if (digTool) digTool.visible = carry === 'digTool'
+      const filling = pinned ? pinned.progress : dipping
+      if (handJar) {
+        // The dip TIPS the jar so its mouth goes into the water, never the
+        // vessel (work-order 1117); off the fill it hangs.
+        const placed = fillJarPlacement(filling)
+        handJar.position.set(...placed.position)
+        handJar.rotation.set(...placed.rotation)
+      }
 
       // The pose: a fill wins over everything, then digging, then the gesture,
       // then the load on the head, then rest.
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      const filling = pinned ? pinned.progress : dipping
       if (filling !== null) {
         state.dug = 0
         // The jar rides the dipping hand of its own accord — it hangs inside the
@@ -3124,7 +3141,29 @@ function ErrandVillagers({
         const squatRef = squats.current[i]
         if (squatRef) squatRef.current = squash
       }
+      const mouth = jarMouths.current[i]
+      if (filling !== null && ringFill === null && mouth) {
+        mouth.updateWorldMatrix(true, false)
+        const at = mouth.getWorldPosition(new THREE.Vector3())
+        ringFill = filling
+        ringX = at.x
+        ringZ = at.z
+      }
     }
+
+    // THE SURFACE ANSWERS THE DIP (work-order 1117, design.md §13.4): rings
+    // spread from the jar's mouth on the water for exactly as long as a fill runs.
+    const rings = fillRings(ringFill)
+    fillRingShown.current = rings !== null
+    fillRingMeshes.current.forEach((mesh, k) => {
+      if (!mesh) return
+      const ring = rings?.[k]
+      mesh.visible = !!ring && ring.opacity > 0
+      if (!ring) return
+      mesh.position.set(ringX, -BANK_WATER_DROP + FILL_RING_LIFT, ringZ)
+      mesh.scale.setScalar(ring.radius)
+      ;(mesh.material as THREE.MeshBasicMaterial).opacity = ring.opacity
+    })
 
     stepAdultWork(work, view, dt, cfg, rand)
     const progress = digProgressOf(work, geography.digSites.length)
@@ -3151,6 +3190,12 @@ function ErrandVillagers({
       staged: { ...work.staged },
       last: work.last ? { ...work.last } : null,
       standJars: work.standJars,
+      /** The fill ring as drawn (work-order 1117): up, and where the water is. */
+      fillRing: {
+        shown: fillRingShown.current,
+        visible: fillRingMeshes.current.filter((m) => m?.visible).length,
+        surfaceY: -BANK_WATER_DROP,
+      },
       geography: {
         waterHead: geography.waterHead,
         waterFoot: geography.waterFoot,
@@ -3169,10 +3214,12 @@ function ErrandVillagers({
         const g = refs.current[i]
         let handY = null
         let headAspect = null
+        let mouthY = null
         if (g) {
           g.updateWorldMatrix(true, true)
           g.traverse((o) => {
             if (o.name === 'hand-left') handY = o.getWorldPosition(new THREE.Vector3()).y
+            if (o.name === 'jar-mouth') mouthY = o.getWorldPosition(new THREE.Vector3()).y
             // THE HEAD AS DRAWN, in world extents: a squat shortens a man, it does
             // not deflate his skull, so the ratio of the head's world height to its
             // world width must stay 1 through the sink (work-order 1085).
@@ -3203,7 +3250,7 @@ function ErrandVillagers({
               ? Math.min(1, task.dug / balance.bankFillSeconds)
               : null,
           yaw: yaws.current[i] ?? 0,
-          drawn: { squatY: g ? g.scale.y : null, handY, headAspect },
+          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY },
           carry: carryOf(work, i),
           work: task
             ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,
@@ -3280,6 +3327,13 @@ function ErrandVillagers({
                   rotation={[0, 0, 0.12]}
                 >
                   <Jar full={false} />
+                  <object3D
+                    name="jar-mouth"
+                    position={[0, JAR_HEIGHT / 2, 0]}
+                    ref={(el) => {
+                      jarMouths.current[i] = el
+                    }}
+                  />
                 </group>
                 <group
                   name="digging-tool"
@@ -3319,6 +3373,22 @@ function ErrandVillagers({
       {geography.waterStand && (
         <WaterStand x={geography.waterStand.x} z={geography.waterStand.z} jarRefs={standJars} />
       )}
+      {Array.from({ length: balance.bankFillRing.count }, (_, k) => (
+        <mesh
+          key={`fill-ring-${k}`}
+          name="fill-ring"
+          visible={false}
+          rotation={[-Math.PI / 2, 0, 0]}
+          renderOrder={2}
+          ref={(el) => {
+            fillRingMeshes.current[k] = el
+          }}
+        >
+          {/* Unit ring, scaled to the ring's radius by the frame loop. */}
+          <ringGeometry args={[1 - FILL_RING_WIDTH, 1, 40]} />
+          <meshBasicMaterial color={FILL_RING_COLOR} transparent opacity={0} depthWrite={false} />
+        </mesh>
+      ))}
     </>
   )
 }
@@ -3339,7 +3409,11 @@ function ErrandVillagers({
 const JAR_RIM_R = 0.155
 const JAR_WAIST_R = 0.16
 const JAR_BASE_R = 0.13
-const JAR_HEIGHT = 0.32
+/** The fill ring's band width as a fraction of its radius, its lift over the
+ *  surface against z-fighting (m), and its colour: the river's own foam. */
+const FILL_RING_WIDTH = 0.16
+const FILL_RING_LIFT = 0.012
+const FILL_RING_COLOR = RIVER_WATER_TONES.foam
 /** How far below the rim the water stands in a full jar: brim-full. */
 const JAR_WATER_DROP = 0.03
 /** How flat the meniscus is against the hemisphere its geometry starts from.

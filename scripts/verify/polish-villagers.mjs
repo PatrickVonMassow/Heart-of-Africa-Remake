@@ -2213,7 +2213,11 @@ if (section('adult-errands')) {
     )
     if (posed) {
       await nextFrames(6)
-      const drawn = await page.evaluate((w) => window.__placeErrands().villagers[w], posed.who)
+      const drawnAll = await page.evaluate((w) => {
+        const e = window.__placeErrands()
+        return { v: e.villagers[w], ring: e.fillRing }
+      }, posed.who)
+      const drawn = drawnAll.v
       // The two halves the design decided on, read off the DRAWN figure rather
       // than off the pose that asked for them: the body sank, and the carrying
       // hand came down to where water at a standing man's feet is. The angles
@@ -2234,6 +2238,19 @@ if (section('adult-errands')) {
         'and its carrying hand arrives at ankle height, out in front of it',
         !!drawn && drawn.drawn.handY != null && drawn.drawn.handY < 0.3,
         drawn ? `hand at ${drawn.drawn.handY == null ? 'nothing' : drawn.drawn.handY.toFixed(3)} m` : 'no villager',
+      )
+      // design.md §13.4 (work-order 1117): the jar's MOUTH tips under the
+      // surface, and the water answers with a ring while he fills.
+      const surfaceY = drawnAll.ring?.surfaceY
+      check(
+        "and the jar's mouth is tipped under the water surface",
+        !!drawn && drawn.drawn.mouthY != null && surfaceY != null && drawn.drawn.mouthY < surfaceY,
+        drawn ? `mouth at ${String(drawn.drawn.mouthY)} m, surface at ${String(surfaceY)} m` : 'no villager',
+      )
+      check(
+        'and the water answers the dip with a ring',
+        !!drawnAll.ring && drawnAll.ring.shown && drawnAll.ring.visible > 0,
+        `ring ${JSON.stringify(drawnAll.ring)}`,
       )
       // Three metres off on a CLEAR bearing, level with him: the fold is a
       // silhouette question, so nothing may stand in the line, and a camera
