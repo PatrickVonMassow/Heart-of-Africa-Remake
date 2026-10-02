@@ -2070,3 +2070,9 @@ before a contact hold ends, so a hold read from mid-way still passes "the whole 
 and the end-hold camera scores `-|sin(a - base)| * 2`, which favours bearings along the pair's
 axis, while the free partner is left out of the clearance check. Possible false approval of a
 frame check, no player impact. Infrastructure freeze: deferred.
+
+From the picture check of 1129 (02.10.2026): `690-cairo-children` (polish-children,
+`children-motion`) frames the child well on WebGPU, but on WebGL 2 the child stands cut off at
+the lower-left edge, and main's frame from the unsplit `polish` shows no child at all. The aim
+is taken before the shot while the child keeps walking; the shutter accepts the projection.
+Pre-existing, test-frame aim only, no player impact. Infrastructure freeze: deferred.
