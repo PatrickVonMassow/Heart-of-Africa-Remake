@@ -15771,3 +15771,20 @@ to land than a mechanism that needs a review.
   User 01.10.2026 (on the cause): »Ein eigener Task für so eine winzige Aufgabe erzeugt doch mehr Overhead, als die forcierte Einhaltung der 150k-Grenze einspart.«
   Bundle: Chat & Tafel.
   Criticality: medium — an answered card stays on the board until a whole point is worked.
+- [ ] 1263. The continuous route's river invitation never targets a speech label on WebGL 2
+  Source: covering WebGL 2 pass of point 1262 (02.10.2026).
+  THE RED. `VERIFY_GL=webgl npm test -- communication --section=continuous-route` on feat/1262 at
+  7f3ad701a (main 543689b21 merged): steps 1-3 green, then `FAIL frame
+  communication-webgl-1790917974739-04-river-invitation — its subject is not in the rendered
+  picture: no element matches .speech-label.targeted` and `FAIL continuous route at 4-guesses:
+  locator.waitFor: Timeout 30000ms exceeded` (log
+  `local/verify-logs/2026-10-02T05-12-50-731-communication.log`). Machine quiet unverified. The
+  same HEAD ran the section GREEN on WebGPU (log `…2026-10-02T04-58-15-452-…`).
+  Final state:
+  - The cause is named with its measurement (no RIVER speaker reaches the stand, or the label
+    exists but is never targeted on WebGL 2?).
+  - `communication --section=continuous-route` passes step 4 on WebGL 2 without a lengthened wait.
+  Tests: Vitest for a logic cause; the existing Playwright step is the scene check.
+  Bundle: Dorfleben.
+  Criticality: medium — a WebGL-2-only red; it blocks the covering WebGL 2 communication proof
+  in the next LARGE.

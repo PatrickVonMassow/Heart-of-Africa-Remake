@@ -2079,3 +2079,9 @@ should a live claimant outlast the cap, renew its `activityAt`, or should the ca
 From the picture check of 1256 (02.10.2026): the continuous-route frame `03-empty-jar`
 (communication, WebGPU) tilts toward the ground; the carrier with the empty jar sits cut at the
 top-left corner. The subject is barely in frame. No player impact.
+
+From the landing of 1262 (02.10.2026): `land-point.mjs` runs its fast gate before the tick, so a
+`RED_CHARGES` entry owned by the landed point expires only afterwards and reds
+`render-verify-core.test.mjs` ("charges only points the work order still holds OPEN") in the
+pre-push gate of main. Repaired by hand (5066489a2). The tick step could drop the landed point's
+charges. Infrastructure freeze: deferred.
