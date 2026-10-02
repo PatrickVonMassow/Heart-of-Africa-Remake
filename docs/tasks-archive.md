@@ -33016,3 +33016,237 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — it certifies nothing false today, but the check that guards the chief
   has never itself been run.
   Bundle: Dorfleben.
+
+- [x] 1219. The renderer no longer starts in the mobile Chromium emulation.
+  PROBLEM, measured 26.09.2026: crossbrowser `chromium-mobile` reds "the renderer initialises
+  on mobile" with `TypeError: Cannot read properties of null (reading 'getSupportedExtensions')`
+  — in the closing LARGE on main 5dff420 and again alone on 80081b15c; earlier LARGE runs
+  were 4 pass, 0 fail. A null GL context reaches code that assumes one.
+  FINAL STATE: the cause is found (host/emulation context loss vs. an app path that reads a
+  null context) and fixed or, if the host lacks the context, the app shows the compatibility
+  notice instead of throwing; crossbrowser is green. Remove this point's charges from
+  scripts/render-verify-charges.mjs when it lands.
+  Criticality: medium — a mobile start may crash instead of degrading.
+  Test: crossbrowser green.
+  Refs: scripts/verify/crossbrowser.mjs, the renderer bring-up.
+  Bundle: Steuerung & Performance.
+
+- [x] 1254. Loom and river fishery share one React key in a village with both
+  Source: finding of 01.10.2026, measured on the covering WebGPU pass of point 1129
+  (feat/1129-polish-theme-split at 78ea39b, log
+  `local/verify-logs/2026-10-01T14-41-12-659-polish-children-polish-villagers.log`).
+  `src/scenes/place/PlaceLife.tsx` renders `<Loom key={placeId}>` and
+  `<RiverFishery key={placeId}>` as siblings since 0bd2d2992 (30.09.2026). In
+  bambara-village, which has both a loom and a bank, React logs "Encountered two children
+  with the same key … bambara-village" eight times and may drop or duplicate one of the two.
+  The same pass read two reds no earlier log holds: village-loom "the station stands at
+  least 70 px tall" (63.8 px) and adult-errands "no adult word inside the children's
+  earshot" (RIVER at 6.2 m).
+  Final state:
+  - Loom and RiverFishery carry distinct keys; no duplicate-key console error in any village.
+  - `polish-villagers --section=village-loom` and `--section=adult-errands` re-run on
+    WebGPU: the two reds above are either gone or charged to their own cause with the
+    measurement that separates them from this key.
+  Tests: the suite's console-error gate (Playwright) is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
+  Bundle: Dorfleben.
+  Criticality: medium — a dropped sibling can lose the loom or the fishery from the scene.
+- [x] 1258. Move 1255 and 1257 to the backlog while the loom is off
+  Source: request deposited 01.10.2026 17:28 (findings carrier), cut from 0e296fba9.
+  Work on a disabled feature costs batch time without player impact (CLAUDE.md §2 finding intake). Explicit user approval of the stated recommendation.
+  User approved (chat 01.10.2026 19:24, "Ja") the recommendation: points 1255 (loom plaza distance) and 1257 (WebGL 2 loom helper wait reds) have no in-game effect because the loom is disabled since the user decision of 29.09.2026 (`loom.placed: false`; only the test enables it). Move both points from the open work order to docs/backlog.md, to be reopened when the loom is switched on again. Park/close the in-flight branch feat/1255-loom-plaza-distance and its worktree per branch hygiene; land nothing from it. 1256 stays open.
+  Bundle: Dorfleben.
+  Criticality: low — work-order bookkeeping; no player-visible change.
+
+- [x] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
+  mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
+  rule; the user ordered these three reds filed at once on 10.09.2026).
+  MEASURED 12.09.2026, and it corrects this point's own first draft. Against the dev
+  server the crossbrowser suite uses (run-all launches `npm run dev`, not preview), at
+  standard depth, on a COLD vite dependency cache:
+    PASS  chromium-mobile the app boots on a mobile viewport
+    PASS  chromium-mobile the renderer initialises on mobile
+    PASS  chromium-mobile the touch layer arms on the first touch (stick + look)
+    FAIL  chromium-mobile no console errors on mobile
+          — Failed to load resource: the server responded with a status of
+            504 (Outdated Optimize Dep)   (twice)
+  The IMMEDIATELY following run, same command, warm cache: ALL GREEN, exit 0.
+  So the cause is NOT a renderer crash and NOT getSupportedExtensions on null — that
+  reading was wrong. Mobile boots, the renderer initialises and the touch layer arms.
+  The single red is vite's dev-server dependency pre-bundling race: when the optimizer
+  re-bundles mid-load, in-flight requests for the superseded chunks answer 504, the page
+  logs them as resource errors, and the no-console-errors assertion trips. A production
+  build has no optimized-dep chunks at all, so NO PLAYER can meet this.
+  Final state: the crossbrowser pass no longer reds on the optimizer's own 504. Settle
+  vite's dependency optimization before the browser pass (or let the harness treat a
+  504 "Outdated Optimize Dep" as the reload signal vite means it to be), so that a cold
+  cache and a warm one give the same verdict. Prove it by running the suite at standard
+  depth TWICE FROM A COLD CACHE (delete node_modules/.vite between runs) and getting
+  the same green both times — a single warm run proves nothing here.
+  Test. Vitest: the console-error filter classifies a 504 "Outdated Optimize Dep" as the
+  optimizer's reload signal and a genuine resource error as a failure.
+  Criticality: LOW, corrected from HIGH on the measurement above. It is a cold-cache
+  flake in the verify harness, not a mobile lane that fails to boot. It still has to be
+  fixed rather than tolerated: it is one of the reds that held point 1065 across 23 LARGE
+  runs, and a gate that reds on its own server's cache state teaches the batch to ignore
+  reds.
+  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
+  touching its change. This point owns it.
+  Refs: scripts/verify/crossbrowser.mjs, scripts/verify/run-all.mjs (the dev server the
+  pass uses), point 1089, point 1065.
+  Bundle: Testinfrastruktur.
+
+- [x] 1260. Villagers speak by their own activity, never gated on what the player has heard
+  Source: user order 01.10.2026 22:12, after the explanation of the bank game's ROCK gate.
+  Final state: no villager utterance, gesture or activity depends on what the player has heard. Remove every
+  "X is not said/done before the listener has heard Y" rule:
+  1. `src/scenes/place/bankGame.ts`: the opening RIVER call and the direction announcement fall in every cycle
+     regardless of ROCK being heard; drop `BankWorld.hasHeard`, the `rockKnown` branch in the cycle opening, the
+     `rockOnly` run mode and the rock-only branch before `announceRun`.
+  2. `src/scenes/place/loomWork.ts`: the loom's directions no longer wait for the first ROCK hearing; drop
+     `rockHeard` from the view and its two uses.
+  3. `src/scenes/place/PlaceLife.tsx`: stop feeding the heard set into both (`hasHeard`, `rockHeard`).
+  4. Sweep `src/` for any further speaker-side read of `communication.heard` (the journal/label side, which
+     records what the player heard, stays) and remove each gate found.
+  5. Update `docs/communication-poc-spec.md` (bank game paragraph), `docs/communication-playthrough.md` (rows 2
+     and B3) and `design.md` where they state the teaching-order gate; adjust or delete the tests that pin it.
+  Tests: Vitest on bankGame/loomWork (RIVER and a direction are spoken in the first cycle with an empty heard set);
+  a Playwright communication/polish section only where an existing one asserted the gate.
+  USER, verbatim:
+  user 01.10.2026: "Diese Regel finde ich unsinnig. Das würde bedeuten, dass die Kinder extra für den Spieler reden bzw. schweigen. Sie sollen ganz normal ihren Tätigkeiten nachgehen (wozu auch ihre Äußerungen gehören), unabgängig davon, ob der Spieler zuhört. Entferne alle Regeln in der Art "X nicht hören, bevor Y gehört wurde"."
+  Bundle: Dorfleben.
+  Criticality: medium — villagers stay silent for the player's sake, which the user rejects as unnatural.
+
+- [x] 1256. A RIVER order falls 6.2 m from the children's roaming quarter
+  Source: covering WebGPU passes of point 1254 (01.10.2026).
+  THE RED. `polish --section=adult-errands`: "and no adult word ever falls inside the
+  children`s earshot — nearest utterance to the children: RIVER at 6.2 m from the roaming
+  quarter's rim" (limit > 10 m; log `local/verify-logs/2026-10-01T16-19-01-472-polish.log`,
+  feat/1254 7c497edd1).
+  IT IS NOT POINT 1254'S: the same reading stood before the key fix (6.2 m on feat/1129
+  78ea39b at 14:41Z, 6.3 m at 15:18Z). No log before 01.10 records this check's value.
+  Likely the water stand or the roaming quarter moved with the bank game's move upstream
+  (0bd2d2992) or the boundary growth (22ec01c17).
+  Final state:
+  - The cause is named with its measurement; no adult word falls within 10 m of the
+    roaming quarter's rim (the earshot rule itself unchanged).
+  - `polish(-villagers) --section=adult-errands` reads the earshot check green on WebGPU.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
+  Bundle: Dorfleben.
+  Criticality: medium — an adult order is spoken inside the children's game.
+
+- [x] 1262. No water carrier sets out with an empty jar in the continuous route's adult step
+  Source: covering WebGPU passes of point 1260 (01.-02.10.2026).
+  THE RED. `communication --section=continuous-route`, WebGPU: `FAIL continuous route at
+  3-adult-work-and-loom: page.waitForFunction: Timeout 480000ms exceeded`, twice on
+  feat/1260 (d6dd8adf9, log `local/verify-logs/2026-10-01T21-08-19-119-…`; 343cc7b1e,
+  `…2026-10-01T22-19-05-530-…`). No `03-empty-jar` frame was written, so the first wait of the
+  step — some villager with `carry === 'emptyJar'` within 480 s of standing at
+  `geography.waterStand` — never came true.
+  NOT 1260'S: its diff touches only the bank game, the loom's ROCK gate and their feeds. Main
+  itself cannot reach step 3: at 54809a1c3 the same section reds earlier, at
+  `2-childrens-bank-game: ROCK precedes the child call, and the first RIVER hearing in
+  words-first` (log `…2026-10-01T22-39-32-337-…`) — the gate 1260 removes. Last green of the
+  section on main: 53b168c14 (28.09.2026); main changed the settlement boundary, the replayed
+  adults' bounds and the water path since.
+  NOT REPRODUCED 02.10.2026: on feat/1260 at aa6ace0f3 (main 6a8ea6ca0 merged in) the section ran
+  GREEN through step 3 on both backends (logs `…2026-10-01T23-51-59-806-…` WebGPU,
+  `…2026-10-02T00-13-04-087-…` WebGL 2) — the red is intermittent, not a constant absence.
+  Final state:
+  - The cause is named with its measurement (are no adults cast to the water errand, or do
+    they never reach `emptyJar` while the player stands at the stand?).
+  - A water carrier sets out with the empty jar within the step's budget on both backends; the
+    wait is not lengthened and the step not skipped.
+  - `communication --section=continuous-route` passes step 3 on WebGPU.
+  Tests: Vitest for an errand-assignment cause; the existing Playwright step is the scene check.
+  Bundle: Dorfleben.
+  Criticality: medium — the water errand is part of the lively settlement (§7.1 no. 15) and the
+  red blocks every covering communication proof.
+
+- [x] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
+  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
+  bambara-village, same session as point 1250.
+  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
+  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
+  blocked activity, unreachable workstation) and fix it.
+  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
+  USER, verbatim:
+  user 30.09.2026: "Der Bewohner steht nur untätig herum."
+  Bundle: Dorfleben.
+  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
+
+- [x] 1259. The river-bank frame loses its subject off the bottom edge on WebGPU every pass
+  Source: covering WebGPU passes of point 1256 (01.10.2026).
+  THE RED. `polish --section=adult-errands`, WebGPU: `FAIL frame 482-village-river-bank — its
+  subject is not in the rendered picture: off the bottom edge of the frame`, in every recorded
+  WebGPU pass of 01.10 (logs `local/verify-logs/2026-10-01T14-41-12-659-…`, `…15-18-30-027-…`,
+  `…16-19-01-472-polish.log`, `…19-14-19-361-…`, `…19-19-15-831-polish.log`), on feat/1129,
+  feat/1254 and feat/1256 alike. Point 1121's charge covers only WebGL 2 and its drifting-fleck
+  race exits by the right edge; a deterministic WebGPU red was not measured before 01.10.
+  NOT 1256'S: it stood at 14:41Z on feat/1129, before 1256's commits.
+  SUSPECTED CAUSE, NOT MEASURED: the aim block (`scripts/verify/polish.mjs` ~8751-8790) returns
+  `null` when no fleck projects inside |ndc| ≤ 0.9, and the fallback subject is `river.bank` at
+  y 0.4 — 1.4 m in front of a player pitched −0.16, which lies below the frame. Likely since the
+  bank game moved upstream (0bd2d2992) no fleck is in view from the new bank spot.
+  Final state:
+  - The cause is named with its measurement (is `aim` null at the shutter?).
+  - The frame shows foam riding the current at the bank on both backends; the check is not
+    weakened into one that passes on an empty river.
+  - `polish --section=adult-errands` reads the 482 frame green on WebGPU.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs this section green.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — reds every WebGPU polish pass and blocks covering proofs.
+
+- [x] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
+  point 1126 on 15.09.2026, which delivered its other three parts the same day).
+  MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
+  ~28 min per backend, and carries the rotating flakes. It is the one object that makes
+  every red of the LARGE tier expensive: point 1126's measurement of 14.09.2026 found it
+  running FOUR times inside a single LARGE run — first pass, flake retry, two baseline
+  passes.
+  Point 1126 made a red repeat only its own SECTION, which is the repair loop. This point
+  makes the COVERING PROOF cheap too: a green theme stays green, and only the red theme's
+  own pass has to be run again.
+  Final state:
+  - The 27 sections are split by THEME into separate suite files under `scripts/verify/`,
+    each with its own name in `DEV_SUITES`. Same checks, same section names, same
+    screenshots, no change to coverage.
+  - The boot prologue and the shared helpers (`nextFrames`, `stepUntil`, `goToPlace`,
+    `probeSilhouetteFooting`, the frame shutter, the console-error gate) move ABOVE the
+    themes into one shared module the theme files import; a section is a block scope, so
+    nothing two themes use may live inside one of them (`scripts/verify/README.md`,
+    "A section is a BLOCK SCOPE").
+  - FIVE SECTIONS DO NOT STAGE THEIR OWN PLACE TODAY and must, before they can move:
+    `giza-skyline` (it relies on the boot standing in Cairo), `panorama-slope-footing`,
+    `settlement-edge`, `children-bank-game`, `children-boulder-climb`. A section that
+    reads a scene the block before it staged passes in the whole run and fails alone —
+    README, "The one recurring defect".
+  - Everything that NAMES the suite follows in the same commit: `tiers.mjs`
+    (`DEV_SUITES`, and `SMALL_SUITES` if it is affected), `machine-load-core.mjs`,
+    `run-wait-core.mjs` (the per-suite expectations and `SEPTEMBER_BANDS`),
+    `render-verify-charges.mjs`, the work order's `Diff → browser-suite mapping`
+    paragraph, `scripts/verify/README.md`, `docs/acceptance-evidence.md`.
+  - NOTHING IS DELETED OR SOFTENED: no check is removed or weakened, the per-point
+    two-backend picture check is unchanged, and the sum of the themes covers exactly what
+    `polish` covered.
+  - The proof is every theme suite green on BOTH backends, with the screenshot set
+    identical to what `polish` wrote before the split.
+  Touches: scripts/verify/polish.mjs (split), scripts/verify/tiers.mjs,
+  scripts/verify/machine-load-core.mjs, scripts/verify/run-wait-core.mjs,
+  scripts/render-verify-charges.mjs, scripts/verify/README.md, TASKS.md (the diff→suite
+  paragraph), docs/acceptance-evidence.md
+  OPEN BEFORE LANDING (picture check 02.10.2026 on 64ef18bd8, WebGL 2 run 12:02Z): the theme
+  frames `93-orientation-highlight`, `102-cairo-lane-plan` and `148-speech-guess-invitation`
+  lack terrain and hut/house walls that main's `polish` frames show, and
+  `690-cairo-children` aims at a wall with no child in view. All theme-suite reds of both
+  backends are charged; this picture defect is the remaining blocker. REPRODUCED 15:25:
+  `VERIFY_GL=webgl npm test -- polish-speech --section=speech-guess` passes 15/15 yet
+  writes `148-speech-guess-invitation` as pure fog (no terrain, huts or figures) — the
+  shutter does not catch an unrendered place. Cause read from the code: `goToPlace` in
+  `scripts/verify/_polish.mjs` waits only for `__placeLayout`, then the section shoots
+  after `nextFrames(4)`; in the unsplit run earlier sections had warmed the scene. Repair
+  there (wait until the entered place is really drawn), then re-shoot the affected frames
+  on both backends; the shutter's blind spot for an empty frame is worth a check too.
+  Bundle: Testinfrastruktur.

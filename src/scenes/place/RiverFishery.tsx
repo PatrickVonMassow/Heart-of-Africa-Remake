@@ -13,7 +13,7 @@ import * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
 import { useGame } from '../../state/store'
-import { FIGURE_LIMBS } from '../../render/figures'
+import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import { applyFigurePose, type FigureLimbs } from '../../render/figurePose'
 import { buildFishGeometry, FISH_TONES } from '../../render/fishMesh'
 import {
@@ -46,6 +46,7 @@ import {
   biteLift,
   createFishFire,
   createFisheryRing,
+  eaterPoundStroke,
   fisherySites,
   stepFishFire,
   type FishFireState,
@@ -80,6 +81,11 @@ const HULL_FLOOR_Y = 0.04
 /** A woven basket: its radius at the rim and its height. */
 const BASKET_R = 0.26
 const BASKET_H = 0.34
+// The eater's mortar is 0.42 m tall; at rest his pestle's foot sits 0.12 m
+// down in it, so the stroke lands in the grain (review of work-order 1251).
+const MORTAR_H = 0.42
+const PESTLE_LENGTH = 1.05
+const PESTLE_REST_Y = MORTAR_H - 0.12 + PESTLE_LENGTH / 2
 /** The rope's own axis and a scratch direction for orienting it. */
 const ROPE_UP = new THREE.Vector3(0, 1, 0)
 const ROPE_DIR = new THREE.Vector3()
@@ -319,6 +325,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const eaterLimbs = useRef<FigureLimbs | null>(null)
   const eaterGait = useRef(0)
   const eaterFish = useRef<THREE.Group>(null)
+  const eaterPestle = useRef<THREE.Mesh>(null)
   const boardFish = useRef<Array<THREE.Mesh | null>>([])
   const grillFish = useRef<Array<THREE.Mesh | null>>([])
   const rackFish = useRef<Array<THREE.Mesh | null>>([])
@@ -327,6 +334,8 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
   // The griller kneels at his fire: a body the passers-by go round.
   useStandingBody(sites.griller.x, sites.griller.z)
+  // The eater's mortar, which he pounds at between his visits (work-order 1251).
+  useStandingBody(sites.eaterMortar.x, sites.eaterMortar.z)
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -591,8 +600,12 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
     const ep = eaterPose.current
     if (ep) {
       const lift = biteLift(e, fireCfg)
+      const stroke = eaterPoundStroke(e, fireCfg)
+      if (eaterPestle.current) eaterPestle.current.position.y = PESTLE_REST_Y + stroke * 0.38
       const next: FigurePose =
-        e.phase === 'take'
+        e.phase === 'home'
+          ? { left: armAim(0.2, 0.35 + stroke * 0.55), right: armAim(-0.2, 0.35 + stroke * 0.55), lean: 0.14 - stroke * 0.08, turn: 0 }
+          : e.phase === 'take'
           ? reachPose(0, 0.3 * Math.sin(Math.PI * Math.min(1, e.clock / fireCfg.takeSeconds)))
           : e.phase === 'eat'
             ? { left: armAim(0.35, -0.55 + 1.35 * lift), right: { ...REST_POSE.right }, lean: 0.04, turn: 0 }
@@ -933,6 +946,17 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       {/* THE GRILLER, kneeling at the fire. */}
       <group name="fish-griller" position={[sites.griller.x, groundHeight(sites.griller.x, sites.griller.z), sites.griller.z]} rotation={[0, sites.griller.yaw, 0]}>
         <Figure cloth={clothOf(3)} kneel pose={grillerPose} limbs={grillerLimbs} />
+      </group>
+      {/* THE EATER'S MORTAR: he pounds grain here between his visits. */}
+      <group position={[sites.eaterMortar.x, groundHeight(sites.eaterMortar.x, sites.eaterMortar.z), sites.eaterMortar.z]}>
+        <mesh position={[0, MORTAR_H / 2, 0]} castShadow>
+          <cylinderGeometry args={[0.2, 0.26, MORTAR_H, TESSELLATION.mortar]} />
+          <meshStandardMaterial color="#5f4526" roughness={0.95} />
+        </mesh>
+        <mesh ref={eaterPestle} name="eater-pestle" position={[0, PESTLE_REST_Y, 0]} castShadow>
+          <cylinderGeometry args={[0.045, 0.055, PESTLE_LENGTH, TESSELLATION.pestle]} />
+          <meshStandardMaterial color="#7a5a32" roughness={0.9} />
+        </mesh>
       </group>
       {/* THE EATER. */}
       <group ref={eaterG} name="fish-eater" position={born.eater}>

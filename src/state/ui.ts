@@ -94,6 +94,11 @@ interface UiState {
   webglFallback: boolean
   /** The fallback notice stays until the player dismisses it. */
   webglWarningDismissed: boolean
+  /** True when the device offers neither WebGPU nor WebGL 2, so the world
+   *  cannot be drawn (src/render/renderSupport.ts). */
+  rendererUnavailable: boolean
+  /** The no-renderer notice stays until the player dismisses it. */
+  rendererUnavailableDismissed: boolean
   /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
   fpsVisible: boolean
   /**
@@ -218,6 +223,8 @@ interface UiState {
   toggleMap: () => void
   setWebglFallback: (fallback: boolean) => void
   dismissWebglWarning: () => void
+  setRendererUnavailable: (unavailable: boolean) => void
+  dismissRendererUnavailable: () => void
   setFpsVisible: (visible: boolean) => void
   setSpeechConceptLabels: (on: boolean) => void
   setTraaEnabled: (enabled: boolean) => void
@@ -263,6 +270,8 @@ export const useUi = create<UiState>()((set) => ({
   mapOpen: false,
   webglFallback: false,
   webglWarningDismissed: false,
+  rendererUnavailable: false,
+  rendererUnavailableDismissed: false,
   fpsVisible: true,
   speechConceptLabels: false,
   traaEnabled: true,
@@ -318,6 +327,8 @@ export const useUi = create<UiState>()((set) => ({
   toggleMap: () => set((s) => ({ mapOpen: !s.mapOpen })),
   setWebglFallback: (webglFallback) => set({ webglFallback }),
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
+  setRendererUnavailable: (rendererUnavailable) => set({ rendererUnavailable }),
+  dismissRendererUnavailable: () => set({ rendererUnavailableDismissed: true }),
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
   setSpeechConceptLabels: (speechConceptLabels) => set({ speechConceptLabels }),
   setTraaEnabled: (traaEnabled) => set({ traaEnabled }),

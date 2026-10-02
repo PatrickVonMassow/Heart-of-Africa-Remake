@@ -329,7 +329,10 @@ describe('the daemon lifecycle in the sandbox', () => {
     const leasePath = join(attemptDir, 'lease.json')
     const lease = readJsonIfAny(leasePath).lease
     // The daemon re-granted this attempt elsewhere: same shape, other lease id.
-    writeFileSync(leasePath, `${JSON.stringify({ lease: { ...lease, leaseId: 'someone-elses-grant' } })}\n`)
+    // Written atomically: a truncate-then-write lets the polling worker read an
+    // empty file and fence on "no usable lease" instead (CI run 36900226606).
+    writeFileSync(`${leasePath}.tmp`, `${JSON.stringify({ lease: { ...lease, leaseId: 'someone-elses-grant' } })}\n`)
+    renameSync(`${leasePath}.tmp`, leasePath)
     let status = null
     const deadline = Date.now() + 15_000
     while (status?.phase !== 'fenced' && Date.now() < deadline) {

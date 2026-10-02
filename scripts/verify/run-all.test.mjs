@@ -77,9 +77,9 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
 
 describe('the log says which suite is running (point 1137)', () => {
   it('names the suite BEFORE it spawns, so a long suite is not a dead log', async () => {
-    const result = await run({ suite: 'polish', outputs: ['PASS  a check'] })
-    const arrow = result.log.split('\n').findIndex((l) => l.startsWith('# → polish'))
-    const verdict = result.log.split('\n').findIndex((l) => l.startsWith('PASS  polish'))
+    const result = await run({ suite: 'polish-children', outputs: ['PASS  a check'] })
+    const arrow = result.log.split('\n').findIndex((l) => l.startsWith('# → polish-children'))
+    const verdict = result.log.split('\n').findIndex((l) => l.startsWith('PASS  polish-children'))
     expect(arrow).toBeGreaterThanOrEqual(0)
     expect(arrow).toBeLessThan(verdict)
     expect(result.log).toContain('its PASS/FAIL line arrives when the suite ENDS')
@@ -122,13 +122,13 @@ describe('one pass per suite (point 1135)', () => {
   it('names every owner once in numeric order when several defects share a suite', async () => {
     const out = [
       'FAIL  the drums were still speaking when the picture was taken — stopped',
-      'FAIL  the dry settlement season reading settles before it is read (read after 60276 ms)',
-      'FAIL  the wet settlement season reading settles before it is read (read after 60104 ms)',
+      'FAIL  the settlement offers a figure in clear view to speak over — none in view',
+      'FAIL  the settlement offers a figure in clear view to speak over — none in view twice',
     ].join('\n')
-    const result = await run({ suite: 'polish', outputs: [out], tasks: '- [ ] 642. settle deadline\n- [ ] 1102. drums' })
+    const result = await run({ suite: 'polish-speech', outputs: [out], tasks: '- [ ] 1043. figure in view\n- [ ] 1102. drums' })
     expect(result.attempts).toHaveLength(1)
-    expect(result.log).toContain('every red is charged to open point(s) 642, 1102; suite stays red')
-    expect(result.log).toContain('1 SUITE(S) FAILED — 1 suites run — reds charged to open points 642, 1102')
+    expect(result.log).toContain('every red is charged to open point(s) 1043, 1102; suite stays red')
+    expect(result.log).toContain('1 SUITE(S) FAILED — 1 suites run — reds charged to open points 1043, 1102')
   })
 
   it('does not describe a partial record as accounted-for coverage', async () => {
@@ -198,7 +198,7 @@ describe('one pass per suite (point 1135)', () => {
 describe('the classified baseline is the charge ledger, not a second set of passes (point 1135)', () => {
   it('surfaces advisory observations without charging or classifying them as reds', async () => {
     const advisory = 'NON-PREDICTIVE  jar — 0 with the full one  [NON-PREDICTIVE in full suite: observed fail; sampling differs]'
-    const result = await run({ large: true, suite: 'polish', outputs: [`PASS  another check\n${advisory}`] })
+    const result = await run({ large: true, suite: 'polish-children', outputs: [`PASS  another check\n${advisory}`] })
     expect(result.status).toBe(0)
     expect(result.attempts).toHaveLength(1)
     expect(result.saved[0].reds).toEqual([])
@@ -423,7 +423,7 @@ describe('no path turns a red into a pass (Astra review round 2, 17.09.2026)', (
     // one's measurement matches the charge. The second must still hold.
     const walk = 'no child walks without getting anywhere'
     const result = await run({
-      suite: 'polish',
+      suite: 'polish-children',
       tasks: '- [ ] 694. child walking',
       outputs: [`FAIL  ${walk} — worst child 3 at 12.5s, 1.29 m walked inside 0.32 m`],
       records: [{ reds: [
@@ -510,7 +510,7 @@ describe('a red with no name still holds (Astra review round 5, 17.09.2026)', ()
     // a detail-scoped charge refuses a varied red.
     const walk = 'no child walks without getting anywhere'
     const result = await run({
-      suite: 'polish',
+      suite: 'polish-children',
       tasks: '- [ ] 694. child walking',
       outputs: [
         `FAIL  ${walk} — worst child 3 at 12.5s, 1.29 m walked inside 0.32 m\n` +
@@ -537,7 +537,7 @@ describe('a section record is judged by what it carries', () => {
     { crashed: true, terminalVerdict: false },
     { truncated: true },
   ])('still refuses a crashed or truncated section record: %j', async (broken) => {
-    const result = await run({ suite: 'polish', section: 'adult-errands', tasks: '- [ ] 568. water rim',
+    const result = await run({ suite: 'polish-villagers', section: 'adult-errands', tasks: '- [ ] 568. water rim',
       outputs: [rimLine], records: [{ ...rimRecord, ...broken }] })
     expect(result.log).toContain('POINT REDS HOLD')
     expect(result.log).toContain('the run record is incomplete, so no charge may be accepted for it')
@@ -585,7 +585,7 @@ describe('a section record is judged by what it carries', () => {
     const walk = 'no child walks without getting anywhere'
     const second = 'worst child 7 at 44.0s, 0.02 m walked inside 9.9 m'
     const result = await run({
-      suite: 'polish',
+      suite: 'polish-children',
       tasks: '- [ ] 694. child walking',
       outputs: [`FAIL  ${walk} — worst child 3 at 12.5s, 1.29 m walked inside 0.32 m\nFAIL  ${walk} — ${second}`],
       records: [{ reds: [{ name: walk, kind: 'check', detail: 'worst child 3 at 12.5s, 1.29 m walked inside 0.32 m' }] }],

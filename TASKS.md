@@ -77,84 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
-  point 1126 on 15.09.2026, which delivered its other three parts the same day).
-  MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
-  ~28 min per backend, and carries the rotating flakes. It is the one object that makes
-  every red of the LARGE tier expensive: point 1126's measurement of 14.09.2026 found it
-  running FOUR times inside a single LARGE run — first pass, flake retry, two baseline
-  passes.
-  Point 1126 made a red repeat only its own SECTION, which is the repair loop. This point
-  makes the COVERING PROOF cheap too: a green theme stays green, and only the red theme's
-  own pass has to be run again.
-  Final state:
-  - The 27 sections are split by THEME into separate suite files under `scripts/verify/`,
-    each with its own name in `DEV_SUITES`. Same checks, same section names, same
-    screenshots, no change to coverage.
-  - The boot prologue and the shared helpers (`nextFrames`, `stepUntil`, `goToPlace`,
-    `probeSilhouetteFooting`, the frame shutter, the console-error gate) move ABOVE the
-    themes into one shared module the theme files import; a section is a block scope, so
-    nothing two themes use may live inside one of them (`scripts/verify/README.md`,
-    "A section is a BLOCK SCOPE").
-  - FIVE SECTIONS DO NOT STAGE THEIR OWN PLACE TODAY and must, before they can move:
-    `giza-skyline` (it relies on the boot standing in Cairo), `panorama-slope-footing`,
-    `settlement-edge`, `children-bank-game`, `children-boulder-climb`. A section that
-    reads a scene the block before it staged passes in the whole run and fails alone —
-    README, "The one recurring defect".
-  - Everything that NAMES the suite follows in the same commit: `tiers.mjs`
-    (`DEV_SUITES`, and `SMALL_SUITES` if it is affected), `machine-load-core.mjs`,
-    `run-wait-core.mjs` (the per-suite expectations and `SEPTEMBER_BANDS`),
-    `render-verify-charges.mjs`, the work order's `Diff → browser-suite mapping`
-    paragraph, `scripts/verify/README.md`, `docs/acceptance-evidence.md`.
-  - NOTHING IS DELETED OR SOFTENED: no check is removed or weakened, the per-point
-    two-backend picture check is unchanged, and the sum of the themes covers exactly what
-    `polish` covered.
-  - The proof is every theme suite green on BOTH backends, with the screenshot set
-    identical to what `polish` wrote before the split.
-  Touches: scripts/verify/polish.mjs (split), scripts/verify/tiers.mjs,
-  scripts/verify/machine-load-core.mjs, scripts/verify/run-wait-core.mjs,
-  scripts/render-verify-charges.mjs, scripts/verify/README.md, TASKS.md (the diff→suite
-  paragraph), docs/acceptance-evidence.md
-  Bundle: Testinfrastruktur.
-
-- [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
-  mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
-  rule; the user ordered these three reds filed at once on 10.09.2026).
-  MEASURED 12.09.2026, and it corrects this point's own first draft. Against the dev
-  server the crossbrowser suite uses (run-all launches `npm run dev`, not preview), at
-  standard depth, on a COLD vite dependency cache:
-    PASS  chromium-mobile the app boots on a mobile viewport
-    PASS  chromium-mobile the renderer initialises on mobile
-    PASS  chromium-mobile the touch layer arms on the first touch (stick + look)
-    FAIL  chromium-mobile no console errors on mobile
-          — Failed to load resource: the server responded with a status of
-            504 (Outdated Optimize Dep)   (twice)
-  The IMMEDIATELY following run, same command, warm cache: ALL GREEN, exit 0.
-  So the cause is NOT a renderer crash and NOT getSupportedExtensions on null — that
-  reading was wrong. Mobile boots, the renderer initialises and the touch layer arms.
-  The single red is vite's dev-server dependency pre-bundling race: when the optimizer
-  re-bundles mid-load, in-flight requests for the superseded chunks answer 504, the page
-  logs them as resource errors, and the no-console-errors assertion trips. A production
-  build has no optimized-dep chunks at all, so NO PLAYER can meet this.
-  Final state: the crossbrowser pass no longer reds on the optimizer's own 504. Settle
-  vite's dependency optimization before the browser pass (or let the harness treat a
-  504 "Outdated Optimize Dep" as the reload signal vite means it to be), so that a cold
-  cache and a warm one give the same verdict. Prove it by running the suite at standard
-  depth TWICE FROM A COLD CACHE (delete node_modules/.vite between runs) and getting
-  the same green both times — a single warm run proves nothing here.
-  Test. Vitest: the console-error filter classifies a 504 "Outdated Optimize Dep" as the
-  optimizer's reload signal and a genuine resource error as a failure.
-  Criticality: LOW, corrected from HIGH on the measurement above. It is a cold-cache
-  flake in the verify harness, not a mobile lane that fails to boot. It still has to be
-  fixed rather than tolerated: it is one of the reds that held point 1065 across 23 LARGE
-  runs, and a gate that reds on its own server's cache state teaches the batch to ignore
-  reds.
-  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
-  touching its change. This point owns it.
-  Refs: scripts/verify/crossbrowser.mjs, scripts/verify/run-all.mjs (the dev server the
-  pass uses), point 1089, point 1065.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1117. The fill's decided surface reading was never built (found 12.09.2026 while building
   point 1087).
   design.md §13.4 states two things about the dip that NO code produces: the jar's MOUTH is
@@ -15575,19 +15497,6 @@ to land than a mechanism that needs a review.
   Test: gamepad --section=interact-chief and touch --section=prompt-tap green.
   Refs: scripts/verify/gamepad.mjs, scripts/verify/touch.mjs, scripts/render-verify-charges.mjs.
   Bundle: Kommunikation.
-- [ ] 1219. The renderer no longer starts in the mobile Chromium emulation.
-  PROBLEM, measured 26.09.2026: crossbrowser `chromium-mobile` reds "the renderer initialises
-  on mobile" with `TypeError: Cannot read properties of null (reading 'getSupportedExtensions')`
-  — in the closing LARGE on main 5dff420 and again alone on 80081b15c; earlier LARGE runs
-  were 4 pass, 0 fail. A null GL context reaches code that assumes one.
-  FINAL STATE: the cause is found (host/emulation context loss vs. an app path that reads a
-  null context) and fixed or, if the host lacks the context, the app shows the compatibility
-  notice instead of throwing; crossbrowser is green. Remove this point's charges from
-  scripts/render-verify-charges.mjs when it lands.
-  Criticality: medium — a mobile start may crash instead of degrading.
-  Test: crossbrowser green.
-  Refs: scripts/verify/crossbrowser.mjs, the renderer bring-up.
-  Bundle: Steuerung & Performance.
 - [ ] 1220. The WebGL 2 notice no longer covers the start journal's title.
   PROBLEM, measured 26.09.2026 on main 96f8c1e: flow frame `verification/06-start-journal.png`
   (WebGL 2) shows the dismissible compatibility notice drawn OVER the open journal panel, its
@@ -15598,6 +15507,9 @@ to land than a mechanism that needs a review.
   Criticality: low — the journal title is hidden at every WebGL 2 start until dismissal.
   Test: a Playwright layout check in the flow or layout suite asserting the notice's box does
   not intersect the journal header on WebGL 2; picture check of 06-start-journal.
+  Also measured 01.10.2026 on feat/1219 (local/1219-no-context.png, mobile emulation): the
+  no-backend notice added by point 1219 sits over the journal heading and its tabs the same
+  way; the fix covers both notices.
   Refs: the compatibility notice component, the journal panel, verification/06-start-journal.png.
   Bundle: Steuerung & Performance.
 - [ ] 1221. The Cairo place ground is no longer flat white at the start.
@@ -15757,17 +15669,6 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs, point 1145.
   Bundle: Testinfrastruktur.
   Criticality: medium — one red check per polish pass until fixed.
-- [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
-  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
-  bambara-village, same session as point 1250.
-  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
-  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
-  blocked activity, unreachable workstation) and fix it.
-  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
-  USER, verbatim:
-  user 30.09.2026: "Der Bewohner steht nur untätig herum."
-  Bundle: Dorfleben.
-  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
 - [ ] 1253. Picture sections that set a game condition by knob need a player-path counterpart
   Source: request deposited 01.10.2026 05:28 by session d17af0dd (findings carrier), cut from e9515346d.
   Lesson from point 1250: the 1245 polish section `villager-canoe` (scripts/verify/polish.mjs at 733e920) marked ROCK as heard (`g.hearUtterance(g.vocabulary.ROCK)`, justified as "a player standing here has met the rocks already") and cut the children's `roamSeconds` from 55 s to 8 s. Those two "spectator-time knobs" skipped exactly the two gates that left the boatmen and the children mute for over a minute after entry, so the suite was green while the player met a silent scene.
@@ -15782,3 +15683,167 @@ to land than a mechanism that needs a review.
   user 01.10.2026: "Ja, mach das."
   Bundle: Testinfrastruktur.
   Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.
+- [ ] 1261. Let the answering window remove an answered board card; drop point 1240
+  Source: request of session 829c2a2a, deposited 01.10.2026 20:51 through the findings carrier.
+  Observed problem: Point 1240 shows the cost: the user answered the card on 29.09. in a non-owner window; that window could only deposit a --request, the owner's drain knows only "TASKS append" or "decision card", so a one-command removal became a queued point and the answered card stood on the board for two days. A whole point (spec, commit, rank, brief, tick, archive) costs more than the single idempotent call it guards against.
+  FINAL STATE:
+  1. A session that does NOT hold the batch lock may run `node scripts/board.mjs vdzk-remove "<title>"` for a "Von dir zu klären" card the user has just answered in that session. The stand-down (batch-singleton STAND DOWN text, and any guard that refuses a board write from a non-owner) no longer covers this one call; every other board/TASKS.md write stays owner-only. This is switching off an obstructing rule, not a new mechanism: no new guard, ledger field or route. The removal already runs under board-edit-lock, so it cannot interleave with the owner's publish.
+  2. The STAND DOWN text and docs/batch-owner-runbook.md say so in one line each.
+  3. Remove the card now: node scripts/board.mjs vdzk-remove "Transkript-Aufbewahrung: die 30 Tage kosten jetzt auch Laufzeit". Its recommendation is already carried out (~/.claude/settings.json "cleanupPeriodDays": 3650, set 29.09.2026 15:58). Record the closure in the decision log (what: retention 10 years; why: transcripts carry citable user orders and review evidence; veto: user may lower the value).
+  4. DELETE open point 1240 "Remove the transcript retention card" from TASKS.md (not tick, not archive as done): this point supersedes it, the user ordered its deletion.
+  Test: a Vitest on the guard/stand-down layer proving vdzk-remove is allowed from a non-owner session and another board write (e.g. vdzk-add) still is not.
+  Files: scripts/board.mjs (vdzk-remove), scripts/batch-singleton.mjs, scripts/finding.mjs, TASKS.md point 1240, commit f2a76cd0f. Spec cut from 5a325dcc9.
+  USER, verbatim:
+  User 01.10.2026: »Ja, gib das als Aufrag in die Batch-Session. Und sie soll die Karte dann entfernen und den damit hinfälligen Task 1240 löschen.«
+  User 01.10.2026 (on the cause): »Ein eigener Task für so eine winzige Aufgabe erzeugt doch mehr Overhead, als die forcierte Einhaltung der 150k-Grenze einspart.«
+  Bundle: Chat & Tafel.
+  Criticality: medium — an answered card stays on the board until a whole point is worked.
+- [ ] 1263. The continuous route's river invitation never targets a speech label on WebGL 2
+  Source: covering WebGL 2 pass of point 1262 (02.10.2026).
+  THE RED. `VERIFY_GL=webgl npm test -- communication --section=continuous-route` on feat/1262 at
+  7f3ad701a (main 543689b21 merged): steps 1-3 green, then `FAIL frame
+  communication-webgl-1790917974739-04-river-invitation — its subject is not in the rendered
+  picture: no element matches .speech-label.targeted` and `FAIL continuous route at 4-guesses:
+  locator.waitFor: Timeout 30000ms exceeded` (log
+  `local/verify-logs/2026-10-02T05-12-50-731-communication.log`). Machine quiet unverified. The
+  same HEAD ran the section GREEN on WebGPU (log `…2026-10-02T04-58-15-452-…`).
+  Final state:
+  - The cause is named with its measurement (no RIVER speaker reaches the stand, or the label
+    exists but is never targeted on WebGL 2?).
+  - `communication --section=continuous-route` passes step 4 on WebGL 2 without a lengthened wait.
+  Tests: Vitest for a logic cause; the existing Playwright step is the scene check.
+  Bundle: Dorfleben.
+  Criticality: medium — a WebGL-2-only red; it blocks the covering WebGL 2 communication proof
+  in the next LARGE.
+- [ ] 1264. The village pounder's pestle pounds the air above its mortar
+  Source: cross-vendor review of point 1251 (02.10.2026), same geometry as the fishers' eater.
+  `src/scenes/place/PlaceLife.tsx` `Pounder`: the 1.05 m pestle's centre rests at 1.05 m, so its
+  foot stops at 0.525 m while the mortar is 0.42 m tall — every stroke ends 10 cm above the rim.
+  Final state:
+  - At the bottom of the stroke the pestle's foot is inside the mortar (point 1251 uses a rest of
+    mortar height − 0.12 m + half the pestle), and the pounder's hands still ride the shaft.
+  - A browser check samples the pestle height and asserts the foot reaches the mortar.
+  Tests: the existing village Playwright section that photographs the pounder gains the assertion.
+  Bundle: Dorfleben.
+  Criticality: low — visible at every pounding village, no mechanic affected.
+- [ ] 1265. The boatman's first reading comes too late at the mute shore
+  Source: covering WebGPU pass of point 1129 (02.10.2026); reproduced alone on `main` fe28c8bde
+  (log `local/verify-logs/2026-10-02T11-31-07-724-polish.log`) and on feat/1129 (log
+  `2026-10-02T11-28-50-894-polish-villagers.log`), so it is not the split's.
+  THE RED. `polish --section=mute-shore-scene`: "a boatman`s reading appears within a few seconds
+  of entry, without ROCK marked heard" — boat at 9.69 s against `canoe.firstCallSeconds` 4 + 3 s
+  slack; the child reads at 3.24 s and ROCK is not heard. `villager-canoe` was green at 0fac48504
+  on both backends the same morning; candidates are the earshot moves 6e64d0e37, d2c3e690b and
+  eb68d9f3f.
+  Final state:
+  - The commit that delayed the boat's first call is named with the reading on either side.
+  - The boatman's first reading lands within `firstCallSeconds` + 3 s of entry again, or the
+    window's premise is revised with the reason recorded.
+  - `polish(-villagers) --section=mute-shore-scene` green on WebGPU and WebGL 2.
+  Tests: the existing Playwright check; no new mechanism.
+  Bundle: Dorfleben.
+  Criticality: medium — the mute shore's lesson starts with the boatman's call.
+- [ ] 1266. The parked loom reads too small from its plaza stand
+  Source: reopened 02.10.2026 from the backlog park of point 1255 (by point 1258), because the
+  `village-loom` section switches the loom on for its own checks and its plaza red is identical
+  on `main` and on feat/1129 (64.3-64.4 px at the 21.285 m stand); an unowned red blocks 1129's
+  covering proof, and the park left no owner. Decision recorded by the batch owner: reopen
+  rather than soften the check (1129 forbids weakening); veto = return it to the backlog and
+  accept that `polish-villagers` cannot read green while the loom is parked.
+  THE RED. `polish(-villagers) --section=village-loom`: "from the plaza the station stands at
+  least 70 px tall on the screen" — {"px":64.36,"viewport":900,"dist":21.285}. On 23.09.2026
+  the same search found 16.4 m and 94.9 px; candidates in `src/scenes/place/` include
+  0bd2d2992, a1f26c86c and 22ec01c17.
+  Final state:
+  - The commit that moved the stand is named with the reading on either side of it.
+  - Either the loom again reads from the plaza (>= 70 px from the nearest open stand), or the
+    threshold's premise is revised with the reason recorded.
+  - `polish-villagers --section=village-loom` green on WebGPU; frame 1183 picture-checked.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Bundle: Dorfleben.
+  Criticality: low — the loom is switched off for the player (`loom.placed: false`).
+- [ ] 1267. The speech-inaudible assert reads a stale speech bus at the end of a drum message
+  Source: first measured 02.10.2026 16:20 in the WebGPU theme run of point 1129 on 9ff47b8f4
+  (`polish-speech`, section `artefact-give`); no earlier recorded log holds this signature.
+  THE RED. Right after the chief's drum answer, a 4-syllable phrase fired
+  `[ASSERT] speech-inaudible — … leave the graph at 0.00e+0 (peak 0.083, speech bus 0.000,
+  master 0.500 …) while the speech volume is 3`. `playDrumMessage` quiets the bus with
+  `quietSpeechBus` (0 now, volume again at `now + duration`) and `playSpeech` exempts only
+  `ctx.currentTime < speechQuietUntil`. Read from the code, not yet proven: `AudioParam.value`
+  on the main thread is the rendering thread's last posted value, so for a render quantum or
+  more after the window ends it can still read 0 while the restoring automation has already
+  run — a detector false positive, not silent speech.
+  Final state:
+  - The cause is measured (log the param value against `currentTime - speechQuietUntil` at the
+    firing, or reproduce it in Vitest with a stubbed context); if it is the stale read, the
+    assert computes the chain from the scheduled level past the window instead of the
+    stale `.value`, with no exemption wider than the evidence.
+  - If the bus is really silent past the window, that is the product defect to fix instead.
+  - A Vitest case pins the boundary; `polish-speech --section=artefact-give` green on WebGPU.
+  Tests: Vitest (jsdom) in `src/systems/ambience.test.ts`; the existing Playwright section.
+  Bundle: Testinfrastruktur.
+  Criticality: low — no player impact measured; it blocks the green of `polish-speech`.
+
+- [ ] 1268. The bank game's announcing child is read without its pointing arm
+  Source: first measured 02.10.2026 ~17:50 in the WebGPU theme run of point 1129 on 74b86cc18
+  (`polish-children`, section `children-bank-game`); no earlier recorded log holds this
+  signature, and the check moved unchanged from `scripts/verify/polish.mjs`.
+  THE RED. `and the same child POINTS it — the arm carries as far as the voice` read
+  `{"kind":null,"t":0,"duration":0,"bearing":0}` while the preceding check (the announced
+  word READ over the calling child inside the picture) passed in the same poll. `announceRun`
+  (`src/scenes/place/bankGame.ts`) gives voice and `point` gesture together, so either the
+  word label outlives the gesture (or belongs to an earlier announcement of the same word),
+  or the gesture is cleared or never armed while the voice is offered — the second would be
+  a player-visible mute arm.
+  Final state:
+  - The cause is measured (label age and gesture state at the poll, over repeated
+    `--section=children-bank-game` runs on a quiet machine); a product cause is fixed in the
+    game, a check cause is fixed by reading the gesture of the announcement the label
+    belongs to, with no tolerance wider than the evidence.
+  - `polish-children --section=children-bank-game` green on WebGPU; a Vitest case pins the
+    voice/gesture pairing if the game owed the fix.
+  Tests: Vitest (jsdom) beside `bankGame.ts`; the existing Playwright section.
+  Bundle: Testinfrastruktur.
+  Criticality: low — no player impact measured yet; it blocks the green of `polish-children`.
+
+- [ ] 1269. The tag beat's side-on standpoint search finds every stand occluded
+  Source: first measured 02.10.2026 ~19:30 in the WebGL 2 covering run of point 1129 on 001ef76f1
+  (`polish-children`, section `tag-catch`, log
+  `local/verify-logs/2026-10-02T17-08-03-519-polish-speech-polish-settlement-polish-children-polish-villagers.log`);
+  no earlier recorded log holds this signature, the check moved unchanged from
+  `scripts/verify/polish.mjs`, and the section alone was green 47 s later on the same head.
+  THE RED. "a clear side-on standpoint on the beat" read `every standpoint occluded`: after the
+  held catch beat, `standBeside(beat.caughtAt, beat.runnerAt ?? beat.caughtAt, beat.caughtAt)`
+  found no candidate stand whose sight line to the caught child was free, so frame
+  `1176-tag-beat` was not taken. The section stages Cairo itself, so it is not an order effect;
+  the port's walls, stalls and walkers around a beat that happens near a wall are the candidates.
+  Final state:
+  - The cause is measured (which candidates were tried and what occluded each, over repeated
+    `--section=tag-catch` runs on a quiet machine on WebGL 2); a search that gives up while an
+    honest side-on view exists is fixed in the search (more bearings or distances, or a later
+    beat), with no check weakened and no occlusion tolerance wider than the evidence.
+  - `polish-children --section=tag-catch` green on WebGPU and WebGL 2; frame `1176-tag-beat`
+    picture-checked.
+  Tests: the existing Playwright section; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low — test-frame staging only, no player impact; it blocks the green of
+  `polish-children` on WebGL 2.
+
+- [ ] 1270. The two-close-speakers shot finds no pair whose tails sit on their own anchors on WebGL 2
+  Source: measured 02.10.2026 ~18:40 in the WebGL 2 covering run of point 1129 on 001ef76f1
+  (`polish-speech`, section `speech-owner`, log
+  `local/verify-logs/2026-10-02T16-39-56-622-polish-panorama-polish-speech-polish-settlement-polish-children-polish-villagers.log`);
+  the check came with point 1238 and was last red during its own development on 29.09.2026;
+  the section alone was green on the same head 27 min later, which does not close it.
+  THE RED. "two close speakers are shot unobstructed, each tail on its own speaker's anchor, the
+  older note receded and neither targeted (point 1238)": 16 pairs 1.2-4 m apart were tried; sight
+  was clear (0.97-0.99) but every attempt read `tails false`, and one was rejected at the shutter.
+  Final state:
+  - The cause is measured over repeated `--section=speech-owner` runs on WebGL 2 on a quiet
+    machine (which pairs, what each tail anchor read); a staging that gives up while an honest
+    pair exists is fixed in the staging, and a real tail-anchor defect is fixed in the speech
+    labels, with no check weakened.
+  - `polish-speech --section=speech-owner` green on WebGPU and WebGL 2; its frame picture-checked.
+  Tests: the existing Playwright section; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low — no player impact measured; it blocks the green of `polish-speech` on WebGL 2.

@@ -92,26 +92,26 @@ export const NON_RENDER_VERIFY = new Set([
   'backend-lane-core.mjs', // WHICH lanes exist and whether a renderer is software; the check drives the browser
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
-  'childMotionMetric.mjs', // the children's shuffle/rescue verdict over a recorded trace; polish.mjs and the replay test record it
-  'colliderProbe.mjs', // the collider geometry the suites read with; collision.mjs and polish.mjs hand it their page
+  'childMotionMetric.mjs', // the children's shuffle/rescue verdict over a recorded trace; the polish-* suites and the replay test record it
+  'colliderProbe.mjs', // the collider geometry the suites read with; collision.mjs and the polish-* suites hand it their page
   'communicationAudio.mjs', // PCM analysis and WAV encoding; no browser
   'communicationCapture.mjs', // final-output tap; communication.mjs supplies the page
   'communicationDriver.mjs', // normal-input driver; communication.mjs supplies the page
   'communicationTimeline.mjs', // read-only hearing subscription; no browser
   'communicationRouteCore.mjs', // ordered river stations; pure geometry
-  'cropLuma.mjs', // how a ground crop's pixels become one reading; polish.mjs captures them
-  'digSitePicture.mjs', // excavation composition and hold checks; polish.mjs supplies the browser page
+  'cropLuma.mjs', // how a ground crop's pixels become one reading; the polish-* suites captures them
+  'digSitePicture.mjs', // excavation composition and hold checks; the polish-* suites supplies the browser page
   'docs.mjs',
-  'drumFrame.mjs', // the live drum capture window; polish.mjs supplies the browser page
-  'eavesColumn.mjs', // the head-clearance verdict over a recorded window; polish.mjs records it
-  'edgeBandReading.mjs', // crop measurements and failure details; polish.mjs captures the frames
-  'edgeBandSettle.mjs', // shot-window settle decisions with injected reads/gaps; polish.mjs drives the browser
+  'drumFrame.mjs', // the live drum capture window; the polish-* suites supplies the browser page
+  'eavesColumn.mjs', // the head-clearance verdict over a recorded window; the polish-* suites records it
+  'edgeBandReading.mjs', // crop measurements and failure details; the polish-* suites captures the frames
+  'edgeBandSettle.mjs', // shot-window settle decisions with injected reads/gaps; the polish-* suites drives the browser
   'fixedWaits.mjs',
-  'footingSeries.mjs', // the slope-footing verdict; polish.mjs hands it the samples
+  'footingSeries.mjs', // the slope-footing verdict; the polish-* suites hands it the samples
   'frameSubject-core.mjs',
   'gpu-backend-probe-core.mjs', // the host GPU verdict over a CDP/canvas reading; gpu-backend-probe.mjs does the driving
   'frameSubject.mjs', // the frame shutter's decision layer; the suites hand it their page
-  'labelFusion.mjs', // the no-fusion bar over a sampled rect series; enrichments.mjs and polish.mjs sample it
+  'labelFusion.mjs', // the no-fusion bar over a sampled rect series; enrichments.mjs and the polish-* suites sample it
   'ladder-core.mjs', // WHETHER a full pass may start (point 1086); it decides, it draws nothing
   'ladder.mjs', // the ladder's git/ledger/source reads; it opens no page
   'launch-args-core.mjs', // the launcher's PLATFORM policy; _browser.mjs opens the browser
@@ -137,13 +137,14 @@ export const NON_RENDER_VERIFY = new Set([
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
   'speechSampler.mjs', // analyser polling and coverage; voice.mjs owns the browser
   'spawnAssertion.mjs', // a TEXT audit of the test files' spawn assertions; it opens no page
-  'stanceSlip.mjs', // the planted-foot verdict over a sample series; polish.mjs records the samples
+  'stanceSlip.mjs', // the planted-foot verdict over a sample series; the polish-* suites records the samples
   'system-chrome.mjs', // WHERE the lane's browser is on this host; _browser.mjs opens it
-  'tagFrameReading.mjs', // the tag frame's readability verdict; polish.mjs takes the reading
+  'tagFrameReading.mjs', // the tag frame's readability verdict; the polish-* suites takes the reading
   'textureLeak.mjs', // the texture-delta decision layer; settings.mjs runs it
   'tiers.mjs',
   'ttsCache.mjs',
   'verify-seed.mjs', // builds the seeded URL a suite opens; it never opens one itself
+  'vite-reload-signal.mjs', // classifies a console error text; crossbrowser.mjs collects them
 ])
 
 /**
@@ -1307,7 +1308,14 @@ export function unexplainedRuns(runs, since, options) {
   const shownGone = (r) => {
     const when = finite(r?.startedAt) ?? finite(r?.at)
     if (when === null || from <= when) return false
-    return all.some(
+    // A red of a retired suite can no longer be re-run under its own name: it
+    // is shown gone once EVERY suite that took over its checks covers.
+    const successors = Object.hasOwn(RETIRED_SUITE_SUCCESSORS, r?.suite) ? RETIRED_SUITE_SUCCESSORS[r.suite] : null
+    if (successors) return successors.every((suite) => coveredAfterFix({ ...r, suite }))
+    return coveredAfterFix(r)
+  }
+  const coveredAfterFix = (r) =>
+    all.some(
       (later) =>
         later &&
         later.partial !== true &&
@@ -1319,7 +1327,6 @@ export function unexplainedRuns(runs, since, options) {
         // that is not a claim a text edit may create.
         runVerdict(later, { openPoints }).covers,
     )
-  }
   /**
    * WAS THE LOST MEASUREMENT TAKEN AGAIN (point 734)? A covering run of the SAME
    * suite on the SAME backend, later than this one and on code since the last
@@ -1726,6 +1733,14 @@ export function baselineFor(state, branch) {
  *
  * Anything else keeps the old behaviour exactly.
  */
+/** Suite names old records still carry that no longer run: `polish` was split by
+ *  theme in point 1129. Kept local — the isolated guard harness cannot import
+ *  scripts/verify/. */
+const RETIRED_SUITE_SUCCESSORS = {
+  polish: ['polish-panorama', 'polish-speech', 'polish-settlement', 'polish-children', 'polish-villagers'],
+}
+const RETIRED_SUITES = Object.keys(RETIRED_SUITE_SUCCESSORS)
+
 export function suggestSuite(runs, changedRenderPaths) {
   if (
     Array.isArray(changedRenderPaths) &&
@@ -1737,7 +1752,7 @@ export function suggestSuite(runs, changedRenderPaths) {
   if (Array.isArray(runs)) {
     for (let i = runs.length - 1; i >= 0; i--) {
       const s = runs[i] && runs[i].suite
-      if (typeof s === 'string' && s !== '' && s !== 'unknown') return s
+      if (typeof s === 'string' && s !== '' && s !== 'unknown' && !RETIRED_SUITES.includes(s)) return s
     }
   }
   return 'enrichments'

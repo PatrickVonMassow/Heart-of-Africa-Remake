@@ -27,7 +27,7 @@
 // Everything here is data-in / data-out so the Vitest layer can pin it; all
 // process work lives elsewhere — the record file and the frame scan in
 // run-record.mjs, the blocking wait in run-wait.mjs, the writing in run-logged.mjs.
-import { laneFor, parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
+import { POLISH_THEME_SUITES, laneFor, parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
 import {
   PROGRESS_LEASE_MS, SUITE_CEILING_MS, WAIT_EXPECTATION_FLOOR_MS, WAIT_LEASE_CAP_MS,
 } from '../wait-lease-core.mjs'
@@ -41,6 +41,11 @@ import {
  *
  * Keep in lockstep with that table — run-wait-core.test.mjs parses the document
  * and fails when a number here no longer matches it.
+ *
+ * `polish` stays here as the MEASUREMENT it was although no suite of that name
+ * runs any more: point 1129 split it into the five POLISH_THEME_SUITES, which
+ * nothing has timed yet and which UNMEASURED_SUITES therefore names. Its row is
+ * no planning figure for a single theme — a theme is a fraction of that pass.
  */
 export const SUITE_RUNTIME_S = Object.freeze({
   enrichments: 951.1,
@@ -95,7 +100,7 @@ export const SUITE_FRAMES = Object.freeze({
  * rather than silently treated as zero — an estimate that quietly omits a suite
  * is how a wait comes out too short and the poll loop returns.
  */
-export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup', 'report', 'crossbrowser', 'communication'])
+export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup', 'report', 'crossbrowser', 'communication', ...POLISH_THEME_SUITES])
 
 /**
  * Their FRAME counts, which — unlike their runtimes — can be established by
@@ -109,8 +114,16 @@ export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup
  * Without `startup` here every clean LARGE run reported one frame MORE than it
  * expected, and a permanent false alarm is how a reader learns to skip the one
  * line that would have caught a missing picture.
+ *
+ * The five `polish-*` theme suites were counted from their source at the split
+ * (point 1129, 01.10.2026): every distinct frame name a section shoots, a
+ * templated name once per value it takes. Together 78 against the 21 the
+ * August table measured for the whole `polish` — the suite had grown since.
  */
-export const COUNTED_SUITE_FRAMES = Object.freeze({ docs: 0, 'board-layout': 0, startup: 1, report: 0, crossbrowser: 0, communication: 48 })
+export const COUNTED_SUITE_FRAMES = Object.freeze({
+  docs: 0, 'board-layout': 0, startup: 1, report: 0, crossbrowser: 0, communication: 48,
+  'polish-panorama': 13, 'polish-speech': 9, 'polish-settlement': 18, 'polish-children': 15, 'polish-villagers': 23,
+})
 
 /** When the runtime/shot table was measured — printed with a frames verdict, so
  *  a reader can tell "the table is older than the suites" from "a suite stopped
@@ -149,8 +162,10 @@ export const SEPTEMBER_BANDS = Object.freeze({
       medianMin: 118.8,
       note: 'eight further LARGE runs aborted early, 0.4–42.1 min (median 4.6)',
     }),
+    // Measured on the whole `polish` before point 1129 split it by theme: the
+    // shape it describes is now ALL FIVE theme suites in one backend's pass.
     polish: Object.freeze({
-      label: 'whole `polish`, one backend',
+      label: 'whole `polish` (now its five theme suites together), one backend',
       n: 6,
       lowMin: 9.9,
       highMin: 61.5,
@@ -163,7 +178,9 @@ export const SEPTEMBER_BANDS = Object.freeze({
       lowMin: 0.2,
       highMin: 7.4,
       medianMin: 2.9,
-      measuredOn: 'polish',
+      // The sections were measured inside `polish`; each now lives, unchanged,
+      // in one of its theme suites, so a section of any theme is that population.
+      measuredOn: POLISH_THEME_SUITES,
       note: 'the plan above quotes the WHOLE suite — the six whole `polish` passes of the same window ran 9.9–61.5 min, median 55.2',
     }),
   }),
@@ -182,7 +199,7 @@ export function observedBand({ isLargeEquivalent = false, passes = 1, section = 
     // The band was measured on `polish` sections alone. Reported for another
     // suite it names the suite it did NOT cover, rather than quoting polish's
     // minutes as if they were enrichments'.
-    const elsewhere = list.length === 1 && list[0] !== kinds.section.measuredOn ? list[0] : ''
+    const elsewhere = list.length === 1 && !kinds.section.measuredOn.includes(list[0]) ? list[0] : ''
     return { key: 'section', ...kinds.section, elsewhere }
   }
   // THE BAND MUST MATCH THE SHAPE THAT WAS MEASURED (Astra, four-eyes round 1).
@@ -190,7 +207,9 @@ export function observedBand({ isLargeEquivalent = false, passes = 1, section = 
   // one pass and roughly half the work, and handing it a 115–121 min band would
   // make a normal run look fast rather than say nothing.
   if (isLargeEquivalent) return passes >= 2 ? { key: 'large', ...kinds.large } : null
-  if (list.length === 1 && list[0] === 'polish') return { key: 'polish', ...kinds.polish }
+  if (list.length === POLISH_THEME_SUITES.length && POLISH_THEME_SUITES.every((s) => list.includes(s))) {
+    return { key: 'polish', ...kinds.polish }
+  }
   return null
 }
 

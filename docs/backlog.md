@@ -9,6 +9,21 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-10-01 parked work-order point 1257. On WebGL 2 the loom helper never walks the warp inside the section's waits — parked by point 1258 while the loom is
+  switched off (`loom.placed: false`, user 29.09.2026); reopen as a point when it is switched on.
+  Original text:
+    Source: covering WebGL 2 pass of point 1254 (01.10.2026, log
+    `local/verify-logs/2026-10-01T16-54-15-528-polish.log`, feat/1254 7c497edd1).
+    THE RED. `VERIFY_GL=webgl npm test -- polish --section=village-loom`: "the weaver's call sends
+    her helper part-way along the warp, and he is walking it OUT under her reading" (60 s wait)
+    and "once the helper has tended an end, the two warp ends differ" (90 s wait) both time out.
+    On WebGPU the same commit read both green (log `2026-10-01T16-15-27-118-polish.log`), and
+    1254 changes only two React keys, so this is a WebGL-2-only moment-catcher, not 1254's.
+    Final state: the cause is named with its measurement (frame rate, loom clock or wait
+    width) and both checks are green on WebGL 2, or reclassified under point 642.
+    Tests: the existing Playwright checks; no new mechanism.
+    Bundle: Dorfleben.
+    Criticality: low — WebGL-2-only, may wait for the next LARGE (CLAUDE.md §7.2).
 - 2026-10-01 point 1246 picture check — `687-bank-play-rocks.png` shows the caller's
   speech bubble anchored at the near rock while the calling child itself stands hidden
   behind that rock from the camera; the bubble reads as spoken by the stone. No occlusion
@@ -2038,3 +2053,26 @@ From closing 1248: on 30.09.2026 the lock released to c3fd94cf was taken by the 
 tick at 13:35:58 although the claimant window was alive, because the pick-up cap
 (`HOA_CLAIM_MAX_MIN`, 30 min = 2 ticks, points 446/461) had expired. Open question, no change made:
 should a live claimant outlast the cap, renew its `activityAt`, or should the cap be recalibrated?
+
+From the picture check of 1256 (02.10.2026): the continuous-route frame `03-empty-jar`
+(communication, WebGPU) tilts toward the ground; the carrier with the empty jar sits cut at the
+top-left corner. The subject is barely in frame. No player impact.
+
+From the landing of 1262 (02.10.2026): `land-point.mjs` runs its fast gate before the tick, so a
+`RED_CHARGES` entry owned by the landed point expires only afterwards and reds
+`render-verify-core.test.mjs` ("charges only points the work order still holds OPEN") in the
+pre-push gate of main. Repaired by hand (5066489a2). The tick step could drop the landed point's
+charges. Infrastructure freeze: deferred.
+
+From the cross-vendor review of 1129 (02.10.2026, carried verbatim from the old `polish.mjs`):
+in `polish-children`, `heldToTheEnd = holdTrace.length >= 6` accepts six samples taken anywhere
+before a contact hold ends, so a hold read from mid-way still passes "the whole hold was read";
+and the end-hold camera scores `-|sin(a - base)| * 2`, which favours bearings along the pair's
+axis, while the free partner is left out of the clearance check. Possible false approval of a
+frame check, no player impact. Infrastructure freeze: deferred.
+
+From the picture check of 1129 (02.10.2026): `690-cairo-children` (polish-children,
+`children-motion`) frames the child well on WebGPU, but on WebGL 2 the child stands cut off at
+the lower-left edge, and main's frame from the unsplit `polish` shows no child at all. The aim
+is taken before the shot while the child keeps walking; the shutter accepts the projection.
+Pre-existing, test-frame aim only, no player impact. Infrastructure freeze: deferred.

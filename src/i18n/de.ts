@@ -229,6 +229,7 @@ export const de: Strings = {
     findTooltip: 'Vor dem Oberhaupt anklicken, um es ihm in die Hände zu legen',
     webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar – das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
     webglFallbackDismiss: 'Verstanden',
+    rendererUnavailable: 'Grafik-Hinweis: Dieses Gerät oder dieser Browser bietet weder WebGPU noch WebGL 2 – die Spielwelt kann nicht gezeichnet werden.',
     fps: (fps) => `${fps} FPS`,
     healthBar: 'Gesundheit',
     movementPenalty: {

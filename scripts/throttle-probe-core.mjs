@@ -102,7 +102,7 @@ export function parseProbeArgs(argv) {
     if (out.error) break
   }
   if (!out.error && !out.help) {
-    if (!out.suite) out.error = 'name the suite to probe, e.g. `polish --section=goat-stance`'
+    if (!out.suite) out.error = 'name the suite to probe, e.g. `polish-panorama --section=panorama-wildlife`'
     else if (!out.section) {
       out.error = `--section=<name> is required: the probe measures ONE named block of ${out.suite}, never the whole suite`
     }

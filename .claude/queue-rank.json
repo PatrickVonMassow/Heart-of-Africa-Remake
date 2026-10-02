@@ -1267,12 +1267,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1116": {
-      "at": "2026-09-12T10:20:24.828Z",
-      "why": "Spielfehler: Auf der mobilen Bahn startet die Darstellung gar nicht, und das Rot kann auf keinem anderen Weg schliessen.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1119": {
       "at": "2026-09-12T21:24:19.202Z",
       "why": "Last is right: it stands beside its siblings 1114/1115/1116, the same class of pre-existing check red filed by a run, and nothing waits on it — the point it was found in (1087) is closed by measuring the load hypothesis, not by repairing this check.",
@@ -1423,12 +1417,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1219": {
-      "at": "2026-09-26T07:11:11.320Z",
-      "why": "Reproduced red, charged; behind the release work already ordered",
-      "origin": "machine",
-      "place": "last"
-    },
     "1220": {
       "at": "2026-09-26T19:56:57.795Z",
       "why": "low-criticality layout overlap; no reason to jump ahead of the settled order",
@@ -1531,21 +1519,57 @@
       "origin": "machine",
       "place": "last"
     },
-    "1251": {
-      "at": "2026-09-30T21:32:47.656Z",
-      "why": "user 30.09.2026: ordinary bug report, end of the order",
-      "origin": "user",
-      "place": "last"
-    },
-    "1252": {
-      "at": "2026-10-01T05:49:11.014Z",
-      "why": "User order 01.10.2026: queue directly after the seriesCycles commit, i.e. at the front of the work order",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1253": {
       "at": "2026-10-01T05:56:11.111Z",
       "why": "Test-coverage lesson from 1250; no player-visible change, so it waits behind the user-ordered front",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1263": {
+      "at": "2026-10-02T06:55:05.825Z",
+      "why": "WebGL-2-only red, which may wait for the next LARGE (CLAUDE.md §7.2); no player report behind it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1264": {
+      "at": "2026-10-02T08:26:41.464Z",
+      "why": "Low-criticality cosmetic pestle gap; behind the open village-life points, no user waits on it",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1265": {
+      "at": "2026-10-02T12:02:39.074Z",
+      "why": "pre-existing shore-timing red found on 1129's covering pass; no other point waits on it, so it queues behind the settled order",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1266": {
+      "at": "2026-10-02T12:02:39.192Z",
+      "why": "the loom is switched off for the player; reopened only to own its red, so last is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1267": {
+      "at": "2026-10-02T14:50:18.557Z",
+      "why": "a low-criticality detector false positive charged to its own point; it blocks no landing, so last is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1268": {
+      "at": "2026-10-02T16:28:47.963Z",
+      "why": "low-criticality test-infra red, first occurrence; behind the open Testinfrastruktur work, no player impact measured",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1269": {
+      "at": "2026-10-02T17:58:46.614Z",
+      "why": "low-criticality test-infra red, first occurrence on WebGL 2; behind the open Testinfrastruktur work, no player impact",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1270": {
+      "at": "2026-10-02T19:14:30.224Z",
+      "why": "low-criticality test-infra red, first occurrence on WebGL 2; behind the open Testinfrastruktur work, no player impact",
       "origin": "machine",
       "place": "last"
     }
@@ -1577,7 +1601,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-01T05:56:11.126Z",
+    "at": "2026-10-02T19:14:30.232Z",
     "points": [
       184,
       200,
@@ -1955,7 +1979,6 @@
       1111,
       1114,
       1115,
-      1116,
       1117,
       1118,
       1119,
@@ -1963,8 +1986,6 @@
       1121,
       1122,
       1123,
-      1129,
-      1132,
       1144,
       1153,
       1163,
@@ -1987,7 +2008,6 @@
       1214,
       1215,
       1217,
-      1219,
       1220,
       1221,
       1222,
@@ -2005,10 +2025,16 @@
       1242,
       1243,
       1244,
-      1249,
-      1251,
-      1252,
-      1253
+      1253,
+      1261,
+      1263,
+      1264,
+      1265,
+      1266,
+      1267,
+      1268,
+      1269,
+      1270
     ]
   }
 }

@@ -9,7 +9,7 @@ import {
 import { DEV_SUITES, SERVERLESS_SUITES, WEBGL_ONLY_SUITES } from './tiers.mjs'
 import { MAX_RUNS, SUITE_SINK_ENV, appendSuiteSink } from '../render-verify-state.mjs'
 
-const ARGS = ['polish', '--section=adult-errands']
+const ARGS = ['polish-villagers', '--section=adult-errands']
 const green = (overrides = {}) => ({
   args: ARGS, head: 'abc123', verifyGl: null, status: 'finished', exitCode: 0, cleanAtStart: true,
   finishedAt: 60_000, receipt: { exitCode: 0, green: true }, ...overrides,
@@ -28,8 +28,8 @@ describe('run-logged green receipts', () => {
 
   it.each([
     { head: 'changed' }, { argv: ['settings', '--section=adult-errands'] },
-    { argv: ['polish', '--section=other'] }, { argv: ['polish'] },
-    { argv: ['large'] }, { argv: ['polish', 'settings'] },
+    { argv: ['polish-villagers', '--section=other'] }, { argv: ['polish-villagers'] },
+    { argv: ['large'] }, { argv: ['polish-villagers', 'settings'] },
     { argv: [...ARGS, '--baseline'] }, { verifyGl: 'webgl' },
     { again: true }, { clean: false }, { head: null },
     { environment: cacheEnvironment({ VERIFY_SEED: '1234' }) },
@@ -92,11 +92,11 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
     path: 'large.log.run.json',
     record: {
       args: ['large'], head: 'old1234', verifyGl: null, status: 'finished', exitCode: 1, cleanAtStart: true,
-      finishedAt: 1000, receipt: { exitCode: 1, green: false, failing: [{ name: 'polish' }] }, suiteRuns, ...overrides,
+      finishedAt: 1000, receipt: { exitCode: 1, green: false, failing: [{ name: 'polish-villagers' }] }, suiteRuns, ...overrides,
     },
   })
-  // polish on WebGPU went red on a check TODAY's ledger does not charge.
-  const loose = { polish: { exit: 1, reds: [{ name: 'a red nobody owns', kind: 'check' }] } }
+  // polish-villagers on WebGPU went red on a check TODAY's ledger does not charge.
+  const loose = { 'polish-villagers': { exit: 1, reds: [{ name: 'a red nobody owns', kind: 'check' }] } }
   const receipt = () => large([...passOf('webgl'), ...passOf('webgpu', loose)])
   const ask = (diff, overrides = {}) => rejudgeLarge({
     records: [receipt()], argv: ['large'], head: 'new5678', verifyGl: undefined,
@@ -111,7 +111,7 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
   })
 
   it('re-judges against the CURRENT ledger: a red charged today to an open point is covered', () => {
-    const ledger = [{ point: 42, suite: 'polish', match: /^a red nobody owns$/ }]
+    const ledger = [{ point: 42, suite: 'polish-villagers', match: /^a red nobody owns$/ }]
     const result = ask(['scripts/render-verify-charges.mjs'], { openPoints: [42], ledger })
     expect(result.covered.map((c) => c.backend)).toEqual(['webgl', 'webgpu'])
     expect(result.missing).toEqual([])
@@ -122,15 +122,15 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
     expect(ask(['docs/backlog.md', 'src/game/store.ts']).missing).toEqual(['webgl', 'webgpu'])
   })
 
-  it.each(['vite.config.ts', 'package-lock.json', 'public/favicon.svg', 'scripts/closing-guard-core.mjs', 'scripts/verify/polish.mjs'])(
+  it.each(['vite.config.ts', 'package-lock.json', 'public/favicon.svg', 'scripts/closing-guard-core.mjs', 'scripts/verify/polish-villagers.mjs'])(
     'runs everything for a path outside the neutral set (fail closed): %s', (path) => {
       expect(isNeutralPath(path)).toBe(false)
       expect(ask([path]).missing).toEqual(['webgl', 'webgpu'])
     })
 
   it('does not re-judge a red whose run record is incomplete — that backend reruns', () => {
-    const ledger = [{ point: 42, suite: 'polish', match: /^a red nobody owns$/ }]
-    const incomplete = { polish: { ...loose.polish, truncated: true } }
+    const ledger = [{ point: 42, suite: 'polish-villagers', match: /^a red nobody owns$/ }]
+    const incomplete = { 'polish-villagers': { ...loose['polish-villagers'], truncated: true } }
     const records = [large([...passOf('webgl'), ...passOf('webgpu', incomplete)])]
     const result = ask([], { records, openPoints: [42], ledger })
     expect(result.missing).toEqual(['webgpu'])
@@ -139,7 +139,7 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
 
   it('never re-judges an old receipt without suite records, a missing suite, or a non-ancestor', () => {
     expect(ask([], { records: [large(undefined)] }).missing).toEqual(['webgl', 'webgpu'])
-    const short = large(passOf('webgl').filter((r) => r.suite !== 'polish'))
+    const short = large(passOf('webgl').filter((r) => r.suite !== 'polish-villagers'))
     expect(ask([], { records: [short] }).missing).toEqual(['webgl', 'webgpu'])
     expect(ask(null).missing).toEqual(['webgl', 'webgpu'])
   })
@@ -147,7 +147,7 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
   it('never re-judges when a non-browser step failed or the request is not an unfiltered LARGE', () => {
     const lint = large(passOf('webgl'), { receipt: { exitCode: 1, failing: [{ name: 'lint' }] } })
     expect(ask([], { records: [lint] }).missing).toEqual(['webgl', 'webgpu'])
-    expect(ask([], { argv: ['polish'] }).covered).toEqual([])
+    expect(ask([], { argv: ['polish-villagers'] }).covered).toEqual([])
     expect(ask([], { again: true }).covered).toEqual([])
   })
 
@@ -157,13 +157,13 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
   })
 
   it('snapshots only the full-suite records the run itself wrote', () => {
-    const runs = [suiteRun('polish', 'webgl'), suiteRun('polish', 'webgl', { head: 'other' }),
-      suiteRun('polish', 'webgl', { partial: true }), suiteRun('polish', 'webgl', { startedAt: 1 })]
+    const runs = [suiteRun('polish-villagers', 'webgl'), suiteRun('polish-villagers', 'webgl', { head: 'other' }),
+      suiteRun('polish-villagers', 'webgl', { partial: true }), suiteRun('polish-villagers', 'webgl', { startedAt: 1 })]
     expect(snapshotSuiteRuns(runs, { head: 'old1234', startedAt: 5, finishedAt: 30 })).toEqual([runs[0]])
   })
 
   it('rejects an exit-zero record that carries an unowned red', () => {
-    const quiet = { polish: { exit: 0, reds: [{ name: 'a red nobody owns', kind: 'check' }] } }
+    const quiet = { 'polish-villagers': { exit: 0, reds: [{ name: 'a red nobody owns', kind: 'check' }] } }
     const records = [large([...passOf('webgl'), ...passOf('webgpu', quiet)])]
     expect(ask([], { records }).missing).toEqual(['webgpu'])
     expect(rejudgeBackend(records[0].record, 'webgpu', { openPoints: [], ledger: [] }).reason).toMatch(/no open point owns/)
@@ -177,7 +177,7 @@ describe('re-judging a LARGE receipt across a render-neutral diff', () => {
         .map((r, i) => ({ ...r, suite: `${r.suite}-${i}` }))
       expect(all.length).toBeGreaterThan(MAX_RUNS)
       for (const r of all) appendSuiteSink(r, { [SUITE_SINK_ENV]: sink })
-      appendSuiteSink(suiteRun('polish', 'webgl'), {})
+      appendSuiteSink(suiteRun('polish-villagers', 'webgl'), {})
       const snap = snapshotSuiteRuns(readSuiteSink(sink), { head: 'old1234', startedAt: 5, finishedAt: 30 })
       expect(snap).toEqual(all)
       const full = [...passOf('webgl'), ...passOf('webgpu')]

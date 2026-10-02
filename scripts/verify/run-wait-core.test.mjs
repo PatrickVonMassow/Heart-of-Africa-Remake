@@ -31,7 +31,10 @@ import {
   suiteRuntimeMs,
   waitPlan,
 } from './run-wait-core.mjs'
-import { DEV_SUITES, SMALL_SUITES } from './tiers.mjs'
+import { DEV_SUITES, POLISH_THEME_SUITES, SMALL_SUITES } from './tiers.mjs'
+
+/** The five polish theme suites' counted frames (point 1129). */
+const POLISH_FRAMES = POLISH_THEME_SUITES.reduce((n, s) => n + COUNTED_SUITE_FRAMES[s], 0)
 import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -163,9 +166,12 @@ describe('the measured constants stay in lockstep with docs/picture-check-cost.m
     expect(Math.round(expectedRuntimeMs(SMALL_SUITES).ms / 100) / 10).toBe(469.3)
     // LARGE, one backend: the document's 93 shots plus `startup`'s single frame,
     // which the recorder never logged; 2536.0 s over the suites plus the preview.
+    // Since point 1129 the measured `polish` row (21 shots, 340.9 s) is replaced
+    // by its five theme suites, whose frames are counted and whose runtime is
+    // named unmeasured.
     const large = [...DEV_SUITES, 'preview']
-    expect(expectedFrames(large).frames).toBe(94 + COUNTED_SUITE_FRAMES.communication)
-    expect(Math.round(expectedRuntimeMs(large).ms / 100) / 10).toBe(2536.0)
+    expect(expectedFrames(large).frames).toBe(94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication)
+    expect(Math.round(expectedRuntimeMs(large).ms / 100) / 10).toBe(Math.round((2536.0 - SUITE_RUNTIME_S.polish) * 10) / 10)
   })
 })
 
@@ -176,7 +182,7 @@ describe('planRun — what the command will really do', () => {
     expect(plan.suites).toContain('preview')
     // 2536.0 s (full pass + preview) + the render-only WebGPU pass.
     expect(plan.expectedMs).toBeGreaterThan(2_536_000)
-    expect(plan.expectedFrames).toBe(94 + COUNTED_SUITE_FRAMES.communication)
+    expect(plan.expectedFrames).toBe(94 - SUITE_FRAMES.polish + POLISH_FRAMES + COUNTED_SUITE_FRAMES.communication)
   })
 
   it('reports the LANE a suite really opens, not the pass it sits in', () => {
@@ -330,9 +336,12 @@ describe('the observed band a plan prints under its expectation (point 1083)', (
     expect(lines.join('\n')).toContain('not a target')
   })
 
-  it('gives a whole polish pass its own band, and the section run the cheap one', () => {
-    expect(planRun({ argv: ['polish'], verifyGl: 'webgpu' }).observedBand?.key).toBe('polish')
-    const section = planRun({ argv: ['polish', '--section=adult-errands'], verifyGl: 'webgpu' })
+  it('gives the whole former polish (all five themes) its band, and a theme section the cheap one', () => {
+    expect(planRun({ argv: [...POLISH_THEME_SUITES], verifyGl: 'webgpu' }).observedBand?.key).toBe('polish')
+    // One theme is a fraction of that pass, so nothing measured its shape.
+    expect(planRun({ argv: ['polish-villagers'], verifyGl: 'webgpu' }).observedBand).toBeNull()
+    const section = planRun({ argv: ['polish-villagers', '--section=adult-errands'], verifyGl: 'webgpu' })
+    expect(section.observedBand?.elsewhere).toBe('')
     expect(section.section).toBe('adult-errands')
     expect(section.observedBand?.key).toBe('section')
     // The expectation above it is still the WHOLE suite's, and the band says so.

@@ -13,6 +13,7 @@ import {
   WATER_PATH_HEAD_RADII,
   WATER_PATH_WIDTH,
   WATER_STAND_RADIUS,
+  WATER_STAND_WORK_RING,
   buildLayout,
   fenceColliders,
   fencePanels,
@@ -30,6 +31,8 @@ import { buildRiverBank, inBankPlayLane } from './riverBank'
 import { mulberry32 } from '../../world/noise'
 import { VILLAGE_SPOTS } from './lifeSpots'
 import { WARP_BODY_RADIUS } from './loom'
+import { WORK_ARRIVE_RADIUS } from './adultWork'
+import { balance } from '../../config/balance'
 
 // The landmark boulder is placed against the REAL terrain (it refuses every wet
 // spot — work-order 585), so this file needs the elevation dataset the browser
@@ -122,6 +125,22 @@ describe('the village water path (work-order 688)', () => {
       const label = `${id}@${seed}`
       expect(layout.waterPath, label).not.toBeNull()
       expect(layout.waterStand, label).not.toBeNull()
+      // BOTH RIVER WORDS FALL ON THE STAND'S WORK RING, a walker's arrival
+      // radius out at most, and that whole reach clears every place the
+      // children speak by the hearing radius — the quarter's rim, both play
+      // rocks and the descent (bambara-village seed 42 put the sender 6.2 m
+      // from the quarter's rim).
+      const stand = layout.waterStand!
+      const g = layout.playGround!
+      const voice = WATER_STAND_WORK_RING + WORK_ARRIVE_RADIUS
+      const toChildren = Math.min(
+        Math.hypot(stand.x - g.x, stand.z - g.z) - g.radius,
+        Math.hypot(stand.x - layout.playRocks!.upstream.x, stand.z - layout.playRocks!.upstream.z),
+        Math.hypot(stand.x - layout.playRocks!.downstream.x, stand.z - layout.playRocks!.downstream.z),
+        Math.hypot(stand.x - layout.bank!.bank.x, stand.z - layout.bank!.bank.z),
+      )
+      expect(toChildren - voice, `${label}: the stand's speakers to the children`)
+        .toBeGreaterThanOrEqual(balance.communication.hearingRadius)
       const path = layout.waterPath!
       const lane = layout.paths.find((p) => p.width === WATER_PATH_WIDTH
         && p.points[0][0] === path.head.x && p.points[0][1] === path.head.z)

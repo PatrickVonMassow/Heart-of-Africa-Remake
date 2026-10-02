@@ -23,6 +23,8 @@
 //   BASE_URL=http://localhost:5173/ CROSSBROWSER_DEPTH=standard node scripts/verify/crossbrowser.mjs
 import { chromium, firefox, webkit } from 'playwright'
 import { applySeedRoute } from './verify-seed.mjs'
+import { splitConsoleErrors } from './vite-reload-signal.mjs'
+import { webglLaunchOptions } from './launch-args-core.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const DEPTH = ['minimal', 'standard', 'thorough'].includes(process.env.CROSSBROWSER_DEPTH ?? '')
@@ -42,7 +44,12 @@ async function launchOrSkip(label, engine) {
   try {
     // The world seed by the shared route (point 557) — one engine must not meet a
     // different settlement layout than the next, or an engine-specific red is a draw.
-    return applySeedRoute(await engine.launch())
+    // Chromium gets the host's WebGL 2 lane options, as every other suite does: a bare
+    // launch inherits the container's stale DISPLAY, its GPU process exits and the page
+    // has no GL context at all (measured 01.10.2026 — the mobile renderer then never
+    // starts). Gecko/WebKit keep their defaults.
+    const options = engine === chromium ? webglLaunchOptions(process.platform, process.env.VERIFY_ANGLE, process.env, process.env.VERIFY_GALLIUM) : undefined
+    return applySeedRoute(await engine.launch(options))
   } catch (e) {
     const msg = String(e.message)
     if (/Executable doesn't exist|not found|install/i.test(msg)) {
@@ -52,6 +59,13 @@ async function launchOrSkip(label, engine) {
     check(label, 'engine launches', false, msg.slice(0, 120))
     return null
   }
+}
+// Console errors minus vite's optimize-dep reload signal (a dev-server cache
+// state, not a game error); the signals are still printed so the record shows them.
+const consoleCheck = (label, name, errors) => {
+  const { failures, reloadSignals } = splitConsoleErrors(errors)
+  if (reloadSignals.length > 0) console.log(`NOTE  ${label.padEnd(15)} vite optimize-dep reload signal (504) seen ${reloadSignals.length}x — not a console error`)
+  check(label, name, failures.length === 0, failures.slice(0, 3).join(' | '))
 }
 const boot = async (page) => {
   await page.goto(BASE, { waitUntil: 'domcontentloaded' })
@@ -127,7 +141,7 @@ for (const [label, engine] of [['firefox', firefox], ['webkit', webkit]]) {
       check(label, 'the map overlay opens', flows.mapOpen === true, JSON.stringify(flows))
       check(label, 'the journal opens', flows.journalOpen === true, JSON.stringify(flows))
     }
-    check(label, 'no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
+    consoleCheck(label, 'no console errors', errors)
   } catch (e) {
     check(label, 'smoke completes without a thrown error', false, String(e.message).slice(0, 160))
   } finally {
@@ -176,7 +190,7 @@ if (at('standard')) {
         })
         check(label, 'the mobile quality preset applied (TRAA/SSAO off, half shadows)', preset.traaOff && preset.ssaoOff && preset.halfShadows, JSON.stringify(preset))
       }
-      check(label, 'no console errors on mobile', errors.length === 0, errors.slice(0, 3).join(' | '))
+      consoleCheck(label, 'no console errors on mobile', errors)
     } catch (e) {
       check(label, 'mobile smoke completes without a thrown error', false, String(e.message).slice(0, 160))
     } finally {
