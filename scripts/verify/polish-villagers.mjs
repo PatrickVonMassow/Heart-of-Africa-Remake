@@ -2652,10 +2652,19 @@ if (section('adult-errands')) {
           `lens (${still.px.toFixed(1)}, ${still.pz.toFixed(1)}) yaw ${still.yaw.toFixed(2)} pitch ${still.pitch.toFixed(2)}`,
       )
       await nextFrames(1)
+      // READ AT THE SHUTTER, not off the sample above (work-order 1108): held
+      // still he still walks, and a carrier who delivers his jar between that
+      // sample and the exposure would be photographed empty-handed while a
+      // check of the sample passed.
+      const atShutter = await page.evaluate((w) => {
+        const v = window.__placeErrands().villagers[w]
+        return { x: v.x, z: v.z, carry: v.carry }
+      }, returning.who)
       check(
         'and he is still under it at the shutter, rather than having set it down',
-        still.carry === 'fullJar',
-        `carrying ${still.carry}, ${Math.hypot(still.x - returning.x, still.z - returning.z).toFixed(2)} m on`,
+        atShutter.carry === 'fullJar',
+        `carrying ${atShutter.carry}, ${Math.hypot(atShutter.x - returning.x, atShutter.z - returning.z).toFixed(2)} m on, ` +
+          `${Math.hypot(atShutter.x - still.x, atShutter.z - still.z).toFixed(2)} m since the aim`,
       )
       await frame('1087-village-carrier-returns-with-water', {
         local: { x: still.x, y: 1.5, z: still.z },
