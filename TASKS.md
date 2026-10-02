@@ -104,24 +104,6 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: medium — the water errand is part of the lively settlement (§7.1 no. 15) and the
   red blocks every covering communication proof.
-- [ ] 1256. A RIVER order falls 6.2 m from the children's roaming quarter
-  Source: covering WebGPU passes of point 1254 (01.10.2026).
-  THE RED. `polish --section=adult-errands`: "and no adult word ever falls inside the
-  children`s earshot — nearest utterance to the children: RIVER at 6.2 m from the roaming
-  quarter's rim" (limit > 10 m; log `local/verify-logs/2026-10-01T16-19-01-472-polish.log`,
-  feat/1254 7c497edd1).
-  IT IS NOT POINT 1254'S: the same reading stood before the key fix (6.2 m on feat/1129
-  78ea39b at 14:41Z, 6.3 m at 15:18Z). No log before 01.10 records this check's value.
-  Likely the water stand or the roaming quarter moved with the bank game's move upstream
-  (0bd2d2992) or the boundary growth (22ec01c17).
-  Final state:
-  - The cause is named with its measurement; no adult word falls within 10 m of the
-    roaming quarter's rim (the earshot rule itself unchanged).
-  - `polish(-villagers) --section=adult-errands` reads the earshot check green on WebGPU.
-  Tests: the existing Playwright check is the right layer; no new mechanism.
-  Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
-  Bundle: Dorfleben.
-  Criticality: medium — an adult order is spoken inside the children's game.
 - [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
   Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
   bambara-village, same session as point 1250.

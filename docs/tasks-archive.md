@@ -33116,3 +33116,22 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   user 01.10.2026: "Diese Regel finde ich unsinnig. Das würde bedeuten, dass die Kinder extra für den Spieler reden bzw. schweigen. Sie sollen ganz normal ihren Tätigkeiten nachgehen (wozu auch ihre Äußerungen gehören), unabgängig davon, ob der Spieler zuhört. Entferne alle Regeln in der Art "X nicht hören, bevor Y gehört wurde"."
   Bundle: Dorfleben.
   Criticality: medium — villagers stay silent for the player's sake, which the user rejects as unnatural.
+
+- [x] 1256. A RIVER order falls 6.2 m from the children's roaming quarter
+  Source: covering WebGPU passes of point 1254 (01.10.2026).
+  THE RED. `polish --section=adult-errands`: "and no adult word ever falls inside the
+  children`s earshot — nearest utterance to the children: RIVER at 6.2 m from the roaming
+  quarter's rim" (limit > 10 m; log `local/verify-logs/2026-10-01T16-19-01-472-polish.log`,
+  feat/1254 7c497edd1).
+  IT IS NOT POINT 1254'S: the same reading stood before the key fix (6.2 m on feat/1129
+  78ea39b at 14:41Z, 6.3 m at 15:18Z). No log before 01.10 records this check's value.
+  Likely the water stand or the roaming quarter moved with the bank game's move upstream
+  (0bd2d2992) or the boundary growth (22ec01c17).
+  Final state:
+  - The cause is named with its measurement; no adult word falls within 10 m of the
+    roaming quarter's rim (the earshot rule itself unchanged).
+  - `polish(-villagers) --section=adult-errands` reads the earshot check green on WebGPU.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
+  Bundle: Dorfleben.
+  Criticality: medium — an adult order is spoken inside the children's game.
