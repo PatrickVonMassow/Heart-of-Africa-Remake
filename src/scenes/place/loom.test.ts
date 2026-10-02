@@ -143,10 +143,11 @@ describe('a household gives way to the plaza’s view (work-order 1191)', () => 
   it('what was left unbuilt is named, and nothing is where the line was already open', () => {
     // Fang@42 keeps its nominal seat with the view open past every hut.
     expect(sharedLayout('fang-village', 42).gaveWayToLoom).toEqual({ households: 0, dwellings: 0, rebuilt: 0 })
-    // Seed 3: since work-order 1245 moved the children's stage upstream, the
-    // shipped plan 394349866 is seen without a household giving way, and 3 is
-    // the first Bambara plan that still needs one.
-    const bambara = sharedLayout('bambara-village', 3)
+    // Seed 4: since work-order 1245 moved the children's stage upstream, the
+    // shipped plan 394349866 is seen without a household giving way; 3 was the
+    // first Bambara plan that still needed one until the water stand moved out
+    // of the children's earshot and the re-enabled loom lost its plaza line there.
+    const bambara = sharedLayout('bambara-village', 4)
     expect(bambara.loom?.seenFromPlaza).toBe(true)
     expect(bambara.gaveWayToLoom.households).toBeGreaterThan(0)
     expect(bambara.gaveWayToLoom.dwellings).toBeGreaterThanOrEqual(bambara.gaveWayToLoom.households)

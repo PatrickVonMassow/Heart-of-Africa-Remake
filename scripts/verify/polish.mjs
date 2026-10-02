@@ -8356,6 +8356,9 @@ if (section('adult-errands')) {
     // frame's edge — while the shutter's subject test still passed. Each bearing
     // is therefore set, drawn, and READ BACK; the first one the ground actually
     // accepts, with a clear line to the subject, wins.
+    /** How far inside the settlement's edge a lens set beside a subject has
+     *  to stay: well clear of the leave check, and of the bank's wade limit. */
+    const CAMERA_EDGE_MARGIN = 8
     const placeCamera = async (subject, radius, pitch) => {
       // NEVER OUTSIDE THE SETTLEMENT. Putting the lens past the walkable region
       // does not merely move it: the leave check hands the player back to the
@@ -8364,12 +8367,23 @@ if (section('adult-errands')) {
       // frames of an empty river. A spot no further from the settlement's middle
       // than the subject himself stands for inland of him (the river lies
       // outward); it is a proxy, not the bank normal.
+      //
+      // A subject near the MIDDLE has no such spot at the distance asked — the
+      // water stand that moved out of the children's earshot stands 3.5 m from
+      // it — so a spot well inside the settlement's own boundary on its bearing
+      // (`__placeBoundaryRadius`, the edge the leave check uses) is accepted on
+      // a second pass, so a subject the first rule serves keeps its frame.
       const subjectR = Math.hypot(subject.x, subject.z)
-      for (let i = 0; i < 12; i++) {
+      for (const nearMiddle of [false, true]) for (let i = 0; i < 12; i++) {
         const bearing = (i / 12) * Math.PI * 2
         const cx = subject.x + Math.sin(bearing) * radius
         const cz = subject.z + Math.cos(bearing) * radius
-        if (Math.hypot(cx, cz) > subjectR) continue
+        const inward = Math.hypot(cx, cz) <= subjectR
+        if (inward === nearMiddle) continue
+        if (nearMiddle) {
+          const edge = await page.evaluate(([x, z]) => window.__placeBoundaryRadius(Math.atan2(z, x)), [cx, cz])
+          if (edge == null || Math.hypot(cx, cz) > edge - CAMERA_EDGE_MARGIN) continue
+        }
         const got = await page.evaluate(
           ([a, v, r, tilt]) =>
             new Promise((res) => {

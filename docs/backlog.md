@@ -2075,3 +2075,7 @@ From closing 1248: on 30.09.2026 the lock released to c3fd94cf was taken by the 
 tick at 13:35:58 although the claimant window was alive, because the pick-up cap
 (`HOA_CLAIM_MAX_MIN`, 30 min = 2 ticks, points 446/461) had expired. Open question, no change made:
 should a live claimant outlast the cap, renew its `activityAt`, or should the cap be recalibrated?
+
+From the picture check of 1256 (02.10.2026): the continuous-route frame `03-empty-jar`
+(communication, WebGPU) tilts toward the ground; the carrier with the empty jar sits cut at the
+top-left corner. The subject is barely in frame. No player impact.
