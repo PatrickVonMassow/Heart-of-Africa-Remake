@@ -15584,9 +15584,10 @@ to land than a mechanism that needs a review.
   User 29.09.2026: »Deine Empfehlung umsetzen und die Karte löschen«
   Bundle: Chat & Tafel.
   Criticality: low.
-- [ ] 1242. WebGL 2: the river beyond the plate rim is a different, darker water than at the bank
+- [ ] 1242. The river beyond the plate rim is a different, darker water than at the bank (both backends)
   MEASURED 30.09.2026 07:14Z, `VERIFY_GL=webgl npm test -- polish --section=adult-errands` on feat/1152 6922bdb2c: `the water beyond the plate's rim is the SAME water as the water at the bank (<= 12/255 per channel)` RED, far 11/92/104 against near 139/157/147, median step 127.5; its sibling `the handover zone itself carries neither band's edge` RED, median step 68.3. This is a STEADY red, not point 568's rotation (568 straddled 12-19): the same pair was red at step 99.6-126.1 in the LARGE runs of 26.09 and 28.09 (on both backends at 28.09 18:09Z and 21:55Z). On WebGPU the check was green on feat/1152 at 05:07Z, after point 1151's sky/water fix. Point 1152 (foam patches) did not cause it.
-  FINAL STATE: the far water continues the bank water's tone on WebGL 2, both checks are green there, and the WebGPU pair stays green.
+  ALSO RED ON WebGPU, measured 02.10.2026: the same pair red in the full `polish-villagers` pass on feat/1108 d6a9d37aa (median step 148.8 / 75.9; WebGL 2 25.1 / 12.5) and already on feat/1117 06312849a at 19:52Z (step 133.2) — before point 1108, which only moves the errand shots' cameras.
+  FINAL STATE: the far water continues the bank water's tone on BOTH backends and both checks are green there.
   Test: `polish --section=adult-errands` on both backends; a Vitest on the layer the fix touches.
   Refs: src/render/placeRiver.ts, scripts/verify/polish.mjs, point 568, point 1151.
   Bundle: Dorfleben.
