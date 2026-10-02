@@ -1752,4 +1752,14 @@ export const RED_CHARGES = [
       + 'the global dead-count flake point 200 already documents (24.07). The section alone at 487ad8d4f '
       + 'was green. The charge dies with 200.',
   },
+  {
+    point: 1267,
+    suite: 'polish-speech',
+    kind: 'console',
+    match: /^console error: \[ASSERT\] speech-inaudible\b/i,
+    why:
+      'MEASURED 02.10.2026 on feat/1129 9ff47b8f4, webgpu/polish-speech (artefact-give): the assert '
+      + 'read the speech bus at 0.000 right as the chief\'s drum answer ended — first occurrence in '
+      + 'all recorded logs; point 1267 owns the boundary read. The charge dies with point 1267.',
+  },
 ]
