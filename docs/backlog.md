@@ -9,28 +9,6 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
-- 2026-10-01 parked work-order point 1255. The loom's nearest open plaza stand moved from 16.4 m to 21.3 m, so it reads 64 px — parked by point 1258 while the loom is
-  switched off (`loom.placed: false`, user 29.09.2026); reopen as a point when it is switched on.
-  Original text:
-    Source: covering WebGPU passes of point 1254 (01.10.2026).
-    THE RED. `polish --section=village-loom`: "from the plaza the station stands at least 70 px
-    tall on the screen" — {"px":64.36,"viewport":900,"dist":21.285} (log
-    `local/verify-logs/2026-10-01T16-15-27-118-polish.log`, feat/1254 7c497edd1).
-    IT IS NOT POINT 1254'S, and that is measured: before the key fix (feat/1129 78ea39b, log
-    `2026-10-01T14-41-12-659-polish-children-polish-villagers.log`) the stand sat at the
-    identical 21.285 m and read 63.8 px. On 23.09.2026 (log `2026-09-23T11-16-36-279-polish.log`)
-    the same search found 16.4 m and 94.9 px. A layout change between 24.09 and 01.10 moved the
-    nearest plaza stand with a 1 m clear sight line outward; candidates in
-    `src/scenes/place/` include 0bd2d2992, a1f26c86c and 22ec01c17.
-    Final state:
-    - The commit that moved the stand is named with the reading on either side of it.
-    - Either the loom again reads from the plaza (>= 70 px from the nearest open stand), or the
-    threshold's premise is revised with the reason recorded.
-    - `polish(-villagers) --section=village-loom` green on WebGPU; frame 1183 picture-checked.
-    Tests: the existing Playwright check is the right layer; no new mechanism.
-    Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
-    Bundle: Dorfleben.
-    Criticality: medium — the plaza view shows the loom as a small figure, not a station.
 - 2026-10-01 parked work-order point 1257. On WebGL 2 the loom helper never walks the warp inside the section's waits — parked by point 1258 while the loom is
   switched off (`loom.placed: false`, user 29.09.2026); reopen as a point when it is switched on.
   Original text:
