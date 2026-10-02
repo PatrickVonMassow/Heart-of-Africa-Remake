@@ -2679,47 +2679,78 @@ if (section('adult-errands')) {
       // Side-on and close, a little above the jar rather than below it: the water
       // surface at the rim is the subject, and it is an ELLIPSE that closes as
       // the lens drops toward the jar's own height.
-      const live = await page.evaluate((w) => {
-        const v = window.__placeErrands().villagers[w]
-        return { x: v.x, z: v.z }
-      }, returning.who)
       // No bearing sweep: a search around a man on the bank keeps offering spots
-      // on the water side, and a lens there tears the scene down. Slightly DOWN,
-      // so the jar on his head is met from a little above and the water standing
-      // at its rim is an ellipse rather than an edge.
-      await page.evaluate((v) => {
-        const p = window.__placePlayer
-        const len = Math.max(0.001, Math.hypot(v.x, v.z))
-        // ACROSS his path, not along it. He walks INLAND, so a lens set inland
-        // of him is a lens he walks into — the frame came back filled by the
-        // shadowed flank of his own cone. The two directions square to the
-        // radial both lie on the ground he is walking on and are equally far
-        // from the settlement's middle, so the comparison below only breaks the
-        // tie; five metres leaves the composition intact even if he drifts a
-        // pace before the shutter.
-        const nx = v.x / len
-        const nz = v.z / len
-        const pick = (sx, sz) => Math.hypot(v.x + sx * 5, v.z + sz * 5)
-        const a = pick(-nz, nx) <= pick(nz, -nx) ? [-nz, nx] : [nz, -nx]
-        p.x = v.x + a[0] * 5
-        p.z = v.z + a[1] * 5
-        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
-        p.pitch = -0.04
-      }, live)
-      await nextFrames(2)
-      const still = await page.evaluate((w) => {
-        const v = window.__placeErrands().villagers[w]
-        const p = window.__placePlayer
-        // The last aim is taken at where he IS: even held still he covers
-        // ground between the placement and the exposure, and the first frames
-        // put him against the edge.
-        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
-        return {
-          x: v.x, z: v.z, carry: v.carry,
-          px: p.x, pz: p.z, yaw: p.yaw, pitch: p.pitch,
-          gap: Math.hypot(v.x - p.x, v.z - p.z),
-        }
-      }, returning.who)
+      // on the water side, and a lens there tears the scene down.
+      // ACROSS his path, not along it. He walks INLAND, so a lens set inland
+      // of him is a lens he walks into — the frame came back filled by the
+      // shadowed flank of his own cone. Both sides of the radial lie on the
+      // ground he is walking on; the side nearer the settlement's middle is
+      // tried first, the other is the fallback.
+      // JUDGED AT THE SHUTTER (work-order 1108): a fence panel in the near
+      // field or a neighbour across his line spoiled the frame on WebGL 2
+      // while every check passed, because none asked. So each candidate is
+      // placed, re-aimed, and judged from the lens read back against where
+      // everyone stands at the exposure; a spoiled one is re-chosen, and only
+      // an exhausted search reds.
+      const RETURN_TRIES = [[0, 5], [1, 5], [0, 6], [1, 6]]
+      let still = null
+      let atShutter = null
+      let spoiledBy = null
+      let tries = 0
+      for (const [side, dist] of RETURN_TRIES) {
+        tries++
+        await page.evaluate(([w, side, dist]) => {
+          const v = window.__placeErrands().villagers[w]
+          const p = window.__placePlayer
+          const len = Math.max(0.001, Math.hypot(v.x, v.z))
+          const nx = v.x / len
+          const nz = v.z / len
+          const pick = (sx, sz) => Math.hypot(v.x + sx * dist, v.z + sz * dist)
+          const near = pick(-nz, nx) <= pick(nz, -nx) ? [-nz, nx] : [nz, -nx]
+          const a = side === 0 ? near : [-near[0], -near[1]]
+          p.x = v.x + a[0] * dist
+          p.z = v.z + a[1] * dist
+          p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+          // Slightly DOWN, so the jar on his head is met from a little above
+          // and the water standing at its rim is an ellipse rather than an edge.
+          p.pitch = -0.04
+        }, [returning.who, side, dist])
+        await nextFrames(2)
+        still = await page.evaluate((w) => {
+          const v = window.__placeErrands().villagers[w]
+          const p = window.__placePlayer
+          // The last aim is taken at where he IS: even held still he covers
+          // ground between the placement and the exposure.
+          p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+          return {
+            x: v.x, z: v.z, carry: v.carry,
+            px: p.x, pz: p.z, yaw: p.yaw, pitch: p.pitch,
+            gap: Math.hypot(v.x - p.x, v.z - p.z),
+          }
+        }, returning.who)
+        await nextFrames(1)
+        // READ AT THE SHUTTER, not off the sample above: a carrier who delivers
+        // his jar between that sample and the exposure would be photographed
+        // empty-handed while a check of the sample passed.
+        atShutter = await page.evaluate((w) => {
+          const vs = window.__placeErrands().villagers
+          const e = window.__placeCamera.matrixWorld.elements
+          return {
+            x: vs[w].x, z: vs[w].z, carry: vs[w].carry,
+            lens: { x: e[12], z: e[14] },
+            unseen: window.__errandUnseen({
+              who: [w],
+              points: [{ name: 'his jar', x: vs[w].x, y: 1.9, z: vs[w].z }],
+            }),
+            others: vs.map((p, j) => ({ who: j, x: p.x, z: p.z })).filter((o) => o.who !== w),
+          }
+        }, returning.who)
+        const over = lineOverlapFrom(atShutter.lens, atShutter, atShutter.others)
+        spoiledBy = atShutter.unseen.length
+          ? `out of sight: ${atShutter.unseen.join(', ')}`
+          : over ? describeOverlap(over) : null
+        if (!spoiledBy || atShutter.carry !== 'fullJar') break
+      }
       // THE SUBJECT IS WHERE THE LENS IS, not merely somewhere in the picture.
       // Three aimings in a row came back showing an empty river with the carrier
       // a speck at the edge, and the shutter's own subject test passed every
@@ -2730,15 +2761,11 @@ if (section('adult-errands')) {
         `${still.gap.toFixed(2)} m from the lens — subject (${still.x.toFixed(1)}, ${still.z.toFixed(1)}), ` +
           `lens (${still.px.toFixed(1)}, ${still.pz.toFixed(1)}) yaw ${still.yaw.toFixed(2)} pitch ${still.pitch.toFixed(2)}`,
       )
-      await nextFrames(1)
-      // READ AT THE SHUTTER, not off the sample above (work-order 1108): held
-      // still he still walks, and a carrier who delivers his jar between that
-      // sample and the exposure would be photographed empty-handed while a
-      // check of the sample passed.
-      const atShutter = await page.evaluate((w) => {
-        const v = window.__placeErrands().villagers[w]
-        return { x: v.x, z: v.z, carry: v.carry }
-      }, returning.who)
+      check(
+        'and nothing stands between him and the lens at the shutter',
+        !spoiledBy,
+        spoiledBy ? `${spoiledBy}, after ${tries} of ${RETURN_TRIES.length} placements` : `clear on placement ${tries}`,
+      )
       check(
         'and he is still under it at the shutter, rather than having set it down',
         atShutter.carry === 'fullJar',
