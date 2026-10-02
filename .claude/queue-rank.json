@@ -1574,38 +1574,38 @@
       "place": "last"
     },
     "1271": {
-      "at": "2026-10-02T22:50:59.266Z",
-      "why": "User 03.10.2026: front group of the requests deposited 00:01-00:11, in the user's order",
-      "origin": "user",
-      "place": "ahead"
+      "at": "2026-10-02T23:55:53.830Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
     },
     "1272": {
-      "at": "2026-10-02T22:50:59.170Z",
-      "why": "User 03.10.2026: front group of the requests deposited 00:01-00:11, in the user's order",
-      "origin": "user",
-      "place": "ahead"
+      "at": "2026-10-02T23:55:53.922Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
     },
     "1273": {
-      "at": "2026-10-02T22:50:59.078Z",
-      "why": "User 03.10.2026: front group of the requests deposited 00:01-00:11, in the user's order",
-      "origin": "user",
-      "place": "ahead"
+      "at": "2026-10-02T23:55:54.018Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
     },
     "1274": {
-      "at": "2026-10-02T22:50:58.986Z",
-      "why": "User 03.10.2026: front group of the requests deposited 00:01-00:11, in the user's order",
-      "origin": "user",
-      "place": "ahead"
+      "at": "2026-10-02T23:55:54.114Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
     },
     "1275": {
-      "at": "2026-10-02T22:50:58.888Z",
-      "why": "User 03.10.2026: front group of the requests deposited 00:01-00:11, in the user's order",
-      "origin": "user",
-      "place": "ahead"
+      "at": "2026-10-02T23:55:54.204Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "settled": {
-    "at": "2026-10-02T21:10:49.448Z",
+    "at": "2026-10-02T23:55:53.839Z",
     "points": [
       184,
       200,
@@ -2035,7 +2035,12 @@
       1267,
       1268,
       1269,
-      1270
+      1270,
+      1271,
+      1272,
+      1273,
+      1274,
+      1275
     ]
   },
   "boundary": {
