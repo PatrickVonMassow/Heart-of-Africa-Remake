@@ -115,6 +115,12 @@ put it is the mistake this line exists to stop.
   scripts/verify/machine-load-core.mjs, scripts/verify/run-wait-core.mjs,
   scripts/render-verify-charges.mjs, scripts/verify/README.md, TASKS.md (the diff→suite
   paragraph), docs/acceptance-evidence.md
+  OPEN BEFORE LANDING (picture check 02.10.2026 on 64ef18bd8, WebGL 2 run 12:02Z): the theme
+  frames `93-orientation-highlight`, `102-cairo-lane-plan` and `148-speech-guess-invitation`
+  lack terrain and hut/house walls that main's `polish` frames show, and
+  `690-cairo-children` aims at a wall with no child in view. All theme-suite reds of both
+  backends are charged; this picture defect is the remaining blocker. First step: one
+  affected section per backend (`npm test -- polish-speech --section=speech-guess`).
   Bundle: Testinfrastruktur.
 
 - [ ] 1117. The fill's decided surface reading was never built (found 12.09.2026 while building
