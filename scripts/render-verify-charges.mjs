@@ -1617,19 +1617,6 @@ export const RED_CHARGES = [
       + 'The charge dies with 1172.',
   },
   {
-    point: 1259,
-    suite: 'polish',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    // WebGPU only: point 1121 owns the WebGL 2 race; this lane reds every pass
-    // since 01.10 by the bottom edge, which reads as a deterministic cause.
-    match: /^frame 482-village-river-bank\b/i,
-    why:
-      'Measured in every WebGPU polish pass of 01.10.2026 (feat/1129, feat/1254, feat/1256), '
-      + 'subject off the bottom edge; first at local/verify-logs/2026-10-01T14-41-12-659-'
-      + 'polish-children-polish-villagers.log. The charge dies with 1259.',
-  },
-  {
     point: 1121,
     suite: 'polish',
     backend: 'webgl',

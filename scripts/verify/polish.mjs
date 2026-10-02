@@ -8796,13 +8796,29 @@ if (section('adult-errands')) {
       // `local` subject with (scripts/verify/frameSubject.mjs), and keeps the
       // fleck that sits well inside the picture. The camera pose is left exactly
       // as it was — the seam reading below stands at this same spot.
-      await page.evaluate((r) => {
-        const p = window.__placePlayer
-        p.x = r.bank.x - r.normal.x * 1.4
-        p.z = r.bank.z - r.normal.z * 1.4
-        p.yaw = Math.atan2(-r.normal.x, -r.normal.z)
-        p.pitch = -0.16
-      }, river)
+      //
+      // OFF THE FOAM (red of 01.10.2026, every WebGPU pass): `river.bank` is the
+      // middle of the children's stretch, ~28 m upstream since 0bd2d2992, while
+      // the foam drifts in a RIVER_DRIFT_SPAN band centred where the bank normal
+      // runs through the village centre. Measured at the shutter: all sixteen
+      // patches projected at ndc x 2-11, `aim` came back null and the fallback
+      // subject sat below the frame. So the photograph slides along the same
+      // stand line to the middle of that band, and the seam reading gets the
+      // children's spot back afterwards.
+      const standAt = (r, along) =>
+        page.evaluate(
+          ([r, along]) => {
+            const p = window.__placePlayer
+            const shift = r.bank.x * r.downstream.x + r.bank.z * r.downstream.z - along
+            p.x = r.bank.x - r.downstream.x * shift - r.normal.x * 1.4
+            p.z = r.bank.z - r.downstream.z * shift - r.normal.z * 1.4
+            p.yaw = Math.atan2(-r.normal.x, -r.normal.z)
+            p.pitch = -0.16
+          },
+          [r, along],
+        )
+      const bankAlong = river.bank.x * river.downstream.x + river.bank.z * river.downstream.z
+      await standAt(river, 0)
       // The matrices follow the pose only on the next drawn frames; projecting
       // before that would aim at where the camera USED to look.
       await nextFrames(6)
@@ -8846,6 +8862,8 @@ if (section('adult-errands')) {
         local: aim ? { x: aim.x, y: aim.y + 0.15, z: aim.z } : { x: river.bank.x, y: 0.4, z: river.bank.z },
         label: 'the river bank, with the foam riding the current',
       })
+      await standAt(river, bankAlong)
+      await nextFrames(6)
 
       // --- No seam where the drawn water hands over to the panorama (525) ----
       // From this same spot the two halves of the river meet: the surface drawn
