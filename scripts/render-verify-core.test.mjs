@@ -1049,6 +1049,8 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       renderChange({ latestChangeAt: 3000, runs: [old, ...greens.slice(1), run('webgl', 3600)], openPoints }),
     )
     expect(fourOfFive.decision).toBe('block')
+    const inherited = redRun('webgpu', 1500, [red('a NEW check nobody filed')], { suite: 'constructor' })
+    expect(evaluate(renderChange({ latestChangeAt: 3000, runs: [inherited, ...greens], openPoints })).decision).toBe('block')
   })
 
   it('does NOT let an unrelated edit plus a green of ANOTHER suite drop the red', () => {

@@ -1310,7 +1310,7 @@ export function unexplainedRuns(runs, since, options) {
     if (when === null || from <= when) return false
     // A red of a retired suite can no longer be re-run under its own name: it
     // is shown gone once EVERY suite that took over its checks covers.
-    const successors = RETIRED_SUITE_SUCCESSORS[r?.suite]
+    const successors = Object.hasOwn(RETIRED_SUITE_SUCCESSORS, r?.suite) ? RETIRED_SUITE_SUCCESSORS[r.suite] : null
     if (successors) return successors.every((suite) => coveredAfterFix({ ...r, suite }))
     return coveredAfterFix(r)
   }
