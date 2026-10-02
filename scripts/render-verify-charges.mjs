@@ -1780,4 +1780,17 @@ export const RED_CHARGES = [
       + '01.10.2026 measures the same 63.8-64.4 px before the split). Pure layout, so no backend '
       + 'is excluded. The charge dies with 1266.',
   },
+  {
+    point: 1050,
+    suite: 'polish-panorama',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^leaving after several settlement visits stays fluid \(point \d+\)$/i,
+    detailMatch: /^\d+ ms$/i,
+    why:
+      'MEASURED 02.10.2026 on WebGL 2, section `travel-panorama-capture` alone: 5175 ms on main '
+      + 'c281e950c (unsplit polish) and 5200 ms on feat/1129 038c7ff70, so the split did not cause '
+      + 'it; the same duration signature point 1050 owns on the WebGPU compatibility lane. The '
+      + 'charge dies with 1050.',
+  },
 ]
