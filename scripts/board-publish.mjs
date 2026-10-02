@@ -159,7 +159,6 @@ function expectedFingerprint() {
 // state file. An unreadable page is never 'current' — a green check over an
 // unread board is the one outcome this must not be able to produce.
 if (args.includes('--check')) {
-  const expected = expectedFingerprint()
   // The open-point set alone misses a stale status line or "Stand" time, so the
   // local board's file hash is compared beside it. State and file are read as
   // ONE snapshot after the fetch, so a publish finishing meanwhile keeps its grace.
@@ -186,6 +185,9 @@ if (args.includes('--check')) {
       fetchError = (e && e.message) || 'fetch failed'
     }
   }
+  // The work order is read after the fetch too: a set changed meanwhile must not
+  // let an old page match an old fingerprint.
+  const expected = expectedFingerprint()
   const { fileHash: expectedFile, publishedFile, publishedAt } = snapshot()
   const v = expectedFile
     ? liveBoardVerdict({
