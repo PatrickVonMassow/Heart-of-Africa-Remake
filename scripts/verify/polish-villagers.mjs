@@ -7,7 +7,7 @@ import { waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { capturePixels } from './frameSubject.mjs'
 import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
 import { onBaselineLane } from './baseline-classify-core.mjs'
-import { describeOverlap, lineOverlap } from './errandShutter.mjs'
+import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
 import { BASE, section, check, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
@@ -2335,15 +2335,29 @@ if (section('adult-errands')) {
           (w) => window.__placeErrands().villagers.map((p, j) => ({ who: j, x: p.x, z: p.z })).filter((o) => o.who !== w),
           posed.who,
         )
+      // Where the lens actually stands: a bearing is a request the ground's
+      // collision may move, and the line is judged from the camera, not from
+      // the spot it was asked to take.
+      const readLens = () =>
+        page.evaluate(() => {
+          const e = window.__placeCamera.matrixWorld.elements
+          return { x: e[12], z: e[14] }
+        })
       const SHUTTER_SEARCHES = 4
-      let shot = await search(posed.others)
+      // Every search, the first included, reads where they stand now; an
+      // exhausted one is not final either, since they walk on.
+      let shot = await search(await readOthers())
       let spoiled = null
       let searches = 1
-      while (shot.bearing != null) {
-        await nextFrames(6)
-        spoiled = lineOverlap(posed, shot.bearing, await readOthers())
-        if (!spoiled || searches >= SHUTTER_SEARCHES) break
+      for (;;) {
+        if (shot.bearing != null) {
+          await nextFrames(6)
+          spoiled = lineOverlapFrom(await readLens(), posed, await readOthers())
+          if (!spoiled) break
+        }
+        if (searches >= SHUTTER_SEARCHES) break
         searches++
+        if (shot.bearing == null) await nextFrames(30)
         shot = await search(await readOthers())
       }
       check(
@@ -2369,7 +2383,7 @@ if (section('adult-errands')) {
         `${Math.hypot(stood.x - posed.x, stood.z - posed.z).toFixed(2)} m from the aim point`,
       )
       // The neighbours once more, immediately before the exposure.
-      if (shot.bearing != null) spoiled = lineOverlap(posed, shot.bearing, await readOthers())
+      if (shot.bearing != null) spoiled = lineOverlapFrom(await readLens(), posed, await readOthers())
       check(
         'and nobody has walked into the line to him by the shutter',
         shot.bearing != null && !spoiled,

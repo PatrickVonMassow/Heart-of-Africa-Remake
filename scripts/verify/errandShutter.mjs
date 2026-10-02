@@ -19,15 +19,28 @@ const LINE_FAR = 9
  * @param {{ who: number, x: number, z: number }[]} others
  */
 export function lineOverlap(subject, bearing, others, dist = 3) {
-  const cx = subject.x + Math.sin(bearing) * dist
-  const cz = subject.z + Math.cos(bearing) * dist
-  const dx = (subject.x - cx) / dist
-  const dz = (subject.z - cz) / dist
+  const lens = { x: subject.x + Math.sin(bearing) * dist, z: subject.z + Math.cos(bearing) * dist }
+  return lineOverlapFrom(lens, subject, others)
+}
+
+/**
+ * The same test from a lens READ BACK rather than requested: collision can
+ * move the player off the spot a bearing asked for, and the line that matters
+ * is the one from where the camera actually stands.
+ * @param {{ x: number, z: number }} lens
+ * @param {{ x: number, z: number }} subject
+ * @param {{ who: number, x: number, z: number }[]} others
+ */
+export function lineOverlapFrom(lens, subject, others) {
+  const dist = Math.hypot(subject.x - lens.x, subject.z - lens.z)
+  if (!(dist > 0)) return null
+  const dx = (subject.x - lens.x) / dist
+  const dz = (subject.z - lens.z) / dist
   let worst = null
   for (const o of others) {
-    const along = (o.x - cx) * dx + (o.z - cz) * dz
+    const along = (o.x - lens.x) * dx + (o.z - lens.z) * dz
     if (along <= LINE_NEAR || along > LINE_FAR) continue
-    const angle = Math.atan2(Math.hypot(o.x - (cx + dx * along), o.z - (cz + dz * along)), along)
+    const angle = Math.atan2(Math.hypot(o.x - (lens.x + dx * along), o.z - (lens.z + dz * along)), along)
     if (angle < LINE_CONE && (!worst || angle < worst.angle)) {
       worst = { who: o.who, angle, along, margin: LINE_CONE - angle }
     }

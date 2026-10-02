@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { LINE_CONE, describeOverlap, lineOverlap } from './errandShutter.mjs'
+import { LINE_CONE, describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 
 // Lens 3 m off on bearing 0 (+z), looking back along -z at the subject.
 const subject = { x: 0, z: 0 }
@@ -28,4 +28,17 @@ it('names the worst offender and its margin inside the cone', () => {
 
 it('nobody at or behind the lens, or beyond nine metres, counts', () => {
   expect(lineOverlap(subject, 0, [{ who: 1, x: 0, z: 3.5 }, { who: 2, x: 0, z: -7 }])).toBeNull()
+})
+
+it('judges the line from the lens where it actually stands, not where it was asked to stand', () => {
+  // Requested 3 m off on bearing 0; collision pushed the lens 1.5 m sideways.
+  const pushed = { x: 1.5, z: 3 }
+  const neighbour = [{ who: 7, x: 0.75, z: 1.5 }]
+  expect(lineOverlap(subject, 0, neighbour)).toBeNull()
+  expect(lineOverlapFrom(pushed, subject, neighbour)?.who).toBe(7)
+})
+
+it('reads the same as the bearing form when the lens landed where it was put', () => {
+  const others = [{ who: 3, x: 0.2, z: -2 }]
+  expect(lineOverlapFrom({ x: 0, z: 3 }, subject, others)).toEqual(lineOverlap(subject, 0, others))
 })
