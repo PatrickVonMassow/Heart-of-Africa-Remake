@@ -1759,4 +1759,25 @@ export const RED_CHARGES = [
       + 'the global dead-count flake point 200 already documents (24.07). The section alone at 487ad8d4f '
       + 'was green. The charge dies with 200.',
   },
+  {
+    point: 1265,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^a boatman`s reading appears within a few seconds of entry, without ROCK marked heard$/i,
+    why:
+      'FILED AS 1265 ON 02.10.2026: `--section=mute-shore-scene` reds identically on main fe28c8bde '
+      + '(unsplit polish, boat at 9.69 s against firstCall 4 + 3) and on feat/1129 14d11f2ca, so the '
+      + 'split did not cause it. Pure scene timing, so no backend is excluded. The charge dies with 1265.',
+  },
+  {
+    point: 1266,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^from the plaza the station stands at least \d+ px tall on the screen$/i,
+    why:
+      'REOPENED AS 1266 ON 02.10.2026 from the backlog park of point 1255: the parked loom reads '
+      + '64 px from its 21.285 m plaza stand on main and on feat/1129 alike (backlog entry of '
+      + '01.10.2026 measures the same 63.8-64.4 px before the split). Pure layout, so no backend '
+      + 'is excluded. The charge dies with 1266.',
+  },
 ]
