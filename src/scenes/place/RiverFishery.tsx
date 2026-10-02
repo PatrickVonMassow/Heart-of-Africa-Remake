@@ -81,6 +81,11 @@ const HULL_FLOOR_Y = 0.04
 /** A woven basket: its radius at the rim and its height. */
 const BASKET_R = 0.26
 const BASKET_H = 0.34
+// The eater's mortar is 0.42 m tall; at rest his pestle's foot sits 0.12 m
+// down in it, so the stroke lands in the grain (review of work-order 1251).
+const MORTAR_H = 0.42
+const PESTLE_LENGTH = 1.05
+const PESTLE_REST_Y = MORTAR_H - 0.12 + PESTLE_LENGTH / 2
 /** The rope's own axis and a scratch direction for orienting it. */
 const ROPE_UP = new THREE.Vector3(0, 1, 0)
 const ROPE_DIR = new THREE.Vector3()
@@ -596,7 +601,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
     if (ep) {
       const lift = biteLift(e, fireCfg)
       const stroke = eaterPoundStroke(e, fireCfg)
-      if (eaterPestle.current) eaterPestle.current.position.y = 1.05 + stroke * 0.38
+      if (eaterPestle.current) eaterPestle.current.position.y = PESTLE_REST_Y + stroke * 0.38
       const next: FigurePose =
         e.phase === 'home'
           ? { left: armAim(0.2, 0.35 + stroke * 0.55), right: armAim(-0.2, 0.35 + stroke * 0.55), lean: 0.14 - stroke * 0.08, turn: 0 }
@@ -944,12 +949,12 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       </group>
       {/* THE EATER'S MORTAR: he pounds grain here between his visits. */}
       <group position={[sites.eaterMortar.x, groundHeight(sites.eaterMortar.x, sites.eaterMortar.z), sites.eaterMortar.z]}>
-        <mesh position={[0, 0.21, 0]} castShadow>
-          <cylinderGeometry args={[0.2, 0.26, 0.42, TESSELLATION.mortar]} />
+        <mesh position={[0, MORTAR_H / 2, 0]} castShadow>
+          <cylinderGeometry args={[0.2, 0.26, MORTAR_H, TESSELLATION.mortar]} />
           <meshStandardMaterial color="#5f4526" roughness={0.95} />
         </mesh>
-        <mesh ref={eaterPestle} name="eater-pestle" position={[0, 1.05, 0]} castShadow>
-          <cylinderGeometry args={[0.045, 0.055, 1.05, TESSELLATION.pestle]} />
+        <mesh ref={eaterPestle} name="eater-pestle" position={[0, PESTLE_REST_Y, 0]} castShadow>
+          <cylinderGeometry args={[0.045, 0.055, PESTLE_LENGTH, TESSELLATION.pestle]} />
           <meshStandardMaterial color="#7a5a32" roughness={0.9} />
         </mesh>
       </group>

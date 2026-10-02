@@ -6384,12 +6384,14 @@ if (section('villager-canoe')) {
         const inside = await inPlace()
         check('the eater’s standing place is inside the settlement', inside)
         const pestle = []
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 20; i++) {
           pestle.push(await page.evaluate(() => window.__placeScene?.getObjectByName('eater-pestle')?.position.y ?? null))
           await nextFrames(4)
         }
         const ys = pestle.filter((y) => typeof y === 'number')
         check('at home he pounds: the pestle rises and falls', ys.length >= 10 && Math.max(...ys) - Math.min(...ys) > 0.15, JSON.stringify(ys.map((y) => +y.toFixed(2))))
+        // Its foot (half its 1.05 m below the centre) lands inside the 0.42 m mortar.
+        check('the pestle lands in the mortar, not in the air above it', ys.length >= 10 && Math.min(...ys) - 0.525 < 0.42, JSON.stringify(ys.map((y) => +y.toFixed(2))))
         const seen = await page.evaluate(() => {
           const f = window.__placeFishFire()
           const seen = window.__canoeSeen
