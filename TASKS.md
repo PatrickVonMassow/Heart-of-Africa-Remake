@@ -15766,3 +15766,20 @@ to land than a mechanism that needs a review.
   Tests: the existing village Playwright section that photographs the pounder gains the assertion.
   Bundle: Dorfleben.
   Criticality: low — visible at every pounding village, no mechanic affected.
+- [ ] 1265. The boatman's first reading comes too late at the mute shore
+  Source: covering WebGPU pass of point 1129 (02.10.2026); reproduced alone on `main` fe28c8bde
+  (log `local/verify-logs/2026-10-02T11-31-07-724-polish.log`) and on feat/1129 (log
+  `2026-10-02T11-28-50-894-polish-villagers.log`), so it is not the split's.
+  THE RED. `polish --section=mute-shore-scene`: "a boatman`s reading appears within a few seconds
+  of entry, without ROCK marked heard" — boat at 9.69 s against `canoe.firstCallSeconds` 4 + 3 s
+  slack; the child reads at 3.24 s and ROCK is not heard. `villager-canoe` was green at 0fac48504
+  on both backends the same morning; candidates are the earshot moves 6e64d0e37, d2c3e690b and
+  eb68d9f3f.
+  Final state:
+  - The commit that delayed the boat's first call is named with the reading on either side.
+  - The boatman's first reading lands within `firstCallSeconds` + 3 s of entry again, or the
+    window's premise is revised with the reason recorded.
+  - `polish(-villagers) --section=mute-shore-scene` green on WebGPU and WebGL 2.
+  Tests: the existing Playwright check; no new mechanism.
+  Bundle: Dorfleben.
+  Criticality: medium — the mute shore's lesson starts with the boatman's call.
