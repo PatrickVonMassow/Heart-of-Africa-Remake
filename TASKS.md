@@ -15788,3 +15788,14 @@ to land than a mechanism that needs a review.
   Bundle: Dorfleben.
   Criticality: medium — a WebGL-2-only red; it blocks the covering WebGL 2 communication proof
   in the next LARGE.
+- [ ] 1264. The village pounder's pestle pounds the air above its mortar
+  Source: cross-vendor review of point 1251 (02.10.2026), same geometry as the fishers' eater.
+  `src/scenes/place/PlaceLife.tsx` `Pounder`: the 1.05 m pestle's centre rests at 1.05 m, so its
+  foot stops at 0.525 m while the mortar is 0.42 m tall — every stroke ends 10 cm above the rim.
+  Final state:
+  - At the bottom of the stroke the pestle's foot is inside the mortar (point 1251 uses a rest of
+    mortar height − 0.12 m + half the pestle), and the pounder's hands still ride the shaft.
+  - A browser check samples the pestle height and asserts the foot reaches the mortar.
+  Tests: the existing village Playwright section that photographs the pounder gains the assertion.
+  Bundle: Dorfleben.
+  Criticality: low — visible at every pounding village, no mechanic affected.
