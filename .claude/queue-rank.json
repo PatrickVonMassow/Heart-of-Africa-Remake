@@ -1536,6 +1536,18 @@
       "why": "Low-criticality cosmetic pestle gap; behind the open village-life points, no user waits on it",
       "origin": "machine",
       "place": "last"
+    },
+    "1265": {
+      "at": "2026-10-02T12:02:39.074Z",
+      "why": "pre-existing shore-timing red found on 1129's covering pass; no other point waits on it, so it queues behind the settled order",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1266": {
+      "at": "2026-10-02T12:02:39.192Z",
+      "why": "the loom is switched off for the player; reopened only to own its red, so last is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1565,7 +1577,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-02T09:27:48.961Z",
+    "at": "2026-10-02T12:02:39.204Z",
     "points": [
       184,
       200,
@@ -1993,7 +2005,9 @@
       1253,
       1261,
       1263,
-      1264
+      1264,
+      1265,
+      1266
     ]
   }
 }
