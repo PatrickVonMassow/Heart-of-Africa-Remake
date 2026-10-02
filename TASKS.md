@@ -15835,3 +15835,25 @@ to land than a mechanism that needs a review.
   Tests: Vitest (jsdom) in `src/systems/ambience.test.ts`; the existing Playwright section.
   Bundle: Testinfrastruktur.
   Criticality: low — no player impact measured; it blocks the green of `polish-speech`.
+
+- [ ] 1268. The bank game's announcing child is read without its pointing arm
+  Source: first measured 02.10.2026 ~17:50 in the WebGPU theme run of point 1129 on 74b86cc18
+  (`polish-children`, section `children-bank-game`); no earlier recorded log holds this
+  signature, and the check moved unchanged from `scripts/verify/polish.mjs`.
+  THE RED. `and the same child POINTS it — the arm carries as far as the voice` read
+  `{"kind":null,"t":0,"duration":0,"bearing":0}` while the preceding check (the announced
+  word READ over the calling child inside the picture) passed in the same poll. `announceRun`
+  (`src/scenes/place/bankGame.ts`) gives voice and `point` gesture together, so either the
+  word label outlives the gesture (or belongs to an earlier announcement of the same word),
+  or the gesture is cleared or never armed while the voice is offered — the second would be
+  a player-visible mute arm.
+  Final state:
+  - The cause is measured (label age and gesture state at the poll, over repeated
+    `--section=children-bank-game` runs on a quiet machine); a product cause is fixed in the
+    game, a check cause is fixed by reading the gesture of the announcement the label
+    belongs to, with no tolerance wider than the evidence.
+  - `polish-children --section=children-bank-game` green on WebGPU; a Vitest case pins the
+    voice/gesture pairing if the game owed the fix.
+  Tests: Vitest (jsdom) beside `bankGame.ts`; the existing Playwright section.
+  Bundle: Testinfrastruktur.
+  Criticality: low — no player impact measured yet; it blocks the green of `polish-children`.

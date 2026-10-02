@@ -1762,4 +1762,14 @@ export const RED_CHARGES = [
       + 'read the speech bus at 0.000 right as the chief\'s drum answer ended — first occurrence in '
       + 'all recorded logs; point 1267 owns the boundary read. The charge dies with point 1267.',
   },
+  {
+    point: 1268,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /^and the same child POINTS it/i,
+    why:
+      'MEASURED 02.10.2026 on feat/1129 74b86cc18, webgpu/polish-children (children-bank-game): the '
+      + 'announced word was read over the calling child while its gesture read kind null — first '
+      + 'occurrence in all recorded logs; point 1268 owns the voice/arm pairing. The charge dies with point 1268.',
+  },
 ]
