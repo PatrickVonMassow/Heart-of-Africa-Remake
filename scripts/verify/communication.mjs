@@ -429,7 +429,29 @@ async function observations() {
   let carrier = -1
   for (let attempt = 0; carrier < 0; attempt++) {
     await d.inspect(geography.waterStand, 3)
+    // A missed errand names its own cause: the water legs and the children's
+    // ears are sampled through the wait and recorded when it runs out.
+    await d.read(() => {
+      const trace = window.__waterErrandTrace = []
+      const timer = setInterval(() => {
+        const e = window.__placeErrands?.()
+        if (!e) return
+        trace.push({ t: Math.round(performance.now()), standJars: e.standJars, staged: e.staged, tag: window.__placeTag?.().phase,
+          kids: (window.__placeTag?.().children ?? []).map((c) => [Math.round(c.x * 10) / 10, Math.round(c.z * 10) / 10]),
+          villagers: e.villagers.map((v) => ({ x: Math.round(v.x * 10) / 10, z: Math.round(v.z * 10) / 10, carry: v.carry,
+            work: v.work && { situation: v.work.situation, phase: v.work.phase, arrived: v.work.arrived, owes: v.work.owes,
+              withheld: v.work.withheld, childrenHear: v.work.childrenHear } })) })
+        if (trace.length > 400) trace.shift()
+      }, 2000)
+      window.__waterErrandTraceStop = () => clearInterval(timer)
+    })
     await d.wait(() => window.__placeErrands().villagers.some((v) => v.carry === 'emptyJar'), null, 480000)
+      .catch(async (error) => {
+        await event('water-errand-missed', await d.read(() => ({ trace: window.__waterErrandTrace,
+          asserts: window.__assertLog ?? [], player: { ...window.__placePlayer } })))
+        throw error
+      })
+      .finally(() => d.read(() => window.__waterErrandTraceStop?.()))
     const i = await d.read(() => window.__placeErrands().villagers.findIndex((v) => v.carry === 'emptyJar'))
     // Aim at the framed height: without y the view keeps the previous pitch.
     const empty = await d.read((i) => ({ ...window.__placeErrands().villagers[i], y: 0.8 }), i)
