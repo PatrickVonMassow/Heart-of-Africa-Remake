@@ -72,11 +72,13 @@ import {
   BOARD_REF,
   LIVE_GRACE_MS,
   boardMissingPoints,
+  checkSnapshot,
   liveBoardVerdict,
   liveCheckUrl,
   openFingerprintOfTasks,
   pagesFailurePatch,
   pagesPublishPatch,
+  stampFileHash,
   stampFingerprint,
 } from './board-currency-core.mjs'
 
@@ -157,24 +159,52 @@ function expectedFingerprint() {
 // state file. An unreadable page is never 'current' — a green check over an
 // unread board is the one outcome this must not be able to produce.
 if (args.includes('--check')) {
-  const expected = expectedFingerprint()
+  // The open-point set alone misses a stale status line or "Stand" time, so the
+  // local board's file hash is compared beside it. State and file are read as
+  // ONE snapshot after the fetch, so a publish finishing meanwhile keeps its grace.
+  const snapshot = () =>
+    checkSnapshot({
+      readState: () => readJson(STATE_PATH),
+      readBoardHash: () => {
+        const st = readJson(STATE_PATH) ?? {}
+        return sha256(readFileSync(resolve(REPO_ROOT, st.dashboardPath ?? '.batch-dashboard.html'), 'utf8'))
+      },
+    })
   let liveHtml = null
   let fetchError = null
-  try {
-    const res = await fetchWithTimeout(liveCheckUrl(BOARD_CONTENT_URL))
-    // The body is consumed either way, so no socket is left half-read.
-    const body = await res.text()
-    if (!res.ok) fetchError = `HTTP ${res.status} ${res.statusText}`
-    else liveHtml = body
-  } catch (e) {
-    fetchError = (e && e.message) || 'fetch failed'
+  // An unreadable local board can never be judged current: refuse before the
+  // network is touched at all.
+  if (snapshot().fileHash) {
+    try {
+      const res = await fetchWithTimeout(liveCheckUrl(BOARD_CONTENT_URL))
+      // The body is consumed either way, so no socket is left half-read.
+      const body = await res.text()
+      if (!res.ok) fetchError = `HTTP ${res.status} ${res.statusText}`
+      else liveHtml = body
+    } catch (e) {
+      fetchError = (e && e.message) || 'fetch failed'
+    }
   }
-  const publishedAt = Number(state.pagesPublishedAt) || 0
-  const v = liveBoardVerdict({ liveHtml, fetchError, expected, publishedAt, graceMs: LIVE_GRACE_MS })
+  // The work order is read after the fetch too: a set changed meanwhile must not
+  // let an old page match an old fingerprint.
+  const expected = expectedFingerprint()
+  const { fileHash: expectedFile, publishedFile, publishedAt } = snapshot()
+  const v = expectedFile
+    ? liveBoardVerdict({
+        liveHtml,
+        fetchError,
+        expected,
+        publishedAt,
+        graceMs: LIVE_GRACE_MS,
+        expectedFile,
+        publishedFile,
+      })
+    : { verdict: 'unknown', live: null, reason: `the local board could not be read (${boardFile})` }
   console.log(`live board : ${BOARD_CONTENT_URL}`)
   console.log(`viewer     : ${BOARD_PAGE_URL}`)
   console.log(`work order : ${expected ?? '<unreadable>'}`)
   console.log(`live page  : ${v.live ?? '<none>'}`)
+  console.log(`local file : ${expectedFile ? expectedFile.slice(0, 16) : '<unreadable>'}`)
   console.log(`verdict    : ${v.verdict.toUpperCase()}${v.reason ? ` — ${v.reason}` : ''}`)
   // 'settling' and 'unknown' are not faults: the first is the deploy/CDN floor
   // this check exists to tolerate, the second says honestly that there was
@@ -186,7 +216,8 @@ if (args.includes('--check')) {
   // very first `--check` did exactly that, turning an honest "the board is
   // unreachable" (exit 1) into a crash a caller cannot read. The sockets are
   // unref'd, so the process ends by itself once the loop drains.
-  process.exitCode = v.verdict === 'behind' || v.verdict === 'unreachable' ? 1 : 0
+  // An unreadable LOCAL board is a failed check, not an honest 'unknown'.
+  process.exitCode = v.verdict === 'behind' || v.verdict === 'unreachable' || !expectedFile ? 1 : 0
 } else {
   if (args.length > 0 && !lockedByCaller) {
     console.error('usage: node scripts/board-publish.mjs [--check | --url]')
@@ -383,7 +414,7 @@ try {
 // The fingerprint is stamped on the way OUT, never into the repo file: the repo
 // bytes are what every publish record attests, and moving them under that record
 // would make the board look stale on every publish.
-let published = stampFingerprint(repoBytes, fingerprint)
+let published = stampFileHash(stampFingerprint(repoBytes, fingerprint), sha256(repoBytes))
 // THE LIVENESS AND PROGRESS LINES are measured HERE, on the way out, like the
 // fingerprint: they change on every publish, so writing them into the repo file
 // would move the bytes every publish record attests. No session writes them —

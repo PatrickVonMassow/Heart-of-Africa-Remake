@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import {
   ARCHIVE_CONTENT_URL,
   BOARD_CONTENT_URL,
   boardMissingPoints,
+  checkSnapshot,
   BOARD_PAGE_URL,
   BOARD_REF,
   LIVE_GRACE_MS,
@@ -19,7 +23,9 @@ import {
   pagesPublishPatch,
   publishCapability,
   publishDuePatch,
+  readFileHash,
   readFingerprint,
+  stampFileHash,
   stampFingerprint,
   syncedPublishPatch,
   watchdogDecision,
@@ -223,6 +229,156 @@ describe('delta D/E — judging the LIVE page', () => {
 
   it('says so honestly when there is nothing to compare against', () => {
     expect(liveBoardVerdict({ liveHtml: live(expected), expected: null }).verdict).toBe('unknown')
+  })
+})
+
+describe('delta D/E — the live page is compared by what the reader sees', () => {
+  // The open-point set is the same on both sides; only the status line or the
+  // "Stand" time moved (the 12.09.2026 case: live 14:24, local 15:13, CURRENT).
+  const expected = 'sha256:aaaa'
+  const sha = (t) => createHash('sha256').update(Buffer.from(t)).digest('hex')
+  const repoAt = (stand, status = 'Batch läuft') =>
+    board(`<section class="now"><p class="status">${status}</p><p>Stand ${stand}</p></section>\n`)
+  const publish = (repo) => stampFileHash(stampFingerprint(repo, expected), sha(repo))
+  const old = repoAt('14:24')
+  const longAgo = { publishedAt: 1000, now: 1000 + LIVE_GRACE_MS + 1 }
+
+  it('stamps and reads back the repo-file hash beside the fingerprint', () => {
+    const page = publish(old)
+    expect(readFileHash(page)).toBe(sha(old))
+    expect(readFingerprint(page)).toBe(expected)
+    expect(stampFileHash(page, sha(old))).toBe(page)
+  })
+
+  it('calls the board current when the local file is the one that was published', () => {
+    const v = liveBoardVerdict({ liveHtml: publish(old), expected, expectedFile: sha(old), ...longAgo })
+    expect(v.verdict).toBe('current')
+  })
+
+  it('reports a board that differs only in its "Stand" time as BEHIND, not CURRENT', () => {
+    const local = repoAt('15:13')
+    const v = liveBoardVerdict({ liveHtml: publish(old), expected, expectedFile: sha(local), ...longAgo })
+    expect(v.verdict).toBe('behind')
+    expect(v.reason).toMatch(/file hash/)
+  })
+
+  it('reports a board that differs only in its status line as BEHIND, not CURRENT', () => {
+    const local = repoAt('14:24', 'Batch pausiert')
+    const v = liveBoardVerdict({ liveHtml: publish(old), expected, expectedFile: sha(local), ...longAgo })
+    expect(v.verdict).toBe('behind')
+  })
+
+  it('gives no CDN grace to a local edit that was never published', () => {
+    const local = repoAt('15:13')
+    const v = liveBoardVerdict({
+      liveHtml: publish(old),
+      expected,
+      expectedFile: sha(local),
+      publishedFile: sha(old),
+      publishedAt: 1000,
+      now: 1000 + 60_000,
+    })
+    expect(v.verdict).toBe('behind')
+  })
+
+  it('keeps the grace for a publish of the local file that is still settling', () => {
+    const local = repoAt('15:13')
+    const v = liveBoardVerdict({
+      liveHtml: publish(old),
+      expected,
+      expectedFile: sha(local),
+      publishedFile: sha(local),
+      publishedAt: 1000,
+      now: 1000 + 60_000,
+    })
+    expect(v.verdict).toBe('settling')
+  })
+
+  it('does not call a page without a file hash current once a local hash is known', () => {
+    const v = liveBoardVerdict({ liveHtml: stampFingerprint(old, expected), expected, expectedFile: sha(old), ...longAgo })
+    expect(v.verdict).toBe('behind')
+  })
+})
+
+describe('--check never calls a board current over an unread local board', () => {
+  const expected = 'sha256:aaaa'
+  const page = stampFileHash(stampFingerprint(board(), expected), 'f'.repeat(64))
+
+  it('judges an unreadable local board unknown, not current', () => {
+    expect(liveBoardVerdict({ liveHtml: page, expected, expectedFile: null }).verdict).toBe('unknown')
+    expect(liveBoardVerdict({ liveHtml: page, expected, expectedFile: '' }).verdict).toBe('unknown')
+  })
+
+  it('still compares only the open-point set when no local hash is asked for (the watchdog)', () => {
+    expect(liveBoardVerdict({ liveHtml: page, expected }).verdict).toBe('current')
+  })
+
+  it('the CLI exits non-zero with UNKNOWN when the local board is missing, without fetching', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'hoa-board-check-'))
+    try {
+      writeFileSync(resolve(root, 'TASKS.md'), '# Tasks\n')
+      let out = ''
+      let status = 0
+      try {
+        out = execFileSync(process.execPath, [resolve(__dirname, 'board-publish.mjs'), '--check'], {
+          cwd: root,
+          env: { ...process.env, HOA_REPO_ROOT: root },
+          encoding: 'utf8',
+          timeout: 20000,
+        })
+      } catch (e) {
+        status = e.status
+        out = String(e.stdout ?? '')
+      }
+      expect(status).toBe(1)
+      expect(out).toMatch(/verdict\s*: UNKNOWN — the local board could not be read/)
+      expect(out).not.toMatch(/CURRENT/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 30000)
+})
+
+describe('--check reads the local board and the publish record as one snapshot', () => {
+  it('re-reads the board under the newer record when a publish lands between the reads', () => {
+    // Publish A is recorded; publish B rewrites the file and then its record
+    // while --check is reading. The snapshot must pair B with B.
+    let file = 'A'
+    let reads = 0
+    const states = [{ pagesPublishedHash: 'A', pagesPublishedAt: 1 }, { pagesPublishedHash: 'B', pagesPublishedAt: 2 }]
+    const snap = checkSnapshot({
+      readState: () => states[Math.min(reads++, 1)],
+      readBoardHash: () => {
+        const h = file
+        file = 'B' // the concurrent publish writes its file right after the first read
+        return h
+      },
+    })
+    expect(snap).toEqual({ fileHash: 'B', publishedFile: 'B', publishedAt: 2 })
+  })
+
+  it('keeps the settling grace for that concurrent publish while the CDN still serves A', () => {
+    const snap = { fileHash: 'b'.repeat(64), publishedFile: 'b'.repeat(64), publishedAt: 1000 }
+    const cached = stampFileHash(stampFingerprint(board(), 'sha256:aaaa'), 'a'.repeat(64))
+    const v = liveBoardVerdict({
+      liveHtml: cached,
+      expected: 'sha256:aaaa',
+      expectedFile: snap.fileHash,
+      publishedFile: snap.publishedFile,
+      publishedAt: snap.publishedAt,
+      now: 1000 + 30_000,
+    })
+    expect(v.verdict).toBe('settling')
+  })
+
+  it('reports an unreadable board as a null hash', () => {
+    const snap = checkSnapshot({
+      readState: () => ({}),
+      readBoardHash: () => {
+        throw new Error('ENOENT')
+      },
+    })
+    expect(snap.fileHash).toBeNull()
   })
 })
 

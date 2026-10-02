@@ -2124,7 +2124,12 @@ session has, so the board is published by a script.
 
 The board carries its open-point set as a `hoa-board-open` meta, stamped on the
 way out (never into the repo file, whose bytes every publish record attests).
-That fingerprint is what a fetched page is compared against.
+That fingerprint is what a fetched page is compared against. Beside it the page
+carries `hoa-board-file`, the sha256 of the repo bytes it was published from;
+`--check` compares that with the local board too, so a page that differs only in
+its status line, "Stand" time or card text is `behind`, not `current` (found
+12.09.2026: live "Stand 14:24" against a local 15:13 was reported CURRENT). A
+local board changed since the last publish gets no CDN grace.
 
 **The floor of "current".** The push lands in seconds, but raw.githubusercontent
 answers with `cache-control: max-age=300`. Every check therefore cache-busts AND
