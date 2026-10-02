@@ -108,31 +108,6 @@ put it is the mistake this line exists to stop.
   scripts/verify/polish.mjs (`adult-errands`), points 1085, 1087.
   Bundle: Dorfleben.
 
-- [ ] 1118. The board's currency check is blind to everything but the set of open point numbers
-  (found 12.09.2026; the user had reported the symptom).
-  `scripts/board-publish.mjs --check` compares only the fingerprint from `board-currency-core.mjs`,
-  and that fingerprint is EXCLUSIVELY the set of open point numbers (`normaliseOpenSet`). The
-  status line, the "Stand" time, every card's text and the queue's order are not in it.
-  MEASURED 12.09.2026 around 16:5x: the live page carried "Stand 14:24" while the local
-  `.batch-dashboard.html` carried "Stand 15:13", with different card text and point 1116 in a
-  different position — and `--check` still reported CURRENT (work order sha256:ff3f2beaacd8702c
-  == live page). The user reported it himself; a hard refresh with the cache cleared still showed
-  14:24.
-  WHY IT IS WORKED ON UNDER THE INFRASTRUCTURE FREEZE: it permits a false approval. Every gate
-  reports the board current while the user reads an arbitrarily old one on his phone, which is
-  the exact case the engmaschig rule exists for.
-  Final state: `--check` compares what the reader actually sees. The file hash already exists in
-  `board-publish.mjs` as `sha256(repoBytes)`; either the fingerprint takes in the now-card's
-  "Stand" line as well, or `--check` compares that hash beside the open-point set. A stale status
-  line makes the check say so.
-  Test. Vitest: a board that differs only in its status line or its "Stand" time is reported
-  BEHIND, not CURRENT.
-  Criticality: LOW by player impact, but it is the reason a stale board went unnoticed for
-  388 minutes.
-  Refs: scripts/board-publish.mjs, scripts/board-currency-core.mjs (`normaliseOpenSet`),
-  docs/batch-autonomy.md.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1108. The fill's proof frame measures its neighbours BEFORE they walk, so a green suite
   can still certify a picture with no readable subject.
   MEASURED 11.09.2026 on main at 72114fb3, in the covering runs of point 1085 on BOTH lanes:
