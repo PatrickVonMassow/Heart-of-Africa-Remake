@@ -95,6 +95,9 @@ interface BalanceConfig {
   waterStandCapacity: number
   /** Arrival tolerance at the separate working spots beside the water stand. */
   waterStandArrivalRadius: number
+  /** Arrival tolerance at the fill spot in the river (work-order 1117), so the
+   *  carrier dips ankle-deep rather than from the dry edge. */
+  bankFillArrivalRadius: number
   /** The settlement edge painted on the ground (design.md §2.6, point 352/488):
    *  where the swept, trodden ground gives way to open land. The band's PLACE is
    *  never configured — it sits at the boundary the leave check reads
@@ -1239,6 +1242,9 @@ export const balance: BalanceConfig = {
   // Calibratable: stop within 0.3 m of the assigned spot. The generic 1.1 m
   // tolerance let a waiting carrier occupy the sender's approach lane.
   waterStandArrivalRadius: 0.3,
+  // Calibratable (work-order 1117): the fill spot lies only ~0.5 m past the
+  // waterline, so the generic 1.1 m let the carrier dip from dry ground.
+  bankFillArrivalRadius: 0.2,
   placeEdgeBand: {
     // Calibratable: ~8 m of give-way at a slightly softened 0.8 strength —
     // tuned by the operator in play on 27.08.2026: the wider, gentler ramp

@@ -3130,7 +3130,9 @@ function ErrandVillagers({
       if (g) {
         // The same walking bob the other inhabitants ride, off the distance this
         // villager has actually covered rather than off a wall clock.
-        g.position.set(me.x, groundHeight(me.x, me.z) + Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05, me.z)
+        // No bob while filling: he stands in the river (work-order 1117).
+        const bob = filling === null ? Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05 : 0
+        g.position.set(me.x, groundHeight(me.x, me.z) + bob, me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
         if (facing !== null) yaws.current[i] = facing
         g.rotation.y = yaws.current[i]
@@ -3250,7 +3252,7 @@ function ErrandVillagers({
               ? Math.min(1, task.dug / balance.bankFillSeconds)
               : null,
           yaw: yaws.current[i] ?? 0,
-          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY },
+          drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY, feetY: g ? g.position.y : null, groundY: groundHeight(p.x, p.z) },
           carry: carryOf(work, i),
           work: task
             ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,

@@ -2245,7 +2245,10 @@ if (section('adult-errands')) {
       check(
         "and the jar's mouth is tipped under the water surface",
         !!drawn && drawn.drawn.mouthY != null && surfaceY != null && drawn.drawn.mouthY < surfaceY,
-        drawn ? `mouth at ${String(drawn.drawn.mouthY)} m, surface at ${String(surfaceY)} m` : 'no villager',
+        drawn
+          ? `mouth at ${String(drawn.drawn.mouthY)} m, surface at ${String(surfaceY)} m ` +
+            `(hand ${String(drawn.drawn.handY)}, feet ${String(drawn.drawn.feetY)}, ground ${String(drawn.drawn.groundY)})`
+          : 'no villager',
       )
       check(
         'and the water answers the dip with a ring',
