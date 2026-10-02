@@ -91,6 +91,9 @@ put it is the mistake this line exists to stop.
   words-first` (log `…2026-10-01T22-39-32-337-…`) — the gate 1260 removes. Last green of the
   section on main: 53b168c14 (28.09.2026); main changed the settlement boundary, the replayed
   adults' bounds and the water path since.
+  NOT REPRODUCED 02.10.2026: on feat/1260 at aa6ace0f3 (main 6a8ea6ca0 merged in) the section ran
+  GREEN through step 3 on both backends (logs `…2026-10-01T23-51-59-806-…` WebGPU,
+  `…2026-10-02T00-13-04-087-…` WebGL 2) — the red is intermittent, not a constant absence.
   Final state:
   - The cause is named with its measurement (are no adults cast to the water errand, or do
     they never reach `emptyJar` while the player stands at the stand?).
