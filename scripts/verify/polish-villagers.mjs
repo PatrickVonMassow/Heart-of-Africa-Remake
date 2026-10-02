@@ -583,6 +583,50 @@ if (section('villager-canoe')) {
           label: 'the fishers’ own fire by the landing: the carrier gutting the catch at the board, the griller turning fish over the embers, the smoking rack with its fish and the storage basket beside it',
         })
       }
+
+      // --- 4. The eater between his visits (work-order 1251) ---------------
+      // The report `UntaetigerErwachsener`: he stood idle on the beach. At home
+      // he now pounds grain at his mortar; photographed from beside him.
+      const atHome = await page
+        .waitForFunction(() => window.__placeFishFire?.().eater.phase === 'home', null, { timeout: 200000, polling: 250 })
+        .then(() => true)
+        .catch(() => false)
+      check('the eater is at home between his visits', atHome)
+      if (atHome) {
+        const eaterStand = await page.evaluate(() => {
+          const s = window.__placeFishFire().sites
+          const h = s.eaterHome
+          const m = s.eaterMortar
+          // Across the mortar from him, a few metres back, so both are in frame.
+          const dx = m.x - h.x
+          const dz = m.z - h.z
+          const d = Math.hypot(dx, dz) || 1
+          return { at: { x: m.x + (dx / d) * 4 + (dz / d) * 1.5, z: m.z + (dz / d) * 4 - (dx / d) * 1.5 }, look: { x: (h.x + m.x) / 2, z: (h.z + m.z) / 2 } }
+        })
+        await standAt(eaterStand.at, eaterStand.look)
+        const inside = await inPlace()
+        check('the eater’s standing place is inside the settlement', inside)
+        const pestle = []
+        for (let i = 0; i < 20; i++) {
+          pestle.push(await page.evaluate(() => window.__placeScene?.getObjectByName('eater-pestle')?.position.y ?? null))
+          await nextFrames(4)
+        }
+        const ys = pestle.filter((y) => typeof y === 'number')
+        check('at home he pounds: the pestle rises and falls', ys.length >= 10 && Math.max(...ys) - Math.min(...ys) > 0.15, JSON.stringify(ys.map((y) => +y.toFixed(2))))
+        // Its foot (half its 1.05 m below the centre) lands inside the 0.42 m mortar.
+        check('the pestle lands in the mortar, not in the air above it', ys.length >= 10 && Math.min(...ys) - 0.525 < 0.42, JSON.stringify(ys.map((y) => +y.toFixed(2))))
+        const seen = await page.evaluate(() => {
+          const f = window.__placeFishFire()
+          const seen = window.__canoeSeen
+          return { phase: f.eater.phase, eater: seen(f.eater.x, 0.9, f.eater.z, 0.8), mortar: seen(f.sites.eaterMortar.x, 0.3, f.sites.eaterMortar.z, 0.5) }
+        })
+        check('the eater and his mortar are in frame, nothing hiding them', inside && seen.phase === 'home' && seen.eater && seen.mortar, JSON.stringify(seen))
+        const m = await page.evaluate(() => window.__placeFishFire().sites.eaterMortar)
+        await frame('1251-eater-pounds', {
+          local: { x: m.x, y: 0.6, z: m.z },
+          label: 'the fishers’ eater between his visits to the smoking rack: pounding grain with pestle and mortar at his place on the shore, not standing idle',
+        })
+      }
     }
   } finally {
     await page.evaluate((kept) => {
@@ -2308,6 +2352,9 @@ if (section('adult-errands')) {
     // frame's edge — while the shutter's subject test still passed. Each bearing
     // is therefore set, drawn, and READ BACK; the first one the ground actually
     // accepts, with a clear line to the subject, wins.
+    /** How far inside the settlement's edge a lens set beside a subject has
+     *  to stay: well clear of the leave check, and of the bank's wade limit. */
+    const CAMERA_EDGE_MARGIN = 8
     const placeCamera = async (subject, radius, pitch) => {
       // NEVER OUTSIDE THE SETTLEMENT. Putting the lens past the walkable region
       // does not merely move it: the leave check hands the player back to the
@@ -2316,12 +2363,23 @@ if (section('adult-errands')) {
       // frames of an empty river. A spot no further from the settlement's middle
       // than the subject himself stands for inland of him (the river lies
       // outward); it is a proxy, not the bank normal.
+      //
+      // A subject near the MIDDLE has no such spot at the distance asked — the
+      // water stand that moved out of the children's earshot stands 3.5 m from
+      // it — so a spot well inside the settlement's own boundary on its bearing
+      // (`__placeBoundaryRadius`, the edge the leave check uses) is accepted on
+      // a second pass, so a subject the first rule serves keeps its frame.
       const subjectR = Math.hypot(subject.x, subject.z)
-      for (let i = 0; i < 12; i++) {
+      for (const nearMiddle of [false, true]) for (let i = 0; i < 12; i++) {
         const bearing = (i / 12) * Math.PI * 2
         const cx = subject.x + Math.sin(bearing) * radius
         const cz = subject.z + Math.cos(bearing) * radius
-        if (Math.hypot(cx, cz) > subjectR) continue
+        const inward = Math.hypot(cx, cz) <= subjectR
+        if (inward === nearMiddle) continue
+        if (nearMiddle) {
+          const edge = await page.evaluate(([x, z]) => window.__placeBoundaryRadius(Math.atan2(z, x)), [cx, cz])
+          if (edge == null || Math.hypot(cx, cz) > edge - CAMERA_EDGE_MARGIN) continue
+        }
         const got = await page.evaluate(
           ([a, v, r, tilt]) =>
             new Promise((res) => {
@@ -2690,13 +2748,29 @@ if (section('adult-errands')) {
       // `local` subject with (scripts/verify/frameSubject.mjs), and keeps the
       // fleck that sits well inside the picture. The camera pose is left exactly
       // as it was — the seam reading below stands at this same spot.
-      await page.evaluate((r) => {
-        const p = window.__placePlayer
-        p.x = r.bank.x - r.normal.x * 1.4
-        p.z = r.bank.z - r.normal.z * 1.4
-        p.yaw = Math.atan2(-r.normal.x, -r.normal.z)
-        p.pitch = -0.16
-      }, river)
+      //
+      // OFF THE FOAM (red of 01.10.2026, every WebGPU pass): `river.bank` is the
+      // middle of the children's stretch, ~28 m upstream since 0bd2d2992, while
+      // the foam drifts in a RIVER_DRIFT_SPAN band centred where the bank normal
+      // runs through the village centre. Measured at the shutter: all sixteen
+      // patches projected at ndc x 2-11, `aim` came back null and the fallback
+      // subject sat below the frame. So the photograph slides along the same
+      // stand line to the middle of that band, and the seam reading gets the
+      // children's spot back afterwards.
+      const standAt = (r, along) =>
+        page.evaluate(
+          ([r, along]) => {
+            const p = window.__placePlayer
+            const shift = r.bank.x * r.downstream.x + r.bank.z * r.downstream.z - along
+            p.x = r.bank.x - r.downstream.x * shift - r.normal.x * 1.4
+            p.z = r.bank.z - r.downstream.z * shift - r.normal.z * 1.4
+            p.yaw = Math.atan2(-r.normal.x, -r.normal.z)
+            p.pitch = -0.16
+          },
+          [r, along],
+        )
+      const bankAlong = river.bank.x * river.downstream.x + river.bank.z * river.downstream.z
+      await standAt(river, 0)
       // The matrices follow the pose only on the next drawn frames; projecting
       // before that would aim at where the camera USED to look.
       await nextFrames(6)
@@ -2740,6 +2814,8 @@ if (section('adult-errands')) {
         local: aim ? { x: aim.x, y: aim.y + 0.15, z: aim.z } : { x: river.bank.x, y: 0.4, z: river.bank.z },
         label: 'the river bank, with the foam riding the current',
       })
+      await standAt(river, bankAlong)
+      await nextFrames(6)
 
       // --- No seam where the drawn water hands over to the panorama (525) ----
       // From this same spot the two halves of the river meet: the surface drawn
