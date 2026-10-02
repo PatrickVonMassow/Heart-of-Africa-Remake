@@ -15857,3 +15857,26 @@ to land than a mechanism that needs a review.
   Tests: Vitest (jsdom) beside `bankGame.ts`; the existing Playwright section.
   Bundle: Testinfrastruktur.
   Criticality: low — no player impact measured yet; it blocks the green of `polish-children`.
+
+- [ ] 1269. The tag beat's side-on standpoint search finds every stand occluded
+  Source: first measured 02.10.2026 ~19:30 in the WebGL 2 covering run of point 1129 on 001ef76f1
+  (`polish-children`, section `tag-catch`, log
+  `local/verify-logs/2026-10-02T17-08-03-519-polish-speech-polish-settlement-polish-children-polish-villagers.log`);
+  no earlier recorded log holds this signature, the check moved unchanged from
+  `scripts/verify/polish.mjs`, and the section alone was green 47 s later on the same head.
+  THE RED. "a clear side-on standpoint on the beat" read `every standpoint occluded`: after the
+  held catch beat, `standBeside(beat.caughtAt, beat.runnerAt ?? beat.caughtAt, beat.caughtAt)`
+  found no candidate stand whose sight line to the caught child was free, so frame
+  `1176-tag-beat` was not taken. The section stages Cairo itself, so it is not an order effect;
+  the port's walls, stalls and walkers around a beat that happens near a wall are the candidates.
+  Final state:
+  - The cause is measured (which candidates were tried and what occluded each, over repeated
+    `--section=tag-catch` runs on a quiet machine on WebGL 2); a search that gives up while an
+    honest side-on view exists is fixed in the search (more bearings or distances, or a later
+    beat), with no check weakened and no occlusion tolerance wider than the evidence.
+  - `polish-children --section=tag-catch` green on WebGPU and WebGL 2; frame `1176-tag-beat`
+    picture-checked.
+  Tests: the existing Playwright section; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low — test-frame staging only, no player impact; it blocks the green of
+  `polish-children` on WebGL 2.

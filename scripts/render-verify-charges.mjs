@@ -1772,4 +1772,16 @@ export const RED_CHARGES = [
       + 'announced word was read over the calling child while its gesture read kind null — first '
       + 'occurrence in all recorded logs; point 1268 owns the voice/arm pairing. The charge dies with point 1268.',
   },
+  {
+    point: 1269,
+    suite: 'polish-children',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^a clear side-on standpoint on the beat$/i,
+    detailMatch: /^every standpoint occluded$/i,
+    why:
+      'MEASURED 02.10.2026 on feat/1129 001ef76f1, webgl/polish-children (tag-catch): no free '
+      + 'side-on stand after the held catch beat — first occurrence in all recorded logs, the section '
+      + 'alone green on the same head; point 1269 owns the standpoint search. The charge dies with point 1269.',
+  },
 ]
