@@ -77,17 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
-  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
-  bambara-village, same session as point 1250.
-  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
-  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
-  blocked activity, unreachable workstation) and fix it.
-  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
-  USER, verbatim:
-  user 30.09.2026: "Der Bewohner steht nur untätig herum."
-  Bundle: Dorfleben.
-  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
 - [ ] 1259. The river-bank frame loses its subject off the bottom edge on WebGPU every pass
   Source: covering WebGPU passes of point 1256 (01.10.2026).
   THE RED. `polish --section=adult-errands`, WebGPU: `FAIL frame 482-village-river-bank — its
