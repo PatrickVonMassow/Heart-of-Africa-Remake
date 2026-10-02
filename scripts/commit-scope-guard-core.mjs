@@ -70,12 +70,15 @@ export const LARGE_FILE_DIRS = ['verification', 'public', 'cover']
  *  MUST touch this file. Named here rather than by raising the ceiling, so a real
  *  stray file of the same size still blocks. The blind cleanup record of closing
  *  633 is the same case: docs/four-eyes/README.md requires both halves verbatim
- *  and the union tracked, and at 7158 entries each crosses the limit. */
+ *  and the union tracked, and at 7158 entries each crosses the limit. The
+ *  review ledger is append-only text of the same kind; it crossed 2.0 MB on
+ *  02.10.2026 and blocked the record of a cross-vendor review. */
 export const LARGE_FILE_PATHS = [
   'docs/tasks-archive.md',
   'docs/blind-633/A.txt',
   'docs/blind-633/B.txt',
   'docs/four-eyes/633-union.json',
+  '.claude/mechanism-reviews.jsonl',
 ]
 
 const topSegment = (p) => String(p).split('/')[0]
