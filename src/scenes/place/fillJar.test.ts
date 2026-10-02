@@ -79,7 +79,7 @@ describe('the surface answers the dip with a spreading ring', () => {
   })
 
   it('shows a visible ring through the whole hold', () => {
-    for (const p of across(56).map((k) => 0.2 + k * 0.01)) {
+    for (const p of across(56).map((k) => 0.2 + k * 0.56)) {
       const rings = fillRings(p) ?? []
       expect(Math.max(...rings.map((r) => r.opacity))).toBeGreaterThan(0.1)
     }
