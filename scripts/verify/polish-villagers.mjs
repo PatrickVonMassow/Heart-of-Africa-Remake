@@ -7,6 +7,7 @@ import { waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { capturePixels } from './frameSubject.mjs'
 import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
 import { onBaselineLane } from './baseline-classify-core.mjs'
+import { describeOverlap, lineOverlap } from './errandShutter.mjs'
 import sharp from 'sharp'
 import { BASE, section, check, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
@@ -2156,7 +2157,7 @@ if (section('adult-errands')) {
               liveFilling: v[i].filling,
               fill: errands.geography.waterFill,
               foot: errands.geography.waterFoot,
-              others: v.filter((_, j) => j !== i).map((p) => ({ x: p.x, z: p.z })),
+              others: v.map((p, j) => ({ who: j, x: p.x, z: p.z })).filter((o) => o.who !== i),
             }
           }
           return null
@@ -2260,7 +2261,7 @@ if (section('adult-errands')) {
       // looking down its own axis at a bent figure foreshortens the very angle
       // under judgement. Each bearing is DRAWN before it is judged — the camera
       // only follows the player on the next frame (point 549).
-      const shot = await (async () => {
+      const search = async (others) => {
         const blocked = []
         // NOBODY MAY OVERLAP HIM IN THE PICTURE, in front of him or behind.
         // The frame is judged on a silhouette, and two cones that touch in the
@@ -2270,26 +2271,12 @@ if (section('adult-errands')) {
         // villager standing behind the crouching one on WebGL 2, then let the
         // WebGPU frame through, where two neighbours stood BESIDE him — inside
         // three metres, so never "past him" — and buried his outline anyway.
-        // A neighbour is dropped when it sits within 0.30 rad of the view axis
-        // between 0.3 and 9 m in front of the lens: at his own three metres that is 0.9 m
-        // to the side, and further out it widens exactly as the picture does.
-        const clearLine = (bearing) => {
-          const cx = posed.x + Math.sin(bearing) * 3
-          const cz = posed.z + Math.cos(bearing) * 3
-          const dx = (posed.x - cx) / 3
-          const dz = (posed.z - cz) / 3
-          for (const o of posed.others) {
-            const along = (o.x - cx) * dx + (o.z - cz) * dz
-            if (along <= 0.3 || along > 9) continue
-            const perp = Math.hypot(o.x - (cx + dx * along), o.z - (cz + dz * along))
-            if (Math.atan2(perp, along) < 0.3) return false
-          }
-          return true
-        }
+        // The test itself is `lineOverlap` (scripts/verify/errandShutter.mjs).
         for (let i = 0; i < 16; i++) {
           const a = (i / 16) * Math.PI * 2
-          if (!clearLine(a)) {
-            blocked.push(`${a.toFixed(2)}→a villager overlaps him in the picture`)
+          const over = lineOverlap(posed, a, others)
+          if (over) {
+            blocked.push(`${a.toFixed(2)}→${describeOverlap(over)}`)
             continue
           }
           const hit = await page.evaluate(
@@ -2335,15 +2322,37 @@ if (section('adult-errands')) {
           blocked.push(`${a.toFixed(2)}→${hit.name} at ${hit.hit.toFixed(2)} of ${hit.target.toFixed(2)}`)
         }
         return { bearing: null, tried: 16, blocked }
-      })()
+      }
+      // THE LINE IS JUDGED AT THE SHUTTER, NOT BEFORE IT (work-order 1108). Only
+      // he is pinned: the others keep walking their errands through the search
+      // and the settling frames, and in a full pass, with the errands well on,
+      // a line clear when chosen came back with two cones over him while the
+      // suite stayed green. So the neighbours are read again after the settle,
+      // and a bearing gone stale is chosen afresh against where they stand now;
+      // only a search that runs out reds.
+      const readOthers = () =>
+        page.evaluate(
+          (w) => window.__placeErrands().villagers.map((p, j) => ({ who: j, x: p.x, z: p.z })).filter((o) => o.who !== w),
+          posed.who,
+        )
+      const SHUTTER_SEARCHES = 4
+      let shot = await search(posed.others)
+      let spoiled = null
+      let searches = 1
+      while (shot.bearing != null) {
+        await nextFrames(6)
+        spoiled = lineOverlap(posed, shot.bearing, await readOthers())
+        if (!spoiled || searches >= SHUTTER_SEARCHES) break
+        searches++
+        shot = await search(await readOthers())
+      }
       check(
         'and a clear line to him exists for the shutter',
         shot.bearing != null,
         shot.bearing == null
-          ? `all 16 bearings blocked: ${shot.blocked.join(', ')}`
-          : `bearing ${shot.bearing.toFixed(2)} rad, the ${shot.tried}. of 16 tried`,
+          ? `all 16 bearings blocked in search ${searches}: ${shot.blocked.join(', ')}`
+          : `bearing ${shot.bearing.toFixed(2)} rad, the ${shot.tried}. of 16 tried, search ${searches} of ${SHUTTER_SEARCHES}`,
       )
-      await nextFrames(6)
       // HE MUST STILL BE WHERE THE CAMERA IS AIMED. The pin held his pose and
       // left his errand walking underneath it: on WebGL 2, at 33-52 FPS, he was
       // metres away by the shutter and the frame came back as an empty bank —
@@ -2358,6 +2367,15 @@ if (section('adult-errands')) {
         'and he is still standing where the shutter is aimed, rather than having walked on',
         Math.hypot(stood.x - posed.x, stood.z - posed.z) < 0.05,
         `${Math.hypot(stood.x - posed.x, stood.z - posed.z).toFixed(2)} m from the aim point`,
+      )
+      // The neighbours once more, immediately before the exposure.
+      if (shot.bearing != null) spoiled = lineOverlap(posed, shot.bearing, await readOthers())
+      check(
+        'and nobody has walked into the line to him by the shutter',
+        shot.bearing != null && !spoiled,
+        shot.bearing == null
+          ? 'no bearing to judge'
+          : spoiled ? `${describeOverlap(spoiled)}, after ${searches} searches` : `clear after ${searches} searches`,
       )
       await frame('1085-village-adult-fills-a-jar', {
         local: { x: posed.x, y: 0.6, z: posed.z },
