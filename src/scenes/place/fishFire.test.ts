@@ -16,6 +16,8 @@ import { basketRingViolation } from './fishBaskets'
 import {
   createFishFire,
   createFisheryRing,
+  eaterOccupation,
+  eaterPoundStroke,
   fisherySites,
   gutSecondsFor,
   stepFishFire,
@@ -234,6 +236,7 @@ describe('where the fire stands (work-order 1245 item 4)', () => {
         griller: sites.griller,
         eaterAtRack: sites.eaterAtRack,
         eaterHome: sites.eaterHome,
+        eaterMortar: sites.eaterMortar,
         fire: sites.fire,
         rack: sites.rack,
         storage: sites.storage,
@@ -279,6 +282,8 @@ describe('nothing at the fire stands inside anything else (work-order 1245)', ()
       ['rack', s.rack, 0.6],
       ['board', s.board, 0.45],
       ['storage', s.storage, 0.3],
+      ['eaterHome', s.eaterHome, 0.3],
+      ['eaterMortar', s.eaterMortar, 0.26],
     ]
     for (let i = 0; i < bodies.length; i++) {
       for (let j = i + 1; j < bodies.length; j++) {
@@ -288,6 +293,48 @@ describe('nothing at the fire stands inside anything else (work-order 1245)', ()
         const allowed = (an === 'carrierAtFire' && bn === 'board') ? 0.2 : 0
         expect(Math.hypot(a.x - b.x, a.z - b.z) + allowed, `${an} / ${bn}`).toBeGreaterThanOrEqual(ar + br)
       }
+    }
+  })
+})
+
+describe('the eater between his visits (work-order 1251)', () => {
+  it('is never idle: at home he pounds grain, otherwise he walks, takes or eats', () => {
+    const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
+    const sites = fisherySites(bank, canoeLane(bank))
+    const rand = mulberry32(1251)
+    const ring = createFisheryRing()
+    const fire = createFishFire(sites, ring, 60, cfg, rand)
+    const strokes: number[] = []
+    let homeSeconds = 0
+    for (let t = 0; t < 1800; t += 0.05) {
+      stepFishFire(fire, sites, ring, 0.05, 120, cfg, rand)
+      const occupation = eaterOccupation(fire.eater)
+      expect(['pound', 'walk', 'take', 'eat']).toContain(occupation)
+      if (fire.eater.phase === 'home') {
+        homeSeconds += 0.05
+        strokes.push(eaterPoundStroke(fire.eater, cfg))
+        // He stands at his mortar, facing it.
+        expect(Math.hypot(fire.eater.x - sites.eaterHome.x, fire.eater.z - sites.eaterHome.z)).toBeLessThan(1e-6)
+      } else expect(eaterPoundStroke(fire.eater, cfg)).toBe(0)
+    }
+    // Home is most of his time, and the pestle visibly rises and falls there.
+    expect(homeSeconds).toBeGreaterThan(900)
+    expect(Math.max(...strokes)).toBeGreaterThan(0.95)
+    expect(Math.min(...strokes)).toBeLessThan(0.05)
+  })
+
+  it.each(RIVER_VILLAGES)('%s: he faces his mortar, and his walk to the rack passes clear of it', (id) => {
+    const bank = buildRiverBank(PLACES.find((p) => p.id === id)!, PLACE_RADIUS)!
+    const s = fisherySites(bank, canoeLane(bank))
+    const m = s.eaterMortar
+    const h = s.eaterHome
+    const facing = Math.atan2(m.x - h.x, m.z - h.z)
+    expect(Math.abs(Math.atan2(Math.sin(facing - h.yaw), Math.cos(facing - h.yaw)))).toBeLessThan(1e-9)
+    expect(Math.hypot(m.x - h.x, m.z - h.z)).toBeCloseTo(cfg.eaterMortarOffset, 9)
+    for (let k = 0; k <= 40; k++) {
+      const x = h.x + (s.eaterAtRack.x - h.x) * (k / 40)
+      const z = h.z + (s.eaterAtRack.z - h.z) * (k / 40)
+      expect(Math.hypot(x - m.x, z - m.z), `walk ${k}`).toBeGreaterThanOrEqual(0.26 + 0.3 - 0.01)
     }
   })
 })
