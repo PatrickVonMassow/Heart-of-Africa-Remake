@@ -3297,7 +3297,7 @@ function ErrandVillagers({
       delete w.__placeCastErrand
       delete w.__placeForceFill
     }
-  }, [work, people, geography, view])
+  }, [work, people, geography, view, groundHeight])
 
   return (
     <>
