@@ -119,8 +119,14 @@ put it is the mistake this line exists to stop.
   frames `93-orientation-highlight`, `102-cairo-lane-plan` and `148-speech-guess-invitation`
   lack terrain and hut/house walls that main's `polish` frames show, and
   `690-cairo-children` aims at a wall with no child in view. All theme-suite reds of both
-  backends are charged; this picture defect is the remaining blocker. First step: one
-  affected section per backend (`npm test -- polish-speech --section=speech-guess`).
+  backends are charged; this picture defect is the remaining blocker. REPRODUCED 15:25:
+  `VERIFY_GL=webgl npm test -- polish-speech --section=speech-guess` passes 15/15 yet
+  writes `148-speech-guess-invitation` as pure fog (no terrain, huts or figures) — the
+  shutter does not catch an unrendered place. Cause read from the code: `goToPlace` in
+  `scripts/verify/_polish.mjs` waits only for `__placeLayout`, then the section shoots
+  after `nextFrames(4)`; in the unsplit run earlier sections had warmed the scene. Repair
+  there (wait until the entered place is really drawn), then re-shoot the affected frames
+  on both backends; the shutter's blind spot for an empty frame is worth a check too.
   Bundle: Testinfrastruktur.
 
 - [ ] 1117. The fill's decided surface reading was never built (found 12.09.2026 while building
