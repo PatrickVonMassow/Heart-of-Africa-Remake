@@ -33175,3 +33175,26 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   user 30.09.2026: "Der Bewohner steht nur untätig herum."
   Bundle: Dorfleben.
   Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
+
+- [x] 1259. The river-bank frame loses its subject off the bottom edge on WebGPU every pass
+  Source: covering WebGPU passes of point 1256 (01.10.2026).
+  THE RED. `polish --section=adult-errands`, WebGPU: `FAIL frame 482-village-river-bank — its
+  subject is not in the rendered picture: off the bottom edge of the frame`, in every recorded
+  WebGPU pass of 01.10 (logs `local/verify-logs/2026-10-01T14-41-12-659-…`, `…15-18-30-027-…`,
+  `…16-19-01-472-polish.log`, `…19-14-19-361-…`, `…19-19-15-831-polish.log`), on feat/1129,
+  feat/1254 and feat/1256 alike. Point 1121's charge covers only WebGL 2 and its drifting-fleck
+  race exits by the right edge; a deterministic WebGPU red was not measured before 01.10.
+  NOT 1256'S: it stood at 14:41Z on feat/1129, before 1256's commits.
+  SUSPECTED CAUSE, NOT MEASURED: the aim block (`scripts/verify/polish.mjs` ~8751-8790) returns
+  `null` when no fleck projects inside |ndc| ≤ 0.9, and the fallback subject is `river.bank` at
+  y 0.4 — 1.4 m in front of a player pitched −0.16, which lies below the frame. Likely since the
+  bank game moved upstream (0bd2d2992) no fleck is in view from the new bank spot.
+  Final state:
+  - The cause is named with its measurement (is `aim` null at the shutter?).
+  - The frame shows foam riding the current at the bank on both backends; the check is not
+    weakened into one that passes on an empty river.
+  - `polish --section=adult-errands` reads the 482 frame green on WebGPU.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs this section green.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — reds every WebGPU polish pass and blocks covering proofs.
