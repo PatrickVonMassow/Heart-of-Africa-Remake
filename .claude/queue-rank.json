@@ -1554,6 +1554,12 @@
       "why": "a low-criticality detector false positive charged to its own point; it blocks no landing, so last is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1268": {
+      "at": "2026-10-02T16:28:47.963Z",
+      "why": "low-criticality test-infra red, first occurrence; behind the open Testinfrastruktur work, no player impact measured",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1583,7 +1589,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-02T14:50:18.570Z",
+    "at": "2026-10-02T16:28:47.974Z",
     "points": [
       184,
       200,
@@ -2014,7 +2020,8 @@
       1264,
       1265,
       1266,
-      1267
+      1267,
+      1268
     ]
   }
 }
