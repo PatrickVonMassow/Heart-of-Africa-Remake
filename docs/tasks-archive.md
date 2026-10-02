@@ -33095,3 +33095,24 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: scripts/verify/crossbrowser.mjs, scripts/verify/run-all.mjs (the dev server the
   pass uses), point 1089, point 1065.
   Bundle: Testinfrastruktur.
+
+- [x] 1260. Villagers speak by their own activity, never gated on what the player has heard
+  Source: user order 01.10.2026 22:12, after the explanation of the bank game's ROCK gate.
+  Final state: no villager utterance, gesture or activity depends on what the player has heard. Remove every
+  "X is not said/done before the listener has heard Y" rule:
+  1. `src/scenes/place/bankGame.ts`: the opening RIVER call and the direction announcement fall in every cycle
+     regardless of ROCK being heard; drop `BankWorld.hasHeard`, the `rockKnown` branch in the cycle opening, the
+     `rockOnly` run mode and the rock-only branch before `announceRun`.
+  2. `src/scenes/place/loomWork.ts`: the loom's directions no longer wait for the first ROCK hearing; drop
+     `rockHeard` from the view and its two uses.
+  3. `src/scenes/place/PlaceLife.tsx`: stop feeding the heard set into both (`hasHeard`, `rockHeard`).
+  4. Sweep `src/` for any further speaker-side read of `communication.heard` (the journal/label side, which
+     records what the player heard, stays) and remove each gate found.
+  5. Update `docs/communication-poc-spec.md` (bank game paragraph), `docs/communication-playthrough.md` (rows 2
+     and B3) and `design.md` where they state the teaching-order gate; adjust or delete the tests that pin it.
+  Tests: Vitest on bankGame/loomWork (RIVER and a direction are spoken in the first cycle with an empty heard set);
+  a Playwright communication/polish section only where an existing one asserted the gate.
+  USER, verbatim:
+  user 01.10.2026: "Diese Regel finde ich unsinnig. Das würde bedeuten, dass die Kinder extra für den Spieler reden bzw. schweigen. Sie sollen ganz normal ihren Tätigkeiten nachgehen (wozu auch ihre Äußerungen gehören), unabgängig davon, ob der Spieler zuhört. Entferne alle Regeln in der Art "X nicht hören, bevor Y gehört wurde"."
+  Bundle: Dorfleben.
+  Criticality: medium — villagers stay silent for the player's sake, which the user rejects as unnatural.
