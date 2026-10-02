@@ -1508,6 +1508,18 @@ Nutzers nicht ausführen, ohne die Tafel zu belügen oder zu warten — und beid
 das, was die Regel verhindern soll.
 
 
+### 3.307 Die geliehene Karte
+
+Am 01.10. lief die Verschiebung des `poc`-Tags auf Anordnung des Nutzers unter der Jetzt-Karte von
+Punkt 1256 — der Weg aus §3.306, nur mit einer fremden Nummer statt einer eigenen. Die Tafel war
+damit formal zufrieden und inhaltlich falsch: Wer sie las, sah Arbeit an einem Dorf-Punkt, während
+ein Release-Tag bewegt wurde. Der Nutzer hat das noch am selben Abend untersagt: Arbeit, die eine
+Karte braucht, bekommt einen eigenen Auftragspunkt.
+
+**Lehre:** Eine Karte ist eine Aussage über genau eine Arbeit. Wer sie für eine zweite borgt, um ein
+Tor zu passieren, erfüllt die Form der Regel und bricht ihren Zweck — die Tafel lügt dann nicht
+durch Weglassen, sondern durch Zuordnung.
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1721,7 +1733,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 01.10.2026, 19:51 · Quellen-Fingerprint: `1c417c8c501b…`
+Zuletzt aktualisiert: Freitag, 02.10.2026, 01:02 · Quellen-Fingerprint: `801de27e1a10…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1765,7 +1777,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 108 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 109 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1786,6 +1798,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | There is exactly one head session — this chat; every other session is headless and the user cannot be reached through it | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A retrospective about a context overshoot changes nothing — a fresh session never reads it; only an in-loop brake or an indexed memory does | 5 | hoch | — (Regel/Memory) | ◐ Regel |
+| Never put work on another point's board card; work that needs a card gets its own TASKS point | 1 | niedrig | dashboard-card-topic-guard.mjs, decision-card-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A `pgrep -f` wait loop matches its own shell command line, so it never exits — anchor on the process, not the pattern | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
@@ -1831,10 +1844,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 102 Feedback-/Projekt-/User-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 145 Prozess-/Meta-TASKS-Punkte (davon 67 offen).
+Erfasste Quellen: 103 Feedback-/Projekt-/User-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 145 Prozess-/Meta-TASKS-Punkte (davon 67 offen).
 
-<!-- RETRO-FINGERPRINT: 1c417c8c501ba634cf1798c5c48323c42cda1f63847b7813c019c8532c2d0d71 -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-01T17:51:34.949Z -->
+<!-- RETRO-FINGERPRINT: 801de27e1a1005ae4e96b7d775863359c2284b787a6d756a2a956dee8122ca9f -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-01T23:02:06.365Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

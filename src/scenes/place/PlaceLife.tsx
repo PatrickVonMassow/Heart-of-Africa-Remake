@@ -317,7 +317,6 @@ function Loom({
         // A settlement whose warp lies on no river has no upstream to name.
         vocabulary: useGame.getState().vocabulary,
         teaches: station.onRiverAxis,
-        rockHeard: Object.hasOwn(useGame.getState().communication.heard, useGame.getState().vocabulary.ROCK),
         helper: true,
         seat: station.weaver,
         childrenHear,
@@ -807,10 +806,6 @@ function Kids({
     // three of them — and with a stage it is switched off altogether (above).
     if (nav) navRestrict(nav, onGround)
     return {
-      hasHeard: (concept) => {
-        const s = useGame.getState()
-        return Object.hasOwn(s.communication.heard, s.vocabulary[concept])
-      },
       radius: region.radius,
       centerX: region.x,
       centerZ: region.z,

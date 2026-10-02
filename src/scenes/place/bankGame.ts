@@ -358,8 +358,6 @@ export type BankConfig = TagConfig & BankRoundConfig
  * the player stepped into it would never be watched at all.
  */
 export interface BankWorld extends TagWorld {
-  /** Live listener memory. Omitted only in simulations without a listener. */
-  hasHeard?: (concept: BankConcept) => boolean
   floor?: SpeechFloor
   stranger?: { x: number; z: number; radius: number } | null
   /** Whether the straight line between two points crosses ground a child may
@@ -386,9 +384,6 @@ export interface BankState {
   /** The word announced for the coming or current run, or null while none has
    *  been announced. */
   direction: BankConcept | null
-  /** ROCK was unheard when this run opened. Held through the run even if its
-   *  tap teaches ROCK; the following run then requires a direction. */
-  rockOnly: boolean
   /** Who called RIVER and opened this cycle — the first catcher. */
   caller: number
   /** Who climbs the boulder this roaming phase, or −1. */
@@ -773,7 +768,6 @@ export function createBankGame(
     phaseFor: cfg.roamSeconds,
     from: 'downstream',
     direction: null,
-    rockOnly: false,
     caller: -1,
     climber: -1,
     tapper: -1,
@@ -813,10 +807,9 @@ export function createBankGame(
  * their quarter. The roaming phase is closed at once, and marked as finished
  * without a naming — the same state `roamGuardSeconds` leaves — so the first
  * step opens the cycle there and the first run follows as soon as everybody
- * stands in place. A listener who has not heard ROCK gets the rock-only run,
- * exactly as one who missed a climb does; every later roaming phase carries its
- * boulder climb as before. Each child keeps its quarter spot as its anchor for
- * the roam that follows.
+ * stands in place. Every later roaming phase carries its boulder climb as
+ * before. Each child keeps its quarter spot as its anchor for the roam that
+ * follows.
  */
 export function openVisitAtBank(
   s: BankState,
@@ -1049,8 +1042,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankW
     s.children.map((_, i) => i),
     rockAt(stage, otherEnd(s.from)),
   )
-  const rockKnown = world.hasHeard?.('ROCK') ?? true
-  if (rockKnown && caller >= 0 && !maySpeak(s, world, caller, 'call')) return
+  if (caller >= 0 && !maySpeak(s, world, caller, 'call')) return
   s.caller = caller
   s.children.forEach((c, i) => {
     c.role = i === caller ? 'catcher' : 'runner'
@@ -1065,7 +1057,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankW
   s.tapper = caller
   s.direction = null
   s.runsThisCycle = 0
-  if (rockKnown && caller >= 0) {
+  if (caller >= 0) {
     say(s, {
       concept: 'RIVER',
       moment: 'call',
@@ -1097,15 +1089,13 @@ function announceRun(s: BankState, stage: BankStage, world: BankWorld): void {
   })
 }
 
-/** Opens one run: the catcher taps his own rock and names it with nobody
- *  arriving. Direction runs were announced; rock-only runs teach the object
- *  before the listener can hear a direction. */
+/** Opens one announced run: the catcher taps his own rock and names it with
+ *  nobody arriving. */
 function openRun(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWorld): boolean {
   const to = otherEnd(s.from)
   const contact = s.tapper >= 0 ? touchReach(stage, to, s.children[s.tapper]) : null
   if (contact && Math.abs(contact.gap) <= TOUCH_GAP && !maySpeak(s, world, s.tapper, 'tap')) return false
   s.phase = 'run'
-  s.rockOnly = world.hasHeard?.('ROCK') === false
   s.phaseFor = cfg.runSeconds
   // The hold belongs to the WORD, and the word is offered further down only if
   // the hand reaches the stone — so it is armed there, not here.
@@ -1183,7 +1173,6 @@ function endRun(s: BankState, cfg: BankConfig): void {
   }
   s.from = otherEnd(s.from)
   s.direction = null
-  s.rockOnly = false
   // The cycle normally ends when no runner is left. A run per child is the
   // explicit backstop for the equally valid sequence in which every runner
   // reaches the rock untouched: without it the same sides swap forever and the
@@ -1351,11 +1340,7 @@ function advanceBankGame(
     !s.children.some((c) => c.arrival) &&
     (s.phaseFor <= 0 || inPlace(s, stage, cfg, world, s.from, otherEnd(s.from)))
   ) {
-    if (world.hasHeard && !world.hasHeard('ROCK')) {
-      // A listener who missed the climb gets a rock-only touch/run. Never
-      // introduce a direction alongside an as-yet unheard object.
-      openedRun = openRun(s, stage, cfg, world)
-    } else if (s.direction === null && s.pending.length === 0 && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
+    if (s.direction === null && s.pending.length === 0 && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
       // Not in the step that already called the river: `drain` speaks one
       // word per step, and the run must not open on a dropped announcement.
       announceRun(s, stage, world)
@@ -2151,7 +2136,7 @@ function stepPart(
  */
 function assertRoundSound(s: BankState, cfg: BankConfig): void {
   devAssert(
-    s.phase !== 'run' || s.direction !== null || s.rockOnly,
+    s.phase !== 'run' || s.direction !== null,
     'bank-run-unannounced',
     () => `a direction run is on with no direction announced (run ${s.runs})`,
   )

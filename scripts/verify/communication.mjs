@@ -397,10 +397,10 @@ async function observations() {
   receipt.bankTeaching = { cycleSeconds,
     ...bankTeachingOrder(await d.read(() => window.__communicationHearings.events), call) }
   await event('bank-rock-before-river', receipt.bankTeaching)
-  // The message-first expedition can hear RIVER on the drums before ROCK.
-  // Both orders still owe a child call observed after the ROCK hearing.
-  check('ROCK precedes the child call, and the first RIVER hearing in words-first',
-    receipt.bankTeaching.rockBeforeCall && (receipt.order === 'message-first' || receipt.bankTeaching.rockBeforeRiver))
+  // The children call RIVER by their own game, never gated on what the player
+  // has heard, so RIVER may be heard before ROCK; the receipt only records it.
+  // The driver still observes its child call after the ROCK hearing.
+  check('ROCK precedes the observed child call', receipt.bankTeaching.rockBeforeCall)
   await d.walk(view); await d.aim(view.look)
   for (const direction of ['UPSTREAM', 'DOWNSTREAM']) {
     await d.wait((direction) => window.__placeTag().phase === 'run' && window.__placeTag().direction === direction, direction, 480000)

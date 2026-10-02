@@ -77,6 +77,33 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1262. No water carrier sets out with an empty jar in the continuous route's adult step
+  Source: covering WebGPU passes of point 1260 (01.-02.10.2026).
+  THE RED. `communication --section=continuous-route`, WebGPU: `FAIL continuous route at
+  3-adult-work-and-loom: page.waitForFunction: Timeout 480000ms exceeded`, twice on
+  feat/1260 (d6dd8adf9, log `local/verify-logs/2026-10-01T21-08-19-119-…`; 343cc7b1e,
+  `…2026-10-01T22-19-05-530-…`). No `03-empty-jar` frame was written, so the first wait of the
+  step — some villager with `carry === 'emptyJar'` within 480 s of standing at
+  `geography.waterStand` — never came true.
+  NOT 1260'S: its diff touches only the bank game, the loom's ROCK gate and their feeds. Main
+  itself cannot reach step 3: at 54809a1c3 the same section reds earlier, at
+  `2-childrens-bank-game: ROCK precedes the child call, and the first RIVER hearing in
+  words-first` (log `…2026-10-01T22-39-32-337-…`) — the gate 1260 removes. Last green of the
+  section on main: 53b168c14 (28.09.2026); main changed the settlement boundary, the replayed
+  adults' bounds and the water path since.
+  NOT REPRODUCED 02.10.2026: on feat/1260 at aa6ace0f3 (main 6a8ea6ca0 merged in) the section ran
+  GREEN through step 3 on both backends (logs `…2026-10-01T23-51-59-806-…` WebGPU,
+  `…2026-10-02T00-13-04-087-…` WebGL 2) — the red is intermittent, not a constant absence.
+  Final state:
+  - The cause is named with its measurement (are no adults cast to the water errand, or do
+    they never reach `emptyJar` while the player stands at the stand?).
+  - A water carrier sets out with the empty jar within the step's budget on both backends; the
+    wait is not lengthened and the step not skipped.
+  - `communication --section=continuous-route` passes step 3 on WebGPU.
+  Tests: Vitest for an errand-assignment cause; the existing Playwright step is the scene check.
+  Bundle: Dorfleben.
+  Criticality: medium — the water errand is part of the lively settlement (§7.1 no. 15) and the
+  red blocks every covering communication proof.
 - [ ] 1256. A RIVER order falls 6.2 m from the children's roaming quarter
   Source: covering WebGPU passes of point 1254 (01.10.2026).
   THE RED. `polish --section=adult-errands`: "and no adult word ever falls inside the
@@ -95,6 +122,39 @@ put it is the mistake this line exists to stop.
   Stands before 1129 because 1129's covering proof needs `polish-villagers` green.
   Bundle: Dorfleben.
   Criticality: medium — an adult order is spoken inside the children's game.
+- [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
+  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
+  bambara-village, same session as point 1250.
+  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
+  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
+  blocked activity, unreachable workstation) and fix it.
+  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
+  USER, verbatim:
+  user 30.09.2026: "Der Bewohner steht nur untätig herum."
+  Bundle: Dorfleben.
+  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
+- [ ] 1259. The river-bank frame loses its subject off the bottom edge on WebGPU every pass
+  Source: covering WebGPU passes of point 1256 (01.10.2026).
+  THE RED. `polish --section=adult-errands`, WebGPU: `FAIL frame 482-village-river-bank — its
+  subject is not in the rendered picture: off the bottom edge of the frame`, in every recorded
+  WebGPU pass of 01.10 (logs `local/verify-logs/2026-10-01T14-41-12-659-…`, `…15-18-30-027-…`,
+  `…16-19-01-472-polish.log`, `…19-14-19-361-…`, `…19-19-15-831-polish.log`), on feat/1129,
+  feat/1254 and feat/1256 alike. Point 1121's charge covers only WebGL 2 and its drifting-fleck
+  race exits by the right edge; a deterministic WebGPU red was not measured before 01.10.
+  NOT 1256'S: it stood at 14:41Z on feat/1129, before 1256's commits.
+  SUSPECTED CAUSE, NOT MEASURED: the aim block (`scripts/verify/polish.mjs` ~8751-8790) returns
+  `null` when no fleck projects inside |ndc| ≤ 0.9, and the fallback subject is `river.bank` at
+  y 0.4 — 1.4 m in front of a player pitched −0.16, which lies below the frame. Likely since the
+  bank game moved upstream (0bd2d2992) no fleck is in view from the new bank spot.
+  Final state:
+  - The cause is named with its measurement (is `aim` null at the shutter?).
+  - The frame shows foam riding the current at the bank on both backends; the check is not
+    weakened into one that passes on an empty river.
+  - `polish --section=adult-errands` reads the 482 frame green on WebGPU.
+  Tests: the existing Playwright check is the right layer; no new mechanism.
+  Stands before 1129 because 1129's covering proof needs this section green.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — reds every WebGPU polish pass and blocks covering proofs.
 - [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
   point 1126 on 15.09.2026, which delivered its other three parts the same day).
   MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
@@ -133,44 +193,6 @@ put it is the mistake this line exists to stop.
   scripts/verify/machine-load-core.mjs, scripts/verify/run-wait-core.mjs,
   scripts/render-verify-charges.mjs, scripts/verify/README.md, TASKS.md (the diff→suite
   paragraph), docs/acceptance-evidence.md
-  Bundle: Testinfrastruktur.
-
-- [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
-  mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
-  rule; the user ordered these three reds filed at once on 10.09.2026).
-  MEASURED 12.09.2026, and it corrects this point's own first draft. Against the dev
-  server the crossbrowser suite uses (run-all launches `npm run dev`, not preview), at
-  standard depth, on a COLD vite dependency cache:
-    PASS  chromium-mobile the app boots on a mobile viewport
-    PASS  chromium-mobile the renderer initialises on mobile
-    PASS  chromium-mobile the touch layer arms on the first touch (stick + look)
-    FAIL  chromium-mobile no console errors on mobile
-          — Failed to load resource: the server responded with a status of
-            504 (Outdated Optimize Dep)   (twice)
-  The IMMEDIATELY following run, same command, warm cache: ALL GREEN, exit 0.
-  So the cause is NOT a renderer crash and NOT getSupportedExtensions on null — that
-  reading was wrong. Mobile boots, the renderer initialises and the touch layer arms.
-  The single red is vite's dev-server dependency pre-bundling race: when the optimizer
-  re-bundles mid-load, in-flight requests for the superseded chunks answer 504, the page
-  logs them as resource errors, and the no-console-errors assertion trips. A production
-  build has no optimized-dep chunks at all, so NO PLAYER can meet this.
-  Final state: the crossbrowser pass no longer reds on the optimizer's own 504. Settle
-  vite's dependency optimization before the browser pass (or let the harness treat a
-  504 "Outdated Optimize Dep" as the reload signal vite means it to be), so that a cold
-  cache and a warm one give the same verdict. Prove it by running the suite at standard
-  depth TWICE FROM A COLD CACHE (delete node_modules/.vite between runs) and getting
-  the same green both times — a single warm run proves nothing here.
-  Test. Vitest: the console-error filter classifies a 504 "Outdated Optimize Dep" as the
-  optimizer's reload signal and a genuine resource error as a failure.
-  Criticality: LOW, corrected from HIGH on the measurement above. It is a cold-cache
-  flake in the verify harness, not a mobile lane that fails to boot. It still has to be
-  fixed rather than tolerated: it is one of the reds that held point 1065 across 23 LARGE
-  runs, and a gate that reds on its own server's cache state teaches the batch to ignore
-  reds.
-  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
-  touching its change. This point owns it.
-  Refs: scripts/verify/crossbrowser.mjs, scripts/verify/run-all.mjs (the dev server the
-  pass uses), point 1089, point 1065.
   Bundle: Testinfrastruktur.
 
 - [ ] 1117. The fill's decided surface reading was never built (found 12.09.2026 while building
@@ -15765,17 +15787,6 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs, point 1145.
   Bundle: Testinfrastruktur.
   Criticality: medium — one red check per polish pass until fixed.
-- [ ] 1251. Bambara-village: an adult inhabitant only stands idle on the shore
-  Source: bug report `local/UntaetigerErwachsener.zip` (via /backup/hoa/local), build 733e920, WebGPU, seed 2425147265,
-  bambara-village, same session as point 1250.
-  Final state: the adult in the orange robe on the shore beach (near the fishers' drying rack) follows a visible
-  occupation or routine like every other adult; find why this one has none (missing job assignment, finished or
-  blocked activity, unreachable workstation) and fix it.
-  Tests: Vitest on the assignment logic; Playwright only if the fix is scene-side.
-  USER, verbatim:
-  user 30.09.2026: "Der Bewohner steht nur untätig herum."
-  Bundle: Dorfleben.
-  Criticality: medium — an idle adult breaks the lively-settlement picture (§7.1 no. 15).
 - [ ] 1253. Picture sections that set a game condition by knob need a player-path counterpart
   Source: request deposited 01.10.2026 05:28 by session d17af0dd (findings carrier), cut from e9515346d.
   Lesson from point 1250: the 1245 polish section `villager-canoe` (scripts/verify/polish.mjs at 733e920) marked ROCK as heard (`g.hearUtterance(g.vocabulary.ROCK)`, justified as "a player standing here has met the rocks already") and cut the children's `roamSeconds` from 55 s to 8 s. Those two "spectator-time knobs" skipped exactly the two gates that left the boatmen and the children mute for over a minute after entry, so the suite was green while the player met a silent scene.
@@ -15790,3 +15801,18 @@ to land than a mechanism that needs a review.
   user 01.10.2026: "Ja, mach das."
   Bundle: Testinfrastruktur.
   Criticality: medium — a knob-staged suite can stay green while the player meets a broken scene.
+- [ ] 1261. Let the answering window remove an answered board card; drop point 1240
+  Source: request of session 829c2a2a, deposited 01.10.2026 20:51 through the findings carrier.
+  Observed problem: Point 1240 shows the cost: the user answered the card on 29.09. in a non-owner window; that window could only deposit a --request, the owner's drain knows only "TASKS append" or "decision card", so a one-command removal became a queued point and the answered card stood on the board for two days. A whole point (spec, commit, rank, brief, tick, archive) costs more than the single idempotent call it guards against.
+  FINAL STATE:
+  1. A session that does NOT hold the batch lock may run `node scripts/board.mjs vdzk-remove "<title>"` for a "Von dir zu klären" card the user has just answered in that session. The stand-down (batch-singleton STAND DOWN text, and any guard that refuses a board write from a non-owner) no longer covers this one call; every other board/TASKS.md write stays owner-only. This is switching off an obstructing rule, not a new mechanism: no new guard, ledger field or route. The removal already runs under board-edit-lock, so it cannot interleave with the owner's publish.
+  2. The STAND DOWN text and docs/batch-owner-runbook.md say so in one line each.
+  3. Remove the card now: node scripts/board.mjs vdzk-remove "Transkript-Aufbewahrung: die 30 Tage kosten jetzt auch Laufzeit". Its recommendation is already carried out (~/.claude/settings.json "cleanupPeriodDays": 3650, set 29.09.2026 15:58). Record the closure in the decision log (what: retention 10 years; why: transcripts carry citable user orders and review evidence; veto: user may lower the value).
+  4. DELETE open point 1240 "Remove the transcript retention card" from TASKS.md (not tick, not archive as done): this point supersedes it, the user ordered its deletion.
+  Test: a Vitest on the guard/stand-down layer proving vdzk-remove is allowed from a non-owner session and another board write (e.g. vdzk-add) still is not.
+  Files: scripts/board.mjs (vdzk-remove), scripts/batch-singleton.mjs, scripts/finding.mjs, TASKS.md point 1240, commit f2a76cd0f. Spec cut from 5a325dcc9.
+  USER, verbatim:
+  User 01.10.2026: »Ja, gib das als Aufrag in die Batch-Session. Und sie soll die Karte dann entfernen und den damit hinfälligen Task 1240 löschen.«
+  User 01.10.2026 (on the cause): »Ein eigener Task für so eine winzige Aufgabe erzeugt doch mehr Overhead, als die forcierte Einhaltung der 150k-Grenze einspart.«
+  Bundle: Chat & Tafel.
+  Criticality: medium — an answered card stays on the board until a whole point is worked.

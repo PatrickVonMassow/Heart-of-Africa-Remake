@@ -1617,6 +1617,19 @@ export const RED_CHARGES = [
       + 'The charge dies with 1172.',
   },
   {
+    point: 1259,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    // WebGPU only: point 1121 owns the WebGL 2 race; this lane reds every pass
+    // since 01.10 by the bottom edge, which reads as a deterministic cause.
+    match: /^frame 482-village-river-bank\b/i,
+    why:
+      'Measured in every WebGPU polish pass of 01.10.2026 (feat/1129, feat/1254, feat/1256), '
+      + 'subject off the bottom edge; first at local/verify-logs/2026-10-01T14-41-12-659-'
+      + 'polish-children-polish-villagers.log. The charge dies with 1259.',
+  },
+  {
     point: 1121,
     suite: 'polish',
     backend: 'webgl',
@@ -1751,5 +1764,17 @@ export const RED_CHARGES = [
       'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl): deadAfter 2 with the calf alive — '
       + 'the global dead-count flake point 200 already documents (24.07). The section alone at 487ad8d4f '
       + 'was green. The charge dies with 200.',
+  },
+  {
+    point: 1262,
+    suite: 'communication',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^continuous route at 3-adult-work-and-loom: page\.waitForFunction: Timeout\b/i,
+    why:
+      'MEASURED 01./02.10.2026 twice on feat/1260 (d6dd8adf9, 343cc7b1e), webgpu: no carrier took '
+      + 'the empty jar within 480 s; the branch does not touch the water errand, and main at 54809a1c3 '
+      + 'reds earlier at step 2 (the gate 1260 removes). The charge dies with 1262.',
   },
 ]
