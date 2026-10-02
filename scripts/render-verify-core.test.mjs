@@ -1037,6 +1037,20 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(result).toEqual({ decision: 'allow', clear: true })
   })
 
+  it('lets a red of the retired `polish` go once ALL five theme suites cover after the fix', () => {
+    const old = redRun('webgpu', 1500, [red('a NEW check nobody filed')], { suite: 'polish' })
+    const themes = ['polish-panorama', 'polish-speech', 'polish-settlement', 'polish-children', 'polish-villagers']
+    const greens = themes.map((suite, i) => ({ ...run('webgpu', 3500 + i), suite }))
+    const allFive = evaluate(
+      renderChange({ latestChangeAt: 3000, runs: [old, ...greens, run('webgl', 3600)], openPoints }),
+    )
+    expect(allFive).toEqual({ decision: 'allow', clear: true })
+    const fourOfFive = evaluate(
+      renderChange({ latestChangeAt: 3000, runs: [old, ...greens.slice(1), run('webgl', 3600)], openPoints }),
+    )
+    expect(fourOfFive.decision).toBe('block')
+  })
+
   it('does NOT let an unrelated edit plus a green of ANOTHER suite drop the red', () => {
     // The old rule dropped every red older than the newest render edit, so an
     // edit that had nothing to do with it plus any covering run closed it —

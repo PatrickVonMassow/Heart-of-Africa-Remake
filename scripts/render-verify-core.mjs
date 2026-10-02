@@ -1308,7 +1308,14 @@ export function unexplainedRuns(runs, since, options) {
   const shownGone = (r) => {
     const when = finite(r?.startedAt) ?? finite(r?.at)
     if (when === null || from <= when) return false
-    return all.some(
+    // A red of a retired suite can no longer be re-run under its own name: it
+    // is shown gone once EVERY suite that took over its checks covers.
+    const successors = RETIRED_SUITE_SUCCESSORS[r?.suite]
+    if (successors) return successors.every((suite) => coveredAfterFix({ ...r, suite }))
+    return coveredAfterFix(r)
+  }
+  const coveredAfterFix = (r) =>
+    all.some(
       (later) =>
         later &&
         later.partial !== true &&
@@ -1320,7 +1327,6 @@ export function unexplainedRuns(runs, since, options) {
         // that is not a claim a text edit may create.
         runVerdict(later, { openPoints }).covers,
     )
-  }
   /**
    * WAS THE LOST MEASUREMENT TAKEN AGAIN (point 734)? A covering run of the SAME
    * suite on the SAME backend, later than this one and on code since the last
@@ -1730,7 +1736,10 @@ export function baselineFor(state, branch) {
 /** Suite names old records still carry that no longer run: `polish` was split by
  *  theme in point 1129. Kept local — the isolated guard harness cannot import
  *  scripts/verify/. */
-const RETIRED_SUITES = ['polish']
+const RETIRED_SUITE_SUCCESSORS = {
+  polish: ['polish-panorama', 'polish-speech', 'polish-settlement', 'polish-children', 'polish-villagers'],
+}
+const RETIRED_SUITES = Object.keys(RETIRED_SUITE_SUCCESSORS)
 
 export function suggestSuite(runs, changedRenderPaths) {
   if (
