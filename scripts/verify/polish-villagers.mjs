@@ -2395,7 +2395,29 @@ if (section('adult-errands')) {
     /** How far inside the settlement's edge a lens set beside a subject has
      *  to stay: well clear of the leave check, and of the bank's wade limit. */
     const CAMERA_EDGE_MARGIN = 8
-    const placeCamera = async (subject, radius, pitch) => {
+    // WHAT MUST BE SEEN, not the empty air between (work-order 1108): each of
+    // `seen.who` (villagers, read live) and `seen.points` has to land inside the
+    // rendered frame with nothing nearer on the line to it. Returns the names
+    // of those that do not.
+    await page.evaluate(() => {
+      const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+      window.__errandUnseen = (seen) => {
+        const cam = window.__placeCamera
+        const vs = window.__placeErrands().villagers
+        const targets = [
+          ...seen.who.map((w) => ({ name: `villager ${w}`, x: vs[w].x, y: 1, z: vs[w].z })),
+          ...seen.points,
+        ]
+        return targets.filter((t) => {
+          const clip = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [t.x, t.y, t.z, 1]))
+          const w = clip[3]
+          if (!(w > 0) || Math.abs(clip[0] / w) > 1 || Math.abs(clip[1] / w) > 1 || clip[2] / w >= 1) return true
+          const ray = window.__placeRayHit(t.x, t.y, t.z)
+          return ray.hitDistance != null && ray.hitDistance < ray.targetDistance - 0.6
+        }).map((t) => t.name)
+      }
+    })
+    const placeCamera = async (subject, radius, pitch, seen = null) => {
       // NEVER OUTSIDE THE SETTLEMENT. Putting the lens past the walkable region
       // does not merely move it: the leave check hands the player back to the
       // bird's-eye view and DESTROYS the place scene — measured as
@@ -2421,7 +2443,7 @@ if (section('adult-errands')) {
           if (edge == null || Math.hypot(cx, cz) > edge - CAMERA_EDGE_MARGIN) continue
         }
         const got = await page.evaluate(
-          ([a, v, r, tilt]) =>
+          ([a, v, r, tilt, want]) =>
             new Promise((res) => {
               const p = window.__placePlayer
               p.x = v.x + Math.sin(a) * r
@@ -2431,17 +2453,18 @@ if (section('adult-errands')) {
               requestAnimationFrame(() =>
                 requestAnimationFrame(() => {
                   const hit = window.__placeRayHit(v.x, 1.2, v.z)
+                  const unseen = want ? window.__errandUnseen(want) : []
                   res({
                     x: p.x,
                     z: p.z,
                     drift: Math.hypot(p.x - (v.x + Math.sin(a) * r), p.z - (v.z + Math.cos(a) * r)),
-                    blocked: hit.hitDistance != null && hit.hitDistance < hit.targetDistance - 0.6,
-                    what: hit.hitName,
+                    blocked: want ? unseen.length > 0 : hit.hitDistance != null && hit.hitDistance < hit.targetDistance - 0.6,
+                    what: want ? unseen.join(', ') : hit.hitName,
                   })
                 }),
               )
             }),
-          [bearing, subject, radius, pitch],
+          [bearing, subject, radius, pitch, seen],
         )
         if (got.drift < 0.4 && !got.blocked) {
           // Re-aim from where he stands NOW, one frame before the exposure.
@@ -2510,7 +2533,12 @@ if (section('adult-errands')) {
           for (let i = 0; i < v.length; i++) {
             if (i === sender || v[i].work?.situation !== 'water-out' || v[i].carry !== 'emptyJar') continue
             const gap = Math.hypot(v[i].x - stand.x, v[i].z - stand.z)
-            return { stand, carrier: { x: v[i].x, z: v[i].z }, sender: { x: v[sender].x, z: v[sender].z }, gap }
+            return {
+              stand,
+              carrier: { who: i, x: v[i].x, z: v[i].z },
+              sender: { who: sender, x: v[sender].x, z: v[sender].z },
+              gap,
+            }
           }
           return null
         },
@@ -2540,17 +2568,54 @@ if (section('adult-errands')) {
     if (order) {
       // Backed off their midpoint on the first of twelve bearings that
       // `placeCamera` accepts, so both and the stand between them are in one frame.
-      const mid = { x: (order.carrier.x + order.sender.x) / 2, z: (order.carrier.z + order.sender.z) / 2 }
-      // Far enough back that the further of the two men is still in the picture,
-      // and on a bearing the ground accepts with nothing standing in the line —
-      // the first attempt put a shelter post through the middle of the frame.
-      const from = await placeCamera(mid, Math.min(16, Math.max(7, order.gap * 0.8 + 5)), -0.1)
+      // BOTH MEN AND THE STAND, not their midpoint (work-order 1108): a post in
+      // front of either man leaves the empty air between them clear. And judged
+      // AT THE SHUTTER, as the fill is: both keep walking at the held pace, so
+      // a bearing that has gone stale by the exposure is chosen afresh from
+      // where they stand then; only a search that runs out reds.
+      const seen = {
+        who: [order.sender.who, order.carrier.who],
+        points: [{ name: 'the stand', x: order.stand.x, y: 0.36, z: order.stand.z }],
+      }
+      const midNow = () =>
+        page.evaluate(([a, b]) => {
+          const v = window.__placeErrands().villagers
+          return { x: (v[a].x + v[b].x) / 2, z: (v[a].z + v[b].z) / 2 }
+        }, seen.who)
+      let mid = { x: (order.carrier.x + order.sender.x) / 2, z: (order.carrier.z + order.sender.z) / 2 }
+      let from = null
+      let unseen = []
+      let searches = 0
+      while (searches < 4) {
+        searches++
+        // Far enough back that the further of the two men is still in the picture,
+        // and on a bearing the ground accepts with nothing standing in the line —
+        // the first attempt put a shelter post through the middle of the frame.
+        from = await placeCamera(mid, Math.min(16, Math.max(7, order.gap * 0.8 + 5)), -0.1, seen)
+        if (!from) break
+        await nextFrames(4)
+        unseen = await page.evaluate((want) => window.__errandUnseen(want), seen)
+        if (!unseen.length) break
+        mid = await midNow()
+      }
       check(
-        'and the order has a stand for the shutter with nothing in the line',
+        'and the order has a stand for the shutter with both men and the stand in sight',
         from != null,
-        from ? `bearing ${from.bearing.toFixed(2)} rad, ${from.drift.toFixed(2)} m of drift` : 'all 12 bearings refused',
+        from
+          ? `bearing ${from.bearing.toFixed(2)} rad, ${from.drift.toFixed(2)} m of drift, search ${searches}`
+          : `all 12 bearings refused in search ${searches}`,
       )
-      await nextFrames(4)
+      // Once more, immediately before the exposure.
+      if (from) unseen = await page.evaluate((want) => window.__errandUnseen(want), seen)
+      check(
+        'and both men and the stand are still in sight at the shutter',
+        from != null && !unseen.length,
+        from == null
+          ? 'no bearing to judge'
+          : unseen.length
+            ? `out of sight: ${unseen.join(', ')}, after ${searches} searches`
+            : `all three after ${searches} searches`,
+      )
       await frame('1087-village-water-order-at-the-stand', {
         local: { x: mid.x, y: 0.8, z: mid.z },
         label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
