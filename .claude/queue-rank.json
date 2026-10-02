@@ -1566,6 +1566,12 @@
       "why": "low-criticality test-infra red, first occurrence on WebGL 2; behind the open Testinfrastruktur work, no player impact",
       "origin": "machine",
       "place": "last"
+    },
+    "1270": {
+      "at": "2026-10-02T19:14:30.224Z",
+      "why": "low-criticality test-infra red, first occurrence on WebGL 2; behind the open Testinfrastruktur work, no player impact",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1595,7 +1601,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-02T18:55:09.530Z",
+    "at": "2026-10-02T19:14:30.232Z",
     "points": [
       184,
       200,
@@ -2027,7 +2033,8 @@
       1266,
       1267,
       1268,
-      1269
+      1269,
+      1270
     ]
   }
 }
