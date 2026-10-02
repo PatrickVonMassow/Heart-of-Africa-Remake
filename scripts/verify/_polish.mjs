@@ -115,7 +115,9 @@ export const page = await browser.newPage({ viewport: { width: 1440, height: 900
 // Point 375: every frame below states the subject it must show — the settlement
 // it stands in, the building it is aimed at, the overlay it documents — and the
 // shutter proves that subject is in the picture before the file is written.
-export const frame = frameShutter(page, OUT)
+// `frame` itself is defined below the frame helpers: it first waits for the
+// shader pipelines to settle (`awaitPlaceDrawn`).
+const shutter = frameShutter(page, OUT)
 // The collider geometry the wedged-adults and village sections read with (scripts/verify/colliderProbe.mjs).
 await installColliderProbe(page)
 export const errors = []
@@ -169,6 +171,36 @@ export const stepUntil = async (ready, arg = null, capFrames = 240) => {
 }
 
 /**
+ * Step frames until the shader-pipeline set is WARM: nothing compiling and, on
+ * WebGL 2, nothing waiting for its throttled first-use release
+ * (`window.__shaderPipelines`, src/render/asyncPipelines.ts). Until then
+ * three.js silently SKIPS every object whose pipeline is not ready, so a freshly
+ * entered place draws as pure fog — the frames 93, 102, 148 and 690 of point
+ * 1129, which in the unsplit run only looked right because earlier sections had
+ * warmed the same materials. Warm must HOLD for a few frames, because an object
+ * drawn for the first time starts its pipeline a frame later. A set that never
+ * settles is a red, not a shot taken anyway.
+ */
+export const awaitPlaceDrawn = async (label, capFrames = 900) => {
+  let warmRun = 0
+  for (let f = 0; f < capFrames; f++) {
+    const s = await page.evaluate(() => window.__shaderPipelines?.() ?? null)
+    warmRun = !s || (s.pending === 0 && s.queued === 0) ? warmRun + 1 : 0
+    if (warmRun >= 3) return true
+    await nextFrames(1)
+  }
+  const s = await page.evaluate(() => window.__shaderPipelines?.() ?? null)
+  check(`${label}: the shader pipelines settle before the shot (point 1129)`, false, JSON.stringify(s))
+  return false
+}
+
+/** The frame shutter (point 375), behind the pipeline wait above. */
+export const frame = async (name, decl) => {
+  await awaitPlaceDrawn(name)
+  return shutter(name, decl)
+}
+
+/**
  * Stand in `id` by a DIRECT place->place enter (no travel scene, so no panorama
  * capture — that is what the capture section's fallback check reads). It is the
  * setup the sections that work "wherever the suite happens to stand" own for
@@ -186,6 +218,8 @@ export const goToPlace = async (id) => {
     .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, id, { timeout: 40000 })
     .catch(() => {})
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  // The layout exists before the place is DRAWN; wait for that too (point 1129).
+  await awaitPlaceDrawn(`entering ${id}`)
 }
 
 /**
