@@ -15814,3 +15814,24 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright check is the right layer; no new mechanism.
   Bundle: Dorfleben.
   Criticality: low — the loom is switched off for the player (`loom.placed: false`).
+- [ ] 1267. The speech-inaudible assert reads a stale speech bus at the end of a drum message
+  Source: first measured 02.10.2026 16:20 in the WebGPU theme run of point 1129 on 9ff47b8f4
+  (`polish-speech`, section `artefact-give`); no earlier recorded log holds this signature.
+  THE RED. Right after the chief's drum answer, a 4-syllable phrase fired
+  `[ASSERT] speech-inaudible — … leave the graph at 0.00e+0 (peak 0.083, speech bus 0.000,
+  master 0.500 …) while the speech volume is 3`. `playDrumMessage` quiets the bus with
+  `quietSpeechBus` (0 now, volume again at `now + duration`) and `playSpeech` exempts only
+  `ctx.currentTime < speechQuietUntil`. Read from the code, not yet proven: `AudioParam.value`
+  on the main thread is the rendering thread's last posted value, so for a render quantum or
+  more after the window ends it can still read 0 while the restoring automation has already
+  run — a detector false positive, not silent speech.
+  Final state:
+  - The cause is measured (log the param value against `currentTime - speechQuietUntil` at the
+    firing, or reproduce it in Vitest with a stubbed context); if it is the stale read, the
+    assert computes the chain from the scheduled level past the window instead of the
+    stale `.value`, with no exemption wider than the evidence.
+  - If the bus is really silent past the window, that is the product defect to fix instead.
+  - A Vitest case pins the boundary; `polish-speech --section=artefact-give` green on WebGPU.
+  Tests: Vitest (jsdom) in `src/systems/ambience.test.ts`; the existing Playwright section.
+  Bundle: Testinfrastruktur.
+  Criticality: low — no player impact measured; it blocks the green of `polish-speech`.

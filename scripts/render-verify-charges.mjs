@@ -1793,4 +1793,14 @@ export const RED_CHARGES = [
       + 'it; the same duration signature point 1050 owns on the WebGPU compatibility lane. The '
       + 'charge dies with 1050.',
   },
+  {
+    point: 1267,
+    suite: 'polish-speech',
+    kind: 'console',
+    match: /^console error: \[ASSERT\] speech-inaudible\b/i,
+    why:
+      'MEASURED 02.10.2026 on feat/1129 9ff47b8f4, webgpu/polish-speech (artefact-give): the assert '
+      + 'read the speech bus at 0.000 right as the chief\'s drum answer ended — first occurrence in '
+      + 'all recorded logs; point 1267 owns the boundary read. The charge dies with point 1267.',
+  },
 ]
