@@ -377,10 +377,12 @@ if (section('speech-hypothesis')) {
     const moved = await tipGapWith(base.was + 6)
     const back = await tipGapWith(base.was)
     check(
-      'the tail’s gap over the head follows its calibration: 6 px more lift, 6 px more gap (point 1276)',
+      'the tail’s gap over the head is its calibration: each measured gap equals the set lift, 6 px more lift giving 6 px more gap (point 1276)',
       // Drawn in every sample, and back where it started once restored.
       base.visible && moved.visible && back.visible &&
         base.gap !== null && moved.gap !== null && back.gap !== null &&
+        // Each measured gap IS its requested calibration, not just a shift.
+        [base, moved, back].every((m) => Math.abs(m.gap - m.px) <= 1.5) &&
         Math.abs(moved.gap - base.gap - 6) <= 1.5 && Math.abs(back.gap - base.gap) <= 1.5,
       JSON.stringify({ base, moved, back }),
     )
