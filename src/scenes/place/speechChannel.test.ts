@@ -5,6 +5,7 @@
 // src/communication/speechLabel.test.ts.
 import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, it, expect, beforeEach } from 'vitest'
+import * as THREE from 'three/webgpu'
 import type { Object3D } from 'three/webgpu'
 import { utteranceOf } from '../../communication/lexicon'
 import { speechLabelHeight } from '../../communication/speechLabel'
@@ -12,6 +13,7 @@ import { markActor } from '../actorLabelSource'
 import {
   clearSpeechLabels,
   forgetSpeechLabel,
+  placeSpeechNote,
   pruneSpeechLabels,
   speakOverhead,
   speechAnchor,
@@ -358,4 +360,104 @@ it('leaves a note raised outside the floor standing, with its figure', () => {
   expect(speechLabelState().labels.map((l) => l.speakerId).sort()).toEqual(['outside-floor', 'villager-5'])
   expect(speechAnchor('outside-floor')).not.toBeNull()
   expect(speechAnchor('villager-4')).toBeNull()
+})
+
+/**
+ * The note's scene node, stood on its tail tip each frame (point 1276) — with
+ * REAL three objects, so the matrix refresh, the head lookup and the camera
+ * all run as they do in the scene. The judge is the rendered projection: the
+ * node must project onto the top edge of the head's drawn outline, found by
+ * projecting every vertex of the head mesh — not by the formula under test.
+ */
+describe('placeSpeechNote', () => {
+  const H = 900
+  /** A figure as placeFigure builds it: a body group, the head a sphere mesh
+   *  named figure-head at 1.18 over the feet. */
+  function villager(scale = 1): { root: THREE.Group; body: THREE.Group; head: THREE.Mesh } {
+    const root = new THREE.Group()
+    const body = new THREE.Group()
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 16))
+    head.name = 'figure-head'
+    head.position.y = 1.18
+    body.add(head)
+    root.add(body)
+    root.scale.setScalar(scale)
+    new THREE.Scene().add(root)
+    return { root, body, head }
+  }
+  function eye(at: [number, number, number], look: [number, number, number]) {
+    const cam = new THREE.PerspectiveCamera(60, 1440 / H, 0.1, 500)
+    cam.position.set(...at)
+    cam.lookAt(...look)
+    return cam
+  }
+  const screenY = (cam: THREE.Camera, p: THREE.Vector3) => ((1 - p.clone().project(cam).y) / 2) * H
+  /** The head outline's top edge on screen, off the projected mesh. */
+  function drawnTop(cam: THREE.Camera, head: THREE.Mesh): number {
+    head.updateWorldMatrix(true, false)
+    cam.updateMatrixWorld(true)
+    const pos = head.geometry.getAttribute('position')
+    const v = new THREE.Vector3()
+    let best = Infinity
+    for (let i = 0; i < pos.count; i++) {
+      best = Math.min(best, screenY(cam, v.fromBufferAttribute(pos, i).applyMatrix4(head.matrixWorld)))
+    }
+    return best
+  }
+
+  it('stands the node on the top of the head as the camera draws it, near and far, level and from above', () => {
+    for (const [scale, at, look] of [
+      [1, [0, 1.6, 4], [0, 1.4, 0]],
+      [1, [2, 1.6, 20], [0, 1.4, 0]],
+      [0.55, [0, 1.6, 1], [0, 0.6, 0]],
+      [1, [0.3, 1.6, 1.4], [0, 1.0, 0]],
+    ] as Array<[number, [number, number, number], [number, number, number]]>) {
+      clearSpeechLabels()
+      const { root, head } = villager(scale)
+      const cam = eye(at, look)
+      speakOverhead('villager-1', [RIVER_UTTERANCE], root, { now: 0 })
+      const note = new THREE.Group()
+      expect(placeSpeechNote(note, speechLabelState().labels[0], cam)).toBe(true)
+      // The node's WORLD matrix is published at once (drei reads it first).
+      expect(new THREE.Vector3().setFromMatrixPosition(note.matrixWorld)).toEqual(note.position)
+      // Within a pixel of the drawn outline's top: the mesh is a 24×16
+      // polygon, the formula a true sphere.
+      expect(Math.abs(screenY(cam, note.position) - drawnTop(cam, head))).toBeLessThan(1)
+    }
+  })
+
+  it('follows the figure every frame after the speech began: a step, a lean, a kneel', () => {
+    const { root, body, head } = villager()
+    const cam = eye([0, 1.6, 4], [0, 1.4, 0])
+    speakOverhead('villager-1', [RIVER_UTTERANCE], root, { now: 0 })
+    const label = speechLabelState().labels[0]
+    const note = new THREE.Group()
+    placeSpeechNote(note, label, cam)
+    const first = note.position.clone()
+    // No matrix refresh by hand: the scene has not rendered since the move.
+    root.position.set(1.5, 0, -0.5)
+    body.rotation.z = 0.35
+    body.scale.y = 0.7
+    expect(placeSpeechNote(note, label, cam)).toBe(true)
+    expect(note.position.distanceTo(first)).toBeGreaterThan(0.5)
+    expect(Math.abs(screenY(cam, note.position) - drawnTop(cam, head))).toBeLessThan(1)
+    // Horizontally over the head too, not over the body's origin.
+    head.updateWorldMatrix(true, false)
+    const centre = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld).project(cam)
+    expect(Math.abs(note.position.clone().project(cam).x - centre.x) * 720).toBeLessThan(1)
+  })
+
+  it('keeps an explicit height over the origin, and leaves the node alone once the speaker is gone', () => {
+    const { root } = villager()
+    root.position.set(2, 0, 0)
+    const cam = eye([0, 1.6, 4], [0, 1.4, 0])
+    speakOverhead('probe', [RIVER_UTTERANCE], root, { now: 0, height: 3 })
+    const note = new THREE.Group()
+    expect(placeSpeechNote(note, speechLabelState().labels[0], cam)).toBe(true)
+    expect(note.position.toArray()).toEqual([2, 3, 0])
+    const gone = { ...speechLabelState().labels[0], speakerId: 'nobody' }
+    note.position.set(9, 9, 9)
+    expect(placeSpeechNote(note, gone, cam)).toBe(false)
+    expect(note.position.toArray()).toEqual([9, 9, 9])
+  })
 })

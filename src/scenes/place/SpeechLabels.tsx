@@ -36,6 +36,7 @@ import {
   pruneSpeechLabels,
   speakOverhead,
   speechAnchor,
+  placeSpeechNote,
   speechLabelState,
   speechTipWorld,
   subscribeSpeechLabels,
@@ -79,16 +80,12 @@ function SpeechLabelView({
   const conceptLabels = useUi((s) => s.speechConceptLabels)
 
   useFrame(({ camera }) => {
-    // The tip follows the speaker's drawn head every frame — its lean, its
-    // kneel, its step — not a height sampled when the speech began (point 1276).
-    if (!group.current || !speechTipWorld(label, WORLD)) return
-    group.current.position.copy(WORLD)
-    // The label's screen place is read off this group's WORLD matrix by drei's
-    // <Html>, in a frame callback of its own — before the renderer refreshes the
-    // graph. Without this the note never leaves the scene origin (measured in
-    // the browser), so the move is published here rather than left to the loop.
-    group.current.updateMatrix()
-    group.current.updateMatrixWorld(true)
+    // The tip follows the top of the speaker's drawn head as this camera sees
+    // it, every frame — its lean, its kneel, its step — not a height sampled
+    // when the speech began (point 1276). placeSpeechNote also publishes the
+    // group's world matrix: drei's <Html> reads it before the renderer
+    // refreshes the graph, and without it the note never leaves the origin.
+    if (!group.current || !placeSpeechNote(group.current, label, camera)) return
     const el = sizer.current
     if (el) {
       const scale = speechBubbleScale(camera.getWorldPosition(EYE).distanceTo(group.current.getWorldPosition(WORLD)))
@@ -180,7 +177,7 @@ export function SpeechLabels() {
       },
       anchorScreen: (speakerId: string) => {
         const label = speechLabelState().labels.find((l) => l.speakerId === speakerId)
-        if (!label || !speechTipWorld(label, WORLD)) return null
+        if (!label || !speechTipWorld(label, WORLD, camera)) return null
         WORLD.project(camera)
         // Behind the camera the projection mirrors onto the screen while drei
         // hides the note; report what the picture shows, which is nothing.

@@ -31,7 +31,14 @@ import {
   type SpeechLabelState,
 } from '../../communication/speechLabel'
 import { pickSpeechTarget, type SpeechTargetCandidate } from '../../communication/speechTarget'
-import { drawnHeadTop, markedActorRise, type HeadNode, type MarkedNode } from '../actorLabelSource'
+import {
+  drawnHeadBall,
+  drawnHeadTop,
+  markedActorRise,
+  silhouetteTop,
+  type HeadNode,
+  type MarkedNode,
+} from '../actorLabelSource'
 import type { UseCandidate } from './useKeyTarget'
 import { placePlayerPosition } from './playerPosition'
 
@@ -124,17 +131,30 @@ export function speakOverhead(
 /**
  * Where a label's tail tip stands in the world RIGHT NOW (point 1276): the top
  * of its speaker's drawn head, read live off the refreshed matrices so a lean,
- * a kneel or a step since the speech started carries the note with it. Without
- * a visible head — or with a height its caller fixed — the stored height over
- * the speaker's origin stands in. Writes `out`; false when there is no anchor.
+ * a kneel or a step since the speech started carries the note with it. Given
+ * the `camera`, the top of the head's SILHOUETTE as that camera draws it
+ * (silhouetteTop) — seen from above or close by, the world crown projects
+ * below the outline and the tip would sink into the hair. Without a visible
+ * head — or with a height its caller fixed — the stored height over the
+ * speaker's origin stands in. Writes `out`; false when there is no anchor.
  */
-export function speechTipWorld(label: SpeechLabel, out: { x: number; y: number; z: number }): boolean {
+export function speechTipWorld(
+  label: SpeechLabel,
+  out: { x: number; y: number; z: number },
+  camera?: Object3D,
+): boolean {
   const anchor = anchors.get(label.speakerId)
   if (!anchor) return false
   ;(anchor as Partial<Object3D>).updateWorldMatrix?.(true, true)
   const e = (anchor as HeadNode).matrixWorld?.elements
   if (!e) return false
-  const top = fixedHeights.has(label.speakerId) ? null : drawnHeadTop(anchor as HeadNode)
+  const fixed = fixedHeights.has(label.speakerId)
+  const ball = fixed || !camera ? null : drawnHeadBall(anchor as HeadNode)
+  if (ball && camera) {
+    camera.updateWorldMatrix(true, false)
+    if (silhouetteTop(ball.center, ball.radius, camera.matrixWorld.elements, out)) return true
+  }
+  const top = fixed ? null : drawnHeadTop(anchor as HeadNode)
   if (top) {
     out.x = e[12] + top[0]
     out.y = e[13] + top[1]
@@ -144,6 +164,24 @@ export function speechTipWorld(label: SpeechLabel, out: { x: number; y: number; 
     out.y = e[13] + label.height
     out.z = e[14]
   }
+  return true
+}
+
+/** Scratch for placeSpeechNote. */
+const TIP = { x: 0, y: 0, z: 0 }
+
+/**
+ * Stands a note's scene node on its tail tip for this frame (point 1276): the
+ * speaker's head-silhouette top as `camera` draws it, published to the node's
+ * world matrix at once — drei's <Html> reads that matrix in a frame callback
+ * of its own, before the renderer refreshes the graph. False, node untouched,
+ * when the speaker is gone.
+ */
+export function placeSpeechNote(node: Object3D, label: SpeechLabel, camera: Object3D): boolean {
+  if (!speechTipWorld(label, TIP, camera)) return false
+  node.position.set(TIP.x, TIP.y, TIP.z)
+  node.updateMatrix()
+  node.updateMatrixWorld(true)
   return true
 }
 

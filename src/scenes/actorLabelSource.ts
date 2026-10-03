@@ -188,6 +188,59 @@ export function drawnHeadRise(root: HeadNode | null | undefined): number | null 
   return drawnHeadTop(root)?.[1] ?? null
 }
 
+/** The drawn head under `root` as a ball in WORLD space: its centre and its
+ *  world-up half-extent (r·|row y|, as drawnHeadTop reads it). Null without a
+ *  visible head. The figures' heads are drawn round; a squashed head is
+ *  treated as the ball of its vertical extent. */
+export function drawnHeadBall(
+  root: HeadNode | null | undefined,
+): { center: [number, number, number]; radius: number } | null {
+  if (!root?.matrixWorld) return null
+  const head = findHead(root)
+  if (!head) return null
+  const e = head.matrixWorld!.elements
+  const r = head.geometry?.parameters?.radius ?? 0
+  return { center: [e[12], e[13], e[14]], radius: r * Math.hypot(e[1], e[5], e[9]) }
+}
+
+/**
+ * The point of a ball (world `center`, `radius`) that a perspective camera
+ * with world matrix `camera` draws HIGHEST on screen — the top of its
+ * silhouette (work-order point 1276). Seen from above or close by, that is not
+ * the ball's world crown but a point behind it: the crown projects below the
+ * outline, by about r(1 − cos α)/D of the view (α the elevation, D the
+ * distance) — a 5 px lift can vanish into the hair over a child a metre away.
+ *
+ * In camera space (right, up, back) screen height is y/−z, independent of x,
+ * so the highest point lies where a plane through the eye and the camera's x
+ * axis touches the ball: at angle θ = atan2(cy, −cz) + asin(R/D) above the
+ * view axis, D = hypot(cy, cz); the point is center + R(cos θ·up + sin θ·back).
+ * Writes `out`; false (nothing written) when the ball is not wholly in front
+ * of the camera, so the caller keeps the world crown.
+ */
+export function silhouetteTop(
+  center: readonly [number, number, number],
+  radius: number,
+  camera: ArrayLike<number>,
+  out: { x: number; y: number; z: number },
+): boolean {
+  const len = (i: number) => Math.hypot(camera[i], camera[i + 1], camera[i + 2]) || 1
+  const up = [camera[4] / len(4), camera[5] / len(4), camera[6] / len(4)]
+  const back = [camera[8] / len(8), camera[9] / len(8), camera[10] / len(8)]
+  const d = [center[0] - camera[12], center[1] - camera[13], center[2] - camera[14]]
+  const cy = d[0] * up[0] + d[1] * up[1] + d[2] * up[2]
+  const cz = d[0] * back[0] + d[1] * back[1] + d[2] * back[2]
+  const dist = Math.hypot(cy, cz)
+  if (!(radius >= 0) || -cz <= radius || dist <= radius) return false
+  const theta = Math.atan2(cy, -cz) + Math.asin(radius / dist)
+  const c = Math.cos(theta) * radius
+  const s = Math.sin(theta) * radius
+  out.x = center[0] + c * up[0] + s * back[0]
+  out.y = center[1] + c * up[1] + s * back[1]
+  out.z = center[2] + c * up[2] + s * back[2]
+  return true
+}
+
 function findHead(node: HeadNode): HeadNode | null {
   if (node.visible === false) return null
   if (node.name === 'figure-head' && node.matrixWorld !== undefined) return node
