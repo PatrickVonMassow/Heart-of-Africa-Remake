@@ -2800,9 +2800,9 @@ if (section('adult-errands')) {
         // him, so a subject that drifted off it is a lens that moved.
         spoiledBy = !(still.gap > 2.5 && still.gap < 7)
           ? `the lens landed ${still.gap.toFixed(2)} m off him`
-          : atShutter.unseen.length
-          ? `out of sight: ${atShutter.unseen.join(', ')}`
-          : over ? describeOverlap(over)
+          : atShutter.unseen.length || over
+          ? [atShutter.unseen.length && `out of sight: ${atShutter.unseen.join(', ')}`, over && describeOverlap(over)]
+            .filter(Boolean).join('; ')
             : Math.abs(atShutter.ndcX) > RETURN_OFF_AXIS ? `${atShutter.ndcX.toFixed(2)} off the frame's middle` : null
         if (!spoiledBy || atShutter.carry !== 'fullJar') break
         refused.push(`${tries}: ${spoiledBy}`)
