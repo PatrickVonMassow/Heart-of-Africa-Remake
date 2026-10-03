@@ -3392,6 +3392,10 @@ if (section('village-pounding')) {
       const SEARCHES = 4
       const refused = []
       for (let attempt = 1; attempt <= SEARCHES; attempt++) {
+      // Every retry first lets the thawed village run on, so the obstruction
+      // that refused the last search can move away (a `continue` below must
+      // not skip this, so it stands at the top of the attempt).
+      if (attempt > 1) await nextFrames(30)
       // Just past woman 0's impact: her foot still in the grain, the puff up.
       const caught = await stepUntil(() => {
         const w = window.__placePounding().women[0]
@@ -3527,7 +3531,6 @@ if (section('village-pounding')) {
         await freezeLife(false)
       }
       if (!retry) break
-      await nextFrames(30)
       }
     }
   }
