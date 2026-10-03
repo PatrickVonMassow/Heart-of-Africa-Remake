@@ -3369,14 +3369,22 @@ if (section('village-pounding')) {
     ]
     const sameProbe = (a, b) => JSON.stringify(a) === JSON.stringify(b)
     for (const shot of shots) {
+      // A walker passing the pair can block every side-on stand for a moment;
+      // then the village thaws, he moves on, and the next impact is tried.
+      const SEARCHES = 4
+      const refused = []
+      for (let attempt = 1; attempt <= SEARCHES; attempt++) {
       // Just past woman 0's impact: her foot still in the grain, the puff up.
       const caught = await stepUntil(() => {
         const w = window.__placePounding().women[0]
         return w.phase > 0.005 && w.phase < 0.1
       }, null, 900)
-      check(`${shot.name}: the shutter catches an impact`, caught)
-      if (!caught) continue
+      if (!caught) {
+        check(`${shot.name}: the shutter catches an impact`, false)
+        break
+      }
       await freezeLife(true)
+      let retry = false
       try {
         const staged = await page.evaluate(({ standOff, maxOff }) => {
           const probe = window.__placePounding()
@@ -3427,11 +3435,17 @@ if (section('village-pounding')) {
             p.pitch = standOff < 4 ? -0.18 : -0.08
             return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2) }, people: people.length }
           }
-          return { probe, stand: null }
+          return { probe, stand: null, people: people.length }
         }, { standOff: shot.stand, maxOff: MAX_OFF_SQUARE })
+        if (!staged.stand && attempt < SEARCHES) {
+          refused.push(`${attempt}: no clear stand (${staged.people} people)`)
+          retry = true
+          continue
+        }
         check(`${shot.name}: a side-on stand on open ground frames the pair (at most ${MAX_OFF_SQUARE}° off square)`,
-          !!staged.stand && staged.offSquare <= MAX_OFF_SQUARE, JSON.stringify({ stand: staged.stand, offSquare: staged.offSquare }))
-        if (!staged.stand) continue
+          !!staged.stand && staged.offSquare <= MAX_OFF_SQUARE,
+          JSON.stringify({ stand: staged.stand, offSquare: staged.offSquare, refused }))
+        if (!staged.stand) break
         await nextFrames(3)
         // THE POSE AT THE SHUTTER: re-read after the settling frames. It must be
         // the staged one — that is the proof the freeze held.
@@ -3484,6 +3498,9 @@ if (section('village-pounding')) {
         check(`${shot.name}: and stayed frozen through the exposure`, sameProbe(atShutter.probe, afterShot))
       } finally {
         await freezeLife(false)
+      }
+      if (!retry) break
+      await nextFrames(30)
       }
     }
   }
