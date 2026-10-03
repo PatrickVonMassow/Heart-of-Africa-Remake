@@ -704,8 +704,8 @@ if (section('speech-owner')) {
 // that the DRAWN notes follow it: a speaker a few metres away carries a visibly
 // larger note than one far across the village, each still on its own speaker.
 // The size is read off each note's `.speech-distance` wrapper, whose box is the
-// card's layout box times the distance scale alone, so the near note's receded
-// look (it speaks first) cannot pass for the distance effect.
+// card's layout box times the distance scale alone; both notes are spoken at
+// one instant, so neither recedes and the picture shows the distance alone.
 if (section('speech-distance-scale')) {
   await goToPlace('bambara-village')
   const RIVER = 'ba-BA-ba-BA'
@@ -815,27 +815,26 @@ if (section('speech-distance-scale')) {
       { near: pair.near, far: pair.far },
     )
   const clear = (ratios) => ratios.every((r) => r !== null && r >= 0.85 && r <= 1.15)
-  // The near figure speaks first, the far one after, both held long; neither
-  // may be the guess target, so both are spoken with a tiny reach.
+  // Both figures speak at ONE instant, held long, with a tiny reach so neither
+  // is the guess target. Equal timestamps mean neither note is older, so
+  // neither recedes (speechLabelRecedes) and the picture shows the distance
+  // scale alone. Through the game's own channel module (the dev server hands
+  // the page the same instance), because the dev hook stamps its own clock.
   const speak = (pair) =>
     page.evaluate(
       async ({ near, far, u }) => {
+        const { speakOverhead, speechClock } = await import('/src/scenes/place/speechChannel.ts')
         const figs = window.__speechScaleFigures
+        const scene = window.__placeScene
         const raf = () => new Promise((r) => requestAnimationFrame(() => r()))
         window.__game.getState().hearUtterance(u)
-        const say = (f, id) => {
-          const name = f.name
-          f.name = `${id}-figure`
-          const ok = window.__speech?.speak(id, [u], `${id}-figure`, 120, 0.1) === true
-          f.name = name
-          return ok
-        }
-        const a = say(figs[near], 'scale-near')
-        await raf()
-        await raf()
-        const b = say(figs[far], 'scale-far')
+        const live = (f) => !!f && scene?.getObjectById(f.id) === f
+        if (!live(figs?.[near]) || !live(figs?.[far])) return false
+        const now = speechClock()
+        speakOverhead('scale-near', [u], figs[near], { seconds: 120, reach: 0.1, now })
+        speakOverhead('scale-far', [u], figs[far], { seconds: 120, reach: 0.1, now })
         for (let i = 0; i < 3; i++) await raf()
-        return a && b
+        return true
       },
       { near: pair.near, far: pair.far, u: RIVER },
     )
@@ -923,6 +922,7 @@ if (section('speech-distance-scale')) {
       tracks(far) &&
       shows(near) &&
       shows(far) &&
+      !near.receded &&
       !far.receded &&
       near.onTip &&
       far.onTip &&
