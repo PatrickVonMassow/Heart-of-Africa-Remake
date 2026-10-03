@@ -2327,46 +2327,46 @@ if (section('adult-errands')) {
       // he is pinned: the others keep walking their errands through the search
       // and the settling frames, and in a full pass, with the errands well on,
       // a line clear when chosen came back with two cones over him while the
-      // suite stayed green. So the neighbours are read again after the settle,
-      // and a bearing gone stale is chosen afresh against where they stand now;
-      // only a search that runs out reds.
-      const readOthers = () =>
-        page.evaluate(
-          (w) => window.__placeErrands().villagers.map((p, j) => ({ who: j, x: p.x, z: p.z })).filter((o) => o.who !== w),
-          posed.who,
-        )
-      // Where the lens actually stands: a bearing is a request the ground's
-      // collision may move, and the line is judged from the camera, not from
-      // the spot it was asked to take.
-      const readLens = () =>
-        page.evaluate(() => {
+      // suite stayed green. So the line is read again after the exposure, from
+      // where the lens actually stands — a bearing is a request the ground's
+      // collision may move — and a spoiled frame is taken again from a bearing
+      // chosen afresh; only a search that runs out reds.
+      // Lens and neighbours in ONE read, so the line is judged at one instant.
+      const readLine = () =>
+        page.evaluate((w) => {
           const e = window.__placeCamera.matrixWorld.elements
-          return { x: e[12], z: e[14] }
-        })
+          return {
+            lens: { x: e[12], z: e[14] },
+            others: window.__placeErrands().villagers.map((p, j) => ({ who: j, x: p.x, z: p.z })).filter((o) => o.who !== w),
+          }
+        }, posed.who)
       const SHUTTER_SEARCHES = 4
-      // Every search, the first included, reads where they stand now; an
-      // exhausted one is not final either, since they walk on.
-      let shot = await search(await readOthers())
+      // Every search reads where they stand now; the frame is written, THEN
+      // the line is read, since the shutter's own wait lets them walk on. A
+      // spoiled frame is overwritten by the next search; an exhausted search
+      // waits for them to move.
+      let shot = null
       let spoiled = null
-      let searches = 1
-      for (;;) {
-        if (shot.bearing != null) {
-          await nextFrames(6)
-          spoiled = lineOverlapFrom(await readLens(), posed, await readOthers())
-          if (!spoiled) break
-        }
-        if (searches >= SHUTTER_SEARCHES) break
+      let searches = 0
+      const refusals = []
+      while (searches < SHUTTER_SEARCHES) {
         searches++
-        if (shot.bearing == null) await nextFrames(30)
-        shot = await search(await readOthers())
+        shot = await search((await readLine()).others)
+        if (shot.bearing == null) {
+          refusals.push(`${searches}: all 16 bearings blocked (${shot.blocked.join(', ')})`)
+          await nextFrames(30)
+          continue
+        }
+        await nextFrames(6)
+        await frame('1085-village-adult-fills-a-jar', {
+          local: { x: posed.x, y: 0.6, z: posed.z },
+          label: 'the village water carrier at the bottom of his dip, standing in the river, side-on, three metres off',
+        })
+        const line = await readLine()
+        spoiled = lineOverlapFrom(line.lens, posed, line.others)
+        if (!spoiled) break
+        refusals.push(`${searches}: ${describeOverlap(spoiled)}`)
       }
-      check(
-        'and a clear line to him exists for the shutter',
-        shot.bearing != null,
-        shot.bearing == null
-          ? `all 16 bearings blocked in search ${searches}: ${shot.blocked.join(', ')}`
-          : `bearing ${shot.bearing.toFixed(2)} rad, the ${shot.tried}. of 16 tried, search ${searches} of ${SHUTTER_SEARCHES}`,
-      )
       // HE MUST STILL BE WHERE THE CAMERA IS AIMED. The pin held his pose and
       // left his errand walking underneath it: on WebGL 2, at 33-52 FPS, he was
       // metres away by the shutter and the frame came back as an empty bank —
@@ -2382,19 +2382,14 @@ if (section('adult-errands')) {
         Math.hypot(stood.x - posed.x, stood.z - posed.z) < 0.05,
         `${Math.hypot(stood.x - posed.x, stood.z - posed.z).toFixed(2)} m from the aim point`,
       )
-      // The neighbours once more, immediately before the exposure.
-      if (shot.bearing != null) spoiled = lineOverlapFrom(await readLens(), posed, await readOthers())
       check(
-        'and nobody has walked into the line to him by the shutter',
+        'and the line to him is clear at the shutter',
         shot.bearing != null && !spoiled,
-        shot.bearing == null
-          ? 'no bearing to judge'
-          : spoiled ? `${describeOverlap(spoiled)}, after ${searches} searches` : `clear after ${searches} searches`,
+        shot.bearing != null && !spoiled
+          ? `bearing ${shot.bearing.toFixed(2)} rad, the ${shot.tried}. of 16 tried, search ${searches} of ${SHUTTER_SEARCHES}` +
+            (refusals.length ? ` (refused: ${refusals.join('; ')})` : '')
+          : `after ${searches} searches — ${refusals.join('; ')}`,
       )
-      await frame('1085-village-adult-fills-a-jar', {
-        local: { x: posed.x, y: 0.6, z: posed.z },
-        label: 'the village water carrier at the bottom of his dip, standing in the river, side-on, three metres off',
-      })
       await page.evaluate(() => window.__placeForceFill(null))
       await nextFrames(4)
     }
@@ -2600,40 +2595,40 @@ if (section('adult-errands')) {
       let from = null
       let unseen = []
       let searches = 0
+      const refusals = []
+      // THE STATE IS READ AFTER THE FRAME IS WRITTEN: the shutter waits for the
+      // scene to finish drawing while both walk on, so a reading before it
+      // judged a picture nobody took. A spoiled frame is overwritten by the
+      // next search; a search with no bearing waits for them to move.
       while (searches < 4) {
         searches++
         // Far enough back that the further of the two men is still in the picture,
         // and on a bearing the ground accepts with nothing standing in the line —
         // the first attempt put a shelter post through the middle of the frame.
         from = await placeCamera(mid, Math.min(16, Math.max(7, order.gap * 0.8 + 5)), -0.1, seen)
-        if (!from) break
-        await nextFrames(4)
-        unseen = await page.evaluate((want) => window.__errandUnseen(want), seen)
-        if (!unseen.length) break
+        if (from) {
+          await nextFrames(4)
+          await frame('1087-village-water-order-at-the-stand', {
+            local: { x: mid.x, y: 0.8, z: mid.z },
+            label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
+          })
+          unseen = await page.evaluate((want) => window.__errandUnseen(want), seen)
+          if (!unseen.length) break
+          refusals.push(`${searches}: out of sight: ${unseen.join(', ')}`)
+        } else {
+          refusals.push(`${searches}: all 12 bearings refused`)
+          await nextFrames(30)
+        }
         mid = await midNow()
       }
       check(
-        'and the order has a stand for the shutter with both men and the stand in sight',
-        from != null,
-        from
-          ? `bearing ${from.bearing.toFixed(2)} rad, ${from.drift.toFixed(2)} m of drift, search ${searches}`
-          : `all 12 bearings refused in search ${searches}`,
-      )
-      // Once more, immediately before the exposure.
-      if (from) unseen = await page.evaluate((want) => window.__errandUnseen(want), seen)
-      check(
-        'and both men and the stand are still in sight at the shutter',
+        'and both men and the stand are in sight at the shutter',
         from != null && !unseen.length,
-        from == null
-          ? 'no bearing to judge'
-          : unseen.length
-            ? `out of sight: ${unseen.join(', ')}, after ${searches} searches`
-            : `all three after ${searches} searches`,
+        from != null && !unseen.length
+          ? `bearing ${from.bearing.toFixed(2)} rad, ${from.drift.toFixed(2)} m of drift, search ${searches}` +
+            (refusals.length ? ` (refused: ${refusals.join('; ')})` : '')
+          : `after ${searches} searches — ${refusals.join('; ')}`,
       )
-      await frame('1087-village-water-order-at-the-stand', {
-        local: { x: mid.x, y: 0.8, z: mid.z },
-        label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
-      })
     }
     await letThemWalk()
 
@@ -2796,16 +2791,20 @@ if (section('adult-errands')) {
           }
         }, returning.who)
         const over = lineOverlapFrom(atShutter.lens, atShutter, atShutter.others)
+        // The reading distance at the exposure too: he walks on through it.
+        atShutter.gap = Math.hypot(atShutter.x - atShutter.lens.x, atShutter.z - atShutter.lens.z)
         // In the middle of the frame, not at its edge: the aim is taken at
         // him, so a subject that drifted off it is a lens that moved.
-        spoiledBy = !(still.gap > 2.5 && still.gap < 7)
-          ? `the lens landed ${still.gap.toFixed(2)} m off him`
+        spoiledBy = !(atShutter.gap > 2.5 && atShutter.gap < 7)
+          ? `the lens stood ${atShutter.gap.toFixed(2)} m off him at the shutter`
           : atShutter.unseen.length || over
           ? [atShutter.unseen.length && `out of sight: ${atShutter.unseen.join(', ')}`, over && describeOverlap(over)]
             .filter(Boolean).join('; ')
             : Math.abs(atShutter.ndcX) > RETURN_OFF_AXIS ? `${atShutter.ndcX.toFixed(2)} off the frame's middle` : null
-        if (!spoiledBy || atShutter.carry !== 'fullJar') break
+        if (!spoiledBy) break
+        // Recorded before giving up on a set-down jar, so the refusal keeps it.
         refused.push(`${tries}: ${spoiledBy}`)
+        if (atShutter.carry !== 'fullJar') break
       }
       // THE SUBJECT IS WHERE THE LENS IS, not merely somewhere in the picture.
       // Three aimings in a row came back showing an empty river with the carrier
@@ -2813,9 +2812,9 @@ if (section('adult-errands')) {
       // time: "inside the frustum" is not "readable".
       check(
         'and the carrier stands at reading distance from the lens, neither on it nor lost in it',
-        !!still && still.gap > 2.5 && still.gap < 7,
-        !still ? 'no placement inland of him' : `${still.gap.toFixed(2)} m from the lens — subject (${still.x.toFixed(1)}, ${still.z.toFixed(1)}), ` +
-          `lens (${still.px.toFixed(1)}, ${still.pz.toFixed(1)}) yaw ${still.yaw.toFixed(2)} pitch ${still.pitch.toFixed(2)}`,
+        !!atShutter && atShutter.gap > 2.5 && atShutter.gap < 7,
+        !atShutter ? 'no placement inland of him' : `${atShutter.gap.toFixed(2)} m from the lens at the shutter — subject (${atShutter.x.toFixed(1)}, ${atShutter.z.toFixed(1)}), ` +
+          `lens (${atShutter.lens.x.toFixed(1)}, ${atShutter.lens.z.toFixed(1)}) yaw ${still.yaw.toFixed(2)} pitch ${still.pitch.toFixed(2)}`,
       )
       check(
         'and nothing stands between him and the lens at the shutter',
