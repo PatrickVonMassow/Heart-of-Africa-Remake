@@ -85,6 +85,7 @@ put it is the mistake this line exists to stop.
   Handover note 2 (03.10.2026, 18:20): branch feat/1276-speech-note-trio (HEAD 30414428b) carries 1276, 1277 and 1278 item 1, gate green on both backends (polish-speech speech-distance-scale + speech-hypothesis); item 2 decided by owner record on the board (tip stays 1-16 px above the drawn head, veto open). Still owed before landing the trio: cross-vendor review (scripts/review-astra.mjs), the main session's two-backend picture check, then land-point for 1276, 1277, 1278.
   Handover note 3 (03.10.2026, 18:55): Astra review recorded (3f30fb1c3; pass-1 finding on baseScale rejected as a misreading of item 1). Main-session picture check: WebGPU frames 1271/146 right; WebGL 2 frame 146 shows NO speaker and NO note while speech-hypothesis is green (reproduced twice) — a delegated author is fixing cause + adding a post-shutter visibility check on this branch. Still owed after that: confirming review of the changed files, two-backend picture check, land 1276-1278.
   Test: Vitest for the curve (monotone, 3.04 at 3 m, 0.60 at 22 m, cap 4.0, clamped) and for the label height against the drawn crown; Playwright frame from a player-reachable stand with a speaker at ~2 m and one at ~15 m, bubble pixel sizes and tip-to-crown gap measured against the speakers' projections, both backends.
+  Handover note (03.10.2026, 23:25): the speech note trio branch is MERGED to main with point 1276 (reviews recorded, frames 146/1271 picture-checked on both backends). The branch feat/1276-speech-note-trio and worktree .claude/worktrees/point-1276 were kept; what remains is confirming this point's final state on main and ticking it (land-point), then removing branch and worktree.
   Bundle: Kommunikation.
 - [ ] 1277. The speech-distance-scale shot accepts pairs whose far speaker has already walked close
   Source: measured 03.10.2026 ~10:05 in the WebGPU covering run of `polish-speech` on main ebc37be92
@@ -99,6 +100,7 @@ put it is the mistake this line exists to stop.
   - `polish-speech --section=speech-distance-scale` green on WebGPU and WebGL 2; its frame
     picture-checked.
   Tests: the existing Playwright section; no new mechanism.
+  Handover note (03.10.2026, 23:25): the speech note trio branch is MERGED to main with point 1276 (reviews recorded, frames 146/1271 picture-checked on both backends). The branch feat/1276-speech-note-trio and worktree .claude/worktrees/point-1276 were kept; what remains is confirming this point's final state on main and ticking it (land-point), then removing branch and worktree.
   Bundle: Kommunikation.
   Criticality: low — no player impact measured (the drawn scale matched the expected one in every
   attempt); it blocks the green of `polish-speech`.
