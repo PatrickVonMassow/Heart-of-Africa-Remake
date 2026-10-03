@@ -3389,13 +3389,16 @@ if (section('village-pounding')) {
     for (const shot of shots) {
       // A walker passing the pair can block every side-on stand for a moment;
       // then the village thaws, he moves on, and the next impact is tried.
-      const SEARCHES = 4
+      // A free villager pauses 3-9 s where her stroll ends, so the thaw between
+      // searches is long enough for one such pause to run out.
+      const SEARCHES = 6
+      const THAW_FRAMES = 180
       const refused = []
       for (let attempt = 1; attempt <= SEARCHES; attempt++) {
       // Every retry first lets the thawed village run on, so the obstruction
       // that refused the last search can move away (a `continue` below must
       // not skip this, so it stands at the top of the attempt).
-      if (attempt > 1) await nextFrames(30)
+      if (attempt > 1) await nextFrames(THAW_FRAMES)
       // Just past woman 0's impact: her foot still in the grain, the puff up.
       const caught = await stepUntil(() => {
         const w = window.__placePounding().women[0]
