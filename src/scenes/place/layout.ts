@@ -7,7 +7,7 @@
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
-import { LOOM_SPOT, PORT_TALKERS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
+import { LOOM_SPOT, PORT_TALKERS, VILLAGE_SPOTS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
 import { placeLoom, stationGround, PLAZA_SIGHT_HALF_WIDTH, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
@@ -960,8 +960,19 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // The original market band crosses the loom. Fit its full collider around
     // the props and figures before any lanes or dwellings depend on its door.
     const marketRadius = interactiveCircleRadius('market', style)
+    // The drummer points at the chief's hut (drummerVoice.ts, point 1272): the
+    // market hut keeps a clearly different bearing from his seat. Bambara only
+    // for now; widening it reshapes the other villages' plans (follow-up point).
+    const drummer = VILLAGE_SPOTS.drummer
+    const chiefBearing = Math.atan2(chiefPos[0] - drummer[0], chiefPos[1] - drummer[1])
+    const marketBearingClear = (x: number, z: number) => {
+      if (place.peopleId !== 'bambara') return true
+      const off = Math.abs(Math.atan2(x - drummer[0], z - drummer[1]) - chiefBearing) % (2 * Math.PI)
+      return Math.min(off, 2 * Math.PI - off) * 180 / Math.PI >= balance.communication.marketBearingFromChief
+    }
     const marketFits = (x: number, z: number) =>
       clearsLife([{ x, z, r: marketRadius }]) &&
+      marketBearingClear(x, z) &&
       Math.hypot(x - chiefPos[0], z - chiefPos[1]) >= 7.25 - 1e-9 &&
       Math.hypot(x, z) + marketRadius < radius - 1
     if (!marketFits(...marketPos)) {
