@@ -90,6 +90,7 @@ put it is the mistake this line exists to stop.
   5. Scope: the same surface also draws the far river in the panorama (backdropMaterial.ts uses riverWaterSurface); the change applies there too (user: yes).
   Test: Vitest for the season-coupled speed and the per-tier flotsam counts; Playwright frame pair from a player-reachable bank stand at Bambara, a few hundred ms apart, showing measurable downstream displacement of texture and flotsam; picture check of the 60-220 m band for shimmer on medium and high; both backends.
   Files: src/render/waterAppearance.ts, src/render/placeRiver.ts, src/scenes/place/backdropMaterial.ts, src/config/quality.ts.
+  Bundle: Dorfleben.
 
 - [ ] 1276. Speech note tail meets a near speaker's head
   Seen while authoring point 1271 (frame verification/1271-speech-near-far-sizes.png): with a speaker about 4 m from the camera, the speech note's tail tip sits 65-85 px above the drawn head, so the note reads as detached from its speaker. The tip sits correctly on its anchor; the anchor (src/scenes/place/SpeechLabels.tsx) lies too high above the head at close range. Final state: at every camera distance the tail tip ends just above the speaker's rendered head (gap from the projected head top within a small calibratable pixel band in src/config/balance.ts). Test: Vitest for the anchor height from the figure's head height; Playwright near-speaker frame asserting the tip-to-head-top gap in the rendered projection, both backends.
