@@ -259,6 +259,7 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
           cwd: REPO_ROOT,
           input: JSON.stringify(bad),
           encoding: 'utf8',
+          windowsHide: true,
         })
         expect(run.status).toBe(0)
         expect(JSON.parse(run.stdout).hookSpecificOutput.permissionDecision).toBe('deny')
