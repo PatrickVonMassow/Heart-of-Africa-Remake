@@ -268,7 +268,12 @@ describe('silhouetteTop', () => {
    *  over a dense sampling of the unit sphere mapped through the semi-axes —
    *  independent of the closed form. */
   function sampledTopY(cam: THREE.PerspectiveCamera, c: V, axes: [V, V, V]) {
+    return sampledTop(cam, c, axes).y
+  }
+  /** The same sampling's topmost screen point, x and y in px (1440 × 900). */
+  function sampledTop(cam: THREE.PerspectiveCamera, c: V, axes: [V, V, V]) {
     let best = Infinity
+    let bestX = 0
     const n = 360
     const v = new THREE.Vector3()
     for (let i = 0; i <= n; i++) {
@@ -279,11 +284,18 @@ describe('silhouetteTop', () => {
         v.set(
           ...([0, 1, 2].map((k) => c[k] + axes[0][k] * u[0] + axes[1][k] * u[1] + axes[2][k] * u[2]) as V),
         )
-        best = Math.min(best, ((1 - v.project(cam).y) / 2) * H)
+        v.project(cam)
+        const y = ((1 - v.y) / 2) * H
+        if (y < best) {
+          best = y
+          bestX = ((v.x + 1) / 2) * 1440
+        }
       }
     }
-    return best
+    return { x: bestX, y: best }
   }
+  const screenX = (cam: THREE.PerspectiveCamera, p: { x: number; y: number; z: number }) =>
+    ((new THREE.Vector3(p.x, p.y, p.z).project(cam).x + 1) / 2) * 1440
   // A grown head (r 0.16, centre 1.18) and a child's (0.55 of it), seen from
   // the traveller's eye at 1.6 m — level, looking down from a metre, at 20 m,
   // off to the side, pitched, rolled, and a squashed head seen from above.
@@ -305,7 +317,11 @@ describe('silhouetteTop', () => {
       const cam = cameraAt(k.eye, k.look, k.up)
       const out = { x: 0, y: 0, z: 0 }
       expect(silhouetteTop(k.c, k.axes, cam.matrixWorld.elements, out)).toBe(true)
-      expect(screenY(cam, out)).toBeCloseTo(sampledTopY(cam, k.c, k.axes), 1)
+      const want = sampledTop(cam, k.c, k.axes)
+      expect(screenY(cam, out)).toBeCloseTo(want.y, 1)
+      // Sideways too: the topmost point is flat along the outline, so the
+      // sampled x is looser than its y, but a displacement shows at once.
+      expect(Math.abs(screenX(cam, out) - want.x)).toBeLessThan(1.5)
     })
   }
 
@@ -354,8 +370,11 @@ describe('silhouetteTop', () => {
     expect(silhouetteTop([0, 1.6, 4.05], ball(0.16), cam.matrixWorld.elements, out)).toBe(false)
     expect(silhouetteTop([0, 1.6, 8], ball(0.16), cam.matrixWorld.elements, out)).toBe(false)
     expect(out).toEqual({ x: 7, y: 7, z: 7 })
-    // And in front it does write.
+    // And in front it does write: the top of a ball straight ahead, level.
     expect(silhouetteTop([0, 1.6, 0], ball(0.16), cam.matrixWorld.elements, out)).toBe(true)
+    expect(out.x).toBeCloseTo(0, 6)
+    expect(out.y).toBeGreaterThan(1.6 + 0.159)
+    expect(Math.hypot(out.x, out.y - 1.6, out.z)).toBeCloseTo(0.16, 6)
   })
 })
 

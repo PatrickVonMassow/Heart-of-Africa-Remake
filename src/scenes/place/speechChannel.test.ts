@@ -454,6 +454,17 @@ describe('placeSpeechNote', () => {
     expect(Math.abs(screenY(cam, note.position) - drawnTop(cam, head))).toBeLessThan(1)
   })
 
+  it('keeps a fixed height through an empty phrase, which changes nothing', () => {
+    const { root } = villager()
+    root.position.set(2, 0, 0)
+    const cam = eye([0, 1.6, 4], [0, 1.4, 0])
+    speakOverhead('probe', [RIVER_UTTERANCE], root, { now: 0, height: 3 })
+    speakOverhead('probe', [], root, { now: 1 })
+    const note = new THREE.Group()
+    expect(placeSpeechNote(note, speechLabelState().labels[0], cam)).toBe(true)
+    expect(note.position.toArray()).toEqual([2, 3, 0])
+  })
+
   it('tracks the head again once a speaker that had a fixed height speaks without one', () => {
     const { root, head } = villager()
     const cam = eye([0, 1.6, 4], [0, 1.4, 0])

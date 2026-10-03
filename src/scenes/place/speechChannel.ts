@@ -92,6 +92,9 @@ export function speakOverhead(
   anchor: Object3D,
   options: { seconds?: number; height?: number; now?: number; reach?: number; floor?: boolean } = {},
 ): void {
+  // Nothing said, nothing changed: not the labels, nor how an existing note
+  // follows its speaker (a fixed height must not flip to head tracking).
+  if (atoms.length === 0) return
   const now = options.now ?? speechClock()
   // THE FLOOR CLEARS WHAT THE FLOOR RAISED, and nothing else. Clearing every
   // label instead swept away the chief's answer to the player — raised outside
@@ -106,6 +109,7 @@ export function speakOverhead(
       if (!label.floor || label.speakerId === speakerId || base.labels.some((l) => l.speakerId === label.speakerId)) continue
       anchors.delete(label.speakerId)
       reaches.delete(label.speakerId)
+      fixedHeights.delete(label.speakerId)
     }
   }
   anchors.set(speakerId, anchor)
@@ -274,6 +278,7 @@ export function pruneSpeechLabels(now: number = speechClock()): void {
     if (!next.labels.some((l) => l.speakerId === id)) {
       anchors.delete(id)
       reaches.delete(id)
+      fixedHeights.delete(id)
     }
   }
   publish(next)
