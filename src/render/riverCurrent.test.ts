@@ -39,8 +39,22 @@ describe('the drift speed follows the season', () => {
   })
 
   it('reads the factors live, so a debug edit of them lands at once', () => {
-    const b = { riverCurrent: { ...balance.riverCurrent, driftBaseSpeed: 2 }, waterDrama: { ...balance.waterDrama, wetFlowFactor: 3 } }
-    expect(riverDriftSpeed(1, b)).toBeCloseTo(6, 9)
+    const base = balance.riverCurrent.driftBaseSpeed
+    const wet = balance.waterDrama.wetFlowFactor
+    const phase = riverDrift.value
+    try {
+      balance.riverCurrent.driftBaseSpeed = 2
+      balance.waterDrama.wetFlowFactor = 3
+      expect(riverDriftSpeed(1)).toBeCloseTo(6, 9)
+      riverDrift.value = 0
+      advanceRiverDrift(0.05, 1)
+      expect(riverDrift.value).toBeCloseTo(0.3, 9)
+    } finally {
+      balance.riverCurrent.driftBaseSpeed = base
+      balance.waterDrama.wetFlowFactor = wet
+      riverDrift.value = phase
+    }
+    expect(riverDriftSpeed(1)).toBeCloseTo(2.34, 9)
   })
 })
 
