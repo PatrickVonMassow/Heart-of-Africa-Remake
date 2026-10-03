@@ -2188,8 +2188,9 @@ export const balance: BalanceConfig = {
     // speaker nears: 65-85 px over a speaker 4 m away. The anchor is the head
     // top now and the gap a fixed screen lift, so it reads the same at every
     // distance: 5 px clears the hair, and the band allows the projection's
-    // rounding plus a head bobbing with the walk between frames.
-    labelTipGap: { px: 5, minPx: 0, maxPx: 16 },
+    // rounding plus a head bobbing with the walk between frames. The floor is
+    // positive: a tip touching the hair (0 px) reads as no gap at all.
+    labelTipGap: { px: 5, minPx: 1, maxPx: 16 },
     // Calibratable (CLAUDE.md §2): with two notes up, the older one steps back —
     // dimmed and a little smaller — so the current speaker's note is always the
     // most prominent. Still readable: the player may want to guess at it.

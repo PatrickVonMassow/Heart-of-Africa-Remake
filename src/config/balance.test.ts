@@ -191,7 +191,7 @@ describe('village speech (design.md §13.4)', () => {
       speechPitchInterval: 1.68,
       speechVolume: 3,
       drumMessagePeak: 4.5,
-      labelTipGap: { px: 5, minPx: 0, maxPx: 16 },
+      labelTipGap: { px: 5, minPx: 1, maxPx: 16 },
       labelRecede: { opacity: 0.55, scale: 0.85 },
       speechBubble: { baseScale: 1.4, nearDistance: 3, farDistance: 22, nearScale: 1.35, farScale: 0.75 },
       giveReach: 2.6,
@@ -237,6 +237,9 @@ describe('village speech (design.md §13.4)', () => {
     const gap = balance.communication.labelTipGap
     expect(gap.px).toBeGreaterThanOrEqual(gap.minPx)
     expect(gap.px).toBeLessThanOrEqual(gap.maxPx)
+    // A positive floor: the tip must stand clear of the hair, never touch it.
+    expect(gap.minPx).toBeGreaterThan(0)
+    expect(gap.px).toBeGreaterThan(gap.minPx)
     expect(gap.maxPx).toBeLessThanOrEqual(20)
   })
 
