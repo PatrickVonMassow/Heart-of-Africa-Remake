@@ -88,8 +88,13 @@ const STREAK_ACROSS = 0.55
 const FINE_ALONG = 0.45
 const FINE_ACROSS = 0.75
 /** How strongly the fine octave shades the water (art constants, calibratable). */
-const FINE_TONE = 0.55
-const FINE_GLOSS = 0.06
+const FINE_TONE = 2.2
+const FINE_GLOSS = 0.08
+/** Height of the fine cells' relief in metres: a few centimetres over 1-3 m,
+ *  enough for the sky's reflection to glint and slide on them (calibratable). */
+const FINE_RELIEF = 0.08
+/** How much the fine cells fray the froth ribbons' edges into moving flecks. */
+const FINE_FROTH = 0.35
 /** Its fade (work-order 1280): a 1-3 m grain turns sub-pixel FAR sooner than the
  *  ~11 m streaks, and resampled under the TRAA jitter it shimmers. So it fades
  *  by its own screen footprint — cycles of the field per pixel, from `fwidth` —
@@ -166,10 +171,11 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
   // Foam where the current drags over the shallows at the near shore...
   const shoreFoam = smoothstep(float(SHORE_FOAM_REACH), float(0.3), v)
     .mul(smoothstep(float(SHORE_FOAM_INNER), float(SHORE_FOAM_INNER + 0.6), v))
-    .mul(smoothstep(float(0.4), float(0.75), streak))
+    .mul(smoothstep(float(0.4), float(0.75), streak.add(fine.mul(FINE_FROTH))))
   // ... and a thinner ribbon of it further out, so the movement reads across
   // the whole surface rather than only at the player's feet.
-  const midFoam = smoothstep(float(0.62), float(0.86), streak).mul(0.45)
+  // The fine cells fray its edges into flecks that travel with the water.
+  const midFoam = smoothstep(float(0.62), float(0.86), streak.add(fine.mul(FINE_FROTH))).mul(0.45)
   const foam = max(shoreFoam, midFoam)
 
   return {
@@ -183,6 +189,9 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
     // sheet turns fully opaque a few metres out — which is also what keeps the drawn surface from reading
     // darker than the opaque panorama where the two meet.
     opacity: smoothstep(float(0.5), float(3), v).mul(0.06).add(0.94),
+    /** The fine cells as a relief in metres (0 where they have faded), for a
+     *  surface that bumps its normal with it — the drawn mesh at the bank. */
+    relief: fine.mul(FINE_RELIEF),
     /** Vertical ripple in metres (design.md §11: only slight movement). */
     ripple: mx_fractal_noise_float(
       vec3(flowing.mul(0.22), v.mul(0.9), time.mul(0.12)),

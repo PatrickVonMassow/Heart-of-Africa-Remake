@@ -129,7 +129,7 @@ describe('the debris floats ON the water and rides the current', () => {
     const twig = flotsamScale('twig', 0.5)
     const grass = flotsamScale('grass', 0.5)
     expect(leaf[2]).toBeGreaterThan(0.1)
-    expect(leaf[2]).toBeLessThan(0.3)
+    expect(leaf[2]).toBeLessThan(0.4)
     expect(twig[2]).toBeGreaterThan(grass[2])
   })
 

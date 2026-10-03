@@ -29,6 +29,7 @@ import {
 } from '../scenes/place/riverBank'
 import { groundPlateRadius, type PlaceBounds } from '../scenes/place/boundary'
 import { balance } from '../config/balance'
+import { proceduralBump } from './materials'
 import {
   RIVER_WATER_TONES,
   WATER_FOAM_ROUGHNESS,
@@ -237,6 +238,10 @@ export function createPlaceRiverMaterial(octaves: number): THREE.MeshStandardNod
   m.positionNode = positionLocal.add(vec3(0, water.ripple, 0))
   m.opacityNode = water.opacity
   m.roughnessNode = water.roughness
+  // The fine cells tilt the normal a little, so the sky's reflection glints on
+  // them and slides downstream with them (work-order 1280). Their relief is 0
+  // wherever the fine octave has faded, so the far surface keeps a flat normal.
+  m.normalNode = proceduralBump(water.relief, 1)
   riverMaterialCache.set(octaves, m)
   return m
 }
@@ -401,11 +406,11 @@ export function flotsamScale(kind: FlotsamKind, size: number): [number, number, 
     case 'foam':
       return [size * 0.55, 1, size * 2.4]
     case 'leaf':
-      return [size * 0.22, 1, size * 0.42] // a 7-14 cm leaf
+      return [size * 0.32, 1, size * 0.55] // a broad 19-36 cm leaf (fig, banana)
     case 'grass':
-      return [size * 0.7, size * 0.7, size * 0.9] // a torn tuft, 25-50 cm
+      return [size * 1.0, size * 0.8, size * 1.2] // a torn tuft, 40-80 cm
     case 'twig':
-      return [size * 0.9, size * 0.9, size * 1.6] // a 55-105 cm stick
+      return [size * 1.6, size * 1.6, size * 1.8] // a 65-115 cm branch
   }
 }
 
