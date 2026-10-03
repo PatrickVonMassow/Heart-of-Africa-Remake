@@ -312,6 +312,15 @@ describe('confirming review findings (GPT-6 Astra, b9d21dd) — all caught by th
       { title: 'Other', approved: '' },
     ])
   })
+  it('stops the approval lookup at a --request=<value> deposit too (round-3 review)', () => {
+    const command = 'node scripts/finding.mjs --request "A"; node scripts/finding.mjs --request="B" --approved "passt so"'
+    expect(requestsOf(command)).toEqual([
+      { title: 'A', approved: '' },
+      { title: 'B', approved: 'passt so' },
+    ])
+    const chat = [human('start'), said('A and B'), human('passt so')]
+    expect(evaluate({ command, entries: chat })).toMatchObject({ block: true, id: 'no-approved' })
+  })
   it('denies a matched command whose --request has no readable title (fail closed)', () => {
     for (const command of ['node scripts/finding.mjs --request', 'node scripts/finding.mjs --request --stdin', 'node scripts/finding.mjs --request ; ls']) {
       expect(evaluate({ command, entries: approvedChat }), command).toMatchObject({ block: true, id: 'no-title' })

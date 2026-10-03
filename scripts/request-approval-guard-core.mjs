@@ -147,6 +147,10 @@ export function tokenize(text, shell = 'bash') {
 const REQUEST_FLAG_RE = /(^|[^\w-])--request(?![\w-])/g
 const MAX_NESTING = 3
 
+/** The ONE request predicate: detection and approval boundaries both use it. */
+const isRequestWord = (word) =>
+  typeof word === 'string' && (word === REQUEST_FLAG || word.startsWith(`${REQUEST_FLAG}=`))
+
 /**
  * The deposits in a token stream: every exact `--request` word (or
  * `--request=<value>`), with the next word as its title and the first
@@ -162,10 +166,10 @@ function depositsIn(tokens, shell, depth) {
   const valueAt = (k) => (isWord(k) && !tokens[k].startsWith('--') ? (consumed.add(k), tokens[k]) : '')
   for (let k = 0; k < tokens.length; k++) {
     const word = tokens[k]
-    if (word === REQUEST_FLAG || (typeof word === 'string' && word.startsWith(`${REQUEST_FLAG}=`))) {
+    if (isRequestWord(word)) {
       const title = word === REQUEST_FLAG ? valueAt(k + 1) : word.slice(REQUEST_FLAG.length + 1)
       let approved = ''
-      for (let j = k + 1; j < tokens.length && tokens[j] !== REQUEST_FLAG; j++) {
+      for (let j = k + 1; j < tokens.length && !isRequestWord(tokens[j]); j++) {
         if (tokens[j] === APPROVED_FLAG) {
           approved = valueAt(j + 1)
           break
@@ -175,7 +179,7 @@ function depositsIn(tokens, shell, depth) {
     }
   }
   tokens.forEach((word, k) => {
-    if (typeof word !== 'string' || consumed.has(k) || word === REQUEST_FLAG || word.startsWith(`${REQUEST_FLAG}=`)) return
+    if (typeof word !== 'string' || consumed.has(k) || isRequestWord(word)) return
     const occurrences = (word.match(REQUEST_FLAG_RE) ?? []).length
     if (occurrences === 0) return
     const inner = depth < MAX_NESTING ? depositsIn(tokenize(word, shell), shell, depth + 1) : []
