@@ -31,7 +31,7 @@ import {
   type SpeechLabelState,
 } from '../../communication/speechLabel'
 import { pickSpeechTarget, type SpeechTargetCandidate } from '../../communication/speechTarget'
-import { drawnHeadRise, markedActorRise, type HeadNode, type MarkedNode } from '../actorLabelSource'
+import { drawnHeadTop, markedActorRise, type HeadNode, type MarkedNode } from '../actorLabelSource'
 import type { UseCandidate } from './useKeyTarget'
 import { placePlayerPosition } from './playerPosition'
 
@@ -41,6 +41,8 @@ let state: SpeechLabelState = noSpeechLabels()
 const reaches = new Map<string, number>()
 /** The object each speaker is drawn as — the label rides on its world position. */
 const anchors = new Map<string, Object3D>()
+/** Speakers whose caller set the height explicitly: no live head tracking. */
+const fixedHeights = new Set<string>()
 
 const listeners = new Set<() => void>()
 
@@ -101,15 +103,48 @@ export function speakOverhead(
   }
   anchors.set(speakerId, anchor)
   reaches.set(speakerId, options.reach ?? balance.communication.talk.reach)
+  if (options.height === undefined) fixedHeights.delete(speakerId)
+  else fixedHeights.add(speakerId)
   // The height is read from the SPEAKER, here rather than at each call site, so
   // every speaker — the villagers, the children, the dev hook — gets its note
   // over its own head without computing anything (work-order point 582). The
   // figure's DRAWN head says where the tail ends (point 1276); a speaker
-  // without one falls back to its actor record, then to a grown figure.
+  // without one falls back to its actor record, then to a grown figure. The
+  // matrices are refreshed first: a figure placed this frame has not been
+  // through the render's own update yet. This height is only the start value
+  // and the fallback — the label layer re-reads the head every frame
+  // (speechTipWorld), so a pose or scale change carries the tail along.
+  ;(anchor as Partial<Object3D>).updateWorldMatrix?.(true, true)
   const height =
     options.height ??
-    speechLabelHeight(drawnHeadRise(anchor as HeadNode) ?? markedActorRise(anchor as MarkedNode))
+    speechLabelHeight(drawnHeadTop(anchor as HeadNode)?.[1] ?? markedActorRise(anchor as MarkedNode))
   publish(showSpeechLabel(base, speakerId, atoms, now, { ...options, height }))
+}
+
+/**
+ * Where a label's tail tip stands in the world RIGHT NOW (point 1276): the top
+ * of its speaker's drawn head, read live off the refreshed matrices so a lean,
+ * a kneel or a step since the speech started carries the note with it. Without
+ * a visible head — or with a height its caller fixed — the stored height over
+ * the speaker's origin stands in. Writes `out`; false when there is no anchor.
+ */
+export function speechTipWorld(label: SpeechLabel, out: { x: number; y: number; z: number }): boolean {
+  const anchor = anchors.get(label.speakerId)
+  if (!anchor) return false
+  ;(anchor as Partial<Object3D>).updateWorldMatrix?.(true, true)
+  const e = (anchor as HeadNode).matrixWorld?.elements
+  if (!e) return false
+  const top = fixedHeights.has(label.speakerId) ? null : drawnHeadTop(anchor as HeadNode)
+  if (top) {
+    out.x = e[12] + top[0]
+    out.y = e[13] + top[1]
+    out.z = e[14] + top[2]
+  } else {
+    out.x = e[12]
+    out.y = e[13] + label.height
+    out.z = e[14]
+  }
+  return true
 }
 
 /** The object a speaker is drawn as, or null once it is gone. */
@@ -224,5 +259,6 @@ export function forgetSpeechLabel(speakerId: string): void {
 export function clearSpeechLabels(): void {
   anchors.clear()
   reaches.clear()
+  fixedHeights.clear()
   publish(noSpeechLabels())
 }

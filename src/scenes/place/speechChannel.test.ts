@@ -18,6 +18,7 @@ import {
   speechClock,
   speechLabelState,
   speechTargetLabel,
+  speechTipWorld,
   speechUseCandidate,
   subscribeSpeechLabels,
   updateSpeechTarget,
@@ -167,6 +168,50 @@ describe('the height comes from the speaker itself', () => {
     ]
     speakOverhead('villager-1', [RIVER_UTTERANCE], fig, { now: 0 })
     expect(speechLabelState().labels[0].height).toBeCloseTo(1.34)
+  })
+
+  it('follows the head after the speech began: a lean, a kneel, a step (point 1276)', () => {
+    const fig = drawn(1)
+    const head = {
+      name: 'figure-head',
+      matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.18, 0, 1] },
+      geometry: { parameters: { radius: 0.16 } },
+    }
+    ;(fig as unknown as { children: unknown[] }).children = [head]
+    let refreshed = 0
+    ;(fig as unknown as { updateWorldMatrix: () => void }).updateWorldMatrix = () => (refreshed += 1)
+    speakOverhead('villager-1', [RIVER_UTTERANCE], fig, { now: 0 })
+    // The matrices are refreshed before the start height is read.
+    expect(refreshed).toBe(1)
+    const label = speechLabelState().labels[0]
+    const tip = { x: 0, y: 0, z: 0 }
+    expect(speechTipWorld(label, tip)).toBe(true)
+    expect([tip.x, tip.y, tip.z].map((n) => +n.toFixed(3))).toEqual([0, 1.34, 0])
+    // The figure kneels and leans after speaking: the head drops and moves.
+    head.matrixWorld.elements = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.2, 0.8, -0.1, 1]
+    expect(speechTipWorld(label, tip)).toBe(true)
+    // Every read refreshes the matrices again (one start value, two reads).
+    expect(refreshed).toBe(3)
+    expect([tip.x, tip.y, tip.z].map((n) => +n.toFixed(3))).toEqual([0.2, 0.96, -0.1])
+  })
+
+  it('keeps an explicit height over the origin, and the stored height without a head', () => {
+    const fig = drawn(1)
+    ;(fig as unknown as { children: unknown[] }).children = [
+      {
+        name: 'figure-head',
+        matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.18, 0, 1] },
+        geometry: { parameters: { radius: 0.16 } },
+      },
+    ]
+    speakOverhead('probe', [RIVER_UTTERANCE], fig, { now: 0, height: 9 })
+    const tip = { x: 0, y: 0, z: 0 }
+    expect(speechTipWorld(speechLabelState().labels[0], tip)).toBe(true)
+    expect(tip.y).toBe(9)
+    speakOverhead('villager-2', [RIVER_UTTERANCE], drawn(1), { now: 0 })
+    const label = speechLabelState().labels.find((l) => l.speakerId === 'villager-2')!
+    expect(speechTipWorld(label, tip)).toBe(true)
+    expect(tip.y).toBeCloseTo(speechLabelHeight(1.45))
   })
 
   it('falls back to a grown figure for an object that is no marked actor', () => {
