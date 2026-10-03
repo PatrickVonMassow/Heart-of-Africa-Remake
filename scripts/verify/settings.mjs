@@ -1302,9 +1302,10 @@ if (section('render-leak-watch')) {
 // own drift apart, and the water's TEXTURE and its FLOTSAM must both have moved
 // DOWNSTREAM by a measurable amount — the texture by the screen shift that best
 // re-aligns the two frames, the flotsam by the positions the scene drew. Then
-// the 60-220 m band of the same river on medium and high, for the shimmer
-// judgement of the fine octave's fade, and the frame cost of the low tier's
-// flotsam, measured on and off at the same stand.
+// the 60-220 m band of the same river on medium and high, one frame each for
+// the picture judgement of the fine octave's fade (no fade line; temporal
+// shimmer is NOT measured), and the frame cost of the low tier's flotsam,
+// measured on and off at the same stand against an allowed overhead.
 if (section('river-current')) {
   await page.evaluate(() => {
     window.__ui.getState().setDetailLevel('medium')
@@ -1508,7 +1509,7 @@ if (section('river-current')) {
     })
     return shot(`1280-river-band-${level}`, {
       local: subject,
-      label: `the far river 60-220 m out at ${level}: the fine grain fades without shimmer or a fade line`,
+      label: `the far river 60-220 m out at ${level}: the fine grain fades without a fade line`,
     })
   }
   await bandShot('medium')
@@ -1557,6 +1558,20 @@ if (section('river-current')) {
     `per window on ${runs.on.map((r) => r.median.toFixed(1)).join('/')}, off ${runs.off.map((r) => r.median.toFixed(1)).join('/')}`)
   check('the low tier\'s flotsam was measured on and off', runs.on.length === 4 && runs.off.length === 4,
     `${runs.on.length}+${runs.off.length} timed windows`)
+  // Acceptance: the median of the window medians may rise by at most this much
+  // with the 12 low-tier items shown (calibratable; a suite threshold, not game
+  // config). The rAF clock is vsync-capped at 60 fps, so an overhead inside the
+  // frame budget's headroom reads as 0 — the check fails only on a CLEAR
+  // overhead, one that pushes frames past the cap; it proves no more than that.
+  const FLOTSAM_LOW_ALLOWED_MS = 2.0
+  const mid = (xs) => {
+    const m = xs.map((x) => x.median).sort((a, b) => a - b)
+    return m.length ? (m[Math.floor((m.length - 1) / 2)] + m[Math.ceil((m.length - 1) / 2)]) / 2 : NaN
+  }
+  const overhead = mid(runs.on) - mid(runs.off)
+  check('the low tier\'s flotsam adds no clear frame-time overhead',
+    Number.isFinite(overhead) && overhead <= FLOTSAM_LOW_ALLOWED_MS,
+    `median of window medians ${mid(runs.off).toFixed(2)} → ${mid(runs.on).toFixed(2)} ms (+${overhead.toFixed(2)}, allowed ${FLOTSAM_LOW_ALLOWED_MS} ms; vsync-capped)`)
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 
