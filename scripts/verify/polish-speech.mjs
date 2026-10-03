@@ -342,7 +342,16 @@ if (section('speech-hypothesis')) {
         at.tipToHeadX !== null && Math.abs(at.tipToHeadX) <= Math.max(2, 0.25 * at.headWidth),
       at ? JSON.stringify(at) : 'no speaker',
     )
-    // The gap IS the calibration (point 1276): move labelTipGap.px within its
+    await frame('146-speech-hypothesis-label', {
+      local: {
+        x: (at ?? speaker).x,
+        y: (at ?? speaker).y + (at?.rise ?? 1.7),
+        z: (at ?? speaker).z,
+      },
+      label: 'the reading over the speaking figure',
+    })
+    // After the shutter, so the frame keeps its single note (a child left
+    // longer starts speaking on its own). The gap IS the calibration (point 1276): move labelTipGap.px within its
     // band and the measured tip-to-head gap must move with it — a renderer
     // that hard-coded the shipped lift would pass the band check above.
     const tipGapWith = (px) =>
@@ -367,14 +376,6 @@ if (section('speech-hypothesis')) {
       base.gap !== null && moved.gap !== null && Math.abs(moved.gap - base.gap - 6) <= 1.5 && back.px === base.was,
       JSON.stringify({ base, moved, back }),
     )
-    await frame('146-speech-hypothesis-label', {
-      local: {
-        x: (at ?? speaker).x,
-        y: (at ?? speaker).y + (at?.rise ?? 1.7),
-        z: (at ?? speaker).z,
-      },
-      label: 'the reading over the speaking figure',
-    })
     await page.evaluate((u) => {
       window.__game.getState().setUtteranceHypothesis(u, '')
       window.__speech?.clear()
