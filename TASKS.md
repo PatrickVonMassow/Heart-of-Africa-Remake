@@ -92,6 +92,9 @@ put it is the mistake this line exists to stop.
 - [ ] 1275. Collision for the fish grilling scene
   The fishers' scene (src/scenes/place/RiverFishery.tsx: griller, grill/fire, smoking rack, eater, beached canoe and its props; logic in villagerCanoe.ts) gets collision like every other solid settlement object: the player and walking villagers can no longer pass through the grill, fire, smoking rack, canoe or the seated/standing fishers. Colliders are registered through the settlement collision fabric (src/scenes/place/collision.ts, as huts/dig sites/loom do), sized from the rendered geometry, and follow the canoe/figures where they move. The walking paths of the fishers' own routine stay passable for them. Test: Vitest asserting every solid fishery prop and figure has a collider in the collision set of each village plan with a fishery; Playwright: walk the player straight into the grill and the smoking rack and assert the player stops outside them.
   Bundle: Siedlungsgeometrie.
+- [ ] 1276. Speech note tail meets a near speaker's head
+  Seen while authoring point 1271 (frame verification/1271-speech-near-far-sizes.png): with a speaker about 4 m from the camera, the speech note's tail tip sits 65-85 px above the drawn head, so the note reads as detached from its speaker. The tip sits correctly on its anchor; the anchor (src/scenes/place/SpeechLabels.tsx) lies too high above the head at close range. Final state: at every camera distance the tail tip ends just above the speaker's rendered head (gap from the projected head top within a small calibratable pixel band in src/config/balance.ts). Test: Vitest for the anchor height from the figure's head height; Playwright near-speaker frame asserting the tip-to-head-top gap in the rendered projection, both backends.
+  Bundle: Kommunikation.
 
 - [ ] 1121. The river-bank frame aims at a drifting fleck and shoots six frames later
   (measured 14.09.2026 on the covering WebGL 2 pass of point 1073).
