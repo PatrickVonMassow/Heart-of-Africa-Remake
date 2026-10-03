@@ -1582,6 +1582,15 @@ if (section('chief-to-drummer')) {
     askDrummer,
   )
   check('the use key arms at the drummer', drummerPrompt, `waited for: ${askDrummer}`)
+  // The higher of his two hands, read off the drawn figure (point 1272).
+  const drummerHandY = () => page.evaluate(() => {
+    const g = window.__placeScene?.getObjectByName('drummer')
+    if (!g) return null
+    g.updateMatrixWorld(true)
+    const ys = ['hand-left', 'hand-right'].map((n) => g.getObjectByName(n)?.getWorldPosition(g.position.clone()).y)
+    return ys.every(Number.isFinite) ? Math.max(...ys) : null
+  })
+  const restHandY = await drummerHandY()
   await page.keyboard.press('Space')
   const named = await page
     .waitForFunction(
@@ -1598,9 +1607,15 @@ if (section('chief-to-drummer')) {
     Array.isArray(named) && named.length === 1 && named[0] === chiefWord,
     JSON.stringify({ named, chiefWord }),
   )
-  // Past the arm's 0.3 s rise and short of its fall at 1.7 s: hold the pose.
-  await nextFrames(4)
-  await page.waitForTimeout(400)
+  // Hold the pose once the arm has risen, so it is still up at the shutter.
+  const ARM_RISE = 0.3
+  const armUp = await stepUntil(({ rest, rise }) => {
+    const g = window.__placeScene?.getObjectByName('drummer')
+    if (!g || rest == null) return false
+    g.updateMatrixWorld(true)
+    const ys = ['hand-left', 'hand-right'].map((n) => g.getObjectByName(n)?.getWorldPosition(g.position.clone()).y)
+    return ys.every(Number.isFinite) && Math.max(...ys) - rest > rise
+  }, { rest: restHandY, rise: ARM_RISE })
   await page.evaluate(() => window.__placeFreezeLife?.(true))
 
   // 1a. ONE HUT ON THE POINTING LINE (point 1272): seen from behind the drummer
@@ -1648,6 +1663,12 @@ if (section('chief-to-drummer')) {
     local: { x: hut.pos[0], y: 1.5, z: hut.pos[1] },
     label: "from behind the drummer, his arm raised toward the chief's hut — the only hut along the pointing line",
   })
+  const shotHandY = await drummerHandY()
+  check(
+    "the drummer's arm is raised in the pointing frame (point 1272)",
+    armUp && shotHandY != null && restHandY != null && shotHandY - restHandY > ARM_RISE,
+    JSON.stringify({ restHandY, shotHandY }),
+  )
   await page.evaluate(() => window.__placeFreezeLife?.(false))
   await standAt(inFrontOf(drummer, 2), drummer)
 

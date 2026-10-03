@@ -199,6 +199,7 @@ describe('village speech (design.md §13.4)', () => {
       chiefStaySeconds: 60,
       chiefBesideDrummer: 1.5,
       chiefHutGap: 0.8,
+      marketBearingFromChief: 60,
       chiefTalkReach: 2.6,
     })
     // His stand beside the drummer clears both drum shells (the further of the
