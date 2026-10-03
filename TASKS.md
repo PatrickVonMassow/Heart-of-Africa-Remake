@@ -77,9 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1274. Recognisable mortar pounding
-  The villagers' pounding at the mortar (Pounder in src/scenes/place/PlaceLife.tsx, spots in lifeSpots.ts) is shown in a richer, clearly recognisable way instead of today's primitive form. Author designs and implements it; the final state must include at least: a waist-high wooden mortar of plausible shape (hourglass/footed, hollowed top with visible grain/millet inside), a long pestle gripped with both hands, a full-body stroke cycle (lift overhead, drive down with knees bending, pestle foot actually reaching into the mortar, small grain puff/scatter on impact), and an audible thud synced to impact if the place audio mix allows. Optional, if it fits design.md: two women pounding alternately at one mortar. Tunables in src/config/balance.ts (calibratable). Test: Vitest for the stroke cycle (pestle foot reaches below the mortar rim at impact, alternation phase); Playwright close and mid-distance frames in which the activity is recognisable as mortar pounding, both backends.
-  Bundle: Dorfleben.
 - [ ] 1280. River current reads at a glance near Bambara: fine texture, seasonal drift, more flotsam
   Sketch (user-approved as the target look): https://claude.ai/artifact/Um35i3XmCoHyJEBwMaEtDg ("Flussströmung A"). User order 03.10.2026, 15:13: front of the work order.
   The river's current is readable at a glance in the place scene (Bambara on the Niger as the reference stand), without breaking design.md §11's calm surface.
