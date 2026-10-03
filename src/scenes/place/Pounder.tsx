@@ -54,8 +54,9 @@ const MAX_POUNDERS = 2
 
 /** Dev/verify probe of the pounding (read by the place verification). */
 export interface PoundingProbe {
-  /** The mortar's centre on the ground, and the rim's height above it. */
-  mortar: { x: number; y: number; z: number; rim: number }
+  /** The mortar's centre on the ground, the rim's height above it, and the
+   *  turn of its frame (the pair stands on that frame's z axis). */
+  mortar: { x: number; y: number; z: number; rim: number; yaw: number }
   /** What the pair is doing (`DuoPhase`): only 'pound' and 'settle' are at
    *  the mortar. */
   activity: PoundingDuo['phase']
@@ -157,7 +158,7 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn }: {
     if (!import.meta.env.DEV) return
     const w = window as unknown as { __placePounding?: () => PoundingProbe }
     w.__placePounding = () => ({
-      mortar: { x, y: gy, z, rim: cfg.height },
+      mortar: { x, y: gy, z, rim: cfg.height, yaw },
       activity: duo.phase,
       women: Array.from({ length: count }, (_, i) => {
         const phase = womanStrokePhase(duo, i, cfg)
@@ -178,7 +179,7 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn }: {
     return () => {
       delete w.__placePounding
     }
-  }, [x, z, gy, count, cfg, duo, stands])
+  }, [x, z, gy, yaw, count, cfg, duo, stands])
 
   useFrame((_, rawDt) => {
     if (isLifeFrozen()) return
