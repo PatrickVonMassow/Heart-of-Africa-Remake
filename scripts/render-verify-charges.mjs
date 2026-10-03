@@ -161,6 +161,18 @@ export const RED_CHARGES = [
       + 'charge dies with that point.',
   },
   {
+    point: 1277,
+    suite: 'polish-speech',
+    kind: 'check',
+    match: /a near speaker.s note is drawn visibly larger than a far speaker.s/i,
+    why:
+      'MEASURED 03.10.2026 in the WebGPU covering run of polish-speech on main ebc37be92: every '
+      + 'attempt read set == expected on both speakers, but pairs staged 10-22 m apart reached the '
+      + 'shutter with the far speaker walked to 4.95-5.63 m, so the size gap fell under the '
+      + 'threshold. A staging defect, not a scale defect. It is charged, not excused: 1277 owns '
+      + 're-measuring the pair at the shutter, and the charge dies with that point.',
+  },
+  {
     point: 1043,
     suite: 'polish-speech',
     kind: 'check',

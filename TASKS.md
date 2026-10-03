@@ -15749,3 +15749,20 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright section; no new mechanism.
   Bundle: Testinfrastruktur.
   Criticality: low — no player impact measured; it blocks the green of `polish-speech` on WebGL 2.
+
+- [ ] 1277. The speech-distance-scale shot accepts pairs whose far speaker has already walked close
+  Source: measured 03.10.2026 ~10:05 in the WebGPU covering run of `polish-speech` on main ebc37be92
+  (the run owed for the landed speech-scale point 1271), on a machine under load (an author agent
+  was building). The check "a near speaker's note is drawn visibly larger than a far speaker's …
+  (point 1271)" went red although every attempt read `set == expected` on both speakers: pairs
+  staged 10-22 m apart reached the shutter with the far speaker at 4.95-5.63 m (inhabitants walk
+  during staging), so the size difference fell below the check's threshold.
+  Final state:
+  - The staging re-measures the pair distance at the shutter and rejects or re-stages a pair whose
+    far speaker is no longer far; the scale rule itself and the check's threshold stay unchanged.
+  - `polish-speech --section=speech-distance-scale` green on WebGPU and WebGL 2; its frame
+    picture-checked.
+  Tests: the existing Playwright section; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low — no player impact measured (the drawn scale matched the expected one in every
+  attempt); it blocks the green of `polish-speech`.
