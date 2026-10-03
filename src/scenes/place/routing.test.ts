@@ -248,14 +248,22 @@ describe('a villager sent to the BANK gets there (work-order 483)', () => {
     const grid = buildPlaceNavGrid(bounds, layout.colliders, R)
     const me = { ...from }
     let route = null as ReturnType<typeof findPlaceRoute>
+    // ErrandVillagers plans at most once a second (`state.replan`). Without that
+    // throttle a walker standing on a cell edge of the line of sight re-plans
+    // every frame, steps back to the route's first corner, sees the line open,
+    // drops the route and steps forward again — a thrash the scene never shows
+    // (found by point 1282, whose layouts put bambara seed 2987912600 there).
+    let replan = 0
     const dt = 1 / 60
     // The SHIPPED pace (1.25 m/s), capped at the errand backstop itself: a walk
     // that outlasts `balance.villageLife.adultErrands.errandSeconds` is one the
     // scheduler lets go of, so it never ends in front of the player either.
     for (let f = 0; f < balance.villageLife.adultErrands.errandSeconds * 60; f++) {
       if (Math.hypot(to.x - me.x, to.z - me.z) <= 1.1) return f * dt
-      if (!route && !navClearBetween(grid, me.x, me.z, to.x, to.z)) {
+      replan -= dt
+      if (!route && replan <= 0 && !navClearBetween(grid, me.x, me.z, to.x, to.z)) {
         route = findPlaceRoute(grid, me, to)
+        replan = 1
       }
       let aim = to as { x: number; z: number }
       if (route) {

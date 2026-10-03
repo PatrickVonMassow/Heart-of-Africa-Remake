@@ -135,8 +135,14 @@ describe('buildWedgeCarve in the quarter the reported village measured (seed 297
   })
 })
 
-describe('buildWedgeCarve in the quarter the reported village places today (seed 2972259115)', () => {
-  const layout = buildLayout('bambara-village', 2972259115)
+// Point 1282 moved the quarter of the reported seed 2972259115 (the centre
+// mortar's pair went to the river) onto ground with no pinch at all: its carve
+// rightly takes nothing there, and a block pinned to it could only go vacuous.
+// The bambara plan with the most carved ground among seeds 1-15 stands in.
+const TODAY_SEED = 5
+
+describe('buildWedgeCarve in the quarter the reporting village places today (seed 5)', () => {
+  const layout = buildLayout('bambara-village', TODAY_SEED)
   const NPC_RADIUS = WALKER_RADIUS
   // THE LAYOUT'S OWN QUARTER, not a second one derived here. Work-order 688
   // moved the decision into the layout exactly so it is made once; a test that
@@ -159,7 +165,8 @@ describe('buildWedgeCarve in the quarter the reported village places today (seed
     // and this probe went with it — which is the drift the guards below exist
     // to catch, and did. Re-taken again by work-order 1245: the quarter now
     // lies beside the moved bank stage, and the pinch is one of its carved cells.
-    const pinch = { x: -18.14, z: 16.89 }
+    // Re-taken by point 1282 on the stand-in seed (see `TODAY_SEED`).
+    const pinch = { x: -19.87, z: 4.67 }
     // ... and it is a point of THIS quarter's own free ground, not a coordinate
     // that happens to still be classified. A pinned probe that has drifted
     // outside the disc, or under a body, would answer without meaning anything
@@ -171,7 +178,8 @@ describe('buildWedgeCarve in the quarter the reported village places today (seed
     expect(standingClear(layout.colliders, pinch.x, pinch.z, NPC_RADIUS), 'the pinch is not free ground').toBe(true)
     expect(carve(pinch.x, pinch.z)).toBe(true)
     // The open middle of the quarter, well inside it:
-    expect(carve(-14.64, 14.64)).toBe(false)
+    expect(standingClear(layout.colliders, ground.x, ground.z, NPC_RADIUS)).toBe(true)
+    expect(carve(ground.x, ground.z)).toBe(false)
   })
 
   it('takes only a small share of the statically free ground', () => {

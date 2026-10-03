@@ -2003,7 +2003,10 @@ export const balance: BalanceConfig = {
       // children's stretch, and the worst stand-to-fill leg grew to about 62 m
       // (bambara-village seed 1: 150.6 s of straight round trip, 327 s once
       // doubled for bends and given its dwell and stall). 360 s covers it.
-      errandSeconds: 360,
+      // RE-SIZED BY POINT 1282: with the centre mortar gone to the river the
+      // worst plan is mandinka-village seed 5 (167.2 s straight, 360.4 s with
+      // bends, dwell and stall). 375 s covers it.
+      errandSeconds: 375,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
       // without shortening the straight line, and a fifteenth of the backstop

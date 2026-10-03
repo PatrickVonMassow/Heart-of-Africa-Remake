@@ -103,17 +103,20 @@ describe('the well leaves the communication village (point 1092)', () => {
     expect(carriesWell(other)).toBe(true)
     expect(carriesWaterCarrier(other)).toBe(true)
     // Two stations fewer, and nothing else moved: the children's quarter gains
-    // the room, the other vignettes stay where they stood.
-    expect(rock).toHaveLength(other.length - 2)
-    expect(other.filter((s) => !carriesWell([s]) && !carriesWaterCarrier([s]))).toEqual(rock)
+    // the room, the other vignettes stay where they stood. (The riverside
+    // village's pounding pair works by the fishers' fire, point 1282.)
+    const centrePounder = (s: readonly [number, number]) => s[0] === VILLAGE_SPOTS.pounder[0] && s[1] === VILLAGE_SPOTS.pounder[1]
+    expect(rock).toHaveLength(other.length - 3)
+    expect(other.filter((s) => !carriesWell([s]) && !carriesWaterCarrier([s]) && !centrePounder(s))).toEqual(rock)
   })
 
   it('drops the well from the keep-clear spots there only', () => {
     expect(carriesWell(villageKeepClearSpots(ROCK_VILLAGE_ID))).toBe(false)
     expect(carriesWell(villageKeepClearSpots(WELL_VILLAGE))).toBe(true)
     expect(villageKeepClearSpots(WELL_VILLAGE)).toEqual(Object.values(VILLAGE_SPOTS))
+    // Less the well, and the centre mortar the river village's pair left (point 1282).
     expect(villageKeepClearSpots(ROCK_VILLAGE_ID)).toHaveLength(
-      villageKeepClearSpots(WELL_VILLAGE).length - 1,
+      villageKeepClearSpots(WELL_VILLAGE).length - 2,
     )
   })
 
@@ -125,9 +128,11 @@ describe('the well leaves the communication village (point 1092)', () => {
     expect(villageLifeFootprints(FIRE, ROCK_VILLAGE_ID)).not.toContainEqual(body)
     expect(villageLifeProps(FIRE, WELL_VILLAGE)).toContainEqual(prop)
     expect(villageLifeFootprints(FIRE, WELL_VILLAGE)).toContainEqual(body)
-    // The rest of the village is untouched, not merely shorter.
+    // The rest of the village is untouched, not merely shorter — but for the
+    // centre mortar, whose pair works by the fishers' fire there (point 1282).
+    const mortar = { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1] }
     expect(villageLifeProps(FIRE, ROCK_VILLAGE_ID)).toEqual(
-      villageLifeProps(FIRE, WELL_VILLAGE).filter((c) => c.x !== prop.x || c.z !== prop.z),
+      villageLifeProps(FIRE, WELL_VILLAGE).filter((c) => (c.x !== prop.x || c.z !== prop.z) && (c.x !== mortar.x || c.z !== mortar.z)),
     )
   })
 
