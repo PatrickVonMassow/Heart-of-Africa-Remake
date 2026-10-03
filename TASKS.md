@@ -77,23 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1277. The speech-distance-scale shot accepts pairs whose far speaker has already walked close
-  Source: measured 03.10.2026 ~10:05 in the WebGPU covering run of `polish-speech` on main ebc37be92
-  (the run owed for the landed speech-scale point 1271), on a machine under load (an author agent
-  was building). The check "a near speaker's note is drawn visibly larger than a far speaker's …
-  (point 1271)" went red although every attempt read `set == expected` on both speakers: pairs
-  staged 10-22 m apart reached the shutter with the far speaker at 4.95-5.63 m (inhabitants walk
-  during staging), so the size difference fell below the check's threshold.
-  Final state:
-  - The staging re-measures the pair distance at the shutter and rejects or re-stages a pair whose
-    far speaker is no longer far; the scale rule itself and the check's threshold stay unchanged.
-  - `polish-speech --section=speech-distance-scale` green on WebGPU and WebGL 2; its frame
-    picture-checked.
-  Tests: the existing Playwright section; no new mechanism.
-  Handover note (03.10.2026, 23:25): the speech note trio branch is MERGED to main with point 1276 (reviews recorded, frames 146/1271 picture-checked on both backends). The branch feat/1276-speech-note-trio and worktree .claude/worktrees/point-1276 were kept; what remains is confirming this point's final state on main and ticking it (land-point), then removing branch and worktree.
-  Bundle: Kommunikation.
-  Criticality: low — no player impact measured (the drawn scale matched the expected one in every
-  attempt); it blocks the green of `polish-speech`.
 - [ ] 1281. Enforce user approval before a chat session deposits a request
   User order 03.10.2026 ("Stelle erstmal sicher, dass es nicht mehr passiert, dass diese Freigaberegel verletzt wird."); placed right after the Kommunikation trio, before the mortar point.
   A PreToolUse hook (matcher Bash|PowerShell, registered in .claude/settings.json next to firewall-guard) blocks every `finding.mjs --request` deposit unless the session's transcript shows the user's approval of exactly that request. Structure like scripts/firewall-guard.mjs: pure core `scripts/request-approval-guard-core.mjs` (Vitest-covered) plus thin wrapper `scripts/request-approval-guard.mjs` reading the hook payload's `transcript_path` (JSONL), with a `--check` manual mode; not registered in guard-preflight (same reason as firewall-guard).
