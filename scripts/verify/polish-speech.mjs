@@ -722,7 +722,10 @@ if (section('speech-distance-scale')) {
     window.__speechScaleFigures = found
   })
   // Pairs 10-22 m apart, widest first: the nearer stands a few metres before
-  // the camera, the other far behind it and off to the side.
+  // the camera, the other far behind it and off to the side. The widest pairs
+  // stand at opposite rims, so the stand behind the near one falls outside the
+  // settlement or against its huts; only 24 of them could all be rejected (a
+  // WebGL 2 red with no attempt at all), hence the longer list.
   const pairs = await page.evaluate(() => {
     const at = (window.__speechScaleFigures ?? []).map((o) => {
       o.updateWorldMatrix(true, false)
@@ -736,7 +739,7 @@ if (section('speech-distance-scale')) {
         if (i !== j && d >= 10 && d <= 22) out.push({ near: i, far: j, d })
       }
     }
-    return out.sort((l, r) => r.d - l.d).slice(0, 24)
+    return out.sort((l, r) => r.d - l.d).slice(0, 96)
   })
   // Where to stand: `back` before the near figure, `side` off the far figure's
   // line (either hand). Tried in order per pair, like speech-owner's
