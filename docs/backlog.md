@@ -2088,3 +2088,13 @@ WebGL 2 frame) or behind a cooking fire with a seated figure (WebGPU). Compositi
 subject reads. Test-frame aim, no player impact: deferred.
 The same holds for `1087-village-water-order-at-the-stand` on WebGPU: stand and carrier read,
 but a bystander can stand large in the near field (03.10.2026, at 62bf7150b).
+
+## Near/far speech-note judge trusts CSS no product path writes (03.10.2026)
+
+GPT-6 Astra's confirming pass on point 1271 (f1b7fe7, merge-with-fixes) names two
+false-positive paths in `scripts/verify/polish-speech.mjs` `speech-distance-scale`:
+a `clip-path` on `.speech-bubble` would hide a note while its rect and opacity still
+pass, and a horizontal transform on the inner card would not show in the measured
+`.speech-distance` wrapper. Neither CSS exists in the product (the inner card is
+untransformed while not receded, and both notes are staged unreceded), so there is
+no player impact: hardening only, filed here instead of holding the landing.
