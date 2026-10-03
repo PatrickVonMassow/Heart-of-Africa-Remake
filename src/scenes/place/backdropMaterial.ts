@@ -13,6 +13,7 @@ import {
   mix,
   mx_fractal_noise_float,
   normalWorldGeometry,
+  positionLocal,
   positionWorld,
   smoothstep,
   uniform,
@@ -21,6 +22,11 @@ import {
 } from 'three/tsl'
 import { detailFade, proceduralBump } from '../../render/materials'
 import { WATER_METALNESS, riverWaterSurface } from '../../render/waterAppearance'
+import { BACKDROP_RIVER_Y } from './backdropRiver'
+
+/** How far (place units) the heightfield may leave the river plane before the
+ *  water's fine octave is gone from it. */
+const FINE_OFF_PLANE = 0.08
 
 /** The backdrop material and the handles the scene keeps writing to. */
 interface BackdropMaterialHandle {
@@ -85,6 +91,12 @@ export function createBackdropMaterial(waterOctaves: number): BackdropMaterialHa
     along: p.x.mul(flow.x).add(p.z.mul(flow.y)),
     across: p.x.mul(flow.z).add(p.z.mul(flow.w)).sub(waterline),
     octaves: waterOctaves,
+    // The fine grain only where the heightfield lies ON the river plane; it
+    // fades out within a few cm of leaving it, so the tucked inner rim (which
+    // dips to meet the ground disc) never carries it. Height interpolates
+    // linearly over each facet, so the fade has no edge of its own.
+    // (Ordered smoothstep edges: GLSL ES leaves reversed ones undefined.)
+    fineWeight: smoothstep(float(0), float(FINE_OFF_PLANE), positionLocal.y.sub(BACKDROP_RIVER_Y).abs()).oneMinus(),
   })
 
   // three multiplies the geometry's vertex colour into every colorNode while

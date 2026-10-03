@@ -123,6 +123,11 @@ interface RiverWaterInput {
   /** Fractal octaves of the moving detail — the `waterDetailOctaves` quality
    *  lever, applied to BOTH halves so a frugal level can never part them. */
   octaves: number
+  /** Optional 0..1 weight on the fine octave (default 1). The panorama passes
+   *  0 where its heightfield leaves the water plane (the tucked inner rim): a
+   *  1-3 m grain mapped in world x/z onto those tilted facets smears into a
+   *  bright, stepped band along their edges. */
+  fineWeight?: unknown
 }
 
 /**
@@ -130,7 +135,7 @@ interface RiverWaterInput {
  * the ripple it rides. The near mesh displaces its vertices by the
  * ripple; the panorama, a compressed heightfield, only shades.
  */
-export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
+export function riverWaterSurface({ along, across, octaves, fineWeight = 1 }: RiverWaterInput) {
   const u = float(along as never)
   const v = float(across as never)
   // ONE distance resolve for both halves: at the rim they stand at the same
@@ -162,7 +167,9 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
   const fineFade = smoothstep(float(FINE_FOOTPRINT_FULL), float(FINE_FOOTPRINT_GONE), footprint)
     .oneMinus()
     .mul(detailFade(FINE_DETAIL_NEAR, FINE_DETAIL_FAR))
-  const fine = mx_fractal_noise_float(fineAt, Math.min(2, Math.max(1, Math.round(octaves)))).mul(fineFade)
+  const fine = mx_fractal_noise_float(fineAt, Math.min(2, Math.max(1, Math.round(octaves))))
+    .mul(fineFade)
+    .mul(float(fineWeight as never))
 
   const base = mix(
     color(RIVER_WATER_TONES.deep),
