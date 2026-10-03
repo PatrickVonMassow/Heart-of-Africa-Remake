@@ -307,10 +307,11 @@ if (section('speech-hypothesis')) {
       figure.updateWorldMatrix(true, false)
       const e = figure.matrixWorld.elements
       const label = window.__speech?.labels().find((l) => l.speakerId === 'probe-speaker')
-      const tail = document
-        .querySelector('.speech-label[data-speaker="probe-speaker"]')
-        ?.parentElement?.querySelector('.speech-tail')
-        ?.getBoundingClientRect()
+      const labelEl = document.querySelector('.speech-label[data-speaker="probe-speaker"]')
+      const tailNode = labelEl?.parentElement?.querySelector('.speech-tail')
+      const tail = tailNode?.getBoundingClientRect()
+      // Drawn, as the player sees it: a rectangle survives `visibility: hidden`.
+      const shown = (n) => !!n && n.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
       const fig = window.__speech?.figureScreen('probe-speaker')
       const head = fig?.headTop
       return {
@@ -327,6 +328,7 @@ if (section('speech-hypothesis')) {
         // Sideways: the tip over the head's top, not over the body's origin.
         tipToHeadX: tail && head ? +(tail.left + tail.width / 2 - head.x).toFixed(1) : null,
         headWidth: fig?.headWidth ?? null,
+        visible: shown(labelEl) && shown(tailNode),
         band: [gap.minPx, gap.maxPx],
       }
     }, speakerIndex)
@@ -336,9 +338,34 @@ if (section('speech-hypothesis')) {
     // child would leave the tip far above the head and fail the band at once.
     check(
       'the note’s tail ends just above the speaker’s own drawn head, in the calibrated pixel band (points 582, 1276)',
-      !!at && at.tipToHead !== null && at.tipToHead >= at.band[0] && at.tipToHead <= at.band[1] &&
+      !!at && at.visible && at.tipToHead !== null && at.tipToHead >= at.band[0] && at.tipToHead <= at.band[1] &&
         at.tipToHeadX !== null && Math.abs(at.tipToHeadX) <= Math.max(2, 0.25 * at.headWidth),
       at ? JSON.stringify(at) : 'no speaker',
+    )
+    // The gap IS the calibration (point 1276): move labelTipGap.px within its
+    // band and the measured tip-to-head gap must move with it — a renderer
+    // that hard-coded the shipped lift would pass the band check above.
+    const tipGapWith = (px) =>
+      page.evaluate(async (px) => {
+        const { balance } = await import('/src/config/balance.ts')
+        const gap = balance.communication.labelTipGap
+        const was = gap.px
+        if (px != null) gap.px = px
+        for (let i = 0; i < 3; i++) await new Promise((r) => requestAnimationFrame(() => r()))
+        const tail = document
+          .querySelector('.speech-label[data-speaker="probe-speaker"]')
+          ?.parentElement?.querySelector('.speech-tail')
+          ?.getBoundingClientRect()
+        const head = window.__speech?.figureScreen('probe-speaker')?.headTop
+        return { was, px: gap.px, gap: tail && head ? +(head.y - tail.bottom).toFixed(1) : null }
+      }, px)
+    const base = await tipGapWith(null)
+    const moved = await tipGapWith(base.was + 6)
+    const back = await tipGapWith(base.was)
+    check(
+      'the tail’s gap over the head follows its calibration: 6 px more lift, 6 px more gap (point 1276)',
+      base.gap !== null && moved.gap !== null && Math.abs(moved.gap - base.gap - 6) <= 1.5 && back.px === base.was,
+      JSON.stringify({ base, moved, back }),
     )
     await frame('146-speech-hypothesis-label', {
       local: {
