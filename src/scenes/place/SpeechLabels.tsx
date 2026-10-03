@@ -49,11 +49,14 @@ const WORLD = new THREE.Vector3()
 const EYE = new THREE.Vector3()
 
 /** Lifts drei's wrapper by its own size so its bottom centre — the tail tip —
- *  sits on the anchor (the drawn head top), plus the calibratable screen gap
- *  that keeps the tip off the hair at every distance (point 1276). */
-function tipOnAnchor(gapPx: number) {
-  return { transform: `translate3d(-50%,calc(-100% - ${Math.max(0, gapPx)}px),0)` }
-}
+ *  sits on the anchor (the head's silhouette top), plus the calibratable
+ *  screen gap that keeps the tip off the hair at every distance (point 1276).
+ *  The gap is a CSS variable the frame callback keeps current, so the debug
+ *  menu's setting moves the notes already shown. */
+const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,calc(-100% - var(--speech-tip-gap, 0px)),0)' }
+
+/** The calibrated tip gap as a CSS length. */
+const tipGap = () => `${Math.max(0, balance.communication.labelTipGap.px)}px`
 
 /** One speaker's note, following its figure. */
 function SpeechLabelView({
@@ -73,6 +76,7 @@ function SpeechLabelView({
   // own transform (the receded look) and its .targeted styling stay untouched.
   const sizer = useRef<HTMLDivElement>(null)
   const lastScale = useRef(0)
+  const lastGap = useRef('')
   // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
   // syllables and the player's guess. Never on in a real run — it hands the
   // player the very answer the mechanic asks him to work out.
@@ -87,6 +91,13 @@ function SpeechLabelView({
     // refreshes the graph, and without it the note never leaves the origin.
     if (!group.current || !placeSpeechNote(group.current, label, camera)) return
     const el = sizer.current
+    // drei's styled wrapper — the element whose transform reads the gap.
+    const wrap = el?.parentElement
+    const gap = tipGap()
+    if (wrap && gap !== lastGap.current) {
+      lastGap.current = gap
+      wrap.style.setProperty('--speech-tip-gap', gap)
+    }
     if (el) {
       const scale = speechBubbleScale(camera.getWorldPosition(EYE).distanceTo(group.current.getWorldPosition(WORLD)))
       if (Math.abs(scale - lastScale.current) > 0.002) {
@@ -100,7 +111,7 @@ function SpeechLabelView({
     <group ref={group}>
       {/* Not centred: the bubble's bottom centre — its tail's tip — stands on
           the anchor, so the tail points down at this speaker's crown. */}
-      <Html style={tipOnAnchor(balance.communication.labelTipGap.px)} zIndexRange={[20, 10]}>
+      <Html style={TIP_ON_ANCHOR} zIndexRange={[20, 10]}>
         <div ref={sizer} className="speech-distance">
           <SpeechLabelCard
             speakerId={label.speakerId}

@@ -11,12 +11,39 @@ const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera()
 const size = { width: 800, height: 600 }
 
+// The frame callbacks are collected, so a test can run the frame loop by hand.
+const frames = vi.hoisted(() => [] as Array<(state: { camera: unknown }) => void>)
 vi.mock('@react-three/fiber', () => ({
-  useFrame: () => {},
+  useFrame: (cb: (state: { camera: unknown }) => void) => {
+    frames.push(cb)
+  },
   useThree: (select: (state: unknown) => unknown) => select({ scene, camera, size }),
 }))
 const htmlProps = vi.hoisted(() => vi.fn())
-vi.mock('@react-three/drei', () => ({ Html: (props: unknown) => { htmlProps(props); return null } }))
+// drei's non-transform <Html> draws one styled div around its children.
+vi.mock('@react-three/drei', async () => {
+  const React = await import('react')
+  return {
+    Html: (props: { style?: object; children?: unknown }) => {
+      htmlProps(props)
+      return React.createElement('div', { style: props.style }, props.children as never)
+    },
+  }
+})
+// The frame placement itself is pinned with real three objects in
+// speechChannel.test.ts; here only that the frame loop CALLS it. In jsdom the
+// group ref is a DOM element, so the spy gives it the one method the frame
+// callback reads afterwards.
+const placeSpy = vi.hoisted(() =>
+  vi.fn((node: { getWorldPosition?: (v: { set: (...a: number[]) => unknown }) => unknown }) => {
+    node.getWorldPosition = (v) => v.set(0, 1.3, -4)
+    return true
+  }),
+)
+vi.mock('./speechChannel', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./speechChannel')>()),
+  placeSpeechNote: placeSpy,
+}))
 
 const atoms: Phrase = [utteranceOf('UPSTREAM', SHIPPED_VOCABULARY)]
 const hook = () => (window as unknown as {
@@ -115,12 +142,37 @@ it('stands each note on its tail tip and hands the older of two notes the recede
     expect(props.center).toBeFalsy()
     // The tip stands on the head-top anchor, lifted by the calibrated screen
     // gap (point 1276).
-    expect(props.style?.transform).toBe(
-      `translate3d(-50%,calc(-100% - ${balance.communication.labelTipGap.px}px),0)`,
-    )
+    expect(props.style?.transform).toBe('translate3d(-50%,calc(-100% - var(--speech-tip-gap, 0px)),0)')
   }
   for (const props of calls) expect(props.children.props.className).toBe('speech-distance')
   const cards = calls.map((p) => p.children.props.children.props)
   const receded = Object.fromEntries(cards.map((c) => [c.speakerId, c.receded]))
   expect(receded).toEqual({ elder: true, youth: false })
+})
+
+it('places every note from the frame loop and keeps its tip gap live with the calibration (point 1276)', async () => {
+  const { useGame } = await import('../../state/store')
+  const fig = new THREE.Group()
+  scene.add(fig)
+  useGame.getState().hearUtterance(atoms[0])
+  speakOverhead('elder', atoms, fig, { now: 10 })
+  frames.length = 0
+  placeSpy.mockClear()
+  const { container } = render(<SpeechLabels />)
+  expect(frames.length).toBeGreaterThan(0)
+  const runFrames = () => act(() => frames.forEach((f) => f({ camera })))
+  runFrames()
+  // The frame loop stands the note on its speaker's head for THIS camera.
+  expect(placeSpy).toHaveBeenCalledWith(expect.anything(), speechLabelState().labels[0], camera)
+  const wrap = container.querySelector('.speech-distance')!.parentElement!
+  const gap = balance.communication.labelTipGap.px
+  expect(wrap.style.getPropertyValue('--speech-tip-gap')).toBe(`${gap}px`)
+  // The debug menu moves the calibration: the note already shown follows.
+  try {
+    balance.communication.labelTipGap.px = gap + 6
+    runFrames()
+    expect(wrap.style.getPropertyValue('--speech-tip-gap')).toBe(`${gap + 6}px`)
+  } finally {
+    balance.communication.labelTipGap.px = gap
+  }
 })
