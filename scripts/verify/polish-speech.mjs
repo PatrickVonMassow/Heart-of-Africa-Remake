@@ -831,7 +831,8 @@ if (section('speech-distance-scale')) {
         // A stand the player can REACH: clear of every collider by his own
         // radius, as the collision suite judges it — not inside a hut wall.
         const cs = window.__placeColliders
-        if (cs && window.__clearanceTo && !cs.every((c) => window.__clearanceTo(c, x, z) - 0.35 > 0.02)) return null
+        if (!cs || !window.__clearanceTo) return null // no instrument, no stand (checked below)
+        if (!cs.every((c) => window.__clearanceTo(c, x, z) - 0.35 > 0.02)) return null
         const dir = pos.map((q) => {
           const l = Math.hypot(q.x - x, q.z - z) || 1
           return { x: (q.x - x) / l, z: (q.z - z) / l }
@@ -1023,7 +1024,13 @@ if (section('speech-distance-scale')) {
       near.layoutWidth === far.layoutWidth
     )
   }
+  // The reachability instrument must be there: without it no stand is
+  // judged, and the shot below fails for want of one — named here.
+  const balanceRecede = await page.evaluate(async () => (await import('/src/config/balance.ts')).balance.communication.labelRecede.scale)
+  const clearanceHooks = await page.evaluate(() => !!window.__placeColliders && typeof window.__clearanceTo === 'function')
+  check('the stand-clearance instruments (__placeColliders, __clearanceTo) are present (point 1278)', clearanceHooks)
   const MAX_ATTEMPTS = 8
+  let receded = null
   const attempts = []
   // Every pair dropped before staging, with the step that dropped it — a red
   // that only said "attempts []" could not tell an outside stand from a blocked
@@ -1110,7 +1117,22 @@ if (section('speech-distance-scale')) {
       },
     )
     attempts.push({ pair, at: 'shutter', view: atShutter })
-    if (atShutter?.ok) shot = atShutter
+    if (atShutter?.ok) {
+      shot = atShutter
+      // ORDINARY CONVERSATION (point 1278): the far speaker speaks again, so
+      // the NEAR note becomes the older one and recedes. Its drawn size must
+      // shrink by the receded scale alone and stay plainly the larger.
+      await page.evaluate(
+        async ({ far, u }) => {
+          const { speakOverhead, speechClock } = await import('/src/scenes/place/speechChannel.ts')
+          speakOverhead('scale-far', [u], window.__speechScaleFigures[far], { seconds: 120, reach: 0.1, now: speechClock() + 1 })
+          for (let i = 0; i < 3; i++) await new Promise((r) => requestAnimationFrame(() => r()))
+        },
+        { far: pair.far, u: RIVER },
+      )
+      await settled()
+      receded = await read()
+    }
     await page.evaluate(() => window.__speech?.clear())
   }
   const brief = (a) =>
@@ -1161,6 +1183,27 @@ if (section('speech-distance-scale')) {
     !!growth && growth.near.d <= 3.2 && growth.far.d >= 12 && growth.noteRatio >= 2.5 &&
       growth.exponent >= 0.45 && growth.exponent <= 1,
     growth ? JSON.stringify(growth) : 'no frame was staged',
+  )
+  // The receded near note, measured on the page: its drawn height over its
+  // sizer's (the receded transform alone), against the same ratio unreceded
+  // at the shutter, and against the far note.
+  const recede = (() => {
+    const n = receded?.near
+    const f = receded?.far
+    if (!shot || !n || !f || !n.height || !f.bubbleH || !shot.near.height) return null
+    return {
+      nearReceded: n.receded,
+      farReceded: f.receded,
+      shrink: +(n.bubbleH / n.height / (shot.near.bubbleH / shot.near.height)).toFixed(3),
+      noteRatio: +(n.bubbleH / f.bubbleH).toFixed(2),
+      visible: n.visible && f.visible,
+    }
+  })()
+  check(
+    'a near speaker’s older, receded note shrinks by the receded scale alone and stays at least 2.2x the far note (point 1278)',
+    !!recede && recede.nearReceded && !recede.farReceded && recede.visible &&
+      Math.abs(recede.shrink - balanceRecede) <= 0.05 && recede.noteRatio >= 2.2,
+    recede ? JSON.stringify({ ...recede, want: balanceRecede }) : 'no frame was staged',
   )
   // FRAME BY FRAME on a MOVING speaker (point 1276): a note placed after
   // drei had projected it trailed its speaker by one frame — invisible on a
