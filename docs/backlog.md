@@ -2098,3 +2098,12 @@ pass, and a horizontal transform on the inner card would not show in the measure
 `.speech-distance` wrapper. Neither CSS exists in the product (the inner card is
 untransformed while not receded, and both notes are staged unreceded), so there is
 no player impact: hardening only, filed here instead of holding the landing.
+
+## WebGL 2 fish-fire frame draws no ground or river (03.10.2026)
+
+From the picture check of 1273 at 0711a3c25: on WebGL 2 (39 FPS) the new frame
+`1273-fish-fire-framed-from-inland` shows fire, rack frame and performers but no
+terrain, no river, no fish on the rack and baskets as bare rims. The same camera on
+WebGPU, and the later Bambara frame `604-unstuck-freed` on WebGL 2, draw everything.
+Suspected first-view material readiness at a shutter two frames after the walk; not
+shown to be player-visible. Re-check at the next LARGE; a repeat makes it a point.
