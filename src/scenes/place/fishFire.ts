@@ -117,11 +117,12 @@ export function fisherySites(
   const pz = -(rack.x - mortar.x) / dl
   const duoYaw = Math.atan2(px, pz)
   const duoStands = pounderStands(mortar.x, mortar.z, duoYaw, mortarCfg)
-  // At the rack each keeps her side: the walks run beside each other.
-  const atRack = stand(fs - 2.3, fo - 0.75, toWater)
-  const duoAtRack = [-1, 1]
-    .slice(0, duoStands.length)
-    .map((side) => ({ x: atRack.x + px * side * cfg.duoRackGap / 2, z: atRack.z + pz * side * cfg.duoRackGap / 2, yaw: toWater }))
+  // Side by side along the bank before the rack, each on the side her stand
+  // at the mortar lies, so the two walks run beside each other.
+  const duoAtRack = duoStands.map((p) => {
+    const side = (p.x - mortar.x) * bank.fx + (p.z - mortar.z) * bank.fz >= 0 ? 1 : -1
+    return stand(fs - 2.3 + side * cfg.duoRackGap / 2, fo - 0.75, toWater)
+  })
   return {
     fire,
     rack,

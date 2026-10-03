@@ -180,9 +180,9 @@ describe('the village water path (work-order 688)', () => {
     const props = [
       { x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 },
       { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
-      { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
       { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },
-      // No well here: this village draws its water from the river (point 1092).
+      // No well here: this village draws its water from the river (point 1092),
+      // and its pounding pair works by the fishers' fire (point 1282).
     ]
     for (const prop of props) expect(layout.colliders).toContainEqual(prop)
     // Weaving is parked (user 29.09.2026): the shipped plan lays no loom, so

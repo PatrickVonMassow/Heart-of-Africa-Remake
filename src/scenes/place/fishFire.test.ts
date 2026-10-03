@@ -1,7 +1,8 @@
 // THE FISHERMEN'S FIRE AND THE TWO BASKETS (work-order 1245 items 4-6): the
 // boat and the fire run together over many rounds, and what the user asked for
 // is measured on the run — two baskets that never become more or get lost,
-// neither side waiting long, a rack at a steady fill, an eater every few minutes.
+// neither side waiting long, a rack at a steady fill, and the pounding pair
+// eating at it every few minutes (point 1282).
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
@@ -16,11 +17,10 @@ import { basketRingViolation } from './fishBaskets'
 import {
   createFishFire,
   createFisheryRing,
-  eaterOccupation,
-  eaterPoundStroke,
   fisherySites,
   gutSecondsFor,
   stepFishFire,
+  stepPoundingDuo,
   walkSeconds,
 } from './fishFire'
 import { canoeCycleSeconds, canoeLane, canoeRangeGap, createCanoe, stepCanoe, type CanoeWord } from './villagerCanoe'
@@ -55,8 +55,8 @@ function simulate(options: { village?: string; rounds?: number; seed?: number; h
   const dt = 0.05
   let t = 0
   const rackSeen: number[] = []
-  const eaterStarts: number[] = []
-  let lastEater = fire.eater.phase
+  const duoStarts: number[] = []
+  let lastDuo = fire.duo.phase
   let caught = 0
   let lastRound = 0
   const roundWaits: number[] = []
@@ -73,7 +73,8 @@ function simulate(options: { village?: string; rounds?: number; seed?: number; h
       rand,
     )
     if (beforeHaul === 'down' && canoe.phase === 'haul') caught += canoe.catch
-    stepFishFire(fire, sites, ring, dt, round, cfg, rand)
+    stepFishFire(fire, sites, ring, dt, round, cfg)
+    stepPoundingDuo(fire, sites, dt, cfg, rand)
     t += dt
     expect(basketRingViolation(ring)).toBeNull()
     if (canoe.rounds !== lastRound) {
@@ -82,10 +83,10 @@ function simulate(options: { village?: string; rounds?: number; seed?: number; h
       lastRound = canoe.rounds
     }
     if (t > round * 2) rackSeen.push(fire.rack.length)
-    if (fire.eater.phase === 'toRack' && lastEater === 'home') eaterStarts.push(t)
-    lastEater = fire.eater.phase
+    if (fire.duo.phase === 'settle' && lastDuo === 'pound') duoStarts.push(t)
+    lastDuo = fire.duo.phase
   }
-  return { bank, lane, sites, ring, canoe, fire, t, rackSeen, eaterStarts, caught, round, roundWaits }
+  return { bank, lane, sites, ring, canoe, fire, t, rackSeen, duoStarts, caught, round, roundWaits }
 }
 
 describe('the two baskets (work-order 1245 item 4)', () => {
@@ -98,7 +99,7 @@ describe('the two baskets (work-order 1245 item 4)', () => {
     // own `startFish` in a basket and a filled rack, which count in too.)
     const inBaskets = ring.baskets.reduce((n, b) => n + b.fish, 0)
     const start = cfg.startFish + 2 + cfg.rackFill + cfg.storageStart
-    const now = canoe.inHull + inBaskets + fire.board + fire.grill.length + fire.rack.length + fire.storage + fire.eaten + (fire.eater.fish > 0 ? 1 : 0)
+    const now = canoe.inHull + inBaskets + fire.board + fire.grill.length + fire.rack.length + fire.storage + fire.eaten + fire.duo.women.filter((w) => w.fish > 0).length
     expect(now).toBe(caught + start)
   })
 
@@ -115,7 +116,7 @@ describe('the two baskets (work-order 1245 item 4)', () => {
     let lastCarried: number | null = null
     for (let i = 0; i < 40 * 60 * 20 && carried.length < 8; i++) {
       stepCanoe(canoe, lane, ring, { say: () => 'said', obeyDelay: () => OBEY }, 0.05, canoeCfg, rand)
-      stepFishFire(fire, sites, ring, 0.05, round, cfg, rand)
+      stepFishFire(fire, sites, ring, 0.05, round, cfg)
       const held = ring.baskets.find((b) => b.at === 'carrier' && b.fish > 0)
       if (held && held.id !== lastCarried) carried.push(held.id)
       lastCarried = held?.id ?? null
@@ -173,7 +174,7 @@ describe('the timing: nobody waits long for the other (work-order 1245 item 4)',
     const dt = 0.05
     let t = 0
     while (fire.carrier.phase !== 'waitBank' && t < 400) {
-      stepFishFire(fire, sites, ring, dt, 139, cfg, mulberry32(3))
+      stepFishFire(fire, sites, ring, dt, 139, cfg)
       t += dt
     }
     expect(t).toBeCloseTo(untilFull - cfg.carrierLeadSeconds, 0)
@@ -190,12 +191,13 @@ describe('the timing: nobody waits long for the other (work-order 1245 item 4)',
   })
 })
 
-describe('the griller, the rack and the eater (work-order 1245 items 5 and 6)', () => {
+describe('the griller, the rack and the pounding pair (work-order 1245 items 5 and 6, point 1282)', () => {
   it('keeps the rack at a roughly constant fill, packing the driest into the storage basket', () => {
     const { rackSeen, fire } = simulate({ rounds: 15 })
     expect(rackSeen.length).toBeGreaterThan(1000)
     for (const n of rackSeen) {
-      expect(n).toBeGreaterThanOrEqual(cfg.rackFill - 2)
+      // Lowest just after the pounding pair has taken a fish each.
+      expect(n).toBeGreaterThanOrEqual(cfg.rackFill - 1 - balance.villageLife.mortar.pounders)
       expect(n).toBeLessThanOrEqual(cfg.rackFill)
     }
     expect(fire.storage).toBeGreaterThan(cfg.storageStart)
@@ -206,18 +208,21 @@ describe('the griller, the rack and the eater (work-order 1245 items 5 and 6)', 
     expect(fire.board).toBeLessThanOrEqual(canoeCfg.catchMax)
   })
 
-  it('an eater comes every few minutes, takes one fish, eats it and goes back', () => {
-    const { eaterStarts, fire, t } = simulate({ rounds: 15 })
-    expect(fire.eaten).toBeGreaterThanOrEqual(Math.floor(t / (cfg.eaterIntervalSeconds * (1 + cfg.eaterIntervalSpread) + 80)))
-    for (let i = 1; i < eaterStarts.length; i++) {
-      const gap = eaterStarts[i] - eaterStarts[i - 1]
-      // His interval, plus his walk there and back and the eating itself.
-      expect(gap).toBeGreaterThanOrEqual(cfg.eaterIntervalSeconds * (1 - cfg.eaterIntervalSpread) + cfg.eatSeconds)
-      expect(gap).toBeLessThanOrEqual(cfg.eaterIntervalSeconds * (1 + cfg.eaterIntervalSpread) + cfg.eatSeconds + 60)
+  it('the pair comes every few minutes, each takes one fish, eats it and they go back', () => {
+    const { duoStarts, fire, t } = simulate({ rounds: 15 })
+    expect(duoStarts.length).toBeGreaterThanOrEqual(3)
+    // Two fish a visit: one for each woman.
+    expect(fire.eaten).toBe(2 * fire.duo.visits)
+    expect(fire.duo.visits).toBeGreaterThanOrEqual(Math.floor(t / (cfg.duoIntervalSeconds * (1 + cfg.duoIntervalSpread) + 80)))
+    for (let i = 1; i < duoStarts.length; i++) {
+      const gap = duoStarts[i] - duoStarts[i - 1]
+      // Their interval, plus the walk there and back and the eating itself.
+      expect(gap).toBeGreaterThanOrEqual(cfg.duoIntervalSeconds * (1 - cfg.duoIntervalSpread) + cfg.eatSeconds)
+      expect(gap).toBeLessThanOrEqual(cfg.duoIntervalSeconds * (1 + cfg.duoIntervalSpread) + cfg.eatSeconds + 60)
     }
     // Every few minutes, as asked: two to five minutes between visits.
-    expect(cfg.eaterIntervalSeconds).toBeGreaterThanOrEqual(120)
-    expect(cfg.eaterIntervalSeconds).toBeLessThanOrEqual(300)
+    expect(cfg.duoIntervalSeconds).toBeGreaterThanOrEqual(120)
+    expect(cfg.duoIntervalSeconds).toBeLessThanOrEqual(300)
   })
 })
 
@@ -234,9 +239,9 @@ describe('where the fire stands (work-order 1245 item 4)', () => {
         carrierAtFire: sites.carrierAtFire,
         carrierAtBank: sites.carrierAtBank,
         griller: sites.griller,
-        eaterAtRack: sites.eaterAtRack,
-        eaterHome: sites.eaterHome,
-        eaterMortar: sites.eaterMortar,
+        duoMortar: sites.duoMortar,
+        ...Object.fromEntries(sites.duoStands.map((p, i) => [`duoStand${i}`, p])),
+        ...Object.fromEntries(sites.duoAtRack.map((p, i) => [`duoAtRack${i}`, p])),
         fire: sites.fire,
         rack: sites.rack,
         storage: sites.storage,
@@ -246,8 +251,9 @@ describe('where the fire stands (work-order 1245 item 4)', () => {
         expect(standsOnGroundPlate(bank, p.x, p.z, WALKER_RADIUS), `${name} on the plate`).toBe(true)
         expect(standingClear(layout.colliders, p.x, p.z, WALKER_RADIUS), `${name} clear`).toBe(true)
       }
-      // The carrier's and the eater's walks cross nothing solid.
-      for (const [a, b] of [[sites.carrierAtFire, sites.carrierAtBank], [sites.eaterHome, sites.eaterAtRack]] as const) {
+      // The carrier's and both pounding women's walks cross nothing solid.
+      const walks = [[sites.carrierAtFire, sites.carrierAtBank], ...sites.duoStands.map((p, i) => [p, sites.duoAtRack[i]])] as const
+      for (const [a, b] of walks) {
         for (let k = 0; k <= 40; k++) {
           const x = a.x + (b.x - a.x) * (k / 40)
           const z = a.z + (b.z - a.z) * (k / 40)
@@ -273,7 +279,7 @@ describe('nothing at the fire stands inside anything else (work-order 1245)', ()
     const bodies: Array<[string, { x: number; z: number }, number]> = [
       ['carrierAtFire', s.carrierAtFire, 0.3],
       ['griller', s.griller, 0.3],
-      ['eaterAtRack', s.eaterAtRack, 0.3],
+      ...s.duoAtRack.map((p, i): [string, { x: number; z: number }, number] => [`duoAtRack${i}`, p, 0.3]),
       ['carrierAtBank', s.carrierAtBank, 0.3],
       ['fireBasket', s.fireBasket, 0.26],
       ['basketSpot', s.basketSpot, 0.26],
@@ -282,59 +288,20 @@ describe('nothing at the fire stands inside anything else (work-order 1245)', ()
       ['rack', s.rack, 0.6],
       ['board', s.board, 0.45],
       ['storage', s.storage, 0.3],
-      ['eaterHome', s.eaterHome, 0.3],
-      ['eaterMortar', s.eaterMortar, 0.26],
+      ...s.duoStands.map((p, i): [string, { x: number; z: number }, number] => [`duoStand${i}`, p, 0.3]),
+      ['duoMortar', s.duoMortar, balance.villageLife.mortar.footRadius],
     ]
     for (let i = 0; i < bodies.length; i++) {
       for (let j = i + 1; j < bodies.length; j++) {
         const [an, a, ar] = bodies[i]
         const [bn, b, br] = bodies[j]
         // The carrier works AT his board: he may touch it, never stand in it.
-        const allowed = (an === 'carrierAtFire' && bn === 'board') ? 0.2 : 0
+        // The pounding women stand AT their mortar, as at the village one.
+        const atMortar = an.startsWith('duoStand') && bn === 'duoMortar'
+        const allowed = (an === 'carrierAtFire' && bn === 'board') ? 0.2 : atMortar ? ar : 0
         expect(Math.hypot(a.x - b.x, a.z - b.z) + allowed, `${an} / ${bn}`).toBeGreaterThanOrEqual(ar + br)
       }
     }
   })
 })
 
-describe('the eater between his visits (work-order 1251)', () => {
-  it('is never idle: at home he pounds grain, otherwise he walks, takes or eats', () => {
-    const bank = buildRiverBank(PLACES.find((p) => p.id === 'bambara-village')!, PLACE_RADIUS)!
-    const sites = fisherySites(bank, canoeLane(bank))
-    const rand = mulberry32(1251)
-    const ring = createFisheryRing()
-    const fire = createFishFire(sites, ring, 60, cfg, rand)
-    const strokes: number[] = []
-    let homeSeconds = 0
-    for (let t = 0; t < 1800; t += 0.05) {
-      stepFishFire(fire, sites, ring, 0.05, 120, cfg, rand)
-      const occupation = eaterOccupation(fire.eater)
-      expect(['pound', 'walk', 'take', 'eat']).toContain(occupation)
-      if (fire.eater.phase === 'home') {
-        homeSeconds += 0.05
-        strokes.push(eaterPoundStroke(fire.eater, cfg))
-        // He stands at his mortar, facing it.
-        expect(Math.hypot(fire.eater.x - sites.eaterHome.x, fire.eater.z - sites.eaterHome.z)).toBeLessThan(1e-6)
-      } else expect(eaterPoundStroke(fire.eater, cfg)).toBe(0)
-    }
-    // Home is most of his time, and the pestle visibly rises and falls there.
-    expect(homeSeconds).toBeGreaterThan(900)
-    expect(Math.max(...strokes)).toBeGreaterThan(0.95)
-    expect(Math.min(...strokes)).toBeLessThan(0.05)
-  })
-
-  it.each(RIVER_VILLAGES)('%s: he faces his mortar, and his walk to the rack passes clear of it', (id) => {
-    const bank = buildRiverBank(PLACES.find((p) => p.id === id)!, PLACE_RADIUS)!
-    const s = fisherySites(bank, canoeLane(bank))
-    const m = s.eaterMortar
-    const h = s.eaterHome
-    const facing = Math.atan2(m.x - h.x, m.z - h.z)
-    expect(Math.abs(Math.atan2(Math.sin(facing - h.yaw), Math.cos(facing - h.yaw)))).toBeLessThan(1e-9)
-    expect(Math.hypot(m.x - h.x, m.z - h.z)).toBeCloseTo(cfg.eaterMortarOffset, 9)
-    for (let k = 0; k <= 40; k++) {
-      const x = h.x + (s.eaterAtRack.x - h.x) * (k / 40)
-      const z = h.z + (s.eaterAtRack.z - h.z) * (k / 40)
-      expect(Math.hypot(x - m.x, z - m.z), `walk ${k}`).toBeGreaterThanOrEqual(0.26 + 0.3 - 0.01)
-    }
-  })
-})
