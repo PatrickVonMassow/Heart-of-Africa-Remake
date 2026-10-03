@@ -45,7 +45,7 @@ device pixel ratio is kept (no cap).
 | `wildlifeDensity` | 0.6 | 1 | 1 |
 | `figureLimbSegments` | 5 | 8 | 12 |
 | `placeRiverSegments` | 8 | 32 | 64 |
-| `placeRiverFoam` | 6 | 16 | 30 |
+| `placeRiverFlotsam` | 12 | 48 | 90 |
 | `waterDetailOctaves` | 1 | 3 | 4 |
 
 ## What each setting does
@@ -113,10 +113,12 @@ added.
   a settlement that stands on a river (work-order 482). The ripple is a vertex
   displacement, so this decides whether the water undulates or lies flat; one
   surface per settlement, hence a modest climb 8 → 32 → 64.
-- **`placeRiverFoam`** — How many patches of foam ride that current (work-order
-  482). Never zero on any level: they carry the reading of WHICH WAY the water
-  runs, which the whole upstream/downstream teaching depends on, so a frugal
-  level shows fewer (6 → 16 → 30), never none.
+- **`placeRiverFlotsam`** — How many items of flotsam — foam patches, leaves,
+  grass tufts and twigs — ride that current (work-orders 482, 1280). Never zero
+  on any level: they carry the reading of WHICH WAY the water runs, which the
+  whole upstream/downstream teaching depends on, so a frugal level shows fewer
+  (12 → 48 → 90), never none. Medium and high carry ~3x the foam they had; low
+  only doubles its 6, to spare the weakest tier — its frame cost was measured.
 - **`waterDetailOctaves`** — Fractal octaves of the ONE water detail field
   (work-order 525, `src/render/waterAppearance.ts`): the streaks, the froth and
   the ripple riding the current. It prices the water's per-pixel shading, and it
