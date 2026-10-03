@@ -14,7 +14,7 @@
 // in-scene labels; modals and full-screen overlays sit above it through the
 // z-index constants in index.css.
 
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
@@ -29,13 +29,16 @@ import {
 } from '../../communication/speechLabel'
 import { labelPresentation } from '../../communication/speechTarget'
 import { speechBubbleScale } from '../../communication/speechBubbleScale'
+import { balance } from '../../config/balance'
 import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
 import {
   clearSpeechLabels,
   pruneSpeechLabels,
   speakOverhead,
   speechAnchor,
+  placeSpeechNote,
   speechLabelState,
+  speechTipWorld,
   subscribeSpeechLabels,
   updateSpeechTarget,
 } from './speechChannel'
@@ -45,8 +48,67 @@ const WORLD = new THREE.Vector3()
 /** Scratch vector for the camera's world place. */
 const EYE = new THREE.Vector3()
 
-/** Lifts drei's wrapper by its own size so its bottom centre sits on the point. */
-const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,-100%,0)' }
+/** Lifts drei's wrapper by its own size so its bottom centre — the tail tip —
+ *  sits on the anchor (the head's silhouette top), plus the calibratable
+ *  screen gap that keeps the tip off the hair at every distance (point 1276).
+ *  The gap is a CSS variable the frame callback keeps current, so the debug
+ *  menu's setting moves the notes already shown. */
+const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,calc(-100% - var(--speech-tip-gap, 0px)),0)' }
+
+/** The calibrated tip gap as a CSS length. */
+const tipGap = () => `${Math.max(0, balance.communication.labelTipGap.px)}px`
+
+/**
+ * Stands one note on its speaker's head each frame. Its own component, drawn
+ * BEFORE the note's <Html>: R3F subscribes a frame callback in a layout
+ * effect, React runs a child's layout effects before its parent's, and drei's
+ * <Html> projects its group in a frame callback of its own — so a placement
+ * in the view itself ran AFTER that projection and the note trailed a moving
+ * speaker by one frame (point 1276). A sibling ahead of the <Html> subscribes
+ * first, and the projection reads this frame's place.
+ */
+function NoteFollower({
+  label,
+  group,
+  sizer,
+}: {
+  label: SpeechLabel
+  group: RefObject<THREE.Group | null>
+  sizer: RefObject<HTMLDivElement | null>
+}) {
+  const lastScale = useRef(0)
+  const lastGap = useRef('')
+  useFrame(({ camera }) => {
+    // The tip follows the top of the speaker's drawn head as this camera sees
+    // it, every frame — its lean, its kneel, its step — not a height sampled
+    // when the speech began (point 1276). placeSpeechNote also publishes the
+    // group's world matrix: drei's <Html> reads it before the renderer
+    // refreshes the graph, and without it the note never leaves the origin.
+    if (!group.current || !placeSpeechNote(group.current, label, camera)) return
+    const el = sizer.current
+    // drei's styled wrapper — the element whose transform reads the gap.
+    const wrap = el?.parentElement
+    const gap = tipGap()
+    if (wrap && gap !== lastGap.current) {
+      lastGap.current = gap
+      wrap.style.setProperty('--speech-tip-gap', gap)
+    }
+    if (el) {
+      // The note's own layout size (untouched by its transforms) and the
+      // viewport: the scale grows with the speaker but never past the caps.
+      const scale = speechBubbleScale(
+        camera.getWorldPosition(EYE).distanceTo(group.current.getWorldPosition(WORLD)),
+        balance.communication.speechBubble,
+        { width: el.offsetWidth, height: el.offsetHeight, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight },
+      )
+      if (Math.abs(scale - lastScale.current) > 0.002) {
+        lastScale.current = scale
+        el.style.setProperty('--speech-distance-scale', scale.toFixed(3))
+      }
+    }
+  })
+  return null
+}
 
 /** One speaker's note, following its figure. */
 function SpeechLabelView({
@@ -65,38 +127,18 @@ function SpeechLabelView({
   // straight on the DOM each frame: no React render per frame, and the card's
   // own transform (the receded look) and its .targeted styling stay untouched.
   const sizer = useRef<HTMLDivElement>(null)
-  const lastScale = useRef(0)
   // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
   // syllables and the player's guess. Never on in a real run — it hands the
   // player the very answer the mechanic asks him to work out.
   const vocabulary = useGame((s) => s.vocabulary)
   const conceptLabels = useUi((s) => s.speechConceptLabels)
 
-  useFrame(({ camera }) => {
-    const anchor = speechAnchor(label.speakerId)
-    if (!anchor || !group.current) return
-    anchor.getWorldPosition(WORLD)
-    group.current.position.set(WORLD.x, WORLD.y + label.height, WORLD.z)
-    // The label's screen place is read off this group's WORLD matrix by drei's
-    // <Html>, in a frame callback of its own — before the renderer refreshes the
-    // graph. Without this the note never leaves the scene origin (measured in
-    // the browser), so the move is published here rather than left to the loop.
-    group.current.updateMatrix()
-    group.current.updateMatrixWorld(true)
-    const el = sizer.current
-    if (el) {
-      const scale = speechBubbleScale(camera.getWorldPosition(EYE).distanceTo(group.current.getWorldPosition(WORLD)))
-      if (Math.abs(scale - lastScale.current) > 0.002) {
-        lastScale.current = scale
-        el.style.setProperty('--speech-distance-scale', scale.toFixed(3))
-      }
-    }
-  })
 
   return (
     <group ref={group}>
       {/* Not centred: the bubble's bottom centre — its tail's tip — stands on
           the anchor, so the tail points down at this speaker's crown. */}
+      <NoteFollower label={label} group={group} sizer={sizer} />
       <Html style={TIP_ON_ANCHOR} zIndexRange={[20, 10]}>
         <div ref={sizer} className="speech-distance">
           <SpeechLabelCard
@@ -173,11 +215,8 @@ export function SpeechLabels() {
         return true
       },
       anchorScreen: (speakerId: string) => {
-        const anchor = speechAnchor(speakerId)
         const label = speechLabelState().labels.find((l) => l.speakerId === speakerId)
-        if (!anchor || !label) return null
-        anchor.getWorldPosition(WORLD)
-        WORLD.y += label.height
+        if (!label || !speechTipWorld(label, WORLD, camera)) return null
         WORLD.project(camera)
         // Behind the camera the projection mirrors onto the screen while drei
         // hides the note; report what the picture shows, which is nothing.
@@ -190,6 +229,69 @@ export function SpeechLabels() {
       anchorWorld: (speakerId: string) => {
         const anchor = speechAnchor(speakerId)
         return anchor ? anchor.getWorldPosition(WORLD).toArray() : null
+      },
+      // Where the note's tail tip stands in the world for this camera — the
+      // point its distance scale is measured from (point 1278).
+      tipWorld: (speakerId: string) => {
+        const label = speechLabelState().labels.find((l) => l.speakerId === speakerId)
+        return label && speechTipWorld(label, WORLD, camera) ? WORLD.toArray() : null
+      },
+      // The speaker's DRAWN head top and feet on screen, measured on the
+      // projected geometry itself (point 1276): every vertex of the visible
+      // head mesh goes through the camera, and the head's top on screen is the
+      // smallest screen y among them — the silhouette's upper edge under any
+      // perspective and pitch, not a projected world-up offset of its centre.
+      figureScreen: (speakerId: string) => {
+        const anchor = speechAnchor(speakerId)
+        if (!anchor) return null
+        anchor.updateWorldMatrix(true, true)
+        // Only a head the renderer draws: the anchor and every ancestor
+        // visible, and traverseVisible skips a hidden group's whole subtree.
+        for (let o: THREE.Object3D | null = anchor; o; o = o.parent) if (!o.visible) return null
+        let head: THREE.Mesh | null = null
+        anchor.traverseVisible((o) => {
+          if (!head && o.name === 'figure-head') head = o as THREE.Mesh
+        })
+        const toScreen = (v: THREE.Vector3) => ({ x: ((v.x + 1) / 2) * size.width, y: ((1 - v.y) / 2) * size.height })
+        const v = anchor.getWorldPosition(new THREE.Vector3()).project(camera)
+        const feet = v.z > 1 ? null : toScreen(v)
+        if (!head) return { feet, headTop: null }
+        const mesh = head as THREE.Mesh
+        const pos = mesh.geometry.getAttribute('position')
+        let top: { x: number; y: number } | null = null
+        let left = Infinity
+        let right = -Infinity
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).project(camera)
+          if (v.z > 1) return { feet, headTop: null } // partly behind the camera
+          const p = toScreen(v)
+          if (!top || p.y < top.y) top = p
+          left = Math.min(left, p.x)
+          right = Math.max(right, p.x)
+        }
+        if (!top) return { feet, headTop: null }
+        // The top edge's x: the mean over the vertices within a sliver of the
+        // top — a coarse sphere's single highest vertex can sit a ring off the
+        // true top, while for a tilted head the true top IS off the outline's
+        // centre, so neither the one vertex nor the centre will do. The
+        // outline's centre and drawn width are reported beside it.
+        const sliver = top.y + Math.max(1, 0.03 * (right - left))
+        let sx = 0
+        let n = 0
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).project(camera)
+          const p = toScreen(v)
+          if (p.y <= sliver) {
+            sx += p.x
+            n += 1
+          }
+        }
+        return {
+          feet,
+          headTop: { x: sx / n, y: top.y },
+          headCenterX: (left + right) / 2,
+          headWidth: right - left,
+        }
       },
       labels: () => speechLabelState().labels,
       clear: clearSpeechLabels,

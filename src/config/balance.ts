@@ -1232,19 +1232,27 @@ interface BalanceConfig {
      *  of long-range speech, so it carries its own level rather than the
      *  meaningless bed's `drumBed.villageGain`. */
     drumMessagePeak: number
-    /** The gap between a speaker's own crown and its note, in settlement units. */
-    labelHeadroom: number
+    /** The gap between the top of a speaker's DRAWN head and its note's tail
+     *  tip, in screen pixels (the note's anchor is the head top itself).
+     *  `px` is the lift applied; `minPx`..`maxPx` is the band the rendered gap
+     *  must fall in at every camera distance (verification asserts it). */
+    labelTipGap: { px: number; minPx: number; maxPx: number }
     /** How an older note stands back while a newer one is shown (speechLabelRecedes). */
     labelRecede: { opacity: number; scale: number }
-    /** The note's size on screen (speechBubbleScale): `baseScale` times a factor
-     *  that runs from `nearScale` at `nearDistance` down to `farScale` at
-     *  `farDistance` (camera to note, settlement units) and is held beyond both. */
+    /** The note's size on screen (speechBubbleScale): `baseScale` times a
+     *  power law through `nearScale` at `nearDistance` and `farScale` at
+     *  `farDistance` (camera-to-note, settlement units), held at `farScale`
+     *  beyond and capped at `maxScale` up close. Never wider than
+     *  `maxViewportWidth` nor taller than `maxViewportHeight` of the viewport. */
     speechBubble: {
       baseScale: number
       nearDistance: number
       farDistance: number
       nearScale: number
       farScale: number
+      maxScale: number
+      maxViewportWidth: number
+      maxViewportHeight: number
     }
     /** How close the traveller must stand to the chief, in settlement units, for
      *  the find from the boulder to be laid in his hands. */
@@ -2284,25 +2292,39 @@ export const balance: BalanceConfig = {
     // one master, so a strike landing on the two-voice worst case still adds to
     // it — that coincidence is point 1156's, not a reason to lower this value.
     drumMessagePeak: 4.5,
-    // A hand's breadth over the head, no more (point 582). The note used to
-    // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown
-    // villager's head and about twice a child's own height over a child's — so
-    // a player looking at the figures never saw it. It rides the SPEAKER's own
-    // height now, and this is the whole gap left above it: enough for the box
-    // to clear the head, little enough that the note plainly belongs to the
-    // figure under it. Since the note carries a tail whose TIP stands on this
-    // point (the box above it), the gap is only what keeps the tip off the hair.
-    labelHeadroom: 0.15,
+    // Calibratable (CLAUDE.md §2, point 1276): the tail tip ends just above the
+    // drawn head. The gap used to be 0.15 m over the actor record — itself
+    // 0.11 m over the head sphere — and a metre gap grows on screen as the
+    // speaker nears: 65-85 px over a speaker 4 m away. The anchor is the head
+    // top now and the gap a fixed screen lift, so it reads the same at every
+    // distance: 5 px clears the hair, and the band allows the projection's
+    // rounding plus a head bobbing with the walk between frames. The floor is
+    // positive: a tip touching the hair (0 px) reads as no gap at all.
+    labelTipGap: { px: 5, minPx: 1, maxPx: 16 },
     // Calibratable (CLAUDE.md §2): with two notes up, the older one steps back —
     // dimmed and a little smaller — so the current speaker's note is always the
     // most prominent. Still readable: the player may want to guess at it.
     labelRecede: { opacity: 0.55, scale: 0.85 },
-    // Calibratable (CLAUDE.md §2): the note is drawn 1.4x its CSS size, and a
-    // near speaker's note larger than a far one's. The factor holds below 3 m
-    // and beyond 22 m, so the smallest note (1.4 x 0.75 = 1.05, a 13.7 px
-    // script) stays readable and the largest (1.4 x 1.35 = 1.89) never covers
-    // the scene in a close-up.
-    speechBubble: { baseScale: 1.4, nearDistance: 3, farDistance: 22, nearScale: 1.35, farScale: 0.75 },
+    // Calibratable (CLAUDE.md §2, user-approved 03.10.2026): the note follows
+    // felt loudness. The old linear curve spanned only 1.8x and held flat below
+    // 3 m while the speaker's own picture grows ~1/d, so a near note read
+    // SMALLER beside its speaker. Against those values: near (3 m) x2.25 —
+    // nearScale 1.35 -> 3.04 — and far (22 m) /1.25 — farScale 0.75 -> 0.60 —
+    // with baseScale 1.4 unchanged; between them a power law,
+    // k = ln(3.04/0.60)/ln(22/3) ~ 0.81. Closer than 3 m it keeps growing to a
+    // hard cap of 4.0 (reached at ~2.1 m); beyond 22 m it holds at 0.60. The
+    // viewport caps — a third of the width, under a third of the height — keep
+    // a close-up note from covering the scene whatever its text.
+    speechBubble: {
+      baseScale: 1.4,
+      nearDistance: 3,
+      farDistance: 22,
+      nearScale: 3.04,
+      farScale: 0.6,
+      maxScale: 4,
+      maxViewportWidth: 0.35,
+      maxViewportHeight: 0.3,
+    },
     // Calibratable (CLAUDE.md §2): the find is handed over face to face, so the
     // reach is an arm's length plus a step — a little over the 1.6 m the chief
     // stands beside his own door (CHIEF_STAND_OFFSET), and well inside the

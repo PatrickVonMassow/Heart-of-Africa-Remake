@@ -8,7 +8,7 @@ import { waitForStable, waitForSceneBuilt } from './_browser.mjs'
 import { captureFrame } from './frameSubject.mjs'
 import { frameSpeakingDrums } from './drumFrame.mjs'
 import { FUSE_CROWD_SHARE, FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
-import { OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
+import { OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 // --- The hypothesis over the speaker's head (design.md §13.4, point 485) ------
 // The lifetime and the note binding are pinned in the Vitest layer. What only a
 // browser can answer is the ATTACHMENT: the note must ride on the FIGURE that
@@ -56,11 +56,12 @@ if (section('speech-hypothesis')) {
   // is not depth-tested), and a frame of a note floating over a roof would prove
   // the attachment to nobody. Each candidate is stood in front of and ray-probed
   // against the rendered scene — the same instrument the silhouette footing uses.
-  // The first surface drawn along the sight line must be the FIGURE ITSELF, and
-  // that is what its DISTANCE says: a hut wall in front reads far too near, and a
-  // ray that sails PAST a smaller figure hits the ground far beyond it. Hence the
-  // ratio is bounded on BOTH sides — "nothing in front" alone accepted a miss,
-  // and a frame of a note over an empty patch of village was the result.
+  // The first surface drawn along the sight line must be the FIGURE ITSELF — the
+  // object hit, not its distance: "nothing in front" accepted a ray that sailed
+  // PAST a smaller figure to the ground beyond, and a distance band in turn
+  // accepted a wall half a metre in front of the head (0.90 of the way). So the
+  // hit must be the probe figure or one of its own meshes; the ratio is reported
+  // beside it only to say what stood in the way.
   // Every position here is read LIVE: these figures WALK, and a probe cast at
   // the spot one was standing on when the list was built misses it entirely
   // once a loaded machine lets a second pass between. That stale target is what
@@ -69,6 +70,45 @@ if (section('speech-hypothesis')) {
   // hut — the probe then reads that wall, and a figure the player could plainly
   // walk up to is rejected for the geometry behind the lens. The nearer range is
   // tried before the candidate is given up on.
+  // The sight-line probe, installed in the page once so the selection, the
+  // shutter's aim and the post-shot reading (inside measureAt, in the same
+  // evaluate as the note) all ask the very same question.
+  await page.evaluate(() => {
+    window.__speechProbeSight = (idx) => {
+      const figure = window.__speechProbeFigures?.[idx]
+      if (!figure || !window.__placeRayHit) return null
+      figure.updateWorldMatrix(true, false)
+      const e = figure.matrixWorld.elements
+      // THIS figure's DRAWN HEAD, and against its position NOW — it may have
+      // walked on since the pose was set. The head is what the note stands over,
+      // so it is the surface the frame must show. A chest height from the
+      // group's scale (a flat metre sailed over every child, point 481) still
+      // missed a CROUCHING child: at scale 0.55 the ray ran between its lowered
+      // head (0.6 m) and its bent body to the ground beyond, 1.58@ground-disc on
+      // every try, while a ray at the head hit it at 0.98. The chest stays the
+      // fallback for a figure without a drawn head.
+      let head = null
+      figure.traverseVisible((o) => {
+        if (!head && o.name === 'figure-head') head = o
+      })
+      let at
+      if (head) {
+        head.updateWorldMatrix(true, false)
+        const he = head.matrixWorld.elements
+        at = [he[12], he[13], he[14]]
+      } else {
+        const scaleY = Math.hypot(e[4], e[5], e[6])
+        at = [e[12], e[13] + Math.max(0.4, scaleY), e[14]]
+      }
+      const h = window.__placeRayHit(...at)
+      return {
+        ratio: h.hitDistance == null ? null : h.hitDistance / h.targetDistance,
+        name: h.hitName,
+        // The first surface is the figure's OWN: itself or a mesh under it.
+        own: h.hitUuid != null && !!figure.getObjectByProperty('uuid', h.hitUuid),
+      }
+    }
+  })
   const STAND_BACKS = [5, 3.5]
   /** Put the camera `back` in front of figure `i`, on the outward bearing, and
    *  look at it. Reads the figure's position LIVE, so it composes the shot on
@@ -100,26 +140,16 @@ if (section('speech-hypothesis')) {
       { idx: i, back: STAND_BACK },
     )
   /** Stand `back` in front of figure `i`, on the outward bearing, and report what
-   *  the frame draws at its chest. */
+   *  the sight line meets first on the way to its head. */
   const aimAt = async (i, STAND_BACK) => {
     await standBefore(i, STAND_BACK)
     await nextFrames(2)
-    return page.evaluate((idx) => {
-      const figure = window.__speechProbeFigures?.[idx]
-      if (!figure || !window.__placeRayHit) return null
-      figure.updateWorldMatrix(true, false)
-      const e = figure.matrixWorld.elements
-      // THIS figure's chest, and against its position NOW — it may have walked on
-      // since the pose was set. The height is taken from the group's own scale
-      // rather than a flat metre: the children are barely 0.9 m tall (point 481),
-      // so a metre above the feet sailed clean over every one of them and reported
-      // the ground beyond as the obstruction — half the candidate list could never
-      // qualify, whatever the picture showed.
-      const scaleY = Math.hypot(e[4], e[5], e[6])
-      const h = window.__placeRayHit(e[12], e[13] + Math.max(0.4, scaleY), e[14])
-      return { ratio: h.hitDistance == null ? null : h.hitDistance / h.targetDistance, name: h.hitName }
-    }, i)
+    return page.evaluate((idx) => window.__speechProbeSight?.(idx) ?? null, i)
   }
+  /** The first surface along the sight line is the figure itself (see above). */
+  const clearSight = (hit) => !!hit && hit.own === true
+  const sightText = (hit) =>
+    hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}${hit.own ? '' : '(not the figure)'}` : 'none'
   let speaker = null
   let speakerIndex = -1
   let speakerBack = STAND_BACKS[0]
@@ -127,8 +157,8 @@ if (section('speech-hypothesis')) {
   for (let i = 0; i < candidates.length && speakerIndex < 0; i++) {
     for (const back of STAND_BACKS) {
       const hit = await aimAt(i, back)
-      probes.push(hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
-      if (hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15) {
+      probes.push(sightText(hit))
+      if (clearSight(hit)) {
         // The pose that VALIDATED it is the pose the block goes on to measure
         // from, so the accepting aim is deliberately the last one performed —
         // and the range it was validated at is the one the shutter re-aims with.
@@ -298,12 +328,22 @@ if (section('speech-hypothesis')) {
     await aimAt(speakerIndex, speakerBack)
     // The subject is where the figure stands NOW — it may have walked on since
     // it was chosen — so the shutter judges the frame against the live anchor.
-    const at = await page.evaluate((idx) => {
+    const measureAt = () => page.evaluate(async (idx) => {
+      // The band from the game's own balance module, not a copy written here.
+      const { balance } = await import('/src/config/balance.ts')
+      const gap = balance.communication.labelTipGap
       const figure = window.__speechProbeFigures?.[idx]
       if (!figure) return null
       figure.updateWorldMatrix(true, false)
       const e = figure.matrixWorld.elements
       const label = window.__speech?.labels().find((l) => l.speakerId === 'probe-speaker')
+      const labelEl = document.querySelector('.speech-label[data-speaker="probe-speaker"]')
+      const tailNode = labelEl?.parentElement?.querySelector('.speech-tail')
+      const tail = tailNode?.getBoundingClientRect()
+      // Drawn, as the player sees it: a rectangle survives `visibility: hidden`.
+      const shown = (n) => !!n && n.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+      const fig = window.__speech?.figureScreen('probe-speaker')
+      const head = fig?.headTop
       return {
         x: e[12],
         y: e[13],
@@ -311,30 +351,140 @@ if (section('speech-hypothesis')) {
         // The note's OWN rise, so the shutter aims where the label actually is
         // rather than at a height written down here (point 582 moved it).
         rise: label?.height ?? null,
-        mark: figure.userData?.actor?.height ?? null,
-        // The VERTICAL scale, as the label's own rise uses: a kneeling figure is
-        // squashed in height only.
-        scale: Math.hypot(e[4], e[5], e[6]),
+        // Pixels from the tail tip down to the speaker's DRAWN head top on the
+        // rendered projection (points 582, 1276): the screen lift included,
+        // since the tip is read off the DOM and the head off its projected mesh.
+        tipToHead: tail && head ? +(head.y - tail.bottom).toFixed(1) : null,
+        // Sideways: the tip over the head's top, not over the body's origin.
+        tipToHeadX: tail && head ? +(tail.left + tail.width / 2 - head.x).toFixed(1) : null,
+        headWidth: fig?.headWidth ?? null,
+        visible: shown(labelEl) && shown(tailNode),
+        // The drawn head inside the viewport, so a post-shot read proves the shot.
+        headInView: !!head && head.x > 0 && head.x < window.innerWidth && head.y > 0 && head.y < window.innerHeight,
+        // Any other drawn note (a child speaking at its game) muddles the shot.
+        otherNotes: [...document.querySelectorAll('.speech-label')].filter((n) => n !== labelEl && shown(n)).length,
+        // The sight line to the head in the SAME state as the note's reading, so
+        // a speaker that walked behind a hut during the capture reads red.
+        sight: window.__speechProbeSight?.(idx) ?? null,
+        band: [gap.minPx, gap.maxPx],
       }
     }, speakerIndex)
-    // Point 582: the note floats a hand's breadth over THAT figure's head, at
-    // the scale it is drawn — measured in WORLD units against the figure's own
-    // record, the same one the Ctrl labels read. A label that fell back to a
-    // grown figure's height over a child would stand out here at once.
+    const at = await measureAt()
+    // Points 582 and 1276: the note's tail ends just above THAT figure's own
+    // drawn head, at the scale it is drawn — measured in screen pixels on the
+    // rendered frame. A label that fell back to a grown figure's height over a
+    // child would leave the tip far above the head and fail the band at once.
     check(
-      'the note floats close over the speaker’s own head, at its own scale (point 582)',
-      !!at && at.rise !== null && at.mark !== null &&
-        at.rise > at.mark * at.scale && at.rise - at.mark * at.scale <= 0.5,
+      'the note’s tail ends just above the speaker’s own drawn head, in the calibrated pixel band (points 582, 1276)',
+      !!at && at.visible && at.tipToHead !== null && at.tipToHead >= at.band[0] && at.tipToHead <= at.band[1] &&
+        at.tipToHeadX !== null && Math.abs(at.tipToHeadX) <= Math.max(2, 0.25 * at.headWidth),
       at ? JSON.stringify(at) : 'no speaker',
     )
-    await frame('146-speech-hypothesis-label', {
+    // The shutter waits for a quiet draw-count window after judging the subject
+    // — measured 5.6 s on WebGL 2, long enough for the speaker to walk ~8 m out
+    // of the view, leaving a frame of rock and sea. So the camera is put back on
+    // the speaker just before the capture, and the shot is judged again from the
+    // same state right after it: a frame without its note over its speaker is red.
+    await awaitPlaceDrawn('146-speech-hypothesis-label')
+    let shutterSight = null
+    let shutterSights = []
+    const shot = await captureFrame(page, OUT, '146-speech-hypothesis-label', {
       local: {
         x: (at ?? speaker).x,
         y: (at ?? speaker).y + (at?.rise ?? 1.7),
         z: (at ?? speaker).z,
       },
       label: 'the reading over the speaking figure',
+    }, {
+      beforeCapture: async () => {
+        // A SINGLE NOTE IN THE SHOT. The village keeps talking: re-aiming walks
+        // the player up to the speaker, which brings the working villagers and
+        // the children's game within hearing, and their next word raised its own
+        // note between this hook and the shutter (a second, "BA-ba-ba-BA ???",
+        // over a neighbour). Forgetting the notes once was therefore not enough:
+        // for the duration of the shot every OTHER speaker's note is taken down
+        // the moment the channel publishes it. Staging only — the probe's own
+        // note is never touched, and the DOM is still counted after the shot, so
+        // a note the label layer failed to take down still reads red.
+        await page.evaluate(async () => {
+          const { forgetSpeechLabel, speechLabelState, subscribeSpeechLabels } = await import('/src/scenes/place/speechChannel.ts')
+          const hush = () => {
+            for (const l of speechLabelState().labels) if (l.speakerId !== 'probe-speaker') forgetSpeechLabel(l.speakerId)
+          }
+          hush()
+          window.__speechProbeHush = subscribeSpeechLabels(hush)
+        })
+        // The shot is aimed AND sight-probed afresh (the probe the speaker was
+        // chosen by): the figure has walked on, and a pose re-aimed blind can put
+        // a hut between the lens and the head while the note, never depth-tested,
+        // still floats in the frame. The nearer range is tried when the first is
+        // blocked, as at the selection, and the pair a few times over: a single
+        // ray at a walking child's chest can slip past it to the ground behind
+        // (measured 1.58@ground-disc), which is a missed probe, not a clear view.
+        // Whatever pose passes is the pose shot; none passing is red below.
+        const ranges = [speakerBack, ...STAND_BACKS.filter((b) => b !== speakerBack)]
+        const sights = []
+        for (let round = 0; round < 3 && !clearSight(shutterSight); round++) {
+          for (const back of ranges) {
+            shutterSight = await aimAt(speakerIndex, back)
+            sights.push(sightText(shutterSight))
+            if (clearSight(shutterSight)) break
+          }
+        }
+        shutterSights = sights
+      },
     })
+    const post = await measureAt()
+    await page.evaluate(() => {
+      window.__speechProbeHush?.()
+      delete window.__speechProbeHush
+    })
+    check(
+      'the written frame shows the note, alone, over its speaker’s drawn head, in clear sight before and after the shutter',
+      !!shot && !!post && post.visible && post.headInView && post.otherNotes === 0 && clearSight(shutterSight) && clearSight(post.sight) &&
+        post.tipToHead !== null && post.tipToHead >= post.band[0] && post.tipToHead <= post.band[1] &&
+        post.tipToHeadX !== null && Math.abs(post.tipToHeadX) <= Math.max(2, 0.25 * post.headWidth),
+      post ? `${JSON.stringify(post)}; sight lines at the shutter [${shutterSights.join(', ')}], after it ${sightText(post.sight)}` : 'no speaker',
+    )
+    // After the shutter, so the frame keeps its single note (a child left
+    // longer starts speaking on its own). The gap IS the calibration (point 1276): move labelTipGap.px within its
+    // band and the measured tip-to-head gap must move with it — a renderer
+    // that hard-coded the shipped lift would pass the band check above.
+    const tipGapWith = (px) =>
+      page.evaluate(async (px) => {
+        const { balance } = await import('/src/config/balance.ts')
+        const gap = balance.communication.labelTipGap
+        const was = gap.px
+        if (px != null) gap.px = px
+        for (let i = 0; i < 3; i++) await new Promise((r) => requestAnimationFrame(() => r()))
+        const labelEl = document.querySelector('.speech-label[data-speaker="probe-speaker"]')
+        const tailNode = labelEl?.parentElement?.querySelector('.speech-tail')
+        const tail = tailNode?.getBoundingClientRect()
+        const shown = (n) => !!n && n.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+        const head = window.__speech?.figureScreen('probe-speaker')?.headTop
+        return {
+          was,
+          px: gap.px,
+          gap: tail && head ? +(head.y - tail.bottom).toFixed(1) : null,
+          visible: shown(labelEl) && shown(tailNode),
+        }
+      }, px)
+    // Re-aim first: the figure walks on through the shutter, and on a slow
+    // lane it had left the view by now (drei hides an off-screen note).
+    await aimAt(speakerIndex, speakerBack)
+    const base = await tipGapWith(null)
+    const moved = await tipGapWith(base.was + 6)
+    const back = await tipGapWith(base.was)
+    check(
+      'the tail’s gap over the head is its calibration: each measured gap equals the set lift, 6 px more lift giving 6 px more gap (point 1276)',
+      // Drawn in every sample, and back where it started once restored.
+      base.visible && moved.visible && back.visible &&
+        base.gap !== null && moved.gap !== null && back.gap !== null &&
+        // Each measured gap IS its requested calibration, not just a shift.
+        [base, moved, back].every((m) => Math.abs(m.gap - m.px) <= 1.5) &&
+        Math.abs(moved.gap - base.gap - 6) <= 1.5 && Math.abs(back.gap - base.gap) <= 1.5,
+      JSON.stringify({ base, moved, back }),
+    )
     await page.evaluate((u) => {
       window.__game.getState().setUtteranceHypothesis(u, '')
       window.__speech?.clear()
@@ -721,10 +871,9 @@ if (section('speech-distance-scale')) {
     })
     window.__speechScaleFigures = found
   })
-  // Pairs 10-22 m apart, widest first: the nearer stands a few metres before
-  // the camera, the other far behind it and off to the side. The widest pairs
-  // stand at opposite rims, so the stand behind the near one falls outside the
-  // settlement or against its huts; only 24 of them could all be rejected (a
+  // Pairs 10-22 m apart: the nearer stands ~2 m before the camera, the other
+  // far behind it and off to the side. A stand can fall outside the
+  // settlement or against its huts; only 24 pairs could all be rejected (a
   // WebGL 2 red with no attempt at all), hence the longer list.
   const pairs = await page.evaluate(() => {
     const at = (window.__speechScaleFigures ?? []).map((o) => {
@@ -739,17 +888,21 @@ if (section('speech-distance-scale')) {
         if (i !== j && d >= 10 && d <= 22) out.push({ near: i, far: j, d })
       }
     }
-    return out.sort((l, r) => r.d - l.d).slice(0, 96)
+    // Nearest to 13 m apart first: with the camera ~2 m before the near one,
+    // the far speaker then stands ~15 m off (point 1278).
+    return out.sort((l, r) => Math.abs(l.d - 13) - Math.abs(r.d - 13)).slice(0, 96)
   })
   // Where to stand: `back` before the near figure, `side` off the far figure's
   // line (either hand). Tried in order per pair, like speech-owner's
   // STAND_BACKS — one stand landing in a hut or behind a post is the next
   // stand's turn, not the pair's end.
+  // ~2 m from the near speaker (point 1278): a conversation's distance, where
+  // a note must read as plainly larger than one 15 m off.
   const STANDS = [
-    { back: 3.5, side: 2.5 },
-    { back: 3.5, side: -2.5 },
-    { back: 5, side: 3 },
-    { back: 5, side: -3 },
+    { back: 1.8, side: 0.9 },
+    { back: 1.8, side: -0.9 },
+    { back: 2.3, side: 1.2 },
+    { back: 2.3, side: -1.2 },
   ]
   /** Stand `back` before the near figure, on the far figure's line but `side`
    *  off it, and look between the two — live positions, the figures walk. */
@@ -774,6 +927,11 @@ if (section('speech-distance-scale')) {
         const x = pos[0].x - ux * back - uz * side
         const z = pos[0].z - uz * back + ux * side
         if (!insidePlace(layout, x, z, 1)) return null
+        // A stand the player can REACH: clear of every collider by his own
+        // radius, as the collision suite judges it — not inside a hut wall.
+        const cs = window.__placeColliders
+        if (!cs || !window.__clearanceTo) return null // no instrument, no stand (checked below)
+        if (!cs.every((c) => window.__clearanceTo(c, x, z) - 0.35 > 0.02)) return null
         const dir = pos.map((q) => {
           const l = Math.hypot(q.x - x, q.z - z) || 1
           return { x: (q.x - x) / l, z: (q.z - z) / l }
@@ -874,27 +1032,53 @@ if (section('speech-distance-scale')) {
         const bubble = el?.closest('.speech-bubble')
         const tailNode = bubble?.querySelector('.speech-tail')
         const tail = tailNode?.getBoundingClientRect()
-        const anchor = window.__speech?.anchorWorld(id)
+        const anchor = window.__speech?.tipWorld(id)
         const label = window.__speech?.labels().find((l) => l.speakerId === id)
         const pt = window.__speech?.anchorScreen(id)
         if (!el || !sizer || !tail || !anchor || !label || !pt || !cam) return null
         const box = sizer.getBoundingClientRect()
-        const distance = Math.hypot(
-          anchor[0] - cam.position.x,
-          anchor[1] + label.height - cam.position.y,
-          anchor[2] - cam.position.z,
-        )
+        // The DRAWN head top and feet on screen, off the head mesh (point 1276).
+        const fig = window.__speech?.figureScreen(id)
+        // From the camera's world place to the note's own tail tip, as the
+        // scene layer measures it.
+        const eye = cam.getWorldPosition(cam.position.clone())
+        const distance = Math.hypot(anchor[0] - eye.x, anchor[1] - eye.y, anchor[2] - eye.z)
+        const fit = {
+          width: sizer.offsetWidth,
+          height: sizer.offsetHeight,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        }
+        const drawn = bubble.getBoundingClientRect()
         return {
           distance: +distance.toFixed(2),
           width: +box.width.toFixed(1),
           height: +box.height.toFixed(1),
           layoutWidth: sizer.offsetWidth,
           set: Number(getComputedStyle(sizer).getPropertyValue('--speech-distance-scale')),
-          expected: +speechBubbleScale(distance).toFixed(3),
+          expected: +speechBubbleScale(distance, balance.communication.speechBubble, fit).toFixed(3),
+          // The drawn note's height (every transform in) against its
+          // speaker's projected height, feet to head top (point 1278).
+          bubbleH: +drawn.height.toFixed(1),
+          figH: fig?.headTop && fig?.feet ? +(fig.feet.y - fig.headTop.y).toFixed(1) : null,
+          // How tall the speaker stands in the world, feet to the tip's head
+          // top — a child is half a man, so the projection is compared per
+          // metre, not per figure.
+          figWorldH: (() => {
+            const feet = window.__speech?.anchorWorld(id)
+            return feet ? +(anchor[1] - feet[1]).toFixed(3) : null
+          })(),
           // The speech-owner tolerances: these figures walk between frames.
           tipOff: [+(tail.left + tail.width / 2 - pt.x).toFixed(1), +(tail.bottom - pt.y).toFixed(1)],
           onTip: Math.abs(tail.left + tail.width / 2 - pt.x) <= 0.5 * box.height && Math.abs(tail.bottom - pt.y) <= 0.35 * box.height,
           onScreen: box.left > 0 && box.right < window.innerWidth && box.top > 0 && tail.bottom < window.innerHeight,
+          // Pixels from the tail tip down to the drawn head top (positive: the
+          // tip stands above the head), and the band it must fall in.
+          tipToHead: fig?.headTop ? +(fig.headTop.y - tail.bottom).toFixed(1) : null,
+          // Sideways off the head's top, against the head's drawn width.
+          tipToHeadX: fig?.headTop ? +(tail.left + tail.width / 2 - fig.headTop.x).toFixed(1) : null,
+          headWidth: fig?.headTop ? +fig.headWidth.toFixed(1) : null,
+          tipBand: [balance.communication.labelTipGap.minPx, balance.communication.labelTipGap.maxPx],
           targeted: el.classList.contains('targeted'),
           receded: bubble.classList.contains('receded'),
           visible: rendered(el) && rendered(tailNode) && tail.width > 0 && tail.height > 0,
@@ -906,6 +1090,9 @@ if (section('speech-distance-scale')) {
       }
       return { near: one('scale-near'), far: one('scale-far') }
     })
+  // The least distance the far speaker must still stand at, at the shutter —
+  // the ~15 m stand the growth check below reads (point 1277).
+  const FAR_AT_SHUTTER = 12
   const judge = (v) => {
     const near = v?.near
     const far = v?.far
@@ -916,7 +1103,17 @@ if (section('speech-distance-scale')) {
       n.visible && n.wantOpacity > 0.1 &&
       Math.abs(n.opacity - n.wantOpacity) < 0.03 && Math.abs(n.tailOpacity - n.wantOpacity) < 0.03
     return (
-      near.distance < far.distance &&
+      // Both speakers DRAWN at the shutter: an inhabitant gone home is hidden
+      // (PlaceLife), and its note over an empty hut proves nothing.
+      near.tipToHead != null &&
+      far.tipToHead != null &&
+      // A conversation's distance for the near one (point 1278), and the far
+      // one STILL far: inhabitants walk during staging, and a pair staged 10-22 m
+      // apart reached the shutter with its far speaker at ~5 m, too close for
+      // the size difference to show (point 1277). Re-measured here, at the
+      // shutter too, so such a pair is re-staged rather than shot.
+      near.distance <= 3.2 &&
+      far.distance >= FAR_AT_SHUTTER &&
       near.width >= 1.25 * far.width &&
       tracks(near) &&
       tracks(far) &&
@@ -933,7 +1130,13 @@ if (section('speech-distance-scale')) {
       near.layoutWidth === far.layoutWidth
     )
   }
+  // The reachability instrument must be there: without it no stand is
+  // judged, and the shot below fails for want of one — named here.
+  const balanceRecede = await page.evaluate(async () => (await import('/src/config/balance.ts')).balance.communication.labelRecede.scale)
+  const clearanceHooks = await page.evaluate(() => !!window.__placeColliders && typeof window.__clearanceTo === 'function')
+  check('the stand-clearance instruments (__placeColliders, __clearanceTo) are present (point 1278)', clearanceHooks)
   const MAX_ATTEMPTS = 8
+  let receded = null
   const attempts = []
   // Every pair dropped before staging, with the step that dropped it — a red
   // that only said "attempts []" could not tell an outside stand from a blocked
@@ -941,8 +1144,30 @@ if (section('speech-distance-scale')) {
   const rejected = []
   const fmt = (r) => (r == null ? 'sky' : r.toFixed(2))
   let shot = null
+  // Both figures DRAWN right now — an inhabitant gone home is hidden, and a
+  // sight ray to it stops at its own hut wall close enough to read as clear.
+  // A cheap refusal before the pair spends one of the attempts.
+  const drawnNow = (pair) =>
+    page.evaluate(
+      ({ near, far }) =>
+        [near, far].every((i) => {
+          const f = window.__speechScaleFigures?.[i]
+          if (!f) return false
+          for (let o = f; o; o = o.parent) if (!o.visible) return false
+          let head = false
+          f.traverseVisible((o) => {
+            if (o.name === 'figure-head') head = true
+          })
+          return head
+        }),
+      { near: pair.near, far: pair.far },
+    )
   for (const candidate of pairs) {
     if (attempts.length >= MAX_ATTEMPTS || shot) break
+    if (!(await drawnNow(candidate))) {
+      rejected.push(`${candidate.near}/${candidate.far} not-drawn`)
+      continue
+    }
     let pair = null
     for (const stand of STANDS) {
       const tried = { ...candidate, ...stand }
@@ -998,7 +1223,22 @@ if (section('speech-distance-scale')) {
       },
     )
     attempts.push({ pair, at: 'shutter', view: atShutter })
-    if (atShutter?.ok) shot = atShutter
+    if (atShutter?.ok) {
+      shot = atShutter
+      // ORDINARY CONVERSATION (point 1278): the far speaker speaks again, so
+      // the NEAR note becomes the older one and recedes. Its drawn size must
+      // shrink by the receded scale alone and stay plainly the larger.
+      await page.evaluate(
+        async ({ far, u }) => {
+          const { speakOverhead, speechClock } = await import('/src/scenes/place/speechChannel.ts')
+          speakOverhead('scale-far', [u], window.__speechScaleFigures[far], { seconds: 120, reach: 0.1, now: speechClock() + 1 })
+          for (let i = 0; i < 3; i++) await new Promise((r) => requestAnimationFrame(() => r()))
+        },
+        { far: pair.far, u: RIVER },
+      )
+      await settled()
+      receded = await read()
+    }
     await page.evaluate(() => window.__speech?.clear())
   }
   const brief = (a) =>
@@ -1008,6 +1248,163 @@ if (section('speech-distance-scale')) {
     !!shot,
     `${pairs.length} pairs 10-22 m apart; attempts [${attempts.map(brief).join('; ')}]; rejected [${rejected.join(', ')}]` +
       (shot ? ` — shot ${JSON.stringify({ near: shot.near, far: shot.far })}` : ''),
+  )
+  // The tail meets its speaker's head (point 1276): at the shutter, the tip of
+  // each note ends just above its speaker's DRAWN head — inside the calibrated
+  // pixel band — near and far alike, measured on the rendered projection.
+  const tipMeets = (n) =>
+    n && n.tipToHead != null && n.tipToHead >= n.tipBand[0] && n.tipToHead <= n.tipBand[1] &&
+    n.tipToHeadX != null && Math.abs(n.tipToHeadX) <= Math.max(2, 0.25 * n.headWidth)
+  check(
+    'each note’s tail tip ends just above its speaker’s drawn head and over it sideways, near and far, inside the calibrated pixel band (point 1276)',
+    !!shot && tipMeets(shot.near) && tipMeets(shot.far),
+    shot
+      ? `near ${shot.near.distance} m: tip ${shot.near.tipToHead} px over the head, ${shot.near.tipToHeadX} px aside (head ${shot.near.headWidth} px wide); far ${shot.far.distance} m: ${shot.far.tipToHead} px, ${shot.far.tipToHeadX} px aside (head ${shot.far.headWidth} px); band ${JSON.stringify(shot.near.tipBand)}`
+      : 'no frame was staged',
+  )
+  // THE NOTE GROWS WITH ITS SPEAKER (point 1278), read off the rendered
+  // frame: the near note's drawn height against the far one's, beside the
+  // speakers' own projected heights. The figure grows ~1/d; the note must
+  // grow plainly too — at least 2.5x between ~2 m and ~15 m — and follow
+  // that growth part-way (exponent ln(note ratio)/ln(figure ratio) between
+  // 0.45 and 1), not shrink beside it as the old flat curve did.
+  const growth = (() => {
+    if (!shot) return null
+    const { near, far } = shot
+    if (!near.figH || !far.figH || !near.bubbleH || !far.bubbleH || !near.figWorldH || !far.figWorldH) return null
+    const note = near.bubbleH / far.bubbleH
+    // The projection's own growth: drawn pixels per world metre of speaker.
+    const perMetre = (n) => n.figH / n.figWorldH
+    const projection = perMetre(near) / perMetre(far)
+    return {
+      near: { d: near.distance, bubbleH: near.bubbleH, figH: near.figH, figWorldH: near.figWorldH },
+      far: { d: far.distance, bubbleH: far.bubbleH, figH: far.figH, figWorldH: far.figWorldH },
+      noteRatio: +note.toFixed(2),
+      projectionRatio: +projection.toFixed(2),
+      exponent: +(Math.log(note) / Math.log(projection)).toFixed(2),
+    }
+  })()
+  check(
+    'a near speaker’s note grows with its speaker: at ~2 m against ~15 m it is drawn at least 2.5x the far note’s height, following the speakers’ projected size part-way (point 1278)',
+    !!growth && growth.near.d <= 3.2 && growth.far.d >= FAR_AT_SHUTTER && growth.noteRatio >= 2.5 &&
+      growth.exponent >= 0.45 && growth.exponent <= 1,
+    growth ? JSON.stringify(growth) : 'no frame was staged',
+  )
+  // The receded near note, measured on the page: its drawn height over its
+  // sizer's (the receded transform alone), against the same ratio unreceded
+  // at the shutter, and against the far note.
+  const recede = (() => {
+    const n = receded?.near
+    const f = receded?.far
+    if (!shot || !n || !f || !n.height || !f.bubbleH || !shot.near.height) return null
+    return {
+      nearReceded: n.receded,
+      farReceded: f.receded,
+      shrink: +(n.bubbleH / n.height / (shot.near.bubbleH / shot.near.height)).toFixed(3),
+      noteRatio: +(n.bubbleH / f.bubbleH).toFixed(2),
+      visible: n.visible && f.visible,
+    }
+  })()
+  check(
+    'a near speaker’s older, receded note shrinks by the receded scale alone and stays at least 2.2x the far note (point 1278)',
+    !!recede && recede.nearReceded && !recede.farReceded && recede.visible &&
+      Math.abs(recede.shrink - balanceRecede) <= 0.05 && recede.noteRatio >= 2.2,
+    recede ? JSON.stringify({ ...recede, want: balanceRecede }) : 'no frame was staged',
+  )
+  // FRAME BY FRAME on a MOVING speaker (point 1276): a note placed after
+  // drei had projected it trailed its speaker by one frame — invisible on a
+  // speaker who happens to stand, plain on one that moves. The motion is
+  // CONTROLLED, not hoped for: a copy of the near figure (plain scene objects,
+  // which no village routine drives) speaks and is carried 0.12 m along the
+  // camera's right on every frame, out and back. Each frame is measured
+  // before the next step, tail off the DOM and head off its projected mesh.
+  let walk = null
+  {
+    walk = await page.evaluate(
+      async ({ u }) => {
+        const { speakOverhead, speechClock, forgetSpeechLabel } = await import('/src/scenes/place/speechChannel.ts')
+        const { balance } = await import('/src/config/balance.ts')
+        const band = balance.communication.labelTipGap
+        // Any villager's figure will do; the copy stands 4 m ahead of the
+        // camera, so the check needs no staged pair (those walk off home).
+        const src = window.__speechScaleFigures?.find((f) => f.parent)
+        const cam = window.__placeCamera
+        if (!src || !cam) return null
+        const raf = () => new Promise((r) => requestAnimationFrame(() => r()))
+        const walker = src.clone()
+        walker.visible = true
+        src.parent.add(walker)
+        const V = walker.position.constructor
+        const right = new V(1, 0, 0).applyQuaternion(cam.quaternion)
+        right.y = 0
+        right.normalize()
+        const ahead = new V(0, 0, -1).applyQuaternion(cam.quaternion)
+        ahead.y = 0
+        ahead.normalize()
+        // The traveller's eye stands 1.6 m over the ground he stands on.
+        const at = cam.position.clone().addScaledVector(ahead, 4)
+        at.y = cam.position.y - 1.6
+        const place = () => walker.position.copy(src.parent.worldToLocal(at.clone()))
+        place()
+        speakOverhead('scale-walk', [u], walker, { seconds: 60, reach: 0.1, now: speechClock() })
+        for (let i = 0; i < 4; i++) await raf()
+        const rows = []
+        let travel = 0
+        let exposing = 0
+        let last = null
+        try {
+          for (let f = 0; f < 24; f++) {
+            await raf()
+            const labelEl = document.querySelector('.speech-label[data-speaker="scale-walk"]')
+            const tailNode = labelEl?.closest('.speech-bubble')?.querySelector('.speech-tail')
+            // Drawn on every frame: a rectangle survives `visibility: hidden`
+            // and `opacity: 0`, a note the player cannot see proves nothing.
+            const shown = (n) => !!n && n.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+            const tail = shown(labelEl) && shown(tailNode) ? tailNode.getBoundingClientRect() : null
+            const fig = window.__speech?.figureScreen('scale-walk')
+            if (!tail || !fig?.headTop) {
+              // Which half is gone, and whether the note still exists at all.
+              rows.push({
+                f,
+                missing: !tail ? 'tail' : !fig ? 'figure' : 'head',
+                labels: (window.__speech?.labels() ?? []).map((l) => l.speakerId),
+              })
+            }
+            else {
+              if (last) {
+                const step = Math.hypot(fig.headTop.x - last.x, fig.headTop.y - last.y)
+                travel += step
+                // Only a step past the tolerance lets a one-frame lag show.
+                if (step > Math.max(2, 0.25 * fig.headWidth)) exposing += 1
+              }
+              last = fig.headTop
+              const dy = fig.headTop.y - tail.bottom
+              const dx = tail.left + tail.width / 2 - fig.headTop.x
+              rows.push({ f, dy: +dy.toFixed(1), dx: +dx.toFixed(1), w: +fig.headWidth.toFixed(1) })
+            }
+            // The step for the NEXT frame: out for twelve, back for twelve.
+            at.addScaledVector(right, f < 12 ? 0.12 : -0.12)
+            place()
+          }
+        } finally {
+          forgetSpeechLabel('scale-walk')
+          walker.removeFromParent()
+        }
+        const bad = rows.filter(
+          (r) => r.missing || r.dy < band.minPx || r.dy > band.maxPx || Math.abs(r.dx) > Math.max(2, 0.25 * r.w),
+        )
+        return { frames: 24, bad, exposing, travel: +travel.toFixed(1) }
+      },
+      { u: RIVER },
+    )
+  }
+  check(
+    'a note’s tail stays on its moving speaker’s head on every one of 24 consecutive frames (point 1276)',
+    !!walk && walk.bad.length === 0,
+    walk ? JSON.stringify(walk) : 'no figure or camera to stage a walker with',
+    // Speakers that stood still prove nothing about a lag: below this the
+    // line reads NOT-COVERING, not green.
+    { subjects: walk?.exposing ?? 0, minimum: 3, what: 'frames on which a head moved farther than the tolerance' },
   )
   await page.evaluate((u) => {
     window.__game.getState().setUtteranceHypothesis(u, '')
