@@ -16,7 +16,7 @@
 // lock, the render-leak watch, the screenshots and the console-error gate.
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browser.mjs'
-import { frameShutter, capturePixels } from './frameSubject.mjs'
+import { frameShutter, capturePixels, captureFrame } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
 import { SETTINGS_VIEWPORT, SETTINGS_SCENE_LUMA_MIN, settingsSceneLuma } from './settingsSceneLuma.mjs'
 import { settingsPipelineState, startSettingsFrameTiming, stopSettingsFrameTiming } from './settingsPipelineState.mjs'
@@ -1295,6 +1295,264 @@ if (section('render-leak-watch')) {
     check('the leak block produced no OTHER console errors', errors.length === errsBeforeLeak,
       errors.slice(errsBeforeLeak).join(' | ').slice(0, 300))
   }
+}
+
+// --- The river current reads at a glance (work-order 1280) --------------------
+// At the Bambara bank on the Niger: two frames a few hundred ms of the game's
+// own drift apart, and the water's TEXTURE and its FLOTSAM must both have moved
+// DOWNSTREAM by a measurable amount — the texture by the screen shift that best
+// re-aligns the two frames, the flotsam by the positions the scene drew. Then
+// the 60-220 m band of the same river on medium and high, for the shimmer
+// judgement of the fine octave's fade, and the frame cost of the low tier's
+// flotsam, measured on and off at the same stand.
+if (section('river-current')) {
+  await page.evaluate(() => {
+    window.__ui.getState().setDetailLevel('medium')
+    window.__game.getState().enterPlace('bambara-village')
+  })
+  await page.waitForFunction(
+    () => window.__game.getState().placeId === 'bambara-village' && window.__placeRiver && window.__placePlayer && window.__placeCamera,
+    null,
+    { timeout: 60000 },
+  )
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await waitForSceneBuilt(page)
+  // A level change builds the water's material for its octave count anew, and
+  // an object whose pipeline is still compiling is SKIPPED by the renderer — so
+  // a frame taken then shows the shore where the water should be (seen on the
+  // WebGL 2 lane at high). Wait for the compile queue to drain first.
+  const pipelinesIdle = () => page.waitForFunction(() => {
+    const s = window.__shaderPipelines?.()
+    return !s || (s.pending === 0 && s.queued === 0)
+  }, null, { timeout: 120000 })
+  await pipelinesIdle()
+  const river = await page.evaluate(() => window.__placeRiver())
+  check('Bambara draws its river with mixed flotsam at medium (48 items)',
+    river.riverId === 'niger' && river.flecks.length === 48 && new Set(river.flecks.map((f) => f.kind)).size === 4,
+    `${river.riverId}, ${river.flecks.length} items, kinds ${[...new Set(river.flecks.map((f) => f.kind))].join('/')}`)
+
+  // Stand where a player stands: at the top of the bank, in the middle of the
+  // drift band, looking straight out over the water (the polish stand line).
+  const standAt = (yawTurn, pitch) => page.evaluate(([r, turn, pitch]) => {
+    const p = window.__placePlayer
+    const along = r.bank.x * r.downstream.x + r.bank.z * r.downstream.z
+    p.x = r.bank.x - r.downstream.x * along - r.normal.x * 1.4
+    p.z = r.bank.z - r.downstream.z * along - r.normal.z * 1.4
+    // turn > 0 swings the view from straight out toward downstream.
+    const dx = r.normal.x * Math.cos(turn) + r.downstream.x * Math.sin(turn)
+    const dz = r.normal.z * Math.cos(turn) + r.downstream.z * Math.sin(turn)
+    p.yaw = Math.atan2(-dx, -dz)
+    p.pitch = pitch
+  }, [river, yawTurn, pitch])
+  /** NDC of a world point through the live place camera (null behind it). */
+  const ndcOf = (pts) => page.evaluate((pts) => {
+    const cam = window.__placeCamera
+    cam.updateMatrixWorld()
+    const apply = (e, v) => [0, 1, 2, 3].map((i) => e[i] * v[0] + e[i + 4] * v[1] + e[i + 8] * v[2] + e[i + 12] * v[3])
+    return pts.map(([x, y, z]) => {
+      const clip = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [x, y, z, 1]))
+      return clip[3] > 0 ? { x: clip[0] / clip[3], y: clip[1] / clip[3] } : null
+    })
+  }, pts)
+  const W = SETTINGS_VIEWPORT.width
+  const H = SETTINGS_VIEWPORT.height
+  const toPx = (n) => ({ x: ((n.x + 1) / 2) * W, y: ((1 - n.y) / 2) * H })
+  const WATER_Y = -0.25
+  await standAt(0, -0.16)
+  await lookSettled()
+
+  // The frame's subject is the flotsam item nearest the picture's middle.
+  const pickSubject = async () => {
+    const r = await page.evaluate(() => window.__placeRiver())
+    const ndc = await ndcOf(r.flecks.map((f) => [f.x, f.y + 0.1, f.z]))
+    let best = null
+    let bestScore = Infinity
+    r.flecks.forEach((f, i) => {
+      const n = ndc[i]
+      if (!n || Math.abs(n.x) > 0.8 || Math.abs(n.y) > 0.8) return
+      const score = Math.hypot(n.x, n.y)
+      if (score < bestScore) { bestScore = score; best = f }
+    })
+    return best
+  }
+  const readDrift = () => page.evaluate(() => {
+    const r = window.__placeRiver()
+    return { drift: r.drift, speed: r.driftSpeed, flecks: r.flecks }
+  })
+  const aimA = await pickSubject()
+  const subjectA = aimA ? { x: aimA.x, y: aimA.y + 0.1, z: aimA.z } : { x: river.bank.x, y: 0.4, z: river.bank.z }
+  // Each frame's drift is bracketed tightly: read just before the capture (after
+  // the readiness wait) and just after it.
+  const pairShot = async (name, label, sceneReady) => {
+    let pre = null
+    const buf = await captureFrame(page, OUT, name, { local: subjectA, label, ...(sceneReady === false ? { sceneReady } : {}) },
+      { beforeCapture: async () => { pre = await readDrift() } })
+    const post = await readDrift()
+    return { buf, pre, post, at: pre ? (pre.drift + post.drift) / 2 : post.drift }
+  }
+  const A = await pairShot('1280-river-current-a', 'the Niger at the Bambara bank, frame A of the drift pair')
+  // A few hundred ms of the game's OWN drift, waited for on its clock.
+  const GAP_M = 0.2
+  await page.waitForFunction((d) => window.__placeRiver().drift >= d, A.post.drift + GAP_M, { timeout: 30000 })
+  // The scene settled for frame A and the camera has not moved; waiting again
+  // would stretch the pair far past a few hundred ms.
+  const B = await pairShot('1280-river-current-b', 'the same stand a few hundred ms of drift later, frame B', false)
+  const frameA = A.buf
+  const frameB = B.buf
+  const beforeA = A.post
+  const afterB = B.pre ?? B.post
+  const dDrift = B.at - A.at
+  console.log(`river drift pair — speed ${beforeA.speed.toFixed(2)} m/s, drift advanced ~${dDrift.toFixed(2)} m between the frames ` +
+    `(capture brackets A ${(A.post.drift - (A.pre?.drift ?? A.post.drift)).toFixed(2)} m, B ${(B.post.drift - (B.pre?.drift ?? B.post.drift)).toFixed(2)} m)`)
+
+  // FLOTSAM: the drawn positions, A against B.
+  let forward = 0
+  let backward = 0
+  let moved = 0
+  let sum = 0
+  const fa = beforeA.flecks
+  const fb = afterB.flecks
+  for (let i = 0; i < Math.min(fa.length, fb.length); i++) {
+    const along = (fb[i].x - fa[i].x) * river.downstream.x + (fb[i].z - fa[i].z) * river.downstream.z
+    if (along < -5) continue // re-entered upstream: a wrap, not a backward current
+    moved++
+    sum += along
+    if (along > 1e-3) forward++
+    else backward++
+  }
+  const meanMove = moved ? sum / moved : 0
+  const expectMove = afterB.drift - beforeA.drift
+  check('the flotsam rides DOWNSTREAM between the two frames, by the drift advanced',
+    moved >= 20 && backward === 0 && Math.abs(meanMove - expectMove) < 0.15 && meanMove > GAP_M * 0.9,
+    `${forward} of ${moved} items moved downstream (mean ${meanMove.toFixed(2)} m, drift ${expectMove.toFixed(2)} m), ${backward} not`)
+  const inFrame = await ndcOf(fa.map((f) => [f.x, f.y + 0.05, f.z]))
+  const visibleKinds = new Set(fa.filter((f, i) => inFrame[i] && Math.abs(inFrame[i].x) < 1 && Math.abs(inFrame[i].y) < 1).map((f) => f.kind))
+  check('the picture holds a MIXED drift — foam and debris both in frame',
+    visibleKinds.has('foam') && visibleKinds.size >= 2, [...visibleKinds].join('/'))
+
+  // TEXTURE: the horizontal shift that best re-aligns a band of open water.
+  // Looking straight out, downstream runs across the picture, so the drift is a
+  // sideways screen shift whose sign and size the projection predicts.
+  if (frameA && frameB) {
+    // A water point `out` metres past the waterline, on the stand's own line
+    // (along 0), carried `d` metres downstream.
+    const waterAt = (out, d) => [
+      river.normal.x * (river.distance + out) + river.downstream.x * d,
+      WATER_Y,
+      river.normal.z * (river.distance + out) + river.downstream.z * d,
+    ]
+    const bands = []
+    for (const out of [3, 7, 12]) {
+      const [n0, n1] = await ndcOf([waterAt(out, 0), waterAt(out, dDrift)])
+      if (!n0 || !n1 || Math.abs(n0.y) > 0.95) continue
+      bands.push({ out, y: toPx(n0).y, expect: toPx(n1).x - toPx(n0).x })
+    }
+    const grey = async (buf) => sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true })
+    const ga = await grey(frameA)
+    const gb = await grey(frameB)
+    const results = []
+    for (const b of bands) {
+      const y0 = Math.max(0, Math.round(b.y - 18))
+      const y1 = Math.min(ga.info.height - 1, Math.round(b.y + 18))
+      const x0 = Math.round(W * 0.2)
+      const x1 = Math.round(W * 0.8)
+      const S = Math.max(12, Math.ceil(Math.abs(b.expect) * 2.5))
+      const cost = (s) => {
+        let acc = 0
+        let n = 0
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x < x1; x++) {
+            const xb = x + s
+            if (xb < 0 || xb >= ga.info.width) continue
+            acc += Math.abs(ga.data[y * ga.info.width + x] - gb.data[y * gb.info.width + xb])
+            n++
+          }
+        }
+        return n ? acc / n : Infinity
+      }
+      let best = 0
+      let bestCost = Infinity
+      for (let s = -S; s <= S; s++) {
+        const c = cost(s)
+        if (c < bestCost) { bestCost = c; best = s }
+      }
+      results.push({ out: b.out, rowY: Math.round(b.y), expect: b.expect, found: best, still: cost(0), aligned: bestCost })
+    }
+    const good = results.filter((r) =>
+      Math.sign(r.found) === Math.sign(r.expect) && Math.abs(r.found) >= 3 &&
+      Math.abs(r.found) >= Math.abs(r.expect) * 0.4 && Math.abs(r.found) <= Math.abs(r.expect) * 2.5 &&
+      r.aligned < r.still * 0.9)
+    check('the water TEXTURE moves downstream between the frames by about the drift',
+      results.length >= 2 && good.length >= 2,
+      results.map((r) => `${r.out.toFixed(0)}m out: shift ${r.found}px (expected ${r.expect.toFixed(1)}), diff ${r.still.toFixed(1)}→${r.aligned.toFixed(1)}`).join('; '))
+  }
+
+  // The 60-220 m band, on medium and on high: looking out and downstream at a
+  // level eye, so the far river fills the lower picture. The subject is the
+  // water ~120 m along the view ray.
+  const bandShot = async (level) => {
+    await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+    await page.waitForFunction((n) => window.__placeRiver && window.__placeRiver().flecks.length === n, level === 'high' ? 90 : 48, { timeout: 30000 })
+    await pipelinesIdle()
+    await standAt(0.6, -0.04)
+    await lookSettled()
+    const subject = await page.evaluate(() => {
+      const p = window.__placePlayer
+      const d = 120
+      return { x: p.x - Math.sin(p.yaw) * d, y: -0.25, z: p.z - Math.cos(p.yaw) * d }
+    })
+    return shot(`1280-river-band-${level}`, {
+      local: subject,
+      label: `the far river 60-220 m out at ${level}: the fine grain fades without shimmer or a fade line`,
+    })
+  }
+  await bandShot('medium')
+  await bandShot('high')
+
+  // The low tier's flotsam: its frame cost measured on and off, interleaved.
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
+  await page.waitForFunction(() => window.__placeRiver && window.__placeRiver().flecks.length === 12, null, { timeout: 30000 })
+  await pipelinesIdle()
+  await standAt(0, -0.16)
+  await lookSettled()
+  const timeFrames = (n) => page.evaluate((n) => new Promise((resolve) => {
+    const ts = []
+    const give = setTimeout(() => resolve(null), 30000)
+    const step = () => {
+      ts.push(performance.now())
+      if (ts.length > n) {
+        clearTimeout(give)
+        const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b)
+        resolve({ median: d[Math.floor(d.length / 2)], p95: d[Math.floor(d.length * 0.95)] })
+      } else requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  }), n)
+  const setFlotsam = (on) => page.evaluate((on) => {
+    window.__placeScene.traverse((o) => {
+      if (/^place-river-(foam|leaf|grass|twig)$/.test(o.name)) o.visible = on
+    })
+  }, on)
+  const runs = { on: [], off: [] }
+  // One untimed window first: the level switch's new pipelines compile there.
+  await timeFrames(60)
+  for (const on of [false, true, false, true, false, true, false, true]) {
+    await setFlotsam(on)
+    const t = await timeFrames(90)
+    if (t) runs[on ? 'on' : 'off'].push(t)
+  }
+  await setFlotsam(true)
+  const avg = (xs, k) => xs.reduce((a, x) => a + x[k], 0) / Math.max(1, xs.length)
+  const cost = {
+    onMedian: avg(runs.on, 'median'), offMedian: avg(runs.off, 'median'),
+    onP95: avg(runs.on, 'p95'), offP95: avg(runs.off, 'p95'),
+  }
+  console.log(`low-tier flotsam frame cost (12 items) — median frame ${cost.offMedian.toFixed(2)} → ${cost.onMedian.toFixed(2)} ms, ` +
+    `p95 ${cost.offP95.toFixed(2)} → ${cost.onP95.toFixed(2)} ms (off → on, ${runs.on.length}+${runs.off.length} windows of 90 frames) — ` +
+    `per window on ${runs.on.map((r) => r.median.toFixed(1)).join('/')}, off ${runs.off.map((r) => r.median.toFixed(1)).join('/')}`)
+  check('the low tier\'s flotsam was measured on and off', runs.on.length === 4 && runs.off.length === 4,
+    `${runs.on.length}+${runs.off.length} timed windows`)
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
