@@ -2076,3 +2076,13 @@ From the picture check of 1129 (02.10.2026): `690-cairo-children` (polish-childr
 the lower-left edge, and main's frame from the unsplit `polish` shows no child at all. The aim
 is taken before the shot while the child keeps walking; the shutter accepts the projection.
 Pre-existing, test-frame aim only, no player impact. Infrastructure freeze: deferred.
+
+From the 1108 work (03.10.2026): the unit run's repository-integrity teardown threw "own index
+changed" with nothing staged and HEAD unchanged (567/567 files, 16933 pass). Likely a stat
+refresh of the index by a git call during the run, which a byte comparison reads as leakage.
+Test-harness noise, no player impact. Infrastructure freeze: deferred.
+
+From the picture check of 1108 (03.10.2026): `1087-village-carrier-returns-with-water` keeps the
+carrier and his full jar clear, but its lens can land against a hut flank (right third of the
+WebGL 2 frame) or behind a cooking fire with a seated figure (WebGPU). Composition only, the
+subject reads. Test-frame aim, no player impact: deferred.
