@@ -2107,3 +2107,10 @@ terrain, no river, no fish on the rack and baskets as bare rims. The same camera
 WebGPU, and the later Bambara frame `604-unstuck-freed` on WebGL 2, draw everything.
 Suspected first-view material readiness at a shutter two frames after the walk; not
 shown to be player-visible. Re-check at the next LARGE; a repeat makes it a point.
+
+From the third cross-vendor review of the mortar-pounding audio check (1274 at
+bd138038d): the thud probe counts a thud as played only when the AudioContext is
+running at dispatch, and the suite checks the state before and after the window; a
+suspend-and-resume between two dispatches would still pass. No player impact (each
+counted thud was dispatched into a running context); a test-harness rigor edge after
+two fix rounds. Record state transitions in the window if the check is touched again.
