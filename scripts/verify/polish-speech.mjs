@@ -738,13 +738,21 @@ if (section('speech-distance-scale')) {
     }
     return out.sort((l, r) => r.d - l.d).slice(0, 24)
   })
-  const NEAR = 3.5
-  const SIDE = 2.5
-  /** Stand NEAR before the near figure, on the far figure's line but SIDE off
-   *  it, and look between the two — live positions, the figures walk. */
+  // Where to stand: `back` before the near figure, `side` off the far figure's
+  // line (either hand). Tried in order per pair, like speech-owner's
+  // STAND_BACKS — one stand landing in a hut or behind a post is the next
+  // stand's turn, not the pair's end.
+  const STANDS = [
+    { back: 3.5, side: 2.5 },
+    { back: 3.5, side: -2.5 },
+    { back: 5, side: 3 },
+    { back: 5, side: -3 },
+  ]
+  /** Stand `back` before the near figure, on the far figure's line but `side`
+   *  off it, and look between the two — live positions, the figures walk. */
   const aim = (pair) =>
     page.evaluate(
-      async ({ near, far, NEAR, SIDE }) => {
+      async ({ near, far, back, side }) => {
         const { insidePlace } = await import('/src/scenes/place/boundary.ts')
         const figs = window.__speechScaleFigures
         const p = window.__placePlayer
@@ -760,8 +768,8 @@ if (section('speech-distance-scale')) {
         const n = Math.hypot(ux, uz) || 1
         ux /= n
         uz /= n
-        const x = pos[0].x - ux * NEAR - uz * SIDE
-        const z = pos[0].z - uz * NEAR + ux * SIDE
+        const x = pos[0].x - ux * back - uz * side
+        const z = pos[0].z - uz * back + ux * side
         if (!insidePlace(layout, x, z, 1)) return null
         const dir = pos.map((q) => {
           const l = Math.hypot(q.x - x, q.z - z) || 1
@@ -773,7 +781,7 @@ if (section('speech-distance-scale')) {
         p.yaw = Math.atan2(dir[0].x + dir[1].x, dir[0].z + dir[1].z) + Math.PI
         return pos
       },
-      { near: pair.near, far: pair.far, NEAR, SIDE },
+      { near: pair.near, far: pair.far, back: pair.back, side: pair.side },
     )
   // Both heads in plain sight: the first surface along each sight line is the
   // figure itself (the speech-owner instrument), and no roof over the camera.
@@ -846,11 +854,24 @@ if (section('speech-distance-scale')) {
   const read = () =>
     page.evaluate(async () => {
       const { speechBubbleScale } = await import('/src/communication/speechBubbleScale.ts')
+      const { balance } = await import('/src/config/balance.ts')
       const cam = window.__placeCamera
+      // What the player SEES, as speech-owner reads it: the rendered element and
+      // the opacity of it and every ancestor multiplied — a rectangle alone
+      // survives `visibility: hidden` and `opacity: 0`.
+      const rendered = (node) =>
+        !!node && node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })
+      const effectiveOpacity = (node) => {
+        let o = 1
+        for (let n = node; n && n instanceof Element; n = n.parentElement) o *= Number(getComputedStyle(n).opacity)
+        return o
+      }
       const one = (id) => {
         const el = document.querySelector(`.speech-label[data-speaker="${id}"]`)
         const sizer = el?.closest('.speech-distance')
-        const tail = el?.closest('.speech-bubble')?.querySelector('.speech-tail')?.getBoundingClientRect()
+        const bubble = el?.closest('.speech-bubble')
+        const tailNode = bubble?.querySelector('.speech-tail')
+        const tail = tailNode?.getBoundingClientRect()
         const anchor = window.__speech?.anchorWorld(id)
         const label = window.__speech?.labels().find((l) => l.speakerId === id)
         const pt = window.__speech?.anchorScreen(id)
@@ -873,6 +894,12 @@ if (section('speech-distance-scale')) {
           onTip: Math.abs(tail.left + tail.width / 2 - pt.x) <= 0.5 * box.height && Math.abs(tail.bottom - pt.y) <= 0.35 * box.height,
           onScreen: box.left > 0 && box.right < window.innerWidth && box.top > 0 && tail.bottom < window.innerHeight,
           targeted: el.classList.contains('targeted'),
+          receded: bubble.classList.contains('receded'),
+          visible: rendered(el) && rendered(tailNode) && tail.width > 0 && tail.height > 0,
+          opacity: +effectiveOpacity(el).toFixed(3),
+          tailOpacity: +effectiveOpacity(tailNode).toFixed(3),
+          // The opacity this note must be drawn at: full, or the configured dim.
+          wantOpacity: bubble.classList.contains('receded') ? balance.communication.labelRecede.opacity : 1,
         }
       }
       return { near: one('scale-near'), far: one('scale-far') }
@@ -882,11 +909,18 @@ if (section('speech-distance-scale')) {
     const far = v?.far
     if (!near || !far) return false
     const tracks = (n) => Math.abs(n.set - n.expected) <= 0.03 && Math.abs(n.width / n.layoutWidth - n.set) <= 0.03
+    // Drawn, and at the opacity it is meant to have (a nonzero dim when receded).
+    const shows = (n) =>
+      n.visible && n.wantOpacity > 0.1 &&
+      Math.abs(n.opacity - n.wantOpacity) < 0.03 && Math.abs(n.tailOpacity - n.wantOpacity) < 0.03
     return (
       near.distance < far.distance &&
       near.width >= 1.25 * far.width &&
       tracks(near) &&
       tracks(far) &&
+      shows(near) &&
+      shows(far) &&
+      !far.receded &&
       near.onTip &&
       far.onTip &&
       near.onScreen &&
@@ -904,19 +938,27 @@ if (section('speech-distance-scale')) {
   const rejected = []
   const fmt = (r) => (r == null ? 'sky' : r.toFixed(2))
   let shot = null
-  for (const pair of pairs) {
+  for (const candidate of pairs) {
     if (attempts.length >= MAX_ATTEMPTS || shot) break
+    let pair = null
+    for (const stand of STANDS) {
+      const tried = { ...candidate, ...stand }
+      const tag = `${candidate.near}/${candidate.far}@${stand.back}/${stand.side}`
+      if (!(await aim(tried))) {
+        rejected.push(`${tag} stand-outside`)
+        continue
+      }
+      await nextFrames(2)
+      const firstSight = await seen(tried)
+      if (!clear(firstSight)) {
+        rejected.push(`${tag} sight ${firstSight.map(fmt).join('/')}`)
+        continue
+      }
+      pair = tried
+      break
+    }
+    if (!pair) continue
     const tag = `${pair.near}/${pair.far}`
-    if (!(await aim(pair))) {
-      rejected.push(`${tag} stand-outside`)
-      continue
-    }
-    await nextFrames(2)
-    const firstSight = await seen(pair)
-    if (!clear(firstSight)) {
-      rejected.push(`${tag} sight ${firstSight.map(fmt).join('/')}`)
-      continue
-    }
     if (!(await speak(pair))) {
       rejected.push(`${tag} speak`)
       continue
@@ -957,7 +999,7 @@ if (section('speech-distance-scale')) {
     await page.evaluate(() => window.__speech?.clear())
   }
   const brief = (a) =>
-    `${a.pair.near}/${a.pair.far}@${a.pair.d.toFixed(1)}m ${a.at}: ${JSON.stringify({ near: a.view?.near, far: a.view?.far, sight: a.view?.sight })}`
+    `${a.pair.near}/${a.pair.far}@${a.pair.d.toFixed(1)}m stand ${a.pair.back}/${a.pair.side} ${a.at}: ${JSON.stringify({ near: a.view?.near, far: a.view?.far, sight: a.view?.sight })}`
   check(
     'a near speaker’s note is drawn visibly larger than a far speaker’s, each at the scale its distance gives and on its own speaker (point 1271)',
     !!shot,
