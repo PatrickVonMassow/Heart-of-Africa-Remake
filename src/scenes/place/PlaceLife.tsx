@@ -2088,8 +2088,8 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
         const u = since / cfg.puffSeconds
         cloud.visible = u < 1
         if (u < 1) {
-          cloud.scale.setScalar(0.4 + 1.6 * u)
-          ;(cloud.material as THREE.MeshStandardMaterial).opacity = 0.45 * (1 - u)
+          cloud.scale.setScalar(0.6 + 2 * u)
+          ;(cloud.material as THREE.MeshStandardMaterial).opacity = 0.6 * (1 - u)
         }
       }
       const struck = impactsBetween(previous, t, i)
@@ -2139,7 +2139,7 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
             </mesh>
             {Array.from({ length: cfg.puffGrains }, (_, k) => (
               <mesh key={k} ref={(el) => { grains.current[i][k] = el }} visible={false}>
-                <sphereGeometry args={[0.014, 4, 3]} />
+                <sphereGeometry args={[0.022, 5, 4]} />
                 <meshStandardMaterial color="#e2cc84" roughness={1} />
               </mesh>
             ))}

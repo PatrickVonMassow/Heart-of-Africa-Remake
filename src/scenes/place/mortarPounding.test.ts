@@ -4,8 +4,10 @@ import { FIGURE_LIMBS } from '../../render/figures'
 import {
   bowlRadiusAt,
   footAtElevation,
+  footDriftAt,
   footHeightAt,
   grainLevel,
+  HEAD_RADIUS,
   impactFootY,
   impactsBetween,
   mortarProfile,
@@ -87,7 +89,40 @@ describe('the stroke cycle', () => {
         expect(off, `phase ${p}`).toBeLessThan(cfg.gripHalf + 0.02)
       }
       // A pestle held near upright, never a pole swung flat.
-      expect(f.tilt, `phase ${p}`).toBeLessThan(0.55)
+      expect(f.tilt, `phase ${p}`).toBeLessThan(0.3)
+    }
+  })
+
+  it('never runs the shaft through a head, hers or the other woman\'s', () => {
+    // Closest approach of a point to the drawn shaft segment.
+    const toShaft = (f: ReturnType<typeof poundFrame>, q: readonly number[]) => {
+      const rel = q.map((v, k) => v - f.foot[k])
+      const s = Math.max(0, Math.min(cfg.pestleLength, rel[0] * f.axis[0] + rel[1] * f.axis[1] + rel[2] * f.axis[2]))
+      return Math.hypot(...rel.map((v, k) => v - f.axis[k] * s))
+    }
+    let own = Infinity
+    let other = Infinity
+    for (const p of phases) {
+      const a = poundFrame(p)
+      const b = poundFrame((p + 0.5) % 1)
+      own = Math.min(own, toShaft(a, a.head))
+      other = Math.min(other, toShaft(a, acrossTheMortar(b.head)))
+    }
+    expect(own).toBeGreaterThan(HEAD_RADIUS + cfg.pestleRadius)
+    expect(other).toBeGreaterThan(HEAD_RADIUS + cfg.pestleRadius)
+  })
+
+  it('keeps the foot over the opening whenever it is at or below the rim', () => {
+    for (const p of phases) {
+      const f = poundFrame(p)
+      const off = Math.hypot(f.foot[0], f.foot[2] - cfg.standOff)
+      expect(footDriftAt(f.foot[1])).toBeCloseTo(cfg.standOff - f.foot[2], 9)
+      if (f.foot[1] <= cfg.height + 0.02) {
+        expect(off + cfg.pestleRadius, `phase ${p}`).toBeLessThan(bowlRadiusAt(Math.min(cfg.height, Math.max(f.foot[1], grainLevel()))))
+      } else {
+        // Above the rim it cannot touch the wood; it only hangs over the top.
+        expect(off, `phase ${p}`).toBeLessThan(cfg.rimRadius)
+      }
     }
   })
 

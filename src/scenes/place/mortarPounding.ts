@@ -139,6 +139,8 @@ export interface PoundFrame {
   axis: [number, number, number]
   /** The shaft's tilt from the vertical (rad). */
   tilt: number
+  /** Her head's centre, in her frame. */
+  head: [number, number, number]
 }
 
 /** The bearing that puts one hand `gripHalf` beside her shaft at an elevation. */
@@ -151,14 +153,24 @@ function bearingFor(side: 'left' | 'right', elevation: number, cfg: MortarConfig
   return Math.asin(Math.max(-1, Math.min(1, needed)))
 }
 
-function chainAt(elevation: number, lean: number, squat: number, cfg: MortarConfig) {
+/** How far toward her the pestle foot hangs at a foot height: none in the
+ *  bowl, `footDrift` at the top. Above the rim the foot only has to be over
+ *  the opening, and drawing it toward her is what keeps the lifted shaft
+ *  upright in front of her face instead of slanting through her head. */
+export function footDriftAt(footY: number, cfg: MortarConfig = balance.villageLife.mortar): number {
+  const bottom = impactFootY(cfg)
+  const top = cfg.height + cfg.liftAboveRim
+  return cfg.footDrift * Math.min(1, Math.max(0, (footY - bottom) / (top - bottom)))
+}
+
+function chainAt(elevation: number, lean: number, squat: number, cfg: MortarConfig, drift: number) {
   const bl = bearingFor('left', elevation, cfg)
   const br = bearingFor('right', elevation, cfg)
   const [lx, ly, lz] = handAt('left', bl, elevation, lean, POUNDER_PIVOT_Y)
   const [rx, ry, rz] = handAt('right', br, elevation, lean, POUNDER_PIVOT_Y)
   const grip: [number, number, number] = [(lx + rx) / 2, ((ly + ry) / 2) * squat, (lz + rz) / 2]
   const dx = cfg.strikeOffset - grip[0]
-  const dz = cfg.standOff - grip[2]
+  const dz = cfg.standOff - drift - grip[2]
   const flat = Math.hypot(dx, dz)
   const rise = Math.sqrt(Math.max(0, cfg.gripFromFoot ** 2 - flat ** 2))
   return { bl, br, grip, footY: grip[1] - rise, hands: [[lx, ly * squat, lz], [rx, ry * squat, rz]] as const }
@@ -179,16 +191,17 @@ export function poundFrame(phase: number, cfg: MortarConfig = balance.villageLif
   const squat = 1 - cfg.squatDepth * k
   const lean = cfg.leanTop + (cfg.leanImpact - cfg.leanTop) * k
   const target = footHeightAt(phase, cfg)
+  const drift = footDriftAt(target, cfg)
   let [lo, hi] = ELEVATION_RANGE
   // Foot height rises with the elevation over the whole range (pinned by test).
   for (let i = 0; i < 40; i++) {
     const mid = (lo + hi) / 2
-    if (chainAt(mid, lean, squat, cfg).footY < target) lo = mid
+    if (chainAt(mid, lean, squat, cfg, drift).footY < target) lo = mid
     else hi = mid
   }
   const elevation = (lo + hi) / 2
-  const { bl, br, grip, footY, hands } = chainAt(elevation, lean, squat, cfg)
-  const foot: [number, number, number] = [cfg.strikeOffset, footY, cfg.standOff]
+  const { bl, br, grip, footY, hands } = chainAt(elevation, lean, squat, cfg, drift)
+  const foot: [number, number, number] = [cfg.strikeOffset, footY, cfg.standOff - drift]
   const d = [grip[0] - foot[0], grip[1] - foot[1], grip[2] - foot[2]]
   const len = Math.hypot(d[0], d[1], d[2]) || 1
   const axis: [number, number, number] = [d[0] / len, d[1] / len, d[2] / len]
@@ -202,13 +215,24 @@ export function poundFrame(phase: number, cfg: MortarConfig = balance.villageLif
     centre: [foot[0] + axis[0] * half, foot[1] + axis[1] * half, foot[2] + axis[2] * half],
     axis,
     tilt: Math.acos(Math.min(1, axis[1])),
+    head: headCentre(lean, squat),
   }
 }
+
+/** Her head's centre in her frame: the Figure puts it 0.18 above the body
+ *  cone, inside the trunk that leans about the hip; the squat scales it. */
+export function headCentre(lean: number, squat: number): [number, number, number] {
+  const up = 1.18 - POUNDER_PIVOT_Y
+  return [0, (POUNDER_PIVOT_Y + up * Math.cos(lean)) * squat, up * Math.sin(lean)]
+}
+
+/** The Figure's head radius (placeFigure.tsx). */
+export const HEAD_RADIUS = 0.16
 
 /** The foot height the solve reaches at an elevation (for the monotony pin). */
 export function footAtElevation(elevation: number, phase: number, cfg: MortarConfig = balance.villageLife.mortar): number {
   const k = kneeBendAt(phase)
-  return chainAt(elevation, cfg.leanTop + (cfg.leanImpact - cfg.leanTop) * k, 1 - cfg.squatDepth * k, cfg).footY
+  return chainAt(elevation, cfg.leanTop + (cfg.leanImpact - cfg.leanTop) * k, 1 - cfg.squatDepth * k, cfg, footDriftAt(footHeightAt(phase, cfg), cfg)).footY
 }
 
 export const POUND_ELEVATION_RANGE = ELEVATION_RANGE

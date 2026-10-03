@@ -1145,6 +1145,9 @@ interface BalanceConfig {
       impactDepth: number
       /** At the top of the stroke the foot hangs this far above the rim. */
       liftAboveRim: number
+      /** Lifted, the foot hangs this far toward her over the opening (none
+       *  in the bowl), so the raised shaft stands upright before her face. */
+      footDrift: number
       /** The knee dip at impact: the body's height shrinks by this fraction. */
       squatDepth: number
       /** Forward lean of the trunk at impact and at the top (rad). */
@@ -2143,10 +2146,11 @@ export const balance: BalanceConfig = {
       gripHalf: 0.05, // calibratable
       impactDepth: 0.03, // calibratable
       liftAboveRim: 0.18, // calibratable
+      footDrift: 0.12, // calibratable
       squatDepth: 0.12, // calibratable
       leanImpact: 0.04, // calibratable
-      leanTop: 0.1, // calibratable
-      puffGrains: 8, // calibratable
+      leanTop: 0, // calibratable
+      puffGrains: 12, // calibratable
       puffSeconds: 0.38, // calibratable
       puffSpeed: 0.9, // calibratable
       thudPeak: 1.1, // calibratable
