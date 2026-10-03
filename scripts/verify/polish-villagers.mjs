@@ -3359,10 +3359,13 @@ if (section('village-pounding')) {
     // stands within the thud's reach so every dispatch really sounds.
     // A SUSPENDED context accepts every node and sounds nothing, so the start
     // is awaited to 'running' and the state is read again after the window.
-    const audio = await page.evaluate(async () => {
+    await page.evaluate(() => {
       window.__ambience.start()
+      void window.__ambience.context()?.resume()
+    })
+    await page.waitForFunction(() => window.__ambience.context()?.state === 'running', null, { timeout: 3000 }).catch(() => {})
+    const audio = await page.evaluate(() => {
       const ac = window.__ambience.context()
-      if (ac && ac.state !== 'running') await Promise.race([ac.resume(), new Promise((r) => setTimeout(r, 3000))])
       const m = window.__placePounding().mortar
       const p = window.__placePlayer
       const reach = window.__balance.communication.call.reach
