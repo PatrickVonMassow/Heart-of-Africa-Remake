@@ -11,21 +11,37 @@ const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera()
 const size = { width: 800, height: 600 }
 
-// The frame callbacks are collected, so a test can run the frame loop by hand.
+// The frame callbacks are collected IN SUBSCRIPTION ORDER, as R3F keeps them:
+// it subscribes in a layout effect (useFrame), so a child's callback comes
+// before its parent's. A test runs the frame loop by hand.
 const frames = vi.hoisted(() => [] as Array<(state: { camera: unknown }) => void>)
-vi.mock('@react-three/fiber', () => ({
-  useFrame: (cb: (state: { camera: unknown }) => void) => {
-    frames.push(cb)
-  },
-  useThree: (select: (state: unknown) => unknown) => select({ scene, camera, size }),
-}))
+vi.mock('@react-three/fiber', async () => {
+  const React = await import('react')
+  return {
+    useFrame: (cb: (state: { camera: unknown }) => void) => {
+      const ref = React.useRef(cb)
+      ref.current = cb
+      React.useLayoutEffect(() => {
+        frames.push((state) => ref.current(state))
+      }, [])
+    },
+    useThree: (select: (state: unknown) => unknown) => select({ scene, camera, size }),
+  }
+})
 const htmlProps = vi.hoisted(() => vi.fn())
+// What drei's <Html> does in its own frame callback: project the group. The
+// mock records WHEN it runs, against the placement.
+const order = vi.hoisted(() => [] as string[])
 // drei's non-transform <Html> draws one styled div around its children.
 vi.mock('@react-three/drei', async () => {
   const React = await import('react')
+  const { useFrame } = await import('@react-three/fiber')
   return {
     Html: (props: { style?: object; children?: unknown }) => {
       htmlProps(props)
+      useFrame(() => {
+        order.push('project')
+      })
       return React.createElement('div', { style: props.style }, props.children as never)
     },
   }
@@ -36,6 +52,7 @@ vi.mock('@react-three/drei', async () => {
 // callback reads afterwards.
 const placeSpy = vi.hoisted(() =>
   vi.fn((node: { getWorldPosition?: (v: { set: (...a: number[]) => unknown }) => unknown }) => {
+    order.push('place')
     node.getWorldPosition = (v) => v.set(0, 1.3, -4)
     return true
   }),
@@ -157,13 +174,16 @@ it('places every note from the frame loop and keeps its tip gap live with the ca
   useGame.getState().hearUtterance(atoms[0])
   speakOverhead('elder', atoms, fig, { now: 10 })
   frames.length = 0
+  order.length = 0
   placeSpy.mockClear()
   const { container } = render(<SpeechLabels />)
   expect(frames.length).toBeGreaterThan(0)
   const runFrames = () => act(() => frames.forEach((f) => f({ camera })))
   runFrames()
-  // The frame loop stands the note on its speaker's head for THIS camera.
+  // The frame loop stands the note on its speaker's head for THIS camera —
+  // and BEFORE drei projects it, or the note trails a moving speaker a frame.
   expect(placeSpy).toHaveBeenCalledWith(expect.anything(), speechLabelState().labels[0], camera)
+  expect(order).toEqual(['place', 'project'])
   const wrap = container.querySelector('.speech-distance')!.parentElement!
   const gap = balance.communication.labelTipGap.px
   expect(wrap.style.getPropertyValue('--speech-tip-gap')).toBe(`${gap}px`)

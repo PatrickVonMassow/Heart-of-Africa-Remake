@@ -14,7 +14,7 @@
 // in-scene labels; modals and full-screen overlays sit above it through the
 // z-index constants in index.css.
 
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
@@ -58,31 +58,26 @@ const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,calc(-100% - var(--speech-t
 /** The calibrated tip gap as a CSS length. */
 const tipGap = () => `${Math.max(0, balance.communication.labelTipGap.px)}px`
 
-/** One speaker's note, following its figure. */
-function SpeechLabelView({
+/**
+ * Stands one note on its speaker's head each frame. Its own component, drawn
+ * BEFORE the note's <Html>: R3F subscribes a frame callback in a layout
+ * effect, React runs a child's layout effects before its parent's, and drei's
+ * <Html> projects its group in a frame callback of its own — so a placement
+ * in the view itself ran AFTER that projection and the note trailed a moving
+ * speaker by one frame (point 1276). A sibling ahead of the <Html> subscribes
+ * first, and the projection reads this frame's place.
+ */
+function NoteFollower({
   label,
-  memory,
-  targeted,
-  receded,
+  group,
+  sizer,
 }: {
   label: SpeechLabel
-  memory: CommunicationMemory
-  targeted: boolean
-  receded: boolean
+  group: RefObject<THREE.Group | null>
+  sizer: RefObject<HTMLDivElement | null>
 }) {
-  const group = useRef<THREE.Group>(null)
-  // The note's distance scale (point 1271) rides a wrapper of its own, set
-  // straight on the DOM each frame: no React render per frame, and the card's
-  // own transform (the receded look) and its .targeted styling stay untouched.
-  const sizer = useRef<HTMLDivElement>(null)
   const lastScale = useRef(0)
   const lastGap = useRef('')
-  // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
-  // syllables and the player's guess. Never on in a real run — it hands the
-  // player the very answer the mechanic asks him to work out.
-  const vocabulary = useGame((s) => s.vocabulary)
-  const conceptLabels = useUi((s) => s.speechConceptLabels)
-
   useFrame(({ camera }) => {
     // The tip follows the top of the speaker's drawn head as this camera sees
     // it, every frame — its lean, its kneel, its step — not a height sampled
@@ -106,11 +101,38 @@ function SpeechLabelView({
       }
     }
   })
+  return null
+}
+
+/** One speaker's note, following its figure. */
+function SpeechLabelView({
+  label,
+  memory,
+  targeted,
+  receded,
+}: {
+  label: SpeechLabel
+  memory: CommunicationMemory
+  targeted: boolean
+  receded: boolean
+}) {
+  const group = useRef<THREE.Group>(null)
+  // The note's distance scale (point 1271) rides a wrapper of its own, set
+  // straight on the DOM each frame: no React render per frame, and the card's
+  // own transform (the receded look) and its .targeted styling stay untouched.
+  const sizer = useRef<HTMLDivElement>(null)
+  // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
+  // syllables and the player's guess. Never on in a real run — it hands the
+  // player the very answer the mechanic asks him to work out.
+  const vocabulary = useGame((s) => s.vocabulary)
+  const conceptLabels = useUi((s) => s.speechConceptLabels)
+
 
   return (
     <group ref={group}>
       {/* Not centred: the bubble's bottom centre — its tail's tip — stands on
           the anchor, so the tail points down at this speaker's crown. */}
+      <NoteFollower label={label} group={group} sizer={sizer} />
       <Html style={TIP_ON_ANCHOR} zIndexRange={[20, 10]}>
         <div ref={sizer} className="speech-distance">
           <SpeechLabelCard
