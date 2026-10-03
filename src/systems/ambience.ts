@@ -1183,8 +1183,22 @@ export function poundThudPlan(distance: number, bearing = 0, volume = balance.am
   }
 }
 
+/** Dev/verify probe: every thud handed to the audio module (`calls`) and every
+ *  one that really scheduled a sound (`scheduled`, at `lastPeak`) — counted
+ *  HERE, so the browser gate observes the dispatch itself, not the caller's
+ *  own bookkeeping. */
+const thudProbe =
+  import.meta.env.DEV && typeof window !== 'undefined'
+    ? ((window as unknown as { __poundThud?: { calls: number; scheduled: number; lastPeak: number } }).__poundThud ??= {
+        calls: 0,
+        scheduled: 0,
+        lastPeak: 0,
+      })
+    : null
+
 export function playPoundThud(distance: number, bearing = 0): void {
   const plan = poundThudPlan(distance, bearing)
+  if (thudProbe) thudProbe.calls++
   if (!ctx || !master || plan.peak <= 0) return
   const ac = ctx
   const route = speechRoute(ac, ambientBus ?? master, plan.pan)
@@ -1195,6 +1209,10 @@ export function playPoundThud(distance: number, bearing = 0): void {
     gain.exponentialRampToValueAtTime(0.0001, t + plan.duration)
   })
   source.onended = route.dispose
+  if (thudProbe) {
+    thudProbe.scheduled++
+    thudProbe.lastPeak = plan.peak
+  }
 }
 
 /**
@@ -1418,6 +1436,7 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     speakPhrase: (phrase: string[], distance: number) => playSpeech(phrasePlan(phrase, distance)),
     speechProbe: () => ({ ...(speechProbe ?? { spoken: 0, syllables: 0, lastPeak: 0 }) }),
     cryProbe: () => ({ ...(cryProbe ?? { cries: 0, scheduled: 0, lastPeak: 0, lastLeaving: 0 }) }),
+    thudProbe: () => ({ ...(thudProbe ?? { calls: 0, scheduled: 0, lastPeak: 0 }) }),
   }
 }
 

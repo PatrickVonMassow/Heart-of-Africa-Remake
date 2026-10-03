@@ -1550,4 +1550,15 @@ describe('the pestle thud reaches the ambient bus through its placed route', () 
     playPoundThud(0, 0)
     expect([ctx.sources.length, ctx.panners.length]).toEqual(before)
   })
+
+  it('counts every dispatch in its dev probe and only the sounding ones as scheduled', () => {
+    const probe = () => (window as unknown as { __poundThud: { calls: number; scheduled: number; lastPeak: number } }).__poundThud
+    const before = { ...probe() }
+    balance.ambienceVolume = 1
+    playPoundThud(3, 0)
+    playPoundThud(Infinity, 0)
+    expect(probe().calls - before.calls).toBe(2)
+    expect(probe().scheduled - before.scheduled).toBe(1)
+    expect(probe().lastPeak).toBeCloseTo(poundThudPlan(3, 0, 1).peak)
+  })
 })
