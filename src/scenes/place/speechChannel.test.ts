@@ -394,16 +394,28 @@ describe('placeSpeechNote', () => {
   const screenY = (cam: THREE.Camera, p: THREE.Vector3) => ((1 - p.clone().project(cam).y) / 2) * H
   /** The head outline's top edge on screen, off the projected mesh. */
   function drawnTop(cam: THREE.Camera, head: THREE.Mesh): number {
+    return outline(cam, head).top
+  }
+  /** The projected head mesh's top edge and its horizontal middle, in px
+   *  (1440 × 900) — every vertex through the camera, not the formula. */
+  function outline(cam: THREE.Camera, head: THREE.Mesh): { top: number; mid: number } {
     head.updateWorldMatrix(true, false)
     cam.updateMatrixWorld(true)
     const pos = head.geometry.getAttribute('position')
     const v = new THREE.Vector3()
-    let best = Infinity
+    let top = Infinity
+    let left = Infinity
+    let right = -Infinity
     for (let i = 0; i < pos.count; i++) {
-      best = Math.min(best, screenY(cam, v.fromBufferAttribute(pos, i).applyMatrix4(head.matrixWorld)))
+      v.fromBufferAttribute(pos, i).applyMatrix4(head.matrixWorld)
+      top = Math.min(top, screenY(cam, v))
+      const x = ((v.project(cam).x + 1) / 2) * 1440
+      left = Math.min(left, x)
+      right = Math.max(right, x)
     }
-    return best
+    return { top, mid: (left + right) / 2 }
   }
+  const screenX = (cam: THREE.Camera, p: THREE.Vector3) => ((p.clone().project(cam).x + 1) / 2) * 1440
 
   it('stands the node on the top of the head as the camera draws it, near and far, level and from above', () => {
     for (const [scale, at, look] of [
@@ -423,7 +435,33 @@ describe('placeSpeechNote', () => {
       // Within a pixel of the drawn outline's top: the mesh is a 24×16
       // polygon, the formula a true sphere.
       expect(Math.abs(screenY(cam, note.position) - drawnTop(cam, head))).toBeLessThan(1)
+      // And over the head sideways, not displaced along the camera's right.
+      expect(Math.abs(screenX(cam, note.position) - outline(cam, head).mid)).toBeLessThan(1)
     }
+  })
+
+  it('meets a squashed head’s outline seen from above, the head drawn as the ellipsoid it is', () => {
+    // A body squashed to 0.7 with no counter-scale on the head, a metre away
+    // and looked down at: a ball of the head's height missed by 9 px here.
+    const { root, body, head } = villager()
+    body.scale.y = 0.7
+    root.updateWorldMatrix(true, true)
+    const centre = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld)
+    const cam = eye([0, 1.6, 1], [centre.x, centre.y, centre.z])
+    speakOverhead('villager-1', [RIVER_UTTERANCE], root, { now: 0 })
+    const note = new THREE.Group()
+    expect(placeSpeechNote(note, speechLabelState().labels[0], cam)).toBe(true)
+    expect(Math.abs(screenY(cam, note.position) - drawnTop(cam, head))).toBeLessThan(1)
+  })
+
+  it('tracks the head again once a speaker that had a fixed height speaks without one', () => {
+    const { root, head } = villager()
+    const cam = eye([0, 1.6, 4], [0, 1.4, 0])
+    speakOverhead('villager-1', [RIVER_UTTERANCE], root, { now: 0, height: 3 })
+    speakOverhead('villager-1', [RIVER_UTTERANCE], root, { now: 1 })
+    const note = new THREE.Group()
+    placeSpeechNote(note, speechLabelState().labels.find((l) => l.speakerId === 'villager-1')!, cam)
+    expect(Math.abs(screenY(cam, note.position) - drawnTop(cam, head))).toBeLessThan(1)
   })
 
   it('follows the figure every frame after the speech began: a step, a lean, a kneel', () => {
@@ -441,10 +479,27 @@ describe('placeSpeechNote', () => {
     expect(placeSpeechNote(note, label, cam)).toBe(true)
     expect(note.position.distanceTo(first)).toBeGreaterThan(0.5)
     expect(Math.abs(screenY(cam, note.position) - drawnTop(cam, head))).toBeLessThan(1)
-    // Horizontally over the head too, not over the body's origin.
+    // Sideways at the outline's TOPMOST point — for a leaning, squashed head
+    // a tilted ellipsoid, so not over the head's centre nor the body's origin.
+    // Found by densely sampling the head sphere through its world matrix.
     head.updateWorldMatrix(true, false)
-    const centre = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld).project(cam)
-    expect(Math.abs(note.position.clone().project(cam).x - centre.x) * 720).toBeLessThan(1)
+    let topY = Infinity
+    let topX = 0
+    const v = new THREE.Vector3()
+    for (let a = 0; a <= 180; a++) {
+      for (let c = 0; c < 360; c++) {
+        const th = (Math.PI * a) / 180
+        const ph = (Math.PI * c) / 180
+        v.set(0.16 * Math.sin(th) * Math.cos(ph), 0.16 * Math.cos(th), 0.16 * Math.sin(th) * Math.sin(ph)).applyMatrix4(head.matrixWorld)
+        const y = screenY(cam, v)
+        if (y < topY) {
+          topY = y
+          topX = screenX(cam, v)
+        }
+      }
+    }
+    expect(Math.abs(screenX(cam, note.position) - topX)).toBeLessThan(1)
+    expect(Math.abs(screenY(cam, note.position) - topY)).toBeLessThan(0.1)
   })
 
   it('keeps an explicit height over the origin, and leaves the node alone once the speaker is gone', () => {

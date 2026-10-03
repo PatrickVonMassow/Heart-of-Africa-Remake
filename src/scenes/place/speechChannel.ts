@@ -32,7 +32,7 @@ import {
 } from '../../communication/speechLabel'
 import { pickSpeechTarget, type SpeechTargetCandidate } from '../../communication/speechTarget'
 import {
-  drawnHeadBall,
+  drawnHeadShape,
   drawnHeadTop,
   markedActorRise,
   silhouetteTop,
@@ -149,10 +149,10 @@ export function speechTipWorld(
   const e = (anchor as HeadNode).matrixWorld?.elements
   if (!e) return false
   const fixed = fixedHeights.has(label.speakerId)
-  const ball = fixed || !camera ? null : drawnHeadBall(anchor as HeadNode)
-  if (ball && camera) {
+  const shape = fixed || !camera ? null : drawnHeadShape(anchor as HeadNode)
+  if (shape && camera) {
     camera.updateWorldMatrix(true, false)
-    if (silhouetteTop(ball.center, ball.radius, camera.matrixWorld.elements, out)) return true
+    if (silhouetteTop(shape.center, shape.axes, camera.matrixWorld.elements, out)) return true
   }
   const top = fixed ? null : drawnHeadTop(anchor as HeadNode)
   if (top) {

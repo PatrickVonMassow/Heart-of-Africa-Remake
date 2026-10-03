@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import * as THREE from 'three/webgpu'
 import {
   collectActors,
-  drawnHeadBall,
+  drawnHeadShape,
   drawnHeadRise,
   drawnHeadTop,
   markActor,
@@ -251,19 +251,23 @@ describe('drawnHeadRise', () => {
  */
 describe('silhouetteTop', () => {
   const H = 900
-  /** A real three camera at `eye` looking at `look`, 900 px tall. */
-  function cameraAt(eye: [number, number, number], look: [number, number, number]) {
+  type V = [number, number, number]
+  /** A real three camera at `eye` looking at `look`, 900 px tall; `up` rolls it. */
+  function cameraAt(eye: V, look: V, up: V = [0, 1, 0]) {
     const cam = new THREE.PerspectiveCamera(60, 1440 / H, 0.1, 500)
+    cam.up.set(...up)
     cam.position.set(...eye)
     cam.lookAt(...look)
     cam.updateMatrixWorld(true)
     return cam
   }
+  const ball = (r: number): [V, V, V] => [[r, 0, 0], [0, r, 0], [0, 0, r]]
   const screenY = (cam: THREE.PerspectiveCamera, p: { x: number; y: number; z: number }) =>
     ((1 - new THREE.Vector3(p.x, p.y, p.z).project(cam).y) / 2) * H
   /** The silhouette's top edge on screen by brute force: the smallest screen y
-   *  over a dense sampling of the sphere — independent of the closed form. */
-  function sampledTopY(cam: THREE.PerspectiveCamera, c: [number, number, number], r: number) {
+   *  over a dense sampling of the unit sphere mapped through the semi-axes —
+   *  independent of the closed form. */
+  function sampledTopY(cam: THREE.PerspectiveCamera, c: V, axes: [V, V, V]) {
     let best = Infinity
     const n = 360
     const v = new THREE.Vector3()
@@ -271,7 +275,10 @@ describe('silhouetteTop', () => {
       const th = (Math.PI * i) / n
       for (let j = 0; j < 2 * n; j++) {
         const ph = (Math.PI * j) / n
-        v.set(c[0] + r * Math.sin(th) * Math.cos(ph), c[1] + r * Math.cos(th), c[2] + r * Math.sin(th) * Math.sin(ph))
+        const u = [Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]
+        v.set(
+          ...([0, 1, 2].map((k) => c[k] + axes[0][k] * u[0] + axes[1][k] * u[1] + axes[2][k] * u[2]) as V),
+        )
         best = Math.min(best, ((1 - v.project(cam).y) / 2) * H)
       }
     }
@@ -279,52 +286,93 @@ describe('silhouetteTop', () => {
   }
   // A grown head (r 0.16, centre 1.18) and a child's (0.55 of it), seen from
   // the traveller's eye at 1.6 m — level, looking down from a metre, at 20 m,
-  // off to the side, and with the camera pitched.
-  const cases: Array<{ name: string; c: [number, number, number]; r: number; eye: [number, number, number]; look: [number, number, number] }> = [
-    { name: 'grown, 4 m, level look', c: [0, 1.18, 0], r: 0.16, eye: [0, 1.6, 4], look: [0, 1.6, 0] },
-    { name: 'child, 1 m, looking down at it', c: [0, 0.65, 0], r: 0.088, eye: [0, 1.6, 1], look: [0, 0.65, 0] },
-    { name: 'grown, 20 m, off to the side', c: [3, 1.18, -2], r: 0.16, eye: [-4, 1.6, 17], look: [0, 1.4, 0] },
-    { name: 'grown, 1.5 m, pitched up past it', c: [0.4, 1.18, 0], r: 0.16, eye: [0, 1.6, 1.5], look: [0, 2.5, -3] },
+  // off to the side, pitched, rolled, and a squashed head seen from above.
+  const cases: Array<{ name: string; c: V; axes: [V, V, V]; eye: V; look: V; up?: V }> = [
+    { name: 'grown, 4 m, level look', c: [0, 1.18, 0], axes: ball(0.16), eye: [0, 1.6, 4], look: [0, 1.6, 0] },
+    { name: 'child, 1 m, looking down at it', c: [0, 0.65, 0], axes: ball(0.088), eye: [0, 1.6, 1], look: [0, 0.65, 0] },
+    { name: 'grown, 20 m, off to the side', c: [3, 1.18, -2], axes: ball(0.16), eye: [-4, 1.6, 17], look: [0, 1.4, 0] },
+    { name: 'grown, 1.5 m, pitched up past it', c: [0.4, 1.18, 0], axes: ball(0.16), eye: [0, 1.6, 1.5], look: [0, 2.5, -3] },
+    { name: 'grown, 3 m, camera rolled 20°', c: [0.3, 1.18, 0], axes: ball(0.16), eye: [0, 1.6, 3], look: [0, 1.3, 0], up: [Math.sin(0.35), Math.cos(0.35), 0] },
+    // The review's counterexample: a body squashed to 0.7 in height, no
+    // counter-scale, seen from a metre above — a ball of the vertical extent
+    // missed the outline by 9.4 px here.
+    { name: 'squashed head, 1 m, from above', c: [0, 0.826, 0], axes: [[0.16, 0, 0], [0, 0.112, 0], [0, 0, 0.16]], eye: [0, 1.6, 1], look: [0, 0.826, 0] },
+    // Tilted and non-uniform: every axis off the world grid.
+    { name: 'tilted non-uniform head, 2 m', c: [0.2, 1.1, -0.1], axes: [[0.277, 0.08, 0], [-0.04, 0.069, 0.03], [0, -0.05, 0.15]], eye: [0.5, 1.6, 2], look: [0, 1.0, 0] },
   ]
   for (const k of cases) {
     it(`meets the projected outline's top edge: ${k.name}`, () => {
-      const cam = cameraAt(k.eye, k.look)
+      const cam = cameraAt(k.eye, k.look, k.up)
       const out = { x: 0, y: 0, z: 0 }
-      expect(silhouetteTop(k.c, k.r, cam.matrixWorld.elements, out)).toBe(true)
-      expect(screenY(cam, out)).toBeCloseTo(sampledTopY(cam, k.c, k.r), 1)
-      // A point OF the ball, not one floating near it.
-      expect(Math.hypot(out.x - k.c[0], out.y - k.c[1], out.z - k.c[2])).toBeCloseTo(k.r, 6)
+      expect(silhouetteTop(k.c, k.axes, cam.matrixWorld.elements, out)).toBe(true)
+      expect(screenY(cam, out)).toBeCloseTo(sampledTopY(cam, k.c, k.axes), 1)
     })
   }
 
   it('is not the world crown when the head is seen from above: the crown sinks into the outline', () => {
-    // The hostile case: an implementation that returned the crown passes every
-    // level view above, and fails here by several pixels.
+    // An implementation that returned the crown passes every level view; here
+    // it is several pixels inside the outline — and silhouetteTop is not.
     const k = cases[1]
     const cam = cameraAt(k.eye, k.look)
-    const crown = { x: k.c[0], y: k.c[1] + k.r, z: k.c[2] }
-    expect(screenY(cam, crown) - sampledTopY(cam, k.c, k.r)).toBeGreaterThan(5)
+    const crown = { x: k.c[0], y: k.c[1] + 0.088, z: k.c[2] }
+    const top = sampledTopY(cam, k.c, k.axes)
+    expect(screenY(cam, crown) - top).toBeGreaterThan(5)
+    const out = { x: 0, y: 0, z: 0 }
+    silhouetteTop(k.c, k.axes, cam.matrixWorld.elements, out)
+    expect(Math.abs(screenY(cam, out) - top)).toBeLessThan(0.1)
   })
 
-  it('declines a ball the camera is inside or behind, writing nothing', () => {
+  it('stands on the outline sideways too: over the head under a rolled camera', () => {
+    // A rolled camera's "up" is not the world's: the top of the outline moves
+    // sideways on screen, and the tip with it.
+    const k = cases[4]
+    const cam = cameraAt(k.eye, k.look, k.up)
+    const out = { x: 0, y: 0, z: 0 }
+    silhouetteTop(k.c, k.axes, cam.matrixWorld.elements, out)
+    const p = new THREE.Vector3(out.x, out.y, out.z).project(cam)
+    // The sampled point of smallest screen y, its x.
+    let bestY = Infinity
+    let bestX = 0
+    const v = new THREE.Vector3()
+    for (let i = 0; i <= 360; i++) {
+      for (let j = 0; j < 720; j++) {
+        const th = (Math.PI * i) / 360
+        const ph = (Math.PI * j) / 360
+        v.set(k.c[0] + 0.16 * Math.sin(th) * Math.cos(ph), k.c[1] + 0.16 * Math.cos(th), k.c[2] + 0.16 * Math.sin(th) * Math.sin(ph)).project(cam)
+        if (v.y > -bestY) {
+          bestY = -v.y
+          bestX = v.x
+        }
+      }
+    }
+    expect(Math.abs(p.x - bestX) * 720).toBeLessThan(1)
+  })
+
+  it('declines an ellipsoid the camera is inside or behind, writing nothing', () => {
     const cam = cameraAt([0, 1.6, 4], [0, 1.6, 0])
     const out = { x: 7, y: 7, z: 7 }
-    expect(silhouetteTop([0, 1.6, 4.05], 0.16, cam.matrixWorld.elements, out)).toBe(false)
-    expect(silhouetteTop([0, 1.6, 8], 0.16, cam.matrixWorld.elements, out)).toBe(false)
+    expect(silhouetteTop([0, 1.6, 4.05], ball(0.16), cam.matrixWorld.elements, out)).toBe(false)
+    expect(silhouetteTop([0, 1.6, 8], ball(0.16), cam.matrixWorld.elements, out)).toBe(false)
     expect(out).toEqual({ x: 7, y: 7, z: 7 })
+    // And in front it does write.
+    expect(silhouetteTop([0, 1.6, 0], ball(0.16), cam.matrixWorld.elements, out)).toBe(true)
   })
 })
 
-describe('drawnHeadBall', () => {
-  it('is the visible head’s world centre and world-up half-extent', () => {
-    const e = [0.55, 0, 0, 0, 0, 0.55, 0, 0, 0, 0, 0.55, 0, 2, 0.65, -1, 1]
+describe('drawnHeadShape', () => {
+  it('is the visible head’s world centre and its matrix columns times the radius', () => {
+    // Rotated and non-uniformly scaled, so a row/column mix-up shows.
+    const c = Math.cos(Math.PI / 6)
+    const sn = Math.sin(Math.PI / 6)
+    const e = [c * 2, sn * 2, 0, 0, -sn * 0.5, c * 0.5, 0, 0, 0, 0, 1, 0, 2, 0.65, -1, 1]
     const anchor: HeadNode = {
       matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0, -1, 1] },
-      children: [{ name: 'figure-head', matrixWorld: { elements: e }, geometry: { parameters: { radius: 0.16 } } }],
+      children: [{ name: 'figure-head', matrixWorld: { elements: e }, geometry: { parameters: { radius: 0.1 } } }],
     }
-    const ball = drawnHeadBall(anchor)!
-    expect(ball.center).toEqual([2, 0.65, -1])
-    expect(ball.radius).toBeCloseTo(0.088)
+    const shape = drawnHeadShape(anchor)!
+    expect(shape.center).toEqual([2, 0.65, -1])
+    const round = (v: number[]) => v.map((x) => +x.toFixed(6))
+    expect(shape.axes.map(round)).toEqual([round([c * 0.2, sn * 0.2, 0]), round([-sn * 0.05, c * 0.05, 0]), [0, 0, 0.1]])
   })
 
   it('is null under a hidden group, as the renderer draws nothing there', () => {
@@ -337,6 +385,9 @@ describe('drawnHeadBall', () => {
         },
       ],
     }
-    expect(drawnHeadBall(anchor)).toBeNull()
+    expect(drawnHeadShape(anchor)).toBeNull()
+    // The same head, its group shown: found.
+    ;(anchor.children![0] as { visible: boolean }).visible = true
+    expect(drawnHeadShape(anchor)).not.toBeNull()
   })
 })

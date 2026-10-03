@@ -188,56 +188,88 @@ export function drawnHeadRise(root: HeadNode | null | undefined): number | null 
   return drawnHeadTop(root)?.[1] ?? null
 }
 
-/** The drawn head under `root` as a ball in WORLD space: its centre and its
- *  world-up half-extent (r·|row y|, as drawnHeadTop reads it). Null without a
- *  visible head. The figures' heads are drawn round; a squashed head is
- *  treated as the ball of its vertical extent. */
-export function drawnHeadBall(
+/** The drawn head under `root` in WORLD space: its centre and the three world
+ *  semi-axes the head sphere's radius becomes under its world matrix (the
+ *  matrix columns times r) — a squashed or tilted head is the ellipsoid it is
+ *  drawn as. Null without a visible head. */
+export function drawnHeadShape(
   root: HeadNode | null | undefined,
-): { center: [number, number, number]; radius: number } | null {
+): { center: [number, number, number]; axes: [Vec3, Vec3, Vec3] } | null {
   if (!root?.matrixWorld) return null
   const head = findHead(root)
   if (!head) return null
   const e = head.matrixWorld!.elements
   const r = head.geometry?.parameters?.radius ?? 0
-  return { center: [e[12], e[13], e[14]], radius: r * Math.hypot(e[1], e[5], e[9]) }
+  return {
+    center: [e[12], e[13], e[14]],
+    axes: [
+      [e[0] * r, e[1] * r, e[2] * r],
+      [e[4] * r, e[5] * r, e[6] * r],
+      [e[8] * r, e[9] * r, e[10] * r],
+    ],
+  }
 }
 
+type Vec3 = [number, number, number]
+const dot = (a: ArrayLike<number>, b: ArrayLike<number>) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
 /**
- * The point of a ball (world `center`, `radius`) that a perspective camera
- * with world matrix `camera` draws HIGHEST on screen — the top of its
- * silhouette (work-order point 1276). Seen from above or close by, that is not
- * the ball's world crown but a point behind it: the crown projects below the
- * outline, by about r(1 − cos α)/D of the view (α the elevation, D the
- * distance) — a 5 px lift can vanish into the hair over a child a metre away.
+ * The point of an ellipsoid (world `center`, world semi-axes `axes`, i.e. the
+ * unit sphere under the linear map L whose columns they are) that a
+ * perspective camera with world matrix `camera` draws HIGHEST on screen — the
+ * top of its silhouette (work-order point 1276). Seen from above or close by,
+ * that is not the world crown but a point behind it: the crown projects
+ * below the outline, and a few-pixel lift can vanish into the hair.
  *
- * In camera space (right, up, back) screen height is y/−z, independent of x,
- * so the highest point lies where a plane through the eye and the camera's x
- * axis touches the ball: at angle θ = atan2(cy, −cz) + asin(R/D) above the
- * view axis, D = hypot(cy, cz); the point is center + R(cos θ·up + sin θ·back).
- * Writes `out`; false (nothing written) when the ball is not wholly in front
- * of the camera, so the caller keeps the world crown.
+ * In camera space (right, up, back) screen height is y/−z. The topmost slope k
+ * is where the plane y + k·z = 0 through the eye touches the ellipsoid: with
+ * n = up + k·back, the ellipsoid's highest value of n·p is n·c + |Lᵀn|, and
+ * touching means n·c + |Lᵀn| = 0 — a quadratic in k, whose larger root is the
+ * top tangent (the smaller one the bottom). The touching point is
+ * c + L·Lᵀn/|Lᵀn|. Camera roll is honoured: "up" is the camera's own up.
+ * Writes `out`; false (nothing written) when the ellipsoid is not wholly in
+ * front of the camera, so the caller keeps the world crown.
  */
 export function silhouetteTop(
   center: readonly [number, number, number],
-  radius: number,
+  axes: readonly [Vec3, Vec3, Vec3],
   camera: ArrayLike<number>,
   out: { x: number; y: number; z: number },
 ): boolean {
-  const len = (i: number) => Math.hypot(camera[i], camera[i + 1], camera[i + 2]) || 1
-  const up = [camera[4] / len(4), camera[5] / len(4), camera[6] / len(4)]
-  const back = [camera[8] / len(8), camera[9] / len(8), camera[10] / len(8)]
-  const d = [center[0] - camera[12], center[1] - camera[13], center[2] - camera[14]]
-  const cy = d[0] * up[0] + d[1] * up[1] + d[2] * up[2]
-  const cz = d[0] * back[0] + d[1] * back[1] + d[2] * back[2]
-  const dist = Math.hypot(cy, cz)
-  if (!(radius >= 0) || -cz <= radius || dist <= radius) return false
-  const theta = Math.atan2(cy, -cz) + Math.asin(radius / dist)
-  const c = Math.cos(theta) * radius
-  const s = Math.sin(theta) * radius
-  out.x = center[0] + c * up[0] + s * back[0]
-  out.y = center[1] + c * up[1] + s * back[1]
-  out.z = center[2] + c * up[2] + s * back[2]
+  const unit = (i: number): Vec3 => {
+    const l = Math.hypot(camera[i], camera[i + 1], camera[i + 2]) || 1
+    return [camera[i] / l, camera[i + 1] / l, camera[i + 2] / l]
+  }
+  const up = unit(4)
+  const back = unit(8)
+  const d: Vec3 = [center[0] - camera[12], center[1] - camera[13], center[2] - camera[14]]
+  const cy = dot(d, up)
+  const cz = dot(d, back)
+  // Lᵀv: the projections of v on the semi-axes.
+  const lt = (v: Vec3): Vec3 => [dot(axes[0], v), dot(axes[1], v), dot(axes[2], v)]
+  const lu = lt(up)
+  const lb = lt(back)
+  // |Lᵀ(up + k·back)|² = (cy + k·cz)²  →  A k² + 2B k + C = 0
+  const A = dot(lb, lb) - cz * cz
+  const B = dot(lu, lb) - cy * cz
+  const C = dot(lu, lu) - cy * cy
+  // A < 0 exactly when the whole ellipsoid lies in front of the eye
+  // (its depth half-extent |Lᵀback| is less than its depth −cz).
+  if (!(cz < 0) || !(A < 0)) return false
+  const disc = B * B - A * C
+  if (!(disc >= 0)) return false
+  // A < 0: the larger root is (−B − √disc)/A.
+  const k = (-B - Math.sqrt(disc)) / A
+  const n: Vec3 = [up[0] + k * back[0], up[1] + k * back[1], up[2] + k * back[2]]
+  const ltn = lt(n)
+  const len = Math.hypot(ltn[0], ltn[1], ltn[2])
+  if (!(len > 0)) return false
+  for (let i = 0; i < 3; i++) {
+    const v = center[i] + (axes[0][i] * ltn[0] + axes[1][i] * ltn[1] + axes[2][i] * ltn[2]) / len
+    if (i === 0) out.x = v
+    else if (i === 1) out.y = v
+    else out.z = v
+  }
   return true
 }
 
