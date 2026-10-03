@@ -3379,8 +3379,8 @@ if (section('village-pounding')) {
           const along = Math.atan2(-m.x, -m.z)
           const others = layout.colliders.filter((c) => !(Math.hypot((c.x ?? 1e9) - m.x, (c.z ?? 1e9) - m.z) < 1.2))
           const clear = (x, z) => Math.min(...others.map((c) => window.__clearanceTo(c, x, z)))
-          // Every OTHER drawn person (life is frozen): none may stand in the
-          // lens' cone in front of the pair, or the picture is of a bystander.
+          // Every OTHER drawn person (life is frozen): none may stand between
+          // the lens and the pair, or the picture is of a bystander.
           const people = []
           window.__placeScene.traverse((o) => {
             if (o.name !== 'figure-head') return
@@ -3393,9 +3393,12 @@ if (section('village-pounding')) {
             const bx = q.x - x
             const bz = q.z - z
             const reach = Math.hypot(ax, az)
-            const d = Math.hypot(bx, bz)
-            if (d < 0.3 || d > reach + 0.6) return false
-            return Math.acos(Math.max(-1, Math.min(1, (ax * bx + az * bz) / (reach * d)))) < 0.3
+            // In FRONT of the pair (nearer the lens than the mortar's near
+            // woman) and within a body and a half of the sight line.
+            const ahead = (ax * bx + az * bz) / reach
+            const aside = Math.abs(ax * bz - az * bx) / reach
+            // Nor anyone at the lens' elbow, who fills a third of a close frame.
+            return (ahead > 0.3 && ahead < reach - 0.5 && aside < 0.8) || Math.hypot(bx, bz) < 1.5
           })
           for (let k = 0; k < 24; k++) {
             const angle = along + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
