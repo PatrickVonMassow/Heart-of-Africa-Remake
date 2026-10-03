@@ -1037,7 +1037,7 @@ interface BalanceConfig {
       hullBeam: number
     }
     /** The fishermen's own fire by the landing (work-order 1245): the carrier,
-     *  the griller, the smoking rack and the eater. */
+     *  the griller, the smoking rack and the pounding pair who eat there. */
     fishFire: {
       /** The fire: this far upstream of the landing and inland of the top of
        *  the bank (m). */
@@ -1045,7 +1045,7 @@ interface BalanceConfig {
       fireInland: number
       /** Walking paces (m/s). */
       carrierPace: number
-      eaterPace: number
+      duoPace: number
       /** Setting down or taking up a basket or a fish. */
       liftSeconds: number
       /** How long before the full basket is set down the carrier is meant to
@@ -1068,18 +1068,18 @@ interface BalanceConfig {
       rackFill: number
       /** Smoked fish in the storage basket at the start. */
       storageStart: number
-      /** The eater: how often he comes (s, with a spread 0..1), how long a
-       *  fish takes to eat and one bite, and how far toward the village he
-       *  goes back to. */
-      eaterIntervalSeconds: number
-      eaterIntervalSpread: number
+      /** The pounding pair (point 1282): how often they walk to the rack
+       *  together (s, with a spread 0..1), how long a fish takes to eat and
+       *  one bite, and where their mortar stands — this far back from the
+       *  rack toward the village and this far to the side of that bearing. */
+      duoIntervalSeconds: number
+      duoIntervalSpread: number
       eatSeconds: number
       biteSeconds: number
-      eaterHomeBack: number
-      /** At home he pounds grain: his mortar this far to his side (m) and the
-       *  pestle's stroke rate (rad/s). */
-      eaterMortarOffset: number
-      eaterPoundRate: number
+      duoHomeBack: number
+      duoMortarOffset: number
+      /** Side by side at the rack: the gap between the two women (m). */
+      duoRackGap: number
       /** The wait budget per round, boat and carrier alike (s, averaged). */
       waitBudgetSeconds: number
     }
@@ -2098,13 +2098,13 @@ export const balance: BalanceConfig = {
     // carrier's gutting fills his round up to the boat's (`gutSecondsFor`), so
     // with about six fish a round he spends ~20 s on each; the griller keeps
     // four on the embers for 50 s each, far more than the ~6 fish a round
-    // bring, so the board never backs up; the eater comes about every three
-    // minutes and takes one fish, which the next laid fish replaces.
+    // bring, so the board never backs up; the pounding pair comes about every
+    // three minutes and takes a fish each, which the next laid fish replace.
     fishFire: {
       fireBack: 8,
       fireInland: 6.5,
       carrierPace: 1.25,
-      eaterPace: 1.1,
+      duoPace: 1.1, // calibratable
       liftSeconds: 0.8,
       carrierLeadSeconds: 6,
       gutMinSecondsPerFish: 6,
@@ -2117,13 +2117,13 @@ export const balance: BalanceConfig = {
       packSeconds: 1.2,
       rackFill: 8,
       storageStart: 4,
-      eaterIntervalSeconds: 180,
-      eaterIntervalSpread: 0.3,
-      eatSeconds: 24,
-      biteSeconds: 3,
-      eaterHomeBack: 12,
-      eaterMortarOffset: 0.6, // calibratable
-      eaterPoundRate: 2.4, // calibratable; the village pounder's rate (rad/s)
+      duoIntervalSeconds: 180, // calibratable
+      duoIntervalSpread: 0.3, // calibratable
+      eatSeconds: 24, // calibratable
+      biteSeconds: 3, // calibratable
+      duoHomeBack: 12, // calibratable
+      duoMortarOffset: 0.6, // calibratable
+      duoRackGap: 0.85, // calibratable
       waitBudgetSeconds: 15,
     },
     loom: {

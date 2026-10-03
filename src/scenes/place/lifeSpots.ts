@@ -6,6 +6,9 @@ import { balance } from '../../config/balance'
 import { WALKER_RADIUS } from './collision'
 import { mulberry32 } from '../../world/noise'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
+import { PLACES } from '../../world/geo'
+import { buildRiverBank } from './riverBank'
+import { PLACE_RADIUS } from './placeRadius'
 
 /**
  * Where the loom BELONGS while the village is planned: the buildings are fitted
@@ -75,11 +78,22 @@ export function villageHasWell(placeId: string): boolean {
   return placeId !== ROCK_VILLAGE_ID
 }
 
+/**
+ * Whether a village's two women pound at the CENTRE mortar (`VILLAGE_SPOTS.pounder`).
+ * A riverside village has moved them to the fishers' shore, where they pound
+ * and walk to the fish fire to eat (point 1282, `fishFire.ts`); there the
+ * centre spot is free. Bankless villages keep the centre mortar.
+ */
+export function villagePoundsAtCentre(placeId: string): boolean {
+  const place = PLACES.find((p) => p.id === placeId)
+  return !place || place.kind !== 'village' || !buildRiverBank(place, PLACE_RADIUS)
+}
+
 /** The fixed life-prop spots a village's buildings are kept clear of. Derived
  *  from `VILLAGE_SPOTS` so a new prop is covered without a second list. */
 export function villageKeepClearSpots(placeId: string): Array<[number, number]> {
   return Object.entries(VILLAGE_SPOTS)
-    .filter(([name]) => name !== 'well' || villageHasWell(placeId))
+    .filter(([name]) => (name !== 'well' || villageHasWell(placeId)) && (name !== 'pounder' || villagePoundsAtCentre(placeId)))
     .map(([, spot]) => spot)
 }
 
@@ -107,7 +121,7 @@ export function villageAdultStations(
     : []
   return [
     VILLAGE_SPOTS.talkers,
-    VILLAGE_SPOTS.pounder,
+    ...(villagePoundsAtCentre(placeId) ? [VILLAGE_SPOTS.pounder] : []),
     VILLAGE_SPOTS.drummer,
     ...well,
     LOOM_SPOT, // the weaver's reserved ground (the laid warp clears them itself)
@@ -124,11 +138,20 @@ export function villageLifeProps(fire: readonly [number, number], placeId: strin
     { x: fire[0], z: fire[1], r: 1.3 },
     { x: LOOM_SPOT[0], z: LOOM_SPOT[1], r: 1 },
     { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
-    { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
+    ...(villagePoundsAtCentre(placeId) ? [{ x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 }] : []),
     { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },
     ...(villageHasWell(placeId)
       ? [{ x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 }]
       : []),
+  ]
+}
+
+/** The centre pounders' bodies (point 1274), where the renderer stands them. */
+function centrePounderBodies() {
+  const { standOff, pounders } = balance.villageLife.mortar
+  return [
+    inwardStationBody(VILLAGE_SPOTS.pounder, -standOff),
+    ...(pounders > 1 ? [inwardStationBody(VILLAGE_SPOTS.pounder, standOff)] : []),
   ]
 }
 
@@ -140,8 +163,7 @@ export function villageLifeFootprints(fire: readonly [number, number], placeId: 
     weaverStance(),
     // The women pounding (point 1274), where the renderer stands them: the first
     // on the outer side of the mortar, the second across it on the village side.
-    inwardStationBody(VILLAGE_SPOTS.pounder, -balance.villageLife.mortar.standOff),
-    ...(balance.villageLife.mortar.pounders > 1 ? [inwardStationBody(VILLAGE_SPOTS.pounder, balance.villageLife.mortar.standOff)] : []),
+    ...(villagePoundsAtCentre(placeId) ? centrePounderBodies() : []),
     ...[-0.5, 0.5].map(dx => ({ x: VILLAGE_SPOTS.talkers[0] + dx, z: VILLAGE_SPOTS.talkers[1], r: WALKER_RADIUS })),
     { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: WALKER_RADIUS },
     ...(villageHasWell(placeId)

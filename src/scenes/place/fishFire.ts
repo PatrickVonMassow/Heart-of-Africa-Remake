@@ -7,8 +7,10 @@
 // the gutted fish over the embers, turns them, and lays them on a SMOKING RACK
 // beside the fire; the rack stays at a roughly constant fill because each time
 // he lays fresh fish on a full rack he packs the driest into a STORAGE BASKET;
-// and every few minutes an EATER comes to the rack, takes one fish, eats it on
-// the spot and goes back. Nobody here says a word.
+// and every few minutes the village's two POUNDING WOMEN, whose mortar stands
+// back from the fire toward the village, finish their strokes, walk together
+// to the rack, each take a fish, eat it there and walk back to take up their
+// alternating pounding again (point 1282). Nobody here says a word.
 //
 // THE TIMING (user: "niemand zu lange auf den anderen wartet"). The carrier's
 // round is the boat's round: he guts for as long as it takes the boat to come
@@ -29,6 +31,14 @@ import {
   gutOneAtFire,
   type BasketRing,
 } from './fishBaskets'
+import {
+  advancePounding,
+  createPoundingDuo,
+  pounderStands,
+  type MortarConfig,
+  type PounderStand,
+  type PoundingDuo,
+} from './mortarPounding'
 import type { BankPoint, PlaceRiverBank } from './riverBank'
 import { yawOf, type CanoeLane } from './villagerCanoe'
 
@@ -53,11 +63,18 @@ export interface FisherySites {
   carrierAtFire: FisheryStand
   carrierAtBank: FisheryStand
   griller: FisheryStand
-  eaterAtRack: FisheryStand
-  /** Where the eater pounds grain between his visits, facing his mortar. */
-  eaterHome: FisheryStand
-  /** The eater's mortar, beside his walk to the rack (work-order 1251). */
-  eaterMortar: BankPoint
+  /** The village's one mortar outside the middle, where the pounding pair
+   *  works between their visits to the rack (point 1282; it is the spot the
+   *  fish eater's mortar of work-order 1251 stood on). */
+  duoMortar: BankPoint
+  /** The turn of the mortar's frame (`Pounder`'s yaw): the pair stands across
+   *  it on the line square to their walk, so both walk side by side and
+   *  neither passes the mortar. */
+  duoYaw: number
+  /** Each woman's stand at the mortar (`pounderStands`). */
+  duoStands: PounderStand[]
+  /** Each woman's stand at the rack, side by side, facing the water. */
+  duoAtRack: FisheryStand[]
   /** Where the basket stands at the landing (`CanoeLane.basketSpot`). */
   basketSpot: BankPoint
 }
@@ -73,6 +90,7 @@ export function fisherySites(
   lane: Pick<CanoeLane, 'basketSpot'>,
   laneEnd: number = balance.villageLife.canoe.laneEnd,
   cfg: FireConfig = balance.villageLife.fishFire,
+  mortarCfg: MortarConfig = balance.villageLife.mortar,
 ): FisherySites {
   const on = (s: number, out: number): BankPoint => ({ x: bank.nx * out + bank.fx * s, z: bank.nz * out + bank.fz * s })
   const fs = laneEnd - cfg.fireBack
@@ -82,18 +100,28 @@ export function fisherySites(
   const fire = on(fs, fo)
   const rack = on(fs - 2.3, fo + 0.2)
   const board = on(fs + 1.5, fo + 0.3)
-  // The eater comes from the village: back from the rack toward the
-  // settlement's middle, along the rack's own bearing.
+  // The mortar stands back from the rack toward the settlement's middle,
+  // along the rack's own bearing, and `duoMortarOffset` to the side of it.
   const r = Math.hypot(rack.x, rack.z)
-  const k = Math.max(0, (r - cfg.eaterHomeBack) / r)
+  const k = Math.max(0, (r - cfg.duoHomeBack) / r)
   const home = { x: rack.x * k, z: rack.z * k }
-  // His mortar stands to his side of that bearing, so his walk to the rack
-  // never crosses it, and he faces it while he pounds.
   const toRack = Math.hypot(rack.x - home.x, rack.z - home.z) || 1
   const mortar = {
-    x: home.x + ((rack.z - home.z) / toRack) * cfg.eaterMortarOffset,
-    z: home.z - ((rack.x - home.x) / toRack) * cfg.eaterMortarOffset,
+    x: home.x + ((rack.z - home.z) / toRack) * cfg.duoMortarOffset,
+    z: home.z - ((rack.x - home.x) / toRack) * cfg.duoMortarOffset,
   }
+  // The pair's frame: its z axis square to the walk from the mortar to the
+  // rack, so the two stand side by side to that walk.
+  const dl = Math.hypot(rack.x - mortar.x, rack.z - mortar.z) || 1
+  const px = (rack.z - mortar.z) / dl
+  const pz = -(rack.x - mortar.x) / dl
+  const duoYaw = Math.atan2(px, pz)
+  const duoStands = pounderStands(mortar.x, mortar.z, duoYaw, mortarCfg)
+  // At the rack each keeps her side: the walks run beside each other.
+  const atRack = stand(fs - 2.3, fo - 0.75, toWater)
+  const duoAtRack = [-1, 1]
+    .slice(0, duoStands.length)
+    .map((side) => ({ x: atRack.x + px * side * cfg.duoRackGap / 2, z: atRack.z + pz * side * cfg.duoRackGap / 2, yaw: toWater }))
   return {
     fire,
     rack,
@@ -109,9 +137,10 @@ export function fisherySites(
     ),
     // Kneeling just clear of the hearth's ring of stones (radius 1 m).
     griller: stand(fs, fo - 1.4, toWater),
-    eaterAtRack: stand(fs - 2.3, fo - 0.75, toWater),
-    eaterHome: { ...home, yaw: yawOf(mortar.x - home.x, mortar.z - home.z) },
-    eaterMortar: mortar,
+    duoMortar: mortar,
+    duoYaw,
+    duoStands,
+    duoAtRack,
     basketSpot: lane.basketSpot,
   }
 }
@@ -154,27 +183,11 @@ export interface FishGriller {
   slot: number
 }
 
-export type EaterPhase = 'home' | 'toRack' | 'take' | 'eat' | 'back'
-
-export interface FishEater {
-  phase: EaterPhase
-  clock: number
-  x: number
-  z: number
-  yaw: number
-  walked: number
-  /** Seconds until he next comes to the rack (while at home). */
-  next: number
-  /** How much of his fish is left, 1 whole to 0 eaten. */
-  fish: number
-  /** Visits made. */
-  visits: number
-}
-
 export interface FishFireState {
   carrier: FishCarrier
   griller: FishGriller
-  eater: FishEater
+  /** The pounding pair, who come to the rack to eat (point 1282). */
+  duo: PoundingDuo
   /** Gutted fish on the board, waiting for the griller. */
   board: number
   /** Fish over the embers. */
@@ -222,15 +235,7 @@ export function createFishFire(
   return {
     carrier,
     griller: { action: 'tend', clock: 0, ...sites.griller, slot: -1 },
-    eater: {
-      phase: 'home',
-      clock: 0,
-      ...sites.eaterHome,
-      walked: 0,
-      next: cfg.eaterIntervalSeconds * (0.3 + 0.4 * rand()),
-      fish: 0,
-      visits: 0,
-    },
+    duo: createPoundingDuo(sites.duoStands, cfg.duoIntervalSeconds * (0.3 + 0.4 * rand())),
     board: 0,
     grill: [
       { t: cfg.grillSeconds * 0.2, turned: false },
@@ -287,7 +292,9 @@ function walkTo(f: { x: number; z: number; yaw: number; walked: number }, to: Ba
 }
 
 /**
- * Advances the fire by `dt`. `round` is the boat's expected round in seconds
+ * Advances the fire by `dt` — the boat's people, the griller and the rack; the
+ * pounding pair is `stepPoundingDuo`'s, so the scene's life freeze can hold
+ * them at their mortar on its own. `round` is the boat's expected round in seconds
  * (`canoeCycleSeconds`), which the carrier's gutting is timed against.
  */
 export function stepFishFire(
@@ -297,11 +304,9 @@ export function stepFishFire(
   dt: number,
   round: number,
   cfg: FireConfig = balance.villageLife.fishFire,
-  rand: () => number = Math.random,
 ): void {
   stepCarrier(state, sites, ring, dt, round, cfg)
   stepGriller(state, sites, dt, cfg)
-  stepEater(state, sites, dt, cfg, rand)
   for (let i = 0; i < state.rack.length; i++) state.rack[i] += dt
 }
 
@@ -419,90 +424,119 @@ function stepGriller(state: FishFireState, sites: FisherySites, dt: number, cfg:
   g.action = 'tend'
 }
 
-function stepEater(state: FishFireState, sites: FisherySites, dt: number, cfg: FireConfig, rand: () => number): void {
-  const e = state.eater
-  e.clock += dt
-  switch (e.phase) {
-    case 'home':
-      e.next -= dt
-      if (e.next <= 0) {
-        if (state.rack.length > 0) {
-          e.phase = 'toRack'
-          e.clock = 0
-        } else e.next = cfg.eaterIntervalSeconds * 0.25
+/**
+ * Advances the pounding pair by `dt` (point 1282). At the mortar they pound
+ * alternately; when their interval runs out (and the rack holds a fish for
+ * each) each finishes the stroke in hand, and they walk TOGETHER to the rack,
+ * each takes the driest fish, both eat it there, and they walk back together
+ * and take up their pounding again. A woman who arrives first waits for the
+ * other, so the pair always moves on as one.
+ */
+export function stepPoundingDuo(
+  state: FishFireState,
+  sites: FisherySites,
+  dt: number,
+  cfg: FireConfig = balance.villageLife.fishFire,
+  rand: () => number = Math.random,
+  mortarCfg: MortarConfig = balance.villageLife.mortar,
+): void {
+  const d = state.duo
+  d.clock += dt
+  const enter = (phase: PoundingDuo['phase']) => {
+    d.phase = phase
+    d.clock = 0
+    for (const w of d.women) w.arrived = false
+  }
+  const walkAll = (to: readonly FisheryStand[]): boolean => {
+    d.women.forEach((w, i) => {
+      if (w.arrived) return
+      if (walkTo(w, to[i], cfg.duoPace, dt)) {
+        w.arrived = true
+        w.yaw = to[i].yaw
       }
+    })
+    return d.women.every((w) => w.arrived)
+  }
+  switch (d.phase) {
+    case 'pound':
+      advancePounding(d, dt, mortarCfg)
+      d.next -= dt
+      if (d.next <= 0) {
+        if (state.rack.length >= d.women.length) enter('settle')
+        else d.next = cfg.duoIntervalSeconds * 0.25
+      }
+      break
+    case 'settle':
+      advancePounding(d, dt, mortarCfg)
+      if (d.women.every((w) => w.resting)) enter('toRack')
       break
     case 'toRack':
-      if (walkTo(e, sites.eaterAtRack, cfg.eaterPace, dt)) {
-        e.yaw = sites.eaterAtRack.yaw
-        e.phase = 'take'
-        e.clock = 0
-      }
+      if (walkAll(sites.duoAtRack)) enter('take')
       break
     case 'take':
-      if (e.clock >= cfg.takeSeconds / 2 && e.fish === 0) {
-        // The driest fish, taken off the rack by hand.
-        let oldest = -1
-        for (let i = 0; i < state.rack.length; i++) if (oldest < 0 || state.rack[i] > state.rack[oldest]) oldest = i
-        if (oldest >= 0) {
+      if (d.clock >= cfg.takeSeconds / 2) {
+        for (const w of d.women) {
+          if (w.fish > 0) continue
+          // The driest fish, taken off the rack by hand.
+          let oldest = -1
+          for (let i = 0; i < state.rack.length; i++) if (oldest < 0 || state.rack[i] > state.rack[oldest]) oldest = i
+          if (oldest < 0) break
           state.rack.splice(oldest, 1)
-          e.fish = 1
+          w.fish = 1
         }
       }
-      if (e.clock >= cfg.takeSeconds) {
-        e.phase = e.fish > 0 ? 'eat' : 'back'
-        e.clock = 0
-      }
+      if (d.clock >= cfg.takeSeconds) enter(d.women.some((w) => w.fish > 0) ? 'eat' : 'back')
       break
     case 'eat':
-      e.fish = Math.max(0, 1 - e.clock / cfg.eatSeconds)
-      if (e.clock >= cfg.eatSeconds) {
-        e.fish = 0
-        e.visits++
-        state.eaten++
-        e.phase = 'back'
-        e.clock = 0
-      }
+      if (d.clock >= cfg.eatSeconds) {
+        for (const w of d.women) {
+          if (w.fish > 0) state.eaten++
+          w.fish = 0
+        }
+        d.visits++
+        enter('back')
+      } else for (const w of d.women) if (w.fish > 0) w.fish = Math.max(1e-3, 1 - d.clock / cfg.eatSeconds)
       break
     case 'back':
-      if (walkTo(e, sites.eaterHome, cfg.eaterPace, dt)) {
-        e.yaw = sites.eaterHome.yaw
-        e.phase = 'home'
-        e.clock = 0
-        e.next = cfg.eaterIntervalSeconds * (1 + cfg.eaterIntervalSpread * (2 * rand() - 1))
+      if (walkAll(sites.duoStands)) {
+        d.phase = 'pound'
+        d.clock = 0
+        d.poundClock = 0
+        d.women.forEach((w) => {
+          w.resting = false
+          w.arrived = true
+        })
+        d.next = cfg.duoIntervalSeconds * (1 + cfg.duoIntervalSpread * (2 * rand() - 1))
       }
       break
   }
 }
 
-/** What the eater visibly does in each phase; none of them is standing idle
- *  (work-order 1251: between visits he pounds grain at his mortar). */
-export type EaterOccupation = 'pound' | 'walk' | 'take' | 'eat'
+/** What a woman of the pair visibly does: pounding, walking, taking, eating,
+ *  or — briefly, when she reached the rack or her stand first — waiting for
+ *  the other (work-order 1251: nobody here stands idle). */
+export type DuoOccupation = 'pound' | 'walk' | 'take' | 'eat' | 'wait'
 
-export function eaterOccupation(eater: Pick<FishEater, 'phase'>): EaterOccupation {
-  switch (eater.phase) {
-    case 'home':
+export function duoOccupation(duo: PoundingDuo, i: number): DuoOccupation {
+  const w = duo.women[i]
+  switch (duo.phase) {
+    case 'pound':
+    case 'settle':
       return 'pound'
     case 'toRack':
     case 'back':
-      return 'walk'
+      return w.arrived ? 'wait' : 'walk'
     case 'take':
       return 'take'
     case 'eat':
-      return 'eat'
+      return w.fish > 0 ? 'eat' : 'wait'
   }
 }
 
-/** The pestle's lift at home, 0 down in the mortar to 1 at the top of the
- *  stroke; 0 while he is away, so the pestle rests in the mortar. */
-export function eaterPoundStroke(eater: Pick<FishEater, 'phase' | 'clock'>, cfg: FireConfig = balance.villageLife.fishFire): number {
-  if (eater.phase !== 'home') return 0
-  return Math.abs(Math.sin(eater.clock * cfg.eaterPoundRate))
-}
-
-/** Where his hand is in a bite: 0 at the fish held low, 1 at the mouth. */
-export function biteLift(eater: Pick<FishEater, 'phase' | 'clock'>, cfg: FireConfig = balance.villageLife.fishFire): number {
-  if (eater.phase !== 'eat') return 0
-  const f = (eater.clock / cfg.biteSeconds) % 1
+/** Where her hand is in a bite: 0 at the fish held low, 1 at the mouth. */
+export function biteLift(duo: Pick<PoundingDuo, 'phase' | 'clock'>, cfg: FireConfig = balance.villageLife.fishFire, woman = 0): number {
+  if (duo.phase !== 'eat') return 0
+  // The second woman bites a little out of step with the first.
+  const f = ((duo.clock + woman * 0.45 * cfg.biteSeconds) / cfg.biteSeconds) % 1
   return Math.sin(Math.PI * Math.min(1, f / 0.6)) * (f < 0.6 ? 1 : 0)
 }

@@ -41,16 +41,8 @@ import { chiefBesideDrummerSpot } from './chiefWalk'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
 import type { UseCandidate } from './useKeyTarget'
-
-/** The walkable radius the place scene was first built at, and the unit
- *  `balance.settlementRoom` multiplies. It is a historical base, not a knob:
- *  the calibratable handle is the factor in `balance.ts` (point 1173). */
-export const PLACE_RADIUS_BASE = 28
-/** Walkable radius of a village in meters; leaving it exits the place. Every
- *  consumer reads THIS (or the layout's own `radius`; a port sets its own from
- *  its size) — no caller keeps a radius of its own. The factor scales this
- *  radius; distances the plans write as literals do not scale with it. */
-export const PLACE_RADIUS = PLACE_RADIUS_BASE * balance.settlementRoom
+import { PLACE_RADIUS } from './placeRadius'
+export { PLACE_RADIUS, PLACE_RADIUS_BASE } from './placeRadius'
 
 /** How far inside the southern edge a settlement drops the arriving traveller. */
 export const SPAWN_INSET = 10
