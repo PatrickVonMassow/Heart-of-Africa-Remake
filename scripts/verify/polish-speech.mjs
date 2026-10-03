@@ -1003,7 +1003,6 @@ if (section('speech-distance-scale')) {
   const rejected = []
   const fmt = (r) => (r == null ? 'sky' : r.toFixed(2))
   let shot = null
-  let shotPair = null
   for (const candidate of pairs) {
     if (attempts.length >= MAX_ATTEMPTS || shot) break
     let pair = null
@@ -1061,10 +1060,7 @@ if (section('speech-distance-scale')) {
       },
     )
     attempts.push({ pair, at: 'shutter', view: atShutter })
-    if (atShutter?.ok) {
-      shot = atShutter
-      shotPair = pair
-    }
+    if (atShutter?.ok) shot = atShutter
     await page.evaluate(() => window.__speech?.clear())
   }
   const brief = (a) =>
@@ -1096,23 +1092,33 @@ if (section('speech-distance-scale')) {
   // camera's right on every frame, out and back. Each frame is measured
   // before the next step, tail off the DOM and head off its projected mesh.
   let walk = null
-  if (shotPair) {
-    await aim(shotPair)
+  {
     walk = await page.evaluate(
-      async ({ near, u }) => {
+      async ({ u }) => {
         const { speakOverhead, speechClock, forgetSpeechLabel } = await import('/src/scenes/place/speechChannel.ts')
         const { balance } = await import('/src/config/balance.ts')
         const band = balance.communication.labelTipGap
-        const src = window.__speechScaleFigures?.[near]
+        // Any villager's figure will do; the copy stands 4 m ahead of the
+        // camera, so the check needs no staged pair (those walk off home).
+        const src = window.__speechScaleFigures?.find((f) => f.parent)
         const cam = window.__placeCamera
-        if (!src?.parent || !cam) return null
+        if (!src || !cam) return null
         const raf = () => new Promise((r) => requestAnimationFrame(() => r()))
         const walker = src.clone()
         walker.visible = true
         src.parent.add(walker)
-        const right = new walker.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion)
+        const V = walker.position.constructor
+        const right = new V(1, 0, 0).applyQuaternion(cam.quaternion)
         right.y = 0
         right.normalize()
+        const ahead = new V(0, 0, -1).applyQuaternion(cam.quaternion)
+        ahead.y = 0
+        ahead.normalize()
+        // The traveller's eye stands 1.6 m over the ground he stands on.
+        const at = cam.position.clone().addScaledVector(ahead, 4)
+        at.y = cam.position.y - 1.6
+        const place = () => walker.position.copy(src.parent.worldToLocal(at.clone()))
+        place()
         speakOverhead('scale-walk', [u], walker, { seconds: 60, reach: 0.1, now: speechClock() })
         for (let i = 0; i < 4; i++) await raf()
         const rows = []
@@ -1128,7 +1134,14 @@ if (section('speech-distance-scale')) {
               ?.querySelector('.speech-tail')
               ?.getBoundingClientRect()
             const fig = window.__speech?.figureScreen('scale-walk')
-            if (!tail || !fig?.headTop) rows.push({ f, missing: true })
+            if (!tail || !fig?.headTop) {
+              // Which half is gone, and whether the note still exists at all.
+              rows.push({
+                f,
+                missing: !tail ? 'tail' : !fig ? 'figure' : 'head',
+                labels: (window.__speech?.labels() ?? []).map((l) => l.speakerId),
+              })
+            }
             else {
               if (last) {
                 const step = Math.hypot(fig.headTop.x - last.x, fig.headTop.y - last.y)
@@ -1142,7 +1155,8 @@ if (section('speech-distance-scale')) {
               rows.push({ f, dy: +dy.toFixed(1), dx: +dx.toFixed(1), w: +fig.headWidth.toFixed(1) })
             }
             // The step for the NEXT frame: out for twelve, back for twelve.
-            walker.position.addScaledVector(right, f < 12 ? 0.12 : -0.12)
+            at.addScaledVector(right, f < 12 ? 0.12 : -0.12)
+            place()
           }
         } finally {
           forgetSpeechLabel('scale-walk')
@@ -1153,13 +1167,13 @@ if (section('speech-distance-scale')) {
         )
         return { frames: 24, bad, exposing, travel: +travel.toFixed(1) }
       },
-      { near: shotPair.near, u: RIVER },
+      { u: RIVER },
     )
   }
   check(
     'a note’s tail stays on its moving speaker’s head on every one of 24 consecutive frames (point 1276)',
     !!walk && walk.bad.length === 0,
-    walk ? JSON.stringify(walk) : 'no shot pair to follow',
+    walk ? JSON.stringify(walk) : 'no figure or camera to stage a walker with',
     // Speakers that stood still prove nothing about a lag: below this the
     // line reads NOT-COVERING, not green.
     { subjects: walk?.exposing ?? 0, minimum: 3, what: 'frames on which a head moved farther than the tolerance' },
