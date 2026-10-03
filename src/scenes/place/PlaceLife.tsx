@@ -1967,6 +1967,8 @@ function pestleProfile(length: number, r: number): THREE.Vector2[] {
 }
 
 const UP = new THREE.Vector3(0, 1, 0)
+/** The most women `villageLife.mortar.pounders` can put at one mortar. */
+const MAX_POUNDERS = 2
 
 /** Dev/verify probe of the pounding (read by the place verification). */
 export interface PoundingProbe {
@@ -1990,7 +1992,7 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
   const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
   const cfg = balance.villageLife.mortar
-  const count = cfg.pounders
+  const count = Math.min(MAX_POUNDERS, Math.max(1, cfg.pounders))
   const yaw = Math.atan2(-x, -z)
   const gy = groundHeight(x, z)
   // Woman 0 stands on the outer side facing in (her old place), woman 1 across
@@ -2001,9 +2003,14 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
   })), [x, z, yaw, count, cfg.standOff])
   // Bodies the passers-by go round (point 578).
   useStandingBodies(stands)
+  // Rebuilt whenever a shape tunable changes (the profile reads all of them).
+  const { height, footRadius, waistRadius, rimRadius, bowlDepth } = cfg
   const mortarGeometry = useMemo(
-    () => new THREE.LatheGeometry(mortarProfile().map(([r, y]) => new THREE.Vector2(r, y)), TESSELLATION.mortar),
-    [],
+    () => new THREE.LatheGeometry(
+      mortarProfile({ ...balance.villageLife.mortar, height, footRadius, waistRadius, rimRadius, bowlDepth }).map(([r, y]) => new THREE.Vector2(r, y)),
+      TESSELLATION.mortar,
+    ),
+    [height, footRadius, waistRadius, rimRadius, bowlDepth],
   )
   const pestleGeometry = useMemo(
     () => new THREE.LatheGeometry(pestleProfile(cfg.pestleLength, cfg.pestleRadius), TESSELLATION.pestle),
@@ -2011,14 +2018,16 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
   )
   useEffect(() => () => { mortarGeometry.dispose(); pestleGeometry.dispose() }, [mortarGeometry, pestleGeometry])
   const grainRadius = bowlRadiusAt(grainLevel())
-  const poses = useRef(Array.from({ length: count }, () => ({ current: { ...poundFrame(0).pose } as FigurePose | null })))
-  const squats = useRef(Array.from({ length: count }, () => ({ current: 1 })))
+  // Per-woman state is sized for EVERY slot `pounders` allows, so a change of
+  // the count between renders can never index past it.
+  const poses = useRef(Array.from({ length: MAX_POUNDERS }, () => ({ current: { ...poundFrame(0).pose } as FigurePose | null })))
+  const squats = useRef(Array.from({ length: MAX_POUNDERS }, () => ({ current: 1 })))
   const figures = useRef<Array<THREE.Group | null>>([])
   const pestles = useRef<Array<THREE.Mesh | null>>([])
-  const grains = useRef<Array<Array<THREE.Mesh | null>>>(Array.from({ length: count }, () => []))
+  const grains = useRef<Array<Array<THREE.Mesh | null>>>(Array.from({ length: MAX_POUNDERS }, () => []))
   const chaff = useRef<Array<THREE.Mesh | null>>([])
   const last = useRef<number | null>(null)
-  const impacts = useRef(Array.from({ length: count }, () => 0))
+  const impacts = useRef(Array.from({ length: MAX_POUNDERS }, () => 0))
   const thuds = useRef(0)
   const axis = useMemo(() => new THREE.Vector3(), [])
 
