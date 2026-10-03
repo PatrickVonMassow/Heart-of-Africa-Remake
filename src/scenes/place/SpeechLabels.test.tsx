@@ -3,6 +3,7 @@ import { act, render } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three/webgpu'
 import { utteranceOf, type Phrase } from '../../communication/lexicon'
+import { balance } from '../../config/balance'
 import { SpeechLabels } from './SpeechLabels'
 import { clearSpeechLabels, speakOverhead, speechAnchor, speechLabelState } from './speechChannel'
 
@@ -112,7 +113,11 @@ it('stands each note on its tail tip and hands the older of two notes the recede
   expect(calls.length).toBeGreaterThanOrEqual(2)
   for (const props of calls) {
     expect(props.center).toBeFalsy()
-    expect(props.style?.transform).toBe('translate3d(-50%,-100%,0)')
+    // The tip stands on the head-top anchor, lifted by the calibrated screen
+    // gap (point 1276).
+    expect(props.style?.transform).toBe(
+      `translate3d(-50%,calc(-100% - ${balance.communication.labelTipGap.px}px),0)`,
+    )
   }
   for (const props of calls) expect(props.children.props.className).toBe('speech-distance')
   const cards = calls.map((p) => p.children.props.children.props)
