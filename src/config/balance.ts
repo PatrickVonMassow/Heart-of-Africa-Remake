@@ -264,15 +264,18 @@ interface BalanceConfig {
   settlementRoom: number
   /**
    * Walkable room, in metres, the settlement boundary keeps around every scene
-   * ground the player watches (children's quarter, bank stage, dig sites, water
-   * errand, loom, chief's hut) — `boundary.ts` grows the boundary per bearing
-   * until it holds; the layout does not move. CALIBRATABLE (work-order 1252):
-   * framing a ground of ~6 m radius at the reference viewport needs ~4 m past
-   * its rim. The edge band (`placeEdgeBand.widthM` 8, centred on the boundary)
+   * ground with a performer (children's quarter, bank stage, dig sites, water
+   * errand, loom, chief's hut, market, the fishers' fire and mortar, the fixed
+   * vignettes; `sceneGrounds.ts`) — `boundary.ts` grows the boundary per
+   * bearing until it holds; the layout does not move. CALIBRATABLE (work-order
+   * 1252, raised 1273): a ground of radius r fills the reference viewport's
+   * width (73.4 deg) from r / sin 36.7 deg, i.e. ~0.67 r past its rim; the
+   * widest ground (a bank stage, r 12) needs 8.07 m, the fishers' fire (~4 m)
+   * under 3. The edge band (`placeEdgeBand.widthM` 8, centred on the boundary)
    * reaches 4 m (+0.4 wander) inside, but its visible fall is only the last
    * ~1.4 m (measured in polish settlement-edge); inside that the ground reads
-   * as the village's own. 8 m thus leaves ~6 m before the visible edge and
-   * 3.6 m clear of the band's nominal extent. Toward the river the wade limit
+   * as the village's own. 8.5 m thus leaves ~7 m before the visible edge and
+   * 4.1 m clear of the band's nominal extent. Toward the river the wade limit
    * stays the edge.
    */
   observerMargin: number
@@ -1338,7 +1341,7 @@ export const balance: BalanceConfig = {
   digRadius: 3,
   placeEnterRadius: 2.5,
   settlementRoom: 1.1,
-  observerMargin: 8, // calibratable (work-order 1252): room around a watched scene before the boundary
+  observerMargin: 8.5, // calibratable (work-order 1252/1273): room around a watched scene before the boundary
   // 0.6 → a 1.5-unit collider around the marker: it matches the drawn cluster
   // (the port's main house plus annex reaches ~1.3 units past the anchor, the
   // village huts ~1.45) and stays inside the river clearance every place keeps

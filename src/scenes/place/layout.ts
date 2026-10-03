@@ -7,7 +7,7 @@
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
-import { LOOM_SPOT, PORT_TALKERS, VILLAGE_SPOTS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
+import { LOOM_SPOT, PORT_TALKERS, VILLAGE_SPOTS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, villageHasWell, type PlayGround } from './lifeSpots'
 import { placeLoom, stationGround, PLAZA_SIGHT_HALF_WIDTH, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
@@ -31,6 +31,8 @@ import {
 } from './riverBank'
 import { inBankArc, type ObservedGround } from './boundary'
 import { CHIEF_DOOR_REACH, sceneGrounds } from './sceneGrounds'
+import { fisherySites } from './fishFire'
+import { canoeLane } from './villagerCanoe'
 import { balance } from '../../config/balance'
 import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 import { digFurnitureFootprints } from './digSiteAppearance'
@@ -2731,8 +2733,17 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
 
 
   const chief = interactives.find((i) => i.type === 'chief')
+  const market = interactives.find((i) => i.type === 'market')
   const observed = place.kind === 'village'
-    ? sceneGrounds({ playGround, playRocks, digSites, waterPath, waterStand, loom, chief: chief?.pos ?? null })
+    ? sceneGrounds({
+        playGround, playRocks, digSites, waterPath, waterStand, loom,
+        chief: chief?.pos ?? null,
+        market: market ? { pos: market.pos, door: market.door ?? market.pos } : null,
+        // The same sites `RiverFishery` draws from this bank.
+        fishery: bank ? fisherySites(bank, canoeLane(bank)) : null,
+        fire: VILLAGE_FIRE,
+        hasWell: villageHasWell(placeId),
+      })
     : []
   return { radius, observed, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, climbRock, digSites, bank, playRocks, waterPath, waterStand, loom, gaveWayToLoom, playGround, wayOut, pen, errands, colliders }
 }
