@@ -1,6 +1,6 @@
 // Headless polish verification, theme polish-villagers: the adults of a village:
 // gestures, the canoe and its fishermen, the mute shore scene, no wedged adult, the
-// well, the stations, the loom and the errands (design.md §19.10).
+// well, the stations, the loom, the errands and the mortar (design.md §19.10).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { waitForSceneBuilt, assertBackend } from './_browser.mjs'
@@ -9,7 +9,7 @@ import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } fr
 import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
-import { BASE, section, check, page, frame, nextFrames, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
@@ -3334,6 +3334,104 @@ if (section('adult-errands')) {
   }
   }
 
+}
+
+// GRAIN POUNDING READS AS GRAIN POUNDING (work-order 1274). The stroke itself —
+// foot below the rim at impact, the alternation, hands and shafts apart — is
+// pinned in src/scenes/place/mortarPounding.test.ts; what needs the browser is
+// the PICTURE: from close by and from mid-distance, side-on to the pair, one
+// woman's pestle down in the grain with its puff while the other's is lifted
+// high. Life is frozen just after an impact so the shutter holds that instant.
+if (section('village-pounding')) {
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+  await goToPlace('bambara-village')
+  const ready = await stepUntil(() => !!window.__placePounding, null, 240)
+  check('the village mortar publishes its pounding', ready)
+  if (ready) {
+    // Both women strike, and every impact frame hands a thud to the audio.
+    const before = await page.evaluate(() => window.__placePounding())
+    await stepUntil((n) => window.__placePounding().thuds >= n + 3, before.thuds, 600)
+    const after = await page.evaluate(() => window.__placePounding())
+    check('both women strike the mortar and the strikes are heard',
+      after.women.length === 2 && after.women.every((w, i) => w.impacts > before.women[i].impacts) && after.thuds > before.thuds,
+      JSON.stringify({ before: before.women.map((w) => w.impacts), after: after.women.map((w) => w.impacts), thuds: [before.thuds, after.thuds] }))
+    const shots = [
+      { name: '1274-village-pounding-close', stand: 2.6, label: 'two women pounding grain at a footed wooden mortar, side-on from 2.6 m: one pestle down in the grain with a puff, the other lifted high' },
+      { name: '1274-village-pounding-mid', stand: 8, label: 'the same mortar pounding from 8 m across the village ground, side-on: two women, one pestle down, one lifted' },
+    ]
+    for (const shot of shots) {
+      // Just past woman 0's impact: her foot still in the grain, the puff up.
+      const caught = await stepUntil(() => {
+        const w = window.__placePounding().women[0]
+        return w.phase > 0.005 && w.phase < 0.1
+      }, null, 900)
+      check(`${shot.name}: the shutter catches an impact`, caught)
+      if (!caught) continue
+      await freezeLife(true)
+      try {
+        const staged = await page.evaluate((standOff) => {
+          const probe = window.__placePounding()
+          const layout = window.__placeLayout
+          const m = probe.mortar
+          const p = window.__placePlayer
+          // The pair stands on the line through the village centre; side-on is
+          // square to it. Anything near the mortar is the vignette itself.
+          const along = Math.atan2(-m.x, -m.z)
+          const others = layout.colliders.filter((c) => !(Math.hypot((c.x ?? 1e9) - m.x, (c.z ?? 1e9) - m.z) < 1.2))
+          const clear = (x, z) => Math.min(...others.map((c) => window.__clearanceTo(c, x, z)))
+          // Every OTHER drawn person (life is frozen): none may stand in the
+          // lens' cone in front of the pair, or the picture is of a bystander.
+          const people = []
+          window.__placeScene.traverse((o) => {
+            if (o.name !== 'figure-head') return
+            const v = o.getWorldPosition(new o.position.constructor())
+            if (Math.hypot(v.x - m.x, v.z - m.z) > 1.1) people.push({ x: v.x, z: v.z })
+          })
+          const blocked = (x, z) => people.some((q) => {
+            const ax = m.x - x
+            const az = m.z - z
+            const bx = q.x - x
+            const bz = q.z - z
+            const reach = Math.hypot(ax, az)
+            const d = Math.hypot(bx, bz)
+            if (d < 0.3 || d > reach + 0.6) return false
+            return Math.acos(Math.max(-1, Math.min(1, (ax * bx + az * bz) / (reach * d)))) < 0.3
+          })
+          for (let k = 0; k < 24; k++) {
+            const angle = along + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
+            const x = m.x + Math.sin(angle) * standOff
+            const z = m.z + Math.cos(angle) * standOff
+            if (Math.hypot(x, z) > layout.radius - 0.5 || clear(x, z) < 0.35) continue
+            let open = true
+            for (let step = 1; step <= 12; step++) {
+              const t = step / 12
+              if (clear(x + (m.x - x) * t, z + (m.z - z) * t) < 0.1) open = false
+            }
+            if (!open || blocked(x, z)) continue
+            p.x = x
+            p.z = z
+            p.yaw = Math.atan2(m.x - x, m.z - z) + Math.PI
+            p.pitch = standOff < 4 ? -0.18 : -0.08
+            return { probe, offSquare: +(Math.floor(k / 2) * 180 / 24).toFixed(1), people: people.length, stand: { x: +x.toFixed(2), z: +z.toFixed(2) } }
+          }
+          return { probe, stand: null }
+        }, shot.stand)
+        const [down, up] = staged.probe.women
+        const rim = staged.probe.mortar.y + staged.probe.mortar.rim
+        check(`${shot.name}: one pestle foot is down below the rim, in the grain`, down.foot.y < rim - 0.04, `${(down.foot.y - rim).toFixed(3)} m`)
+        check(`${shot.name}: the other pestle is lifted clear above the rim`, up.foot.y > rim + 0.1, `${(up.foot.y - rim).toFixed(3)} m`)
+        check(`${shot.name}: the grain puff is in the air`, down.puff)
+        check(`${shot.name}: a side-on stand on open ground frames the pair`, !!staged.stand, JSON.stringify(staged.stand))
+        if (staged.stand) {
+          await nextFrames(3)
+          const m = staged.probe.mortar
+          await frame(shot.name, { local: { x: m.x, y: m.y + 0.7, z: m.z }, label: shot.label })
+        }
+      } finally {
+        await freezeLife(false)
+      }
+    }
+  }
 }
 
 await finishPolishSuite()
