@@ -1625,12 +1625,12 @@ if (section('chief-to-drummer')) {
     !alongLine.market && alongLine.dwellings === 0,
     JSON.stringify(alongLine),
   )
-  // Three metres back along the pointing line, past the drummer's shoulder.
+  // Beside the drummer and a step back, so man, arm and hut share the frame
+  // (straight behind him a shade roof's post covers the line).
   const toHut = Math.hypot(hut.pos[0] - drummer.x, hut.pos[1] - drummer.z)
-  const behind = {
-    x: drummer.x - ((hut.pos[0] - drummer.x) / toHut) * 3 + 0.6,
-    z: drummer.z - ((hut.pos[1] - drummer.z) / toHut) * 3,
-  }
+  const ux = (hut.pos[0] - drummer.x) / toHut
+  const uz = (hut.pos[1] - drummer.z) / toHut
+  const behind = { x: drummer.x - ux * 1.5 - uz * 2.5, z: drummer.z - uz * 1.5 + ux * 2.5 }
   await standAt(behind, { x: hut.pos[0], z: hut.pos[1] })
   await frame('1272-drummer-points-at-chief-hut', {
     local: { x: hut.pos[0], y: 1.5, z: hut.pos[1] },
