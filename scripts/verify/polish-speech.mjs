@@ -8,7 +8,7 @@ import { waitForStable, waitForSceneBuilt } from './_browser.mjs'
 import { captureFrame } from './frameSubject.mjs'
 import { frameSpeakingDrums } from './drumFrame.mjs'
 import { FUSE_CROWD_SHARE, FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
-import { OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
+import { OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 // --- The hypothesis over the speaker's head (design.md §13.4, point 485) ------
 // The lifetime and the note binding are pinned in the Vitest layer. What only a
 // browser can answer is the ATTACHMENT: the note must ride on the FIGURE that
@@ -298,7 +298,7 @@ if (section('speech-hypothesis')) {
     await aimAt(speakerIndex, speakerBack)
     // The subject is where the figure stands NOW — it may have walked on since
     // it was chosen — so the shutter judges the frame against the live anchor.
-    const at = await page.evaluate(async (idx) => {
+    const measureAt = () => page.evaluate(async (idx) => {
       // The band from the game's own balance module, not a copy written here.
       const { balance } = await import('/src/config/balance.ts')
       const gap = balance.communication.labelTipGap
@@ -329,9 +329,14 @@ if (section('speech-hypothesis')) {
         tipToHeadX: tail && head ? +(tail.left + tail.width / 2 - head.x).toFixed(1) : null,
         headWidth: fig?.headWidth ?? null,
         visible: shown(labelEl) && shown(tailNode),
+        // The drawn head inside the viewport, so a post-shot read proves the shot.
+        headInView: !!head && head.x > 0 && head.x < window.innerWidth && head.y > 0 && head.y < window.innerHeight,
+        // Any other drawn note (a child speaking at its game) muddles the shot.
+        otherNotes: [...document.querySelectorAll('.speech-label')].filter((n) => n !== labelEl && shown(n)).length,
         band: [gap.minPx, gap.maxPx],
       }
     }, speakerIndex)
+    const at = await measureAt()
     // Points 582 and 1276: the note's tail ends just above THAT figure's own
     // drawn head, at the scale it is drawn — measured in screen pixels on the
     // rendered frame. A label that fell back to a grown figure's height over a
@@ -342,14 +347,37 @@ if (section('speech-hypothesis')) {
         at.tipToHeadX !== null && Math.abs(at.tipToHeadX) <= Math.max(2, 0.25 * at.headWidth),
       at ? JSON.stringify(at) : 'no speaker',
     )
-    await frame('146-speech-hypothesis-label', {
+    // The shutter waits for a quiet draw-count window after judging the subject
+    // — measured 5.6 s on WebGL 2, long enough for the speaker to walk ~8 m out
+    // of the view, leaving a frame of rock and sea. So the camera is put back on
+    // the speaker just before the capture, and the shot is judged again from the
+    // same state right after it: a frame without its note over its speaker is red.
+    await awaitPlaceDrawn('146-speech-hypothesis-label')
+    const shot = await captureFrame(page, OUT, '146-speech-hypothesis-label', {
       local: {
         x: (at ?? speaker).x,
         y: (at ?? speaker).y + (at?.rise ?? 1.7),
         z: (at ?? speaker).z,
       },
       label: 'the reading over the speaking figure',
+    }, {
+      beforeCapture: async () => {
+        // A single note in the shot: a child left this long speaks on its own.
+        await page.evaluate(async () => {
+          const { forgetSpeechLabel, speechLabelState } = await import('/src/scenes/place/speechChannel.ts')
+          for (const l of speechLabelState().labels) if (l.speakerId !== 'probe-speaker') forgetSpeechLabel(l.speakerId)
+        })
+        await standBefore(speakerIndex, speakerBack)
+        await nextFrames(2)
+      },
     })
+    const post = await measureAt()
+    check(
+      'the written frame shows the note, alone, over its speaker’s drawn head at the shutter',
+      !!shot && !!post && post.visible && post.headInView && post.otherNotes === 0 && post.tipToHead !== null &&
+        post.tipToHead >= post.band[0] && post.tipToHead <= post.band[1],
+      post ? JSON.stringify(post) : 'no speaker',
+    )
     // After the shutter, so the frame keeps its single note (a child left
     // longer starts speaking on its own). The gap IS the calibration (point 1276): move labelTipGap.px within its
     // band and the measured tip-to-head gap must move with it — a renderer
