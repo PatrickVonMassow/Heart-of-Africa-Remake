@@ -298,12 +298,20 @@ if (section('speech-hypothesis')) {
     await aimAt(speakerIndex, speakerBack)
     // The subject is where the figure stands NOW — it may have walked on since
     // it was chosen — so the shutter judges the frame against the live anchor.
-    const at = await page.evaluate((idx) => {
+    const at = await page.evaluate(async (idx) => {
+      // The band from the game's own balance module, not a copy written here.
+      const { balance } = await import('/src/config/balance.ts')
+      const gap = balance.communication.labelTipGap
       const figure = window.__speechProbeFigures?.[idx]
       if (!figure) return null
       figure.updateWorldMatrix(true, false)
       const e = figure.matrixWorld.elements
       const label = window.__speech?.labels().find((l) => l.speakerId === 'probe-speaker')
+      const tail = document
+        .querySelector('.speech-label[data-speaker="probe-speaker"]')
+        ?.parentElement?.querySelector('.speech-tail')
+        ?.getBoundingClientRect()
+      const head = window.__speech?.figureScreen('probe-speaker')?.headTop
       return {
         x: e[12],
         y: e[13],
@@ -311,20 +319,20 @@ if (section('speech-hypothesis')) {
         // The note's OWN rise, so the shutter aims where the label actually is
         // rather than at a height written down here (point 582 moved it).
         rise: label?.height ?? null,
-        mark: figure.userData?.actor?.height ?? null,
-        // The VERTICAL scale, as the label's own rise uses: a kneeling figure is
-        // squashed in height only.
-        scale: Math.hypot(e[4], e[5], e[6]),
+        // Pixels from the tail tip down to the speaker's DRAWN head top on the
+        // rendered projection (points 582, 1276): the screen lift included,
+        // since the tip is read off the DOM and the head off its projected mesh.
+        tipToHead: tail && head ? +(head.y - tail.bottom).toFixed(1) : null,
+        band: [gap.minPx, gap.maxPx],
       }
     }, speakerIndex)
-    // Point 582: the note floats a hand's breadth over THAT figure's head, at
-    // the scale it is drawn — measured in WORLD units against the figure's own
-    // record, the same one the Ctrl labels read. A label that fell back to a
-    // grown figure's height over a child would stand out here at once.
+    // Points 582 and 1276: the note's tail ends just above THAT figure's own
+    // drawn head, at the scale it is drawn — measured in screen pixels on the
+    // rendered frame. A label that fell back to a grown figure's height over a
+    // child would leave the tip far above the head and fail the band at once.
     check(
-      'the note floats close over the speaker’s own head, at its own scale (point 582)',
-      !!at && at.rise !== null && at.mark !== null &&
-        at.rise > at.mark * at.scale && at.rise - at.mark * at.scale <= 0.5,
+      'the note’s tail ends just above the speaker’s own drawn head, in the calibrated pixel band (points 582, 1276)',
+      !!at && at.tipToHead !== null && at.tipToHead >= at.band[0] && at.tipToHead <= at.band[1],
       at ? JSON.stringify(at) : 'no speaker',
     )
     await frame('146-speech-hypothesis-label', {
