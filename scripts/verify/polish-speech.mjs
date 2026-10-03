@@ -109,17 +109,34 @@ if (section('speech-hypothesis')) {
       if (!figure || !window.__placeRayHit) return null
       figure.updateWorldMatrix(true, false)
       const e = figure.matrixWorld.elements
-      // THIS figure's chest, and against its position NOW — it may have walked on
-      // since the pose was set. The height is taken from the group's own scale
-      // rather than a flat metre: the children are barely 0.9 m tall (point 481),
-      // so a metre above the feet sailed clean over every one of them and reported
-      // the ground beyond as the obstruction — half the candidate list could never
-      // qualify, whatever the picture showed.
-      const scaleY = Math.hypot(e[4], e[5], e[6])
-      const h = window.__placeRayHit(e[12], e[13] + Math.max(0.4, scaleY), e[14])
+      // THIS figure's DRAWN HEAD, and against its position NOW — it may have
+      // walked on since the pose was set. The head is what the note stands over,
+      // so it is the surface the frame must show. A chest height from the
+      // group's scale (a flat metre sailed over every child, point 481) still
+      // missed a CROUCHING child: at scale 0.55 the ray ran between its lowered
+      // head (0.6 m) and its bent body to the ground beyond, 1.58@ground-disc on
+      // every try, while a ray at the head hit it at 0.98. The chest stays the
+      // fallback for a figure without a drawn head.
+      let head = null
+      figure.traverseVisible((o) => {
+        if (!head && o.name === 'figure-head') head = o
+      })
+      let at
+      if (head) {
+        head.updateWorldMatrix(true, false)
+        const he = head.matrixWorld.elements
+        at = [he[12], he[13], he[14]]
+      } else {
+        const scaleY = Math.hypot(e[4], e[5], e[6])
+        at = [e[12], e[13] + Math.max(0.4, scaleY), e[14]]
+      }
+      const h = window.__placeRayHit(...at)
       return { ratio: h.hitDistance == null ? null : h.hitDistance / h.targetDistance, name: h.hitName }
     }, i)
   }
+  /** The first surface along the sight line is the figure itself (see above). */
+  const clearSight = (hit) => !!hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15
+  const sightText = (hit) => (hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
   let speaker = null
   let speakerIndex = -1
   let speakerBack = STAND_BACKS[0]
@@ -127,8 +144,8 @@ if (section('speech-hypothesis')) {
   for (let i = 0; i < candidates.length && speakerIndex < 0; i++) {
     for (const back of STAND_BACKS) {
       const hit = await aimAt(i, back)
-      probes.push(hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
-      if (hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15) {
+      probes.push(sightText(hit))
+      if (clearSight(hit)) {
         // The pose that VALIDATED it is the pose the block goes on to measure
         // from, so the accepting aim is deliberately the last one performed —
         // and the range it was validated at is the one the shutter re-aims with.
@@ -353,6 +370,8 @@ if (section('speech-hypothesis')) {
     // the speaker just before the capture, and the shot is judged again from the
     // same state right after it: a frame without its note over its speaker is red.
     await awaitPlaceDrawn('146-speech-hypothesis-label')
+    let shutterSight = null
+    let shutterSights = []
     const shot = await captureFrame(page, OUT, '146-speech-hypothesis-label', {
       local: {
         x: (at ?? speaker).x,
@@ -362,21 +381,54 @@ if (section('speech-hypothesis')) {
       label: 'the reading over the speaking figure',
     }, {
       beforeCapture: async () => {
-        // A single note in the shot: a child left this long speaks on its own.
+        // A SINGLE NOTE IN THE SHOT. The village keeps talking: re-aiming walks
+        // the player up to the speaker, which brings the working villagers and
+        // the children's game within hearing, and their next word raised its own
+        // note between this hook and the shutter (a second, "BA-ba-ba-BA ???",
+        // over a neighbour). Forgetting the notes once was therefore not enough:
+        // for the duration of the shot every OTHER speaker's note is taken down
+        // the moment the channel publishes it. Staging only — the probe's own
+        // note is never touched, and the DOM is still counted after the shot, so
+        // a note the label layer failed to take down still reads red.
         await page.evaluate(async () => {
-          const { forgetSpeechLabel, speechLabelState } = await import('/src/scenes/place/speechChannel.ts')
-          for (const l of speechLabelState().labels) if (l.speakerId !== 'probe-speaker') forgetSpeechLabel(l.speakerId)
+          const { forgetSpeechLabel, speechLabelState, subscribeSpeechLabels } = await import('/src/scenes/place/speechChannel.ts')
+          const hush = () => {
+            for (const l of speechLabelState().labels) if (l.speakerId !== 'probe-speaker') forgetSpeechLabel(l.speakerId)
+          }
+          hush()
+          window.__speechProbeHush = subscribeSpeechLabels(hush)
         })
-        await standBefore(speakerIndex, speakerBack)
-        await nextFrames(2)
+        // The shot is aimed AND sight-probed afresh (the probe the speaker was
+        // chosen by): the figure has walked on, and a pose re-aimed blind can put
+        // a hut between the lens and the head while the note, never depth-tested,
+        // still floats in the frame. The nearer range is tried when the first is
+        // blocked, as at the selection, and the pair a few times over: a single
+        // ray at a walking child's chest can slip past it to the ground behind
+        // (measured 1.58@ground-disc), which is a missed probe, not a clear view.
+        // Whatever pose passes is the pose shot; none passing is red below.
+        const ranges = [speakerBack, ...STAND_BACKS.filter((b) => b !== speakerBack)]
+        const sights = []
+        for (let round = 0; round < 3 && !clearSight(shutterSight); round++) {
+          for (const back of ranges) {
+            shutterSight = await aimAt(speakerIndex, back)
+            sights.push(sightText(shutterSight))
+            if (clearSight(shutterSight)) break
+          }
+        }
+        shutterSights = sights
       },
     })
     const post = await measureAt()
+    await page.evaluate(() => {
+      window.__speechProbeHush?.()
+      delete window.__speechProbeHush
+    })
     check(
-      'the written frame shows the note, alone, over its speaker’s drawn head at the shutter',
-      !!shot && !!post && post.visible && post.headInView && post.otherNotes === 0 && post.tipToHead !== null &&
-        post.tipToHead >= post.band[0] && post.tipToHead <= post.band[1],
-      post ? JSON.stringify(post) : 'no speaker',
+      'the written frame shows the note, alone, over its speaker’s drawn head, in clear sight at the shutter',
+      !!shot && !!post && post.visible && post.headInView && post.otherNotes === 0 && clearSight(shutterSight) &&
+        post.tipToHead !== null && post.tipToHead >= post.band[0] && post.tipToHead <= post.band[1] &&
+        post.tipToHeadX !== null && Math.abs(post.tipToHeadX) <= Math.max(2, 0.25 * post.headWidth),
+      post ? `${JSON.stringify(post)}; sight lines at the shutter [${shutterSights.join(', ')}]` : 'no speaker',
     )
     // After the shutter, so the frame keeps its single note (a child left
     // longer starts speaking on its own). The gap IS the calibration (point 1276): move labelTipGap.px within its
