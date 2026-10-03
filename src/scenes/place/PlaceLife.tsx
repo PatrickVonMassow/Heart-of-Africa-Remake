@@ -1979,6 +1979,9 @@ export interface PoundingProbe {
   women: Array<{ phase: number; foot: { x: number; y: number; z: number }; puff: boolean; impacts: number }>
   /** Thuds actually handed to the audio this visit. */
   thuds: number
+  /** Impacts that were handed to a thud in the frame they happened — equal to
+   *  the women's impacts summed when every strike is heard. */
+  heard: number
 }
 
 /**
@@ -2029,6 +2032,7 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
   const last = useRef<number | null>(null)
   const impacts = useRef(Array.from({ length: MAX_POUNDERS }, () => 0))
   const thuds = useRef(0)
+  const heard = useRef(0)
   const axis = useMemo(() => new THREE.Vector3(), [])
 
   useEffect(() => {
@@ -2056,6 +2060,7 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
           }
         }),
         thuds: thuds.current,
+        heard: heard.current,
       }
     }
     return () => {
@@ -2068,7 +2073,7 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
     const t = clock.elapsedTime
     const previous = last.current ?? t
     last.current = t
-    let thud = false
+    let struckNow = 0
     for (let i = 0; i < count; i++) {
       const frame = poundFrame(poundPhase(t, i))
       const pose = poses.current[i].current
@@ -2104,11 +2109,12 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
       const struck = impactsBetween(previous, t, i)
       if (struck > 0) {
         impacts.current[i] += struck
-        thud = true
+        struckNow += struck
       }
     }
-    if (thud) {
+    if (struckNow > 0) {
       thuds.current++
+      heard.current += struckNow
       const at = { x, z }
       const distance = placePlayerPosition.active
         ? Math.hypot(at.x - placePlayerPosition.x, at.z - placePlayerPosition.z)
@@ -2137,13 +2143,13 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string
       </mesh>
       {stands.map((_, i) => (
         // Each woman's own frame: at her stand, facing the mortar.
-        <group key={i} position={[0, 0, i === 0 ? -cfg.standOff : cfg.standOff]} rotation={[0, i === 0 ? 0 : Math.PI, 0]}>
+        <group key={i} name={`village-pounder-${i}`} position={[0, 0, i === 0 ? -cfg.standOff : cfg.standOff]} rotation={[0, i === 0 ? 0 : Math.PI, 0]}>
           <group ref={(el) => { figures.current[i] = el }}>
             <Figure cloth={cloth[i % cloth.length]} pose={poses.current[i]} squat={squats.current[i]} legs />
           </group>
           {/* Her pestle, its foot in the mortar (her frame: +z is forward). */}
           <group>
-            <mesh ref={(el) => { pestles.current[i] = el }} geometry={pestleGeometry} castShadow>
+            <mesh name={`village-pestle-${i}`} ref={(el) => { pestles.current[i] = el }} geometry={pestleGeometry} castShadow>
               <meshStandardMaterial color="#8a6438" roughness={0.85} />
             </mesh>
             {Array.from({ length: cfg.puffGrains }, (_, k) => (
