@@ -1495,12 +1495,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1240": {
-      "at": "2026-09-29T17:43:30.538Z",
-      "why": "Pure board bookkeeping without a user-named position; it blocks nothing, so last is right",
-      "origin": "machine",
-      "place": "last"
-    },
     "1242": {
       "at": "2026-09-30T08:24:34.750Z",
       "why": "A WebGL-2-only visual seam (CLAUDE.md §7.2: may wait until the next LARGE); it blocks no point, so it stays behind the ranked Dorfleben work.",
@@ -1524,6 +1518,12 @@
       "why": "Test-coverage lesson from 1250; no player-visible change, so it waits behind the user-ordered front",
       "origin": "machine",
       "place": "last"
+    },
+    "1261": {
+      "at": "2026-10-02T22:50:59.371Z",
+      "why": "User 03.10.2026 00:30: card still on the board two days after the order",
+      "origin": "user",
+      "place": "ahead"
     },
     "1263": {
       "at": "2026-10-02T06:55:05.825Z",
@@ -1572,36 +1572,40 @@
       "why": "low-criticality test-infra red, first occurrence on WebGL 2; behind the open Testinfrastruktur work, no player impact",
       "origin": "machine",
       "place": "last"
+    },
+    "1271": {
+      "at": "2026-10-02T23:55:53.830Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1272": {
+      "at": "2026-10-02T23:55:53.922Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1273": {
+      "at": "2026-10-02T23:55:54.018Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1274": {
+      "at": "2026-10-02T23:55:54.114Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1275": {
+      "at": "2026-10-02T23:55:54.204Z",
+      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
+      "origin": "machine",
+      "place": "last"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-10-02T19:14:30.232Z",
+    "at": "2026-10-02T23:55:53.839Z",
     "points": [
       184,
       200,
@@ -1979,8 +1983,6 @@
       1111,
       1114,
       1115,
-      1117,
-      1118,
       1119,
       1120,
       1121,
@@ -2021,7 +2023,6 @@
       1231,
       1235,
       1236,
-      1240,
       1242,
       1243,
       1244,
@@ -2034,7 +2035,38 @@
       1267,
       1268,
       1269,
-      1270
+      1270,
+      1271,
+      1272,
+      1273,
+      1274,
+      1275
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

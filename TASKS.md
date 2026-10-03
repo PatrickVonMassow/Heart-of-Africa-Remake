@@ -127,6 +127,22 @@ put it is the mistake this line exists to stop.
   directly in front of point 1087.
   Bundle: Dorfleben.
 
+- [ ] 1271. Speech bubbles larger and scaled by distance
+  Speech bubbles (speech labels over speaking figures, src/ui/SpeechLabelCard.tsx, src/index.css) are clearly larger than today, and they scale with the speaker's distance from the camera: a nearer figure's bubble is larger, a farther figure's bubble smaller, monotonically, with a readable minimum and a maximum so a close-up bubble never covers the scene. Base size and the near/far scale limits live in src/config/balance.ts, marked calibratable. Targeting/selection of a bubble (.speech-label.targeted) keeps working at every size. Test: Vitest for the size-from-distance function (monotone, clamped); Playwright frame in the village showing a near and a far speaker with visibly different bubble sizes, both backends (CSS/layout path).
+  Bundle: Kommunikation.
+- [ ] 1272. Bambara market hut no longer beside the chief hut
+  In the Bambara village the market hut no longer stands directly beside the chief's hut. The layout (src/scenes/place/layout.ts, market band vs. chief position around line 930-960) places it so that, seen from where the drummer performs his pointing gesture toward the chief's hut and from the player's typical viewpoints of that scene, the market hut lies at a clearly different bearing (angular separation large enough that the gesture cannot be read as pointing at the market hut; value in src/config/balance.ts, calibratable). Roof stand-offs, collision and all station placements stay valid. Test: Vitest asserting the angular separation chief-hut vs. market-hut as seen from the drummer exceeds the threshold for the Bambara plan; Playwright frame of the drummer's pointing gesture showing the chief's hut as the only hut along the pointing direction.
+  Bundle: Siedlungsgeometrie.
+- [ ] 1273. Walkable room around every scene, fish grilling included
+  The settlement's walkable area is enlarged so that between EVERY scene ground the player watches and the settlement boundary there is always enough room to stand back and overlook it without leaving the village. Measured cause: balance.ts observerMargin (8 m, applied by boundary.ts per bearing) lists children's quarter, bank stage, dig sites, water errand, loom and chief's hut, but NOT the fishers' grilling/smoking/eating spot (src/scenes/place/RiverFishery.tsx) - there the player easily leaves the village by accident while positioning to watch. Final state: every scene ground with a performer (incl. fish grilling, pounding, drummer, market) is part of the set boundary.ts protects, and the margin is raised if needed so a player can frame each scene at the reference viewport from any landward side without crossing the leave boundary. Test: Vitest over all scene grounds of every village plan asserting boundary distance >= margin per bearing; Playwright: walk back from the grilling spot to framing distance and assert the player is still in the village.
+  Bundle: Siedlungsgeometrie.
+- [ ] 1274. Recognisable mortar pounding
+  The villagers' pounding at the mortar (Pounder in src/scenes/place/PlaceLife.tsx, spots in lifeSpots.ts) is shown in a richer, clearly recognisable way instead of today's primitive form. Author designs and implements it; the final state must include at least: a waist-high wooden mortar of plausible shape (hourglass/footed, hollowed top with visible grain/millet inside), a long pestle gripped with both hands, a full-body stroke cycle (lift overhead, drive down with knees bending, pestle foot actually reaching into the mortar, small grain puff/scatter on impact), and an audible thud synced to impact if the place audio mix allows. Optional, if it fits design.md: two women pounding alternately at one mortar. Tunables in src/config/balance.ts (calibratable). Test: Vitest for the stroke cycle (pestle foot reaches below the mortar rim at impact, alternation phase); Playwright close and mid-distance frames in which the activity is recognisable as mortar pounding, both backends.
+  Bundle: Dorfleben.
+- [ ] 1275. Collision for the fish grilling scene
+  The fishers' scene (src/scenes/place/RiverFishery.tsx: griller, grill/fire, smoking rack, eater, beached canoe and its props; logic in villagerCanoe.ts) gets collision like every other solid settlement object: the player and walking villagers can no longer pass through the grill, fire, smoking rack, canoe or the seated/standing fishers. Colliders are registered through the settlement collision fabric (src/scenes/place/collision.ts, as huts/dig sites/loom do), sized from the rendered geometry, and follow the canoe/figures where they move. The walking paths of the fishers' own routine stay passable for them. Test: Vitest asserting every solid fishery prop and figure has a collider in the collision set of each village plan with a fishery; Playwright: walk the player straight into the grill and the smoking rack and assert the player stops outside them.
+  Bundle: Siedlungsgeometrie.
+
 - [ ] 1121. The river-bank frame aims at a drifting fleck and shoots six frames later
   (measured 14.09.2026 on the covering WebGL 2 pass of point 1073).
   THE RED. `polish --section=adult-errands`, WebGL 2, first attempt:
@@ -15578,15 +15594,10 @@ to land than a mechanism that needs a review.
   Bundle: Tierverhalten.
   Criticality: medium.
 
-- [ ] 1240. Remove the transcript retention card
-  Remove the "Von dir zu klären" card "Transkript-Aufbewahrung: die 30 Tage kosten jetzt auch Laufzeit" from the board: node scripts/board.mjs vdzk-remove "Transkript-Aufbewahrung: die 30 Tage kosten jetzt auch Laufzeit". Its recommendation is already carried out: ~/.claude/settings.json now has "cleanupPeriodDays": 3650 (set 29.09.2026 15:58 with explicit user approval). Record the closure in the decision log (what: retention 10 years; why: transcripts carry citable user orders and review evidence; veto: user may lower the value).
-  USER, verbatim:
-  User 29.09.2026: »Deine Empfehlung umsetzen und die Karte löschen«
-  Bundle: Chat & Tafel.
-  Criticality: low.
-- [ ] 1242. WebGL 2: the river beyond the plate rim is a different, darker water than at the bank
+- [ ] 1242. The river beyond the plate rim is a different, darker water than at the bank (both backends)
   MEASURED 30.09.2026 07:14Z, `VERIFY_GL=webgl npm test -- polish --section=adult-errands` on feat/1152 6922bdb2c: `the water beyond the plate's rim is the SAME water as the water at the bank (<= 12/255 per channel)` RED, far 11/92/104 against near 139/157/147, median step 127.5; its sibling `the handover zone itself carries neither band's edge` RED, median step 68.3. This is a STEADY red, not point 568's rotation (568 straddled 12-19): the same pair was red at step 99.6-126.1 in the LARGE runs of 26.09 and 28.09 (on both backends at 28.09 18:09Z and 21:55Z). On WebGPU the check was green on feat/1152 at 05:07Z, after point 1151's sky/water fix. Point 1152 (foam patches) did not cause it.
-  FINAL STATE: the far water continues the bank water's tone on WebGL 2, both checks are green there, and the WebGPU pair stays green.
+  ALSO RED ON WebGPU, measured 02.10.2026: the same pair red in the full `polish-villagers` pass on feat/1108 d6a9d37aa (median step 148.8 / 75.9; WebGL 2 25.1 / 12.5) and already on feat/1117 06312849a at 19:52Z (step 133.2) — before point 1108, which only moves the errand shots' cameras.
+  FINAL STATE: the far water continues the bank water's tone on BOTH backends and both checks are green there.
   Test: `polish --section=adult-errands` on both backends; a Vitest on the layer the fix touches.
   Refs: src/render/placeRiver.ts, scripts/verify/polish.mjs, point 568, point 1151.
   Bundle: Dorfleben.
