@@ -2,26 +2,27 @@
 // monotone, clamped, and growing with its speaker noticeably.
 import { describe, it, expect } from 'vitest'
 import { balance } from '../config/balance'
-import { speechBubbleScale } from './speechBubbleScale'
+import { speechBubbleExponent, speechBubbleScale } from './speechBubbleScale'
 
 const cfg = balance.communication.speechBubble
 const FAR = speechBubbleScale(cfg.farDistance)
-const NEAR = speechBubbleScale(cfg.nearDistance)
+const CAP = cfg.baseScale * cfg.maxScale
 
 describe('speechBubbleScale', () => {
-  it('shrinks monotonically with distance, strictly between the holds', () => {
+  it('shrinks monotonically with distance, strictly between the cap and the far hold', () => {
+    const capAt = cfg.nearDistance * Math.pow(cfg.nearScale / cfg.maxScale, 1 / speechBubbleExponent())
     let last = Infinity
     for (let d = 0; d <= 60; d += 0.05) {
       const s = speechBubbleScale(d)
       expect(s).toBeLessThanOrEqual(last)
-      if (d > cfg.nearDistance + 1e-9 && d <= cfg.farDistance) expect(s).toBeLessThan(last)
+      if (d > capAt + 0.05 && d <= cfg.farDistance) expect(s).toBeLessThan(last)
       last = s
     }
   })
 
-  it('is held below the near distance and beyond the far one', () => {
-    expect(speechBubbleScale(0)).toBeCloseTo(NEAR)
-    expect(speechBubbleScale(cfg.nearDistance / 2)).toBeCloseTo(NEAR)
+  it('is capped up close and held beyond the far distance', () => {
+    expect(speechBubbleScale(0)).toBeCloseTo(CAP)
+    expect(speechBubbleScale(1)).toBeCloseTo(CAP)
     expect(speechBubbleScale(cfg.farDistance * 3)).toBeCloseTo(FAR)
     expect(speechBubbleScale(500)).toBeCloseTo(FAR)
   })
@@ -55,10 +56,6 @@ describe('speechBubbleScale', () => {
     expect(receded / speechBubbleScale(15)).toBeGreaterThanOrEqual(2.5)
   })
 
-  it('keeps the far note readable: never under the old minimum of 1.05 (a 13.7 px script)', () => {
-    expect(FAR).toBeGreaterThanOrEqual(1.05 - 1e-9)
-  })
-
   it('treats a missing distance as far, never as a huge note', () => {
     expect(speechBubbleScale(Number.NaN)).toBeCloseTo(FAR)
     expect(speechBubbleScale(Number.POSITIVE_INFINITY)).toBeCloseTo(FAR)
@@ -70,19 +67,48 @@ describe('speechBubbleScale', () => {
     const wide = { width: 300, height: 40, ...view }
     const sw = speechBubbleScale(0.5, cfg, wide)
     expect(sw * wide.width).toBeCloseTo(cfg.maxViewportWidth * 1440)
-    expect(sw).toBeLessThan(NEAR)
+    expect(sw).toBeLessThan(CAP)
     // A tall one: the height cap decides.
     const tall = { width: 120, height: 120, ...view }
     const st = speechBubbleScale(0.5, cfg, tall)
     expect(st * tall.height).toBeCloseTo(cfg.maxViewportHeight * 900)
     // Far away nothing is capped.
-    expect(speechBubbleScale(20, cfg, wide)).toBeCloseTo(FAR)
+    expect(speechBubbleScale(22, cfg, wide)).toBeCloseTo(FAR)
     // An unmeasured note (zero size) is not capped to nothing.
     expect(speechBubbleScale(2, cfg, { width: 0, height: 0, ...view })).toBeCloseTo(speechBubbleScale(2))
   })
 
+  it('gives the calibrated sizes themselves, worked out by hand', () => {
+    // 1.4 · clamp(3.04 · (3/d)^k, 0.60, 4.0), k = ln(3.04/0.60)/ln(22/3) —
+    // numbers computed outside the function, so a curve that kept the ratios
+    // but not the scale fails here.
+    expect(cfg).toMatchObject({ baseScale: 1.4, nearDistance: 3, farDistance: 22, nearScale: 3.04, farScale: 0.6, maxScale: 4 })
+    expect(speechBubbleExponent()).toBeCloseTo(0.814424, 5)
+    expect(speechBubbleScale(3)).toBeCloseTo(4.256, 4) // 1.4 · 3.04
+    expect(speechBubbleScale(22)).toBeCloseTo(0.84, 4) // 1.4 · 0.60
+    expect(speechBubbleScale(10)).toBeCloseTo(1.596455, 4)
+    expect(speechBubbleScale(15)).toBeCloseTo(1.147476, 4)
+    expect(speechBubbleScale(2.2)).toBeCloseTo(1.4 * 3.04 * Math.pow(3 / 2.2, 0.814424), 3) // just short of the cap
+    expect(speechBubbleScale(2)).toBeCloseTo(5.6, 4) // capped at 4.0, reached at ~2.14 m
+  })
+
+  it('reads every field of the configuration it is handed', () => {
+    const own = { ...cfg, baseScale: 2, nearDistance: 2, farDistance: 8, nearScale: 4, farScale: 1, maxScale: 6 }
+    // k = ln 4 / ln 4 = 1
+    expect(speechBubbleExponent(own)).toBeCloseTo(1, 6)
+    expect(speechBubbleScale(4, own)).toBeCloseTo(4, 6) // 2 · 4 · 2/4
+    expect(speechBubbleScale(1, own)).toBeCloseTo(12, 6) // 2 · min(6, 8)
+    expect(speechBubbleScale(80, own)).toBeCloseTo(2, 6)
+    // The caps read their own shares.
+    const fit = { width: 100, height: 10, viewportWidth: 1000, viewportHeight: 1000 }
+    expect(speechBubbleScale(1, { ...own, maxViewportWidth: 0.2 }, fit)).toBeCloseTo(2, 6)
+    expect(speechBubbleScale(1, { ...own, maxViewportHeight: 0.01 }, fit)).toBeCloseTo(1, 6)
+  })
+
   it('stays clamped for a degenerate near/far span', () => {
     const flat = { ...cfg, farDistance: cfg.nearDistance }
-    expect(speechBubbleScale(0, flat)).toBeCloseTo(speechBubbleScale(100, flat))
+    expect(Number.isFinite(speechBubbleScale(0, flat))).toBe(true)
+    expect(speechBubbleScale(0, flat)).toBeLessThanOrEqual(cfg.baseScale * cfg.maxScale)
+    expect(speechBubbleScale(100, flat)).toBeCloseTo(cfg.baseScale * cfg.farScale)
   })
 })

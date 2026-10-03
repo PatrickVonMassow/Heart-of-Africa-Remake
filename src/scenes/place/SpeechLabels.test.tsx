@@ -196,3 +196,40 @@ it('places every note from the frame loop and keeps its tip gap live with the ca
     balance.communication.labelTipGap.px = gap
   }
 })
+
+it('sizes each note by its distance through the curve, and caps a close-up one to the viewport (point 1278)', async () => {
+  const { useGame } = await import('../../state/store')
+  const fig = new THREE.Group()
+  scene.add(fig)
+  useGame.getState().hearUtterance(atoms[0])
+  speakOverhead('elder', atoms, fig, { now: 10 })
+  frames.length = 0
+  const { container } = render(<SpeechLabels />)
+  const sizer = container.querySelector('.speech-distance') as HTMLElement
+  const scaleAt = (x: number, y: number, z: number, layout: { w: number; h: number }) => {
+    placeSpy.mockImplementation((node: { getWorldPosition?: (v: { set: (...a: number[]) => unknown }) => unknown }) => {
+      node.getWorldPosition = (v) => v.set(x, y, z)
+      return true
+    })
+    Object.defineProperty(sizer, 'offsetWidth', { configurable: true, value: layout.w })
+    Object.defineProperty(sizer, 'offsetHeight', { configurable: true, value: layout.h })
+    act(() => frames.forEach((f) => f({ camera })))
+    return Number(sizer.style.getPropertyValue('--speech-distance-scale'))
+  }
+  try {
+    // The camera stands at the origin. 10 m off: 1.4 · 3.04 · (3/10)^0.8144, by hand.
+    expect(scaleAt(0, 0, -10, { w: 0, h: 0 })).toBeCloseTo(1.596, 3)
+    // 22 m off: the far size, 1.4 · 0.60.
+    expect(scaleAt(0, 0, -22, { w: 0, h: 0 })).toBeCloseTo(0.84, 3)
+    // Half a metre off, a 300 px wide note: capped at 35 % of the viewport.
+    const capped = scaleAt(0, 0, -0.5, { w: 300, h: 40 })
+    expect(capped).toBeCloseTo((0.35 * window.innerWidth) / 300, 2)
+    expect(capped).toBeLessThan(5.6)
+  } finally {
+    placeSpy.mockImplementation((node: { getWorldPosition?: (v: { set: (...a: number[]) => unknown }) => unknown }) => {
+      order.push('place')
+      node.getWorldPosition = (v) => v.set(0, 1.3, -4)
+      return true
+    })
+  }
+})

@@ -15,24 +15,35 @@ export interface BubbleFit {
   viewportHeight: number
 }
 
+/** The power-law exponent that carries `nearScale` at `nearDistance` to
+ *  `farScale` at `farDistance`: ln(nearScale/farScale) / ln(far/near). */
+export function speechBubbleExponent(config: BubbleScale = balance.communication.speechBubble): number {
+  const { nearDistance, farDistance, nearScale, farScale } = config
+  if (!(farDistance > nearDistance) || !(nearDistance > 0) || !(nearScale > 0) || !(farScale > 0)) return 0
+  return Math.log(nearScale / farScale) / Math.log(farDistance / nearDistance)
+}
+
 /**
  * The note's CSS scale at `distance` (settlement units) from the camera:
- * `baseScale` · (refDistance / d)^exponent with d held to
- * [nearDistance, farDistance] — monotonically non-increasing in distance and
- * flat beyond both ends. Given the note's `fit`, never wider or taller on
- * screen than the configured share of the viewport; the cap wins over the
- * readable minimum, since a note that covers the scene is the worse failure.
+ * `baseScale` · nearScale · (nearDistance / d)^k, k from
+ * speechBubbleExponent — `nearScale` at `nearDistance`, `farScale` at
+ * `farDistance` and held there beyond it; closer than `nearDistance` it keeps
+ * growing up to `maxScale` and holds. Monotonically non-increasing in distance.
+ * Given the note's `fit`, never wider or taller on screen than the configured
+ * share of the viewport; the cap wins over the readable minimum, since a note
+ * that covers the scene is the worse failure.
  */
 export function speechBubbleScale(
   distance: number,
   config: BubbleScale = balance.communication.speechBubble,
   fit?: BubbleFit,
 ): number {
-  const { baseScale, refDistance, exponent, nearDistance, farDistance } = config
-  const near = Math.max(1e-3, nearDistance)
-  const far = Math.max(near, farDistance)
-  const d = Number.isFinite(distance) ? Math.min(far, Math.max(near, distance)) : far
-  let scale = baseScale * Math.pow(refDistance / d, exponent)
+  const { baseScale, nearDistance, farDistance, nearScale, farScale, maxScale } = config
+  const k = speechBubbleExponent(config)
+  const d = Number.isFinite(distance) ? Math.max(1e-3, distance) : Infinity
+  const factor =
+    d >= farDistance ? farScale : Math.min(maxScale, Math.max(farScale, nearScale * Math.pow(nearDistance / d, k)))
+  let scale = baseScale * factor
   if (fit) {
     if (fit.width > 0 && fit.viewportWidth > 0) {
       scale = Math.min(scale, (config.maxViewportWidth * fit.viewportWidth) / fit.width)
