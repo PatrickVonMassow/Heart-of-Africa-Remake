@@ -361,19 +361,27 @@ if (section('speech-hypothesis')) {
         const was = gap.px
         if (px != null) gap.px = px
         for (let i = 0; i < 3; i++) await new Promise((r) => requestAnimationFrame(() => r()))
-        const tail = document
-          .querySelector('.speech-label[data-speaker="probe-speaker"]')
-          ?.parentElement?.querySelector('.speech-tail')
-          ?.getBoundingClientRect()
+        const labelEl = document.querySelector('.speech-label[data-speaker="probe-speaker"]')
+        const tailNode = labelEl?.parentElement?.querySelector('.speech-tail')
+        const tail = tailNode?.getBoundingClientRect()
+        const shown = (n) => !!n && n.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
         const head = window.__speech?.figureScreen('probe-speaker')?.headTop
-        return { was, px: gap.px, gap: tail && head ? +(head.y - tail.bottom).toFixed(1) : null }
+        return {
+          was,
+          px: gap.px,
+          gap: tail && head ? +(head.y - tail.bottom).toFixed(1) : null,
+          visible: shown(labelEl) && shown(tailNode),
+        }
       }, px)
     const base = await tipGapWith(null)
     const moved = await tipGapWith(base.was + 6)
     const back = await tipGapWith(base.was)
     check(
       'the tail’s gap over the head follows its calibration: 6 px more lift, 6 px more gap (point 1276)',
-      base.gap !== null && moved.gap !== null && Math.abs(moved.gap - base.gap - 6) <= 1.5 && back.px === base.was,
+      // Drawn in every sample, and back where it started once restored.
+      base.visible && moved.visible && back.visible &&
+        base.gap !== null && moved.gap !== null && back.gap !== null &&
+        Math.abs(moved.gap - base.gap - 6) <= 1.5 && Math.abs(back.gap - base.gap) <= 1.5,
       JSON.stringify({ base, moved, back }),
     )
     await page.evaluate((u) => {
@@ -1095,6 +1103,9 @@ if (section('speech-distance-scale')) {
       const rows = []
       const travel = { 'scale-near': 0, 'scale-far': 0 }
       const last = {}
+      // Frames on which a head moved farther than the sideways tolerance: only
+      // on such a frame would a one-frame lag breach the check at all.
+      let exposing = 0
       for (let f = 0; f < 24; f++) {
         await new Promise((r) => requestAnimationFrame(() => r()))
         for (const id of ['scale-near', 'scale-far']) {
@@ -1110,7 +1121,11 @@ if (section('speech-distance-scale')) {
           }
           const dy = fig.headTop.y - tail.bottom
           const dx = tail.left + tail.width / 2 - fig.headTop.x
-          if (last[id]) travel[id] += Math.hypot(fig.headTop.x - last[id].x, fig.headTop.y - last[id].y)
+          if (last[id]) {
+            const step = Math.hypot(fig.headTop.x - last[id].x, fig.headTop.y - last[id].y)
+            travel[id] += step
+            if (step > Math.max(2, 0.25 * fig.headWidth)) exposing += 1
+          }
           last[id] = fig.headTop
           rows.push({ id, f, dy: +dy.toFixed(1), dx: +dx.toFixed(1), w: +fig.headWidth.toFixed(1) })
         }
@@ -1118,13 +1133,21 @@ if (section('speech-distance-scale')) {
       const bad = rows.filter(
         (r) => r.missing || r.dy < band.minPx || r.dy > band.maxPx || Math.abs(r.dx) > Math.max(2, 0.25 * r.w),
       )
-      return { frames: 24, bad, travel: Object.fromEntries(Object.entries(travel).map(([k, v]) => [k, +v.toFixed(1)])) }
+      return {
+        frames: 24,
+        bad,
+        exposing,
+        travel: Object.fromEntries(Object.entries(travel).map(([k, v]) => [k, +v.toFixed(1)])),
+      }
     })
   }
   check(
     'each note’s tail stays on its walking speaker’s head on every one of 24 consecutive frames (point 1276)',
     !!walk && walk.bad.length === 0,
     walk ? JSON.stringify(walk) : 'no shot pair to follow',
+    // Speakers that stood still prove nothing about a lag: below this the
+    // line reads NOT-COVERING, not green.
+    { subjects: walk?.exposing ?? 0, minimum: 3, what: 'frames on which a head moved farther than the tolerance' },
   )
   await page.evaluate((u) => {
     window.__game.getState().setUtteranceHypothesis(u, '')
