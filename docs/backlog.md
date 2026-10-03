@@ -2125,3 +2125,5 @@ V-wakes at the fishermen's dugout and a stake, an eddy behind a bank stone, a lo
 Sketch: https://claude.ai/artifact/Ug2L7bnc1cDCkyfttYYkwx . Open items: no stake
 exists in Bambara; a moving dugout needs a moving wake; real crinkle height needs a
 finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
+
+- WebGL run overwrites tracked WebGPU reference frames (03.10.2026): `VERIFY_GL=webgl node scripts/verify/run-all.mjs polish-villagers` on main rewrote 26 tracked `verification/*.png` with WebGL captures; restored by hand. Risk: a later commit could carry WebGL frames as WebGPU references.
