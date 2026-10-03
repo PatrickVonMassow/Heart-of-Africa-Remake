@@ -1377,7 +1377,7 @@ if (section('river-current')) {
   }
   const readDrift = () => page.evaluate(() => {
     const r = window.__placeRiver()
-    return { drift: r.drift, speed: r.driftSpeed, flecks: r.flecks }
+    return { drift: r.drift, flecksDrift: r.flecksDrift, speed: r.driftSpeed, flecks: r.flecks }
   })
   const aimA = await pickSubject()
   const subjectA = aimA ? { x: aimA.x, y: aimA.y + 0.1, z: aimA.z } : { x: river.bank.x, y: 0.4, z: river.bank.z }
@@ -1398,6 +1398,11 @@ if (section('river-current')) {
   // would stretch the pair far past a few hundred ms.
   const B = await pairShot('1280-river-current-b', 'the same stand a few hundred ms of drift later, frame B', false)
   const frameA = A.buf
+  // The drift is advanced before the flotsam is placed in the same frame, so
+  // between frames the instances stand at exactly the phase the shader reads.
+  check('the flotsam is placed at the same drift phase the water reports (no frame lag)',
+    [A.post, B.post].every((r) => r.flecksDrift === r.drift),
+    `A ${A.post.flecksDrift?.toFixed(4)} vs ${A.post.drift.toFixed(4)}, B ${B.post.flecksDrift?.toFixed(4)} vs ${B.post.drift.toFixed(4)}`)
   const frameB = B.buf
   const beforeA = A.post
   const afterB = B.pre ?? B.post

@@ -2138,6 +2138,8 @@ function PlaceRiver({
   const meshRefs = useRef<Partial<Record<FlotsamKind, THREE.InstancedMesh | null>>>({})
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const positions = useRef<Array<{ kind: FlotsamKind; x: number; y: number; z: number }>>([])
+  // The phase the flotsam was last placed at (dev hook: must equal `drift`).
+  const positionsDrift = useRef(0)
 
   // Each item takes a tone of its kind, by index — set once per item set.
   useLayoutEffect(() => {
@@ -2176,6 +2178,7 @@ function PlaceRiver({
       mesh.setMatrixAt(byKind.slots[i], dummy.matrix)
     }
     positions.current = now
+    positionsDrift.current = phase
     for (const k of FLOTSAM_KINDS) {
       const mesh = meshRefs.current[k]
       if (mesh) mesh.instanceMatrix.needsUpdate = true
@@ -2199,6 +2202,9 @@ function PlaceRiver({
       flecks: positions.current.map((p) => ({ ...p })),
       /** The shared drift phase (m) and the speed it advances at right now. */
       drift: riverDrift.value,
+      /** The phase the flecks above were placed at — equal to `drift` once the
+       *  frame's flotsam has run. */
+      flecksDrift: positionsDrift.current,
       driftSpeed: riverDriftSpeed(placeWetnessNow.value),
     })
     return () => {
@@ -3034,6 +3040,14 @@ export function PlaceScene() {
     }
   }, [])
 
+  // The current's drift: advanced ONCE per frame at priority -1, before the
+  // river places its flotsam (default priority), so instances, shader and the
+  // dev hook share this frame's phase. Speed from the wetness published below
+  // (it changes per game day, so last frame's value is exact enough).
+  useFrame((_, rawDt) => {
+    if (place) advanceRiverDrift(rawDt, placeWetnessNow.value)
+  }, -1)
+
   useFrame(({ clock, scene }, rawDt) => {
     if (!layout) return
     const dt = Math.min(rawDt, 0.1)
@@ -3057,9 +3071,6 @@ export function PlaceScene() {
       )
       placeWetness.current = wet
       placeWetnessNow.value = wet
-      // The current's drift (work-order 1280): advanced ONCE per frame, here,
-      // at the season's speed — the water's shader and the flotsam both read it.
-      advanceRiverDrift(dt, wet)
       // Wet ground (design.md §19.13, point 225): the settlement ground darkens
       // and glosses as it rains — more the harder AND the longer — through the
       // shared GROUND_WET_U uniform, exactly like the travel terrain.
