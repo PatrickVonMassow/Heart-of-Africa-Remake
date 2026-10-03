@@ -1579,12 +1579,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1278": {
-      "at": "2026-10-03T08:20:27.813Z",
-      "why": "user-reported play defect of the landed 1271; ranked with 1276/1277",
-      "origin": "machine",
-      "place": "last"
-    },
     "1288": {
       "at": "2026-10-03T19:50:49.199Z",
       "why": "User order 03.10.2026: directly before point 1081",
@@ -1625,7 +1619,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-03T21:19:28.677Z",
+    "at": "2026-10-03T21:43:41.240Z",
     "points": [
       184,
       200,
@@ -2057,7 +2051,6 @@
       1270,
       1275,
       1277,
-      1278,
       1279,
       1281,
       1282,
