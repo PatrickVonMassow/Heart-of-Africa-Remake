@@ -78,7 +78,7 @@ it('rejects a remembered child anchor that has left the scene', () => {
   expect(speechLabelState()).toBe(before)
 })
 
-it('keeps speech notes at screen size and below the HUD instead of enlarging at close range', async () => {
+it('keeps speech notes off drei\'s unbounded distance factor and below the HUD (the clamped scale is speechBubbleScale, point 1271)', async () => {
   const { useGame } = await import('../../state/store')
   const child = new THREE.Group()
   scene.add(child)
@@ -106,13 +106,16 @@ it('stands each note on its tail tip and hands the older of two notes the recede
   const calls = htmlProps.mock.calls.map(([props]) => props as {
     center?: boolean
     style?: { transform?: string }
-    children: { props: { speakerId: string; receded: boolean } }
+    // The card sits in the `.speech-distance` wrapper (point 1271).
+    children: { props: { className: string; children: { props: { speakerId: string; receded: boolean } } } }
   })
   expect(calls.length).toBeGreaterThanOrEqual(2)
   for (const props of calls) {
     expect(props.center).toBeFalsy()
     expect(props.style?.transform).toBe('translate3d(-50%,-100%,0)')
   }
-  const receded = Object.fromEntries(calls.map((p) => [p.children.props.speakerId, p.children.props.receded]))
+  for (const props of calls) expect(props.children.props.className).toBe('speech-distance')
+  const cards = calls.map((p) => p.children.props.children.props)
+  const receded = Object.fromEntries(cards.map((c) => [c.speakerId, c.receded]))
   expect(receded).toEqual({ elder: true, youth: false })
 })

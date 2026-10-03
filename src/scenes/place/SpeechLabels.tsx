@@ -28,6 +28,7 @@ import {
   type SpeechLabel,
 } from '../../communication/speechLabel'
 import { labelPresentation } from '../../communication/speechTarget'
+import { speechBubbleScale } from '../../communication/speechBubbleScale'
 import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
 import {
   clearSpeechLabels,
@@ -41,6 +42,8 @@ import {
 
 /** Scratch vector — the label positions are sampled every frame. */
 const WORLD = new THREE.Vector3()
+/** Scratch vector for the camera's world place. */
+const EYE = new THREE.Vector3()
 
 /** Lifts drei's wrapper by its own size so its bottom centre sits on the point. */
 const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,-100%,0)' }
@@ -58,13 +61,18 @@ function SpeechLabelView({
   receded: boolean
 }) {
   const group = useRef<THREE.Group>(null)
+  // The note's distance scale (point 1271) rides a wrapper of its own, set
+  // straight on the DOM each frame: no React render per frame, and the card's
+  // own transform (the receded look) and its .targeted styling stay untouched.
+  const sizer = useRef<HTMLDivElement>(null)
+  const lastScale = useRef(0)
   // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
   // syllables and the player's guess. Never on in a real run — it hands the
   // player the very answer the mechanic asks him to work out.
   const vocabulary = useGame((s) => s.vocabulary)
   const conceptLabels = useUi((s) => s.speechConceptLabels)
 
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const anchor = speechAnchor(label.speakerId)
     if (!anchor || !group.current) return
     anchor.getWorldPosition(WORLD)
@@ -75,6 +83,14 @@ function SpeechLabelView({
     // the browser), so the move is published here rather than left to the loop.
     group.current.updateMatrix()
     group.current.updateMatrixWorld(true)
+    const el = sizer.current
+    if (el) {
+      const scale = speechBubbleScale(camera.getWorldPosition(EYE).distanceTo(group.current.getWorldPosition(WORLD)))
+      if (Math.abs(scale - lastScale.current) > 0.002) {
+        lastScale.current = scale
+        el.style.setProperty('--speech-distance-scale', scale.toFixed(3))
+      }
+    }
   })
 
   return (
@@ -82,15 +98,17 @@ function SpeechLabelView({
       {/* Not centred: the bubble's bottom centre — its tail's tip — stands on
           the anchor, so the tail points down at this speaker's crown. */}
       <Html style={TIP_ON_ANCHOR} zIndexRange={[20, 10]}>
-        <SpeechLabelCard
-          speakerId={label.speakerId}
-          atoms={label.atoms}
-          memory={memory}
-          vocabulary={vocabulary}
-          conceptLabels={conceptLabels}
-          targeted={targeted}
-          receded={receded}
-        />
+        <div ref={sizer} className="speech-distance">
+          <SpeechLabelCard
+            speakerId={label.speakerId}
+            atoms={label.atoms}
+            memory={memory}
+            vocabulary={vocabulary}
+            conceptLabels={conceptLabels}
+            targeted={targeted}
+            receded={receded}
+          />
+        </div>
       </Html>
     </group>
   )
