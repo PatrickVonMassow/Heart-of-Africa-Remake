@@ -2086,3 +2086,5 @@ From the picture check of 1108 (03.10.2026): `1087-village-carrier-returns-with-
 carrier and his full jar clear, but its lens can land against a hut flank (right third of the
 WebGL 2 frame) or behind a cooking fire with a seated figure (WebGPU). Composition only, the
 subject reads. Test-frame aim, no player impact: deferred.
+The same holds for `1087-village-water-order-at-the-stand` on WebGPU: stand and carrier read,
+but a bystander can stand large in the near field (03.10.2026, at 62bf7150b).
