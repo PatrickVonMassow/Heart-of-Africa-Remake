@@ -2774,17 +2774,24 @@ if (section('adult-errands')) {
           const e = cam.matrixWorld.elements
           const apply = (m, v) => [0, 1, 2, 3].map((r) => m[r] * v[0] + m[r + 4] * v[1] + m[r + 8] * v[2] + m[r + 12] * v[3])
           const clip = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [vs[w].x, 1.2, vs[w].z, 1]))
+          // ACROSS HIS WIDTH, not only down his axis: a near neighbour over
+          // one flank of his cone, and a post over half his jar, left the
+          // centre lines clear and passed on WebGL 2. So each height is probed
+          // at its edges too, perpendicular to the line from the lens.
+          const d = Math.max(0.001, Math.hypot(vs[w].x - e[12], vs[w].z - e[14]))
+          const sx = (vs[w].z - e[14]) / d
+          const sz = -(vs[w].x - e[12]) / d
+          const points = []
+          for (const [part, y, half] of [['his jar', 1.9, 0.15], ['his body', 0.75, 0.12], ['his feet', 0.3, 0.22]]) {
+            for (const [side, k] of [['', 0], [' (left)', -1], [' (right)', 1]]) {
+              points.push({ name: part + side, x: vs[w].x + sx * half * k, y, z: vs[w].z + sz * half * k })
+            }
+          }
           return {
             x: vs[w].x, z: vs[w].z, carry: vs[w].carry,
             lens: { x: e[12], z: e[14] },
             ndcX: clip[0] / clip[3],
-            unseen: window.__errandUnseen({
-              who: [w],
-              points: [
-                { name: 'his jar', x: vs[w].x, y: 1.9, z: vs[w].z },
-                { name: 'his lower body', x: vs[w].x, y: 0.6, z: vs[w].z },
-              ],
-            }),
+            unseen: window.__errandUnseen({ who: [w], points }),
             others: vs.map((p, j) => ({ who: j, x: p.x, z: p.z })).filter((o) => o.who !== w),
           }
         }, returning.who)
