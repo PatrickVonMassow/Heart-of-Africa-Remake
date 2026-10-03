@@ -1567,12 +1567,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1274": {
-      "at": "2026-10-02T23:55:54.114Z",
-      "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
-      "origin": "machine",
-      "place": "last"
-    },
     "1275": {
       "at": "2026-10-02T23:55:54.204Z",
       "why": "user request of 02./03.10., moved to the front behind the in-flight 1108",
@@ -1619,7 +1613,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-03T10:12:12.961Z",
+    "at": "2026-10-03T15:42:08.393Z",
     "points": [
       184,
       200,
@@ -2049,12 +2043,12 @@
       1268,
       1269,
       1270,
-      1274,
       1275,
       1276,
       1277,
       1278,
-      1279
+      1279,
+      1280
     ]
   }
 }
