@@ -3,8 +3,21 @@
 // request. The 03.10.2026 failure — the user reports a problem, the session
 // deposits quoting the report — is pinned as its own case.
 import { describe, it, expect } from 'vitest'
-import { evaluate, normalize, requestOf, tokenize, humanText } from './request-approval-guard-core.mjs'
-import { commandFrom } from './request-approval-guard.mjs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import {
+  evaluate,
+  normalize,
+  parseTranscript,
+  requestOf,
+  requestsOf,
+  tokenize,
+  humanText,
+} from './request-approval-guard-core.mjs'
+import { commandFrom, hookDecision, readTranscript } from './request-approval-guard.mjs'
+import { REPO_ROOT } from './repo-paths.mjs'
 
 const TITLE = 'Guard the request deposit'
 const human = (text) => ({ type: 'user', origin: { kind: 'human' }, message: { role: 'user', content: [{ type: 'text', text }] } })
@@ -179,5 +192,101 @@ describe('the wrapper payload reader', () => {
   it('humanText refuses a mixed tool_result message', () => {
     const mixed = { type: 'user', origin: { kind: 'human' }, message: { content: [{ type: 'tool_result' }, { type: 'text', text: 'x' }] } }
     expect(humanText(mixed)).toBe(null)
+  })
+})
+
+describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
+  const approvedChat = [human('start'), said(TITLE), human('passt so')]
+
+  it('1: judges EVERY deposit in a chained command, not only the first', () => {
+    const command = `${deposit('passt so')} ; node scripts/finding.mjs --request "Unapproved" --stdin`
+    expect(requestsOf(command).map((r) => r.title)).toEqual([TITLE, 'Unapproved'])
+    expect(verdict(deposit('passt so'), approvedChat).block).toBe(false)
+    expect(verdict(command, approvedChat)).toMatchObject({ block: true, id: 'no-approved' })
+    expect(verdict(command, approvedChat).reason).toContain('Unapproved')
+  })
+
+  it('2: sees the deposit behind value-taking node options', () => {
+    for (const opts of ['-r fs', '--require fs', '--import ./x.mjs', '--loader ./l.mjs', '--max-old-space-size 4096']) {
+      const command = `node ${opts} scripts/finding.mjs --request "${TITLE}" --stdin`
+      expect(requestOf(command), opts).toEqual({ title: TITLE, approved: '' })
+      expect(verdict(command, approvedChat).block, opts).toBe(true)
+    }
+  })
+
+  it('3: reads PowerShell backslash paths as paths', () => {
+    const command = `node .\\scripts\\finding.mjs --request "${TITLE}" --stdin`
+    expect(requestOf(command, 'powershell')).toEqual({ title: TITLE, approved: '' })
+    expect(command).toContain('.\\scripts\\finding.mjs')
+    expect(evaluate({ command, entries: approvedChat, shell: 'powershell' }).block).toBe(true)
+    expect(hookDecision({ tool_name: 'PowerShell', tool_input: { command }, transcript_path: '/nonexistent' })).not.toBe(null)
+    // the PowerShell escape is the backtick, and a here-string body is one word
+    expect(requestOf('& node C:\\hoa\\scripts\\finding.mjs --request "a `"b`"" --approved "ok"', 'powershell')).toEqual({
+      title: 'a "b"',
+      approved: 'ok',
+    })
+    const here = `node .\\scripts\\finding.mjs --request "${TITLE}" --stdin @'\n--approved "passt so"\n'@`
+    expect(requestOf(here, 'powershell')).toEqual({ title: TITLE, approved: '' })
+  })
+
+  describe('4: a malformed transcript is unreadable, not headless', () => {
+    let dir
+    const payload = (text) => {
+      const path = join(dir, 't.jsonl')
+      writeFileSync(path, text, 'utf8')
+      return { tool_name: 'Bash', tool_input: { command: deposit() }, transcript_path: path }
+    }
+    it('the parser counts malformed lines and forgives only a torn last line', () => {
+      expect(parseTranscript('{bad\n{"type":"x"}\n')).toEqual({ entries: [{ type: 'x' }], malformed: 1 })
+      expect(parseTranscript('{"type":"x"}\n{"type":"us')).toEqual({ entries: [{ type: 'x' }], malformed: 0 })
+      expect(parseTranscript('')).toEqual({ entries: [], malformed: 0 })
+    })
+    it('the reader and the hook deny an all-malformed transcript, and allow a clean headless one', () => {
+      dir = mkdtempSync(join(tmpdir(), 'hoa-rag-'))
+      try {
+        const bad = payload('not json\n{also not}\n')
+        expect(readTranscript(bad.transcript_path)).toEqual({ entries: [], malformed: 2 })
+        const denied = hookDecision(bad)
+        expect(denied.hookSpecificOutput.permissionDecision).toBe('deny')
+        expect(denied.hookSpecificOutput.permissionDecisionReason).toContain('transcript-unreadable')
+        expect(hookDecision(payload(`${JSON.stringify(said('working'))}\n`))).toBe(null)
+        // malformed lines beside a readable human message: the ordinary rule judges
+        const mixed = payload(`garbage\n${[human('start'), said(TITLE), human('passt so')].map((e) => JSON.stringify(e)).join('\n')}\n`)
+        mixed.tool_input.command = deposit('passt so')
+        expect(hookDecision(mixed)).toBe(null)
+        // the real process prints the deny for the all-malformed transcript
+        const run = spawnSync(process.execPath, ['scripts/request-approval-guard.mjs'], {
+          cwd: REPO_ROOT,
+          input: JSON.stringify(bad),
+          encoding: 'utf8',
+        })
+        expect(run.status).toBe(0)
+        expect(JSON.parse(run.stdout).hookSpecificOutput.permissionDecision).toBe('deny')
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+    it('evaluate denies malformed lines without a human message', () => {
+      expect(evaluate({ command: deposit(), entries: [], malformed: 3 })).toMatchObject({ block: true, id: 'transcript-unreadable' })
+      expect(evaluate({ command: deposit(), entries: [], malformed: 0 }).block).toBe(false)
+    })
+  })
+
+  it('5: counts node only in an executable position', () => {
+    expect(requestOf(`echo node scripts/finding.mjs --request "Example"`)).toBe(null)
+    expect(requestOf(`printf '%s' node scripts/finding.mjs --request "Example"`)).toBe(null)
+    for (const command of [
+      `FOO=1 node scripts/finding.mjs --request "Example"`,
+      `env FOO=1 node scripts/finding.mjs --request "Example"`,
+      `timeout 60 node scripts/finding.mjs --request "Example"`,
+      `npx node scripts/finding.mjs --request "Example"`,
+      `x=$(node scripts/finding.mjs --request "Example")`,
+      `bash -c 'node scripts/finding.mjs --request "Example"'`,
+      `ls | node scripts/finding.mjs --request "Example"`,
+      `{ node scripts/finding.mjs --request "Example"; }`,
+    ]) {
+      expect(requestOf(command), command).toEqual({ title: 'Example', approved: '' })
+    }
+    expect(requestOf(`pwsh -Command 'node .\\scripts\\finding.mjs --request "Example"'`)).toEqual({ title: 'Example', approved: '' })
   })
 })

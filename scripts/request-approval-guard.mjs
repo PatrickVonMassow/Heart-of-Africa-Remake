@@ -24,12 +24,12 @@
 // sessions this guard exists for are exactly the non-owner chat windows.
 //
 // Manual check:
-//   node scripts/request-approval-guard.mjs --check '<command>' [--transcript <path.jsonl>]
+//   node scripts/request-approval-guard.mjs --check '<command>' [--transcript <path.jsonl>] [--powershell]
 //
 // NOT REGISTERED with guard-preflight.mjs, for the reason firewall-guard.mjs
 // gives: it judges a command that does not exist until the tool call is made.
 import { readFileSync } from 'node:fs'
-import { evaluate, requestOf } from './request-approval-guard-core.mjs'
+import { evaluate, parseTranscript, requestsOf, shellOf } from './request-approval-guard-core.mjs'
 import { isMainModule } from './is-main.mjs'
 
 export const GUARDED_TOOLS = new Set(['Bash', 'PowerShell'])
@@ -42,25 +42,34 @@ export function commandFrom(payload) {
   return typeof command === 'string' ? command : ''
 }
 
-/** Parsed transcript entries, or null when the file cannot be read. Bad lines are skipped. */
+/**
+ * The transcript as `{ entries, malformed }` (see parseTranscript), or null when
+ * the file cannot be read at all.
+ */
 export function readTranscript(path) {
   if (typeof path !== 'string' || !path) return null
-  let text
   try {
-    text = readFileSync(path, 'utf8')
+    return parseTranscript(readFileSync(path, 'utf8'))
   } catch {
     return null
   }
-  const entries = []
-  for (const line of text.split('\n')) {
-    if (!line.trim()) continue
-    try {
-      entries.push(JSON.parse(line))
-    } catch {
-      // a torn last line while the harness writes — skip it
-    }
+}
+
+/** The hook's verdict for a parsed payload: the deny output object, or null to allow. */
+export function hookDecision(payload) {
+  const command = commandFrom(payload)
+  const shell = shellOf(payload && payload.tool_name)
+  if (!command || requestsOf(command, shell).length === 0) return null
+  const transcript = readTranscript(payload.transcript_path)
+  const verdict = evaluate({ command, shell, entries: transcript && transcript.entries, malformed: transcript ? transcript.malformed : 0 })
+  if (!verdict.block) return null
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: verdict.reason,
+    },
   }
-  return entries
 }
 
 if (isMainModule(import.meta.url)) {
@@ -69,12 +78,14 @@ if (isMainModule(import.meta.url)) {
     if (checkAt >= 0) {
       const command = process.argv[checkAt + 1] ?? ''
       const tAt = process.argv.indexOf('--transcript')
-      if (!requestOf(command)) {
+      const shell = process.argv.includes('--powershell') ? 'powershell' : 'bash'
+      if (requestsOf(command, shell).length === 0) {
         console.log('request-approval-guard: OK (not a request deposit)')
       } else if (tAt < 0) {
         console.log('request-approval-guard: a request deposit — pass --transcript <path.jsonl> to judge its approval')
       } else {
-        const verdict = evaluate({ command, entries: readTranscript(process.argv[tAt + 1]) })
+        const transcript = readTranscript(process.argv[tAt + 1])
+        const verdict = evaluate({ command, shell, entries: transcript && transcript.entries, malformed: transcript ? transcript.malformed : 0 })
         console.log(verdict.block ? `WOULD DENY (${verdict.id}):\n\n${verdict.reason}` : 'request-approval-guard: OK')
       }
       process.exit(0)
@@ -87,21 +98,8 @@ if (isMainModule(import.meta.url)) {
       process.exit(0) // no/garbled stdin (manual run) — nothing to judge
     }
 
-    const command = commandFrom(payload)
-    if (!command || !requestOf(command)) process.exit(0)
-
-    const verdict = evaluate({ command, entries: readTranscript(payload.transcript_path) })
-    if (verdict.block) {
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: verdict.reason,
-          },
-        }),
-      )
-    }
+    const decision = hookDecision(payload)
+    if (decision) process.stdout.write(JSON.stringify(decision))
     process.exit(0)
   } catch (e) {
     console.error(`request-approval-guard error (allowing the call): ${e && e.message}`)
