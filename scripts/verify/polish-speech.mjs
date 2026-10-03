@@ -373,6 +373,9 @@ if (section('speech-hypothesis')) {
           visible: shown(labelEl) && shown(tailNode),
         }
       }, px)
+    // Re-aim first: the figure walks on through the shutter, and on a slow
+    // lane it had left the view by now (drei hides an off-screen note).
+    await aimAt(speakerIndex, speakerBack)
     const base = await tipGapWith(null)
     const moved = await tipGapWith(base.was + 6)
     const back = await tipGapWith(base.was)
