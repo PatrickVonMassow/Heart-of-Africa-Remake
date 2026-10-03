@@ -311,7 +311,8 @@ if (section('speech-hypothesis')) {
         .querySelector('.speech-label[data-speaker="probe-speaker"]')
         ?.parentElement?.querySelector('.speech-tail')
         ?.getBoundingClientRect()
-      const head = window.__speech?.figureScreen('probe-speaker')?.headTop
+      const fig = window.__speech?.figureScreen('probe-speaker')
+      const head = fig?.headTop
       return {
         x: e[12],
         y: e[13],
@@ -323,6 +324,9 @@ if (section('speech-hypothesis')) {
         // rendered projection (points 582, 1276): the screen lift included,
         // since the tip is read off the DOM and the head off its projected mesh.
         tipToHead: tail && head ? +(head.y - tail.bottom).toFixed(1) : null,
+        // Sideways: the tip over the head's top, not over the body's origin.
+        tipToHeadX: tail && head ? +(tail.left + tail.width / 2 - head.x).toFixed(1) : null,
+        headWidth: fig?.headWidth ?? null,
         band: [gap.minPx, gap.maxPx],
       }
     }, speakerIndex)
@@ -332,7 +336,8 @@ if (section('speech-hypothesis')) {
     // child would leave the tip far above the head and fail the band at once.
     check(
       'the note’s tail ends just above the speaker’s own drawn head, in the calibrated pixel band (points 582, 1276)',
-      !!at && at.tipToHead !== null && at.tipToHead >= at.band[0] && at.tipToHead <= at.band[1],
+      !!at && at.tipToHead !== null && at.tipToHead >= at.band[0] && at.tipToHead <= at.band[1] &&
+        at.tipToHeadX !== null && Math.abs(at.tipToHeadX) <= Math.max(2, 0.25 * at.headWidth),
       at ? JSON.stringify(at) : 'no speaker',
     )
     await frame('146-speech-hypothesis-label', {
@@ -908,6 +913,9 @@ if (section('speech-distance-scale')) {
           // Pixels from the tail tip down to the drawn head top (positive: the
           // tip stands above the head), and the band it must fall in.
           tipToHead: fig?.headTop ? +(fig.headTop.y - tail.bottom).toFixed(1) : null,
+          // Sideways off the head's top, against the head's drawn width.
+          tipToHeadX: fig?.headTop ? +(tail.left + tail.width / 2 - fig.headTop.x).toFixed(1) : null,
+          headWidth: fig?.headTop ? +fig.headWidth.toFixed(1) : null,
           tipBand: [balance.communication.labelTipGap.minPx, balance.communication.labelTipGap.maxPx],
           targeted: el.classList.contains('targeted'),
           receded: bubble.classList.contains('receded'),
@@ -1026,12 +1034,14 @@ if (section('speech-distance-scale')) {
   // The tail meets its speaker's head (point 1276): at the shutter, the tip of
   // each note ends just above its speaker's DRAWN head — inside the calibrated
   // pixel band — near and far alike, measured on the rendered projection.
-  const tipMeets = (n) => n && n.tipToHead != null && n.tipToHead >= n.tipBand[0] && n.tipToHead <= n.tipBand[1]
+  const tipMeets = (n) =>
+    n && n.tipToHead != null && n.tipToHead >= n.tipBand[0] && n.tipToHead <= n.tipBand[1] &&
+    n.tipToHeadX != null && Math.abs(n.tipToHeadX) <= Math.max(2, 0.25 * n.headWidth)
   check(
-    'each note’s tail tip ends just above its speaker’s drawn head, near and far, inside the calibrated pixel band (point 1276)',
+    'each note’s tail tip ends just above its speaker’s drawn head and over it sideways, near and far, inside the calibrated pixel band (point 1276)',
     !!shot && tipMeets(shot.near) && tipMeets(shot.far),
     shot
-      ? `near ${shot.near.distance} m: tip ${shot.near.tipToHead} px over the head; far ${shot.far.distance} m: ${shot.far.tipToHead} px; band ${JSON.stringify(shot.near.tipBand)}`
+      ? `near ${shot.near.distance} m: tip ${shot.near.tipToHead} px over the head, ${shot.near.tipToHeadX} px aside (head ${shot.near.headWidth} px wide); far ${shot.far.distance} m: ${shot.far.tipToHead} px, ${shot.far.tipToHeadX} px aside (head ${shot.far.headWidth} px); band ${JSON.stringify(shot.near.tipBand)}`
       : 'no frame was staged',
   )
   await page.evaluate((u) => {
