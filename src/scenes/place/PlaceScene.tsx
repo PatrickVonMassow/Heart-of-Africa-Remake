@@ -4,7 +4,7 @@
 // which buildings exist is fixed per place kind. Visuals: TSL sky dome and
 // noise materials, sun shadows, detailed buildings, palms and scatter props.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
@@ -27,7 +27,7 @@ import {
   effectiveFireShadows,
   effectiveFireShadowResolution,
   effectiveFireShadowSoft,
-  effectivePlaceRiverFoam,
+  effectivePlaceRiverFlotsam,
   effectivePlaceRiverSegments,
   effectiveWaterDetailOctaves,
 } from '../../state/ui'
@@ -135,13 +135,19 @@ import {
   buildBankShoreGeometry,
   buildFoamPatchGeometry,
   buildGroundPlateGeometry,
+  buildFlotsamGeometry,
   buildRiverFlecks,
   buildRiverSurfaceGeometry,
+  createFlotsamMaterial,
   createPlaceRiverMaterial,
   createRiverFoamMaterial,
+  FLOTSAM_KINDS,
+  FLOTSAM_TONES,
+  flotsamScale,
   fleckPosition,
+  type FlotsamKind,
 } from '../../render/placeRiver'
-import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
+import { advanceRiverDrift, riverDrift, riverDriftSpeed } from '../../render/waterAppearance'
 import { PLAY_ROCK_SEEDS, playRockYaw } from './playRockSurface'
 import { bankPlayRocksView, type PlaceRiverBank } from './riverBank'
 import { scatterGrassTufts } from './groundScatter'
@@ -2063,6 +2069,10 @@ function LandscapeBackdrop({
 
 // --- The river the settlement stands on (work-order 482) ----------------------
 
+/** This frame's wetness at the settlement, as the place scene computed it — read
+ *  by the river's dev hook to report the drift speed (frame scratch). */
+const placeWetnessNow = { value: 0 }
+
 /**
  * The bank, the water and the foam riding it — real geometry on the
  * settlement's own ground, on the side the bird's-eye view puts the river
@@ -2087,7 +2097,7 @@ function PlaceRiver({
   groundMaterial: THREE.Material
 }) {
   const segments = useUi(effectivePlaceRiverSegments)
-  const foamCount = useUi(effectivePlaceRiverFoam)
+  const flotsamCount = useUi(effectivePlaceRiverFlotsam)
   const waterOctaves = useUi(effectiveWaterDetailOctaves)
   const water = useMemo(() => createPlaceRiverMaterial(waterOctaves), [waterOctaves])
   // The shore runs on, upstream and downstream alike, as far as the widened
@@ -2104,36 +2114,72 @@ function PlaceRiver({
     () => buildRiverFloorGeometry(bank, Math.max(RIVER_HALF_LENGTH, reach.up), Math.max(RIVER_HALF_LENGTH, reach.down)),
     [bank, reach],
   )
-  const flecks = useMemo(() => buildRiverFlecks(foamCount), [foamCount])
+  const flecks = useMemo(() => buildRiverFlecks(flotsamCount), [flotsamCount])
+  // One instanced mesh per kind; `slots[i]` is item i's instance in its kind's.
+  const byKind = useMemo(() => {
+    const counts: Record<FlotsamKind, number> = { foam: 0, leaf: 0, grass: 0, twig: 0 }
+    const slots = flecks.map((f) => counts[f.kind]++)
+    return { counts, slots }
+  }, [flecks])
   const foamGeometry = useMemo(() => buildFoamPatchGeometry(), [])
-  // A module singleton like the water's, so it is never disposed here.
+  const debrisGeometry = useMemo(
+    () => ({ leaf: buildFlotsamGeometry('leaf'), grass: buildFlotsamGeometry('grass'), twig: buildFlotsamGeometry('twig') }),
+    [],
+  )
+  // Module singletons like the water's, so they are never disposed here.
   const foamMaterial = createRiverFoamMaterial()
+  const debrisMaterial = createFlotsamMaterial()
   useEffect(() => () => surface.dispose(), [surface])
   useEffect(() => () => shore.dispose(), [shore])
   useEffect(() => () => floor.dispose(), [floor])
   useEffect(() => () => foamGeometry.dispose(), [foamGeometry])
+  useEffect(() => () => Object.values(debrisGeometry).forEach((g) => g.dispose()), [debrisGeometry])
 
-  const foamRef = useRef<THREE.InstancedMesh>(null)
-  const phase = useRef(0)
+  const meshRefs = useRef<Partial<Record<FlotsamKind, THREE.InstancedMesh | null>>>({})
   const dummy = useMemo(() => new THREE.Object3D(), [])
-  const positions = useRef<Array<{ x: number; y: number; z: number }>>([])
+  const positions = useRef<Array<{ kind: FlotsamKind; x: number; y: number; z: number }>>([])
 
-  useFrame((_, rawDt) => {
-    phase.current += Math.min(rawDt, 0.1) * RIVER_DRIFT_SPEED
-    const mesh = foamRef.current
-    const now: Array<{ x: number; y: number; z: number }> = []
+  // Each item takes a tone of its kind, by index — set once per item set.
+  useLayoutEffect(() => {
+    const tint = new THREE.Color()
+    flecks.forEach((f, i) => {
+      if (f.kind === 'foam') return
+      const mesh = meshRefs.current[f.kind]
+      if (!mesh) return
+      const tones = FLOTSAM_TONES[f.kind]
+      mesh.setColorAt(byKind.slots[i], tint.set(tones[i % tones.length]))
+    })
+    for (const k of FLOTSAM_KINDS) {
+      const mesh = meshRefs.current[k]
+      if (mesh?.instanceColor) mesh.instanceColor.needsUpdate = true
+    }
+  }, [flecks, byKind])
+
+  useFrame(() => {
+    // The ONE drift phase the water's shader reads too (advanced once per frame
+    // by the place scene), so flotsam and pattern cannot run apart.
+    const phase = riverDrift.value
+    const heading = Math.atan2(bank.fx, bank.fz)
+    const now: Array<{ kind: FlotsamKind; x: number; y: number; z: number }> = []
     for (let i = 0; i < flecks.length; i++) {
-      const p = fleckPosition(bank, flecks[i], phase.current)
-      now.push(p)
+      const f = flecks[i]
+      const p = fleckPosition(bank, f, phase)
+      now.push({ kind: f.kind, ...p })
+      const mesh = meshRefs.current[f.kind]
       if (!mesh) continue
       dummy.position.set(p.x, p.y, p.z)
-      dummy.rotation.y = Math.atan2(bank.fx, bank.fz)
-      dummy.scale.set(flecks[i].size * 0.55, 1, flecks[i].size * 2.4)
+      // Foam lies drawn out along the current; debris turns slowly as it rides.
+      dummy.rotation.y = f.kind === 'foam' ? heading : heading + f.yaw0 + f.spin * phase
+      const [sx, sy, sz] = flotsamScale(f.kind, f.size)
+      dummy.scale.set(sx, sy, sz)
       dummy.updateMatrix()
-      mesh.setMatrixAt(i, dummy.matrix)
+      mesh.setMatrixAt(byKind.slots[i], dummy.matrix)
     }
     positions.current = now
-    if (mesh) mesh.instanceMatrix.needsUpdate = true
+    for (const k of FLOTSAM_KINDS) {
+      const mesh = meshRefs.current[k]
+      if (mesh) mesh.instanceMatrix.needsUpdate = true
+    }
   })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): where the water
@@ -2151,6 +2197,9 @@ function PlaceRiver({
       upstream: bank.upstream,
       downstream_point: bank.downstream,
       flecks: positions.current.map((p) => ({ ...p })),
+      /** The shared drift phase (m) and the speed it advances at right now. */
+      drift: riverDrift.value,
+      driftSpeed: riverDriftSpeed(placeWetnessNow.value),
     })
     return () => {
       delete w.__placeRiver
@@ -2164,11 +2213,21 @@ function PlaceRiver({
       <mesh name="place-river" geometry={surface} material={water} />
       <instancedMesh
         name="place-river-foam"
-        ref={foamRef}
-        args={[foamGeometry, foamMaterial, Math.max(1, flecks.length)]}
-        count={flecks.length}
+        ref={(m: THREE.InstancedMesh | null) => { meshRefs.current.foam = m }}
+        args={[foamGeometry, foamMaterial, Math.max(1, byKind.counts.foam)]}
+        count={byKind.counts.foam}
         frustumCulled={false}
       />
+      {(['leaf', 'grass', 'twig'] as const).map((k) => (
+        <instancedMesh
+          key={`${k}-${byKind.counts[k]}`}
+          name={`place-river-${k}`}
+          ref={(m: THREE.InstancedMesh | null) => { meshRefs.current[k] = m }}
+          args={[debrisGeometry[k], debrisMaterial, Math.max(1, byKind.counts[k])]}
+          count={byKind.counts[k]}
+          frustumCulled={false}
+        />
+      ))}
     </>
   )
 }
@@ -2997,6 +3056,10 @@ export function PlaceScene() {
         elevationAt(place.lat, place.lon), useUi.getState().seasonWetnessOverride,
       )
       placeWetness.current = wet
+      placeWetnessNow.value = wet
+      // The current's drift (work-order 1280): advanced ONCE per frame, here,
+      // at the season's speed — the water's shader and the flotsam both read it.
+      advanceRiverDrift(dt, wet)
       // Wet ground (design.md §19.13, point 225): the settlement ground darkens
       // and glosses as it rains — more the harder AND the longer — through the
       // shared GROUND_WET_U uniform, exactly like the travel terrain.

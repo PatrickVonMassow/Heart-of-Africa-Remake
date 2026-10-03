@@ -28,6 +28,7 @@ import {
   type PlaceRiverBank,
 } from '../scenes/place/riverBank'
 import { groundPlateRadius, type PlaceBounds } from '../scenes/place/boundary'
+import { balance } from '../config/balance'
 import {
   RIVER_WATER_TONES,
   WATER_FOAM_ROUGHNESS,
@@ -308,39 +309,190 @@ export function createRiverFoamMaterial(): THREE.MeshStandardNodeMaterial {
   return m
 }
 
-/** One patch of foam riding the current. */
+// --- The flotsam riding the current (work-order 1280) ------------------------
+//
+// Foam alone read as a few pale dots; a river past a village carries what the
+// banks drop into it. So the drift set is MIXED: foam patches, leaves, grass
+// tufts torn from the bank, and twigs — all on the one drift phase the water's
+// pattern rides (`riverDrift`), so nothing on the surface outruns anything else.
+
+/** What a drifting item is. */
+export type FlotsamKind = 'foam' | 'leaf' | 'grass' | 'twig'
+export const FLOTSAM_KINDS: readonly FlotsamKind[] = ['foam', 'leaf', 'grass', 'twig']
+
+/** One item riding the current. */
 export interface RiverFleck {
+  /** What it is. */
+  kind: FlotsamKind
   /** Along-bank offset at phase 0, in metres (0 .. `RIVER_DRIFT_SPAN`). */
   along0: number
   /** Distance out from the waterline, in metres. */
   across: number
-  /** Radius of the drawn patch, in metres. */
+  /** Nominal size in metres — a foam patch's radius; the other kinds derive
+   *  their drawn dimensions from it (`flotsamScale`). */
   size: number
+  /** Heading on the water at phase 0 (radians, 0 = along the current). */
+  yaw0: number
+  /** Slow turn while it drifts, radians per metre travelled (a twig swings
+   *  round as it rides, a leaf turns). */
+  spin: number
 }
 
 /**
- * The foam patches, deterministically spread: evenly along the current (so the
- * flow reads as continuous rather than as a clump) and scattered across it.
- * Pure — the scene only advances the phase.
+ * Deterministic kind sequence for `count` items over the share `mix`: a
+ * largest-deficit walk, so the kinds interleave along the current and every
+ * count gets its shares to within one item. Index 0 is always foam (the reading
+ * the oldest checks were written against) wherever foam has a share.
  */
-export function buildRiverFlecks(count: number): RiverFleck[] {
-  const out: RiverFleck[] = []
-  const n = Math.max(0, Math.round(count))
-  for (let i = 0; i < n; i++) {
-    // A golden-ratio walk across the channel: no seed to carry, no two patches
-    // in a row at the same distance out, the same set in every run.
-    const g = (i * 0.6180339887) % 1
-    out.push({
-      along0: ((i + 0.5) / n) * RIVER_DRIFT_SPAN,
-      across: i % 2 === 0 ? 0.8 + g * 3 : 4 + g * (RIVER_REACH - 5),
-      size: 0.35 + ((i * 0.381966) % 1) * 0.3,
-    })
+export function flotsamKinds(count: number, mix: Record<FlotsamKind, number>): FlotsamKind[] {
+  const total = FLOTSAM_KINDS.reduce((a, k) => a + Math.max(0, mix[k]), 0)
+  const share = (k: FlotsamKind) => (total > 0 ? Math.max(0, mix[k]) / total : k === 'foam' ? 1 : 0)
+  const given: Record<FlotsamKind, number> = { foam: 0, leaf: 0, grass: 0, twig: 0 }
+  const out: FlotsamKind[] = []
+  for (let i = 0; i < count; i++) {
+    let best: FlotsamKind = 'foam'
+    let deficit = -Infinity
+    for (const k of FLOTSAM_KINDS) {
+      const d = share(k) * (i + 1) - given[k]
+      if (d > deficit + 1e-9) {
+        deficit = d
+        best = k
+      }
+    }
+    given[best]++
+    out.push(best)
   }
   return out
 }
 
 /**
- * Where a foam patch is at a given drift phase (metres travelled downstream).
+ * The flotsam, deterministically spread: evenly along the current (so the flow
+ * reads as continuous rather than as a clump) and scattered across it, the
+ * kinds interleaved by `mix`. Pure — the scene only advances the phase.
+ */
+export function buildRiverFlecks(
+  count: number,
+  mix: Record<FlotsamKind, number> = balance.riverCurrent.flotsamMix,
+): RiverFleck[] {
+  const out: RiverFleck[] = []
+  const n = Math.max(0, Math.round(count))
+  const kinds = flotsamKinds(n, mix)
+  for (let i = 0; i < n; i++) {
+    // A golden-ratio walk across the channel: no seed to carry, no two items
+    // in a row at the same distance out, the same set in every run.
+    const g = (i * 0.6180339887) % 1
+    const h = (i * 0.7548776662) % 1
+    out.push({
+      kind: kinds[i],
+      along0: ((i + 0.5) / n) * RIVER_DRIFT_SPAN,
+      across: i % 2 === 0 ? 0.8 + g * 3 : 4 + g * (RIVER_REACH - 5),
+      size: 0.35 + ((i * 0.381966) % 1) * 0.3,
+      yaw0: (h - 0.5) * Math.PI,
+      spin: ((i * 0.5698402910) % 1 - 0.5) * 0.35,
+    })
+  }
+  return out
+}
+
+/** The drawn scale (x across, y up, z along the heading) of an item of `kind`
+ *  and nominal `size`, applied to that kind's unit geometry. */
+export function flotsamScale(kind: FlotsamKind, size: number): [number, number, number] {
+  switch (kind) {
+    case 'foam':
+      return [size * 0.55, 1, size * 2.4]
+    case 'leaf':
+      return [size * 0.22, 1, size * 0.42] // a 7-14 cm leaf
+    case 'grass':
+      return [size * 0.7, size * 0.7, size * 0.9] // a torn tuft, 25-50 cm
+    case 'twig':
+      return [size * 0.9, size * 0.9, size * 1.6] // a 55-105 cm stick
+  }
+}
+
+/** Height of an item's origin above the water plane, in metres: clear of the
+ *  ripple (±0.03 m) so the surface never swallows it. */
+export const FLOTSAM_FLOAT: Record<FlotsamKind, number> = { foam: 0.035, leaf: 0.04, grass: 0.04, twig: 0.045 }
+
+/** A unit leaf lying flat: a pointed oval, 1 long (z) and 1 wide (x). */
+export function buildLeafGeometry(): THREE.BufferGeometry {
+  const shape = new THREE.Shape()
+  shape.moveTo(0, -0.5)
+  shape.quadraticCurveTo(0.55, -0.1, 0, 0.5)
+  shape.quadraticCurveTo(-0.55, -0.1, 0, -0.5)
+  return new THREE.ShapeGeometry(shape, 4).rotateX(-Math.PI / 2)
+}
+
+/** A unit tuft of torn grass: a fan of thin blades lying on the water, the tips
+ *  lifted a little, all rooted in one knot. */
+export function buildGrassTuftGeometry(): THREE.BufferGeometry {
+  const positions: number[] = []
+  const blades = 7
+  for (let b = 0; b < blades; b++) {
+    const a = ((b / (blades - 1)) - 0.5) * 1.1
+    const len = 0.75 + ((b * 0.618) % 1) * 0.25
+    const tx = Math.sin(a) * len * 0.5
+    const tz = Math.cos(a) * len - 0.5
+    const w = 0.035
+    positions.push(-w * Math.cos(a), 0, -0.5 + w * Math.sin(a), w * Math.cos(a), 0, -0.5 - w * Math.sin(a), tx, 0.08, tz)
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
+  g.computeVertexNormals()
+  return g
+}
+
+/** A unit twig: a thin round stick of length 1 along z with a short side
+ *  shoot, so it reads as wood rather than as a rod. */
+export function buildTwigGeometry(): THREE.BufferGeometry {
+  const stem = new THREE.CylinderGeometry(0.018, 0.026, 1, 5, 1).rotateX(Math.PI / 2)
+  const shoot = new THREE.CylinderGeometry(0.008, 0.014, 0.32, 4, 1)
+    .rotateX(Math.PI / 2)
+    .rotateY(0.7)
+    .translate(0.09, 0, 0.12)
+  const merged = new THREE.BufferGeometry()
+  const parts = [stem.toNonIndexed(), shoot.toNonIndexed()]
+  const pos = parts.flatMap((p) => Array.from(p.getAttribute('position').array as Float32Array))
+  merged.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3))
+  merged.computeVertexNormals()
+  stem.dispose()
+  shoot.dispose()
+  for (const p of parts) p.dispose()
+  return merged
+}
+
+/** Unit geometry of each non-foam kind (the foam patch keeps its own). */
+export function buildFlotsamGeometry(kind: Exclude<FlotsamKind, 'foam'>): THREE.BufferGeometry {
+  if (kind === 'leaf') return buildLeafGeometry()
+  if (kind === 'grass') return buildGrassTuftGeometry()
+  return buildTwigGeometry()
+}
+
+/** Tones per kind (art constants, calibratable): each item takes one of its
+ *  kind's tones, by index, so a drift of leaves is not one flat colour. */
+export const FLOTSAM_TONES: Record<Exclude<FlotsamKind, 'foam'>, readonly string[]> = {
+  leaf: ['#6f7a2c', '#8a6a2a', '#5d6b2a', '#9c7b3a'],
+  grass: ['#a39a4e', '#8c8a45', '#b5a35a'],
+  twig: ['#5a4430', '#6b5238', '#4a3a2a'],
+}
+
+let debrisMaterial: THREE.MeshStandardNodeMaterial | null = null
+
+/** The leaves', tufts' and twigs' material: matt, wet-dark, double-sided (a
+ *  leaf and a blade are single sheets), coloured per instance. A module
+ *  singleton like the foam's. */
+export function createFlotsamMaterial(): THREE.MeshStandardNodeMaterial {
+  if (debrisMaterial) return debrisMaterial
+  const m = new THREE.MeshStandardNodeMaterial()
+  m.color = new THREE.Color('#ffffff')
+  m.roughness = 0.7
+  m.metalness = 0
+  m.side = THREE.DoubleSide
+  debrisMaterial = m
+  return m
+}
+
+/**
+ * Where a drifting item is at a given drift phase (metres travelled downstream).
  * It rides the current until it has covered the span, then re-enters upstream —
  * so over any window shorter than the span, a patch that did not wrap has moved
  * DOWNSTREAM by exactly the phase advance. That is the measurable claim.
@@ -357,7 +509,7 @@ export function fleckPosition(
   const out = bank.distance + fleck.across
   return {
     x: bank.nx * out + bank.fx * along,
-    y: -BANK_WATER_DROP + 0.035,
+    y: -BANK_WATER_DROP + FLOTSAM_FLOAT[fleck.kind],
     z: bank.nz * out + bank.fz * along,
   }
 }

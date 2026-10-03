@@ -422,8 +422,8 @@ export const effectiveWeatherIntensity = (s: UiState): number => currentQuality(
 export const effectiveFigureLimbSegments = (s: UiState): number => currentQuality(s).figureLimbSegments
 /** Segments along the current of a settlement river's surface (work-order 482). */
 export const effectivePlaceRiverSegments = (s: UiState): number => currentQuality(s).placeRiverSegments
-/** How many patches of foam ride that current (work-order 482). */
-export const effectivePlaceRiverFoam = (s: UiState): number => currentQuality(s).placeRiverFoam
+/** How many items of flotsam ride that current (work-orders 482, 1280). */
+export const effectivePlaceRiverFlotsam = (s: UiState): number => currentQuality(s).placeRiverFlotsam
 /** Octaves of the one water detail field both halves of a settlement river read
  *  (work-order 525). */
 export const effectiveWaterDetailOctaves = (s: UiState): number => currentQuality(s).waterDetailOctaves

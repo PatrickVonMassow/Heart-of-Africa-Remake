@@ -439,6 +439,18 @@ interface BalanceConfig {
     /** Seconds a mired calf struggles before the mud releases it (no predator came). */
     mireSeconds: number
   }
+  /** How the settlement river's current READS (design.md §11.3, work-order
+   *  1280): the speed its pattern and flotsam drift at, and the flotsam mix. */
+  riverCurrent: {
+    /** Drift speed of the drawn current at a season factor of 1, in m/s. The
+     *  season scales it with `waterDrama.dryFlowFactor` / `wetFlowFactor` — the
+     *  gameplay current's own factors — so dry 0.6 → 0.78 m/s, wet 1.8 → 2.34. */
+    driftBaseSpeed: number
+    /** Shares of the drifting flotsam by kind; normalised, so only the ratio
+     *  matters. Foam patches carry the old reading, the rest is the debris a
+     *  river carries past a village. */
+    flotsamMix: { foam: number; leaf: number; grass: number; twig: number }
+  }
   /** The vigil at a calf's carcass (design.md §19.8, point 121). */
   vigil: {
     /** Seconds the bereaved parent holds the vigil before rejoining the herd. */
@@ -1483,6 +1495,10 @@ export const balance: BalanceConfig = {
     mireChancePerBout: 0.35, // per bout ENDING at a dry lake bank — the bank visits are already rare
     mireDrynessThreshold: 0.25, // wetness below this turns the shrinking bank to mud
     mireSeconds: 45, // the mud releases an unfound calf — the drama always resolves
+  },
+  riverCurrent: {
+    driftBaseSpeed: 1.3, // calibratable: m/s at season factor 1 (was a fixed 0.85)
+    flotsamMix: { foam: 0.5, leaf: 0.2, grass: 0.15, twig: 0.15 }, // calibratable art shares
   },
   vigil: {
     seconds: 60, // calibratable: how long the parent stands vigil before rejoining the herd

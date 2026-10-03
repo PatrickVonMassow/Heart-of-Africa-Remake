@@ -21,14 +21,38 @@
 // position, so the pattern runs CONTINUOUSLY across the rim rather than
 // restarting at it.
 
-import { color, float, max, mix, mx_fractal_noise_float, smoothstep, time, vec3 } from 'three/tsl'
+import { clamp, color, float, fwidth, max, mix, mx_fractal_noise_float, smoothstep, time, uniform, vec3 } from 'three/tsl'
+import { balance } from '../config/balance'
+import { seasonFlowFactor } from '../scenes/travel/wildlifeBehavior'
 import { detailFade } from './materials'
 
-/** How fast the water's pattern — and the foam patches riding it — travel
- *  downstream, in metres per second. An art constant like the wave figures of
- *  the ocean material: fast enough to read as a current at a glance, slow
- *  enough for a wide river. */
-export const RIVER_DRIFT_SPEED = 0.85
+/**
+ * How fast the water's pattern — and the flotsam riding it — travels
+ * downstream, in metres per second, at a local wetness of 0..1 (work-order
+ * 1280). The base speed is scaled by the gameplay current's OWN season factors
+ * (`waterDrama.dryFlowFactor` / `wetFlowFactor`), so the river the player
+ * watches runs as tame or as swollen as the one the §19.8 water drama uses.
+ */
+export function riverDriftSpeed(wetness: number, b: Pick<typeof balance, 'riverCurrent' | 'waterDrama'> = balance): number {
+  const season = seasonFlowFactor(wetness, b.waterDrama.dryFlowFactor, b.waterDrama.wetFlowFactor)
+  return b.riverCurrent.driftBaseSpeed * season
+}
+
+/**
+ * Metres the current has carried the water since the session began — the ONE
+ * drift phase the shader's streaks, fine texture and ripple AND the drifting
+ * flotsam all read, so they cannot run at different speeds. A phase rather than
+ * `time × speed`: the speed follows the season, and a changing factor on a
+ * large `time` would make the whole pattern lurch.
+ */
+export const riverDrift = uniform(0)
+
+/** Advance the drift phase by one frame; the place scene calls this exactly
+ *  once per frame. `dt` is clamped like every frame step of the scene. */
+export function advanceRiverDrift(dt: number, wetness: number): number {
+  riverDrift.value += Math.min(Math.max(dt, 0), 0.1) * riverDriftSpeed(wetness)
+  return riverDrift.value
+}
 
 /**
  * The tones the surface is built from — the ONE colour source of both halves.
@@ -57,6 +81,25 @@ const WATER_DETAIL_FAR = 220
 /** World size of the streak field: long along the current, narrow across it. */
 const STREAK_ALONG = 0.09
 const STREAK_ACROSS = 0.55
+
+/** The FINE octave over the streaks (work-order 1280): cells of ~1-3 m that
+ *  ride the same drift, so the surface visibly advances a good fraction of its
+ *  own grain every second. Slightly longer along the flow than across it. */
+const FINE_ALONG = 0.45
+const FINE_ACROSS = 0.75
+/** How strongly the fine octave shades the water (art constants, calibratable). */
+const FINE_TONE = 0.55
+const FINE_GLOSS = 0.06
+/** Its fade (work-order 1280): a 1-3 m grain turns sub-pixel FAR sooner than the
+ *  ~11 m streaks, and resampled under the TRAA jitter it shimmers. So it fades
+ *  by its own screen footprint — cycles of the field per pixel, from `fwidth` —
+ *  which follows the grazing angle and the resolution, and is gone well before
+ *  the Nyquist limit of 0.5. A gentle distance fade rides along as a floor, so
+ *  nothing of it reaches the 60-220 m band whatever the footprint reads. */
+const FINE_FOOTPRINT_FULL = 0.08
+const FINE_FOOTPRINT_GONE = 0.3
+const FINE_DETAIL_NEAR = 20
+const FINE_DETAIL_FAR = 60
 
 /** How far out from the waterline the shore froth reaches, and how far INSIDE
  *  it the froth still applies. The inner gate matters only for the panorama,
@@ -89,6 +132,8 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
   // range, so they carry the same amount of detail and cannot step against
   // each other.
   const detail = detailFade(WATER_DETAIL_NEAR, WATER_DETAIL_FAR)
+  // The water's own frame, carried downstream by the shared drift phase.
+  const flowing = u.sub(riverDrift)
 
   // Streaks stretched along the flow (long in u, narrow in v) and carried
   // downstream at the drift speed the foam flecks ride, so shader and props
@@ -96,14 +141,28 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
   // "resolved by distance" means here: the far sheet keeps the near water's
   // mean base colour, it just stops carrying the pattern and its streak foam.
   const streakField = mx_fractal_noise_float(
-    vec3(u.mul(STREAK_ALONG).sub(time.mul(RIVER_DRIFT_SPEED * STREAK_ALONG)), v.mul(STREAK_ACROSS), 1.0),
+    vec3(flowing.mul(STREAK_ALONG), v.mul(STREAK_ACROSS), 1.0),
     Math.max(1, Math.round(octaves)),
   )
     .mul(0.5)
     .add(0.5)
   const streak = mix(float(0.5), streakField, detail)
 
-  const base = mix(color(RIVER_WATER_TONES.deep), color(RIVER_WATER_TONES.sheen), streak.mul(0.5))
+  // The fine octave: same drift, its own footprint fade (see FINE_FOOTPRINT_*).
+  // A slow third coordinate lets the cells churn a little as they travel, as
+  // moving water does, without that churn ever outrunning the drift.
+  const fineAt = vec3(flowing.mul(FINE_ALONG), v.mul(FINE_ACROSS), time.mul(0.07).add(4.0))
+  const footprint = max(fwidth(fineAt.x), fwidth(fineAt.y))
+  const fineFade = smoothstep(float(FINE_FOOTPRINT_GONE), float(FINE_FOOTPRINT_FULL), footprint).mul(
+    detailFade(FINE_DETAIL_NEAR, FINE_DETAIL_FAR),
+  )
+  const fine = mx_fractal_noise_float(fineAt, Math.min(2, Math.max(1, Math.round(octaves)))).mul(fineFade)
+
+  const base = mix(
+    color(RIVER_WATER_TONES.deep),
+    color(RIVER_WATER_TONES.sheen),
+    clamp(streak.mul(0.5).add(fine.mul(FINE_TONE * 0.5)), 0, 1),
+  )
   // Foam where the current drags over the shallows at the near shore...
   const shoreFoam = smoothstep(float(SHORE_FOAM_REACH), float(0.3), v)
     .mul(smoothstep(float(SHORE_FOAM_INNER), float(SHORE_FOAM_INNER + 0.6), v))
@@ -117,14 +176,16 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
     /** 1 up close, 0 once the distance has flattened the field out. */
     detail,
     color: mix(base, color(RIVER_WATER_TONES.foam), foam.mul(0.85)),
-    roughness: foam.mul(WATER_FOAM_ROUGHNESS).add(WATER_ROUGHNESS),
+    // The fine cells also break the gloss up a little, so the sky's reflection
+    // is what visibly slides downstream on them.
+    roughness: foam.mul(WATER_FOAM_ROUGHNESS).add(WATER_ROUGHNESS).add(fine.abs().mul(FINE_GLOSS)),
     // The shallows let a trace of the bed through at the bank (0.94) and the
     // sheet turns fully opaque a few metres out — which is also what keeps the drawn surface from reading
     // darker than the opaque panorama where the two meet.
     opacity: smoothstep(float(0.5), float(3), v).mul(0.06).add(0.94),
     /** Vertical ripple in metres (design.md §11: only slight movement). */
     ripple: mx_fractal_noise_float(
-      vec3(u.mul(0.22).sub(time.mul(RIVER_DRIFT_SPEED * 0.22)), v.mul(0.9), time.mul(0.12)),
+      vec3(flowing.mul(0.22), v.mul(0.9), time.mul(0.12)),
       Math.max(1, Math.round(octaves) - 1),
     )
       .mul(0.03)

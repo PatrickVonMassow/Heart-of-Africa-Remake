@@ -70,10 +70,11 @@ export interface QualityPreset {
    *  decides whether the water undulates or lies as a flat sheet; one surface
    *  per settlement, hence a modest lever. */
   placeRiverSegments: number
-  /** How many patches of foam ride the settlement river's current (work-order
-   *  482). Never zero on any level: they are the reading the UPSTREAM/DOWNSTREAM
-   *  teaching depends on, so a frugal level shows fewer, never none. */
-  placeRiverFoam: number
+  /** How many items of flotsam — foam patches, leaves, grass tufts, twigs —
+   *  ride the settlement river's current (work-orders 482, 1280). Never zero on
+   *  any level: they are the reading the UPSTREAM/DOWNSTREAM teaching depends
+   *  on, so a frugal level shows fewer, never none. */
+  placeRiverFlotsam: number
   /** Fractal octaves of the ONE water detail field (work-order 525,
    *  render/waterAppearance.ts). It prices the water's moving pattern, and it
    *  is deliberately a SINGLE lever for BOTH halves of a settlement river — the
@@ -108,7 +109,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     wildlifeDensity: 0.6,
     figureLimbSegments: 5, // point 479: the frugal floor — a limb still reads, faceted
     placeRiverSegments: 8, // a coarse undulation; the current still reads
-    placeRiverFoam: 6, // fewer patches, never none — the flow must stay visible
+    placeRiverFlotsam: 12, // x2 only, to spare the weakest tier (frame cost measured, work-order 1280); never none
     waterDetailOctaves: 1, // one octave: the water still moves, at the lowest shading cost
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
@@ -132,7 +133,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     wildlifeDensity: 1,
     figureLimbSegments: 8, // point 479: smooth enough at conversation range
     placeRiverSegments: 32,
-    placeRiverFoam: 16,
+    placeRiverFlotsam: 48, // ~3x the 16 foam patches it had, now a mixed drift
     waterDetailOctaves: 3, // the field before the presets existed
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
@@ -155,7 +156,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     wildlifeDensity: 1,
     figureLimbSegments: 12, // point 479: no facet on an arm the player stands beside
     placeRiverSegments: 64,
-    placeRiverFoam: 30,
+    placeRiverFlotsam: 90, // ~3x the 30 foam patches it had
     waterDetailOctaves: 4, // one octave more structure on the water
   },
 }
