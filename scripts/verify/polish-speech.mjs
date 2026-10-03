@@ -1088,61 +1088,76 @@ if (section('speech-distance-scale')) {
       ? `near ${shot.near.distance} m: tip ${shot.near.tipToHead} px over the head, ${shot.near.tipToHeadX} px aside (head ${shot.near.headWidth} px wide); far ${shot.far.distance} m: ${shot.far.tipToHead} px, ${shot.far.tipToHeadX} px aside (head ${shot.far.headWidth} px); band ${JSON.stringify(shot.near.tipBand)}`
       : 'no frame was staged',
   )
-  // FRAME BY FRAME while the speakers walk (point 1276): a note placed after
-  // drei had projected it trailed its speaker by one frame — invisible in one
-  // still reading of a speaker who happened to stand, plain on a walking one.
-  // The shot pair speaks again and every one of 24 consecutive frames is
-  // measured, tail off the DOM and head off its projected mesh.
+  // FRAME BY FRAME on a MOVING speaker (point 1276): a note placed after
+  // drei had projected it trailed its speaker by one frame — invisible on a
+  // speaker who happens to stand, plain on one that moves. The motion is
+  // CONTROLLED, not hoped for: a copy of the near figure (plain scene objects,
+  // which no village routine drives) speaks and is carried 0.12 m along the
+  // camera's right on every frame, out and back. Each frame is measured
+  // before the next step, tail off the DOM and head off its projected mesh.
   let walk = null
-  if (shotPair && (await speak(shotPair))) {
-    await settled()
+  if (shotPair) {
     await aim(shotPair)
-    walk = await page.evaluate(async () => {
-      const { balance } = await import('/src/config/balance.ts')
-      const band = balance.communication.labelTipGap
-      const rows = []
-      const travel = { 'scale-near': 0, 'scale-far': 0 }
-      const last = {}
-      // Frames on which a head moved farther than the sideways tolerance: only
-      // on such a frame would a one-frame lag breach the check at all.
-      let exposing = 0
-      for (let f = 0; f < 24; f++) {
-        await new Promise((r) => requestAnimationFrame(() => r()))
-        for (const id of ['scale-near', 'scale-far']) {
-          const tail = document
-            .querySelector(`.speech-label[data-speaker="${id}"]`)
-            ?.closest('.speech-bubble')
-            ?.querySelector('.speech-tail')
-            ?.getBoundingClientRect()
-          const fig = window.__speech?.figureScreen(id)
-          if (!tail || !fig?.headTop) {
-            rows.push({ id, f, missing: true })
-            continue
+    walk = await page.evaluate(
+      async ({ near, u }) => {
+        const { speakOverhead, speechClock, forgetSpeechLabel } = await import('/src/scenes/place/speechChannel.ts')
+        const { balance } = await import('/src/config/balance.ts')
+        const band = balance.communication.labelTipGap
+        const src = window.__speechScaleFigures?.[near]
+        const cam = window.__placeCamera
+        if (!src?.parent || !cam) return null
+        const raf = () => new Promise((r) => requestAnimationFrame(() => r()))
+        const walker = src.clone()
+        walker.visible = true
+        src.parent.add(walker)
+        const right = new walker.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion)
+        right.y = 0
+        right.normalize()
+        speakOverhead('scale-walk', [u], walker, { seconds: 60, reach: 0.1, now: speechClock() })
+        for (let i = 0; i < 4; i++) await raf()
+        const rows = []
+        let travel = 0
+        let exposing = 0
+        let last = null
+        try {
+          for (let f = 0; f < 24; f++) {
+            await raf()
+            const tail = document
+              .querySelector('.speech-label[data-speaker="scale-walk"]')
+              ?.closest('.speech-bubble')
+              ?.querySelector('.speech-tail')
+              ?.getBoundingClientRect()
+            const fig = window.__speech?.figureScreen('scale-walk')
+            if (!tail || !fig?.headTop) rows.push({ f, missing: true })
+            else {
+              if (last) {
+                const step = Math.hypot(fig.headTop.x - last.x, fig.headTop.y - last.y)
+                travel += step
+                // Only a step past the tolerance lets a one-frame lag show.
+                if (step > Math.max(2, 0.25 * fig.headWidth)) exposing += 1
+              }
+              last = fig.headTop
+              const dy = fig.headTop.y - tail.bottom
+              const dx = tail.left + tail.width / 2 - fig.headTop.x
+              rows.push({ f, dy: +dy.toFixed(1), dx: +dx.toFixed(1), w: +fig.headWidth.toFixed(1) })
+            }
+            // The step for the NEXT frame: out for twelve, back for twelve.
+            walker.position.addScaledVector(right, f < 12 ? 0.12 : -0.12)
           }
-          const dy = fig.headTop.y - tail.bottom
-          const dx = tail.left + tail.width / 2 - fig.headTop.x
-          if (last[id]) {
-            const step = Math.hypot(fig.headTop.x - last[id].x, fig.headTop.y - last[id].y)
-            travel[id] += step
-            if (step > Math.max(2, 0.25 * fig.headWidth)) exposing += 1
-          }
-          last[id] = fig.headTop
-          rows.push({ id, f, dy: +dy.toFixed(1), dx: +dx.toFixed(1), w: +fig.headWidth.toFixed(1) })
+        } finally {
+          forgetSpeechLabel('scale-walk')
+          walker.removeFromParent()
         }
-      }
-      const bad = rows.filter(
-        (r) => r.missing || r.dy < band.minPx || r.dy > band.maxPx || Math.abs(r.dx) > Math.max(2, 0.25 * r.w),
-      )
-      return {
-        frames: 24,
-        bad,
-        exposing,
-        travel: Object.fromEntries(Object.entries(travel).map(([k, v]) => [k, +v.toFixed(1)])),
-      }
-    })
+        const bad = rows.filter(
+          (r) => r.missing || r.dy < band.minPx || r.dy > band.maxPx || Math.abs(r.dx) > Math.max(2, 0.25 * r.w),
+        )
+        return { frames: 24, bad, exposing, travel: +travel.toFixed(1) }
+      },
+      { near: shotPair.near, u: RIVER },
+    )
   }
   check(
-    'each note’s tail stays on its walking speaker’s head on every one of 24 consecutive frames (point 1276)',
+    'a note’s tail stays on its moving speaker’s head on every one of 24 consecutive frames (point 1276)',
     !!walk && walk.bad.length === 0,
     walk ? JSON.stringify(walk) : 'no shot pair to follow',
     // Speakers that stood still prove nothing about a lag: below this the
