@@ -995,6 +995,7 @@ if (section('speech-distance-scale')) {
   const rejected = []
   const fmt = (r) => (r == null ? 'sky' : r.toFixed(2))
   let shot = null
+  let shotPair = null
   for (const candidate of pairs) {
     if (attempts.length >= MAX_ATTEMPTS || shot) break
     let pair = null
@@ -1052,7 +1053,10 @@ if (section('speech-distance-scale')) {
       },
     )
     attempts.push({ pair, at: 'shutter', view: atShutter })
-    if (atShutter?.ok) shot = atShutter
+    if (atShutter?.ok) {
+      shot = atShutter
+      shotPair = pair
+    }
     await page.evaluate(() => window.__speech?.clear())
   }
   const brief = (a) =>
@@ -1075,6 +1079,52 @@ if (section('speech-distance-scale')) {
     shot
       ? `near ${shot.near.distance} m: tip ${shot.near.tipToHead} px over the head, ${shot.near.tipToHeadX} px aside (head ${shot.near.headWidth} px wide); far ${shot.far.distance} m: ${shot.far.tipToHead} px, ${shot.far.tipToHeadX} px aside (head ${shot.far.headWidth} px); band ${JSON.stringify(shot.near.tipBand)}`
       : 'no frame was staged',
+  )
+  // FRAME BY FRAME while the speakers walk (point 1276): a note placed after
+  // drei had projected it trailed its speaker by one frame — invisible in one
+  // still reading of a speaker who happened to stand, plain on a walking one.
+  // The shot pair speaks again and every one of 24 consecutive frames is
+  // measured, tail off the DOM and head off its projected mesh.
+  let walk = null
+  if (shotPair && (await speak(shotPair))) {
+    await settled()
+    await aim(shotPair)
+    walk = await page.evaluate(async () => {
+      const { balance } = await import('/src/config/balance.ts')
+      const band = balance.communication.labelTipGap
+      const rows = []
+      const travel = { 'scale-near': 0, 'scale-far': 0 }
+      const last = {}
+      for (let f = 0; f < 24; f++) {
+        await new Promise((r) => requestAnimationFrame(() => r()))
+        for (const id of ['scale-near', 'scale-far']) {
+          const tail = document
+            .querySelector(`.speech-label[data-speaker="${id}"]`)
+            ?.closest('.speech-bubble')
+            ?.querySelector('.speech-tail')
+            ?.getBoundingClientRect()
+          const fig = window.__speech?.figureScreen(id)
+          if (!tail || !fig?.headTop) {
+            rows.push({ id, f, missing: true })
+            continue
+          }
+          const dy = fig.headTop.y - tail.bottom
+          const dx = tail.left + tail.width / 2 - fig.headTop.x
+          if (last[id]) travel[id] += Math.hypot(fig.headTop.x - last[id].x, fig.headTop.y - last[id].y)
+          last[id] = fig.headTop
+          rows.push({ id, f, dy: +dy.toFixed(1), dx: +dx.toFixed(1), w: +fig.headWidth.toFixed(1) })
+        }
+      }
+      const bad = rows.filter(
+        (r) => r.missing || r.dy < band.minPx || r.dy > band.maxPx || Math.abs(r.dx) > Math.max(2, 0.25 * r.w),
+      )
+      return { frames: 24, bad, travel: Object.fromEntries(Object.entries(travel).map(([k, v]) => [k, +v.toFixed(1)])) }
+    })
+  }
+  check(
+    'each note’s tail stays on its walking speaker’s head on every one of 24 consecutive frames (point 1276)',
+    !!walk && walk.bad.length === 0,
+    walk ? JSON.stringify(walk) : 'no shot pair to follow',
   )
   await page.evaluate((u) => {
     window.__game.getState().setUtteranceHypothesis(u, '')
