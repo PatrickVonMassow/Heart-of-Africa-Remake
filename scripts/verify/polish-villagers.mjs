@@ -3364,8 +3364,8 @@ if (section('village-pounding')) {
     // A stand at most this far off square to the pair still shows them side by side.
     const MAX_OFF_SQUARE = 30
     const shots = [
-      { name: '1274-village-pounding-close', stand: 2.6, label: 'two women pounding grain at a footed wooden mortar, side-on from 2.6 m: one pestle down in the grain with a puff, the other lifted high' },
-      { name: '1274-village-pounding-mid', stand: 8, label: 'the same mortar pounding from 8 m across the village ground, side-on: two women, one pestle down, one lifted' },
+      { name: '1274-village-pounding-close', stand: [2.6, 3.2, 2.2, 3.8], label: 'two women pounding grain at a footed wooden mortar, side-on from close range (2.2-3.8 m): one pestle down in the grain with a puff, the other lifted high' },
+      { name: '1274-village-pounding-mid', stand: [8, 7, 9.5, 6], label: 'the same mortar pounding from mid-distance (6-9.5 m) across the village ground, side-on: two women, one pestle down, one lifted' },
     ]
     const sameProbe = (a, b) => JSON.stringify(a) === JSON.stringify(b)
     for (const shot of shots) {
@@ -3386,7 +3386,7 @@ if (section('village-pounding')) {
       await freezeLife(true)
       let retry = false
       try {
-        const staged = await page.evaluate(({ standOff, maxOff }) => {
+        const staged = await page.evaluate(({ standOffs, maxOff }) => {
           const probe = window.__placePounding()
           const layout = window.__placeLayout
           const m = probe.mortar
@@ -3418,27 +3418,36 @@ if (section('village-pounding')) {
             return (ahead > 0.3 && ahead < reach - 0.5 && aside < 0.8) || Math.hypot(bx, bz) < 1.5
           })
           const step = Math.PI / 24
-          for (let k = 0; Math.floor(k / 2) * step <= (maxOff * Math.PI) / 180; k++) {
+          const why = []
+          // The nominal distance first, then nearer and farther ones, each
+          // through the whole bound before the next.
+          for (const standOff of standOffs) for (let k = 0; Math.floor(k / 2) * step <= (maxOff * Math.PI) / 180; k++) {
             const angle = along + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * step)
             const x = m.x + Math.sin(angle) * standOff
             const z = m.z + Math.cos(angle) * standOff
-            if (Math.hypot(x, z) > layout.radius - 0.5 || clear(x, z) < 0.35) continue
+            if (Math.hypot(x, z) > layout.radius - 0.5) { why.push(`${standOff}/${k}:outside`); continue }
+            if (clear(x, z) < 0.35) { why.push(`${standOff}/${k}:stand ${clear(x, z).toFixed(2)}`); continue }
             let open = true
             for (let s = 1; s <= 12; s++) {
               const t = s / 12
               if (clear(x + (m.x - x) * t, z + (m.z - z) * t) < 0.1) open = false
             }
-            if (!open || blocked(x, z)) continue
+            if (!open) { why.push(`${standOff}/${k}:sightline`); continue }
+            if (blocked(x, z)) {
+              const near = people.map((q) => Math.hypot(q.x - x, q.z - z)).sort((a, b) => a - b)[0]
+              why.push(`${standOff}/${k}:person (nearest ${near.toFixed(2)} m)`)
+              continue
+            }
             p.x = x
             p.z = z
             p.yaw = Math.atan2(m.x - x, m.z - z) + Math.PI
-            p.pitch = standOff < 4 ? -0.18 : -0.08
-            return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2) }, people: people.length }
+            p.pitch = standOff < 5 ? -0.18 : -0.08
+            return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2), at: standOff }, people: people.length }
           }
-          return { probe, stand: null, people: people.length }
-        }, { standOff: shot.stand, maxOff: MAX_OFF_SQUARE })
+          return { probe, stand: null, people: people.length, why }
+        }, { standOffs: shot.stand, maxOff: MAX_OFF_SQUARE })
         if (!staged.stand && attempt < SEARCHES) {
-          refused.push(`${attempt}: no clear stand (${staged.people} people)`)
+          refused.push(`${attempt}: ${staged.why.join(', ')}`)
           retry = true
           continue
         }
