@@ -109,7 +109,7 @@ put it is the mistake this line exists to stop.
   - `polish-speech --section=speech-distance-scale` green on WebGPU and WebGL 2; its frame
     picture-checked.
   Tests: the existing Playwright section; no new mechanism.
-  Bundle: Testinfrastruktur.
+  Bundle: Kommunikation.
   Criticality: low — no player impact measured (the drawn scale matched the expected one in every
   attempt); it blocks the green of `polish-speech`.
 - [ ] 1121. The river-bank frame aims at a drifting fleck and shoots six frames later
