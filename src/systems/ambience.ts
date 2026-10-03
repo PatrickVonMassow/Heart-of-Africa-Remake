@@ -1169,6 +1169,34 @@ export function playLoomBeat(distance: number, bearing = 0): void {
   source.onended = route.dispose
 }
 
+/** A dull wooden thud of the pestle landing in the grain, placed like the
+ *  loom's beat but low and soft-edged: a lowpassed brown-noise knock that
+ *  carries across the plaza as far as a called voice. */
+export function poundThudPlan(distance: number, bearing = 0, volume = balance.ambienceVolume) {
+  const cfg = balance.villageLife.mortar
+  return {
+    peak: cfg.thudPeak * hearingGain(distance, balance.communication.call.reach, balance.communication.call.falloff) * Math.max(0, volume),
+    pan: speechPan(bearing),
+    attack: cfg.thudAttack,
+    duration: cfg.thudDuration,
+    frequency: cfg.thudFrequency,
+  }
+}
+
+export function playPoundThud(distance: number, bearing = 0): void {
+  const plan = poundThudPlan(distance, bearing)
+  if (!ctx || !master || plan.peak <= 0) return
+  const ac = ctx
+  const route = speechRoute(ac, ambientBus ?? master, plan.pan)
+  const t = ac.currentTime
+  const source = clapVoice(ac, route.input, t, plan.duration, true, 'lowpass', plan.frequency, 1.2, (gain) => {
+    gain.setValueAtTime(0.0001, t)
+    gain.linearRampToValueAtTime(plan.peak, t + plan.attack)
+    gain.exponentialRampToValueAtTime(0.0001, t + plan.duration)
+  })
+  source.onended = route.dispose
+}
+
 /**
  * Speaks a pure SpeechPlan (src/communication/speaking.ts): its syllables at the
  * constant pace, a phrase's atoms with the constant pause between them, all on

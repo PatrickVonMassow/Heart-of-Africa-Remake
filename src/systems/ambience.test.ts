@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import {
   coastSurfGain,
   loomBeatPlan,
+  poundThudPlan,
   playLoomBeat,
   emitFootstep,
   emitDrumPhrase,
@@ -1473,4 +1474,23 @@ it('cuts scheduled speech for the complete drum interval and restores the voice 
   quietSpeechBus(gain as unknown as AudioParam, 10, 8, 0.7)
   expect(gain.cancelScheduledValues).toHaveBeenCalledWith(10)
   expect(gain.setValueAtTime.mock.calls).toEqual([[0, 10], [0.7, 18]])
+})
+
+describe('the mortar has a placed, dull thud', () => {
+  it('uses the called-voice falloff and the speech panning', () => {
+    const near = poundThudPlan(0, 0, 1)
+    for (const d of [1, 5, 15, balance.communication.call.reach]) {
+      expect(poundThudPlan(d, 0, 1).peak / near.peak).toBeCloseTo(hearingGain(d, balance.communication.call.reach, balance.communication.call.falloff))
+    }
+    expect(poundThudPlan(balance.communication.call.reach + 1, 0, 1).peak).toBe(0)
+    expect(poundThudPlan(0, Math.PI / 2).pan).toBe(speechPan(Math.PI / 2))
+  })
+
+  it('is low and short, unlike the reed, and respects the ambience mute', () => {
+    const plan = poundThudPlan(2, 0, 1)
+    expect(plan.attack).toBeLessThan(0.01)
+    expect(plan.duration).toBeLessThan(0.25)
+    expect(plan.frequency).toBeLessThan(loomBeatPlan(2, 0, 1).frequency / 4)
+    expect(poundThudPlan(2, 0, 0).peak).toBe(0)
+  })
 })
