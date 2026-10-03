@@ -77,56 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1108. The fill's proof frame measures its neighbours BEFORE they walk, so a green suite
-  can still certify a picture with no readable subject.
-  MEASURED 11.09.2026 on main at 72114fb3, in the covering runs of point 1085 on BOTH lanes:
-  `polish` reported 255 pass, 0 fail, 0 console-errors — and
-  `verification/1085-village-adult-fills-a-jar.png` came back as the village square with two
-  cones overlapping the subject and a large vessel in the near field, the same unreadable
-  picture that 1085 was split off to fix. Run as a SINGLE SECTION
-  (`polish --section=adult-errands`) the very same code writes a clean frame on both lanes —
-  one figure alone on the bank — which is why nothing reported it.
-  THE CAUSE IS A STALE SNAPSHOT. In `scripts/verify/polish.mjs` the adult-errands shot reads
-  `posed.others` ONCE, before the bearing loop, and every clearance test — the angular
-  overlap test and the ray probes alike — is judged against those positions. The subject is
-  pinned by `__placeForceFill`, but the OTHER villagers keep walking their errands through
-  the loop and through the six settling frames before the shutter, so by the time the frame
-  is taken a neighbour has walked into a line that was clear when it was measured. The
-  section-only run is quiet enough that they have not moved far; the full pass, thirty
-  minutes in with the errands well advanced, is not. The code already knows this failure mode
-  for the SUBJECT — it re-reads his position and asserts "he is still standing where the
-  shutter is aimed" — and simply never asked it of anyone else.
-  Final state:
-  - The clearance the frame depends on is measured at the SHUTTER, not before it: the
-    villagers' positions are re-read immediately before `frame(...)` and the same angular
-    overlap test is asserted then, as a check that can fail.
-  - A bearing that has gone stale is re-chosen rather than shot: the search re-runs against
-    the fresh positions, and only an exhausted search reds.
-  - The check says which neighbour spoiled the line and by how much, so a future red names its
-    cause instead of leaving a reader to compare pictures.
-  - Evidence: the frame is taken in a FULL `polish` pass on both lanes, not only in the
-    section, and read by someone told nothing but "what is this man doing?".
-  WHY IT IS A POINT AND NOT A BACKLOG LINE: it permits a false approval. The suite certifies
-  a proof frame whose subject is not readable, which is exactly the vanished-subject pitfall
-  this repository recorded on 11.09.2026, and point 1087 owes a frame of this same act.
-  THE SAME CLASS, FOUND AGAIN ON 12.09.2026 while point 1087 was being reviewed, in TWO more
-  places in the same section — so the fix belongs here rather than being repaired shot by shot:
-  - THE RETURN CAPTURE ASSERTS A STALE SAMPLE. `holdStill()` sets the errand pace to 0.5 and
-    leaves movement ON, and the return shot samples the carrier's position and cargo, then
-    advances another frame before the shutter and asserts the SAMPLED `still.carry`. A carrier
-    who delivers his jar between the measurement and the exposure is photographed empty-handed
-    while the check passes.
-  - A CLEAR MIDPOINT IS NOT TWO VISIBLE MEN. The order shot raycasts `placeCamera` at the
-    MIDPOINT between sender and carrier, so a post standing in front of either man leaves that
-    midpoint clear and the bearing is accepted. Both participants and the stand have to be
-    visible, not the empty air between them.
-  Both are the same defect as the one above — a frame judged on a state that was true before
-  the shutter rather than at it — and the final state below covers them: the clearance and the
-  cargo are measured AT the shutter, and a bearing that has gone stale is re-chosen.
-  Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
-  directly in front of point 1087.
-  Bundle: Dorfleben.
-
 - [ ] 1271. Speech bubbles larger and scaled by distance
   Speech bubbles (speech labels over speaking figures, src/ui/SpeechLabelCard.tsx, src/index.css) are clearly larger than today, and they scale with the speaker's distance from the camera: a nearer figure's bubble is larger, a farther figure's bubble smaller, monotonically, with a readable minimum and a maximum so a close-up bubble never covers the scene. Base size and the near/far scale limits live in src/config/balance.ts, marked calibratable. Targeting/selection of a bubble (.speech-label.targeted) keeps working at every size. Test: Vitest for the size-from-distance function (monotone, clamped); Playwright frame in the village showing a near and a far speaker with visibly different bubble sizes, both backends (CSS/layout path).
   Bundle: Kommunikation.
