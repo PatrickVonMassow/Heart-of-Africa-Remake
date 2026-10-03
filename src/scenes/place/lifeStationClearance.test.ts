@@ -28,8 +28,9 @@ function stationBodies(id: string) {
         x: p[0], z: p[1], r: { talkers: 0.85, pounder: 0.55, drummer: 0.8, well: 0.75 }[name as keyof typeof VILLAGE_SPOTS],
       })),
     ...[-0.5, 0.5].map(dx => ({ x: VILLAGE_SPOTS.talkers[0] + dx, z: VILLAGE_SPOTS.talkers[1], r: WALKER_RADIUS })),
-    inward(VILLAGE_SPOTS.pounder, -0.55),
-    inward(VILLAGE_SPOTS.pounder, balance.villageLife.mortar.standOff), // the second pounder
+    // Both pounders, where the renderer stands them (point 1274).
+    inward(VILLAGE_SPOTS.pounder, -balance.villageLife.mortar.standOff),
+    ...(balance.villageLife.mortar.pounders > 1 ? [inward(VILLAGE_SPOTS.pounder, balance.villageLife.mortar.standOff)] : []),
     { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: WALKER_RADIUS },
     ...(hasWell ? [{ x: VILLAGE_SPOTS.well[0] - 1.1, z: VILLAGE_SPOTS.well[1], r: WALKER_RADIUS }] : []),
     { x: fire[0], z: fire[1], r: 1.3 },
