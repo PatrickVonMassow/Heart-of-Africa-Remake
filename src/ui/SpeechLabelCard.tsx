@@ -17,6 +17,10 @@
 // speaker, and an older card RECEDES — dimmed and a little smaller — behind a
 // newer one, so with several figures in view the current speaker's note is the
 // most prominent. The scene layer decides `receded` (speechLabelRecedes).
+//
+// HOW LARGE a note is drawn (point 1271) is the scene layer's too: it wraps
+// this card in `.speech-distance` and scales it by the speaker's distance
+// (speechBubbleScale), so this card's own transform stays the receded look.
 
 import { conceptOf } from '../communication/lexicon'
 import type { Phrase, Vocabulary } from '../communication/lexicon'

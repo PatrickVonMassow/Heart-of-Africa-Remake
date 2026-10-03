@@ -1168,6 +1168,16 @@ interface BalanceConfig {
     labelHeadroom: number
     /** How an older note stands back while a newer one is shown (speechLabelRecedes). */
     labelRecede: { opacity: number; scale: number }
+    /** The note's size on screen (speechBubbleScale): `baseScale` times a factor
+     *  that runs from `nearScale` at `nearDistance` down to `farScale` at
+     *  `farDistance` (camera to note, settlement units) and is held beyond both. */
+    speechBubble: {
+      baseScale: number
+      nearDistance: number
+      farDistance: number
+      nearScale: number
+      farScale: number
+    }
     /** How close the traveller must stand to the chief, in settlement units, for
      *  the find from the boulder to be laid in his hands. */
     giveReach: number
@@ -2179,6 +2189,12 @@ export const balance: BalanceConfig = {
     // dimmed and a little smaller — so the current speaker's note is always the
     // most prominent. Still readable: the player may want to guess at it.
     labelRecede: { opacity: 0.55, scale: 0.85 },
+    // Calibratable (CLAUDE.md §2): the note is drawn 1.4x its CSS size, and a
+    // near speaker's note larger than a far one's. The factor holds below 3 m
+    // and beyond 22 m, so the smallest note (1.4 x 0.75 = 1.05, a 13.7 px
+    // script) stays readable and the largest (1.4 x 1.35 = 1.89) never covers
+    // the scene in a close-up.
+    speechBubble: { baseScale: 1.4, nearDistance: 3, farDistance: 22, nearScale: 1.35, farScale: 0.75 },
     // Calibratable (CLAUDE.md §2): the find is handed over face to face, so the
     // reach is an arm's length plus a step — a little over the 1.6 m the chief
     // stands beside his own door (CHIEF_STAND_OFFSET), and well inside the

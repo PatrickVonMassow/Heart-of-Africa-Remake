@@ -193,6 +193,7 @@ describe('village speech (design.md §13.4)', () => {
       drumMessagePeak: 4.5,
       labelHeadroom: 0.15,
       labelRecede: { opacity: 0.55, scale: 0.85 },
+      speechBubble: { baseScale: 1.4, nearDistance: 3, farDistance: 22, nearScale: 1.35, farScale: 0.75 },
       giveReach: 2.6,
       chiefWalkSpeed: 1.4,
       chiefStaySeconds: 60,

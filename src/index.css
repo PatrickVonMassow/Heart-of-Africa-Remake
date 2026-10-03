@@ -1566,6 +1566,15 @@ textarea {
   pointer-events: none;
 }
 
+/* The note's size by its speaker's distance (point 1271): the scene layer sets
+   the scale per frame (speechBubbleScale), about the tail's tip so the note
+   stays on its speaker. No transition — it follows the camera directly. */
+.speech-distance {
+  transform: scale(var(--speech-distance-scale, 1));
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+
 /* The note plus its tail (point 1238). The scene layer anchors the bubble's
    BOTTOM CENTRE — the tail's tip — over the speaker's crown, so the tail points
    at its own speaker; a receded bubble shrinks about that same tip. */
