@@ -1598,6 +1598,10 @@ if (section('chief-to-drummer')) {
     Array.isArray(named) && named.length === 1 && named[0] === chiefWord,
     JSON.stringify({ named, chiefWord }),
   )
+  // Past the arm's 0.3 s rise and short of its fall at 1.7 s: hold the pose.
+  await nextFrames(4)
+  await page.waitForTimeout(400)
+  await page.evaluate(() => window.__placeFreezeLife?.(true))
 
   // 1a. ONE HUT ON THE POINTING LINE (point 1272): seen from behind the drummer
   //     while his arm is up, the chief's hut is the only hut his gesture can
@@ -1625,17 +1629,21 @@ if (section('chief-to-drummer')) {
     !alongLine.market && alongLine.dwellings === 0,
     JSON.stringify(alongLine),
   )
-  // Beside the drummer and a step back, so man, arm and hut share the frame
-  // (straight behind him a shade roof's post covers the line).
+  // Behind the drummer and well off to his open side, so man, arm and hut
+  // share the frame (straight behind him, or on the dwelling side, a shade
+  // roof's post covers the line). Life stays frozen from the word on, so the
+  // arm is still up when the shutter falls.
   const toHut = Math.hypot(hut.pos[0] - drummer.x, hut.pos[1] - drummer.z)
   const ux = (hut.pos[0] - drummer.x) / toHut
   const uz = (hut.pos[1] - drummer.z) / toHut
-  const behind = { x: drummer.x - ux * 1.5 - uz * 2.5, z: drummer.z - uz * 1.5 + ux * 2.5 }
-  await standAt(behind, { x: hut.pos[0], z: hut.pos[1] })
+  const behind = { x: drummer.x - ux * 5 - uz * 3.5, z: drummer.z - uz * 5 + ux * 3.5 }
+  // Aimed between the man and the hut, so both stand in the frame.
+  await standAt(behind, { x: (drummer.x + hut.pos[0]) / 2, z: (drummer.z + hut.pos[1]) / 2 })
   await frame('1272-drummer-points-at-chief-hut', {
     local: { x: hut.pos[0], y: 1.5, z: hut.pos[1] },
     label: "from behind the drummer, his arm raised toward the chief's hut — the only hut along the pointing line",
   })
+  await page.evaluate(() => window.__placeFreezeLife?.(false))
   await standAt(inFrontOf(drummer, 2), drummer)
 
   // 1b. THE COLLISION THE TWO KEYS REMOVED (point 1139, user 16.09.2026). The
