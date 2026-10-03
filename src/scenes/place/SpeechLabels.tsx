@@ -29,6 +29,7 @@ import {
 } from '../../communication/speechLabel'
 import { labelPresentation } from '../../communication/speechTarget'
 import { speechBubbleScale } from '../../communication/speechBubbleScale'
+import { balance } from '../../config/balance'
 import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
 import {
   clearSpeechLabels,
@@ -45,8 +46,12 @@ const WORLD = new THREE.Vector3()
 /** Scratch vector for the camera's world place. */
 const EYE = new THREE.Vector3()
 
-/** Lifts drei's wrapper by its own size so its bottom centre sits on the point. */
-const TIP_ON_ANCHOR = { transform: 'translate3d(-50%,-100%,0)' }
+/** Lifts drei's wrapper by its own size so its bottom centre — the tail tip —
+ *  sits on the anchor (the drawn head top), plus the calibratable screen gap
+ *  that keeps the tip off the hair at every distance (point 1276). */
+function tipOnAnchor(gapPx: number) {
+  return { transform: `translate3d(-50%,calc(-100% - ${Math.max(0, gapPx)}px),0)` }
+}
 
 /** One speaker's note, following its figure. */
 function SpeechLabelView({
@@ -97,7 +102,7 @@ function SpeechLabelView({
     <group ref={group}>
       {/* Not centred: the bubble's bottom centre — its tail's tip — stands on
           the anchor, so the tail points down at this speaker's crown. */}
-      <Html style={TIP_ON_ANCHOR} zIndexRange={[20, 10]}>
+      <Html style={tipOnAnchor(balance.communication.labelTipGap.px)} zIndexRange={[20, 10]}>
         <div ref={sizer} className="speech-distance">
           <SpeechLabelCard
             speakerId={label.speakerId}

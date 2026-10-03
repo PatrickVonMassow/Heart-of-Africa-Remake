@@ -191,7 +191,7 @@ describe('village speech (design.md §13.4)', () => {
       speechPitchInterval: 1.68,
       speechVolume: 3,
       drumMessagePeak: 4.5,
-      labelHeadroom: 0.15,
+      labelTipGap: { px: 5, minPx: 0, maxPx: 16 },
       labelRecede: { opacity: 0.55, scale: 0.85 },
       speechBubble: { baseScale: 1.4, nearDistance: 3, farDistance: 22, nearScale: 1.35, farScale: 0.75 },
       giveReach: 2.6,
@@ -232,11 +232,12 @@ describe('village speech (design.md §13.4)', () => {
     expect(balance.communication.labelSeconds).toBeGreaterThan(
       balance.communication.syllableSeconds * 5,
     )
-    // And it floats a hand's breadth over the speaker's own head, not a metre
-    // over it: the flat 2.3 m the note used to hang at was most of a grown
-    // figure's height above the head, and about twice a child's (point 582).
-    expect(balance.communication.labelHeadroom).toBeGreaterThan(0)
-    expect(balance.communication.labelHeadroom).toBeLessThan(0.5)
+    // And its tail ends just above the speaker's own head: a few screen pixels,
+    // inside the band the rendered gap is held to (points 582, 1276).
+    const gap = balance.communication.labelTipGap
+    expect(gap.px).toBeGreaterThanOrEqual(gap.minPx)
+    expect(gap.px).toBeLessThanOrEqual(gap.maxPx)
+    expect(gap.maxPx).toBeLessThanOrEqual(20)
   })
 
   it('pitches both syllables inside one human voice, an interval apart that the ear cannot miss', () => {

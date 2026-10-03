@@ -1164,8 +1164,11 @@ interface BalanceConfig {
      *  of long-range speech, so it carries its own level rather than the
      *  meaningless bed's `drumBed.villageGain`. */
     drumMessagePeak: number
-    /** The gap between a speaker's own crown and its note, in settlement units. */
-    labelHeadroom: number
+    /** The gap between the top of a speaker's DRAWN head and its note's tail
+     *  tip, in screen pixels (the note's anchor is the head top itself).
+     *  `px` is the lift applied; `minPx`..`maxPx` is the band the rendered gap
+     *  must fall in at every camera distance (verification asserts it). */
+    labelTipGap: { px: number; minPx: number; maxPx: number }
     /** How an older note stands back while a newer one is shown (speechLabelRecedes). */
     labelRecede: { opacity: number; scale: number }
     /** The note's size on screen (speechBubbleScale): `baseScale` times a factor
@@ -2179,15 +2182,14 @@ export const balance: BalanceConfig = {
     // one master, so a strike landing on the two-voice worst case still adds to
     // it — that coincidence is point 1156's, not a reason to lower this value.
     drumMessagePeak: 4.5,
-    // A hand's breadth over the head, no more (point 582). The note used to
-    // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown
-    // villager's head and about twice a child's own height over a child's — so
-    // a player looking at the figures never saw it. It rides the SPEAKER's own
-    // height now, and this is the whole gap left above it: enough for the box
-    // to clear the head, little enough that the note plainly belongs to the
-    // figure under it. Since the note carries a tail whose TIP stands on this
-    // point (the box above it), the gap is only what keeps the tip off the hair.
-    labelHeadroom: 0.15,
+    // Calibratable (CLAUDE.md §2, point 1276): the tail tip ends just above the
+    // drawn head. The gap used to be 0.15 m over the actor record — itself
+    // 0.11 m over the head sphere — and a metre gap grows on screen as the
+    // speaker nears: 65-85 px over a speaker 4 m away. The anchor is the head
+    // top now and the gap a fixed screen lift, so it reads the same at every
+    // distance: 5 px clears the hair, and the band allows the projection's
+    // rounding plus a head bobbing with the walk between frames.
+    labelTipGap: { px: 5, minPx: 0, maxPx: 16 },
     // Calibratable (CLAUDE.md §2): with two notes up, the older one steps back —
     // dimmed and a little smaller — so the current speaker's note is always the
     // most prominent. Still readable: the player may want to guess at it.

@@ -576,7 +576,7 @@ export const de: Strings = {
     speechChildPitch: 'Kinder: tiefer Sprachton (Hz)',
     speechStereoWidth: 'Sprache: Stereobreite (0 = Mono)',
     speechPitchInterval: 'Beide Altersgruppen: hoher Ton über tiefem (×)',
-    speechLabelHeadroom: 'Sprache: Abstand über dem Kopf (m)',
+    speechLabelHeadroom: 'Sprache: Abstand über dem Kopf (px)',
     speechConceptLabels: 'Sprache: Begriffe statt Silben zeigen',
     tagChildCount: 'Fangen: Zahl der Kinder',
     tagSprintSpeed: 'Fangen: Sprint des Fängers (m/s)',

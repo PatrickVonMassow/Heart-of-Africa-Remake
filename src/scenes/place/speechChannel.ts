@@ -31,7 +31,7 @@ import {
   type SpeechLabelState,
 } from '../../communication/speechLabel'
 import { pickSpeechTarget, type SpeechTargetCandidate } from '../../communication/speechTarget'
-import { markedActorRise, type MarkedNode } from '../actorLabelSource'
+import { drawnHeadRise, markedActorRise, type HeadNode, type MarkedNode } from '../actorLabelSource'
 import type { UseCandidate } from './useKeyTarget'
 import { placePlayerPosition } from './playerPosition'
 
@@ -104,9 +104,11 @@ export function speakOverhead(
   // The height is read from the SPEAKER, here rather than at each call site, so
   // every speaker — the villagers, the children, the dev hook — gets its note
   // over its own head without computing anything (work-order point 582). The
-  // figure's own actor record says how tall it is drawn; a speaker that carries
-  // none falls back to a grown figure's height.
-  const height = options.height ?? speechLabelHeight(markedActorRise(anchor as MarkedNode))
+  // figure's DRAWN head says where the tail ends (point 1276); a speaker
+  // without one falls back to its actor record, then to a grown figure.
+  const height =
+    options.height ??
+    speechLabelHeight(drawnHeadRise(anchor as HeadNode) ?? markedActorRise(anchor as MarkedNode))
   publish(showSpeechLabel(base, speakerId, atoms, now, { ...options, height }))
 }
 

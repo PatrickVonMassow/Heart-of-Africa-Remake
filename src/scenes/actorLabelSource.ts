@@ -136,6 +136,46 @@ export function markedActorRise(root: MarkedNode | null | undefined): number | n
   return found.m[13] + found.mark.height * scale - base[13]
 }
 
+/** A drawn head as this module reads it: named `figure-head` by placeFigure,
+ *  a sphere whose radius its geometry carries. Structural, like MarkedNode. */
+export interface HeadNode {
+  name?: string
+  visible?: boolean
+  children?: readonly HeadNode[]
+  matrixWorld?: { elements: ArrayLike<number> }
+  geometry?: { parameters?: { radius?: number } }
+}
+
+/**
+ * How high the TOP of the drawn head under `root` stands above root's own
+ * origin, in world units — null when no visible head is drawn there (a wrap
+ * pulled over it, an object that is no figure). The speech note's tail ends
+ * here (work-order point 1276): the actor record sits 0.11 m above the head
+ * sphere, and with the old metre headroom on top the tip floated 65-85 px over
+ * a near speaker's hair. A sphere of radius r reaches r times the length of its
+ * world matrix's y row above its centre — squash, lean and the head's own
+ * counter-rotation included (the reading PlaceLife's head check takes).
+ */
+export function drawnHeadRise(root: HeadNode | null | undefined): number | null {
+  const base = root?.matrixWorld?.elements
+  if (!root || base === undefined) return null
+  const head = findHead(root)
+  if (!head) return null
+  const e = head.matrixWorld!.elements
+  const r = head.geometry?.parameters?.radius ?? 0
+  return e[13] + r * Math.hypot(e[1], e[5], e[9]) - base[13]
+}
+
+function findHead(node: HeadNode): HeadNode | null {
+  if (node.visible === false) return null
+  if (node.name === 'figure-head' && node.matrixWorld !== undefined) return node
+  for (const child of node.children ?? []) {
+    const hit = findHead(child)
+    if (hit) return hit
+  }
+  return null
+}
+
 /** The first marked node at or under `root` in depth-first order (not
  *  necessarily the shallowest) — an invisible node takes its subtree with it,
  *  exactly as the label collection does. */

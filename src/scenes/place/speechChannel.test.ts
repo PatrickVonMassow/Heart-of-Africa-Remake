@@ -156,6 +156,19 @@ describe('the height comes from the speaker itself', () => {
     expect(at('kid-1')).toBeLessThan(at('villager-1'))
   })
 
+  it('ends the tail at the DRAWN head top, not at the record over it (point 1276)', () => {
+    const fig = drawn(1)
+    ;(fig as unknown as { children: unknown[] }).children = [
+      {
+        name: 'figure-head',
+        matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.18, 0, 1] },
+        geometry: { parameters: { radius: 0.16 } },
+      },
+    ]
+    speakOverhead('villager-1', [RIVER_UTTERANCE], fig, { now: 0 })
+    expect(speechLabelState().labels[0].height).toBeCloseTo(1.34)
+  })
+
   it('falls back to a grown figure for an object that is no marked actor', () => {
     speakOverhead('probe', [RIVER_UTTERANCE], figure(), { now: 0 })
     expect(speechLabelState().labels[0].height).toBeCloseTo(speechLabelHeight())

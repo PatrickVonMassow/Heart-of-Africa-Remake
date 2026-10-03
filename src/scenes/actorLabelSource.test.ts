@@ -3,11 +3,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   collectActors,
+  drawnHeadRise,
   markActor,
   markedActorRise,
   pushMarkedActors,
   registerActorSource,
   type LabelledActor,
+  type HeadNode,
   type MarkedNode,
 } from './actorLabelSource'
 
@@ -147,5 +149,43 @@ describe('the marked figure’s rise above its anchor', () => {
       children: [node(0, 0, 0, { visible: false, userData: villager })],
     })
     expect(markedActorRise(anchor)).toBeNull()
+  })
+})
+
+/**
+ * WHERE THE SPEECH TAIL ENDS (work-order point 1276): at the top of the DRAWN
+ * head sphere, not at the actor record 0.11 m over it.
+ */
+describe('drawnHeadRise', () => {
+  /** A head sphere of radius `r` whose world matrix is `elements`. */
+  const head = (elements: number[], r = 0.16, extra: Partial<HeadNode> = {}): HeadNode => ({
+    name: 'figure-head',
+    matrixWorld: { elements },
+    geometry: { parameters: { radius: r } },
+    ...extra,
+  })
+  const at = (y: number, s = 1) => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, y, 0, 1]
+
+  it('is the head centre plus its radius, measured from the anchor', () => {
+    // A grown figure: head centre at bodyH + 0.18 = 1.18, radius 0.16.
+    const anchor: HeadNode = { matrixWorld: { elements: at(0.5) }, children: [{ children: [head(at(1.68))] }] }
+    expect(drawnHeadRise(anchor)).toBeCloseTo(1.34)
+  })
+
+  it('takes the world scale: a child at 0.55 has a 0.55 head', () => {
+    const anchor: HeadNode = { matrixWorld: { elements: at(0) }, children: [head(at(1.18 * 0.55, 0.55))] }
+    expect(drawnHeadRise(anchor)).toBeCloseTo(1.34 * 0.55)
+  })
+
+  it('reads the y row, so a head kept round through a squash stays round', () => {
+    // Squashed figure, counter-scaled head: world y row length 1.
+    const anchor: HeadNode = { matrixWorld: { elements: at(0) }, children: [head(at(0.9))] }
+    expect(drawnHeadRise(anchor)).toBeCloseTo(1.06)
+  })
+
+  it('is null without a visible head, so the record takes over', () => {
+    expect(drawnHeadRise({ matrixWorld: { elements: at(0) }, children: [] })).toBeNull()
+    expect(drawnHeadRise({ matrixWorld: { elements: at(0) }, children: [head(at(1), 0.16, { visible: false })] })).toBeNull()
+    expect(drawnHeadRise(null)).toBeNull()
   })
 })

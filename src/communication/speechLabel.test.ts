@@ -208,74 +208,46 @@ describe('the note a click would take (design.md §13.4)', () => {
 })
 
 /**
- * WHERE THE NOTE FLOATS (work-order point 582). The old flat height was 2.3 m
- * over the speaker's FEET whoever spoke, which put a child's note about twice
- * the child's own height above it — the user reported missing utterances
- * because of it. The rule is now the SPEAKER's own height plus one small gap,
- * so these cases are stated in the only terms that matter: how far the note
- * ends up above THAT figure's crown, in world units.
+ * WHERE THE NOTE'S TAIL ENDS (work-order points 582, 1276). The old flat height
+ * was 2.3 m over the speaker's FEET whoever spoke; then a 0.15 m gap over the
+ * actor record (itself 0.11 m over the head sphere), which on screen grew to
+ * 65-85 px over a speaker 4 m away. The anchor is now the top of the speaker's
+ * own DRAWN head, and the gap a screen lift applied by the scene layer.
  */
-describe('the note rides on the speaker’s own height', () => {
-  /** The crown of a figure whose actor record says `rise` (the record sits a
-   *  little above the head sphere, exactly as the Ctrl label reads it). */
-  const CROWN_UNDER_RECORD = 0.11
-  const grown = GROWN_FIGURE_HEIGHT
-  const kid = GROWN_FIGURE_HEIGHT * 0.55
+describe('the anchor is the speaker’s own head top', () => {
+  const grown = 1.34 // a grown figure's drawn head top: bodyH 1.0 + 0.18 + r 0.16
+  const kid = grown * 0.55
 
-  it('leaves the same small gap over a grown villager and over a child', () => {
-    for (const rise of [grown, kid]) {
-      const gap = speechLabelHeight(rise) - rise
-      expect(gap).toBeCloseTo(balance.communication.labelHeadroom)
-    }
+  it('stands exactly on the head top it is given, grown or child', () => {
+    for (const top of [grown, kid]) expect(speechLabelHeight(top)).toBeCloseTo(top)
   })
 
-  it('sits a hand’s breadth over the head at BOTH scales, and never below it', () => {
-    for (const [what, rise, scale] of [
-      ['a grown villager', grown, 1],
-      ['a child', kid, 0.55],
-    ] as const) {
-      const crown = rise - CROWN_UNDER_RECORD * scale
-      const over = speechLabelHeight(rise) - crown
-      expect(over, `${what}: the note must clear the head`).toBeGreaterThan(0)
-      expect(over, `${what}: the note must stay close over it`).toBeLessThanOrEqual(0.5)
-    }
+  it('carries no metre gap: a metre gap grows on screen as the speaker nears', () => {
+    // Pinhole projection, 1080 px over a 50° vertical field: what 0.26 m —
+    // the old record-plus-headroom gap over the head sphere — spans at 4 m,
+    // against the band the screen lift is held to.
+    const pxPerMetre = (d: number) => 1080 / (2 * d * Math.tan((25 * Math.PI) / 180))
+    expect(0.26 * pxPerMetre(4)).toBeGreaterThan(balance.communication.labelTipGap.maxPx)
+    expect(speechLabelHeight(grown) - grown).toBe(0)
   })
 
   it('is the defect it fixes: the old flat height stood far higher over both', () => {
-    // The shipped constant, for the contrast this case exists to state.
     const FLAT = 2.3
-    expect(FLAT - (grown - CROWN_UNDER_RECORD)).toBeGreaterThan(0.8)
-    expect(FLAT - (kid - CROWN_UNDER_RECORD * 0.55)).toBeGreaterThan(kid)
+    expect(FLAT - grown).toBeGreaterThan(0.8)
+    expect(FLAT - kid).toBeGreaterThan(kid)
     expect(speechLabelHeight(kid)).toBeLessThan(FLAT - 1)
-  })
-
-  it('moves with the figure: half the scale, roughly half the height', () => {
-    const half = speechLabelHeight(kid)
-    const full = speechLabelHeight(grown)
-    expect(half).toBeLessThan(full)
-    expect(half - balance.communication.labelHeadroom).toBeCloseTo(
-      (full - balance.communication.labelHeadroom) * 0.55,
-    )
   })
 
   it('falls back to a grown figure for a speaker that carries no height', () => {
     for (const missing of [undefined, null, 0, -1]) {
-      expect(speechLabelHeight(missing)).toBeCloseTo(
-        GROWN_FIGURE_HEIGHT + balance.communication.labelHeadroom,
-      )
+      expect(speechLabelHeight(missing)).toBeCloseTo(GROWN_FIGURE_HEIGHT)
     }
   })
 
-  it('follows the calibrated gap when it is tuned in the debug menu', () => {
-    const before = balance.communication.labelHeadroom
-    try {
-      balance.communication.labelHeadroom = 0.6
-      expect(speechLabelHeight(grown)).toBeCloseTo(grown + 0.6)
-      balance.communication.labelHeadroom = -5
-      expect(speechLabelHeight(grown)).toBeCloseTo(grown)
-    } finally {
-      balance.communication.labelHeadroom = before
-    }
+  it('holds the calibrated screen lift inside its own band', () => {
+    const { px, minPx, maxPx } = balance.communication.labelTipGap
+    expect(minPx).toBeLessThanOrEqual(px)
+    expect(px).toBeLessThanOrEqual(maxPx)
   })
 })
 

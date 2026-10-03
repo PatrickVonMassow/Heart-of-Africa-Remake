@@ -30,22 +30,19 @@ export const NO_READING = '???'
 export const GROWN_FIGURE_HEIGHT = 1.45
 
 /**
- * Where a label floats above the speaker's own origin — that speaker's own
- * crown plus the calibratable gap, never a flat height over its FEET.
+ * Where a label's ANCHOR — its tail tip — stands above the speaker's own
+ * origin: the top of that speaker's own drawn head, never a flat height over
+ * its FEET (`drawnHeadRise`, falling back to the actor record).
  *
  * The flat height was 2.3 m for everyone (work-order point 582): about 0.85 m
  * over a grown villager's head, and over a CHILD at 0.55 scale roughly twice
- * the child's own height — and the children teach most of the concepts. The
- * user reported missing utterances entirely because of it.
- *
- * The gap is in METRES and does NOT scale with the figure: the note is an HTML
- * box whose size on screen follows the distance to the camera and not the
- * height of whoever is speaking, so a small figure needs the same absolute
- * clearance to keep the box off its head.
+ * the child's own height. A metre gap over the crown followed it, and grew on
+ * screen as the speaker neared — 65-85 px over a speaker 4 m away (point 1276).
+ * The gap is a SCREEN lift now (`balance.communication.labelTipGap.px`, applied
+ * by the scene layer), so the tail meets the head alike at every distance.
  */
 export function speechLabelHeight(figureHeight?: number | null): number {
-  const crown = figureHeight != null && figureHeight > 0 ? figureHeight : GROWN_FIGURE_HEIGHT
-  return crown + Math.max(0, balance.communication.labelHeadroom)
+  return figureHeight != null && figureHeight > 0 ? figureHeight : GROWN_FIGURE_HEIGHT
 }
 
 /** One label: the atoms one speaker is saying, and how long it stands. */

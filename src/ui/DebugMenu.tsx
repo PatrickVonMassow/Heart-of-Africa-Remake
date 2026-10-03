@@ -683,8 +683,8 @@ export function DebugMenu() {
       // The speech's own LEVEL is a volume, so it lives with the other volumes
       // in the graphics-and-sound group, not here (point 605).
       // How close over the speaker's own head the reading floats (point 582).
-      num(t.debug.speechLabelHeadroom, balance.communication.labelHeadroom,
-        (v) => { balance.communication.labelHeadroom = Math.max(0, v); bump() }, 0.05),
+      num(t.debug.speechLabelHeadroom, balance.communication.labelTipGap.px,
+        (v) => { balance.communication.labelTipGap.px = Math.max(0, v); bump() }, 1),
       // DEBUG VIEW (user 09.08.2026): the concept behind each utterance instead
       // of its syllables and the player's guess — and every speaker labelled,
       // not only the ones already heard. It answers "did that situation stage

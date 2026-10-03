@@ -577,7 +577,7 @@ export const en: Strings = {
     speechChildPitch: 'Children: low speech tone (Hz)',
     speechStereoWidth: 'Speech: stereo width (0 = mono)',
     speechPitchInterval: 'Both ages: high tone above low (×)',
-    speechLabelHeadroom: 'Speech: gap above the head (m)',
+    speechLabelHeadroom: 'Speech: gap above the head (px)',
     speechConceptLabels: 'Speech: show concepts instead of syllables',
     tagChildCount: 'Tag: children playing',
     tagSprintSpeed: 'Tag: chaser sprint (m/s)',
