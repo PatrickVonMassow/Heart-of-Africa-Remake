@@ -77,10 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1276. Speech note tail meets a near speaker's head
-  Seen while authoring point 1271 (frame verification/1271-speech-near-far-sizes.png): with a speaker about 4 m from the camera, the speech note's tail tip sits 65-85 px above the drawn head, so the note reads as detached from its speaker. The tip sits correctly on its anchor; the anchor (src/scenes/place/SpeechLabels.tsx) lies too high above the head at close range. Final state: at every camera distance the tail tip ends just above the speaker's rendered head (gap from the projected head top within a small calibratable pixel band in src/config/balance.ts). Test: Vitest for the anchor height from the figure's head height; Playwright near-speaker frame asserting the tip-to-head-top gap in the rendered projection, both backends.
-  Bundle: Kommunikation.
-
 - [ ] 1278. Speech bubbles follow felt loudness: large and readable near, smaller but readable far, and sit lower over the head
   Speech bubbles follow felt loudness: large and readable near, smaller but readable far, and sit lower over the head (user-approved 03.10.2026 from faked screenshots).
   1. Size curve (src/communication/speechBubbleScale.ts, balance.communication.speechBubble, calibratable): relative to the 1271 values, near (3 m) x2.25 and far (22 m) /1.25, i.e. nearScale 1.35 -> 3.04 at 3 m, farScale 0.75 -> 0.60 at 22 m, baseScale 1.4 unchanged. Between them a power law scale = nearScale * (3/d)^k with k = ln(3.04/0.60)/ln(22/3) ~ 0.81. Closer than 3 m the curve keeps growing up to a hard cap of 4.0 (reached at ~2.1 m) and holds there; beyond 22 m it holds at 0.60. Keep a viewport cap so a close-up note never covers the scene; check that labelRecede (0.85, dimmed) does not undo the effect in ordinary conversation.
