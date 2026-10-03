@@ -3536,7 +3536,10 @@ if (section('village-pounding')) {
             const angle = along + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * step)
             const x = m.x + Math.sin(angle) * standOff
             const z = m.z + Math.cos(angle) * standOff
-            if (Math.hypot(x, z) > layout.radius - 0.5) { why.push(`${standOff}/${k}:outside`); continue }
+            // The walkable boundary at that bearing (the river village's lobe
+            // reaches past the plain radius; the mortar stands in it, point 1282).
+            const edge = window.__placeBoundaryRadius?.(Math.atan2(z, x)) ?? layout.radius
+            if (Math.hypot(x, z) > edge - 0.5) { why.push(`${standOff}/${k}:outside`); continue }
             if (clear(x, z) < 0.35) { why.push(`${standOff}/${k}:stand ${clear(x, z).toFixed(2)}`); continue }
             let open = true
             for (let s = 1; s <= 12; s++) {
