@@ -2708,7 +2708,7 @@ if (section('adult-errands')) {
       for (const [rank, dist, round] of RETURN_TRIES) {
         tries++
         if (round && !rank && dist === 5) await nextFrames(60)
-        const placed = await page.evaluate(([w, rank, dist]) => {
+        const placed = await page.evaluate(([w, rank, dist, margin]) => {
           const v = window.__placeErrands().villagers[w]
           const p = window.__placePlayer
           const r = Math.max(0.001, Math.hypot(v.x, v.z))
@@ -2717,11 +2717,20 @@ if (section('adult-errands')) {
             const a = (i / 12) * Math.PI * 2
             const sx = Math.sin(a)
             const sz = Math.cos(a)
-            if (Math.hypot(v.x + sx * dist, v.z + sz * dist) > r) continue
+            const cx = v.x + sx * dist
+            const cz = v.z + sz * dist
+            // Inland of him, or — as placeCamera's second pass — well inside
+            // the settlement's own edge: back among the huts he stands near
+            // the middle, and inland alone left one or two bearings.
+            const inward = Math.hypot(cx, cz) <= r
+            if (!inward) {
+              const edge = window.__placeBoundaryRadius(Math.atan2(cz, cx))
+              if (edge == null || Math.hypot(cx, cz) > edge - margin) continue
+            }
             // |cos| to the radial: 0 is side-on.
-            ok.push({ sx, sz, along: Math.abs((sx * v.x + sz * v.z) / r) })
+            ok.push({ sx, sz, inward, along: Math.abs((sx * v.x + sz * v.z) / r) })
           }
-          ok.sort((a, b) => a.along - b.along)
+          ok.sort((a, b) => (b.inward - a.inward) || (a.along - b.along))
           const c = ok[rank]
           if (!c) return false
           p.x = v.x + c.sx * dist
@@ -2731,7 +2740,7 @@ if (section('adult-errands')) {
           // and the water standing at its rim is an ellipse rather than an edge.
           p.pitch = -0.04
           return true
-        }, [returning.who, rank, dist])
+        }, [returning.who, rank, dist, CAMERA_EDGE_MARGIN])
         if (!placed) continue
         await nextFrames(2)
         // The new view's shader pipelines are waited for HERE, before the aim:
