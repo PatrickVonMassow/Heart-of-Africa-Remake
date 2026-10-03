@@ -3343,22 +3343,31 @@ if (section('adult-errands')) {
 // woman's pestle down in the grain with its puff while the other's is lifted
 // high. Life is frozen just after an impact so the shutter holds that instant.
 if (section('village-pounding')) {
-  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+  // The freeze is what ties every reading below to the picture, so a missing
+  // hook is a red, never a silent no-op.
+  const hasFreeze = await page.evaluate(() => typeof window.__placeFreezeLife === 'function')
+  check('the place exposes its life freeze for the pounding shots', hasFreeze)
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife(v), on)
   await goToPlace('bambara-village')
   const ready = await stepUntil(() => !!window.__placePounding, null, 240)
   check('the village mortar publishes its pounding', ready)
-  if (ready) {
-    // Both women strike, and every impact frame hands a thud to the audio.
+  if (ready && hasFreeze) {
+    // Both women strike, and EVERY impact is handed to a thud in its own frame.
     const before = await page.evaluate(() => window.__placePounding())
-    await stepUntil((n) => window.__placePounding().thuds >= n + 3, before.thuds, 600)
+    const heardThree = await stepUntil((n) => window.__placePounding().thuds >= n + 3, before.thuds, 600)
     const after = await page.evaluate(() => window.__placePounding())
-    check('both women strike the mortar and the strikes are heard',
-      after.women.length === 2 && after.women.every((w, i) => w.impacts > before.women[i].impacts) && after.thuds > before.thuds,
-      JSON.stringify({ before: before.women.map((w) => w.impacts), after: after.women.map((w) => w.impacts), thuds: [before.thuds, after.thuds] }))
+    const struck = after.women.reduce((sum, w, i) => sum + w.impacts - before.women[i].impacts, 0)
+    check('both women strike the mortar and every strike is heard',
+      heardThree && after.women.length === 2 && after.women.every((w, i) => w.impacts > before.women[i].impacts) &&
+        after.heard - before.heard === struck && after.thuds - before.thuds >= Math.ceil(struck / 2),
+      JSON.stringify({ heardThree, struck, heard: after.heard - before.heard, thuds: after.thuds - before.thuds }))
+    // A stand at most this far off square to the pair still shows them side by side.
+    const MAX_OFF_SQUARE = 30
     const shots = [
       { name: '1274-village-pounding-close', stand: 2.6, label: 'two women pounding grain at a footed wooden mortar, side-on from 2.6 m: one pestle down in the grain with a puff, the other lifted high' },
       { name: '1274-village-pounding-mid', stand: 8, label: 'the same mortar pounding from 8 m across the village ground, side-on: two women, one pestle down, one lifted' },
     ]
+    const sameProbe = (a, b) => JSON.stringify(a) === JSON.stringify(b)
     for (const shot of shots) {
       // Just past woman 0's impact: her foot still in the grain, the puff up.
       const caught = await stepUntil(() => {
@@ -3369,7 +3378,7 @@ if (section('village-pounding')) {
       if (!caught) continue
       await freezeLife(true)
       try {
-        const staged = await page.evaluate((standOff) => {
+        const staged = await page.evaluate(({ standOff, maxOff }) => {
           const probe = window.__placePounding()
           const layout = window.__placeLayout
           const m = probe.mortar
@@ -3400,14 +3409,15 @@ if (section('village-pounding')) {
             // Nor anyone at the lens' elbow, who fills a third of a close frame.
             return (ahead > 0.3 && ahead < reach - 0.5 && aside < 0.8) || Math.hypot(bx, bz) < 1.5
           })
-          for (let k = 0; k < 24; k++) {
-            const angle = along + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
+          const step = Math.PI / 24
+          for (let k = 0; Math.floor(k / 2) * step <= (maxOff * Math.PI) / 180; k++) {
+            const angle = along + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * step)
             const x = m.x + Math.sin(angle) * standOff
             const z = m.z + Math.cos(angle) * standOff
             if (Math.hypot(x, z) > layout.radius - 0.5 || clear(x, z) < 0.35) continue
             let open = true
-            for (let step = 1; step <= 12; step++) {
-              const t = step / 12
+            for (let s = 1; s <= 12; s++) {
+              const t = s / 12
               if (clear(x + (m.x - x) * t, z + (m.z - z) * t) < 0.1) open = false
             }
             if (!open || blocked(x, z)) continue
@@ -3415,21 +3425,63 @@ if (section('village-pounding')) {
             p.z = z
             p.yaw = Math.atan2(m.x - x, m.z - z) + Math.PI
             p.pitch = standOff < 4 ? -0.18 : -0.08
-            return { probe, offSquare: +(Math.floor(k / 2) * 180 / 24).toFixed(1), people: people.length, stand: { x: +x.toFixed(2), z: +z.toFixed(2) } }
+            return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2) }, people: people.length }
           }
           return { probe, stand: null }
-        }, shot.stand)
-        const [down, up] = staged.probe.women
-        const rim = staged.probe.mortar.y + staged.probe.mortar.rim
+        }, { standOff: shot.stand, maxOff: MAX_OFF_SQUARE })
+        check(`${shot.name}: a side-on stand on open ground frames the pair (at most ${MAX_OFF_SQUARE}° off square)`,
+          !!staged.stand && staged.offSquare <= MAX_OFF_SQUARE, JSON.stringify({ stand: staged.stand, offSquare: staged.offSquare }))
+        if (!staged.stand) continue
+        await nextFrames(3)
+        // THE POSE AT THE SHUTTER: re-read after the settling frames. It must be
+        // the staged one — that is the proof the freeze held.
+        const atShutter = await page.evaluate(() => {
+          const probe = window.__placePounding()
+          const cam = window.__placeCamera
+          const V = cam.position.constructor
+          const scene = window.__placeScene
+          const px = (v) => {
+            const q = v.clone().project(cam)
+            return { x: ((q.x + 1) / 2) * window.innerWidth, y: ((1 - q.y) / 2) * window.innerHeight, inFrame: q.z < 1 && Math.abs(q.x) < 0.98 && Math.abs(q.y) < 0.98 }
+          }
+          const heads = [0, 1].map((i) => {
+            let head = null
+            scene.getObjectByName(`village-pounder-${i}`)?.traverse((o) => { if (o.name === 'figure-head') head = o })
+            if (!head) return null
+            const c = head.getWorldPosition(new V())
+            const edge = px(c.clone().add(new V(0, 0.16, 0)))
+            const mid = px(c)
+            return { ...mid, r: Math.abs(edge.y - mid.y) }
+          })
+          const tips = [0, 1].map((i) => {
+            const pestle = scene.getObjectByName(`village-pestle-${i}`)
+            if (!pestle) return null
+            pestle.updateWorldMatrix(true, false)
+            const len = window.__balance.villageLife.mortar.pestleLength
+            return px(new V(0, len, 0).applyMatrix4(pestle.matrixWorld))
+          })
+          return { probe, heads, tips }
+        })
+        check(`${shot.name}: life stayed frozen between the staging read and the shutter`, sameProbe(staged.probe, atShutter.probe))
+        const [down, up] = atShutter.probe.women
+        const rim = atShutter.probe.mortar.y + atShutter.probe.mortar.rim
         check(`${shot.name}: one pestle foot is down below the rim, in the grain`, down.foot.y < rim - 0.04, `${(down.foot.y - rim).toFixed(3)} m`)
         check(`${shot.name}: the other pestle is lifted clear above the rim`, up.foot.y > rim + 0.1, `${(up.foot.y - rim).toFixed(3)} m`)
         check(`${shot.name}: the grain puff is in the air`, down.puff)
-        check(`${shot.name}: a side-on stand on open ground frames the pair`, !!staged.stand, JSON.stringify(staged.stand))
-        if (staged.stand) {
-          await nextFrames(3)
-          const m = staged.probe.mortar
-          await frame(shot.name, { local: { x: m.x, y: m.y + 0.7, z: m.z }, label: shot.label })
-        }
+        // SEPARATELY VISIBLE: both heads and both pestle tips in the frame, the
+        // heads more than two head-radii apart on screen and the tips apart too.
+        const [h0, h1] = atShutter.heads
+        const [t0, t1] = atShutter.tips
+        const apart = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+        const sides = h0 && h1 && t0 && t1 &&
+          h0.inFrame && h1.inFrame && t0.inFrame && t1.inFrame &&
+          apart(h0, h1) > 2 * Math.max(h0.r, h1.r) && apart(t0, t1) > Math.max(h0.r, h1.r)
+        check(`${shot.name}: both women and both pestles are separately visible in the frame`, !!sides,
+          JSON.stringify({ heads: atShutter.heads, tips: atShutter.tips }))
+        const m = atShutter.probe.mortar
+        await frame(shot.name, { local: { x: m.x, y: m.y + 0.7, z: m.z }, label: shot.label })
+        const afterShot = await page.evaluate(() => window.__placePounding())
+        check(`${shot.name}: and stayed frozen through the exposure`, sameProbe(atShutter.probe, afterShot))
       } finally {
         await freezeLife(false)
       }
