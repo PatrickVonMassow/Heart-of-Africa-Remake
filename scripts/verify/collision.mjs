@@ -1067,9 +1067,14 @@ if (section('fish-fire-room')) {
         const walk = await page.evaluate(
           ({ fire, framing }) =>
             new Promise((resolve) => {
+              // A stall is counted in RESOLVED frames (the game's own resolver
+              // stepping without gaining ground), never in wall-clock time — a
+              // slow host must not end the walk. The 90 s cap is a separate
+              // backstop and reports itself.
+              const STALL_RESOLVES = 120
               const t0 = performance.now()
               let lastResolves = window.__placeResolves ?? 0
-              let stillSince = performance.now()
+              let stalledResolves = 0
               let lastD = 0
               const tick = () => {
                 window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS' }))
@@ -1078,14 +1083,16 @@ if (section('fish-fire-room')) {
                 const d = p ? Math.hypot(p.x - fire.x, p.z - fire.z) : 0
                 const resolves = window.__placeResolves ?? 0
                 if (resolves !== lastResolves) {
+                  if (d > lastD + 0.01) stalledResolves = 0
+                  else stalledResolves += resolves - lastResolves
                   lastResolves = resolves
-                  if (d > lastD + 0.01) stillSince = performance.now()
                   lastD = Math.max(lastD, d)
                 }
-                const done = mode !== 'place' || d >= framing || performance.now() - stillSince > 8000 || performance.now() - t0 > 90000
-                if (done) {
+                const stalled = stalledResolves >= STALL_RESOLVES
+                const timedOut = performance.now() - t0 > 90000
+                if (mode !== 'place' || d >= framing || stalled || timedOut) {
                   window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyS' }))
-                  resolve({ mode, d, x: p?.x ?? null, z: p?.z ?? null })
+                  resolve({ mode, d, x: p?.x ?? null, z: p?.z ?? null, stalled, timedOut })
                 } else requestAnimationFrame(tick)
               }
               requestAnimationFrame(tick)
@@ -1095,8 +1102,22 @@ if (section('fish-fire-room')) {
         check(
           `fish-fire room: backing ${label} from the grill to framing distance keeps him in the village`,
           walk.mode === 'place' && walk.d >= framing,
-          `reached ${walk.d.toFixed(2)} of ${framing.toFixed(2)} m from the fire (ground r ${spot.ground.r.toFixed(2)}, margin ${spot.margin}) in ${walk.mode} mode`,
+          `reached ${walk.d.toFixed(2)} of ${framing.toFixed(2)} m from the fire (ground r ${spot.ground.r.toFixed(2)}, margin ${spot.margin}) in ${walk.mode} mode${walk.stalled ? ', stalled' : ''}${walk.timedOut ? ', timed out' : ''}`,
         )
+        // Along the requested bearing, not anywhere far enough: the endpoint's
+        // displacement from the fire is split into along/across the bearing, so
+        // a walk deflected sideways round an obstacle cannot pass.
+        if (walk.x !== null) {
+          const ox = walk.x - spot.fire.x
+          const oz = walk.z - spot.fire.z
+          const along = ox * dir.x + oz * dir.z
+          const across = Math.abs(ox * dir.z - oz * dir.x)
+          check(
+            `fish-fire room: backing ${label}, he walked back ALONG the bearing, not round it`,
+            along >= framing - 0.05 && across <= 0.5,
+            `along ${along.toFixed(2)} m (framing ${framing.toFixed(2)}), across ${across.toFixed(2)} m (tolerance 0.5)`,
+          )
+        }
         if (label === 'inland' && walk.mode === 'place') {
           await page.evaluate(({ fire }) => {
             const p = window.__placePlayer
