@@ -1150,11 +1150,12 @@ if (section('speech-distance-scale')) {
         try {
           for (let f = 0; f < 24; f++) {
             await raf()
-            const tail = document
-              .querySelector('.speech-label[data-speaker="scale-walk"]')
-              ?.closest('.speech-bubble')
-              ?.querySelector('.speech-tail')
-              ?.getBoundingClientRect()
+            const labelEl = document.querySelector('.speech-label[data-speaker="scale-walk"]')
+            const tailNode = labelEl?.closest('.speech-bubble')?.querySelector('.speech-tail')
+            // Drawn on every frame: a rectangle survives `visibility: hidden`
+            // and `opacity: 0`, a note the player cannot see proves nothing.
+            const shown = (n) => !!n && n.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+            const tail = shown(labelEl) && shown(tailNode) ? tailNode.getBoundingClientRect() : null
             const fig = window.__speech?.figureScreen('scale-walk')
             if (!tail || !fig?.headTop) {
               // Which half is gone, and whether the note still exists at all.
