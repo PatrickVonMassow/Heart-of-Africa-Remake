@@ -269,11 +269,29 @@ export function SpeechLabels() {
           left = Math.min(left, p.x)
           right = Math.max(right, p.x)
         }
-        // The top edge's height at the outline's horizontal CENTRE — the top
-        // vertex of a coarse sphere can sit a ring off the middle — and the
-        // drawn width, so a sideways tip offset is judged against the head.
         if (!top) return { feet, headTop: null }
-        return { feet, headTop: { x: (left + right) / 2, y: top.y }, headWidth: right - left }
+        // The top edge's x: the mean over the vertices within a sliver of the
+        // top — a coarse sphere's single highest vertex can sit a ring off the
+        // true top, while for a tilted head the true top IS off the outline's
+        // centre, so neither the one vertex nor the centre will do. The
+        // outline's centre and drawn width are reported beside it.
+        const sliver = top.y + Math.max(1, 0.03 * (right - left))
+        let sx = 0
+        let n = 0
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).project(camera)
+          const p = toScreen(v)
+          if (p.y <= sliver) {
+            sx += p.x
+            n += 1
+          }
+        }
+        return {
+          feet,
+          headTop: { x: sx / n, y: top.y },
+          headCenterX: (left + right) / 2,
+          headWidth: right - left,
+        }
       },
       labels: () => speechLabelState().labels,
       clear: clearSpeechLabels,
