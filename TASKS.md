@@ -77,19 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1281. Enforce user approval before a chat session deposits a request
-  User order 03.10.2026 ("Stelle erstmal sicher, dass es nicht mehr passiert, dass diese Freigaberegel verletzt wird."); placed right after the Kommunikation trio, before the mortar point.
-  A PreToolUse hook (matcher Bash|PowerShell, registered in .claude/settings.json next to firewall-guard) blocks every `finding.mjs --request` deposit unless the session's transcript shows the user's approval of exactly that request. Structure like scripts/firewall-guard.mjs: pure core `scripts/request-approval-guard-core.mjs` (Vitest-covered) plus thin wrapper `scripts/request-approval-guard.mjs` reading the hook payload's `transcript_path` (JSONL), with a `--check` manual mode; not registered in guard-preflight (same reason as firewall-guard).
-  Rule the core enforces:
-  - Applies only to a command invoking finding.mjs with the exact `--request` flag (not `--requests`, `--show`, `--queued`, `--blocked`, `--record`, `--drain`, `--none`); chained commands (`cd … && node scripts/finding.mjs --request …`) are detected; flags are parsed from the command text before any heredoc `<<`, so a heredoc body never counts.
-  - A transcript with no real human message (headless/launcher session, no chat) → allow.
-  - Otherwise the deposit must carry `--approved "<verbatim words>"`, and there must be an assistant TEXT block (not thinking, not tool_use) containing the request's exact title at an index BEFORE a real human message containing the quote. Real human message = `type:"user"` with `origin.kind === "human"`; hook feedback, local-command caveats (`isMeta`) and tool_result entries never count. Whitespace-normalized, case-sensitive substring match; quote at least 2 non-space characters.
-  - Missing/failed approval → deny with a short English reason naming the rule (memory `solutions-need-user-approval`) and how to pass (show the title in a reply, user approves in a later message, deposit with `--approved`). A request deposit whose transcript cannot be read → deny (loud); any other guard error → allow with stderr note.
-  finding.mjs accepts `--approved` and stores it in the entry's user quotes (appended if quotes are also given) so the owner sees the approval; usage lines for --request show it. No other behaviour change.
-  Tests (Vitest, core): non-request commands pass; request without --approved blocked; quote only in an isMeta/hook-feedback entry blocked; quote in a human message BEFORE the assistant proposal blocked (today's exact failure: user reports a problem, session deposits quoting the report); proposal-then-approval allowed; title only in a thinking block blocked; no-human transcript allowed; whitespace normalization; chained command detected; heredoc text containing "--approved" ignored. Manual: one deny and one allow via a simulated stdin payload.
-  Known gap, to be stated in the hook header: a batch-owner session appending a point directly to TASKS.md from a chat discussion is not covered; there the memory rule alone applies.
-  This is a deliberate exception to the infrastructure freeze of 01.09.2026, by user order of 03.10.2026; record it so in the commit and closure.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1282. One mortar in the Bambara village: the pounding duo moves to the river and eats at the fish fire
   Queue position: directly after point 1277 (user order).
   In the Bambara village there is afterwards only ONE mortar:
