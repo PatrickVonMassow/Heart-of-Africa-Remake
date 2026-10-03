@@ -898,13 +898,29 @@ if (section('speech-distance-scale')) {
   }
   const MAX_ATTEMPTS = 8
   const attempts = []
+  // Every pair dropped before staging, with the step that dropped it — a red
+  // that only said "attempts []" could not tell an outside stand from a blocked
+  // sight line.
+  const rejected = []
+  const fmt = (r) => (r == null ? 'sky' : r.toFixed(2))
   let shot = null
   for (const pair of pairs) {
     if (attempts.length >= MAX_ATTEMPTS || shot) break
-    if (!(await aim(pair))) continue
+    const tag = `${pair.near}/${pair.far}`
+    if (!(await aim(pair))) {
+      rejected.push(`${tag} stand-outside`)
+      continue
+    }
     await nextFrames(2)
-    if (!clear(await seen(pair))) continue
-    if (!(await speak(pair))) continue
+    const firstSight = await seen(pair)
+    if (!clear(firstSight)) {
+      rejected.push(`${tag} sight ${firstSight.map(fmt).join('/')}`)
+      continue
+    }
+    if (!(await speak(pair))) {
+      rejected.push(`${tag} speak`)
+      continue
+    }
     await settled()
     let pos = await aim(pair)
     await nextFrames(2)
@@ -945,7 +961,7 @@ if (section('speech-distance-scale')) {
   check(
     'a near speaker’s note is drawn visibly larger than a far speaker’s, each at the scale its distance gives and on its own speaker (point 1271)',
     !!shot,
-    `${pairs.length} pairs 10-22 m apart; attempts [${attempts.map(brief).join('; ')}]` +
+    `${pairs.length} pairs 10-22 m apart; attempts [${attempts.map(brief).join('; ')}]; rejected [${rejected.join(', ')}]` +
       (shot ? ` — shot ${JSON.stringify({ near: shot.near, far: shot.far })}` : ''),
   )
   await page.evaluate((u) => {
