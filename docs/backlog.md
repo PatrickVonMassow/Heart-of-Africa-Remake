@@ -2127,3 +2127,5 @@ exists in Bambara; a moving dugout needs a moving wake; real crinkle height need
 finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 
 - WebGL run overwrites tracked WebGPU reference frames (03.10.2026): `VERIFY_GL=webgl node scripts/verify/run-all.mjs polish-villagers` on main rewrote 26 tracked `verification/*.png` with WebGL captures; restored by hand. Risk: a later commit could carry WebGL frames as WebGPU references.
+
+- Faint angular wedge on the panorama river's tucked rim (03.10.2026): at the Bambara bank stand (`settings --section=river-current`, band frames, x~870-1000 y~465-495) the coarse streaks still draw a dim wedge on the backdrop's tilted rim facets (`backdropBase`, `src/scenes/place/backdrop.ts:111`); present on main before 1280, which only faded its fine grain there. Also from 1280: ~9 older reversed smoothstep calls (water.ts:136, Rivers.tsx:336, PlaceRain.tsx:45 …) that GLSL ES leaves undefined.
