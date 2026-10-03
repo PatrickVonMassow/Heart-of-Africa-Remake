@@ -23,7 +23,7 @@ import { VILLAGE_FIRE, type PlaceLayout } from './layout'
 import { fisherySites } from './fishFire'
 import { canoeLane } from './villagerCanoe'
 import { fisheryGrounds } from './sceneGrounds'
-import { VILLAGE_SPOTS, villageHasWell } from './lifeSpots'
+import { LOOM_SPOT, villageLifeFootprints } from './lifeSpots'
 import { setupGeodata } from '../../test/geodata'
 import { PLACES } from '../../world/geo'
 import { balance } from '../../config/balance'
@@ -89,14 +89,14 @@ function sceneParts(l: PlaceLayout, placeId: string): Part[] {
       parts.push({ what, x: p.x, z: p.z, r: WALKER_RADIUS })
     }
   }
-  const spots: Array<[string, readonly [number, number], number]> = [
-    ['pounder', VILLAGE_SPOTS.pounder, 0.55],
-    ['drummer', VILLAGE_SPOTS.drummer, 0.8],
-    ['talkers', VILLAGE_SPOTS.talkers, 0.85],
-    ['village fire', VILLAGE_FIRE, 1.3],
-  ]
-  if (villageHasWell(placeId)) spots.push(['well', VILLAGE_SPOTS.well, 0.75])
-  for (const [what, [x, z], r] of spots) parts.push({ what, x, z, r })
+  // The fixed vignettes: every prop AND every performer's body, as the layout's
+  // collision reserves them (`villageLifeFootprints`) — the cook, tender and
+  // carrier round the fire, the well's carrier, the pounder's and talkers'
+  // bodies. The loom's reservation is left out: the laid loom is above.
+  for (const f of villageLifeFootprints(VILLAGE_FIRE, placeId)) {
+    if (Math.hypot(f.x - LOOM_SPOT[0], f.z - LOOM_SPOT[1]) < 1) continue
+    parts.push({ what: `vignette (${f.x.toFixed(1)}, ${f.z.toFixed(1)})`, x: f.x, z: f.z, r: f.r })
+  }
   return parts
 }
 
@@ -188,6 +188,16 @@ describe('every watched scene keeps an observer margin before the boundary', () 
       for (const g of l.observed) {
         const back = g.r / Math.sin(halfH) - g.r
         expect(back, `${id}@${seed}: ground at (${g.x.toFixed(1)}, ${g.z.toFixed(1)}) r ${g.r.toFixed(1)}`).toBeLessThanOrEqual(margin)
+      }
+    }
+  })
+
+  it('hands the boundary grounds that enclose every scene part, performers included', () => {
+    for (const id of VILLAGES) for (const seed of SEEDS) {
+      const l = sharedLayout(id, seed)
+      for (const part of sceneParts(l, id)) {
+        const held = l.observed.some((g) => Math.hypot(part.x - g.x, part.z - g.z) + part.r <= g.r + 1e-6)
+        expect(held, `${id}@${seed}: ${part.what} at (${part.x.toFixed(2)}, ${part.z.toFixed(2)}) r ${part.r}`).toBe(true)
       }
     }
   })

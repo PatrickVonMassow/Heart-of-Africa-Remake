@@ -126,7 +126,7 @@ function vignetteGrounds(fire: readonly [number, number], hasWell: boolean): Obs
   const out = [
     { x: pounder[0], z: pounder[1], r: 0.55 + 2 * w },
     { x: drummer[0], z: drummer[1], r: 0.8 + w },
-    enclose(talkers[0], talkers[1], [-0.5, 0.5].map((dx) => ({ x: talkers[0] + dx, z: talkers[1], r: w }))),
+    enclose(talkers[0], talkers[1], [at(talkers, 0.85), ...[-0.5, 0.5].map((dx) => ({ x: talkers[0] + dx, z: talkers[1], r: w }))]),
     enclose(fire[0], fire[1], [at(fire, 1.3), ...[[1.2, 1], [-1.3, -0.7], [0.7, 1.8]].map(([dx, dz]) => ({ x: fire[0] + dx, z: fire[1] + dz, r: w }))]),
   ]
   if (hasWell) out.push(enclose(well[0], well[1], [at(well, 0.75), { x: well[0] - 1.1, z: well[1], r: w }]))
