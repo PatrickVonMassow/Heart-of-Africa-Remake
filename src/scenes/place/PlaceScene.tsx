@@ -2786,6 +2786,9 @@ export function PlaceScene() {
         targetDistance: target.distanceTo(origin),
         hitDistance: hit ? hit.distance : null,
         hitName: hit ? hit.object.name || (hit.object as THREE.Mesh).geometry?.type || 'mesh' : null,
+        // Which object, exactly: a check can ask whether the first surface
+        // belongs to its subject instead of guessing from the distance.
+        hitUuid: hit ? hit.object.uuid : null,
         hitWater,
         behindName: behind === undefined ? undefined : behind ? behind.object.name || 'mesh' : null,
         behindDistance: behind ? behind.distance : null,

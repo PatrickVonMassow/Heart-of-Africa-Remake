@@ -56,11 +56,12 @@ if (section('speech-hypothesis')) {
   // is not depth-tested), and a frame of a note floating over a roof would prove
   // the attachment to nobody. Each candidate is stood in front of and ray-probed
   // against the rendered scene — the same instrument the silhouette footing uses.
-  // The first surface drawn along the sight line must be the FIGURE ITSELF, and
-  // that is what its DISTANCE says: a hut wall in front reads far too near, and a
-  // ray that sails PAST a smaller figure hits the ground far beyond it. Hence the
-  // ratio is bounded on BOTH sides — "nothing in front" alone accepted a miss,
-  // and a frame of a note over an empty patch of village was the result.
+  // The first surface drawn along the sight line must be the FIGURE ITSELF — the
+  // object hit, not its distance: "nothing in front" accepted a ray that sailed
+  // PAST a smaller figure to the ground beyond, and a distance band in turn
+  // accepted a wall half a metre in front of the head (0.90 of the way). So the
+  // hit must be the probe figure or one of its own meshes; the ratio is reported
+  // beside it only to say what stood in the way.
   // Every position here is read LIVE: these figures WALK, and a probe cast at
   // the spot one was standing on when the list was built misses it entirely
   // once a loaded machine lets a second pass between. That stale target is what
@@ -69,6 +70,45 @@ if (section('speech-hypothesis')) {
   // hut — the probe then reads that wall, and a figure the player could plainly
   // walk up to is rejected for the geometry behind the lens. The nearer range is
   // tried before the candidate is given up on.
+  // The sight-line probe, installed in the page once so the selection, the
+  // shutter's aim and the post-shot reading (inside measureAt, in the same
+  // evaluate as the note) all ask the very same question.
+  await page.evaluate(() => {
+    window.__speechProbeSight = (idx) => {
+      const figure = window.__speechProbeFigures?.[idx]
+      if (!figure || !window.__placeRayHit) return null
+      figure.updateWorldMatrix(true, false)
+      const e = figure.matrixWorld.elements
+      // THIS figure's DRAWN HEAD, and against its position NOW — it may have
+      // walked on since the pose was set. The head is what the note stands over,
+      // so it is the surface the frame must show. A chest height from the
+      // group's scale (a flat metre sailed over every child, point 481) still
+      // missed a CROUCHING child: at scale 0.55 the ray ran between its lowered
+      // head (0.6 m) and its bent body to the ground beyond, 1.58@ground-disc on
+      // every try, while a ray at the head hit it at 0.98. The chest stays the
+      // fallback for a figure without a drawn head.
+      let head = null
+      figure.traverseVisible((o) => {
+        if (!head && o.name === 'figure-head') head = o
+      })
+      let at
+      if (head) {
+        head.updateWorldMatrix(true, false)
+        const he = head.matrixWorld.elements
+        at = [he[12], he[13], he[14]]
+      } else {
+        const scaleY = Math.hypot(e[4], e[5], e[6])
+        at = [e[12], e[13] + Math.max(0.4, scaleY), e[14]]
+      }
+      const h = window.__placeRayHit(...at)
+      return {
+        ratio: h.hitDistance == null ? null : h.hitDistance / h.targetDistance,
+        name: h.hitName,
+        // The first surface is the figure's OWN: itself or a mesh under it.
+        own: h.hitUuid != null && !!figure.getObjectByProperty('uuid', h.hitUuid),
+      }
+    }
+  })
   const STAND_BACKS = [5, 3.5]
   /** Put the camera `back` in front of figure `i`, on the outward bearing, and
    *  look at it. Reads the figure's position LIVE, so it composes the shot on
@@ -100,43 +140,16 @@ if (section('speech-hypothesis')) {
       { idx: i, back: STAND_BACK },
     )
   /** Stand `back` in front of figure `i`, on the outward bearing, and report what
-   *  the frame draws at its chest. */
+   *  the sight line meets first on the way to its head. */
   const aimAt = async (i, STAND_BACK) => {
     await standBefore(i, STAND_BACK)
     await nextFrames(2)
-    return page.evaluate((idx) => {
-      const figure = window.__speechProbeFigures?.[idx]
-      if (!figure || !window.__placeRayHit) return null
-      figure.updateWorldMatrix(true, false)
-      const e = figure.matrixWorld.elements
-      // THIS figure's DRAWN HEAD, and against its position NOW — it may have
-      // walked on since the pose was set. The head is what the note stands over,
-      // so it is the surface the frame must show. A chest height from the
-      // group's scale (a flat metre sailed over every child, point 481) still
-      // missed a CROUCHING child: at scale 0.55 the ray ran between its lowered
-      // head (0.6 m) and its bent body to the ground beyond, 1.58@ground-disc on
-      // every try, while a ray at the head hit it at 0.98. The chest stays the
-      // fallback for a figure without a drawn head.
-      let head = null
-      figure.traverseVisible((o) => {
-        if (!head && o.name === 'figure-head') head = o
-      })
-      let at
-      if (head) {
-        head.updateWorldMatrix(true, false)
-        const he = head.matrixWorld.elements
-        at = [he[12], he[13], he[14]]
-      } else {
-        const scaleY = Math.hypot(e[4], e[5], e[6])
-        at = [e[12], e[13] + Math.max(0.4, scaleY), e[14]]
-      }
-      const h = window.__placeRayHit(...at)
-      return { ratio: h.hitDistance == null ? null : h.hitDistance / h.targetDistance, name: h.hitName }
-    }, i)
+    return page.evaluate((idx) => window.__speechProbeSight?.(idx) ?? null, i)
   }
   /** The first surface along the sight line is the figure itself (see above). */
-  const clearSight = (hit) => !!hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15
-  const sightText = (hit) => (hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
+  const clearSight = (hit) => !!hit && hit.own === true
+  const sightText = (hit) =>
+    hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}${hit.own ? '' : '(not the figure)'}` : 'none'
   let speaker = null
   let speakerIndex = -1
   let speakerBack = STAND_BACKS[0]
@@ -350,6 +363,9 @@ if (section('speech-hypothesis')) {
         headInView: !!head && head.x > 0 && head.x < window.innerWidth && head.y > 0 && head.y < window.innerHeight,
         // Any other drawn note (a child speaking at its game) muddles the shot.
         otherNotes: [...document.querySelectorAll('.speech-label')].filter((n) => n !== labelEl && shown(n)).length,
+        // The sight line to the head in the SAME state as the note's reading, so
+        // a speaker that walked behind a hut during the capture reads red.
+        sight: window.__speechProbeSight?.(idx) ?? null,
         band: [gap.minPx, gap.maxPx],
       }
     }, speakerIndex)
@@ -424,11 +440,11 @@ if (section('speech-hypothesis')) {
       delete window.__speechProbeHush
     })
     check(
-      'the written frame shows the note, alone, over its speaker’s drawn head, in clear sight at the shutter',
-      !!shot && !!post && post.visible && post.headInView && post.otherNotes === 0 && clearSight(shutterSight) &&
+      'the written frame shows the note, alone, over its speaker’s drawn head, in clear sight before and after the shutter',
+      !!shot && !!post && post.visible && post.headInView && post.otherNotes === 0 && clearSight(shutterSight) && clearSight(post.sight) &&
         post.tipToHead !== null && post.tipToHead >= post.band[0] && post.tipToHead <= post.band[1] &&
         post.tipToHeadX !== null && Math.abs(post.tipToHeadX) <= Math.max(2, 0.25 * post.headWidth),
-      post ? `${JSON.stringify(post)}; sight lines at the shutter [${shutterSights.join(', ')}]` : 'no speaker',
+      post ? `${JSON.stringify(post)}; sight lines at the shutter [${shutterSights.join(', ')}], after it ${sightText(post.sight)}` : 'no speaker',
     )
     // After the shutter, so the frame keeps its single note (a child left
     // longer starts speaking on its own). The gap IS the calibration (point 1276): move labelTipGap.px within its
