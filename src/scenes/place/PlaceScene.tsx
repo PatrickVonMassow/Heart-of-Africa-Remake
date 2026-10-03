@@ -1914,7 +1914,7 @@ function TravelPanorama({ placeId }: { placeId: string }) {
     // the bottom fades into the backdrop ground, a soft top guard remains.
     m.opacityNode = band.a
       .mul(smoothstep(float(0.02), float(0.22), v))
-      .mul(smoothstep(float(1.0), float(0.8), v))
+      .mul(smoothstep(float(0.8), float(1.0), v).oneMinus())
       .mul(0.96)
     return m
   }, [capture])

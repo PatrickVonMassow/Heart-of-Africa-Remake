@@ -158,9 +158,10 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
   // moving water does, without that churn ever outrunning the drift.
   const fineAt = vec3(flowing.mul(FINE_ALONG), v.mul(FINE_ACROSS), time.mul(0.07).add(4.0))
   const footprint = max(fwidth(fineAt.x), fwidth(fineAt.y))
-  const fineFade = smoothstep(float(FINE_FOOTPRINT_GONE), float(FINE_FOOTPRINT_FULL), footprint).mul(
-    detailFade(FINE_DETAIL_NEAR, FINE_DETAIL_FAR),
-  )
+  // Ordered edges (edge0 < edge1): GLSL ES leaves reversed ones undefined.
+  const fineFade = smoothstep(float(FINE_FOOTPRINT_FULL), float(FINE_FOOTPRINT_GONE), footprint)
+    .oneMinus()
+    .mul(detailFade(FINE_DETAIL_NEAR, FINE_DETAIL_FAR))
   const fine = mx_fractal_noise_float(fineAt, Math.min(2, Math.max(1, Math.round(octaves)))).mul(fineFade)
 
   const base = mix(
@@ -169,7 +170,8 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
     clamp(streak.mul(0.5).add(fine.mul(FINE_TONE * 0.5)), 0, 1),
   )
   // Foam where the current drags over the shallows at the near shore...
-  const shoreFoam = smoothstep(float(SHORE_FOAM_REACH), float(0.3), v)
+  const shoreFoam = smoothstep(float(0.3), float(SHORE_FOAM_REACH), v)
+    .oneMinus()
     .mul(smoothstep(float(SHORE_FOAM_INNER), float(SHORE_FOAM_INNER + 0.6), v))
     .mul(smoothstep(float(0.4), float(0.75), streak.add(fine.mul(FINE_FROTH))))
   // ... and a thinner ribbon of it further out, so the movement reads across

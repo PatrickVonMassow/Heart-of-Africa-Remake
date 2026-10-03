@@ -147,6 +147,14 @@ describe('the drifting foam patches are shaded as the water they ride', () => {
     expect(src).toContain('m.opacityNode = fray.mul(guard).mul(FOAM_PATCH_OPACITY)')
   })
 
+  it('builds the river surface fades with ordered smoothstep edges', () => {
+    const src = source('src/render/waterAppearance.ts')
+    expect(src).not.toContain('smoothstep(float(FINE_FOOTPRINT_GONE)')
+    expect(src).not.toContain('smoothstep(float(SHORE_FOAM_REACH)')
+    expect(src).toContain('smoothstep(float(FINE_FOOTPRINT_FULL), float(FINE_FOOTPRINT_GONE), footprint)')
+    expect(src).toContain('smoothstep(float(0.3), float(SHORE_FOAM_REACH), v)')
+  })
+
   it('is round enough that no facet corner shows, and faces up like the water', () => {
     expect(FOAM_PATCH_SEGMENTS).toBeGreaterThanOrEqual(24)
     const g = buildFoamPatchGeometry()
