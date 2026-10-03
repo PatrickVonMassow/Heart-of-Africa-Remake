@@ -94,7 +94,13 @@ function NoteFollower({
       wrap.style.setProperty('--speech-tip-gap', gap)
     }
     if (el) {
-      const scale = speechBubbleScale(camera.getWorldPosition(EYE).distanceTo(group.current.getWorldPosition(WORLD)))
+      // The note's own layout size (untouched by its transforms) and the
+      // viewport: the scale grows with the speaker but never past the caps.
+      const scale = speechBubbleScale(
+        camera.getWorldPosition(EYE).distanceTo(group.current.getWorldPosition(WORLD)),
+        balance.communication.speechBubble,
+        { width: el.offsetWidth, height: el.offsetHeight, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight },
+      )
       if (Math.abs(scale - lastScale.current) > 0.002) {
         lastScale.current = scale
         el.style.setProperty('--speech-distance-scale', scale.toFixed(3))

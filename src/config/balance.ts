@@ -1171,15 +1171,19 @@ interface BalanceConfig {
     labelTipGap: { px: number; minPx: number; maxPx: number }
     /** How an older note stands back while a newer one is shown (speechLabelRecedes). */
     labelRecede: { opacity: number; scale: number }
-    /** The note's size on screen (speechBubbleScale): `baseScale` times a factor
-     *  that runs from `nearScale` at `nearDistance` down to `farScale` at
-     *  `farDistance` (camera to note, settlement units) and is held beyond both. */
+    /** The note's size on screen (speechBubbleScale): `baseScale` at
+     *  `refDistance`, times (refDistance / d)^`exponent` for the camera-to-note
+     *  distance d (settlement units), d held between `nearDistance` and
+     *  `farDistance`. Never wider than `maxViewportWidth` nor taller than
+     *  `maxViewportHeight` of the viewport. */
     speechBubble: {
       baseScale: number
+      refDistance: number
+      exponent: number
       nearDistance: number
       farDistance: number
-      nearScale: number
-      farScale: number
+      maxViewportWidth: number
+      maxViewportHeight: number
     }
     /** How close the traveller must stand to the chief, in settlement units, for
      *  the find from the boulder to be laid in his hands. */
@@ -2195,12 +2199,26 @@ export const balance: BalanceConfig = {
     // dimmed and a little smaller — so the current speaker's note is always the
     // most prominent. Still readable: the player may want to guess at it.
     labelRecede: { opacity: 0.55, scale: 0.85 },
-    // Calibratable (CLAUDE.md §2): the note is drawn 1.4x its CSS size, and a
-    // near speaker's note larger than a far one's. The factor holds below 3 m
-    // and beyond 22 m, so the smallest note (1.4 x 0.75 = 1.05, a 13.7 px
-    // script) stays readable and the largest (1.4 x 1.35 = 1.89) never covers
-    // the scene in a close-up.
-    speechBubble: { baseScale: 1.4, nearDistance: 3, farDistance: 22, nearScale: 1.35, farScale: 0.75 },
+    // Calibratable (CLAUDE.md §2, point 1278): the note grows with its speaker.
+    // The old linear curve spanned only 1.8x and held flat below 3 m while the
+    // speaker's own picture grows ~1/d — about 7x from 22 m to 3 m — so beside
+    // its speaker a near note read SMALLER (user, 03.10.2026). A power law
+    // follows the projection part-way: exponent 0.6 gives 4x between 2 m and
+    // 20 m (the speaker grows 10x there), enough to read as growth without a
+    // close note swallowing the view. The smallest note stays the old readable
+    // one (1.05, a 13.7 px script), held from 20 m out; the curve holds below
+    // 1.2 m, about where a speaker stands at arm's length. The viewport caps —
+    // a third of the width, under a third of the height — keep a close-up
+    // note from covering the scene whatever its text.
+    speechBubble: {
+      baseScale: 1.05,
+      refDistance: 20,
+      exponent: 0.6,
+      nearDistance: 1.2,
+      farDistance: 20,
+      maxViewportWidth: 0.35,
+      maxViewportHeight: 0.3,
+    },
     // Calibratable (CLAUDE.md §2): the find is handed over face to face, so the
     // reach is an arm's length plus a step — a little over the 1.6 m the chief
     // stands beside his own door (CHIEF_STAND_OFFSET), and well inside the
