@@ -938,6 +938,10 @@ if (section('speech-distance-scale')) {
       n.visible && n.wantOpacity > 0.1 &&
       Math.abs(n.opacity - n.wantOpacity) < 0.03 && Math.abs(n.tailOpacity - n.wantOpacity) < 0.03
     return (
+      // Both speakers DRAWN at the shutter: an inhabitant gone home is hidden
+      // (PlaceLife), and its note over an empty hut proves nothing.
+      near.tipToHead != null &&
+      far.tipToHead != null &&
       near.distance < far.distance &&
       near.width >= 1.25 * far.width &&
       tracks(near) &&

@@ -224,9 +224,11 @@ export function SpeechLabels() {
           left = Math.min(left, p.x)
           right = Math.max(right, p.x)
         }
-        // The head's drawn width, so a horizontal tip offset can be judged
-        // against the head it should sit over.
-        return { feet, headTop: top, headWidth: top ? right - left : 0 }
+        // The top edge's height at the outline's horizontal CENTRE — the top
+        // vertex of a coarse sphere can sit a ring off the middle — and the
+        // drawn width, so a sideways tip offset is judged against the head.
+        if (!top) return { feet, headTop: null }
+        return { feet, headTop: { x: (left + right) / 2, y: top.y }, headWidth: right - left }
       },
       labels: () => speechLabelState().labels,
       clear: clearSpeechLabels,
