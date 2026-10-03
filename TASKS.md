@@ -220,6 +220,15 @@ put it is the mistake this line exists to stop.
   Criticality: high - every bird's-eye frame changes, and consumers that silently assume a centred traveller can break (user, 03.10.2026).
   Bundle: Steuerung & Performance.
 
+- [ ] 1288. Carry a card decision from the head session to the batch owner
+  Queue position: directly before point 1081 (user order 03.10.2026, "Reihe außerdem einen neue Task direkt vor 1081 zum Fix dieses Nachrichtenzustellproblems ein.").
+  Measured 03.10.2026, 21:16-21:21, head session 036dac43 standing down while f865e213 owned the batch: the user answered the card "Anfrage nicht übernehmbar: Recognisable pounding at the fish eater's mortar" with "verwerfen", and that decision could not reach the owner by any path:
+  - `node scripts/vdzk-answer.mjs "fish eater's mortar" --answer "…"` failed twice with "cannot identify this session's active user message; wait for the guard to run", also with CLAUDE_SESSION_ID set. `.claude/decision-card-guard-state.json` had session entries, but every `userMessage` was null and the head session had no entry at all.
+  - The fallback, a SendMessage to the owner session, was "held for the recipient user's approval" and expired undelivered. The owner is headless; nobody can approve it (memory only-one-head-session).
+  Find and fix the cause, so that a card answer the user gives in the head session while it stands down is carried to the owner and acted on without any human step in another session.
+  Done when: in a reproduction with a live headless owner, `vdzk-answer.mjs` records the head session's answer, and the owner (or the due-redeem path) removes the named card. A unit test covers the state shape that made activeSource fail. A SendMessage to a headless peer is not part of the solution.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
   `main` on 09.09.2026 while work-order 1080 was being verified: the crowded construction of
