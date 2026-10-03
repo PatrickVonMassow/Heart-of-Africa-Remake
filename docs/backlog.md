@@ -2114,3 +2114,14 @@ running at dispatch, and the suite checks the state before and after the window;
 suspend-and-resume between two dispatches would still pass. No player impact (each
 counted thud was dispatched into a running context); a test-harness rigor edge after
 two fix rounds. Record state transitions in the window if the check is touched again.
+
+From the speech-note trio author (03.10.2026): when a speaker goes indoors, their
+speech note keeps floating over the hut. Product question (should a hidden speaker's
+note fade or stay as a voice from inside?); not changed. A user decision makes it a point.
+
+River current sketch B (03.10.2026, user decision pending, do not queue unapproved):
+V-wakes at the fishermen's dugout and a stake, an eddy behind a bank stone, a low
+0.4-0.8 m crinkle drifting downstream; builds on sketch A (queued as point 1280).
+Sketch: https://claude.ai/artifact/Ug2L7bnc1cDCkyfttYYkwx . Open items: no stake
+exists in Bambara; a moving dugout needs a moving wake; real crinkle height needs a
+finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
