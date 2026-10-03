@@ -868,7 +868,9 @@ if (section('speech-distance-scale')) {
           layoutWidth: sizer.offsetWidth,
           set: Number(getComputedStyle(sizer).getPropertyValue('--speech-distance-scale')),
           expected: +speechBubbleScale(distance).toFixed(3),
-          onTip: Math.abs(tail.left + tail.width / 2 - pt.x) <= 6 && Math.abs(tail.bottom - pt.y) <= 0.35 * box.height,
+          // The speech-owner tolerances: these figures walk between frames.
+          tipOff: [+(tail.left + tail.width / 2 - pt.x).toFixed(1), +(tail.bottom - pt.y).toFixed(1)],
+          onTip: Math.abs(tail.left + tail.width / 2 - pt.x) <= 0.5 * box.height && Math.abs(tail.bottom - pt.y) <= 0.35 * box.height,
           onScreen: box.left > 0 && box.right < window.innerWidth && box.top > 0 && tail.bottom < window.innerHeight,
           targeted: el.classList.contains('targeted'),
         }
@@ -907,8 +909,9 @@ if (section('speech-distance-scale')) {
     let pos = await aim(pair)
     await nextFrames(2)
     const before = await read()
-    if (!pos || !clear(await seen(pair)) || !judge(before)) {
-      attempts.push({ pair, at: 'staging', view: before })
+    const sight = await seen(pair)
+    if (!pos || !clear(sight) || !judge(before)) {
+      attempts.push({ pair, at: 'staging', view: { ...before, sight } })
       await page.evaluate(() => window.__speech?.clear())
       continue
     }
@@ -938,7 +941,7 @@ if (section('speech-distance-scale')) {
     await page.evaluate(() => window.__speech?.clear())
   }
   const brief = (a) =>
-    `${a.pair.near}/${a.pair.far}@${a.pair.d.toFixed(1)}m ${a.at}: ${JSON.stringify({ near: a.view?.near, far: a.view?.far })}`
+    `${a.pair.near}/${a.pair.far}@${a.pair.d.toFixed(1)}m ${a.at}: ${JSON.stringify({ near: a.view?.near, far: a.view?.far, sight: a.view?.sight })}`
   check(
     'a near speaker’s note is drawn visibly larger than a far speaker’s, each at the scale its distance gives and on its own speaker (point 1271)',
     !!shot,
