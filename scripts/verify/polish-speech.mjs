@@ -991,6 +991,9 @@ if (section('speech-distance-scale')) {
       }
       return { near: one('scale-near'), far: one('scale-far') }
     })
+  // The least distance the far speaker must still stand at, at the shutter —
+  // the ~15 m stand the growth check below reads (point 1277).
+  const FAR_AT_SHUTTER = 12
   const judge = (v) => {
     const near = v?.near
     const far = v?.far
@@ -1005,9 +1008,13 @@ if (section('speech-distance-scale')) {
       // (PlaceLife), and its note over an empty hut proves nothing.
       near.tipToHead != null &&
       far.tipToHead != null &&
-      // A conversation's distance for the near one (point 1278).
+      // A conversation's distance for the near one (point 1278), and the far
+      // one STILL far: inhabitants walk during staging, and a pair staged 10-22 m
+      // apart reached the shutter with its far speaker at ~5 m, too close for
+      // the size difference to show (point 1277). Re-measured here, at the
+      // shutter too, so such a pair is re-staged rather than shot.
       near.distance <= 3.2 &&
-      near.distance < far.distance &&
+      far.distance >= FAR_AT_SHUTTER &&
       near.width >= 1.25 * far.width &&
       tracks(near) &&
       tracks(far) &&
@@ -1180,7 +1187,7 @@ if (section('speech-distance-scale')) {
   })()
   check(
     'a near speaker’s note grows with its speaker: at ~2 m against ~15 m it is drawn at least 2.5x the far note’s height, following the speakers’ projected size part-way (point 1278)',
-    !!growth && growth.near.d <= 3.2 && growth.far.d >= 12 && growth.noteRatio >= 2.5 &&
+    !!growth && growth.near.d <= 3.2 && growth.far.d >= FAR_AT_SHUTTER && growth.noteRatio >= 2.5 &&
       growth.exponent >= 0.45 && growth.exponent <= 1,
     growth ? JSON.stringify(growth) : 'no frame was staged',
   )
