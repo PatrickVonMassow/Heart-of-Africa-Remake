@@ -12,6 +12,7 @@ import {
   loomBeatPlan,
   poundThudPlan,
   playLoomBeat,
+  playPoundThud,
   emitFootstep,
   emitDrumPhrase,
   playDrumMessage,
@@ -1492,5 +1493,61 @@ describe('the mortar has a placed, dull thud', () => {
     expect(plan.duration).toBeLessThan(0.25)
     expect(plan.frequency).toBeLessThan(loomBeatPlan(2, 0, 1).frequency / 4)
     expect(poundThudPlan(2, 0, 0).peak).toBe(0)
+  })
+})
+
+describe('the pestle thud reaches the ambient bus through its placed route', () => {
+  let ctx: FakeCtx
+  const defaultVolume = balance.ambienceVolume
+  beforeAll(() => {
+    vi.useFakeTimers()
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = FakeCtx
+    startAmbience()
+    ctx = FakeCtx.last!
+  })
+  afterAll(() => { vi.useRealTimers(); balance.ambienceVolume = defaultVolume })
+
+  /** The ambient, footstep and speech buses are built one after another onto
+   *  the master (startAmbience); the ambient one is the first of that run. */
+  const ambientBus = () => {
+    const g = ctx.gains
+    const i = g.findIndex((n, k) => k + 2 < g.length && n.connected[0] && n.connected[0] === g[k + 1].connected[0] && n.connected[0] === g[k + 2].connected[0])
+    expect(i).toBeGreaterThanOrEqual(0)
+    return { ambient: g[i], speech: g[i + 2] }
+  }
+
+  it('schedules one lowpassed brown-noise source with its envelope, panned onto the ambient bus', () => {
+    ctx.currentTime = 700
+    balance.ambienceVolume = 1
+    const before = ctx.sources.length
+    const plan = poundThudPlan(6, -Math.PI / 3)
+    playPoundThud(6, -Math.PI / 3)
+    expect(ctx.sources.length - before).toBe(1)
+    const source = ctx.sources.at(-1)!
+    const filter = source.connected[0] as FakeFilter
+    const envelope = filter.connected[0] as FakeGain
+    const route = envelope.connected[0] as FakeGain
+    const panner = route.connected[0] as FakePanner
+    expect(source.startedAt).toBe(700)
+    expect(source.stoppedAt).toBeCloseTo(700 + plan.duration + 0.05)
+    expect(filter.type).toBe('lowpass')
+    expect(filter.frequency.value).toBe(plan.frequency)
+    expect(envelope.gain.events).toContainEqual({ type: 'lin', value: plan.peak, time: 700 + plan.attack })
+    expect(envelope.gain.events.at(-1)).toMatchObject({ value: 0.0001, time: 700 + plan.duration })
+    expect(panner.pan.value).toBe(plan.pan)
+    const { ambient, speech } = ambientBus()
+    expect(panner.connected[0]).toBe(ambient)
+    expect(panner.connected[0]).not.toBe(speech)
+    source.onended!()
+    expect(route.disconnectCalls).toBe(1)
+    expect(panner.disconnectCalls).toBe(1)
+  })
+
+  it('schedules nothing beyond reach or while muted', () => {
+    const before = [ctx.sources.length, ctx.panners.length]
+    playPoundThud(Infinity, 0)
+    balance.ambienceVolume = 0
+    playPoundThud(0, 0)
+    expect([ctx.sources.length, ctx.panners.length]).toEqual(before)
   })
 })
