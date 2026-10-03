@@ -698,6 +698,267 @@ if (section('speech-owner')) {
     p.pitch = saved.pitch
   }, pose)
 }
+// --- A near and a far speaker's note, sized by distance (point 1271) ---------
+// The size curve (monotone, clamped) is pinned in
+// src/communication/speechBubbleScale.test.ts. What only a browser can answer is
+// that the DRAWN notes follow it: a speaker a few metres away carries a visibly
+// larger note than one far across the village, each still on its own speaker.
+// The size is read off each note's `.speech-distance` wrapper, whose box is the
+// card's layout box times the distance scale alone, so the near note's receded
+// look (it speaks first) cannot pass for the distance effect.
+if (section('speech-distance-scale')) {
+  await goToPlace('bambara-village')
+  const RIVER = 'ba-BA-ba-BA'
+  const pose = await page.evaluate(() => {
+    const p = window.__placePlayer
+    return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
+  })
+  await page.evaluate(() => {
+    const scene = window.__placeScene
+    const found = []
+    scene?.traverse((o) => {
+      if (o.name === 'inhabitant' && found.length < 24) found.push(o)
+    })
+    window.__speechScaleFigures = found
+  })
+  // Pairs 10-22 m apart, widest first: the nearer stands a few metres before
+  // the camera, the other far behind it and off to the side.
+  const pairs = await page.evaluate(() => {
+    const at = (window.__speechScaleFigures ?? []).map((o) => {
+      o.updateWorldMatrix(true, false)
+      const e = o.matrixWorld.elements
+      return { x: e[12], z: e[14] }
+    })
+    const out = []
+    for (let i = 0; i < at.length; i++) {
+      for (let j = 0; j < at.length; j++) {
+        const d = Math.hypot(at[i].x - at[j].x, at[i].z - at[j].z)
+        if (i !== j && d >= 10 && d <= 22) out.push({ near: i, far: j, d })
+      }
+    }
+    return out.sort((l, r) => r.d - l.d).slice(0, 24)
+  })
+  const NEAR = 3.5
+  const SIDE = 2.5
+  /** Stand NEAR before the near figure, on the far figure's line but SIDE off
+   *  it, and look between the two — live positions, the figures walk. */
+  const aim = (pair) =>
+    page.evaluate(
+      async ({ near, far, NEAR, SIDE }) => {
+        const { insidePlace } = await import('/src/scenes/place/boundary.ts')
+        const figs = window.__speechScaleFigures
+        const p = window.__placePlayer
+        const layout = window.__placeLayout
+        if (!figs || !p || !layout) return null
+        const pos = [figs[near], figs[far]].map((f) => {
+          f.updateWorldMatrix(true, false)
+          const e = f.matrixWorld.elements
+          return { x: e[12], y: e[13], z: e[14] }
+        })
+        let ux = pos[1].x - pos[0].x
+        let uz = pos[1].z - pos[0].z
+        const n = Math.hypot(ux, uz) || 1
+        ux /= n
+        uz /= n
+        const x = pos[0].x - ux * NEAR - uz * SIDE
+        const z = pos[0].z - uz * NEAR + ux * SIDE
+        if (!insidePlace(layout, x, z, 1)) return null
+        const dir = pos.map((q) => {
+          const l = Math.hypot(q.x - x, q.z - z) || 1
+          return { x: (q.x - x) / l, z: (q.z - z) / l }
+        })
+        p.x = x
+        p.z = z
+        p.pitch = 0
+        p.yaw = Math.atan2(dir[0].x + dir[1].x, dir[0].z + dir[1].z) + Math.PI
+        return pos
+      },
+      { near: pair.near, far: pair.far, NEAR, SIDE },
+    )
+  // Both heads in plain sight: the first surface along each sight line is the
+  // figure itself (the speech-owner instrument), and no roof over the camera.
+  const seen = (pair) =>
+    page.evaluate(
+      ({ near, far }) => {
+        const figs = window.__speechScaleFigures
+        const cam = window.__placeCamera
+        if (!window.__placeRayHit || !cam) return [null]
+        const out = [figs[near], figs[far]].map((f) => {
+          f.updateWorldMatrix(true, false)
+          const e = f.matrixWorld.elements
+          const h = (f.userData?.actor?.height ?? 1.45) * Math.hypot(e[4], e[5], e[6])
+          let best = null
+          for (const k of [0.8, 0.88, 0.95]) {
+            const hit = window.__placeRayHit(e[12], e[13] + h * k, e[14])
+            if (hit.hitDistance == null) continue
+            const ratio = hit.hitDistance / hit.targetDistance
+            if (ratio < 0.85) return 0
+            if (best === null || Math.abs(ratio - 1) < Math.abs(best - 1)) best = ratio
+          }
+          return best
+        })
+        const up = window.__placeRayHit(cam.position.x, cam.position.y + 8, cam.position.z)
+        if (up.hitDistance != null && up.hitDistance < up.targetDistance) out.push(-1)
+        return out
+      },
+      { near: pair.near, far: pair.far },
+    )
+  const clear = (ratios) => ratios.every((r) => r !== null && r >= 0.85 && r <= 1.15)
+  // The near figure speaks first, the far one after, both held long; neither
+  // may be the guess target, so both are spoken with a tiny reach.
+  const speak = (pair) =>
+    page.evaluate(
+      async ({ near, far, u }) => {
+        const figs = window.__speechScaleFigures
+        const raf = () => new Promise((r) => requestAnimationFrame(() => r()))
+        window.__game.getState().hearUtterance(u)
+        const say = (f, id) => {
+          const name = f.name
+          f.name = `${id}-figure`
+          const ok = window.__speech?.speak(id, [u], `${id}-figure`, 120, 0.1) === true
+          f.name = name
+          return ok
+        }
+        const a = say(figs[near], 'scale-near')
+        await raf()
+        await raf()
+        const b = say(figs[far], 'scale-far')
+        for (let i = 0; i < 3; i++) await raf()
+        return a && b
+      },
+      { near: pair.near, far: pair.far, u: RIVER },
+    )
+  const settled = () =>
+    page
+      .waitForFunction(
+        () =>
+          ['scale-near', 'scale-far'].every((id) => {
+            const b = document.querySelector(`.speech-label[data-speaker="${id}"]`)?.closest('.speech-bubble')
+            return !!b && b.getAnimations().length === 0
+          }),
+        null,
+        { timeout: 5000 },
+      )
+      .catch(() => {})
+  // Each note's drawn size (its wrapper's box), its distance scale as set by the
+  // scene layer, the scale the pure curve gives for the camera distance read
+  // here, and whether the tail's tip still stands on the speaker's anchor.
+  const read = () =>
+    page.evaluate(async () => {
+      const { speechBubbleScale } = await import('/src/communication/speechBubbleScale.ts')
+      const cam = window.__placeCamera
+      const one = (id) => {
+        const el = document.querySelector(`.speech-label[data-speaker="${id}"]`)
+        const sizer = el?.closest('.speech-distance')
+        const tail = el?.closest('.speech-bubble')?.querySelector('.speech-tail')?.getBoundingClientRect()
+        const anchor = window.__speech?.anchorWorld(id)
+        const label = window.__speech?.labels().find((l) => l.speakerId === id)
+        const pt = window.__speech?.anchorScreen(id)
+        if (!el || !sizer || !tail || !anchor || !label || !pt || !cam) return null
+        const box = sizer.getBoundingClientRect()
+        const distance = Math.hypot(
+          anchor[0] - cam.position.x,
+          anchor[1] + label.height - cam.position.y,
+          anchor[2] - cam.position.z,
+        )
+        return {
+          distance: +distance.toFixed(2),
+          width: +box.width.toFixed(1),
+          height: +box.height.toFixed(1),
+          layoutWidth: sizer.offsetWidth,
+          set: Number(getComputedStyle(sizer).getPropertyValue('--speech-distance-scale')),
+          expected: +speechBubbleScale(distance).toFixed(3),
+          onTip: Math.abs(tail.left + tail.width / 2 - pt.x) <= 6 && Math.abs(tail.bottom - pt.y) <= 0.35 * box.height,
+          onScreen: box.left > 0 && box.right < window.innerWidth && box.top > 0 && tail.bottom < window.innerHeight,
+          targeted: el.classList.contains('targeted'),
+        }
+      }
+      return { near: one('scale-near'), far: one('scale-far') }
+    })
+  const judge = (v) => {
+    const near = v?.near
+    const far = v?.far
+    if (!near || !far) return false
+    const tracks = (n) => Math.abs(n.set - n.expected) <= 0.03 && Math.abs(n.width / n.layoutWidth - n.set) <= 0.03
+    return (
+      near.distance < far.distance &&
+      near.width >= 1.25 * far.width &&
+      tracks(near) &&
+      tracks(far) &&
+      near.onTip &&
+      far.onTip &&
+      near.onScreen &&
+      far.onScreen &&
+      !near.targeted &&
+      !far.targeted &&
+      near.layoutWidth === far.layoutWidth
+    )
+  }
+  const MAX_ATTEMPTS = 8
+  const attempts = []
+  let shot = null
+  for (const pair of pairs) {
+    if (attempts.length >= MAX_ATTEMPTS || shot) break
+    if (!(await aim(pair))) continue
+    await nextFrames(2)
+    if (!clear(await seen(pair))) continue
+    if (!(await speak(pair))) continue
+    await settled()
+    let pos = await aim(pair)
+    await nextFrames(2)
+    const before = await read()
+    if (!pos || !clear(await seen(pair)) || !judge(before)) {
+      attempts.push({ pair, at: 'staging', view: before })
+      await page.evaluate(() => window.__speech?.clear())
+      continue
+    }
+    let atShutter = null
+    await captureFrame(
+      page,
+      OUT,
+      '1271-speech-near-far-sizes',
+      {
+        local: { x: (pos[0].x + pos[1].x) / 2, y: (pos[0].y + pos[1].y) / 2 + 1.6, z: (pos[0].z + pos[1].z) / 2 },
+        label: 'a near and a far speaker in the village, the near note visibly larger than the far one',
+        // The figures walk; the scene has long been drawn by now.
+        settle: false,
+      },
+      {
+        beforeCapture: async () => {
+          pos = (await aim(pair)) ?? pos
+          await nextFrames(2)
+          const view = await read()
+          atShutter = { ...view, sight: await seen(pair) }
+          atShutter.ok = judge(view) && clear(atShutter.sight)
+        },
+      },
+    )
+    attempts.push({ pair, at: 'shutter', view: atShutter })
+    if (atShutter?.ok) shot = atShutter
+    await page.evaluate(() => window.__speech?.clear())
+  }
+  const brief = (a) =>
+    `${a.pair.near}/${a.pair.far}@${a.pair.d.toFixed(1)}m ${a.at}: ${JSON.stringify({ near: a.view?.near, far: a.view?.far })}`
+  check(
+    'a near speaker’s note is drawn visibly larger than a far speaker’s, each at the scale its distance gives and on its own speaker (point 1271)',
+    !!shot,
+    `${pairs.length} pairs 10-22 m apart; attempts [${attempts.map(brief).join('; ')}]` +
+      (shot ? ` — shot ${JSON.stringify({ near: shot.near, far: shot.far })}` : ''),
+  )
+  await page.evaluate((u) => {
+    window.__game.getState().setUtteranceHypothesis(u, '')
+    window.__speech?.clear()
+    delete window.__speechScaleFigures
+  }, RIVER)
+  await page.evaluate((saved) => {
+    const p = window.__placePlayer
+    if (!p || !saved) return
+    p.x = saved.x
+    p.z = saved.z
+    p.yaw = saved.yaw
+    p.pitch = saved.pitch
+  }, pose)
+}
 // --- Guessing a meaning where it is spoken (design.md §13.4, points 588/691) --
 // The arbitration, the dialog and the note it writes are pinned in the Vitest
 // layer. What ONLY a browser can answer is the input path: the guess key E opens
