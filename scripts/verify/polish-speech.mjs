@@ -1003,8 +1003,30 @@ if (section('speech-distance-scale')) {
   const rejected = []
   const fmt = (r) => (r == null ? 'sky' : r.toFixed(2))
   let shot = null
+  // Both figures DRAWN right now — an inhabitant gone home is hidden, and a
+  // sight ray to it stops at its own hut wall close enough to read as clear.
+  // A cheap refusal before the pair spends one of the attempts.
+  const drawnNow = (pair) =>
+    page.evaluate(
+      ({ near, far }) =>
+        [near, far].every((i) => {
+          const f = window.__speechScaleFigures?.[i]
+          if (!f) return false
+          for (let o = f; o; o = o.parent) if (!o.visible) return false
+          let head = false
+          f.traverseVisible((o) => {
+            if (o.name === 'figure-head') head = true
+          })
+          return head
+        }),
+      { near: pair.near, far: pair.far },
+    )
   for (const candidate of pairs) {
     if (attempts.length >= MAX_ATTEMPTS || shot) break
+    if (!(await drawnNow(candidate))) {
+      rejected.push(`${candidate.near}/${candidate.far} not-drawn`)
+      continue
+    }
     let pair = null
     for (const stand of STANDS) {
       const tried = { ...candidate, ...stand }
