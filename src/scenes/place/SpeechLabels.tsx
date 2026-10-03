@@ -196,6 +196,30 @@ export function SpeechLabels() {
         const anchor = speechAnchor(speakerId)
         return anchor ? anchor.getWorldPosition(WORLD).toArray() : null
       },
+      // The speaker's DRAWN head top and feet on screen, read live off the head
+      // mesh (not off the label), so a check can measure the tail-to-head gap
+      // and the speaker's projected height in the rendered frame (point 1276).
+      figureScreen: (speakerId: string) => {
+        const anchor = speechAnchor(speakerId)
+        if (!anchor) return null
+        anchor.updateWorldMatrix(true, true)
+        let head: THREE.Mesh | null = null
+        anchor.traverse((o) => {
+          if (!head && o.name === 'figure-head' && o.visible) head = o as THREE.Mesh
+        })
+        const screen = (v: THREE.Vector3) => {
+          v.project(camera)
+          return v.z > 1 ? null : { x: ((v.x + 1) / 2) * size.width, y: ((1 - v.y) / 2) * size.height }
+        }
+        const feet = screen(anchor.getWorldPosition(new THREE.Vector3()))
+        if (!head) return { feet, headTop: null }
+        const mesh = head as THREE.Mesh
+        const e = mesh.matrixWorld.elements
+        const r = (mesh.geometry as THREE.SphereGeometry).parameters?.radius ?? 0
+        const top = mesh.getWorldPosition(new THREE.Vector3())
+        top.y += r * Math.hypot(e[1], e[5], e[9])
+        return { feet, headTop: screen(top) }
+      },
       labels: () => speechLabelState().labels,
       clear: clearSpeechLabels,
     }

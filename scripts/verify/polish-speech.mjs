@@ -879,6 +879,8 @@ if (section('speech-distance-scale')) {
         const pt = window.__speech?.anchorScreen(id)
         if (!el || !sizer || !tail || !anchor || !label || !pt || !cam) return null
         const box = sizer.getBoundingClientRect()
+        // The DRAWN head top and feet on screen, off the head mesh (point 1276).
+        const fig = window.__speech?.figureScreen(id)
         const distance = Math.hypot(
           anchor[0] - cam.position.x,
           anchor[1] + label.height - cam.position.y,
@@ -895,6 +897,10 @@ if (section('speech-distance-scale')) {
           tipOff: [+(tail.left + tail.width / 2 - pt.x).toFixed(1), +(tail.bottom - pt.y).toFixed(1)],
           onTip: Math.abs(tail.left + tail.width / 2 - pt.x) <= 0.5 * box.height && Math.abs(tail.bottom - pt.y) <= 0.35 * box.height,
           onScreen: box.left > 0 && box.right < window.innerWidth && box.top > 0 && tail.bottom < window.innerHeight,
+          // Pixels from the tail tip down to the drawn head top (positive: the
+          // tip stands above the head), and the band it must fall in.
+          tipToHead: fig?.headTop ? +(fig.headTop.y - tail.bottom).toFixed(1) : null,
+          tipBand: [balance.communication.labelTipGap.minPx, balance.communication.labelTipGap.maxPx],
           targeted: el.classList.contains('targeted'),
           receded: bubble.classList.contains('receded'),
           visible: rendered(el) && rendered(tailNode) && tail.width > 0 && tail.height > 0,
@@ -1008,6 +1014,17 @@ if (section('speech-distance-scale')) {
     !!shot,
     `${pairs.length} pairs 10-22 m apart; attempts [${attempts.map(brief).join('; ')}]; rejected [${rejected.join(', ')}]` +
       (shot ? ` — shot ${JSON.stringify({ near: shot.near, far: shot.far })}` : ''),
+  )
+  // The tail meets its speaker's head (point 1276): at the shutter, the tip of
+  // each note ends just above its speaker's DRAWN head — inside the calibrated
+  // pixel band — near and far alike, measured on the rendered projection.
+  const tipMeets = (n) => n && n.tipToHead != null && n.tipToHead >= n.tipBand[0] && n.tipToHead <= n.tipBand[1]
+  check(
+    'each note’s tail tip ends just above its speaker’s drawn head, near and far, inside the calibrated pixel band (point 1276)',
+    !!shot && tipMeets(shot.near) && tipMeets(shot.far),
+    shot
+      ? `near ${shot.near.distance} m: tip ${shot.near.tipToHead} px over the head; far ${shot.far.distance} m: ${shot.far.tipToHead} px; band ${JSON.stringify(shot.near.tipBand)}`
+      : 'no frame was staged',
   )
   await page.evaluate((u) => {
     window.__game.getState().setUtteranceHypothesis(u, '')
