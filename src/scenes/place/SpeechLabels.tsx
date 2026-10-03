@@ -200,9 +200,12 @@ export function SpeechLabels() {
         const anchor = speechAnchor(speakerId)
         if (!anchor) return null
         anchor.updateWorldMatrix(true, true)
+        // Only a head the renderer draws: the anchor and every ancestor
+        // visible, and traverseVisible skips a hidden group's whole subtree.
+        for (let o: THREE.Object3D | null = anchor; o; o = o.parent) if (!o.visible) return null
         let head: THREE.Mesh | null = null
-        anchor.traverse((o) => {
-          if (!head && o.name === 'figure-head' && o.visible) head = o as THREE.Mesh
+        anchor.traverseVisible((o) => {
+          if (!head && o.name === 'figure-head') head = o as THREE.Mesh
         })
         const toScreen = (v: THREE.Vector3) => ({ x: ((v.x + 1) / 2) * size.width, y: ((1 - v.y) / 2) * size.height })
         const v = anchor.getWorldPosition(new THREE.Vector3()).project(camera)
@@ -211,13 +214,19 @@ export function SpeechLabels() {
         const mesh = head as THREE.Mesh
         const pos = mesh.geometry.getAttribute('position')
         let top: { x: number; y: number } | null = null
+        let left = Infinity
+        let right = -Infinity
         for (let i = 0; i < pos.count; i++) {
           v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).project(camera)
           if (v.z > 1) return { feet, headTop: null } // partly behind the camera
           const p = toScreen(v)
           if (!top || p.y < top.y) top = p
+          left = Math.min(left, p.x)
+          right = Math.max(right, p.x)
         }
-        return { feet, headTop: top }
+        // The head's drawn width, so a horizontal tip offset can be judged
+        // against the head it should sit over.
+        return { feet, headTop: top, headWidth: top ? right - left : 0 }
       },
       labels: () => speechLabelState().labels,
       clear: clearSpeechLabels,
