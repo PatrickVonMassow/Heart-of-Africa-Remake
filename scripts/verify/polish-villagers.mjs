@@ -3420,11 +3420,14 @@ if (section('village-pounding')) {
           const clear = (x, z) => Math.min(...others.map((c) => window.__clearanceTo(c, x, z)))
           // Every OTHER drawn person (life is frozen): none may stand between
           // the lens and the pair, or the picture is of a bystander.
+          // The pair is known by name, not by distance: a passer-by halted at
+          // the mortar's elbow is a bystander too.
           const people = []
+          const ofPair = (o) => { for (let a = o; a; a = a.parent) if (/^village-pounder-\d$/.test(a.name)) return true; return false }
           window.__placeScene.traverse((o) => {
-            if (o.name !== 'figure-head') return
+            if (o.name !== 'figure-head' || ofPair(o)) return
             const v = o.getWorldPosition(new o.position.constructor())
-            if (Math.hypot(v.x - m.x, v.z - m.z) > 1.1) people.push({ x: v.x, z: v.z })
+            people.push({ x: v.x, z: v.z })
           })
           const blocked = (x, z) => people.some((q) => {
             const ax = m.x - x
@@ -3480,7 +3483,7 @@ if (section('village-pounding')) {
         await nextFrames(3)
         // THE POSE AT THE SHUTTER: re-read after the settling frames. It must be
         // the staged one — that is the proof the freeze held.
-        const atShutter = await page.evaluate(() => {
+        const atShutter = await page.evaluate((close) => {
           const probe = window.__placePounding()
           const cam = window.__placeCamera
           const V = cam.position.constructor
@@ -3498,6 +3501,51 @@ if (section('village-pounding')) {
             const mid = px(c)
             return { ...mid, r: Math.abs(edge.y - mid.y) }
           })
+          // SCREEN SILHOUETTES: each pounder's drawn body and every other drawn
+          // person as a projected box. A bystander behind or beside a woman whose
+          // box overlaps hers merges with her into one two-headed figure. Only a
+          // body drawn at least half her height can: a far villager a few pixels
+          // tall in the background reads as distance, not as a second head.
+          const screenBox = (obj) => {
+            obj.updateWorldMatrix(true, true)
+            let lo = null
+            let hi = null
+            obj.traverse((o) => {
+              if (!o.isMesh || !o.visible) return
+              if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+              const b = o.geometry.boundingBox
+              for (let c = 0; c < 8; c++) {
+                const w = new V(c & 1 ? b.max.x : b.min.x, c & 2 ? b.max.y : b.min.y, c & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld)
+                const q = px(w)
+                lo = lo ? { x: Math.min(lo.x, q.x), y: Math.min(lo.y, q.y) } : { x: q.x, y: q.y }
+                hi = hi ? { x: Math.max(hi.x, q.x), y: Math.max(hi.y, q.y) } : { x: q.x, y: q.y }
+              }
+            })
+            return lo && { x0: Math.round(lo.x), y0: Math.round(lo.y), x1: Math.round(hi.x), y1: Math.round(hi.y) }
+          }
+          const pair = [0, 1].map((i) => scene.getObjectByName(`village-pounder-${i}`))
+          const pairBoxes = pair.map((g) => g && screenBox(g))
+          const overlaps = []
+          scene.traverse((o) => {
+            if (o.name !== 'inhabitant' || !o.visible) return
+            let inPair = false
+            for (let a = o.parent; a; a = a.parent) if (pair.includes(a)) inPair = true
+            if (inPair) return
+            const head = o.getObjectByName('figure-head')
+            if (!head || head.getWorldPosition(new V()).clone().project(cam).z >= 1) return
+            const b = screenBox(o)
+            if (!b) return
+            // In the CLOSE frame, nor a body nearer the lens than the pair (drawn
+            // taller than either woman): at 2-4 m it fills the picture of the
+            // work. From mid-distance the village's own vignettes (the fire's
+            // cook and tender) may stand nearer; that is the village, not a crowd.
+            const tallest = Math.max(...pairBoxes.map((p) => (p ? p.y1 - p.y0 : 0)))
+            const inView = b.x1 > 0 && b.x0 < window.innerWidth && b.y1 > 0 && b.y0 < window.innerHeight
+            if (close && inView && b.y1 - b.y0 > 1.2 * tallest) overlaps.push({ pounder: 'nearer', box: b })
+            pairBoxes.forEach((p, i) => {
+              if (p && b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0 && b.y1 - b.y0 >= 0.5 * (p.y1 - p.y0)) overlaps.push({ pounder: i, box: b, pounderBox: p })
+            })
+          })
           const tips = [0, 1].map((i) => {
             const pestle = scene.getObjectByName(`village-pestle-${i}`)
             if (!pestle) return null
@@ -3505,8 +3553,17 @@ if (section('village-pounding')) {
             const len = window.__balance.villageLife.mortar.pestleLength
             return px(new V(0, len, 0).applyMatrix4(pestle.matrixWorld))
           })
-          return { probe, heads, tips }
-        })
+          return { probe, heads, tips, overlaps }
+        }, staged.stand.at < 5)
+        // A bystander overlapping a pounder on screen refuses the frame; the
+        // village thaws and the next impact is tried with him moved on.
+        if (atShutter.overlaps.length > 0 && attempt < SEARCHES) {
+          refused.push(`${attempt}: bystander over pounder ${atShutter.overlaps.map((o) => o.pounder).join('+')}`)
+          retry = true
+          continue
+        }
+        check(`${shot.name}: no other figure overlaps either pounder's silhouette on screen${staged.stand.at < 5 ? ' or stands nearer the lens in the frame' : ''}`, atShutter.overlaps.length === 0,
+          JSON.stringify({ overlaps: atShutter.overlaps, refused }))
         check(`${shot.name}: life stayed frozen between the staging read and the shutter`, sameProbe(staged.probe, atShutter.probe))
         const [down, up] = atShutter.probe.women
         const rim = atShutter.probe.mortar.y + atShutter.probe.mortar.rim
