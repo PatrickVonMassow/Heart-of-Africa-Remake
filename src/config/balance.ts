@@ -1191,6 +1191,9 @@ interface BalanceConfig {
     chiefBesideDrummer: number
     /** Clear passage between the hut wall and the chief’s robe at his door. */
     chiefHutGap: number
+    /** Least angle, in degrees, between the chief’s hut and the market hut as
+     *  seen from the drummer, so his pointing gesture names one hut only. */
+    marketBearingFromChief: number
     /** How near the traveller must stand to the chief or to the drummer for the
      *  use key to reach either man. */
     chiefTalkReach: number
@@ -2216,6 +2219,9 @@ export const balance: BalanceConfig = {
     chiefBesideDrummer: 1.5,
     // Calibratable: the player’s 0.7 m diameter plus 0.1 m of walking clearance.
     chiefHutGap: 0.8,
+    // Calibratable: the market hut stands ~6 m from the drummer and spans about
+    // ±29° there; 60° keeps its edge well off the line to the chief’s hut.
+    marketBearingFromChief: 60,
     // Calibratable: the same reach the give already uses, so a traveller who
     // can hand the find over is exactly one who can ask for the drums.
     chiefTalkReach: 2.6,

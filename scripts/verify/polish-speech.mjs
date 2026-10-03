@@ -1599,6 +1599,45 @@ if (section('chief-to-drummer')) {
     JSON.stringify({ named, chiefWord }),
   )
 
+  // 1a. ONE HUT ON THE POINTING LINE (point 1272): seen from behind the drummer
+  //     while his arm is up, the chief's hut is the only hut his gesture can
+  //     mean — the market hut lies at a clearly different bearing.
+  const alongLine = await page.evaluate(() => {
+    const d = window.__placeSpots.drummer
+    const layout = window.__placeLayout
+    const chief = layout.interactives.find((i) => i.type === 'chief').pos
+    const len = Math.hypot(chief[0] - d[0], chief[1] - d[1])
+    const ux = (chief[0] - d[0]) / len
+    const uz = (chief[1] - d[1]) / len
+    // A hut body crosses the ray when its centre lies ahead and within its radius of the line.
+    const crosses = (x, z, r) => {
+      const t = (x - d[0]) * ux + (z - d[1]) * uz
+      return t > 0 && t < len && Math.abs((x - d[0]) * uz - (z - d[1]) * ux) < r
+    }
+    const market = layout.interactives.find((i) => i.type === 'market').pos
+    return {
+      market: crosses(market[0], market[1], 2.6),
+      dwellings: layout.dwellings.filter((h) => crosses(h.x, h.z, h.r)).length,
+    }
+  })
+  check(
+    'no other hut stands on the line the drummer points along (point 1272)',
+    !alongLine.market && alongLine.dwellings === 0,
+    JSON.stringify(alongLine),
+  )
+  // Three metres back along the pointing line, past the drummer's shoulder.
+  const toHut = Math.hypot(hut.pos[0] - drummer.x, hut.pos[1] - drummer.z)
+  const behind = {
+    x: drummer.x - ((hut.pos[0] - drummer.x) / toHut) * 3 + 0.6,
+    z: drummer.z - ((hut.pos[1] - drummer.z) / toHut) * 3,
+  }
+  await standAt(behind, { x: hut.pos[0], z: hut.pos[1] })
+  await frame('1272-drummer-points-at-chief-hut', {
+    local: { x: hut.pos[0], y: 1.5, z: hut.pos[1] },
+    label: "from behind the drummer, his arm raised toward the chief's hut — the only hut along the pointing line",
+  })
+  await standAt(inFrontOf(drummer, 2), drummer)
+
   // 1b. THE COLLISION THE TWO KEYS REMOVED (point 1139, user 16.09.2026). The
   //     player stands before the drummer with the drummer's own word standing
   //     over his head: under the one candidate list of point 691 the word and
