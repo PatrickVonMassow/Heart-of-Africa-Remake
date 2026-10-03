@@ -2341,10 +2341,10 @@ if (section('adult-errands')) {
           }
         }, posed.who)
       const SHUTTER_SEARCHES = 4
-      // Every search reads where they stand now; the frame is written, THEN
-      // the line is read, since the shutter's own wait lets them walk on. A
-      // spoiled frame is overwritten by the next search; an exhausted search
-      // waits for them to move.
+      // A read before the shutter and one after it both race the neighbours'
+      // walk (cross-vendor review of d0005286d), so their life is FROZEN, the
+      // line read, and only a clear line exposed — the read is the instant the
+      // picture shows. A spoiled line thaws them and searches afresh.
       let shot = null
       let spoiled = null
       let searches = 0
@@ -2358,13 +2358,25 @@ if (section('adult-errands')) {
           continue
         }
         await nextFrames(6)
-        await frame('1085-village-adult-fills-a-jar', {
-          local: { x: posed.x, y: 0.6, z: posed.z },
-          label: 'the village water carrier at the bottom of his dip, standing in the river, side-on, three metres off',
-        })
+        await page.evaluate(() => window.__placeFreezeLife(true))
         const line = await readLine()
         spoiled = lineOverlapFrom(line.lens, posed, line.others)
-        if (!spoiled) break
+        if (!spoiled) {
+          try {
+            await frame('1085-village-adult-fills-a-jar', {
+              local: { x: posed.x, y: 0.6, z: posed.z },
+              label: 'the village water carrier at the bottom of his dip, standing in the river, side-on, three metres off',
+            })
+            // The freeze is what ties the read to the picture; prove it held.
+            const after = await readLine()
+            const drift = Math.max(...line.others.map((o, k) => Math.hypot(o.x - after.others[k].x, o.z - after.others[k].z)), 0)
+            check('and no neighbour moved between the line read and the exposure', drift < 1e-6, `${drift.toFixed(6)} m`)
+          } finally {
+            await page.evaluate(() => window.__placeFreezeLife(false))
+          }
+          break
+        }
+        await page.evaluate(() => window.__placeFreezeLife(false))
         refusals.push(`${searches}: ${describeOverlap(spoiled)}`)
       }
       // HE MUST STILL BE WHERE THE CAMERA IS AIMED. The pin held his pose and
@@ -2596,10 +2608,10 @@ if (section('adult-errands')) {
       let unseen = []
       let searches = 0
       const refusals = []
-      // THE STATE IS READ AFTER THE FRAME IS WRITTEN: the shutter waits for the
-      // scene to finish drawing while both walk on, so a reading before it
-      // judged a picture nobody took. A spoiled frame is overwritten by the
-      // next search; a search with no bearing waits for them to move.
+      // THE STATE IS READ AT THE INSTANT THE PICTURE SHOWS: life is frozen,
+      // the sight lines read, and only a clear view exposed (cross-vendor
+      // review of d0005286d); a spoiled view thaws them for the next search,
+      // and a search with no bearing waits for them to move.
       while (searches < 4) {
         searches++
         // Far enough back that the further of the two men is still in the picture,
@@ -2608,12 +2620,16 @@ if (section('adult-errands')) {
         from = await placeCamera(mid, Math.min(16, Math.max(7, order.gap * 0.8 + 5)), -0.1, seen)
         if (from) {
           await nextFrames(4)
-          await frame('1087-village-water-order-at-the-stand', {
-            local: { x: mid.x, y: 0.8, z: mid.z },
-            label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
-          })
+          await page.evaluate(() => window.__placeFreezeLife(true))
           unseen = await page.evaluate((want) => window.__errandUnseen(want), seen)
-          if (!unseen.length) break
+          if (!unseen.length) {
+            await frame('1087-village-water-order-at-the-stand', {
+              local: { x: mid.x, y: 0.8, z: mid.z },
+              label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
+            }).finally(() => page.evaluate(() => window.__placeFreezeLife(false)))
+            break
+          }
+          await page.evaluate(() => window.__placeFreezeLife(false))
           refusals.push(`${searches}: out of sight: ${unseen.join(', ')}`)
         } else {
           refusals.push(`${searches}: all 12 bearings refused`)

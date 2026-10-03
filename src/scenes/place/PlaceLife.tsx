@@ -179,6 +179,18 @@ import {
 /** Collision radius of inhabitants (WALKER_RADIUS; the player's own is PLAYER_RADIUS). */
 const NPC_RADIUS = WALKER_RADIUS
 
+/**
+ * Dev-only life freeze for the headless proof frames (work-order 1108): while
+ * set, every inhabitant loop below skips its frame, so a line read and the
+ * picture taken after it show the same instant.
+ */
+let lifeFrozen = false
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__placeFreezeLife = (on: boolean) => {
+    lifeFrozen = on
+  }
+}
+
 /** Kneeling cook with a three-stick pot beside the village fire. */
 function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const groundHeight = usePlaceGround()
@@ -310,6 +322,7 @@ function Loom({
   )
 
   useFrame((_, rawDt) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const dt = Math.min(rawDt, 0.1)
     const before = work.errand ? work.errand.at : 0
     const said = stepLoomWork(
@@ -967,6 +980,7 @@ function Kids({
   const beatShot = useRef<TagBeatShot | null>(null)
 
   useFrame((_, rawDt) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     if (import.meta.env.DEV && (chargeCapture.current.held || catchCapture.current.held)) return
     const dt = Math.min(rawDt, 0.1)
     let spoken: BankUtterance | null = null
@@ -1557,6 +1571,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
     }))
   }
   useFrame(({ clock }, rawDt) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const t = clock.elapsedTime
     const dt = Math.min(rawDt, 0.1)
     // Publish every animal's last position into the scene before anyone moves,
@@ -1748,6 +1763,7 @@ function Porters({
     [colliders],
   )
   useFrame(({ clock }, rawDt) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const dt = Math.min(rawDt, 0.1)
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
@@ -2193,6 +2209,7 @@ function TaskWalker({
   )
 
   useFrame((_, rawDt) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const dt = Math.min(rawDt, 0.1)
     const s = state.current
     const stand = standing.current
@@ -2450,6 +2467,7 @@ function Walkers({
   }, [defs, groundHeight])
 
   useFrame(({ clock }, rawDt) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const dt = Math.min(rawDt, 0.1)
     const t = clock.elapsedTime
     /** Point 578: this walker's body, pushed clear of the other inhabitants
@@ -2866,6 +2884,7 @@ function ErrandVillagers({
   )
 
   useFrame((_, rawDt) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.adultErrands
     // The jars standing at the village water stand: as many as the errand
