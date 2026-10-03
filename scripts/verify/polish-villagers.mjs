@@ -1769,6 +1769,10 @@ if (section('village-loom')) {
 }
 
 if (section('adult-errands')) {
+  // Village life held still between a line read and its exposure (point 1108).
+  // A pre-change baseline build lacks the hook: the call is then a no-op and
+  // the fill shot's drift check reports the unfrozen exposure.
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -2358,11 +2362,11 @@ if (section('adult-errands')) {
           continue
         }
         await nextFrames(6)
-        await page.evaluate(() => window.__placeFreezeLife(true))
-        const line = await readLine()
-        spoiled = lineOverlapFrom(line.lens, posed, line.others)
-        if (!spoiled) {
-          try {
+        await freezeLife(true)
+        try {
+          const line = await readLine()
+          spoiled = lineOverlapFrom(line.lens, posed, line.others)
+          if (!spoiled) {
             await frame('1085-village-adult-fills-a-jar', {
               local: { x: posed.x, y: 0.6, z: posed.z },
               label: 'the village water carrier at the bottom of his dip, standing in the river, side-on, three metres off',
@@ -2371,12 +2375,11 @@ if (section('adult-errands')) {
             const after = await readLine()
             const drift = Math.max(...line.others.map((o, k) => Math.hypot(o.x - after.others[k].x, o.z - after.others[k].z)), 0)
             check('and no neighbour moved between the line read and the exposure', drift < 1e-6, `${drift.toFixed(6)} m`)
-          } finally {
-            await page.evaluate(() => window.__placeFreezeLife(false))
           }
-          break
+        } finally {
+          await freezeLife(false)
         }
-        await page.evaluate(() => window.__placeFreezeLife(false))
+        if (!spoiled) break
         refusals.push(`${searches}: ${describeOverlap(spoiled)}`)
       }
       // HE MUST STILL BE WHERE THE CAMERA IS AIMED. The pin held his pose and
@@ -2620,16 +2623,19 @@ if (section('adult-errands')) {
         from = await placeCamera(mid, Math.min(16, Math.max(7, order.gap * 0.8 + 5)), -0.1, seen)
         if (from) {
           await nextFrames(4)
-          await page.evaluate(() => window.__placeFreezeLife(true))
-          unseen = await page.evaluate((want) => window.__errandUnseen(want), seen)
-          if (!unseen.length) {
-            await frame('1087-village-water-order-at-the-stand', {
-              local: { x: mid.x, y: 0.8, z: mid.z },
-              label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
-            }).finally(() => page.evaluate(() => window.__placeFreezeLife(false)))
-            break
+          await freezeLife(true)
+          try {
+            unseen = await page.evaluate((want) => window.__errandUnseen(want), seen)
+            if (!unseen.length) {
+              await frame('1087-village-water-order-at-the-stand', {
+                local: { x: mid.x, y: 0.8, z: mid.z },
+                label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
+              })
+            }
+          } finally {
+            await freezeLife(false)
           }
-          await page.evaluate(() => window.__placeFreezeLife(false))
+          if (!unseen.length) break
           refusals.push(`${searches}: out of sight: ${unseen.join(', ')}`)
         } else {
           refusals.push(`${searches}: all 12 bearings refused`)

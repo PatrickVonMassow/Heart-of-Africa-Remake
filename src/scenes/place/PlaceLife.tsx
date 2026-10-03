@@ -1900,6 +1900,7 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   useStandingBodies(stances)
 
   useFrame(({ clock }) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const t = clock.elapsedTime
     // Slight turns toward each other — the conversation's idle, and all of it.
     if (a.current) {
@@ -1965,6 +1966,7 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   // rises with the shaft instead of hanging beside a tool that lifts itself.
   const pose = useRef<FigurePose | null>({ left: armAim(0.2, 0.5), right: armAim(-0.2, 0.5), lean: 0.1, turn: 0 })
   useFrame(({ clock }) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const t = clock.elapsedTime
     const stroke = Math.abs(Math.sin(t * 2.4))
     if (pestle.current) pestle.current.position.y = 1.05 + stroke * 0.38
@@ -2082,6 +2084,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     return () => { setDrummerVoice(null); voice?.dispose() }
   }, [voice])
   useFrame((_, rawDt) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
@@ -2117,6 +2120,7 @@ function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   useStandingBody(x, z)
   const stick = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     if (stick.current) stick.current.rotation.x = 0.85 + Math.sin(clock.elapsedTime * 1.6) * 0.12
   })
   return (
@@ -3609,6 +3613,7 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
   // Bodies the passers-by go round (point 578).
   useStandingBodies(spots)
   useFrame(({ clock }) => {
+    if (import.meta.env.DEV && lifeFrozen) return
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
       const s = spots[i]
