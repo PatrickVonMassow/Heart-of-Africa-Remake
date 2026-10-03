@@ -147,7 +147,9 @@ describe('a household gives way to the plaza’s view (work-order 1191)', () => 
     // shipped plan 394349866 is seen without a household giving way; 3 was the
     // first Bambara plan that still needed one until the water stand moved out
     // of the children's earshot and the re-enabled loom lost its plaza line there.
-    const bambara = sharedLayout('bambara-village', 4)
+    // Point 1272 moved the market hut; seed 4 no longer needs a household to
+    // give way, 8 is the first Bambara plan that does.
+    const bambara = sharedLayout('bambara-village', 8)
     expect(bambara.loom?.seenFromPlaza).toBe(true)
     expect(bambara.gaveWayToLoom.households).toBeGreaterThan(0)
     expect(bambara.gaveWayToLoom.dwellings).toBeGreaterThanOrEqual(bambara.gaveWayToLoom.households)

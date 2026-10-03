@@ -172,7 +172,8 @@ describe('the village water path (work-order 688)', () => {
   // a sweep of the first 2000 seeds still routes through a wall. Re-picked by
   // work-order 1245: with the water path moved upstream, 330 finds its lane on
   // the outer head rungs instead; 661, 673 and 762 still route through a wall.
-  const gatedSeeds = [661, 762]
+  // Re-picked by point 1272 (market hut moved): 661 found a way round; 3 needs a gate.
+  const gatedSeeds = [3, 762]
 
   it.each(gatedSeeds)('seed %i: gate rebuilding preserves village props and exactly two settled rock colliders', (seed) => {
     const layout = buildLayout('bambara-village', seed)
