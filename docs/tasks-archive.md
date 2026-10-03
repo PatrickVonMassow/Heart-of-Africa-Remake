@@ -33356,3 +33356,7 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
   directly in front of point 1087.
   Bundle: Dorfleben.
+
+- [x] 1271. Speech bubbles larger and scaled by distance
+  Speech bubbles (speech labels over speaking figures, src/ui/SpeechLabelCard.tsx, src/index.css) are clearly larger than today, and they scale with the speaker's distance from the camera: a nearer figure's bubble is larger, a farther figure's bubble smaller, monotonically, with a readable minimum and a maximum so a close-up bubble never covers the scene. Base size and the near/far scale limits live in src/config/balance.ts, marked calibratable. Targeting/selection of a bubble (.speech-label.targeted) keeps working at every size. Test: Vitest for the size-from-distance function (monotone, clamped); Playwright frame in the village showing a near and a far speaker with visibly different bubble sizes, both backends (CSS/layout path).
+  Bundle: Kommunikation.
