@@ -37,6 +37,7 @@ import {
   speakOverhead,
   speechAnchor,
   speechLabelState,
+  speechTipWorld,
   subscribeSpeechLabels,
   updateSpeechTarget,
 } from './speechChannel'
@@ -78,10 +79,10 @@ function SpeechLabelView({
   const conceptLabels = useUi((s) => s.speechConceptLabels)
 
   useFrame(({ camera }) => {
-    const anchor = speechAnchor(label.speakerId)
-    if (!anchor || !group.current) return
-    anchor.getWorldPosition(WORLD)
-    group.current.position.set(WORLD.x, WORLD.y + label.height, WORLD.z)
+    // The tip follows the speaker's drawn head every frame — its lean, its
+    // kneel, its step — not a height sampled when the speech began (point 1276).
+    if (!group.current || !speechTipWorld(label, WORLD)) return
+    group.current.position.copy(WORLD)
     // The label's screen place is read off this group's WORLD matrix by drei's
     // <Html>, in a frame callback of its own — before the renderer refreshes the
     // graph. Without this the note never leaves the scene origin (measured in
@@ -178,11 +179,8 @@ export function SpeechLabels() {
         return true
       },
       anchorScreen: (speakerId: string) => {
-        const anchor = speechAnchor(speakerId)
         const label = speechLabelState().labels.find((l) => l.speakerId === speakerId)
-        if (!anchor || !label) return null
-        anchor.getWorldPosition(WORLD)
-        WORLD.y += label.height
+        if (!label || !speechTipWorld(label, WORLD)) return null
         WORLD.project(camera)
         // Behind the camera the projection mirrors onto the screen while drei
         // hides the note; report what the picture shows, which is nothing.
@@ -196,9 +194,11 @@ export function SpeechLabels() {
         const anchor = speechAnchor(speakerId)
         return anchor ? anchor.getWorldPosition(WORLD).toArray() : null
       },
-      // The speaker's DRAWN head top and feet on screen, read live off the head
-      // mesh (not off the label), so a check can measure the tail-to-head gap
-      // and the speaker's projected height in the rendered frame (point 1276).
+      // The speaker's DRAWN head top and feet on screen, measured on the
+      // projected geometry itself (point 1276): every vertex of the visible
+      // head mesh goes through the camera, and the head's top on screen is the
+      // smallest screen y among them — the silhouette's upper edge under any
+      // perspective and pitch, not a projected world-up offset of its centre.
       figureScreen: (speakerId: string) => {
         const anchor = speechAnchor(speakerId)
         if (!anchor) return null
@@ -207,18 +207,20 @@ export function SpeechLabels() {
         anchor.traverse((o) => {
           if (!head && o.name === 'figure-head' && o.visible) head = o as THREE.Mesh
         })
-        const screen = (v: THREE.Vector3) => {
-          v.project(camera)
-          return v.z > 1 ? null : { x: ((v.x + 1) / 2) * size.width, y: ((1 - v.y) / 2) * size.height }
-        }
-        const feet = screen(anchor.getWorldPosition(new THREE.Vector3()))
+        const toScreen = (v: THREE.Vector3) => ({ x: ((v.x + 1) / 2) * size.width, y: ((1 - v.y) / 2) * size.height })
+        const v = anchor.getWorldPosition(new THREE.Vector3()).project(camera)
+        const feet = v.z > 1 ? null : toScreen(v)
         if (!head) return { feet, headTop: null }
         const mesh = head as THREE.Mesh
-        const e = mesh.matrixWorld.elements
-        const r = (mesh.geometry as THREE.SphereGeometry).parameters?.radius ?? 0
-        const top = mesh.getWorldPosition(new THREE.Vector3())
-        top.y += r * Math.hypot(e[1], e[5], e[9])
-        return { feet, headTop: screen(top) }
+        const pos = mesh.geometry.getAttribute('position')
+        let top: { x: number; y: number } | null = null
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).project(camera)
+          if (v.z > 1) return { feet, headTop: null } // partly behind the camera
+          const p = toScreen(v)
+          if (!top || p.y < top.y) top = p
+        }
+        return { feet, headTop: top }
       },
       labels: () => speechLabelState().labels,
       clear: clearSpeechLabels,
