@@ -15857,3 +15857,7 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright section; no new mechanism.
   Bundle: Testinfrastruktur.
   Criticality: low — no player impact measured; it blocks the green of `polish-speech` on WebGL 2.
+- [ ] 1289. Stop guards keep binding a session whose lock was released to a reserved claimant
+  Measured 03.10.2026, about 21:25-21:45: session f865e213 had its batch lock handed back to the reserved claimant 036dac43 (batch-claim --status: released-reserved). Main writes were refused for it, yet render-verify-guard, retro-currency-guard (beginner guide) and ci-status-guard kept blocking its Stop five turns in a row, demanding hour-long suite runs and main commits it may not make.
+  Done when: a session whose lock was released to a claimant is treated as a non-owner by every Stop guard (the house rule: every Stop guard stands down for a non-owner), covered by a unit test on the shared ownership predicate the guards read; no guard is switched off for owners.
+  Bundle: Session- & Repo-Hygiene.
