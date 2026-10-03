@@ -90,6 +90,25 @@ put it is the mistake this line exists to stop.
   Seen while authoring point 1271 (frame verification/1271-speech-near-far-sizes.png): with a speaker about 4 m from the camera, the speech note's tail tip sits 65-85 px above the drawn head, so the note reads as detached from its speaker. The tip sits correctly on its anchor; the anchor (src/scenes/place/SpeechLabels.tsx) lies too high above the head at close range. Final state: at every camera distance the tail tip ends just above the speaker's rendered head (gap from the projected head top within a small calibratable pixel band in src/config/balance.ts). Test: Vitest for the anchor height from the figure's head height; Playwright near-speaker frame asserting the tip-to-head-top gap in the rendered projection, both backends.
   Bundle: Kommunikation.
 
+- [ ] 1278. Speech bubbles must visibly grow as a speaker comes near (1271 reads inverted in play)
+  In play the user sees no growth of a near speaker's speech bubble; near bubbles even look smaller (user, 03.10.2026). The 1271 curve (src/communication/speechBubbleScale.ts, balance.communication.speechBubble: baseScale 1.4, nearScale 1.35 at 3 m, farScale 0.75 at 22 m) only spans a 1.8x size ratio and is held flat below 3 m, while the speaker's own projection grows ~1/d (about 7x from 22 m to 3 m, and further below 3 m). Relative to its speaker the bubble therefore shrinks as he approaches. Retune so a bubble's size follows its speaker's projected size noticeably (e.g. scale proportional to (ref/d)^k with k around 0.6-0.8, cap raised and the near hold moved to ~1.2 m, a max-width/viewport cap kept so a close-up note never covers the scene); also check that a near speaker's older note receding (labelRecede 0.85, dimmed) does not undo the effect in ordinary conversation. Test: Vitest for the curve (monotone, clamped, near/far ratio at least ~3x between 2 m and 20 m); Playwright frame from a player-reachable stand with a speaker at ~2 m and one at ~15 m, bubble pixel heights measured against the speakers' projected heights, both backends.
+  Bundle: Kommunikation.
+- [ ] 1277. The speech-distance-scale shot accepts pairs whose far speaker has already walked close
+  Source: measured 03.10.2026 ~10:05 in the WebGPU covering run of `polish-speech` on main ebc37be92
+  (the run owed for the landed speech-scale point 1271), on a machine under load (an author agent
+  was building). The check "a near speaker's note is drawn visibly larger than a far speaker's …
+  (point 1271)" went red although every attempt read `set == expected` on both speakers: pairs
+  staged 10-22 m apart reached the shutter with the far speaker at 4.95-5.63 m (inhabitants walk
+  during staging), so the size difference fell below the check's threshold.
+  Final state:
+  - The staging re-measures the pair distance at the shutter and rejects or re-stages a pair whose
+    far speaker is no longer far; the scale rule itself and the check's threshold stay unchanged.
+  - `polish-speech --section=speech-distance-scale` green on WebGPU and WebGL 2; its frame
+    picture-checked.
+  Tests: the existing Playwright section; no new mechanism.
+  Bundle: Testinfrastruktur.
+  Criticality: low — no player impact measured (the drawn scale matched the expected one in every
+  attempt); it blocks the green of `polish-speech`.
 - [ ] 1121. The river-bank frame aims at a drifting fleck and shoots six frames later
   (measured 14.09.2026 on the covering WebGL 2 pass of point 1073).
   THE RED. `polish --section=adult-errands`, WebGL 2, first attempt:
@@ -15749,20 +15768,3 @@ to land than a mechanism that needs a review.
   Tests: the existing Playwright section; no new mechanism.
   Bundle: Testinfrastruktur.
   Criticality: low — no player impact measured; it blocks the green of `polish-speech` on WebGL 2.
-
-- [ ] 1277. The speech-distance-scale shot accepts pairs whose far speaker has already walked close
-  Source: measured 03.10.2026 ~10:05 in the WebGPU covering run of `polish-speech` on main ebc37be92
-  (the run owed for the landed speech-scale point 1271), on a machine under load (an author agent
-  was building). The check "a near speaker's note is drawn visibly larger than a far speaker's …
-  (point 1271)" went red although every attempt read `set == expected` on both speakers: pairs
-  staged 10-22 m apart reached the shutter with the far speaker at 4.95-5.63 m (inhabitants walk
-  during staging), so the size difference fell below the check's threshold.
-  Final state:
-  - The staging re-measures the pair distance at the shutter and rejects or re-stages a pair whose
-    far speaker is no longer far; the scale rule itself and the check's threshold stay unchanged.
-  - `polish-speech --section=speech-distance-scale` green on WebGPU and WebGL 2; its frame
-    picture-checked.
-  Tests: the existing Playwright section; no new mechanism.
-  Bundle: Testinfrastruktur.
-  Criticality: low — no player impact measured (the drawn scale matched the expected one in every
-  attempt); it blocks the green of `polish-speech`.
