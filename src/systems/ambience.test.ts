@@ -1551,14 +1551,31 @@ describe('the pestle thud reaches the ambient bus through its placed route', () 
     expect([ctx.sources.length, ctx.panners.length]).toEqual(before)
   })
 
+  const thudProbe = () => (window as unknown as { __poundThud: { calls: number; scheduled: number; played: number; lastPeak: number } }).__poundThud
+
   it('counts every dispatch in its dev probe and only the sounding ones as scheduled', () => {
-    const probe = () => (window as unknown as { __poundThud: { calls: number; scheduled: number; lastPeak: number } }).__poundThud
-    const before = { ...probe() }
+    const before = { ...thudProbe() }
     balance.ambienceVolume = 1
     playPoundThud(3, 0)
     playPoundThud(Infinity, 0)
-    expect(probe().calls - before.calls).toBe(2)
-    expect(probe().scheduled - before.scheduled).toBe(1)
-    expect(probe().lastPeak).toBeCloseTo(poundThudPlan(3, 0, 1).peak)
+    expect(thudProbe().calls - before.calls).toBe(2)
+    expect(thudProbe().scheduled - before.scheduled).toBe(1)
+    expect(thudProbe().played - before.played).toBe(1)
+    expect(thudProbe().lastPeak).toBeCloseTo(poundThudPlan(3, 0, 1).peak)
+  })
+
+  it('does not count a thud scheduled on a SUSPENDED context as played', () => {
+    balance.ambienceVolume = 1
+    const was = ctx.state
+    ctx.state = 'suspended'
+    try {
+      const before = { ...thudProbe() }
+      playPoundThud(3, 0)
+      expect(thudProbe().calls - before.calls).toBe(1)
+      expect(thudProbe().scheduled - before.scheduled).toBe(1)
+      expect(thudProbe().played - before.played).toBe(0)
+    } finally {
+      ctx.state = was
+    }
   })
 })

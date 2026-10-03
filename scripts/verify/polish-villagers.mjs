@@ -3357,14 +3357,19 @@ if (section('village-pounding')) {
     // (`__poundThud`), never by the vignette's own counters alone: deleting the
     // audio call must turn this red. The audio graph is started and the player
     // stands within the thud's reach so every dispatch really sounds.
-    const audio = await page.evaluate(() => {
+    // A SUSPENDED context accepts every node and sounds nothing, so the start
+    // is awaited to 'running' and the state is read again after the window.
+    const audio = await page.evaluate(async () => {
       window.__ambience.start()
+      const ac = window.__ambience.context()
+      if (ac && ac.state !== 'running') await Promise.race([ac.resume(), new Promise((r) => setTimeout(r, 3000))])
       const m = window.__placePounding().mortar
       const p = window.__placePlayer
       const reach = window.__balance.communication.call.reach
-      return { started: !!window.__ambience.context(), distance: +Math.hypot(p.x - m.x, p.z - m.z).toFixed(1), reach }
+      return { state: ac?.state ?? null, distance: +Math.hypot(p.x - m.x, p.z - m.z).toFixed(1), reach }
     })
-    const read = () => page.evaluate(() => ({ pounding: window.__placePounding(), thud: window.__ambience.thudProbe() }))
+    check('the audio context is running before the thuds are observed', audio.state === 'running', JSON.stringify(audio))
+    const read = () => page.evaluate(() => ({ pounding: window.__placePounding(), thud: window.__ambience.thudProbe(), state: window.__ambience.context()?.state ?? null }))
     const before = await read()
     const heardThree = await stepUntil((n) => window.__placePounding().thuds >= n + 3, before.pounding.thuds, 600)
     const after = await read()
@@ -3372,13 +3377,15 @@ if (section('village-pounding')) {
     const thuds = after.pounding.thuds - before.pounding.thuds
     const calls = after.thud.calls - before.thud.calls
     const scheduled = after.thud.scheduled - before.thud.scheduled
+    const played = after.thud.played - before.thud.played
     check('both women strike the mortar and every strike is heard',
       heardThree && after.pounding.women.length === 2 && after.pounding.women.every((w, i) => w.impacts > before.pounding.women[i].impacts) &&
         after.pounding.heard - before.pounding.heard === struck && thuds >= Math.ceil(struck / 2),
       JSON.stringify({ heardThree, struck, heard: after.pounding.heard - before.pounding.heard, thuds }))
-    check('every thud reaches the audio module and is scheduled there with a level',
-      audio.started && audio.distance < audio.reach && thuds > 0 && calls === thuds && scheduled === calls && after.thud.lastPeak > 0,
-      JSON.stringify({ audio, thuds, calls, scheduled, lastPeak: after.thud.lastPeak }))
+    check('every thud reaches the audio module and plays there with a level, the context running throughout',
+      audio.state === 'running' && before.state === 'running' && after.state === 'running' && audio.distance < audio.reach &&
+        thuds > 0 && calls === thuds && scheduled === calls && played === calls && after.thud.lastPeak > 0,
+      JSON.stringify({ audio, states: [before.state, after.state], thuds, calls, scheduled, played, lastPeak: after.thud.lastPeak }))
     // A stand at most this far off square to the pair still shows them side by side.
     const MAX_OFF_SQUARE = 30
     const shots = [
