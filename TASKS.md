@@ -112,6 +112,15 @@ put it is the mistake this line exists to stop.
   Bundle: Kommunikation.
   Criticality: low — no player impact measured (the drawn scale matched the expected one in every
   attempt); it blocks the green of `polish-speech`.
+- [ ] 1279. Route pure read and search delegations to the Explore agent
+  Pure read/search delegations go to the existing `Explore` agent instead of `general-purpose`, to shrink per-subagent context (usage report 03.10.2026: 73 % of weekly usage from subagent-heavy sessions, 61 % from "general-purpose", 52 % at >150k context).
+  1. Scope: delegations whose job is only to locate or summarize (where is X, which files touch Y, collect status/log facts) use `subagent_type: "Explore"`. Authoring, review, suites, and anything that writes, commits, or runs verification stay on their current agent types. No change to the model policy: everything keeps running on the allowed serving chain.
+  2. Carry the rule where delegations are written: the batch owner's delegation guidance (docs/batch-owner-runbook.md, delegation section) gets one sentence; no new agent definition, guard, router, or workflow abstraction (infrastructure freeze, CLAUDE.md §2).
+  3. Record it as a working rule in memory (one memory file, indexed in MEMORY.md).
+  Done when: the runbook sentence and the memory entry exist, and a spot check of the next batch session shows read-only lookups delegated to Explore.
+  Evidence afterwards (no gate): the user compares the "Day" view of the usage panel over the following days; the "general-purpose" share should drop somewhat and the >150k share should not rise again.
+  Not in scope: fewer subagents overall (would push the main session back over 150k), cheaper models for helpers (would need a model-policy exception), new agent types.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1121. The river-bank frame aims at a drifting fleck and shoots six frames later
   (measured 14.09.2026 on the covering WebGL 2 pass of point 1073).
   THE RED. `polish --section=adult-errands`, WebGL 2, first attempt:
