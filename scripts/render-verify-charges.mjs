@@ -65,6 +65,41 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1283,
+    suite: 'settings',
+    kind: 'check',
+    match: /^feeding: lion head lowered/i,
+    why: 'Measured 03.10.2026 on the full webgpu settings pass on main after the 1280 landing: red in the full suite while the river-current section alone was green on both backends. Point 1283 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1283,
+    suite: 'settings',
+    kind: 'check',
+    match: /^feeding: tearing movement animates/i,
+    why: 'Measured 03.10.2026 on the full webgpu settings pass on main after the 1280 landing: red in the full suite while the river-current section alone was green on both backends. Point 1283 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1283,
+    suite: 'settings',
+    kind: 'check',
+    match: /^feeding: prey lies on its side/i,
+    why: 'Measured 03.10.2026 on the full webgpu settings pass on main after the 1280 landing: red in the full suite while the river-current section alone was green on both backends. Point 1283 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1283,
+    suite: 'settings',
+    kind: 'check',
+    match: /^feeding: stain beneath the carcass/i,
+    why: 'Measured 03.10.2026 on the full webgpu settings pass on main after the 1280 landing: red in the full suite while the river-current section alone was green on both backends. Point 1283 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1283,
+    suite: 'settings',
+    kind: 'check',
+    match: /^the water TEXTURE moves downstream between the frames by about the drift/i,
+    why: 'Measured 03.10.2026 on the full webgpu settings pass on main after the 1280 landing: red in the full suite while the river-current section alone was green on both backends. Point 1283 owns the cause; the charge dies with it.',
+  },
+  {
     point: 1236,
     suite: 'enrichments',
     kind: 'check',
