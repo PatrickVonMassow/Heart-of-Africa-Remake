@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest'
 import {
   collectActors,
   drawnHeadRise,
+  drawnHeadTop,
   markActor,
   markedActorRise,
   pushMarkedActors,
@@ -181,6 +182,56 @@ describe('drawnHeadRise', () => {
     // Squashed figure, counter-scaled head: world y row length 1.
     const anchor: HeadNode = { matrixWorld: { elements: at(0) }, children: [head(at(0.9))] }
     expect(drawnHeadRise(anchor)).toBeCloseTo(1.06)
+  })
+
+  /** The highest point of the unit sphere of radius `r` under the column-major
+   *  matrix `e`, found by brute force over the sphere's surface — independent
+   *  of the closed form drawnHeadTop uses. */
+  function sampledTop(e: number[], r: number): [number, number, number] {
+    let best: [number, number, number] = [0, -Infinity, 0]
+    const n = 720
+    for (let i = 0; i <= n; i++) {
+      const theta = (Math.PI * i) / n
+      for (let j = 0; j < 2 * n; j++) {
+        const phi = (Math.PI * j) / n
+        const u = [Math.sin(theta) * Math.cos(phi), Math.cos(theta), Math.sin(theta) * Math.sin(phi)]
+        const p: [number, number, number] = [0, 1, 2].map(
+          (k) => e[12 + k] + r * (e[k] * u[0] + e[4 + k] * u[1] + e[8 + k] * u[2]),
+        ) as [number, number, number]
+        if (p[1] > best[1]) best = p
+      }
+    }
+    return best
+  }
+
+  it('reads the WORLD y row under a rotated, non-uniformly scaled head', () => {
+    // Rz(30°)·diag(2, 0.5, 1): world y row (1, 0.433, 0), length 1.0897 —
+    // neither elements[5] (0.433) nor the y column's length (0.5).
+    const c = Math.cos(Math.PI / 6)
+    const sn = Math.sin(Math.PI / 6)
+    const e = [c * 2, sn * 2, 0, 0, -sn * 0.5, c * 0.5, 0, 0, 0, 0, 1, 0, 0.2, 1.1, -0.1, 1]
+    expect(Math.abs(e[5] - Math.hypot(e[1], e[5], e[9]))).toBeGreaterThan(0.5)
+    expect(Math.abs(Math.hypot(e[4], e[5], e[6]) - Math.hypot(e[1], e[5], e[9]))).toBeGreaterThan(0.5)
+    const anchor: HeadNode = { matrixWorld: { elements: at(0) }, children: [head(e)] }
+    const want = sampledTop(e, 0.16)
+    expect(want[1]).toBeCloseTo(1.1 + 0.16 * Math.sqrt(1 + 0.1875), 4)
+    const got = drawnHeadTop(anchor)!
+    expect(got[1]).toBeCloseTo(want[1], 4)
+    // The top of the tilted ellipsoid is off the centre sideways too.
+    expect(got[0]).toBeCloseTo(want[0], 2)
+    expect(got[2]).toBeCloseTo(want[2], 2)
+    expect(drawnHeadRise(anchor)).toBeCloseTo(want[1], 4)
+  })
+
+  it('keeps a displaced head’s full position, not only its rise', () => {
+    // A figure at (3, 0.5, 4) whose head leans 0.12 m to +x and 0.08 m to -z.
+    const root = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0.5, 4, 1]
+    const h = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3.12, 1.68, 3.92, 1]
+    const anchor: HeadNode = { matrixWorld: { elements: root }, children: [head(h)] }
+    const top = drawnHeadTop(anchor)!
+    expect(top[0]).toBeCloseTo(0.12)
+    expect(top[1]).toBeCloseTo(1.34)
+    expect(top[2]).toBeCloseTo(-0.08)
   })
 
   it('is null without a visible head, so the record takes over', () => {

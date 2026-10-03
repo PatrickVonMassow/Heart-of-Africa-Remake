@@ -147,23 +147,45 @@ export interface HeadNode {
 }
 
 /**
- * How high the TOP of the drawn head under `root` stands above root's own
- * origin, in world units — null when no visible head is drawn there (a wrap
- * pulled over it, an object that is no figure). The speech note's tail ends
- * here (work-order point 1276): the actor record sits 0.11 m above the head
- * sphere, and with the old metre headroom on top the tip floated 65-85 px over
- * a near speaker's hair. A sphere of radius r reaches r times the length of its
- * world matrix's y row above its centre — squash, lean and the head's own
- * counter-rotation included (the reading PlaceLife's head check takes).
+ * Where the TOP of the drawn head under `root` stands relative to root's own
+ * origin, as a world-space offset [dx, dy, dz] — null when no visible head is
+ * drawn there (a wrap pulled over it, an object that is no figure). The speech
+ * note's tail ends here (work-order point 1276): the actor record sits 0.11 m
+ * above the head sphere, and with the old metre headroom on top the tip floated
+ * 65-85 px over a near speaker's hair. The FULL offset, not only the rise: a
+ * leaning or stepping head carries the tail with it sideways and in depth.
+ *
+ * A sphere of radius r under the linear map L reaches r·|row y of L| above its
+ * centre (the top of the ellipsoid it becomes) — squash, lean and the head's
+ * own counter-rotation included. That top point lies at centre + r·rowY/|rowY|
+ * in world space, so its x/z follow the tilt too. Matrices are read as they
+ * stand: the caller refreshes them (`updateWorldMatrix`) when the scene moved.
  */
-export function drawnHeadRise(root: HeadNode | null | undefined): number | null {
+export function drawnHeadTop(root: HeadNode | null | undefined): [number, number, number] | null {
   const base = root?.matrixWorld?.elements
   if (!root || base === undefined) return null
   const head = findHead(root)
   if (!head) return null
   const e = head.matrixWorld!.elements
   const r = head.geometry?.parameters?.radius ?? 0
-  return e[13] + r * Math.hypot(e[1], e[5], e[9]) - base[13]
+  // Column-major: the world y of L·u is e1·ux + e5·uy + e9·uz, largest over
+  // the unit sphere at u = (e1, e5, e9)/len; the top point is centre + r·L·u.
+  const len = Math.hypot(e[1], e[5], e[9])
+  if (len === 0) return [e[12] - base[12], e[13] - base[13], e[14] - base[14]]
+  const ux = e[1] / len
+  const uy = e[5] / len
+  const uz = e[9] / len
+  return [
+    e[12] + r * (e[0] * ux + e[4] * uy + e[8] * uz) - base[12],
+    e[13] + r * len - base[13],
+    e[14] + r * (e[2] * ux + e[6] * uy + e[10] * uz) - base[14],
+  ]
+}
+
+/** How high the drawn head's top stands above root's origin (`drawnHeadTop`'s
+ *  rise alone), or null without a visible head. */
+export function drawnHeadRise(root: HeadNode | null | undefined): number | null {
+  return drawnHeadTop(root)?.[1] ?? null
 }
 
 function findHead(node: HeadNode): HeadNode | null {
