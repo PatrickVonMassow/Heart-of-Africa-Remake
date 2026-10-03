@@ -230,6 +230,12 @@ export function SpeechLabels() {
         const anchor = speechAnchor(speakerId)
         return anchor ? anchor.getWorldPosition(WORLD).toArray() : null
       },
+      // Where the note's tail tip stands in the world for this camera — the
+      // point its distance scale is measured from (point 1278).
+      tipWorld: (speakerId: string) => {
+        const label = speechLabelState().labels.find((l) => l.speakerId === speakerId)
+        return label && speechTipWorld(label, WORLD, camera) ? WORLD.toArray() : null
+      },
       // The speaker's DRAWN head top and feet on screen, measured on the
       // projected geometry itself (point 1276): every vertex of the visible
       // head mesh goes through the camera, and the head's top on screen is the

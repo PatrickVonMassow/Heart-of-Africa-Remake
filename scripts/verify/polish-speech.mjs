@@ -772,10 +772,9 @@ if (section('speech-distance-scale')) {
     })
     window.__speechScaleFigures = found
   })
-  // Pairs 10-22 m apart, widest first: the nearer stands a few metres before
-  // the camera, the other far behind it and off to the side. The widest pairs
-  // stand at opposite rims, so the stand behind the near one falls outside the
-  // settlement or against its huts; only 24 of them could all be rejected (a
+  // Pairs 10-22 m apart: the nearer stands ~2 m before the camera, the other
+  // far behind it and off to the side. A stand can fall outside the
+  // settlement or against its huts; only 24 pairs could all be rejected (a
   // WebGL 2 red with no attempt at all), hence the longer list.
   const pairs = await page.evaluate(() => {
     const at = (window.__speechScaleFigures ?? []).map((o) => {
@@ -790,17 +789,21 @@ if (section('speech-distance-scale')) {
         if (i !== j && d >= 10 && d <= 22) out.push({ near: i, far: j, d })
       }
     }
-    return out.sort((l, r) => r.d - l.d).slice(0, 96)
+    // Nearest to 13 m apart first: with the camera ~2 m before the near one,
+    // the far speaker then stands ~15 m off (point 1278).
+    return out.sort((l, r) => Math.abs(l.d - 13) - Math.abs(r.d - 13)).slice(0, 96)
   })
   // Where to stand: `back` before the near figure, `side` off the far figure's
   // line (either hand). Tried in order per pair, like speech-owner's
   // STAND_BACKS — one stand landing in a hut or behind a post is the next
   // stand's turn, not the pair's end.
+  // ~2 m from the near speaker (point 1278): a conversation's distance, where
+  // a note must read as plainly larger than one 15 m off.
   const STANDS = [
-    { back: 3.5, side: 2.5 },
-    { back: 3.5, side: -2.5 },
-    { back: 5, side: 3 },
-    { back: 5, side: -3 },
+    { back: 1.8, side: 0.9 },
+    { back: 1.8, side: -0.9 },
+    { back: 2.3, side: 1.2 },
+    { back: 2.3, side: -1.2 },
   ]
   /** Stand `back` before the near figure, on the far figure's line but `side`
    *  off it, and look between the two — live positions, the figures walk. */
@@ -825,6 +828,10 @@ if (section('speech-distance-scale')) {
         const x = pos[0].x - ux * back - uz * side
         const z = pos[0].z - uz * back + ux * side
         if (!insidePlace(layout, x, z, 1)) return null
+        // A stand the player can REACH: clear of every collider by his own
+        // radius, as the collision suite judges it — not inside a hut wall.
+        const cs = window.__placeColliders
+        if (cs && window.__clearanceTo && !cs.every((c) => window.__clearanceTo(c, x, z) - 0.35 > 0.02)) return null
         const dir = pos.map((q) => {
           const l = Math.hypot(q.x - x, q.z - z) || 1
           return { x: (q.x - x) / l, z: (q.z - z) / l }
@@ -925,25 +932,42 @@ if (section('speech-distance-scale')) {
         const bubble = el?.closest('.speech-bubble')
         const tailNode = bubble?.querySelector('.speech-tail')
         const tail = tailNode?.getBoundingClientRect()
-        const anchor = window.__speech?.anchorWorld(id)
+        const anchor = window.__speech?.tipWorld(id)
         const label = window.__speech?.labels().find((l) => l.speakerId === id)
         const pt = window.__speech?.anchorScreen(id)
         if (!el || !sizer || !tail || !anchor || !label || !pt || !cam) return null
         const box = sizer.getBoundingClientRect()
         // The DRAWN head top and feet on screen, off the head mesh (point 1276).
         const fig = window.__speech?.figureScreen(id)
-        const distance = Math.hypot(
-          anchor[0] - cam.position.x,
-          anchor[1] + label.height - cam.position.y,
-          anchor[2] - cam.position.z,
-        )
+        // From the camera's world place to the note's own tail tip, as the
+        // scene layer measures it.
+        const eye = cam.getWorldPosition(cam.position.clone())
+        const distance = Math.hypot(anchor[0] - eye.x, anchor[1] - eye.y, anchor[2] - eye.z)
+        const fit = {
+          width: sizer.offsetWidth,
+          height: sizer.offsetHeight,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        }
+        const drawn = bubble.getBoundingClientRect()
         return {
           distance: +distance.toFixed(2),
           width: +box.width.toFixed(1),
           height: +box.height.toFixed(1),
           layoutWidth: sizer.offsetWidth,
           set: Number(getComputedStyle(sizer).getPropertyValue('--speech-distance-scale')),
-          expected: +speechBubbleScale(distance).toFixed(3),
+          expected: +speechBubbleScale(distance, balance.communication.speechBubble, fit).toFixed(3),
+          // The drawn note's height (every transform in) against its
+          // speaker's projected height, feet to head top (point 1278).
+          bubbleH: +drawn.height.toFixed(1),
+          figH: fig?.headTop && fig?.feet ? +(fig.feet.y - fig.headTop.y).toFixed(1) : null,
+          // How tall the speaker stands in the world, feet to the tip's head
+          // top — a child is half a man, so the projection is compared per
+          // metre, not per figure.
+          figWorldH: (() => {
+            const feet = window.__speech?.anchorWorld(id)
+            return feet ? +(anchor[1] - feet[1]).toFixed(3) : null
+          })(),
           // The speech-owner tolerances: these figures walk between frames.
           tipOff: [+(tail.left + tail.width / 2 - pt.x).toFixed(1), +(tail.bottom - pt.y).toFixed(1)],
           onTip: Math.abs(tail.left + tail.width / 2 - pt.x) <= 0.5 * box.height && Math.abs(tail.bottom - pt.y) <= 0.35 * box.height,
@@ -980,6 +1004,8 @@ if (section('speech-distance-scale')) {
       // (PlaceLife), and its note over an empty hut proves nothing.
       near.tipToHead != null &&
       far.tipToHead != null &&
+      // A conversation's distance for the near one (point 1278).
+      near.distance <= 3.2 &&
       near.distance < far.distance &&
       near.width >= 1.25 * far.width &&
       tracks(near) &&
@@ -1107,6 +1133,34 @@ if (section('speech-distance-scale')) {
     shot
       ? `near ${shot.near.distance} m: tip ${shot.near.tipToHead} px over the head, ${shot.near.tipToHeadX} px aside (head ${shot.near.headWidth} px wide); far ${shot.far.distance} m: ${shot.far.tipToHead} px, ${shot.far.tipToHeadX} px aside (head ${shot.far.headWidth} px); band ${JSON.stringify(shot.near.tipBand)}`
       : 'no frame was staged',
+  )
+  // THE NOTE GROWS WITH ITS SPEAKER (point 1278), read off the rendered
+  // frame: the near note's drawn height against the far one's, beside the
+  // speakers' own projected heights. The figure grows ~1/d; the note must
+  // grow plainly too — at least 2.5x between ~2 m and ~15 m — and follow
+  // that growth part-way (exponent ln(note ratio)/ln(figure ratio) between
+  // 0.45 and 1), not shrink beside it as the old flat curve did.
+  const growth = (() => {
+    if (!shot) return null
+    const { near, far } = shot
+    if (!near.figH || !far.figH || !near.bubbleH || !far.bubbleH || !near.figWorldH || !far.figWorldH) return null
+    const note = near.bubbleH / far.bubbleH
+    // The projection's own growth: drawn pixels per world metre of speaker.
+    const perMetre = (n) => n.figH / n.figWorldH
+    const projection = perMetre(near) / perMetre(far)
+    return {
+      near: { d: near.distance, bubbleH: near.bubbleH, figH: near.figH, figWorldH: near.figWorldH },
+      far: { d: far.distance, bubbleH: far.bubbleH, figH: far.figH, figWorldH: far.figWorldH },
+      noteRatio: +note.toFixed(2),
+      projectionRatio: +projection.toFixed(2),
+      exponent: +(Math.log(note) / Math.log(projection)).toFixed(2),
+    }
+  })()
+  check(
+    'a near speaker’s note grows with its speaker: at ~2 m against ~15 m it is drawn at least 2.5x the far note’s height, following the speakers’ projected size part-way (point 1278)',
+    !!growth && growth.near.d <= 3.2 && growth.far.d >= 12 && growth.noteRatio >= 2.5 &&
+      growth.exponent >= 0.45 && growth.exponent <= 1,
+    growth ? JSON.stringify(growth) : 'no frame was staged',
   )
   // FRAME BY FRAME on a MOVING speaker (point 1276): a note placed after
   // drei had projected it trailed its speaker by one frame — invisible on a
