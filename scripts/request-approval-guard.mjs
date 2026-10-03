@@ -17,6 +17,16 @@
 // `transcript_path` (JSONL). A request deposit whose transcript cannot be read
 // is DENIED (loud); any other guard error ALLOWS with a stderr note.
 //
+// WHAT IS JUDGED is decided TEXTUALLY and fail-closed: any command whose words
+// (heredoc bodies and PowerShell here-strings excluded) mention `finding.mjs`
+// and the exact `--request` flag; every `--request` in it is a deposit needing
+// its own approval, and one without a readable title is denied. The guard keeps
+// a cooperative session from forgetting the rule; it is no shell parser and
+// does not try to win against an adversary.
+// ACCEPTED FALSE POSITIVE: a command that merely MENTIONS
+// `finding.mjs … --request` (echo, grep, a test name) is judged as well. The
+// way out is to rephrase the command.
+//
 // KNOWN GAP: a batch-owner session appending a point directly to TASKS.md from
 // a chat discussion is not covered; there the memory rule alone applies.
 //

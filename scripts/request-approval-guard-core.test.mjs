@@ -51,7 +51,8 @@ describe('non-request commands pass untouched', () => {
     'node scripts/finding.mjs --record "x" --detail "y"',
     'node scripts/finding.mjs --drain',
     'node scripts/finding.mjs --none "nothing"',
-    'grep -n -- --request scripts/finding.mjs',
+    'grep -n -- --requests scripts/finding.mjs',
+    'node scripts/other.mjs --request "x"',
     'npx vitest run scripts/finding-request-cli.test.mjs',
   ])('%s', (command) => {
     expect(requestOf(command)).toBe(null)
@@ -231,8 +232,8 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
 
   describe('4: a malformed transcript is unreadable, not headless', () => {
     let dir
-    const payload = (text) => {
-      const path = join(dir, 't.jsonl')
+    const payload = (text, name) => {
+      const path = join(dir, `${name}.jsonl`)
       writeFileSync(path, text, 'utf8')
       return { tool_name: 'Bash', tool_input: { command: deposit() }, transcript_path: path }
     }
@@ -244,14 +245,14 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
     it('the reader and the hook deny an all-malformed transcript, and allow a clean headless one', () => {
       dir = mkdtempSync(join(tmpdir(), 'hoa-rag-'))
       try {
-        const bad = payload('not json\n{also not}\n')
+        const bad = payload('not json\n{also not}\n', 'all-malformed')
         expect(readTranscript(bad.transcript_path)).toEqual({ entries: [], malformed: 2 })
         const denied = hookDecision(bad)
         expect(denied.hookSpecificOutput.permissionDecision).toBe('deny')
         expect(denied.hookSpecificOutput.permissionDecisionReason).toContain('transcript-unreadable')
-        expect(hookDecision(payload(`${JSON.stringify(said('working'))}\n`))).toBe(null)
+        expect(hookDecision(payload(`${JSON.stringify(said('working'))}\n`, 'headless'))).toBe(null)
         // malformed lines beside a readable human message: the ordinary rule judges
-        const mixed = payload(`garbage\n${[human('start'), said(TITLE), human('passt so')].map((e) => JSON.stringify(e)).join('\n')}\n`)
+        const mixed = payload(`garbage\n${[human('start'), said(TITLE), human('passt so')].map((e) => JSON.stringify(e)).join('\n')}\n`, 'mixed')
         mixed.tool_input.command = deposit('passt so')
         expect(hookDecision(mixed)).toBe(null)
         // the real process prints the deny for the all-malformed transcript
@@ -262,7 +263,9 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
           windowsHide: true,
         })
         expect(run.status).toBe(0)
-        expect(JSON.parse(run.stdout).hookSpecificOutput.permissionDecision).toBe('deny')
+        const out = JSON.parse(run.stdout).hookSpecificOutput
+        expect(out.permissionDecision).toBe('deny')
+        expect(out.permissionDecisionReason).toContain('transcript-unreadable')
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }
@@ -273,21 +276,56 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
     })
   })
 
-  it('5: counts node only in an executable position', () => {
-    expect(requestOf(`echo node scripts/finding.mjs --request "Example"`)).toBe(null)
-    expect(requestOf(`printf '%s' node scripts/finding.mjs --request "Example"`)).toBe(null)
-    for (const command of [
-      `FOO=1 node scripts/finding.mjs --request "Example"`,
-      `env FOO=1 node scripts/finding.mjs --request "Example"`,
-      `timeout 60 node scripts/finding.mjs --request "Example"`,
-      `npx node scripts/finding.mjs --request "Example"`,
-      `x=$(node scripts/finding.mjs --request "Example")`,
-      `bash -c 'node scripts/finding.mjs --request "Example"'`,
-      `ls | node scripts/finding.mjs --request "Example"`,
-      `{ node scripts/finding.mjs --request "Example"; }`,
-    ]) {
+  it('5 (superseded by the textual rule): a command that merely mentions a deposit is judged too', () => {
+    // Documented accepted false positive: rephrase the command to get past it.
+    for (const command of [`echo node scripts/finding.mjs --request "Example"`, `printf '%s' node scripts/finding.mjs --request "Example"`]) {
       expect(requestOf(command), command).toEqual({ title: 'Example', approved: '' })
+      expect(verdict(command, approvedChat).block, command).toBe(true)
     }
-    expect(requestOf(`pwsh -Command 'node .\\scripts\\finding.mjs --request "Example"'`)).toEqual({ title: 'Example', approved: '' })
+    expect(requestOf('grep -n -- --request scripts/finding.mjs')).toEqual({ title: 'scripts/finding.mjs', approved: '' })
   })
+})
+
+describe('confirming review findings (GPT-6 Astra, b9d21dd) — all caught by the textual rule', () => {
+  const approvedChat = [human('start'), said(TITLE), human('passt so')]
+  const caught = (command, shell = 'bash') => {
+    expect(requestOf(command, shell), command).toEqual({ title: TITLE, approved: '' })
+    expect(evaluate({ command, entries: approvedChat, shell }).block, command).toBe(true)
+  }
+  it('if/then', () => caught(`if true; then node scripts/finding.mjs --request "${TITLE}" --stdin; fi`))
+  it('env -u', () => caught(`env -u HOME node scripts/finding.mjs --request "${TITLE}" --stdin`))
+  it('bash -lc', () => caught(`bash -lc 'node scripts/finding.mjs --request "${TITLE}" --stdin'`))
+  it('multi-argument pwsh -Command', () =>
+    caught(`pwsh -NoProfile -Command node .\\scripts\\finding.mjs --request "${TITLE}" --stdin`, 'powershell'))
+  it('PowerShell backtick + CRLF continuation', () =>
+    caught(`node .\\scripts\\finding.mjs --request \`\r\n  "${TITLE}" --stdin`, 'powershell'))
+  it('node -e … -- finding.mjs --request is judged (fail closed, no longer a false positive to argue)', () =>
+    caught(`node -e "1" -- scripts/finding.mjs --request "${TITLE}"`))
+  it('chain and node -r stay caught', () => {
+    caught(`node -r fs scripts/finding.mjs --request "${TITLE}"`)
+    expect(requestsOf(`${deposit('passt so')} && node scripts/finding.mjs --request "Unapproved"`)).toHaveLength(2)
+  })
+  it('pairs each --approved with its own --request', () => {
+    const command = `node scripts/finding.mjs --request "${TITLE}" --approved "passt so"; node scripts/finding.mjs --request "Other"`
+    expect(requestsOf(command)).toEqual([
+      { title: TITLE, approved: 'passt so' },
+      { title: 'Other', approved: '' },
+    ])
+  })
+  it('denies a matched command whose --request has no readable title (fail closed)', () => {
+    for (const command of ['node scripts/finding.mjs --request', 'node scripts/finding.mjs --request --stdin', 'node scripts/finding.mjs --request ; ls']) {
+      expect(evaluate({ command, entries: approvedChat }), command).toMatchObject({ block: true, id: 'no-title' })
+    }
+    // a nested string whose flag yields no title is an untitled deposit
+    expect(requestsOf(`bash -c 'node scripts/finding.mjs --request'`)).toEqual([{ title: '', approved: '' }])
+  })
+  it('does not read a title that merely contains the flag as a second deposit', () => {
+    expect(requestsOf('node scripts/finding.mjs --request "Fix the --request parser" --approved "ok"')).toEqual([
+      { title: 'Fix the --request parser', approved: 'ok' },
+    ])
+  })
+  it('a title-less mention without finding.mjs is not judged', () => {
+    expect(requestsOf('node scripts/other.mjs --request')).toEqual([])
+  })
+
 })

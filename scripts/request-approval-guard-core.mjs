@@ -100,8 +100,13 @@ export function tokenize(text, shell = 'bash') {
       continue
     }
     if (c === escape && i + 1 < src.length) {
-      if (src[i + 1] !== '\n') word = (word ?? '') + src[i + 1]
-      i += 2
+      // escape + newline (LF or CRLF) is a line continuation
+      if (src.startsWith('\r\n', i + 1)) i += 3
+      else if (src[i + 1] === '\n') i += 2
+      else {
+        word = (word ?? '') + src[i + 1]
+        i += 2
+      }
       continue
     }
     if (!ps && src.startsWith('<<<', i)) {
@@ -138,81 +143,60 @@ export function tokenize(text, shell = 'bash') {
   return out
 }
 
-/** Split a token stream into simple commands (arrays of words). */
-export function segmentsOf(tokens) {
-  const segments = [[]]
-  for (const t of tokens) {
-    if (typeof t === 'string') segments[segments.length - 1].push(t)
-    else segments.push([])
-  }
-  return segments.filter((s) => s.length > 0)
-}
-
-const baseName = (word) => word.split(/[\\/]/).pop()
-const isNode = (word) => /^node(\.exe)?$/i.test(baseName(word))
-const isFindingScript = (word) => baseName(word) === 'finding.mjs'
-
-/** Prefix commands that run the word after them (their own options skipped). */
-const WRAPPERS = new Set(['env', 'sudo', 'time', 'nice', 'nohup', 'exec', 'command', 'npx', 'timeout', 'xargs', '{', '!', '$'])
-/** Shells whose `-c` / `-Command` string is itself a command line. */
-const SHELLS = new Map([
-  ['bash', 'bash'],
-  ['sh', 'bash'],
-  ['zsh', 'bash'],
-  ['pwsh', 'powershell'],
-  ['pwsh.exe', 'powershell'],
-  ['powershell', 'powershell'],
-  ['powershell.exe', 'powershell'],
-])
+/** The exact `--request` flag inside any text (`--requests` and `--request-x` excluded). */
+const REQUEST_FLAG_RE = /(^|[^\w-])--request(?![\w-])/g
+const MAX_NESTING = 3
 
 /**
- * The word index where a segment's real command starts: leading `VAR=value`
- * assignments and wrapper commands with their options are skipped. Only a
- * command in THIS position runs — `echo node …` merely prints.
+ * The deposits in a token stream: every exact `--request` word (or
+ * `--request=<value>`), with the next word as its title and the first
+ * `--approved` word after it (before the next `--request`) as its approval.
+ * A word that is not a title or approval value but still CONTAINS the flag —
+ * a `bash -lc '…'` or `pwsh -Command '…'` string — is tokenized again; any
+ * occurrence that yields no deposit there becomes an untitled one.
  */
-function commandStart(words) {
-  let k = 0
-  for (;;) {
-    while (k < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[k])) k++
-    if (k >= words.length || !WRAPPERS.has(baseName(words[k]).toLowerCase())) return k
-    const wrapper = baseName(words[k]).toLowerCase()
-    k++
-    while (k < words.length && words[k].startsWith('-')) k++
-    if (wrapper === 'timeout' && k < words.length && /^\d/.test(words[k])) k++
+function depositsIn(tokens, shell, depth) {
+  const found = []
+  const consumed = new Set()
+  const isWord = (k) => k < tokens.length && typeof tokens[k] === 'string'
+  const valueAt = (k) => (isWord(k) && !tokens[k].startsWith('--') ? (consumed.add(k), tokens[k]) : '')
+  for (let k = 0; k < tokens.length; k++) {
+    const word = tokens[k]
+    if (word === REQUEST_FLAG || (typeof word === 'string' && word.startsWith(`${REQUEST_FLAG}=`))) {
+      const title = word === REQUEST_FLAG ? valueAt(k + 1) : word.slice(REQUEST_FLAG.length + 1)
+      let approved = ''
+      for (let j = k + 1; j < tokens.length && tokens[j] !== REQUEST_FLAG; j++) {
+        if (tokens[j] === APPROVED_FLAG) {
+          approved = valueAt(j + 1)
+          break
+        }
+      }
+      found.push({ title, approved })
+    }
   }
+  tokens.forEach((word, k) => {
+    if (typeof word !== 'string' || consumed.has(k) || word === REQUEST_FLAG || word.startsWith(`${REQUEST_FLAG}=`)) return
+    const occurrences = (word.match(REQUEST_FLAG_RE) ?? []).length
+    if (occurrences === 0) return
+    const inner = depth < MAX_NESTING ? depositsIn(tokenize(word, shell), shell, depth + 1) : []
+    found.push(...inner)
+    for (let n = inner.length; n < occurrences; n++) found.push({ title: '', approved: '' })
+  })
+  return found
 }
 
 /**
- * Every finding.mjs request deposit in a command, in order. A deposit is a
- * segment whose command (after assignments and wrappers) is node, with a later
- * word path-ending in `finding.mjs` — wherever node's own options put it, so a
- * value-taking option such as `-r fs` cannot hide it (fail closed) — followed
- * by the exact `--request` flag (not `--requests`, `--show`, `--queued`,
- * `--blocked`, `--record`, `--drain`, `--none`). A `bash -c` / `pwsh -Command`
- * string is searched as a command line of its own. Each result is
- * `{ title, approved }`; either may be ''.
+ * Every finding.mjs request deposit in a command — a TEXTUAL, fail-closed rule.
+ * A command is judged when its words (heredoc bodies and PowerShell
+ * here-strings excluded) mention `finding.mjs` and the exact `--request` flag;
+ * each `--request` occurrence is then a deposit `{ title, approved }`, with ''
+ * where no value could be extracted. No attempt is made to decide whether the
+ * text would really execute: `echo …/finding.mjs --request x` is judged too.
  */
 export function requestsOf(command, shell = 'bash') {
-  const found = []
-  for (const words of segmentsOf(tokenize(command, shell))) {
-    const n = commandStart(words)
-    if (n >= words.length) continue
-    const head = baseName(words[n]).toLowerCase()
-    if (SHELLS.has(head)) {
-      const c = words.findIndex((w, k) => k > n && /^-(c|command)$/i.test(w))
-      if (c >= 0 && c + 1 < words.length) found.push(...requestsOf(words[c + 1], SHELLS.get(head)))
-      continue
-    }
-    if (!isNode(words[n])) continue
-    const s = words.findIndex((w, k) => k > n && isFindingScript(w))
-    if (s < 0) continue
-    const args = words.slice(s + 1)
-    const at = args.indexOf(REQUEST_FLAG)
-    if (at < 0) continue
-    const valueAfter = (k) => (k >= 0 && k + 1 < args.length && !args[k + 1].startsWith('--') ? args[k + 1] : '')
-    found.push({ title: valueAfter(at), approved: valueAfter(args.indexOf(APPROVED_FLAG)) })
-  }
-  return found
+  const tokens = tokenize(command, shell)
+  if (!tokens.some((t) => typeof t === 'string' && t.includes('finding.mjs'))) return []
+  return depositsIn(tokens, shell, 0)
 }
 
 /** The first request deposit in a command, or null (convenience for callers and tests). */
@@ -327,7 +311,9 @@ function judge(request, entries, malformed) {
     // Headless/launcher session: nobody to ask, nothing to violate.
     return ALLOW
   }
-  if (!title) return deny('no-title', 'the --request deposit carries no title.')
+  if (!title) {
+    return deny('no-title', 'a --request in this command carries no title that could be read, so no approval can be matched.')
+  }
   const quote = normalize(request.approved)
   if (!quote) return deny('no-approved', `the deposit "${title}" carries no --approved "<user words>".`)
   if (quote.replace(/\s/g, '').length < MIN_QUOTE_CHARS) {
