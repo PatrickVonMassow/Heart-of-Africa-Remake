@@ -264,15 +264,18 @@ interface BalanceConfig {
   settlementRoom: number
   /**
    * Walkable room, in metres, the settlement boundary keeps around every scene
-   * ground the player watches (children's quarter, bank stage, dig sites, water
-   * errand, loom, chief's hut) — `boundary.ts` grows the boundary per bearing
-   * until it holds; the layout does not move. CALIBRATABLE (work-order 1252):
-   * framing a ground of ~6 m radius at the reference viewport needs ~4 m past
-   * its rim. The edge band (`placeEdgeBand.widthM` 8, centred on the boundary)
+   * ground with a performer (children's quarter, bank stage, dig sites, water
+   * errand, loom, chief's hut, market, the fishers' fire and mortar, the fixed
+   * vignettes; `sceneGrounds.ts`) — `boundary.ts` grows the boundary per
+   * bearing until it holds; the layout does not move. CALIBRATABLE (work-order
+   * 1252, raised 1273): a ground of radius r fills the reference viewport's
+   * width (73.4 deg) from r / sin 36.7 deg, i.e. ~0.67 r past its rim; the
+   * widest ground (a bank stage, r 12) needs 8.07 m, the fishers' fire (~4 m)
+   * under 3. The edge band (`placeEdgeBand.widthM` 8, centred on the boundary)
    * reaches 4 m (+0.4 wander) inside, but its visible fall is only the last
    * ~1.4 m (measured in polish settlement-edge); inside that the ground reads
-   * as the village's own. 8 m thus leaves ~6 m before the visible edge and
-   * 3.6 m clear of the band's nominal extent. Toward the river the wade limit
+   * as the village's own. 8.5 m thus leaves ~7 m before the visible edge and
+   * 4.1 m clear of the band's nominal extent. Toward the river the wade limit
    * stays the edge.
    */
   observerMargin: number
@@ -1107,6 +1110,59 @@ interface BalanceConfig {
       beatDuration: number
       beatFrequency: number
     }
+    /** Grain pounding at the village mortar (`mortarPounding.ts`): the mortar's
+     *  shape, the pestle, the full-body stroke of the two women who pound it
+     *  alternately, the grain puff and the thud. Lengths in metres, at the
+     *  figure's own scale (a 1.34 m villager). */
+    mortar: {
+      /** How many women pound the one mortar: 1, or 2 striking alternately. */
+      pounders: 1 | 2
+      /** Seconds of ONE woman's stroke, impact to impact. */
+      strokeSeconds: number
+      /** Overall height of the mortar, rim included (waist-high to the figure). */
+      height: number
+      /** Outer radii: the flared foot, the narrow waist and the rim. */
+      footRadius: number
+      waistRadius: number
+      rimRadius: number
+      /** How far the hollowed bowl reaches down from the rim. */
+      bowlDepth: number
+      /** The grain's surface, this far below the rim. */
+      grainBelowRim: number
+      /** From the mortar's centre to where each woman stands. */
+      standOff: number
+      /** Sideways from the centre that each woman's pestle lands, so the two
+       *  shafts pass each other instead of meeting in the bowl. */
+      strikeOffset: number
+      /** The pestle: its length, its radius, and where it is gripped (measured
+       *  from its foot). */
+      pestleLength: number
+      pestleRadius: number
+      gripFromFoot: number
+      /** Half the gap between the two hands across the shaft. */
+      gripHalf: number
+      /** At impact the pestle foot goes this far below the grain's surface. */
+      impactDepth: number
+      /** At the top of the stroke the foot hangs this far above the rim. */
+      liftAboveRim: number
+      /** Lifted, the foot hangs this far toward her over the opening (none
+       *  in the bowl), so the raised shaft stands upright before her face. */
+      footDrift: number
+      /** The knee dip at impact: the body's height shrinks by this fraction. */
+      squatDepth: number
+      /** Forward lean of the trunk at impact and at the top (rad). */
+      leanImpact: number
+      leanTop: number
+      /** The grain puff: grains thrown, how long they fly (s), how fast (m/s). */
+      puffGrains: number
+      puffSeconds: number
+      puffSpeed: number
+      /** The thud: envelope peak, attack and length (s), lowpass corner (Hz). */
+      thudPeak: number
+      thudAttack: number
+      thudDuration: number
+      thudFrequency: number
+    }
     /** The body every inhabitant presents to every other (work-order 578). */
     separation: {
       /** Body radius of a figure drawn at scale 1; a child's is this times its
@@ -1346,7 +1402,7 @@ export const balance: BalanceConfig = {
   digRadius: 3,
   placeEnterRadius: 2.5,
   settlementRoom: 1.1,
-  observerMargin: 8, // calibratable (work-order 1252): room around a watched scene before the boundary
+  observerMargin: 8.5, // calibratable (work-order 1252/1273): room around a watched scene before the boundary
   // 0.6 → a 1.5-unit collider around the marker: it matches the drawn cluster
   // (the port's main house plus annex reaches ~1.3 units past the anchor, the
   // village huts ~1.45) and stays inside the river clearance every place keeps
@@ -2076,6 +2132,39 @@ export const balance: BalanceConfig = {
       beatAttack: 0.003,
       beatDuration: 0.085,
       beatFrequency: 1800,
+    },
+    // Calibratable starting values (educated guess, CLAUDE.md §2): an East and
+    // West African wooden mortar scaled to the 1.34 m figure — a 1.6 m woman's
+    // ~65 cm mortar and ~1.6 m pestle — and a stroke of about one per 1.5 s per
+    // woman, so a pair thuds roughly every 0.75 s.
+    mortar: {
+      pounders: 2, // calibratable
+      strokeSeconds: 1.5, // calibratable
+      height: 0.54, // calibratable
+      footRadius: 0.16, // calibratable
+      waistRadius: 0.085, // calibratable
+      rimRadius: 0.16, // calibratable
+      bowlDepth: 0.17, // calibratable
+      grainBelowRim: 0.07, // calibratable
+      standOff: 0.42, // calibratable
+      strikeOffset: 0.06, // calibratable
+      pestleLength: 1.3, // calibratable
+      pestleRadius: 0.032, // calibratable
+      gripFromFoot: 0.25, // calibratable
+      gripHalf: 0.05, // calibratable
+      impactDepth: 0.03, // calibratable
+      liftAboveRim: 0.18, // calibratable
+      footDrift: 0.12, // calibratable
+      squatDepth: 0.12, // calibratable
+      leanImpact: 0.04, // calibratable
+      leanTop: 0, // calibratable
+      puffGrains: 12, // calibratable
+      puffSeconds: 0.38, // calibratable
+      puffSpeed: 0.9, // calibratable
+      thudPeak: 1.1, // calibratable
+      thudAttack: 0.004, // calibratable
+      thudDuration: 0.14, // calibratable
+      thudFrequency: 260, // calibratable
     },
     // The body every inhabitant presents to every other (work-order 578).
     // Calibratable starting values (educated guess, CLAUDE.md §2), stated

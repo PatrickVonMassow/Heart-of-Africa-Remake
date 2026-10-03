@@ -1,7 +1,10 @@
 // THE ROOM TO WATCH A SCENE FROM (work-order 1252).
 //
 // Every scene ground a village plays — the children's quarter, the bank stage,
-// the dig sites, the water errand, the loom and the chief's hut — must keep
+// the dig sites, the water errand, the loom, the chief's hut and (work-order
+// 1273) every other ground with a performer: the fishers' grilling, smoking
+// and eating spot with the eater's mortar, the market hut, the pounder, the
+// drummer, the talkers, the well and the village fire — must keep
 // `balance.observerMargin` of walkable ground before the boundary, so stepping
 // aside to watch never leaves the village. The extents are measured here from
 // the layout's own fields, NOT from `layout.observed`, so a scene the layout
@@ -16,7 +19,11 @@ import { digFurnitureFootprints } from './digSiteAppearance'
 import { stationGround } from './loom'
 import { WALKER_RADIUS } from './collision'
 import { BANK_PLAY_LANE_HALF } from './riverBank'
-import type { PlaceLayout } from './layout'
+import { VILLAGE_FIRE, type PlaceLayout } from './layout'
+import { fisherySites } from './fishFire'
+import { canoeLane } from './villagerCanoe'
+import { fisheryGrounds } from './sceneGrounds'
+import { LOOM_SPOT, villageLifeFootprints } from './lifeSpots'
 import { setupGeodata } from '../../test/geodata'
 import { PLACES } from '../../world/geo'
 import { balance } from '../../config/balance'
@@ -31,8 +38,9 @@ const SAMPLES = 2048
 
 interface Part { what: string; x: number; z: number; r: number }
 
-/** Every scene ground's extent, from the layout's own fields. */
-function sceneParts(l: PlaceLayout): Part[] {
+/** Every scene ground's extent, from the layout's own fields (and, for the
+ *  fishers, from its bank, as `RiverFishery` derives them). */
+function sceneParts(l: PlaceLayout, placeId: string): Part[] {
   const parts: Part[] = []
   if (l.playGround) parts.push({ what: 'quarter', x: l.playGround.x, z: l.playGround.z, r: l.playGround.radius })
   if (l.playRocks) {
@@ -64,6 +72,30 @@ function sceneParts(l: PlaceLayout): Part[] {
     if (it.type !== 'chief') continue
     parts.push({ what: 'chief hut', x: it.pos[0], z: it.pos[1], r: 3.35 })
     if (it.door) parts.push({ what: 'chief door', x: it.door[0], z: it.door[1], r: WALKER_RADIUS })
+  }
+  for (const it of l.interactives) {
+    if (it.type !== 'market') continue
+    parts.push({ what: 'market hut', x: it.pos[0], z: it.pos[1], r: 2.9 })
+    if (it.door) parts.push({ what: 'market door', x: it.door[0], z: it.door[1], r: WALKER_RADIUS })
+  }
+  if (l.bank) {
+    const s = fisherySites(l.bank, canoeLane(l.bank))
+    parts.push({ what: 'fish fire', ...s.fire, r: 1 })
+    parts.push({ what: 'fish rack', ...s.rack, r: 0.7 })
+    for (const [what, p] of [['fish storage', s.storage], ['fish board', s.board], ['fish basket', s.fireBasket], ['eater mortar', s.eaterMortar], ['landing basket', s.basketSpot]] as const) {
+      parts.push({ what, ...p, r: 0.26 })
+    }
+    for (const [what, p] of [['fish carrier', s.carrierAtFire], ['fish griller', s.griller], ['fish eater at rack', s.eaterAtRack], ['fish eater home', s.eaterHome], ['carrier at landing', s.carrierAtBank]] as const) {
+      parts.push({ what, x: p.x, z: p.z, r: WALKER_RADIUS })
+    }
+  }
+  // The fixed vignettes: every prop AND every performer's body, as the layout's
+  // collision reserves them (`villageLifeFootprints`) — the cook, tender and
+  // carrier round the fire, the well's carrier, the pounder's and talkers'
+  // bodies. The loom's reservation is left out: the laid loom is above.
+  for (const f of villageLifeFootprints(VILLAGE_FIRE, placeId)) {
+    if (Math.hypot(f.x - LOOM_SPOT[0], f.z - LOOM_SPOT[1]) < 1) continue
+    parts.push({ what: `vignette (${f.x.toFixed(1)}, ${f.z.toFixed(1)})`, x: f.x, z: f.z, r: f.r })
   }
   return parts
 }
@@ -122,7 +154,7 @@ describe('every watched scene keeps an observer margin before the boundary', () 
   it.each(SEEDS)('seed %i: every village', (seed) => {
     for (const id of VILLAGES) {
       const l = sharedLayout(id, seed)
-      const { part, room } = tightest(l, sceneParts(l))
+      const { part, room } = tightest(l, sceneParts(l, id))
       expect(room, `${id}@${seed}: ${part.what} at (${part.x.toFixed(1)}, ${part.z.toFixed(1)})`).toBeGreaterThanOrEqual(margin - 0.02)
     }
   })
@@ -130,7 +162,7 @@ describe('every watched scene keeps an observer margin before the boundary', () 
   it.each(BAMBARA_SEEDS)('seed %i: the Bambara village, river lobe included', (seed) => {
     const l = sharedLayout('bambara-village', seed)
     expect(l.bank, 'the Bambara village stands on its river').not.toBeNull()
-    const { part, room } = tightest(l, sceneParts(l))
+    const { part, room } = tightest(l, sceneParts(l, 'bambara-village'))
     expect(room, `${part.what} at (${part.x.toFixed(1)}, ${part.z.toFixed(1)})`).toBeGreaterThanOrEqual(margin - 0.02)
   })
 
@@ -144,7 +176,39 @@ describe('every watched scene keeps an observer margin before the boundary', () 
   it('was short without the scene room — the reported shortfall', () => {
     const l = sharedLayout('bambara-village', 42)
     const plain = { radius: l.radius, bank: l.bank }
-    expect(tightest(plain, sceneParts(l)).room).toBeLessThan(margin / 2)
+    expect(tightest(plain, sceneParts(l, 'bambara-village')).room).toBeLessThan(margin / 2)
+  })
+
+  it('frames every scene ground with performers at the reference viewport inside the margin', () => {
+    // App.tsx's 50 deg vertical field at the verification's 1440x900: a ground
+    // fills the frame's width from r / sin(half the horizontal field).
+    const halfH = Math.atan(Math.tan((50 / 2) * Math.PI / 180) * (1440 / 900))
+    for (const id of VILLAGES) for (const seed of SEEDS) {
+      const l = sharedLayout(id, seed)
+      for (const g of l.observed) {
+        const back = g.r / Math.sin(halfH) - g.r
+        expect(back, `${id}@${seed}: ground at (${g.x.toFixed(1)}, ${g.z.toFixed(1)}) r ${g.r.toFixed(1)}`).toBeLessThanOrEqual(margin)
+      }
+    }
+  })
+
+  it('hands the boundary grounds that enclose every scene part, performers included', () => {
+    for (const id of VILLAGES) for (const seed of SEEDS) {
+      const l = sharedLayout(id, seed)
+      for (const part of sceneParts(l, id)) {
+        const held = l.observed.some((g) => Math.hypot(part.x - g.x, part.z - g.z) + part.r <= g.r + 1e-6)
+        expect(held, `${id}@${seed}: ${part.what} at (${part.x.toFixed(2)}, ${part.z.toFixed(2)}) r ${part.r}`).toBe(true)
+      }
+    }
+  })
+
+  it('hands the boundary the fishers\' grilling spot of every river village', () => {
+    for (const id of VILLAGES) {
+      const l = sharedLayout(id, 42)
+      if (!l.bank) continue
+      const [fire] = fisheryGrounds(fisherySites(l.bank, canoeLane(l.bank)))
+      expect(l.observed, id).toContainEqual(fire)
+    }
   })
 
   it('leaves ports and monuments on their plain boundary', () => {

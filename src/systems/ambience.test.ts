@@ -10,7 +10,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import {
   coastSurfGain,
   loomBeatPlan,
+  poundThudPlan,
   playLoomBeat,
+  playPoundThud,
   emitFootstep,
   emitDrumPhrase,
   playDrumMessage,
@@ -1473,4 +1475,107 @@ it('cuts scheduled speech for the complete drum interval and restores the voice 
   quietSpeechBus(gain as unknown as AudioParam, 10, 8, 0.7)
   expect(gain.cancelScheduledValues).toHaveBeenCalledWith(10)
   expect(gain.setValueAtTime.mock.calls).toEqual([[0, 10], [0.7, 18]])
+})
+
+describe('the mortar has a placed, dull thud', () => {
+  it('uses the called-voice falloff and the speech panning', () => {
+    const near = poundThudPlan(0, 0, 1)
+    for (const d of [1, 5, 15, balance.communication.call.reach]) {
+      expect(poundThudPlan(d, 0, 1).peak / near.peak).toBeCloseTo(hearingGain(d, balance.communication.call.reach, balance.communication.call.falloff))
+    }
+    expect(poundThudPlan(balance.communication.call.reach + 1, 0, 1).peak).toBe(0)
+    expect(poundThudPlan(0, Math.PI / 2).pan).toBe(speechPan(Math.PI / 2))
+  })
+
+  it('is low and short, unlike the reed, and respects the ambience mute', () => {
+    const plan = poundThudPlan(2, 0, 1)
+    expect(plan.attack).toBeLessThan(0.01)
+    expect(plan.duration).toBeLessThan(0.25)
+    expect(plan.frequency).toBeLessThan(loomBeatPlan(2, 0, 1).frequency / 4)
+    expect(poundThudPlan(2, 0, 0).peak).toBe(0)
+  })
+})
+
+describe('the pestle thud reaches the ambient bus through its placed route', () => {
+  let ctx: FakeCtx
+  const defaultVolume = balance.ambienceVolume
+  beforeAll(() => {
+    vi.useFakeTimers()
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = FakeCtx
+    startAmbience()
+    ctx = FakeCtx.last!
+  })
+  afterAll(() => { vi.useRealTimers(); balance.ambienceVolume = defaultVolume })
+
+  /** The ambient, footstep and speech buses are built one after another onto
+   *  the master (startAmbience); the ambient one is the first of that run. */
+  const ambientBus = () => {
+    const g = ctx.gains
+    const i = g.findIndex((n, k) => k + 2 < g.length && n.connected[0] && n.connected[0] === g[k + 1].connected[0] && n.connected[0] === g[k + 2].connected[0])
+    expect(i).toBeGreaterThanOrEqual(0)
+    return { ambient: g[i], speech: g[i + 2] }
+  }
+
+  it('schedules one lowpassed brown-noise source with its envelope, panned onto the ambient bus', () => {
+    ctx.currentTime = 700
+    balance.ambienceVolume = 1
+    const before = ctx.sources.length
+    const plan = poundThudPlan(6, -Math.PI / 3)
+    playPoundThud(6, -Math.PI / 3)
+    expect(ctx.sources.length - before).toBe(1)
+    const source = ctx.sources.at(-1)!
+    const filter = source.connected[0] as FakeFilter
+    const envelope = filter.connected[0] as FakeGain
+    const route = envelope.connected[0] as FakeGain
+    const panner = route.connected[0] as FakePanner
+    expect(source.startedAt).toBe(700)
+    expect(source.stoppedAt).toBeCloseTo(700 + plan.duration + 0.05)
+    expect(filter.type).toBe('lowpass')
+    expect(filter.frequency.value).toBe(plan.frequency)
+    expect(envelope.gain.events).toContainEqual({ type: 'lin', value: plan.peak, time: 700 + plan.attack })
+    expect(envelope.gain.events.at(-1)).toMatchObject({ value: 0.0001, time: 700 + plan.duration })
+    expect(panner.pan.value).toBe(plan.pan)
+    const { ambient, speech } = ambientBus()
+    expect(panner.connected[0]).toBe(ambient)
+    expect(panner.connected[0]).not.toBe(speech)
+    source.onended!()
+    expect(route.disconnectCalls).toBe(1)
+    expect(panner.disconnectCalls).toBe(1)
+  })
+
+  it('schedules nothing beyond reach or while muted', () => {
+    const before = [ctx.sources.length, ctx.panners.length]
+    playPoundThud(Infinity, 0)
+    balance.ambienceVolume = 0
+    playPoundThud(0, 0)
+    expect([ctx.sources.length, ctx.panners.length]).toEqual(before)
+  })
+
+  const thudProbe = () => (window as unknown as { __poundThud: { calls: number; scheduled: number; played: number; lastPeak: number } }).__poundThud
+
+  it('counts every dispatch in its dev probe and only the sounding ones as scheduled', () => {
+    const before = { ...thudProbe() }
+    balance.ambienceVolume = 1
+    playPoundThud(3, 0)
+    playPoundThud(Infinity, 0)
+    expect(thudProbe().calls - before.calls).toBe(2)
+    expect(thudProbe().scheduled - before.scheduled).toBe(1)
+    expect(thudProbe().played - before.played).toBe(1)
+    expect(thudProbe().lastPeak).toBeCloseTo(poundThudPlan(3, 0, 1).peak)
+  })
+
+  it('does not count a thud scheduled on a SUSPENDED context as played', () => {
+    balance.ambienceVolume = 1
+    const was = ctx.state
+    ctx.state = 'suspended'
+    try {
+      const before = { ...thudProbe() }
+      playPoundThud(3, 0)
+      expect(thudProbe().calls - before.calls).toBe(1)
+      expect(thudProbe().scheduled - before.scheduled).toBe(1)
+      expect(thudProbe().played - before.played).toBe(0)
+    } finally {
+      ctx.state = was
+    }
+  })
 })

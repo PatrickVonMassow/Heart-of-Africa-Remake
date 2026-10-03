@@ -2,6 +2,7 @@
 // between PlaceLife (rendering) and the layout builder (colliders and
 // keep-clear zones in layout.ts).
 
+import { balance } from '../../config/balance'
 import { WALKER_RADIUS } from './collision'
 import { mulberry32 } from '../../world/noise'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
@@ -137,7 +138,10 @@ export function villageLifeFootprints(fire: readonly [number, number], placeId: 
   return [
     ...villageLifeProps(fire, placeId),
     weaverStance(),
-    inwardStationBody(VILLAGE_SPOTS.pounder, -0.55),
+    // The women pounding (point 1274), where the renderer stands them: the first
+    // on the outer side of the mortar, the second across it on the village side.
+    inwardStationBody(VILLAGE_SPOTS.pounder, -balance.villageLife.mortar.standOff),
+    ...(balance.villageLife.mortar.pounders > 1 ? [inwardStationBody(VILLAGE_SPOTS.pounder, balance.villageLife.mortar.standOff)] : []),
     ...[-0.5, 0.5].map(dx => ({ x: VILLAGE_SPOTS.talkers[0] + dx, z: VILLAGE_SPOTS.talkers[1], r: WALKER_RADIUS })),
     { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: WALKER_RADIUS },
     ...(villageHasWell(placeId)

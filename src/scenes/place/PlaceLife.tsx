@@ -123,10 +123,11 @@ import {
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { speechBearing } from './speechBearing'
+import { bowlRadiusAt, grainLevel, impactsBetween, mortarProfile, poundFrame, poundPhase, puffGrain, sinceImpact } from './mortarPounding'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { conceptSpeech, cryPlan, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
-import { playLoomBeat, playSpeech, playTagCry } from '../../systems/ambience'
+import { playLoomBeat, playPoundThud, playSpeech, playTagCry } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
@@ -1955,45 +1956,215 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   )
 }
 
-/** Grain pounding: mortar and a rising, falling pestle (period staple). */
-function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+/** The pestle's turned profile from its foot: a rounded, heavier foot, a
+ *  slimmer grip and a flared head, so it reads as a carved pestle and not a
+ *  stick. */
+function pestleProfile(length: number, r: number): THREE.Vector2[] {
+  return [
+    [0.0001, 0], [r * 0.9, 0.012], [r * 1.25, 0.06], [r * 1.25, 0.2], [r * 0.85, 0.42],
+    [r * 0.85, length - 0.38], [r * 1.12, length - 0.12], [r * 0.85, length - 0.01], [0.0001, length],
+  ].map(([x, y]) => new THREE.Vector2(x, y))
+}
+
+const UP = new THREE.Vector3(0, 1, 0)
+/** The most women `villageLife.mortar.pounders` can put at one mortar. */
+const MAX_POUNDERS = 2
+
+/** Dev/verify probe of the pounding (read by the place verification). */
+export interface PoundingProbe {
+  /** The mortar's centre on the ground, and the rim's height above it. */
+  mortar: { x: number; y: number; z: number; rim: number }
+  /** Per woman: her stroke phase, her pestle foot (world), whether her grain
+   *  puff is in the air, and how many impacts she has made. */
+  women: Array<{ phase: number; foot: { x: number; y: number; z: number }; puff: boolean; impacts: number }>
+  /** Thuds actually handed to the audio this visit. */
+  thuds: number
+  /** Impacts that were handed to a thud in the frame they happened — equal to
+   *  the women's impacts summed when every strike is heard. */
+  heard: number
+}
+
+/**
+ * Grain pounding (design.md §19), work-order point 1274: a footed, hollowed
+ * wooden mortar with grain in its bowl, and two women who pound it ALTERNATELY
+ * with long pestles held in both hands — lifted high, driven down with the
+ * knees giving, the foot landing in the grain with a puff and a thud. The
+ * whole stroke is solved in `mortarPounding.ts`; this only draws it.
+ */
+function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string[] }) {
   const groundHeight = usePlaceGround()
-  // A body the passers-by go round (point 578).
-  useStandingBody(x, z)
-  const pestle = useRef<THREE.Mesh>(null)
-  const body = useRef<THREE.Group>(null)
-  // Both hands on the pestle (point 479): the arms ride the stroke, so the grip
-  // rises with the shaft instead of hanging beside a tool that lifts itself.
-  const pose = useRef<FigurePose | null>({ left: armAim(0.2, 0.5), right: armAim(-0.2, 0.5), lean: 0.1, turn: 0 })
+  const camera = useThree((state) => state.camera)
+  const cfg = balance.villageLife.mortar
+  const count = Math.min(MAX_POUNDERS, Math.max(1, cfg.pounders))
+  const yaw = Math.atan2(-x, -z)
+  const gy = groundHeight(x, z)
+  // Woman 0 stands on the outer side facing in (her old place), woman 1 across
+  // the mortar facing out — each `standOff` from its centre.
+  const stands = useMemo(() => [-1, 1].slice(0, count).map((side) => ({
+    x: x + Math.sin(yaw) * side * cfg.standOff,
+    z: z + Math.cos(yaw) * side * cfg.standOff,
+  })), [x, z, yaw, count, cfg.standOff])
+  // Bodies the passers-by go round (point 578).
+  useStandingBodies(stands)
+  // Rebuilt whenever a shape tunable changes (the profile reads all of them).
+  const { height, footRadius, waistRadius, rimRadius, bowlDepth } = cfg
+  const mortarGeometry = useMemo(
+    () => new THREE.LatheGeometry(
+      mortarProfile({ ...balance.villageLife.mortar, height, footRadius, waistRadius, rimRadius, bowlDepth }).map(([r, y]) => new THREE.Vector2(r, y)),
+      TESSELLATION.mortar,
+    ),
+    [height, footRadius, waistRadius, rimRadius, bowlDepth],
+  )
+  const pestleGeometry = useMemo(
+    () => new THREE.LatheGeometry(pestleProfile(cfg.pestleLength, cfg.pestleRadius), TESSELLATION.pestle),
+    [cfg.pestleLength, cfg.pestleRadius],
+  )
+  useEffect(() => () => { mortarGeometry.dispose(); pestleGeometry.dispose() }, [mortarGeometry, pestleGeometry])
+  const grainRadius = bowlRadiusAt(grainLevel())
+  // Per-woman state is sized for EVERY slot `pounders` allows, so a change of
+  // the count between renders can never index past it.
+  const poses = useRef(Array.from({ length: MAX_POUNDERS }, () => ({ current: { ...poundFrame(0).pose } as FigurePose | null })))
+  const squats = useRef(Array.from({ length: MAX_POUNDERS }, () => ({ current: 1 })))
+  const figures = useRef<Array<THREE.Group | null>>([])
+  const pestles = useRef<Array<THREE.Mesh | null>>([])
+  const grains = useRef<Array<Array<THREE.Mesh | null>>>(Array.from({ length: MAX_POUNDERS }, () => []))
+  const chaff = useRef<Array<THREE.Mesh | null>>([])
+  const last = useRef<number | null>(null)
+  const impacts = useRef(Array.from({ length: MAX_POUNDERS }, () => 0))
+  const thuds = useRef(0)
+  const heard = useRef(0)
+  const axis = useMemo(() => new THREE.Vector3(), [])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as { __placePounding?: () => PoundingProbe }
+    w.__placePounding = () => {
+      const t = last.current ?? 0
+      return {
+        mortar: { x, y: gy, z, rim: cfg.height },
+        women: Array.from({ length: count }, (_, i) => {
+          const phase = poundPhase(t, i)
+          const f = poundFrame(phase).foot
+          // Her frame: woman 0 faces +yaw from the outer side, woman 1 the other way.
+          const side = i === 0 ? -1 : 1
+          const facing = i === 0 ? yaw : yaw + Math.PI
+          const s = Math.sin(facing)
+          const c = Math.cos(facing)
+          const ox = x + Math.sin(yaw) * side * cfg.standOff
+          const oz = z + Math.cos(yaw) * side * cfg.standOff
+          return {
+            phase,
+            foot: { x: ox + f[0] * c + f[2] * s, y: gy + f[1], z: oz - f[0] * s + f[2] * c },
+            puff: sinceImpact(t, i) < cfg.puffSeconds,
+            impacts: impacts.current[i],
+          }
+        }),
+        thuds: thuds.current,
+        heard: heard.current,
+      }
+    }
+    return () => {
+      delete w.__placePounding
+    }
+  }, [x, z, gy, yaw, count, cfg])
+
   useFrame(({ clock }) => {
     if (import.meta.env.DEV && lifeFrozen) return
     const t = clock.elapsedTime
-    const stroke = Math.abs(Math.sin(t * 2.4))
-    if (pestle.current) pestle.current.position.y = 1.05 + stroke * 0.38
-    if (body.current) body.current.position.y = -stroke * 0.06
-    const p = pose.current
-    if (p) {
-      const elevation = 0.35 + stroke * 0.55
-      Object.assign(p.left, armAim(0.2, elevation))
-      Object.assign(p.right, armAim(-0.2, elevation))
-      p.lean = 0.14 - stroke * 0.08
+    const previous = last.current ?? t
+    last.current = t
+    let struckNow = 0
+    for (let i = 0; i < count; i++) {
+      const frame = poundFrame(poundPhase(t, i))
+      const pose = poses.current[i].current
+      if (pose) {
+        Object.assign(pose.left, frame.pose.left)
+        Object.assign(pose.right, frame.pose.right)
+        pose.lean = frame.pose.lean
+        pose.turn = 0
+      }
+      squats.current[i].current = frame.squat
+      figures.current[i]?.scale.set(1, frame.squat, 1)
+      const pestle = pestles.current[i]
+      if (pestle) {
+        pestle.position.set(frame.foot[0], frame.foot[1], frame.foot[2])
+        pestle.quaternion.setFromUnitVectors(UP, axis.set(frame.axis[0], frame.axis[1], frame.axis[2]))
+      }
+      const since = sinceImpact(t, i)
+      grains.current[i].forEach((g, k) => {
+        if (!g) return
+        const puff = puffGrain(k, since)
+        g.visible = puff.visible
+        if (puff.visible) g.position.set(cfg.strikeOffset + puff.offset[0], grainLevel() + puff.offset[1], cfg.standOff + puff.offset[2])
+      })
+      const cloud = chaff.current[i]
+      if (cloud) {
+        const u = since / cfg.puffSeconds
+        cloud.visible = u < 1
+        if (u < 1) {
+          cloud.scale.setScalar(0.6 + 2 * u)
+          ;(cloud.material as THREE.MeshStandardMaterial).opacity = 0.6 * (1 - u)
+        }
+      }
+      const struck = impactsBetween(previous, t, i)
+      if (struck > 0) {
+        impacts.current[i] += struck
+        struckNow += struck
+      }
+    }
+    if (struckNow > 0) {
+      thuds.current++
+      heard.current += struckNow
+      const at = { x, z }
+      const distance = placePlayerPosition.active
+        ? Math.hypot(at.x - placePlayerPosition.x, at.z - placePlayerPosition.z)
+        : Infinity
+      playPoundThud(distance, speechBearing(camera, at))
     }
   })
+
   return (
-    <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.atan2(-x, -z), 0]}>
-      <group ref={body} position={[0, 0, -0.55]}>
-        <Figure cloth={cloth} pose={pose} />
-      </group>
-      {/* Mortar */}
-      <mesh position={[0, 0.21, 0]} castShadow>
-        <cylinderGeometry args={[0.2, 0.26, 0.42, TESSELLATION.mortar]} />
-        <meshStandardMaterial color="#5f4526" roughness={0.95} />
+    <group position={[x, gy, z]} rotation={[0, yaw, 0]}>
+      {/* The mortar: one carved block, footed and waisted, hollowed at the top. */}
+      <mesh geometry={mortarGeometry} castShadow receiveShadow>
+        <meshStandardMaterial color="#6a4526" roughness={0.92} />
       </mesh>
-      {/* Pestle */}
-      <mesh ref={pestle} position={[0, 1.05, 0]} castShadow>
-        <cylinderGeometry args={[0.045, 0.055, 1.05, TESSELLATION.pestle]} />
-        <meshStandardMaterial color="#7a5a32" roughness={0.9} />
+      {/* Two carved bands, darker where the wood is worn by hands. */}
+      {[0.16, 0.86].map((f) => (
+        <mesh key={f} position={[0, cfg.height * f, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[f < 0.5 ? cfg.footRadius * 0.84 : cfg.rimRadius * 0.96, 0.009, 4, TESSELLATION.mortar]} />
+          <meshStandardMaterial color="#3f2914" roughness={0.95} />
+        </mesh>
+      ))}
+      {/* Grain heaped in the bowl (millet / sorghum). */}
+      <mesh position={[0, grainLevel(), 0]} scale={[1, 0.28, 1]}>
+        <sphereGeometry args={[grainRadius, TESSELLATION.mortar, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#d9bf6e" roughness={1} />
       </mesh>
+      {stands.map((_, i) => (
+        // Each woman's own frame: at her stand, facing the mortar.
+        <group key={i} name={`village-pounder-${i}`} position={[0, 0, i === 0 ? -cfg.standOff : cfg.standOff]} rotation={[0, i === 0 ? 0 : Math.PI, 0]}>
+          <group ref={(el) => { figures.current[i] = el }}>
+            <Figure cloth={cloth[i % cloth.length]} pose={poses.current[i]} squat={squats.current[i]} legs />
+          </group>
+          {/* Her pestle, its foot in the mortar (her frame: +z is forward). */}
+          <group>
+            <mesh name={`village-pestle-${i}`} ref={(el) => { pestles.current[i] = el }} geometry={pestleGeometry} castShadow>
+              <meshStandardMaterial color="#8a6438" roughness={0.85} />
+            </mesh>
+            {Array.from({ length: cfg.puffGrains }, (_, k) => (
+              <mesh key={k} ref={(el) => { grains.current[i][k] = el }} visible={false}>
+                <sphereGeometry args={[0.022, 5, 4]} />
+                <meshStandardMaterial color="#e2cc84" roughness={1} />
+              </mesh>
+            ))}
+            <mesh ref={(el) => { chaff.current[i] = el }} position={[cfg.strikeOffset, grainLevel() + 0.05, cfg.standOff]} visible={false}>
+              <sphereGeometry args={[0.08, 8, 6]} />
+              <meshStandardMaterial color="#e8dcb0" roughness={1} transparent opacity={0.4} depthWrite={false} />
+            </mesh>
+          </group>
+        </group>
+      ))}
     </group>
   )
 }
@@ -4024,7 +4195,7 @@ export function PlaceLife({
           {/* Inhabitant/prop interactions (design.md §19). */}
           <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
           <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
-          <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={style.cloth[0]} />
+          <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={[style.cloth[0], style.cloth[3 % style.cloth.length]]} />
           <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
           {hasWell && <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />}
           {homes.length > 0 && (

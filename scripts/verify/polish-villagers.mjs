@@ -1,6 +1,6 @@
 // Headless polish verification, theme polish-villagers: the adults of a village:
 // gestures, the canoe and its fishermen, the mute shore scene, no wedged adult, the
-// well, the stations, the loom and the errands (design.md §19.10).
+// well, the stations, the loom, the errands and the mortar (design.md §19.10).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { waitForSceneBuilt, assertBackend } from './_browser.mjs'
@@ -9,7 +9,7 @@ import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } fr
 import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
-import { BASE, section, check, page, frame, nextFrames, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
@@ -3334,6 +3334,276 @@ if (section('adult-errands')) {
   }
   }
 
+}
+
+// GRAIN POUNDING READS AS GRAIN POUNDING (work-order 1274). The stroke itself —
+// foot below the rim at impact, the alternation, hands and shafts apart — is
+// pinned in src/scenes/place/mortarPounding.test.ts; what needs the browser is
+// the PICTURE: from close by and from mid-distance, side-on to the pair, one
+// woman's pestle down in the grain with its puff while the other's is lifted
+// high. Life is frozen just after an impact so the shutter holds that instant.
+if (section('village-pounding')) {
+  // The freeze is what ties every reading below to the picture, so a missing
+  // hook is a red, never a silent no-op.
+  const hasFreeze = await page.evaluate(() => typeof window.__placeFreezeLife === 'function')
+  check('the place exposes its life freeze for the pounding shots', hasFreeze)
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife(v), on)
+  await goToPlace('bambara-village')
+  const ready = await stepUntil(() => !!window.__placePounding, null, 240)
+  check('the village mortar publishes its pounding', ready)
+  if (ready && hasFreeze) {
+    // Both women strike, and EVERY impact is handed to a thud in its own frame.
+    // The thud is observed where the AUDIO module receives and schedules it
+    // (`__poundThud`), never by the vignette's own counters alone: deleting the
+    // audio call must turn this red. The audio graph is started and the player
+    // stands within the thud's reach so every dispatch really sounds.
+    // A SUSPENDED context accepts every node and sounds nothing, so the start
+    // is awaited to 'running' and the state is read again after the window.
+    await page.evaluate(() => {
+      window.__ambience.start()
+      void window.__ambience.context()?.resume()
+    })
+    await page.waitForFunction(() => window.__ambience.context()?.state === 'running', null, { timeout: 3000 }).catch(() => {})
+    const audio = await page.evaluate(() => {
+      const ac = window.__ambience.context()
+      const m = window.__placePounding().mortar
+      const p = window.__placePlayer
+      const reach = window.__balance.communication.call.reach
+      return { state: ac?.state ?? null, distance: +Math.hypot(p.x - m.x, p.z - m.z).toFixed(1), reach }
+    })
+    check('the audio context is running before the thuds are observed', audio.state === 'running', JSON.stringify(audio))
+    const read = () => page.evaluate(() => ({ pounding: window.__placePounding(), thud: window.__ambience.thudProbe(), state: window.__ambience.context()?.state ?? null }))
+    const before = await read()
+    const heardThree = await stepUntil((n) => window.__placePounding().thuds >= n + 3, before.pounding.thuds, 600)
+    const after = await read()
+    const struck = after.pounding.women.reduce((sum, w, i) => sum + w.impacts - before.pounding.women[i].impacts, 0)
+    const thuds = after.pounding.thuds - before.pounding.thuds
+    const calls = after.thud.calls - before.thud.calls
+    const scheduled = after.thud.scheduled - before.thud.scheduled
+    const played = after.thud.played - before.thud.played
+    check('both women strike the mortar and every strike is heard',
+      heardThree && after.pounding.women.length === 2 && after.pounding.women.every((w, i) => w.impacts > before.pounding.women[i].impacts) &&
+        after.pounding.heard - before.pounding.heard === struck && thuds >= Math.ceil(struck / 2),
+      JSON.stringify({ heardThree, struck, heard: after.pounding.heard - before.pounding.heard, thuds }))
+    check('every thud reaches the audio module and plays there with a level, the context running throughout',
+      audio.state === 'running' && before.state === 'running' && after.state === 'running' && audio.distance < audio.reach &&
+        thuds > 0 && calls === thuds && scheduled === calls && played === calls && after.thud.lastPeak > 0,
+      JSON.stringify({ audio, states: [before.state, after.state], thuds, calls, scheduled, played, lastPeak: after.thud.lastPeak }))
+    // A stand at most this far off square to the pair still shows them side by side.
+    const MAX_OFF_SQUARE = 30
+    const shots = [
+      { name: '1274-village-pounding-close', stand: [2.6, 3.2, 2.2, 3.8], label: 'two women pounding grain at a footed wooden mortar, side-on from close range (2.2-3.8 m): one pestle down in the grain with a puff, the other lifted high' },
+      { name: '1274-village-pounding-mid', stand: [8, 7, 9.5, 6], label: 'the same mortar pounding from mid-distance (6-9.5 m) across the village ground, side-on: two women, one pestle down, one lifted' },
+    ]
+    const sameProbe = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+    for (const shot of shots) {
+      // A walker passing the pair can block every side-on stand for a moment;
+      // then the village thaws, he moves on, and the next impact is tried.
+      // A free villager pauses 3-9 s where her stroll ends, so the thaw between
+      // searches is long enough for one such pause to run out.
+      const SEARCHES = 6
+      const THAW_FRAMES = 180
+      const refused = []
+      for (let attempt = 1; attempt <= SEARCHES; attempt++) {
+      // Every retry first lets the thawed village run on, so the obstruction
+      // that refused the last search can move away (a `continue` below must
+      // not skip this, so it stands at the top of the attempt).
+      if (attempt > 1) await nextFrames(THAW_FRAMES)
+      // Just past woman 0's impact: her foot still in the grain, the puff up.
+      const caught = await stepUntil(() => {
+        const w = window.__placePounding().women[0]
+        return w.phase > 0.005 && w.phase < 0.1
+      }, null, 900)
+      if (!caught) {
+        check(`${shot.name}: the shutter catches an impact`, false)
+        break
+      }
+      await freezeLife(true)
+      let retry = false
+      try {
+        const staged = await page.evaluate(({ standOffs, maxOff }) => {
+          const probe = window.__placePounding()
+          const layout = window.__placeLayout
+          const m = probe.mortar
+          const p = window.__placePlayer
+          // The pair stands on the line through the village centre; side-on is
+          // square to it. Anything near the mortar is the vignette itself.
+          const along = Math.atan2(-m.x, -m.z)
+          const others = layout.colliders.filter((c) => !(Math.hypot((c.x ?? 1e9) - m.x, (c.z ?? 1e9) - m.z) < 1.2))
+          const clear = (x, z) => Math.min(...others.map((c) => window.__clearanceTo(c, x, z)))
+          // Every OTHER drawn person (life is frozen): none may stand between
+          // the lens and the pair, or the picture is of a bystander.
+          // The pair is known by name, not by distance: a passer-by halted at
+          // the mortar's elbow is a bystander too.
+          const people = []
+          const ofPair = (o) => { for (let a = o; a; a = a.parent) if (/^village-pounder-\d$/.test(a.name)) return true; return false }
+          window.__placeScene.traverse((o) => {
+            if (o.name !== 'figure-head' || ofPair(o)) return
+            const v = o.getWorldPosition(new o.position.constructor())
+            people.push({ x: v.x, z: v.z })
+          })
+          const blocked = (x, z) => people.some((q) => {
+            const ax = m.x - x
+            const az = m.z - z
+            const bx = q.x - x
+            const bz = q.z - z
+            const reach = Math.hypot(ax, az)
+            // In FRONT of the pair (nearer the lens than the mortar's near
+            // woman) and within a body and a half of the sight line.
+            const ahead = (ax * bx + az * bz) / reach
+            const aside = Math.abs(ax * bz - az * bx) / reach
+            // Nor anyone at the lens' elbow, who fills a third of a close frame.
+            return (ahead > 0.3 && ahead < reach - 0.5 && aside < 0.8) || Math.hypot(bx, bz) < 1.5
+          })
+          const step = Math.PI / 24
+          const why = []
+          // The nominal distance first, then nearer and farther ones, each
+          // through the whole bound before the next.
+          for (const standOff of standOffs) for (let k = 0; Math.floor(k / 2) * step <= (maxOff * Math.PI) / 180; k++) {
+            const angle = along + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * step)
+            const x = m.x + Math.sin(angle) * standOff
+            const z = m.z + Math.cos(angle) * standOff
+            if (Math.hypot(x, z) > layout.radius - 0.5) { why.push(`${standOff}/${k}:outside`); continue }
+            if (clear(x, z) < 0.35) { why.push(`${standOff}/${k}:stand ${clear(x, z).toFixed(2)}`); continue }
+            let open = true
+            for (let s = 1; s <= 12; s++) {
+              const t = s / 12
+              if (clear(x + (m.x - x) * t, z + (m.z - z) * t) < 0.1) open = false
+            }
+            if (!open) { why.push(`${standOff}/${k}:sightline`); continue }
+            if (blocked(x, z)) {
+              const near = people.map((q) => Math.hypot(q.x - x, q.z - z)).sort((a, b) => a - b)[0]
+              why.push(`${standOff}/${k}:person (nearest ${near.toFixed(2)} m)`)
+              continue
+            }
+            p.x = x
+            p.z = z
+            p.yaw = Math.atan2(m.x - x, m.z - z) + Math.PI
+            p.pitch = standOff < 5 ? -0.18 : -0.08
+            return { probe, offSquare: +((Math.floor(k / 2) * step * 180) / Math.PI).toFixed(1), stand: { x: +x.toFixed(2), z: +z.toFixed(2), at: standOff }, people: people.length }
+          }
+          return { probe, stand: null, people: people.length, why }
+        }, { standOffs: shot.stand, maxOff: MAX_OFF_SQUARE })
+        if (!staged.stand && attempt < SEARCHES) {
+          refused.push(`${attempt}: ${staged.why.join(', ')}`)
+          retry = true
+          continue
+        }
+        check(`${shot.name}: a side-on stand on open ground frames the pair (at most ${MAX_OFF_SQUARE}° off square)`,
+          !!staged.stand && staged.offSquare <= MAX_OFF_SQUARE,
+          JSON.stringify({ stand: staged.stand, offSquare: staged.offSquare, refused }))
+        if (!staged.stand) break
+        await nextFrames(3)
+        // THE POSE AT THE SHUTTER: re-read after the settling frames. It must be
+        // the staged one — that is the proof the freeze held.
+        const atShutter = await page.evaluate((close) => {
+          const probe = window.__placePounding()
+          const cam = window.__placeCamera
+          const V = cam.position.constructor
+          const scene = window.__placeScene
+          const px = (v) => {
+            const q = v.clone().project(cam)
+            return { x: ((q.x + 1) / 2) * window.innerWidth, y: ((1 - q.y) / 2) * window.innerHeight, inFrame: q.z < 1 && Math.abs(q.x) < 0.98 && Math.abs(q.y) < 0.98 }
+          }
+          const heads = [0, 1].map((i) => {
+            let head = null
+            scene.getObjectByName(`village-pounder-${i}`)?.traverse((o) => { if (o.name === 'figure-head') head = o })
+            if (!head) return null
+            const c = head.getWorldPosition(new V())
+            const edge = px(c.clone().add(new V(0, 0.16, 0)))
+            const mid = px(c)
+            return { ...mid, r: Math.abs(edge.y - mid.y) }
+          })
+          // SCREEN SILHOUETTES: each pounder's drawn body and every other drawn
+          // person as a projected box. A bystander behind or beside a woman whose
+          // box overlaps hers merges with her into one two-headed figure. Only a
+          // body drawn at least half her height can: a far villager a few pixels
+          // tall in the background reads as distance, not as a second head.
+          const screenBox = (obj) => {
+            obj.updateWorldMatrix(true, true)
+            let lo = null
+            let hi = null
+            obj.traverse((o) => {
+              if (!o.isMesh || !o.visible) return
+              if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+              const b = o.geometry.boundingBox
+              for (let c = 0; c < 8; c++) {
+                const w = new V(c & 1 ? b.max.x : b.min.x, c & 2 ? b.max.y : b.min.y, c & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld)
+                const q = px(w)
+                lo = lo ? { x: Math.min(lo.x, q.x), y: Math.min(lo.y, q.y) } : { x: q.x, y: q.y }
+                hi = hi ? { x: Math.max(hi.x, q.x), y: Math.max(hi.y, q.y) } : { x: q.x, y: q.y }
+              }
+            })
+            return lo && { x0: Math.round(lo.x), y0: Math.round(lo.y), x1: Math.round(hi.x), y1: Math.round(hi.y) }
+          }
+          const pair = [0, 1].map((i) => scene.getObjectByName(`village-pounder-${i}`))
+          const pairBoxes = pair.map((g) => g && screenBox(g))
+          const overlaps = []
+          scene.traverse((o) => {
+            if (o.name !== 'inhabitant' || !o.visible) return
+            let inPair = false
+            for (let a = o.parent; a; a = a.parent) if (pair.includes(a)) inPair = true
+            if (inPair) return
+            const head = o.getObjectByName('figure-head')
+            if (!head || head.getWorldPosition(new V()).clone().project(cam).z >= 1) return
+            const b = screenBox(o)
+            if (!b) return
+            // In the CLOSE frame, nor a body nearer the lens than the pair (drawn
+            // taller than either woman): at 2-4 m it fills the picture of the
+            // work. From mid-distance the village's own vignettes (the fire's
+            // cook and tender) may stand nearer; that is the village, not a crowd.
+            const tallest = Math.max(...pairBoxes.map((p) => (p ? p.y1 - p.y0 : 0)))
+            const inView = b.x1 > 0 && b.x0 < window.innerWidth && b.y1 > 0 && b.y0 < window.innerHeight
+            if (close && inView && b.y1 - b.y0 > 1.2 * tallest) overlaps.push({ pounder: 'nearer', box: b })
+            pairBoxes.forEach((p, i) => {
+              if (p && b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0 && b.y1 - b.y0 >= 0.5 * (p.y1 - p.y0)) overlaps.push({ pounder: i, box: b, pounderBox: p })
+            })
+          })
+          const tips = [0, 1].map((i) => {
+            const pestle = scene.getObjectByName(`village-pestle-${i}`)
+            if (!pestle) return null
+            pestle.updateWorldMatrix(true, false)
+            const len = window.__balance.villageLife.mortar.pestleLength
+            return px(new V(0, len, 0).applyMatrix4(pestle.matrixWorld))
+          })
+          return { probe, heads, tips, overlaps }
+        }, staged.stand.at < 5)
+        // A bystander overlapping a pounder on screen refuses the frame; the
+        // village thaws and the next impact is tried with him moved on.
+        if (atShutter.overlaps.length > 0 && attempt < SEARCHES) {
+          refused.push(`${attempt}: bystander over pounder ${atShutter.overlaps.map((o) => o.pounder).join('+')}`)
+          retry = true
+          continue
+        }
+        check(`${shot.name}: no other figure overlaps either pounder's silhouette on screen${staged.stand.at < 5 ? ' or stands nearer the lens in the frame' : ''}`, atShutter.overlaps.length === 0,
+          JSON.stringify({ overlaps: atShutter.overlaps, refused }))
+        check(`${shot.name}: life stayed frozen between the staging read and the shutter`, sameProbe(staged.probe, atShutter.probe))
+        const [down, up] = atShutter.probe.women
+        const rim = atShutter.probe.mortar.y + atShutter.probe.mortar.rim
+        check(`${shot.name}: one pestle foot is down below the rim, in the grain`, down.foot.y < rim - 0.04, `${(down.foot.y - rim).toFixed(3)} m`)
+        check(`${shot.name}: the other pestle is lifted clear above the rim`, up.foot.y > rim + 0.1, `${(up.foot.y - rim).toFixed(3)} m`)
+        check(`${shot.name}: the grain puff is in the air`, down.puff)
+        // SEPARATELY VISIBLE: both heads and both pestle tips in the frame, the
+        // heads more than two head-radii apart on screen and the tips apart too.
+        const [h0, h1] = atShutter.heads
+        const [t0, t1] = atShutter.tips
+        const apart = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+        const sides = h0 && h1 && t0 && t1 &&
+          h0.inFrame && h1.inFrame && t0.inFrame && t1.inFrame &&
+          apart(h0, h1) > 2 * Math.max(h0.r, h1.r) && apart(t0, t1) > Math.max(h0.r, h1.r)
+        check(`${shot.name}: both women and both pestles are separately visible in the frame`, !!sides,
+          JSON.stringify({ heads: atShutter.heads, tips: atShutter.tips }))
+        const m = atShutter.probe.mortar
+        await frame(shot.name, { local: { x: m.x, y: m.y + 0.7, z: m.z }, label: shot.label })
+        const afterShot = await page.evaluate(() => window.__placePounding())
+        check(`${shot.name}: and stayed frozen through the exposure`, sameProbe(atShutter.probe, afterShot))
+      } finally {
+        await freezeLife(false)
+      }
+      if (!retry) break
+      }
+    }
+  }
 }
 
 await finishPolishSuite()

@@ -1019,6 +1019,121 @@ if (section('river-bank')) {
   }
 }
 
+// === Room to watch the fishers' fire (work-order 1273) =========================
+// The report: positioning to watch the fish being grilled, the player left the
+// village by accident. Every scene ground with a performer is now one the
+// boundary keeps `balance.observerMargin` of room around (sceneGrounds.ts; the
+// unit layer measures every village plan). What only the live scene shows is
+// the walk itself: from the griller's side of the hearth he backs away, under
+// the game's own resolver, until the whole grilling ground fills the reference
+// viewport's width — and he is still in the village. Three landward bearings:
+// straight inland and 60 deg to either side along the bank.
+if (section('fish-fire-room')) {
+  await enterSettlement('bambara-village')
+  const ready = await page
+    .waitForFunction(() => !!window.__placeFishFire && !!window.__placeLayout?.bank && !!window.__placePlayer, null, { timeout: 40000 })
+    .then(() => true)
+    .catch(() => false)
+  check('fish-fire room: the river village carries the fishers’ fire', ready)
+  if (ready) {
+    const spot = await page.evaluate(() => {
+      const fire = window.__placeFishFire().sites.fire
+      const ground = (window.__placeLayout.observed ?? []).find((g) => Math.hypot(g.x - fire.x, g.z - fire.z) < 1e-6) ?? null
+      const b = window.__placeLayout.bank
+      return { fire, ground, nx: b.nx, nz: b.nz, fx: b.fx, fz: b.fz, margin: window.__balance.observerMargin }
+    })
+    check('fish-fire room: the grilling spot is a ground the boundary keeps room around', !!spot.ground, JSON.stringify(spot.ground))
+    if (spot.ground) {
+      // App.tsx's 50 deg vertical field at 1440x900: the ground spans the frame's
+      // width from r / sin(half the horizontal field) — the framing distance.
+      const halfH = Math.atan(Math.tan((25 * Math.PI) / 180) * (1440 / 900))
+      const framing = spot.ground.r / Math.sin(halfH)
+      for (const [label, deg] of [['inland', 0], ['upstream side', -60], ['downstream side', 60]]) {
+        // Inland is -n; turning toward +f is downstream.
+        const a = (deg * Math.PI) / 180
+        const dir = {
+          x: -spot.nx * Math.cos(a) + spot.fx * Math.sin(a),
+          z: -spot.nz * Math.cos(a) + spot.fz * Math.sin(a),
+        }
+        await page.evaluate(({ fire, dir, r }) => {
+          const p = window.__placePlayer
+          // At the hearth's rim on that side, facing the fire.
+          p.x = fire.x + dir.x * (r * 0.5)
+          p.z = fire.z + dir.z * (r * 0.5)
+          p.yaw = Math.atan2(dir.x, dir.z)
+          p.pitch = -0.1
+        }, { fire: spot.fire, dir, r: spot.ground.r })
+        // Hold BACK until he stands at framing distance, or the walk stops.
+        const walk = await page.evaluate(
+          ({ fire, framing }) =>
+            new Promise((resolve) => {
+              // A stall is counted in RESOLVED frames (the game's own resolver
+              // stepping without gaining ground), never in wall-clock time — a
+              // slow host must not end the walk. The 90 s cap is a separate
+              // backstop and reports itself.
+              const STALL_RESOLVES = 120
+              const t0 = performance.now()
+              let lastResolves = window.__placeResolves ?? 0
+              let stalledResolves = 0
+              let lastD = 0
+              const tick = () => {
+                window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS' }))
+                const p = window.__placePlayer
+                const mode = window.__game.getState().mode
+                const d = p ? Math.hypot(p.x - fire.x, p.z - fire.z) : 0
+                const resolves = window.__placeResolves ?? 0
+                if (resolves !== lastResolves) {
+                  if (d > lastD + 0.01) stalledResolves = 0
+                  else stalledResolves += resolves - lastResolves
+                  lastResolves = resolves
+                  lastD = Math.max(lastD, d)
+                }
+                const stalled = stalledResolves >= STALL_RESOLVES
+                const timedOut = performance.now() - t0 > 90000
+                if (mode !== 'place' || d >= framing || stalled || timedOut) {
+                  window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyS' }))
+                  resolve({ mode, d, x: p?.x ?? null, z: p?.z ?? null, stalled, timedOut })
+                } else requestAnimationFrame(tick)
+              }
+              requestAnimationFrame(tick)
+            }),
+          { fire: spot.fire, framing },
+        )
+        check(
+          `fish-fire room: backing ${label} from the grill to framing distance keeps him in the village`,
+          walk.mode === 'place' && walk.d >= framing,
+          `reached ${walk.d.toFixed(2)} of ${framing.toFixed(2)} m from the fire (ground r ${spot.ground.r.toFixed(2)}, margin ${spot.margin}) in ${walk.mode} mode${walk.stalled ? ', stalled' : ''}${walk.timedOut ? ', timed out' : ''}`,
+        )
+        // Along the requested bearing, not anywhere far enough: the endpoint's
+        // displacement from the fire is split into along/across the bearing, so
+        // a walk deflected sideways round an obstacle cannot pass.
+        if (walk.x !== null) {
+          const ox = walk.x - spot.fire.x
+          const oz = walk.z - spot.fire.z
+          const along = ox * dir.x + oz * dir.z
+          const across = Math.abs(ox * dir.z - oz * dir.x)
+          check(
+            `fish-fire room: backing ${label}, he walked back ALONG the bearing, not round it`,
+            along >= framing - 0.05 && across <= 0.5,
+            `along ${along.toFixed(2)} m (framing ${framing.toFixed(2)}), across ${across.toFixed(2)} m (tolerance 0.5)`,
+          )
+        }
+        if (label === 'inland' && walk.mode === 'place') {
+          await page.evaluate(({ fire }) => {
+            const p = window.__placePlayer
+            p.yaw = Math.atan2(p.x - fire.x, p.z - fire.z)
+          }, { fire: spot.fire })
+          await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+          await shot('1273-fish-fire-framed-from-inland', {
+            local: { x: spot.fire.x, y: 0.4, z: spot.fire.z },
+            label: 'the fishers’ grilling spot — fire, griller, smoking rack — framed whole from the inland side, the player still inside the village',
+          })
+        }
+      }
+    }
+  }
+}
+
 // === No wedge is fatal (work-order 604) ======================================
 // The collision rules keep the traveller out of the walls; this keeps him out of
 // the gaps BETWEEN them. The pure halves (the stall detector, the outward search)

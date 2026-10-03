@@ -2098,3 +2098,30 @@ pass, and a horizontal transform on the inner card would not show in the measure
 `.speech-distance` wrapper. Neither CSS exists in the product (the inner card is
 untransformed while not receded, and both notes are staged unreceded), so there is
 no player impact: hardening only, filed here instead of holding the landing.
+
+## WebGL 2 fish-fire frame draws no ground or river (03.10.2026)
+
+From the picture check of 1273 at 0711a3c25: on WebGL 2 (39 FPS) the new frame
+`1273-fish-fire-framed-from-inland` shows fire, rack frame and performers but no
+terrain, no river, no fish on the rack and baskets as bare rims. The same camera on
+WebGPU, and the later Bambara frame `604-unstuck-freed` on WebGL 2, draw everything.
+Suspected first-view material readiness at a shutter two frames after the walk; not
+shown to be player-visible. Re-check at the next LARGE; a repeat makes it a point.
+
+From the third cross-vendor review of the mortar-pounding audio check (1274 at
+bd138038d): the thud probe counts a thud as played only when the AudioContext is
+running at dispatch, and the suite checks the state before and after the window; a
+suspend-and-resume between two dispatches would still pass. No player impact (each
+counted thud was dispatched into a running context); a test-harness rigor edge after
+two fix rounds. Record state transitions in the window if the check is touched again.
+
+From the speech-note trio author (03.10.2026): when a speaker goes indoors, their
+speech note keeps floating over the hut. Product question (should a hidden speaker's
+note fade or stay as a voice from inside?); not changed. A user decision makes it a point.
+
+River current sketch B (03.10.2026, user decision pending, do not queue unapproved):
+V-wakes at the fishermen's dugout and a stake, an eddy behind a bank stone, a low
+0.4-0.8 m crinkle drifting downstream; builds on sketch A (queued as point 1280).
+Sketch: https://claude.ai/artifact/Ug2L7bnc1cDCkyfttYYkwx . Open items: no stake
+exists in Bambara; a moving dugout needs a moving wake; real crinkle height needs a
+finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
