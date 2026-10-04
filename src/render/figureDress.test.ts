@@ -131,3 +131,27 @@ describe('the shared material', () => {
     expect(figureMaterial().roughnessNode).toBeTruthy()
   })
 })
+
+describe('a cloak over both shoulders', () => {
+  const centroids = (g: THREE.BufferGeometry) => {
+    const idx = g.getIndex()!
+    const pos = g.getAttribute('position')
+    const out: THREE.Vector3[] = []
+    for (let i = 0; i < idx.count; i += 3) {
+      const c = new THREE.Vector3()
+      for (let k = 0; k < 3; k++) c.add(new THREE.Vector3().fromBufferAttribute(pos, idx.getX(i + k)))
+      out.push(c.divideScalar(3))
+    }
+    return out
+  }
+  it('hangs open in front below the shoulders and closed behind', () => {
+    const cloak = layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear: 'bothShoulders' })
+    const g = buildLayerGeometry(cloak, adultMan, 16)!
+    const cs = centroids(g)
+    const below = adultMan.shoulderY - 0.03 * adultMan.stature
+    const front = cs.filter((c) => c.y < below - 0.02 && c.z > 0 && Math.abs(c.x) < 0.03)
+    const back = cs.filter((c) => c.y < below - 0.02 && c.z < 0 && Math.abs(c.x) < 0.03)
+    expect(front).toHaveLength(0)
+    expect(back.length).toBeGreaterThan(0)
+  })
+})

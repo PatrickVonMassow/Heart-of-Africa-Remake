@@ -116,6 +116,30 @@ export function trunkAt(p: BodyProportions, y: number): [number, number] {
 
 const st = (y: number, rx: number, rz: number, z = 0): SweepStation => ({ p: [0, y, z], rx, ry: rz })
 
+/**
+ * Open a vertical sweep's front below `belowY`: drop the `cols` tube columns
+ * either side of the front vertex line (u = ¼ — sweepTube's ring starts at +x
+ * and turns toward +z). Chosen by the columns' u, not by a polar angle, so the
+ * edges follow the mesh lines exactly: on an elliptic ring a polar angle cuts
+ * across the columns and left a sawtooth down the opening.
+ */
+function openFront(geo: THREE.BufferGeometry, cols: number, belowY: number): void {
+  const index = geo.getIndex()
+  const uv = geo.getAttribute('uv')
+  const pos = geo.getAttribute('position')
+  if (!index || !uv) return
+  const radial = Math.round(1 / Math.max(1e-6, uv.getX(1) - uv.getX(0)))
+  const keep: number[] = []
+  for (let i = 0; i < index.count; i += 3) {
+    const t = [index.getX(i), index.getX(i + 1), index.getX(i + 2)]
+    const u = t.reduce((sum, k) => sum + uv.getX(k), 0) / 3
+    const y = t.reduce((sum, k) => sum + pos.getY(k), 0) / 3
+    const inFront = Math.abs(u - 0.25) < cols / radial
+    if (!(inFront && y < belowY)) keep.push(...t)
+  }
+  geo.setIndex(keep)
+}
+
 /** A tube round the trunk from `top` down to `bottom`, `ease` off the body
  *  and flaring by `flare` (fraction of stature) at the hem. */
 function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number, flare: number, radial: number, rings = 10): THREE.BufferGeometry {
@@ -219,7 +243,7 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
           const x = (s === 'L' ? 1 : -1) * p.shoulderX
           const sleeve = sweepTube(
             [
-              { p: [x, p.shoulderY + p.armR, 0], rx: p.armR * 1.5, ry: p.armR * 1.5 },
+              { p: [x, p.shoulderY - p.armR * 0.2, 0], rx: p.armR * 1.5, ry: p.armR * 1.5 },
               { p: [x, p.shoulderY - p.upperArm * 0.75, 0], rx: p.armR * 1.9, ry: p.armR * 1.9 },
             ],
             { radial: Math.max(8, radial - 4), rings: 4 },
@@ -232,14 +256,27 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
     case 'cloak':
     case 'cape': {
       bottom = l.form === 'cloak' ? p.kneeY + 0.03 * H : p.waistY - 0.02 * H
+      // DRAPED: from a collar round the neck down the slope of the shoulders
+      // (the trunk's own profile, eased off it), over the shoulder point and
+      // falling with a slight flare. A flat shelf from the neck straight out
+      // to shoulder width and walls straight down read as a cardboard box.
       const rows: SweepStation[] = [
-        st(p.neckY + 0.02 * H, p.neckR * 1.7, p.neckR * 1.6),
-        st(p.shoulderY + p.armR * 0.8, p.shoulderX + p.armR * 1.7, p.chestHalfD * 1.25),
-        st(p.chestY, p.shoulderX + p.armR * 2.0, p.chestHalfD * 1.35),
+        st(p.neckY + 0.012 * H, p.neckR * 1.5, p.neckR * 1.45),
+        st(p.shoulderY + 0.006 * H, p.shoulderX * 0.78, p.chestHalfD * 1.08),
+        st(p.shoulderY - 0.03 * H, p.shoulderX + p.armR * 1.45, p.chestHalfD * 1.22),
+        st(p.chestY - 0.02 * H, p.shoulderX + p.armR * 1.75, p.chestHalfD * 1.3),
       ]
-      for (let y = p.chestY - 0.08 * H; y > bottom; y -= 0.08 * H) rows.push(st(y, p.shoulderX + p.armR * 2.1, p.chestHalfD * 1.4))
-      rows.push(st(bottom, p.shoulderX + p.armR * 2.3, p.chestHalfD * 1.5))
+      for (let y = p.chestY - 0.1 * H; y > bottom + 0.02 * H; y -= 0.08 * H) {
+        const t = (p.chestY - y) / (p.chestY - bottom)
+        rows.push(st(y, p.shoulderX + p.armR * (1.8 + 0.5 * t), p.chestHalfD * (1.32 + 0.15 * t)))
+      }
+      rows.push(st(bottom, p.shoulderX + p.armR * 2.4, p.chestHalfD * 1.5))
       const geo = sweepTube(rows, { radial, rings: rows.length * 3 })
+      // Over both shoulders it hangs OPEN in front below the shoulders, so the
+      // body and the hip dress show through as on a worn skin. The opening is
+      // whole columns of the tube either side of the front (+z, a vertex line
+      // at a quarter turn): a slanted cut through the triangles left a sawtooth.
+      if (l.wear === 'bothShoulders') openFront(geo, Math.max(1, Math.round(radial / 16)), p.shoulderY - 0.03 * H)
       // Knotted over one shoulder: the other shoulder is bare above the chest.
       if (l.wear === 'rightShoulder') sector(geo, (c) => !(c.x > 0.01 * H && c.y > p.chestY))
       if (l.wear === 'leftShoulder') sector(geo, (c) => !(c.x < -0.01 * H && c.y > p.chestY))

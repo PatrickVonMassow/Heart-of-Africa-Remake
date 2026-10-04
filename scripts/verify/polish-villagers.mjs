@@ -3790,32 +3790,47 @@ if (section('villager-dress')) {
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   const PEOPLES = (process.env.DRESS_PEOPLES ?? 'zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai,somali,swahili,baganda,sidama,tuareg,berbers,nubians,hausa,bambara,mandinka,fang,mongo,mbuti,banda').split(',')
   const villageOf = (p) => (p === 'berbers' ? 'berber' : p === 'nubians' ? 'nubian' : p) + '-village'
-  // A clear line of sight from the player to a row `d` metres ahead on one of
-  // 16 bearings: the probe's first surface must lie at or behind both row ends
-  // and its middle at chest height.
+  // A clear line of sight from the player to every figure of a row `d` metres
+  // ahead, on one of 16 bearings (and, failing that, a little nearer or
+  // farther): the probe's first surface must lie at or behind each figure, at
+  // a child's chest height and an adult's. The full row is 8 figures 0.9 m
+  // apart, so a fence or a hut that hides only the children is caught too.
   const stageRow = (d, only) =>
     page.evaluate(
       ({ d, only }) => {
         const p = window.__placePlayer
         const best = { score: -1 }
-        for (let k = 0; k < 16; k++) {
-          const yaw = p.yaw + (k * Math.PI) / 8
-          const fx = -Math.sin(yaw)
-          const fz = -Math.cos(yaw)
-          const cx = p.x + fx * d
-          const cz = p.z + fz * d
-          const half = only ? 0.6 : 3.4
-          let clear = 0
-          for (const s of [-half, 0, half]) {
-            const x = cx + Math.cos(yaw) * s
-            const z = cz - Math.sin(yaw) * s
-            const hit = window.__placeRayHit?.(x, 0.8, z)
-            const ratio = !hit || hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance
-            if (ratio >= 0.98) clear++
+        // the row staged before must not block the probes for the next one
+        const hidden = []
+        window.__placeScene.getObjectByName('dress-lineup')?.traverse((o) => {
+          if (o.visible) hidden.push(o)
+          o.visible = false
+        })
+        const half = only ? 0.45 : 3.15
+        const lateral = only ? [-half, half] : [-half, -2.25, -1.35, -0.45, 0.45, 1.35, 2.25, half]
+        for (const dist of [d, d * 0.85, d * 1.2]) {
+          for (let k = 0; k < 16; k++) {
+            const yaw = p.yaw + (k * Math.PI) / 8
+            const fx = -Math.sin(yaw)
+            const fz = -Math.cos(yaw)
+            const cx = p.x + fx * dist
+            const cz = p.z + fz * dist
+            let clear = 0
+            for (const s of lateral) {
+              const x = cx + Math.cos(yaw) * s
+              const z = cz - Math.sin(yaw) * s
+              for (const y of [0.5, 1.0]) {
+                const hit = window.__placeRayHit?.(x, y, z)
+                const ratio = !hit || hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance
+                if (ratio >= 0.98) clear++
+              }
+            }
+            if (clear > best.score) Object.assign(best, { score: clear, of: lateral.length * 2, yaw, cx, cz, dist })
+            if (clear === lateral.length * 2) break
           }
-          if (clear > best.score) Object.assign(best, { score: clear, yaw, cx, cz })
-          if (clear === 3) break
+          if (best.score === best.of) break
         }
+        for (const o of hidden) o.visible = true
         p.yaw = best.yaw
         p.pitch = -0.08
         window.__dressLineup({ x: best.cx, z: best.cz, yaw: best.yaw, only })
@@ -3849,8 +3864,8 @@ if (section('villager-dress')) {
     const got = await rowBodies()
     check(
       `${people}: every sex and age group stands in the row, each one skinned mesh (body and dress merged)`,
-      !!got && got.figures === 8 && got.heads === 8 && got.skinned === 8,
-      JSON.stringify({ ...got, clear: at.score }),
+      !!got && got.figures === 8 && got.heads === 8 && got.skinned === 8 && at.score === at.of,
+      JSON.stringify({ ...got, clear: `${at.score}/${at.of}`, dist: at.dist }),
     )
     await frame(shot(`1293-dress-${people}`), {
       local: { x: at.cx, y: 0.7, z: at.cz },
