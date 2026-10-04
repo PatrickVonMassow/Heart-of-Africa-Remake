@@ -154,10 +154,27 @@ added.
   code-built skinned body — trunk and head; limbs take two thirds — and of the
   dress layers drawn on it from the appearance table
   (`src/systems/appearance.ts`, `src/render/figureBody.ts`,
-  `src/render/figureDress.ts`). One body mesh plus one mesh per dress layer
-  per inhabitant, sharing two materials; geometries are cached per distinct
-  body and layer. Climbs 0 → 16 → 24. Cost per village, measured: see the
-  table below this list.
+  `src/render/figureDress.ts`). Body and dress are merged into ONE skinned
+  mesh per inhabitant with one shared material, so a villager is one draw
+  (the primitive figure is about a dozen); geometries are cached per distinct
+  body and dress. Climbs 0 → 16 → 24. Cost per village, measured 04.10.2026
+  (`polish-villagers.mjs` section `villager-dress`; the same view of a village
+  with 25 inhabitants on each level, once with `figureBodySegments` forced to
+  0 — the "before" — and once as shipped; per-frame draw calls / triangles,
+  WebGPU, WebGL 2 within a few percent):
+
+  | Village | Low (primitive) | Medium before → after | High before → after |
+  | --- | --- | --- | --- |
+  | Zulu | 37 / 43 k | 544 / 141 k → 344 / 269 k | 524 / 144 k → 354 / 351 k |
+  | Hausa | 295 / 75 k | 835 / 170 k → 489 / 392 k | 864 / 185 k → 519 / 549 k |
+  | Maasai | 289 / 90 k | 794 / 231 k → 464 / 422 k | 765 / 236 k → 470 / 518 k |
+
+  So on medium and high the skinned villagers cost about 40 % FEWER draw calls
+  than the primitive figures did and about twice the triangles (+130 k to
+  +360 k per village). The median frame time did not separate the variants on
+  this shared, software-composited machine (16.7–66.7 ms in every column,
+  quantised to the display's vsync), so no frame-time cost is claimed either
+  way; low is unchanged by construction.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a
