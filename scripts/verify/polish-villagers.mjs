@@ -3,7 +3,7 @@
 // well, the stations, the loom, the errands and the mortar (design.md §19.10).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
-import { waitForSceneBuilt, assertBackend } from './_browser.mjs'
+import { waitForSceneBuilt, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { capturePixels } from './frameSubject.mjs'
 import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
 import { onBaselineLane } from './baseline-classify-core.mjs'
@@ -3765,6 +3765,133 @@ if (section('village-pounding')) {
       }
     }
   }
+}
+
+// --- The villagers' dress (work-order "villager dress") ---------------------------
+// Picture evidence, staged like the animal models' herd (1284): in every
+// people's village one villager of each sex and age group stands in a row in
+// front of the player (`window.__dressLineup`, dev only), drawn by the real
+// Figure with that settlement's look — child, girl / young man, married, old.
+// Then the low preset draws the same row as the primitive figure, and the
+// young man and the elder stand side by side at growing distances for the
+// age-readability judgement. The table, body and dress builders are pinned in
+// src/systems/appearance.test.ts and src/render/figure{Body,Dress,Rig}.test.ts.
+if (section('villager-dress')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  const PEOPLES = (process.env.DRESS_PEOPLES ?? 'zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai,somali,swahili,baganda,sidama,tuareg,berbers,nubians,hausa,bambara,mandinka,fang,mongo,mbuti,banda').split(',')
+  const villageOf = (p) => (p === 'berbers' ? 'berber' : p === 'nubians' ? 'nubian' : p) + '-village'
+  // A clear line of sight from the player to a row `d` metres ahead on one of
+  // 16 bearings: the probe's first surface must lie at or behind both row ends
+  // and its middle at chest height.
+  const stageRow = (d, only) =>
+    page.evaluate(
+      ({ d, only }) => {
+        const p = window.__placePlayer
+        const best = { score: -1 }
+        for (let k = 0; k < 16; k++) {
+          const yaw = p.yaw + (k * Math.PI) / 8
+          const fx = -Math.sin(yaw)
+          const fz = -Math.cos(yaw)
+          const cx = p.x + fx * d
+          const cz = p.z + fz * d
+          const half = only ? 0.6 : 3.4
+          let clear = 0
+          for (const s of [-half, 0, half]) {
+            const x = cx + Math.cos(yaw) * s
+            const z = cz - Math.sin(yaw) * s
+            const hit = window.__placeRayHit?.(x, 0.8, z)
+            const ratio = !hit || hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance
+            if (ratio >= 0.98) clear++
+          }
+          if (clear > best.score) Object.assign(best, { score: clear, yaw, cx, cz })
+          if (clear === 3) break
+        }
+        p.yaw = best.yaw
+        p.pitch = -0.08
+        window.__dressLineup({ x: best.cx, z: best.cz, yaw: best.yaw, only })
+        return best
+      },
+      { d, only },
+    )
+  // What the row is drawn with: skinned meshes on medium/high, none on low.
+  const rowBodies = () =>
+    page.evaluate(() => {
+      const row = window.__placeScene.getObjectByName('dress-lineup')
+      if (!row) return null
+      let skinned = 0
+      let heads = 0
+      const meshes = new Set()
+      row.traverse((o) => {
+        if (o.isSkinnedMesh) {
+          skinned++
+          meshes.add(o.name)
+        }
+        if (o.name === 'figure-head') heads++
+      })
+      return { figures: row.children.length, skinned, heads, meshes: [...meshes].sort() }
+    })
+
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  for (const people of PEOPLES) {
+    await goToPlace(villageOf(people))
+    const at = await stageRow(4.6)
+    await nextFrames(4)
+    const got = await rowBodies()
+    check(
+      `${people}: every sex and age group stands in the row, each on the skinned body with its dress`,
+      !!got && got.figures === 8 && got.heads === 8 && got.skinned >= 14,
+      JSON.stringify({ ...got, clear: at.score }),
+    )
+    await frame(shot(`1293-dress-${people}`), {
+      local: { x: at.cx, y: 0.7, z: at.cz },
+      label: `${people}: staged row of villagers left to right girl child, boy, girl, young man, married woman, married man, old woman, old man, in the researched dress`,
+    })
+    await page.evaluate(() => window.__dressLineup(null))
+  }
+
+  // THE AGE-READABILITY DISTANCE: the young man and the elder side by side.
+  await goToPlace('zulu-village')
+  for (const d of [4, 8, 14, 22, 32]) {
+    const at = await stageRow(d, ['male-youth', 'male-elder'])
+    await nextFrames(4)
+    const px = await page.evaluate(() => {
+      const cam = window.__placeCamera
+      const row = window.__placeScene.getObjectByName('dress-lineup')
+      const out = {}
+      row.traverse((o) => {
+        if (o.name !== 'figure-head') return
+        const v = o.getWorldPosition(new o.position.constructor())
+        const top = v.clone().project(cam)
+        const foot = v.clone().setY(v.y - 1.3).project(cam)
+        let n = o
+        while (n && !/^dress-lineup-/.test(n.name)) n = n.parent
+        out[n?.name ?? '?'] = Math.round(((top.y - foot.y) / 2) * window.innerHeight)
+      })
+      return out
+    })
+    console.log(`  1293 elder/young man at ${d} m: drawn heights (px) ${JSON.stringify(px)}`)
+    await frame(shot(`1293-elder-youth-${String(d).padStart(2, '0')}m`), {
+      local: { x: at.cx, y: 0.7, z: at.cz },
+      label: `the Zulu young man (left) and the elder (right) side by side, ${d} m from the camera`,
+    })
+  }
+  await page.evaluate(() => window.__dressLineup(null))
+
+  // THE LOW PRESET keeps the primitive figure (user decision 04.10.2026).
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
+  await nextFrames(6)
+  const lowAt = await stageRow(4.6)
+  await nextFrames(4)
+  const low = await rowBodies()
+  check('low preset: the row is the primitive figure — no skinned mesh, every head drawn', !!low && low.figures === 8 && low.skinned === 0 && low.heads === 8, JSON.stringify(low))
+  await frame(shot('1293-dress-low-primitive'), {
+    local: { x: lowAt.cx, y: 0.7, z: lowAt.cz },
+    label: 'the low preset: the same Zulu row drawn as the primitive cone-and-sphere figure',
+  })
+  await page.evaluate(() => {
+    window.__dressLineup(null)
+    window.__ui.getState().setDetailLevel('medium')
+  })
 }
 
 await finishPolishSuite()

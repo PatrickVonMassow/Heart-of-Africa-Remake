@@ -167,6 +167,7 @@ import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 import { Figure } from './placeFigure'
+import { DressLineup } from './dressLineup'
 import {
   ColdCloaksContext,
   FigureLookContext,
@@ -3949,6 +3950,7 @@ export function PlaceLife({
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
+          <DressLineup cloth={style.cloth} />
           {loom && (
             <Loom
               key={`loom-${placeId}`}

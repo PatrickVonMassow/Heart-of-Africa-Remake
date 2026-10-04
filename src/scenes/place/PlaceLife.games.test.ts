@@ -18,7 +18,7 @@ const source = readFileSync('src/scenes/place/PlaceLife.tsx', 'utf8')
 const component = source.slice(source.indexOf('export function PlaceLife(')).replace('export function', 'function').replaceAll('import.meta.env.DEV', 'true')
 const devAssert = vi.fn()
 const components = ['Kids', 'Porters', 'Traders', 'Talkers', 'Walkers', 'Cook', 'Loom', 'RiverFishery',
-  'ErrandVillagers', 'Goats', 'FireTender', 'Pounder', 'Drummer', 'Well', 'TaskWalker']
+  'ErrandVillagers', 'Goats', 'FireTender', 'Pounder', 'Drummer', 'Well', 'TaskWalker', 'DressLineup']
 const contexts = ['ColdCloaksContext', 'LimbDetailContext', 'FigureLookContext', 'InhabitantBodiesContext', 'SpeechFloorContext']
 const deps = {
   React: { createElement },
