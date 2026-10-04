@@ -85,6 +85,7 @@ describe('detailed ungulates keep the gait rig (points 228/255/300)', () => {
               hi = Math.max(hi, pos.getZ(i))
             }
           }
+          expect(hi - lo, `${name} leg slab at ${frac}`).toBeGreaterThan(0)
           return { depth: hi - lo, mid: (hi + lo) / 2 }
         }
         const top = depthAt(0.08)
@@ -105,19 +106,40 @@ describe('detailed ungulates read as their species', () => {
       const { body } = { zebra: buildZebraParts, antelope: buildAntelopeParts, goat: buildGoatParts }[name as 'zebra']()
       const L = ungulateLayout(spec)
       const pos = body.attributes.position
-      const depthAt = (z: number) => {
+      const index = body.index!
+      // Vertical extent of the body's section by the plane at `z`: every
+      // triangle edge crossing the plane contributes its intersection, so a
+      // plane between two rings is sampled too (a vertex slab may be empty).
+      const sectionAt = (z: number) => {
         let lo = Infinity
         let hi = -Infinity
-        for (let i = 0; i < pos.count; i++) {
-          // Torso only: below the neck root.
-          if (Math.abs(pos.getZ(i) - z) < spec.bodyR * 0.08 && pos.getY(i) < L.backY + spec.bodyR) {
-            lo = Math.min(lo, pos.getY(i))
-            hi = Math.max(hi, pos.getY(i))
+        let hits = 0
+        for (let t = 0; t < index.count; t += 3) {
+          for (let e = 0; e < 3; e++) {
+            const a = index.getX(t + e)
+            const b = index.getX(t + ((e + 1) % 3))
+            const za = pos.getZ(a) - z
+            const zb = pos.getZ(b) - z
+            if (za < 0 === zb < 0) continue
+            const y = pos.getY(a) + (za / (za - zb)) * (pos.getY(b) - pos.getY(a))
+            // Torso only: below the neck root.
+            if (y >= L.backY + spec.bodyR) continue
+            lo = Math.min(lo, y)
+            hi = Math.max(hi, y)
+            hits++
           }
         }
-        return hi - lo
+        expect(hits, `${name} section at z=${z}`).toBeGreaterThan(8)
+        expect(Number.isFinite(hi - lo) && hi - lo > 0, `${name} section at z=${z}`).toBe(true)
+        return { depth: hi - lo, belly: lo }
       }
-      expect(depthAt(L.halfL - 0.1 * spec.bodyR), name).toBeGreaterThan(depthAt(0) * 1.05)
+      const chest = sectionAt(L.halfL - 0.1 * spec.bodyR)
+      const waist = sectionAt(0)
+      const rump = sectionAt(-L.halfL + 0.1 * spec.bodyR)
+      expect(chest.depth, name).toBeGreaterThan(waist.depth * 1.05)
+      expect(chest.depth, name).toBeGreaterThan(rump.depth * 1.05)
+      // The girth hangs lower than the waist's underline.
+      expect(chest.belly, name).toBeLessThan(waist.belly)
     }
   })
 
