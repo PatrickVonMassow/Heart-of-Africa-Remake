@@ -3838,6 +3838,38 @@ if (section('villager-dress')) {
       },
       { d, only },
     )
+  // Whether a passer-by of the village's own life stands between the camera
+  // and a figure of the row (a walker with a basket hid the Mongo young man):
+  // any other inhabitant within 0.45 m of a sight line, nearer than the row.
+  const rowHidden = () =>
+    page.evaluate(() => {
+      const scene = window.__placeScene
+      const cam = window.__placeCamera.position
+      const row = scene.getObjectByName('dress-lineup')
+      if (!row) return false
+      const V = cam.constructor
+      const targets = row.children.map((g) => g.getWorldPosition(new V()).setY(cam.y - 0.6))
+      const others = []
+      scene.traverse((o) => {
+        if (o.name !== 'inhabitant') return
+        for (let n = o.parent; n; n = n.parent) if (n === row) return
+        others.push(o.getWorldPosition(new V()).setY(cam.y - 0.6))
+      })
+      const seg = new V()
+      const rel = new V()
+      return targets.some((t) =>
+        others.some((p) => {
+          seg.subVectors(t, cam)
+          rel.subVectors(p, cam)
+          const k = rel.dot(seg) / seg.lengthSq()
+          if (k <= 0 || k >= 0.95) return false
+          return rel.addScaledVector(seg, -k).length() < 0.45
+        }),
+      )
+    })
+  const awaitRowClear = async () => {
+    for (let i = 0; i < 60 && (await rowHidden()); i++) await nextFrames(5)
+  }
   // What the row is drawn with: skinned meshes on medium/high, none on low.
   const rowBodies = () =>
     page.evaluate(() => {
@@ -3861,11 +3893,13 @@ if (section('villager-dress')) {
     await goToPlace(villageOf(people))
     const at = await stageRow(5.6)
     await nextFrames(4)
+    await awaitRowClear()
+    const hidden = await rowHidden()
     const got = await rowBodies()
     check(
-      `${people}: every sex and age group stands in the row, each one skinned mesh (body and dress merged)`,
-      !!got && got.figures === 8 && got.heads === 8 && got.skinned === 8 && at.score === at.of,
-      JSON.stringify({ ...got, clear: `${at.score}/${at.of}`, dist: at.dist }),
+      `${people}: every sex and age group stands in the row in view, each one skinned mesh (body and dress merged)`,
+      !!got && got.figures === 8 && got.heads === 8 && got.skinned === 8 && at.score === at.of && !hidden,
+      JSON.stringify({ ...got, clear: `${at.score}/${at.of}`, dist: at.dist, hidden }),
     )
     await frame(shot(`1293-dress-${people}`), {
       local: { x: at.cx, y: 0.7, z: at.cz },
@@ -3879,6 +3913,7 @@ if (section('villager-dress')) {
   for (const d of [4, 8, 14, 22, 32]) {
     const at = await stageRow(d, ['male-youth', 'male-elder'])
     await nextFrames(4)
+    await awaitRowClear()
     // Drawn crown height and shoulder span (px) of each: the measurable part
     // of the age read — the rest is the frame, judged by looking.
     const px = await page.evaluate(() => {
@@ -3919,6 +3954,7 @@ if (section('villager-dress')) {
   await nextFrames(6)
   const lowAt = await stageRow(5.6)
   await nextFrames(4)
+  await awaitRowClear()
   const low = await rowBodies()
   check('low preset: the row is the primitive figure — no skinned mesh, every head drawn', !!low && low.figures === 8 && low.skinned === 0 && low.heads === 8, JSON.stringify(low))
   await frame(shot('1293-dress-low-primitive'), {
