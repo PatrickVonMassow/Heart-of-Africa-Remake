@@ -1378,7 +1378,8 @@ if (section('river-current')) {
   }
   const readDrift = () => page.evaluate(() => {
     const r = window.__placeRiver()
-    return { drift: r.drift, flecksDrift: r.flecksDrift, speed: r.driftSpeed, flecks: r.flecks }
+    const c = window.__placeCanoe?.()
+    return { drift: r.drift, flecksDrift: r.flecksDrift, speed: r.driftSpeed, flecks: r.flecks, canoe: c ? { x: c.x, z: c.z } : null }
   })
   const aimA = await pickSubject()
   const subjectA = aimA ? { x: aimA.x, y: aimA.y + 0.1, z: aimA.z } : { x: river.bank.x, y: 0.4, z: river.bank.z }
@@ -1453,6 +1454,24 @@ if (section('river-current')) {
       if (!n0 || !n1 || Math.abs(n0.y) > 0.95) continue
       bands.push({ out, y: toPx(n0).y, expect: toPx(n1).x - toPx(n0).x })
     }
+    // The fishing canoe works this stretch and can lie across a band, idling in
+    // a call phase while the water flows past it: its hull would anchor the
+    // alignment at zero. Its screen box (a 4 m reach round its centre, up to
+    // the paddlers' heads) at both frames is left out of the comparison.
+    const canoeBoxes = []
+    for (const c of [A.pre?.canoe, A.post.canoe, B.pre?.canoe, B.post.canoe]) {
+      if (!c) continue
+      const corners = []
+      for (const dx of [-4, 4]) for (const dz of [-4, 4]) for (const y of [-0.4, 1.6]) corners.push([c.x + dx, y, c.z + dz])
+      const ndc = await ndcOf(corners)
+      if (ndc.some((n) => !n)) continue
+      const px = ndc.map(toPx)
+      canoeBoxes.push({
+        x0: Math.min(...px.map((q) => q.x)), x1: Math.max(...px.map((q) => q.x)),
+        y0: Math.min(...px.map((q) => q.y)), y1: Math.max(...px.map((q) => q.y)),
+      })
+    }
+    const onCanoe = (x, y) => canoeBoxes.some((b) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1)
     const grey = async (buf) => sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true })
     const ga = await grey(frameA)
     const gb = await grey(frameB)
@@ -1469,7 +1488,7 @@ if (section('river-current')) {
         for (let y = y0; y <= y1; y++) {
           for (let x = x0; x < x1; x++) {
             const xb = x + s
-            if (xb < 0 || xb >= ga.info.width) continue
+            if (xb < 0 || xb >= ga.info.width || onCanoe(x, y) || onCanoe(xb, y)) continue
             acc += Math.abs(ga.data[y * ga.info.width + x] - gb.data[y * gb.info.width + xb])
             n++
           }
