@@ -1733,7 +1733,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 03.10.2026, 23:44 · Quellen-Fingerprint: `b6c84dc2cfc0…`
+Zuletzt aktualisiert: Sonntag, 04.10.2026, 02:06 · Quellen-Fingerprint: `56880c1642ad…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1816,13 +1816,13 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 8 | hoch | model-guard.mjs | ✔ Mechanismus |
 | Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 4 | hoch | worktree-reminder.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| When we discuss a problem in chat, never queue my own proposed solution (finding request, point, TASKS entry) — propose it, the user approves first | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| When we discuss a problem in chat, never queue my own proposed solution (finding request, point, TASKS entry) — propose it, the user approves first | 1 | niedrig | request-approval-guard.mjs | ✔ Mechanismus |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | a large point that stops converging is cut into smaller standalone points and each is worked on its own — general procedure, no confirmation needed | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | a repeated Stop-guard refusal means my model of the state is wrong — re-measure, never answer it twice with the same words | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | request-approval-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | batch-doctor-states.mjs, tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1845,10 +1845,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 104 Feedback-/Projekt-/User-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 147 Prozess-/Meta-TASKS-Punkte (davon 69 offen).
+Erfasste Quellen: 104 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 147 Prozess-/Meta-TASKS-Punkte (davon 69 offen).
 
-<!-- RETRO-FINGERPRINT: b6c84dc2cfc05057bd099eb64483efaf5b66bea093946d6ca1903ee8696e2152 -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-03T21:44:24.213Z -->
+<!-- RETRO-FINGERPRINT: 56880c1642ad4f3c2492d46c61781f4915eb0bf9e7827478a945492139f438f0 -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-04T00:06:57.519Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
