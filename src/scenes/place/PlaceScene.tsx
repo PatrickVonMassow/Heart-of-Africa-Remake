@@ -33,10 +33,12 @@ import {
   effectiveWaterDetailOctaves,
 } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, fireRainFactor, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
+import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { cloakForCloth } from '../../systems/dress'
-import { fireHasCookShelter } from '../../systems/cookShelter'
+import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor } from '../../systems/cookShelter'
+import { withFisheryMovers } from './fisheryColliders'
+import { CookShelter } from './CookShelter'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
 import { placeById, type RegionId } from '../../world/geo'
@@ -167,7 +169,6 @@ import {
 } from './useKeyTarget'
 import { buildLayout, chiefStandingSpot, interactiveCircleRadius, doorCandidates, fencePanels, isOnLane, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
-  COOK_SHELTER,
   EYE_HEIGHT,
   HUT_CONE,
   HUT_CONE_EAVE,
@@ -1216,7 +1217,7 @@ function FirePit({
     // lower/steamier; an unsheltered fire (the dome-dweller villages) is beaten
     // down by rain (point 256, the two branches of fireRainFactor).
     const rain = rainAmount(rainRef.current, balance.season.weatherStrength)
-    const rainFactor = fireRainFactor(rain, sheltered, balance.fire.shelteredRainDamp, balance.fire.openRainDamp)
+    const rainFactor = shelteredFireRainFactor(rain, sheltered)
     if (light.current) {
       // The fire burns harder in the cold months (point 142, the §4.9 "fire
       // image": warming fires, not just cooking fires) — and 120g already made
@@ -1297,39 +1298,6 @@ function PlayerShadowProxy({ player }: { player: MutableRefObject<{ x: number; z
       <cylinderGeometry args={[0.3, 0.34, 1.7, 10]} />
       <meshBasicMaterial colorWrite={false} depthWrite={false} />
     </mesh>
-  )
-}
-
-/**
- * Open-sided thatched cook-shelter over the fire (design.md §19.10, point 256):
- * four corner posts carrying a low pyramidal thatch roof, well clear of the
- * flame. Cheap geometry in the settlement's own thatch/wood material style — it
- * lets the fire read as sheltered from the rain rather than blazing in the open.
- */
-function CookShelter({ thatchMat }: { thatchMat: THREE.Material }) {
-  // Corner posts a comfortable margin around the 0.9 stone ring, and an eave
-  // height clear of a standing figure and the flame — the same numbers the
-  // head-clearance sweep reads (work-order 349).
-  const { postR, postH } = COOK_SHELTER
-  const posts: Array<[number, number]> = [
-    [postR, postR],
-    [postR, -postR],
-    [-postR, postR],
-    [-postR, -postR],
-  ]
-  return (
-    <group>
-      {posts.map(([px, pz], i) => (
-        <mesh key={i} position={[px, postH / 2, pz]} castShadow>
-          <cylinderGeometry args={[0.08, 0.1, postH, 6]} />
-          <meshStandardMaterial color="#5a4526" roughness={1} />
-        </mesh>
-      ))}
-      {/* Low pyramidal thatch roof, eaves overhanging the posts a little. */}
-      <mesh name="hut-roof" position={[0, postH + COOK_SHELTER.capCentre, 0]} rotation={[0, Math.PI / 4, 0]} castShadow material={thatchMat}>
-        <coneGeometry args={[postR * COOK_SHELTER.capSpread, COOK_SHELTER.capHeight, 4]} />
-      </mesh>
-    </group>
   )
 }
 
@@ -2858,13 +2826,8 @@ export function PlaceScene() {
       fireBlaze,
       // The cook-fire's rain shelter (point 256): whether this village keeps its
       // fire under a cook-shelter canopy, and the resulting rain-damping factor.
-      fireSheltered: place ? fireHasCookShelter(place.peopleId) : false,
-      fireRainFactor: fireRainFactor(
-        rainAmount(placeWetness.current, balance.season.weatherStrength),
-        place ? fireHasCookShelter(place.peopleId) : false,
-        balance.fire.shelteredRainDamp,
-        balance.fire.openRainDamp,
-      ),
+      fireSheltered: fireShelterResponse(place?.peopleId, 0).sheltered,
+      fireRainFactor: fireShelterResponse(place?.peopleId, rainAmount(placeWetness.current, balance.season.weatherStrength)).rainFactor,
     })
     return () => {
       delete w.__placeSeason
@@ -3016,9 +2979,10 @@ export function PlaceScene() {
       const { pos, found } = findFreeSpot(p.x, p.z, {
         step: balance.unstuck.searchStep,
         maxRadius: balance.unstuck.searchRadius,
-        // Free ground here is the full rule: no collider touches his footprint,
+        // Free ground here is the full rule: no collider touches his footprint
+        // (the dugout and the walking fishers included, as for his walking),
         // and the spot lies inside the settlement, on the drawn ground.
-        accept: (x, z) => standingClear(chiefMovementColliders(l.colliders), x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
+        accept: (x, z) => standingClear(withFisheryMovers(chiefMovementColliders(l.colliders)), x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
         // A POINT inside a collider is a wall between him and a candidate, so he
         // is never set down on the far side of something he could not walk through.
         blocked: (x, z) => !standingClear(l.colliders, x, z, 0),
@@ -3239,7 +3203,7 @@ export function PlaceScene() {
     const dx = (-sin * w.velF + cos * w.velS) * dt
     const dz = (-cos * w.velF - sin * w.velS) * dt
     const [rx, rz] = resolveMove(
-      chiefMovementColliders(layout.colliders), p.x + dx, p.z + dz, PLAYER_RADIUS, [p.x, p.z],
+      withFisheryMovers(chiefMovementColliders(layout.colliders)), p.x + dx, p.z + dz, PLAYER_RADIUS, [p.x, p.z],
     )
     p.x = rx
     p.z = rz
@@ -3525,6 +3489,7 @@ export function PlaceScene() {
           radius={layout.radius}
           observed={layout.observed}
           onDigProgress={onDigProgress}
+          fisheryFire={{ thatchMat: mats.thatch, rainRef: placeWetness, peopleId: place.peopleId }}
         />
       )}
 
