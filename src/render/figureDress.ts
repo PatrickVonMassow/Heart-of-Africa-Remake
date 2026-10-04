@@ -22,7 +22,6 @@ import {
   mx_noise_float,
   positionGeometry,
   smoothstep,
-  vec3,
   vertexColor,
 } from 'three/tsl'
 import type { DressLayer, DressPattern } from '../systems/appearance'
@@ -160,7 +159,9 @@ function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number,
     const y = top + (bottom - top) * t
     const [rx, rz] = trunkAt(p, y)
     const out = ease + flare * p.stature * t * t
-    stations.push(st(y, rx + out, rz + out * 0.8))
+    // The hem flares mostly sideways: a deep front-back flare is what a
+    // kneeling figure's shins turn into depth below the ground.
+    stations.push(st(y, rx + out, rz + ease * 0.8 + (out - ease) * 0.3))
   }
   return sweepTube(stations, { radial, rings: rings * 2 })
 }
@@ -451,15 +452,16 @@ function patternMix() {
 }
 
 /**
- * The colour node: a factor on the vertex colour (the material multiplies the
- * vertex colour in itself), mixing it toward the layer's second colour by the
- * pattern — 1 on a plain surface, so the body renders exactly its tone.
+ * The colour node: the vertex colour mixed DIRECTLY toward the layer's second
+ * colour by the pattern — the vertex colour itself on a plain surface, so the
+ * body renders exactly its tone. The material does not multiply the vertex
+ * colour in a second time (`vertexColors: false`): a factor on it could not
+ * reach a light second colour from a near-black cloth (white bands on black).
  */
 function figureColorNode() {
   return Fn(() => {
-    const base = max(vertexColor().rgb, vec3(0.02))
     const second = attribute<'vec3'>(SECOND_COLOUR_ATTRIBUTE, 'vec3')
-    return mix(vec3(1), second.div(base), patternMix())
+    return mix(vertexColor().rgb, second, patternMix())
   })()
 }
 
@@ -473,7 +475,7 @@ let figureMat: THREE.MeshStandardNodeMaterial | null = null
  */
 export function figureMaterial(): THREE.MeshStandardNodeMaterial {
   if (!figureMat) {
-    figureMat = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side: THREE.DoubleSide })
+    figureMat = new THREE.MeshStandardNodeMaterial({ vertexColors: false, side: THREE.DoubleSide })
     figureMat.colorNode = figureColorNode()
     figureMat.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w
     figureMat.name = 'figure'

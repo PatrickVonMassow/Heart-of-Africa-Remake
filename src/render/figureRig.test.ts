@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import { armAim, REST_POSE } from './gesture'
 import {
+  unsquashHead,
   CONTACT_LEAN_MAX,
   contactLean,
   gestureArmEuler,
@@ -33,6 +34,13 @@ describe('two-bone IK puts the hand on the target', () => {
     expect(reached).toBe(true)
     const hand = s.clone().addScaledVector(upper, 0.2).addScaledVector(fore, 0.2)
     expect(hand.distanceTo(t)).toBeLessThan(1e-6)
+  })
+
+  it('a target on the shoulder itself folds the arm flat, never NaN', () => {
+    const { upper, fore, reached } = solveTwoBone(v(0, 0, 0), v(0, 0, 0), 0.2, 0.2, v(0, 0, -1))
+    expect(reached).toBe(true)
+    for (const c of [upper.x, upper.y, upper.z, fore.x, fore.y, fore.z]) expect(Number.isFinite(c)).toBe(true)
+    expect(upper.clone().add(fore).length()).toBeLessThan(1e-9)
   })
 
   it('points straight at a target out of reach', () => {
@@ -86,5 +94,33 @@ describe('kneeling', () => {
     // Thigh forward by |thigh|, shin turned back by thigh + 90°: horizontal.
     expect(k.thigh + k.shin).toBeCloseTo(Math.PI / 2)
     expect(k.hipY).toBeCloseTo(0.036 + 0.31 * Math.cos(-k.thigh))
+  })
+})
+
+describe('the head stays round through a squat', () => {
+  it('a squashed, leaning, stooped chain leaves the head unsheared', () => {
+    const squash = new THREE.Group()
+    squash.scale.set(1, 0.7, 1)
+    const chain = [new THREE.Bone(), new THREE.Bone(), new THREE.Bone(), new THREE.Bone()]
+    chain[1].rotation.set(0.35, 0.4, 0) // the lean and the turn
+    chain[2].rotation.set(0.42, 0, 0) // the elder's stoop
+    chain[3].rotation.set(-0.19, 0, 0)
+    const head = new THREE.Bone()
+    squash.add(chain[0])
+    chain.forEach((b, i) => i > 0 && chain[i - 1].add(b))
+    chain[3].add(head)
+    unsquashHead(head, chain, 0.7)
+    squash.updateMatrixWorld(true)
+    // a unit sphere on the head stays a unit sphere: every axis keeps length 1
+    // and they stay perpendicular
+    const e = head.matrixWorld.elements
+    const ax = [v(e[0], e[1], e[2]), v(e[4], e[5], e[6]), v(e[8], e[9], e[10])]
+    for (const a of ax) expect(a.length()).toBeCloseTo(1, 6)
+    expect(ax[0].dot(ax[1])).toBeCloseTo(0, 6)
+    expect(ax[1].dot(ax[2])).toBeCloseTo(0, 6)
+    // and no squat leaves it untouched
+    unsquashHead(head, chain, 1)
+    expect(head.scale.y).toBe(1)
+    expect(head.quaternion.equals(new THREE.Quaternion())).toBe(true)
   })
 })

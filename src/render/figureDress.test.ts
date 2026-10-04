@@ -1,7 +1,8 @@
 import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
-import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, SURFACE_ATTRIBUTE } from './figureBody'
+import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, SURFACE_ATTRIBUTE } from './figureBody'
+import { kneelLegs } from './figureRig'
 import { buildLayerGeometry, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
 
 const adultMan = bodyProportions('male', 'adult')
@@ -108,6 +109,38 @@ describe('the garments sit on the body', () => {
     expect(n).toBeGreaterThan(0)
   })
 
+  it('posed kneeling, a long garment lies along the shins instead of hanging into the ground', () => {
+    // The kneeling pose skinnedFigure.tsx applies. Hanging from the thighs the
+    // hem went 0.255 below the ground; following the shins with a mostly
+    // sideways flare, what remains under 0.07 (about 9 cm) is the cloth's
+    // underside beneath the laid-back shins — cloth resting on the ground,
+    // clipped by the ground plane, never a skirt standing down into it.
+    for (const [sex, age] of [['male', 'adult'], ['female', 'adult'], ['male', 'elder']] as const) {
+      const p = bodyProportions(sex, age)
+      for (const form of ['robe', 'toga', 'wrapLong'] as const) {
+        const g = buildLayerGeometry(layer({ slot: 'torso', form, wear: 'chest' }), p)!
+        const { skeleton, bones } = createSkeleton(p)
+        const m = new THREE.SkinnedMesh(g, new THREE.MeshBasicMaterial())
+        m.add(bones.hips)
+        m.bind(skeleton, new THREE.Matrix4())
+        const k = kneelLegs(p.hipY - p.kneeY, p.calfR)
+        bones.hips.position.y = k.hipY
+        for (const sd of ['L', 'R'] as const) {
+          bones[`thigh.${sd}`].rotation.x = k.thigh
+          bones[`shin.${sd}`].rotation.x = k.shin
+          bones[`foot.${sd}`].rotation.x = k.foot
+        }
+        m.updateMatrixWorld(true)
+        skeleton.update()
+        const v = new THREE.Vector3()
+        let min = Infinity
+        const pos = g.getAttribute('position')
+        for (let i = 0; i < pos.count; i++) min = Math.min(min, m.applyBoneTransform(i, v.fromBufferAttribute(pos, i)).y)
+        expect(min, `${sex} ${age} ${form}`).toBeGreaterThan(-0.07)
+      }
+    }
+  })
+
   it('a toga over one shoulder leaves the other bare; a cloak covers both', () => {
     const above = (l: DressLayer, side: 1 | -1) => {
       const g = buildLayerGeometry(l, adultMan)!
@@ -166,6 +199,9 @@ describe('the shared material', () => {
   it('one double-sided, TSL-driven material for body and dress alike', () => {
     expect(figureMaterial()).toBe(figureMaterial())
     expect(figureMaterial().side).toBe(THREE.DoubleSide)
+    // the colour node carries the vertex colour itself; a second multiply by
+    // it would keep a light pattern colour off a dark cloth
+    expect(figureMaterial().vertexColors).toBe(false)
     expect(figureMaterial().colorNode).toBeTruthy()
     expect(figureMaterial().roughnessNode).toBeTruthy()
   })

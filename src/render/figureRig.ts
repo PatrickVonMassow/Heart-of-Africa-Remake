@@ -57,6 +57,12 @@ export function solveTwoBone(
 ): { upper: THREE.Vector3; fore: THREE.Vector3; reached: boolean } {
   const toT = t.clone().sub(s)
   const d = toT.length()
+  if (d < 1e-6) {
+    // The hand on the shoulder itself: folded flat, the elbow out along the
+    // pole (or straight down when the pole gives no direction).
+    const up = pole.lengthSq() > 1e-12 ? pole.clone().normalize() : new THREE.Vector3(0, -1, 0)
+    return { upper: up, fore: up.clone().negate(), reached: Math.abs(a - b) < 1e-6 }
+  }
   const dir = d > 1e-6 ? toT.clone().divideScalar(d) : new THREE.Vector3(0, -1, 0)
   const reached = d <= a + b && d >= Math.abs(a - b)
   if (!reached) return { upper: dir.clone(), fore: dir.clone(), reached: false }
@@ -101,6 +107,28 @@ export function contactLean(s: THREE.Vector3, t: THREE.Vector3, reach: number, p
 export function kneelLegs(thighLen: number, calfR: number): { thigh: number; shin: number; foot: number; hipY: number } {
   const thigh = 0.9
   return { thigh: -thigh, shin: Math.PI / 2 + thigh, foot: Math.PI / 2, hipY: calfR + thighLen * Math.cos(thigh) }
+}
+
+/**
+ * Keep the head round through the caller's vertical squash `s` (work-order
+ * 1085, as on the primitive figure). The squash sits ABOVE the bones, and the
+ * chain from hips to neck is rotated by the lean and the stoop, so a y-scale
+ * on the head alone shears it. The head's world linear part is
+ * `diag(1,s,1) · Q · R · S` (Q the chain's rotation); with `R = Q⁻¹` and
+ * `S = diag(1,1/s,1)` it is the identity — a counter-rotation and a stretch.
+ * Writes `head`'s quaternion and scale; `chain` is hips → neck, in order.
+ */
+export function unsquashHead(head: THREE.Object3D, chain: readonly THREE.Object3D[], s: number): void {
+  const flattened = s > 0.01 && Math.abs(s - 1) > 1e-4
+  if (!flattened) {
+    head.quaternion.identity()
+    head.scale.set(1, 1, 1)
+    return
+  }
+  const q = new THREE.Quaternion()
+  for (const b of chain) q.multiply(b.quaternion)
+  head.quaternion.copy(q.invert())
+  head.scale.set(1, 1 / s, 1)
 }
 
 const DOWN = new THREE.Vector3(0, -1, 0)

@@ -3873,7 +3873,9 @@ if (section('villager-dress')) {
           seg.subVectors(t, cam)
           rel.subVectors(p, cam)
           const k = rel.dot(seg) / seg.lengthSq()
-          if (k <= 0 || k >= 0.95) continue
+          // the whole sight line up to the subject (row members are excluded by
+          // identity above, so a walker just in front of one still counts)
+          if (k <= 0 || k >= 1) continue
           const d = rel.addScaledVector(seg, -k).length()
           if (d < best.d) best = { d, k }
         }

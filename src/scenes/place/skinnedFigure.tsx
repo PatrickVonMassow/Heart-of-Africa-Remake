@@ -25,7 +25,7 @@ import {
 } from '../../render/figureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactLean, gestureArmEuler, hangToward, kneelLegs, solveTwoBone } from '../../render/figureRig'
+import { contactLean, gestureArmEuler, hangToward, kneelLegs, solveTwoBone, unsquashHead } from '../../render/figureRig'
 import { appearanceFor, skinTone, type AgeGroup, type DressLayer, type Sex } from '../../systems/appearance'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
@@ -306,8 +306,7 @@ export function SkinnedFigure({
       b['shin.R'].rotation.x = Math.max(0, -b['thigh.R'].rotation.x) * 0.8 + flex
     }
     // A squat shortens a person; it does not flatten the skull (work-order 1085).
-    const squash = squat?.current ?? 1
-    b.head.scale.y = squash > 0.01 && Math.abs(squash - 1) > 1e-4 ? 1 / squash : 1
+    unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
   })
 
   return (
