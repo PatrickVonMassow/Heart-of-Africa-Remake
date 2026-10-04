@@ -41,16 +41,8 @@ import { chiefBesideDrummerSpot } from './chiefWalk'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
 import type { UseCandidate } from './useKeyTarget'
-
-/** The walkable radius the place scene was first built at, and the unit
- *  `balance.settlementRoom` multiplies. It is a historical base, not a knob:
- *  the calibratable handle is the factor in `balance.ts` (point 1173). */
-export const PLACE_RADIUS_BASE = 28
-/** Walkable radius of a village in meters; leaving it exits the place. Every
- *  consumer reads THIS (or the layout's own `radius`; a port sets its own from
- *  its size) — no caller keeps a radius of its own. The factor scales this
- *  radius; distances the plans write as literals do not scale with it. */
-export const PLACE_RADIUS = PLACE_RADIUS_BASE * balance.settlementRoom
+import { PLACE_RADIUS } from './placeRadius'
+export { PLACE_RADIUS, PLACE_RADIUS_BASE } from './placeRadius'
 
 /** How far inside the southern edge a settlement drops the arriving traveller. */
 export const SPAWN_INSET = 10
@@ -922,6 +914,15 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     : null
 
   const lifeFootprints = place.kind === 'village' ? villageLifeFootprints(VILLAGE_FIRE, placeId) : []
+  // A riverside village's pounding pair walks from its mortar to the fishers'
+  // smoking rack and back (point 1282): no body stands on either walk.
+  const pairWalks: Array<[number, number][]> = (() => {
+    if (!bank) return []
+    const s = fisherySites(bank, canoeLane(bank))
+    return s.duoStands.map((a, i): [number, number][] => [[a.x, a.z], [s.duoAtRack[i].x, s.duoAtRack[i].z]])
+  })()
+  const onPairWalk = (x: number, z: number, bodyR: number) =>
+    pairWalks.some((walk) => closestOnPolyline(walk, x, z).dist < WALKER_RADIUS + bodyR)
   const clearsLife = (obstacles: Collider[]) =>
     lifeFootprints.every(body => standingClear(obstacles, body.x, body.z, body.r + 2 * WALKER_RADIUS))
 
@@ -1044,6 +1045,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
 
   const isFree = (x: number, z: number, margin: number, ownR = 0) => {
     if (Math.abs(x) < 4.5 && z > 5) return false
+    // The pounding pair's walks to the fishers' rack and back (point 1282).
+    if (onPairWalk(x, z, ownR)) return false
     if (Math.hypot(x, z - 18) < 6) return false
     if (!lifeSpots.every(([sx, sz]) => Math.hypot(x - sx, z - sz) > margin * 0.6 + 1)) return false
     // Window clearance also against the functional buildings (their body
@@ -2135,7 +2138,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // unstandable, and the openness the quarter was chosen for is measured on
     // ground that is standable (GPT-5.6 Sol, first cross-vendor round, B4).
     !inPlayGround(x, z, bodyR + WALKER_RADIUS) &&
-    !onWayToWater(x, z, bodyR)
+    !onWayToWater(x, z, bodyR) &&
+    !onPairWalk(x, z, bodyR)
   for (let i = 0; i < 48 && flora.length < 9; i++) {
     const angle = rand() * Math.PI * 2
     const r = 8 + rand() * 18

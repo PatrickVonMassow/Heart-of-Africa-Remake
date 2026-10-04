@@ -274,3 +274,126 @@ export function puffGrain(
     offset: [Math.cos(angle) * out * since, up * since - 0.5 * g * since * since, Math.sin(angle) * out * since],
   }
 }
+
+// --- The pair's stations and their own pounding clock (point 1282) ---------
+
+/** A woman's stand at the mortar: where she is and the way she faces. */
+export interface PounderStand {
+  x: number
+  z: number
+  yaw: number
+}
+
+/**
+ * Where the women stand round a mortar at (`x`, `z`) whose frame is turned by
+ * `yaw`: woman 0 `standOff` on the frame's -z side facing +z, woman 1 across
+ * the mortar facing back. `Pounder` draws them exactly here.
+ */
+export function pounderStands(x: number, z: number, yaw: number, cfg: MortarConfig = balance.villageLife.mortar): PounderStand[] {
+  const count = Math.min(2, Math.max(1, cfg.pounders))
+  return [-1, 1].slice(0, count).map((side, i) => ({
+    x: x + Math.sin(yaw) * side * cfg.standOff,
+    z: z + Math.cos(yaw) * side * cfg.standOff,
+    yaw: i === 0 ? yaw : yaw + Math.PI,
+  }))
+}
+
+/** What the pair is doing: pounding; finishing the stroke in hand before
+ *  they leave; walking to the fish rack; taking a fish; eating it; walking
+ *  back. Only the first two are at the mortar. */
+export type DuoPhase = 'pound' | 'settle' | 'toRack' | 'take' | 'eat' | 'back'
+
+export interface PoundingWoman {
+  x: number
+  z: number
+  yaw: number
+  /** Metres walked, for the stride. */
+  walked: number
+  /** Her fish, 1 whole to 0 eaten; 0 while she holds none. */
+  fish: number
+  /** Impacts struck, and the pounding clock's reading at the last one. */
+  impacts: number
+  lastImpact: number
+  /** At the mortar but no longer striking: her pestle rests in the grain. */
+  resting: boolean
+  /** Arrived at the end of the current walk (the pair moves on together). */
+  arrived: boolean
+}
+
+export interface PoundingDuo {
+  phase: DuoPhase
+  /** Seconds in the current phase. */
+  clock: number
+  /** Seconds of pounding since the pair last took up their pestles. */
+  poundClock: number
+  /** Seconds until they next walk to the fish rack (Infinity: never). */
+  next: number
+  women: PoundingWoman[]
+  /** Visits to the rack made together. */
+  visits: number
+}
+
+/** The pair at its stands, just taking up the pestles. */
+export function createPoundingDuo(stands: readonly PounderStand[], next: number): PoundingDuo {
+  return {
+    phase: 'pound',
+    clock: 0,
+    poundClock: 0,
+    next,
+    women: stands.map((s) => ({ ...s, walked: 0, fish: 0, impacts: 0, lastImpact: -Infinity, resting: false, arrived: true })),
+    visits: 0,
+  }
+}
+
+/** Pounding-clock second at which woman `i` makes her first stroke: the
+ *  second woman starts half a stroke later, from her pestle at rest, so the
+ *  alternation is taken up without a jump. */
+function strokeStart(i: number, cfg: MortarConfig): number {
+  return (i % 2) * 0.5 * cfg.strokeSeconds
+}
+
+/** Woman `i`'s stroke phase at the mortar (0 is the impact, her pestle down in
+ *  the grain), or null while she is away from it. */
+export function womanStrokePhase(duo: PoundingDuo, i: number, cfg: MortarConfig = balance.villageLife.mortar): number | null {
+  if (duo.phase !== 'pound' && duo.phase !== 'settle') return null
+  if (duo.women[i].resting || duo.poundClock < strokeStart(i, cfg)) return 0
+  return poundPhase(duo.poundClock, i, cfg)
+}
+
+/** Seconds since woman `i`'s last impact (Infinity away or before her first). */
+export function womanSinceImpact(duo: PoundingDuo, i: number): number {
+  if (duo.phase !== 'pound' && duo.phase !== 'settle') return Infinity
+  return duo.poundClock - duo.women[i].lastImpact
+}
+
+/**
+ * Runs the pounding clock on by `dt` while the pair is at the mortar and
+ * counts each woman's impacts. While settling, a woman stops at her next
+ * impact and leaves her pestle resting in the grain.
+ */
+export function advancePounding(duo: PoundingDuo, dt: number, cfg: MortarConfig = balance.villageLife.mortar): void {
+  if (duo.phase !== 'pound' && duo.phase !== 'settle') return
+  const from = duo.poundClock
+  duo.poundClock += dt
+  duo.women.forEach((w, i) => {
+    if (w.resting) return
+    // Not yet started: her pestle is already resting in the grain.
+    if (duo.phase === 'settle' && from < strokeStart(i, cfg)) {
+      w.resting = true
+      return
+    }
+    const start = Math.max(from, strokeStart(i, cfg))
+    const struck = impactsBetween(start, duo.poundClock, i, cfg)
+    if (struck <= 0) return
+    if (duo.phase === 'settle') {
+      // She stops at the FIRST impact crossed, however long the step.
+      const offset = (i % 2) * 0.5
+      w.impacts += 1
+      w.lastImpact = (Math.floor(start / cfg.strokeSeconds + offset) + 1 - offset) * cfg.strokeSeconds
+      w.resting = true
+      return
+    }
+    w.impacts += struck
+    w.lastImpact = duo.poundClock - sinceImpact(duo.poundClock, i, cfg)
+  })
+}

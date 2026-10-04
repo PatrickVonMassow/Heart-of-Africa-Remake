@@ -1,7 +1,7 @@
 // THE FISHERMEN OF A RIVERSIDE VILLAGE, DRAWN (work-order 1245, design.md
 // §13.4): the two men in their dugout with the drift net, the catch, the two
 // woven baskets, and the fishers' own fire by the landing with its carrier,
-// griller, smoking rack and eater. The logic is `villagerCanoe.ts`,
+// griller, smoking rack, and the pounding pair who come to it to eat. The logic is `villagerCanoe.ts`,
 // `fishBaskets.ts` and `fishFire.ts`; this draws what they decide and speaks
 // the net man's two words through the same §13.4 path as every village voice:
 // the atom through the hearing curve at the CALL register, the reading over
@@ -13,7 +13,7 @@ import * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
 import { useGame } from '../../state/store'
-import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
+import { FIGURE_LIMBS } from '../../render/figures'
 import { applyFigurePose, type FigureLimbs } from '../../render/figurePose'
 import { buildFishGeometry, FISH_TONES } from '../../render/fishMesh'
 import {
@@ -43,12 +43,11 @@ import { speechBearing } from './speechBearing'
 import { BANK_WATER_DROP, type PlaceRiverBank } from './riverBank'
 import { basketRingViolation, type BasketRing, type FishBasket } from './fishBaskets'
 import {
-  biteLift,
   createFishFire,
   createFisheryRing,
-  eaterPoundStroke,
   fisherySites,
   stepFishFire,
+  stepPoundingDuo,
   type FishFireState,
   type FisherySites,
 } from './fishFire'
@@ -68,6 +67,8 @@ import {
   type PaddlerAction,
 } from './villagerCanoe'
 import { devAssert } from '../../systems/devAssert'
+import { isLifeFrozen } from './lifeFreeze'
+import { Pounder } from './Pounder'
 
 /** The speech-label id of the net man's words (the dugout's, as before). */
 export const CANOE_SPEAKER_ID = 'village-canoe'
@@ -81,11 +82,6 @@ const HULL_FLOOR_Y = 0.04
 /** A woven basket: its radius at the rim and its height. */
 const BASKET_R = 0.26
 const BASKET_H = 0.34
-// The eater's mortar is 0.42 m tall; at rest his pestle's foot sits 0.12 m
-// down in it, so the stroke lands in the grain (review of work-order 1251).
-const MORTAR_H = 0.42
-const PESTLE_LENGTH = 1.05
-const PESTLE_REST_Y = MORTAR_H - 0.12 + PESTLE_LENGTH / 2
 /** The rope's own axis and a scratch direction for orienting it. */
 const ROPE_UP = new THREE.Vector3(0, 1, 0)
 const ROPE_DIR = new THREE.Vector3()
@@ -320,12 +316,6 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const gutFish = useRef<THREE.Mesh>(null)
   const grillerPose = useRef<FigurePose | null>({ ...REST_POSE })
   const grillerLimbs = useRef<FigureLimbs | null>(null)
-  const eaterG = useRef<THREE.Group>(null)
-  const eaterPose = useRef<FigurePose | null>({ ...REST_POSE })
-  const eaterLimbs = useRef<FigureLimbs | null>(null)
-  const eaterGait = useRef(0)
-  const eaterFish = useRef<THREE.Group>(null)
-  const eaterPestle = useRef<THREE.Mesh>(null)
   const boardFish = useRef<Array<THREE.Mesh | null>>([])
   const grillFish = useRef<Array<THREE.Mesh | null>>([])
   const rackFish = useRef<Array<THREE.Mesh | null>>([])
@@ -334,8 +324,6 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
   // The griller kneels at his fire: a body the passers-by go round.
   useStandingBody(sites.griller.x, sites.griller.z)
-  // The eater's mortar, which he pounds at between his visits (work-order 1251).
-  useStandingBody(sites.eaterMortar.x, sites.eaterMortar.z)
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -373,7 +361,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       cfg,
       rand,
     )
-    stepFishFire(fire, sites, ring, dt, round, fireCfg, rand)
+    stepFishFire(fire, sites, ring, dt, round, fireCfg)
     devAssert(basketRingViolation(ring) === null, 'fish-basket-ring', () => `fish baskets: ${basketRingViolation(ring)}`)
 
     // THE HULL AND THE MEN.
@@ -590,33 +578,9 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
     })
     if (flame.current) flame.current.scale.set(1, 0.8 + 0.25 * Math.sin(t * 9) + 0.1 * Math.sin(t * 23.7), 1)
 
-    // THE EATER.
-    const e = fire.eater
-    eaterGait.current = e.phase === 'toRack' || e.phase === 'back' ? gaitPhase(e.walked, cadence) : 0
-    if (eaterG.current) {
-      eaterG.current.position.set(e.x, groundHeight(e.x, e.z), e.z)
-      eaterG.current.rotation.y = e.yaw
-    }
-    const ep = eaterPose.current
-    if (ep) {
-      const lift = biteLift(e, fireCfg)
-      const stroke = eaterPoundStroke(e, fireCfg)
-      if (eaterPestle.current) eaterPestle.current.position.y = PESTLE_REST_Y + stroke * 0.38
-      const next: FigurePose =
-        e.phase === 'home'
-          ? { left: armAim(0.2, 0.35 + stroke * 0.55), right: armAim(-0.2, 0.35 + stroke * 0.55), lean: 0.14 - stroke * 0.08, turn: 0 }
-          : e.phase === 'take'
-          ? reachPose(0, 0.3 * Math.sin(Math.PI * Math.min(1, e.clock / fireCfg.takeSeconds)))
-          : e.phase === 'eat'
-            ? { left: armAim(0.35, -0.55 + 1.35 * lift), right: { ...REST_POSE.right }, lean: 0.04, turn: 0 }
-            : { ...REST_POSE, left: { ...REST_POSE.left }, right: { ...REST_POSE.right } }
-      copyPose(ep, next)
-      applyFigurePose(eaterLimbs.current, ep)
-    }
-    if (eaterFish.current) {
-      eaterFish.current.visible = e.fish > 0
-      eaterFish.current.scale.set(1, 1, Math.max(0.15, e.fish))
-    }
+    // THE POUNDING PAIR, held at their mortar by the dev life freeze like
+    // every other inhabitant (`Pounder` draws them).
+    if (!isLifeFrozen()) stepPoundingDuo(fire, sites, dt, fireCfg, rand)
   })
 
   // Dev hooks for the headless verification (CLAUDE.md §7.2).
@@ -647,7 +611,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
     w.__placeFishFire = () => ({
       carrier: { ...fire.carrier, waits: [...fire.carrier.waits] },
       griller: { ...fire.griller },
-      eater: { ...fire.eater },
+      duo: { ...fire.duo, women: fire.duo.women.map((w) => ({ ...w })) },
       board: fire.board,
       grill: fire.grill.map((f) => ({ ...f })),
       rack: [...fire.rack],
@@ -655,9 +619,15 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       baskets: ring.baskets.map((b) => ({ ...b })),
       sites,
     })
+    // Sets the seconds until the pounding pair next leaves for the rack, so a
+    // proof can hold them at their mortar or send them now (point 1282).
+    w.__placeFishDuoNext = (seconds: number) => {
+      fire.duo.next = seconds
+    }
     return () => {
       delete w.__placeCanoe
       delete w.__placeFishFire
+      delete w.__placeFishDuoNext
     }
   }, [canoe, fire, ring, lane, sites, cfg])
 
@@ -675,7 +645,6 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       paddler: [canoe.paddler.x, -BANK_WATER_DROP + CANOE_SEAT_Y, canoe.paddler.z] as [number, number, number],
       net: [canoe.netMan.x, -BANK_WATER_DROP + CANOE_SEAT_Y, canoe.netMan.z] as [number, number, number],
       carrier: [fire.carrier.x, 0, fire.carrier.z] as [number, number, number],
-      eater: [fire.eater.x, 0, fire.eater.z] as [number, number, number],
     }),
     // Read once at birth; the frame loop owns the transforms afterwards.
     [canoe, fire],
@@ -947,32 +916,8 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       <group name="fish-griller" position={[sites.griller.x, groundHeight(sites.griller.x, sites.griller.z), sites.griller.z]} rotation={[0, sites.griller.yaw, 0]}>
         <Figure cloth={clothOf(3)} kneel pose={grillerPose} limbs={grillerLimbs} />
       </group>
-      {/* THE EATER'S MORTAR: he pounds grain here between his visits. */}
-      <group position={[sites.eaterMortar.x, groundHeight(sites.eaterMortar.x, sites.eaterMortar.z), sites.eaterMortar.z]}>
-        <mesh position={[0, MORTAR_H / 2, 0]} castShadow>
-          <cylinderGeometry args={[0.2, 0.26, MORTAR_H, TESSELLATION.mortar]} />
-          <meshStandardMaterial color="#5f4526" roughness={0.95} />
-        </mesh>
-        <mesh ref={eaterPestle} name="eater-pestle" position={[0, PESTLE_REST_Y, 0]} castShadow>
-          <cylinderGeometry args={[0.045, 0.055, PESTLE_LENGTH, TESSELLATION.pestle]} />
-          <meshStandardMaterial color="#7a5a32" roughness={0.9} />
-        </mesh>
-      </group>
-      {/* THE EATER. */}
-      <group ref={eaterG} name="fish-eater" position={born.eater}>
-        <Figure
-          cloth={clothOf(4)}
-          legs
-          pose={eaterPose}
-          limbs={eaterLimbs}
-          gait={eaterGait}
-          handProp={
-            <group ref={eaterFish} visible={false}>
-              <mesh geometry={fishGeometry} material={materials.smoked} rotation={[Math.PI / 2, 0, 0]} scale={0.3} />
-            </group>
-          }
-        />
-      </group>
+      {/* THE POUNDING PAIR at the village's one mortar outside the middle (point 1282). */}
+      <Pounder x={sites.duoMortar.x} z={sites.duoMortar.z} yaw={sites.duoYaw} cloth={[clothOf(4), clothOf(0)]} duo={fire.duo} />
     </>
   )
 }

@@ -173,16 +173,18 @@ describe('the village water path (work-order 688)', () => {
   // work-order 1245: with the water path moved upstream, 330 finds its lane on
   // the outer head rungs instead; 661, 673 and 762 still route through a wall.
   // Re-picked by point 1272 (market hut moved): 661 found a way round; 3 needs a gate.
-  const gatedSeeds = [3, 762]
+  // Re-picked by point 1282 (the centre mortar went to the river): 3 found a
+  // way round; 10 is the first seed that crosses a compound opening again.
+  const gatedSeeds = [10, 762]
 
   it.each(gatedSeeds)('seed %i: gate rebuilding preserves village props and exactly two settled rock colliders', (seed) => {
     const layout = buildLayout('bambara-village', seed)
     const props = [
       { x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 },
       { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
-      { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
       { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },
-      // No well here: this village draws its water from the river (point 1092).
+      // No well here: this village draws its water from the river (point 1092),
+      // and its pounding pair works by the fishers' fire (point 1282).
     ]
     for (const prop of props) expect(layout.colliders).toContainEqual(prop)
     // Weaving is parked (user 29.09.2026): the shipped plan lays no loom, so

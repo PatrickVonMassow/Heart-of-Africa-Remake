@@ -66,6 +66,8 @@ import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
 import { RiverFishery } from './RiverFishery'
+import { Pounder } from './Pounder'
+import { isLifeFrozen } from './lifeFreeze'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import {
   absorbSeparation,
@@ -123,11 +125,10 @@ import {
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { speechBearing } from './speechBearing'
-import { bowlRadiusAt, grainLevel, impactsBetween, mortarProfile, poundFrame, poundPhase, puffGrain, sinceImpact } from './mortarPounding'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { conceptSpeech, cryPlan, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
-import { playLoomBeat, playPoundThud, playSpeech, playTagCry } from '../../systems/ambience'
+import { playLoomBeat, playSpeech, playTagCry } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
@@ -180,17 +181,6 @@ import {
 /** Collision radius of inhabitants (WALKER_RADIUS; the player's own is PLAYER_RADIUS). */
 const NPC_RADIUS = WALKER_RADIUS
 
-/**
- * Dev-only life freeze for the headless proof frames (work-order 1108): while
- * set, every inhabitant loop below skips its frame, so a line read and the
- * picture taken after it show the same instant.
- */
-let lifeFrozen = false
-if (import.meta.env.DEV && typeof window !== 'undefined') {
-  ;(window as unknown as Record<string, unknown>).__placeFreezeLife = (on: boolean) => {
-    lifeFrozen = on
-  }
-}
 
 /** Kneeling cook with a three-stick pot beside the village fire. */
 function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
@@ -323,7 +313,7 @@ function Loom({
   )
 
   useFrame((_, rawDt) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const before = work.errand ? work.errand.at : 0
     const said = stepLoomWork(
@@ -981,7 +971,7 @@ function Kids({
   const beatShot = useRef<TagBeatShot | null>(null)
 
   useFrame((_, rawDt) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     if (import.meta.env.DEV && (chargeCapture.current.held || catchCapture.current.held)) return
     const dt = Math.min(rawDt, 0.1)
     let spoken: BankUtterance | null = null
@@ -1572,7 +1562,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
     }))
   }
   useFrame(({ clock }, rawDt) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const t = clock.elapsedTime
     const dt = Math.min(rawDt, 0.1)
     // Publish every animal's last position into the scene before anyone moves,
@@ -1764,7 +1754,7 @@ function Porters({
     [colliders],
   )
   useFrame(({ clock }, rawDt) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
@@ -1901,7 +1891,7 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   useStandingBodies(stances)
 
   useFrame(({ clock }) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const t = clock.elapsedTime
     // Slight turns toward each other — the conversation's idle, and all of it.
     if (a.current) {
@@ -1952,219 +1942,6 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
       <group ref={b} position={[0.5, 0, 0]}>
         <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} />
       </group>
-    </group>
-  )
-}
-
-/** The pestle's turned profile from its foot: a rounded, heavier foot, a
- *  slimmer grip and a flared head, so it reads as a carved pestle and not a
- *  stick. */
-function pestleProfile(length: number, r: number): THREE.Vector2[] {
-  return [
-    [0.0001, 0], [r * 0.9, 0.012], [r * 1.25, 0.06], [r * 1.25, 0.2], [r * 0.85, 0.42],
-    [r * 0.85, length - 0.38], [r * 1.12, length - 0.12], [r * 0.85, length - 0.01], [0.0001, length],
-  ].map(([x, y]) => new THREE.Vector2(x, y))
-}
-
-const UP = new THREE.Vector3(0, 1, 0)
-/** The most women `villageLife.mortar.pounders` can put at one mortar. */
-const MAX_POUNDERS = 2
-
-/** Dev/verify probe of the pounding (read by the place verification). */
-export interface PoundingProbe {
-  /** The mortar's centre on the ground, and the rim's height above it. */
-  mortar: { x: number; y: number; z: number; rim: number }
-  /** Per woman: her stroke phase, her pestle foot (world), whether her grain
-   *  puff is in the air, and how many impacts she has made. */
-  women: Array<{ phase: number; foot: { x: number; y: number; z: number }; puff: boolean; impacts: number }>
-  /** Thuds actually handed to the audio this visit. */
-  thuds: number
-  /** Impacts that were handed to a thud in the frame they happened — equal to
-   *  the women's impacts summed when every strike is heard. */
-  heard: number
-}
-
-/**
- * Grain pounding (design.md §19), work-order point 1274: a footed, hollowed
- * wooden mortar with grain in its bowl, and two women who pound it ALTERNATELY
- * with long pestles held in both hands — lifted high, driven down with the
- * knees giving, the foot landing in the grain with a puff and a thud. The
- * whole stroke is solved in `mortarPounding.ts`; this only draws it.
- */
-function Pounder({ x, z, cloth }: { x: number; z: number; cloth: readonly string[] }) {
-  const groundHeight = usePlaceGround()
-  const camera = useThree((state) => state.camera)
-  const cfg = balance.villageLife.mortar
-  const count = Math.min(MAX_POUNDERS, Math.max(1, cfg.pounders))
-  const yaw = Math.atan2(-x, -z)
-  const gy = groundHeight(x, z)
-  // Woman 0 stands on the outer side facing in (her old place), woman 1 across
-  // the mortar facing out — each `standOff` from its centre.
-  const stands = useMemo(() => [-1, 1].slice(0, count).map((side) => ({
-    x: x + Math.sin(yaw) * side * cfg.standOff,
-    z: z + Math.cos(yaw) * side * cfg.standOff,
-  })), [x, z, yaw, count, cfg.standOff])
-  // Bodies the passers-by go round (point 578).
-  useStandingBodies(stands)
-  // Rebuilt whenever a shape tunable changes (the profile reads all of them).
-  const { height, footRadius, waistRadius, rimRadius, bowlDepth } = cfg
-  const mortarGeometry = useMemo(
-    () => new THREE.LatheGeometry(
-      mortarProfile({ ...balance.villageLife.mortar, height, footRadius, waistRadius, rimRadius, bowlDepth }).map(([r, y]) => new THREE.Vector2(r, y)),
-      TESSELLATION.mortar,
-    ),
-    [height, footRadius, waistRadius, rimRadius, bowlDepth],
-  )
-  const pestleGeometry = useMemo(
-    () => new THREE.LatheGeometry(pestleProfile(cfg.pestleLength, cfg.pestleRadius), TESSELLATION.pestle),
-    [cfg.pestleLength, cfg.pestleRadius],
-  )
-  useEffect(() => () => { mortarGeometry.dispose(); pestleGeometry.dispose() }, [mortarGeometry, pestleGeometry])
-  const grainRadius = bowlRadiusAt(grainLevel())
-  // Per-woman state is sized for EVERY slot `pounders` allows, so a change of
-  // the count between renders can never index past it.
-  const poses = useRef(Array.from({ length: MAX_POUNDERS }, () => ({ current: { ...poundFrame(0).pose } as FigurePose | null })))
-  const squats = useRef(Array.from({ length: MAX_POUNDERS }, () => ({ current: 1 })))
-  const figures = useRef<Array<THREE.Group | null>>([])
-  const pestles = useRef<Array<THREE.Mesh | null>>([])
-  const grains = useRef<Array<Array<THREE.Mesh | null>>>(Array.from({ length: MAX_POUNDERS }, () => []))
-  const chaff = useRef<Array<THREE.Mesh | null>>([])
-  const last = useRef<number | null>(null)
-  const impacts = useRef(Array.from({ length: MAX_POUNDERS }, () => 0))
-  const thuds = useRef(0)
-  const heard = useRef(0)
-  const axis = useMemo(() => new THREE.Vector3(), [])
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    const w = window as unknown as { __placePounding?: () => PoundingProbe }
-    w.__placePounding = () => {
-      const t = last.current ?? 0
-      return {
-        mortar: { x, y: gy, z, rim: cfg.height },
-        women: Array.from({ length: count }, (_, i) => {
-          const phase = poundPhase(t, i)
-          const f = poundFrame(phase).foot
-          // Her frame: woman 0 faces +yaw from the outer side, woman 1 the other way.
-          const side = i === 0 ? -1 : 1
-          const facing = i === 0 ? yaw : yaw + Math.PI
-          const s = Math.sin(facing)
-          const c = Math.cos(facing)
-          const ox = x + Math.sin(yaw) * side * cfg.standOff
-          const oz = z + Math.cos(yaw) * side * cfg.standOff
-          return {
-            phase,
-            foot: { x: ox + f[0] * c + f[2] * s, y: gy + f[1], z: oz - f[0] * s + f[2] * c },
-            puff: sinceImpact(t, i) < cfg.puffSeconds,
-            impacts: impacts.current[i],
-          }
-        }),
-        thuds: thuds.current,
-        heard: heard.current,
-      }
-    }
-    return () => {
-      delete w.__placePounding
-    }
-  }, [x, z, gy, yaw, count, cfg])
-
-  useFrame(({ clock }) => {
-    if (import.meta.env.DEV && lifeFrozen) return
-    const t = clock.elapsedTime
-    const previous = last.current ?? t
-    last.current = t
-    let struckNow = 0
-    for (let i = 0; i < count; i++) {
-      const frame = poundFrame(poundPhase(t, i))
-      const pose = poses.current[i].current
-      if (pose) {
-        Object.assign(pose.left, frame.pose.left)
-        Object.assign(pose.right, frame.pose.right)
-        pose.lean = frame.pose.lean
-        pose.turn = 0
-      }
-      squats.current[i].current = frame.squat
-      figures.current[i]?.scale.set(1, frame.squat, 1)
-      const pestle = pestles.current[i]
-      if (pestle) {
-        pestle.position.set(frame.foot[0], frame.foot[1], frame.foot[2])
-        pestle.quaternion.setFromUnitVectors(UP, axis.set(frame.axis[0], frame.axis[1], frame.axis[2]))
-      }
-      const since = sinceImpact(t, i)
-      grains.current[i].forEach((g, k) => {
-        if (!g) return
-        const puff = puffGrain(k, since)
-        g.visible = puff.visible
-        if (puff.visible) g.position.set(cfg.strikeOffset + puff.offset[0], grainLevel() + puff.offset[1], cfg.standOff + puff.offset[2])
-      })
-      const cloud = chaff.current[i]
-      if (cloud) {
-        const u = since / cfg.puffSeconds
-        cloud.visible = u < 1
-        if (u < 1) {
-          cloud.scale.setScalar(0.6 + 2 * u)
-          ;(cloud.material as THREE.MeshStandardMaterial).opacity = 0.6 * (1 - u)
-        }
-      }
-      const struck = impactsBetween(previous, t, i)
-      if (struck > 0) {
-        impacts.current[i] += struck
-        struckNow += struck
-      }
-    }
-    if (struckNow > 0) {
-      thuds.current++
-      heard.current += struckNow
-      const at = { x, z }
-      const distance = placePlayerPosition.active
-        ? Math.hypot(at.x - placePlayerPosition.x, at.z - placePlayerPosition.z)
-        : Infinity
-      playPoundThud(distance, speechBearing(camera, at))
-    }
-  })
-
-  return (
-    <group position={[x, gy, z]} rotation={[0, yaw, 0]}>
-      {/* The mortar: one carved block, footed and waisted, hollowed at the top. */}
-      <mesh geometry={mortarGeometry} castShadow receiveShadow>
-        <meshStandardMaterial color="#6a4526" roughness={0.92} />
-      </mesh>
-      {/* Two carved bands, darker where the wood is worn by hands. */}
-      {[0.16, 0.86].map((f) => (
-        <mesh key={f} position={[0, cfg.height * f, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[f < 0.5 ? cfg.footRadius * 0.84 : cfg.rimRadius * 0.96, 0.009, 4, TESSELLATION.mortar]} />
-          <meshStandardMaterial color="#3f2914" roughness={0.95} />
-        </mesh>
-      ))}
-      {/* Grain heaped in the bowl (millet / sorghum). */}
-      <mesh position={[0, grainLevel(), 0]} scale={[1, 0.28, 1]}>
-        <sphereGeometry args={[grainRadius, TESSELLATION.mortar, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color="#d9bf6e" roughness={1} />
-      </mesh>
-      {stands.map((_, i) => (
-        // Each woman's own frame: at her stand, facing the mortar.
-        <group key={i} name={`village-pounder-${i}`} position={[0, 0, i === 0 ? -cfg.standOff : cfg.standOff]} rotation={[0, i === 0 ? 0 : Math.PI, 0]}>
-          <group ref={(el) => { figures.current[i] = el }}>
-            <Figure cloth={cloth[i % cloth.length]} pose={poses.current[i]} squat={squats.current[i]} legs />
-          </group>
-          {/* Her pestle, its foot in the mortar (her frame: +z is forward). */}
-          <group>
-            <mesh name={`village-pestle-${i}`} ref={(el) => { pestles.current[i] = el }} geometry={pestleGeometry} castShadow>
-              <meshStandardMaterial color="#8a6438" roughness={0.85} />
-            </mesh>
-            {Array.from({ length: cfg.puffGrains }, (_, k) => (
-              <mesh key={k} ref={(el) => { grains.current[i][k] = el }} visible={false}>
-                <sphereGeometry args={[0.022, 5, 4]} />
-                <meshStandardMaterial color="#e2cc84" roughness={1} />
-              </mesh>
-            ))}
-            <mesh ref={(el) => { chaff.current[i] = el }} position={[cfg.strikeOffset, grainLevel() + 0.05, cfg.standOff]} visible={false}>
-              <sphereGeometry args={[0.08, 8, 6]} />
-              <meshStandardMaterial color="#e8dcb0" roughness={1} transparent opacity={0.4} depthWrite={false} />
-            </mesh>
-          </group>
-        </group>
-      ))}
     </group>
   )
 }
@@ -2255,7 +2032,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     return () => { setDrummerVoice(null); voice?.dispose() }
   }, [voice])
   useFrame((_, rawDt) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
@@ -2291,7 +2068,7 @@ function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   useStandingBody(x, z)
   const stick = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     if (stick.current) stick.current.rotation.x = 0.85 + Math.sin(clock.elapsedTime * 1.6) * 0.12
   })
   return (
@@ -2384,7 +2161,7 @@ function TaskWalker({
   )
 
   useFrame((_, rawDt) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const s = state.current
     const stand = standing.current
@@ -2642,7 +2419,7 @@ function Walkers({
   }, [defs, groundHeight])
 
   useFrame(({ clock }, rawDt) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const t = clock.elapsedTime
     /** Point 578: this walker's body, pushed clear of the other inhabitants
@@ -3059,7 +2836,7 @@ function ErrandVillagers({
   )
 
   useFrame((_, rawDt) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.adultErrands
     // The jars standing at the village water stand: as many as the errand
@@ -3784,7 +3561,7 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
   // Bodies the passers-by go round (point 578).
   useStandingBodies(spots)
   useFrame(({ clock }) => {
-    if (import.meta.env.DEV && lifeFrozen) return
+    if (isLifeFrozen()) return
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
       const s = spots[i]
@@ -4195,7 +3972,8 @@ export function PlaceLife({
           {/* Inhabitant/prop interactions (design.md §19). */}
           <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
           <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
-          <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={[style.cloth[0], style.cloth[3 % style.cloth.length]]} />
+          {/* A riverside village's pair pounds by the fishers' fire (RiverFishery, point 1282). */}
+          {!bank && <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={[style.cloth[0], style.cloth[3 % style.cloth.length]]} />}
           <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
           {hasWell && <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />}
           {homes.length > 0 && (

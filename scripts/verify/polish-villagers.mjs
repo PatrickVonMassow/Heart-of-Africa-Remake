@@ -585,48 +585,134 @@ if (section('villager-canoe')) {
         })
       }
 
-      // --- 4. The eater between his visits (work-order 1251) ---------------
-      // The report `UntaetigerErwachsener`: he stood idle on the beach. At home
-      // he now pounds grain at his mortar; photographed from beside him.
-      const atHome = await page
-        .waitForFunction(() => window.__placeFishFire?.().eater.phase === 'home', null, { timeout: 200000, polling: 250 })
+      // --- 4. The pounding pair by the fishers' fire (point 1282) ------------
+      // One mortar in the village: the fish eater's mortar is gone, and the two
+      // pounding women work where it stood. Every few minutes they walk together
+      // to the smoking rack, each take a fish and eat it there.
+      const mortars = await page.evaluate(() => {
+        const spot = window.__placeSpots.pounder
+        const found = []
+        window.__placeScene.traverse((o) => {
+          if (o.name !== 'village-mortar') return
+          const v = o.getWorldPosition(new o.position.constructor())
+          found.push({ x: +v.x.toFixed(2), z: +v.z.toFixed(2), atCentre: Math.hypot(v.x - spot[0], v.z - spot[1]) < 1 })
+        })
+        const s = window.__placeFishFire().sites
+        return { found, duo: s.duoMortar, eaterPestle: !!window.__placeScene.getObjectByName('eater-pestle') }
+      })
+      check('the village carries exactly one mortar, none at the old village-centre spot, and no fish eater’s mortar',
+        mortars.found.length === 1 && !mortars.found[0].atCentre && !mortars.eaterPestle &&
+          Math.hypot(mortars.found[0].x - mortars.duo.x, mortars.found[0].z - mortars.duo.z) < 0.05,
+        JSON.stringify(mortars))
+      const atMortar = await page
+        .waitForFunction(() => window.__placeFishFire?.().duo.phase === 'pound', null, { timeout: 200000, polling: 250 })
         .then(() => true)
         .catch(() => false)
-      check('the eater is at home between his visits', atHome)
-      if (atHome) {
-        const eaterStand = await page.evaluate(() => {
+      check('the pair is at its mortar by the river between visits', atMortar)
+      if (atMortar) {
+        // Held at the mortar for the frame, then sent to the rack below.
+        await page.evaluate(() => window.__placeFishDuoNext(1e9))
+        const pairStand = await page.evaluate(() => {
           const s = window.__placeFishFire().sites
-          const h = s.eaterHome
-          const m = s.eaterMortar
-          // Across the mortar from him, a few metres back, so both are in frame.
-          const dx = m.x - h.x
-          const dz = m.z - h.z
-          const d = Math.hypot(dx, dz) || 1
-          return { at: { x: m.x + (dx / d) * 4 + (dz / d) * 1.5, z: m.z + (dz / d) * 4 - (dx / d) * 1.5 }, look: { x: (h.x + m.x) / 2, z: (h.z + m.z) / 2 } }
+          const m = s.duoMortar
+          // Side-on to the pair: along the line square to their stands, a few
+          // metres out, on the village side of the walk to the rack.
+          const ax = s.duoStands[1].x - s.duoStands[0].x
+          const az = s.duoStands[1].z - s.duoStands[0].z
+          const d = Math.hypot(ax, az) || 1
+          const sx = -az / d
+          const sz = ax / d
+          const toRack = (s.rack.x - m.x) * sx + (s.rack.z - m.z) * sz
+          const k = toRack > 0 ? -1 : 1
+          return { at: { x: m.x + sx * k * 3.6, z: m.z + sz * k * 3.6 }, look: { x: m.x, z: m.z } }
         })
-        await standAt(eaterStand.at, eaterStand.look)
+        await standAt(pairStand.at, pairStand.look)
         const inside = await inPlace()
-        check('the eater’s standing place is inside the settlement', inside)
-        const pestle = []
+        check('the pair’s standing place is inside the settlement', inside)
+        const strokes = []
         for (let i = 0; i < 20; i++) {
-          pestle.push(await page.evaluate(() => window.__placeScene?.getObjectByName('eater-pestle')?.position.y ?? null))
+          strokes.push(await page.evaluate(() => window.__placePounding().women.map((w) => +w.foot.y.toFixed(2))))
           await nextFrames(4)
         }
-        const ys = pestle.filter((y) => typeof y === 'number')
-        check('at home he pounds: the pestle rises and falls', ys.length >= 10 && Math.max(...ys) - Math.min(...ys) > 0.15, JSON.stringify(ys.map((y) => +y.toFixed(2))))
-        // Its foot (half its 1.05 m below the centre) lands inside the 0.42 m mortar.
-        check('the pestle lands in the mortar, not in the air above it', ys.length >= 10 && Math.min(...ys) - 0.525 < 0.42, JSON.stringify(ys.map((y) => +y.toFixed(2))))
+        const lifts = [0, 1].map((i) => Math.max(...strokes.map((s) => s[i])) - Math.min(...strokes.map((s) => s[i])))
+        check('at the river mortar both women pound: each pestle rises and falls', lifts.every((l) => l > 0.2), JSON.stringify(lifts))
         const seen = await page.evaluate(() => {
           const f = window.__placeFishFire()
           const seen = window.__canoeSeen
-          return { phase: f.eater.phase, eater: seen(f.eater.x, 0.9, f.eater.z, 0.8), mortar: seen(f.sites.eaterMortar.x, 0.3, f.sites.eaterMortar.z, 0.5) }
+          return { phase: f.duo.phase, women: f.duo.women.map((w) => seen(w.x, 0.9, w.z, 0.8)), mortar: seen(f.sites.duoMortar.x, 0.4, f.sites.duoMortar.z, 0.5) }
         })
-        check('the eater and his mortar are in frame, nothing hiding them', inside && seen.phase === 'home' && seen.eater && seen.mortar, JSON.stringify(seen))
-        const m = await page.evaluate(() => window.__placeFishFire().sites.eaterMortar)
-        await frame('1251-eater-pounds', {
-          local: { x: m.x, y: 0.6, z: m.z },
-          label: 'the fishers’ eater between his visits to the smoking rack: pounding grain with pestle and mortar at his place on the shore, not standing idle',
+        check('both women and their mortar are in frame, nothing hiding them', inside && seen.phase === 'pound' && seen.women.every(Boolean) && seen.mortar, JSON.stringify(seen))
+        const m = await page.evaluate(() => window.__placeFishFire().sites.duoMortar)
+        await frame('1282-pair-pounds-by-the-river', {
+          local: { x: m.x, y: 0.7, z: m.z },
+          label: 'the village’s one mortar, by the fishers’ fire: two women pounding grain alternately where the fish eater’s mortar stood',
         })
+        // Now send them: both finish the stroke in hand and walk to the rack.
+        await page.evaluate(() => window.__placeFishDuoNext(0))
+        const eating = await page
+          .waitForFunction(() => window.__placeFishFire?.().duo.phase === 'eat', null, { timeout: 120000, polling: 100 })
+          .then(() => true)
+          .catch(() => false)
+        check('the pair walks to the fish rack together and both eat there', eating)
+        if (eating) {
+          const rackStand = await page.evaluate(() => {
+            const f = window.__placeFishFire()
+            const [a, b] = f.sites.duoAtRack
+            const mid = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }
+            // Obliquely from the water side, beyond the rack's far end (away
+            // from the fire): their faces and the fish they raise are toward the
+            // lens, the rack stands beside them, and neither hides the other.
+            const fx = Math.sin(a.yaw)
+            const fz = Math.cos(a.yaw)
+            const ux = f.sites.rack.x - f.sites.fire.x
+            const uz = f.sites.rack.z - f.sites.fire.z
+            const ud = Math.hypot(ux, uz) || 1
+            return { at: { x: mid.x + (ux / ud) * 3.6 + fx * 2.4, z: mid.z + (uz / ud) * 3.6 + fz * 2.4 }, look: mid, holding: f.duo.women.map((w) => w.fish > 0) }
+          })
+          await standAt(rackStand.at, rackStand.look)
+          await nextFrames(2)
+          const inside2 = await inPlace()
+          const seen2 = await page.evaluate(() => {
+            const f = window.__placeFishFire()
+            const seen = window.__canoeSeen
+            return { phase: f.duo.phase, women: f.duo.women.map((w) => seen(w.x, 0.9, w.z, 0.8)), holding: f.duo.women.map((w) => w.fish > 0), rack: seen(f.sites.rack.x, 0.9, f.sites.rack.z, 0.8) }
+          })
+          check('both women stand eating at the rack, each with a fish in hand, in frame', inside2 && seen2.phase === 'eat' && seen2.women.every(Boolean) && seen2.holding.every(Boolean), JSON.stringify({ rackStand, seen2 }))
+          const r = await page.evaluate(() => {
+            const [a, b] = window.__placeFishFire().sites.duoAtRack
+            return { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }
+          })
+          await frame('1282-pair-eats-at-fish-fire', {
+            local: { x: r.x, y: 0.9, z: r.z },
+            label: 'the two pounding women at the fishers’ smoking rack, each eating a smoked fish before they walk back to their mortar together',
+          })
+          // And back: both at their stands again, pounding alternately.
+          const back = await page
+            .waitForFunction(() => window.__placeFishFire?.().duo.phase === 'pound', null, { timeout: 120000, polling: 100 })
+            .then(() => true)
+            .catch(() => false)
+          const atStands = back && (await page.evaluate(() => {
+            const f = window.__placeFishFire()
+            return f.duo.women.every((w, i) => Math.hypot(w.x - f.sites.duoStands[i].x, w.z - f.sites.duoStands[i].z) < 0.05)
+          }))
+          check('the pair walks back to the mortar and both stand at their stands again', atStands)
+          const before = await page.evaluate(() => window.__placePounding().women.map((w) => w.impacts))
+          const gaps = []
+          for (let i = 0; i < 20; i++) {
+            gaps.push(await page.evaluate(() => {
+              const [a, b] = window.__placePounding().women.map((w) => w.phase)
+              return a > 0 && b > 0 ? Math.min((b - a + 1) % 1, (a - b + 1) % 1) : null
+            }))
+            await nextFrames(4)
+          }
+          const after = await page.evaluate(() => window.__placePounding().women.map((w) => w.impacts))
+          const measured = gaps.filter((g) => g !== null)
+          check(
+            'back at the mortar both strike again, half a stroke apart',
+            atStands && after.every((n, i) => n > before[i]) && measured.length > 0 && measured.every((g) => g > 0.45),
+            JSON.stringify({ before, after, gaps }),
+          )
+        }
       }
     }
   } finally {
@@ -3351,7 +3437,25 @@ if (section('village-pounding')) {
   await goToPlace('bambara-village')
   const ready = await stepUntil(() => !!window.__placePounding, null, 240)
   check('the village mortar publishes its pounding', ready)
-  if (ready && hasFreeze) {
+  // The pair walks to the fishers' fire every few minutes (point 1282): wait
+  // until they are back at the mortar, then hold them there for the shots.
+  const pounding = ready && await page
+    .waitForFunction(() => window.__placePounding().activity === 'pound', null, { timeout: 200000, polling: 250 })
+    .then(() => true)
+    .catch(() => false)
+  check('the pair is at its mortar', pounding)
+  if (pounding) {
+    await page.evaluate(() => {
+      window.__placeFishDuoNext?.(1e9)
+      // Within earshot of the mortar, which now stands by the fishers' fire.
+      const m = window.__placePounding().mortar
+      const p = window.__placePlayer
+      p.x = m.x + Math.cos(m.yaw) * 4
+      p.z = m.z - Math.sin(m.yaw) * 4
+    })
+    await nextFrames(3)
+  }
+  if (ready && hasFreeze && pounding) {
     // Both women strike, and EVERY impact is handed to a thud in its own frame.
     // The thud is observed where the AUDIO module receives and schedules it
     // (`__poundThud`), never by the vignette's own counters alone: deleting the
@@ -3393,7 +3497,7 @@ if (section('village-pounding')) {
     const MAX_OFF_SQUARE = 30
     const shots = [
       { name: '1274-village-pounding-close', stand: [2.6, 3.2, 2.2, 3.8], label: 'two women pounding grain at a footed wooden mortar, side-on from close range (2.2-3.8 m): one pestle down in the grain with a puff, the other lifted high' },
-      { name: '1274-village-pounding-mid', stand: [8, 7, 9.5, 6], label: 'the same mortar pounding from mid-distance (6-9.5 m) across the village ground, side-on: two women, one pestle down, one lifted' },
+      { name: '1274-village-pounding-mid', stand: [8, 7, 9.5, 6], label: 'the same mortar by the fishers\u2019 fire pounding from mid-distance (6-9.5 m), side-on: two women, one pestle down, one lifted' },
     ]
     const sameProbe = (a, b) => JSON.stringify(a) === JSON.stringify(b)
     for (const shot of shots) {
@@ -3426,9 +3530,9 @@ if (section('village-pounding')) {
           const layout = window.__placeLayout
           const m = probe.mortar
           const p = window.__placePlayer
-          // The pair stands on the line through the village centre; side-on is
-          // square to it. Anything near the mortar is the vignette itself.
-          const along = Math.atan2(-m.x, -m.z)
+          // The pair stands on the line the mortar's frame is turned to; side-on
+          // is square to it. Anything near the mortar is the vignette itself.
+          const along = m.yaw
           const others = layout.colliders.filter((c) => !(Math.hypot((c.x ?? 1e9) - m.x, (c.z ?? 1e9) - m.z) < 1.2))
           const clear = (x, z) => Math.min(...others.map((c) => window.__clearanceTo(c, x, z)))
           // Every OTHER drawn person (life is frozen): none may stand between
@@ -3463,7 +3567,10 @@ if (section('village-pounding')) {
             const angle = along + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * step)
             const x = m.x + Math.sin(angle) * standOff
             const z = m.z + Math.cos(angle) * standOff
-            if (Math.hypot(x, z) > layout.radius - 0.5) { why.push(`${standOff}/${k}:outside`); continue }
+            // The walkable boundary at that bearing (the river village's lobe
+            // reaches past the plain radius; the mortar stands in it, point 1282).
+            const edge = window.__placeBoundaryRadius?.(Math.atan2(z, x)) ?? layout.radius
+            if (Math.hypot(x, z) > edge - 0.5) { why.push(`${standOff}/${k}:outside`); continue }
             if (clear(x, z) < 0.35) { why.push(`${standOff}/${k}:stand ${clear(x, z).toFixed(2)}`); continue }
             let open = true
             for (let s = 1; s <= 12; s++) {

@@ -3,7 +3,7 @@
 // Every scene ground a village plays — the children's quarter, the bank stage,
 // the dig sites, the water errand, the loom, the chief's hut and (work-order
 // 1273) every other ground with a performer: the fishers' grilling, smoking
-// and eating spot with the eater's mortar, the market hut, the pounder, the
+// and eating spot with the pounding pair's mortar, the market hut, the pounder, the
 // drummer, the talkers, the well and the village fire — must keep
 // `balance.observerMargin` of walkable ground before the boundary, so stepping
 // aside to watch never leaves the village. The extents are measured here from
@@ -82,10 +82,11 @@ function sceneParts(l: PlaceLayout, placeId: string): Part[] {
     const s = fisherySites(l.bank, canoeLane(l.bank))
     parts.push({ what: 'fish fire', ...s.fire, r: 1 })
     parts.push({ what: 'fish rack', ...s.rack, r: 0.7 })
-    for (const [what, p] of [['fish storage', s.storage], ['fish board', s.board], ['fish basket', s.fireBasket], ['eater mortar', s.eaterMortar], ['landing basket', s.basketSpot]] as const) {
+    for (const [what, p] of [['fish storage', s.storage], ['fish board', s.board], ['fish basket', s.fireBasket], ['pair mortar', s.duoMortar], ['landing basket', s.basketSpot]] as const) {
       parts.push({ what, ...p, r: 0.26 })
     }
-    for (const [what, p] of [['fish carrier', s.carrierAtFire], ['fish griller', s.griller], ['fish eater at rack', s.eaterAtRack], ['fish eater home', s.eaterHome], ['carrier at landing', s.carrierAtBank]] as const) {
+    const pair = [...s.duoAtRack.map((p) => ['pounder at rack', p] as const), ...s.duoStands.map((p) => ['pounder at mortar', p] as const)]
+    for (const [what, p] of [['fish carrier', s.carrierAtFire], ['fish griller', s.griller], ...pair, ['carrier at landing', s.carrierAtBank]] as const) {
       parts.push({ what, x: p.x, z: p.z, r: WALKER_RADIUS })
     }
   }
