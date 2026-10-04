@@ -382,10 +382,18 @@ export function advancePounding(duo: PoundingDuo, dt: number, cfg: MortarConfig 
       w.resting = true
       return
     }
-    const struck = impactsBetween(Math.max(from, strokeStart(i, cfg)), duo.poundClock, i, cfg)
+    const start = Math.max(from, strokeStart(i, cfg))
+    const struck = impactsBetween(start, duo.poundClock, i, cfg)
     if (struck <= 0) return
+    if (duo.phase === 'settle') {
+      // She stops at the FIRST impact crossed, however long the step.
+      const offset = (i % 2) * 0.5
+      w.impacts += 1
+      w.lastImpact = (Math.floor(start / cfg.strokeSeconds + offset) + 1 - offset) * cfg.strokeSeconds
+      w.resting = true
+      return
+    }
     w.impacts += struck
     w.lastImpact = duo.poundClock - sinceImpact(duo.poundClock, i, cfg)
-    if (duo.phase === 'settle') w.resting = true
   })
 }
