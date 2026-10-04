@@ -128,7 +128,13 @@ export function unsquashHead(head: THREE.Object3D, chain: readonly THREE.Object3
   const f = Math.min(1, Math.abs(1 - k) / SQUASH_BLEND)
   const q = new THREE.Quaternion()
   for (const b of chain) q.multiply(b.quaternion)
-  head.quaternion.identity().slerp(q.invert(), f)
+  // Keep the chain's TURN (its twist about y): a rotation about y commutes
+  // with the y-squash, so only the rest — lean and stoop — must be undone.
+  // With R = Q⁻¹·T the head's world part is diag(1,s,1)·T·diag(1,1/s,1) = T.
+  const twist = new THREE.Quaternion(0, q.y, 0, q.w)
+  if (twist.lengthSq() < 1e-12) twist.identity()
+  else twist.normalize()
+  head.quaternion.identity().slerp(q.invert().multiply(twist), f)
   head.scale.set(1, 1 / k, 1)
 }
 /** The squash over which the head's counter-rotation fades in. */

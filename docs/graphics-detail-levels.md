@@ -171,7 +171,11 @@ added.
 
   So on medium and high the skinned villagers cost about 40 % FEWER draw calls
   than the primitive figures did and about twice the triangles (+130 k to
-  +360 k per village). The median frame time did not separate the variants on
+  +360 k per village). These are OBSERVATIONS, not a controlled experiment:
+  the village keeps living while the variants are read one after the other,
+  so walkers and activities move between readings; the draw-call drop is far
+  larger than that drift (the primitive figure is about a dozen draws, the
+  skinned one one), the exact triangle difference less so. The median frame time did not separate the variants on
   this shared, software-composited machine (16.7–66.7 ms in every column,
   quantised to the display's vsync), so no frame-time cost is claimed either
   way; low is unchanged by construction.

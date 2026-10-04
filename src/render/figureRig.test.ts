@@ -141,3 +141,24 @@ describe('the head stays round through a squat', () => {
     expect(head.quaternion.equals(new THREE.Quaternion())).toBe(true)
   })
 })
+
+describe('the squat correction keeps the head facing where the body turns', () => {
+  it('a chain turned 90° about y keeps that turn on the squashed head', () => {
+    const squash = new THREE.Group()
+    squash.scale.set(1, 0.9, 1)
+    const chain = [new THREE.Bone(), new THREE.Bone(), new THREE.Bone(), new THREE.Bone()]
+    chain[1].rotation.set(0, Math.PI / 2, 0)
+    chain[2].rotation.set(0.3, 0, 0)
+    const head = new THREE.Bone()
+    squash.add(chain[0])
+    chain.forEach((b, i) => i > 0 && chain[i - 1].add(b))
+    chain[3].add(head)
+    unsquashHead(head, chain, 0.9)
+    squash.updateMatrixWorld(true)
+    const e = head.matrixWorld.elements
+    // the head's forward (+z) points where the turned body faces (+x), level
+    const fwd = v(e[8], e[9], e[10]).normalize()
+    expect(fwd.x).toBeCloseTo(1, 5)
+    expect(Math.abs(fwd.y)).toBeLessThan(1e-5)
+  })
+})
