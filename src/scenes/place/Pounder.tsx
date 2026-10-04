@@ -301,6 +301,8 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn }: {
           <group ref={(el) => { figures.current[i] = el }}>
             <Figure
               cloth={cloth[i % cloth.length]}
+              sex="female"
+              age={i === 0 ? 'adult' : 'youth'}
               pose={poses.current[i]}
               squat={squats.current[i]}
               gait={gaits.current[i]}

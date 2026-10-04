@@ -192,7 +192,7 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   useStandingBody(x, z)
   return (
     <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.PI / 3, 0]}>
-      <Figure cloth={cloth} kneel />
+      <Figure cloth={cloth} kneel sex="female" age="adult" />
       {/* Tripod with pot over the embers */}
       <group position={[0.85, 0, -0.4]}>
         {[0, 1, 2].map((i) => {
@@ -1949,10 +1949,12 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   return (
     <group position={[x, groundHeight(x, z), z]}>
       <group ref={a} position={[-0.5, 0, 0]}>
-        <Figure cloth={cloth[0]} gesture={gestureA} />
+        {/* The conversing pair: the notable elder and a young man (work-order
+            "villager dress": the pair the age-readability judgement compares). */}
+        <Figure cloth={cloth[0]} gesture={gestureA} sex="male" age="elder" />
       </group>
       <group ref={b} position={[0.5, 0, 0]}>
-        <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} />
+        <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} sex="male" age="youth" />
       </group>
     </group>
   )
@@ -2064,7 +2066,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   })
   return (
     <group ref={group} name={DRUMMER_SPEAKER_ID} position={[x, groundHeight(x, z), z]} rotation={[0, yaw, 0]}>
-      <Figure cloth={cloth} pose={pose} />
+      <Figure cloth={cloth} pose={pose} sex="male" age="youth" />
       {/* The large low drum (`ba`) and the small high one (`BA`) — each on the
           side its own x puts it, which is the side its hand is read from. */}
       <Drum drum={LOW_DRUM} headRef={lowHead} />
