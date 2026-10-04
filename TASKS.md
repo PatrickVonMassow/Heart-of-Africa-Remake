@@ -4105,29 +4105,6 @@ Build order, chosen so no two parallel agents own the same file:
   class is not confined to the coast, and whatever the diagnosis finds must also
   explain a plate-like, hard-edged look on an inland river surface.
 
-- [ ] 575. The animals carry no pelt pattern and no face (found 09.08.2026 by the
-  point-264 control frame, which photographed two zebras at the player's own zoom).
-  `ZEBRA_SPEC` paints the body `#d8d4cc` and the head `#9a958c`, flat and untextured —
-  a zebra with NO STRIPES. At the reachable bird's-eye zoom (0.125–0.5, default 0.5) the
-  animal reads as a uniform light capsule; nothing identifies the species, and two of them
-  side by side read as one pale bar. The point-264 control frame
-  (`verification/148a-intraspecies-clash-pose-off.png`) is the evidence. By inspection the
-  same holds for the other `buildQuadruped` species — this is the shared model, not one
-  animal.
-  FINAL STATE: every ambient species is IDENTIFIABLE at the zoom the player uses. The
-  zebra carries stripes, and each other species the audit finds unmarked carries the
-  marking that identifies it (giraffe patches, the darker mane and cape where the species
-  has one). The pattern is applied so it survives being small — the silhouette and the
-  large-scale bands do the work, fine texture does not — and it is procedural/TSL rather
-  than an added texture asset, so it costs no download and stays backend-neutral. Faces
-  get whatever minimum reads at distance and no more. The cost is measured before and
-  after, and the feature is sorted into the three detail levels with its
-  `QUALITY_PRESETS` entries and the matching row in `docs/graphics-detail-levels.md`.
-  VERIFIABLE: a frame per treated species at zoom 0.5, judged by looking — the species is
-  recognisable — plus the before/after cost measurement, on both backends.
-  Criticality: medium — it is the visual identity of every animal in the bird's-eye view,
-  and acceptance criterion 11 (no schematic look) speaks to exactly this.
-
 - [ ] 533. What brings the container back after a host reboot (found 07.08.2026 while
   merging point 447; bundle Urlaubsfestigkeit). Point 447 hardened the WINDOWS boot path —
   `HoA-Batch-Autostart` with an at-logon trigger, plus `HoA-Batch-Watchdog` watching it —
