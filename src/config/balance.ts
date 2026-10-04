@@ -426,7 +426,8 @@ interface BalanceConfig {
     markBandScale: number
     /** Height multiplier of the gazelle's dark flank band on the silhouette. */
     markFlankWiden: number
-    /** Feet sink below the visible horizon line so they never appear to float. */
+    /** Feet sink below the visible horizon line so they never appear to float,
+     *  in the silhouette's model units (scaled with it). */
     sinkEpsilon: number
     /** Clearance (deg) added around a fixed skyline landmark's footprint: no
      *  drifting silhouette enters that azimuth span, so none crosses the
@@ -1513,7 +1514,7 @@ export const balance: BalanceConfig = {
     markContrast: 0.7, // calibratable: haze-reduced, still clearly visible stripes/flank band
     markBandScale: 0.6, // calibratable: ~4 broad torso bands on a two-degree zebra
     markFlankWiden: 2.5, // calibratable: the flank band spans ~a third of the flank, not one pixel
-    sinkEpsilon: 0.4, // feet just below the horizon line, never floating
+    sinkEpsilon: 0.12, // calibratable: 0.4 m at the former ~3.3 scale; feet just below the line
     landmarkMarginDeg: 8, // clearance around Giza / Table Mountain
     vicinityMinAnimals: 6, // region-typical animals guaranteed near a settlement
     vicinityRadius: 75, // ≈ 1.5× the default-zoom view ring (VIEW_AT_ZOOM1·0.5)

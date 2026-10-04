@@ -1397,4 +1397,97 @@ if (section('animal-models')) {
   }
 }
 
+// --- Skyline species at true proportions (work-order 1285) -------------------
+// One factor sizes every species: the skyline giraffe stands tallest, the
+// elephant below it, zebra and antelope about half a degree. ONE frame holds
+// all four, found from a standpoint where they share the view unobstructed.
+if (section('skyline-species-scale')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  const ALL = ['giraffe', 'elephant', 'zebra', 'antelope']
+  const STAGES = ['maasai-village', 'sidama-village', 'baganda-village', 'swahili-village', 'zulu-village', 'pedi-village', 'bemba-village']
+  // Shared factor: worldHeight / true height is one number for every silhouette.
+  const TRUE_H = { elephant: 4.2, giraffe: 5.5, zebra: 2.1, antelope: 1.85 }
+  // The five walkers spread round the whole ring, so four species never share
+  // a view on their own: stand on the settlement edge looking OUT and walk one
+  // walker per species to ring angles just either side of that bearing (each a
+  // spot it could reach; the hook refuses water).
+  const stageAt = (a) =>
+    page.evaluate(({ a, ALL }) => {
+      const info = window.__placePanoramaWildlifeInfo ?? {}
+      const aim = window.__placePanoramaWildlifeAim
+      const R = (window.__placeLayout?.radius ?? 30) * 0.9
+      if (!aim) return null
+      const keys = []
+      const offsets = [-0.12, -0.04, 0.04, 0.12]
+      for (const [n, sp] of ALL.entries()) {
+        const idx = Object.entries(info).find(([, w]) => w.species === sp)?.[0]
+        if (idx == null || !aim(Number(idx), a + offsets[n])) return null
+        keys.push(idx)
+      }
+      return { fx: Math.cos(a) * R, fz: Math.sin(a) * R, yaw: Math.atan2(-Math.cos(a), -Math.sin(a)), keys }
+    }, { a, ALL })
+  // Stand, aim, and probe each walker's line of sight (point 181's probe).
+  const standAndSee = async (c) => {
+    await page.evaluate((c) => {
+      const p = window.__placePlayer
+      p.x = c.fx
+      p.z = c.fz
+      p.pitch = 0
+      p.yaw = c.yaw
+    }, c)
+    await nextFrames(2)
+    return page.evaluate((c) => {
+      const info = window.__placePanoramaWildlifeInfo ?? {}
+      const p = window.__placePlayer
+      if (!window.__placeRayHit || Math.hypot(p.x - c.fx, p.z - c.fz) > 0.5) return { seen: false, why: 'moved' }
+      const blocked = []
+      for (const key of c.keys) {
+        const it = info[key]
+        if (!it?.visible) { blocked.push(`${key}:hidden`); continue }
+        const hit = window.__placeRayHit(it.x, it.y + it.worldHeight / 2, it.z)
+        const ratio = hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance
+        if (ratio < 0.98) blocked.push(`${it.species}:${hit.hitName}@${ratio.toFixed(2)}`)
+      }
+      return { seen: blocked.length === 0, why: blocked.join(' ') }
+    }, c)
+  }
+  let aimed = null
+  const tried = []
+  for (const place of STAGES) {
+    await goToPlace(place)
+    await page.waitForFunction(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}).filter((w) => w.visible).length >= 4, null, { timeout: 25000 }).catch(() => {})
+    for (let k = 0; k < 24 && !aimed; k++) {
+      const c = await stageAt((k / 24) * Math.PI * 2)
+      if (!c) { tried.push(`${place}@${k}:unstageable`); continue }
+      await nextFrames(2)
+      const got = await standAndSee(c)
+      if (got.seen) aimed = { ...c, place }
+      else tried.push(`${place}@${k}:${got.why}`)
+    }
+    if (aimed) break
+  }
+  check('all four skyline species share one unobstructed view', !!aimed, aimed ? `${aimed.place} from (${aimed.fx.toFixed(1)}, ${aimed.fz.toFixed(1)})` : `none [${tried.slice(-12).join(', ')}]`)
+  const rows = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
+  const fac = rows.map((w) => ({ sp: w.species, f: w.worldHeight / TRUE_H[w.species], deg: w.apparentDeg, r: w.radius }))
+  const fMin = Math.min(...fac.map((x) => x.f))
+  const fMax = Math.max(...fac.map((x) => x.f))
+  check('every skyline species is drawn by the one shared factor', fac.length >= 4 && fMax - fMin < 1e-3 * fMax, fac.map((x) => `${x.sp} ${x.deg.toFixed(2)}° @${Math.round(x.r)}m`).join(', '))
+  check('no skyline silhouette reaches the 2.5° safety net', fac.every((x) => x.deg < 2.5), fac.map((x) => x.deg.toFixed(2)).join(', '))
+  if (aimed) {
+    await nextFrames(3)
+    // The subject point: the walker nearest the view's centre, at the shutter.
+    const centre = await page.evaluate((keys) => {
+      const info = window.__placePanoramaWildlifeInfo ?? {}
+      const p = window.__placePlayer
+      const fwd = [-Math.sin(p.yaw), -Math.cos(p.yaw)]
+      const pickIt = keys.map((k) => info[k]).filter(Boolean).sort((a, b) => {
+        const off = (w) => Math.abs(Math.atan2((w.x - p.x) * fwd[1] - (w.z - p.z) * fwd[0], (w.x - p.x) * fwd[0] + (w.z - p.z) * fwd[1]))
+        return off(a) - off(b)
+      })[0]
+      return pickIt ? { x: pickIt.x, y: pickIt.y + pickIt.worldHeight / 2, z: pickIt.z } : null
+    }, aimed.keys)
+    await frame(shot('1285-skyline-four-species'), { local: centre ?? { x: aimed.fx, y: 1.5, z: aimed.fz }, label: 'the skyline with giraffe, elephant, zebra and antelope' })
+  }
+}
+
 await finishPolishSuite()

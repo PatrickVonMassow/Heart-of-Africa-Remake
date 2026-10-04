@@ -1680,12 +1680,21 @@ function PanoramaWildlife({
     w.__placePanoramaWildlife = items.length
     // Excluded skyline azimuth spans (point 102) for the polish assertion.
     w.__placeSkylineExclusion = exclusionSpans.map((s) => ({ center: s.center, half: s.half }))
+    // Stage a walker at a ring angle it could walk to (work-order 1285's
+    // four-species frame); refused on water, where it never stands.
+    w.__placePanoramaWildlifeAim = (index: number, angle: number) => {
+      const walk = walks[index]
+      if (!walk || walk.wet(angle)) return false
+      walk.angle = angle
+      return true
+    }
     return () => {
       delete w.__placePanoramaWildlife
       delete w.__placePanoramaWildlifeInfo
       delete w.__placeSkylineExclusion
+      delete w.__placePanoramaWildlifeAim
     }
-  }, [items, exclusionSpans])
+  }, [items, walks, exclusionSpans])
 
   useFrame(({ camera }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -1728,7 +1737,9 @@ function PanoramaWildlife({
       const camZ = camera.position.z
       const frontY = panoramaStandY(x + fx, z + fz, lat, lon, seed, centerH, rimAt(x + fx, z + fz), camX, camZ, EYE_HEIGHT)
       const backY = panoramaStandY(x - fx, z - fz, lat, lon, seed, centerH, rimAt(x - fx, z - fz), camX, camZ, EYE_HEIGHT)
-      const groundY = (frontY + backY) / 2 - pw.sinkEpsilon
+      // The sink is in the animal's own units, so every species sinks alike.
+      const sink = pw.sinkEpsilon * it.scale
+      const groundY = (frontY + backY) / 2 - sink
       const pitch = groundPitch(frontY, backY, it.rig.wheelbase * it.scale)
       // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
       // wall-clock bob. The stride rides the ground they cover along the ring,
@@ -1797,7 +1808,7 @@ function PanoramaWildlife({
           // does not move — a foot dragged fore/aft would be skating again.
           const standY =
             panoramaStandY(x + off[0], z + off[2], lat, lon, seed, centerH, rimAt(x + off[0], z + off[2]), camX, camZ, EYE_HEIGHT) -
-            pw.sinkEpsilon
+            sink
           const targetY = standY + footHeight(phase, leg.phaseOffset, it.rig.legLength) * it.scale
           const seat = seatFootOnGround(swing, it.rig.legLength, targetY - (y + off[1]), pitch, it.scale)
           lg.rotation.x = seat.angle
@@ -1824,7 +1835,7 @@ function PanoramaWildlife({
             info[i].footGap =
               foot.y -
               (panoramaStandY(foot.x, foot.z, lat, lon, seed, centerH, rimAt(foot.x, foot.z), camX, camZ, EYE_HEIGHT) -
-                pw.sinkEpsilon)
+                sink)
           }
         }
       }
