@@ -679,7 +679,12 @@ export function appearanceFor(q: AppearanceQuery): DressLayer[] {
       material = blanket ? 'blanket' : 'hide'
       source = blanket ? G('blanket share by year, VILLAGER_DRESS (§8.3)') : S('§2.3')
     }
-    layers = layers.filter((l) => l.slot !== 'shoulder')
+    // The seasonal wrap replaces the shoulder layer of its own kind — a cloak
+    // or cape for a cloak, a hood for a hood — and keeps the rest: a Tuareg
+    // woman's everyday head cloth stays on under the cold-weather wool cloak.
+    const replaces = (l: DressLayer) =>
+      l.slot === 'shoulder' && (seasonal.wear === 'head' ? l.form === 'hood' : l.form === 'cloak' || l.form === 'cape')
+    layers = layers.filter((l) => !replaces(l))
     layers.push(
       seasonal.wear === 'head'
         ? layer('shoulder', 'hood', material, colour, 'overHead', source)

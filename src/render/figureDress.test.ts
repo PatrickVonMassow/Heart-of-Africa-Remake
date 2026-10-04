@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
-import { BONE_NAMES, bodyProportions, boneIndex, SURFACE_ATTRIBUTE } from './figureBody'
+import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, SURFACE_ATTRIBUTE } from './figureBody'
 import { buildLayerGeometry, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
 
 const adultMan = bodyProportions('male', 'adult')
@@ -67,6 +67,45 @@ describe('the garments sit on the body', () => {
       const r = Math.hypot(v.x / rx, v.z / rz)
       expect(r).toBeGreaterThan(0.999)
     }
+  })
+
+  it('the garment envelope holds the tops of the thighs, not only the pelvis', () => {
+    const body = buildBodyGeometry(adultMan, { skin: '#5c3317', paint: null }, 16)
+    const pos = body.getAttribute('position')
+    const v = new THREE.Vector3()
+    const lo = adultMan.hipY - 0.07 * adultMan.stature
+    const hi = adultMan.hipY + 0.02 * adultMan.stature
+    let seen = 0
+    for (let k = 0; k < pos.count; k++) {
+      v.fromBufferAttribute(pos, k)
+      // the trunk and leg surfaces between crotch and hip joint (arms hang
+      // further out and are not wrapped)
+      if (v.y < lo || v.y > hi || Math.abs(v.x) > adultMan.shoulderX - adultMan.armR * 1.5) continue
+      const [rx, rz] = trunkAt(adultMan, v.y)
+      expect(Math.hypot(v.x / rx, v.z / rz)).toBeLessThanOrEqual(1.0001)
+      seen++
+    }
+    expect(seen).toBeGreaterThan(20)
+  })
+
+  it('a robe below the knee follows the shins, so a kneeling figure folds it back', () => {
+    const g = buildLayerGeometry(layer({ slot: 'torso', form: 'robe', wear: 'chest' }), adultMan)!
+    const pos = g.getAttribute('position')
+    const idx = g.getAttribute('skinIndex')
+    const wt = g.getAttribute('skinWeight')
+    const shins = new Set([boneIndex('shin.L'), boneIndex('shin.R')])
+    const below = adultMan.kneeY - 0.05 * adultMan.stature
+    let n = 0
+    for (let k = 0; k < pos.count; k++) {
+      if (pos.getY(k) > below) continue
+      let w = 0
+      ;[idx.getX(k), idx.getY(k), idx.getZ(k), idx.getW(k)].forEach((b, j) => {
+        if (shins.has(b)) w += [wt.getX(k), wt.getY(k), wt.getZ(k), wt.getW(k)][j]
+      })
+      expect(w).toBeGreaterThan(0.5)
+      n++
+    }
+    expect(n).toBeGreaterThan(0)
   })
 
   it('a toga over one shoulder leaves the other bare; a cloak covers both', () => {

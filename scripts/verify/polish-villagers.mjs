@@ -3795,9 +3795,11 @@ if (section('villager-dress')) {
   // farther): the probe's first surface must lie at or behind each figure, at
   // a child's chest height and an adult's. The full row is 8 figures 0.9 m
   // apart, so a fence or a hut that hides only the children is caught too.
-  const stageRow = (d, only) =>
+  // `exact`: stand the row at exactly `d` (the age-readability distances are
+  // the measurement, so no nearer or farther fallback may relabel them).
+  const stageRow = (d, only, exact = false) =>
     page.evaluate(
-      ({ d, only }) => {
+      ({ d, only, exact }) => {
         const p = window.__placePlayer
         const best = { score: -1 }
         // the row staged before must not block the probes for the next one
@@ -3808,7 +3810,7 @@ if (section('villager-dress')) {
         })
         const half = only ? 0.45 : 3.15
         const lateral = only ? [-half, half] : [-half, -2.25, -1.35, -0.45, 0.45, 1.35, 2.25, half]
-        for (const dist of [d, d * 0.85, d * 1.2]) {
+        for (const dist of exact ? [d] : [d, d * 0.85, d * 1.2]) {
           for (let k = 0; k < 16; k++) {
             const yaw = p.yaw + (k * Math.PI) / 8
             const fx = -Math.sin(yaw)
@@ -3836,7 +3838,7 @@ if (section('villager-dress')) {
         window.__dressLineup({ x: best.cx, z: best.cz, yaw: best.yaw, only })
         return best
       },
-      { d, only },
+      { d, only, exact },
     )
   // Whether a passer-by of the village's own life stands between the camera
   // and a figure of the row (a carrier with a basket hid the Mongo young man):
@@ -3926,10 +3928,17 @@ if (section('villager-dress')) {
   // THE AGE-READABILITY DISTANCE: the young man and the elder side by side.
   await goToPlace('zulu-village')
   for (const d of [4, 8, 14, 22, 32]) {
-    const at = await stageRow(d, ['male-youth', 'male-elder'])
+    const at = await stageRow(d, ['male-youth', 'male-elder'], true)
     await nextFrames(4)
     await awaitPlaceDrawn(`elder/young man ${d} m`)
     await awaitRowClear()
+    const hidden = await rowHidden()
+    // An occluded pair would read as a lost age cue: the shot must be clear.
+    check(
+      `elder and young man at ${d} m: staged at exactly that distance with a clear view`,
+      at.dist === d && at.score === at.of && !hidden,
+      JSON.stringify({ dist: at.dist, clear: `${at.score}/${at.of}`, hidden }),
+    )
     // Drawn crown height and shoulder span (px) of each: the measurable part
     // of the age read — the rest is the frame, judged by looking.
     const px = await page.evaluate(() => {
@@ -3957,7 +3966,7 @@ if (section('villager-dress')) {
       }
       return out
     })
-    record('elder-youth', { d, px })
+    record('elder-youth', { d, dist: at.dist, px })
     await frame(shot(`1293-elder-youth-${String(d).padStart(2, '0')}m`), {
       local: { x: at.cx, y: 0.7, z: at.cz },
       label: `the Zulu young man (left) and the elder (right) side by side, ${d} m from the camera`,

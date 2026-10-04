@@ -14,12 +14,25 @@ import {
 const LOOK = { skin: '#5c3317', paint: null }
 
 describe('the skeleton (body 2a)', () => {
-  it('has about 17 bones, parents before children', () => {
+  it('has 17 bones in one connected tree, parents before children', () => {
     expect(BONE_NAMES.length).toBe(17)
-    const { skeleton } = createSkeleton(bodyProportions('male', 'adult'))
+    const { skeleton, bones } = createSkeleton(bodyProportions('male', 'adult'))
+    expect(skeleton.bones).toHaveLength(17)
     skeleton.bones.forEach((b, i) => {
-      if (b.parent instanceof THREE.Bone) expect(skeleton.bones.indexOf(b.parent)).toBeLessThan(i)
+      if (i === 0) {
+        expect(b).toBe(bones.hips)
+        expect(b.parent).toBeNull()
+        return
+      }
+      // every other bone hangs from a bone of the SAME skeleton, listed earlier
+      expect(b.parent).toBeInstanceOf(THREE.Bone)
+      const at = skeleton.bones.indexOf(b.parent as THREE.Bone)
+      expect(at).toBeGreaterThanOrEqual(0)
+      expect(at).toBeLessThan(i)
     })
+    expect(bones['hand.L'].parent).toBe(bones['forearm.L'])
+    expect(bones['foot.R'].parent).toBe(bones['shin.R'])
+    expect(bones.head.parent).toBe(bones.neck)
   })
 
   it('puts every bone at its joint in bind pose', () => {
@@ -99,10 +112,18 @@ describe('the body geometry', () => {
         expect(Math.abs(b.max.y - p.stature)).toBeLessThan(0.03)
         const idx = g.getAttribute('skinIndex')
         const wt = g.getAttribute('skinWeight')
-        for (let i = 0; i < wt.count; i++) {
-          const s = wt.getX(i) + wt.getY(i) + wt.getZ(i) + wt.getW(i)
-          expect(Math.abs(s - 1)).toBeLessThan(1e-4)
-          for (const k of [idx.getX(i), idx.getY(i), idx.getZ(i), idx.getW(i)]) expect(k).toBeLessThan(BONE_NAMES.length)
+        const n = g.getAttribute('position').count
+        expect(idx.count).toBe(n)
+        expect(wt.count).toBe(n)
+        expect(idx.itemSize).toBe(4)
+        expect(wt.itemSize).toBe(4)
+        for (let i = 0; i < n; i++) {
+          const ws = [wt.getX(i), wt.getY(i), wt.getZ(i), wt.getW(i)]
+          for (const w of ws) expect(Number.isFinite(w) && w >= 0 && w <= 1 + 1e-6).toBe(true)
+          expect(Math.abs(ws.reduce((a, b) => a + b, 0) - 1)).toBeLessThan(1e-4)
+          for (const k of [idx.getX(i), idx.getY(i), idx.getZ(i), idx.getW(i)]) {
+            expect(Number.isInteger(k) && k >= 0 && k < BONE_NAMES.length).toBe(true)
+          }
         }
       })
     }

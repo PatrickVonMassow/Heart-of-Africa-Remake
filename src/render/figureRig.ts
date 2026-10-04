@@ -63,7 +63,12 @@ export function solveTwoBone(
   const cosA = Math.min(1, Math.max(-1, (a * a + d * d - b * b) / (2 * a * d)))
   const sinA = Math.sqrt(1 - cosA * cosA)
   const side = pole.clone().addScaledVector(dir, -pole.dot(dir))
-  if (side.lengthSq() < 1e-10) side.set(0, 0, -1).addScaledVector(dir, -dir.z)
+  if (side.lengthSq() < 1e-10) {
+    // The pole lies along the reach: bend toward whichever axis is least
+    // aligned with it, projected off the reach (v − (v·d)d).
+    const ax = Math.abs(dir.x) < 0.6 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)
+    side.copy(ax).addScaledVector(dir, -ax.dot(dir))
+  }
   side.normalize()
   const upper = dir.clone().multiplyScalar(cosA).addScaledVector(side, sinA).normalize()
   const elbow = s.clone().addScaledVector(upper, a)

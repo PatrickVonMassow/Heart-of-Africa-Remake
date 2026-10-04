@@ -159,15 +159,15 @@ added.
   (the primitive figure is about a dozen); geometries are cached per distinct
   body and dress. Climbs 0 → 16 → 24. Cost per village, measured 04.10.2026
   (`polish-villagers.mjs` section `villager-dress`; the same view of a village
-  with 25 inhabitants on each level, once with `figureBodySegments` forced to
+  on each level, once with `figureBodySegments` forced to
   0 — the "before" — and once as shipped; per-frame draw calls / triangles,
   WebGPU, WebGL 2 within a few percent):
 
-  | Village | Low (primitive) | Medium before → after | High before → after |
-  | --- | --- | --- | --- |
-  | Zulu | 37 / 43 k | 544 / 141 k → 344 / 269 k | 524 / 144 k → 354 / 351 k |
-  | Hausa | 295 / 75 k | 835 / 170 k → 489 / 392 k | 864 / 185 k → 519 / 549 k |
-  | Maasai | 289 / 90 k | 794 / 231 k → 464 / 422 k | 765 / 236 k → 470 / 518 k |
+  | Village | Inhabitants | Low (primitive) | Medium before → after | High before → after |
+  | --- | --- | --- | --- | --- |
+  | Zulu | 25 | 37 / 43 k | 544 / 141 k → 344 / 269 k | 524 / 144 k → 354 / 351 k |
+  | Hausa | 25 | 295 / 75 k | 835 / 170 k → 489 / 392 k | 864 / 185 k → 519 / 549 k |
+  | Maasai | 25 | 289 / 90 k | 794 / 231 k → 464 / 422 k | 765 / 236 k → 470 / 518 k |
 
   So on medium and high the skinned villagers cost about 40 % FEWER draw calls
   than the primitive figures did and about twice the triangles (+130 k to

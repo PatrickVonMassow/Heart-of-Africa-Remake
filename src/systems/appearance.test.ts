@@ -140,6 +140,15 @@ describe('the season switches the layers (folded from systems/dress.ts)', () => 
     expect(appearanceFor(query({ age: 'child', drivers: COLD })).some((l) => l.slot === 'shoulder')).toBe(false)
   })
 
+  it('a seasonal cloak keeps an everyday head cloth: the Tuareg woman of rank stays hooded in the cold', () => {
+    const q = { peopleId: 'tuareg', sex: 'female', cloth: SOUTH[0] } as const
+    const warm = appearanceFor(query({ ...q, drivers: WARM }))
+    const cold = appearanceFor(query({ ...q, drivers: COLD }))
+    expect(warm.some((l) => l.form === 'hood')).toBe(true)
+    expect(cold.some((l) => l.form === 'hood')).toBe(true)
+    expect(cold.some((l) => l.form === 'cloak')).toBe(true)
+  })
+
   it('a people without a seasonal record wears the same in the cold', () => {
     expect(appearanceFor(query({ peopleId: 'baganda', drivers: COLD }))).toEqual(
       appearanceFor(query({ peopleId: 'baganda', drivers: WARM })),

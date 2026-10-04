@@ -26,6 +26,15 @@ describe('two-bone IK puts the hand on the target', () => {
     expect(elbow.z).toBeLessThan(s.z + (t.z - s.z) * ((elbow.y - s.y) / (t.y - s.y)))
   })
 
+  it('reaches a target in range that lies straight along the pole', () => {
+    const s = v(0, 0, 0)
+    const t = v(0, 0, 0.3)
+    const { upper, fore, reached } = solveTwoBone(s, t, 0.2, 0.2, v(0, 0, -1))
+    expect(reached).toBe(true)
+    const hand = s.clone().addScaledVector(upper, 0.2).addScaledVector(fore, 0.2)
+    expect(hand.distanceTo(t)).toBeLessThan(1e-6)
+  })
+
   it('points straight at a target out of reach', () => {
     const r = solveTwoBone(v(0, 1, 0), v(0, 1, 2), 0.2, 0.2, v(0, 0, -1))
     expect(r.reached).toBe(false)

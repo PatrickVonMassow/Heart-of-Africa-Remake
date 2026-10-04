@@ -101,9 +101,19 @@ export function trunkAt(p: BodyProportions, y: number): [number, number] {
   const st = trunkProfile(p).map(([y, x, z], i) => [y, x, i === 3 ? z + p.bust * 0.75 : z] as [number, number, number])
   if (y <= st[0][0]) {
     // Below the crotch: both legs side by side.
-    const legW = p.hipX + p.thighR
+    const legW = p.hipX + p.thighR * 1.15
     return [Math.max(legW, st[0][1]), Math.max(p.thighR, st[0][2])]
   }
+  // From the crotch up to the hip joint the tops of the thighs still bulge
+  // past the pelvis (their sweep starts at the hip, 1.1 × thighR wide).
+  if (y <= p.hipY + 0.02 * p.stature) {
+    const [x, z] = trunkInterp(st, y)
+    return [Math.max(x, p.hipX + p.thighR * 1.15), Math.max(z, p.thighR * 1.5)]
+  }
+  return trunkInterp(st, y)
+}
+
+function trunkInterp(st: Array<[number, number, number]>, y: number): [number, number] {
   for (let i = 0; i < st.length - 1; i++) {
     const [y0, x0, z0] = st[i]
     const [y1, x1, z1] = st[i + 1]
@@ -157,6 +167,9 @@ function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number,
 
 const LOWER: readonly BoneName[] = ['hips', 'spine', 'thigh.L', 'thigh.R', 'shin.L', 'shin.R']
 const UPPER: readonly BoneName[] = ['hips', 'spine', 'chest', 'neck', 'upperArm.L', 'upperArm.R', 'thigh.L', 'thigh.R']
+/** A garment from the chest past the knee: its lower part follows the shins,
+ *  so a kneeling figure's robe folds back with the legs, not into the ground. */
+const LONG: readonly BoneName[] = [...UPPER, 'shin.L', 'shin.R']
 
 /** Shape one layer, or null for a layer drawn on the skin (body paint). */
 export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 16): THREE.BufferGeometry | null {
@@ -199,7 +212,7 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
       const top = l.wear === 'chest' ? chestTop : girdleY
       bottom =
         l.form === 'skirtShort' ? (p.hipY + p.kneeY) / 2 : l.form === 'skirtKnee' ? p.kneeY - 0.015 * H : p.kneeY - 0.6 * (p.kneeY - p.ankleY)
-      parts.push({ geo: wrapTube(p, top, bottom, 0.01 * H, l.form === 'wrapLong' ? 0.035 : 0.025, radial, 12), weigh: near(top > p.waistY ? UPPER : LOWER) })
+      parts.push({ geo: wrapTube(p, top, bottom, 0.01 * H, l.form === 'wrapLong' ? 0.035 : 0.025, radial, 12), weigh: near(top > p.waistY ? LONG : LOWER) })
       break
     }
     case 'trousers': {
@@ -238,7 +251,7 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
         const bare = l.wear === 'rightShoulder' ? 1 : -1
         sector(body, (c) => !(c.x * bare > -0.02 * H && c.y > chestTop - c.x * bare * 0.6))
       }
-      parts.push({ geo: body, weigh: near(UPPER) })
+      parts.push({ geo: body, weigh: near(l.form === 'shirt' ? UPPER : LONG) })
       if (l.form !== 'toga') {
         for (const s of ['L', 'R'] as const) {
           const x = (s === 'L' ? 1 : -1) * p.shoulderX
