@@ -610,7 +610,10 @@ export const LIMITS = {
   // 01.10.2026, a genuinely new tip: one card per piece of work — a borrowed card satisfies the
   // board and shows the wrong thing (retrospective, borrowed-card class). Shortened from three
   // lines to two before raising. Net: +2 lines. 703 -> 705.
-  maxLines: 705,
+  // 04.10.2026, a genuinely new tip: a problem report is no approval of a solution — the
+  // solution is shown first, approved after, and the words travel with the request
+  // (retrospective §3.308). Net: +7 lines. 705 -> 712.
+  maxLines: 712,
   // 18.09.2026, second fold of the day: the lesson that a check the test environment CANNOT
   // perform is measured and filed as its own visible task, not carried as a footnote, reached
   // the guide as one clause on "Gruener Test, falsches Bild" and was paid for inside the same
@@ -939,7 +942,8 @@ export const LIMITS = {
   // belong to, and the freshness bullet gave back more filler than they took. Net: -3 words.
   // 6900 -> 6897.
   // 01.10.2026: the borrowed-card tip justified beside maxLines measures 19 words: 6897 -> 6916.
-  maxWords: 6916,
+  // 04.10.2026: the approval-sequence tip justified beside maxLines measures 85 words: 6916 -> 7001.
+  maxWords: 7001,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
