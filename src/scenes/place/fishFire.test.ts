@@ -25,6 +25,8 @@ import {
 } from './fishFire'
 import { canoeCycleSeconds, canoeLane, canoeRangeGap, createCanoe, stepCanoe, type CanoeWord } from './villagerCanoe'
 import { mulberry32 } from '../../world/noise'
+import { fisheryStaticColliders } from './fisheryColliders'
+import { fireHasCookShelter } from '../../systems/cookShelter'
 
 beforeAll(setupGeodata)
 
@@ -235,6 +237,11 @@ describe('where the fire stands (work-order 1245 item 4)', () => {
       const bank = layout.bank!
       const lane = canoeLane(bank)
       const sites = fisherySites(bank, lane)
+      // The village's solids, without the fishers' own (point 1275): those are
+      // the scene asked about here, and its figures stand at them by design.
+      const own = fisheryStaticColliders(sites, bank, fireHasCookShelter(PLACES.find((p) => p.id === id)!.peopleId))
+      const others = layout.colliders.filter((c) => !own.some((o) => JSON.stringify(o) === JSON.stringify(c)))
+      expect(others.length, 'the fishers\' colliders are all in the set').toBe(layout.colliders.length - own.length)
       const stands = {
         carrierAtFire: sites.carrierAtFire,
         carrierAtBank: sites.carrierAtBank,
@@ -249,7 +256,7 @@ describe('where the fire stands (work-order 1245 item 4)', () => {
       for (const [name, p] of Object.entries(stands)) {
         expect(insidePlace(layout, p.x, p.z, 2 * WALKER_RADIUS), `${name} inside`).toBe(true)
         expect(standsOnGroundPlate(bank, p.x, p.z, WALKER_RADIUS), `${name} on the plate`).toBe(true)
-        expect(standingClear(layout.colliders, p.x, p.z, WALKER_RADIUS), `${name} clear`).toBe(true)
+        expect(standingClear(others, p.x, p.z, WALKER_RADIUS), `${name} clear`).toBe(true)
       }
       // The carrier's and both pounding women's walks cross nothing solid.
       const walks = [[sites.carrierAtFire, sites.carrierAtBank], ...sites.duoStands.map((p, i) => [p, sites.duoAtRack[i]])] as const
@@ -257,7 +264,7 @@ describe('where the fire stands (work-order 1245 item 4)', () => {
         for (let k = 0; k <= 40; k++) {
           const x = a.x + (b.x - a.x) * (k / 40)
           const z = a.z + (b.z - a.z) * (k / 40)
-          expect(standingClear(layout.colliders, x, z, WALKER_RADIUS), `walk ${k}`).toBe(true)
+          expect(standingClear(others, x, z, WALKER_RADIUS), `walk ${k}`).toBe(true)
           expect(insidePlace(layout, x, z, WALKER_RADIUS)).toBe(true)
         }
       }

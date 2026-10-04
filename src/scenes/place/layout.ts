@@ -32,6 +32,8 @@ import {
 import { inBankArc, type ObservedGround } from './boundary'
 import { CHIEF_DOOR_REACH, sceneGrounds } from './sceneGrounds'
 import { fisherySites } from './fishFire'
+import { fisheryStaticColliders } from './fisheryColliders'
+import { fireHasCookShelter } from '../../systems/cookShelter'
 import { canoeLane } from './villagerCanoe'
 import { balance } from '../../config/balance'
 import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
@@ -1784,6 +1786,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     colliders.push(...villageLifeProps(VILLAGE_FIRE, placeId).filter(
       (c) => !(c.x === LOOM_SPOT[0] && c.z === LOOM_SPOT[1]),
     ))
+    // The fishers' fire, rack, board, storage basket, kneeling griller and the
+    // cook-shelter's posts (point 1275); their movers follow in `RiverFishery`.
+    if (bank) colliders.push(...fisheryStaticColliders(fisherySites(bank, canoeLane(bank)), bank, fireHasCookShelter(place.peopleId)))
   } else {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }

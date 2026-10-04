@@ -1100,6 +1100,14 @@ interface BalanceConfig {
       duoRackGap: number
       /** The wait budget per round, boat and carrier alike (s, averaged). */
       waitBudgetSeconds: number
+      /** The fishers' cook-shelter (point 1275): half the post square (m), wide
+       *  enough that the grill, its forked posts and the kneeling griller stand
+       *  beneath it — the village shelter's 1.35 m would leave him outside. */
+      shelterPostR: number
+      /** Collision (point 1275): the stand-off added round each drawn prop, and
+       *  the body radius of a fisher the traveller cannot walk through. */
+      colliderMargin: number
+      figureBodyR: number
     }
     /** The weaver's loom (work-order 1157): the station that shows weaving AND
      *  teaches UPSTREAM/DOWNSTREAM a second time, on a walking body instead of
@@ -2152,6 +2160,9 @@ export const balance: BalanceConfig = {
       duoMortarOffset: 0.6, // calibratable
       duoRackGap: 0.85, // calibratable
       waitBudgetSeconds: 15,
+      shelterPostR: 1.55, // calibratable
+      colliderMargin: 0.15, // calibratable
+      figureBodyR: 0.28, // calibratable
     },
     loom: {
       placed: false, // weaving parked (user 29.09.2026); true re-enables the station
