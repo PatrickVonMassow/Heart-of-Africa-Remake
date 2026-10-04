@@ -22,6 +22,7 @@ export {
   buildZebra,
   buildZebraCalf,
   buildZebraParts,
+  DEFAULT_FAUNA_BODY_SEGMENTS,
 } from './faunaUngulates'
 
 /**

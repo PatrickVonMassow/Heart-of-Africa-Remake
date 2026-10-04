@@ -47,6 +47,7 @@ device pixel ratio is kept (no cap).
 | `placeRiverSegments` | 8 | 32 | 64 |
 | `placeRiverFlotsam` | 12 | 48 | 90 |
 | `waterDetailOctaves` | 1 | 3 | 4 |
+| `faunaBodySegments` | 12 | 18 | 24 |
 
 ## What each setting does
 
@@ -126,6 +127,25 @@ added.
   the bank and the panorama's continuation of it past the ground plate's rim —
   because a level that thinned only one of them would put back the straight seam
   the two used to meet along. Climbs 1 → 3 → 4.
+- **`faunaBodySegments`** — Radial segments of the swept torso, neck and head
+  of the detailed ungulates — zebra, antelope (gazelle) and the settlement goat
+  (work-order 1284); legs take 0.6 of it, tails, horns and manes a third. It
+  decides whether a close animal's outline reads round or faceted. The pelt
+  markings (zebra stripes, gazelle flank band, giraffe patches, cat and hyena
+  spots) are not a lever: they identify the species, so every level draws them;
+  they are a per-fragment pattern in the one shared fauna material, antialiased
+  by their own screen derivative. Climbs 12 → 18 → 24. Measured cost per
+  animal (vertices / triangles; one instanced draw per species, unchanged; the
+  walking rigs keep their five draws):
+
+  | Build | Before (capsules) | Low 12 | Medium 18 | High 24 |
+  | --- | --- | --- | --- | --- |
+  | zebra | 1914 / 2960 | 1153 / 2022 | 1525 / 2742 | 1927 / 3520 |
+  | antelope | 1984 / 2992 | 1189 / 2082 | 1561 / 2802 | 1975 / 3600 |
+  | goat | 1984 / 2992 | 1224 / 2098 | 1596 / 2818 | 2010 / 3616 |
+
+  So medium (the default) draws fewer triangles per animal than the capsule
+  build did, low about a third fewer, and high about a fifth more.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a

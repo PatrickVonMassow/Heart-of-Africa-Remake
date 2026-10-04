@@ -1589,6 +1589,14 @@ its own subject never occurred:
   prop, and none inside another goat — sampled over 20 reads of the herd, with
   the deepest penetration and the closest pair reported, plus the frame
   `143-village-goat-separation`.
+- **Detailed animal models (work-order 1284, `polish-panorama --section=animal-models`).**
+  Picture evidence only: per treated species one settlement frame
+  (`1284-zebra-settlement`, `1284-antelope-settlement` — the panorama
+  silhouettes, found by the species the dev probe names — and
+  `1284-goat-settlement` at close range) and one bird's-eye frame at zoom 0.5
+  (`1284-zebra-birdseye-zoom05`, `1284-antelope-birdseye-zoom05`, a small herd
+  staged beside the player). The goat lives only in settlements. The geometry
+  and marking invariants are pinned in `src/render/faunaUngulates.test.ts`.
 - **Villager gestures (point 479).** The four poses — beckon, point, refuse,
   indicate — are photographed at conversational distance from a standpoint the
   suite RAY-PROBES clear first (a camera dropped on a fixed bearing lands inside

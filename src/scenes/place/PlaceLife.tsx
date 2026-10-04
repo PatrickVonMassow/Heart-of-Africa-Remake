@@ -49,7 +49,7 @@ import {
   type GestureKind,
   type GestureState,
 } from '../../render/gesture'
-import { effectiveFigureLimbSegments, useUi } from '../../state/ui'
+import { effectiveFaunaBodySegments, effectiveFigureLimbSegments, useUi } from '../../state/ui'
 import { useColdCloaks } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
 import { devAssert } from '../../systems/devAssert'
@@ -1528,7 +1528,16 @@ function Kids({
  *  silhouettes, which walk real relief, carry that half. */
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
   const groundHeight = usePlaceGround()
-  const parts = useMemo(() => buildGoatParts(), [])
+  // Built at the detail level's body tessellation; a level change rebuilds it.
+  const bodySegments = useUi(effectiveFaunaBodySegments)
+  const parts = useMemo(() => buildGoatParts(bodySegments), [bodySegments])
+  useEffect(
+    () => () => {
+      parts.body.dispose()
+      parts.legs.forEach((l) => l.geo.dispose())
+    },
+    [parts],
+  )
   // The gait read off this rig's own legs (point 300): stride length, cadence.
   const rig = useMemo(() => gaitRig(parts.legs), [parts])
   // The shared smooth-shaded fauna material (point 214) — the goats stand at
