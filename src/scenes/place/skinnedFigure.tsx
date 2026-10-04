@@ -253,9 +253,9 @@ export function SkinnedFigure({
         }
         if (!done && vPivot) {
           // A hanging arm hangs by gravity, not with the stooped chest.
-          const hang = Math.abs(vPivot.rotation.x) < 0.3 ? p.stoop * 0.8 : 0
+          const hang = Math.abs(vPivot.rotation.x) < 0.3 ? p.stoop : 0
           up.quaternion.setFromEuler(gestureArmEuler({ pitch: vPivot.rotation.x + hang, yaw: vPivot.rotation.y, roll: vPivot.rotation.z }, _euler))
-          fore.rotation.set(-0.28, 0, 0)
+          fore.rotation.set(-0.2, 0, 0)
         }
         b[`hand.${s}`].quaternion.identity()
       })

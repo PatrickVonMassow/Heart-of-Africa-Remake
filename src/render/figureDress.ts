@@ -37,6 +37,7 @@ import {
   skinGeometry,
   SURFACE_ATTRIBUTE,
   tidy,
+  trunkProfile,
   vertexWeights,
   type BodyProportions,
   type BoneName,
@@ -96,15 +97,7 @@ export function surfaceOf(l: DressLayer, p: BodyProportions, bottomY: number): [
 
 /** Half-width and half-depth of the trunk at height y (bind pose). */
 export function trunkAt(p: BodyProportions, y: number): [number, number] {
-  const H = p.stature
-  const st: Array<[number, number, number]> = [
-    [p.hipY - 0.07 * H, p.pelvisHalfW * 0.7, p.chestHalfD * 0.8],
-    [p.hipY + 0.01 * H, p.pelvisHalfW, p.chestHalfD * 1.05],
-    [p.waistY, p.waistHalfW, p.chestHalfD * 0.92],
-    [p.chestY, p.chestHalfW, p.chestHalfD],
-    [p.shoulderY, p.shoulderX + p.armR * 0.6, p.chestHalfD * 0.85],
-    [p.neckY + 0.012 * H, p.neckR * 1.3, p.neckR * 1.2],
-  ]
+  const st = trunkProfile(p)
   if (y <= st[0][0]) {
     // Below the crotch: both legs side by side.
     const legW = p.hipX + p.thighR
@@ -307,8 +300,9 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
       break
     }
     case 'topknot': {
-      const g = new THREE.CylinderGeometry(p.headHalfW * 0.45, p.headHalfW * 0.6, 0.06 * H, radial, 2)
-      g.translate(0, p.crownY + 0.02 * H, -0.012 * H)
+      // a domed knot of dressed hair, not a cylinder (that read as a fez)
+      const g = new THREE.SphereGeometry(p.headHalfW * 0.58, radial, 8).scale(1, 0.82, 0.95)
+      g.translate(0, p.crownY + 0.008 * H, -0.014 * H)
       parts.push({ geo: g, weigh: rigid('head') })
       bottom = p.crownY
       break

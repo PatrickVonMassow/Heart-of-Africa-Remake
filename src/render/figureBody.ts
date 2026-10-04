@@ -377,14 +377,7 @@ export function buildBodyGeometry(p: BodyProportions, look: BodyLook, radial = 1
   // TORSO: crotch → pelvis → waist → chest → shoulders → neck base. The
   // shoulder cap blends into the upper arms so a raised arm lifts it.
   const torso = sweepTube(
-    [
-      st(0, p.hipY - 0.07 * p.stature, 0, p.pelvisHalfW * 0.7, p.chestHalfD * 0.8),
-      st(0, p.hipY + 0.01 * p.stature, 0, p.pelvisHalfW, p.chestHalfD * 1.05),
-      st(0, p.waistY, 0, p.waistHalfW, p.chestHalfD * 0.92),
-      st(0, p.chestY, 0, p.chestHalfW, p.chestHalfD),
-      st(0, p.shoulderY - 0.01 * p.stature, 0, p.shoulderX + p.armR * 0.6, p.chestHalfD * 0.85),
-      st(0, p.neckY + 0.012 * p.stature, 0, p.neckR * 1.3, p.neckR * 1.2),
-    ],
+    trunkProfile(p).map(([y, rx, rz]) => st(0, y, 0, rx, rz)),
     { radial, rings: 18, capStart: true },
   )
   add(torso, (v) => {
@@ -451,7 +444,7 @@ export function buildBodyGeometry(p: BodyProportions, look: BodyLook, radial = 1
     const wrist = elbow - p.forearm
     const arm = sweepTube(
       [
-        st(x, top + p.armR * 0.6, 0, p.armR * 1.25, p.armR * 1.3),
+        st(x, top + p.armR * 0.15, 0, p.armR * 1.2, p.armR * 1.25),
         st(x, top - p.upperArm * 0.4, 0, p.armR * 1.05, p.armR * 1.1),
         st(x, elbow, 0, p.armR * 0.85, p.armR * 0.9),
         st(x, elbow - p.forearm * 0.35, 0.002, p.armR * 0.9, p.armR * 0.95),
@@ -491,6 +484,27 @@ export function buildBodyGeometry(p: BodyProportions, look: BodyLook, radial = 1
   const body = merge(parts)
   body.computeBoundingSphere()
   return body
+}
+
+/**
+ * The trunk's cross-sections, bottom to top, as [y, half-width, half-depth]:
+ * crotch → pelvis → waist → chest → shoulders → neck base. The shoulders
+ * ROUND and slope up to the neck (the trapezius) — one flat shelf from the
+ * shoulder width to the neck read as a coat hanger. The dress is fitted to
+ * the same profile (figureDress.ts `trunkAt`).
+ */
+export function trunkProfile(p: BodyProportions): Array<[number, number, number]> {
+  const H = p.stature
+  return [
+    [p.hipY - 0.07 * H, p.pelvisHalfW * 0.7, p.chestHalfD * 0.8],
+    [p.hipY + 0.01 * H, p.pelvisHalfW, p.chestHalfD * 1.05],
+    [p.waistY, p.waistHalfW, p.chestHalfD * 0.92],
+    [p.chestY, p.chestHalfW, p.chestHalfD],
+    [p.shoulderY - 0.03 * H, p.shoulderX + p.armR * 0.55, p.chestHalfD * 0.88],
+    [p.shoulderY + 0.002 * H, p.shoulderX * 0.85, p.chestHalfD * 0.8],
+    [p.shoulderY + 0.014 * H, p.shoulderX * 0.5, p.chestHalfD * 0.68],
+    [p.neckY + 0.014 * H, p.neckR * 1.25, p.neckR * 1.15],
+  ]
 }
 
 /** Drop the triangles whose centroid passes `drop` (a cut-out: the face of a
