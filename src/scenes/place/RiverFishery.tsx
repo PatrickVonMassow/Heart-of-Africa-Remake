@@ -35,7 +35,8 @@ import { playSpeech } from '../../systems/ambience'
 import { markActor } from '../actorLabelSource'
 import { usePlaceGround } from './PlaceGroundContext'
 import { Figure } from './placeFigure'
-import { HEAD_CARRY_POSE, SpeechFloorContext, useStandingBody } from './placeFigureContext'
+import { HEAD_CARRY_POSE, SpeechFloorContext, useInhabitantBodies, useStandingBody } from './placeFigureContext'
+import { createFisheryMovers, fisheryLiveColliders, placeFisheryMovers } from './fisheryColliders'
 import { carrierWalkPose, copyPose, netFishRotation, ownPose, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
@@ -324,6 +325,15 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
   // The griller kneels at his fire: a body the passers-by go round.
   useStandingBody(sites.griller.x, sites.griller.z)
+  // THE MOVERS ARE SOLID TOO (point 1275): the traveller resolves against the
+  // dugout and the walking fishers' live colliders, and the villagers meet the
+  // carrier, the net man ashore and the pair away from their mortar as fixed
+  // bodies — pushed aside by them, never pushing them off their own walks.
+  const movers = useMemo(() => createFisheryMovers(fire.duo.women.length), [fire])
+  const moverBodies = useInhabitantBodies(2 + fire.duo.women.length, { fixed: true })
+  useEffect(() => () => {
+    fisheryLiveColliders.length = 0
+  }, [])
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -581,6 +591,28 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
     // THE POUNDING PAIR, held at their mortar by the dev life freeze like
     // every other inhabitant (`Pounder` draws them).
     if (!isLifeFrozen()) stepPoundingDuo(fire, sites, dt, fireCfg, rand)
+
+    // Where the movers' bodies stand now (point 1275).
+    placeFisheryMovers(movers, canoe, fire, cfg, fireCfg, fisheryLiveColliders)
+    const [carrierBody, netBody, ...womenBodies] = moverBodies
+    if (carrierBody) {
+      carrierBody.x = fire.carrier.x
+      carrierBody.z = fire.carrier.z
+    }
+    if (netBody) {
+      netBody.x = nm.x
+      netBody.z = nm.z
+      netBody.active = !nm.inBoat
+    }
+    const away = fire.duo.phase !== 'pound' && fire.duo.phase !== 'settle'
+    womenBodies.forEach((b, i) => {
+      const w = fire.duo.women[i]
+      if (!w) return
+      b.x = w.x
+      b.z = w.z
+      // At the mortar `Pounder`'s standing bodies hold their places.
+      b.active = away
+    })
   })
 
   // Dev hooks for the headless verification (CLAUDE.md §7.2).

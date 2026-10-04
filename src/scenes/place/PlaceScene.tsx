@@ -37,6 +37,7 @@ import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness,
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { cloakForCloth } from '../../systems/dress'
 import { fireHasCookShelter } from '../../systems/cookShelter'
+import { withFisheryMovers } from './fisheryColliders'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
 import { placeById, type RegionId } from '../../world/geo'
@@ -3239,7 +3240,7 @@ export function PlaceScene() {
     const dx = (-sin * w.velF + cos * w.velS) * dt
     const dz = (-cos * w.velF - sin * w.velS) * dt
     const [rx, rz] = resolveMove(
-      chiefMovementColliders(layout.colliders), p.x + dx, p.z + dz, PLAYER_RADIUS, [p.x, p.z],
+      withFisheryMovers(chiefMovementColliders(layout.colliders)), p.x + dx, p.z + dz, PLAYER_RADIUS, [p.x, p.z],
     )
     p.x = rx
     p.z = rz
