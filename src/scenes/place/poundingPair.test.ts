@@ -21,7 +21,7 @@ import {
 import { buildRiverBank } from './riverBank'
 import { sceneGrounds } from './sceneGrounds'
 import { createFishFire, createFisheryRing, duoOccupation, fisherySites, stepFishFire, stepPoundingDuo, type FisherySites } from './fishFire'
-import { pounderStands, womanStrokePhase, type DuoPhase } from './mortarPounding'
+import { advancePounding, createPoundingDuo, pounderStands, womanStrokePhase, type DuoPhase } from './mortarPounding'
 import { canoeCycleSeconds, canoeLane, createCanoe, stepCanoe } from './villagerCanoe'
 
 beforeAll(setupGeodata)
@@ -159,21 +159,27 @@ describe('the pair walks to the fish fire together, eats, and returns to poundin
 
   it('walks both ways together: they set off in the same frame and arrive within a second of each other', () => {
     const { trace } = run('bambara-village', 1800, 11)
+    let walks = 0
     for (let k = 1; k < trace.length; k++) {
       const [a, b] = [trace[k - 1], trace[k]]
       if ((b.phase === 'toRack' || b.phase === 'back') && a.phase !== b.phase) {
         // Both on the move from the walk's first frame.
         expect(b.women.every((w) => !w.arrived)).toBe(true)
-        let first = -1
-        let last = -1
-        for (let j = k; j < trace.length && trace[j].phase === b.phase; j++) {
-          const n = trace[j].women.filter((w) => w.arrived).length
-          if (n >= 1 && first < 0) first = trace[j].t
-          if (n === 2) last = trace[j].t
+        const at = [-1, -1]
+        let j = k
+        for (; j < trace.length && trace[j].phase === b.phase; j++) {
+          trace[j].women.forEach((w, i) => {
+            if (w.arrived && at[i] < 0) at[i] = trace[j].t
+          })
         }
-        if (first >= 0 && last >= 0) expect(last - first).toBeLessThan(1)
+        if (j === trace.length) continue // walk cut off by the end of the trace
+        // A woman never seen arrived arrived in the frame that ended the walk.
+        const [t0, t1] = at.map((v) => (v < 0 ? trace[j].t : v))
+        expect(Math.abs(t1 - t0)).toBeLessThan(1)
+        walks++
       }
     }
+    expect(walks).toBeGreaterThanOrEqual(4)
   })
 
   it('back at the mortar they take up the alternating stroke again, half a stroke apart', () => {
@@ -248,4 +254,20 @@ describe('the pair\'s stations and walks stay clear (point 1282)', () => {
     }
     expect(failed.slice(0, 20), `${failed.length} violations`).toEqual([])
   }, 120_000)
+})
+
+describe('settling stops each woman at her first impact', () => {
+  it('counts one strike and dates it to the first crossed impact, even over a step of several strokes', () => {
+    const T = mortarCfg.strokeSeconds
+    const duo = createPoundingDuo(pounderStands(0, 0, 0), Infinity)
+    advancePounding(duo, 0.9 * T)
+    const before = duo.women.map((w) => w.impacts)
+    duo.phase = 'settle'
+    advancePounding(duo, 2.2 * T)
+    // Woman 0 strikes at T, woman 1 (half a stroke later) at 1.5 T; neither strikes again.
+    expect(duo.women.map((w, i) => w.impacts - before[i])).toEqual([1, 1])
+    expect(duo.women[0].lastImpact).toBeCloseTo(T, 9)
+    expect(duo.women[1].lastImpact).toBeCloseTo(1.5 * T, 9)
+    expect(duo.women.every((w) => w.resting)).toBe(true)
+  })
 })
