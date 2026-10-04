@@ -15761,3 +15761,13 @@ to land than a mechanism that needs a review.
   Done when: retro-currency-guard stands down once a context boundary is committed (as the other Stop guards do for a session past its boundary), covered by a unit test on the guard core.
   Bundle: Session- & Repo-Hygiene.
   Criticality: low — a real blockade at the boundary, no player impact.
+- [ ] 1292. The pounding check counts two strikes against three heard thuds on WebGL 2
+  Measured 04.10.2026 on the covering WebGL 2 run of `polish-villagers` after point 1121
+  (`local/1121-pv-webgl.log`): FAIL "both women strike the mortar and every strike is heard"
+  `{heardThree:true, struck:2, heard:3, thuds:3}` [--section=village-pounding]. Not 1121's (that
+  point only changed the river-bank aim block); the same check ran green on WebGPU minutes earlier.
+  The strike counter appears to miss a strike whose thud was heard — a counting race, not a missing sound.
+  Done when: the strike count and the heard thuds are read from the same moment, and the check stays
+  able to fail on a strike that is truly silent.
+  Bundle: Prüfstand.
+  Criticality: low — a test-side race, no player impact measured.
