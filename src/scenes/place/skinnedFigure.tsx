@@ -80,6 +80,7 @@ interface Rig {
   layers: DressLayer[]
   meshes: THREE.SkinnedMesh[]
   bones: Record<BoneName, THREE.Bone>
+  skeleton: THREE.Skeleton
   head: THREE.Object3D
   hands: [THREE.Object3D, THREE.Object3D]
 }
@@ -125,7 +126,7 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     bones[`hand.${side}`].add(o)
     return o
   }
-  return { p, layers, meshes, bones, head, hands: [hand('L', 'hand-left'), hand('R', 'hand-right')] }
+  return { p, layers, meshes, bones, skeleton, head, hands: [hand('L', 'hand-left'), hand('R', 'hand-right')] }
 }
 
 const _s = new THREE.Vector3()
@@ -178,6 +179,9 @@ export function SkinnedFigure({
   const key = identityKey ?? ownKey
   const id = useMemo(() => figureIdentity(key, scale, sex, age), [key, scale, sex, age])
   const rig = useMemo(() => buildRig(id, look, cloth, skin), [id, look, cloth, skin])
+  // The skeleton (and its bone texture) is this figure's own; the geometry is
+  // shared through the caches and stays.
+  useEffect(() => () => rig.skeleton.dispose(), [rig])
   const L = FIGURE_LIMBS
   // THE VIRTUAL PRIMITIVE RIG the poses are written onto — the primitive
   // figure's pivots exactly (placeFigure.tsx), drawing nothing.
@@ -212,21 +216,36 @@ export function SkinnedFigure({
       b.chest.rotation.set(p.stoop, 0, 0)
       b.neck.rotation.set(-p.stoop * 0.45, 0, 0)
       root.updateWorldMatrix(true, true)
+      // THE SOLVE RUNS IN THE BODY MESH'S OWN SPACE, not in world space: a
+      // caller may squash the figure non-uniformly (the pounding squat), and a
+      // bone quaternion cannot undo a world-space shear. Inside the body every
+      // transform is rigid, so lengths and directions there are the bones' own;
+      // the virtual hand, brought into the same space, is the primitive's
+      // contact with the squash taken out, and rendering puts it back.
+      const body = rig.meshes[0]
+      const loc = (o: THREE.Object3D, out: THREE.Vector3) => body.worldToLocal(o.getWorldPosition(out))
+      const qIn = (o: THREE.Object3D, out: THREE.Quaternion) => {
+        const chain: THREE.Object3D[] = []
+        for (let n: THREE.Object3D | null = o; n && n !== body; n = n.parent) chain.push(n)
+        out.identity()
+        for (let k = chain.length - 1; k >= 0; k--) out.multiply(chain[k].quaternion)
+        return out
+      }
       // A contact the hands cannot quite reach is reached by leaning in.
       const reachOf = (s: 'L' | 'R') =>
-        b[`forearm.${s}`].getWorldPosition(_e).distanceTo(b[`upperArm.${s}`].getWorldPosition(_s)) +
-        b[`hand.${s}`].getWorldPosition(_w).distanceTo(_e) +
-        rig.hands[s === 'L' ? 0 : 1].getWorldPosition(_t).distanceTo(_w)
+        loc(b[`forearm.${s}`], _e).distanceTo(loc(b[`upperArm.${s}`], _s)) +
+        loc(b[`hand.${s}`], _w).distanceTo(_e) +
+        loc(rig.hands[s === 'L' ? 0 : 1], _t).distanceTo(_w)
       if (contact) {
-        b.spine.getWorldPosition(_pivot)
-        _fwd.set(0, 0, 1).applyQuaternion(b.spine.getWorldQuaternion(_q)).setY(0).normalize()
+        loc(b.spine, _pivot)
+        _fwd.set(0, 0, 1).applyQuaternion(qIn(b.spine, _q)).setY(0).normalize()
         let lean = 0
         ;(['L', 'R'] as const).forEach((s, i) => {
           const vh = virtualHands.current[i]
           if (!vh) return
           const reach = reachOf(s)
-          b[`upperArm.${s}`].getWorldPosition(_s)
-          vh.getWorldPosition(_t)
+          loc(b[`upperArm.${s}`], _s)
+          loc(vh, _t)
           lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
         })
         if (lean > 0) {
@@ -241,17 +260,17 @@ export function SkinnedFigure({
         const vh = virtualHands.current[i]
         let done = false
         if (contact && vh) {
-          const a = fore.getWorldPosition(_e).distanceTo(up.getWorldPosition(_s))
+          const a = loc(fore, _e).distanceTo(loc(up, _s))
           const reach = reachOf(s)
-          up.getWorldPosition(_s)
-          vh.getWorldPosition(_t)
-          const chestQ = b.chest.getWorldQuaternion(new THREE.Quaternion())
+          loc(up, _s)
+          loc(vh, _t)
+          const chestQ = qIn(b.chest, new THREE.Quaternion())
           _pole.set(s === 'L' ? 0.5 : -0.5, -0.4, -1).applyQuaternion(chestQ)
           const sol = solveTwoBone(_s, _t, a, reach - a, _pole)
           if (sol.reached) {
             up.quaternion.copy(hangToward(sol.upper, chestQ))
             up.updateWorldMatrix(false, true)
-            fore.quaternion.copy(hangToward(sol.fore, up.getWorldQuaternion(new THREE.Quaternion())))
+            fore.quaternion.copy(hangToward(sol.fore, qIn(up, new THREE.Quaternion())))
             done = true
           }
         }
