@@ -33480,3 +33480,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: scripts/verify/polish.mjs (~6044-6070, the `aim` block and the 482 frame),
   scripts/render-verify-charges.mjs (the entry filed with this point).
   Bundle: Testinfrastruktur.
+
+- [x] 1284. Antelope, goat and zebra get detailed, recognisable models with pelt pattern and face, in and outside settlements
+  Queue position: directly before the request "Skyline wildlife: true species proportions sized to one shared readable target", which itself goes directly before point 1275 (user order).
+  This point ABSORBS point 575 entirely: delete point 575 from TASKS.md when appending this one (user order 03.10.2026).
+  The antelope, the zebra and the settlement goat (src/render/fauna.ts: buildAntelope*/buildZebra*/buildGoat*, shared buildQuadruped/buildQuadrupedParts) get more detailed, recognisable models — inside settlements, in the bird's-eye view and as skyline silhouettes: readable head with muzzle and ears, horns on the antelope, mane on the zebra, shaped neck and torso instead of capsules, jointed legs. The gait keeps running on the existing leg pivots (GoatLeg, gaitRig).
+  Carried over from 575: every ambient species the audit finds unmarked carries the marking that identifies it (zebra stripes, giraffe patches, the darker mane and cape where the species has one); the pattern is laid out at a scale that survives being small (silhouette and large bands do the work, not fine texture); procedural/TSL, no added texture asset; faces get the minimum that reads at distance and no more.
+  Cost measured before and after; the feature is sorted into the three detail levels with its QUALITY_PRESETS entries and the matching row in docs/graphics-detail-levels.md.
+  Verifiable: per treated species one frame inside a settlement and one in the bird's-eye view at zoom 0.5, both backends, judged by looking — the species is recognisable — plus the before/after cost measurement. Vitest for the geometry/pattern builders where browserless.
+  Criticality: medium — the visual identity of every animal; acceptance criterion 11 (no schematic look).
+  Bundle: Tierverhalten.
