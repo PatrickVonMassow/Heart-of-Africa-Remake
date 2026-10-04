@@ -686,6 +686,32 @@ if (section('villager-canoe')) {
             local: { x: r.x, y: 0.9, z: r.z },
             label: 'the two pounding women at the fishers’ smoking rack, each eating a smoked fish before they walk back to their mortar together',
           })
+          // And back: both at their stands again, pounding alternately.
+          const back = await page
+            .waitForFunction(() => window.__placeFishFire?.().duo.phase === 'pound', null, { timeout: 120000, polling: 100 })
+            .then(() => true)
+            .catch(() => false)
+          const atStands = back && (await page.evaluate(() => {
+            const f = window.__placeFishFire()
+            return f.duo.women.every((w, i) => Math.hypot(w.x - f.sites.duoStands[i].x, w.z - f.sites.duoStands[i].z) < 0.05)
+          }))
+          check('the pair walks back to the mortar and both stand at their stands again', atStands)
+          const before = await page.evaluate(() => window.__placePounding().women.map((w) => w.impacts))
+          const gaps = []
+          for (let i = 0; i < 20; i++) {
+            gaps.push(await page.evaluate(() => {
+              const [a, b] = window.__placePounding().women.map((w) => w.phase)
+              return a > 0 && b > 0 ? Math.min((b - a + 1) % 1, (a - b + 1) % 1) : null
+            }))
+            await nextFrames(4)
+          }
+          const after = await page.evaluate(() => window.__placePounding().women.map((w) => w.impacts))
+          const measured = gaps.filter((g) => g !== null)
+          check(
+            'back at the mortar both strike again, half a stroke apart',
+            atStands && after.every((n, i) => n > before[i]) && measured.length > 0 && measured.every((g) => g > 0.45),
+            JSON.stringify({ before, after, gaps }),
+          )
         }
       }
     }
