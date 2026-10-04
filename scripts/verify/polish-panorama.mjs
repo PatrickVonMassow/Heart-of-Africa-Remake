@@ -1241,7 +1241,8 @@ if (section('animal-models')) {
     window.__game.getState().debugJumpTo(-2.2, 34.8)
   })
   await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 30000 }).catch(() => {})
-  await page.waitForTimeout(1500)
+  // Let the jump settle on the app clock before staging the herds.
+  await nextFrames(10)
   const staged = await page.evaluate(() => {
     const herds = window.__wildlife?.herdsRef?.current
     if (!herds) return null
