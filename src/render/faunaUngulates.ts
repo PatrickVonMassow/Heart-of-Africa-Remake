@@ -49,6 +49,8 @@ export interface UngulateSpec extends QuadrupedSpec {
   hornForm?: 'lyre' | 'swept'
   hornLen?: number
   hornColor?: string
+  /** Torso width factor (1 = round; a goat is slab-sided). */
+  bodyWidth?: number
   /** Chin beard (goat). */
   beard?: string
   hoofColor: string
@@ -112,6 +114,7 @@ const GOAT: UngulateSpec = {
   headColor: '#8a7a62',
   horns: true,
   seed: 171,
+  bodyWidth: 0.85,
   headLen: 2.6,
   headPitch: 0.85,
   ear: { len: 1.0, width: 0.24, spread: 1.25, back: 0.15 },
@@ -159,19 +162,24 @@ function ungulateBodyParts(s: UngulateSpec, segs: Segs): THREE.BufferGeometry[] 
   const h = s.headSize
   const headColor = s.headColor ?? s.bodyColor
 
-  // Torso: rump, hip, waist, deep girth, breast — not a capsule.
-  const st = (z: number, y: number, rx: number, ry: number): SweepStation => ({ p: [0, backY + y * R, z], rx: rx * R, ry: ry * R })
+  // Torso: a rounded rump, the hip, a waist, the deep girth behind the
+  // forelegs and the breast — not a capsule. The ends close along an
+  // elliptical falloff so the rump reads round, never as a cut-off tube.
+  const w = s.bodyWidth ?? 1
+  const st = (z: number, y: number, rx: number, ry: number): SweepStation => ({ p: [0, backY + y * R, z], rx: rx * R * w, ry: ry * R })
   const torso = sweepTube(
     [
-      st(-halfL - 0.75 * R, -0.05, 0.3, 0.36),
-      st(-halfL - 0.42 * R, 0.03, 0.72, 0.78),
-      st(-halfL + 0.08 * R, 0.0, 0.8, 0.82),
-      st(0, -0.06, 0.78, 0.8),
-      st(halfL - 0.1 * R, -0.05, 0.78, 0.92),
-      st(halfL + 0.4 * R, 0.0, 0.6, 0.76),
-      st(halfL + 0.72 * R, 0.06, 0.3, 0.38),
+      st(-halfL - 0.8 * R, 0.0, 0.22, 0.26),
+      st(-halfL - 0.62 * R, 0.02, 0.55, 0.6),
+      st(-halfL - 0.35 * R, 0.02, 0.74, 0.78),
+      st(-halfL + 0.05 * R, -0.02, 0.8, 0.84),
+      st(0, -0.1, 0.8, 0.86),
+      st(halfL - 0.15 * R, -0.12, 0.76, 0.96),
+      st(halfL + 0.3 * R, -0.08, 0.62, 0.84),
+      st(halfL + 0.55 * R, -0.02, 0.44, 0.6),
+      st(halfL + 0.72 * R, 0.04, 0.2, 0.26),
     ],
-    { radial: segs.body, rings: 16, capStart: true, capEnd: true },
+    { radial: segs.body, rings: 20, capStart: true, capEnd: true },
   )
   parts.push(tint(torso, s.bodyColor, 0.08, s.seed))
 
@@ -309,7 +317,7 @@ function ungulateBodyParts(s: UngulateSpec, segs: Segs): THREE.BufferGeometry[] 
     markStripes(head, v3(hd), 8)
   } else if (s.marking === 'gazelle') {
     // Pale belly under a dark flank band.
-    const bellyY = backY - 0.5 * R
+    const bellyY = backY - 0.55 * R
     markGeometry(torso, MARK.flank, bellyY, 0.22 * R)
   }
   return parts

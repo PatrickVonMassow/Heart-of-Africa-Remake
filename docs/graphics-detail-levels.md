@@ -140,12 +140,12 @@ added.
 
   | Build | Before (capsules) | Low 12 | Medium 18 | High 24 |
   | --- | --- | --- | --- | --- |
-  | zebra | 1914 / 2960 | 1153 / 2022 | 1525 / 2742 | 1927 / 3520 |
-  | antelope | 1984 / 2992 | 1189 / 2082 | 1561 / 2802 | 1975 / 3600 |
-  | goat | 1984 / 2992 | 1224 / 2098 | 1596 / 2818 | 2010 / 3616 |
+  | zebra | 1914 / 2960 | 1201 / 2118 | 1597 / 2886 | 2023 / 3712 |
+  | antelope | 1984 / 2992 | 1237 / 2178 | 1633 / 2946 | 2071 / 3792 |
+  | goat | 1984 / 2992 | 1272 / 2194 | 1668 / 2962 | 2106 / 3808 |
 
-  So medium (the default) draws fewer triangles per animal than the capsule
-  build did, low about a third fewer, and high about a fifth more.
+  So medium (the default) draws slightly fewer triangles per animal than the
+  capsule build did, low about a quarter fewer, and high about a quarter more.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a
