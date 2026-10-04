@@ -3086,11 +3086,27 @@ if (section('adult-errands')) {
       const bankAlong = river.bank.x * river.downstream.x + river.bank.z * river.downstream.z
       await standAt(river, 0)
       // The matrices follow the pose only on the next drawn frames; projecting
-      // before that would aim at where the camera USED to look.
+      // before that would aim at where the camera USED to look. The pipeline
+      // wait the shutter runs anyway is run HERE, before the aim, so the time
+      // between choosing the patch and opening the shutter is as short as the
+      // shutter itself allows.
       await nextFrames(6)
-      const aim = await page.evaluate(() => {
+      await awaitPlaceDrawn('482-village-river-bank aim')
+      // THE AIM RACES ITS OWN SUBJECT (point 1121, red of 14.09.2026 on WebGL 2:
+      // "off the right edge"). The foam drifts with the current — that is what
+      // the check above measures — so a patch chosen while it is in the picture
+      // can have ridden out of it by the time the shutter opens, and on a slower
+      // lane the frames in between cost more wall time. So the patch is chosen
+      // for where it WILL be as well: it must sit inside the picture now AND
+      // `AIM_LEAD_M` metres further downstream, without re-entering upstream in
+      // between. After the shutter the SAME patch is re-read, and the frame only
+      // counts when the foam is still in the picture it was declared for — an
+      // empty river gives no aim and fails, never a picture of plain water.
+      const AIM_LEAD_M = 6
+      const aimRead = (arg) => {
         const cam = window.__placeCamera
         const p = window.__placePlayer
+        const r = window.__placeRiver()
         if (!cam || !cam.projectionMatrix || !cam.matrixWorldInverse) return null
         const apply = (e, v) =>
           [0, 1, 2, 3].map((i) => e[i] * v[0] + e[i + 4] * v[1] + e[i + 8] * v[2] + e[i + 12] * v[3])
@@ -3100,17 +3116,33 @@ if (section('adult-errands')) {
           if (!(clip[3] > 0)) return null
           return { x: clip[0] / clip[3], y: clip[1] / clip[3], z: clip[2] / clip[3] }
         }
+        // The subject is declared 15 cm above the patch, so that is the point
+        // that has to be in the picture.
+        const inside = (x, y, z, rim) => {
+          const ndc = ndcOf(x, y + 0.15, z)
+          return !!ndc && ndc.z < 1 && Math.abs(ndc.x) <= rim && Math.abs(ndc.y) <= rim ? ndc : null
+        }
+        if (arg.index != null) {
+          // The re-read at the shutter: where the chosen patch has drifted to.
+          const f = r.flecks[arg.index]
+          const ndc = f ? inside(f.x, f.y, f.z, 1) : null
+          return { inPicture: !!ndc, ndc, driftedM: r.flecksDrift - arg.drift }
+        }
         let best = null
         let bestScore = Infinity
-        for (const f of window.__placeRiver().flecks) {
-          // The subject is declared 15 cm above the patch, so that is the point
-          // that has to be in the picture.
-          const ndc = ndcOf(f.x, f.y + 0.15, f.z)
-          if (!ndc || ndc.z >= 1) continue
+        r.flecks.forEach((f, index) => {
+          // Along the drift band, centred where the bank normal runs through the
+          // village (src/render/placeRiver.ts fleckPosition): a patch that would
+          // reach the band's end within the lead re-enters upstream, out of shot.
+          const along = f.x * r.downstream.x + f.z * r.downstream.z
+          if (along + arg.lead > arg.span / 2 - 0.5) return
           // On screen at all — and the score below then pulls the choice toward
-          // the middle, so a patch at the very rim, one drift step from the next
-          // red, only ever wins when the picture holds nothing better.
-          if (Math.abs(ndc.x) > 0.9 || Math.abs(ndc.y) > 0.9) continue
+          // the middle, so a patch at the very rim only ever wins when the
+          // picture holds nothing better.
+          const ndc = inside(f.x, f.y, f.z, 0.9)
+          if (!ndc) return
+          const ahead = { x: f.x + r.downstream.x * arg.lead, z: f.z + r.downstream.z * arg.lead }
+          if (!inside(ahead.x, f.y, ahead.z, 0.9)) return
           // Centring weighs most, and distance adds 0.002 per metre to every
           // score, so of two near-equally centred patches the nearer wins: a
           // patch dead ahead 200 m downstream reads as water, not as the foam at
@@ -3118,16 +3150,33 @@ if (section('adult-errands')) {
           const score = Math.hypot(ndc.x, ndc.y) + Math.hypot(f.x - p.x, f.z - p.z) * 0.002
           if (score < bestScore) {
             bestScore = score
-            best = f
+            best = { index, x: f.x, y: f.y, z: f.z, drift: r.flecksDrift }
           }
-        }
+        })
         return best
-      })
-      await nextFrames(6)
-      await frame('482-village-river-bank', {
+      }
+      // span: RIVER_DRIFT_SPAN in src/render/placeRiver.ts (a .mjs cannot import it).
+      const aim = await page.evaluate(aimRead, { lead: AIM_LEAD_M, span: 40 })
+      check(
+        'the river-bank frame finds a foam patch that stays in the picture until the shutter',
+        !!aim,
+        aim ? `patch ${aim.index} at ${aim.x.toFixed(1)}, ${aim.z.toFixed(1)}` : 'no patch in the picture now and 6 m downstream',
+      )
+      const shot = await frame('482-village-river-bank', {
         local: aim ? { x: aim.x, y: aim.y + 0.15, z: aim.z } : { x: river.bank.x, y: 0.4, z: river.bank.z },
         label: 'the river bank, with the foam riding the current',
       })
+      if (aim && shot) {
+        const after = await page.evaluate(aimRead, { index: aim.index, drift: aim.drift })
+        check(
+          'the river-bank frame: the foam it was aimed at is still in the picture after the shutter',
+          !!after && after.inPicture,
+          after
+            ? `drifted ${after.driftedM.toFixed(2)} m (lead ${AIM_LEAD_M} m)` +
+                (after.ndc ? `, ndc ${after.ndc.x.toFixed(2)}, ${after.ndc.y.toFixed(2)}` : ', out of the picture')
+            : 'no reading',
+        )
+      }
       await standAt(river, bankAlong)
       await nextFrames(6)
 
