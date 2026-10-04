@@ -10,7 +10,7 @@
 import * as THREE from 'three/webgpu'
 import { float, positionGeometry, smoothstep } from 'three/tsl'
 import { calfProportions, merge, tint, type GoatLeg, type QuadrupedSpec } from './faunaGeometry'
-import { faunaMarkingColorNode, MARK, markGeometry } from './faunaMarkings'
+import { faunaMarkingColorNode, MARK, markGeometry, silhouetteMarkingColorNode } from './faunaMarkings'
 
 export { calfProportions, type GoatLeg, type QuadrupedSpec } from './faunaGeometry'
 export {
@@ -69,6 +69,19 @@ export function createFaunaMaterial(): THREE.MeshStandardNodeMaterial {
   // The pelt markings (faunaMarkings.ts): a factor on the vertex colour, 1 on
   // every unmarked part.
   m.colorNode = faunaMarkingColorNode()
+  return m
+}
+
+/**
+ * Material of a skyline silhouette (PanoramaWildlife, point 102): the flat
+ * hazed `tint` carries the species' pelt marking at a reduced `contrast`, with
+ * bands widened by `bandScale` (work-order 1284) — a zebra reads striped and a
+ * gazelle banded on the horizon without losing the aerial-perspective tone.
+ */
+export function createSilhouetteFaunaMaterial(tint: THREE.Color, contrast: number, bandScale: number): THREE.MeshStandardNodeMaterial {
+  const m = new THREE.MeshStandardNodeMaterial({ roughness: 1, flatShading: false })
+  m.color.copy(tint)
+  m.colorNode = silhouetteMarkingColorNode(tint, contrast, bandScale)
   return m
 }
 

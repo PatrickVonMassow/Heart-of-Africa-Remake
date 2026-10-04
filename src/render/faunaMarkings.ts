@@ -91,50 +91,91 @@ const aaBelow = (value: THREE.Node<'float'>, edge: THREE.Node<'float'>) => {
 }
 
 /**
+ * The marking factor on a base coat colour, per fragment: 1 on an unmarked part
+ * (kind 0). `bandScale` widens every band and cell (1 = as built; < 1 = fewer,
+ * broader bands — the skyline silhouettes use it so a stripe still spans
+ * several pixels on a two-degree animal).
+ */
+function markingFactor(base: THREE.Node<'vec3'>, bandScale: number) {
+  const m = attribute<'vec4'>(FAUNA_MARK_ATTRIBUTE, 'vec4')
+  const kind = m.x.round()
+  const p = positionGeometry
+  const k = float(bandScale)
+  const creamRgb = new THREE.Color(MARK_TONES.cream)
+  const cream = vec3(creamRgb.r, creamRgb.g, creamRgb.b)
+  // Factor that turns the base colour into `target`.
+  const toward = (target: THREE.Node<'vec3'>, mask: THREE.Node<'float'>) => mix(vec3(1), target.div(base), mask)
+  const factor = vec3(1).toVar()
+
+  If(kind.equal(MARK.stripes), () => {
+    // Gently wavy bands: the wobble rides height only, so a band stays
+    // continuous over the back from one flank to the other.
+    const s = dot(p, m.yzw.mul(k)).add(sin(p.y.mul(7)).mul(0.18))
+    const d = abs(fract(s).sub(0.5)).mul(2) // 0 mid-band .. 1 between bands
+    const dark = aaBelow(d, float(MARK_TONES.stripeDuty))
+    factor.assign(mix(vec3(1), vec3(MARK_TONES.stripeDark), dark))
+  })
+    .ElseIf(kind.equal(MARK.patches), () => {
+      // Voronoi cells (squared distances): F2² − F1² grows linearly with the
+      // distance to a cell border, so a threshold draws even pale lines.
+      const f = mx_worley_noise_vec2(p.mul(m.y.mul(k)), 0.85)
+      const edge = f.y.sub(f.x)
+      const line = aaBelow(edge, m.z)
+      factor.assign(mix(vec3(MARK_TONES.patchDark), toward(cream, float(1)), line))
+    })
+    .ElseIf(kind.equal(MARK.spots), () => {
+      const f = mx_worley_noise_vec2(p.mul(m.y.mul(k)), 0.9)
+      const r = f.x.sqrt()
+      const spot = aaBelow(r, m.z).mul(float(1).sub(aaBelow(r, m.w)))
+      factor.assign(mix(vec3(1), vec3(MARK_TONES.spotDark), spot))
+    })
+    .ElseIf(kind.equal(MARK.flank), () => {
+      const belly = aaBelow(p.y, m.y)
+      const band = aaBelow(p.y, m.y.add(m.z)).sub(belly)
+      const dark = mix(vec3(1), vec3(MARK_TONES.flankDark), clamp(band, 0, 1))
+      factor.assign(mix(dark, toward(cream, float(1)), belly))
+    })
+  return factor
+}
+
+/**
  * The TSL colour node of the shared fauna material: a per-fragment factor on
  * the vertex colour (the material multiplies the vertex colour in itself), so
  * an unmarked part (kind 0) renders exactly as before.
  */
 export function faunaMarkingColorNode() {
-  return Fn(() => {
-    const m = attribute<'vec4'>(FAUNA_MARK_ATTRIBUTE, 'vec4')
-    const kind = m.x.round()
-    const p = positionGeometry
-    const base = max(vertexColor().rgb, vec3(0.02))
-    const creamRgb = new THREE.Color(MARK_TONES.cream)
-    const cream = vec3(creamRgb.r, creamRgb.g, creamRgb.b)
-    // Factor that turns the vertex colour into `target`.
-    const toward = (target: THREE.Node<'vec3'>, mask: THREE.Node<'float'>) => mix(vec3(1), target.div(base), mask)
-    const factor = vec3(1).toVar()
+  return Fn(() => markingFactor(max(vertexColor().rgb, vec3(0.02)), 1))()
+}
 
-    If(kind.equal(MARK.stripes), () => {
-      // Gently wavy bands: the wobble rides height only, so a band stays
-      // continuous over the back from one flank to the other.
-      const s = dot(p, m.yzw).add(sin(p.y.mul(7)).mul(0.18))
-      const d = abs(fract(s).sub(0.5)).mul(2) // 0 mid-band .. 1 between bands
-      const dark = aaBelow(d, float(MARK_TONES.stripeDuty))
-      factor.assign(mix(vec3(1), vec3(MARK_TONES.stripeDark), dark))
-    })
-      .ElseIf(kind.equal(MARK.patches), () => {
-        // Voronoi cells (squared distances): F2² − F1² grows linearly with the
-        // distance to a cell border, so a threshold draws even pale lines.
-        const f = mx_worley_noise_vec2(p.mul(m.y), 0.85)
-        const edge = f.y.sub(f.x)
-        const line = aaBelow(edge, m.z)
-        factor.assign(mix(vec3(MARK_TONES.patchDark), toward(cream, float(1)), line))
-      })
-      .ElseIf(kind.equal(MARK.spots), () => {
-        const f = mx_worley_noise_vec2(p.mul(m.y), 0.9)
-        const r = f.x.sqrt()
-        const spot = aaBelow(r, m.z).mul(float(1).sub(aaBelow(r, m.w)))
-        factor.assign(mix(vec3(1), vec3(MARK_TONES.spotDark), spot))
-      })
-      .ElseIf(kind.equal(MARK.flank), () => {
-        const belly = aaBelow(p.y, m.y)
-        const band = aaBelow(p.y, m.y.add(m.z)).sub(belly)
-        const dark = mix(vec3(1), vec3(MARK_TONES.flankDark), clamp(band, 0, 1))
-        factor.assign(mix(dark, toward(cream, float(1)), belly))
-      })
-    return factor
+/** Rec. 709 luminance weights, for the silhouette's marking contrast. */
+const LUMA = [0.2126, 0.7152, 0.0722] as const
+
+/**
+ * How a skyline silhouette's haze tint is scaled by its pelt marking (CPU
+ * mirror of `silhouetteMarkingColorNode`, for tests): the marked coat's
+ * luminance relative to the plain coat, eased toward 1 by `contrast` (0 = the
+ * flat haze tint, 1 = the full pelt contrast) and clamped so a pale belly
+ * lifts the tint without blowing out to the sky.
+ */
+export function silhouetteMarkScale(markedOverCoat: number, contrast: number, maxLift = 1.8): number {
+  const r = Math.min(maxLift, Math.max(0, markedOverCoat))
+  return 1 + (r - 1) * Math.max(0, Math.min(1, contrast))
+}
+
+/**
+ * Colour node of a skyline silhouette (point 102 haze look, work-order 1284
+ * species marks): the flat aerial-perspective `tint` scaled per fragment by the
+ * pelt marking at a haze-reduced `contrast` — so the zebra still reads striped
+ * and the gazelle as dark-banded over a pale belly, while the mean tone stays
+ * the hazed one. Bands are widened by `bandScale` to survive the small size.
+ */
+export function silhouetteMarkingColorNode(tint: THREE.Color, contrast: number, bandScale: number, maxLift = 1.8) {
+  return Fn(() => {
+    const base = max(vertexColor().rgb, vec3(0.02))
+    const factor = markingFactor(base, bandScale)
+    const luma = vec3(LUMA[0], LUMA[1], LUMA[2])
+    const ratio = clamp(dot(base.mul(factor), luma).div(dot(base, luma)), 0, maxLift)
+    const scale = float(1).add(ratio.sub(1).mul(clamp(float(contrast), 0, 1)))
+    return vec3(tint.r, tint.g, tint.b).mul(scale)
   })()
 }

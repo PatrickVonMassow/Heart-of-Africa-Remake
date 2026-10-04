@@ -80,6 +80,7 @@ import {
   buildElephantParts,
   buildGiraffeParts,
   buildZebraParts,
+  createSilhouetteFaunaMaterial,
   footBodyOffset,
   footHeight,
   gaitBodyLift,
@@ -1624,7 +1625,9 @@ function PanoramaWildlife({
         parts: builds[gi],
         species: PANORAMA_FAUNA[region][gi],
         rig: rigs[gi],
-        material: new THREE.MeshStandardMaterial({ color: new THREE.Color(rgb[0], rgb[1], rgb[2]), roughness: 1 }),
+        // The hazed tint carries the species' pelt marking at a reduced
+        // contrast (work-order 1284), so the skyline zebra reads striped.
+        material: createSilhouetteFaunaMaterial(new THREE.Color(rgb[0], rgb[1], rgb[2]), pw.markContrast, pw.markBandScale),
         worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
         hazeLum: luminance(rgb),

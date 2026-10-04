@@ -20,9 +20,11 @@ import {
   buildZebraCalf,
   buildZebraParts,
   createFaunaMaterial,
+  createSilhouetteFaunaMaterial,
   gaitRig,
 } from './fauna'
-import { FAUNA_MARK_ATTRIBUTE, MARK, markAt } from './faunaMarkings'
+import { FAUNA_MARK_ATTRIBUTE, MARK, MARK_TONES, markAt, silhouetteMarkScale } from './faunaMarkings'
+import { balance } from '../config/balance'
 import { sweepTube } from './faunaGeometry'
 import { UNGULATE_SPECS, ungulateLayout } from './faunaUngulates'
 import { QUALITY_PRESETS } from '../config/quality'
@@ -224,6 +226,47 @@ describe('pelt markings (procedural, no texture asset)', () => {
     expect(m.colorNode).toBeTruthy()
     expect(m.vertexColors).toBe(true)
     m.dispose()
+  })
+})
+
+describe('skyline silhouettes carry the species marking (point 102 haze look)', () => {
+  const pw = balance.panoramaWildlife
+
+  it('the silhouette material is the hazed tint with the marking in its colour node, not the vertex coat', () => {
+    const tint = new THREE.Color(0.4, 0.38, 0.33)
+    const m = createSilhouetteFaunaMaterial(tint, pw.markContrast, pw.markBandScale)
+    expect(m.colorNode).toBeTruthy()
+    expect(m.vertexColors).toBe(false)
+    expect(m.color.equals(tint)).toBe(true)
+    m.dispose()
+  })
+
+  it('the panorama zebra body and legs are striped, the antelope body flank-banded with its horns kept', () => {
+    const zebra = buildZebraParts()
+    expect(kinds(zebra.body).has(MARK.stripes)).toBe(true)
+    zebra.legs.forEach((l) => expect(kinds(l.geo).has(MARK.stripes)).toBe(true))
+    const antelope = buildAntelopeParts()
+    expect(kinds(antelope.body).has(MARK.flank)).toBe(true)
+    expect(kinds(antelope.body).has(MARK.stripes)).toBe(false)
+    expect(kinds(buildGiraffeParts().body).has(MARK.patches)).toBe(true)
+  })
+
+  it('a stripe stays clearly darker than the coat after the haze reduction, a pale belly lifts it', () => {
+    const stripe = silhouetteMarkScale(MARK_TONES.stripeDark, pw.markContrast)
+    expect(stripe).toBeLessThan(0.55) // clearly visible band on the tint
+    expect(stripe).toBeGreaterThan(0.1) // never a black hole in the haze
+    const flank = silhouetteMarkScale(MARK_TONES.flankDark, pw.markContrast)
+    expect(flank).toBeLessThan(0.75)
+    const belly = silhouetteMarkScale(3, pw.markContrast)
+    expect(belly).toBeGreaterThan(1.3)
+    expect(belly).toBeLessThanOrEqual(1.8)
+    expect(silhouetteMarkScale(1, pw.markContrast)).toBe(1) // unmarked: the flat haze tint
+    expect(silhouetteMarkScale(MARK_TONES.stripeDark, 0)).toBe(1)
+  })
+
+  it('broadens the bands for the small skyline animal', () => {
+    expect(pw.markBandScale).toBeGreaterThan(0.3)
+    expect(pw.markBandScale).toBeLessThan(1)
   })
 })
 
