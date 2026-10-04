@@ -110,6 +110,20 @@ put it is the mistake this line exists to stop.
   Evidence afterwards (no gate): the user compares the "Day" view of the usage panel over the following days; the "general-purpose" share should drop somewhat and the >150k share should not rise again.
   Not in scope: fewer subagents overall (would push the main session back over 150k), cheaper models for helpers (would need a model-policy exception), new agent types.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1293. Villagers show the researched dress by people, sex, age, season and year on a code-built skinned body
+  Queue position: directly after point 1279 (user order 04.10.2026).
+  Source: user decision 04.10.2026 on the figure-rendering proposal (layers 1 → 3 on body 2a). Sketch: https://claude.ai/artifact/M16uuyeq4skXZCKRp2meXE (Zulu village, 15.07.1890, after Mayr 1907). Sibling with a CC0 glTF body: point 1294, after 1288.
+  Today the place figures are cone, sphere and cylinder (src/scenes/place/placeFigure.tsx); only the seasonal part of the research reaches the game (src/systems/dress.ts). The research in docs/peoples-1890.md (dress by people, sex, age, season and year) is to become visible.
+  Final state:
+  1. APPEARANCE TABLE (pure logic, src/systems/): people × sex × age group (child, girl/young man, adult, elder) × season × year → an ordered list of dress layers (hip, torso, shoulder, head, ornament), each with form, material, colour, pattern and way of wearing. dress.ts's seasonal rules are folded into it, not duplicated. Every entry names its source section in peoples-1890.md or is marked as an educated guess.
+  2. GAPS ARE RESEARCHED FIRST (user decision 04.10.2026): for every cell the table needs that peoples-1890.md does not cover (known today for the Zulu alone: men's everyday dress under the cloak, children's dress, whether Mayr 1907 Natal transfers to Zululand 1890, and the share of hide versus blanket wearers), the author first researches period sources. What it cannot settle goes to GPT-6 Astra for a second search. Only what both searches leave open is filled by educated guessing, marked calibratable, and recorded as a guess in peoples-1890.md. Findings land in peoples-1890.md, whose §8 implementation section stays current.
+  3. BODY 2a: a skinned figure built in code — lathe/sweep surfaces along a skeleton of about 17 bones; age, sex and build are proportion parameters, children with child head-to-body proportions. No asset, no new runtime dependency.
+  4. DRESS ON THE SKELETON: wrap, cloak, head covering and ornament as their own meshes bound to the bones, patterns in TSL, identical on WebGPU and WebGL 2.
+  5. LOW PRESET KEEPS TODAY'S PRIMITIVE FIGURE (user decision 04.10.2026): the skinned body and dress run on the medium and high presets; low keeps the cone/sphere/cylinder figure. Sorted into QUALITY_PRESETS with the matching row in docs/graphics-detail-levels.md; cost measured per village before and after.
+  6. POSES AND AGE READABILITY ARE JUDGED IN THE WORK (user decision 04.10.2026): the existing poses (drummer, fisher, weaver, pounding; the FigureLimbs pivots) move onto the bones without losing a pose; the author measures from which camera distance elder and young man are still told apart and works proportion, posture, hair or dress until they are. Both findings go into the point's evidence.
+  Verifiable: Vitest over the appearance table (a source or guess mark on every entry, season and year switch the layers, no people/age group without an entry) and over the body and dress geometry builders. Playwright, both backends: one village frame per treated people with all age groups visible, plus one low-preset frame showing the primitive figure, judged by looking — people, sex and age readable, no schematic look (acceptance criterion 11).
+  Criticality: high — every villager in every settlement, place-scene performance, both backends.
+  Bundle: Dorfleben.
 - [ ] 1286. The bird's-eye camera tilts with the walking direction and settles back on a stop
   Queue position: directly after point 1121; the request "The bird's-eye view shows as much land to the south as to the north" follows directly after this one.
   Source: user report 03.10.2026 ~20:30 ("das Bild kippt, je nachdem in welche Richtung man geht"); cause derived from the code on e4cc4aba7, not yet measured in the game.
@@ -141,6 +155,18 @@ put it is the mistake this line exists to stop.
   Find and fix the cause, so that a card answer the user gives in the head session while it stands down is carried to the owner and acted on without any human step in another session.
   Done when: in a reproduction with a live headless owner, `vdzk-answer.mjs` records the head session's answer, and the owner (or the due-redeem path) removes the named card. A unit test covers the state shape that made activeSource fail. A SendMessage to a headless peer is not part of the solution.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1294. Villagers on a CC0 glTF base body with morph targets, prepared by a container-managed Blender
+  Queue position: directly after point 1288 (user order 04.10.2026).
+  Source: user decision 04.10.2026 on the figure-rendering proposal, variant 2b. Sketch: https://claude.ai/artifact/XcFmBv6Qz7SFTFKsiEeeez. Builds on point 1293 (queued after 1279): its appearance table, skeleton-bound dress, research results and low-preset rule are reused, not rebuilt.
+  Final state:
+  1. BLENDER IS SET UP AND MANAGED IN THE CONTAINER BY THE AUTHOR, with no user hand involved (user authorization 04.10.2026: download, install and configure whatever is needed). One idempotent project command installs a pinned Blender version into an uncommitted local tools directory; every session uses that command. Blender runs headless only (`blender -b --python`). It is never a build or runtime dependency: the game builds and runs without it.
+  2. ASSET PIPELINE: a committed Python script turns a chosen CC0 base model (MakeHuman or Quaternius export, licence checked and named in the commit) into the committed .glb files the game loads: skeleton matched to the bones the dress layer expects, morph targets for age, sex and build (children included, or a separate child base if a morph cannot carry child proportions), reduced polygons, UVs fit for the TSL patterns. Re-running the script reproduces the files.
+  3. THE GAME LOADS THE BASE BODY with three's GLTFLoader (no new runtime dependency) and drives its morphs from the appearance table; point 1293's dress meshes sit on it unchanged.
+  4. LOW PRESET KEEPS TODAY'S PRIMITIVE FIGURE (user decision 04.10.2026). Load size and per-village cost measured against the load-freeze budget (design-reference §21.2); sorted into QUALITY_PRESETS with its row in docs/graphics-detail-levels.md.
+  5. POSES AND AGE READABILITY ARE JUDGED IN THE WORK (user decision 04.10.2026), as in point 1293, and compared with its result: the evidence states whether 2b reads age better than 2a and at what cost, so the user can decide which body stays.
+  Verifiable: the install command run twice (the second run is a no-op); the pipeline script reproduces the .glb files; Vitest for the morph mapping from the appearance table; Playwright, both backends: the same village frames as point 1293 plus a low-preset frame, judged by looking, and the before/after load-size and cost measurement.
+  Criticality: high — new asset pipeline, load budget, every villager, both backends.
+  Bundle: Dorfleben.
 
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
