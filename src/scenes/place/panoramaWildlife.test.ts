@@ -16,14 +16,62 @@ import {
   panoramaGaitStep,
   dryRingAngle,
   resumeRingWalks,
+  ringSpreadWithin,
+  sharedSilhouetteFactor,
   stepRingWalk,
   type RingWalk,
 } from './panoramaWildlife'
+import { balance } from '../../config/balance'
+import { BACKDROP_INNER_OFFSET, PANORAMA_RADIUS, PANORAMA_RING_CLEARANCE } from './backdrop'
+import { PLACE_RADIUS } from './placeRadius'
 import { buildElephantParts, GAIT_MAX_PITCH, GAIT_SWING, gaitBodyLift, gaitPhase, gaitRig, groundPitch } from '../../render/fauna'
 
 /** The cadence a panorama silhouette really walks on: read off its own rig, as
  *  PlaceScene does (point 300) — never the one shared constant it used to be. */
 const RIG = gaitRig(buildElephantParts().legs)
+
+describe('skyline species sizing (work-order 1285)', () => {
+  const pw = balance.panoramaWildlife
+  const BAND = PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE
+  // The village's backdrop rim, as PlaceScene passes it (measured, not assumed).
+  const villageInner = PLACE_RADIUS + BACKDROP_INNER_OFFSET
+  const spread = ringSpreadWithin(villageInner, pw.ringInner, pw.ringSpread, BAND)
+  const mid = villageInner + pw.ringInner + spread / 2
+  const factor = sharedSilhouetteFactor(pw.speciesHeight.giraffe, mid, pw.giraffeTargetDeg)
+  const angleAt = (sp: keyof typeof pw.speciesHeight, dist: number) => apparentAngleDeg(factor * pw.speciesHeight[sp], dist)
+
+  it('brings the giraffe to its target angle at mid-ring distance', () => {
+    expect(angleAt('giraffe', mid)).toBeCloseTo(pw.giraffeTargetDeg, 6)
+  })
+
+  it('keeps the true species ratios under the one shared factor', () => {
+    for (const sp of ['elephant', 'zebra', 'antelope'] as const) {
+      const ratio = Math.tan((angleAt(sp, mid) * Math.PI) / 180) / Math.tan((angleAt('giraffe', mid) * Math.PI) / 180)
+      expect(ratio, sp).toBeCloseTo(pw.speciesHeight[sp] / pw.speciesHeight.giraffe, 6)
+    }
+    // The sketch's targets: elephant ~1.07°, zebra ~0.54°, antelope ~0.47°.
+    expect(angleAt('elephant', mid)).toBeCloseTo(1.07, 1)
+    expect(angleAt('zebra', mid)).toBeCloseTo(0.54, 1)
+    expect(angleAt('antelope', mid)).toBeCloseTo(0.47, 1)
+    // No species reaches the safety net, so it never flattens them to one size.
+    expect(angleAt('giraffe', villageInner + pw.ringInner)).toBeLessThan(pw.maxApparentAngleDeg)
+  })
+
+  // Measured from the centre the village ring (82.8..162.8 m) gives ~2x, not
+  // the sketch's ~3x, which left out the 42.8 m rim; the band caps the far side.
+  it('spreads the ring by the balance values, so one species visibly varies in size', () => {
+    expect(spread).toBe(pw.ringSpread)
+    const near = angleAt('zebra', villageInner + pw.ringInner)
+    const far = angleAt('zebra', villageInner + pw.ringInner + spread)
+    expect(near / far).toBeCloseTo((pw.ringInner + spread + villageInner) / (pw.ringInner + villageInner), 1)
+    expect(near / far).toBeGreaterThan(1.9)
+  })
+
+  it('shortens the spread where the band leaves less room, never past it', () => {
+    expect(ringSpreadWithin(110, 40, 80, BAND)).toBe(BAND - 150)
+    expect(ringSpreadWithin(170, 40, 80, BAND)).toBe(0)
+  })
+})
 
 describe('silhouetteScale', () => {
   it('shrinks an oversized scale so the subtended angle stays within the cap', () => {

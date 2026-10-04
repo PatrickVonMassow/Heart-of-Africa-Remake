@@ -49,6 +49,7 @@ import {
   BACKDROP_SEGS,
   GROUND_DISC_OVERHANG,
   PANORAMA_RADIUS,
+  PANORAMA_RING_CLEARANCE,
   backdropRingRadius,
   backdropSurfaceY,
   groundDiscSegments,
@@ -190,6 +191,8 @@ import {
   excludedAzimuthSpan,
   isAzimuthExcluded,
   resumeRingWalks,
+  ringSpreadWithin,
+  sharedSilhouetteFactor,
   stepRingWalk,
   type AzimuthSpan,
   type RingWalk,
@@ -1607,32 +1610,38 @@ function PanoramaWildlife({
     let hash = 0
     for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
     const rand = mulberry32(((seed ^ hash) + 0x5eed) >>> 0)
-    // Pushed far out (point 94): close silhouettes loomed; a distant ring keeps
-    // the subtended angle small. The scale is clamped down so the animal never
-    // exceeds maxApparentAngleDeg, and the colour hazes toward the sky
-    // (stronger for farther rings) so it reads as distance, not a black blob.
+    // Pushed far out (point 94) and sized by ONE factor for every species
+    // (work-order 1285): a giraffe at mid ring subtends giraffeTargetDeg, the
+    // others their true height ratio of it, and a farther ring draws smaller.
+    // maxApparentAngleDeg only nets an outlier. The colour hazes toward the
+    // sky (stronger for farther rings) so it reads as distance, not a blob.
+    const spread = ringSpreadWithin(innerRadius, pw.ringInner, pw.ringSpread, PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE)
+    const midRing = innerRadius + pw.ringInner + spread / 2
+    const factor = sharedSilhouetteFactor(pw.speciesHeight.giraffe, midRing, pw.giraffeTargetDeg)
     return Array.from({ length: 5 }, (_, i) => {
-      const radius = innerRadius + pw.ringInner + rand() * pw.ringSpread
+      const radius = innerRadius + pw.ringInner + rand() * spread
       const gi = i % builds.length
-      const scale = silhouetteScale(geoHeights[gi], radius, pw.maxApparentAngleDeg, 2.6 + rand() * 1.6)
+      const species = PANORAMA_FAUNA[region][gi]
+      const scale = silhouetteScale(geoHeights[gi], radius, pw.maxApparentAngleDeg, (factor * pw.speciesHeight[species]) / geoHeights[gi])
       // Farther rings haze a touch more (ringInner..ringInner+spread → +0..0.15).
-      const hazeMix = Math.min(1, pw.hazeMix + ((radius - innerRadius - pw.ringInner) / pw.ringSpread) * 0.15)
+      const hazeMix = Math.min(1, pw.hazeMix + (spread > 0 ? ((radius - innerRadius - pw.ringInner) / spread) * 0.15 : 0))
       const rgb = hazeColor(baseRgb, skyRgb, hazeMix)
       return {
         // Stable identity across a re-tessellation (the walk state's key).
-        key: `${placeId}:${seed}:${PANORAMA_FAUNA[region][gi]}:${i}`,
+        key: `${placeId}:${seed}:${species}:${i}`,
         angle: rand() * Math.PI * 2,
         radius,
         scale,
         drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
         parts: builds[gi],
-        species: PANORAMA_FAUNA[region][gi],
+        species,
         rig: rigs[gi],
         // The hazed tint carries the species' pelt marking at a reduced
         // contrast (work-order 1284), so the skyline zebra reads striped.
         material: createSilhouetteFaunaMaterial(new THREE.Color(rgb[0], rgb[1], rgb[2]), pw.markContrast, pw.markBandScale, pw.markFlankWiden),
         worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
+        midRing,
         hazeLum: luminance(rgb),
         phase: rand() * Math.PI * 2,
       }
@@ -1673,12 +1682,21 @@ function PanoramaWildlife({
     w.__placePanoramaWildlife = items.length
     // Excluded skyline azimuth spans (point 102) for the polish assertion.
     w.__placeSkylineExclusion = exclusionSpans.map((s) => ({ center: s.center, half: s.half }))
+    // Stage a walker at a ring angle it could walk to (work-order 1285's
+    // four-species frame); refused on water, where it never stands.
+    w.__placePanoramaWildlifeAim = (index: number, angle: number) => {
+      const walk = walks[index]
+      if (!walk || walk.wet(angle)) return false
+      walk.angle = angle
+      return true
+    }
     return () => {
       delete w.__placePanoramaWildlife
       delete w.__placePanoramaWildlifeInfo
       delete w.__placeSkylineExclusion
+      delete w.__placePanoramaWildlifeAim
     }
-  }, [items, exclusionSpans])
+  }, [items, walks, exclusionSpans])
 
   useFrame(({ camera }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -1721,7 +1739,9 @@ function PanoramaWildlife({
       const camZ = camera.position.z
       const frontY = panoramaStandY(x + fx, z + fz, lat, lon, seed, centerH, rimAt(x + fx, z + fz), camX, camZ, EYE_HEIGHT)
       const backY = panoramaStandY(x - fx, z - fz, lat, lon, seed, centerH, rimAt(x - fx, z - fz), camX, camZ, EYE_HEIGHT)
-      const groundY = (frontY + backY) / 2 - pw.sinkEpsilon
+      // The sink is in the animal's own units, so every species sinks alike.
+      const sink = pw.sinkEpsilon * it.scale
+      const groundY = (frontY + backY) / 2 - sink
       const pitch = groundPitch(frontY, backY, it.rig.wheelbase * it.scale)
       // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
       // wall-clock bob. The stride rides the ground they cover along the ring,
@@ -1757,7 +1777,7 @@ function PanoramaWildlife({
         // how far the body dipped onto its stance leg and how it lies on the
         // slope under its own wheelbase — and `stretch` (below) the reach the
         // tracked leg needed on top of that fit to stand on its own ground.
-        info[i] = { species: it.species, y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
+        info[i] = { species: it.species, y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, midRing: it.midRing, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
       }
       g.position.set(x, y, z)
       // Lie on the ground slope in the body's own frame (YXZ: yaw first, so x
@@ -1790,7 +1810,7 @@ function PanoramaWildlife({
           // does not move — a foot dragged fore/aft would be skating again.
           const standY =
             panoramaStandY(x + off[0], z + off[2], lat, lon, seed, centerH, rimAt(x + off[0], z + off[2]), camX, camZ, EYE_HEIGHT) -
-            pw.sinkEpsilon
+            sink
           const targetY = standY + footHeight(phase, leg.phaseOffset, it.rig.legLength) * it.scale
           const seat = seatFootOnGround(swing, it.rig.legLength, targetY - (y + off[1]), pitch, it.scale)
           lg.rotation.x = seat.angle
@@ -1817,7 +1837,7 @@ function PanoramaWildlife({
             info[i].footGap =
               foot.y -
               (panoramaStandY(foot.x, foot.z, lat, lon, seed, centerH, rimAt(foot.x, foot.z), camX, camZ, EYE_HEIGHT) -
-                pw.sinkEpsilon)
+                sink)
           }
         }
       }

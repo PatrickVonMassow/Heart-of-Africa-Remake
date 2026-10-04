@@ -65,7 +65,7 @@ export const PANORAMA_RING_CLEARANCE = 5
  *
  * @param silhouetteRingSpan how far past the backdrop's inner rim the outermost
  *   drifting silhouette can sit (`balance.panoramaWildlife.ringInner +
- *   ringSpread`).
+ *   openPlainRingSpread`; the ring compresses to that span there).
  */
 export function openPlainWalkRadius(silhouetteRingSpan: number): number {
   return PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE - BACKDROP_INNER_OFFSET - silhouetteRingSpan
