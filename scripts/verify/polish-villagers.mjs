@@ -9,6 +9,7 @@ import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } fr
 import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
+import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
@@ -3777,6 +3778,15 @@ if (section('village-pounding')) {
 // age-readability judgement. The table, body and dress builders are pinned in
 // src/systems/appearance.test.ts and src/render/figure{Body,Dress,Rig}.test.ts.
 if (section('villager-dress')) {
+  // The measurements (distance heights, cost) leave the run only as a file:
+  // run-all keeps nothing of a suite's stdout but its summary.
+  const MEASURE = 'local/verify-measure/villager-dress.jsonl'
+  mkdirSync('local/verify-measure', { recursive: true })
+  const record = (what, data) => {
+    const line = { at: new Date().toISOString(), gl: VERIFY_GL ?? 'webgpu', what, ...data }
+    console.log(`  villager-dress ${JSON.stringify(line)}`)
+    appendFileSync(MEASURE, JSON.stringify(line) + '\n')
+  }
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   const PEOPLES = (process.env.DRESS_PEOPLES ?? 'zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai,somali,swahili,baganda,sidama,tuareg,berbers,nubians,hausa,bambara,mandinka,fang,mongo,mbuti,banda').split(',')
   const villageOf = (p) => (p === 'berbers' ? 'berber' : p === 'nubians' ? 'nubian' : p) + '-village'
@@ -3834,12 +3844,12 @@ if (section('villager-dress')) {
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   for (const people of PEOPLES) {
     await goToPlace(villageOf(people))
-    const at = await stageRow(4.6)
+    const at = await stageRow(5.6)
     await nextFrames(4)
     const got = await rowBodies()
     check(
-      `${people}: every sex and age group stands in the row, each on the skinned body with its dress`,
-      !!got && got.figures === 8 && got.heads === 8 && got.skinned >= 14,
+      `${people}: every sex and age group stands in the row, each one skinned mesh (body and dress merged)`,
+      !!got && got.figures === 8 && got.heads === 8 && got.skinned === 8,
       JSON.stringify({ ...got, clear: at.score }),
     )
     await frame(shot(`1293-dress-${people}`), {
@@ -3854,22 +3864,34 @@ if (section('villager-dress')) {
   for (const d of [4, 8, 14, 22, 32]) {
     const at = await stageRow(d, ['male-youth', 'male-elder'])
     await nextFrames(4)
+    // Drawn crown height and shoulder span (px) of each: the measurable part
+    // of the age read — the rest is the frame, judged by looking.
     const px = await page.evaluate(() => {
       const cam = window.__placeCamera
       const row = window.__placeScene.getObjectByName('dress-lineup')
-      const out = {}
-      row.traverse((o) => {
-        if (o.name !== 'figure-head') return
+      const H = window.innerHeight
+      const W = window.innerWidth
+      const at = (o, dy = 0) => {
         const v = o.getWorldPosition(new o.position.constructor())
-        const top = v.clone().project(cam)
-        const foot = v.clone().setY(v.y - 1.3).project(cam)
-        let n = o
-        while (n && !/^dress-lineup-/.test(n.name)) n = n.parent
-        out[n?.name ?? '?'] = Math.round(((top.y - foot.y) / 2) * window.innerHeight)
-      })
+        v.y += dy
+        return v.project(cam)
+      }
+      const out = {}
+      for (const g of row.children) {
+        const find = (n) => g.getObjectByName(n)
+        const head = find('figure-head')
+        const crown = at(head, 0.16 * head.getWorldScale(new head.position.constructor()).y)
+        const foot = at(g)
+        const l = at(find('bone-upperArm.L'))
+        const r = at(find('bone-upperArm.R'))
+        out[g.name.replace('dress-lineup-', '')] = {
+          height: Math.round(((crown.y - foot.y) / 2) * H),
+          shoulders: Math.round((Math.abs(l.x - r.x) / 2) * W),
+        }
+      }
       return out
     })
-    console.log(`  1293 elder/young man at ${d} m: drawn heights (px) ${JSON.stringify(px)}`)
+    record('elder-youth', { d, px })
     await frame(shot(`1293-elder-youth-${String(d).padStart(2, '0')}m`), {
       local: { x: at.cx, y: 0.7, z: at.cz },
       label: `the Zulu young man (left) and the elder (right) side by side, ${d} m from the camera`,
@@ -3880,7 +3902,7 @@ if (section('villager-dress')) {
   // THE LOW PRESET keeps the primitive figure (user decision 04.10.2026).
   await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
   await nextFrames(6)
-  const lowAt = await stageRow(4.6)
+  const lowAt = await stageRow(5.6)
   await nextFrames(4)
   const low = await rowBodies()
   check('low preset: the row is the primitive figure — no skinned mesh, every head drawn', !!low && low.figures === 8 && low.skinned === 0 && low.heads === 8, JSON.stringify(low))
@@ -3888,10 +3910,70 @@ if (section('villager-dress')) {
     local: { x: lowAt.cx, y: 0.7, z: lowAt.cz },
     label: 'the low preset: the same Zulu row drawn as the primitive cone-and-sphere figure',
   })
-  await page.evaluate(() => {
-    window.__dressLineup(null)
-    window.__ui.getState().setDetailLevel('medium')
-  })
+  await page.evaluate(() => window.__dressLineup(null))
+
+  // THE COST PER VILLAGE (graphics-detail-levels.md): the same village, the
+  // same view, on each level, each once with the primitive figure (the
+  // "before": `figureBodySegments` forced to 0 in the dev server's live preset
+  // table) and once with the skinned body — so the difference is the figures'.
+  // Draw calls and triangles from the renderer's per-frame counters; the frame
+  // time is the median of 60 rendered frames (a shared, software-rendered
+  // machine: compare the levels, not the absolute milliseconds).
+  for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
+    await goToPlace(villageOf(people))
+    const row = {}
+    const runs = [['low', null], ['medium', 0], ['medium', null], ['high', 0], ['high', null]]
+    for (const [level, force] of runs) {
+      await page.evaluate(
+        async ({ l, force }) => {
+          const q = await import('/src/config/quality.ts')
+          window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
+          for (const k of ['medium', 'high']) q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
+          // through another level, so every figure re-reads the table
+          window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+          window.__ui.getState().setDetailLevel(l)
+        },
+        { l: level, force },
+      )
+      const name = force === 0 ? `${level}-primitive` : level
+      await nextFrames(10)
+      await awaitPlaceDrawn(`${people} ${name}`)
+      row[name] = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const times = []
+            const calls = []
+            const tris = []
+            let last = performance.now()
+            const tick = (t) => {
+              times.push(t - last)
+              last = t
+              const r = window.__renderer?.info?.render
+              calls.push(r?.drawCalls ?? 0)
+              tris.push(r?.triangles ?? 0)
+              if (times.length < 61) return requestAnimationFrame(tick)
+              const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
+              let figures = 0
+              let skinned = 0
+              window.__placeScene.traverse((o) => {
+                if (o.name === 'inhabitant') figures++
+                if (o.isSkinnedMesh) skinned++
+              })
+              resolve({ figures, skinned, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+            }
+            requestAnimationFrame(tick)
+          }),
+      )
+    }
+    record('cost', { village: `${people}-village`, row })
+    check(
+      `${people}: the cost probe read every level (low draws no skinned mesh, medium and high do)`,
+      row.low.skinned === 0 && row['medium-primitive'].skinned === 0 && row.medium.skinned > 0 && row.high.skinned > 0 && row.low.drawCalls > 0,
+      JSON.stringify(row),
+    )
+  }
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 
 await finishPolishSuite()

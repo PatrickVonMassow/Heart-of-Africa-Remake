@@ -23,7 +23,8 @@ import {
   type BodyProportions,
   type BoneName,
 } from '../../render/figureBody'
-import { buildLayerGeometry, figureBodyMaterial, figureDressMaterial } from '../../render/figureDress'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
 import { contactLean, gestureArmEuler, hangToward, kneelLegs, solveTwoBone } from '../../render/figureRig'
 import { appearanceFor, skinTone, type AgeGroup, type DressLayer, type Sex } from '../../systems/appearance'
 import type { ActorRoleKind } from '../../systems/actorLabels'
@@ -35,6 +36,7 @@ import { figureIdentity, type FigureIdentity } from './figureIdentity'
 
 const bodyCache = new Map<string, THREE.BufferGeometry>()
 const layerCache = new Map<string, THREE.BufferGeometry | null>()
+const figureCache = new Map<string, THREE.BufferGeometry>()
 
 function cachedBody(p: BodyProportions, key: string, skin: string, paint: string | null, radial: number) {
   const k = `${key}|${skin}|${paint}|${radial}`
@@ -46,10 +48,30 @@ function cachedBody(p: BodyProportions, key: string, skin: string, paint: string
   return g
 }
 
+const layerKey = (l: DressLayer, key: string, radial: number) =>
+  `${key}|${radial}|${l.form}|${l.wear}|${l.material}|${l.colour}|${l.colour2}|${l.pattern}`
+
 function cachedLayer(l: DressLayer, p: BodyProportions, key: string, radial: number) {
-  const k = `${key}|${radial}|${l.form}|${l.wear}|${l.material}|${l.colour}|${l.colour2}|${l.pattern}`
+  const k = layerKey(l, key, radial)
   if (!layerCache.has(k)) layerCache.set(k, buildLayerGeometry(l, p, radial))
   return layerCache.get(k) ?? null
+}
+
+/** Body and every dress layer as ONE geometry: a villager is one draw. */
+function cachedFigure(p: BodyProportions, layers: DressLayer[], key: string, skin: string, paint: string | null, radial: number) {
+  const k = `${key}|${skin}|${paint}|${radial}|${layers.map((l) => layerKey(l, '', radial)).join('/')}`
+  let g = figureCache.get(k)
+  if (!g) {
+    const parts = [cachedBody(p, key, skin, paint, radial)]
+    for (const l of layers) {
+      const lg = cachedLayer(l, p, key, radial)
+      if (lg) parts.push(lg)
+    }
+    g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
+    g.computeBoundingSphere()
+    figureCache.set(k, g)
+  }
+  return g
 }
 
 /** The figure's whole scene graph, built once per identity and look. */
@@ -85,17 +107,10 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     m.boundingSphere = bound
     return m
   }
-  const body = mesh(cachedBody(p, key, skin, paint === skin ? null : paint, look.radial), figureBodyMaterial(), 'figure-body')
+  const body = mesh(cachedFigure(p, layers, key, skin, paint === skin ? null : paint, look.radial), figureMaterial(), 'figure-body')
   body.add(bones.hips)
   body.bind(skeleton, new THREE.Matrix4())
   const meshes = [body]
-  for (const l of layers) {
-    const g = cachedLayer(l, p, key, look.radial)
-    if (!g) continue
-    const m = mesh(g, figureDressMaterial(), `figure-dress-${l.slot}-${l.form}`)
-    m.bind(skeleton, new THREE.Matrix4())
-    meshes.push(m)
-  }
   // The anchors the verification and the carried props read.
   const head = new THREE.Object3D()
   head.name = 'figure-head'
@@ -173,6 +188,10 @@ export function SkinnedFigure({
   const owned = !!(pose && limbs)
   const contact = !!pose
   const kneelLeg = useMemo(() => kneelLegs(rig.p.hipY - rig.p.kneeY, rig.p.calfR), [rig])
+  // The elder's give at the knees, feet kept on the ground: both leg segments
+  // tilt by the flex, so the hips sink by their summed length × (1 − cos).
+  const flex = rig.p.kneeFlex
+  const standDrop = (rig.p.hipY - rig.p.ankleY) * (1 - Math.cos(flex))
 
   // Carry the virtual pose onto the bones. Called by `applyFigurePose` in the
   // frame the pose is written, and by this figure's own frame for the rest.
@@ -184,10 +203,10 @@ export function SkinnedFigure({
       const root = b.hips.parent?.parent
       if (!vTrunk || !root) return
       // Trunk: the pose's lean and turn at the hips, the elder's stoop at the chest.
-      b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY
+      b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY - standDrop
       b.spine.rotation.set(vTrunk.rotation.x, vTrunk.rotation.y, 0)
       b.chest.rotation.set(p.stoop, 0, 0)
-      b.neck.rotation.set(-p.stoop * 0.6, 0, 0)
+      b.neck.rotation.set(-p.stoop * 0.45, 0, 0)
       root.updateWorldMatrix(true, true)
       // A contact the hands cannot quite reach is reached by leaning in.
       const reachOf = (s: 'L' | 'R') =>
@@ -233,14 +252,16 @@ export function SkinnedFigure({
           }
         }
         if (!done && vPivot) {
-          up.quaternion.setFromEuler(gestureArmEuler({ pitch: vPivot.rotation.x, yaw: vPivot.rotation.y, roll: vPivot.rotation.z }, _euler))
-          fore.rotation.set(-0.15, 0, 0)
+          // A hanging arm hangs by gravity, not with the stooped chest.
+          const hang = Math.abs(vPivot.rotation.x) < 0.3 ? p.stoop * 0.8 : 0
+          up.quaternion.setFromEuler(gestureArmEuler({ pitch: vPivot.rotation.x + hang, yaw: vPivot.rotation.y, roll: vPivot.rotation.z }, _euler))
+          fore.rotation.set(-0.28, 0, 0)
         }
         b[`hand.${s}`].quaternion.identity()
       })
       b.hips.updateWorldMatrix(false, true)
     }
-  }, [rig, kneel, kneelLeg, contact])
+  }, [rig, kneel, kneelLeg, contact, standDrop])
 
   // Publish the virtual pivots to the caller that owns the pose.
   const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget })
@@ -257,11 +278,11 @@ export function SkinnedFigure({
   useEffect(() => {
     const b = rig.bones
     for (const s of ['L', 'R'] as const) {
-      b[`thigh.${s}`].rotation.set(kneel ? kneelLeg.thigh : 0, 0, 0)
-      b[`shin.${s}`].rotation.set(kneel ? kneelLeg.shin : 0, 0, 0)
-      b[`foot.${s}`].rotation.set(kneel ? kneelLeg.foot : 0, 0, 0)
+      b[`thigh.${s}`].rotation.set(kneel ? kneelLeg.thigh : -flex, 0, 0)
+      b[`shin.${s}`].rotation.set(kneel ? kneelLeg.shin : 2 * flex, 0, 0)
+      b[`foot.${s}`].rotation.set(kneel ? kneelLeg.foot : -flex, 0, 0)
     }
-  }, [rig, kneel, kneelLeg])
+  }, [rig, kneel, kneelLeg, flex])
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -278,10 +299,10 @@ export function SkinnedFigure({
     }
     const b = rig.bones
     if (!kneel && gait) {
-      b['thigh.L'].rotation.x = legSwingAngle(gait.current, 0)
-      b['thigh.R'].rotation.x = legSwingAngle(gait.current, Math.PI)
-      b['shin.L'].rotation.x = Math.max(0, -b['thigh.L'].rotation.x) * 0.8
-      b['shin.R'].rotation.x = Math.max(0, -b['thigh.R'].rotation.x) * 0.8
+      b['thigh.L'].rotation.x = legSwingAngle(gait.current, 0) - flex
+      b['thigh.R'].rotation.x = legSwingAngle(gait.current, Math.PI) - flex
+      b['shin.L'].rotation.x = Math.max(0, -b['thigh.L'].rotation.x) * 0.8 + flex
+      b['shin.R'].rotation.x = Math.max(0, -b['thigh.R'].rotation.x) * 0.8 + flex
     }
     // A squat shortens a person; it does not flatten the skull (work-order 1085).
     const squash = squat?.current ?? 1

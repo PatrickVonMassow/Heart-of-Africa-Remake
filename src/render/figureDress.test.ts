@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
 import { BONE_NAMES, bodyProportions, boneIndex, SURFACE_ATTRIBUTE } from './figureBody'
-import { buildLayerGeometry, figureBodyMaterial, figureDressMaterial, PATTERN_KIND, trunkAt } from './figureDress'
+import { buildLayerGeometry, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
 
 const adultMan = bodyProportions('male', 'adult')
 const layer = (over: Partial<DressLayer>): DressLayer => ({
@@ -123,11 +123,11 @@ describe('the garments sit on the body', () => {
   })
 })
 
-describe('the shared materials', () => {
-  it('one body and one double-sided dress material, both TSL-driven', () => {
-    expect(figureBodyMaterial()).toBe(figureBodyMaterial())
-    expect(figureDressMaterial().side).toBe(THREE.DoubleSide)
-    expect(figureDressMaterial().colorNode).toBeTruthy()
-    expect(figureBodyMaterial().roughnessNode).toBeTruthy()
+describe('the shared material', () => {
+  it('one double-sided, TSL-driven material for body and dress alike', () => {
+    expect(figureMaterial()).toBe(figureMaterial())
+    expect(figureMaterial().side).toBe(THREE.DoubleSide)
+    expect(figureMaterial().colorNode).toBeTruthy()
+    expect(figureMaterial().roughnessNode).toBeTruthy()
   })
 })

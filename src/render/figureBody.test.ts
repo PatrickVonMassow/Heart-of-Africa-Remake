@@ -55,6 +55,18 @@ describe('proportions by sex and age', () => {
     expect(y.stoop).toBe(0)
     expect(e.hair).not.toBe(y.hair)
     expect(e.armR).toBeLessThan(bodyProportions('male', 'adult').armR)
+    // the age read at a distance: bent knees and, for the old man, a grey beard
+    expect(e.kneeFlex).toBeGreaterThan(0.1)
+    expect(y.kneeFlex).toBe(0)
+    expect(e.beard).toBe(true)
+    expect(y.beard).toBe(false)
+    expect(bodyProportions('female', 'elder').beard).toBe(false)
+  })
+
+  it('the old man’s beard adds geometry to the body, bound to the head', () => {
+    const withBeard = buildBodyGeometry(bodyProportions('male', 'elder'), { skin: '#5c3317', paint: null }, 16)
+    const without = buildBodyGeometry({ ...bodyProportions('male', 'elder'), beard: false }, { skin: '#5c3317', paint: null }, 16)
+    expect(withBeard.getAttribute('position').count).toBeGreaterThan(without.getAttribute('position').count)
   })
 
   it('build scales the girth and nothing else', () => {

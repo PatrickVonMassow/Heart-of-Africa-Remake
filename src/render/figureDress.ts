@@ -416,23 +416,20 @@ function figureColorNode() {
   })()
 }
 
-let bodyMaterial: THREE.MeshStandardNodeMaterial | null = null
-let dressMaterial: THREE.MeshStandardNodeMaterial | null = null
+let figureMat: THREE.MeshStandardNodeMaterial | null = null
 
-function createFigureMaterial(side: THREE.Side): THREE.MeshStandardNodeMaterial {
-  const m = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side })
-  m.colorNode = figureColorNode()
-  m.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w
-  m.name = side === THREE.DoubleSide ? 'figure-dress' : 'figure-body'
-  return m
-}
-
-/** The one body material (skin, hair) every skinned villager shares. */
-export function figureBodyMaterial(): THREE.MeshStandardNodeMaterial {
-  return (bodyMaterial ??= createFigureMaterial(THREE.FrontSide))
-}
-
-/** The one dress material — double-sided, a hem is seen from below. */
-export function figureDressMaterial(): THREE.MeshStandardNodeMaterial {
-  return (dressMaterial ??= createFigureMaterial(THREE.DoubleSide))
+/**
+ * The ONE material every skinned villager is drawn with — body and dress
+ * merged into a single mesh per figure, so a villager is one draw (and one per
+ * shadow pass), not one per layer. Double-sided: a hem or a cloak's edge is
+ * seen from below and inside; the closed body never shows its back faces.
+ */
+export function figureMaterial(): THREE.MeshStandardNodeMaterial {
+  if (!figureMat) {
+    figureMat = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side: THREE.DoubleSide })
+    figureMat.colorNode = figureColorNode()
+    figureMat.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w
+    figureMat.name = 'figure'
+  }
+  return figureMat
 }

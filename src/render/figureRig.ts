@@ -21,8 +21,10 @@ import * as THREE from 'three/webgpu'
 import type { ArmPose } from './gesture'
 
 /** How much of the primitive's resting outward roll a hanging arm keeps: the
- *  cone needed 0.46 rad to clear its own flank, a body needs a third of it. */
-export const HANGING_ROLL_KEEP = 0.35
+ *  cone needed 0.46 rad to clear its own flank; a body's arm hangs nearly
+ *  plumb, clearing chest and hip by a hand's breadth (a third of it held the
+ *  hands out from the thighs like a mannequin's). */
+export const HANGING_ROLL_KEEP = 0.18
 /** The most the chest may lean forward to bring a contact into reach (rad). */
 export const CONTACT_LEAN_MAX = 0.5
 /** The largest shortfall (figure units) the lean may make up; a hand further

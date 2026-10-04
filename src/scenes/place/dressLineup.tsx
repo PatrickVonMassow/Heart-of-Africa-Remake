@@ -23,7 +23,7 @@ const LINEUP: ReadonlyArray<{ sex: Sex; age: AgeGroup }> = [
   { sex: 'female', age: 'elder' },
   { sex: 'male', age: 'elder' },
 ]
-const SPACING = 0.95
+const SPACING = 0.9
 
 export function DressLineup({ cloth }: { cloth: readonly string[] }) {
   const [at, setAt] = useState<{ x: number; z: number; yaw: number; only?: string[] } | null>(null)

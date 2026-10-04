@@ -91,6 +91,10 @@ export interface BodyProportions {
   stoop: number
   /** Hair colour (grey for the elder). */
   hair: string
+  /** Standing knee bend (rad): the elder's give at the knees. */
+  kneeFlex: number
+  /** A short beard on the jaw (the old man's grey one). */
+  beard: boolean
 }
 
 /** Stature against an adult man's, by sex and age (anthropometric means). */
@@ -113,6 +117,9 @@ export function bodyProportions(sex: Sex, age: AgeGroup, build = 0): BodyProport
   const f = sex === 'female'
   const girth = (1 + 0.12 * build) * (age === 'elder' ? 0.9 : age === 'youth' ? 0.95 : 1)
   const limb = age === 'elder' ? 0.85 : 1
+  // The young man's square shoulders against the old man's narrow, sloping
+  // ones — the age read from the FRONT, where a stoop barely shows.
+  const span = child ? 1 : age === 'youth' && !f ? 1.06 : age === 'elder' ? 0.92 : 1
   const headH = child ? 0.178 : 0.132
   const chinY = 1 - headH
   return {
@@ -124,9 +131,9 @@ export function bodyProportions(sex: Sex, age: AgeGroup, build = 0): BodyProport
     neckY: H * (chinY - (child ? 0.035 : 0.045)),
     neckR: H * (child ? 0.03 : 0.028) * girth,
     shoulderY: H * (child ? 0.77 : 0.815),
-    shoulderX: H * (child ? 0.105 : f ? 0.112 : 0.128) * (0.9 + 0.1 * girth),
+    shoulderX: H * (child ? 0.105 : f ? 0.112 : 0.128) * (0.9 + 0.1 * girth) * span,
     chestY: H * (child ? 0.68 : 0.72),
-    chestHalfW: H * (child ? 0.095 : f ? 0.094 : 0.104) * girth,
+    chestHalfW: H * (child ? 0.095 : f ? 0.094 : 0.104) * girth * span,
     chestHalfD: H * (child ? 0.065 : f ? 0.07 : 0.066) * girth,
     waistY: H * (child ? 0.58 : 0.61),
     waistHalfW: H * (child ? 0.085 : f ? 0.072 : 0.078) * girth,
@@ -138,12 +145,16 @@ export function bodyProportions(sex: Sex, age: AgeGroup, build = 0): BodyProport
     upperArm: H * (child ? 0.16 : 0.175),
     forearm: H * (child ? 0.13 : 0.15),
     hand: H * (child ? 0.05 : 0.055),
-    armR: H * (child ? 0.026 : 0.024) * girth * limb,
-    thighR: H * (child ? 0.04 : f ? 0.044 : 0.041) * girth * limb,
-    calfR: H * (child ? 0.028 : 0.027) * girth * limb,
+    armR: H * (child ? 0.028 : 0.029) * girth * limb,
+    thighR: H * (child ? 0.046 : f ? 0.055 : 0.05) * girth * limb,
+    calfR: H * (child ? 0.032 : 0.033) * girth * limb,
     footLen: H * (child ? 0.12 : 0.13),
-    stoop: age === 'elder' ? 0.2 : 0,
-    hair: age === 'elder' ? '#b7b2a8' : '#1c1814',
+    // The age read at a distance is the posture (work-order "villager dress",
+    // final state 6): the elder bent at the chest and giving at the knees.
+    stoop: age === 'elder' ? 0.42 : 0,
+    hair: age === 'elder' ? '#bcb7ad' : '#1c1814',
+    kneeFlex: age === 'elder' ? 0.16 : 0,
+    beard: age === 'elder' && !f,
   }
 }
 
@@ -418,6 +429,19 @@ export function buildBodyGeometry(p: BodyProportions, look: BodyLook, radial = 1
   )
   cutTriangles(hair, (c) => c.z > p.headHalfW * 0.35 && c.y < hc + p.headHalfH * 0.5)
   add(hair, () => [[boneIndex('head'), 1]], p.hair, [4, 90, 0.25, 0.95])
+  // BEARD: the front half of a short sleeve round the jaw, ending under the chin.
+  if (p.beard) {
+    const beard = sweepTube(
+      [
+        st(0, p.chinY + p.headHalfH * 0.5, 0.003 * p.stature, p.headHalfW * 0.97, p.headHalfW * 1.04),
+        st(0, p.chinY + p.headHalfH * 0.12, 0.011 * p.stature, p.headHalfW * 0.72, p.headHalfW * 0.92),
+        st(0, p.chinY - 0.03 * p.stature, 0.022 * p.stature, p.headHalfW * 0.3, p.headHalfW * 0.38),
+      ],
+      { radial, rings: 5, capEnd: true },
+    )
+    cutTriangles(beard, (c) => c.z < p.headHalfW * 0.15)
+    add(beard, () => [[boneIndex('head'), 1]], p.hair, [4, 90, 0.25, 0.95])
+  }
 
   // ARMS hang down their bones; the hand is a flattened end.
   for (const s of ['L', 'R'] as const) {
