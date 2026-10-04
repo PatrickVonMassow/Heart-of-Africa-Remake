@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
-import { useUi } from '../../state/ui'
+import { effectiveFaunaBodySegments, useUi } from '../../state/ui'
 import { setAmbienceAnimals, playTrampleCrunch, proximityGain, trampleCrunchFires } from '../../systems/ambience'
 import { devAssert } from '../../systems/devAssert'
 import {
@@ -190,6 +190,7 @@ import {
   buildZebraCalf,
   createCrocodileMaterial,
   createFaunaMaterial,
+  DEFAULT_FAUNA_BODY_SEGMENTS,
   crocodileBodyY,
 } from '../../render/fauna'
 import { setGroundStains } from '../../render/groundStains'
@@ -1650,13 +1651,15 @@ function seedDryShoreDrinkers(
 interface WildlifeMeshPool {
   adult: Record<Species, THREE.InstancedMesh>
   calf: Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
-  material: THREE.MeshStandardMaterial
+  material: THREE.MeshStandardNodeMaterial
   /** STRIKING crocodiles' mesh (point 274): same geometry as the hidden pool
    *  mesh but the ordinary OPAQUE fauna material — the two croc poses draw
    *  through two meshes instead of a per-instance waterline attribute (which
    *  never bound on WebGL2; see CROCODILE_FADE_BAND in fauna.ts). */
   crocStrike: THREE.InstancedMesh
   vultureGeo: THREE.BufferGeometry
+  /** The body tessellation the detailed ungulates are currently built at. */
+  bodySegments: number
 }
 let wildlifeMeshCache: WildlifeMeshPool | null = null
 function getWildlifeMeshes(): WildlifeMeshPool {
@@ -1725,8 +1728,27 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.count = 0
     calf[sp] = m
   }
-  wildlifeMeshCache = { adult, calf, material, crocStrike, vultureGeo: buildVulture() }
+  wildlifeMeshCache = { adult, calf, material, crocStrike, vultureGeo: buildVulture(), bodySegments: DEFAULT_FAUNA_BODY_SEGMENTS }
   return wildlifeMeshCache
+}
+
+/** Rebuild the detailed ungulates (zebra, antelope and their young) at the
+ *  detail level's body tessellation (`faunaBodySegments`) and swap them into
+ *  the pooled instanced meshes in place — the instances keep their matrices.
+ *  The one-off hunt actors keep the default build. */
+function applyFaunaBodySegments(segments: number): void {
+  const pool = getWildlifeMeshes()
+  if (pool.bodySegments === segments) return
+  pool.bodySegments = segments
+  const swap = (mesh: THREE.InstancedMesh, geo: THREE.BufferGeometry) => {
+    const old = mesh.geometry
+    mesh.geometry = geo
+    old.dispose()
+  }
+  swap(pool.adult.zebra, buildZebra(segments))
+  swap(pool.adult.antelope, buildAntelope(segments))
+  swap(pool.calf.zebra, buildZebraCalf(segments))
+  swap(pool.calf.antelope, buildAntelopeCalf(segments))
 }
 
 // Lion-hunt predator/prey geometries, module-cached for the same reason: the
@@ -1796,6 +1818,9 @@ function Herds() {
   // materials and meshes all live in the module pool (point 96).
   const calfMeshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>(pool.calf)
   const material = pool.material
+  // The detail level's body tessellation of the detailed ungulates.
+  const faunaBodySegments = useUi(effectiveFaunaBodySegments)
+  useEffect(() => applyFaunaBodySegments(faunaBodySegments), [faunaBodySegments])
   const vultureGeo = pool.vultureGeo
 
   useEffect(() => {

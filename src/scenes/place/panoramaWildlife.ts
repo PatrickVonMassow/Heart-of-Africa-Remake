@@ -211,3 +211,31 @@ export function stepRingWalk(
   const next = angle + drift * dt
   return wet(next) ? { angle, drift: -drift } : { angle: next, drift }
 }
+
+/** A silhouette's live walk along its ring; mutated in place each frame. */
+export interface RingWalk {
+  angle: number
+  drift: number
+  /** Distance walked so far — the gait phase's clock. */
+  gait: number
+  wet: (a: number) => boolean
+}
+
+/**
+ * Walks for a (re)built set of silhouettes. One whose stable `key` walked
+ * before keeps its angle, heading and gait, so a rebuild that only re-tessellates
+ * the bodies (a quality change) never teleports it back to its seeded start —
+ * only re-seated on dry ground should the water have changed. A new key starts
+ * on the dry ground nearest its seeded angle; null where its whole ring is water.
+ */
+export function resumeRingWalks(
+  seeds: ReadonlyArray<{ key: string; angle: number; drift: number; wet: (a: number) => boolean }>,
+  previous: ReadonlyMap<string, RingWalk>,
+): Array<RingWalk | null> {
+  return seeds.map((s) => {
+    const prev = previous.get(s.key)
+    const angle = dryRingAngle(prev ? prev.angle : s.angle, s.wet)
+    if (angle === null) return null
+    return prev ? { angle, drift: prev.drift, gait: prev.gait, wet: s.wet } : { angle, drift: s.drift, gait: 0, wet: s.wet }
+  })
+}

@@ -28,6 +28,7 @@ import {
   effectiveFireShadowResolution,
   effectiveFireShadowSoft,
   effectivePlaceRiverFlotsam,
+  effectiveFaunaBodySegments,
   effectivePlaceRiverSegments,
   effectiveWaterDetailOctaves,
 } from '../../state/ui'
@@ -79,6 +80,7 @@ import {
   buildElephantParts,
   buildGiraffeParts,
   buildZebraParts,
+  createSilhouetteFaunaMaterial,
   footBodyOffset,
   footHeight,
   gaitBodyLift,
@@ -187,9 +189,10 @@ import {
   panoramaGaitStep,
   excludedAzimuthSpan,
   isAzimuthExcluded,
-  dryRingAngle,
+  resumeRingWalks,
   stepRingWalk,
   type AzimuthSpan,
+  type RingWalk,
 } from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
 import { bandHeightAt, panoramaBandShown } from '../travel/panoramaMath'
@@ -1487,12 +1490,19 @@ function skylineExclusionSpans(placeId: string): AzimuthSpan[] {
 // horizon on their own legs — at this range a body-level bob moves barely a
 // pixel, so only a real leg swing stops the glide.
 type FaunaParts = { body: THREE.BufferGeometry; legs: GoatLeg[] }
-const PANORAMA_FAUNA: Record<RegionId, Array<() => FaunaParts>> = {
-  north: [buildAntelopeParts],
-  west: [buildZebraParts, buildAntelopeParts],
-  central: [buildElephantParts, buildAntelopeParts],
-  east: [buildElephantParts, buildGiraffeParts, buildZebraParts, buildAntelopeParts],
-  south: [buildElephantParts, buildGiraffeParts, buildZebraParts, buildAntelopeParts],
+type PanoramaSpecies = 'elephant' | 'giraffe' | 'zebra' | 'antelope'
+const PANORAMA_BUILDS: Record<PanoramaSpecies, (bodySegments: number) => FaunaParts> = {
+  elephant: () => buildElephantParts(),
+  giraffe: () => buildGiraffeParts(),
+  zebra: buildZebraParts,
+  antelope: buildAntelopeParts,
+}
+const PANORAMA_FAUNA: Record<RegionId, PanoramaSpecies[]> = {
+  north: ['antelope'],
+  west: ['zebra', 'antelope'],
+  central: ['elephant', 'antelope'],
+  east: ['elephant', 'giraffe', 'zebra', 'antelope'],
+  south: ['elephant', 'giraffe', 'zebra', 'antelope'],
 }
 
 /**
@@ -1556,7 +1566,17 @@ function PanoramaWildlife({
     return (x: number, z: number) => river(x, z) || map(x, z)
   }, [lat, lon, seed, bounds])
   // Region-typical species aligned to the bird's-eye pool (point 102, part c).
-  const builds = useMemo(() => PANORAMA_FAUNA[region].map((b) => b()), [region])
+  // Built at the detail level's body tessellation (the detailed ungulates).
+  const bodySegments = useUi(effectiveFaunaBodySegments)
+  const builds = useMemo(() => PANORAMA_FAUNA[region].map((sp) => PANORAMA_BUILDS[sp](bodySegments)), [region, bodySegments])
+  useEffect(
+    () => () =>
+      builds.forEach((p) => {
+        p.body.dispose()
+        p.legs.forEach((l) => l.geo.dispose())
+      }),
+    [builds],
+  )
   // Azimuth arcs of this settlement's skyline landmarks: a silhouette drifting
   // into one is hidden so it never crosses the monument (point 102, part a).
   const exclusionSpans = useMemo(() => skylineExclusionSpans(placeId), [placeId])
@@ -1599,35 +1619,48 @@ function PanoramaWildlife({
       const hazeMix = Math.min(1, pw.hazeMix + ((radius - innerRadius - pw.ringInner) / pw.ringSpread) * 0.15)
       const rgb = hazeColor(baseRgb, skyRgb, hazeMix)
       return {
+        // Stable identity across a re-tessellation (the walk state's key).
+        key: `${placeId}:${seed}:${PANORAMA_FAUNA[region][gi]}:${i}`,
         angle: rand() * Math.PI * 2,
         radius,
         scale,
         drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
         parts: builds[gi],
+        species: PANORAMA_FAUNA[region][gi],
         rig: rigs[gi],
-        material: new THREE.MeshStandardMaterial({ color: new THREE.Color(rgb[0], rgb[1], rgb[2]), roughness: 1 }),
+        // The hazed tint carries the species' pelt marking at a reduced
+        // contrast (work-order 1284), so the skyline zebra reads striped.
+        material: createSilhouetteFaunaMaterial(new THREE.Color(rgb[0], rgb[1], rgb[2]), pw.markContrast, pw.markBandScale, pw.markFlankWiden),
         worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
         hazeLum: luminance(rgb),
         phase: rand() * Math.PI * 2,
       }
     })
-  }, [placeId, seed, innerRadius, builds, rigs, geoHeights, baseRgb, skyRgb, pw])
+  }, [placeId, seed, innerRadius, builds, rigs, geoHeights, baseRgb, skyRgb, pw, region])
   useEffect(
     () => () => items.forEach((it) => it.material.dispose()),
     [items],
   )
   // Where each silhouette walks its ring now, and which way: it starts on the
   // nearest dry ground and turns back at the water (work-order 1250). Null
-  // where its whole ring is water — that one is never shown.
-  const walks = useMemo(
-    () => items.map((it) => {
-      const wet = (a: number) => wetAt(Math.cos(a) * it.radius, Math.sin(a) * it.radius)
-      const angle = dryRingAngle(it.angle, wet)
-      return angle === null ? null : { angle, drift: it.drift, wet, gait: 0 }
-    }),
-    [items, wetAt],
-  )
+  // where its whole ring is water — that one is never shown. A rebuild of
+  // `items` (a quality change re-tessellates the bodies) resumes each walk by
+  // key instead of teleporting the animal back to its seeded start.
+  const walkMemory = useRef(new Map<string, RingWalk>())
+  const walks = useMemo(() => {
+    const next = resumeRingWalks(
+      items.map((it) => ({
+        key: it.key,
+        angle: it.angle,
+        drift: it.drift,
+        wet: (a: number) => wetAt(Math.cos(a) * it.radius, Math.sin(a) * it.radius),
+      })),
+      walkMemory.current,
+    )
+    walkMemory.current = new Map(next.flatMap((w, i) => (w ? [[items[i].key, w] as const] : [])))
+    return next
+  }, [items, wetAt])
   const refs = useRef<Array<THREE.Group | null>>([])
   // Per-silhouette leg-pivot groups, so the stride swings them about the hips.
   const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
@@ -1724,7 +1757,7 @@ function PanoramaWildlife({
         // how far the body dipped onto its stance leg and how it lies on the
         // slope under its own wheelbase — and `stretch` (below) the reach the
         // tracked leg needed on top of that fit to stand on its own ground.
-        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
+        info[i] = { species: it.species, y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
       }
       g.position.set(x, y, z)
       // Lie on the ground slope in the body's own frame (YXZ: yaw first, so x

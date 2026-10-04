@@ -4,7 +4,7 @@
 // (design.md §2.5/§4.4).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
-import { waitForStable } from './_browser.mjs'
+import { VERIFY_GL, waitForStable } from './_browser.mjs'
 import { capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
@@ -1162,6 +1162,239 @@ if (section('giza-site')) {
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
+// --- Detailed animal models (work-order 1284) ----------------------------------
+// The zebra, the antelope and the settlement goat are shaped models with face,
+// horns/mane and jointed legs; the zebra and the gazelle carry their pelt
+// marking. Per species one frame inside a settlement and one from the bird's-eye
+// view at zoom 0.5 — judged by looking (is the species recognisable?). The goat
+// lives only in the settlements, so it has no bird's-eye frame. Zebra and
+// antelope stand in a settlement only as the panorama silhouettes, which the
+// dev probe names by species.
+if (section('animal-models')) {
+  // The silhouettes are clamped to a couple of degrees on purpose (point 94),
+  // so a full 1440x900 frame shows them as specks among their neighbours. Each
+  // settlement frame therefore stands at the settlement edge where its animal
+  // stands clear of other species and narrows the framing to a window around
+  // it (a quarter of the view each way), shifted away from any other species,
+  // so the named one is the main subject and large enough to judge.
+  const VIEW = { width: 1440, height: 900 }
+  const CLIP = { width: 360, height: 225 }
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  // Two walkers can share a bearing in one settlement for the whole run, so the
+  // aim tries the region's settlements in turn (east first: the zebra and the
+  // antelope both walk there) and takes the first where the named one stands
+  // clear — else the clearest seen.
+  // Clear standpoints for `sp` here, best first: on the settlement edge
+  // looking OUT, scored by how far in bearing the nearest silhouette of another
+  // species stands from the named one (walkers sharing an azimuth from the
+  // centre can part by parallax from the edge); among clear ones the nearest.
+  const standpoints = (sp) =>
+    page.evaluate((sp) => {
+      const rows = Object.entries(window.__placePanoramaWildlifeInfo ?? {}).filter(([, w]) => w.visible)
+      const R = (window.__placeLayout?.radius ?? 40) * 0.9
+      const bearing = (fx, fz, w) => Math.atan2(w.z - fz, w.x - fx)
+      const out = []
+      for (const [key, it] of rows.filter(([, w]) => w.species === sp)) {
+        for (let k = 0; k < 48; k++) {
+          const a = (k / 48) * Math.PI * 2
+          const fx = Math.cos(a) * R
+          const fz = Math.sin(a) * R
+          const dist = Math.hypot(it.x - fx, it.z - fz)
+          if (((it.x - fx) * Math.cos(a) + (it.z - fz) * Math.sin(a)) / dist < 0.5) continue
+          const b0 = bearing(fx, fz, it)
+          const sep = Math.min(
+            Math.PI,
+            ...rows
+              .filter(([, o]) => o.species !== sp)
+              .map(([, o]) => Math.abs(Math.atan2(Math.sin(bearing(fx, fz, o) - b0), Math.cos(bearing(fx, fz, o) - b0)))),
+          )
+          if (sep >= (12 * Math.PI) / 180) out.push({ key, fx, fz, sepDeg: Math.round((sep * 180) / Math.PI), dist: Math.round(dist) })
+        }
+      }
+      return out.sort((p, q) => p.dist - q.dist).slice(0, 8)
+    }, sp)
+  // Stand there, aim at the animal's mid-body and ray-probe the line of sight
+  // (point 181's probe): no hut, fence or ridge may stand in front of it.
+  const standAndSee = async (c) => {
+    await page.evaluate((c) => {
+      const it = window.__placePanoramaWildlifeInfo?.[c.key]
+      const p = window.__placePlayer
+      p.x = c.fx
+      p.z = c.fz
+      p.pitch = 0
+      p.yaw = Math.atan2(-(it.x - p.x), -(it.z - p.z))
+    }, c)
+    await nextFrames(2)
+    return page.evaluate((c) => {
+      const it = window.__placePanoramaWildlifeInfo?.[c.key]
+      const p = window.__placePlayer
+      if (!it || !it.visible || !window.__placeRayHit) return null
+      const hit = window.__placeRayHit(it.x, it.y + (it.worldHeight ?? 2) / 2, it.z)
+      const moved = Math.hypot(p.x - c.fx, p.z - c.fz)
+      // The probe skips the silhouettes, so the first surface must lie at or
+      // BEHIND the animal's mid-body; anything nearer stands in front of it.
+      const ratio = hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance
+      const seen = ratio >= 0.98 && moved < 0.5
+      return { ...c, x: it.x, z: it.z, y: it.y, seen, hit: `${hit.hitName ?? 'sky'}@${ratio.toFixed(2)}`, moved: Math.round(moved * 10) / 10 }
+    }, c)
+  }
+  // Two walkers can share a bearing in one settlement for the whole run, so the
+  // aim tries the region's settlements in turn (east: the zebra and the
+  // antelope both walk there) and takes the first clear, unobstructed view.
+  const STAGES = ['maasai-village', 'sidama-village', 'baganda-village', 'swahili-village']
+  for (const species of ['zebra', 'antelope']) {
+    let aimed = null
+    const tried = []
+    for (const place of STAGES) {
+      await goToPlace(place)
+      await page.waitForFunction(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}).filter((w) => w.visible).length >= 2, null, { timeout: 25000 }).catch(() => {})
+      for (const c of await standpoints(species)) {
+        const got = await standAndSee(c)
+        if (got?.seen) {
+          aimed = { ...got, place }
+          break
+        }
+        tried.push(`${place}:${got ? got.hit : 'lost'}`)
+      }
+      if (aimed) break
+    }
+    check(`a ${species} silhouette stands clear and in sight of a settlement edge`, !!aimed, aimed ? JSON.stringify(aimed) : `none clear [${tried.join(', ')}]`)
+    if (!aimed) continue
+    await nextFrames(3)
+    // Re-read the walker at the shutter (it drifts along its ring) and frame
+    // the window around its projection through the place camera.
+    const at = await page.evaluate(
+      ({ key, view, clipSize }) => {
+        const info = window.__placePanoramaWildlifeInfo ?? {}
+        const it = info[key]
+        const cam = window.__placeCamera
+        if (!it || !cam) return null
+        cam.updateMatrixWorld()
+        const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+        const px = (x, y, z) => {
+          const c = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, [x, y, z, 1]))
+          if (!(c[3] > 0)) return null
+          return { x: ((c[0] / c[3] + 1) / 2) * view.width, y: ((1 - c[1] / c[3]) / 2) * view.height }
+        }
+        const mid = it.y + (it.worldHeight ?? 2) / 2
+        const self = px(it.x, mid, it.z)
+        if (!self) return null
+        const top = px(it.x, it.y + (it.worldHeight ?? 2), it.z)
+        const others = Object.entries(info)
+          .filter(([k, o]) => k !== key && o.visible && o.species !== it.species)
+          .map(([, o]) => ({ species: o.species, at: px(o.x, o.y + (o.worldHeight ?? 2) / 2, o.z) }))
+          .filter((o) => o.at)
+        // Centre on the animal; slide the window (keeping the animal inside
+        // with a margin) away from another species that would share it.
+        let cx = self.x
+        const margin = clipSize.width * 0.3
+        for (const o of others) {
+          if (Math.abs(o.at.y - self.y) > clipSize.height) continue
+          const dx = o.at.x - cx
+          if (Math.abs(dx) < clipSize.width / 2 + 40) cx = Math.max(self.x - clipSize.width / 2 + margin, Math.min(self.x + clipSize.width / 2 - margin, self.x - Math.sign(dx || 1) * clipSize.width))
+        }
+        const x = Math.round(Math.max(0, Math.min(view.width - clipSize.width, cx - clipSize.width / 2)))
+        const y = Math.round(Math.max(0, Math.min(view.height - clipSize.height, self.y - clipSize.height * 0.55)))
+        const clip = { x, y, width: clipSize.width, height: clipSize.height }
+        const inClip = (q) => q.x >= clip.x && q.x <= clip.x + clip.width && q.y >= clip.y && q.y <= clip.y + clip.height
+        return {
+          local: { x: it.x, y: mid, z: it.z },
+          clip,
+          heightPx: top ? Math.round(self.y - top.y) * 2 : null,
+          intruders: others.filter((o) => inClip(o.at)).map((o) => o.species),
+        }
+      },
+      { key: aimed.key, view: VIEW, clipSize: CLIP },
+    )
+    check(
+      `the ${species} frame shows no other species beside it`,
+      !!at && at.intruders.length === 0,
+      at ? `clip ${JSON.stringify(at.clip)}, height ${at.heightPx}px, other species in frame: [${at.intruders.join(', ')}]` : 'walker lost at the shutter',
+    )
+    await frame(shot(`1284-${species}-settlement`), {
+      local: at?.local ?? aimed,
+      clip: at?.clip,
+      label: `the ${species} silhouette on the settlement skyline`,
+    })
+  }
+  await goToPlace('maasai-village')
+  // A goat at close range and in PROFILE: the standpoint lies square to its
+  // facing, on the side toward the herd's centre (inside the pen, away from
+  // the fence and the people outside it).
+  await page.waitForFunction(() => Object.keys(window.__placeGoatGait ?? {}).length > 0, null, { timeout: 15000 }).catch(() => {})
+  const goat = await page.evaluate(() => {
+    const p = window.__placePlayer
+    const herd = Object.values(window.__placeGoatGait ?? {})
+    if (!p || herd.length === 0) return null
+    const g = herd[0]
+    const cx = herd.reduce((s, h) => s + h.x, 0) / herd.length
+    const cz = herd.reduce((s, h) => s + h.z, 0) / herd.length
+    const sx = Math.cos(g.yaw ?? 0)
+    const sz = -Math.sin(g.yaw ?? 0)
+    const side = sx * (cx - g.x) + sz * (cz - g.z) >= 0 ? 1 : -1
+    p.x = g.x + side * sx * 3.2
+    p.z = g.z + side * sz * 3.2
+    p.pitch = -0.15
+    p.yaw = Math.atan2(-(g.x - p.x), -(g.z - p.z))
+    return { x: g.x, z: g.z }
+  })
+  check('the settlement has goats to photograph', !!goat, goat ? JSON.stringify(goat) : 'no goats')
+  if (goat) {
+    await nextFrames(3)
+    const g = await page.evaluate(() => {
+      const herd = Object.values(window.__placeGoatGait ?? {})
+      return herd[0] ? { x: herd[0].x, z: herd[0].z } : null
+    })
+    await frame(shot('1284-goat-settlement'), { local: { x: (g ?? goat).x, y: 0.4, z: (g ?? goat).z }, label: 'a settlement goat at close range' })
+  }
+
+  // Bird's-eye at zoom 0.5: a small herd of each species staged beside the
+  // player in open savanna, the hunt held idle so nothing chases them off.
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
+  await page.evaluate(() => {
+    window.__game.getState().setJournalOpen(false)
+    window.__ui.getState().setTravelZoom(0.5)
+    window.__game.getState().debugJumpTo(-2.2, 34.8)
+  })
+  await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 30000 }).catch(() => {})
+  // Let the jump settle on the app clock before staging the herds.
+  await nextFrames(10)
+  const staged = await page.evaluate(() => {
+    const herds = window.__wildlife?.herdsRef?.current
+    if (!herds) return null
+    if (window.__lionHunt) {
+      window.__lionHunt.state.mode = 'idle'
+      window.__lionHunt.state.timer = 999
+    }
+    const p = window.__game.getState().pos
+    const out = {}
+    for (const [sp, dx] of [['zebra', 4], ['antelope', -4]]) {
+      herds[sp] = herds[sp].filter((a) => Math.hypot(a.x - p.x, a.z - p.z) > 30)
+      const group = [[0, 0], [1.6, 1.1], [0.8, -1.4]].map(([ox, oz], i) => ({ x: p.x + dx + ox * Math.sign(dx), z: p.z + oz, y: 0, rot: 0.6 + i, scale: 1, phase: i }))
+      group[0].__shot = sp
+      herds[sp].push(...group)
+      out[sp] = { x: group[0].x, z: group[0].z }
+    }
+    return out
+  })
+  check('zebra and antelope staged in the bird\'s-eye view', !!staged, JSON.stringify(staged))
+  if (staged) {
+    for (const species of ['zebra', 'antelope']) {
+      await nextFrames(4)
+      // The lead animal where it stands at the shutter (the herd sim moves it).
+      const at = (await page.evaluate((sp) => {
+        const a = window.__wildlife?.herdsRef?.current?.[sp]?.find((x) => x.__shot === sp)
+        return a ? { x: a.x, z: a.z } : null
+      }, species)) ?? staged[species]
+      await frame(shot(`1284-${species}-birdseye-zoom05`), { world: { x: at.x, z: at.z }, label: `the ${species} herd at zoom 0.5` })
+    }
+  }
 }
 
 await finishPolishSuite()
