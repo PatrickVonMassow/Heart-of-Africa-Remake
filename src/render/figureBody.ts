@@ -95,6 +95,11 @@ export interface BodyProportions {
   kneeFlex: number
   /** A short beard on the jaw (the old man's grey one). */
   beard: boolean
+  /** Radius of each breast; 0 for men and children. Where most of the roster
+   *  goes bare above the waist, this is what tells a woman from a man. */
+  bust: number
+  /** How far the breasts sit below the chest line (the elder's lower). */
+  bustDrop: number
 }
 
 /** Stature against an adult man's, by sex and age (anthropometric means). */
@@ -155,6 +160,8 @@ export function bodyProportions(sex: Sex, age: AgeGroup, build = 0): BodyProport
     hair: age === 'elder' ? '#bcb7ad' : '#1c1814',
     kneeFlex: age === 'elder' ? 0.16 : 0,
     beard: age === 'elder' && !f,
+    bust: !f || child ? 0 : H * (age === 'youth' ? 0.027 : age === 'adult' ? 0.031 : 0.027),
+    bustDrop: H * (age === 'elder' ? 0.04 : age === 'adult' ? 0.018 : 0.008),
   }
 }
 
@@ -386,6 +393,15 @@ export function buildBodyGeometry(p: BodyProportions, look: BodyLook, radial = 1
     const share = Math.max(0, Math.min(1, cap)) * Math.max(0, Math.min(1, (side - 0.45) / 0.45)) * 0.7
     return vertexWeights(v, segs, TORSO_BONES, { bone: v.x > 0 ? 'upperArm.L' : 'upperArm.R', share })
   }, skin)
+
+  // BREASTS: two low domes on the chest front, bound to the chest.
+  if (p.bust > 0) {
+    for (const sx of [1, -1]) {
+      const b = new THREE.SphereGeometry(p.bust, Math.max(8, Math.round(radial * 0.6)), 6).scale(1, p.bustDrop > 0.03 * p.stature ? 1.15 : 1, 0.8)
+      b.translate(sx * p.chestHalfW * 0.45, p.chestY - p.bustDrop, p.chestHalfD * 0.82)
+      add(b, () => [[boneIndex('chest'), 1]], skin)
+    }
+  }
 
   // NECK and HEAD: the skull an ellipsoid, a nose so the face has a front.
   const neck = sweepTube(

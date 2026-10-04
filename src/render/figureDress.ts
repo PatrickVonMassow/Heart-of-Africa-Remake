@@ -97,7 +97,8 @@ export function surfaceOf(l: DressLayer, p: BodyProportions, bottomY: number): [
 
 /** Half-width and half-depth of the trunk at height y (bind pose). */
 export function trunkAt(p: BodyProportions, y: number): [number, number] {
-  const st = trunkProfile(p)
+  // the dress goes over the bust (the chest station), not through it
+  const st = trunkProfile(p).map(([y, x, z], i) => [y, x, i === 3 ? z + p.bust * 0.75 : z] as [number, number, number])
   if (y <= st[0][0]) {
     // Below the crotch: both legs side by side.
     const legW = p.hipX + p.thighR
@@ -276,7 +277,9 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
       // body and the hip dress show through as on a worn skin. The opening is
       // whole columns of the tube either side of the front (+z, a vertex line
       // at a quarter turn): a slanted cut through the triangles left a sawtooth.
-      if (l.wear === 'bothShoulders') openFront(geo, Math.max(1, Math.round(radial / 16)), p.shoulderY - 0.03 * H)
+      // A knee-long cloak hangs open too, whichever shoulder it is knotted on
+      // (closed, a one-shoulder kaross read as a barrel).
+      if (l.wear === 'bothShoulders' || l.form === 'cloak') openFront(geo, Math.max(1, Math.round(radial / 16)), p.shoulderY - 0.03 * H)
       // Knotted over one shoulder: the other shoulder is bare above the chest.
       if (l.wear === 'rightShoulder') sector(geo, (c) => !(c.x > 0.01 * H && c.y > p.chestY))
       if (l.wear === 'leftShoulder') sector(geo, (c) => !(c.x < -0.01 * H && c.y > p.chestY))

@@ -63,6 +63,15 @@ describe('proportions by sex and age', () => {
     expect(bodyProportions('female', 'elder').beard).toBe(false)
   })
 
+  it('a woman has a bust and a man or a child none — the sex read where the chest is bare', () => {
+    for (const age of ['youth', 'adult', 'elder'] as const) {
+      expect(bodyProportions('female', age).bust).toBeGreaterThan(0)
+      expect(bodyProportions('male', age).bust).toBe(0)
+    }
+    expect(bodyProportions('female', 'child').bust).toBe(0)
+    expect(bodyProportions('female', 'elder').bustDrop).toBeGreaterThan(bodyProportions('female', 'youth').bustDrop)
+  })
+
   it('the old man’s beard adds geometry to the body, bound to the head', () => {
     const withBeard = buildBodyGeometry(bodyProportions('male', 'elder'), { skin: '#5c3317', paint: null }, 16)
     const without = buildBodyGeometry({ ...bodyProportions('male', 'elder'), beard: false }, { skin: '#5c3317', paint: null }, 16)

@@ -2565,7 +2565,15 @@ flap or apron of the people's own material for the rest.
 *Elders* — no source gives a garment that marks age (Astra B10, B47), so the
 elder wears the adult's dress and is told apart by the BODY: grey hair, a
 stoop, a thinner build (`figureBody.ts`). The Maasai elder's fur cloak is the
-one sourced exception (§7.1, Hollis Pl. II).
+one sourced exception (§7.1, Hollis Pl. II). Measured in the picture (Zulu
+village, the young man and the old man side by side, 4 to 32 m): from the
+front a stoop barely shows, so the body carries the read in front view too —
+the old man's narrower, sloping shoulders against the young man's square ones,
+a give at the knees, the head carried low, and a short grey beard (a GUESS of
+the hair, not a garment: no source in this document names an elder's beard,
+so it is a readability cue, calibratable). They are told
+apart reliably to about 14 m (drawn about 90 px tall at 900 px), still by the
+build alone at 22 m (~57 px), and no longer at 32 m (~40 px).
 
 *Year* — Astra (B43) knows no garment that arrives or vanishes inside 1890–1895
 for any people. The two year rules are therefore GUESSES, both calibratable:
