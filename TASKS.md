@@ -15781,3 +15781,13 @@ to land than a mechanism that needs a review.
   Measured 03.10.2026, about 21:25-21:45: session f865e213 had its batch lock handed back to the reserved claimant 036dac43 (batch-claim --status: released-reserved). Main writes were refused for it, yet render-verify-guard, retro-currency-guard (beginner guide) and ci-status-guard kept blocking its Stop five turns in a row, demanding hour-long suite runs and main commits it may not make.
   Done when: a session whose lock was released to a claimant is treated as a non-owner by every Stop guard (the house rule: every Stop guard stands down for a non-owner), covered by a unit test on the shared ownership predicate the guards read; no guard is switched off for owners.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1290. On WebGL 2 the lion feeding scene shows neither the lion nor its prey, only a shadow and the blood stain
+  Measured 04.10.2026 on feat/1283 (base a13dcae0e), `settings --section=lion-feeding`, VERIFY_GL=webgl: frame 68-lion-feeding without a wait shows only grey haze with place labels (no terrain); with a 4 s wait it shows terrain, the blood stain and one predator shadow, but neither the lion mesh nor the prey mesh. WebGPU shows lion, lying prey and stain in the same section. The section's checks read poses only, so they stay green while the animals are invisible.
+  Done when: the cause is measured on WebGL 2 (mesh visibility/material compile vs. staging timing), the lion and its prey render on WebGL 2 as on WebGPU, and the section asserts the rendered animals, not only their poses; frame picture-checked on both backends.
+  Bundle: Tierverhalten.
+  Criticality: medium — a player on the fallback backend sees a feeding scene without animals.
+- [ ] 1291. retro-currency-guard deadlocks a session after a committed context boundary
+  Measured 04.10.2026 (session 05e22fce): after `batch-boundary.mjs --commit --context`, retro-currency-guard demanded a beginner-guide addition, which the context watermark forbids as authoring — a Stop loop with no way out.
+  Done when: retro-currency-guard stands down once a context boundary is committed (as the other Stop guards do for a session past its boundary), covered by a unit test on the guard core.
+  Bundle: Session- & Repo-Hygiene.
+  Criticality: low — a real blockade at the boundary, no player impact.
