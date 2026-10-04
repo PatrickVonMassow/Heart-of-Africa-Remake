@@ -81,6 +81,12 @@ export interface QualityPreset {
    *  surface drawn at the bank and the panorama's continuation of it — because
    *  a level that thinned one of them would put the seam back. */
   waterDetailOctaves: number
+  /** Radial segments of the swept torso, neck and head of the detailed
+   *  ungulates — zebra, antelope, settlement goat (work-order 1284); their legs,
+   *  tails, horns and manes take a fixed fraction of it. It decides whether a
+   *  close animal's outline reads round or faceted; a herd draws one instanced
+   *  mesh per species, so the cost is vertices per instance. */
+  faunaBodySegments: number
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -111,6 +117,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     placeRiverSegments: 8, // a coarse undulation; the current still reads
     placeRiverFlotsam: 12, // x2 only, to spare the weakest tier (frame cost measured, work-order 1280); never none
     waterDetailOctaves: 1, // one octave: the water still moves, at the lowest shading cost
+    faunaBodySegments: 12, // the frugal floor: 30° facets, the shapes and markings still read
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -135,6 +142,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     placeRiverSegments: 32,
     placeRiverFlotsam: 48, // ~3x the 16 foam patches it had, now a mixed drift
     waterDetailOctaves: 3, // the field before the presets existed
+    faunaBodySegments: 18, // round at the bird's-eye range
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -158,6 +166,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     placeRiverSegments: 64,
     placeRiverFlotsam: 90, // ~3x the 30 foam patches it had
     waterDetailOctaves: 4, // one octave more structure on the water
+    faunaBodySegments: 24, // no facet on the outline at the closest zoom
   },
 }
 

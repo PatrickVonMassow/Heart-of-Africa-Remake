@@ -1650,7 +1650,7 @@ function seedDryShoreDrinkers(
 interface WildlifeMeshPool {
   adult: Record<Species, THREE.InstancedMesh>
   calf: Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
-  material: THREE.MeshStandardMaterial
+  material: THREE.MeshStandardNodeMaterial
   /** STRIKING crocodiles' mesh (point 274): same geometry as the hidden pool
    *  mesh but the ordinary OPAQUE fauna material — the two croc poses draw
    *  through two meshes instead of a per-instance waterline attribute (which

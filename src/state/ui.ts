@@ -427,6 +427,8 @@ export const effectivePlaceRiverFlotsam = (s: UiState): number => currentQuality
 /** Octaves of the one water detail field both halves of a settlement river read
  *  (work-order 525). */
 export const effectiveWaterDetailOctaves = (s: UiState): number => currentQuality(s).waterDetailOctaves
+/** Radial segments of the detailed ungulates' swept bodies (work-order 1284). */
+export const effectiveFaunaBodySegments = (s: UiState): number => currentQuality(s).faunaBodySegments
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
