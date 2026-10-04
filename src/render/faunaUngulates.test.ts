@@ -23,7 +23,7 @@ import {
   createSilhouetteFaunaMaterial,
   gaitRig,
 } from './fauna'
-import { FAUNA_MARK_ATTRIBUTE, MARK, MARK_TONES, markAt, silhouetteMarkScale } from './faunaMarkings'
+import { FAUNA_MARK_ATTRIBUTE, MARK, MARK_TONES, markAt, SILHOUETTE_PALE, silhouetteMarkScale } from './faunaMarkings'
 import { balance } from '../config/balance'
 import { sweepTube } from './faunaGeometry'
 import { UNGULATE_SPECS, ungulateLayout } from './faunaUngulates'
@@ -257,7 +257,7 @@ describe('skyline silhouettes carry the species marking (point 102 haze look)', 
     expect(stripe).toBeGreaterThan(0.1) // never a black hole in the haze
     const flank = silhouetteMarkScale(MARK_TONES.flankDark, pw.markContrast)
     expect(flank).toBeLessThan(0.75)
-    const belly = silhouetteMarkScale(3, pw.markContrast)
+    const belly = silhouetteMarkScale(SILHOUETTE_PALE, pw.markContrast)
     expect(belly).toBeGreaterThan(1.3)
     expect(belly).toBeLessThanOrEqual(1.8)
     expect(silhouetteMarkScale(1, pw.markContrast)).toBe(1) // unmarked: the flat haze tint

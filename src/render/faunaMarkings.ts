@@ -91,21 +91,19 @@ const aaBelow = (value: THREE.Node<'float'>, edge: THREE.Node<'float'>) => {
 }
 
 /**
- * The marking factor on a base coat colour, per fragment: 1 on an unmarked part
- * (kind 0). `bandScale` widens every band and cell (1 = as built; < 1 = fewer,
+ * The marking factor per fragment: 1 on an unmarked part (kind 0). `pale` is
+ * the factor of the pale parts (giraffe network lines, gazelle belly) — the
+ * one that turns the coat into cream on the full model, a plain lift on the
+ * flat-tinted silhouette. `bandScale` widens every band and cell (1 = as built; < 1 = fewer,
  * broader bands — the skyline silhouettes use it so a stripe still spans
  * several pixels on a two-degree animal); `flankWiden` multiplies the height of
  * the gazelle's dark flank band for the same reason.
  */
-function markingFactor(base: THREE.Node<'vec3'>, bandScale: number, flankWiden = 1) {
+function markingFactor(pale: THREE.Node<'vec3'>, bandScale: number, flankWiden = 1) {
   const m = attribute<'vec4'>(FAUNA_MARK_ATTRIBUTE, 'vec4')
   const kind = m.x.round()
   const p = positionGeometry
   const k = float(bandScale)
-  const creamRgb = new THREE.Color(MARK_TONES.cream)
-  const cream = vec3(creamRgb.r, creamRgb.g, creamRgb.b)
-  // Factor that turns the base colour into `target`.
-  const toward = (target: THREE.Node<'vec3'>, mask: THREE.Node<'float'>) => mix(vec3(1), target.div(base), mask)
   const factor = vec3(1).toVar()
 
   If(kind.equal(MARK.stripes), () => {
@@ -122,7 +120,7 @@ function markingFactor(base: THREE.Node<'vec3'>, bandScale: number, flankWiden =
       const f = mx_worley_noise_vec2(p.mul(m.y.mul(k)), 0.85)
       const edge = f.y.sub(f.x)
       const line = aaBelow(edge, m.z)
-      factor.assign(mix(vec3(MARK_TONES.patchDark), toward(cream, float(1)), line))
+      factor.assign(mix(vec3(MARK_TONES.patchDark), pale, line))
     })
     .ElseIf(kind.equal(MARK.spots), () => {
       const f = mx_worley_noise_vec2(p.mul(m.y.mul(k)), 0.9)
@@ -134,7 +132,7 @@ function markingFactor(base: THREE.Node<'vec3'>, bandScale: number, flankWiden =
       const belly = aaBelow(p.y, m.y)
       const band = aaBelow(p.y, m.y.add(m.z.mul(flankWiden))).sub(belly)
       const dark = mix(vec3(1), vec3(MARK_TONES.flankDark), clamp(band, 0, 1))
-      factor.assign(mix(dark, toward(cream, float(1)), belly))
+      factor.assign(mix(dark, pale, belly))
     })
   return factor
 }
@@ -145,23 +143,30 @@ function markingFactor(base: THREE.Node<'vec3'>, bandScale: number, flankWiden =
  * an unmarked part (kind 0) renders exactly as before.
  */
 export function faunaMarkingColorNode() {
-  return Fn(() => markingFactor(max(vertexColor().rgb, vec3(0.02)), 1))()
+  return Fn(() => {
+    const base = max(vertexColor().rgb, vec3(0.02))
+    const creamRgb = new THREE.Color(MARK_TONES.cream)
+    // The factor that turns the coat into cream.
+    return markingFactor(vec3(creamRgb.r, creamRgb.g, creamRgb.b).div(base), 1)
+  })()
 }
 
 /** Rec. 709 luminance weights, for the silhouette's marking contrast. */
 const LUMA = [0.2126, 0.7152, 0.0722] as const
 
 /**
- * How a skyline silhouette's haze tint is scaled by its pelt marking (CPU
- * mirror of `silhouetteMarkingColorNode`, for tests): the marked coat's
- * luminance relative to the plain coat, eased toward 1 by `contrast` (0 = the
- * flat haze tint, 1 = the full pelt contrast) and clamped so a pale belly
- * lifts the tint without blowing out to the sky.
+ * How a skyline silhouette's haze tint is scaled by one marking tone (CPU
+ * mirror of `silhouetteMarkingColorNode`, for tests): the tone's factor on the
+ * coat (a stripe's `stripeDark`, the pale parts' `SILHOUETTE_PALE`), eased
+ * toward 1 by `contrast` (0 = the flat haze tint, 1 = the full pelt contrast).
  */
-export function silhouetteMarkScale(markedOverCoat: number, contrast: number, maxLift = 1.8): number {
-  const r = Math.min(maxLift, Math.max(0, markedOverCoat))
-  return 1 + (r - 1) * Math.max(0, Math.min(1, contrast))
+export function silhouetteMarkScale(factor: number, contrast: number): number {
+  return 1 + (Math.max(0, factor) - 1) * Math.max(0, Math.min(1, contrast))
 }
+
+/** The pale parts' factor on the flat silhouette tint (gazelle belly, giraffe
+ *  network): a lift, so the haze tint pales without blowing out to the sky. */
+export const SILHOUETTE_PALE = 1.8
 
 /**
  * Colour node of a skyline silhouette (point 102 haze look, work-order 1284
@@ -171,13 +176,13 @@ export function silhouetteMarkScale(markedOverCoat: number, contrast: number, ma
  * the hazed one. Bands are widened by `bandScale` (and the flank band by
  * `flankWiden`) to survive the small size.
  */
-export function silhouetteMarkingColorNode(tint: THREE.Color, contrast: number, bandScale: number, flankWiden = 1, maxLift = 1.8) {
+export function silhouetteMarkingColorNode(tint: THREE.Color, contrast: number, bandScale: number, flankWiden = 1) {
   return Fn(() => {
-    const base = max(vertexColor().rgb, vec3(0.02))
-    const factor = markingFactor(base, bandScale, flankWiden)
+    // Flat tint, no coat colour: every marking tone is a plain grey factor, so
+    // its luminance IS the factor (the weights sum to 1).
+    const factor = markingFactor(vec3(SILHOUETTE_PALE), bandScale, flankWiden)
     const luma = vec3(LUMA[0], LUMA[1], LUMA[2])
-    const ratio = clamp(dot(base.mul(factor), luma).div(dot(base, luma)), 0, maxLift)
-    const scale = float(1).add(ratio.sub(1).mul(clamp(float(contrast), 0, 1)))
+    const scale = float(1).add(dot(factor, luma).sub(1).mul(clamp(float(contrast), 0, 1)))
     return vec3(tint.r, tint.g, tint.b).mul(scale)
   })()
 }

@@ -1173,8 +1173,6 @@ if (section('giza-site')) {
 // antelope stand in a settlement only as the panorama silhouettes, which the
 // dev probe names by species.
 if (section('animal-models')) {
-  await goToPlace('maasai-village')
-  await page.waitForFunction(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}).filter((w) => w.visible).length >= 2, null, { timeout: 25000 }).catch(() => {})
   // The silhouettes are clamped to a couple of degrees on purpose (point 94),
   // so a full 1440x900 frame shows them as specks among their neighbours. Each
   // settlement frame therefore stands at the settlement edge where its animal
@@ -1184,26 +1182,26 @@ if (section('animal-models')) {
   const VIEW = { width: 1440, height: 900 }
   const CLIP = { width: 360, height: 225 }
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
-  for (const species of ['zebra', 'antelope']) {
-    const aimed = await page.evaluate((sp) => {
-      const info = window.__placePanoramaWildlifeInfo ?? {}
-      const rows = Object.entries(info).filter(([, w]) => w.visible)
-      const p = window.__placePlayer
+  // Two walkers can share a bearing in one settlement for the whole run, so the
+  // aim tries the region's settlements in turn (east first: the zebra and the
+  // antelope both walk there) and takes the first where the named one stands
+  // clear — else the clearest seen.
+  // Clear standpoints for `sp` here, best first: on the settlement edge
+  // looking OUT, scored by how far in bearing the nearest silhouette of another
+  // species stands from the named one (walkers sharing an azimuth from the
+  // centre can part by parallax from the edge); among clear ones the nearest.
+  const standpoints = (sp) =>
+    page.evaluate((sp) => {
+      const rows = Object.entries(window.__placePanoramaWildlifeInfo ?? {}).filter(([, w]) => w.visible)
       const R = (window.__placeLayout?.radius ?? 40) * 0.9
-      // Standpoints on the settlement edge looking OUT (nothing of the village
-      // between eye and animal). Each is scored by how far, in bearing, the
-      // nearest silhouette of another species stands from the named one —
-      // two walkers can share an azimuth from the centre yet part by parallax
-      // from the edge; among the clear ones the nearest standpoint wins.
       const bearing = (fx, fz, w) => Math.atan2(w.z - fz, w.x - fx)
-      let best = null
+      const out = []
       for (const [key, it] of rows.filter(([, w]) => w.species === sp)) {
         for (let k = 0; k < 48; k++) {
           const a = (k / 48) * Math.PI * 2
           const fx = Math.cos(a) * R
           const fz = Math.sin(a) * R
           const dist = Math.hypot(it.x - fx, it.z - fz)
-          // Outward-looking only.
           if (((it.x - fx) * Math.cos(a) + (it.z - fz) * Math.sin(a)) / dist < 0.5) continue
           const b0 = bearing(fx, fz, it)
           const sep = Math.min(
@@ -1212,19 +1210,57 @@ if (section('animal-models')) {
               .filter(([, o]) => o.species !== sp)
               .map(([, o]) => Math.abs(Math.atan2(Math.sin(bearing(fx, fz, o) - b0), Math.cos(bearing(fx, fz, o) - b0)))),
           )
-          const clear = sep >= (12 * Math.PI) / 180
-          const score = (clear ? 1e6 : 0) + (clear ? -dist : sep * 1000)
-          if (!best || score > best.score) best = { score, key, it, fx, fz, sepDeg: (sep * 180) / Math.PI, dist }
+          if (sep >= (12 * Math.PI) / 180) out.push({ key, fx, fz, sepDeg: Math.round((sep * 180) / Math.PI), dist: Math.round(dist) })
         }
       }
-      if (!best) return null
-      p.x = best.fx
-      p.z = best.fz
+      return out.sort((p, q) => p.dist - q.dist).slice(0, 8)
+    }, sp)
+  // Stand there, aim at the animal's mid-body and ray-probe the line of sight
+  // (point 181's probe): no hut, fence or ridge may stand in front of it.
+  const standAndSee = async (c) => {
+    await page.evaluate((c) => {
+      const it = window.__placePanoramaWildlifeInfo?.[c.key]
+      const p = window.__placePlayer
+      p.x = c.fx
+      p.z = c.fz
       p.pitch = 0
-      p.yaw = Math.atan2(-(best.it.x - p.x), -(best.it.z - p.z))
-      return { key: best.key, x: best.it.x, z: best.it.z, y: best.it.y, sepDeg: Math.round(best.sepDeg), dist: Math.round(best.dist) }
-    }, species)
-    check(`a ${species} silhouette walks the settlement panorama`, !!aimed, aimed ? JSON.stringify(aimed) : 'none visible')
+      p.yaw = Math.atan2(-(it.x - p.x), -(it.z - p.z))
+    }, c)
+    await nextFrames(2)
+    return page.evaluate((c) => {
+      const it = window.__placePanoramaWildlifeInfo?.[c.key]
+      const p = window.__placePlayer
+      if (!it || !it.visible || !window.__placeRayHit) return null
+      const hit = window.__placeRayHit(it.x, it.y + (it.worldHeight ?? 2) / 2, it.z)
+      const moved = Math.hypot(p.x - c.fx, p.z - c.fz)
+      // The probe skips the silhouettes, so the first surface must lie at or
+      // BEHIND the animal's mid-body; anything nearer stands in front of it.
+      const ratio = hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance
+      const seen = ratio >= 0.98 && moved < 0.5
+      return { ...c, x: it.x, z: it.z, y: it.y, seen, hit: `${hit.hitName ?? 'sky'}@${ratio.toFixed(2)}`, moved: Math.round(moved * 10) / 10 }
+    }, c)
+  }
+  // Two walkers can share a bearing in one settlement for the whole run, so the
+  // aim tries the region's settlements in turn (east: the zebra and the
+  // antelope both walk there) and takes the first clear, unobstructed view.
+  const STAGES = ['maasai-village', 'sidama-village', 'baganda-village', 'swahili-village']
+  for (const species of ['zebra', 'antelope']) {
+    let aimed = null
+    const tried = []
+    for (const place of STAGES) {
+      await goToPlace(place)
+      await page.waitForFunction(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}).filter((w) => w.visible).length >= 2, null, { timeout: 25000 }).catch(() => {})
+      for (const c of await standpoints(species)) {
+        const got = await standAndSee(c)
+        if (got?.seen) {
+          aimed = { ...got, place }
+          break
+        }
+        tried.push(`${place}:${got ? got.hit : 'lost'}`)
+      }
+      if (aimed) break
+    }
+    check(`a ${species} silhouette stands clear and in sight of a settlement edge`, !!aimed, aimed ? JSON.stringify(aimed) : `none clear [${tried.join(', ')}]`)
     if (!aimed) continue
     await nextFrames(3)
     // Re-read the walker at the shutter (it drifts along its ring) and frame
@@ -1283,6 +1319,7 @@ if (section('animal-models')) {
       label: `the ${species} silhouette on the settlement skyline`,
     })
   }
+  await goToPlace('maasai-village')
   // A goat at close range and in PROFILE: the standpoint lies square to its
   // facing, on the side toward the herd's centre (inside the pen, away from
   // the fence and the people outside it).
