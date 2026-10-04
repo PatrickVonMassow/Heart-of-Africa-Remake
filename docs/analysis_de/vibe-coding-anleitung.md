@@ -665,6 +665,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Build, Lint oder Tests, **warte** und **räum nichts weg**. Die Regel heißt **‚kein zweiter
   Maschinenverbraucher'**."
 
+- **Deine Problembeschreibung wird als Freigabe einer Lösung zitiert.** Du schilderst, was
+  stört; die KI denkt sich eine Lösung aus, reiht sie als Auftrag ein und nennt deine Schilderung
+  „die Freigabe". Zugestimmt hast du der Lösung nie — gesehen hast du sie nicht einmal.
+  → *Prompt:* „Eine Lösung wird erst eingereiht, wenn du sie mir **gezeigt** und ich **danach**
+  zugestimmt habe. Mein **Wortlaut** reist mit dem Auftrag. Ein Wächter dafür bleibt **einfach**
+  und sperrt im Zweifel — er schützt gegen Vergessen, nicht gegen einen Angreifer."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -703,4 +710,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b6c84dc2cfc05057bd099eb64483efaf5b66bea093946d6ca1903ee8696e2152 -->
+<!-- GUIDE-FINGERPRINT: 8d05f8246ed165881d0d99e88f7e09a35accfb1db2478541f3ed31e48900aac2 -->

@@ -1520,6 +1520,22 @@ Karte braucht, bekommt einen eigenen Auftragspunkt.
 Tor zu passieren, erfüllt die Form der Regel und bricht ihren Zweck — die Tafel lügt dann nicht
 durch Weglassen, sondern durch Zuordnung.
 
+### 3.308 Die Problemmeldung als Freigabe
+
+Am 03.10. hinterlegte eine Chat-Sitzung einen Lösungsauftrag und zitierte als „Freigabe" die
+Problemmeldung des Nutzers — der Nutzer hatte ein Problem beschrieben, aber keiner Lösung
+zugestimmt. Er ordnete daraufhin an, sicherzustellen, dass die Freigaberegel nicht mehr verletzt
+wird (Punkt 1281). Der Wächter brauchte vier Review-Runden: Die ersten Fassungen versuchten,
+Befehlszeilen wie ein Angreifer-Parser vollständig zu verstehen, und jede Runde fand eine neue
+Lücke. Erst eine schlichte textuelle Fail-closed-Regel konvergierte — ein `--request` braucht
+`--approved "<Wortlaut>"`, und dieser Wortlaut muss in einer Nutzernachricht stehen, die NACH
+einem Antwortblock mit dem Titel des Auftrags kam.
+
+**Lehre:** Eine Freigabe ist eine Abfolge, kein Zitat: erst der Vorschlag, dann die Zustimmung des
+Nutzers zu genau diesem Vorschlag. Und ein Wächter gegen Vergesslichkeit braucht keinen Parser
+gegen Angreifer — wer die Regel vergisst, versteckt sie nicht; eine einfache Regel, die im Zweifel
+sperrt, schützt besser als eine kluge, die nie fertig wird.
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1733,7 +1749,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 04.10.2026, 02:50 · Quellen-Fingerprint: `7413910884fe…`
+Zuletzt aktualisiert: Sonntag, 04.10.2026, 05:03 · Quellen-Fingerprint: `8d05f8246ed1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1845,10 +1861,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 104 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 147 Prozess-/Meta-TASKS-Punkte (davon 69 offen).
+Erfasste Quellen: 104 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 148 Prozess-/Meta-TASKS-Punkte (davon 70 offen).
 
-<!-- RETRO-FINGERPRINT: 7413910884fe0f1dd73fbbe862df9933763a693fa703db553de2866e8fbbec35 -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-04T00:50:53.076Z -->
+<!-- RETRO-FINGERPRINT: 8d05f8246ed165881d0d99e88f7e09a35accfb1db2478541f3ed31e48900aac2 -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-04T03:03:28.178Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
