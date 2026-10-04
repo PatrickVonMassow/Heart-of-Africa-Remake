@@ -1198,17 +1198,23 @@ if (section('animal-models')) {
     }, species)
     await frame(`1284-${species}-settlement`, { local: at ?? aimed, label: `the ${species} silhouette on the settlement skyline` })
   }
-  // The goats at close range, from a standpoint a few metres off the herd.
+  // A goat at close range and in PROFILE: the standpoint lies square to its
+  // facing, on the side toward the herd's centre (inside the pen, away from
+  // the fence and the people outside it).
   await page.waitForFunction(() => Object.keys(window.__placeGoatGait ?? {}).length > 0, null, { timeout: 15000 }).catch(() => {})
   const goat = await page.evaluate(() => {
     const p = window.__placePlayer
     const herd = Object.values(window.__placeGoatGait ?? {})
     if (!p || herd.length === 0) return null
     const g = herd[0]
-    const d = Math.hypot(g.x - p.x, g.z - p.z) || 1
-    p.x = g.x - ((g.x - p.x) / d) * 3.2
-    p.z = g.z - ((g.z - p.z) / d) * 3.2
-    p.pitch = -0.12
+    const cx = herd.reduce((s, h) => s + h.x, 0) / herd.length
+    const cz = herd.reduce((s, h) => s + h.z, 0) / herd.length
+    const sx = Math.cos(g.yaw ?? 0)
+    const sz = -Math.sin(g.yaw ?? 0)
+    const side = sx * (cx - g.x) + sz * (cz - g.z) >= 0 ? 1 : -1
+    p.x = g.x + side * sx * 3.2
+    p.z = g.z + side * sz * 3.2
+    p.pitch = -0.15
     p.yaw = Math.atan2(-(g.x - p.x), -(g.z - p.z))
     return { x: g.x, z: g.z }
   })
