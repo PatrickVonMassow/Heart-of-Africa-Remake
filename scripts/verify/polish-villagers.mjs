@@ -3839,8 +3839,10 @@ if (section('villager-dress')) {
       { d, only },
     )
   // Whether a passer-by of the village's own life stands between the camera
-  // and a figure of the row (a walker with a basket hid the Mongo young man):
-  // any other inhabitant within 0.45 m of a sight line, nearer than the row.
+  // and a figure of the row (a carrier with a basket hid the Mongo young man):
+  // any other figure's head or chest (`figure-head`, on every drawn person — a
+  // villager, a porter, a vignette's actor) within 0.6 m of a sight line to a
+  // head or chest of the row, nearer than the row.
   const rowHidden = () =>
     page.evaluate(() => {
       const scene = window.__placeScene
@@ -3848,27 +3850,36 @@ if (section('villager-dress')) {
       const row = scene.getObjectByName('dress-lineup')
       if (!row) return false
       const V = cam.constructor
-      const targets = row.children.map((g) => g.getWorldPosition(new V()).setY(cam.y - 0.6))
+      const inRow = (o) => {
+        for (let n = o.parent; n; n = n.parent) if (n === row) return true
+        return false
+      }
+      const targets = []
       const others = []
       scene.traverse((o) => {
-        if (o.name !== 'inhabitant') return
-        for (let n = o.parent; n; n = n.parent) if (n === row) return
-        others.push(o.getWorldPosition(new V()).setY(cam.y - 0.6))
+        if (o.name !== 'figure-head') return
+        // the head and the chest below it: a walker's body hides a child's
+        // head even where the walker's own head passes above the sight line
+        const h = o.getWorldPosition(new V())
+        ;(inRow(o) ? targets : others).push(h, h.clone().setY(h.y - 0.5))
       })
       const seg = new V()
       const rel = new V()
-      return targets.some((t) =>
-        others.some((p) => {
+      let best = { d: Infinity }
+      for (const t of targets)
+        for (const p of others) {
           seg.subVectors(t, cam)
           rel.subVectors(p, cam)
           const k = rel.dot(seg) / seg.lengthSq()
-          if (k <= 0 || k >= 0.95) return false
-          return rel.addScaledVector(seg, -k).length() < 0.45
-        }),
-      )
+          if (k <= 0 || k >= 0.95) continue
+          const d = rel.addScaledVector(seg, -k).length()
+          if (d < best.d) best = { d, k }
+        }
+      window.__rowHiddenDebug = { targets: targets.length, others: others.length, ...best }
+      return best.d < 0.6
     })
   const awaitRowClear = async () => {
-    for (let i = 0; i < 60 && (await rowHidden()); i++) await nextFrames(5)
+    for (let i = 0; i < 120 && (await rowHidden()); i++) await nextFrames(5)
   }
   // What the row is drawn with: skinned meshes on medium/high, none on low.
   const rowBodies = () =>
@@ -3893,8 +3904,12 @@ if (section('villager-dress')) {
     await goToPlace(villageOf(people))
     const at = await stageRow(5.6)
     await nextFrames(4)
+    // drawn first (the pipeline wait steps frames, and walkers walk on), then
+    // clear, so the shutter below opens a few frames after the clear reading
+    await awaitPlaceDrawn(`${people} row`)
     await awaitRowClear()
     const hidden = await rowHidden()
+    record('row-hidden', { people, ...(await page.evaluate(() => window.__rowHiddenDebug)) })
     const got = await rowBodies()
     check(
       `${people}: every sex and age group stands in the row in view, each one skinned mesh (body and dress merged)`,
@@ -3913,6 +3928,7 @@ if (section('villager-dress')) {
   for (const d of [4, 8, 14, 22, 32]) {
     const at = await stageRow(d, ['male-youth', 'male-elder'])
     await nextFrames(4)
+    await awaitPlaceDrawn(`elder/young man ${d} m`)
     await awaitRowClear()
     // Drawn crown height and shoulder span (px) of each: the measurable part
     // of the age read — the rest is the frame, judged by looking.
@@ -3954,6 +3970,7 @@ if (section('villager-dress')) {
   await nextFrames(6)
   const lowAt = await stageRow(5.6)
   await nextFrames(4)
+  await awaitPlaceDrawn('low row')
   await awaitRowClear()
   const low = await rowBodies()
   check('low preset: the row is the primitive figure — no skinned mesh, every head drawn', !!low && low.figures === 8 && low.skinned === 0 && low.heads === 8, JSON.stringify(low))
