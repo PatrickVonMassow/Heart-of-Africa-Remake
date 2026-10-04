@@ -1616,7 +1616,8 @@ function PanoramaWildlife({
     // maxApparentAngleDeg only nets an outlier. The colour hazes toward the
     // sky (stronger for farther rings) so it reads as distance, not a blob.
     const spread = ringSpreadWithin(innerRadius, pw.ringInner, pw.ringSpread, PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE)
-    const factor = sharedSilhouetteFactor(pw.speciesHeight.giraffe, innerRadius + pw.ringInner + spread / 2, pw.giraffeTargetDeg)
+    const midRing = innerRadius + pw.ringInner + spread / 2
+    const factor = sharedSilhouetteFactor(pw.speciesHeight.giraffe, midRing, pw.giraffeTargetDeg)
     return Array.from({ length: 5 }, (_, i) => {
       const radius = innerRadius + pw.ringInner + rand() * spread
       const gi = i % builds.length
@@ -1640,6 +1641,7 @@ function PanoramaWildlife({
         material: createSilhouetteFaunaMaterial(new THREE.Color(rgb[0], rgb[1], rgb[2]), pw.markContrast, pw.markBandScale, pw.markFlankWiden),
         worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
+        midRing,
         hazeLum: luminance(rgb),
         phase: rand() * Math.PI * 2,
       }
@@ -1775,7 +1777,7 @@ function PanoramaWildlife({
         // how far the body dipped onto its stance leg and how it lies on the
         // slope under its own wheelbase — and `stretch` (below) the reach the
         // tracked leg needed on top of that fit to stand on its own ground.
-        info[i] = { species: it.species, y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
+        info[i] = { species: it.species, y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, midRing: it.midRing, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
       }
       g.position.set(x, y, z)
       // Lie on the ground slope in the body's own frame (YXZ: yaw first, so x

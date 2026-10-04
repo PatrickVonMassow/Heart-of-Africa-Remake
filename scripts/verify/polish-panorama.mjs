@@ -1473,6 +1473,9 @@ if (section('skyline-species-scale')) {
   const fMax = Math.max(...fac.map((x) => x.f))
   check('every skyline species is drawn by the one shared factor', fac.length >= 4 && fMax - fMin < 1e-3 * fMax, fac.map((x) => `${x.sp} ${x.deg.toFixed(2)}° @${Math.round(x.r)}m`).join(', '))
   check('no skyline silhouette reaches the 2.5° safety net', fac.every((x) => x.deg < 2.5), fac.map((x) => x.deg.toFixed(2)).join(', '))
+  // Absolute calibration: the shared factor puts a giraffe at mid ring at ≈1.4°.
+  const midDeg = rows.map((w) => (Math.atan2((w.worldHeight / TRUE_H[w.species]) * TRUE_H.giraffe, w.midRing) * 180) / Math.PI)
+  check('a mid-ring giraffe subtends about 1.4°', midDeg.length >= 4 && midDeg.every((d) => Math.abs(d - 1.4) < 0.05), midDeg.map((d) => d.toFixed(3)).join(', '))
   if (aimed) {
     await nextFrames(3)
     // The subject point: the walker nearest the view's centre, at the shutter.
@@ -1486,6 +1489,18 @@ if (section('skyline-species-scale')) {
       })[0]
       return pickIt ? { x: pickIt.x, y: pickIt.y + pickIt.worldHeight / 2, z: pickIt.z } : null
     }, aimed.keys)
+    // All four walkers project inside the viewport at the shutter.
+    const inFrame = await page.evaluate((keys) => {
+      const info = window.__placePanoramaWildlifeInfo ?? {}
+      const cam = window.__placeCamera
+      return keys.map((k) => {
+        const it = info[k]
+        if (!it || !cam) return `${k}:missing`
+        const v = new cam.position.constructor(it.x, it.y + it.worldHeight / 2, it.z).project(cam)
+        return Math.abs(v.x) <= 0.95 && Math.abs(v.y) <= 0.95 && v.z < 1 ? null : `${it.species}@(${v.x.toFixed(2)},${v.y.toFixed(2)})`
+      }).filter(Boolean)
+    }, aimed.keys)
+    check('all four skyline species project inside the frame at the shutter', inFrame.length === 0, inFrame.join(' ') || 'all in view')
     await frame(shot('1285-skyline-four-species'), { local: centre ?? { x: aimed.fx, y: 1.5, z: aimed.fz }, label: 'the skyline with giraffe, elephant, zebra and antelope' })
   }
 }
