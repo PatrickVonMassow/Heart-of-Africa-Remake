@@ -594,6 +594,8 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       x: canoe.x,
       z: canoe.z,
       yaw: canoe.yaw,
+      hullLength: cfg.hullLength,
+      hullBeam: cfg.hullBeam,
       calls: canoe.calls,
       lastCall: canoe.lastCall,
       word: canoe.word ? { ...canoe.word } : null,

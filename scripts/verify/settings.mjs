@@ -505,12 +505,15 @@ if (section('lion-feeding')) {
   // all-zero because the loop had not yet drawn a feed frame. Poll for the depiction
   // (a real failure to depict exhausts the window), then sample a series — WebGPU
   // frames are sparser headless, and the head bobs on a ~2 s sine, so keep the
-  // most-lowered sample and assert the swing across the series.
+  // most-lowered sample and assert the swing across the series. Visibility alone
+  // is no proof: a natural chase already shows both meshes, unposed — the
+  // 03.10.2026 full-order red read exactly that (all poses 0). Only the feed
+  // lays the prey on its side, so wait for that pose.
   await page
     .waitForFunction(
       () => {
         const h = window.__lionHunt
-        return h?.lion.current?.visible === true && h?.prey.current?.visible === true
+        return h?.lion.current?.visible === true && h?.prey.current?.visible === true && h.prey.current.rotation.z > 1
       },
       null,
       { timeout: 20000 },
@@ -529,6 +532,7 @@ if (section('lion-feeding')) {
         headPitch: h.lion.current?.rotation.x,
         preyOnSide: h.prey.current?.rotation.z,
         stainRadius: h.stain.r,
+        mode: h.state.mode,
       }
     })
     pitches.push(s.headPitch ?? 0)
@@ -538,7 +542,7 @@ if (section('lion-feeding')) {
   }
   const pitchSwing = Math.max(...pitches) - Math.min(...pitches)
   check('feeding: lion and carcass visible', feedA.lionVisible === true && feedA.preyVisible === true, '')
-  check('feeding: lion head lowered', feedA.headPitch > 0.1, `${feedA.headPitch?.toFixed(3)}`)
+  check('feeding: lion head lowered', feedA.headPitch > 0.1, `${feedA.headPitch?.toFixed(3)} (mode ${feedA.mode})`)
   check('feeding: tearing movement animates', pitchSwing > 0.005,
     pitches.map((p) => p?.toFixed(3)).join(' -> '))
   check('feeding: prey lies on its side', feedA.preyOnSide > 1.0, `${feedA.preyOnSide?.toFixed(2)}`)
@@ -1379,7 +1383,7 @@ if (section('river-current')) {
   const readDrift = () => page.evaluate(() => {
     const r = window.__placeRiver()
     const c = window.__placeCanoe?.()
-    return { drift: r.drift, flecksDrift: r.flecksDrift, speed: r.driftSpeed, flecks: r.flecks, canoe: c ? { x: c.x, z: c.z } : null }
+    return { drift: r.drift, flecksDrift: r.flecksDrift, speed: r.driftSpeed, flecks: r.flecks, canoe: c ? { x: c.x, z: c.z, yaw: c.yaw, length: c.hullLength, beam: c.hullBeam } : null }
   })
   const aimA = await pickSubject()
   const subjectA = aimA ? { x: aimA.x, y: aimA.y + 0.1, z: aimA.z } : { x: river.bank.x, y: 0.4, z: river.bank.z }
@@ -1456,13 +1460,20 @@ if (section('river-current')) {
     }
     // The fishing canoe works this stretch and can lie across a band, idling in
     // a call phase while the water flows past it: its hull would anchor the
-    // alignment at zero. Its screen box (a 4 m reach round its centre, up to
-    // the paddlers' heads) at both frames is left out of the comparison.
+    // alignment at zero. Its screen box — the hull's length and beam along its
+    // yaw, widened by the paddle's reach, up to the paddlers' heads — at both
+    // frames is left out of the comparison.
     const canoeBoxes = []
     for (const c of [A.pre?.canoe, A.post.canoe, B.pre?.canoe, B.post.canoe]) {
       if (!c) continue
+      const hl = c.length / 2 + 0.3
+      const hb = c.beam / 2 + 0.8
+      const cos = Math.cos(c.yaw)
+      const sin = Math.sin(c.yaw)
       const corners = []
-      for (const dx of [-4, 4]) for (const dz of [-4, 4]) for (const y of [-0.4, 1.6]) corners.push([c.x + dx, y, c.z + dz])
+      for (const lx of [-hb, hb]) for (const lz of [-hl, hl]) for (const y of [-0.4, 1.6]) {
+        corners.push([c.x + lx * cos + lz * sin, y, c.z - lx * sin + lz * cos])
+      }
       const ndc = await ndcOf(corners)
       if (ndc.some((n) => !n)) continue
       const px = ndc.map(toPx)
