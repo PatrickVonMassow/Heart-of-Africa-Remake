@@ -1239,9 +1239,10 @@ if (section('fish-shelter-rain')) {
       p.yaw = Math.atan2(dx, dz)
       p.pitch = -0.08
     }, geo)
-    // Two frames for the redraw, then read what the fire reports now.
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    await page.waitForTimeout(600)
+    // A few scene resolves for the redraw (the scene's own count, not the
+    // browser's frames), then read what the fire reports now.
+    const r0 = await page.evaluate(() => window.__placeResolves ?? 0)
+    await page.waitForFunction((r0) => (window.__placeResolves ?? 0) >= r0 + 3, r0, { timeout: 30000 })
     const now = await page.evaluate(() => {
       const f = window.__placeFishFire()
       const s = window.__placeSeason()
