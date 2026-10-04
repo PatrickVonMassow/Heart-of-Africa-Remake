@@ -33502,3 +33502,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Reference: sketch "Vorschlag 2: Mittelweg" https://claude.ai/artifact/N4JToMstmmxkZM7ypt9cBz
   Tests: Vitest — species ratios preserved; the giraffe reaches its target angle at mid-ring distance; the ring spread follows the balance values. Playwright, both backends: one skyline frame with all four species (east or south region), judged by looking — recognisable, reads as distant.
   Bundle: Tierverhalten.
+
+- [x] 1279. Route pure read and search delegations to the Explore agent
+  Pure read/search delegations go to the existing `Explore` agent instead of `general-purpose`, to shrink per-subagent context (usage report 03.10.2026: 73 % of weekly usage from subagent-heavy sessions, 61 % from "general-purpose", 52 % at >150k context).
+  1. Scope: delegations whose job is only to locate or summarize (where is X, which files touch Y, collect status/log facts) use `subagent_type: "Explore"`. Authoring, review, suites, and anything that writes, commits, or runs verification stay on their current agent types. No change to the model policy: everything keeps running on the allowed serving chain.
+  2. Carry the rule where delegations are written: the batch owner's delegation guidance (docs/batch-owner-runbook.md, delegation section) gets one sentence; no new agent definition, guard, router, or workflow abstraction (infrastructure freeze, CLAUDE.md §2).
+  3. Record it as a working rule in memory (one memory file, indexed in MEMORY.md).
+  Done when: the runbook sentence and the memory entry exist, and a spot check of the next batch session shows read-only lookups delegated to Explore.
+  Evidence afterwards (no gate): the user compares the "Day" view of the usage panel over the following days; the "general-purpose" share should drop somewhat and the >150k share should not rise again.
+  Not in scope: fewer subagents overall (would push the main session back over 150k), cheaper models for helpers (would need a model-policy exception), new agent types.
+  Bundle: Session- & Repo-Hygiene.
