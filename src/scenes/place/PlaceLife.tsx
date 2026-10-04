@@ -65,7 +65,7 @@ import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
-import { RiverFishery } from './RiverFishery'
+import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
 import { isLifeFrozen } from './lifeFreeze'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
@@ -3655,6 +3655,7 @@ export function PlaceLife({
   radius,
   observed,
   onDigProgress,
+  fisheryFire,
 }: {
   kind: 'port' | 'village'
   /** Settlement size (design.md §4.1): big cities show more bustle. */
@@ -3709,6 +3710,8 @@ export function PlaceLife({
   observed?: readonly ObservedGround[]
   /** Publishes strike-quantized progress to the site meshes in PlaceScene. */
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
+  /** The fishers' fire's thatch, rain and people (point 1275). */
+  fisheryFire?: FisheryFireEnv
 }) {
   const speechTime = useRef(0)
   useFrame((_, dt) => { speechTime.current += Math.min(dt, 0.1) })
@@ -3975,7 +3978,7 @@ export function PlaceLife({
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
           {/* The fisherman's dugout beside the children's bank game (work-order 1237). */}
-          {bank && <RiverFishery key={`fishery-${placeId}`} bank={bank} cloth={[2, 0, 1, 3, 4].map((k) => style.cloth[k % style.cloth.length])} seed={localSeed} />}
+          {bank && <RiverFishery key={`fishery-${placeId}`} bank={bank} cloth={[2, 0, 1, 3, 4].map((k) => style.cloth[k % style.cloth.length])} seed={localSeed} fireEnv={fisheryFire} />}
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
           <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           {/* Inhabitant/prop interactions (design.md §19). */}

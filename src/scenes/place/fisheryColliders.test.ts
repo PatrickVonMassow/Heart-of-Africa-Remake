@@ -7,7 +7,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
 import { PLACES } from '../../world/geo'
-import { fireHasCookShelter } from '../../systems/cookShelter'
+import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor } from '../../systems/cookShelter'
+import { fireRainFactor } from '../../systems/season'
 import { resolveMove, standingClear, PLAYER_RADIUS, type Collider } from './collision'
 import { sharedLayout } from './layoutHarness'
 import { PLACE_RADIUS } from './layout'
@@ -120,5 +121,44 @@ describe('the movers follow the dugout and the walking fishers (point 1275)', ()
     placeFisheryMovers(movers, canoe, fire, undefined, undefined, live)
     expect(movers.carrier.x).toBe(fire.carrier.x)
     expect(standingClear(live, fire.carrier.x, fire.carrier.z, PLAYER_RADIUS)).toBe(false)
+  })
+})
+
+describe('the fishers\' fire takes the village fire\'s rain shelter (point 1275)', () => {
+  it.each(RIVER_VILLAGES.map((p) => [p.id, p.peopleId] as const))('%s: same sheltered flag and rain factor as the village fire', (_, peopleId) => {
+    const village = fireHasCookShelter(peopleId)
+    for (const rain of [0, 0.25, 0.6, 1]) {
+      const fishery = fireShelterResponse(peopleId, rain)
+      expect(fishery.sheltered).toBe(village)
+      // The village fire pit's own reading (PlaceScene's FirePit and its dev hook).
+      expect(fishery.rainFactor).toBe(fireRainFactor(rain, village, balance.fire.shelteredRainDamp, balance.fire.openRainDamp))
+      expect(fishery.rainFactor).toBe(shelteredFireRainFactor(rain, village))
+    }
+    // Roofed it barely dips; open it is beaten down.
+    const full = fireShelterResponse(peopleId, 1).rainFactor
+    if (village) expect(full).toBeGreaterThan(fireShelterResponse('zulu', 1).rainFactor)
+  })
+
+  it('the canopy\'s posts stand round the grill, its forked posts and the kneeling griller', () => {
+    const place = RIVER_VILLAGES.find((p) => fireHasCookShelter(p.peopleId))!
+    const bank = buildRiverBank(place, PLACE_RADIUS)!
+    const sites = fisherySites(bank, canoeLane(bank))
+    const along = fisheryAlong(bank)
+    const P = balance.villageLife.fishFire.shelterPostR
+    // In the fire's frame every post is P along and P across; the griller and
+    // the grill's posts lie inside that square.
+    const local = (p: { x: number; z: number }) => {
+      const dx = p.x - sites.fire.x
+      const dz = p.z - sites.fire.z
+      return { lx: Math.cos(along) * dx - Math.sin(along) * dz, lz: Math.sin(along) * dx + Math.cos(along) * dz }
+    }
+    for (const post of fisheryShelterPosts(sites, along)) {
+      const { lx, lz } = local(post)
+      expect(Math.abs(Math.abs(lx) - P)).toBeLessThan(1e-9)
+      expect(Math.abs(Math.abs(lz) - P)).toBeLessThan(1e-9)
+    }
+    const g = local(sites.griller)
+    expect(Math.max(Math.abs(g.lx), Math.abs(g.lz))).toBeLessThan(P)
+    expect(0.95).toBeLessThan(P)
   })
 })

@@ -36,7 +36,10 @@ import { markActor } from '../actorLabelSource'
 import { usePlaceGround } from './PlaceGroundContext'
 import { Figure } from './placeFigure'
 import { HEAD_CARRY_POSE, SpeechFloorContext, useInhabitantBodies, useStandingBody } from './placeFigureContext'
-import { createFisheryMovers, fisheryLiveColliders, placeFisheryMovers } from './fisheryColliders'
+import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryMovers } from './fisheryColliders'
+import { CookShelter } from './CookShelter'
+import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
+import { rainAmount } from '../../systems/season'
 import { carrierWalkPose, copyPose, netFishRotation, ownPose, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
@@ -242,7 +245,18 @@ function fishLength(i: number): number {
  * THE FISHERMEN AT A RIVERSIDE VILLAGE (work-order 1245). One component for the
  * boat and the fire, because the two baskets pass between them every round.
  */
-export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; cloth: readonly string[]; seed: number }) {
+/** What the fishers' fire needs of its settlement (point 1275): the thatch
+ *  its cook-shelter is roofed with, the place's live wetness and its people. */
+export interface FisheryFireEnv {
+  thatchMat: THREE.Material
+  rainRef: { readonly current: number }
+  peopleId?: string
+}
+
+/** The fishers' fire's light at full flame, before the rain damps it. */
+const FISH_FIRE_LIGHT = 6
+
+export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverBank; cloth: readonly string[]; seed: number; fireEnv?: FisheryFireEnv }) {
   const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
   const floor = useContext(SpeechFloorContext)
@@ -322,6 +336,12 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
   const rackFish = useRef<Array<THREE.Mesh | null>>([])
   const storeFish = useRef<Array<THREE.Mesh | null>>([])
   const flame = useRef<THREE.Mesh>(null)
+  const fireLight = useRef<THREE.PointLight>(null)
+  // THE FISHERS' FIRE AND THE RAIN (point 1275): the village fire's rule —
+  // under a cook-shelter where this people roofs its cook-fire, open and
+  // beaten down by the rain where it does not (design.md §19.10).
+  const sheltered = fireHasCookShelter(fireEnv?.peopleId)
+  const fireRain = useRef({ sheltered, rainFactor: 1 })
   const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
   // The griller kneels at his fire: a body the passers-by go round.
   useStandingBody(sites.griller.x, sites.griller.z)
@@ -586,7 +606,12 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
     storeFish.current.forEach((m, i) => {
       if (m) m.visible = i < Math.min(fire.storage, storeFish.current.length)
     })
-    if (flame.current) flame.current.scale.set(1, 0.8 + 0.25 * Math.sin(t * 9) + 0.1 * Math.sin(t * 23.7), 1)
+    const rain = fireEnv ? rainAmount(fireEnv.rainRef.current, balance.season.weatherStrength) : 0
+    fireRain.current = fireShelterResponse(fireEnv?.peopleId, rain)
+    const rainFactor = fireRain.current.rainFactor
+    // Rain lowers the flame cone and its light as at the village fire pit.
+    if (flame.current) flame.current.scale.set(1, (0.8 + 0.25 * Math.sin(t * 9) + 0.1 * Math.sin(t * 23.7)) * (0.7 + 0.3 * rainFactor), 1)
+    if (fireLight.current) fireLight.current.intensity = FISH_FIRE_LIGHT * rainFactor
 
     // THE POUNDING PAIR, held at their mortar by the dev life freeze like
     // every other inhabitant (`Pounder` draws them).
@@ -652,6 +677,8 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       storage: fire.storage,
       baskets: ring.baskets.map((b) => ({ ...b })),
       sites,
+      fireSheltered: fireRain.current.sheltered,
+      fireRainFactor: fireRain.current.rainFactor,
     })
     // Sets the seconds until the pounding pair next leaves for the rack, so a
     // proof can hold them at their mortar or send them now (point 1282).
@@ -790,16 +817,16 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
           flickering flame cone — with a grate of green sticks on two forked
           posts over it, the grilling fish on the grate. */}
       <group name="fish-fire" position={[sites.fire.x, fireY, sites.fire.z]} rotation={[0, along, 0]}>
-        <pointLight position={[0, 0.6, 0]} color="#ff9a4a" intensity={6} distance={6} decay={2} />
+        <pointLight ref={fireLight} position={[0, 0.6, 0]} color="#ff9a4a" intensity={FISH_FIRE_LIGHT} distance={6} decay={2} />
         <mesh position={[0, 0.02, 0]} receiveShadow>
-          <cylinderGeometry args={[0.8, 0.8, 0.05, 14]} />
+          <cylinderGeometry args={[FISHERY_PROPS.hearthR, FISHERY_PROPS.hearthR, 0.05, 14]} />
           <meshStandardMaterial color="#3a3128" roughness={1} />
         </mesh>
         {Array.from({ length: 7 }, (_, i) => {
           const a = (i / 7) * Math.PI * 2
           return (
-            <mesh key={i} position={[Math.cos(a) * 0.85, 0.12, Math.sin(a) * 0.85]} castShadow>
-              <dodecahedronGeometry args={[0.15, 0]} />
+            <mesh key={i} position={[Math.cos(a) * FISHERY_PROPS.stoneRing, 0.12, Math.sin(a) * FISHERY_PROPS.stoneRing]} castShadow>
+              <dodecahedronGeometry args={[FISHERY_PROPS.stoneR, 0]} />
               <meshStandardMaterial color="#79706a" roughness={1} />
             </mesh>
           )
@@ -814,9 +841,9 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
           <coneGeometry args={[0.28, 0.7, 8]} />
           <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
         </mesh>
-        {[-0.95, 0.95].map((x, i) => (
+        {[-FISHERY_PROPS.grillPostOffset, FISHERY_PROPS.grillPostOffset].map((x, i) => (
           <mesh key={i} position={[0, 0.48, x]} castShadow>
-            <cylinderGeometry args={[0.03, 0.035, 0.96, 5]} />
+            <cylinderGeometry args={[0.03, FISHERY_PROPS.grillPostR, 0.96, 5]} />
             <meshStandardMaterial color="#4a3018" roughness={1} />
           </mesh>
         ))}
@@ -841,20 +868,23 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
             castShadow
           />
         ))}
+        {/* The village fire pit's own cook-shelter (point 1275), widened so the
+            grill, its forked posts and the kneeling griller stand beneath it. */}
+        {sheltered && fireEnv && <CookShelter thatchMat={fireEnv.thatchMat} postR={fireCfg.shelterPostR} />}
       </group>
       {/* THE SMOKING RACK: four posts, two rails and slats, the fish across them. */}
       {/* Turned so its rails run along the bank: seen from the village, the fish
           hang side by side. */}
       <group name="fish-rack" position={[sites.rack.x, rackY, sites.rack.z]} rotation={[0, along + Math.PI / 2, 0]}>
-        {[[-0.5, -0.35], [0.5, -0.35], [-0.5, 0.35], [0.5, 0.35]].map(([x, z], i) => (
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => [sx * FISHERY_PROPS.rackPostX, sz * FISHERY_PROPS.rackPostZ]).map(([x, z], i) => (
           <mesh key={i} position={[x, 0.45, z]} castShadow>
             <cylinderGeometry args={[0.03, 0.035, 0.9, 5]} />
             <meshStandardMaterial color="#4a3018" roughness={1} />
           </mesh>
         ))}
-        {[-0.35, 0.35].map((z, i) => (
+        {[-FISHERY_PROPS.rackPostZ, FISHERY_PROPS.rackPostZ].map((z, i) => (
           <mesh key={i} position={[0, 0.88, z]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.022, 0.022, 1.15, 5]} />
+            <cylinderGeometry args={[0.022, 0.022, FISHERY_PROPS.rackRail, 5]} />
             <meshStandardMaterial color="#5a3a20" roughness={1} />
           </mesh>
         ))}
@@ -884,7 +914,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       {/* THE STORAGE BASKET, the smoked fish packed in it. */}
       <group name="fish-storage" position={[sites.storage.x, storeY, sites.storage.z]}>
         <mesh position={[0, 0.22, 0]} castShadow>
-          <cylinderGeometry args={[0.3, 0.24, 0.44, 14, 1, true]} />
+          <cylinderGeometry args={[FISHERY_PROPS.storageR, 0.24, 0.44, 14, 1, true]} />
           <meshStandardMaterial color="#9c7a44" roughness={1} side={THREE.DoubleSide} />
         </mesh>
         <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -912,7 +942,7 @@ export function RiverFishery({ bank, cloth, seed }: { bank: PlaceRiverBank; clot
       {/* THE GUTTING BOARD beside the fire, the gutted fish on it. */}
       <group name="fish-board" position={[sites.board.x, boardY, sites.board.z]} rotation={[0, along, 0]}>
         <mesh position={[0, 0.04, 0]} castShadow receiveShadow>
-          <boxGeometry args={[0.9, 0.06, 0.4]} />
+          <boxGeometry args={[FISHERY_PROPS.boardX, 0.06, FISHERY_PROPS.boardZ]} />
           <meshStandardMaterial color="#8a6a44" roughness={0.95} />
         </mesh>
         {Array.from({ length: cfg.catchMax }, (_, i) => (
