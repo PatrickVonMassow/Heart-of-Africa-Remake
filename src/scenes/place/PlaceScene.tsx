@@ -49,6 +49,7 @@ import {
   BACKDROP_SEGS,
   GROUND_DISC_OVERHANG,
   PANORAMA_RADIUS,
+  PANORAMA_RING_CLEARANCE,
   backdropRingRadius,
   backdropSurfaceY,
   groundDiscSegments,
@@ -190,6 +191,8 @@ import {
   excludedAzimuthSpan,
   isAzimuthExcluded,
   resumeRingWalks,
+  ringSpreadWithin,
+  sharedSilhouetteFactor,
   stepRingWalk,
   type AzimuthSpan,
   type RingWalk,
@@ -1607,26 +1610,30 @@ function PanoramaWildlife({
     let hash = 0
     for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
     const rand = mulberry32(((seed ^ hash) + 0x5eed) >>> 0)
-    // Pushed far out (point 94): close silhouettes loomed; a distant ring keeps
-    // the subtended angle small. The scale is clamped down so the animal never
-    // exceeds maxApparentAngleDeg, and the colour hazes toward the sky
-    // (stronger for farther rings) so it reads as distance, not a black blob.
+    // Pushed far out (point 94) and sized by ONE factor for every species
+    // (work-order 1285): a giraffe at mid ring subtends giraffeTargetDeg, the
+    // others their true height ratio of it, and a farther ring draws smaller.
+    // maxApparentAngleDeg only nets an outlier. The colour hazes toward the
+    // sky (stronger for farther rings) so it reads as distance, not a blob.
+    const spread = ringSpreadWithin(innerRadius, pw.ringInner, pw.ringSpread, PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE)
+    const factor = sharedSilhouetteFactor(pw.speciesHeight.giraffe, innerRadius + pw.ringInner + spread / 2, pw.giraffeTargetDeg)
     return Array.from({ length: 5 }, (_, i) => {
-      const radius = innerRadius + pw.ringInner + rand() * pw.ringSpread
+      const radius = innerRadius + pw.ringInner + rand() * spread
       const gi = i % builds.length
-      const scale = silhouetteScale(geoHeights[gi], radius, pw.maxApparentAngleDeg, 2.6 + rand() * 1.6)
+      const species = PANORAMA_FAUNA[region][gi]
+      const scale = silhouetteScale(geoHeights[gi], radius, pw.maxApparentAngleDeg, (factor * pw.speciesHeight[species]) / geoHeights[gi])
       // Farther rings haze a touch more (ringInner..ringInner+spread → +0..0.15).
-      const hazeMix = Math.min(1, pw.hazeMix + ((radius - innerRadius - pw.ringInner) / pw.ringSpread) * 0.15)
+      const hazeMix = Math.min(1, pw.hazeMix + (spread > 0 ? ((radius - innerRadius - pw.ringInner) / spread) * 0.15 : 0))
       const rgb = hazeColor(baseRgb, skyRgb, hazeMix)
       return {
         // Stable identity across a re-tessellation (the walk state's key).
-        key: `${placeId}:${seed}:${PANORAMA_FAUNA[region][gi]}:${i}`,
+        key: `${placeId}:${seed}:${species}:${i}`,
         angle: rand() * Math.PI * 2,
         radius,
         scale,
         drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
         parts: builds[gi],
-        species: PANORAMA_FAUNA[region][gi],
+        species,
         rig: rigs[gi],
         // The hazed tint carries the species' pelt marking at a reduced
         // contrast (work-order 1284), so the skyline zebra reads striped.

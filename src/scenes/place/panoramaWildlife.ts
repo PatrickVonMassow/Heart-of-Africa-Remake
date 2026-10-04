@@ -6,8 +6,9 @@
 
 /**
  * Clamp a silhouette's scale so the animal's subtended angle at `ringDist`
- * never exceeds `maxApparentAngleDeg` — a distant animal must read small. Only
- * ever SHRINKS: a base scale already small enough is kept (never enlarged).
+ * never exceeds `maxApparentAngleDeg` — a safety net since work-order 1285,
+ * which sizes the animals by `sharedSilhouetteFactor`. Only ever SHRINKS: a
+ * base scale already small enough is kept (never enlarged).
  */
 export function silhouetteScale(
   buildHeight: number,
@@ -25,6 +26,28 @@ export function silhouetteScale(
 export function apparentAngleDeg(worldHeight: number, ringDist: number): number {
   if (ringDist <= 0) return 90
   return (Math.atan2(worldHeight, ringDist) * 180) / Math.PI
+}
+
+/**
+ * The depth spread a silhouette ring may use around a settlement whose
+ * backdrop rim sits at `innerRadius`: the configured `ringSpread`, shortened so
+ * the outermost ring still stands at or inside `outerLimit` (the §2.5 band
+ * minus its clearance). Never negative.
+ */
+export function ringSpreadWithin(innerRadius: number, ringInner: number, ringSpread: number, outerLimit: number): number {
+  return Math.max(0, Math.min(ringSpread, outerLimit - innerRadius - ringInner))
+}
+
+/**
+ * The one world-per-true-metre factor every skyline species shares
+ * (work-order 1285): a reference animal `referenceHeight` metres tall,
+ * `midRingDist` away, subtends `targetDeg`. Each species is then drawn
+ * `factor × its true height` tall, so the species keep their real proportions
+ * and a farther silhouette reads smaller.
+ */
+export function sharedSilhouetteFactor(referenceHeight: number, midRingDist: number, targetDeg: number): number {
+  if (referenceHeight <= 0 || midRingDist <= 0) return 1
+  return (Math.tan((targetDeg * Math.PI) / 180) * midRingDist) / referenceHeight
 }
 
 /**

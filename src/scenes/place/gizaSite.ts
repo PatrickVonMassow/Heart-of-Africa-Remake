@@ -45,7 +45,9 @@ import type { PlaceLayout } from './layout'
 export const GIZA_SITE_RADIUS = openPlainWalkRadius(
   // Read at module load, i.e. the SHIPPED ring defaults: a debug-time change to
   // the silhouette ring must not resize the walkable site under the player.
-  balance.panoramaWildlife.ringInner + balance.panoramaWildlife.ringSpread,
+  // The open-plain spread, not the full one: the ring compresses to the band
+  // here rather than shrinking the desert (work-order 1285).
+  balance.panoramaWildlife.ringInner + balance.panoramaWildlife.openPlainRingSpread,
 )
 
 /** Distance south of the centre at which the traveller arrives (design.md §2.3

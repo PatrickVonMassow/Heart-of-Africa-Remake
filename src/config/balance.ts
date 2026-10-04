@@ -402,10 +402,20 @@ interface BalanceConfig {
     /** Dry-season shore guarantee (point 135c): minimum drinkers at the
      *  nearest water in the traveller's view once the land has dried. */
     dryShoreMinDrinkers: number
-    /** Ring distance beyond the settlement edge: innerRadius + inner..(+spread). */
+    /** Ring distance beyond the settlement edge: innerRadius + inner..(+spread),
+     *  the spread shortened where the §2.5 band leaves less room. */
     ringInner: number
     ringSpread: number
-    /** Max subtended angle (deg) of a silhouette — scale is clamped down to it. */
+    /** Depth spread an open-plain site keeps (Giza): its walkable radius is
+     *  derived from `ringInner + openPlainRingSpread`, not the full spread. */
+    openPlainRingSpread: number
+    /** Angle (deg) a giraffe subtends at mid-ring distance from the settlement
+     *  centre; every species shares the factor this sets (work-order 1285). */
+    giraffeTargetDeg: number
+    /** True standing height (m, crown/head) per skyline species; only their
+     *  ratios matter, the shared factor sets the drawn size. */
+    speciesHeight: { elephant: number; giraffe: number; zebra: number; antelope: number }
+    /** Safety net only: max subtended angle (deg) of a silhouette. */
     maxApparentAngleDeg: number
     /** Atmospheric-haze mix toward the sky horizon tone (0 base .. 1 sky). */
     hazeMix: number
@@ -1493,9 +1503,12 @@ export const balance: BalanceConfig = {
   },
   panoramaWildlife: {
     dryShoreMinDrinkers: 4, // the dry season VISIBLY gathers life at the water
-    ringInner: 55, // was +14..28: far too close, so the silhouettes loomed
-    ringSpread: 30,
-    maxApparentAngleDeg: 2.5, // a distant animal subtends only a couple degrees
+    ringInner: 40, // calibratable: nearest ring 40 m past the backdrop rim
+    ringSpread: 80, // calibratable: ..120 m, so one species varies ~3x in apparent size
+    openPlainRingSpread: 45, // calibratable: keeps Giza's walkable radius at 98 m
+    giraffeTargetDeg: 1.4, // calibratable: giraffe at mid ring; elephant ~1.07, zebra ~0.54, antelope ~0.47
+    speciesHeight: { elephant: 4.2, giraffe: 5.5, zebra: 2.1, antelope: 1.85 }, // calibratable ratios
+    maxApparentAngleDeg: 2.5, // safety net; the shared factor stays below it
     hazeMix: 0.55, // lift the flat near-black toward the sky horizon
     markContrast: 0.7, // calibratable: haze-reduced, still clearly visible stripes/flank band
     markBandScale: 0.6, // calibratable: ~4 broad torso bands on a two-degree zebra

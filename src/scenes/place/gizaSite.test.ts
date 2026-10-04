@@ -23,6 +23,7 @@ import {
   PANORAMA_RING_CLEARANCE,
   openPlainWalkRadius,
 } from './backdrop'
+import { ringSpreadWithin } from './panoramaWildlife'
 import { spawnPointFree, standingClear, WALKER_RADIUS } from './collision'
 import { balance } from '../../config/balance'
 import { GIZA_PLATEAU } from '../../world/data/gizaPlateau'
@@ -216,13 +217,17 @@ describe('Giza site — the walkable sand reaches as far as the picture offers i
   })
 
   it('takes the LARGEST radius the §2.5 panorama band affords, derived not guessed', () => {
-    const ringSpan = balance.panoramaWildlife.ringInner + balance.panoramaWildlife.ringSpread
+    const ringSpan = balance.panoramaWildlife.ringInner + balance.panoramaWildlife.openPlainRingSpread
     expect(GIZA_SITE_RADIUS).toBe(openPlainWalkRadius(ringSpan))
     // The bound itself: the outermost drifting silhouette still stands clearly
     // in FRONT of the captured band, and one metre more would not.
     const ringOuter = (r: number) => r + BACKDROP_INNER_OFFSET + ringSpan
     expect(ringOuter(GIZA_SITE_RADIUS)).toBe(PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE)
     expect(ringOuter(GIZA_SITE_RADIUS + 1)).toBeGreaterThan(PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE)
+    // The silhouette ring there compresses to exactly that open-plain span.
+    expect(
+      ringSpreadWithin(GIZA_SITE_RADIUS + BACKDROP_INNER_OFFSET, balance.panoramaWildlife.ringInner, balance.panoramaWildlife.ringSpread, PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE),
+    ).toBe(balance.panoramaWildlife.openPlainRingSpread)
     // The ground plate stays well inside the band it is drawn in front of.
     expect(GIZA_SITE_RADIUS + GROUND_DISC_OVERHANG).toBeLessThan(PANORAMA_RADIUS)
     // And the silhouettes never end up inside the walkable area (point 181).
