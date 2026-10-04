@@ -189,9 +189,10 @@ import {
   panoramaGaitStep,
   excludedAzimuthSpan,
   isAzimuthExcluded,
-  dryRingAngle,
+  resumeRingWalks,
   stepRingWalk,
   type AzimuthSpan,
+  type RingWalk,
 } from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
 import { bandHeightAt, panoramaBandShown } from '../travel/panoramaMath'
@@ -1618,6 +1619,8 @@ function PanoramaWildlife({
       const hazeMix = Math.min(1, pw.hazeMix + ((radius - innerRadius - pw.ringInner) / pw.ringSpread) * 0.15)
       const rgb = hazeColor(baseRgb, skyRgb, hazeMix)
       return {
+        // Stable identity across a re-tessellation (the walk state's key).
+        key: `${placeId}:${seed}:${PANORAMA_FAUNA[region][gi]}:${i}`,
         angle: rand() * Math.PI * 2,
         radius,
         scale,
@@ -1641,15 +1644,23 @@ function PanoramaWildlife({
   )
   // Where each silhouette walks its ring now, and which way: it starts on the
   // nearest dry ground and turns back at the water (work-order 1250). Null
-  // where its whole ring is water — that one is never shown.
-  const walks = useMemo(
-    () => items.map((it) => {
-      const wet = (a: number) => wetAt(Math.cos(a) * it.radius, Math.sin(a) * it.radius)
-      const angle = dryRingAngle(it.angle, wet)
-      return angle === null ? null : { angle, drift: it.drift, wet, gait: 0 }
-    }),
-    [items, wetAt],
-  )
+  // where its whole ring is water — that one is never shown. A rebuild of
+  // `items` (a quality change re-tessellates the bodies) resumes each walk by
+  // key instead of teleporting the animal back to its seeded start.
+  const walkMemory = useRef(new Map<string, RingWalk>())
+  const walks = useMemo(() => {
+    const next = resumeRingWalks(
+      items.map((it) => ({
+        key: it.key,
+        angle: it.angle,
+        drift: it.drift,
+        wet: (a: number) => wetAt(Math.cos(a) * it.radius, Math.sin(a) * it.radius),
+      })),
+      walkMemory.current,
+    )
+    walkMemory.current = new Map(next.flatMap((w, i) => (w ? [[items[i].key, w] as const] : [])))
+    return next
+  }, [items, wetAt])
   const refs = useRef<Array<THREE.Group | null>>([])
   // Per-silhouette leg-pivot groups, so the stride swings them about the hips.
   const legRefs = useRef<Array<Array<THREE.Group | null>>>([])

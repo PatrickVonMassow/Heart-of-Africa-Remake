@@ -15,7 +15,9 @@ import {
   panoramaGaitDistance,
   panoramaGaitStep,
   dryRingAngle,
+  resumeRingWalks,
   stepRingWalk,
+  type RingWalk,
 } from './panoramaWildlife'
 import { buildElephantParts, GAIT_MAX_PITCH, GAIT_SWING, gaitBodyLift, gaitPhase, gaitRig, groundPitch } from '../../render/fauna'
 
@@ -352,5 +354,41 @@ describe('panorama silhouettes keep to dry ground (work-order 1250)', () => {
     }
     // It meets the water from both sides of the dry arc.
     expect(turned).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('resumeRingWalks (a quality rebuild keeps every walk)', () => {
+  const dry = () => false
+  it('a known key keeps its angle, heading and gait instead of its seeded start', () => {
+    const walked: RingWalk = { angle: 2.4, drift: -0.007, gait: 13.5, wet: dry }
+    const [w] = resumeRingWalks([{ key: 'p:1:zebra:0', angle: 0.3, drift: 0.007, wet: dry }], new Map([['p:1:zebra:0', walked]]))
+    expect(w).toEqual({ angle: 2.4, drift: -0.007, gait: 13.5, wet: dry })
+  })
+
+  it('a new key starts from its seed on dry ground with gait 0', () => {
+    const wet = (a: number) => a < 1
+    const [w, sunk] = resumeRingWalks(
+      [
+        { key: 'p:1:antelope:1', angle: 0.5, drift: 0.005, wet },
+        { key: 'p:1:antelope:2', angle: 0.5, drift: 0.005, wet: () => true },
+      ],
+      new Map([['p:2:antelope:1', { angle: 3, drift: 0.005, gait: 9, wet: dry }]]),
+    )
+    expect(w!.angle).toBeCloseTo(1, 1)
+    expect(w!.gait).toBe(0)
+    expect(w!.drift).toBe(0.005)
+    expect(sunk).toBeNull()
+  })
+
+  it('a carried walk is re-seated on dry ground when its spot is now water', () => {
+    const wet = (a: number) => a > 2 && a < 2.5
+    const [w] = resumeRingWalks(
+      [{ key: 'k', angle: 0, drift: 0.005, wet }],
+      new Map([['k', { angle: 2.2, drift: -0.005, gait: 4, wet: dry }]]),
+    )
+    expect(wet(w!.angle)).toBe(false)
+    expect(Math.abs(w!.angle - 2.2)).toBeLessThan(0.35)
+    expect(w!.gait).toBe(4)
+    expect(w!.drift).toBe(-0.005)
   })
 })
