@@ -1165,7 +1165,9 @@ if (section('fish-props')) {
             // W walks along -(sin yaw, cos yaw): face -n, toward the prop.
             p.yaw = Math.atan2(n.x, n.z)
             p.pitch = -0.2
-            const STALL_RESOLVES = 120
+            // Settled after a few resolves without progress, as in pushUntilWithin:
+            // a slow headless backend resolves only a few times a second.
+            const STALL_RESOLVES = 12
             const t0 = performance.now()
             let lastResolves = window.__placeResolves ?? 0
             let stalled = 0
@@ -1194,7 +1196,9 @@ if (section('fish-props')) {
       )
       check(
         `fish props: walking straight into the ${label} he stops outside it`,
-        !walk.timedOut && walk.d >= drawn + 0.35 - 0.05 && walk.d <= 3.0,
+        // Stopped AT this prop: within a hand of its drawn reach and on the line,
+        // so no other obstacle can stand in for it.
+        !walk.timedOut && walk.d >= drawn + 0.35 - 0.05 && walk.d <= drawn + 0.35 + 0.25 && walk.across <= 0.25,
         `stopped ${walk.d.toFixed(2)} m from its middle (drawn reach ${drawn} m + body 0.35), ${walk.across.toFixed(2)} m off the line${walk.timedOut ? ', TIMED OUT' : ''}`,
       )
       check(
