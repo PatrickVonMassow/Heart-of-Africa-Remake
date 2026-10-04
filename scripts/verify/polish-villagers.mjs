@@ -3843,8 +3843,10 @@ if (section('villager-dress')) {
               const z = cz - Math.sin(yaw) * s
               for (const y of [0.5, 1.0]) {
                 const hit = window.__placeRayHit?.(x, y, z)
-                const ratio = !hit || hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance
-                if (ratio >= 0.98 && !personOnLine(x, y + 0.3, z)) clear++
+                // an absolute tolerance: a ratio would let a wall 0.6 m before
+                // a subject 32 m away pass as clear
+                const clearTo = !hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.15
+                if (clearTo && !personOnLine(x, y + 0.3, z)) clear++
               }
             }
             if (clear > best.score) Object.assign(best, { score: clear, of: lateral.length * 2, yaw, cx, cz, dist })
@@ -4003,8 +4005,13 @@ if (section('villager-dress')) {
   await nextFrames(4)
   await awaitPlaceDrawn('low row')
   await awaitRowClear()
+  const lowHidden = await rowHidden()
   const low = await rowBodies()
-  check('low preset: the row is the primitive figure — no skinned mesh, every head drawn', !!low && low.figures === 8 && low.skinned === 0 && low.heads === 8, JSON.stringify(low))
+  check(
+    'low preset: the row is the primitive figure in view — no skinned mesh, every head drawn',
+    !!low && low.figures === 8 && low.skinned === 0 && low.heads === 8 && lowAt.score === lowAt.of && !lowHidden,
+    JSON.stringify({ ...low, clear: `${lowAt.score}/${lowAt.of}`, hidden: lowHidden }),
+  )
   await frame(shot('1293-dress-low-primitive'), {
     local: { x: lowAt.cx, y: 0.7, z: lowAt.cz },
     label: 'the low preset: the same Zulu row drawn as the primitive cone-and-sphere figure',

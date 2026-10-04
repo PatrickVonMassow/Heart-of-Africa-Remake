@@ -1073,10 +1073,13 @@ Verifiable (`scripts/verify/settings.mjs`,
   catches a regression. Live in `scripts/verify/enrichments.mjs`: a
   staged feed whose terrain is read back under BOTH bodies through
   struggle, kill and sink, with screenshot 383.
-OPEN: tree-climbing-to-flee remains to be implemented (§9 open item);
-and the one seasonal-dress reading the research allows but the
-figures cannot yet show — a wrap worn DIFFERENTLY in the cold rather
-than in greater number (§19.13).
+OPEN: tree-climbing-to-flee remains to be implemented (§9 open item).
+The seasonal-dress reading the primitive figure could not show — a wrap
+worn DIFFERENTLY in the cold rather than in greater number (§19.13) —
+is shown on the medium and high levels by the skinned villager (the San
+cape re-worn over both shoulders, `src/systems/appearance.ts`,
+peoples-1890.md §8.3); the low level keeps the primitive figure and so
+still shows the wrap only by its presence.
 
 ## 13. Real geodata.
 

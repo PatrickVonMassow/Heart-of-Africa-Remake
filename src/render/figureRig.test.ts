@@ -43,6 +43,18 @@ describe('two-bone IK puts the hand on the target', () => {
     expect(upper.clone().add(fore).length()).toBeLessThan(1e-9)
   })
 
+  it('inside the inner limit the arm folds flat, continuous with the boundary', () => {
+    const s = v(0, 0, 0)
+    const hand = (d: number) => {
+      const r = solveTwoBone(s, v(0, -d, 0), 0.23, 0.27, v(0, 0, -1))
+      return s.clone().addScaledVector(r.upper, 0.23).addScaledVector(r.fore, 0.27)
+    }
+    // the inner limit is |0.23 − 0.27| = 0.04: just outside and just inside
+    // put the hand at the same place, not half a metre apart
+    expect(hand(0.0401).distanceTo(hand(0.039))).toBeLessThan(0.005)
+    expect(hand(0.02).length()).toBeCloseTo(0.04, 6)
+  })
+
   it('points straight at a target out of reach', () => {
     const r = solveTwoBone(v(0, 1, 0), v(0, 1, 2), 0.2, 0.2, v(0, 0, -1))
     expect(r.reached).toBe(false)
@@ -118,8 +130,13 @@ describe('the head stays round through a squat', () => {
     for (const a of ax) expect(a.length()).toBeCloseTo(1, 6)
     expect(ax[0].dot(ax[1])).toBeCloseTo(0, 6)
     expect(ax[1].dot(ax[2])).toBeCloseTo(0, 6)
-    // and no squat leaves it untouched
+    // no snap at the threshold: a barely squashed head is oriented like an
+    // unsquashed one
+    unsquashHead(head, chain, 0.999)
+    const nearly = head.quaternion.clone()
     unsquashHead(head, chain, 1)
+    expect(nearly.angleTo(head.quaternion)).toBeLessThan(0.02)
+    // and no squat leaves it untouched
     expect(head.scale.y).toBe(1)
     expect(head.quaternion.equals(new THREE.Quaternion())).toBe(true)
   })

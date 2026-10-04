@@ -154,6 +154,7 @@ export function SkinnedFigure({
   handProp,
   sex,
   age,
+  identityKey,
 }: {
   look: FigureLook
   cloth: string
@@ -170,8 +171,11 @@ export function SkinnedFigure({
   handProp?: ReactNode
   sex?: Sex
   age?: AgeGroup
+  /** The outer Figure's id, stable across a detail-level switch. */
+  identityKey?: string
 }) {
-  const key = useId()
+  const ownKey = useId()
+  const key = identityKey ?? ownKey
   const id = useMemo(() => figureIdentity(key, scale, sex, age), [key, scale, sex, age])
   const rig = useMemo(() => buildRig(id, look, cloth, skin), [id, look, cloth, skin])
   const L = FIGURE_LIMBS
@@ -260,9 +264,12 @@ export function SkinnedFigure({
         }
         b[`hand.${s}`].quaternion.identity()
       })
+      // The head's squat correction depends on the chain just posed: renew it
+      // here, so an owning caller's retarget never leaves a stale one.
+      unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
       b.hips.updateWorldMatrix(false, true)
     }
-  }, [rig, kneel, kneelLeg, contact, standDrop])
+  }, [rig, kneel, kneelLeg, contact, standDrop, squat])
 
   // Publish the virtual pivots to the caller that owns the pose.
   const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget })

@@ -57,15 +57,17 @@ export function solveTwoBone(
 ): { upper: THREE.Vector3; fore: THREE.Vector3; reached: boolean } {
   const toT = t.clone().sub(s)
   const d = toT.length()
-  if (d < 1e-6) {
-    // The hand on the shoulder itself: folded flat, the elbow out along the
-    // pole (or straight down when the pole gives no direction).
-    const up = pole.lengthSq() > 1e-12 ? pole.clone().normalize() : new THREE.Vector3(0, -1, 0)
-    return { upper: up, fore: up.clone().negate(), reached: Math.abs(a - b) < 1e-6 }
+  // A target on the shoulder itself has no direction: fold toward the pole.
+  const dir = d > 1e-6 ? toT.clone().divideScalar(d) : pole.lengthSq() > 1e-12 ? pole.clone().normalize() : new THREE.Vector3(0, -1, 0)
+  const reached = d <= a + b && d >= Math.abs(a - b) - 1e-9
+  if (d > a + b) return { upper: dir.clone(), fore: dir.clone(), reached: false }
+  if (d < Math.abs(a - b) + 1e-9) {
+    // Inside the inner limit: the arm folds flat, the hand as near as it can
+    // come (|a − b| along the reach) — continuous with the boundary, never a
+    // jump to a straight arm.
+    const longUpper = a >= b
+    return { upper: longUpper ? dir.clone() : dir.clone().negate(), fore: longUpper ? dir.clone().negate() : dir.clone(), reached }
   }
-  const dir = d > 1e-6 ? toT.clone().divideScalar(d) : new THREE.Vector3(0, -1, 0)
-  const reached = d <= a + b && d >= Math.abs(a - b)
-  if (!reached) return { upper: dir.clone(), fore: dir.clone(), reached: false }
   const cosA = Math.min(1, Math.max(-1, (a * a + d * d - b * b) / (2 * a * d)))
   const sinA = Math.sqrt(1 - cosA * cosA)
   const side = pole.clone().addScaledVector(dir, -pole.dot(dir))
@@ -119,17 +121,18 @@ export function kneelLegs(thighLen: number, calfR: number): { thigh: number; shi
  * Writes `head`'s quaternion and scale; `chain` is hips → neck, in order.
  */
 export function unsquashHead(head: THREE.Object3D, chain: readonly THREE.Object3D[], s: number): void {
-  const flattened = s > 0.01 && Math.abs(s - 1) > 1e-4
-  if (!flattened) {
-    head.quaternion.identity()
-    head.scale.set(1, 1, 1)
-    return
-  }
+  const k = s > 0.01 ? s : 1
+  // The counter-rotation fades in over the first SQUASH_BLEND of the squash,
+  // so the head never snaps between orientations at the threshold; inside
+  // that band the residual shear is at most a few percent of the squash.
+  const f = Math.min(1, Math.abs(1 - k) / SQUASH_BLEND)
   const q = new THREE.Quaternion()
   for (const b of chain) q.multiply(b.quaternion)
-  head.quaternion.copy(q.invert())
-  head.scale.set(1, 1 / s, 1)
+  head.quaternion.identity().slerp(q.invert(), f)
+  head.scale.set(1, 1 / k, 1)
 }
+/** The squash over which the head's counter-rotation fades in. */
+export const SQUASH_BLEND = 0.08
 
 const DOWN = new THREE.Vector3(0, -1, 0)
 

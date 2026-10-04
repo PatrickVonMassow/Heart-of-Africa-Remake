@@ -25,8 +25,10 @@ function hash32(s: string): number {
 /**
  * Who a figure is when its vignette does not say: a child when it is drawn at
  * a child's scale, otherwise a mix of the sexes and of young, married and old
- * — stable per figure (React's `useId`), so a villager does not change between
- * visits of the same layout. The mix itself is a calibratable guess.
+ * — stable per mounted figure (React's `useId` of the outer `Figure`, which
+ * outlives a detail-level switch), so a villager keeps sex, age and dress while
+ * the scene lives; a re-entered place remounts and may reshuffle who is who.
+ * The mix itself is a calibratable guess.
  */
 export function figureIdentity(key: string, scale: number, sex?: Sex, age?: AgeGroup): FigureIdentity {
   const h = hash32(key)

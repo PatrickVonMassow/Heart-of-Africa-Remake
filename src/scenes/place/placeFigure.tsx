@@ -4,7 +4,7 @@
 // the rest of the village is drawn with. Its contexts and hooks are in
 // `placeFigureContext.ts`.
 
-import { useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { useContext, useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { legSwingAngle } from '../../render/fauna'
@@ -35,7 +35,14 @@ type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
  */
 export function Figure({ sex, age, ...props }: FigureProps) {
   const look = useContext(FigureLookContext)
-  return look ? <SkinnedFigure look={look} sex={sex} age={age} {...props} /> : <PrimitiveFigure {...props} />
+  // Who this villager is, keyed HERE: this component stays mounted when the
+  // detail level swaps the drawn body, so medium → low → medium keeps the person.
+  const identityKey = useId()
+  return look ? (
+    <SkinnedFigure look={look} sex={sex} age={age} identityKey={identityKey} {...props} />
+  ) : (
+    <PrimitiveFigure {...props} />
+  )
 }
 
 /**
