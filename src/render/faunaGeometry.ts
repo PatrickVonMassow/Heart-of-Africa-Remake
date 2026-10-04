@@ -206,12 +206,24 @@ export function sweepTube(stations: readonly SweepStation[], opts: SweepOptions)
 }
 
 /** Seat a hanging leg on its pivot: top exactly at the local origin (the hip)
- *  and foot exactly at -`legLen`, so the gait's leg length is the built one. */
+ *  and the hoof contact (its lowest vertex) exactly at (0, -`legLen`, 0) — the
+ *  point the gait math swings — so a jointed leg neither hovers, digs in nor
+ *  slides. A shear proportional to depth recentres the hoof; the top stays put. */
 export function fitLegToPivot(geo: THREE.BufferGeometry, legLen: number): THREE.BufferGeometry {
   geo.computeBoundingBox()
   const b = geo.boundingBox!
   geo.translate(0, -b.max.y, 0)
   geo.scale(1, legLen / (b.max.y - b.min.y), 1)
+  const pos = geo.attributes.position
+  let low = 0
+  for (let i = 1; i < pos.count; i++) if (pos.getY(i) < pos.getY(low)) low = i
+  const dx = pos.getX(low)
+  const dz = pos.getZ(low)
+  for (let i = 0; i < pos.count; i++) {
+    const depth = -pos.getY(i) / legLen
+    pos.setXYZ(i, pos.getX(i) - dx * depth, pos.getY(i), pos.getZ(i) - dz * depth)
+  }
+  pos.needsUpdate = true
   geo.computeVertexNormals()
   geo.computeBoundingBox()
   return geo

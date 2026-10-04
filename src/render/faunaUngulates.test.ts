@@ -56,6 +56,13 @@ describe('detailed ungulates keep the gait rig (points 228/255/300)', () => {
         expect(b.max.y, name).toBeCloseTo(0, 6)
         expect(b.min.y, name).toBeCloseTo(-legLen, 6)
         expect(leg.hip[1], name).toBeCloseTo(legLen, 6)
+        // The hoof contact is the gait model's (0, -legLen, 0), not just its
+        // height: a fore/aft offset would make a swinging foot slide.
+        const pos = leg.geo.attributes.position
+        let low = 0
+        for (let i = 1; i < pos.count; i++) if (pos.getY(i) < pos.getY(low)) low = i
+        expect(pos.getX(low), name).toBeCloseTo(0, 6)
+        expect(pos.getZ(low), name).toBeCloseTo(0, 6)
       }
       // The same hips as the capsule plan, so the derived cadence is unchanged.
       expect(gaitRig(parts.legs).legLength, name).toBeCloseTo(legLen, 6)
