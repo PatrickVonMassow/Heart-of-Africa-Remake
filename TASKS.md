@@ -77,12 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1283. The full settings suite is red on main after 1280: lion feeding checks and the river texture drift
-  Measured 03.10.2026, 20:3x, on main e4cc4aba7 (WebGPU, full `npm test -- settings`, log local/verify-logs/2026-10-03T18-45-21-098-settings.log): RED with five reds no open point owns:
-  `settings: feeding: lion head lowered`, `settings: feeding: tearing movement animates`, `settings: feeding: prey lies on its side`, `settings: feeding: stain beneath the carcass`, and `settings: the water TEXTURE moves downstream between the frames by about the drift`.
-  The river-current section alone was green on both backends on the 1280 branch (logs 2026-10-03T17-34-14-406 and 17-36-20-225), so first measure whether the full-suite order (an earlier section leaving state, load, or frame timing) or a real defect causes each red; fix the cause, not the threshold.
-  Done when: `npm test -- settings` is green on WebGPU and WebGL 2, or each remaining red is charged to its own open point with its cause named.
-  Bundle: Dorfleben.
 - [ ] 1284. Antelope, goat and zebra get detailed, recognisable models with pelt pattern and face, in and outside settlements
   Queue position: directly before the request "Skyline wildlife: true species proportions sized to one shared readable target", which itself goes directly before point 1275 (user order).
   This point ABSORBS point 575 entirely: delete point 575 from TASKS.md when appending this one (user order 03.10.2026).

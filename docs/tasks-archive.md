@@ -33442,3 +33442,10 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   - Reading of the order, open to the user's veto: the duo takes over the fish eater's role (his only home activity was the removed mortar), so the separate single eater figure goes; his eat cycle (walk/take/eat) is reused for the two. If the author finds this reading insufficient, escalate instead of guessing.
   Tests: Vitest — only one mortar exists in the village scene data; the duo's spot equals the former eater-mortar spot; the shared walk/take/eat cycle for both women with return to alternating pounding; station/clearance bodies stay walk-clear. Playwright, both backends: frame of the duo pounding at the river spot and a frame of both eating at the fish fire; no mortar left at the old village-centre spot.
   Bundle: Dorfleben.
+
+- [x] 1283. The full settings suite is red on main after 1280: lion feeding checks and the river texture drift
+  Measured 03.10.2026, 20:3x, on main e4cc4aba7 (WebGPU, full `npm test -- settings`, log local/verify-logs/2026-10-03T18-45-21-098-settings.log): RED with five reds no open point owns:
+  `settings: feeding: lion head lowered`, `settings: feeding: tearing movement animates`, `settings: feeding: prey lies on its side`, `settings: feeding: stain beneath the carcass`, and `settings: the water TEXTURE moves downstream between the frames by about the drift`.
+  The river-current section alone was green on both backends on the 1280 branch (logs 2026-10-03T17-34-14-406 and 17-36-20-225), so first measure whether the full-suite order (an earlier section leaving state, load, or frame timing) or a real defect causes each red; fix the cause, not the threshold.
+  Done when: `npm test -- settings` is green on WebGPU and WebGL 2, or each remaining red is charged to its own open point with its cause named.
+  Bundle: Dorfleben.
