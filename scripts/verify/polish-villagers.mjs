@@ -659,10 +659,15 @@ if (section('villager-canoe')) {
             const f = window.__placeFishFire()
             const [a, b] = f.sites.duoAtRack
             const mid = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }
-            // In front of them, toward the water, a little to the side.
+            // Obliquely from the water side, beyond the rack's far end (away
+            // from the fire): their faces and the fish they raise are toward the
+            // lens, the rack stands beside them, and neither hides the other.
             const fx = Math.sin(a.yaw)
             const fz = Math.cos(a.yaw)
-            return { at: { x: mid.x + fx * 2.6 - fz * 1.4, z: mid.z + fz * 2.6 + fx * 1.4 }, look: mid, holding: f.duo.women.map((w) => w.fish > 0) }
+            const ux = f.sites.rack.x - f.sites.fire.x
+            const uz = f.sites.rack.z - f.sites.fire.z
+            const ud = Math.hypot(ux, uz) || 1
+            return { at: { x: mid.x + (ux / ud) * 3.6 + fx * 2.4, z: mid.z + (uz / ud) * 3.6 + fz * 2.4 }, look: mid, holding: f.duo.women.map((w) => w.fish > 0) }
           })
           await standAt(rackStand.at, rackStand.look)
           await nextFrames(2)
