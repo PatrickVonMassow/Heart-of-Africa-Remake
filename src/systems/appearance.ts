@@ -684,9 +684,13 @@ export function appearanceFor(q: AppearanceQuery): DressLayer[] {
     // woman's everyday head cloth stays on under the cold-weather wool cloak.
     const replaces = (l: DressLayer) =>
       l.slot === 'shoulder' && (seasonal.wear === 'head' ? l.form === 'hood' : l.form === 'cloak' || l.form === 'cape')
-    // A wrap pulled over the head (the Somali tobe in the karif) is the
-    // garment already worn, raised: it keeps that garment's cloth and colour.
-    const raised = seasonal.wear === 'head' ? layers.find((l) => l.form === 'toga' || l.form === 'robe') : undefined
+    // A wrap pulled over the head (the Somali tobe in the karif) or closed
+    // over both shoulders (the San ‡nau) is the garment already worn, worn
+    // differently: it keeps that garment's cloth and colour (dress.ts).
+    const raised =
+      seasonal.wear === 'head'
+        ? layers.find((l) => l.form === 'toga' || l.form === 'robe')
+        : layers.find((l) => l.slot === 'shoulder' && (l.form === 'cape' || l.form === 'cloak'))
     if (raised) {
       colour = raised.colour
       material = raised.material

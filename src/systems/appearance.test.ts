@@ -126,6 +126,9 @@ describe('the season switches the layers (folded from systems/dress.ts)', () => 
     const cold = appearanceFor(query({ peopleId: 'san', drivers: COLD })).filter((l) => l.slot === 'shoulder')
     expect(warm.map((l) => l.wear)).toEqual(['rightShoulder'])
     expect(cold.map((l) => l.wear)).toEqual(['bothShoulders'])
+    // the same skin, worn differently — not a new one
+    expect(cold[0].colour).toBe(warm[0].colour)
+    expect(cold[0].material).toBe(warm[0].material)
   })
 
   it('the Somali tobe goes over the head in the karif', () => {
