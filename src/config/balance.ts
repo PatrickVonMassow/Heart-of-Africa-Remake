@@ -2416,3 +2416,20 @@ export const START_FOOD_DAYS = 35
  *  of 17.09.2026): villages trade in gifts only, so the expedition can buy there
  *  before it has visited a bazaar. */
 export const START_GIFTS = 10
+
+/**
+ * Villager dress, the cells the research could not settle (work-order "dress by
+ * people, sex, age, season and year"; docs/peoples-1890.md §8.3). Every value is
+ * a CALIBRATABLE educated guess: neither the period search nor the second
+ * search (GPT-6 Astra, 04.10.2026) found a dated figure for any of them.
+ */
+export const VILLAGER_DRESS = {
+  /** Share of Zulu cold-weather cloaks that are a trade blanket rather than a
+   *  greased hide, by game year (linear between the two ends). Mayr's 1907
+   *  "Skin-Zulu → Blanket-Zulu" names the direction, no source the rate. */
+  zuluBlanketShare: { from: 1890, share: 0.3, to: 1895, shareTo: 0.5 },
+  /** The year from which a Baganda man of rank wears a white cotton kanzu over
+   *  the bark cloth: the protectorate (1894) favoured cotton (§2.5, MODERN). The
+   *  record gives no population-wide date (Astra B44), so it is rank-gated. */
+  bagandaCottonFrom: 1894,
+} as const
