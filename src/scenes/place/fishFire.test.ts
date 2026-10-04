@@ -258,13 +258,15 @@ describe('where the fire stands (work-order 1245 item 4)', () => {
         expect(standsOnGroundPlate(bank, p.x, p.z, WALKER_RADIUS), `${name} on the plate`).toBe(true)
         expect(standingClear(others, p.x, p.z, WALKER_RADIUS), `${name} clear`).toBe(true)
       }
-      // The carrier's and both pounding women's walks cross nothing solid.
+      // The carrier's and both pounding women's walks cross nothing solid: the
+      // fishers' own solids count too, except one a walk's end stands at by design.
       const walks = [[sites.carrierAtFire, sites.carrierAtBank], ...sites.duoStands.map((p, i) => [p, sites.duoAtRack[i]])] as const
       for (const [a, b] of walks) {
+        const path = [...others, ...own.filter((c) => standingClear([c], a.x, a.z, WALKER_RADIUS) && standingClear([c], b.x, b.z, WALKER_RADIUS))]
         for (let k = 0; k <= 40; k++) {
           const x = a.x + (b.x - a.x) * (k / 40)
           const z = a.z + (b.z - a.z) * (k / 40)
-          expect(standingClear(others, x, z, WALKER_RADIUS), `walk ${k}`).toBe(true)
+          expect(standingClear(path, x, z, WALKER_RADIUS), `walk ${k}`).toBe(true)
           expect(insidePlace(layout, x, z, WALKER_RADIUS)).toBe(true)
         }
       }

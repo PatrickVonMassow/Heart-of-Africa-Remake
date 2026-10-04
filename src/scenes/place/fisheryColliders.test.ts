@@ -114,7 +114,8 @@ describe('the movers follow the dugout and the walking fishers (point 1275)', ()
     let x = canoe.x + nx * 3
     let z = canoe.z + nz * 3
     for (let i = 0; i < 60; i++) [x, z] = resolveMove(live, x - nx * 0.1, z - nz * 0.1, PLAYER_RADIUS, [x, z])
-    const off = Math.hypot(x - canoe.x, z - canoe.z)
+    // Signed along the starting normal: he stays on his own side, not beyond the hull.
+    const off = (x - canoe.x) * nx + (z - canoe.z) * nz
     expect(off).toBeGreaterThanOrEqual(balance.villageLife.canoe.hullBeam / 2 + PLAYER_RADIUS - 1e-6)
     // The carrier's body moves with him.
     fire.carrier.x += 5
