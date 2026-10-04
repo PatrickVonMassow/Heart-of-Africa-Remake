@@ -566,6 +566,23 @@ while the smoothness of that geometry is read off the screenshots. Screenshot
 METRICS count as evidence only once `node scripts/picture-stability.mjs <suite>`
 reports STABLE; the verdicts are `docs/picture-check-levers.md`.
 
+**The villagers' dress (work-order "villager dress").** On the medium and high
+levels every settlement villager is a code-built skinned body (17 bones,
+`src/render/figureBody.ts`) wearing the researched dress of its people, sex,
+age, season and year (`src/systems/appearance.ts`, `src/render/figureDress.ts`;
+the research and its guesses: `docs/peoples-1890.md` §8.3); the low level keeps
+the primitive figure. Pinned in Vitest (`appearance.test.ts`,
+`figureBody.test.ts`, `figureDress.test.ts`, `figureRig.test.ts`); judged by
+looking in `polish-villagers.mjs` section `villager-dress` on both backends —
+one row of all eight sex and age groups per people
+(`verification/1293-dress-<people>.png`, `-webgl2` for WebGL 2), the low
+level's primitive row (`1293-dress-low-primitive`), and the young man beside
+the old man at 4, 8, 14, 22 and 32 m (`1293-elder-youth-<d>m`): the age reads
+reliably to about 14 m, by the build alone at 22 m, not at 32 m. The existing
+poses (drummer, fishers, weaver, pounding women, gestures) are carried onto the
+bones by `src/render/figureRig.ts` and photographed by the suite's own
+sections.
+
 ## 12. Atmosphere.
 
 Verifiable (`scripts/verify/settings.mjs`,

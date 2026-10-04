@@ -525,20 +525,27 @@ export function trunkProfile(p: BodyProportions): Array<[number, number, number]
 
 /** Drop the triangles whose centroid passes `drop` (a cut-out: the face of a
  *  hair cap, a hood's opening, the bare shoulder of a toga). */
-export function cutTriangles(geo: THREE.BufferGeometry, drop: (centroid: THREE.Vector3) => boolean): THREE.BufferGeometry {
+export function cutTriangles(
+  geo: THREE.BufferGeometry,
+  drop: (centroid: THREE.Vector3) => boolean,
+  opts: { quads?: boolean } = {},
+): THREE.BufferGeometry {
   const index = geo.getIndex()
   if (!index) return geo
   const pos = geo.getAttribute('position')
   const keep: number[] = []
-  const a = new THREE.Vector3()
-  const b = new THREE.Vector3()
-  const c = new THREE.Vector3()
-  for (let i = 0; i < index.count; i += 3) {
-    a.fromBufferAttribute(pos, index.getX(i))
-    b.fromBufferAttribute(pos, index.getX(i + 1))
-    c.fromBufferAttribute(pos, index.getX(i + 2))
-    const centroid = a.add(b).add(c).multiplyScalar(1 / 3)
-    if (!drop(centroid)) keep.push(index.getX(i), index.getX(i + 1), index.getX(i + 2))
+  const v = new THREE.Vector3()
+  const centroid = new THREE.Vector3()
+  // `quads`: a sweep's triangles come in pairs (a,b,c)(a,c,d), one quad of the
+  // tube; deciding both by the quad's centre cuts along the mesh lines in a
+  // clean staircase instead of a sawtooth of half-quads.
+  const step = opts.quads ? 6 : 3
+  for (let i = 0; i < index.count; i += step) {
+    const n = Math.min(step, index.count - i)
+    centroid.set(0, 0, 0)
+    for (let k = 0; k < n; k++) centroid.add(v.fromBufferAttribute(pos, index.getX(i + k)))
+    centroid.multiplyScalar(1 / n)
+    if (!drop(centroid)) for (let k = 0; k < n; k++) keep.push(index.getX(i + k))
   }
   geo.setIndex(keep)
   return geo

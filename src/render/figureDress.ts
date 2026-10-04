@@ -176,7 +176,7 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
     g.translate(0, y, 0)
     parts.push({ geo: g, weigh: near(['hips', 'spine']) })
   }
-  const sector = (geo: THREE.BufferGeometry, keep: (c: THREE.Vector3) => boolean) => cutTriangles(geo, (c) => !keep(c))
+  const sector = (geo: THREE.BufferGeometry, keep: (c: THREE.Vector3) => boolean) => cutTriangles(geo, (c) => !keep(c), { quads: true })
 
   switch (l.form) {
     case 'loinFlap':
