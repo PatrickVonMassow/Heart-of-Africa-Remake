@@ -48,6 +48,7 @@ device pixel ratio is kept (no cap).
 | `placeRiverFlotsam` | 12 | 48 | 90 |
 | `waterDetailOctaves` | 1 | 3 | 4 |
 | `faunaBodySegments` | 12 | 18 | 24 |
+| `figureBodySegments` | 0 | 16 | 24 |
 
 ## What each setting does
 
@@ -146,6 +147,17 @@ added.
 
   So medium (the default) draws slightly fewer triangles per animal than the
   capsule build did, low about a quarter fewer, and high about a quarter more.
+
+- **`figureBodySegments`** — The villagers' body (work-order "villager dress"):
+  `0` keeps the primitive cone, sphere and cylinder figure (user decision
+  04.10.2026: the low level keeps it); otherwise the ring resolution of the
+  code-built skinned body — trunk and head; limbs take two thirds — and of the
+  dress layers drawn on it from the appearance table
+  (`src/systems/appearance.ts`, `src/render/figureBody.ts`,
+  `src/render/figureDress.ts`). One body mesh plus one mesh per dress layer
+  per inhabitant, sharing two materials; geometries are cached per distinct
+  body and layer. Climbs 0 → 16 → 24. Cost per village, measured: see the
+  table below this list.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a

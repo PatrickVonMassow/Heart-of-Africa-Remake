@@ -20,6 +20,9 @@ export interface FigureLimbs {
   arms: Array<THREE.Group | null>
   /** The trunk that the lean tips and the shake turns. */
   trunk: THREE.Group | null
+  /** Called once the pose is on the pivots: the skinned body (scenes/place/
+   *  skinnedFigure.tsx) carries it onto its bones in that same frame. */
+  retarget?: () => void
 }
 
 /**
@@ -38,6 +41,7 @@ export function applyFigurePose(limbs: FigureLimbs | null, shown: FigurePose): v
   if (left) left.rotation.set(shown.left.pitch, shown.left.yaw, shown.left.roll)
   if (right) right.rotation.set(shown.right.pitch, shown.right.yaw, shown.right.roll)
   if (limbs.trunk) limbs.trunk.rotation.set(shown.lean, shown.turn, 0)
+  limbs.retarget?.()
 }
 
 /**

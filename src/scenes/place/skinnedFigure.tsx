@@ -1,0 +1,350 @@
+// The settlement's villager on the code-built skinned body, dressed from the
+// appearance table (work-order "villager dress"; medium and high presets — the
+// low preset keeps the primitive figure of placeFigure.tsx).
+//
+// It takes exactly the primitive figure's props and publishes the same pivots
+// (`limbs`), so no vignette changes how it poses a person: the pivots are an
+// invisible VIRTUAL primitive rig, and render/figureRig.ts carries what is
+// written on them onto the bones (see there for why). The named anchors the
+// verification reads — `figure-head`, `hand-left`, `hand-right` — sit on the
+// bones, so they report where the drawn body really is.
+
+import { useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { createPortal, useFrame } from '@react-three/fiber'
+import * as THREE from 'three/webgpu'
+import { legSwingAngle } from '../../render/fauna'
+import { FIGURE_LIMBS } from '../../render/figures'
+import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
+import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
+import {
+  bodyProportions,
+  buildBodyGeometry,
+  createSkeleton,
+  type BodyProportions,
+  type BoneName,
+} from '../../render/figureBody'
+import { buildLayerGeometry, figureBodyMaterial, figureDressMaterial } from '../../render/figureDress'
+import { contactLean, gestureArmEuler, hangToward, kneelLegs, solveTwoBone } from '../../render/figureRig'
+import { appearanceFor, skinTone, type AgeGroup, type DressLayer, type Sex } from '../../systems/appearance'
+import type { ActorRoleKind } from '../../systems/actorLabels'
+import { markActor } from '../actorLabelSource'
+import { REST_POSE_ARMS, type FigureLook } from './placeFigureContext'
+
+export interface FigureIdentity {
+  sex: Sex
+  age: AgeGroup
+  /** −1 slight .. +1 stout. */
+  build: number
+  /** A stable per-figure number in [0, 1) for the choices a share decides. */
+  pick: number
+}
+
+/** A stable 32-bit hash of a string (FNV-1a with an avalanche). */
+function hash32(s: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193)
+  h ^= h >>> 15
+  h = Math.imul(h, 0x2c1b3c6d)
+  h ^= h >>> 12
+  return h >>> 0
+}
+
+/**
+ * Who a figure is when its vignette does not say: a child when it is drawn at
+ * a child's scale, otherwise a mix of the sexes and of young, married and old
+ * — stable per figure (React's `useId`), so a villager does not change between
+ * visits of the same layout. The mix itself is a calibratable guess.
+ */
+export function figureIdentity(key: string, scale: number, sex?: Sex, age?: AgeGroup): FigureIdentity {
+  const h = hash32(key)
+  const u = (bits: number) => ((h >>> bits) & 0xff) / 256
+  const resolvedAge: AgeGroup = age ?? (scale < 0.8 ? 'child' : u(8) < 0.3 ? 'youth' : u(8) < 0.75 ? 'adult' : 'elder')
+  return {
+    sex: sex ?? (u(0) < 0.5 ? 'female' : 'male'),
+    age: resolvedAge,
+    build: Math.round((u(16) - 0.5) * 2) * 0.6,
+    pick: u(24),
+  }
+}
+
+// ---- geometry caches: one build per distinct body and layer -----------------
+
+const bodyCache = new Map<string, THREE.BufferGeometry>()
+const layerCache = new Map<string, THREE.BufferGeometry | null>()
+
+function cachedBody(p: BodyProportions, key: string, skin: string, paint: string | null, radial: number) {
+  const k = `${key}|${skin}|${paint}|${radial}`
+  let g = bodyCache.get(k)
+  if (!g) {
+    g = buildBodyGeometry(p, { skin, paint }, radial)
+    bodyCache.set(k, g)
+  }
+  return g
+}
+
+function cachedLayer(l: DressLayer, p: BodyProportions, key: string, radial: number) {
+  const k = `${key}|${radial}|${l.form}|${l.wear}|${l.material}|${l.colour}|${l.colour2}|${l.pattern}`
+  if (!layerCache.has(k)) layerCache.set(k, buildLayerGeometry(l, p, radial))
+  return layerCache.get(k) ?? null
+}
+
+/** The figure's whole scene graph, built once per identity and look. */
+interface Rig {
+  p: BodyProportions
+  layers: DressLayer[]
+  meshes: THREE.SkinnedMesh[]
+  bones: Record<BoneName, THREE.Bone>
+  head: THREE.Object3D
+  hands: [THREE.Object3D, THREE.Object3D]
+}
+
+function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string): Rig {
+  const p = bodyProportions(id.sex, id.age, id.build)
+  const layers = appearanceFor({
+    peopleId: look.peopleId,
+    sex: id.sex,
+    age: id.age,
+    drivers: look.drivers,
+    year: look.year,
+    cloth,
+    palette: look.palette,
+    pick: id.pick,
+  })
+  const key = `${id.sex}|${id.age}|${id.build}`
+  const paint = skinTone(layers, skin)
+  const { skeleton, bones } = createSkeleton(p)
+  const bound = new THREE.Sphere(new THREE.Vector3(0, p.stature * 0.5, 0), p.stature * 0.85)
+  const mesh = (geo: THREE.BufferGeometry, material: THREE.Material, name: string) => {
+    const m = new THREE.SkinnedMesh(geo, material)
+    m.name = name
+    m.castShadow = true
+    m.boundingSphere = bound
+    return m
+  }
+  const body = mesh(cachedBody(p, key, skin, paint === skin ? null : paint, look.radial), figureBodyMaterial(), 'figure-body')
+  body.add(bones.hips)
+  body.bind(skeleton, new THREE.Matrix4())
+  const meshes = [body]
+  for (const l of layers) {
+    const g = cachedLayer(l, p, key, look.radial)
+    if (!g) continue
+    const m = mesh(g, figureDressMaterial(), `figure-dress-${l.slot}-${l.form}`)
+    m.bind(skeleton, new THREE.Matrix4())
+    meshes.push(m)
+  }
+  // The anchors the verification and the carried props read.
+  const head = new THREE.Object3D()
+  head.name = 'figure-head'
+  head.position.set(0, p.headHalfH, 0)
+  // Scaled so `0.16 × scale` above it is the crown, as on the primitive head.
+  head.scale.setScalar(p.headHalfH / 0.16)
+  bones.head.add(head)
+  const hand = (side: 'L' | 'R', name: string) => {
+    const o = new THREE.Object3D()
+    o.name = name
+    o.position.set(0, -p.hand * 0.9, 0)
+    bones[`hand.${side}`].add(o)
+    return o
+  }
+  return { p, layers, meshes, bones, head, hands: [hand('L', 'hand-left'), hand('R', 'hand-right')] }
+}
+
+const _s = new THREE.Vector3()
+const _t = new THREE.Vector3()
+const _e = new THREE.Vector3()
+const _w = new THREE.Vector3()
+const _pivot = new THREE.Vector3()
+const _fwd = new THREE.Vector3()
+const _q = new THREE.Quaternion()
+const _pole = new THREE.Vector3()
+const _euler = new THREE.Euler()
+
+export function SkinnedFigure({
+  look,
+  cloth,
+  skin = '#5c3317',
+  scale = 1,
+  kneel = false,
+  legs = false,
+  role = 'villager',
+  gesture,
+  pose,
+  limbs,
+  gait,
+  squat,
+  handProp,
+  sex,
+  age,
+}: {
+  look: FigureLook
+  cloth: string
+  skin?: string
+  scale?: number
+  kneel?: boolean
+  legs?: boolean
+  role?: ActorRoleKind
+  gesture?: RefObject<GestureState>
+  pose?: RefObject<FigurePose | null>
+  limbs?: RefObject<FigureLimbs | null>
+  gait?: RefObject<number>
+  squat?: RefObject<number>
+  handProp?: ReactNode
+  sex?: Sex
+  age?: AgeGroup
+}) {
+  const key = useId()
+  const id = useMemo(() => figureIdentity(key, scale, sex, age), [key, scale, sex, age])
+  const rig = useMemo(() => buildRig(id, look, cloth, skin), [id, look, cloth, skin])
+  const L = FIGURE_LIMBS
+  // THE VIRTUAL PRIMITIVE RIG the poses are written onto — the primitive
+  // figure's pivots exactly (placeFigure.tsx), drawing nothing.
+  const bodyH = kneel ? 0.55 : 1.0
+  const withLegs = legs && !kneel
+  const hipY = withLegs ? bodyH * L.hipY : 0
+  const armLen = bodyH * L.armLength
+  const trunk = useRef<THREE.Group>(null)
+  const arms = useRef<Array<THREE.Group | null>>([])
+  const virtualHands = useRef<Array<THREE.Object3D | null>>([])
+  const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
+  const owned = !!(pose && limbs)
+  const contact = !!pose
+  const kneelLeg = useMemo(() => kneelLegs(rig.p.hipY - rig.p.kneeY, rig.p.calfR), [rig])
+
+  // Carry the virtual pose onto the bones. Called by `applyFigurePose` in the
+  // frame the pose is written, and by this figure's own frame for the rest.
+  const retarget = useMemo(() => {
+    const b = rig.bones
+    const p = rig.p
+    return () => {
+      const vTrunk = trunk.current
+      const root = b.hips.parent?.parent
+      if (!vTrunk || !root) return
+      // Trunk: the pose's lean and turn at the hips, the elder's stoop at the chest.
+      b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY
+      b.spine.rotation.set(vTrunk.rotation.x, vTrunk.rotation.y, 0)
+      b.chest.rotation.set(p.stoop, 0, 0)
+      b.neck.rotation.set(-p.stoop * 0.6, 0, 0)
+      root.updateWorldMatrix(true, true)
+      // A contact the hands cannot quite reach is reached by leaning in.
+      const reachOf = (s: 'L' | 'R') =>
+        b[`forearm.${s}`].getWorldPosition(_e).distanceTo(b[`upperArm.${s}`].getWorldPosition(_s)) +
+        b[`hand.${s}`].getWorldPosition(_w).distanceTo(_e) +
+        rig.hands[s === 'L' ? 0 : 1].getWorldPosition(_t).distanceTo(_w)
+      if (contact) {
+        b.spine.getWorldPosition(_pivot)
+        _fwd.set(0, 0, 1).applyQuaternion(b.spine.getWorldQuaternion(_q)).setY(0).normalize()
+        let lean = 0
+        ;(['L', 'R'] as const).forEach((s, i) => {
+          const vh = virtualHands.current[i]
+          if (!vh) return
+          const reach = reachOf(s)
+          b[`upperArm.${s}`].getWorldPosition(_s)
+          vh.getWorldPosition(_t)
+          lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
+        })
+        if (lean > 0) {
+          b.spine.rotation.x += lean
+          b.spine.updateWorldMatrix(false, true)
+        }
+      }
+      ;(['L', 'R'] as const).forEach((s, i) => {
+        const up = b[`upperArm.${s}`]
+        const fore = b[`forearm.${s}`]
+        const vPivot = arms.current[i]
+        const vh = virtualHands.current[i]
+        let done = false
+        if (contact && vh) {
+          const a = fore.getWorldPosition(_e).distanceTo(up.getWorldPosition(_s))
+          const reach = reachOf(s)
+          up.getWorldPosition(_s)
+          vh.getWorldPosition(_t)
+          const chestQ = b.chest.getWorldQuaternion(new THREE.Quaternion())
+          _pole.set(s === 'L' ? 0.5 : -0.5, -0.4, -1).applyQuaternion(chestQ)
+          const sol = solveTwoBone(_s, _t, a, reach - a, _pole)
+          if (sol.reached) {
+            up.quaternion.copy(hangToward(sol.upper, chestQ))
+            up.updateWorldMatrix(false, true)
+            fore.quaternion.copy(hangToward(sol.fore, up.getWorldQuaternion(new THREE.Quaternion())))
+            done = true
+          }
+        }
+        if (!done && vPivot) {
+          up.quaternion.setFromEuler(gestureArmEuler({ pitch: vPivot.rotation.x, yaw: vPivot.rotation.y, roll: vPivot.rotation.z }, _euler))
+          fore.rotation.set(-0.15, 0, 0)
+        }
+        b[`hand.${s}`].quaternion.identity()
+      })
+      b.hips.updateWorldMatrix(false, true)
+    }
+  }, [rig, kneel, kneelLeg, contact])
+
+  // Publish the virtual pivots to the caller that owns the pose.
+  const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget })
+  useEffect(() => {
+    selfLimbs.current.retarget = retarget
+    if (!limbs) return
+    limbs.current = { arms: arms.current, trunk: trunk.current, retarget }
+    return () => {
+      limbs.current = null
+    }
+  }, [limbs, retarget])
+
+  // Kneeling legs are a fixed pose; standing ones swing with the gait.
+  useEffect(() => {
+    const b = rig.bones
+    for (const s of ['L', 'R'] as const) {
+      b[`thigh.${s}`].rotation.set(kneel ? kneelLeg.thigh : 0, 0, 0)
+      b[`shin.${s}`].rotation.set(kneel ? kneelLeg.shin : 0, 0, 0)
+      b[`foot.${s}`].rotation.set(kneel ? kneelLeg.foot : 0, 0, 0)
+    }
+  }, [rig, kneel, kneelLeg])
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    let shown = pose?.current ?? null
+    if (!shown && gesture?.current) {
+      gesture.current = advanceGesture(gesture.current, dt)
+      shown = gesturePose(gesture.current)
+    }
+    if (shown && !owned) {
+      selfLimbs.current.trunk = trunk.current
+      applyFigurePose(selfLimbs.current, shown) // retargets
+    } else {
+      retarget()
+    }
+    const b = rig.bones
+    if (!kneel && gait) {
+      b['thigh.L'].rotation.x = legSwingAngle(gait.current, 0)
+      b['thigh.R'].rotation.x = legSwingAngle(gait.current, Math.PI)
+      b['shin.L'].rotation.x = Math.max(0, -b['thigh.L'].rotation.x) * 0.8
+      b['shin.R'].rotation.x = Math.max(0, -b['thigh.R'].rotation.x) * 0.8
+    }
+    // A squat shortens a person; it does not flatten the skull (work-order 1085).
+    const squash = squat?.current ?? 1
+    b.head.scale.y = squash > 0.01 && Math.abs(squash - 1) > 1e-4 ? 1 / squash : 1
+  })
+
+  return (
+    <group name="inhabitant" scale={scale} userData={markActor({ kind: role, height: bodyH + 0.45 })}>
+      {rig.meshes.map((m) => (
+        <primitive key={m.uuid} object={m} />
+      ))}
+      {/* The virtual primitive rig — pivots only, nothing drawn. */}
+      <group scale={[1, kneel ? 0.75 : 1, 1]} visible={false}>
+        <group ref={trunk} position={[0, hipY, 0]}>
+          {[0, 1].map((i) => (
+            <group key={i} position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]} ref={armRef[i]}>
+              <object3D
+                position={[0, -armLen, 0]}
+                ref={(el) => {
+                  virtualHands.current[i] = el
+                }}
+              />
+            </group>
+          ))}
+        </group>
+      </group>
+      {handProp && createPortal(<>{handProp}</>, rig.hands[0])}
+    </group>
+  )
+}

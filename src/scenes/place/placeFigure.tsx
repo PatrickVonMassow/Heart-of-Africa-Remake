@@ -14,7 +14,29 @@ import { advanceGesture, gesturePose, type FigurePose, type GestureState } from 
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
-import { ColdCloaksContext, LimbDetailContext, REST_POSE_ARMS } from './placeFigureContext'
+import { ColdCloaksContext, FigureLookContext, LimbDetailContext, REST_POSE_ARMS } from './placeFigureContext'
+import { SkinnedFigure } from './skinnedFigure'
+import type { AgeGroup, Sex } from '../../systems/appearance'
+
+type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
+  /** Who this villager is, when the vignette knows (the pounding women, the
+   *  conversing elder and young man); otherwise stable per figure, a child by
+   *  its scale (skinnedFigure.tsx `figureIdentity`). Read by the skinned body. */
+  sex?: Sex
+  age?: AgeGroup
+}
+
+/**
+ * A settlement inhabitant. On the medium and high presets it is the skinned,
+ * dressed body (skinnedFigure.tsx, work-order "villager dress"); on the low
+ * preset — and wherever no settlement look is provided — the primitive figure
+ * below, unchanged (user decision 04.10.2026). Both take the same props and
+ * publish the same pivots, so a vignette never knows which one it drew.
+ */
+export function Figure({ sex, age, ...props }: FigureProps) {
+  const look = useContext(FigureLookContext)
+  return look ? <SkinnedFigure look={look} sex={sex} age={age} {...props} /> : <PrimitiveFigure {...props} />
+}
 
 /**
  * Simple primitive human figure; `kneel` folds it down for sitting work.
@@ -32,7 +54,7 @@ import { ColdCloaksContext, LimbDetailContext, REST_POSE_ARMS } from './placeFig
  * caller that computes the whole pose itself (the drummer, the porter's carry,
  * the children, whose round combines their gestures with the run).
  */
-export function Figure({
+function PrimitiveFigure({
   cloth,
   skin = '#5c3317',
   scale = 1,
