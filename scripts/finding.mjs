@@ -19,12 +19,15 @@
 //   node scripts/finding.mjs --request "<title>" --spec-file <path> \
 //        --why-file <path> [--constraints-file <path>] [--quotes-file <path>] \
 //        [--doc-impact-file <path>] [--open-questions-file <path>] \
-//        [--bundle "<German name>"] [--refs "<…>"] [--rev <sha>]
+//        [--bundle "<German name>"] [--refs "<…>"] [--rev <sha>] \
+//        [--approved "<the user's approving words, verbatim>"]
 //   Every *-file field also takes `-` (that one field from stdin), and
 //   `--stdin` reads ALL fields as one document of `--- <field> ---` parts
 //   (spec, why, constraints, quotes, doc-impact, open-questions, bundle, refs)
 //   — a standing-down session deposits without creating a file (point 1186).
 //   --once with --request deduplicates by exact normalized title in every state.
+//   --approved is appended to the entry's user quotes so the owner sees the
+//   approval; request-approval-guard.mjs demands it from a chat session.
 //   node scripts/finding.mjs --requests                    list pending requests
 //   node scripts/finding.mjs --show "<title substring>"    the full spec to append
 //   node scripts/finding.mjs --queued "<title>" --point <N>
@@ -220,6 +223,13 @@ function listRequest(entry) {
   for (const warning of requestWarnings(entry)) console.log(`      WARNING: ${warning}`)
 }
 
+/** The user quotes with the `--approved` words appended, so the owner sees the approval. */
+function withApproval(quotes, approved) {
+  if (!approved || !approved.trim()) return quotes
+  const line = `approved: "${approved.replace(/\s+/g, ' ').trim()}"`
+  return quotes && quotes.trim() ? `${quotes}\n${line}` : line
+}
+
 if (has('--request')) {
   const title = flag('--request')
   const spec = field('spec')
@@ -231,7 +241,7 @@ if (has('--request')) {
     why: field('why'),
     spec,
     constraints: field('constraints'),
-    userQuotes: field('quotes'),
+    userQuotes: withApproval(field('quotes'), flag('--approved')),
     docImpact: field('doc-impact'),
     bundle: field('bundle'),
     refs: field('refs'),
@@ -419,8 +429,8 @@ if (!has('--drain') && !has('--requests')) {
   console.log('usage: node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]')
   console.log('       node scripts/finding.mjs --none "<why this turn found nothing>"')
   console.log('       node scripts/finding.mjs --drain | --drained "<title>"')
-  console.log('       node scripts/finding.mjs --request "<title>" --spec-file <path|-> --why-file <path|-> [--once] […]')
-  console.log('       node scripts/finding.mjs --request "<title>" --stdin   (parts: --- spec ---, --- why ---, …)')
+  console.log('       node scripts/finding.mjs --request "<title>" --spec-file <path|-> --why-file <path|-> [--approved "<words>"] [--once] […]')
+  console.log('       node scripts/finding.mjs --request "<title>" --stdin [--approved "<words>"]   (parts: --- spec ---, --- why ---, …)')
   console.log('       node scripts/finding.mjs --requests | --show "<title>"')
   console.log('       node scripts/finding.mjs --queued "<title>" --point <N> | --blocked "<title>" --why "<reason>"')
 }

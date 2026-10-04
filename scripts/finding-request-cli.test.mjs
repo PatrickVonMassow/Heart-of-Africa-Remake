@@ -136,6 +136,20 @@ describe('a non-owner deposits a request and the owner drains it', () => {
     expect(run(['--requests'])).toContain('DECISION CARD')
   })
 
+  it('appends the --approved words to the user quotes', () => {
+    deposit('Mit Freigabe', ['--approved', 'Ja, so einreihen.'])
+    const shown = run(['--show', 'Mit Freigabe'])
+    expect(shown).toContain('user 30.07.2026')
+    expect(shown).toContain('approved: "Ja, so einreihen."')
+    expect(shown.indexOf('user 30.07.2026')).toBeLessThan(shown.indexOf('approved: "Ja, so einreihen."'))
+  })
+
+  it('takes --approved alone as the user quotes', () => {
+    const out = run(['--request', 'Nur Freigabe', '--spec-file', join(dir, 'spec.md'), '--approved', 'passt so', '--session', 's'])
+    expect(out).not.toMatch(/WARNING: no user quotes/)
+    expect(run(['--show', 'Nur Freigabe'])).toContain('approved: "passt so"')
+  })
+
   it('names what a half-written deposit does not say instead of refusing it', () => {
     const out = run(['--request', 'Ohne Begründung', '--spec-file', join(dir, 'spec.md'), '--session', 's'])
     expect(out).toMatch(/WARNING: no observed problem/)
