@@ -33490,3 +33490,15 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: per treated species one frame inside a settlement and one in the bird's-eye view at zoom 0.5, both backends, judged by looking — the species is recognisable — plus the before/after cost measurement. Vitest for the geometry/pattern builders where browserless.
   Criticality: medium — the visual identity of every animal; acceptance criterion 11 (no schematic look).
   Bundle: Tierverhalten.
+
+- [x] 1285. Skyline wildlife: true species proportions sized to one shared readable target
+  Queue position: directly before point 1275, directly after the request "Antelope, goat and zebra get detailed, recognisable models with pelt pattern and face, in and outside settlements" (user order).
+  The skyline silhouettes (PanoramaWildlife in src/scenes/place/PlaceScene.tsx, balance.panoramaWildlife) keep the true height proportions between species. One shared factor for all species is chosen so that a giraffe at mid-ring distance subtends about 1.4°; that gives about 1.07° elephant, 0.54° zebra, 0.47° antelope.
+  - The random per-silhouette base scale 2.6–4.2 goes; maxApparentAngleDeg 2.5 stays only as a safety net and no longer clamps every animal to the same size (today nearly every species ends at ≈2–2.5°, an antelope as tall as an elephant).
+  - Each silhouette keeps its own distance; a farther one is drawn smaller.
+  - Widen the distance spread for visible depth: 40–120 beyond the settlement rim instead of today's 55–85 (ringInner/ringSpread), so the same species varies up to about 3× in apparent size.
+  - Measure, do not estimate: the author measures the settlement radius and the camera position and derives the factor from them (the sketch's 450 m / factor 2.8 framing was hypothetical; on the current ring real size is already ≈1.9° for a giraffe).
+  - Target angle and ring spread are calibratable values in src/config/balance.ts. The haze must not swallow the outlines.
+  Reference: sketch "Vorschlag 2: Mittelweg" https://claude.ai/artifact/N4JToMstmmxkZM7ypt9cBz
+  Tests: Vitest — species ratios preserved; the giraffe reaches its target angle at mid-ring distance; the ring spread follows the balance values. Playwright, both backends: one skyline frame with all four species (east or south region), judged by looking — recognisable, reads as distant.
+  Bundle: Tierverhalten.
