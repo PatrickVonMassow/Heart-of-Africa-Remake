@@ -414,6 +414,8 @@ interface BalanceConfig {
      *  so a skyline zebra still reads striped and a gazelle banded. */
     markContrast: number
     markBandScale: number
+    /** Height multiplier of the gazelle's dark flank band on the silhouette. */
+    markFlankWiden: number
     /** Feet sink below the visible horizon line so they never appear to float. */
     sinkEpsilon: number
     /** Clearance (deg) added around a fixed skyline landmark's footprint: no
@@ -1497,6 +1499,7 @@ export const balance: BalanceConfig = {
     hazeMix: 0.55, // lift the flat near-black toward the sky horizon
     markContrast: 0.7, // calibratable: haze-reduced, still clearly visible stripes/flank band
     markBandScale: 0.6, // calibratable: ~4 broad torso bands on a two-degree zebra
+    markFlankWiden: 2.5, // calibratable: the flank band spans ~a third of the flank, not one pixel
     sinkEpsilon: 0.4, // feet just below the horizon line, never floating
     landmarkMarginDeg: 8, // clearance around Giza / Table Mountain
     vicinityMinAnimals: 6, // region-typical animals guaranteed near a settlement

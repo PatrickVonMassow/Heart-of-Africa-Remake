@@ -1627,7 +1627,7 @@ function PanoramaWildlife({
         rig: rigs[gi],
         // The hazed tint carries the species' pelt marking at a reduced
         // contrast (work-order 1284), so the skyline zebra reads striped.
-        material: createSilhouetteFaunaMaterial(new THREE.Color(rgb[0], rgb[1], rgb[2]), pw.markContrast, pw.markBandScale),
+        material: createSilhouetteFaunaMaterial(new THREE.Color(rgb[0], rgb[1], rgb[2]), pw.markContrast, pw.markBandScale, pw.markFlankWiden),
         worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
         hazeLum: luminance(rgb),

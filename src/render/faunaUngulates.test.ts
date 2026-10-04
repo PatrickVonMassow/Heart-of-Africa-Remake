@@ -267,6 +267,20 @@ describe('skyline silhouettes carry the species marking (point 102 haze look)', 
   it('broadens the bands for the small skyline animal', () => {
     expect(pw.markBandScale).toBeGreaterThan(0.3)
     expect(pw.markBandScale).toBeLessThan(1)
+    // The widened flank band stays on the flank: from the belly line to below the back.
+    const R = buildAntelopeParts().body
+    const m = R.getAttribute(FAUNA_MARK_ATTRIBUTE)
+    const pos = R.getAttribute('position')
+    let top = -Infinity
+    let i0 = -1
+    for (let i = 0; i < m.count; i++) {
+      if (m.getX(i) !== MARK.flank) continue
+      top = Math.max(top, pos.getY(i))
+      i0 = i
+    }
+    const [, belly, band] = markAt(R, i0)
+    expect(pw.markFlankWiden).toBeGreaterThan(1)
+    expect(belly + band * pw.markFlankWiden).toBeLessThan(top)
   })
 })
 

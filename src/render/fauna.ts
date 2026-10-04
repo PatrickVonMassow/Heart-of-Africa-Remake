@@ -78,10 +78,15 @@ export function createFaunaMaterial(): THREE.MeshStandardNodeMaterial {
  * bands widened by `bandScale` (work-order 1284) — a zebra reads striped and a
  * gazelle banded on the horizon without losing the aerial-perspective tone.
  */
-export function createSilhouetteFaunaMaterial(tint: THREE.Color, contrast: number, bandScale: number): THREE.MeshStandardNodeMaterial {
+export function createSilhouetteFaunaMaterial(
+  tint: THREE.Color,
+  contrast: number,
+  bandScale: number,
+  flankWiden = 1,
+): THREE.MeshStandardNodeMaterial {
   const m = new THREE.MeshStandardNodeMaterial({ roughness: 1, flatShading: false })
   m.color.copy(tint)
-  m.colorNode = silhouetteMarkingColorNode(tint, contrast, bandScale)
+  m.colorNode = silhouetteMarkingColorNode(tint, contrast, bandScale, flankWiden)
   return m
 }
 

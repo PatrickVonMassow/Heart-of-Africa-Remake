@@ -1177,34 +1177,52 @@ if (section('animal-models')) {
   await page.waitForFunction(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}).filter((w) => w.visible).length >= 2, null, { timeout: 25000 }).catch(() => {})
   // The silhouettes are clamped to a couple of degrees on purpose (point 94),
   // so a full 1440x900 frame shows them as specks among their neighbours. Each
-  // settlement frame therefore stands at the settlement edge toward ITS animal
-  // and narrows the framing to a window around it (a third of the view each
-  // way) — shifted away from any silhouette of another species, so the named
-  // one is the main subject and large enough to judge.
+  // settlement frame therefore stands at the settlement edge where its animal
+  // stands clear of other species and narrows the framing to a window around
+  // it (a quarter of the view each way), shifted away from any other species,
+  // so the named one is the main subject and large enough to judge.
   const VIEW = { width: 1440, height: 900 }
-  const CLIP = { width: 480, height: 300 }
+  const CLIP = { width: 360, height: 225 }
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   for (const species of ['zebra', 'antelope']) {
     const aimed = await page.evaluate((sp) => {
       const info = window.__placePanoramaWildlifeInfo ?? {}
-      const rows = Object.values(info).filter((w) => w.visible)
-      // The one of this species whose nearest other-species neighbour on the
-      // ring is farthest away in azimuth, so it can stand alone in the frame.
-      const gap = (it) =>
-        Math.min(
-          Math.PI,
-          ...rows.filter((o) => o.species !== it.species).map((o) => Math.abs(Math.atan2(Math.sin(o.azimuth - it.azimuth), Math.cos(o.azimuth - it.azimuth)))),
-        )
-      const it = rows.filter((w) => w.species === sp).sort((a, b) => gap(b) - gap(a))[0]
-      if (!it) return null
+      const rows = Object.entries(info).filter(([, w]) => w.visible)
       const p = window.__placePlayer
-      const r = (window.__placeLayout?.radius ?? 40) * 0.95
-      const d = Math.hypot(it.x, it.z) || 1
-      p.x = (it.x / d) * r
-      p.z = (it.z / d) * r
+      const R = (window.__placeLayout?.radius ?? 40) * 0.9
+      // Standpoints on the settlement edge looking OUT (nothing of the village
+      // between eye and animal). Each is scored by how far, in bearing, the
+      // nearest silhouette of another species stands from the named one —
+      // two walkers can share an azimuth from the centre yet part by parallax
+      // from the edge; among the clear ones the nearest standpoint wins.
+      const bearing = (fx, fz, w) => Math.atan2(w.z - fz, w.x - fx)
+      let best = null
+      for (const [key, it] of rows.filter(([, w]) => w.species === sp)) {
+        for (let k = 0; k < 48; k++) {
+          const a = (k / 48) * Math.PI * 2
+          const fx = Math.cos(a) * R
+          const fz = Math.sin(a) * R
+          const dist = Math.hypot(it.x - fx, it.z - fz)
+          // Outward-looking only.
+          if (((it.x - fx) * Math.cos(a) + (it.z - fz) * Math.sin(a)) / dist < 0.5) continue
+          const b0 = bearing(fx, fz, it)
+          const sep = Math.min(
+            Math.PI,
+            ...rows
+              .filter(([, o]) => o.species !== sp)
+              .map(([, o]) => Math.abs(Math.atan2(Math.sin(bearing(fx, fz, o) - b0), Math.cos(bearing(fx, fz, o) - b0)))),
+          )
+          const clear = sep >= (12 * Math.PI) / 180
+          const score = (clear ? 1e6 : 0) + (clear ? -dist : sep * 1000)
+          if (!best || score > best.score) best = { score, key, it, fx, fz, sepDeg: (sep * 180) / Math.PI, dist }
+        }
+      }
+      if (!best) return null
+      p.x = best.fx
+      p.z = best.fz
       p.pitch = 0
-      p.yaw = Math.atan2(-(it.x - p.x), -(it.z - p.z))
-      return { key: Object.keys(info).find((k) => info[k] === it), x: it.x, z: it.z, y: it.y }
+      p.yaw = Math.atan2(-(best.it.x - p.x), -(best.it.z - p.z))
+      return { key: best.key, x: best.it.x, z: best.it.z, y: best.it.y, sepDeg: Math.round(best.sepDeg), dist: Math.round(best.dist) }
     }, species)
     check(`a ${species} silhouette walks the settlement panorama`, !!aimed, aimed ? JSON.stringify(aimed) : 'none visible')
     if (!aimed) continue

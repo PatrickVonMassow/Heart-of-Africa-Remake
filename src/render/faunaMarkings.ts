@@ -94,9 +94,10 @@ const aaBelow = (value: THREE.Node<'float'>, edge: THREE.Node<'float'>) => {
  * The marking factor on a base coat colour, per fragment: 1 on an unmarked part
  * (kind 0). `bandScale` widens every band and cell (1 = as built; < 1 = fewer,
  * broader bands — the skyline silhouettes use it so a stripe still spans
- * several pixels on a two-degree animal).
+ * several pixels on a two-degree animal); `flankWiden` multiplies the height of
+ * the gazelle's dark flank band for the same reason.
  */
-function markingFactor(base: THREE.Node<'vec3'>, bandScale: number) {
+function markingFactor(base: THREE.Node<'vec3'>, bandScale: number, flankWiden = 1) {
   const m = attribute<'vec4'>(FAUNA_MARK_ATTRIBUTE, 'vec4')
   const kind = m.x.round()
   const p = positionGeometry
@@ -131,7 +132,7 @@ function markingFactor(base: THREE.Node<'vec3'>, bandScale: number) {
     })
     .ElseIf(kind.equal(MARK.flank), () => {
       const belly = aaBelow(p.y, m.y)
-      const band = aaBelow(p.y, m.y.add(m.z)).sub(belly)
+      const band = aaBelow(p.y, m.y.add(m.z.mul(flankWiden))).sub(belly)
       const dark = mix(vec3(1), vec3(MARK_TONES.flankDark), clamp(band, 0, 1))
       factor.assign(mix(dark, toward(cream, float(1)), belly))
     })
@@ -167,12 +168,13 @@ export function silhouetteMarkScale(markedOverCoat: number, contrast: number, ma
  * species marks): the flat aerial-perspective `tint` scaled per fragment by the
  * pelt marking at a haze-reduced `contrast` — so the zebra still reads striped
  * and the gazelle as dark-banded over a pale belly, while the mean tone stays
- * the hazed one. Bands are widened by `bandScale` to survive the small size.
+ * the hazed one. Bands are widened by `bandScale` (and the flank band by
+ * `flankWiden`) to survive the small size.
  */
-export function silhouetteMarkingColorNode(tint: THREE.Color, contrast: number, bandScale: number, maxLift = 1.8) {
+export function silhouetteMarkingColorNode(tint: THREE.Color, contrast: number, bandScale: number, flankWiden = 1, maxLift = 1.8) {
   return Fn(() => {
     const base = max(vertexColor().rgb, vec3(0.02))
-    const factor = markingFactor(base, bandScale)
+    const factor = markingFactor(base, bandScale, flankWiden)
     const luma = vec3(LUMA[0], LUMA[1], LUMA[2])
     const ratio = clamp(dot(base.mul(factor), luma).div(dot(base, luma)), 0, maxLift)
     const scale = float(1).add(ratio.sub(1).mul(clamp(float(contrast), 0, 1)))
