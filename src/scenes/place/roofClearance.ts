@@ -27,6 +27,9 @@
 import { PLAYER_RADIUS } from './collision'
 import type { HutRoof, RegionPlaceStyle } from './regionStyles'
 import type { DwellingDef, Interactive, PlaceLayout } from './layout'
+import { balance } from '../../config/balance'
+import { fisherySites } from './fishFire'
+import { canoeLane } from './villagerCanoe'
 
 /** First-person camera height in metres (design.md §2.2). */
 export const EYE_HEIGHT = 1.5
@@ -311,10 +314,11 @@ function interactiveRoofs(it: Interactive, style: RegionPlaceStyle, port: boolea
   return [{ ...hutRoofProfile(style.roof, hut.r, hut.h, style.stilts), x, z }]
 }
 
-/** The cook-shelter's thatch cap over the village fire (design.md §19.10). */
-export function cookShelterRoof(x: number, z: number): PlaceRoof {
+/** The cook-shelter's thatch cap over a fire (design.md §19.10); the fishers'
+ *  fire (point 1275) takes the same shelter with a wider post square. */
+export function cookShelterRoof(x: number, z: number, postR: number = COOK_SHELTER.postR): PlaceRoof {
   const capY = COOK_SHELTER.postH + COOK_SHELTER.capCentre - COOK_SHELTER.capHeight / 2
-  return discRoof('cook shelter', x, z, COOK_SHELTER.postR * COOK_SHELTER.capSpread, () => capY)
+  return discRoof('cook shelter', x, z, postR * COOK_SHELTER.capSpread, () => capY)
 }
 
 /** Every roof volume a settlement draws overhead, in world placement. */
@@ -328,6 +332,12 @@ export function placeRoofs(
   for (const it of layout.interactives) roofs.push(...interactiveRoofs(it, style, kind === 'port'))
   for (const d of layout.dwellings) roofs.push(dwellingRoofProfile(d, style))
   if (kind === 'village' && fire) roofs.push(cookShelterRoof(fire[0], fire[1]))
+  if (kind === 'village' && layout.bank) {
+    // The fishers' fire's shelter, drawn only where the people roofs its fire;
+    // swept wherever it could stand, like the village one above.
+    const site = fisherySites(layout.bank, canoeLane(layout.bank)).fire
+    roofs.push(cookShelterRoof(site.x, site.z, balance.villageLife.fishFire.shelterPostR))
+  }
   return roofs
 }
 

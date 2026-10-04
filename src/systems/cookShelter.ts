@@ -25,6 +25,9 @@
 //    the rain-vs-fire question never arises (`climate-1890.md`), so whether a
 //    canopy stands is immaterial; they are left without one.
 
+import { balance } from '../config/balance'
+import { fireRainFactor } from './season'
+
 /** Peoples whose village fire stands under a cook-shelter canopy (peoples-1890 §9.4/§9.5). */
 const COOK_SHELTER_PEOPLES = new Set<string>([
   'baganda',
@@ -44,4 +47,18 @@ const COOK_SHELTER_PEOPLES = new Set<string>([
  */
 export function fireHasCookShelter(peopleId?: string): boolean {
   return peopleId ? COOK_SHELTER_PEOPLES.has(peopleId) : false
+}
+
+/** The rain factor of a fire, roofed or open, at `rain` 0..1 (point 256): the
+ *  one rule the village fire pit and the fishers' fire (point 1275) share. */
+export function shelteredFireRainFactor(rain: number, sheltered: boolean): number {
+  return fireRainFactor(rain, sheltered, balance.fire.shelteredRainDamp, balance.fire.openRainDamp)
+}
+
+/** Whether this people's fires stand under a cook-shelter, and the factor that
+ *  `rain` damps their flame and light by. Read for the village fire pit and the
+ *  fishers' fire alike, so a riverside village never keeps two answers. */
+export function fireShelterResponse(peopleId: string | undefined, rain: number): { sheltered: boolean; rainFactor: number } {
+  const sheltered = fireHasCookShelter(peopleId)
+  return { sheltered, rainFactor: shelteredFireRainFactor(rain, sheltered) }
 }
