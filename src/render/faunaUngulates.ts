@@ -167,17 +167,22 @@ function ungulateBodyParts(s: UngulateSpec, segs: Segs): THREE.BufferGeometry[] 
   // elliptical falloff so the rump reads round, never as a cut-off tube.
   const w = s.bodyWidth ?? 1
   const st = (z: number, y: number, rx: number, ry: number): SweepStation => ({ p: [0, backY + y * R, z], rx: rx * R * w, ry: ry * R })
+  // Elliptical end cap: stations falling off as sqrt(1 - u²) from a full
+  // section at `z0` over `len` (sign -1 toward the rump, +1 toward the breast).
+  const endCap = (z0: number, len: number, sign: number, y: number, rx: number, ry: number) =>
+    [0.45, 0.72, 0.88, 0.97].map((u) => {
+      const k = Math.sqrt(1 - u * u)
+      return st(z0 + sign * u * len, y, rx * k, ry * k)
+    })
   const torso = sweepTube(
     [
-      st(-halfL - 0.8 * R, 0.0, 0.22, 0.26),
-      st(-halfL - 0.62 * R, 0.02, 0.55, 0.6),
-      st(-halfL - 0.35 * R, 0.02, 0.74, 0.78),
-      st(-halfL + 0.05 * R, -0.02, 0.8, 0.84),
+      ...endCap(-halfL - 0.15 * R, 0.7 * R, -1, 0.02, 0.8, 0.84).reverse(),
+      st(-halfL - 0.15 * R, 0.0, 0.8, 0.84),
+      st(-halfL + 0.2 * R, -0.03, 0.8, 0.85),
       st(0, -0.1, 0.8, 0.86),
       st(halfL - 0.15 * R, -0.12, 0.76, 0.96),
-      st(halfL + 0.3 * R, -0.08, 0.62, 0.84),
-      st(halfL + 0.55 * R, -0.02, 0.44, 0.6),
-      st(halfL + 0.72 * R, 0.04, 0.2, 0.26),
+      st(halfL + 0.2 * R, -0.08, 0.66, 0.88),
+      ...endCap(halfL + 0.2 * R, 0.55 * R, 1, -0.04, 0.66, 0.88),
     ],
     { radial: segs.body, rings: 20, capStart: true, capEnd: true },
   )

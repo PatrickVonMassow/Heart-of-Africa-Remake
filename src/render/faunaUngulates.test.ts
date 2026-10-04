@@ -173,7 +173,7 @@ describe('pelt markings (procedural, no texture asset)', () => {
     let freq = 0
     for (let i = 0; i < pos.count; i++) {
       const [k, , , az] = markAt(g, i)
-      if (k === MARK.stripes && Math.abs(pos.getY(i) - L.backY) < 0.05 && Math.abs(pos.getZ(i)) < 0.2) freq = Math.max(freq, Math.abs(az))
+      if (k === MARK.stripes && Math.abs(pos.getY(i) - L.backY) < 0.15 && Math.abs(pos.getZ(i)) < 0.4) freq = Math.max(freq, Math.abs(az))
     }
     const torsoLen = UNGULATE_SPECS.zebra.bodyLen + 1.5 * UNGULATE_SPECS.zebra.bodyR
     expect(freq).toBeGreaterThan(0)
