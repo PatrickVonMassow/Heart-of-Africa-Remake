@@ -3168,9 +3168,14 @@ if (section('adult-errands')) {
       })
       if (aim && shot) {
         const after = await page.evaluate(aimRead, { index: aim.index, drift: aim.drift })
+        // The drift phase only grows, so a drift within the validated lead means
+        // the patch rode a straight stretch whose both ends were checked inside
+        // the (convex) frustum, without wrapping upstream: it was in the picture
+        // at the shutter too. A larger drift proves nothing and fails.
+        const withinLead = !!after && after.driftedM >= 0 && after.driftedM <= AIM_LEAD_M
         check(
           'the river-bank frame: the foam it was aimed at is still in the picture after the shutter',
-          !!after && after.inPicture,
+          !!after && after.inPicture && withinLead,
           after
             ? `drifted ${after.driftedM.toFixed(2)} m (lead ${AIM_LEAD_M} m)` +
                 (after.ndc ? `, ndc ${after.ndc.x.toFixed(2)}, ${after.ndc.y.toFixed(2)}` : ', out of the picture')
