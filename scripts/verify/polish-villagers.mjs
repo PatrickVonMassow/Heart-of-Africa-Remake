@@ -3808,6 +3808,26 @@ if (section('villager-dress')) {
           if (o.visible) hidden.push(o)
           o.visible = false
         })
+        // For the exact-distance pair the place's own people count as blockers
+        // too: a villager who walks up to address the player otherwise stands
+        // in the one sight line a fixed distance leaves (22 m, WebGL 2 run).
+        const cam = window.__placeCamera.position
+        const people = []
+        if (exact)
+          window.__placeScene.traverse((o) => {
+            if (o.name !== 'figure-head') return
+            for (let n = o.parent; n; n = n.parent) if (n.name === 'dress-lineup') return // the row being re-staged
+            const h = o.getWorldPosition(new cam.constructor())
+            people.push(h, h.clone().setY(h.y - 0.5))
+          })
+        const personOnLine = (x, y, z) =>
+          people.some((h) => {
+            const sx = x - cam.x, sy = y - cam.y, sz = z - cam.z
+            const rx = h.x - cam.x, ry = h.y - cam.y, rz = h.z - cam.z
+            const k = (rx * sx + ry * sy + rz * sz) / (sx * sx + sy * sy + sz * sz)
+            if (k <= 0 || k >= 1) return false
+            return Math.hypot(rx - k * sx, ry - k * sy, rz - k * sz) < 0.8
+          })
         const half = only ? 0.45 : 3.15
         const lateral = only ? [-half, half] : [-half, -2.25, -1.35, -0.45, 0.45, 1.35, 2.25, half]
         for (const dist of exact ? [d] : [d, d * 0.85, d * 1.2]) {
@@ -3824,7 +3844,7 @@ if (section('villager-dress')) {
               for (const y of [0.5, 1.0]) {
                 const hit = window.__placeRayHit?.(x, y, z)
                 const ratio = !hit || hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance
-                if (ratio >= 0.98) clear++
+                if (ratio >= 0.98 && !personOnLine(x, y + 0.3, z)) clear++
               }
             }
             if (clear > best.score) Object.assign(best, { score: clear, of: lateral.length * 2, yaw, cx, cz, dist })
