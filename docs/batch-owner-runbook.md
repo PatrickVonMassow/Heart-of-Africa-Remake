@@ -14,6 +14,10 @@ not need it and must not act on it.
 - Generate an author's spec with `node scripts/point-brief.mjs <N>`; named
   sections may be read on demand, an ambiguous or insufficient brief is
   escalated, and a brief from an older revision is regenerated.
+- A delegation that only locates or summarizes (where is X, which files touch
+  Y, collect status or log facts) uses `subagent_type: "Explore"`; authoring,
+  review, suites, and anything that writes, commits, or verifies keep their
+  current agent types, and the model policy is unchanged.
 - Land with `node scripts/land-point.mjs <N> --model <m>`. It drives the no-ff
   merge, fast gate, work-order tick/archive commit, push, board publish, and
   worktree cleanup, stopping on the first failed step. The post-merge gate is
