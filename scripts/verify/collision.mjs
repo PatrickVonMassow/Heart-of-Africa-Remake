@@ -1134,6 +1134,133 @@ if (section('fish-fire-room')) {
   }
 }
 
+// === The fishers' scene is solid (point 1275) ================================
+// The unit layer pins every fishery collider into the plan; what only the live
+// scene shows is the traveller himself, walking straight at the grill and at the
+// smoking rack from the water side under the game's own resolver, stopping
+// outside each and never inside any collider.
+if (section('fish-props')) {
+  await enterSettlement('bambara-village')
+  const ready = await page
+    .waitForFunction(() => !!window.__placeFishFire && !!window.__placeLayout?.bank && !!window.__placePlayer, null, { timeout: 40000 })
+    .then(() => true)
+    .catch(() => false)
+  check('fish props: the river village carries the fishers’ scene', ready)
+  if (ready) {
+    const geo = await page.evaluate(() => {
+      const s = window.__placeFishFire().sites
+      const b = window.__placeLayout.bank
+      return { fire: s.fire, rack: s.rack, nx: b.nx, nz: b.nz, fx: b.fx, fz: b.fz }
+    })
+    // Inward from the water side (+n), straight at the prop's middle. The fire's
+    // collider is the hearth with the grill's forked posts (FISHERY_PROPS: 1.0 m
+    // drawn); the rack's reaches 0.385 m toward the water (its posts and rails).
+    for (const [label, at, drawn] of [['grill', geo.fire, 1.0], ['smoking rack', geo.rack, 0.385]]) {
+      const walk = await page.evaluate(
+        ({ at, n }) =>
+          new Promise((resolve) => {
+            const p = window.__placePlayer
+            p.x = at.x + n.x * 3.2
+            p.z = at.z + n.z * 3.2
+            // W walks along -(sin yaw, cos yaw): face -n, toward the prop.
+            p.yaw = Math.atan2(n.x, n.z)
+            p.pitch = -0.2
+            const STALL_RESOLVES = 120
+            const t0 = performance.now()
+            let lastResolves = window.__placeResolves ?? 0
+            let stalled = 0
+            let best = Infinity
+            let worstClear = Infinity
+            const tick = () => {
+              window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+              const q = window.__placePlayer
+              const d = (q.x - at.x) * n.x + (q.z - at.z) * n.z
+              for (const c of window.__placeColliders) worstClear = Math.min(worstClear, window.__clearanceTo(c, q.x, q.z) - 0.35)
+              const resolves = window.__placeResolves ?? 0
+              if (resolves !== lastResolves) {
+                if (d < best - 0.01) stalled = 0
+                else stalled += resolves - lastResolves
+                lastResolves = resolves
+                best = Math.min(best, d)
+              }
+              if (stalled >= STALL_RESOLVES || performance.now() - t0 > 60000) {
+                window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }))
+                resolve({ d, across: Math.abs((q.x - at.x) * n.z - (q.z - at.z) * n.x), worstClear, timedOut: stalled < STALL_RESOLVES })
+              } else requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+          }),
+        { at, n: { x: geo.nx, z: geo.nz } },
+      )
+      check(
+        `fish props: walking straight into the ${label} he stops outside it`,
+        !walk.timedOut && walk.d >= drawn + 0.35 - 0.05 && walk.d <= 3.0,
+        `stopped ${walk.d.toFixed(2)} m from its middle (drawn reach ${drawn} m + body 0.35), ${walk.across.toFixed(2)} m off the line${walk.timedOut ? ', TIMED OUT' : ''}`,
+      )
+      check(
+        `fish props: walking into the ${label} he never stands inside any collider`,
+        walk.worstClear >= -0.03,
+        `worst clearance ${walk.worstClear.toFixed(3)} m`,
+      )
+    }
+  }
+}
+
+// === The fishers' fire under its cook-shelter in the rain (point 1275) ========
+// A cook-shelter people's fishery fire is roofed by the village fire pit's own
+// canopy and keeps burning in a downpour with the village fire's rain factor.
+// One frame for the picture judgement on each backend.
+if (section('fish-shelter-rain')) {
+  await enterSettlement('bambara-village')
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+  const ready = await page
+    .waitForFunction(() => !!window.__placeFishFire && !!window.__placeSeason && window.__placeSeason().rain > 0.5, null, { timeout: 40000 })
+    .then(() => true)
+    .catch(() => false)
+  check('fish shelter: the river village is in a downpour', ready)
+  if (ready) {
+    const geo = await page.evaluate(() => {
+      const f = window.__placeFishFire()
+      const b = window.__placeLayout.bank
+      return { fire: f.sites.fire, nx: b.nx, nz: b.nz, fx: b.fx, fz: b.fz }
+    })
+    // Inland of the fire and a little downstream, facing it: the griller kneels
+    // between, the rack beyond on the left.
+    await page.evaluate(({ fire, nx, nz, fx, fz }) => {
+      const p = window.__placePlayer
+      const dx = -nx * 6.5 + fx * 2.5
+      const dz = -nz * 6.5 + fz * 2.5
+      p.x = fire.x + dx
+      p.z = fire.z + dz
+      p.yaw = Math.atan2(dx, dz)
+      p.pitch = -0.08
+    }, geo)
+    // Two frames for the redraw, then read what the fire reports now.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+    await page.waitForTimeout(600)
+    const now = await page.evaluate(() => {
+      const f = window.__placeFishFire()
+      const s = window.__placeSeason()
+      return { sheltered: f.fireSheltered, factor: f.fireRainFactor, villageSheltered: s.fireSheltered, villageFactor: s.fireRainFactor, rain: s.rain }
+    })
+    check(
+      'fish shelter: the fishers’ fire is roofed in a cook-shelter village, like its village fire',
+      now.sheltered === true && now.villageSheltered === true,
+      `fishery sheltered=${now.sheltered}, village sheltered=${now.villageSheltered}`,
+    )
+    check(
+      'fish shelter: in the downpour it burns on with the village fire’s rain factor',
+      Math.abs(now.factor - now.villageFactor) < 1e-9 && now.factor > 0.7,
+      `rain ${now.rain.toFixed(2)}: fishery factor ${now.factor.toFixed(3)}, village ${now.villageFactor.toFixed(3)}`,
+    )
+    await shot('1275-fish-fire-cook-shelter-rain', {
+      local: { x: geo.fire.x, y: 1.2, z: geo.fire.z },
+      label: 'the fishers’ fire under its thatched cook-shelter in the rain, the griller kneeling beneath it',
+    })
+  }
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+}
+
 // === No wedge is fatal (work-order 604) ======================================
 // The collision rules keep the traveller out of the walls; this keeps him out of
 // the gaps BETWEEN them. The pure halves (the stall detector, the outward search)
