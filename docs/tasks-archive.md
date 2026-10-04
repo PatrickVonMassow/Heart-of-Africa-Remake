@@ -33432,3 +33432,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Known gap, to be stated in the hook header: a batch-owner session appending a point directly to TASKS.md from a chat discussion is not covered; there the memory rule alone applies.
   This is a deliberate exception to the infrastructure freeze of 01.09.2026, by user order of 03.10.2026; record it so in the commit and closure.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1282. One mortar in the Bambara village: the pounding duo moves to the river and eats at the fish fire
+  Queue position: directly after point 1277 (user order).
+  In the Bambara village there is afterwards only ONE mortar:
+  - Remove the fish eater's mortar by the water (RiverFishery.tsx "THE EATER'S MORTAR" group, eater-pestle, MORTAR_H/PESTLE_* constants, fishFire.ts eaterMortar and its standing body / sceneGrounds enclosure, balance eaterMortarOffset/eaterPoundRate as far as they become unused).
+  - Move the pounding duo of point 1274 (mortarPounding.ts, PlaceLife Pounder, VILLAGE_SPOTS.pounder in lifeSpots.ts, with its station bodies and clearance) to the place where the fish eater's mortar stood until now. The old village-centre pounder spot is freed.
+  - The duo regularly walks TOGETHER to the fish fire (rack), each takes fish, eats, and they walk back together and resume alternating pounding. Interval and timings as calibratable values in src/config/balance.ts.
+  - Reading of the order, open to the user's veto: the duo takes over the fish eater's role (his only home activity was the removed mortar), so the separate single eater figure goes; his eat cycle (walk/take/eat) is reused for the two. If the author finds this reading insufficient, escalate instead of guessing.
+  Tests: Vitest — only one mortar exists in the village scene data; the duo's spot equals the former eater-mortar spot; the shared walk/take/eat cycle for both women with return to alternating pounding; station/clearance bodies stay walk-clear. Playwright, both backends: frame of the duo pounding at the river spot and a frame of both eating at the fish fire; no mortar left at the old village-centre spot.
+  Bundle: Dorfleben.

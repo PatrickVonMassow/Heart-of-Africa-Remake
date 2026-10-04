@@ -77,15 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1282. One mortar in the Bambara village: the pounding duo moves to the river and eats at the fish fire
-  Queue position: directly after point 1277 (user order).
-  In the Bambara village there is afterwards only ONE mortar:
-  - Remove the fish eater's mortar by the water (RiverFishery.tsx "THE EATER'S MORTAR" group, eater-pestle, MORTAR_H/PESTLE_* constants, fishFire.ts eaterMortar and its standing body / sceneGrounds enclosure, balance eaterMortarOffset/eaterPoundRate as far as they become unused).
-  - Move the pounding duo of point 1274 (mortarPounding.ts, PlaceLife Pounder, VILLAGE_SPOTS.pounder in lifeSpots.ts, with its station bodies and clearance) to the place where the fish eater's mortar stood until now. The old village-centre pounder spot is freed.
-  - The duo regularly walks TOGETHER to the fish fire (rack), each takes fish, eats, and they walk back together and resume alternating pounding. Interval and timings as calibratable values in src/config/balance.ts.
-  - Reading of the order, open to the user's veto: the duo takes over the fish eater's role (his only home activity was the removed mortar), so the separate single eater figure goes; his eat cycle (walk/take/eat) is reused for the two. If the author finds this reading insufficient, escalate instead of guessing.
-  Tests: Vitest — only one mortar exists in the village scene data; the duo's spot equals the former eater-mortar spot; the shared walk/take/eat cycle for both women with return to alternating pounding; station/clearance bodies stay walk-clear. Playwright, both backends: frame of the duo pounding at the river spot and a frame of both eating at the fish fire; no mortar left at the old village-centre spot.
-  Bundle: Dorfleben.
 - [ ] 1283. The full settings suite is red on main after 1280: lion feeding checks and the river texture drift
   Measured 03.10.2026, 20:3x, on main e4cc4aba7 (WebGPU, full `npm test -- settings`, log local/verify-logs/2026-10-03T18-45-21-098-settings.log): RED with five reds no open point owns:
   `settings: feeding: lion head lowered`, `settings: feeding: tearing movement animates`, `settings: feeding: prey lies on its side`, `settings: feeding: stain beneath the carcass`, and `settings: the water TEXTURE moves downstream between the frames by about the drift`.
