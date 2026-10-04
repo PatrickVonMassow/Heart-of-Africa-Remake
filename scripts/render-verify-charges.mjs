@@ -179,6 +179,20 @@ export const RED_CHARGES = [
       + 'charge dies with that point.',
   },
   {
+    point: 1292,
+    suite: 'polish-villagers',
+    backend: 'webgl',
+    kind: 'check',
+    match: /both women strike the mortar and every strike is heard/i,
+    why:
+      'FILED AS 1292 ON 04.10.2026 from the covering WebGL 2 run after point 1121 '
+      + '(local/1121-pv-webgl.log): {struck:2, heard:3, thuds:3}, three thuds heard against two '
+      + 'counted strikes, while the same section ran green on WebGPU minutes earlier and 1121 only '
+      + 'changed the river-bank aim block. A counting race in the check, not a silent strike. '
+      + 'It is charged, not excused: 1292 owns reading strikes and thuds from one moment, and the '
+      + 'charge dies with that point.',
+  },
+  {
     point: 939,
     suite: 'flow',
     backend: 'webgpu',

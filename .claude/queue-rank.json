@@ -1596,6 +1596,12 @@
       "why": "A boundary-only guard deadlock with no player impact; last is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1292": {
+      "at": "2026-10-04T06:57:54.981Z",
+      "why": "Low-criticality test-side race with its red charged; behind the user's ordered work is right.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1625,7 +1631,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-04T03:04:47.507Z",
+    "at": "2026-10-04T06:57:54.992Z",
     "points": [
       184,
       200,
@@ -2003,7 +2009,6 @@
       1115,
       1119,
       1120,
-      1121,
       1122,
       1123,
       1144,
@@ -2063,7 +2068,10 @@
       1288,
       1289,
       1290,
-      1291
+      1291,
+      1292,
+      1293,
+      1294
     ]
   }
 }

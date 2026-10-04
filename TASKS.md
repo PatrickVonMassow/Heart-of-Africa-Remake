@@ -15795,5 +15795,5 @@ to land than a mechanism that needs a review.
   The strike counter appears to miss a strike whose thud was heard — a counting race, not a missing sound.
   Done when: the strike count and the heard thuds are read from the same moment, and the check stays
   able to fail on a strike that is truly silent.
-  Bundle: Prüfstand.
+  Bundle: Testinfrastruktur.
   Criticality: low — a test-side race, no player impact measured.
