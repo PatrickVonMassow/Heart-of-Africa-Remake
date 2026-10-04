@@ -2979,9 +2979,10 @@ export function PlaceScene() {
       const { pos, found } = findFreeSpot(p.x, p.z, {
         step: balance.unstuck.searchStep,
         maxRadius: balance.unstuck.searchRadius,
-        // Free ground here is the full rule: no collider touches his footprint,
+        // Free ground here is the full rule: no collider touches his footprint
+        // (the dugout and the walking fishers included, as for his walking),
         // and the spot lies inside the settlement, on the drawn ground.
-        accept: (x, z) => standingClear(chiefMovementColliders(l.colliders), x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
+        accept: (x, z) => standingClear(withFisheryMovers(chiefMovementColliders(l.colliders)), x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
         // A POINT inside a collider is a wall between him and a candidate, so he
         // is never set down on the far side of something he could not walk through.
         blocked: (x, z) => !standingClear(l.colliders, x, z, 0),
