@@ -5,6 +5,7 @@ import { bodyProportions, buildBodyGeometry, jointPositions } from './figureBody
 import { FIGURE_LIMBS } from './figures'
 import {
   ankleAt,
+  armAtRest,
   crouchTarget,
   crownOffset,
   headLoadGrip,
@@ -117,6 +118,15 @@ describe('the whole body walks', () => {
     const a = walkPose(d, 1, 0.1, 1, 'elder')
     const b = walkPose(d, 1, 0.1, 1, 'adult')
     expect(Math.abs(a.arms[0])).toBeLessThan(Math.abs(b.arms[0]))
+  })
+})
+
+describe('an arm hanging at rest is no contact', () => {
+  it('the rest pose is free, a reach is held', () => {
+    const rest = { pitch: 0.04, yaw: 0, roll: 0.46 }
+    expect(armAtRest({ ...rest }, rest)).toBe(true)
+    expect(armAtRest({ pitch: -1.2, yaw: 0.2, roll: 0 }, rest)).toBe(false)
+    expect(armAtRest({ pitch: -0.17, yaw: 0, roll: 0 }, rest)).toBe(false)
   })
 })
 

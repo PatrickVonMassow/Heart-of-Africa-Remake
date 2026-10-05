@@ -263,3 +263,10 @@ export function primitiveLayout(k: number, legs: boolean, L: { hipY: number; arm
     groupScale: [1, 1, 1],
   }
 }
+
+/** True when a pose leaves this arm hanging at rest — no contact to reach, so
+ *  it is free to swing with the walk (or to steady a head load). */
+export function armAtRest(a: { pitch: number; yaw: number; roll: number }, rest: { pitch: number; yaw: number; roll: number }): boolean {
+  const tol = 0.15
+  return Math.abs(a.pitch - rest.pitch) < tol && Math.abs(a.yaw - rest.yaw) < tol && Math.abs(a.roll - rest.roll) < tol
+}
