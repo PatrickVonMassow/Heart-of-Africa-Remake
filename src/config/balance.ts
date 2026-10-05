@@ -2507,6 +2507,25 @@ export const VILLAGER_MOTION = {
   /** How far up a steadied load the hand grips, as a fraction of its height
    *  (lowered further where the arm cannot reach — never a straight arm). */
   gripFraction: 0.8,
+  /** How far a held stance foot may stray from under its hip, as fractions of
+   *  the leg length (sideways, fore/aft), before it is dragged along — the
+   *  reach a turn or a shove asks of the planted leg. */
+  plantSide: 0.3,
+  plantFore: 0.5,
+  /** The stepping a turn asks for, as ground covered per radian turned
+   *  (figure units): a walker turning steps round, it does not pivot on one
+   *  held foot. */
+  turnStep: 0.4,
+  /** How fast a standing figure's feet shuffle back under the hips (figure
+   *  units per second). */
+  plantSettle: 0.6,
+  /** The tightest corner a walker rounds at its pace (m radius), and how fast
+   *  it turns nearly on the spot when its way lies far off its heading (rad/s). */
+  turnRadius: 0.5,
+  spotTurnRate: 3,
+  /** The heading error (rad) at which a walker stops to turn; its pace eases
+   *  from full (heading on its way) to nothing at this error. */
+  turnStopAngle: 1.75,
 } as const
 
 // Dev hook for the headless verification (the village-walk tolerances).

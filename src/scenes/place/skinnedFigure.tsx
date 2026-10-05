@@ -34,10 +34,11 @@ import {
   kneelBlend,
   legDims,
   legExtent,
-  phasePerDistance,
-  rephase,
-  strideReach,
+  restingMotion,
+  stepWalk,
   walkPose,
+  type FootOffset,
+  type WalkMotion,
   type WalkPose,
 } from '../../render/figureWalk'
 import { VILLAGER_MOTION } from '../../config/balance'
@@ -172,21 +173,6 @@ const _facing = new THREE.Vector3()
 const _grip = new THREE.Vector3()
 
 /** What the figure measured of its own walk, and its transitions in progress. */
-interface Motion {
-  /** Last world position (for the ground speed), null until the first frame. */
-  last: THREE.Vector3 | null
-  /** Smoothed ground speed (figure units per second) and the gait phase. */
-  speed: number
-  phase: number
-  /** The walk's weight (0 standing … 1 walking) and the planted foot's reach. */
-  weight: number
-  reach: number
-  /** The work crouch drawn and the one the contact asks for. */
-  crouch: number
-  crouchTarget: number
-  /** 0 standing … 1 kneeling. */
-  kneel: number
-}
 
 export function SkinnedFigure({
   look,
@@ -257,7 +243,7 @@ export function SkinnedFigure({
   const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
   const owned = !!(pose && limbs)
   const dims = useMemo(() => legDims(rig.p), [rig])
-  const motion = useRef<Motion>({ last: null, speed: 0, phase: 0, weight: 0, reach: 0, crouch: 0, crouchTarget: 0, kneel: kneel ? 1 : 0 })
+  const motion = useRef<WalkMotion>(restingMotion(kneel))
   // THE LEGS AND HIPS from the walk, the work crouch and the kneel — one
   // function, so the frame callback and an owning caller's retarget both
   // leave the stride in place. Returns the walk for the arms and shoulders.
@@ -265,7 +251,7 @@ export function SkinnedFigure({
     const b = rig.bones
     return (): WalkPose => {
       const m = motion.current
-      const walk = walkPose(dims, m.phase, m.reach, m.weight, id.age, m.crouch)
+      const walk = walkPose(dims, m.phase, m.reach, m.weight, id.age, m.crouch, [m.plants[0].offset, m.plants[1].offset])
       let hip = walk.hipHeight
       let legsNow = walk.legs
       let yaw = walk.hipYaw
@@ -278,9 +264,12 @@ export function SkinnedFigure({
       b.hips.position.y = hip
       b.hips.rotation.set(0, yaw, 0)
       ;(['L', 'R'] as const).forEach((s, i) => {
-        b[`thigh.${s}`].rotation.set(legsNow[i].thigh, -yaw, 0)
+        // The hips' turn undone first, then the leg's sideways tilt, then its
+        // swing; the foot kept flat under both.
+        const roll = legsNow[i].roll ?? 0
+        b[`thigh.${s}`].rotation.set(legsNow[i].thigh, -yaw, roll, 'YZX')
         b[`shin.${s}`].rotation.set(legsNow[i].shin, 0, 0)
-        b[`foot.${s}`].rotation.set(legsNow[i].foot, 0, 0)
+        b[`foot.${s}`].rotation.set(legsNow[i].foot, 0, -roll)
       })
       return { ...walk, hipYaw: yaw, chestYaw: walk.chestYaw * (1 - m.kneel) }
     }
@@ -470,30 +459,16 @@ export function SkinnedFigure({
       g.updateWorldMatrix(true, false)
       g.getWorldPosition(_here)
       const unit = g.getWorldScale(_scale).x || 1
-      let walked = 0
-      if (m.last) {
-        const dx = _here.x - m.last.x
-        const dz = _here.z - m.last.z
-        const dist = Math.hypot(dx, dz) / unit
-        if (dist / dt <= VILLAGER_MOTION.teleportSpeed) {
-          // Only the step along the facing is a stride; a sideways shove is not.
-          g.getWorldDirection(_facing)
-          walked = (dx * _facing.x + dz * _facing.z) / (Math.hypot(_facing.x, _facing.z) || 1) / unit
-        }
-      } else m.last = new THREE.Vector3()
-      m.last.copy(_here)
-      const k = 1 - Math.exp(-dt / VILLAGER_MOTION.speedSmoothing)
-      m.speed += (walked / dt - m.speed) * k
-      const wanted = kneel || !!kneeling?.current
-      m.kneel = approach(m.kneel, wanted ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
-      const moving = Math.abs(m.speed) > VILLAGER_MOTION.moveSpeed && m.kneel === 0
-      const placed = m.reach * m.weight
-      m.weight = approach(m.weight, moving ? 1 : 0, VILLAGER_MOTION.walkFadeRate, dt)
-      if (moving) m.reach = strideReach(dims, m.speed, id.age)
-      // A pace change does not drag the planted foot: the phase moves with it.
-      m.phase = rephase(m.phase, placed, m.reach * m.weight)
-      // The planted foot stays put: the phase runs at the rate its reach is swept.
-      m.phase += walked * phasePerDistance(Math.max(m.reach * m.weight, m.reach * 0.3))
+      g.getWorldDirection(_facing)
+      const hips = rig.bones.hips.position
+      const joints = (['L', 'R'] as const).map((side) => {
+        const t = rig.bones[`thigh.${side}`].position
+        return { x: hips.x + t.x, z: hips.z + t.z }
+      }) as [FootOffset, FootOffset]
+      const body = { x: _here.x, z: _here.z, yaw: Math.atan2(_facing.x, _facing.z), unit }
+      stepWalk(m, body, dt, dims, id.age, kneel || !!kneeling?.current, joints)
+      // Dev: the walk the village-walk verification reads beside the bones.
+      if (import.meta.env.DEV) g.userData.walk = m
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
       const actor = g.userData.actor as { height: number } | undefined
       if (actor) actor.height = 1.45 - 0.45 * m.kneel // the label over the drawn crown

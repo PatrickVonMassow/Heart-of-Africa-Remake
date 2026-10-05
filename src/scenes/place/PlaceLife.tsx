@@ -65,6 +65,7 @@ import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
+import { steerHeading } from '../../render/figureWalk'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
 import { isLifeFrozen } from './lifeFreeze'
@@ -2244,26 +2245,30 @@ function TaskWalker({
     const dx = tgt[0] - s.x
     const dz = tgt[1] - s.z
     const d = Math.hypot(dx, dz)
-    const step = 1.2 * dt
+    const speed = 1.2
+    const step = speed * dt
     // The home leg (center ↔ door) passes through the own dwelling.
     const throughDoor = s.mode === 'go' ? s.seg === 0 : s.seg === route.length - 2
     if (d <= step + (throughDoor ? 0.08 : 0.3)) {
       s.seg++
     } else if (throughDoor) {
-      s.x += (dx / d) * step
-      s.z += (dz / d) * step
-      s.yaw = Math.atan2(dx, dz)
+      // Turned toward the way, never snapped (a planted foot rides a snap).
+      const turn = steerHeading(s.yaw, Math.atan2(dx, dz), speed, dt)
+      s.yaw = turn.yaw
+      s.x += Math.sin(s.yaw) * step * turn.pace
+      s.z += Math.cos(s.yaw) * step * turn.pace
     } else {
       // Point 657: another inhabitant on the way is walked round, not walked
       // into.
       const want = body
         ? stepRoundBodies(bodySet, body, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
         : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
-      const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
-      if (Math.hypot(nx - s.x, nz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
-      s.x = nx
-      s.z = nz
-      s.yaw = Math.atan2(dx, dz)
+      const [tx, tz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
+      if (Math.hypot(tx - s.x, tz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
+      const way = wayHeading(s.x, s.z, tx, tz, dx, dz, step)
+      const turn = steerHeading(s.yaw, way, speed, dt)
+      s.yaw = turn.yaw
+      ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
       // Point 578: pushed clear of the other inhabitants where the step left it.
       // The door leg is left out — it runs through its own hut, where every
       // direction is blocked anyway.
@@ -2529,15 +2534,20 @@ function Walkers({
       // Door segments (home center ↔ door) pass through the own dwelling:
       // no collision there, the walker slips through the entrance door.
       const throughDoor = s.seg === 0 || s.seg === s.route.length - 2
+      // Turning nearly on the spot is not being wedged.
+      let turning = false
       if (d <= step + (throughDoor ? 0.08 : 0.35)) {
         // Close enough (the exact point may sit inside a collider).
         s.seg++
         s.stuck = 0
         if (s.seg === 3) s.pause = 2.5 + Math.random() * 4 // linger at the errand
       } else if (throughDoor) {
-        s.x += (dx / d) * step
-        s.z += (dz / d) * step
-        s.yaw = Math.atan2(dx, dz)
+        // Turned toward the way, never snapped (a planted foot rides a snap).
+        const turn = steerHeading(s.yaw, Math.atan2(dx, dz), def.speed, dt)
+        s.yaw = turn.yaw
+        s.x += Math.sin(s.yaw) * step * turn.pace
+        s.z += Math.cos(s.yaw) * step * turn.pace
+        turning = turn.pace < 0.3
       } else {
         // Solid objects block inhabitants too; slide along and skip the
         // waypoint if blocked for too long (design.md §2 collision) — and
@@ -2546,16 +2556,14 @@ function Walkers({
         const want = b657
           ? stepRoundBodies(bodySet, b657, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
           : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
-        const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
-        const moved = Math.hypot(nx - s.x, nz - s.z)
-        // The body faces where it really goes: slid along a wall or round
-        // another body, a figure facing the waypoint would sweep its planted
-        // foot across the line it walks (work-order "walking villagers").
-        // A shove back (a wedged body) never turns it about.
-        const ahead = (nx - s.x) * dx + (nz - s.z) * dz > 0
-        s.yaw = moved > step * 0.3 && ahead ? Math.atan2(nx - s.x, nz - s.z) : Math.atan2(dx, dz)
-        s.x = nx
-        s.z = nz
+        const [tx, tz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
+        const moved = Math.hypot(tx - s.x, tz - s.z)
+        // The body turns toward where it can really go and steps along its
+        // heading: a snapped turn swings a planted foot across the ground.
+        const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, tx, tz, dx, dz, step), def.speed, dt)
+        s.yaw = turn.yaw
+        ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
+        turning = turn.pace < 0.3
         if (moved < step * 0.3) {
           s.stuck += dt
           if (s.stuck > 1.4) {
@@ -2570,7 +2578,9 @@ function Walkers({
       // blocks, but a walker wedged in a pocket keeps cycling waypoints while
       // physically pinned. When it has not actually moved for the calibratable
       // window, place it on free ground — inhabitants only, never the player.
-      if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
+      if (turning) {
+        // the pinned clock holds
+      } else if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
         s.pinned += dt
         if (s.pinned > balance.walkerUnstuckSeconds) {
           const escape = escapeToFree(colliders, s.x, s.z, NPC_RADIUS, nav, def.home.door)
@@ -2621,6 +2631,14 @@ function Walkers({
       ))}
     </>
   )
+}
+
+/** The heading a walker turns toward: where a full step toward its waypoint
+ *  really goes (slid along a wall, round another body) — unless that is
+ *  hardly a step, or a shove back, which never turns it about. */
+function wayHeading(x: number, z: number, tx: number, tz: number, dx: number, dz: number, step: number): number {
+  const ahead = (tx - x) * dx + (tz - z) * dz > 0
+  return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
 }
 
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a

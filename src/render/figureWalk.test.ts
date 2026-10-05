@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { VILLAGER_MOTION as M } from '../config/balance'
-import { AGE_GROUPS, SEXES } from '../systems/appearance'
+import { AGE_GROUPS, SEXES, type AgeGroup } from '../systems/appearance'
 import { bodyProportions, buildBodyGeometry, jointPositions } from './figureBody'
 import { FIGURE_LIMBS } from './figures'
 import {
@@ -16,9 +16,15 @@ import {
   phasePerDistance,
   rephase,
   primitiveLayout,
+  restingMotion,
   solveLeg,
+  steerHeading,
+  stepWalk,
   strideReach,
   walkPose,
+  type FootOffset,
+  type LegDims,
+  type WalkMotion,
 } from './figureWalk'
 
 const bodies = AGE_GROUPS.flatMap((age) => SEXES.map((sex) => ({ age, sex, p: bodyProportions(sex, age, 0) })))
@@ -118,6 +124,22 @@ describe('the walk keeps the feet on the ground', () => {
     expect(worst).toBeLessThanOrEqual(M.stanceSlipTolerance)
   })
 
+  it('a foot held off the hip’s line is reached by tilting the leg, still on the ground', () => {
+    const d = legDims(bodyProportions('male', 'adult'))
+    const reach = strideReach(d, 1.1, 'adult')
+    for (const off of [{ x: 0.12, z: 0.05 }, { x: -0.1, z: -0.08 }]) {
+      for (let ph = -1.4; ph <= 1.4; ph += 0.2) {
+        const pose = walkPose(d, ph, reach, 1, 'adult', 0, [off, { x: 0, z: 0 }])
+        const l = pose.legs[0]
+        const a = ankleAt(d, l)
+        // The tilted plane carries the in-plane ankle sideways by its depth.
+        expect(-a.y * Math.sin(l.roll ?? 0)).toBeCloseTo(off.x, 6)
+        expect(a.z).toBeCloseTo(pose.feet[0].z, 6)
+        expect(pose.hipHeight + a.y * Math.cos(l.roll ?? 0) - d.ankle).toBeCloseTo(0, 5)
+      }
+    }
+  })
+
   it('the legs swing in counter-phase and the stride scales with pace and body', () => {
     const p = bodyProportions('female', 'adult')
     const d = legDims(p)
@@ -127,6 +149,127 @@ describe('the walk keeps the feet on the ground', () => {
     expect(strideReach(d, 1.2, 'elder')).toBeLessThan(strideReach(d, 1.2, 'adult'))
     const child = legDims(bodyProportions('female', 'child'))
     expect(strideReach(child, 1.2, 'child')).toBeLessThan(strideReach(d, 1.2, 'adult'))
+  })
+})
+
+/** Walks a body along a route as the village walkers do — turned by
+ *  `steerHeading`, stepping along its heading — and measures, by forward
+ *  kinematics of the drawn legs, how far each stance foot drifts in the world. */
+function walkRoute(
+  d: LegDims,
+  hipX: number,
+  age: AgeGroup,
+  route: Array<[number, number]>,
+  opts: { speed: number; dt: number; shove?: (f: number) => FootOffset },
+) {
+  const m: WalkMotion = restingMotion()
+  const joints: [FootOffset, FootOffset] = [
+    { x: hipX, z: 0 },
+    { x: -hipX, z: 0 },
+  ]
+  let x = route[0][0]
+  let z = route[0][1]
+  let yaw = Math.atan2(route[1][0] - x, route[1][1] - z)
+  let seg = 0
+  let worstSlip = 0
+  let stances = 0
+  const planted: Array<{ x: number; z: number } | null> = [null, null]
+  // It stood there a moment before setting off.
+  for (let f = 0; f < 3; f++) stepWalk(m, { x, z, yaw, unit: 1 }, opts.dt, d, age, false, joints)
+  for (let f = 0; f < 6000 && seg < route.length - 1; f++) {
+    const [tx, tz] = route[seg + 1]
+    const dx = tx - x
+    const dz = tz - z
+    const step = opts.speed * opts.dt
+    if (Math.hypot(dx, dz) <= step + (seg === route.length - 2 ? 0.08 : 0.35)) {
+      seg++
+      continue
+    }
+    const turn = steerHeading(yaw, Math.atan2(dx, dz), opts.speed, opts.dt)
+    yaw = turn.yaw
+    const before = { x, z }
+    x += Math.sin(yaw) * step * turn.pace
+    z += Math.cos(yaw) * step * turn.pace
+    const push = opts.shove?.(f)
+    if (push) {
+      x += push.x
+      z += push.z
+    }
+    stepWalk(m, { x, z, yaw, unit: 1 }, opts.dt, d, age, false, joints)
+    const pose = walkPose(d, m.phase, m.reach, m.weight, age, m.crouch, [m.plants[0].offset, m.plants[1].offset])
+    // Moving at all (a turn nearly on the spot included).
+    const walking = Math.hypot(x - before.x, z - before.z) > 0.01 * step
+    const c = Math.cos(pose.hipYaw)
+    const sn = Math.sin(pose.hipYaw)
+    pose.legs.forEach((l, i) => {
+      const a = ankleAt(d, l)
+      const j = joints[i]
+      const lx = j.x * c + j.z * sn - a.y * Math.sin(l.roll ?? 0)
+      const lz = -j.x * sn + j.z * c + a.z
+      const world = { x: x + lx * Math.cos(yaw) + lz * Math.sin(yaw), z: z - lx * Math.sin(yaw) + lz * Math.cos(yaw) }
+      if (!pose.feet[i].stance || !walking) {
+        planted[i] = null
+        return
+      }
+      if (!planted[i]) {
+        planted[i] = world
+        stances++
+      }
+      const p0 = planted[i] as { x: number; z: number }
+      worstSlip = Math.max(worstSlip, Math.hypot(world.x - p0.x, world.z - p0.z))
+    })
+  }
+  return { worstSlip, stances, arrived: seg >= route.length - 1 }
+}
+
+describe('a walker turning a corner keeps its planted foot', () => {
+  const corners: Array<[string, Array<[number, number]>]> = [
+    ['a right angle', [[0, 0], [0, 4], [4, 4]]],
+    ['a sharp 135° bend', [[0, 0], [0, 4], [-2.5, 1.5]]],
+    ['a doubling back past a door', [[0, 0], [0, 3], [0.3, 0.2], [0.2, 3]]],
+    ['a zig-zag lane', [[0, 0], [1, 2], [-1, 4], [1, 6], [-1, 8]]],
+  ]
+  for (const [name, route] of corners) {
+    it(`${name}: every waypoint reached, no stance foot drifts`, () => {
+      for (const { age, p } of bodies) {
+        const d = legDims(p)
+        for (const dt of [1 / 60, 1 / 20]) {
+          const r = walkRoute(d, p.hipX, age, route, { speed: age === 'child' ? 1.3 : 1.1, dt })
+          expect(r.arrived).toBe(true)
+          expect(r.stances).toBeGreaterThan(4)
+          expect(r.worstSlip).toBeLessThanOrEqual(M.stanceSlipTolerance)
+        }
+      }
+    })
+  }
+
+  it('a sideways shove (another body pushed clear) does not drag the planted foot', () => {
+    const p = bodyProportions('female', 'adult')
+    const d = legDims(p)
+    const r = walkRoute(d, p.hipX, 'adult', [[0, 0], [0, 8]], {
+      speed: 1.1,
+      dt: 1 / 60,
+      shove: (f) => ({ x: Math.sin(f / 9) * 0.004, z: 0 }),
+    })
+    expect(r.arrived).toBe(true)
+    expect(r.worstSlip).toBeLessThanOrEqual(M.stanceSlipTolerance)
+    // A long push aside, as a crowd shoves a walker clear for half a second.
+    for (const { age, p: q } of bodies) {
+      const long = walkRoute(legDims(q), q.hipX, age, [[0, 0], [0, 8]], {
+        speed: 1.1,
+        dt: 1 / 60,
+        shove: (f) => (f % 120 < 30 ? { x: 0.3 / 60, z: 0 } : { x: 0, z: 0 }),
+      })
+      expect(long.worstSlip).toBeLessThanOrEqual(M.stanceSlipTolerance)
+    }
+  })
+
+  it('the heading is turned, never snapped, and a way far off stops the pace', () => {
+    const a = steerHeading(0, Math.PI * 0.9, 1.1, 1 / 60)
+    expect(Math.abs(a.yaw)).toBeLessThanOrEqual(M.spotTurnRate / 60 + 1e-9)
+    expect(a.pace).toBe(0)
+    const b = steerHeading(0, 0.05, 1.1, 1 / 60)
+    expect(b.pace).toBeGreaterThan(0.99)
   })
 })
 
