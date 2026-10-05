@@ -3102,7 +3102,8 @@ export function TravelScene() {
     const zoom = useUi.getState().travelZoom
     // Position and aim share one smoothed follow point, so the viewing angle
     // stays constant in every direction and on a stop (point 1286).
-    follow.current = stepFollow(follow.current, pos.x, pos.z, zoom, dt, balance.travelCameraFollow)
+    // Uncapped frame time: the movement cap would slow the follow below 10 fps.
+    follow.current = stepFollow(follow.current, pos.x, pos.z, zoom, rawDt, balance.travelCameraFollow)
     const pose = followPose(follow.current, CAMERA_OFFSET)
     camera.position.set(...pose.position)
     camera.lookAt(...pose.target)

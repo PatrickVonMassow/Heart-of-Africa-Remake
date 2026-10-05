@@ -62,6 +62,16 @@ describe('bird\'s-eye follow camera (point 1286)', () => {
     expect(s.x).toBeCloseTo(1.2, 2)
   })
 
+  it('settles a stationary target in the same wall-clock time at 5 and at 60 fps', () => {
+    const settle = (fps: number) => {
+      let s = followAt(0, 0, 1)
+      for (let i = 0; i < fps * 0.4; i++) s = stepFollow(s, 10, 0, 2, 1 / fps, CFG)
+      return s
+    }
+    expect(settle(5).x).toBeCloseTo(settle(60).x, 9)
+    expect(settle(5).zoom).toBeCloseTo(settle(60).zoom, 9)
+  })
+
   it('comes to rest on the traveller after a stop', () => {
     const last = walk(0, -1, 1, 60, 2).at(-1)!
     expect(last.z).toBeCloseTo(-SPEED, 3)
