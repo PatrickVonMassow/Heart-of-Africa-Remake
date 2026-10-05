@@ -77,17 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1286. The bird's-eye camera tilts with the walking direction and settles back on a stop
-  Queue position: directly after point 1121; the request "The bird's-eye view shows as much land to the south as to the north" follows directly after this one.
-  Source: user report 03.10.2026 ~20:30 ("das Bild kippt, je nachdem in welche Richtung man geht"); cause derived from the code on e4cc4aba7, not yet measured in the game.
-  THE DEFECT. `TravelScene.tsx` follows the traveller with `camera.position.lerp(target, 0.12)` but aims with `camera.lookAt(pos.x, 0, pos.z)` at the EXACT position. While the traveller moves, the camera lags and looks at them at an angle: moving east or west rotates the picture, moving north flattens the view, moving south steepens it, and on a stop the view swings back to rest. The lerp factor applies per frame, so the lag (about 0.7 units at 60 fps and 5.6 units/s, about 1 degree) doubles at 30 fps and grows when zoomed in. The in-town strafe roll (`PlaceScene.tsx`) is unrelated and is not touched.
-  Final state:
-  - The camera aims at the same smoothed follow point its position hangs from, so the viewing angle of the bird's-eye view is constant in every direction of travel, while moving, and on a stop; the soft follow stays.
-  - The follow smoothing is time-based (dt), so its lag no longer depends on the frame rate; the smoothing constant lives in `src/config/balance.ts`, marked calibratable, and matches today's feel at 60 fps.
-  - Teleports, the settlement exit and the panorama capture still place the camera without a slide (the existing snap path at the settlement exit stays intact).
-  Tests: a Vitest for the pure follow step (constant camera-to-target direction at every heading and on a stop; the same lag at 30 and 60 fps); the existing travel Playwright suite on WebGPU with a picture check of a walk east, north, and a stop.
-  Criticality: medium - visible to the player on every overland step; no data risk.
-  Bundle: Steuerung & Performance.
 - [ ] 1287. The bird's-eye view shows as much land to the south as to the north
   Queue position: directly after the request "The bird's-eye camera tilts with the walking direction and settles back on a stop", which itself follows point 1121. Build on that point's shared follow point.
   THE ASYMMETRY. The bird's-eye camera keeps CAMERA_OFFSET {y: 42, z: 24} (`TravelScene.tsx`), about 30 degrees oblique toward the north, with the traveller at the picture centre. At fov 50 the frame reaches about 35 units north but only about 20 south on flat ground (1.7 : 1), so travel northward sees villages, animals and rivers much earlier than travel southward.
