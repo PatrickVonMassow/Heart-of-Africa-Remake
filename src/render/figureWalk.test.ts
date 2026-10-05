@@ -26,6 +26,7 @@ import {
   type LegDims,
   type WalkMotion,
 } from './figureWalk'
+import { workStop, type WorkStopMode } from '../scenes/place/taskWalkerStop'
 
 const bodies = AGE_GROUPS.flatMap((age) => SEXES.map((sex) => ({ age, sex, p: bodyProportions(sex, age, 0) })))
 const SPEEDS = [0.3, 0.8, 1.2, 1.8]
@@ -270,6 +271,43 @@ describe('a walker turning a corner keeps its planted foot', () => {
     expect(a.pace).toBe(0)
     const b = steerHeading(0, 0.05, 1.1, 1 / 60)
     expect(b.pace).toBeGreaterThan(0.99)
+  })
+})
+
+describe('the task walker gets up before it walks off', () => {
+  it('no step is taken until the kneel has fully risen', () => {
+    const d = legDims(bodyProportions('male', 'adult'))
+    const p = bodyProportions('male', 'adult')
+    const joints: [FootOffset, FootOffset] = [
+      { x: p.hipX, z: 0 },
+      { x: -p.hipX, z: 0 },
+    ]
+    for (const dt of [1 / 60, 1 / 24, 0.1]) {
+      const m = restingMotion()
+      let mode: WorkStopMode | 'go' = 'work'
+      let timer = 2
+      let x = 0
+      let kneels = true
+      let kneltFully = false
+      let walkedOff = false
+      for (let f = 0; f < 400; f++) {
+        if (mode === 'work' || mode === 'rise') {
+          const next = workStop(mode, timer, dt)
+          mode = next.mode
+          timer = next.timer
+          kneels = next.kneels
+        } else {
+          // Walking: every step must be taken standing.
+          expect(m.kneel).toBe(0)
+          x += 1.2 * dt
+          walkedOff = true
+        }
+        stepWalk(m, { x, z: 0, yaw: Math.PI / 2, unit: 1 }, dt, d, 'adult', kneels, joints)
+        if (m.kneel === 1) kneltFully = true
+      }
+      expect(kneltFully).toBe(true)
+      expect(walkedOff).toBe(true)
+    }
   })
 })
 

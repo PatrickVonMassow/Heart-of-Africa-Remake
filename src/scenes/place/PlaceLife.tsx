@@ -65,6 +65,7 @@ import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
+import { workStop, type WorkStopMode } from './taskWalkerStop'
 import { steerHeading } from '../../render/figureWalk'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
@@ -2163,7 +2164,7 @@ function TaskWalker({
   const kneels = useRef(false)
   const load = useRef<THREE.Group>(null)
   const state = useRef({
-    mode: 'inside' as 'inside' | 'go' | 'work' | 'back',
+    mode: 'inside' as 'inside' | 'go' | WorkStopMode,
     seg: 0,
     x: home.x,
     z: home.z,
@@ -2213,18 +2214,18 @@ function TaskWalker({
       }
       return
     }
-    if (s.mode === 'work') {
+    if (s.mode === 'work' || s.mode === 'rise') {
       // Kneels where it stopped, the load set down; the figure folds down and
-      // stands up again on its own short transition.
-      kneels.current = true
-      if (load.current) load.current.visible = false
+      // stands up again on its own short transition — held on the spot until
+      // it is up, then it takes the load and walks.
+      const next = workStop(s.mode, s.timer, dt)
+      kneels.current = next.kneels
+      if (load.current) load.current.visible = next.mode !== 'work'
+      s.mode = next.mode
+      s.timer = next.timer
+      if (next.mode === 'back') s.seg = 0
       stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
       stand.rotation.y = s.yaw
-      s.timer -= dt
-      if (s.timer <= 0) {
-        s.mode = 'back'
-        s.seg = 0
-      }
       return
     }
 
