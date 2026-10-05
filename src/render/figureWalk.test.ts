@@ -15,7 +15,6 @@ import {
   lowestFoot,
   loadRadiusAt,
   phasePerDistance,
-  rephase,
   primitiveLayout,
   restingMotion,
   solveLeg,
@@ -97,35 +96,17 @@ describe('the walk keeps the feet on the ground', () => {
   })
 
   it('a planted foot stays put when the pace changes mid-stance', () => {
-    const p = bodyProportions('male', 'adult')
-    const d = legDims(p)
-    let walked = 0
-    let phase = 0
-    let reach = strideReach(d, 1.1, 'adult')
-    let planted: [number | null, number | null] = [null, null]
-    let worst = 0
-    for (let f = 0; f < 600; f++) {
-      // A pace that jumps every frame, as a crowded lane or a slow frame makes it.
-      const v = f % 3 === 0 ? 1.8 : 0.9
-      const step = v / 30
-      const next = strideReach(d, v, 'adult')
-      phase = rephase(phase, reach, next)
-      reach = next
-      walked += step
-      phase += step * phasePerDistance(reach)
-      const pose = walkPose(d, phase, reach, 1, 'adult')
-      pose.legs.forEach((l, i) => {
-        const world = walked + ankleAt(d, l).z
-        if (!pose.feet[i].stance) {
-          planted[i] = null
-          return
-        }
-        planted[i] ??= world
-        worst = Math.max(worst, Math.abs(world - (planted[i] as number)))
+    for (const { age, p } of bodies) {
+      // A pace that jumps every few frames, as a crowded lane, a slow frame or
+      // a waypoint makes it — down to a third and back.
+      const r = walkRoute(legDims(p), p.hipX, age, [[0, 0], [0, 10]], {
+        speed: 1.1,
+        dt: 1 / 30,
+        speedAt: (f) => (f % 7 < 3 ? 1.8 : f % 7 < 5 ? 0.6 : 1.1),
       })
-      planted = [planted[0], planted[1]]
+      expect(r.arrived).toBe(true)
+      expect(r.worstSlip).toBeLessThanOrEqual(M.stanceSlipTolerance)
     }
-    expect(worst).toBeLessThanOrEqual(M.stanceSlipTolerance)
   })
 
   it('a foot held off the hip’s line is reached by tilting the leg, still on the ground', () => {
@@ -165,7 +146,7 @@ function walkRoute(
   hipX: number,
   age: AgeGroup,
   route: Array<[number, number]>,
-  opts: { speed: number; dt: number; shove?: (f: number) => FootOffset },
+  opts: { speed: number; dt: number; shove?: (f: number) => FootOffset; speedAt?: (f: number) => number },
 ) {
   const m: WalkMotion = restingMotion()
   const joints: [FootOffset, FootOffset] = [
@@ -185,12 +166,13 @@ function walkRoute(
     const [tx, tz] = route[seg + 1]
     const dx = tx - x
     const dz = tz - z
-    const step = opts.speed * opts.dt
+    const speed = opts.speedAt?.(f) ?? opts.speed
+    const step = speed * opts.dt
     if (Math.hypot(dx, dz) <= step + (seg === route.length - 2 ? 0.08 : 0.35)) {
       seg++
       continue
     }
-    const turn = steerHeading(yaw, Math.atan2(dx, dz), opts.speed, opts.dt)
+    const turn = steerHeading(yaw, Math.atan2(dx, dz), speed, opts.dt)
     yaw = turn.yaw
     const before = { x, z }
     x += Math.sin(yaw) * step * turn.pace

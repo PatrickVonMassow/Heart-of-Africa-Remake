@@ -120,7 +120,10 @@ export function rephase(phase: number, from: number, to: number): number {
   const w0 = Math.atan2(Math.sin(phase), Math.cos(phase))
   const w1 = Math.atan2(Math.sin(phase + Math.PI), Math.cos(phase + Math.PI))
   const w = Math.abs(w0) <= half ? w0 : w1
-  const next = Math.max(-half, Math.min(half, (w * from) / to))
+  const next = (w * from) / to
+  // Rescaled out of the stance, the foot would be thrown into its swing off
+  // its spot: the phase stays, and the foot plant holds the foot instead.
+  if (Math.abs(next) > half) return phase
   return phase + (next - w)
 }
 
