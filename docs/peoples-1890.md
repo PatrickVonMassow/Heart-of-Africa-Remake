@@ -2589,6 +2589,18 @@ Sources of the own search: [Met, Belt (umutsha)](https://www.metmuseum.org/art/c
 Shooter 1857 and Mayr 1907 located (Internet Archive; emandulo UCT) but not
 readable from this container.
 
+### 8.4 Head loads and the walk (work-order "walking villagers")
+
+This document names no people for whom a head load is steadied by hand rather
+than balanced hands-free, so the game's choice is a GUESS, calibratable in
+`VILLAGER_MOTION.headLoad` (`src/config/balance.ts`): a brimming water jar is
+steadied with one hand on its rim, a dry basket or bundle is balanced with both
+arms free. Either way the load rests on the crown of the drawn head (hair or
+head cloth included) and rides its bob — the earlier raised arm beside a load
+at a fixed height read as neither. The walk, the kneel and the stride values
+are educated guesses in the same block; a period source naming a people's
+carrying posture would replace the guess for that people.
+
 ---
 
 ## 9. Keeping the cook-fire alight in the rains (TASKS point 256)
