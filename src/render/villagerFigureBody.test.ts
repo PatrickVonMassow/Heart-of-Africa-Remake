@@ -140,8 +140,8 @@ describe('the dressed figure', () => {
       const bodyCount = person.geometry.getAttribute('position').count
       for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
         // the table's 'cloth' colour is the figure's own cloth (appearanceFor resolves it)
-        const cloth = (c: string | undefined) => (c === 'cloth' ? '#b08850' : c)
-        const layers = table[sex][age].map((l) => ({ ...l, colour: cloth(l.colour)!, colour2: cloth(l.colour2) }))
+        const cloth = <T extends string | null>(c: T): T | string => (c === 'cloth' ? '#b08850' : c)
+        const layers = table[sex][age].map((l) => ({ ...l, colour: cloth(l.colour), colour2: cloth(l.colour2) }))
         const g = gltfFigureGeometry(asset, person, layers, '#5c3317', id === 'maasai' ? '#a0442a' : null, 16)
         expect(g.getAttribute('position').count, `${id} ${sex} ${age}`).toBeGreaterThanOrEqual(bodyCount)
         const si = g.getAttribute('skinIndex')
