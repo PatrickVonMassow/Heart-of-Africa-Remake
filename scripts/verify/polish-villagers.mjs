@@ -3822,18 +3822,17 @@ if (section('villager-dress')) {
           if (o.visible) hidden.push(o)
           o.visible = false
         })
-        // For the exact-distance pair the place's own people count as blockers
-        // too: a villager who walks up to address the player otherwise stands
-        // in the one sight line a fixed distance leaves (22 m, WebGL 2 run).
+        // The place's own people count as blockers too: a villager who walks
+        // up to address the player, or stands in a sight line for the whole
+        // wait, hid the 22 m pair (WebGL 2) and the Fang row (full suite).
         const cam = window.__placeCamera.position
         const people = []
-        if (exact)
-          window.__placeScene.traverse((o) => {
-            if (o.name !== 'figure-head') return
-            for (let n = o.parent; n; n = n.parent) if (n.name === 'dress-lineup') return // the row being re-staged
-            const h = o.getWorldPosition(new cam.constructor())
-            people.push(h, h.clone().setY(h.y - 0.5))
-          })
+        window.__placeScene.traverse((o) => {
+          if (o.name !== 'figure-head') return
+          for (let n = o.parent; n; n = n.parent) if (n.name === 'dress-lineup') return // the row being re-staged
+          const h = o.getWorldPosition(new cam.constructor())
+          people.push(h, h.clone().setY(h.y - 0.5))
+        })
         const personOnLine = (x, y, z) =>
           people.some((h) => {
             const sx = x - cam.x, sy = y - cam.y, sz = z - cam.z
@@ -3942,12 +3941,19 @@ if (section('villager-dress')) {
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   for (const people of PEOPLES) {
     await goToPlace(villageOf(people))
-    const at = await stageRow(5.6)
+    let at = await stageRow(5.6)
     await nextFrames(4)
     // drawn first (the pipeline wait steps frames, and walkers walk on), then
     // clear, so the shutter below opens a few frames after the clear reading
     await awaitPlaceDrawn(`${people} row`)
     await awaitRowClear()
+    for (let again = 0; again < 3 && (await rowHidden()); again++) {
+      // someone settled in a sight line: stand the row on a fresh bearing
+      at = await stageRow(5.6)
+      await nextFrames(4)
+      await awaitPlaceDrawn(`${people} row, re-staged`)
+      await awaitRowClear()
+    }
     const hidden = await rowHidden()
     record('row-hidden', { people, ...(await page.evaluate(() => window.__rowHiddenDebug)) })
     const got = await rowBodies()
