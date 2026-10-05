@@ -2,6 +2,8 @@ import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import { armAim, REST_POSE } from './gesture'
 import {
+  contactCrouch,
+  CROUCH_MAX,
   unsquashHead,
   CONTACT_LEAN_MAX,
   contactLean,
@@ -160,5 +162,17 @@ describe('the squat correction keeps the head facing where the body turns', () =
     const fwd = v(e[8], e[9], e[10]).normalize()
     expect(fwd.x).toBeCloseTo(1, 5)
     expect(Math.abs(fwd.y)).toBeLessThan(1e-5)
+  })
+})
+
+describe('the contact crouch', () => {
+  it('takes the least flex that reaches, the same every call, never bouncing', () => {
+    // shortfall shrinks as the hips drop: reached from 0.4 rad on
+    const short = (c: number) => 0.2 - c * 0.5
+    const first = contactCrouch(short)
+    expect(first).toBeCloseTo(0.4, 9)
+    for (let i = 0; i < 5; i++) expect(contactCrouch(short)).toBe(first)
+    expect(contactCrouch(() => -1)).toBe(0)
+    expect(contactCrouch(() => 1)).toBe(CROUCH_MAX)
   })
 })

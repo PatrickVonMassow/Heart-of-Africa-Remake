@@ -25,7 +25,7 @@ import {
 } from '../../render/figureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactLean, CROUCH_MAX, gestureArmEuler, hangToward, kneelLegs, solveTwoBone, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, gestureArmEuler, hangToward, kneelLegs, solveTwoBone, unsquashHead } from '../../render/figureRig'
 import { appearanceFor, skinTone, type AgeGroup, type DressLayer, type Sex } from '../../systems/appearance'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
@@ -228,7 +228,10 @@ export function SkinnedFigure({
       if (!vTrunk || !root) return
       // Trunk: the pose's lean and turn at the hips, the elder's stoop at the chest.
       const legDrop = (c: number) => (p.hipY - p.ankleY) * (1 - Math.cos(flex + c))
-      b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY - legDrop(crouch.current)
+      // Every pose is solved from STANDING height: a contact's crouch is found
+      // afresh each time, never inherited, so a held contact cannot alternate
+      // between crouched and standing.
+      b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY - legDrop(0)
       b.spine.rotation.set(vTrunk.rotation.x, vTrunk.rotation.y, 0)
       b.chest.rotation.set(p.stoop, 0, 0)
       b.neck.rotation.set(-p.stoop * 0.45, 0, 0)
@@ -277,17 +280,15 @@ export function SkinnedFigure({
               return vh ? loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) - reachOf(s) * 0.995 : -1
             }),
           )
-        let c = 0
-        if (!kneel && shortOf() > 0) {
-          for (c = 0.1; c <= CROUCH_MAX + 1e-9; c += 0.1) {
-            b.hips.position.y = p.hipY - legDrop(c)
-            b.hips.updateWorldMatrix(false, true)
-            if (shortOf() <= 0) break
-          }
-          c = Math.min(c, CROUCH_MAX)
-        }
-        if (c !== crouch.current) {
-          crouch.current = c
+        const c = kneel
+          ? 0
+          : contactCrouch((cc) => {
+              b.hips.position.y = p.hipY - legDrop(cc)
+              b.hips.updateWorldMatrix(false, true)
+              return shortOf()
+            })
+        crouch.current = c
+        if (!kneel) {
           b.hips.position.y = p.hipY - legDrop(c)
           setLegs(c)
           b.hips.updateWorldMatrix(false, true)

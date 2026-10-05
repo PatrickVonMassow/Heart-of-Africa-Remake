@@ -30,6 +30,20 @@ export const CONTACT_LEAN_MAX = 0.5
 /** The deepest contact crouch (rad of knee flex per joint): a full squat at
  *  the water's edge, feet on the ground. */
 export const CROUCH_MAX = 1.1
+/**
+ * The contact crouch: the smallest knee flex (0.1 rad steps up to CROUCH_MAX)
+ * at which `shortAt(c)` — the hand's shortfall with the hips dropped for that
+ * flex — is no longer positive; CROUCH_MAX when none is. Always searched from
+ * standing (c = 0), so the same contact gives the same crouch every frame.
+ */
+export function contactCrouch(shortAt: (c: number) => number): number {
+  for (let k = 0; k <= Math.round(CROUCH_MAX * 10); k++) {
+    const c = k / 10
+    if (shortAt(c) <= 0) return c
+  }
+  return CROUCH_MAX
+}
+
 /** The largest shortfall (figure units) the lean may make up; a hand further
  *  out than this was a gesture, not a contact, and keeps its direction. */
 export const CONTACT_LEAN_REACH = 0.18
