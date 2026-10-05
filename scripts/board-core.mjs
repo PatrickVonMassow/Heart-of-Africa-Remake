@@ -331,7 +331,7 @@ export function renderCardCriticalities(html, tasksText) {
  */
 function escapeCardTitle(text) {
   return String(text ?? '')
-    .replace(/&(?!(?:[a-z]+|#\d+);)/gi, '&amp;')
+    .replace(/&(?!(?:[a-z][a-z0-9]*|#\d+|#x[0-9a-f]+);)/gi, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 }

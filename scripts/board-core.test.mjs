@@ -916,6 +916,13 @@ describe('derived now-section membership', () => {
     expect(reconcileNowProjection(out, [1295], { focusPoint: 1295, stamp: '12:00' })).toBe(out)
   })
 
+  it('keeps decimal and hexadecimal entities of a copied queue title intact', () => {
+    const before = fullBoard({ queue: queueEntry(700, 'Ma&#xDF;nahmen &#223; &amp; mehr', '~1 h') })
+    const out = reconcileNowProjection(before, [700], { stamp: '11:00' })
+    expect(out).toContain('<span class="num">700</span><span class="t">Ma&#xDF;nahmen &#223; &amp; mehr</span>')
+    expect(out).not.toContain('&amp;#')
+  })
+
   it('names a stub from the queue data file when no queue card stands, title else first body line', () => {
     const queueData = {
       points: {
