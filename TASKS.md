@@ -15782,3 +15782,23 @@ to land than a mechanism that needs a review.
   3. `polish --section=village-loom` and `polish --section=mute-shore-scene` green on both backends.
   Test: the two sections above on both backends; a Vitest on the layer a fix touches.
   Bundle: Testinfrastruktur.
+- [ ] 1301. Low-preset primitive villager kneels with fixed limb lengths and stays above ground
+  Queue position: directly behind point 1294.
+  Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
+  (owner decision under the standing split rule, recorded for veto). Cross-vendor review at e8b17e850 (GPT-6 Astra,
+  pass 1/2, receipt 32873f1442e6ce05) and the round-3 author report leave three defects of the low-preset primitive
+  figure (`src/scenes/place/placeFigure.tsx`, `primitiveLayout()` in `src/render/figureWalk.ts`).
+  Final state:
+  1. The primitive kneel folds with fixed limb lengths: no arm-length, shoulder-width or body-height scaling
+     (today 55 % arms/shoulders, 0.4125 body, `placeFigure.tsx` ~196). The primitive arm gets an elbow and its
+     contacts are solved like the skinned figure's, so the low-preset kneel poses tuned for the short 0.242 arm
+     (loom weaver, griller, fish gutting, net seat) keep their hand targets without overshooting into the ground.
+  2. The leg fold (`acos(hipY / legLength)`, `placeFigure.tsx` ~204) leaves clearance for the leg radius: no tilted
+     rim and no lower half of a leg cylinder below the ground at full kneel.
+  3. Resting hands of a kneeling primitive stay on or above the ground (measured today ~4 cm below).
+  Not in scope: horizontal foot slide of the low-preset walk (rejected in 1295 under its item 6).
+  Test: `figureWalk.test.ts` stops accepting shortened arms (~404-415) and asserts constant limb lengths through a
+  kneel; the low-preset grounding check in `scripts/verify/polish-villagers.mjs` measures legs and hands, not only
+  the body; `polish --section=village-walk` green on both backends with a low-preset kneel frame picture-checked.
+  Bundle: Dorfleben.
+  Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
