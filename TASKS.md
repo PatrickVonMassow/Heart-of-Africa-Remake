@@ -102,6 +102,25 @@ put it is the mistake this line exists to stop.
   Dorfleben
   --- files, points, design.md §§ ---
   Point 1293 (archived), point 1294, point 350, src/scenes/place/skinnedFigure.tsx, src/scenes/place/figurePose.ts, src/scenes/place/figureRig.ts, src/scenes/place/PlaceLife.tsx
+- [ ] 1298. Board now-card stub keeps the point's name
+  Queue position: directly after point 1295 (user order 05.10.2026).
+  Source: user 05.10.2026: "Warum gibt es immer wieder Karten, die seit Stunden in Arbeit sind mit Titel "chText für diesen Punkt fehlt noch"? So sehe ich nicht, woran gearbeitet wird." / "Setze deinen Vorschlag um, als neuen Punkt in der Warteschlange, direkt nach 1295." Measured 05.10.2026 11:47: point 1295 stood as such a stub since 10:57 although its queue text existed in .claude/board-queue.json. Cause: renderNowStub (scripts/board-core.mjs ~850) writes a fixed placeholder title, stripProjectedQueueCards removes the queue card that carried the title/prose; `board.mjs status` updates only the body.
+  Final state:
+  1. When reconcileNowProjection inserts a now-card for a derived active point, the card's title is taken, in this order, from: the point's queue card being removed (its title and body text), the entry in .claude/board-queue.json (title, else first body line), the work-order headline. The placeholder "Text für diesen Punkt fehlt noch" is used only when none of these exists.
+  2. Queue prose carried over appears in the card body, as the idle-card carry-over already does; nothing the queue card said is lost by the projection.
+  3. No new guards, audits or state fields (infrastructure freeze 01.09.2026); the change stays inside board-core.mjs's projection and its existing data reads.
+  4. Vitest in scripts/board-core.test.mjs: a derived active point with a queue card gets that card's title and text; one with only a board-queue.json entry gets that; one with neither keeps the placeholder. Existing stub-count tests adjusted where they rely on the placeholder.
+  Files: scripts/board-core.mjs renderNowStub ~850, stripProjectedQueueCards ~864, reconcileNowProjection ~886; scripts/board.mjs now/title/status; .claude/board-queue.json
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1299. Findings carrier appends keep each entry on its own line
+  Queue position: directly after point 1298 (user order 05.10.2026: "Reihe die Behebung von diesem Fehler direkt nach dem neuen Punkt ein.").
+  Final state:
+  1. Every append to the carrier in scripts/finding.mjs (request deposit and --record) separates the new entry from the previous one by a blank line regardless of how the file currently ends.
+  2. Every whole-file rewrite of the carrier (drain, queued, blocked markings) leaves the file ending in a newline.
+  3. After a request deposit, finding.mjs re-reads the carrier and fails loudly (non-zero exit, no "Request deposited") when the new request is not found pending by title.
+  4. Vitest (scripts/finding-request-cli.test.mjs): a carrier ending without a newline, then a deposit — `--requests` lists the new request and the previous entry is unchanged.
+  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 1287. The bird's-eye view shows as much land to the south as to the north
   Queue position: directly after the request "The bird's-eye camera tilts with the walking direction and settles back on a stop", which itself follows point 1121. Build on that point's shared follow point.
   THE ASYMMETRY. The bird's-eye camera keeps CAMERA_OFFSET {y: 42, z: 24} (`TravelScene.tsx`), about 30 degrees oblique toward the north, with the traveller at the picture centre. At fov 50 the frame reaches about 35 units north but only about 20 south on flat ground (1.7 : 1), so travel northward sees villages, animals and rivers much earlier than travel southward.
