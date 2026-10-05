@@ -116,7 +116,7 @@ export function bakePose(geo: THREE.BufferGeometry, rest: Float32Array, heads: F
 }
 
 /** The bone each vertex hangs on most (its largest skin weight). */
-function dominantBones(g: THREE.BufferGeometry): Uint16Array {
+export function dominantBones(g: THREE.BufferGeometry): Uint16Array {
   const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
   const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute
   const out = new Uint16Array(si.count)
@@ -233,9 +233,7 @@ export function measureProportions(asset: VillagerAsset, g: THREE.BufferGeometry
   // it) — so at the pelvis the tops of the thighs count; the dress has to pass
   // over them too. A low-poly body has too few vertices in any thin band.
   const index = g.getIndex()
-  const trunk = (yy: number): [number, number] => {
-    let wx = 0
-    let wz = 0
+  const crossing = (yy: number, each: (x: number, z: number) => void) => {
     const n = index ? index.count : pos.count
     const vi = (t: number) => (index ? index.getX(t) : t)
     for (let t = 0; t < n; t += 3) {
@@ -247,11 +245,31 @@ export function measureProportions(asset: VillagerAsset, g: THREE.BufferGeometry
         const y1 = pos.getY(i1)
         if ((y0 - yy) * (y1 - yy) > 0 || y0 === y1) continue
         const f = (yy - y0) / (y1 - y0)
-        wx = Math.max(wx, Math.abs(pos.getX(i0) + (pos.getX(i1) - pos.getX(i0)) * f))
-        wz = Math.max(wz, Math.abs(pos.getZ(i0) + (pos.getZ(i1) - pos.getZ(i0)) * f))
+        each(pos.getX(i0) + (pos.getX(i1) - pos.getX(i0)) * f, pos.getZ(i0) + (pos.getZ(i1) - pos.getZ(i0)) * f)
       }
     }
+  }
+  const trunk = (yy: number): [number, number] => {
+    let wx = 0
+    let wz = 0
+    crossing(yy, (cx, cz) => {
+      wx = Math.max(wx, Math.abs(cx))
+      wz = Math.max(wz, Math.abs(cz))
+    })
     return [wx, wz]
+  }
+  // The section as the dress draws it: an ellipse round the axis. The widest
+  // and deepest points alone do not bound it — a bust or a belly off the
+  // front line, a square flank, pokes through the ellipse through those two —
+  // so the ellipse of the section's own aspect grows until every point is in.
+  const section = (yy: number): [number, number, number] | null => {
+    const [wx, wz] = trunk(yy)
+    if (!wx || !wz) return null
+    let k = 1
+    crossing(yy, (cx, cz) => {
+      k = Math.max(k, Math.hypot(cx / wx, cz / wz))
+    })
+    return [yy, wx * k, wz * k]
   }
   const headI = at('head')
   let chin = Infinity
@@ -295,6 +313,12 @@ export function measureProportions(asset: VillagerAsset, g: THREE.BufferGeometry
     }
   }
   const [chestW] = trunk(chestY)
+  // Crotch to neck base, every centimetre or so (the dress interpolates).
+  const trunkSections: Array<[number, number, number]> = []
+  for (let yy = hipY - 0.07 * H; yy < y('neck') + 0.014 * H; yy += 0.01 * H) {
+    const s = section(yy)
+    if (s) trunkSections.push(s)
+  }
   return {
     ...p0,
     crownY: crown,
@@ -322,6 +346,7 @@ export function measureProportions(asset: VillagerAsset, g: THREE.BufferGeometry
     thighR: bySegment(asset, g, dom, rest, 'thigh.L', 'shin.L', 0.5),
     calfR: bySegment(asset, g, dom, rest, 'shin.L', 'foot.L', 0.5),
     footLen: tip - heel,
+    trunkSections,
   }
 }
 

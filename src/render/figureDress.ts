@@ -96,8 +96,10 @@ export function surfaceOf(l: DressLayer, p: BodyProportions, bottomY: number): [
 
 /** Half-width and half-depth of the trunk at height y (bind pose). */
 export function trunkAt(p: BodyProportions, y: number): [number, number] {
-  // the dress goes over the bust (the chest station), not through it
-  const st = trunkProfile(p).map(([y, x, z], i) => [y, x, i === 3 ? z + p.bust * 0.75 : z] as [number, number, number])
+  // A measured body: its own sections, bust and belly included. The
+  // code-built one: its profile, the dress going over the bust (the chest
+  // station), not through it.
+  const st = p.trunkSections ?? trunkProfile(p).map(([y, x, z], i) => [y, x, i === 3 ? z + p.bust * 0.75 : z] as [number, number, number])
   if (y <= st[0][0]) {
     // Below the crotch: both legs side by side.
     const legW = p.hipX + p.thighR * 1.15
@@ -154,10 +156,23 @@ function openFront(geo: THREE.BufferGeometry, cols: number, belowY: number): voi
  *  and flaring by `flare` (fraction of stature) at the hem. */
 function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number, flare: number, radial: number, rings = 10): THREE.BufferGeometry {
   const stations: SweepStation[] = []
+  const step = (bottom - top) / (rings - 1)
   for (let i = 0; i < rings; i++) {
     const t = i / (rings - 1)
     const y = top + (bottom - top) * t
-    const [rx, rz] = trunkAt(p, y)
+    // Between two stations the cloth runs from one's girth to the other's, so
+    // each station takes the trunk's largest girth as far as its neighbours:
+    // the cloth then falls straight from a bust or a belly instead of cutting
+    // the chord through it.
+    let rx = 0
+    let rz = 0
+    const from = Math.max(bottom, y + step)
+    const to = Math.min(top, y - step)
+    for (let k = 0; k <= 16; k++) {
+      const [x, z] = trunkAt(p, to + ((from - to) * k) / 16)
+      rx = Math.max(rx, x)
+      rz = Math.max(rz, z)
+    }
     const out = ease + flare * p.stature * t * t
     // The hem flares mostly sideways: a deep front-back flare is what a
     // kneeling figure's shins turn into depth below the ground.

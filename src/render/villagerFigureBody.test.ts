@@ -13,7 +13,8 @@ import { AGE_GROUPS, PEOPLE_DRESS, SEXES } from '../systems/appearance'
 import { BONE_NAMES, bodyProportions } from './figureBody'
 import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { codeBoneMap, createGltfSkeleton, gltfFigureGeometry, gltfPerson, remapSkin } from './villagerFigureBody'
+import { buildLayerGeometry } from './figureDress'
+import { codeBoneMap, createGltfSkeleton, dominantBones, gltfFigureGeometry, gltfPerson, remapSkin } from './villagerFigureBody'
 
 let asset: VillagerAsset
 
@@ -148,6 +149,56 @@ describe('the dressed figure', () => {
         expect(Math.max(...(si.array as Uint16Array))).toBeLessThan(asset.bones.length)
       }
     }
+  })
+
+  it('every people’s dress clears the glTF body’s trunk for every sex, age and build: no skin through the cloth', () => {
+    // A ray from the trunk's axis out through each trunk vertex: where it meets
+    // a layer's cloth, the outermost cloth lies beyond the skin (a sleeve's
+    // inner wall may cross the trunk; its outer wall does not).
+    const ray = new THREE.Ray()
+    const hit = new THREE.Vector3()
+    const [a, b, c] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+    const fails: string[] = []
+    for (const { sex, age } of people()) {
+      for (const build of [-1, 0, 1]) {
+        const person = gltfPerson(asset, sex, age, build)
+        const p = person.p
+        const H = p.stature
+        const dom = dominantBones(person.geometry)
+        const trunkBones = new Set(['hips', 'spine', 'chest'].map((n) => asset.bones.indexOf(n)))
+        const pos = person.geometry.getAttribute('position')
+        const skin: THREE.Vector3[] = []
+        for (let k = 0; k < pos.count; k++) {
+          const y = pos.getY(k)
+          if (trunkBones.has(dom[k]) && y > p.hipY && y < p.shoulderY - 0.03 * H) skin.push(new THREE.Vector3().fromBufferAttribute(pos, k))
+        }
+        for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
+          for (const l of table[sex][age]) {
+            const g = buildLayerGeometry(l, p, 32)
+            if (!g) continue
+            const gp = g.getAttribute('position')
+            const idx = g.getIndex()!
+            let worst = 0
+            for (const v of skin) {
+              const r = Math.hypot(v.x, v.z)
+              ray.origin.set(0, v.y, 0)
+              ray.direction.set(v.x, 0, v.z).normalize()
+              let far = -Infinity
+              for (let t = 0; t < idx.count; t += 3) {
+                a.fromBufferAttribute(gp, idx.getX(t))
+                b.fromBufferAttribute(gp, idx.getX(t + 1))
+                c.fromBufferAttribute(gp, idx.getX(t + 2))
+                if (Math.min(a.y, b.y, c.y) > v.y || Math.max(a.y, b.y, c.y) < v.y) continue
+                if (ray.intersectTriangle(a, b, c, false, hit)) far = Math.max(far, hit.distanceTo(ray.origin))
+              }
+              if (far > -Infinity) worst = Math.max(worst, r - far)
+            }
+            if (worst > 0) fails.push(`${id} ${sex} ${age} build ${build} ${l.form}: skin ${(worst / H).toFixed(4)} H through`)
+          }
+        }
+      }
+    }
+    expect(fails).toEqual([])
   })
 
   it('paints the scalp in the hair colour and the rest in the skin', () => {
