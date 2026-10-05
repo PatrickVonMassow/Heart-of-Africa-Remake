@@ -385,6 +385,11 @@ interface BalanceConfig {
   travelCameraFollow: {
     tau: number
     snapDistance: number
+    /** Fraction (0..1) of the oblique view's north/south ground-reach
+     *  asymmetry the camera compensates by moving south with an unchanged
+     *  tilt (design.md §2.1): 1 = as far south as north (shift ≈ 7.5 units at
+     *  the default zoom, traveller ≈ 37 % from the top), 0 = traveller centred. */
+    southReachCompensation: number
   }
   /** First-person walk feel inside settlements (design.md §2, point 97). */
   walkFeel: {
@@ -1508,6 +1513,7 @@ export const balance: BalanceConfig = {
   travelCameraFollow: {
     tau: 0.13, // calibratable: the former 0.12/frame lerp at 60 fps (-1/(60·ln 0.88))
     snapDistance: 30, // calibratable: far above the walking lag (~0.7), below any jump
+    southReachCompensation: 1.0, // calibratable: full 1:1 reach; 0.5 = about half (user choice pending)
   },
   walkFeel: {
     accelTau: 0.10, // brisk ramp-up, no rubber-banding

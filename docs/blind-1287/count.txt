@@ -1,0 +1,8 @@
+list A authorship: UNVERIFIED — no transcript path was recorded
+list B authorship: UNVERIFIED — no transcript path was recorded
+37 A + 26 B entries → 41 union entries (41 of the 63 input entries merged, 16 only A, 6 only B): every input entry accounted for
+
+record it: node scripts/mechanism-review.mjs --record <sha> --model "<the second model>" \
+    --verdict merge --mode blind-parallel --merged-by "Fable 5.1" \
+    --union "docs/blind-1287/union.json" --list-a "docs/blind-1287/A.json" --list-b "docs/blind-1287/B.json" \
+    --accounting "37 A + 26 B entries → 41 union entries (41 of the 63 input entries merged, 16 only A, 6 only B): every input entry accounted for" --evidence "<what the stage found>"
