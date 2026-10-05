@@ -141,6 +141,34 @@ describe('the garments sit on the body', () => {
     }
   })
 
+  it('a raised arm moves its sleeve, not the robe at the waist', () => {
+    const p = bodyProportions('male', 'adult')
+    const g = buildLayerGeometry(layer({ slot: 'torso', form: 'robe', wear: 'chest' }), p)!
+    const { skeleton, bones } = createSkeleton(p)
+    const m = new THREE.SkinnedMesh(g, new THREE.MeshBasicMaterial())
+    m.add(bones.hips)
+    m.bind(skeleton, new THREE.Matrix4())
+    const pos = g.getAttribute('position')
+    const at = () => {
+      m.updateMatrixWorld(true)
+      skeleton.update()
+      const v = new THREE.Vector3()
+      return Array.from({ length: pos.count }, (_, i) => m.applyBoneTransform(i, v.fromBufferAttribute(pos, i)).clone())
+    }
+    const rest = at()
+    bones['upperArm.L'].rotation.z = Math.PI / 2 // out to the side, level
+    const raised = at()
+    let waistMoved = 0
+    let sleeveMoved = 0
+    for (let i = 0; i < pos.count; i++) {
+      const d = rest[i].distanceTo(raised[i])
+      if (rest[i].y < p.waistY + 0.03 * p.stature) waistMoved = Math.max(waistMoved, d)
+      if (rest[i].y < p.shoulderY && rest[i].y > p.shoulderY - p.upperArm * 0.7 && rest[i].x > p.shoulderX) sleeveMoved = Math.max(sleeveMoved, d)
+    }
+    expect(waistMoved).toBeLessThan(0.01)
+    expect(sleeveMoved).toBeGreaterThan(0.1)
+  })
+
   it('a toga over one shoulder leaves the other bare; a cloak covers both', () => {
     const above = (l: DressLayer, side: 1 | -1) => {
       const g = buildLayerGeometry(l, adultMan)!

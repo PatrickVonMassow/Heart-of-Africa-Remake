@@ -384,11 +384,15 @@ export function SkinnedFigure({
     }
     const b = rig.bones
     if (!kneel && gait) {
+      // The swing is laid OVER the standing flex: the knee bend comes from the
+      // swing alone, so a stopped elder keeps the flat-footed 2f of setLegs.
       const f = flex + crouch.current
-      b['thigh.L'].rotation.x = legSwingAngle(gait.current, 0) - f
-      b['thigh.R'].rotation.x = legSwingAngle(gait.current, Math.PI) - f
-      b['shin.L'].rotation.x = Math.max(0, -b['thigh.L'].rotation.x) * 0.8 + 2 * f
-      b['shin.R'].rotation.x = Math.max(0, -b['thigh.R'].rotation.x) * 0.8 + 2 * f
+      const swingL = legSwingAngle(gait.current, 0)
+      const swingR = legSwingAngle(gait.current, Math.PI)
+      b['thigh.L'].rotation.x = swingL - f
+      b['thigh.R'].rotation.x = swingR - f
+      b['shin.L'].rotation.x = Math.max(0, -swingL) * 0.8 + 2 * f
+      b['shin.R'].rotation.x = Math.max(0, -swingR) * 0.8 + 2 * f
       b['foot.L'].rotation.x = -f
       b['foot.R'].rotation.x = -f
     }

@@ -176,7 +176,11 @@ const LONG: readonly BoneName[] = [...UPPER, 'shin.L', 'shin.R']
 export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 16): THREE.BufferGeometry | null {
   const H = p.stature
   const segs = boneSegments(p)
-  const near = (bones: readonly BoneName[]) => (v: THREE.Vector3) => vertexWeights(v, segs, bones)
+  // The upper arms move only the cloth at the shoulder: below it a raised
+  // arm would drag the garment's waist up with it.
+  const armFree = (bones: readonly BoneName[]) => bones.filter((b) => b !== 'upperArm.L' && b !== 'upperArm.R')
+  const near = (bones: readonly BoneName[]) => (v: THREE.Vector3) =>
+    vertexWeights(v, segs, v.y < p.shoulderY - 0.06 * H ? armFree(bones) : bones)
   const rigid = (bone: BoneName) => () => [[boneIndex(bone), 1]] as Array<[number, number]>
   const hc = p.chinY + p.headHalfH
   const girdleY = p.hipY + 0.06 * H
@@ -263,7 +267,8 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
             ],
             { radial: Math.max(8, radial - 4), rings: 4 },
           )
-          parts.push({ geo: sleeve, weigh: near(['chest', `upperArm.${s}`]) })
+          // a sleeve follows its arm all the way down
+          parts.push({ geo: sleeve, weigh: (v) => vertexWeights(v, segs, ['chest', `upperArm.${s}`]) })
         }
       }
       break
