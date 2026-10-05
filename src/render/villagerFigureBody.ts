@@ -282,7 +282,10 @@ export function measureProportions(asset: VillagerAsset, g: THREE.BufferGeometry
   const chestY = hipY + (p0.chestY - p0.hipY) * ((y('upperArm.L') - hipY) / (p0.shoulderY - p0.hipY))
   const [pelvisW] = trunk(hipY + 0.01 * H)
   const [waistW] = trunk(waistY)
-  const [chestW, chestD] = trunk(chestY)
+  const [chestW, chestAt] = trunk(chestY)
+  // the depth the dress must clear: the deepest section from the chest line
+  // down through the bust (the women's breasts sit below it)
+  const chestD = Math.max(chestAt, ...[0.02, 0.035, 0.05].map((f) => trunk(chestY - (f + (p0.bustDrop / H)) * H)[1]))
   return {
     ...p0,
     crownY: crown,
