@@ -133,10 +133,14 @@ const drivePopIn = (stop) =>
           // a finding can be traced (shoreSeed = the dry-shore guarantee, chunk = the
           // ordinary/vicinity spawn, young = a calf, drink = a shore visitor).
           if (!a.dead && window.__camera.onScreen(a.x, a.z)) {
+            // `dist` is from the traveller, who sits ABOVE the picture centre
+            // (design.md §2.1 south reach) — `ndcY` says where in the frame it
+            // popped (+1 top edge, -1 bottom edge) for the triage.
             pops.push({
               region: stop.name,
               sp,
               dist: +Math.hypot(a.x - pos.x, a.z - pos.z).toFixed(1),
+              ndcY: +window.__camera.ndc(a.x, a.z).y.toFixed(2),
               shoreSeed: !!a.shoreSeed,
               chunk: a.chunk ?? null,
               young: !!a.young,
