@@ -77,15 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1299. Findings carrier appends keep each entry on its own line
-  Queue position: directly after point 1298 (user order 05.10.2026: "Reihe die Behebung von diesem Fehler direkt nach dem neuen Punkt ein.").
-  Final state:
-  1. Every append to the carrier in scripts/finding.mjs (request deposit and --record) separates the new entry from the previous one by a blank line regardless of how the file currently ends.
-  2. Every whole-file rewrite of the carrier (drain, queued, blocked markings) leaves the file ending in a newline.
-  3. After a request deposit, finding.mjs re-reads the carrier and fails loudly (non-zero exit, no "Request deposited") when the new request is not found pending by title.
-  4. Vitest (scripts/finding-request-cli.test.mjs): a carrier ending without a newline, then a deposit — `--requests` lists the new request and the previous entry is unchanged.
-  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 1287. The bird's-eye view shows as much land to the south as to the north
   Queue position: directly after the request "The bird's-eye camera tilts with the walking direction and settles back on a stop", which itself follows point 1121. Build on that point's shared follow point.
   THE ASYMMETRY. The bird's-eye camera keeps CAMERA_OFFSET {y: 42, z: 24} (`TravelScene.tsx`), about 30 degrees oblique toward the north, with the traveller at the picture centre. At fov 50 the frame reaches about 35 units north but only about 20 south on flat ground (1.7 : 1), so travel northward sees villages, animals and rivers much earlier than travel southward.
