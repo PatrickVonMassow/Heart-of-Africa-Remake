@@ -525,7 +525,10 @@ if (section('landmark-frames')) {
 // the walk; the former per-frame lerp aimed at the exact traveller and swung it
 // by about a degree. Frames of the walk and of the stop go to the picture check.
 if (section('follow-camera')) {
-  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
+  await page.evaluate(() => {
+    window.__ui.getState().setTravelZoom(0.5)
+    window.__ui.getState().setJournalDnd(true) // no region entry pops over the walk frames
+  })
   await jump(12.5, 26.0, 1500) // open dry Darfur plain, no water in the path
   await page.waitForFunction(() => window.__camera?.settled(), null, { timeout: 30000 })
   const dir = () => page.evaluate(() => window.__camera.viewDir())
