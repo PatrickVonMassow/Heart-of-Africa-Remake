@@ -33629,3 +33629,59 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Tests: Vitest for the pure camera placement (equal north/south ground reach on flat ground at full compensation; tilt unchanged; scaling with the zoom) and for each adjusted centre-assuming consumer; Playwright, both backends (camera framing is backend-sensitive): travel frames walking north and south and at a settlement edge, judged by looking, plus the herd-seeder and label suites green.
   Criticality: high - every bird's-eye frame changes, and consumers that silently assume a centred traveller can break (user, 03.10.2026).
   Bundle: Steuerung & Performance.
+
+- [x] 1306. Carry the wrongly blocked round-trip simplification into the work order now and pull 1305 forward
+  Final state:
+  1. The user-approved request "Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check" (carrier entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384) stands in TASKS.md as its own open point, placed directly after point 1294 (ahead of 1301), as its original constraint demands. Its point text is the original #spec of that carrier entry, carried verbatim:
+
+     Final state: recurring mechanical work the LLM now performs step by step runs as local scripts/hooks, so measurably fewer LLM round-trips are spent, while NO existing functionality is endangered.
+
+     SAFETY REQUIREMENT (binding for every change):
+      1. No existing functionality is endangered — not only checks, but everything the batch does today.
+      2. No new problems are introduced: deadlocks, hooks blocking each other, Stop-refusal loops, hanging or aborting scripts, half-executed chains.
+      3. Every unexpected error has a fallback: if a new combined command or self-repairing hook fails, the flow falls back to today's behaviour (the LLM runs the single steps, or gets today's refusal). The error is reported loudly, never swallowed. A crashing hook must never paralyse the batch.
+      4. Evidence: the analyses list the failure cases of every candidate; the final check examines exactly 1-3; tests cover the failure paths (aborting intermediate step, timeout, held lock, missing file, ...) and prove the fallback engages.
+
+     PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
+      1. Analysis A (Opus 5.5) and Analysis B (GPT-6 Astra) run BLIND and in parallel. A starts from this point text (measurement and candidate list). B STARTS WITHOUT PRIOR KNOWLEDGE: it receives ONLY the neutral brief below, handed to it directly as a separate text, plus access to the raw material (session transcripts under ~/.claude/projects/-workspace-hoa, scripts/, .claude/settings.json, hooks, tests). B never sees the measurement, the candidate list, or point-brief output of this point. B measures and interprets on its own. Each analysis delivers further savings with measured shares and, per candidate, the failure analysis demanded by the safety requirement plus the test that proves it.
+         NEUTRAL BRIEF FOR B (verbatim): "Find activities the LLM sessions of this repository perform repeatedly that a local script or hook could take over, so that fewer LLM round-trips are spent. Measure from the transcripts yourself. For every proposed change show that no existing functionality is endangered, that no new problems arise (deadlocks, hooks blocking each other, refusal loops, hanging or aborting scripts, half-executed chains), and that every unexpected error falls back to today's behaviour with a loud report. Name the test that proves each of these."
+      2. A third, distinct model (neither A nor B; Fable 5.1 if node scripts/fable-switch.mjs --status permits, else Opus 4.8) checks both proposals thoroughly and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
+      3. The merged plan goes to the model of the OTHER vendor than the merger (GPT-6 Astra via scripts/review-astra.mjs) for a final check focused on the safety requirement. Only an approved plan is implemented; objections are fixed and re-checked first. At this stage Astra may see everything.
+      4. Implementation follows the approved plan, with the usual cross-vendor code review afterwards.
+
+     Candidates for A (starting points, not a closed list; NOT shown to B):
+      a) Merge fixed ritual chains into single commands that run silently and report only failures (e.g. focus set -> board now -> attest -> board-publish -> dashboard-guard --synced; batch-boundary --prepare -> --commit -> --clear).
+      b) Timestamp/header: stop the LLM re-measuring the time and stop exact-minute refusals (tolerance, or header set outside the LLM).
+      c) Stop hooks that self-repair mechanical causes instead of refusing (unpushed main where pushing is permitted, dashboard/focus sync, carrier drain), leaving the LLM only cases needing judgment.
+      d) Retrospective / beginner-guide currency: a script pre-collects the raw delta; LLM only words it; or lower trigger frequency.
+      e) Screenshot pre-filter by pixel metric before LLM inspection (low priority, 1.7 %).
+      f) Small: finding.mjs syntax in hook texts (removes --help calls); more compact point-brief output.
+     Infrastructure-freeze fit: a simplification (fewer steps, no new guards); a new script replaces steps, never adds a check.
+
+     Tests: every changed hook/script keeps or extends its node tests; each merged chain has a test proving it performs every step the old chain did, fails loud on the same conditions, and falls back on injected failures. Evidence of saving: re-run the 05.10. measurement on a comparable later corpus and report calls and cache-read share before/after.
+     #constraints
+
+  2. The decision card "Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…" is removed from the board (vdzk-remove), and the board is republished.
+  3. Point 1305 is moved behind 1294 too, directly after the new point of item 1 (order: 1294, new point, 1305, then the rest), and its final-state item 2 is ticked as satisfied by this carry, so only its watermark-deferral fix remains. Nothing goes ahead of 1294.
+  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
+  USER, verbatim:
+  05.10.2026: "Reihe einen Punkt für solche Vereinfachungen direkt nach 1294 ein. Der soll aber nicht einfach nur die von dir erwähnten Änderungen durchführen, sondern vorher sehr gründlich prüfen, ob zum einen noch mehr eingespart werden kann und zum anderen durch die Umbauten nichts kaputt geht. Das soll mit sechs Augen passieren, also ein anderes Modell soll blind vom ersten die selbe Analyse machen und ein drittes die Vorschläge nochmal gründlich prüfen und zusammenführen."
+  05.10.2026: "Und dieses Mal noch ein Schritt weiter: Die zusammengeführte Lösung durch das dritte Modell noch dann noch einmal dem Modell des anderen Anbieters zur Abschlussprüfung gegeben werden. Ich will ganz sicher gehen, dass wir uns mit so einem Umbau nichts kaputt machen."
+  05.10.2026: "Für die Opus 5.5-Seite ist es okay, mit deiner Liste zu starten, weil du ja auch Opus 5.5 bist, aber Astra sollte ohne Vorwissen starten."
+  05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
+  05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
+  05.10.2026: "ja, aber nach 1294"
+  approved: "ja, aber nach 1294"
+
+- [x] 1307. Point 1294: commission its author now, in parallel with the current queue
+  Commission the author for point 1294 now, in its existing worktree .claude/worktrees/point-1294 on feat/1294-gltf-villager-body (commit ea02452f4 adds scripts/blender.mjs; Blender 3.4.1 verified working at local/tools/blender-3.4.1+dfsg-2+b1/blender). It runs in parallel with the current queue (1287 landing, then 1297 and onward), which stays unchanged.
+  Condition (user): only as far as no mutual interference is to be expected. Concretely:
+  - Browser suites and picture checks of 1294 and of the queue never overlap; they run one after another on a quiet host (memory verify-suites-need-a-quiet-machine).
+  - Heavy Blender renders (frame sheets) do not run while a verify suite of another point is running.
+  - The author tests, commits and pushes; it never merges. Landing stays with the owner after the cross-vendor review.
+  If the owner judges that a concrete interference cannot be avoided, it records that judgement and works 1294 sequentially directly after the point in hand instead.
+  USER, verbatim:
+  User, 05.10.2026 18:39: "1294 soll direkt als nächstes erledigt werden."
+  User, 05.10.2026 18:39: "Und lässt sich das nicht parallel zu anderen Sachen machen?"
+  User, 05.10.2026 18:41: "Ja, sofern keine gegenseitige Störung zu erwarten ist, soll das so gemacht werden."
+  approved: "Ja, sofern keine gegenseitige Störung zu erwarten ist, soll das so gemacht werden."
