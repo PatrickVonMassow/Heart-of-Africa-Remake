@@ -2139,3 +2139,5 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 - Maasai men's shoulder cloak reads as a flat box panel (05.10.2026, point 1293): in `verification/1293-dress-maasai(-webgl2).png` the adult men's shoulder cloak is a flat rectangular tan panel without drape, unlike the draped cloaks of the other peoples. Aesthetic only, both backends.
 
 - Three render-verify charges passed on the 1293 `polish-villagers` run (05.10.2026, branch 85207f7): points 1172 ("both are still at the stroke"), 1187 ("BOTH her hands are elsewhere half a pass later") and 1202 ("the spoil crossing starts on flat ground") in `scripts/render-verify-charges.mjs:1627/1671/1692`. One green run does not prove them fixed; strike after a second green run on both backends.
+
+- Follow-camera frame-time wiring has no call-site test (05.10.2026, point 1286): `TravelScene` passes the uncapped `rawDt` to `stepFollow` while movement uses the 0.1 s cap; the Vitest covers only the pure step, so a revert to the capped `dt` would pass (GPT-6 Astra, receipt b8f515f1845b5b73). No player impact today; a jsdom harness for the scene's frame loop does not exist.
