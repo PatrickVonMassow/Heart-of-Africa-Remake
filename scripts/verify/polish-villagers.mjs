@@ -4111,11 +4111,12 @@ if (section('villager-dress')) {
 if (section('village-walk')) {
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
-  // The camera side-on to a walker (index; null: the task walker), `dist`
-  // off its flank: the left flank first, the right one where the player
-  // cannot stand there (a hut wall pushes it off, the figure leaves the picture).
-  const sideOn = async (walker, dist, pitch) => {
-    for (const flank of [1, -1]) {
+  // The camera side-on to a walker (index; null: the task walker), about
+  // `near` off its flank: the left flank first, then the right, nearer or
+  // farther where the player cannot stand (a hut wall pushes it off, and the
+  // figure leaves the picture).
+  const sideOn = async (walker, near, pitch) => {
+    for (const [flank, dist] of [1, -1].flatMap((f) => [near, near * 0.7, near * 1.35].map((d) => [f, d]))) {
       const want = await page.evaluate(({ walker, dist, pitch, flank }) => {
         const g = walker === null ? window.__placeScene.getObjectByName('village-task-walker') : window.__placeWalkers.group(walker)
         const side = g.rotation.y + (flank * Math.PI) / 2
