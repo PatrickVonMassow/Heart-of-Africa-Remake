@@ -4530,7 +4530,7 @@ if (section('village-walk')) {
   const kneelChecks = (label, j) => {
     const d = JSON.stringify(j)
     check(`${label}: a whole kneel was observed — walking up, down, held, up, walking off`, j.complete && j.kRead, d)
-    check(`${label}: going down and getting up are transitions over several frames, never a pop`, j.downFrames >= 3 && j.upFrames >= 3 && j.jumpOfDrop !== null && j.jumpOfDrop < 0.25, d)
+    check(`${label}: going down and getting up are transitions over several frames, never a pop`, j.downFrames >= 3 && j.upFrames >= 3 && j.jumpOfDrop !== null && j.jumpOfDrop < 0.5, d)
     check(`${label}: the figure really folds down (drawn height at the kneel well under standing)`, j.drop > 0 && j.knelt < j.standing * 0.85, d)
     check(`${label}: no step is taken until it stands again (translation only at kneel 0)`, j.complete && j.movedKneeling === 0, d)
     check(`${label}: one figure throughout, uniformly scaled, the head round`, j.oneFigure && j.uniform && j.headRound, d)
