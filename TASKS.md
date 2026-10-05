@@ -124,6 +124,53 @@ put it is the mistake this line exists to stop.
   Criticality: high — new asset pipeline, load budget, every villager, both backends.
   Bundle: Dorfleben.
 
+- [ ] 1301. Low-preset primitive villager kneels with fixed limb lengths and stays above ground
+  Queue position: directly behind point 1294.
+  Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
+  (owner decision under the standing split rule, recorded for veto). Cross-vendor review at e8b17e850 (GPT-6 Astra,
+  pass 1/2, receipt 32873f1442e6ce05) and the round-3 author report leave three defects of the low-preset primitive
+  figure (`src/scenes/place/placeFigure.tsx`, `primitiveLayout()` in `src/render/figureWalk.ts`).
+  Final state:
+  1. The primitive kneel folds with fixed limb lengths: no arm-length, shoulder-width or body-height scaling
+     (today 55 % arms/shoulders, 0.4125 body, `placeFigure.tsx` ~196). The primitive arm gets an elbow and its
+     contacts are solved like the skinned figure's, so the low-preset kneel poses tuned for the short 0.242 arm
+     (loom weaver, griller, fish gutting, net seat) keep their hand targets without overshooting into the ground.
+  2. The leg fold (`acos(hipY / legLength)`, `placeFigure.tsx` ~204) leaves clearance for the leg radius: no tilted
+     rim and no lower half of a leg cylinder below the ground at full kneel.
+  3. Resting hands of a kneeling primitive stay on or above the ground (measured today ~4 cm below).
+  Not in scope: horizontal foot slide of the low-preset walk (rejected in 1295 under its item 6).
+  Test: `figureWalk.test.ts` stops accepting shortened arms (~404-415) and asserts constant limb lengths through a
+  kneel; the low-preset grounding check in `scripts/verify/polish-villagers.mjs` measures legs and hands, not only
+  the body; `polish --section=village-walk` green on both backends with a low-preset kneel frame picture-checked.
+  Bundle: Dorfleben.
+  Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
+
+- [ ] 1302. Board cards: separate description section from implementation status
+  Queue position: directly after point 1295 (landed; this slot follows its split-off 1301), ahead of point 1303 (user order 05.10.2026: "Ja, übernimm beide so. Reihe sie nach 1295 ein.").
+  Why: a card has one body field (board-core.mjs promoteToNow -> renderCardBody(status)); every status update overwrites the description, so texts like "Punkt erledigt, Abschlussarbeiten stehen noch aus" leave the user unable to see what the point is about.
+  User (05.10.2026): "Der Beschreibungstext von Karten auf dem Dashboard wird aktuell als Status-Angabe missbraucht. [...] Mit so einem Text kann ich nicht erkennen, was im Rahmen des Tickets überhaupt gemacht wird." / "Wie wäre es, den beim Aufklappen einer Karte angezeigten Text in zwei Sektionen aufzuteilen: Einen Bereich, der die Beschreibung enthält. Dieser sollte im Normalfall bereits vor dem Ziehen der Karte geschrieben werden. Während der Bearbeitung wird er nur geändert, wenn sich wider erwarten etwas an den Anforderungen ändert. Einen weiteren, optisch (z. B. durch eine Trennlinie) abgegrenzten Bereich mit dem aktuellen Status der Umsetzung. Dieser soll immer aktuell gehalten werden."
+  Final state: an expanded dashboard card (now/queue/done) shows two sections.
+  1. Description (top): 1-3 sentences on what the point delivers. Set when the card is created (promote/queue add), sourced from the point's TASKS.md text when not given. A status update can NOT touch it; only an explicit board.mjs command (e.g. `describe <point> --text-stdin`) changes it, used only when the requirement actually changes.
+  2. A visible divider (e.g. <hr> or bordered block), then "Stand der Umsetzung" with the "Stand <stamp>" lead. Every progress update replaces only this section.
+  A card without a description renders a visible "Beschreibung fehlt" placeholder instead of failing. No new guard (infrastructure freeze): the separation lives in the card format and in board-core.mjs (renderCardBody / promoteToNow / status-update paths) alone.
+  One-time migration: each existing card's current body becomes its status; its description is filled from the point's TASKS.md text.
+  Tests: node tests in board-core.test.mjs proving a status update leaves the description byte-identical and that both sections render with the divider.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1303. Board cards keep the original start time and show dates for long spans
+  Queue position: directly after point 1302 (user order 05.10.2026: "Ja, übernimm beide so. Reihe sie nach 1295 ein.").
+  Why: the card's times are a free string each session passes to `board.mjs promote <point> "<times>"` (board-core.mjs promoteToNow). A successor session writes its own takeover time, so a point worked for many hours shows e.g. "14:00 – 14:30". And a span over 24 h is indistinguishable from a short one without a date.
+  User (05.10.2026): "Wird eine Karte an eine Nachfolgesitzung übergeben, um den Kontext einer Sitzung nicht zu sehr wachsen zu lassen, schreibt die neue Sitzung ihre Übernahmezeit als Startzeit hinein. Dann kommt am Ende so etwas heraus wie dass in der Karte steht, der Task wäre von 14:00 bis 14:30 Uhr bearbeitet worden, obwohl die Bearbeitung eigentlich viele Stunden vor 14 Uhr begonnen hatte und nur die letzte Sitzung, die daran gearbeitet hat, um 14 Uhr begonnen hat." / "Wenn Start- und Endzeit mehr als 24 h auseinanderliegen, ist das nicht erkennbar. In diesem Fall soll auch das Datum mitangegeben werden - zunächst nur im Format DD.MM. Nur, wenn Start- und Endzeit mehr als ein Jahr auseinanderliegen, soll als Format DD.MM.YY verwendet werden."
+  Final state:
+  1. A card's start time is recorded once, at its first promotion to current work (fallback: the first commit on the point's feat/ branch). A session handover / re-promotion never overwrites it; the successor keeps the original start. board-core.mjs promoteToNow and the handover path read the existing start instead of taking the caller's free "<times>" string for it.
+  2. The number of sessions that worked the card is counted; when >1 the time line appends "· <n> Sitzungen".
+  3. Time-span format (Europe/Berlin), by distance between start and end (or now for running cards):
+     - <= 24 h: times only, "09:12 – 14:30" (also across midnight, "23:10 – 01:40")
+     - > 24 h: date added, "03.10. 09:12 – 05.10. 14:30"
+     - > 1 year: date with two-digit year, "03.10.25 09:12 – 05.10.26 14:30"
+  Tests: node tests in board-core.test.mjs for handover keeping the start, the session count, and all three format bands including the exact 24 h / 1 year boundaries.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
   `main` on 09.09.2026 while work-order 1080 was being verified: the crowded construction of
@@ -15748,23 +15795,11 @@ to land than a mechanism that needs a review.
   3. `polish --section=village-loom` and `polish --section=mute-shore-scene` green on both backends.
   Test: the two sections above on both backends; a Vitest on the layer a fix touches.
   Bundle: Testinfrastruktur.
-- [ ] 1301. Low-preset primitive villager kneels with fixed limb lengths and stays above ground
-  Queue position: directly behind point 1294.
-  Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
-  (owner decision under the standing split rule, recorded for veto). Cross-vendor review at e8b17e850 (GPT-6 Astra,
-  pass 1/2, receipt 32873f1442e6ce05) and the round-3 author report leave three defects of the low-preset primitive
-  figure (`src/scenes/place/placeFigure.tsx`, `primitiveLayout()` in `src/render/figureWalk.ts`).
+
+- [ ] 1304. A request whose open questions read "none" is queued, not turned into a decision card
+  Source: findings carrier 05.10.2026 (session b8700b05): the requests that became 1302 and 1303 listed the literal "none" under open-questions; findings-request-core treated it as a non-empty open question, routed both to DECISION CARDS, and the user-approved requests sat blocked until a later session carried them by hand.
   Final state:
-  1. The primitive kneel folds with fixed limb lengths: no arm-length, shoulder-width or body-height scaling
-     (today 55 % arms/shoulders, 0.4125 body, `placeFigure.tsx` ~196). The primitive arm gets an elbow and its
-     contacts are solved like the skinned figure's, so the low-preset kneel poses tuned for the short 0.242 arm
-     (loom weaver, griller, fish gutting, net seat) keep their hand targets without overshooting into the ground.
-  2. The leg fold (`acos(hipY / legLength)`, `placeFigure.tsx` ~204) leaves clearance for the leg radius: no tilted
-     rim and no lower half of a leg cylinder below the ground at full kneel.
-  3. Resting hands of a kneeling primitive stay on or above the ground (measured today ~4 cm below).
-  Not in scope: horizontal foot slide of the low-preset walk (rejected in 1295 under its item 6).
-  Test: `figureWalk.test.ts` stops accepting shortened arms (~404-415) and asserts constant limb lengths through a
-  kneel; the low-preset grounding check in `scripts/verify/polish-villagers.mjs` measures legs and hands, not only
-  the body; `polish --section=village-walk` green on both backends with a low-preset kneel frame picture-checked.
-  Bundle: Dorfleben.
-  Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
+  1. In scripts/findings-request-core.mjs an open-questions field that is empty after trimming, or consists only of "none", "keine", "n/a" or "-" (case-insensitive, optional trailing period), counts as no open question: the request routes to the TASKS append, not to a decision card.
+  2. Vitest in scripts/findings-request-core.test.mjs: each of those literals routes to the TASKS append; a real question still routes to the decision card.
+  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
+  Bundle: Session- & Repo-Hygiene.

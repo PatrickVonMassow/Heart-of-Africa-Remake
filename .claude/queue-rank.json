@@ -1608,6 +1608,12 @@
       "why": "unreproduced test reds that block no point; last is right until reproduced",
       "origin": "machine",
       "place": "last"
+    },
+    "1304": {
+      "at": "2026-10-05T13:51:02.033Z",
+      "why": "process defect behind the carried requests; no player impact, end of queue is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1637,7 +1643,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-05T12:10:27.335Z",
+    "at": "2026-10-05T13:51:02.042Z",
     "points": [
       184,
       200,
@@ -2071,11 +2077,13 @@
       1291,
       1292,
       1294,
-      1295,
       1296,
       1297,
-      1299,
-      1300
+      1300,
+      1301,
+      1302,
+      1303,
+      1304
     ]
   }
 }
