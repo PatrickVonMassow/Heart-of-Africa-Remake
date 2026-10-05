@@ -35,7 +35,6 @@ import {
   legDims,
   legExtent,
   phasePerDistance,
-  primitiveLayout,
   strideReach,
   walkPose,
   type WalkPose,
@@ -250,7 +249,6 @@ export function SkinnedFigure({
   const withLegs = legs && !kneel
   const hipY = withLegs ? bodyH * L.hipY : 0
   const armLen = bodyH * L.armLength
-  const layout = primitiveLayout(kneel ? 1 : 0, withLegs, L)
   const outer = useRef<THREE.Group>(null)
   const trunk = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
@@ -493,7 +491,7 @@ export function SkinnedFigure({
       m.phase += walked * phasePerDistance(Math.max(m.reach * m.weight, m.reach * 0.3))
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
       const actor = g.userData.actor as { height: number } | undefined
-      if (actor) actor.height = primitiveLayout(m.kneel, false, L).labelHeight
+      if (actor) actor.height = 1.45 - 0.45 * m.kneel // the label over the drawn crown
     }
     let shown = pose?.current ?? null
     if (!shown && gesture?.current) {
@@ -511,7 +509,7 @@ export function SkinnedFigure({
   })
 
   return (
-    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: layout.labelHeight })}>
+    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: bodyH + 0.45 })}>
       {rig.meshes.map((m) => (
         <primitive key={m.uuid} object={m} />
       ))}
