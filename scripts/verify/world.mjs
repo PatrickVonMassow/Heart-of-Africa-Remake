@@ -520,6 +520,60 @@ if (section('landmark-frames')) {
   }
 }
 
+// Point 1286: the bird's-eye camera keeps ONE viewing angle while walking east,
+// walking north and after a stop. The live view direction is sampled through
+// the walk; the former per-frame lerp aimed at the exact traveller and swung it
+// by about a degree. Frames of the walk and of the stop go to the picture check.
+if (section('follow-camera')) {
+  await page.evaluate(() => {
+    window.__ui.getState().setTravelZoom(0.5)
+    window.__ui.getState().setJournalDnd(true) // no region entry pops over the walk frames
+  })
+  await jump(12.5, 26.0, 1500) // open dry Darfur plain, no water in the path
+  await page.waitForFunction(() => window.__camera?.settled(), null, { timeout: 30000 })
+  const dir = () => page.evaluate(() => window.__camera.viewDir())
+  const pos = () => page.evaluate(() => ({ ...window.__game.getState().pos }))
+  // The region entry opens the journal; it would cover the frames. The rest
+  // frame's shutter also waits for the jumped-to terrain to finish building.
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  const origin = await pos()
+  await shot('1286-follow-rest', { world: { x: origin.x, z: origin.z }, label: 'the traveller at rest before the walk' })
+  const rest = await dir()
+  const angleDeg = (d) =>
+    (Math.acos(Math.min(1, d.x * rest.x + d.y * rest.y + d.z * rest.z)) * 180) / Math.PI
+  for (const [key, heading] of [['KeyD', 'east'], ['KeyW', 'north']]) {
+    const start = await pos()
+    let worst = 0
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await page.keyboard.down(key)
+    for (let i = 0; i < 12; i++) {
+      await page.waitForTimeout(100)
+      worst = Math.max(worst, angleDeg(await dir()))
+    }
+    const here = await pos()
+    await shot(`1286-follow-walk-${heading}`, {
+      world: { x: here.x, z: here.z },
+      label: `the traveller walking ${heading}`,
+      settle: false,
+    })
+    await page.keyboard.up(key)
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(100)
+      worst = Math.max(worst, angleDeg(await dir()))
+    }
+    const end = await pos()
+    const moved = Math.hypot(end.x - start.x, end.z - start.z)
+    const ok = worst < 0.05 && moved > 1
+    console.log(
+      `${ok ? 'PASS' : 'FAIL'}  the bird's-eye viewing angle stays constant walking ${heading} and on the stop ` +
+        `(max deviation ${worst.toFixed(4)}°, walked ${moved.toFixed(1)} units)${sections.tag()}`,
+    )
+    if (!ok) errors.push(`follow camera swung ${worst.toFixed(4)}° walking ${heading} (walked ${moved.toFixed(1)})`)
+  }
+  const stop = await pos()
+  await shot('1286-follow-stopped', { world: { x: stop.x, z: stop.z }, label: 'the traveller after the stop' })
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having photographed nothing.
 // This suite reports through `errors`, so it is said in that language.
