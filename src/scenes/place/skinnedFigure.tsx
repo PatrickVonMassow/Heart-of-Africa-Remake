@@ -232,11 +232,15 @@ export function SkinnedFigure({
   // figure's pivots exactly (placeFigure.tsx), drawing nothing.
   // A kneeling one keeps the former squashed pivots: every kneeling contact
   // (the loom, the paddle, the gutting) was solved through them, and this rig
-  // is never drawn — the drawn body kneels by its bones.
-  const bodyH = kneel ? 0.55 : 1.0
-  const withLegs = legs && !kneel
-  const hipY = withLegs ? bodyH * L.hipY : 0
-  const armLen = bodyH * L.armLength
+  // is never drawn — the drawn body kneels by its bones. A figure that kneels
+  // down and gets up (`kneeling`) moves its pivots with its own kneel.
+  const virtualAt = (k: number) => {
+    const bodyH = 1 - 0.45 * k
+    return { bodyH, squash: 1 - 0.25 * k, hipY: legs ? bodyH * L.hipY * (1 - k) : 0, armLen: bodyH * L.armLength }
+  }
+  const { bodyH, squash: virtualSquash, hipY, armLen } = virtualAt(kneel ? 1 : 0)
+  const virtualRoot = useRef<THREE.Group>(null)
+  const virtualK = useRef(kneel ? 1 : 0)
   const outer = useRef<THREE.Group>(null)
   const trunk = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
@@ -474,6 +478,16 @@ export function SkinnedFigure({
       const actor = g.userData.actor as { height: number } | undefined
       if (actor) actor.height = 1.45 - 0.45 * m.kneel // the label over the drawn crown
     }
+    if (m.kneel !== virtualK.current && virtualRoot.current) {
+      virtualK.current = m.kneel
+      const v = virtualAt(m.kneel)
+      virtualRoot.current.scale.set(1, v.squash, 1)
+      trunk.current?.position.setY(v.hipY)
+      ;[0, 1].forEach((i) => {
+        arms.current[i]?.position.set((i === 0 ? 1 : -1) * v.bodyH * L.shoulderX, v.bodyH * L.shoulderY - v.hipY, 0)
+        virtualHands.current[i]?.position.setY(-v.armLen)
+      })
+    }
     let shown = pose?.current ?? null
     if (!shown && gesture?.current) {
       gesture.current = advanceGesture(gesture.current, dt)
@@ -495,7 +509,7 @@ export function SkinnedFigure({
         <primitive key={m.uuid} object={m} />
       ))}
       {/* The virtual primitive rig — pivots only, nothing drawn. */}
-      <group scale={[1, kneel ? 0.75 : 1, 1]} visible={false}>
+      <group ref={virtualRoot} scale={[1, virtualSquash, 1]} visible={false}>
         <group ref={trunk} position={[0, hipY, 0]}>
           {[0, 1].map((i) => (
             <group key={i} position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]} ref={armRef[i]}>

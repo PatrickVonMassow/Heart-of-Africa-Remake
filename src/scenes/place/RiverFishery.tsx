@@ -10,7 +10,7 @@
 import { useContext, useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { balance } from '../../config/balance'
+import { balance, VILLAGER_MOTION } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
 import { useGame } from '../../state/store'
 import { FIGURE_LIMBS } from '../../render/figures'
@@ -28,6 +28,7 @@ import {
   type GestureState,
 } from '../../render/gesture'
 import { gaitCadence, gaitPhase } from '../../render/fauna'
+import { approach } from '../../render/figureWalk'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { conceptSpeech, instructionDelay, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
@@ -40,7 +41,7 @@ import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryM
 import { CookShelter } from './CookShelter'
 import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
 import { rainAmount } from '../../systems/season'
-import { carrierWalkPose, copyPose, netFishRotation, ownPose, reachPose } from './fisheryPoses'
+import { blendPose, carrierWalkPose, copyPose, netFishRotation, ownPose, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
 import { speechBearing } from './speechBearing'
@@ -50,6 +51,7 @@ import {
   createFishFire,
   createFisheryRing,
   fisherySites,
+  carrierKneels,
   stepFishFire,
   stepPoundingDuo,
   type FishFireState,
@@ -325,9 +327,11 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
   const carrierWalkPoseRef = useRef<FigurePose | null>(ownPose(HEAD_CARRY_POSE.current))
   const carrierWalkLimbs = useRef<FigureLimbs | null>(null)
   const carrierGait = useRef(0)
-  const carrierKneel = useRef<THREE.Group>(null)
-  const carrierKneelPose = useRef<FigurePose | null>({ ...REST_POSE })
-  const carrierKneelLimbs = useRef<FigureLimbs | null>(null)
+  // ONE body that walks, kneels to gut and gets up again (work-order "walking
+  // villagers", from point 350) — never a second, kneeling figure swapped in.
+  const carrierDown = useRef(false)
+  const carrierKneelK = useRef(0)
+  const carrierCutPose = useRef<FigurePose>({ ...REST_POSE })
   const gutFish = useRef<THREE.Mesh>(null)
   const grillerPose = useRef<FigurePose | null>({ ...REST_POSE })
   const grillerLimbs = useRef<FigureLimbs | null>(null)
@@ -551,11 +555,13 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
 
     // THE CARRIER.
     const c = fire.carrier
-    const kneeling = c.phase === 'gut'
+    const kneeling = carrierKneels(c, fireCfg)
+    carrierDown.current = kneeling
+    // The arms follow the kneel's own transition over to the gutting.
+    carrierKneelK.current = approach(carrierKneelK.current, kneeling ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
     const moving = c.phase === 'toBank' || c.phase === 'toFire'
     carrierGait.current = moving ? gaitPhase(c.walked, cadence) : 0
     if (carrierWalk.current) {
-      carrierWalk.current.visible = !kneeling
       carrierWalk.current.position.set(c.x, groundHeight(c.x, c.z), c.z)
       carrierWalk.current.rotation.y = c.yaw
       // A basket on his head rests on his crown and rides its bob.
@@ -566,15 +572,10 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
     }
     const cw = carrierWalkPoseRef.current
     if (cw) {
-      copyPose(cw, carrierWalkPose(c.phase, c.clock, fireCfg.liftSeconds))
-      applyFigurePose(carrierWalkLimbs.current, cw)
-    }
-    if (carrierKneel.current) carrierKneel.current.visible = kneeling
-    const ck = carrierKneelPose.current
-    if (ck) {
       const cut = Math.sin(t * 7)
-      copyPose(ck, { left: armAim(0.25, -0.75 + 0.18 * cut), right: armAim(-0.2, -0.7), lean: 0.35, turn: 0 })
-      applyFigurePose(carrierKneelLimbs.current, ck)
+      copyPose(carrierCutPose.current, { left: armAim(0.25, -0.75 + 0.18 * cut), right: armAim(-0.2, -0.7), lean: 0.35, turn: 0 })
+      blendPose(cw, carrierWalkPose(c.phase, c.clock, fireCfg.liftSeconds), carrierCutPose.current, carrierKneelK.current)
+      applyFigurePose(carrierWalkLimbs.current, cw)
     }
     if (gutFish.current) {
       const basket = ring.baskets.find((b) => b.at === 'fire')
@@ -966,16 +967,16 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
         ))}
       </group>
 
-      {/* THE CARRIER: walking with the basket on his head, kneeling to gut. */}
+      {/* THE CARRIER: walking with the basket on his head, kneeling to gut —
+          one body, down and up again on its own transition. */}
       <group ref={carrierWalk} name="fish-carrier" position={born.carrier}>
-        <Figure cloth={clothOf(2)} legs pose={carrierWalkPoseRef} limbs={carrierWalkLimbs} gait={carrierGait} />
-      </group>
-      <group ref={carrierKneel} name="fish-carrier-gutting" position={[sites.carrierAtFire.x, groundHeight(sites.carrierAtFire.x, sites.carrierAtFire.z), sites.carrierAtFire.z]} rotation={[0, sites.carrierAtFire.yaw, 0]} visible={false}>
         <Figure
           cloth={clothOf(2)}
-          kneel
-          pose={carrierKneelPose}
-          limbs={carrierKneelLimbs}
+          legs
+          pose={carrierWalkPoseRef}
+          limbs={carrierWalkLimbs}
+          gait={carrierGait}
+          kneeling={carrierDown}
           handProp={
             <mesh ref={gutFish} geometry={fishGeometry} material={materials.fresh} rotation={[0, 0, Math.PI / 2]} scale={0.3} visible={false} />
           }

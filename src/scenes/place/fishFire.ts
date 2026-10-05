@@ -20,7 +20,7 @@
 //
 // Pure logic: the scene draws what this decides.
 
-import { balance } from '../../config/balance'
+import { balance, VILLAGER_MOTION } from '../../config/balance'
 import {
   basketAt,
   carrierSetsDownAtFire,
@@ -371,6 +371,22 @@ function stepCarrier(state: FishFireState, sites: FisherySites, ring: BasketRing
       break
     }
   }
+}
+
+/** The longest frame step the scene takes (its `dt` clamp), held in hand so a
+ *  rise started one frame late still ends before the first step. */
+const FRAME_CLAMP = 0.1
+
+/**
+ * Whether the carrier kneels at the fire (work-order "walking villagers", from
+ * point 350): down on arrival, up again BEFORE he walks — the getting-up
+ * (`VILLAGER_MOTION.kneelSeconds`) starts that long, and one frame more, before
+ * the gut phase can end, so he never rises while he moves off.
+ */
+export function carrierKneels(c: FishCarrier, cfg: FireConfig = balance.villageLife.fishFire): boolean {
+  if (c.phase !== 'gut') return false
+  const end = cfg.liftSeconds + c.gutSeconds + cfg.liftSeconds
+  return c.clock < end - VILLAGER_MOTION.kneelSeconds - FRAME_CLAMP
 }
 
 function stepGriller(state: FishFireState, sites: FisherySites, dt: number, cfg: FireConfig): void {

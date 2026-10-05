@@ -198,7 +198,15 @@ function PrimitiveFigure({
       }
       handEnds.current[i]?.position.setY(-n.armLength)
     })
-    if (legGroup.current) legGroup.current.visible = withLegs && kneelK.current === 0
+    // The legs fold back under the sinking hips, their feet kept on the ground
+    // — never hidden in one frame (no pop): a rigid leg from a hip at `hipY`
+    // reaches the ground tilted back by acos(hipY / leg), the shin laid behind.
+    const fold = Math.acos(Math.min(1, Math.max(0, n.hipY / L.hipY)))
+    legPivots.current.forEach((p) => {
+      if (!p) return
+      p.position.y = n.hipY
+      if (kneelK.current > 0 || !gait) p.rotation.x = fold
+    })
     const actor = outer.current?.userData.actor as { height: number } | undefined
     if (actor) actor.height = n.labelHeight
   }
@@ -242,7 +250,7 @@ function PrimitiveFigure({
       head.current.scale.y = flattened ? 1 / squash : 1
       head.current.rotation.x = flattened ? -(trunk.current?.rotation.x ?? 0) : 0
     }
-    if (withLegs && gait) {
+    if (withLegs && gait && kneelK.current === 0) {
       const phase = gait.current
       const a = legPivots.current[0]
       const b = legPivots.current[1]
@@ -250,8 +258,8 @@ function PrimitiveFigure({
       if (b) b.rotation.x = legSwingAngle(phase, Math.PI)
       // Dropped onto the stance leg, so the swinging feet ride the ground
       // instead of hanging above it (the drop callers used to apply).
-      lifted.current?.position.setY(kneelK.current === 0 ? gaitBodyLift(phase, L.hipY) : 0)
-    }
+      lifted.current?.position.setY(gaitBodyLift(phase, L.hipY))
+    } else if (kneelK.current > 0) lifted.current?.position.setY(0)
   })
   // The wrap this figure actually wears — null when the season is off, and null
   // for most figures when the record gates the garment on RANK. Barth on the
