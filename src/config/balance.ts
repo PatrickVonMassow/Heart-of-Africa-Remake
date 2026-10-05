@@ -2560,6 +2560,12 @@ export const VILLAGER_ASSET = {
   makeHumanAge: { child: 0.1125, youth: 0.3, adult: 0.54, elder: 0.81 },
   /** The ethnic mix of MakeHuman's macro targets. */
   makeHumanRace: { african: 1, asian: 0, caucasian: 0 },
+  /** The women's breast modifier per age group, as the share toward
+   *  MakeHuman's max cup (0 = its average, which the macro targets leave flat).
+   *  Where most of the roster goes bare above the waist this is what tells a
+   *  woman from a man at village distance (as render/figureBody.ts `bust`).
+   *  Calibratable, read off the frame sheets and the village frames. */
+  breastCup: { child: 0, youth: 0.55, adult: 0.8, elder: 0.75 },
   /** How far a build of ±1 moves MakeHuman's weight slider off its average. */
   buildWeight: 0.3,
   /** Triangles of the decimated body (hands, feet and face kept finer). */

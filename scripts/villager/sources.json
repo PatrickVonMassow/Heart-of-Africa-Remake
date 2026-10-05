@@ -4,7 +4,7 @@
   "makehuman": {
    "licence": "CC0-1.0",
    "licenceFile": "makehuman/LICENSE.ASSETS.md",
-   "origin": "MakeHuman / MPFB2 bundled assets (base mesh, macro targets, game_engine rig and weights), github.com/makehumancommunity/mpfb2 @ d0a32e57a7f9 \u2014 LICENSE.md part C: \"The base mesh and proxies, Targets and modifiers, ... Rigs ... have been released under CC0 1.0 Universal\"."
+   "origin": "MakeHuman / MPFB2 bundled assets (base mesh, macro targets, game_engine rig and weights), github.com/makehumancommunity/mpfb2 @ d0a32e57a7f9 — LICENSE.md part C: \"The base mesh and proxies, Targets and modifiers, ... Rigs ... have been released under CC0 1.0 Universal\"."
   },
   "quaternius": {
    "licence": "CC0-1.0",
@@ -282,6 +282,21 @@
    "path": "makehuman/targets/universal-male-old-averagemuscle-maxweight.target.gz",
    "url": "https://raw.githubusercontent.com/makehumancommunity/mpfb2/d0a32e57a7f915cb2f2b95410e2117648c7bbb7e/src/mpfb/data/targets/macrodetails/universal-male-old-averagemuscle-maxweight.target.gz",
    "sha256": "185c7fba104d170770240e8700f0ff8ea03b348412af7f3496d6f047d50beb39"
+  },
+  {
+   "path": "makehuman/targets/breast/female-child-averagemuscle-averageweight-maxcup-averagefirmness.target.gz",
+   "url": "https://raw.githubusercontent.com/makehumancommunity/mpfb2/d0a32e57a7f915cb2f2b95410e2117648c7bbb7e/src/mpfb/data/targets/breast/female-child-averagemuscle-averageweight-maxcup-averagefirmness.target.gz",
+   "sha256": "ed82d42b9e44132a3a46d0f7ebc7230bd7b75a1793841f5c116046634218f082"
+  },
+  {
+   "path": "makehuman/targets/breast/female-young-averagemuscle-averageweight-maxcup-averagefirmness.target.gz",
+   "url": "https://raw.githubusercontent.com/makehumancommunity/mpfb2/d0a32e57a7f915cb2f2b95410e2117648c7bbb7e/src/mpfb/data/targets/breast/female-young-averagemuscle-averageweight-maxcup-averagefirmness.target.gz",
+   "sha256": "70e67e082034a80cb6a88abac95d6e11d305f769c98f2d70374dea97fa98c604"
+  },
+  {
+   "path": "makehuman/targets/breast/female-old-averagemuscle-averageweight-maxcup-averagefirmness.target.gz",
+   "url": "https://raw.githubusercontent.com/makehumancommunity/mpfb2/d0a32e57a7f915cb2f2b95410e2117648c7bbb7e/src/mpfb/data/targets/breast/female-old-averagemuscle-averageweight-maxcup-averagefirmness.target.gz",
+   "sha256": "a0916a319d648ff75dd6cfb19c1286f98c3da2296983604c9c6cdbe14e28f066"
   },
   {
    "path": "quaternius/UAL1-LICENSE",

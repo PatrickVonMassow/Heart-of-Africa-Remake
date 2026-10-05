@@ -73,9 +73,12 @@ class MakeHuman:
             self._targets[name] = delta
         return self._targets[name]
 
-    def shape(self, gender, age, weight, race):
+    def shape(self, gender, age, weight, race, cup=0.0):
         """Vertex positions (all 19158, MakeHuman units) for macro settings;
-        gender 0 female … 1 male, age 0 … 1 (MakeHuman's slider), weight 0 … 1."""
+        gender 0 female … 1 male, age 0 … 1 (MakeHuman's slider), weight 0 … 1;
+        `cup` 0 … 1 the breast modifier's share toward its max cup (MakeHuman's
+        BreastSize slider above its average: the macro targets alone leave the
+        female chest flat). Only the targets of the average weight are pinned."""
         out = self.v.copy()
         gw = {'female': 1 - gender, 'male': gender}
         aw = age_weights(age)
@@ -92,6 +95,10 @@ class MakeHuman:
                 for r, a_r in race.items():
                     if a_r > 0:
                         out += a_g * a_a * a_r * self.target(f'{r}-{g}-{a}')
+                if g == 'female' and cup > 0 and a != 'baby':
+                    for w, a_w in ww.items():
+                        if a_w > 0:
+                            out += a_g * a_a * a_w * cup * self.target(f'breast/female-{a}-averagemuscle-{w}-maxcup-averagefirmness')
         return out
 
     def centroid(self, verts, group):

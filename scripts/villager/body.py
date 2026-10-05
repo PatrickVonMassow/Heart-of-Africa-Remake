@@ -33,7 +33,8 @@ def corner_shapes(mh, cfg):
 
     def make(sex, age, build):
         w = 0.5 + build * A['buildWeight']
-        v = mh.shape(1.0 if sex == 'male' else 0.0, A['makeHumanAge'][age], w, A['makeHumanRace'])
+        cup = A['breastCup'][age] if sex == 'female' else 0.0
+        v = mh.shape(1.0 if sex == 'male' else 0.0, A['makeHumanAge'][age], w, A['makeHumanRace'], cup)
         lo = v[body, 1].min()
         hi = v[body, 1].max()
         H = A['stature'] * A['statureFactor'][age][sex]
@@ -198,7 +199,10 @@ def decimate(mh, basis, target_tris):
         hand = abs(p[0]) > 0.17 * H / 1.34 and p[1] < 0.62 * H and p[1] > 0.35 * H
         foot = p[1] < 0.06 * H
         face = p[1] > 0.86 * H and p[2] > 0.02 * H / 1.34
-        vg.add([k], 0.85 if (hand or foot) else 0.6 if face else 1.0, 'REPLACE')
+        # the chest front keeps enough rings for the women's breasts (the
+        # female morph is mapped onto this decimated adult man's surface)
+        chest = 0.66 * H < p[1] < 0.8 * H and p[2] > 0.03 * H / 1.34
+        vg.add([k], 0.85 if (hand or foot) else 0.6 if (face or chest) else 1.0, 'REPLACE')
     mod = ob.modifiers.new('dec', 'DECIMATE')
     mod.decimate_type = 'COLLAPSE'
     mod.use_symmetry = True
