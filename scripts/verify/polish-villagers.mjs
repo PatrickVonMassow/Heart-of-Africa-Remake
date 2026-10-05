@@ -4179,11 +4179,32 @@ if (section('village-walk')) {
         const bone = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`)
         const idx = (n) => mesh.skeleton.bones.findIndex((b) => b.name === `bone-${n}`)
         const unit = g.getWorldScale(new V()).y
+        // THE DRAWN SOLE: every vertex skinned wholly to the foot bone, carried
+        // through the bones as the GPU does (`getVertexPosition`), its lowest
+        // point — so a tilted or deformed foot is measured, not assumed flat.
+        const skinned = []
+        g.traverse((o) => { if (o.isSkinnedMesh) skinned.push(o) })
+        const soleVerts = (n) =>
+          skinned.flatMap((m) => {
+            m.userData.soleVerts ??= {}
+            if (!m.userData.soleVerts[n]) {
+              const b = m.skeleton.bones.findIndex((q) => q.name === `bone-${n}`)
+              const si = m.geometry.attributes.skinIndex
+              const sw = m.geometry.attributes.skinWeight
+              const list = []
+              for (let v = 0; si && sw && v < si.count; v++) {
+                for (let c = 0; c < 4; c++) if (si.getComponent(v, c) === b && sw.getComponent(v, c) > 0.99) list.push(v)
+              }
+              m.userData.soleVerts[n] = list
+            }
+            return m.userData.soleVerts[n].map((v) => m.localToWorld(m.getVertexPosition(v, new V())).y)
+          })
         const feet = ['foot.L', 'foot.R'].map((n) => {
-          // The ankle's bind height IS the sole's distance below it (the foot is kept flat).
+          // The walk's own contact: the ankle's bind height above its sole.
           const bind = new V().setFromMatrixPosition(mesh.skeleton.boneInverses[idx(n)].clone().invert())
           const at = bone(n).getWorldPosition(new V())
-          return { x: at.x, z: at.z, sole: at.y - bind.y * unit - s.groundHeight }
+          const drawn = soleVerts(n)
+          return { x: at.x, z: at.z, sole: at.y - bind.y * unit - s.groundHeight, drawnSole: drawn.length ? Math.min(...drawn) - s.groundHeight : null, verts: drawn.length }
         })
         // Fore/aft (body frame) of each hand and ankle: an arm swings against
         // its own side's leg when its hand is forward while that foot is back.
@@ -4214,8 +4235,15 @@ if (section('village-walk')) {
       await nextFrames(1)
     }
     if (process.env.VILLAGE_WALK_DUMP) (await import('node:fs')).writeFileSync(process.env.VILLAGE_WALK_DUMP, JSON.stringify(samples))
-    const lowest = samples.map((r) => Math.min(r.feet[0].sole, r.feet[1].sole))
+    // The lowest DRAWN sole point each frame (the transformed foot geometry).
+    const footVerts = samples.length ? Math.min(...samples.flatMap((r) => r.feet.map((f) => f.verts))) : 0
+    const lowest = samples.map((r) => Math.min(r.feet[0].drawnSole ?? Infinity, r.feet[1].drawnSole ?? Infinity))
     const worstGround = lowest.reduce((m, v) => Math.max(m, Math.abs(v)), 0)
+    // While the walk holds a foot planted, its drawn sole must be on the
+    // ground too — the ankle-height contact is only trusted where the drawn
+    // foot agrees with it (no toe or heel through the ground or floating).
+    let worstPlantedSole = 0
+    for (const r of samples) for (const f of r.feet) if (Math.abs(f.sole) <= 0.002 && f.drawnSole !== null) worstPlantedSole = Math.max(worstPlantedSole, Math.abs(f.drawnSole))
     // A foot counts as planted while its sole is on the ground and the body
     // walks (a turn on the spot after a linger is not a stride); its drift is
     // measured over each such run. A run of one sample measures nothing, and a
@@ -4276,10 +4304,11 @@ if (section('village-walk')) {
     const col = (key, i) => samples.map((r) => r[key][i])
     const armVsLeg = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', i)).toFixed(3)) : [0, 0]
     const armVsOther = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', 1 - i)).toFixed(3)) : [0, 0]
-    const detail = JSON.stringify({ frames: samples.length, worstGround: +worstGround.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
+    const detail = JSON.stringify({ frames: samples.length, footVerts, worstGround: +worstGround.toFixed(4), worstPlantedSole: +worstPlantedSole.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
     console.log(`  village-walk ${detail}`)
     check('village walk: measured over at least 30 walking frames', samples.length >= 30, detail)
-    check(`village walk: the lowest sole sits on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m)`, samples.length > 0 && worstGround <= FOOT_TOL, detail)
+    check(`village walk: the lowest drawn sole sits on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m, transformed foot geometry)`, samples.length > 0 && footVerts > 0 && worstGround <= FOOT_TOL, detail)
+    check(`village walk: a planted foot’s drawn sole is on the ground (≤ ${FOOT_TOL.toFixed(3)} m)`, footVerts > 0 && worstPlantedSole <= FOOT_TOL, detail)
     check('village walk: planted stances were observed (≥ 6 of three samples or more)', fullStances >= 6, detail)
     check(`village walk: a planted foot does not slide (≤ ${SLIP_TOL.toFixed(3)} m per stance)`, fullStances >= 6 && worstSlip <= SLIP_TOL, detail)
     check('village walk: the legs swing in counter-phase and the arms swing with them', thighSwing > 0.25 && armSwing > 0.03 && counter > 5, detail)
