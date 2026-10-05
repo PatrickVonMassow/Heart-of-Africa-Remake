@@ -15848,3 +15848,10 @@ to land than a mechanism that needs a review.
   2. Vitest in scripts/findings-request-core.test.mjs: each of those literals routes to the TASKS append; a real question still routes to the decision card.
   No new guards, audits or state fields (infrastructure freeze 01.09.2026).
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1309. A hard-edged dark rectangle shows in the burning-grass travel frame
+  Source: findings carrier 05.10.2026 16:35, found on the picture check of point 1287.
+  verification/131-burning-grass.png shows a straight-edged dark rectangle (with horizontal bars) in the lower right of the bird's-eye view, on main (d8a093e50, WebGL 2) and on WebGPU and WebGL 2 at point 1287 alike; not caused by the camera shift. Looks like a shadow or overlay with a rectangular footprint.
+  Final state: the cause is measured in game (which mesh, overlay or shadow draws the rectangle) and removed; the burning-grass travel frame shows no straight-edged artefact on either backend.
+  Verifiable: the burning-grass frame on both backends, picture-checked per §7.2; a right-layer test for the corrected cause.
+  Bundle: Wetter & Wasser.
