@@ -1602,6 +1602,12 @@
       "why": "test-staging crash with no measured player impact; it stands with the other suite reds behind the feature work",
       "origin": "machine",
       "place": "last"
+    },
+    "1300": {
+      "at": "2026-10-05T11:24:02.990Z",
+      "why": "unreproduced test reds that block no point; last is right until reproduced",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1631,7 +1637,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-05T10:50:28.643Z",
+    "at": "2026-10-05T11:24:03.001Z",
     "points": [
       184,
       200,
@@ -2069,7 +2075,8 @@
       1296,
       1297,
       1298,
-      1299
+      1299,
+      1300
     ]
   }
 }
