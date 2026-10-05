@@ -6,7 +6,7 @@
 //
 // Blender is NEVER a build or runtime dependency: the game builds and runs
 // from the committed .glb files alone; Blender only REPRODUCES them
-// (tools/villager/). User authorization 04.10.2026: the author downloads,
+// (scripts/villager/). User authorization 04.10.2026: the author downloads,
 // installs and configures it in the container, no user hand involved.
 //
 // WHY THE DEBIAN PACKAGE: this container reaches deb.debian.org but not

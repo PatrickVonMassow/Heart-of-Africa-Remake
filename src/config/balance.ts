@@ -2534,6 +2534,42 @@ export const VILLAGER_MOTION = {
   turnStopAngle: 1.75,
 } as const
 
+/**
+ * The villager's glTF body as the asset pipeline builds it (work-order "glTF
+ * villager body"; scripts/villager/build.mjs reads this block). BUILD-time values:
+ * a change takes effect when the pipeline is re-run and the .glb committed.
+ * Every value is a CALIBRATABLE educated guess unless noted.
+ */
+export const VILLAGER_ASSET = {
+  /** Crown height of an adult man in figure units (render/figureBody.ts
+   *  FIGURE_STATURE: the primitive figure's cone 1 + head) — every caller sizes
+   *  and collides a figure by it. Not a guess: the figure contract. */
+  stature: 1.34,
+  /** Stature against an adult man's, by age and sex (anthropometric means, as
+   *  render/figureBody.ts); a child is built to the adult stature and drawn
+   *  small by its caller's scale. */
+  statureFactor: {
+    child: { male: 1, female: 1 },
+    youth: { male: 0.98, female: 0.94 },
+    adult: { male: 1, female: 0.94 },
+    elder: { male: 0.97, female: 0.91 },
+  },
+  /** MakeHuman's age slider (0 = 1 year, 0.1875 = 11, 0.5 = 25, 1 = 90) for
+   *  each age group: a child of about seven, a youth of about sixteen, an adult
+   *  of about thirty, an elder of about sixty-five. */
+  makeHumanAge: { child: 0.1125, youth: 0.3, adult: 0.54, elder: 0.81 },
+  /** The ethnic mix of MakeHuman's macro targets. */
+  makeHumanRace: { african: 1, asian: 0, caucasian: 0 },
+  /** How far a build of ±1 moves MakeHuman's weight slider off its average. */
+  buildWeight: 0.3,
+  /** Triangles of the decimated body (hands, feet and face kept finer). */
+  bodyTriangles: 6000,
+  /** How far a garment vertex may lie inside the body in any frame of any clip
+   *  at any morph extreme (figure units, ≈ 4 mm) — the penetration report's
+   *  tolerance. */
+  garmentPenetrationTolerance: 0.003,
+} as const
+
 // Dev hook for the headless verification (the village-walk tolerances).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__villagerMotion = VILLAGER_MOTION
