@@ -4394,7 +4394,115 @@ if (section('village-walk')) {
   }
 
   // THE KNEEL TRANSITION (point 350): the task walker kneels at its work by
-  // folding down, never by swapping to a second, squashed figure.
+  // folding down, never by swapping to a second, squashed figure — observed
+  // over one WHOLE kneel, frame by frame in the page: walking up, down, held,
+  // up again, walking off. Its kneel fraction is the figure's own (the skinned
+  // walk's `kneel`, the primitive's dev `userData.kneel`); its height is the
+  // drawn hips bone over its bind height (skinned) or the drawn head (primitive).
+  const kneelSequence = (capMs) =>
+    page.evaluate((capMs) => new Promise((resolve) => {
+      const t0 = performance.now()
+      const out = []
+      let stage = 'walk' // walk → down → up → off
+      let upAt = null
+      const tick = () => {
+        const g = window.__placeScene.getObjectByName('village-task-walker')
+        if (g?.visible) {
+          const V = g.position.constructor
+          const figs = []
+          g.traverse((o) => { if (o.name === 'inhabitant') figs.push(o) })
+          const fig = figs[0]
+          let mesh = null
+          fig.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
+          const k = mesh ? fig.userData.walk?.kneel : fig.userData.kneel
+          let height = null
+          if (mesh) {
+            const hips = mesh.skeleton.bones.find((b) => b.name === 'bone-hips')
+            const bind = new V().setFromMatrixPosition(mesh.skeleton.boneInverses[mesh.skeleton.bones.indexOf(hips)].clone().invert()).y
+            height = hips.position.y / bind
+          } else {
+            const head = fig.getObjectByName('figure-head')
+            height = head ? fig.worldToLocal(head.getWorldPosition(new V())).y : null
+          }
+          const sc = fig.getWorldScale(new V())
+          const head = fig.getObjectByName('figure-head')
+          const hs = head?.getWorldScale(new V())
+          out.push({
+            x: g.position.x,
+            z: g.position.z,
+            k: typeof k === 'number' ? k : null,
+            height,
+            figures: figs.length,
+            skinned: !!mesh,
+            uniform: Math.abs(sc.x - sc.y) < 1e-6 && Math.abs(sc.y - sc.z) < 1e-6,
+            headRound: !hs || (Math.abs(hs.x - hs.y) < 1e-3 && Math.abs(hs.y - hs.z) < 1e-3),
+          })
+          const r = out[out.length - 1]
+          if (stage === 'walk' && r.k === 0 && out.length > 1 && Math.hypot(r.x - out[out.length - 2].x, r.z - out[out.length - 2].z) > 1e-4) stage = 'ready'
+          else if (stage === 'ready' && r.k === 1) stage = 'down'
+          else if (stage === 'down' && r.k === 0) { stage = 'up'; upAt = { x: r.x, z: r.z } }
+          else if (stage === 'up' && Math.hypot(r.x - upAt.x, r.z - upAt.z) > 0.3) return resolve({ complete: true, out })
+        } else if (stage === 'walk' || stage === 'ready') {
+          out.length = 0 // not out yet: start over when it comes out
+          stage = 'walk'
+        }
+        if (performance.now() - t0 > capMs) return resolve({ complete: false, out })
+        requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    }), capMs)
+  /** Reads one observed kneel: complete, a transition both ways, standing
+   *  for every step, one uniformly scaled figure with a round head. */
+  const judgeKneel = (seq) => {
+    const out = seq.out
+    const first = out.findIndex((r) => r.k > 0)
+    const full = out.findIndex((r, i) => i > first && r.k === 1)
+    const back = out.findIndex((r, i) => i > full && r.k === 0)
+    const span = (a, b) => out.slice(a, b).filter((r) => r.k > 0 && r.k < 1).length
+    const downFrames = first >= 0 && full > first ? span(first, full) : 0
+    const upFrames = full >= 0 && back > full ? span(full, back) : 0
+    // Every translation from the first kneel frame on, with its kneel.
+    let movedKneeling = 0
+    for (let i = Math.max(1, first); first >= 0 && i < out.length; i++) {
+      const moved = Math.hypot(out[i].x - out[i - 1].x, out[i].z - out[i - 1].z) > 1e-4
+      if (moved && (out[i].k !== 0 || out[i - 1].k !== 0)) movedKneeling++
+    }
+    const standing = first > 0 ? out[first - 1].height : null
+    const knelt = full >= 0 ? Math.min(...out.slice(full, back > 0 ? back : undefined).filter((r) => r.k === 1).map((r) => r.height)) : null
+    // The largest one-frame change of the drawn height through the transitions:
+    // a pop would be the whole drop in one frame.
+    let jump = 0
+    for (let i = Math.max(1, first); first >= 0 && i <= back; i++) jump = Math.max(jump, Math.abs(out[i].height - out[i - 1].height))
+    const drop = standing !== null && knelt !== null ? standing - knelt : 0
+    return {
+      complete: seq.complete,
+      frames: out.length,
+      downFrames,
+      upFrames,
+      movedKneeling,
+      standing: standing !== null ? +standing.toFixed(3) : null,
+      knelt: knelt !== null ? +knelt.toFixed(3) : null,
+      jumpOfDrop: drop > 0 ? +(jump / drop).toFixed(3) : null,
+      oneFigure: out.every((r) => r.figures === 1),
+      uniform: out.every((r) => r.uniform),
+      headRound: out.every((r) => r.headRound),
+      skinned: [...new Set(out.map((r) => r.skinned))],
+      kRead: out.every((r) => r.k !== null),
+      drop,
+    }
+  }
+  const kneelChecks = (label, j) => {
+    const d = JSON.stringify(j)
+    check(`${label}: a whole kneel was observed — walking up, down, held, up, walking off`, j.complete && j.kRead, d)
+    check(`${label}: going down and getting up are transitions over several frames, never a pop`, j.downFrames >= 3 && j.upFrames >= 3 && j.jumpOfDrop !== null && j.jumpOfDrop < 0.25, d)
+    check(`${label}: the figure really folds down (drawn height at the kneel well under standing)`, j.drop > 0 && j.knelt < j.standing * 0.85, d)
+    check(`${label}: no step is taken until it stands again (translation only at kneel 0)`, j.complete && j.movedKneeling === 0, d)
+    check(`${label}: one figure throughout, uniformly scaled, the head round`, j.oneFigure && j.uniform && j.headRound, d)
+  }
+  const kneelSeen = judgeKneel(await kneelSequence(150000))
+  console.log(`  kneel sequence (medium) ${JSON.stringify(kneelSeen)}`)
+  check('kneel: the observed task walker is the skinned body', kneelSeen.skinned.length === 1 && kneelSeen.skinned[0] === true, JSON.stringify(kneelSeen))
+  kneelChecks('kneel', kneelSeen)
   const halfway = await stepUntil(() => {
     const g = window.__placeScene.getObjectByName('village-task-walker')
     if (!g?.visible) return false
