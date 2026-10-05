@@ -33544,3 +33544,29 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Tests: a Vitest for the pure follow step (constant camera-to-target direction at every heading and on a stop; the same lag at 30 and 60 fps); the existing travel Playwright suite on WebGPU with a picture check of a walk east, north, and a stop.
   Criticality: medium - visible to the player on every overland step; no data risk.
   Bundle: Steuerung & Performance.
+- [x] 350. The kneeling villager is a squashed villager (user 25.07.2026, deployed
+  build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
+  ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
+  kneeling with a NON-UNIFORM vertical squash — `scale={[scale, scale * (kneel ? 0.75 :
+  1), scale]}` (line ~60) on top of a shortened body cone (`bodyH = kneel ? 0.55 : 1.0`).
+  The squash applies to the WHOLE figure, the head included, so the head reads as a
+  flattened ellipsoid: kneeling shortens the legs, it does not compress the skull. And
+  the alternation the user sees is `TaskWalker` (line ~496) swapping the standing and
+  kneeling groups by VISIBILITY when it starts and ends its work at the well — an
+  instant pop between two different-looking figures.
+  TARGET: a kneeling pose built from PROPORTIONS, not from a vertical scale. The lower
+  body folds (a shorter, wider base) and the whole figure sits lower, while the head and
+  every other part keep their true shape — the group's scale stays UNIFORM. And the
+  transition reads as a movement rather than a swap: the figure lowers into the pose and
+  rises out of it over a short, calibratable time, so no frame shows one figure replaced
+  by another. Every user of `kneel` gets it — the cook, the fire tender and the errand
+  walker at the well.
+  VERIFIABLE: pure (`src/render/figures.test.ts` or a test beside it) — the kneeling
+  build applies no non-uniform scale (x, y and z factors equal) and its head radius
+  matches the standing figure's, while the pose is genuinely lower (a bounded overall
+  height reduction); the standing build is unchanged. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): across the frames in which a
+  task walker starts and finishes its work, no single frame changes the figure's
+  rendered height by more than the transition's per-frame step — the pop is what the
+  check is for.
+  Closed 05.10.2026 without its own landing: absorbed into point 1295 by user order ("Der Task 350 sollte dann in diesen zusammengeführt und der alte 350er gelöscht werden"); its kneeling requirement is item 5 there.
