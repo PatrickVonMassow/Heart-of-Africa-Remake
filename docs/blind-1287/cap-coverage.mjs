@@ -71,15 +71,16 @@ function boundHolds(P0, P1) {
 }
 
 let bad = 0
-for (let i = 0; i <= 39; i++) {
-  const aspect = 0.45 + 0.05 * i
+const NAMED = new Map([[16 / 9, '16:9'], [4 / 3, '4:3'], [9 / 16, '9:16']])
+const aspects = [...Array.from({ length: 40 }, (_, i) => 0.45 + 0.05 * i), ...NAMED.keys()]
+for (const aspect of aspects) {
   const P0 = footprint(0, aspect), P1 = footprint(SHIFT, aspect)
   const res = boundHolds(P0, P1)
   if (!res.ok) bad++
-  if ([0.55, 1.35, 1.8].some((x) => Math.abs(aspect - x) < 1e-9) || !res.ok) {
+  if (NAMED.has(aspect) || !res.ok) {
     const row = [25, 30, 35].map((r) => `r${r} ${outDisc(P0, r).toFixed(0)}→${outDisc(P1, r).toFixed(0)}`).join('  ')
-    console.log(`aspect ${aspect.toFixed(2)}: ${res.ok ? 'holds' : 'VIOLATED'} (${res.why}) | ${row} | frame ${polyArea(P0).toFixed(1)}→${polyArea(P1).toFixed(1)} | frame∩disc45 ${inDisc(P0, 45).toFixed(1)}→${inDisc(P1, 45).toFixed(1)} | inradius ${inRadius(P0).toFixed(1)}→${inRadius(P1).toFixed(1)} | far corner ${maxR(P0).toFixed(1)}→${maxR(P1).toFixed(1)}`)
+    console.log(`aspect ${NAMED.get(aspect) ?? aspect.toFixed(2)}: ${res.ok ? 'holds' : 'VIOLATED'} (${res.why}) | ${row} | frame ${polyArea(P0).toFixed(1)}→${polyArea(P1).toFixed(1)} | frame∩disc45 ${inDisc(P0, 45).toFixed(1)}→${inDisc(P1, 45).toFixed(1)} | inradius ${inRadius(P0).toFixed(1)}→${inRadius(P1).toFixed(1)} | far corner ${maxR(P0).toFixed(1)}→${maxR(P1).toFixed(1)}`)
   }
 }
-console.log(`shift ${SHIFT.toFixed(3)}; aspects 0.45..2.40 step 0.05: ${bad ? bad + ' VIOLATED' : 'the frame area outside the disc never grows, for every radius, at each'}`)
+console.log(`shift ${SHIFT.toFixed(3)}; aspects 0.45..2.40 step 0.05 plus 16:9, 4:3, 9:16: ${bad ? bad + ' VIOLATED' : 'the frame area outside the disc never grows, for every radius, at each'}`)
 process.exit(bad ? 1 : 0)
