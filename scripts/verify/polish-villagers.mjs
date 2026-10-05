@@ -4161,6 +4161,9 @@ if (section('village-walk')) {
   }, null, 3600)
   check('village walk: a villager is out walking on the skinned body', found, found ? '' : 'no walker left its dwelling')
   const who = found ? await pick() : null
+  // A walker out but none on the skinned body would skip every gait check
+  // below: that is a red, never a quiet pass.
+  check('village walk: the walker measured is drawn on the skinned body', who !== null, found ? 'walkers out, none skinned' : 'no walker out')
   if (who !== null) {
     // Per frame: the lowest sole over the ground, each foot's position, the
     // thigh and upper-arm swing.
