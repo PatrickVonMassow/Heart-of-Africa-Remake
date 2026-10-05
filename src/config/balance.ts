@@ -2599,6 +2599,10 @@ export const VILLAGER_GLTF = {
   transitionSeconds: 0.35,
   /** Ground speed (figure units / s) below which the figure stands. */
   standSpeed: 0.08,
+  /** Where the hair is painted on the glTF head, as shares of chin → crown
+   *  (brow, and the nape behind the ears) and of the head's depth back → front
+   *  (what counts as behind). The body carries no hair mesh. Calibratable. */
+  hair: { brow: 0.62, nape: 0.3, back: 0.38 },
 } as const
 
 // Dev hook for the headless verification (the village-walk tolerances).

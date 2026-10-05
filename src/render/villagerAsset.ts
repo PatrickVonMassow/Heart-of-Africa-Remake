@@ -214,7 +214,14 @@ export function loadVillagerAsset(): Promise<VillagerAsset> {
         if (!r.ok) throw new Error(`villager.glb: HTTP ${r.status}`)
         return r.arrayBuffer()
       })
-      .then(parseVillager)
+      .then((buf) => {
+        const t0 = performance.now()
+        return parseVillager(buf).then((a) => {
+          // read by the verification's load-cost record (graphics-detail-levels.md)
+          performance.measure?.('villager-glb-parse', { start: t0, end: performance.now(), detail: { bytes: buf.byteLength } })
+          return a
+        })
+      })
       .then((a) => (loaded = a))
     loading.catch((e) => {
       // A missing or broken asset leaves the code-built body in place.

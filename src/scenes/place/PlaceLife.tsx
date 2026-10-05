@@ -49,7 +49,8 @@ import {
   type GestureKind,
   type GestureState,
 } from '../../render/gesture'
-import { effectiveFaunaBodySegments, effectiveFigureBodySegments, effectiveFigureLimbSegments, useUi } from '../../state/ui'
+import { effectiveFaunaBodySegments, effectiveFigureBodySegments, effectiveFigureGltfBody, effectiveFigureLimbSegments, useUi } from '../../state/ui'
+import { useVillagerAsset } from './useVillagerAsset'
 import { placeDressDrivers, useColdCloaks } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
 import { devAssert } from '../../systems/devAssert'
@@ -3816,12 +3817,15 @@ export function PlaceLife({
   // on the low preset, which keeps the primitive figure. Read once per visit,
   // like the cloaks: time does not advance inside a settlement.
   const bodySegments = useUi(effectiveFigureBodySegments)
+  // The glTF body where the level draws it (work-order "glTF villager body"):
+  // loaded on the first such visit; the code-built body stands in until then.
+  const villager = useVillagerAsset(useUi(effectiveFigureGltfBody) && bodySegments > 0)
   const figureLook = useMemo<FigureLook | null>(() => {
     const place = placeId ? placeById(placeId) : null
     if (!bodySegments || !place) return null
     const { drivers, year } = placeDressDrivers(place.id, useGame.getState().day)
-    return { peopleId: place.peopleId ?? null, drivers, year, palette: style.cloth, radial: bodySegments }
-  }, [bodySegments, placeId, style.cloth])
+    return { peopleId: place.peopleId ?? null, drivers, year, palette: style.cloth, radial: bodySegments, villager }
+  }, [bodySegments, placeId, style.cloth, villager])
 
   // Whether this village has a well at all (point 1092) — the same answer the
   // layout's colliders and keep-clear spots are built from, so the drawn prop

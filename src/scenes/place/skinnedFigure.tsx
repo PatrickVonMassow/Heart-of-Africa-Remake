@@ -20,8 +20,13 @@ import {
   buildBodyGeometry,
   createSkeleton,
   type BodyProportions,
+  mixHex,
+  paint as paintSurface,
+  tidy,
   type BoneName,
 } from '../../render/figureBody'
+import type { VillagerAsset } from '../../render/villagerAsset'
+import { codeBoneMap, createGltfSkeleton, gltfPerson, remapSkin, type GltfPerson } from '../../render/villagerFigureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
 import { contactCrouch, contactLean, gestureArmEuler, hangToward, solveTwoBone, unsquashHead } from '../../render/figureRig'
@@ -92,6 +97,51 @@ function cachedFigure(p: BodyProportions, layers: DressLayer[], key: string, ski
   return g
 }
 
+// ---- the glTF body (work-order "glTF villager body"; medium and high) --------
+
+const personCache = new Map<string, GltfPerson>()
+const gltfFigureCache = new Map<string, THREE.BufferGeometry>()
+
+function cachedPerson(asset: VillagerAsset, id: FigureIdentity): GltfPerson {
+  const k = `${id.sex}|${id.age}|${id.build}`
+  let person = personCache.get(k)
+  if (!person) {
+    const t0 = performance.now()
+    person = gltfPerson(asset, id.sex, id.age, id.build)
+    personCache.set(k, person)
+    // read by the verification's per-village cost record
+    performance.measure?.('villager-gltf-person', { start: t0, end: performance.now() })
+  }
+  return person
+}
+
+/** The glTF body painted (skin, scalp) with every dress layer, as ONE geometry
+ *  skinned to the asset's bones. The layers are the code-built ones of point
+ *  1293, fitted to this body's measured proportions — the glTF garments are
+ *  point 1311's (OPEN: replaced there by the pipeline's skinned garments). */
+function cachedGltfFigure(asset: VillagerAsset, person: GltfPerson, layers: DressLayer[], key: string, skin: string, paint: string | null, radial: number) {
+  const k = `gltf|${key}|${skin}|${paint}|${radial}|${layers.map((l) => layerKey(l, '', radial)).join('/')}`
+  let g = gltfFigureCache.get(k)
+  if (!g) {
+    const t0 = performance.now()
+    const body = paintSurface(person.geometry.clone(), paint ? mixHex(skin, paint, 0.55) : skin)
+    const col = body.getAttribute('color') as THREE.BufferAttribute
+    const hair = new THREE.Color(person.p.hair)
+    person.hair.forEach((h, i) => h && col.setXYZ(i, hair.r, hair.g, hair.b))
+    const parts = [tidy(body)]
+    const map = codeBoneMap(asset)
+    for (const l of layers) {
+      const lg = cachedLayer(l, person.p, `gltf|${key}`, radial)
+      if (lg) parts.push(remapSkin(lg.clone(), map))
+    }
+    g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
+    g.computeBoundingSphere()
+    gltfFigureCache.set(k, g)
+    performance.measure?.('villager-gltf-figure', { start: t0, end: performance.now() })
+  }
+  return g
+}
+
 /** The figure's whole scene graph, built once per identity and look. */
 interface Rig {
   p: BodyProportions
@@ -106,7 +156,9 @@ interface Rig {
 }
 
 function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string): Rig {
-  const p = bodyProportions(id.sex, id.age, id.build)
+  const asset = look.villager
+  const person = asset ? cachedPerson(asset, id) : null
+  const p = person ? person.p : bodyProportions(id.sex, id.age, id.build)
   const layers = appearanceFor({
     peopleId: look.peopleId,
     sex: id.sex,
@@ -119,7 +171,10 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   })
   const key = `${id.sex}|${id.age}|${id.build}`
   const paint = skinTone(layers, skin)
-  const { skeleton, bones } = createSkeleton(p)
+  const { skeleton, bones } =
+    asset && person
+      ? (createGltfSkeleton(asset, person.rest) as { skeleton: THREE.Skeleton; bones: Record<BoneName, THREE.Bone> })
+      : createSkeleton(p)
   const bound = new THREE.Sphere(new THREE.Vector3(0, p.stature * 0.5, 0), p.stature * 0.85)
   const mesh = (geo: THREE.BufferGeometry, material: THREE.Material, name: string) => {
     const m = new THREE.SkinnedMesh(geo, material)
@@ -128,7 +183,10 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     m.boundingSphere = bound
     return m
   }
-  const geo = cachedFigure(p, layers, key, skin, paint === skin ? null : paint, look.radial)
+  const geo =
+    asset && person
+      ? cachedGltfFigure(asset, person, layers, key, skin, paint === skin ? null : paint, look.radial)
+      : cachedFigure(p, layers, key, skin, paint === skin ? null : paint, look.radial)
   if (!geo.boundingBox) geo.computeBoundingBox()
   const body = mesh(geo, figureMaterial(), 'figure-body')
   body.add(bones.hips)
