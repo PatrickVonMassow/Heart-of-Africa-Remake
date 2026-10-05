@@ -2536,7 +2536,6 @@ function Walkers({
       // Door segments (home center ↔ door) pass through the own dwelling:
       // no collision there, the walker slips through the entrance door.
       const throughDoor = s.seg === 0 || s.seg === s.route.length - 2
-      // Turning nearly on the spot is not being wedged.
       let turning = false
       if (d <= step + (throughDoor ? 0.08 : 0.35)) {
         // Close enough (the exact point may sit inside a collider).
@@ -2580,9 +2579,9 @@ function Walkers({
       // blocks, but a walker wedged in a pocket keeps cycling waypoints while
       // physically pinned. When it has not actually moved for the calibratable
       // window, place it on free ground — inhabitants only, never the player.
-      if (turning) {
-        // the pinned clock holds
-      } else if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
+      // Turning nearly on the spot is not being wedged: the pinned clock holds.
+      if (turning) s.pinned -= dt
+      if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
         s.pinned += dt
         if (s.pinned > balance.walkerUnstuckSeconds) {
           const escape = escapeToFree(colliders, s.x, s.z, NPC_RADIUS, nav, def.home.door)
