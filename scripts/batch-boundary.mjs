@@ -58,6 +58,8 @@ import {
   claimantCardIdentity,
   boundaryCardText,
   boundaryDestination,
+  boundaryRequestDrainLine,
+  commitGatesRequests,
   boundaryDueFrom,
   classifyLauncherState,
   markerPhase,
@@ -671,9 +673,11 @@ if (isMain) {
     process.exit(1)
   }
 
-  // Waiting user requests are queued BEFORE any commit hands the lock over:
-  // after the handover no owner turn end would see them.
-  if (arg === '--commit') {
+  // Waiting user requests are queued BEFORE a point commit hands the lock
+  // over. The context commit leaves them PENDING: past the watermark the fence
+  // denies the work-order append, and a deferral is never `--blocked`; the
+  // successor's request gate binds its turn ends (boundaryRequestDrainLine).
+  if (commitGatesRequests(argv)) {
     const refusal = boundaryRequestRefusal(() => readFileSync(carrierPath(), 'utf8'))
     if (refusal) fail(refusal)
   }
@@ -825,6 +829,7 @@ if (isMain) {
             (transfer.note ? `, and ${transfer.note}` : '') +
             '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
             `${cardBlock}\n` +
+            `${boundaryRequestDrainLine({ cause: BOUNDARY_CAUSES.CONTEXT })}\n\n` +
             `Then check nothing else would block (\`node scripts/guard-preflight.mjs --for answer --session ${sid}\`), ` +
             'and make `node scripts/batch-boundary.mjs --commit --context` the LAST repository action of this ' +
             'session. End the session right after.',
@@ -1046,6 +1051,7 @@ if (isMain) {
           (transfer.note ? `, and ${transfer.note}` : '') +
           '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
           `${cardBlock}\n` +
+          `${boundaryRequestDrainLine({ cause: BOUNDARY_CAUSES.POINT })}\n\n` +
           `Then check nothing else would block (\`node scripts/guard-preflight.mjs --for answer --session ${sid}\`), ` +
           `and make \`node scripts/batch-boundary.mjs --commit ${point}\` the LAST repository action of this ` +
           'session: it seals the marker, and any mutation after it is an explicit error. End the session right after.',

@@ -159,7 +159,11 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
 
 - Drain waiting findings (`node scripts/finding.mjs --drain` lists them from the
   memory carrier) into the work order, then run
-  `node scripts/finding.mjs --drained "<title>"`.
+  `node scripts/finding.mjs --drained "<title>"`. Queue waiting user requests
+  (`--requests`) with `--show`, a verbatim append and `--queued`; `--blocked`
+  is only for one that cannot be carried out. A deferral leaves it pending:
+  past the watermark, no `--blocked` and no decision card — `--commit
+  --context` hands it on in the carrier and the successor queues it.
 - Use `scripts/board.mjs` serially; concurrent calls race on the dashboard file.
   The canonical source is `.batch-dashboard.html` at the repository root and
   `scripts/board-publish.mjs` publishes it to Pages. Its five-section structure

@@ -233,6 +233,7 @@ describe('condition 3 — a waiting request binds every owner turn end', () => {
     expect(parseCarrier(withRequest).requests.length).toBe(1)
     expect(boundaryRequestRefusal(() => withRequest)).toMatch(/--queued/)
     expect(boundaryRequestRefusal(() => withRequest)).toMatch(/Nothing recorded/)
+    expect(boundaryRequestRefusal(() => withRequest)).toMatch(/Vertagen ist kein --blocked/)
     expect(boundaryRequestRefusal(() => '')).toBeNull()
   })
 
