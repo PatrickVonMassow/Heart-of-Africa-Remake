@@ -14,6 +14,7 @@ import {
   legExtent,
   lowestFoot,
   phasePerDistance,
+  rephase,
   primitiveLayout,
   solveLeg,
   strideReach,
@@ -83,6 +84,38 @@ describe('the walk keeps the feet on the ground', () => {
         planted = [planted[0], planted[1]]
       }
     }
+  })
+
+  it('a planted foot stays put when the pace changes mid-stance', () => {
+    const p = bodyProportions('male', 'adult')
+    const d = legDims(p)
+    let walked = 0
+    let phase = 0
+    let reach = strideReach(d, 1.1, 'adult')
+    let planted: [number | null, number | null] = [null, null]
+    let worst = 0
+    for (let f = 0; f < 600; f++) {
+      // A pace that jumps every frame, as a crowded lane or a slow frame makes it.
+      const v = f % 3 === 0 ? 1.8 : 0.9
+      const step = v / 30
+      const next = strideReach(d, v, 'adult')
+      phase = rephase(phase, reach, next)
+      reach = next
+      walked += step
+      phase += step * phasePerDistance(reach)
+      const pose = walkPose(d, phase, reach, 1, 'adult')
+      pose.legs.forEach((l, i) => {
+        const world = walked + ankleAt(d, l).z
+        if (!pose.feet[i].stance) {
+          planted[i] = null
+          return
+        }
+        planted[i] ??= world
+        worst = Math.max(worst, Math.abs(world - (planted[i] as number)))
+      })
+      planted = [planted[0], planted[1]]
+    }
+    expect(worst).toBeLessThanOrEqual(M.stanceSlipTolerance)
   })
 
   it('the legs swing in counter-phase and the stride scales with pace and body', () => {

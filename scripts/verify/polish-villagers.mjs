@@ -4166,6 +4166,9 @@ if (section('village-walk')) {
           arm: [bone('upperArm.L').quaternion.x, bone('upperArm.R').quaternion.x],
           mode: s.mode,
           pause: s.pause,
+          yaw: g.rotation.y,
+          seg: w.states[i].seg,
+          body: { x: g.position.x, z: g.position.z },
         }
       }, i)
     const samples = []
@@ -4175,18 +4178,28 @@ if (section('village-walk')) {
       samples.push(r)
       await nextFrames(1)
     }
+    if (process.env.VILLAGE_WALK_DUMP) (await import('node:fs')).writeFileSync(process.env.VILLAGE_WALK_DUMP, JSON.stringify(samples))
     const lowest = samples.map((r) => Math.min(r.feet[0].sole, r.feet[1].sole))
     const worstGround = lowest.reduce((m, v) => Math.max(m, Math.abs(v)), 0)
-    // A foot counts as planted while its sole is on the ground; its drift is
+    // A foot counts as planted while its sole is on the ground and the body
+    // walks (a turn on the spot after a linger is not a stride); its drift is
     // measured over each such run.
     let worstSlip = 0
+    let worstStance = null
+    const walking = (j) => j > 0 && Math.hypot(samples[j].body.x - samples[j - 1].body.x, samples[j].body.z - samples[j - 1].body.z) > 0.01
     for (const k of [0, 1]) {
       let start = null
-      for (const r of samples) {
+      for (const [j, r] of samples.entries()) {
         const f = r.feet[k]
-        if (Math.abs(f.sole) <= 0.006) {
-          start ??= f
-          worstSlip = Math.max(worstSlip, Math.hypot(f.x - start.x, f.z - start.z))
+        if (Math.abs(f.sole) <= 0.006 && walking(j)) {
+          start ??= { ...f, yaw: r.yaw, seg: r.seg }
+          const slip = Math.hypot(f.x - start.x, f.z - start.z)
+          if (slip > worstSlip) {
+            worstSlip = slip
+            // What the body did over that stance: its turn and its waypoint.
+            const steps = samples.slice(samples.indexOf(r) - 6, samples.indexOf(r) + 1).map((q, j, a) => j ? +Math.hypot(q.body.x - a[j - 1].body.x, q.body.z - a[j - 1].body.z).toFixed(3) : 0)
+            worstStance = { steps, turn: +Math.abs(Math.atan2(Math.sin(r.yaw - start.yaw), Math.cos(r.yaw - start.yaw))).toFixed(3), segFrom: start.seg, segTo: r.seg }
+          }
         } else start = null
       }
     }
@@ -4194,7 +4207,7 @@ if (section('village-walk')) {
     const thighSwing = samples.length ? Math.max(range(samples.map((r) => r.thigh[0])), range(samples.map((r) => r.thigh[1]))) : 0
     const armSwing = samples.length ? Math.max(range(samples.map((r) => r.arm[0])), range(samples.map((r) => r.arm[1]))) : 0
     const counter = samples.filter((r) => Math.sign(r.thigh[0]) === -Math.sign(r.thigh[1]) && Math.abs(r.thigh[0]) > 0.05).length
-    const detail = JSON.stringify({ frames: samples.length, worstGround: +worstGround.toFixed(4), worstSlip: +worstSlip.toFixed(4), thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter })
+    const detail = JSON.stringify({ frames: samples.length, worstGround: +worstGround.toFixed(4), worstSlip: +worstSlip.toFixed(4), thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, worstStance })
     console.log(`  village-walk ${detail}`)
     check('village walk: measured over at least 30 walking frames', samples.length >= 30, detail)
     check(`village walk: the lowest sole sits on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m)`, samples.length > 0 && worstGround <= FOOT_TOL, detail)

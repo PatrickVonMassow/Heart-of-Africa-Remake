@@ -107,6 +107,20 @@ export function phasePerDistance(reach: number): number {
   return reach > 1e-6 ? Math.PI / (2 * reach) : 0
 }
 
+/** The phase that keeps the planted foot where it is when the stride's reach
+ *  changes from `from` to `to` (a pace change mid-stance): the stance foot's
+ *  fore/aft place is reach × forward, so its forward is rescaled — the swing
+ *  foot, in the air, takes the shift. */
+export function rephase(phase: number, from: number, to: number): number {
+  if (from <= 1e-6 || to <= 1e-6 || from === to) return phase
+  const half = Math.PI / 2
+  const w0 = Math.atan2(Math.sin(phase), Math.cos(phase))
+  const w1 = Math.atan2(Math.sin(phase + Math.PI), Math.cos(phase + Math.PI))
+  const w = Math.abs(w0) <= half ? w0 : w1
+  const next = Math.max(-half, Math.min(half, (w * from) / to))
+  return phase + (next - w)
+}
+
 export interface WalkPose {
   /** Left (+x) leg first. */
   legs: [LegAngles, LegAngles]

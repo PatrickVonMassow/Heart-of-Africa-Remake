@@ -35,6 +35,7 @@ import {
   legDims,
   legExtent,
   phasePerDistance,
+  rephase,
   strideReach,
   walkPose,
   type WalkPose,
@@ -475,8 +476,9 @@ export function SkinnedFigure({
         const dz = _here.z - m.last.z
         const dist = Math.hypot(dx, dz) / unit
         if (dist / dt <= VILLAGER_MOTION.teleportSpeed) {
+          // Only the step along the facing is a stride; a sideways shove is not.
           g.getWorldDirection(_facing)
-          walked = dx * _facing.x + dz * _facing.z >= 0 ? dist : -dist
+          walked = (dx * _facing.x + dz * _facing.z) / (Math.hypot(_facing.x, _facing.z) || 1) / unit
         }
       } else m.last = new THREE.Vector3()
       m.last.copy(_here)
@@ -485,8 +487,11 @@ export function SkinnedFigure({
       const wanted = kneel || !!kneeling?.current
       m.kneel = approach(m.kneel, wanted ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
       const moving = Math.abs(m.speed) > VILLAGER_MOTION.moveSpeed && m.kneel === 0
+      const placed = m.reach * m.weight
       m.weight = approach(m.weight, moving ? 1 : 0, VILLAGER_MOTION.walkFadeRate, dt)
       if (moving) m.reach = strideReach(dims, m.speed, id.age)
+      // A pace change does not drag the planted foot: the phase moves with it.
+      m.phase = rephase(m.phase, placed, m.reach * m.weight)
       // The planted foot stays put: the phase runs at the rate its reach is swept.
       m.phase += walked * phasePerDistance(Math.max(m.reach * m.weight, m.reach * 0.3))
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)

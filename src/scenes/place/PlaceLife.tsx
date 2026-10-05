@@ -2178,6 +2178,7 @@ function TaskWalker({
     [colliders],
   )
 
+  // Before the figure's own frame, as the walkers' below: its stride reads this step.
   useFrame((_, rawDt) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
@@ -2276,7 +2277,7 @@ function TaskWalker({
     }
     stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
     stand.rotation.y = s.yaw
-  })
+  }, -1)
 
   return (
     <group ref={walker} name="village-task-walker" visible={false} position={figureStance(home)}>
@@ -2443,6 +2444,10 @@ function Walkers({
     }
   }, [defs, groundHeight])
 
+  // Priority −1: the walkers move before any figure reads its own ground speed
+  // (React subscribes the child figures first), so a stride is solved against
+  // this frame's step, not the last one's — a frame late, a planted foot rides
+  // forward with the body.
   useFrame(({ clock }, rawDt) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
@@ -2543,9 +2548,14 @@ function Walkers({
           : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
         const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
         const moved = Math.hypot(nx - s.x, nz - s.z)
+        // The body faces where it really goes: slid along a wall or round
+        // another body, a figure facing the waypoint would sweep its planted
+        // foot across the line it walks (work-order "walking villagers").
+        // A shove back (a wedged body) never turns it about.
+        const ahead = (nx - s.x) * dx + (nz - s.z) * dz > 0
+        s.yaw = moved > step * 0.3 && ahead ? Math.atan2(nx - s.x, nz - s.z) : Math.atan2(dx, dz)
         s.x = nx
         s.z = nz
-        s.yaw = Math.atan2(dx, dz)
         if (moved < step * 0.3) {
           s.stuck += dt
           if (s.stuck > 1.4) {
@@ -2579,7 +2589,7 @@ function Walkers({
       g.position.set(s.x, groundHeight(s.x, s.z), s.z)
       g.rotation.y = s.yaw
     })
-  })
+  }, -1)
 
   return (
     <>
