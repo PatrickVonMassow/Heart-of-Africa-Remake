@@ -7745,6 +7745,159 @@ if (section('calf-crossing-flee')) {
   await page.evaluate(() => window.__calfCross.clear())
 }
 
+// --- The shield at the river (user report 05.10.2026) -----------------------
+// A lion hunts an antelope calf at the reported river (seed-independent real
+// geodata, lat 10.0169 lon 4.3767); the parent shields. Per frame it records
+// which body the hunter reaches first and where each animal dies.
+if (section('calf-shield-river')) {
+  await page.evaluate(() => window.__game.getState().debugJumpTo(10.0169, 4.3767))
+  await page.waitForFunction(() => window.__wildlife && window.__game.getState().mode === 'travel', null, { timeout: 15000 })
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
+  await page.evaluate(() => window.__game.setState({ pos: { x: 38, z: -112 }, day: 88.26 }))
+  await page.evaluate(() => window.__sleepSim(0.6))
+  await page.evaluate(() => {
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const st = { T, staged: [] }
+    window.__shieldRiver = st
+    st.clear = () => {
+      const herds = window.__wildlife.herdsRef.current
+      herds.antelope = herds.antelope.filter((a) => !st.staged.includes(a))
+      st.staged = []
+    }
+    // The river's west and east waterline on a row (first and last water cell).
+    st.banks = (z) => {
+      let w = null, e = null
+      for (let x = 30; x <= 70; x += 0.05) if (T(x, z) === 'water') { if (w === null) w = x; e = x }
+      return { w, e }
+    }
+    st.run = async (v) => {
+      st.clear()
+      const herds = window.__wildlife.herdsRef.current
+      for (const sp of Object.keys(herds)) if (sp !== 'antelope' && sp !== 'crocodile') herds[sp].length = 0
+      herds.crocodile.length = 0
+      // Clear the stage of other antelope near the scene.
+      herds.antelope = herds.antelope.filter((a) => Math.hypot(a.x - v.calf.x, a.z - v.calf.z) > 25)
+      let liveChunk
+      for (const a of herds.antelope) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+      const parent = { x: v.parent.x, z: v.parent.z, y: 0.2, rot: 0, scale: 1, phase: 0.31, chunk: liveChunk ?? 'shield-test' }
+      const calf = { x: v.calf.x, z: v.calf.z, y: 0.2, rot: 0, scale: 0.55, phase: 0.72, chunk: liveChunk ?? 'shield-test', young: true, parent }
+      parent.child = calf
+      herds.antelope.unshift(parent, calf)
+      st.staged = [parent, calf]
+      const pd = window.__balance.parentDefense
+      const prevForce = pd.forceOutcome
+      pd.forceOutcome = 'taken' // the shield's take is under test, not the roll
+      const s = window.__lionHunt.state
+      s.predator = 'lion'
+      s.victim = calf; s.victimHunt = true
+      s.lx = v.lion.x; s.lz = v.lion.z
+      s.px = calf.x; s.pz = calf.z
+      s.lionHeading = Math.atan2(calf.x - s.lx, calf.z - s.lz)
+      s.mode = 'chase'
+      const out = { variant: v.name, banks: st.banks(v.calf.z), events: [], minLP: Infinity, minLC: Infinity, frames: 0 }
+      let prev = null
+      let prevLion = { x: s.lx, z: s.lz }
+      let done = false
+      const ev = (kind, extra) => out.events.push({ kind, f: out.frames, ...extra })
+      const r2 = (n) => +n.toFixed(2)
+      const tick = () => {
+        if (done) return
+        out.frames++
+        const chase = s.mode === 'chase'
+        const lp = Math.hypot(s.lx - parent.x, s.lz - parent.z)
+        const lc = Math.hypot(s.lx - calf.x, s.lz - calf.z)
+        if (chase && !parent.dead) out.minLP = Math.min(out.minLP, lp)
+        if (chase && !calf.dead) out.minLC = Math.min(out.minLC, lc)
+        // The drawn bodies touch: lion (0.8) + antelope (0.6).
+        if (chase && !parent.dead && lp < 1.4 && !out.events.some((e) => e.kind === 'visible-parent-contact'))
+          ev('visible-parent-contact', { lp: r2(lp), lc: r2(lc), parentT: T(parent.x, parent.z) })
+        const cur = { pDead: !!parent.dead, cDead: !!calf.dead, caught: calf.caught !== undefined, mode: s.mode }
+        if (prev) {
+          if (cur.caught && !prev.caught) ev('calf-caught', { lc: r2(lc), lp: r2(lp), calf: [r2(calf.x), r2(calf.z)], calfT: T(calf.x, calf.z), lion: [r2(s.lx), r2(s.lz)], lionT: T(s.lx, s.lz) })
+          if (cur.pDead && !prev.pDead) ev('parent-dead', { at: [r2(parent.x), r2(parent.z)], T: T(parent.x, parent.z), lp: r2(lp), lc: r2(lc), calfAlive: !calf.dead })
+          if (cur.cDead && !prev.cDead) ev('calf-dead', { at: [r2(calf.x), r2(calf.z)], T: T(calf.x, calf.z), lc: r2(lc), parentAlive: !parent.dead })
+          if (cur.mode !== prev.mode) {
+            // The feeding lion is drawn at (lx, lz): how far did it jump, and
+            // does it stand on its own side of the body it feeds on?
+            const feed = cur.mode === 'feed'
+            ev('mode', {
+              from: prev.mode, to: cur.mode, lion: [r2(s.lx), r2(s.lz)],
+              snap: r2(Math.hypot(s.lx - prevLion.x, s.lz - prevLion.z)),
+              feedOnParent: feed ? s.victim === parent : null,
+              feedDist: feed ? r2(Math.hypot(s.lx - s.px, s.lz - s.pz)) : null,
+            })
+          }
+        }
+        prev = cur
+        prevLion = { x: s.lx, z: s.lz }
+        requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+      await window.__pollSim(25, () => s.mode === 'leave' || s.mode === 'idle')
+      await window.__sleepSim(0.3)
+      done = true
+      pd.forceOutcome = prevForce
+      s.mode = 'idle'; s.timer = 99999; s.victim = null; s.victimHunt = false
+      out.minLP = +out.minLP.toFixed(2); out.minLC = +out.minLC.toFixed(2)
+      out.final = { parentDead: !!parent.dead, calfDead: !!calf.dead, calf: [r2(calf.x), r2(calf.z), T(calf.x, calf.z)], parent: [r2(parent.x), r2(parent.z), T(parent.x, parent.z)] }
+      return out
+    }
+  })
+  const banks = await page.evaluate(() => window.__shieldRiver.banks(-100))
+  check('calf-shield-river probe: banks', false, JSON.stringify(banks))
+  const W = banks.w, E = banks.e
+  const variants = [
+    { name: 'swim-from-west-bank', calf: { x: W - 0.4, z: -100 }, parent: { x: W - 1.8, z: -100 }, lion: { x: W - 10, z: -100.4 } },
+    { name: 'calf-in-water', calf: { x: W + 1.2, z: -100 }, parent: { x: W - 0.3, z: -100 }, lion: { x: W - 6, z: -100.3 } },
+    { name: 'parent-lateral-in-water', calf: { x: W + 1.5, z: -100 }, parent: { x: W + 0.6, z: -98.6 }, lion: { x: W - 2.2, z: -100 } },
+    { name: 'calf-at-far-bank', calf: { x: E + 0.4, z: -100 }, parent: { x: E - 1.2, z: -100 }, lion: { x: W - 1, z: -100.3 } },
+    { name: 'land-lateral', calf: { x: W - 6, z: -104 }, parent: { x: W - 8.2, z: -102.6 }, lion: { x: W - 13, z: -104.2 } },
+  ]
+  const results = {}
+  for (const v of variants) results[v.name] = await page.evaluate((vv) => window.__shieldRiver.run(vv), v)
+  const kinds = (r) => r.events.map((e) => e.kind)
+  for (const name of ['swim-from-west-bank', 'calf-in-water']) {
+    const r = results[name]
+    check(`a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up (${name})`,
+      !r.final.parentDead && !r.final.calfDead && r.final.calf[2] !== 'water' && r.final.calf[0] > E &&
+        r.events.some((e) => e.kind === 'mode' && e.to === 'leave'),
+      JSON.stringify(r))
+  }
+  for (const name of ['parent-lateral-in-water', 'calf-at-far-bank', 'land-lateral']) {
+    const r = results[name]
+    const k = kinds(r)
+    check(`the lion reaches the shielding parent first and takes it, never the calf past it (${name})`,
+      r.final.parentDead && !r.final.calfDead && !k.includes('calf-caught') &&
+        k.indexOf('visible-parent-contact') !== -1 && k.indexOf('visible-parent-contact') <= k.indexOf('parent-dead'),
+      JSON.stringify(r))
+    const feed = r.events.find((e) => e.kind === 'mode' && e.to === 'feed')
+    check(`the feeding lion is drawn at the body it reached, without snapping across to it (${name})`,
+      !!feed && feed.feedOnParent === true && feed.snap < 1 && Math.abs(feed.feedDist - 0.74) < 0.05,
+      JSON.stringify(feed ?? r))
+  }
+  // The picture: the lion feeding on the parent it reached at the west
+  // waterline, on its own (west) side — the calf escaped across the river.
+  await page.evaluate(async () => {
+    window.__game.setState({ pos: { x: 42, z: -106 } }) // the scene in frame, clear of the lion
+    await window.__sleepSim(0.5)
+  })
+  await captureFrame(page, OUT, 'calf-shield-river-feed', {
+    world: { x: W + 0.2, z: -99.6 },
+    label: 'the lion feeding on the shielding parent it reached at the river, on its own side',
+  }, {
+    beforeCapture: () => page.evaluate(async (vv) => {
+      const st = window.__shieldRiver
+      const s = window.__lionHunt.state
+      const run = st.run(vv)
+      await window.__pollSim(8, () => s.mode === 'feed')
+      await window.__sleepSim(1.2)
+      st.release = run
+    }, variants[2]),
+  })
+  await page.evaluate(async () => { await window.__shieldRiver.release; window.__shieldRiver.clear() })
+}
+
 // --- Point 6: the predator never despawns in view (zoom-aware) ----------------
 // design.md §19: after the meal the predator trots off and leaves the stage
 // only well beyond the visible surroundings; a chase that strays aborts past
