@@ -4099,4 +4099,258 @@ if (section('villager-dress')) {
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 
+// --- Walking villagers (work-order "walking villagers", absorbs point 350) ---
+// The report: walkers gliding in a seated crouch, feet off the ground, legs and
+// arms still, head carriers with one arm straight up beside a floating load,
+// and a kneel that popped between two figures. Measured here on the drawn
+// skinned body, per rendered frame: the lowest sole against the ground under
+// the walker, a planted foot's drift along the ground, and that legs and arms
+// really move; then judged by looking at a walker mid-stride, a head carrier
+// and a kneel caught half-way down. The gait itself is pinned in
+// src/render/figureWalk.test.ts.
+if (section('village-walk')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  await goToPlace('zulu-village')
+  const tol = await page.evaluate(() => ({ ...(window.__villagerMotion ?? {}) }))
+  const FOOT_TOL = (tol.footGroundTolerance ?? 0.02) + 0.02 // + the slope under a stride
+  const SLIP_TOL = (tol.stanceSlipTolerance ?? 0.03) + 0.01 // + one frame's sampling
+  // A walker that is out, walking, not lingering, skinned and drawn.
+  const pick = () =>
+    page.evaluate(() => {
+      const w = window.__placeWalkers
+      if (!w) return null
+      for (let i = 0; i < w.states.length; i++) {
+        const s = w.states[i]
+        const g = w.group(i)
+        if (!g || !g.visible || s.mode !== 'walk' || s.pause > 0) continue
+        if (s.seg === 0 || s.seg >= s.route.length - 2) continue // not on a door leg
+        let skinned = false
+        g.traverse((o) => { if (o.isSkinnedMesh) skinned = true })
+        if (skinned) return i
+      }
+      return null
+    })
+  const found = await stepUntil(async () => {
+    const w = window.__placeWalkers
+    if (!w) return false
+    return w.states.some((s, i) => s.mode === 'walk' && s.pause <= 0 && s.seg > 0 && s.seg < s.route.length - 2 && w.group(i)?.visible)
+  }, null, 3600)
+  check('village walk: a villager is out walking on the skinned body', found, found ? '' : 'no walker left its dwelling')
+  const who = found ? await pick() : null
+  if (who !== null) {
+    // Per frame: the lowest sole over the ground, each foot's position, the
+    // thigh and upper-arm swing.
+    const readFeet = (i) =>
+      page.evaluate((i) => {
+        const w = window.__placeWalkers
+        const g = w.group(i)
+        const s = w.sample(i)
+        let mesh = null
+        g.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
+        if (!mesh) return null
+        const V = mesh.position.constructor
+        const bone = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`)
+        const idx = (n) => mesh.skeleton.bones.findIndex((b) => b.name === `bone-${n}`)
+        const unit = g.getWorldScale(new V()).y
+        const feet = ['foot.L', 'foot.R'].map((n) => {
+          // The ankle's bind height IS the sole's distance below it (the foot is kept flat).
+          const bind = new V().setFromMatrixPosition(mesh.skeleton.boneInverses[idx(n)].clone().invert())
+          const at = bone(n).getWorldPosition(new V())
+          return { x: at.x, z: at.z, sole: at.y - bind.y * unit - s.groundHeight }
+        })
+        return {
+          feet,
+          thigh: [bone('thigh.L').rotation.x, bone('thigh.R').rotation.x],
+          arm: [bone('upperArm.L').quaternion.x, bone('upperArm.R').quaternion.x],
+          mode: s.mode,
+          pause: s.pause,
+        }
+      }, i)
+    const samples = []
+    for (let f = 0; f < 120; f++) {
+      const r = await readFeet(who)
+      if (!r || r.mode !== 'walk' || r.pause > 0) break
+      samples.push(r)
+      await nextFrames(1)
+    }
+    const lowest = samples.map((r) => Math.min(r.feet[0].sole, r.feet[1].sole))
+    const worstGround = lowest.reduce((m, v) => Math.max(m, Math.abs(v)), 0)
+    // A foot counts as planted while its sole is on the ground; its drift is
+    // measured over each such run.
+    let worstSlip = 0
+    for (const k of [0, 1]) {
+      let start = null
+      for (const r of samples) {
+        const f = r.feet[k]
+        if (Math.abs(f.sole) <= 0.006) {
+          start ??= f
+          worstSlip = Math.max(worstSlip, Math.hypot(f.x - start.x, f.z - start.z))
+        } else start = null
+      }
+    }
+    const range = (a) => Math.max(...a) - Math.min(...a)
+    const thighSwing = samples.length ? Math.max(range(samples.map((r) => r.thigh[0])), range(samples.map((r) => r.thigh[1]))) : 0
+    const armSwing = samples.length ? Math.max(range(samples.map((r) => r.arm[0])), range(samples.map((r) => r.arm[1]))) : 0
+    const counter = samples.filter((r) => Math.sign(r.thigh[0]) === -Math.sign(r.thigh[1]) && Math.abs(r.thigh[0]) > 0.05).length
+    const detail = JSON.stringify({ frames: samples.length, worstGround: +worstGround.toFixed(4), worstSlip: +worstSlip.toFixed(4), thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter })
+    console.log(`  village-walk ${detail}`)
+    check('village walk: measured over at least 30 walking frames', samples.length >= 30, detail)
+    check(`village walk: the lowest sole sits on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m)`, samples.length > 0 && worstGround <= FOOT_TOL, detail)
+    check(`village walk: a planted foot does not slide (≤ ${SLIP_TOL.toFixed(3)} m per stance)`, samples.length > 0 && worstSlip <= SLIP_TOL, detail)
+    check('village walk: the legs swing in counter-phase and the arms swing with them', thighSwing > 0.25 && armSwing > 0.03 && counter > 5, detail)
+
+    // MID-STRIDE, side-on: the camera stands three metres off his flank.
+    const stride = await stepUntil((i) => {
+      const g = window.__placeWalkers.group(i)
+      let mesh = null
+      g?.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
+      const t = mesh?.skeleton.bones.find((b) => b.name === 'bone-thigh.L')
+      return !!t && Math.abs(t.rotation.x) > 0.22 && window.__placeWalkers.states[i].mode === 'walk'
+    }, who, 240)
+    if (stride) {
+      await freezeLife(true)
+      try {
+        const at = await page.evaluate((i) => {
+          const g = window.__placeWalkers.group(i)
+          const side = g.rotation.y + Math.PI / 2
+          const p = window.__placePlayer
+          p.x = g.position.x + Math.sin(side) * 3
+          p.z = g.position.z + Math.cos(side) * 3
+          p.yaw = side
+          p.pitch = -0.1
+          return { x: g.position.x, z: g.position.z }
+        }, who)
+        await nextFrames(4)
+        await frame(shot('1295-village-walker-mid-stride'), {
+          local: { x: at.x, y: 0.6, z: at.z },
+          label: 'a Zulu villager walking, caught mid-stride side-on three metres off: one foot planted on the ground, the other swinging, arms countering the legs',
+        })
+      } finally {
+        await freezeLife(false)
+      }
+    }
+    check('village walk: a mid-stride moment was caught for the picture', stride, '')
+  }
+
+  // A HEAD CARRIER: the load sits on the crown, no hand above the load.
+  const carrierFound = await stepUntil(() => {
+    const w = window.__placeWalkers
+    return !!w && w.states.some((s, i) => w.carries[i] && s.mode === 'walk' && s.seg > 0 && s.seg < s.route.length - 2 && w.group(i)?.visible)
+  }, null, 3600)
+  check('village walk: a villager carries a load on the head', carrierFound, '')
+  if (carrierFound) {
+    await freezeLife(true)
+    try {
+      const c = await page.evaluate(() => {
+        const w = window.__placeWalkers
+        const i = w.states.findIndex((s, k) => w.carries[k] && s.mode === 'walk' && w.group(k)?.visible)
+        const g = w.group(i)
+        const V = g.position.constructor
+        const crown = g.getObjectByName('figure-crown')
+        const load = crown?.children.find((o) => o.visible)
+        const head = g.getObjectByName('figure-head')
+        const top = crown ? crown.getWorldPosition(new V()) : null
+        const hands = ['hand-left', 'hand-right'].map((n) => g.getObjectByName(n)?.getWorldPosition(new V()).y ?? -1)
+        const side = g.rotation.y + Math.PI / 2
+        const p = window.__placePlayer
+        p.x = g.position.x + Math.sin(side) * 3.2
+        p.z = g.position.z + Math.cos(side) * 3.2
+        p.yaw = side
+        p.pitch = -0.04
+        return {
+          x: g.position.x,
+          z: g.position.z,
+          onHead: !!load && !!head && load.parent === crown,
+          crownAboveHead: top && head ? top.y - head.getWorldPosition(new V()).y : null,
+          handsBelowCrown: top ? hands.every((h) => h < top.y + 0.05) : false,
+        }
+      })
+      check('head carrier: the load rests on the figure’s crown (mounted on the head, not at a fixed height)', c.onHead && c.crownAboveHead > 0, JSON.stringify(c))
+      check('head carrier: no hand is raised above the head — the balanced carrier keeps both arms free', c.handsBelowCrown, JSON.stringify(c))
+      await nextFrames(4)
+      await frame(shot('1295-village-head-carrier'), {
+        local: { x: c.x, y: 1.2, z: c.z },
+        label: 'a Zulu villager walking with a basket on the head: the basket sits on the crown, both arms swing free',
+      })
+    } finally {
+      await freezeLife(false)
+    }
+  }
+
+  // THE KNEEL TRANSITION (point 350): the task walker kneels at its work by
+  // folding down, never by swapping to a second, squashed figure.
+  const halfway = await stepUntil(() => {
+    const g = window.__placeScene.getObjectByName('village-task-walker')
+    if (!g?.visible) return false
+    let mesh = null
+    g.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
+    const hips = mesh?.skeleton.bones.find((b) => b.name === 'bone-hips')
+    if (!hips) return false
+    const bind = new hips.position.constructor().setFromMatrixPosition(mesh.skeleton.boneInverses[0].clone().invert()).y
+    const f = hips.position.y / bind
+    return f > 0.55 && f < 0.9
+  }, null, 7200)
+  check('kneel: the task walker was caught on its way down or up', halfway, '')
+  if (halfway) {
+    await freezeLife(true)
+    try {
+      const k = await page.evaluate(() => {
+        const g = window.__placeScene.getObjectByName('village-task-walker')
+        const V = g.position.constructor
+        let figures = 0
+        g.traverse((o) => { if (o.name === 'inhabitant') figures++ })
+        const fig = g.getObjectByName('inhabitant')
+        const s = fig.getWorldScale(new V())
+        const head = g.getObjectByName('figure-head')
+        const hs = head.getWorldScale(new V())
+        const p = window.__placePlayer
+        const side = g.rotation.y + Math.PI / 2
+        p.x = g.position.x + Math.sin(side) * 2.6
+        p.z = g.position.z + Math.cos(side) * 2.6
+        p.yaw = side
+        p.pitch = -0.16
+        return {
+          x: g.position.x,
+          z: g.position.z,
+          figures,
+          uniform: Math.abs(s.x - s.y) < 1e-6 && Math.abs(s.y - s.z) < 1e-6,
+          headRound: Math.abs(hs.x - hs.y) < 1e-3 && Math.abs(hs.y - hs.z) < 1e-3,
+        }
+      })
+      check('kneel: one figure folds down — no second body swapped in, no squash, the head keeps its shape', k.figures === 1 && k.uniform && k.headRound, JSON.stringify(k))
+      await nextFrames(4)
+      await frame(shot('1295-village-kneel-transition'), {
+        local: { x: k.x, y: 0.5, z: k.z },
+        label: 'the Zulu task walker half-way through kneeling down at its work, side-on: legs folding, head round, one figure',
+      })
+    } finally {
+      await freezeLife(false)
+    }
+  }
+
+  // THE LOW PRESET: the primitive kneels without a squash too.
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
+  await nextFrames(8)
+  const low = await page.evaluate(() => {
+    const V = window.__placeScene.position.constructor
+    const bad = []
+    let kneeling = 0
+    window.__placeScene.traverse((o) => {
+      if (o.name !== 'inhabitant' || !o.visible) return
+      const head = o.getObjectByName('figure-head')
+      if (!head) return
+      const local = o.worldToLocal(head.getWorldPosition(new V()))
+      if (local.y > 0.8) return // standing
+      kneeling++
+      const s = o.getWorldScale(new V())
+      if (Math.abs(s.x - s.y) > 1e-6) bad.push({ s: [s.x, s.y, s.z] })
+    })
+    return { kneeling, bad }
+  })
+  check('low preset: every kneeling primitive figure keeps a uniform scale', low.kneeling > 0 && low.bad.length === 0, JSON.stringify(low))
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+}
+
 await finishPolishSuite()

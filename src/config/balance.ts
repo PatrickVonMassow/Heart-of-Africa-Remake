@@ -2508,3 +2508,8 @@ export const VILLAGER_MOTION = {
    *  (lowered further where the arm cannot reach — never a straight arm). */
   gripFraction: 0.8,
 } as const
+
+// Dev hook for the headless verification (the village-walk tolerances).
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__villagerMotion = VILLAGER_MOTION
+}
