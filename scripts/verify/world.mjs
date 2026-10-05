@@ -539,17 +539,34 @@ if (section('follow-camera')) {
   const origin = await pos()
   await shot('1286-follow-rest', { world: { x: origin.x, z: origin.z }, label: 'the traveller at rest before the walk' })
   const rest = await dir()
-  const angleDeg = (d) =>
-    (Math.acos(Math.min(1, d.x * rest.x + d.y * rest.y + d.z * rest.z)) * 180) / Math.PI
+  // Samples the view direction on every animation frame until `until` holds in
+  // the page (the app's own clock, no wall-clock pause) and returns the worst
+  // deviation from the rest direction in degrees.
+  const sampleWorst = (until) =>
+    page.evaluate(
+      ({ rest, until }) =>
+        new Promise((resolve) => {
+          const done = new Function('return ' + until)
+          let worst = 0
+          const step = () => {
+            const d = window.__camera.viewDir()
+            const dot = Math.min(1, d.x * rest.x + d.y * rest.y + d.z * rest.z)
+            worst = Math.max(worst, (Math.acos(dot) * 180) / Math.PI)
+            if (done()) resolve(worst)
+            else requestAnimationFrame(step)
+          }
+          requestAnimationFrame(step)
+        }),
+      { rest, until },
+    )
   for (const [key, heading] of [['KeyD', 'east'], ['KeyW', 'north']]) {
     const start = await pos()
-    let worst = 0
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     await page.keyboard.down(key)
-    for (let i = 0; i < 12; i++) {
-      await page.waitForTimeout(100)
-      worst = Math.max(worst, angleDeg(await dir()))
-    }
+    // Walk until the traveller is 4 units away, sampling every frame.
+    let worst = await sampleWorst(
+      `Math.hypot(window.__game.getState().pos.x - ${start.x}, window.__game.getState().pos.z - ${start.z}) > 4`,
+    )
     const here = await pos()
     await shot(`1286-follow-walk-${heading}`, {
       world: { x: here.x, z: here.z },
@@ -557,10 +574,8 @@ if (section('follow-camera')) {
       settle: false,
     })
     await page.keyboard.up(key)
-    for (let i = 0; i < 8; i++) {
-      await page.waitForTimeout(100)
-      worst = Math.max(worst, angleDeg(await dir()))
-    }
+    // The stop: sample every frame until the follow camera has caught up.
+    worst = Math.max(worst, await sampleWorst('window.__camera.settled()'))
     const end = await pos()
     const moved = Math.hypot(end.x - start.x, end.z - start.z)
     const ok = worst < 0.05 && moved > 1
