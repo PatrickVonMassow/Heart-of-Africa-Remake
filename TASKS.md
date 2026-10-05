@@ -77,6 +77,31 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1295. Walking villagers: grounded feet, leg and arm swing, head loads on the head (absorbs point 350)
+  Queue position: AT THE TOP of the open work order, first point to be worked (user order 05.10.2026: "Das soll direkt als oberstes in die Queue"); in any case before point 1294, so 1294 carries finished movement onto its glTF body.
+  Source: user report 05.10.2026 with a village screenshot after point 1293 landed. ABSORBS POINT 350 (user order 05.10.2026: "Der Task 350 sollte dann in diesen zusammengeführt und der alte 350er gelöscht werden"): point 350 is deleted from TASKS.md when this point is appended; its kneel requirement is item 5 below.
+  The user saw on the skinned body of point 1293 (src/scenes/place/skinnedFigure.tsx, medium/high presets):
+  (a) some villagers move across the ground in a seated posture with strongly bent knees;
+  (b) figures hover above the ground, feet not touching it;
+  (c) the legs do not move while walking, although a swing exists in code (`setLegs` / `legSwingAngle(gait…)`, skinnedFigure.tsx ~208-220) — whether walkers get no `gait`, a too small amplitude, or the crouch/flex overrides it is to be MEASURED, not assumed;
+  (d) the arms hang stiff while walking;
+  (e) head carriers hold one arm straight up, with a large gap between the hand and a load that floats high above the head.
+  Final state:
+  1. FEET ON THE GROUND: every standing or walking villager's lowest foot point lies on the ground under it (within a calibratable tolerance in src/config/balance.ts); the hips sink by exactly what knee flex or crouch costs. No villager travels in a crouch: a work crouch (contact crouch, kneel) is released before the figure moves off and resumed only after it stops, as a short transition.
+  2. WALK CYCLE: every moving villager (errand, task walker, porter, child, chief) gets a phase-driven gait from its actual ground speed: thigh, shin and foot swing in counter-phase, a stance foot does not slide, stride length and cadence scale with speed and body size (children, elders shorter/slower). The settlement animals' gait is the reference for phase and foot-contact handling, not for its curves.
+  3. WHOLE-BODY MOTION: arms swing counter to the legs when not held by a pose; a slight hip/shoulder counter-rotation and a small vertical bob through the spine/chest/neck chain; elders reduced. Poses that own an arm (carrying, gesture, work) keep it; the free arm still swings.
+  4. HEAD LOADS: a basket, bundle or jar carried on the head sits on the head bone (contact with the crown, follows the head's bob), never at a fixed height. The supporting arm either is absent (balanced, hands-free) or rests its hand on the load's rim; no stretched arm pointing into the air. Which variant per people/load follows docs/peoples-1890.md where it says so, otherwise an educated guess marked calibratable.
+  5. KNEELING WITHOUT SQUASH (from point 350): kneeling is built from proportions/bones, never a non-uniform scale; the head keeps its shape; going down and getting up is a short calibratable transition, never a visibility swap between two figures (cook, fire tender, well walker in src/scenes/place/PlaceLife.tsx, TaskWalker ~line 496 at the time 350 was written). The low preset's primitive figure gets the same no-squash, no-pop rule.
+  6. LOW PRESET keeps the primitive figure; items 1 and 5 apply to it, items 2-4 only as far as its FigureLimbs already allow.
+  Verifiable: Vitest over the pure gait/pose functions (foot height at stance = ground within tolerance for every age group; arm phase opposite leg phase; no crouch while speed > 0; head-load anchor = head bone crown; kneel build has uniform scale and unchanged head radius). Playwright, both backends (backend-sensitive: skinned figures): a village walk section measuring per frame foot-to-ground distance and stance-foot slip of walking villagers, plus screenshots of walkers mid-stride, a head carrier, and a kneel transition, judged by looking (acceptance criteria 11 and 15).
+  Criticality: high — every villager in every settlement, both backends.
+  Bundle: Dorfleben.
+  --- the user’s own sentences, with their date ---
+  approved: "Bis auf eine Änderung passt es: Das soll direkt als oberstes in die Queue. Ansonsten okay und so einreihen."
+  --- proposed bundle (German name) ---
+  Dorfleben
+  --- files, points, design.md §§ ---
+  Point 1293 (archived), point 1294, point 350, src/scenes/place/skinnedFigure.tsx, src/scenes/place/figurePose.ts, src/scenes/place/figureRig.ts, src/scenes/place/PlaceLife.tsx
 - [ ] 1287. The bird's-eye view shows as much land to the south as to the north
   Queue position: directly after the request "The bird's-eye camera tilts with the walking direction and settles back on a stop", which itself follows point 1121. Build on that point's shared follow point.
   THE ASYMMETRY. The bird's-eye camera keeps CAMERA_OFFSET {y: 42, z: 24} (`TravelScene.tsx`), about 30 degrees oblique toward the north, with the traveller at the picture centre. At fov 50 the frame reaches about 35 units north but only about 20 south on flat ground (1.7 : 1), so travel northward sees villages, animals and rivers much earlier than travel southward.
@@ -6146,32 +6171,6 @@ Build order, chosen so no two parallel agents own the same file:
   screenshot): the Zulu village forced into heavy rain shows the decided state rather
   than an uncovered burning fire, and the same village in dry weather is unchanged from
   today.
-
-- [ ] 350. The kneeling villager is a squashed villager (user 25.07.2026, deployed
-  build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
-  ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
-  kneeling with a NON-UNIFORM vertical squash — `scale={[scale, scale * (kneel ? 0.75 :
-  1), scale]}` (line ~60) on top of a shortened body cone (`bodyH = kneel ? 0.55 : 1.0`).
-  The squash applies to the WHOLE figure, the head included, so the head reads as a
-  flattened ellipsoid: kneeling shortens the legs, it does not compress the skull. And
-  the alternation the user sees is `TaskWalker` (line ~496) swapping the standing and
-  kneeling groups by VISIBILITY when it starts and ends its work at the well — an
-  instant pop between two different-looking figures.
-  TARGET: a kneeling pose built from PROPORTIONS, not from a vertical scale. The lower
-  body folds (a shorter, wider base) and the whole figure sits lower, while the head and
-  every other part keep their true shape — the group's scale stays UNIFORM. And the
-  transition reads as a movement rather than a swap: the figure lowers into the pose and
-  rises out of it over a short, calibratable time, so no frame shows one figure replaced
-  by another. Every user of `kneel` gets it — the cook, the fire tender and the errand
-  walker at the well.
-  VERIFIABLE: pure (`src/render/figures.test.ts` or a test beside it) — the kneeling
-  build applies no non-uniform scale (x, y and z factors equal) and its head radius
-  matches the standing figure's, while the pose is genuinely lower (a bounded overall
-  height reduction); the standing build is unchanged. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): across the frames in which a
-  task walker starts and finishes its work, no single frame changes the figure's
-  rendered height by more than the transition's per-frame step — the pop is what the
-  check is for.
 
 - [ ] 353. Sheltered ground stays less wet (user 25.07.2026). In the rain the whole
   settlement floor darkens uniformly, so the earth under a roof overhang or a tree crown
@@ -15739,3 +15738,14 @@ to land than a mechanism that needs a review.
   able to fail on a strike that is truly silent.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side race, no player impact measured.
+- [ ] 1296. The full world suite crashes on WebGPU at the rock-relief click behind an open dialog
+  Measured 05.10.2026, 08:40-08:45, on main 69221cd36: `VERIFY_GL=webgpu` world (full suite) exits 1 twice in a row with
+  "7 pass, 0 fail" and an uncaught TimeoutError — `page.locator('[data-form="rock-relief"]').click()`
+  (`scripts/verify/world.mjs` ~412) retries 30× because `<div class="dialog-backdrop">` intercepts pointer events; last
+  frame written 19-worldmodel-communication-erratic. The same suite ran green on WebGL 2 in between. Log:
+  `local/verify-logs/2026-10-05T06-44-13-220-world.log`.
+  Done when: the dialog whose backdrop covers the click is identified (measured, not assumed), and either the staging
+  closes it before the act or a product defect that opens it there is fixed; the full world suite is green on both
+  backends with no check weakened.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — the world suite cannot cover a render change on WebGPU until it is fixed.
