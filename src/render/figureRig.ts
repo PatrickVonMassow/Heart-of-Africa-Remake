@@ -27,6 +27,9 @@ import type { ArmPose } from './gesture'
 export const HANGING_ROLL_KEEP = 0.18
 /** The most the chest may lean forward to bring a contact into reach (rad). */
 export const CONTACT_LEAN_MAX = 0.5
+/** The deepest contact crouch (rad of knee flex per joint): a full squat at
+ *  the water's edge, feet on the ground. */
+export const CROUCH_MAX = 1.1
 /** The largest shortfall (figure units) the lean may make up; a hand further
  *  out than this was a gesture, not a contact, and keeps its direction. */
 export const CONTACT_LEAN_REACH = 0.18

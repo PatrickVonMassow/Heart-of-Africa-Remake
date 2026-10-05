@@ -25,7 +25,7 @@ import {
 } from '../../render/figureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactLean, gestureArmEuler, hangToward, kneelLegs, solveTwoBone, unsquashHead } from '../../render/figureRig'
+import { contactLean, CROUCH_MAX, gestureArmEuler, hangToward, kneelLegs, solveTwoBone, unsquashHead } from '../../render/figureRig'
 import { appearanceFor, skinTone, type AgeGroup, type DressLayer, type Sex } from '../../systems/appearance'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
@@ -200,6 +200,22 @@ export function SkinnedFigure({
   // tilt by the flex, so the hips sink by their summed length × (1 − cos).
   const flex = rig.p.kneeFlex
   const standDrop = (rig.p.hipY - rig.p.ankleY) * (1 - Math.cos(flex))
+  // THE CONTACT CROUCH: a human arm is shorter and hangs from a higher
+  // shoulder than the primitive's, so a contact the primitive reached at its
+  // ankles (the jar dipped at the water's edge) is out of reach even leaning.
+  // Then the knees bend and the hips drop, feet kept down, until it is.
+  const crouch = useRef(0)
+  const setLegs = useMemo(() => {
+    const b = rig.bones
+    return (c: number) => {
+      const f = flex + c
+      for (const s of ['L', 'R'] as const) {
+        b[`thigh.${s}`].rotation.x = -f
+        b[`shin.${s}`].rotation.x = 2 * f
+        b[`foot.${s}`].rotation.x = -f
+      }
+    }
+  }, [rig, flex])
 
   // Carry the virtual pose onto the bones. Called by `applyFigurePose` in the
   // frame the pose is written, and by this figure's own frame for the rest.
@@ -211,7 +227,8 @@ export function SkinnedFigure({
       const root = b.hips.parent?.parent
       if (!vTrunk || !root) return
       // Trunk: the pose's lean and turn at the hips, the elder's stoop at the chest.
-      b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY - standDrop
+      const legDrop = (c: number) => (p.hipY - p.ankleY) * (1 - Math.cos(flex + c))
+      b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY - legDrop(crouch.current)
       b.spine.rotation.set(vTrunk.rotation.x, vTrunk.rotation.y, 0)
       b.chest.rotation.set(p.stoop, 0, 0)
       b.neck.rotation.set(-p.stoop * 0.45, 0, 0)
@@ -252,6 +269,34 @@ export function SkinnedFigure({
           b.spine.rotation.x += lean
           b.spine.updateWorldMatrix(false, true)
         }
+        // Still short after the lean: crouch (standing figures only).
+        const shortOf = () =>
+          Math.max(
+            ...(['L', 'R'] as const).map((s, i) => {
+              const vh = virtualHands.current[i]
+              return vh ? loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) - reachOf(s) * 0.995 : -1
+            }),
+          )
+        let c = 0
+        if (!kneel && shortOf() > 0) {
+          for (c = 0.1; c <= CROUCH_MAX + 1e-9; c += 0.1) {
+            b.hips.position.y = p.hipY - legDrop(c)
+            b.hips.updateWorldMatrix(false, true)
+            if (shortOf() <= 0) break
+          }
+          c = Math.min(c, CROUCH_MAX)
+        }
+        if (c !== crouch.current) {
+          crouch.current = c
+          b.hips.position.y = p.hipY - legDrop(c)
+          setLegs(c)
+          b.hips.updateWorldMatrix(false, true)
+        }
+      } else if (crouch.current !== 0 && !kneel) {
+        crouch.current = 0
+        b.hips.position.y = p.hipY - standDrop
+        setLegs(0)
+        b.hips.updateWorldMatrix(false, true)
       }
       ;(['L', 'R'] as const).forEach((s, i) => {
         const up = b[`upperArm.${s}`]
@@ -287,8 +332,20 @@ export function SkinnedFigure({
       // here, so an owning caller's retarget never leaves a stale one.
       unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
       b.hips.updateWorldMatrix(false, true)
+      // A carried prop hangs from the hand anchor and was posed for the
+      // primitive's hand frame: on a contact the anchor takes the virtual
+      // hand's orientation (the jar tips as designed), otherwise the bone's.
+      ;([0, 1] as const).forEach((i) => {
+        const anchor = rig.hands[i]
+        const vh = virtualHands.current[i]
+        if (contact && vh && anchor.parent) {
+          const parentQ = anchor.parent.getWorldQuaternion(new THREE.Quaternion()).invert()
+          anchor.quaternion.copy(parentQ.multiply(vh.getWorldQuaternion(new THREE.Quaternion())))
+        } else anchor.quaternion.identity()
+        anchor.updateWorldMatrix(false, true)
+      })
     }
-  }, [rig, kneel, kneelLeg, contact, standDrop, squat])
+  }, [rig, kneel, kneelLeg, contact, standDrop, squat, flex, setLegs])
 
   // Publish the virtual pivots to the caller that owns the pose.
   const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget })
@@ -326,10 +383,13 @@ export function SkinnedFigure({
     }
     const b = rig.bones
     if (!kneel && gait) {
-      b['thigh.L'].rotation.x = legSwingAngle(gait.current, 0) - flex
-      b['thigh.R'].rotation.x = legSwingAngle(gait.current, Math.PI) - flex
-      b['shin.L'].rotation.x = Math.max(0, -b['thigh.L'].rotation.x) * 0.8 + flex
-      b['shin.R'].rotation.x = Math.max(0, -b['thigh.R'].rotation.x) * 0.8 + flex
+      const f = flex + crouch.current
+      b['thigh.L'].rotation.x = legSwingAngle(gait.current, 0) - f
+      b['thigh.R'].rotation.x = legSwingAngle(gait.current, Math.PI) - f
+      b['shin.L'].rotation.x = Math.max(0, -b['thigh.L'].rotation.x) * 0.8 + 2 * f
+      b['shin.R'].rotation.x = Math.max(0, -b['thigh.R'].rotation.x) * 0.8 + 2 * f
+      b['foot.L'].rotation.x = -f
+      b['foot.R'].rotation.x = -f
     }
     // A squat shortens a person; it does not flatten the skull (work-order 1085).
     unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
