@@ -77,20 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1293. Villagers show the researched dress by people, sex, age, season and year on a code-built skinned body
-  Queue position: directly after point 1279 (user order 04.10.2026).
-  Source: user decision 04.10.2026 on the figure-rendering proposal (layers 1 → 3 on body 2a). Sketch: https://claude.ai/artifact/M16uuyeq4skXZCKRp2meXE (Zulu village, 15.07.1890, after Mayr 1907). Sibling with a CC0 glTF body: point 1294, after 1288.
-  Today the place figures are cone, sphere and cylinder (src/scenes/place/placeFigure.tsx); only the seasonal part of the research reaches the game (src/systems/dress.ts). The research in docs/peoples-1890.md (dress by people, sex, age, season and year) is to become visible.
-  Final state:
-  1. APPEARANCE TABLE (pure logic, src/systems/): people × sex × age group (child, girl/young man, adult, elder) × season × year → an ordered list of dress layers (hip, torso, shoulder, head, ornament), each with form, material, colour, pattern and way of wearing. dress.ts's seasonal rules are folded into it, not duplicated. Every entry names its source section in peoples-1890.md or is marked as an educated guess.
-  2. GAPS ARE RESEARCHED FIRST (user decision 04.10.2026): for every cell the table needs that peoples-1890.md does not cover (known today for the Zulu alone: men's everyday dress under the cloak, children's dress, whether Mayr 1907 Natal transfers to Zululand 1890, and the share of hide versus blanket wearers), the author first researches period sources. What it cannot settle goes to GPT-6 Astra for a second search. Only what both searches leave open is filled by educated guessing, marked calibratable, and recorded as a guess in peoples-1890.md. Findings land in peoples-1890.md, whose §8 implementation section stays current.
-  3. BODY 2a: a skinned figure built in code — lathe/sweep surfaces along a skeleton of about 17 bones; age, sex and build are proportion parameters, children with child head-to-body proportions. No asset, no new runtime dependency.
-  4. DRESS ON THE SKELETON: wrap, cloak, head covering and ornament as their own meshes bound to the bones, patterns in TSL, identical on WebGPU and WebGL 2.
-  5. LOW PRESET KEEPS TODAY'S PRIMITIVE FIGURE (user decision 04.10.2026): the skinned body and dress run on the medium and high presets; low keeps the cone/sphere/cylinder figure. Sorted into QUALITY_PRESETS with the matching row in docs/graphics-detail-levels.md; cost measured per village before and after.
-  6. POSES AND AGE READABILITY ARE JUDGED IN THE WORK (user decision 04.10.2026): the existing poses (drummer, fisher, weaver, pounding; the FigureLimbs pivots) move onto the bones without losing a pose; the author measures from which camera distance elder and young man are still told apart and works proportion, posture, hair or dress until they are. Both findings go into the point's evidence.
-  Verifiable: Vitest over the appearance table (a source or guess mark on every entry, season and year switch the layers, no people/age group without an entry) and over the body and dress geometry builders. Playwright, both backends: one village frame per treated people with all age groups visible, plus one low-preset frame showing the primitive figure, judged by looking — people, sex and age readable, no schematic look (acceptance criterion 11).
-  Criticality: high — every villager in every settlement, place-scene performance, both backends.
-  Bundle: Dorfleben.
 - [ ] 1286. The bird's-eye camera tilts with the walking direction and settles back on a stop
   Queue position: directly after point 1121; the request "The bird's-eye view shows as much land to the south as to the north" follows directly after this one.
   Source: user report 03.10.2026 ~20:30 ("das Bild kippt, je nachdem in welche Richtung man geht"); cause derived from the code on e4cc4aba7, not yet measured in the game.
