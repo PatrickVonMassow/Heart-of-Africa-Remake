@@ -141,6 +141,29 @@ describe('the garments sit on the body', () => {
     }
   })
 
+  it('a raised arm leaves a hood’s chest drape where it hangs', () => {
+    const p = bodyProportions('female', 'adult')
+    const g = buildLayerGeometry(layer({ slot: 'shoulder', form: 'hood', wear: 'overHead' }), p)!
+    const { skeleton, bones } = createSkeleton(p)
+    const m = new THREE.SkinnedMesh(g, new THREE.MeshBasicMaterial())
+    m.add(bones.hips)
+    m.bind(skeleton, new THREE.Matrix4())
+    const pos = g.getAttribute('position')
+    const at = () => {
+      m.updateMatrixWorld(true)
+      skeleton.update()
+      const v = new THREE.Vector3()
+      return Array.from({ length: pos.count }, (_, i) => m.applyBoneTransform(i, v.fromBufferAttribute(pos, i)).clone())
+    }
+    const rest = at()
+    bones['upperArm.L'].rotation.z = Math.PI / 2
+    bones['upperArm.R'].rotation.z = -Math.PI / 2
+    const raised = at()
+    let moved = 0
+    for (let i = 0; i < pos.count; i++) if (rest[i].y < p.shoulderY - 0.06 * p.stature) moved = Math.max(moved, rest[i].distanceTo(raised[i]))
+    expect(moved).toBeLessThan(0.01)
+  })
+
   it('a raised arm moves its sleeve, not the robe at the waist', () => {
     const p = bodyProportions('male', 'adult')
     const g = buildLayerGeometry(layer({ slot: 'torso', form: 'robe', wear: 'chest' }), p)!

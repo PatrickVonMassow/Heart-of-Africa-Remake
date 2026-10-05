@@ -205,17 +205,22 @@ export function SkinnedFigure({
   // ankles (the jar dipped at the water's edge) is out of reach even leaning.
   // Then the knees bend and the hips drop, feet kept down, until it is.
   const crouch = useRef(0)
+  // The standing legs: the flex and crouch, with the walking swing laid over
+  // them when the figure walks — one function, so the frame callback and an
+  // owning caller's retarget both leave the stride in place. The knee bend
+  // comes from the swing alone, so a stopped elder keeps both feet flat.
   const setLegs = useMemo(() => {
     const b = rig.bones
     return (c: number) => {
       const f = flex + c
-      for (const s of ['L', 'R'] as const) {
-        b[`thigh.${s}`].rotation.x = -f
-        b[`shin.${s}`].rotation.x = 2 * f
+      for (const [s, phase] of [['L', 0], ['R', Math.PI]] as const) {
+        const swing = gait ? legSwingAngle(gait.current, phase) : 0
+        b[`thigh.${s}`].rotation.x = swing - f
+        b[`shin.${s}`].rotation.x = Math.max(0, -swing) * 0.8 + 2 * f
         b[`foot.${s}`].rotation.x = -f
       }
     }
-  }, [rig, flex])
+  }, [rig, flex, gait])
 
   // Carry the virtual pose onto the bones. Called by `applyFigurePose` in the
   // frame the pose is written, and by this figure's own frame for the rest.
@@ -383,19 +388,7 @@ export function SkinnedFigure({
       retarget()
     }
     const b = rig.bones
-    if (!kneel && gait) {
-      // The swing is laid OVER the standing flex: the knee bend comes from the
-      // swing alone, so a stopped elder keeps the flat-footed 2f of setLegs.
-      const f = flex + crouch.current
-      const swingL = legSwingAngle(gait.current, 0)
-      const swingR = legSwingAngle(gait.current, Math.PI)
-      b['thigh.L'].rotation.x = swingL - f
-      b['thigh.R'].rotation.x = swingR - f
-      b['shin.L'].rotation.x = Math.max(0, -swingL) * 0.8 + 2 * f
-      b['shin.R'].rotation.x = Math.max(0, -swingR) * 0.8 + 2 * f
-      b['foot.L'].rotation.x = -f
-      b['foot.R'].rotation.x = -f
-    }
+    if (!kneel && gait) setLegs(crouch.current)
     // A squat shortens a person; it does not flatten the skull (work-order 1085).
     unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
   })

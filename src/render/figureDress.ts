@@ -319,7 +319,7 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
       )
       // The face stays open.
       sector(geo, (c) => !(c.z > 0 && c.y > p.chinY - 0.012 * H && c.y < hc + p.headHalfH * 0.55 && Math.abs(c.x) < p.headHalfW * 0.95))
-      parts.push({ geo, weigh: (v) => (v.y > p.neckY + 0.02 * H ? [[boneIndex('head'), 1]] : vertexWeights(v, segs, ['chest', 'neck', 'upperArm.L', 'upperArm.R'])) })
+      parts.push({ geo, weigh: (v) => (v.y > p.neckY + 0.02 * H ? [[boneIndex('head'), 1]] : near(['chest', 'neck', 'upperArm.L', 'upperArm.R'])(v)) })
       break
     }
     case 'turban':
