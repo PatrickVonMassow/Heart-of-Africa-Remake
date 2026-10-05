@@ -162,6 +162,7 @@ function walkRoute(
   let seg = 0
   let worstSlip = 0
   let stances = 0
+  let spotTurns = 0
   const planted: Array<{ x: number; z: number } | null> = [null, null]
   // It stood there a moment before setting off.
   for (let f = 0; f < 3; f++) stepWalk(m, { x, z, yaw, unit: 1 }, opts.dt, d, age, false, joints)
@@ -176,8 +177,9 @@ function walkRoute(
       continue
     }
     const turn = steerHeading(yaw, Math.atan2(dx, dz), speed, opts.dt)
+    const before = { x, z, yaw }
     yaw = turn.yaw
-    const before = { x, z }
+    if (turn.pace === 0 && Math.abs(yaw - before.yaw) > 1e-9) spotTurns++
     x += Math.sin(yaw) * step * turn.pace
     z += Math.cos(yaw) * step * turn.pace
     const push = opts.shove?.(f)
@@ -187,8 +189,9 @@ function walkRoute(
     }
     stepWalk(m, { x, z, yaw, unit: 1 }, opts.dt, d, age, false, joints)
     const pose = walkPose(d, m.phase, m.reach, m.weight, age, m.crouch, [m.plants[0].offset, m.plants[1].offset])
-    // Moving at all (a turn nearly on the spot included).
-    const walking = Math.hypot(x - before.x, z - before.z) > 0.01 * step
+    // Moving at all: a step, or a turn — one on the spot (pace 0) included,
+    // so a stance foot is held to its spot through it and its yaw counts.
+    const walking = Math.hypot(x - before.x, z - before.z) > 0.01 * step || Math.abs(yaw - before.yaw) > 1e-9
     pose.legs.forEach((l, i) => {
       const a = ankleAt(d, l)
       const j = hipJointAt(joints[i], pose.hipYaw)
@@ -211,7 +214,7 @@ function walkRoute(
       worstSlip = Math.max(worstSlip, Math.hypot(world.x - p0.x, world.z - p0.z))
     })
   }
-  return { worstSlip, stances, arrived: seg >= route.length - 1 }
+  return { worstSlip, stances, spotTurns, arrived: seg >= route.length - 1 }
 }
 
 describe('the hip joints are where the bones draw them', () => {
@@ -242,6 +245,7 @@ describe('a walker turning a corner keeps its planted foot', () => {
     ['a zig-zag lane', [[0, 0], [1, 2], [-1, 4], [1, 6], [-1, 8]]],
   ]
   for (const [name, route] of corners) {
+    const spotTurning = name.includes('135') || name.includes('doubling')
     it(`${name}: every waypoint reached, no stance foot drifts`, () => {
       for (const { age, p } of bodies) {
         const d = legDims(p)
@@ -250,6 +254,8 @@ describe('a walker turning a corner keeps its planted foot', () => {
           expect(r.arrived).toBe(true)
           expect(r.stances).toBeGreaterThan(4)
           expect(r.worstSlip).toBeLessThanOrEqual(M.stanceSlipTolerance)
+          // The sharp ones stop to turn on the spot — and those frames are measured.
+          if (spotTurning) expect(r.spotTurns).toBeGreaterThan(0)
         }
       }
     })
