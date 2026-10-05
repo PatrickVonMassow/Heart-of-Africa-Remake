@@ -4,12 +4,12 @@
   "makehuman": {
    "licence": "CC0-1.0",
    "licenceFile": "makehuman/LICENSE.ASSETS.md",
-   "origin": "MakeHuman / MPFB2 bundled assets (base mesh, macro targets, game_engine rig and weights), github.com/makehumancommunity/mpfb2 @ d0a32e57a7f9 — LICENSE.md part C: \"The base mesh and proxies, Targets and modifiers, ... Rigs ... have been released under CC0 1.0 Universal\"."
+   "origin": "MakeHuman / MPFB2 bundled assets (base mesh, macro targets, game_engine rig and weights), github.com/makehumancommunity/mpfb2 @ d0a32e57a7f9 \u2014 LICENSE.md part C: \"The base mesh and proxies, Targets and modifiers, ... Rigs ... have been released under CC0 1.0 Universal\"."
   },
   "quaternius": {
    "licence": "CC0-1.0",
-   "licenceFile": "quaternius/UAL2-License.txt",
-   "origin": "Quaternius Universal Animation Library 1 and 2, Standard (free) editions, quaternius.com/packs/universalanimationlibrary.html and …2.html (licence CC0 on both pages); mirrored unchanged on GitHub: J-Ponzo/gltf-universal-animation-library @ e24c23cf (UAL1 glTF) and NafisRayan/Animate-Rigged-Humanoid-No-Blender @ 5821923a (UAL2 glb). The container reaches github.com but not itch.io."
+   "licenceFile": "quaternius/UAL1-LICENSE",
+   "origin": "Quaternius Universal Animation Library (1), Standard (free) edition, quaternius.com/packs/universalanimationlibrary.html (licence CC0 on the page and in the archive); mirrored unchanged on GitHub as J-Ponzo/gltf-universal-animation-library @ e24c23cf (the container reaches github.com, not itch.io)."
   }
  },
  "files": [
@@ -297,16 +297,6 @@
    "path": "quaternius/AnimationLibrary_Godot_Standard.bin",
    "url": "https://raw.githubusercontent.com/J-Ponzo/gltf-universal-animation-library/e24c23cf2a1323488a3faa226ea7ea21f644b73e/glTF/AnimationLibrary_Godot_Standard.bin",
    "sha256": "6e65377d81558333c4093dbb144a48fd19019343d82b1a3a7992a98ec0e0543c"
-  },
-  {
-   "path": "quaternius/UAL2-License.txt",
-   "url": "https://raw.githubusercontent.com/NafisRayan/Animate-Rigged-Humanoid-No-Blender/5821923af517ac5fdc82505faa92a0d575fc1b1a/Universal%20Animation%20Library%202%5BStandard%5D/Universal%20Animation%20Library%202%5BStandard%5D/License.txt",
-   "sha256": "d77329b05c4c206e76c83285ecdd1e5f2b3df2350ec80657ebdb5a706a0fc0de"
-  },
-  {
-   "path": "quaternius/UAL2_Standard.glb",
-   "url": "https://raw.githubusercontent.com/NafisRayan/Animate-Rigged-Humanoid-No-Blender/5821923af517ac5fdc82505faa92a0d575fc1b1a/Universal%20Animation%20Library%202%5BStandard%5D/Universal%20Animation%20Library%202%5BStandard%5D/Unreal-Godot/UAL2_Standard.glb",
-   "sha256": "8cee20ab1bc55130092447e810e26df22dd2803eccc54f52137a7d54d7ab88a8"
   }
  ]
 }

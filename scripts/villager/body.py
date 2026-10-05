@@ -303,6 +303,13 @@ def build_body(mh, cfg):
     jdel['grip.L'] = np.zeros_like(jbasis)
     jdel['grip.R'] = np.zeros_like(jbasis)
 
+    # Each palm's normal at rest (the retarget aligns the hands' twist by it).
+    palm = {}
+    for side, s in (('L', 'l'), ('R', 'r')):
+        knuckles = mh.centroid(basis, f'joint-{s}-finger-2-1') - mh.centroid(basis, f'joint-{s}-finger-5-1')
+        along = mh.centroid(basis, f'joint-{s}-finger-3-1') - mh.centroid(basis, f'joint-{s}-hand')
+        n = np.cross(along, knuckles) if side == 'L' else np.cross(knuckles, along)
+        palm[side] = n / np.linalg.norm(n)
     verts, tris, tri_uv = decimate(mh, basis, cfg['VILLAGER_ASSET']['bodyTriangles'])
     idx, bary, off = surface_map(mh, basis, verts)
     pos = apply_map(basis, idx, bary, off)
@@ -312,7 +319,7 @@ def build_body(mh, cfg):
     return {
         'C': C, 'basis_full': basis, 'deltas_full': deltas, 'Wfull': Wfull,
         'pos': pos, 'tris': tris, 'tri_uv': tri_uv, 'morph_pos': morph_pos, 'W': W,
-        'joints': jbasis, 'joint_deltas': jdel, 'map': (idx, bary, off),
+        'joints': jbasis, 'joint_deltas': jdel, 'map': (idx, bary, off), 'palm': palm,
     }
 
 

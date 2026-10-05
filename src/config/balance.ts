@@ -2568,6 +2568,12 @@ export const VILLAGER_ASSET = {
    *  at any morph extreme (figure units, ≈ 4 mm) — the penetration report's
    *  tolerance. */
   garmentPenetrationTolerance: 0.003,
+  /** The villagers' digging shovel in its own frame (figure units): +y along
+   *  the shaft to the handle, the blade at −y with its face toward +z; the
+   *  origin is where a one-handed carrier's hand holds it (the primitive
+   *  figure's hand). Shared by the game's tool (PlaceLife.tsx) and the clips
+   *  the pipeline solves the hands onto. */
+  shovel: { top: 0.16, shaftBottom: -0.5, tip: -0.76, shaftRadius: 0.022, bladeWidth: 0.2, bladeThickness: 0.02 },
 } as const
 
 // Dev hook for the headless verification (the village-walk tolerances).

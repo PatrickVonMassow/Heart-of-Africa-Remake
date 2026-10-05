@@ -75,13 +75,6 @@ UAL1 = {
     'thigh.L': 'DEF-thigh.L', 'shin.L': 'DEF-shin.L', 'foot.L': 'DEF-foot.L', 'toe.L': 'DEF-toe.L',
     'thigh.R': 'DEF-thigh.R', 'shin.R': 'DEF-shin.R', 'foot.R': 'DEF-foot.R', 'toe.R': 'DEF-toe.R',
 }
-UAL2 = {
-    'hips': 'pelvis', 'spine': 'spine_01', 'chest': 'spine_03', 'neck': 'neck_01', 'head': 'Head',
-    'shoulder.L': 'clavicle_l', 'upperArm.L': 'upperarm_l', 'forearm.L': 'lowerarm_l', 'hand.L': 'hand_l',
-    'shoulder.R': 'clavicle_r', 'upperArm.R': 'upperarm_r', 'forearm.R': 'lowerarm_r', 'hand.R': 'hand_r',
-    'thigh.L': 'thigh_l', 'shin.L': 'calf_l', 'foot.L': 'foot_l', 'toe.L': 'ball_l',
-    'thigh.R': 'thigh_r', 'shin.R': 'calf_r', 'foot.R': 'foot_r', 'toe.R': 'ball_r',
-}
 # Bones whose rest DIRECTION is aligned before retargeting (limbs: the source
 # stands in a T-pose, the villager in MakeHuman's A-pose); the trunk keeps its
 # rest orientation (both stand upright, facing +z).

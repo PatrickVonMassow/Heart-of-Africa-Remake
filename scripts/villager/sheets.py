@@ -62,3 +62,79 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
     want = set(only.split(',')) if only else None
     if not want or 'body' in want:
         body_sheet(out, body)
+    if clips:
+        for name in clips['clips']:
+            if not want or name in want or 'clips' in want:
+                wide = name in ('dig', 'carry', 'carryIdle', 'kneelDown', 'kneelUp')
+                clip_sheet(out, body, clips, name, frames=8 if wide else 10, spacing=0.95 if wide else None)
+                if wide:
+                    clip_sheet(out, body, clips, name, frames=8, view=35, spacing=1.0, fname=f'clip-{name}-quarter.png')
+
+
+def sample(clip, t):
+    """Pose (local quats, hips position) of a clip at time t (looping)."""
+    from gltfio import qslerp
+    times = clip['times']
+    d = clip['duration']
+    t = t % d if clip.get('kind') in ('gait', 'loop') else min(max(t, 0), d)
+    k = min(len(times) - 2, int(np.searchsorted(times, t, side='right') - 1))
+    k = max(0, k)
+    f = (t - times[k]) / max(1e-9, times[k + 1] - times[k])
+    q = np.array([qslerp(clip['q'][k, i], clip['q'][k + 1, i], f) for i in range(len(SK.NAMES))])
+    hips = clip['hips'][k] * (1 - f) + clip['hips'][k + 1] * f
+    return q, hips
+
+
+def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex='male', age='adult', extra=None, fname=None):
+    R.clear()
+    jidx, jw = top4(body['W'])
+    pos, j = morphed(body, corner_weights(sex, age))
+    c = clips['clips'][name]
+    d = c['duration']
+    spacing = spacing if spacing is not None else (0.55 if view == 'side' else 0.75)
+    span = spacing * (frames - 1)
+    for f in range(frames):
+        t = d * f / frames if c['kind'] in ('gait', 'loop') else d * f / (frames - 1)
+        q, hips = sample(c, t)
+        wr, wp = rig.fk(j, q, hips)
+        v = rig.skin(pos, jidx, jw, j, wr, wp)
+        if view == 'side':
+            v[:, 2] += f * spacing - span / 2
+        else:
+            v[:, 0] += f * spacing - span / 2
+        R.add_mesh(f'f{f}', v, body['tris'], SKIN)
+        if c.get('tool'):
+            tv, tt = shovel_mesh(body, c['tool'], wr, wp, cfg_shovel(clips))
+            if view == 'side':
+                tv[:, 2] += f * spacing - span / 2
+            else:
+                tv[:, 0] += f * spacing - span / 2
+            R.add_mesh(f't{f}', tv, tt, (0.42, 0.3, 0.16, 1))
+    R.ground(-span / 2 - 0.5, span / 2 + 0.5, -span / 2 - 0.5, span / 2 + 0.5)
+    w = span + 1.0
+    R.render(os.path.join(out, fname or f'clip-{name}-{view}.png'), (0, 0.65, 0), w, view, (int(260 * w), int(260 * 1.6)))
+
+
+def cfg_shovel(clips):
+    return clips['shovel']
+
+
+def box(cx, cy, cz, hx, hy, hz):
+    v = np.array([[x, y, z] for x in (-hx, hx) for y in (-hy, hy) for z in (-hz, hz)]) + [cx, cy, cz]
+    t = [[0, 1, 3], [0, 3, 2], [4, 6, 7], [4, 7, 5], [0, 4, 5], [0, 5, 1], [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 5, 7], [1, 7, 3]]
+    return v, np.array(t)
+
+
+def shovel_geometry(sh):
+    """The shovel in its own frame (+y to the handle, blade at -y, face +z)."""
+    sv, st = box(0, (sh['top'] + sh['shaftBottom']) / 2, 0, sh['shaftRadius'], (sh['top'] - sh['shaftBottom']) / 2, sh['shaftRadius'])
+    bv, bt = box(0, (sh['shaftBottom'] + sh['tip']) / 2, 0, sh['bladeWidth'] / 2, (sh['shaftBottom'] - sh['tip']) / 2, sh['bladeThickness'] / 2)
+    return np.concatenate([sv, bv]), np.concatenate([st, bt + len(sv)])
+
+
+def shovel_mesh(body, tool, wr, wp, sh):
+    import toolclips as T
+    pos, rot = T.tool_from_hand(body, tool['hand'], wr, wp, tool.get('thumbUp', True))
+    origin = pos - rot @ np.array([0, tool['grip'], 0])
+    v, t = shovel_geometry(sh)
+    return origin + v @ rot.T, t
