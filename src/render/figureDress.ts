@@ -158,11 +158,12 @@ function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number,
   // Stations evenly down the garment, each moved onto the bulge of the trunk
   // (bust, belly, buttocks, hips) nearest it when one lies within half a
   // step: a station on the bulge's crest carries the cloth over it, where
-  // two either side of it would cut the chord through it.
+  // two either side of it would cut the chord through it. Not the shoulders'
+  // crest: a station there spreads the cloth into a shelf over the arms.
   const step = (top - bottom) / (rings - 1)
   const crests: number[] = []
   const probe = 0.005 * p.stature
-  for (let y = top - probe; y > bottom + probe; y -= probe) {
+  for (let y = Math.min(top, p.shoulderY - 0.06 * p.stature) - probe; y > bottom + probe; y -= probe) {
     const [x0, z0] = trunkAt(p, y + probe)
     const [x1, z1] = trunkAt(p, y)
     const [x2, z2] = trunkAt(p, y - probe)
