@@ -78,6 +78,7 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 - [ ] 1294. Villagers on a CC0 glTF base body with morph targets, prepared by a container-managed Blender
+  SPLIT 05.10.2026 (the point's own rule: "If the point does not converge, split along 'body and pipeline' / 'animation, dress and tool'"; the Opus 5.5 author did not converge in one session, report local/1294-author-report.md, branch feat/1294-gltf-villager-body @ bf2f99bd4): 1294 now owns items 1-5 and 7 (body and pipeline); items 6 and 8-13 (animation, dress and tool) move to point 1311 directly after it. Work already on the branch for 1311's items (retargeted Quaternius clips, garment build, penetration report) may land with 1294 as groundwork, provided every gate stays green; 1311 finishes and judges it. 1294 is done when items 1-5 and 7 hold, the game-side loader figure is wired for medium/high, and the low preset keeps the primitive figure.
   Queue position: at the very top of the open work order (user order 05.10.2026: "point 1294, extended by this text, moves to the very top of the open work order"); previously directly after point 1288 (user order 04.10.2026).
   Source: user decision 04.10.2026 on the figure-rendering proposal, variant 2b. Sketch: https://claude.ai/artifact/XcFmBv6Qz7SFTFKsiEeeez. Builds on point 1293 (queued after 1279): its appearance table, skeleton-bound dress, research results and low-preset rule are reused, not rebuilt.
   Final state:
@@ -100,6 +101,71 @@ put it is the mistake this line exists to stop.
   Low preset keeps the primitive figure (point 1301 covers it); items 6-11 apply to the medium/high skinned body.
   Criticality: high — new asset pipeline, load budget, every villager, both backends. If the point does not converge, split along "body and pipeline" / "animation, dress and tool".
   Bundle: Dorfleben.
+
+- [ ] 1311. Villager glTF body: animation, dress and tool (split from 1294)
+  Queue position: directly after point 1294 (split 05.10.2026 under 1294's own rule; nothing goes ahead of 1294).
+  Source: point 1294, items 6 and 8-13, verbatim there; this point owns them from the split on. Author report: local/1294-author-report.md (open: garment penetration over tolerance, robe at kneel ~0.21 deep — rewrite the lost skirt-bone edit, exclude forearm/hand from the weight transfer; no-slide functions not wired; dig flicker not investigated; dig hook in PlaceLife.tsx; in-game tool is a hoe, make it a shovel; drop unused Quaternius UAL2 sources).
+  Final state: 1294 items 6 (no clothing clipping, per-frame penetration report zero beyond tolerance), 8 (natural gait from retargeted clips, walk/sprint threshold in balance.ts), 9 (1295's achievements stay binding), 10 (tools held in the hand, never below ground), 11 (no flicker, jitter or jumps; blended transitions), 12 (judged by looking) and 13 (cross-vendor second pair of eyes on figures and frame sheets) hold on the body 1294 landed.
+  Deviation to confirm in the work: no reachable CC0 shovel clip was found, so the dig is authored in the pipeline.
+  Verifiable: 1294's "Verifiable (in addition …)" list for these items — penetration report, Blender frame sheet of walk, sprint, dig and shovel-carry, the named Vitest cases, Playwright both backends picture-checked, the cross-vendor review record with its fixes.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
+  Queue position: directly after point 1294 (ahead of 1301); worked only once 1294 has landed (user 05.10.2026: "ja, aber nach 1294").
+  Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:
+  Final state: recurring mechanical work the LLM now performs step by step runs as local scripts/hooks, so measurably fewer LLM round-trips are spent, while NO existing functionality is endangered.
+
+  SAFETY REQUIREMENT (binding for every change):
+   1. No existing functionality is endangered — not only checks, but everything the batch does today.
+   2. No new problems are introduced: deadlocks, hooks blocking each other, Stop-refusal loops, hanging or aborting scripts, half-executed chains.
+   3. Every unexpected error has a fallback: if a new combined command or self-repairing hook fails, the flow falls back to today's behaviour (the LLM runs the single steps, or gets today's refusal). The error is reported loudly, never swallowed. A crashing hook must never paralyse the batch.
+   4. Evidence: the analyses list the failure cases of every candidate; the final check examines exactly 1-3; tests cover the failure paths (aborting intermediate step, timeout, held lock, missing file, ...) and prove the fallback engages.
+
+  PROCEDURE — "Sechs-Augen-Prinzip mit zusätzlicher Nachkontrolle" (analysis BEFORE any change):
+   1. Analysis A (Opus 5.5) and Analysis B (GPT-6 Astra) run BLIND and in parallel. A starts from this point text (measurement and candidate list). B STARTS WITHOUT PRIOR KNOWLEDGE: it receives ONLY the neutral brief below, handed to it directly as a separate text, plus access to the raw material (session transcripts under ~/.claude/projects/-workspace-hoa, scripts/, .claude/settings.json, hooks, tests). B never sees the measurement, the candidate list, or point-brief output of this point. B measures and interprets on its own. Each analysis delivers further savings with measured shares and, per candidate, the failure analysis demanded by the safety requirement plus the test that proves it.
+      NEUTRAL BRIEF FOR B (verbatim): "Find activities the LLM sessions of this repository perform repeatedly that a local script or hook could take over, so that fewer LLM round-trips are spent. Measure from the transcripts yourself. For every proposed change show that no existing functionality is endangered, that no new problems arise (deadlocks, hooks blocking each other, refusal loops, hanging or aborting scripts, half-executed chains), and that every unexpected error falls back to today's behaviour with a loud report. Name the test that proves each of these."
+   2. A third, distinct model (neither A nor B; Fable 5.1 if node scripts/fable-switch.mjs --status permits, else Opus 4.8) checks both proposals thoroughly and merges them via scripts/blind-merge.mjs (ids counted); disagreements resolved with stated reasons, not by union.
+   3. The merged plan goes to the model of the OTHER vendor than the merger (GPT-6 Astra via scripts/review-astra.mjs) for a final check focused on the safety requirement. Only an approved plan is implemented; objections are fixed and re-checked first. At this stage Astra may see everything.
+   4. Implementation follows the approved plan, with the usual cross-vendor code review afterwards.
+
+  Candidates for A (starting points, not a closed list; NOT shown to B):
+   a) Merge fixed ritual chains into single commands that run silently and report only failures (e.g. focus set -> board now -> attest -> board-publish -> dashboard-guard --synced; batch-boundary --prepare -> --commit -> --clear).
+   b) Timestamp/header: stop the LLM re-measuring the time and stop exact-minute refusals (tolerance, or header set outside the LLM).
+   c) Stop hooks that self-repair mechanical causes instead of refusing (unpushed main where pushing is permitted, dashboard/focus sync, carrier drain), leaving the LLM only cases needing judgment.
+   d) Retrospective / beginner-guide currency: a script pre-collects the raw delta; LLM only words it; or lower trigger frequency.
+   e) Screenshot pre-filter by pixel metric before LLM inspection (low priority, 1.7 %).
+   f) Small: finding.mjs syntax in hook texts (removes --help calls); more compact point-brief output.
+  Infrastructure-freeze fit: a simplification (fewer steps, no new guards); a new script replaces steps, never adds a check.
+
+  Tests: every changed hook/script keeps or extends its node tests; each merged chain has a test proving it performs every step the old chain did, fails loud on the same conditions, and falls back on injected failures. Evidence of saving: re-run the 05.10. measurement on a comparable later corpus and report calls and cache-read share before/after.
+  Bundle: Session- & Repo-Hygiene.
+  USER, verbatim:
+  05.10.2026: "Reihe einen Punkt für solche Vereinfachungen direkt nach 1294 ein. Der soll aber nicht einfach nur die von dir erwähnten Änderungen durchführen, sondern vorher sehr gründlich prüfen, ob zum einen noch mehr eingespart werden kann und zum anderen durch die Umbauten nichts kaputt geht. Das soll mit sechs Augen passieren, also ein anderes Modell soll blind vom ersten die selbe Analyse machen und ein drittes die Vorschläge nochmal gründlich prüfen und zusammenführen."
+  05.10.2026: "Und dieses Mal noch ein Schritt weiter: Die zusammengeführte Lösung durch das dritte Modell noch dann noch einmal dem Modell des anderen Anbieters zur Abschlussprüfung gegeben werden. Ich will ganz sicher gehen, dass wir uns mit so einem Umbau nichts kaputt machen."
+  05.10.2026: "Für die Opus 5.5-Seite ist es okay, mit deiner Liste zu starten, weil du ja auch Opus 5.5 bist, aber Astra sollte ohne Vorwissen starten."
+  05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
+  05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
+  05.10.2026: "ja, aber nach 1294"
+
+- [ ] 1305. Deferring a carrier request at the context watermark must not mark it blocked
+  Queue position: directly after point 1308 (point 1306, user 05.10.2026: "order: 1294, new point, 1305, then the rest").
+  Source: findings carrier 05.10.2026 (session 512756ba): at the 1295 boundary past the context watermark the owner ran `finding.mjs --blocked` on the user-approved request "Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check" with a pure deferral reason. That put a decision card "Anfrage nicht übernehmbar: …" before the user and took the request out of the pending set, so no successor drain lists it.
+  Final state:
+  1. A deferral at the watermark leaves the request pending (no `--blocked`, no decision card); the boundary text (`scripts/batch-boundary.mjs --prepare`) and `docs/batch-owner-runbook.md` say so where they name the drain.
+  2. [satisfied 05.10.2026 by point 1306, which carried the request in as point 1308 and removed its decision card] The approved request above is carried into the work order as its own point (re-opened from blocked) and its decision card removed.
+  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1310. The bird's-eye camera compensates about half the south-reach asymmetry
+  Queue position: directly after point 1305 (user card decision 05.10.2026; nothing goes ahead of 1294).
+  Source: decision card "Kamera: volle oder halbe Südverschiebung" from point 1287, which landed with full compensation and left the choice to the user. User, 05.10.2026 20:14: "Zur Karte \"Kamera: volle oder halbe Südverschiebung\": Ich nehme die halbe Verschiebung."
+  Final state:
+  1. `src/config/balance.ts`: `travelCameraFollow.southReachCompensation` is 0.5, marked calibratable as the user's choice of 05.10.2026.
+  2. design.md §2.1: the camera sentence says the camera hangs a little further south so about half the north/south reach asymmetry is compensated (the view reaches noticeably further south than before, still less than north); the traveller sits slightly above the picture centre. "about as far south as north" is gone.
+  3. Tests that pin full compensation through an explicit 1.0 stay; a test that reads the balance value and expects equal north/south reach expects the half-compensation reach instead. No check is weakened.
+  Tests: Vitest for the camera placement at 0.5 (reach ratio between the uncompensated 1.7 : 1 and 1 : 1; tilt unchanged); Playwright travel frames walking north and south and at a settlement edge on both backends (camera framing is backend-sensitive), judged by looking.
+  Bundle: Steuerung & Performance.
 
 - [ ] 1288. Carry a card decision from the head session to the batch owner
   Queue position: directly before point 1081 (user order 03.10.2026, "Reihe außerdem einen neue Task direkt vor 1081 zum Fix dieses Nachrichtenzustellproblems ein.").
@@ -15803,10 +15869,9 @@ to land than a mechanism that needs a review.
   No new guards, audits or state fields (infrastructure freeze 01.09.2026).
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 1305. Deferring a carrier request at the context watermark must not mark it blocked
-  Source: findings carrier 05.10.2026 (session 512756ba): at the 1295 boundary past the context watermark the owner ran `finding.mjs --blocked` on the user-approved request "Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check" with a pure deferral reason. That put a decision card "Anfrage nicht übernehmbar: …" before the user and took the request out of the pending set, so no successor drain lists it.
-  Final state:
-  1. A deferral at the watermark leaves the request pending (no `--blocked`, no decision card); the boundary text (`scripts/batch-boundary.mjs --prepare`) and `docs/batch-owner-runbook.md` say so where they name the drain.
-  2. The approved request above is carried into the work order as its own point (re-opened from blocked) and its decision card removed.
-  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
-  Bundle: Session- & Repo-Hygiene.
+- [ ] 1309. A hard-edged dark rectangle shows in the burning-grass travel frame
+  Source: findings carrier 05.10.2026 16:35, found on the picture check of point 1287.
+  verification/131-burning-grass.png shows a straight-edged dark rectangle (with horizontal bars) in the lower right of the bird's-eye view, on main (d8a093e50, WebGL 2) and on WebGPU and WebGL 2 at point 1287 alike; not caused by the camera shift. Looks like a shadow or overlay with a rectangular footprint.
+  Final state: the cause is measured in game (which mesh, overlay or shadow draws the rectangle) and removed; the burning-grass travel frame shows no straight-edged artefact on either backend.
+  Verifiable: the burning-grass frame on both backends, picture-checked per §7.2; a right-layer test for the corrected cause.
+  Bundle: Wetter & Wasser.

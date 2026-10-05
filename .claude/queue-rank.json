@@ -1620,6 +1620,12 @@
       "why": "process defect; end of queue, carries the stuck approved request",
       "origin": "machine",
       "place": "last"
+    },
+    "1309": {
+      "at": "2026-10-05T17:32:23.639Z",
+      "why": "visual artefact present on main before 1287, no user urgency; queued behind the communication-first and user-ordered points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1649,7 +1655,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-05T14:22:05.511Z",
+    "at": "2026-10-05T17:32:23.650Z",
     "points": [
       184,
       200,
@@ -2076,7 +2082,6 @@
       1268,
       1269,
       1270,
-      1287,
       1288,
       1289,
       1290,
@@ -2090,7 +2095,9 @@
       1302,
       1303,
       1304,
-      1305
+      1305,
+      1308,
+      1309
     ]
   }
 }
