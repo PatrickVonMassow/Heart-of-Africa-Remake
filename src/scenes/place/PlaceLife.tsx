@@ -56,7 +56,7 @@ import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR, balance } from '../../config/balance'
+import { START_YEAR, VILLAGER_MOTION, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
@@ -399,9 +399,8 @@ function Loom({
     helperGait.current = phase
     if (helper.current) {
       if (import.meta.env.DEV) helper.current.userData.errand = work.errand ? { toward: work.errand.toward, phase: work.errand.phase } : null
-      // Dropped onto his stance leg, so the swinging feet ride the ground
-      // instead of hanging above it.
-      helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, gaitBodyLift(phase, FIGURE_LIMBS.hipY), picture.helperAt)
+      // On the ground; the figure drops onto its own stance leg.
+      helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, 0, picture.helperAt)
       // Walking, he faces the way he is going — which is the word. Working or
       // home, he faces the warp he is tending.
       const walking = work.errand !== null && work.errand.phase !== 'work' && moved > 1e-6
@@ -1102,8 +1101,9 @@ function Kids({
       // beside a stone rather than standing on one. The climb now carries its
       // own lift in metres, taken from the boulder the child is actually on, and
       // this only draws it.
-      const gaitLift = gaitBodyLift(phase, legLength)
-      const lift = round.bank ? bankChildBodyLift(c as BankChild, gaitLift, bankChildTouching(round.bank, i)) : gaitLift
+      // The stride's own drop onto the stance leg is the figure's (placeFigure /
+      // skinnedFigure): the group stands on the ground, plus any climb.
+      const lift = round.bank ? bankChildBodyLift(c as BankChild, 0, bankChildTouching(round.bank, i)) : 0
       g.position.set(c.x, groundHeight(c.x, c.z) + lift, c.z)
       // A TAGGED CHILD IS OUT OF PLAY (work-order 687 item 3, redrawn in 1239):
       // it stands at full height in the caught slump — trunk leaned forward,
@@ -1796,7 +1796,7 @@ function Porters({
       }
       const px = p.x
       const pz = p.z
-      g.position.set(px, groundHeight(px, pz) + Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
+      g.position.set(px, groundHeight(px, pz), pz)
       g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
     })
   })
@@ -2155,8 +2155,12 @@ function TaskWalker({
   startDelay: number
 }) {
   const groundHeight = usePlaceGround()
-  const standing = useRef<THREE.Group>(null)
-  const kneeling = useRef<THREE.Group>(null)
+  // ONE body that walks, kneels at its work and gets up again (work-order
+  // "walking villagers", from point 350): never two figures swapped by
+  // visibility, which made the kneel a pop between a standing and a squashed one.
+  const walker = useRef<THREE.Group>(null)
+  const kneels = useRef(false)
+  const load = useRef<THREE.Group>(null)
   const state = useRef({
     mode: 'inside' as 'inside' | 'go' | 'work' | 'back',
     seg: 0,
@@ -2178,9 +2182,8 @@ function TaskWalker({
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const s = state.current
-    const stand = standing.current
-    const kneel = kneeling.current
-    if (!stand || !kneel) return
+    const stand = walker.current
+    if (!stand) return
     if (body) {
       body.active = s.mode !== 'inside'
       body.x = s.x
@@ -2194,12 +2197,11 @@ function TaskWalker({
 
     if (s.mode === 'inside') {
       stand.visible = false
-      kneel.visible = false
-      // Both bodies follow the state while it is at home (point 509): neither
-      // may keep the identity transform that would park it at the settlement
+      kneels.current = false
+      // The body follows the state while it is at home (point 509): it may not
+      // keep the identity transform that would park it at the settlement
       // origin until its first outing writes one.
       stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
-      kneel.position.set(s.x, groundHeight(s.x, s.z), s.z)
       s.timer -= dt
       if (s.timer <= 0) {
         s.mode = 'go'
@@ -2210,10 +2212,12 @@ function TaskWalker({
       return
     }
     if (s.mode === 'work') {
-      stand.visible = false
-      kneel.visible = true
-      kneel.position.set(s.x, groundHeight(s.x, s.z), s.z)
-      kneel.rotation.y = s.yaw
+      // Kneels where it stopped, the load set down; the figure folds down and
+      // stands up again on its own short transition.
+      kneels.current = true
+      if (load.current) load.current.visible = false
+      stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
+      stand.rotation.y = s.yaw
       s.timer -= dt
       if (s.timer <= 0) {
         s.mode = 'back'
@@ -2223,7 +2227,8 @@ function TaskWalker({
     }
 
     stand.visible = true
-    kneel.visible = false
+    kneels.current = false
+    if (load.current) load.current.visible = true
     const tgt = route[s.seg + 1]
     if (!tgt) {
       if (s.mode === 'go') {
@@ -2274,25 +2279,28 @@ function TaskWalker({
   })
 
   return (
-    <>
-      <group ref={standing} visible={false} position={figureStance(home)}>
-        <Figure cloth={cloth} pose={HEAD_CARRY_POSE} />
-        {carry === 'bundle' ? (
-          <mesh position={[0, 1.42, 0]} castShadow>
-            <boxGeometry args={[0.38, 0.22, 0.3]} />
-            <meshStandardMaterial color="#a3702e" roughness={0.95} />
-          </mesh>
-        ) : (
-          <mesh position={[0, 1.5, 0]} castShadow>
-            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-          </mesh>
-        )}
-      </group>
-      <group ref={kneeling} visible={false} position={figureStance(home)}>
-        <Figure cloth={cloth} kneel />
-      </group>
-    </>
+    <group ref={walker} name="village-task-walker" visible={false} position={figureStance(home)}>
+      <Figure
+        cloth={cloth}
+        kneeling={kneels}
+        headSteady={VILLAGER_MOTION.headLoad[carry === 'bundle' ? 'bundle' : 'jar'].steady ? { radius: 0.16, height: 0.32 } : null}
+        headProp={
+          <group ref={load}>
+            {carry === 'bundle' ? (
+              <mesh position={[0, 0.11, 0]} castShadow>
+                <boxGeometry args={[0.38, 0.22, 0.3]} />
+                <meshStandardMaterial color="#a3702e" roughness={0.95} />
+              </mesh>
+            ) : (
+              <mesh position={[0, 0.16, 0]} castShadow>
+                <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+                <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+              </mesh>
+            )}
+          </group>
+        }
+      />
+    </group>
   )
 }
 
@@ -2414,6 +2422,9 @@ function Walkers({
     w.__placeWalkers = {
       states: states.current,
       homes: defs.map((d) => d.home),
+      carries: defs.map((d) => d.carries),
+      // The drawn group, for the walk's foot and stride measurements.
+      group: (who: number) => refs.current[who] ?? null,
       // Read the rendered body independently of the surface it should ride.
       sample: (who: number) => {
         const s = states.current[who]
@@ -2564,7 +2575,8 @@ function Walkers({
         s.pinned = 0
       }
       settleBody(i, s, !throughDoor)
-      g.position.set(s.x, groundHeight(s.x, s.z) + Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
+      // On the ground: the body's own stride carries the rise and fall.
+      g.position.set(s.x, groundHeight(s.x, s.z), s.z)
       g.rotation.y = s.yaw
     })
   })
@@ -2582,14 +2594,19 @@ function Walkers({
             refs.current[i] = el
           }}
         >
-          <Figure cloth={def.cloth} pose={def.carries ? HEAD_CARRY_POSE : undefined} />
-          {/* Some carry a basket or bundle on the head */}
-          {def.carries && (
-            <mesh position={[0, 1.42, 0]} castShadow>
-              <cylinderGeometry args={[0.22, 0.16, 0.18, 8]} />
-              <meshStandardMaterial color="#a3702e" roughness={0.95} />
-            </mesh>
-          )}
+          {/* Some carry a basket on the head, resting on the crown. */}
+          <Figure
+            cloth={def.cloth}
+            headSteady={def.carries && VILLAGER_MOTION.headLoad.basket.steady ? { radius: 0.22, height: 0.18 } : null}
+            headProp={
+              def.carries ? (
+                <mesh position={[0, 0.09, 0]} castShadow>
+                  <cylinderGeometry args={[0.22, 0.16, 0.18, 8]} />
+                  <meshStandardMaterial color="#a3702e" roughness={0.95} />
+                </mesh>
+              ) : undefined
+            }
+          />
         </group>
       ))}
     </>
@@ -3113,11 +3130,8 @@ function ErrandVillagers({
 
       const g = refs.current[i]
       if (g) {
-        // The same walking bob the other inhabitants ride, off the distance this
-        // villager has actually covered rather than off a wall clock.
-        // No bob while filling: he stands in the river (work-order 1117).
-        const bob = filling === null ? Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05 : 0
-        g.position.set(me.x, groundHeight(me.x, me.z) + bob, me.z)
+        // On the ground: the body's own stride carries the rise and fall.
+        g.position.set(me.x, groundHeight(me.x, me.z), me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
         if (facing !== null) yaws.current[i] = facing
         g.rotation.y = yaws.current[i]
@@ -3303,6 +3317,22 @@ function ErrandVillagers({
             pose={poses.current[i]}
             limbs={limbs.current[i]}
             squat={(squats.current[i] ??= { current: 1 })}
+            headSteady={VILLAGER_MOTION.headLoad.jar.steady ? { radius: JAR_RIM_R, height: JAR_HEIGHT } : null}
+            headProp={
+              <group
+                ref={(el) => {
+                  headJars.current[i] = el
+                }}
+                visible={false}
+                position={[0, JAR_HEIGHT / 2, 0]}
+                // A carried jar is not a plumb cylinder: a small lean turns the
+                // mouth off the vertical, which is what lets any of the water in it
+                // be seen from a standing eye rather than only its rim edge-on.
+                rotation={[0.16, 0, 0.1]}
+              >
+                <Jar full />
+              </group>
+            }
             handProp={
               <>
                 <group
@@ -3342,19 +3372,6 @@ function ErrandVillagers({
               </>
             }
           />
-          <group
-            ref={(el) => {
-              headJars.current[i] = el
-            }}
-            visible={false}
-            position={[0, 1.5, 0]}
-            // A carried jar is not a plumb cylinder: a small lean turns the
-            // mouth off the vertical, which is what lets any of the water in it
-            // be seen from a standing eye rather than only its rim edge-on.
-            rotation={[0.16, 0, 0.1]}
-          >
-            <Jar full />
-          </group>
         </group>
       ))}
       {geography.waterStand && (

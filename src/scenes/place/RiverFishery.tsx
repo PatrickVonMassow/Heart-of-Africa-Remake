@@ -35,7 +35,7 @@ import { playSpeech } from '../../systems/ambience'
 import { markActor } from '../actorLabelSource'
 import { usePlaceGround } from './PlaceGroundContext'
 import { Figure } from './placeFigure'
-import { HEAD_CARRY_POSE, SpeechFloorContext, useInhabitantBodies, useStandingBody } from './placeFigureContext'
+import { crownIn, HEAD_CARRY_POSE, SpeechFloorContext, useInhabitantBodies, useStandingBody } from './placeFigureContext'
 import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryMovers } from './fisheryColliders'
 import { CookShelter } from './CookShelter'
 import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
@@ -558,6 +558,11 @@ export function RiverFishery({ bank, cloth, seed, fireEnv }: { bank: PlaceRiverB
       carrierWalk.current.visible = !kneeling
       carrierWalk.current.position.set(c.x, groundHeight(c.x, c.z), c.z)
       carrierWalk.current.rotation.y = c.yaw
+      // A basket on his head rests on his crown and rides its bob.
+      for (const b of ring.baskets) {
+        const g = b.at === 'carrier' ? basketGroups.current[b.id] : null
+        if (g && !kneeling && crownIn(carrierWalk.current, g.parent, g.position)) g.rotation.set(0, c.yaw, 0)
+      }
     }
     const cw = carrierWalkPoseRef.current
     if (cw) {

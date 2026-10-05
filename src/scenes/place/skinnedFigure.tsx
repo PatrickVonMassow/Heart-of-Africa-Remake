@@ -44,6 +44,7 @@ import { VILLAGER_MOTION } from '../../config/balance'
 import { appearanceFor, skinTone, type AgeGroup, type DressLayer, type Sex } from '../../systems/appearance'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
+import { isLifeFrozen } from './lifeFreeze'
 import { REST_POSE_ARMS, type FigureLook } from './placeFigureContext'
 import { figureIdentity, type FigureIdentity } from './figureIdentity'
 
@@ -379,7 +380,8 @@ export function SkinnedFigure({
       b.hips.updateWorldMatrix(false, true)
       if (contact) leanIn()
       // THE STEADYING HAND on a head load: the free arm on the load's side.
-      const steadyArm = headSteady && m.kneel < 0.5 ? (!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1) : -1
+      const loadShown = rig.crown.children.some((c) => c.visible)
+      const steadyArm = headSteady && loadShown && m.kneel < 0.5 ? (!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1) : -1
       ;(['L', 'R'] as const).forEach((s, i) => {
         const up = b[`upperArm.${s}`]
         const fore = b[`forearm.${s}`]
@@ -460,7 +462,8 @@ export function SkinnedFigure({
     // THE FIGURE'S OWN GROUND SPEED, measured where it is drawn: every walker
     // gets its stride from how fast it really goes, whoever moves it.
     const g = outer.current
-    if (g && dt > 0) {
+    // The dev life freeze holds a stride where it is, for the camera.
+    if (g && dt > 0 && !isLifeFrozen()) {
       g.updateWorldMatrix(true, false)
       g.getWorldPosition(_here)
       const unit = g.getWorldScale(_scale).x || 1
