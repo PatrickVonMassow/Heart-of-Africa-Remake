@@ -2454,3 +2454,57 @@ export const VILLAGER_DRESS = {
    *  record gives no population-wide date (Astra B44), so it is rank-gated. */
   bagandaCottonFrom: 1894,
 } as const
+
+/**
+ * How a villager walks, kneels and carries on the head (work-order "walking
+ * villagers"). Units are the figure's own (an adult man is FIGURE_STATURE
+ * tall), seconds and radians. Every value is a CALIBRATABLE educated guess,
+ * read off the pictures, not a measured gait.
+ */
+export const VILLAGER_MOTION = {
+  /** How far the lowest foot point may sit off the ground under it. */
+  footGroundTolerance: 0.02,
+  /** How far a planted foot may drift along the ground during one stance. */
+  stanceSlipTolerance: 0.03,
+  /** Hip swing (rad) at the reference pace; the stride scales from it. */
+  swingAmp: 0.34,
+  /** Pace (figure units per second) the swing amplitude is stated for. */
+  referenceSpeed: 1.2,
+  /** The stride's span of the amplitude, as factors over `swingAmp`, from a
+   *  shuffle to a hurry. */
+  ampMin: 0.45,
+  ampMax: 1.25,
+  /** Below this ground speed a figure is standing, not walking. */
+  moveSpeed: 0.08,
+  /** Time constant (s) of the measured ground speed's smoothing. */
+  speedSmoothing: 0.12,
+  /** A ground speed above this is a placement, not a walk (no stride). */
+  teleportSpeed: 6,
+  /** How fast the walk fades in and out (weight per second, 0 ↔ 1). */
+  walkFadeRate: 5,
+  /** Swing foot's lift at mid-swing, as a fraction of the leg length. */
+  clearance: 0.07,
+  /** Arm counter-swing (rad) at a full stride. */
+  armSwing: 0.3,
+  /** Pelvis and shoulder counter-rotation about the vertical (rad). */
+  hipYaw: 0.07,
+  shoulderYaw: 0.09,
+  /** The elder's walk: shorter stride and smaller swing, as a factor. */
+  elderFactor: 0.65,
+  /** How fast a work crouch is released and resumed (rad of knee flex / s). */
+  crouchRate: 4.5,
+  /** Going down to kneel and getting up again (s). */
+  kneelSeconds: 0.6,
+  /** Head loads: which carrier steadies the load with a hand on its rim, and
+   *  which balances it hands-free. docs/peoples-1890.md names no variant, so
+   *  this is the guess: a brimming water jar is steadied, a dry basket or
+   *  bundle balanced. */
+  headLoad: {
+    jar: { steady: true },
+    basket: { steady: false },
+    bundle: { steady: false },
+  },
+  /** How far up a steadied load the hand grips, as a fraction of its height
+   *  (lowered further where the arm cannot reach — never a straight arm). */
+  gripFraction: 0.8,
+} as const
