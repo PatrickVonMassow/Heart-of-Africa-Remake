@@ -50,7 +50,10 @@ describe('proportions by sex and age', () => {
     expect(ratio(bodyProportions('male', 'child'))).toBeGreaterThan(1 / 6)
     expect(ratio(bodyProportions('male', 'adult'))).toBeLessThan(1 / 7)
     // Shorter legs too: the child's hip sits lower in its stature.
-    expect(bodyProportions('female', 'child').hipY / FIGURE_STATURE).toBeLessThan(bodyProportions('female', 'adult').hipY / bodyProportions('female', 'adult').stature)
+    const child = bodyProportions('female', 'child')
+    const adult = bodyProportions('female', 'adult')
+    // each against its OWN stature: the child's legs are the shorter share
+    expect(child.hipY / child.stature).toBeLessThan(adult.hipY / adult.stature)
   })
 
   it('men are broader at the shoulder, women at the pelvis', () => {
