@@ -7,7 +7,6 @@ import {
   boneIndex,
   buildBodyGeometry,
   createSkeleton,
-  FIGURE_STATURE,
   jointPositions,
 } from './figureBody'
 
