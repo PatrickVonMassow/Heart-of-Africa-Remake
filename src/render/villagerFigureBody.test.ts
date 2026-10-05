@@ -14,7 +14,7 @@ import { BONE_NAMES, bodyProportions } from './figureBody'
 import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { buildLayerGeometry } from './figureDress'
-import { codeBoneMap, createGltfSkeleton, dominantBones, gltfFigureGeometry, gltfPerson, remapSkin } from './villagerFigureBody'
+import { codeBoneMap, createGltfSkeleton, dominantBones, gltfFigureGeometry, gltfPerson, remapSkin, transferTrunkWeights } from './villagerFigureBody'
 
 let asset: VillagerAsset
 
@@ -134,6 +134,31 @@ describe('the skeleton the figure binds', () => {
   })
 })
 
+/** A skinned geometry's positions under the skeleton's current pose (CPU). */
+function skinned(g: THREE.BufferGeometry, sk: THREE.Skeleton): Float32Array {
+  const pos = g.getAttribute('position')
+  const si = g.getAttribute('skinIndex')
+  const sw = g.getAttribute('skinWeight')
+  const out = new Float32Array(pos.count * 3)
+  const v = new THREE.Vector3()
+  const acc = new THREE.Vector3()
+  const t = new THREE.Vector3()
+  const m = new THREE.Matrix4()
+  for (let k = 0; k < pos.count; k++) {
+    v.fromBufferAttribute(pos, k)
+    acc.set(0, 0, 0)
+    for (let j = 0; j < 4; j++) {
+      const w = sw.getComponent(k, j)
+      if (!w) continue
+      const b = si.getComponent(k, j)
+      m.multiplyMatrices(sk.bones[b].matrixWorld, sk.boneInverses[b])
+      acc.addScaledVector(t.copy(v).applyMatrix4(m), w)
+    }
+    acc.toArray(out, k * 3)
+  }
+  return out
+}
+
 describe('the dressed figure', () => {
   it('every people’s dress of every sex and age merges with the glTF body into one geometry', () => {
     for (const { sex, age } of people()) {
@@ -151,13 +176,16 @@ describe('the dressed figure', () => {
     }
   })
 
-  it('every people’s dress clears the glTF body’s trunk for every sex, age and build: no skin through the cloth', () => {
+  it('every people’s dress clears the glTF body’s trunk for every sex, age and build, at rest and stooped: no skin through the cloth', () => {
     // A ray from the trunk's axis out through each trunk vertex: where it meets
     // a layer's cloth, the outermost cloth lies beyond the skin (a sleeve's
-    // inner wall may cross the trunk; its outer wall does not).
+    // inner wall may cross the trunk; its outer wall does not). Checked in the
+    // hanging rest and with the chest bent by the elder's stoop (the pose the
+    // settlement gives every elder), body and cloth skinned alike.
     const ray = new THREE.Ray()
     const hit = new THREE.Vector3()
     const [a, b, c] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+    const map = codeBoneMap(asset)
     const fails: string[] = []
     for (const { sex, age } of people()) {
       for (const build of [-1, 0, 1]) {
@@ -166,40 +194,48 @@ describe('the dressed figure', () => {
         const H = p.stature
         const dom = dominantBones(person.geometry)
         const trunkBones = new Set(['hips', 'spine', 'chest'].map((n) => asset.bones.indexOf(n)))
-        const pos = person.geometry.getAttribute('position')
-        const skin: THREE.Vector3[] = []
-        for (let k = 0; k < pos.count; k++) {
-          const y = pos.getY(k)
-          if (trunkBones.has(dom[k]) && y > p.hipY && y < p.shoulderY - 0.03 * H) skin.push(new THREE.Vector3().fromBufferAttribute(pos, k))
-        }
-        for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
-          for (const l of table[sex][age]) {
-            const g = buildLayerGeometry(l, p, 32)
-            if (!g) continue
-            const gp = g.getAttribute('position')
-            const idx = g.getIndex()!
-            let worst = 0
-            for (const v of skin) {
-              const r = Math.hypot(v.x, v.z)
-              ray.origin.set(0, v.y, 0)
-              ray.direction.set(v.x, 0, v.z).normalize()
-              let far = -Infinity
-              for (let t = 0; t < idx.count; t += 3) {
-                a.fromBufferAttribute(gp, idx.getX(t))
-                b.fromBufferAttribute(gp, idx.getX(t + 1))
-                c.fromBufferAttribute(gp, idx.getX(t + 2))
-                if (Math.min(a.y, b.y, c.y) > v.y || Math.max(a.y, b.y, c.y) < v.y) continue
-                if (ray.intersectTriangle(a, b, c, false, hit)) far = Math.max(far, hit.distanceTo(ray.origin))
+        const { skeleton, bones } = createGltfSkeleton(asset, person.rest)
+        for (const stoop of p.stoop > 0 ? [0, p.stoop] : [0]) {
+          bones.chest.rotation.set(stoop, 0, 0)
+          bones.neck.rotation.set(-stoop * 0.45, 0, 0)
+          let root: THREE.Object3D = bones.hips
+          while (root.parent) root = root.parent
+          root.updateMatrixWorld(true)
+          const body = skinned(person.geometry, skeleton)
+          const skin: THREE.Vector3[] = []
+          for (let k = 0; k < dom.length; k++) {
+            const y = body[k * 3 + 1]
+            if (trunkBones.has(dom[k]) && y > p.hipY && y < p.shoulderY - 0.03 * H) skin.push(new THREE.Vector3().fromArray(body, k * 3))
+          }
+          for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
+            for (const l of table[sex][age]) {
+              const g = buildLayerGeometry(l, p, 32)
+              if (!g) continue
+              const gp = skinned(transferTrunkWeights(asset, person, remapSkin(g, map)), skeleton)
+              const idx = g.getIndex()!
+              let worst = 0
+              for (const v of skin) {
+                const r = Math.hypot(v.x, v.z)
+                ray.origin.set(0, v.y, 0)
+                ray.direction.set(v.x, 0, v.z).normalize()
+                let far = -Infinity
+                for (let t = 0; t < idx.count; t += 3) {
+                  a.fromArray(gp, idx.getX(t) * 3)
+                  b.fromArray(gp, idx.getX(t + 1) * 3)
+                  c.fromArray(gp, idx.getX(t + 2) * 3)
+                  if (Math.min(a.y, b.y, c.y) > v.y || Math.max(a.y, b.y, c.y) < v.y) continue
+                  if (ray.intersectTriangle(a, b, c, false, hit)) far = Math.max(far, hit.distanceTo(ray.origin))
+                }
+                if (far > -Infinity) worst = Math.max(worst, r - far)
               }
-              if (far > -Infinity) worst = Math.max(worst, r - far)
+              if (worst > 0) fails.push(`${id} ${sex} ${age} build ${build} stoop ${stoop.toFixed(2)} ${l.form}: skin ${(worst / H).toFixed(4)} H through`)
             }
-            if (worst > 0) fails.push(`${id} ${sex} ${age} build ${build} ${l.form}: skin ${(worst / H).toFixed(4)} H through`)
           }
         }
       }
     }
     expect(fails).toEqual([])
-  })
+  }, 120_000)
 
   it('paints the scalp in the hair colour and the rest in the skin', () => {
     const person = gltfPerson(asset, 'male', 'elder')

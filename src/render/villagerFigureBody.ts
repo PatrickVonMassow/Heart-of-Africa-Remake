@@ -384,6 +384,81 @@ function hairMask(asset: VillagerAsset, g: THREE.BufferGeometry, dom: Uint16Arra
   return out
 }
 
+/**
+ * The trunk's cloth takes its skin weights from the body beneath it (the
+ * nearest trunk vertex's), so a bent trunk — the elder's stoop — carries skin
+ * and cloth alike; the code-built weights, measured to the code-built bones,
+ * moved the cloth at the belly otherwise than the skin under it and the skin
+ * came through. Only the band from the hips to below the shoulders is
+ * transferred, faded in and out over its edges, and without the arm bones
+ * (a raised arm must not drag the cloth's waist up); the hem and the
+ * shoulders keep the weights that fold a robe with the legs and the arms.
+ * In place on a layer already re-indexed onto the asset's bones.
+ */
+export function transferTrunkWeights(asset: VillagerAsset, person: GltfPerson, g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const { p, geometry: body } = person
+  const H = p.stature
+  const lo = p.hipY + 0.02 * H
+  const hi = p.shoulderY - 0.06 * H
+  const fade = 0.03 * H
+  const bp = body.getAttribute('position') as THREE.BufferAttribute
+  const bi = body.getAttribute('skinIndex') as THREE.BufferAttribute
+  const bw = body.getAttribute('skinWeight') as THREE.BufferAttribute
+  const dom = dominantBones(body)
+  const trunk = new Set(['hips', 'spine', 'chest'].map((n) => asset.bones.indexOf(n)))
+  const arms = new Set(['L', 'R'].flatMap((s) => [`upperArm.${s}`, `forearm.${s}`, `hand.${s}`].map((n) => asset.bones.indexOf(n))))
+  const near: number[] = []
+  for (let k = 0; k < bp.count; k++) {
+    const y = bp.getY(k)
+    if (trunk.has(dom[k]) && y > lo - fade && y < hi + fade) near.push(k)
+  }
+  const pos = g.getAttribute('position') as THREE.BufferAttribute
+  const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
+  const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute
+  if (!near.length || !si || !sw) return g
+  for (let k = 0; k < pos.count; k++) {
+    const x = pos.getX(k)
+    const y = pos.getY(k)
+    const z = pos.getZ(k)
+    const s = Math.min(1, (y - lo + fade) / fade, (hi + fade - y) / fade)
+    if (s <= 0) continue
+    let best = -1
+    let d = Infinity
+    for (const n of near) {
+      const e = (bp.getX(n) - x) ** 2 + (bp.getY(n) - y) ** 2 + (bp.getZ(n) - z) ** 2
+      if (e < d) {
+        d = e
+        best = n
+      }
+    }
+    const w = new Map<number, number>()
+    let own = 0
+    for (let j = 0; j < 4; j++) {
+      const b = bi.getComponent(best, j)
+      const v = bw.getComponent(best, j)
+      if (v > 0 && !arms.has(b)) {
+        w.set(b, (w.get(b) ?? 0) + v)
+        own += v
+      }
+    }
+    if (own <= 0) continue
+    for (const [b, v] of w) w.set(b, (v / own) * s)
+    for (let j = 0; j < 4; j++) {
+      const v = sw.getComponent(k, j)
+      if (v > 0) w.set(si.getComponent(k, j), (w.get(si.getComponent(k, j)) ?? 0) + v * (1 - s))
+    }
+    const top = [...w].sort((a, b) => b[1] - a[1]).slice(0, 4)
+    const sum = top.reduce((t, [, v]) => t + v, 0)
+    for (let j = 0; j < 4; j++) {
+      si.setComponent(k, j, top[j]?.[0] ?? 0)
+      sw.setComponent(k, j, top[j] ? top[j][1] / sum : 0)
+    }
+  }
+  si.needsUpdate = true
+  sw.needsUpdate = true
+  return g
+}
+
 /** The 17 code-built bone names onto the asset's bone indices (the dress
  *  layers are skinned by BONE_NAMES order). */
 export function codeBoneMap(asset: VillagerAsset): Uint16Array {
@@ -456,7 +531,7 @@ export function gltfFigureGeometry(
   const map = codeBoneMap(asset)
   for (const l of layers) {
     const lg = layerOf(l)
-    if (lg) parts.push(remapSkin(lg.clone(), map))
+    if (lg) parts.push(transferTrunkWeights(asset, person, remapSkin(lg.clone(), map)))
   }
   const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
   if (!g) throw new Error('glTF villager: body and dress layers do not merge')
