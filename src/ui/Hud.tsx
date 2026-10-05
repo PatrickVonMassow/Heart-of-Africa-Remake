@@ -10,6 +10,7 @@ import type { FindId } from '../world/finds'
 import { placeById, worldToLatLon } from '../world/geo'
 import { sampleTerrain } from '../world/terrain'
 import { START_YEAR } from '../config/balance'
+import { enterHintTopFraction } from './enterHintPlacement'
 import { MONTH_KEYS } from '../systems/season'
 
 import { useUi } from '../state/ui'
@@ -391,18 +392,19 @@ function Prompt() {
   const enterHint = useUi((s) => s.enterPlaceId !== null)
   if (!prompt || dialog) return null
   const cls = enterHint ? 'prompt prompt-enter' : 'prompt'
+  const style = enterHint ? { top: `${(enterHintTopFraction() * 100).toFixed(2)}%` } : undefined
   // On touch the prompt is the only interaction affordance, so it becomes
   // tappable: a tap dispatches the same synthetic Space keydown the use key
   // would (design.md §17.5, point 84) — one input path. On desktop it stays a
   // plain, non-interactive label (PC play unchanged).
   if (touchActive) {
     return (
-      <button className={`${cls} prompt-tappable`} onClick={() => dispatchSyntheticKey('Space')}>
+      <button className={`${cls} prompt-tappable`} style={style} onClick={() => dispatchSyntheticKey('Space')}>
         {prompt}
       </button>
     )
   }
-  return <div className={cls}>{prompt}</div>
+  return <div className={cls} style={style}>{prompt}</div>
 }
 
 

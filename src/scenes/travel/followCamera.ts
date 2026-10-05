@@ -14,6 +14,8 @@
 
 /** Camera offset from its aim point at zoom 1: height and distance south (+z). */
 export const CAMERA_OFFSET = { y: 42, z: 24 } as const
+/** Vertical field of view of the shared scene camera (App.tsx). */
+export const TRAVEL_CAMERA_FOV_DEG = 50
 
 export interface FollowState {
   x: number
@@ -85,4 +87,17 @@ export function followPose(s: FollowState, offset: { y: number; z: number }, sou
     position: [s.x, offset.y * s.zoom, aimZ + offset.z * s.zoom],
     target: [s.x, 0, aimZ],
   }
+}
+
+/**
+ * Where the follow point sits in the picture, as a fraction of the frame
+ * height from the top (0.5 = centre), for an aim `southShift` (zoom-1 units)
+ * south of it. Independent of the zoom and the aspect, since pose and shift
+ * scale together. PURE.
+ */
+export function followPointFromTop(offset: { y: number; z: number }, fovDeg: number, southShift: number): number {
+  const pitch = Math.atan2(offset.y, offset.z)
+  const rise = pitch - Math.atan2(offset.y, offset.z + southShift) // above the optical axis
+  const ndcY = Math.tan(rise) / Math.tan((fovDeg * Math.PI) / 360)
+  return (1 - ndcY) / 2
 }

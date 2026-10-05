@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import * as THREE from 'three'
-import { CAMERA_OFFSET, followAt, followPose, groundReach, southReachShift, stepFollow, type FollowState } from './followCamera'
+import {
+  CAMERA_OFFSET,
+  followAt,
+  followPointFromTop,
+  followPose,
+  groundReach,
+  southReachShift,
+  stepFollow,
+  type FollowState,
+} from './followCamera'
 
 const OFFSET = { y: 42, z: 24 }
 const CFG = balance.travelCameraFollow
@@ -158,6 +167,15 @@ describe('bird\'s-eye south reach (design.md §2.1)', () => {
       const ref = new THREE.Vector3(0, 0, 0).project(poseCamera(followAt(0, 0, 1), full))
       expect(p.y).toBeCloseTo(ref.y, 6)
     }
+  })
+
+  it('predicts the traveller\'s picture row in closed form (the enter hint anchors on it)', () => {
+    for (const c of [0, 0.5, 1]) {
+      const shift = southReachShift(CAMERA_OFFSET, 50, c)
+      const p = new THREE.Vector3(0, 0, 0).project(poseCamera(followAt(0, 0, 1), shift))
+      expect(followPointFromTop(CAMERA_OFFSET, 50, shift)).toBeCloseTo((1 - p.y) / 2, 9)
+    }
+    expect(followPointFromTop(CAMERA_OFFSET, 50, 0)).toBeCloseTo(0.5, 12)
   })
 
   it('leaves the pose centred without a shift', () => {

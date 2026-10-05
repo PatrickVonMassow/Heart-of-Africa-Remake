@@ -65,7 +65,7 @@ import { RiversAndLakes } from './Rivers'
 import { NILE_FLOOD, waterSurfaceY } from './waterSurface'
 import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
-import { CAMERA_OFFSET, followAt, followPose, southReachShift, stepFollow, type FollowState } from './followCamera'
+import { CAMERA_OFFSET, TRAVEL_CAMERA_FOV_DEG, followAt, followPose, southReachShift, stepFollow, type FollowState } from './followCamera'
 import {
   NATURAL_SITES_GROUP,
   PANORAMA_BAND_BY_KIND,
@@ -190,7 +190,7 @@ const VEGETATION_HIDE_ZOOM = 2.5
  *  (design.md §2.1): the view reaches about as far south as north. Read per
  *  frame so a calibration change through window.__balance shows at once. */
 function travelSouthShift(cam: THREE.Camera): number {
-  const fov = cam instanceof THREE.PerspectiveCamera ? cam.fov : 50
+  const fov = cam instanceof THREE.PerspectiveCamera ? cam.fov : TRAVEL_CAMERA_FOV_DEG
   return southReachShift(CAMERA_OFFSET, fov, balance.travelCameraFollow.southReachCompensation)
 }
 const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels

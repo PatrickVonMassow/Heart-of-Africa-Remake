@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, fireEvent, act } from '@testing-library/react'
 import { Hud, LoadMenu } from './Hud'
+import { ENTER_HINT_BELOW_TRAVELLER, enterHintTopFraction } from './enterHintPlacement'
 import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
@@ -299,6 +300,24 @@ describe('interaction prompt (design.md §17)', () => {
     expect(el.tagName).toBe('BUTTON')
     expect(el.className).toContain('prompt-enter')
     expect(el.className).toContain('prompt-tappable')
+  })
+
+  // design.md §2.1 south reach: the traveller sits above the picture centre, so
+  // the hint keeps point 317's place relative to HIM, not to the centre.
+  it('anchors the enter hint just below the traveller, wherever the camera puts him', () => {
+    expect(enterHintTopFraction(0)).toBeCloseTo(0.5 + ENTER_HINT_BELOW_TRAVELLER, 9) // centred traveller: the old 60 %
+    expect(enterHintTopFraction(1)).toBeGreaterThan(0.35 + ENTER_HINT_BELOW_TRAVELLER)
+    expect(enterHintTopFraction(1)).toBeLessThan(0.39 + ENTER_HINT_BELOW_TRAVELLER)
+    expect(enterHintTopFraction(0.5)).toBeGreaterThan(enterHintTopFraction(1))
+    expect(enterHintTopFraction(0.5)).toBeLessThan(enterHintTopFraction(0))
+    useUi.setState({ prompt: en.prompts.enterPlace('Cairo'), enterPlaceId: 'cairo' })
+    const { unmount } = render(<Hud />)
+    const top = (document.querySelector('.prompt') as HTMLElement).style.top
+    expect(parseFloat(top) / 100).toBeCloseTo(enterHintTopFraction(balance.travelCameraFollow.southReachCompensation), 3)
+    unmount()
+    useUi.setState({ prompt: en.prompts.openCamp, enterPlaceId: null })
+    render(<Hud />)
+    expect((document.querySelector('.prompt') as HTMLElement).style.top).toBe('')
   })
 })
 
