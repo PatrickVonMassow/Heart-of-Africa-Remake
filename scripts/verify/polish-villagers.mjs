@@ -3920,6 +3920,19 @@ if (section('villager-dress')) {
   const awaitRowClear = async () => {
     for (let i = 0; i < 120 && (await rowHidden()); i++) await nextFrames(5)
   }
+  // Stage, draw, wait for passers-by; a row still hidden is stood on a fresh
+  // bearing (up to three times) — the gate after it stays strict.
+  const stageClear = async (label, d, only, exact = false) => {
+    let at = null
+    for (let attempt = 0; attempt < 4; attempt++) {
+      at = await stageRow(d, only, exact)
+      await nextFrames(4)
+      await awaitPlaceDrawn(attempt ? `${label}, re-staged` : label)
+      await awaitRowClear()
+      if (!(await rowHidden())) break
+    }
+    return at
+  }
   // What the row is drawn with: skinned meshes on medium/high, none on low.
   const rowBodies = () =>
     page.evaluate(() => {
@@ -3941,19 +3954,9 @@ if (section('villager-dress')) {
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   for (const people of PEOPLES) {
     await goToPlace(villageOf(people))
-    let at = await stageRow(5.6)
-    await nextFrames(4)
     // drawn first (the pipeline wait steps frames, and walkers walk on), then
     // clear, so the shutter below opens a few frames after the clear reading
-    await awaitPlaceDrawn(`${people} row`)
-    await awaitRowClear()
-    for (let again = 0; again < 3 && (await rowHidden()); again++) {
-      // someone settled in a sight line: stand the row on a fresh bearing
-      at = await stageRow(5.6)
-      await nextFrames(4)
-      await awaitPlaceDrawn(`${people} row, re-staged`)
-      await awaitRowClear()
-    }
+    const at = await stageClear(`${people} row`, 5.6)
     const hidden = await rowHidden()
     record('row-hidden', { people, ...(await page.evaluate(() => window.__rowHiddenDebug)) })
     const got = await rowBodies()
@@ -3972,10 +3975,7 @@ if (section('villager-dress')) {
   // THE AGE-READABILITY DISTANCE: the young man and the elder side by side.
   await goToPlace('zulu-village')
   for (const d of [4, 8, 14, 22, 32]) {
-    const at = await stageRow(d, ['male-youth', 'male-elder'], true)
-    await nextFrames(4)
-    await awaitPlaceDrawn(`elder/young man ${d} m`)
-    await awaitRowClear()
+    const at = await stageClear(`elder/young man ${d} m`, d, ['male-youth', 'male-elder'], true)
     const hidden = await rowHidden()
     // An occluded pair would read as a lost age cue: the shot must be clear.
     check(
@@ -4021,10 +4021,7 @@ if (section('villager-dress')) {
   // THE LOW PRESET keeps the primitive figure (user decision 04.10.2026).
   await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
   await nextFrames(6)
-  const lowAt = await stageRow(5.6)
-  await nextFrames(4)
-  await awaitPlaceDrawn('low row')
-  await awaitRowClear()
+  const lowAt = await stageClear('low row', 5.6)
   const lowHidden = await rowHidden()
   const low = await rowBodies()
   check(
