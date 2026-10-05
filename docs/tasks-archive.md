@@ -33570,3 +33570,14 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   rendered height by more than the transition's per-frame step — the pop is what the
   check is for.
   Closed 05.10.2026 without its own landing: absorbed into point 1295 by user order ("Der Task 350 sollte dann in diesen zusammengeführt und der alte 350er gelöscht werden"); its kneeling requirement is item 5 there.
+
+- [x] 1298. Board now-card stub keeps the point's name
+  Queue position: directly after point 1295 (user order 05.10.2026).
+  Source: user 05.10.2026: "Warum gibt es immer wieder Karten, die seit Stunden in Arbeit sind mit Titel "chText für diesen Punkt fehlt noch"? So sehe ich nicht, woran gearbeitet wird." / "Setze deinen Vorschlag um, als neuen Punkt in der Warteschlange, direkt nach 1295." Measured 05.10.2026 11:47: point 1295 stood as such a stub since 10:57 although its queue text existed in .claude/board-queue.json. Cause: renderNowStub (scripts/board-core.mjs ~850) writes a fixed placeholder title, stripProjectedQueueCards removes the queue card that carried the title/prose; `board.mjs status` updates only the body.
+  Final state:
+  1. When reconcileNowProjection inserts a now-card for a derived active point, the card's title is taken, in this order, from: the point's queue card being removed (its title and body text), the entry in .claude/board-queue.json (title, else first body line), the work-order headline. The placeholder "Text für diesen Punkt fehlt noch" is used only when none of these exists.
+  2. Queue prose carried over appears in the card body, as the idle-card carry-over already does; nothing the queue card said is lost by the projection.
+  3. No new guards, audits or state fields (infrastructure freeze 01.09.2026); the change stays inside board-core.mjs's projection and its existing data reads.
+  4. Vitest in scripts/board-core.test.mjs: a derived active point with a queue card gets that card's title and text; one with only a board-queue.json entry gets that; one with neither keeps the placeholder. Existing stub-count tests adjusted where they rely on the placeholder.
+  Files: scripts/board-core.mjs renderNowStub ~850, stripProjectedQueueCards ~864, reconcileNowProjection ~886; scripts/board.mjs now/title/status; .claude/board-queue.json
+  Bundle: Session- & Repo-Hygiene.
