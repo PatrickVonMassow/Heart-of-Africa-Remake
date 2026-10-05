@@ -155,29 +155,32 @@ function openFront(geo: THREE.BufferGeometry, cols: number, belowY: number): voi
 /** A tube round the trunk from `top` down to `bottom`, `ease` off the body
  *  and flaring by `flare` (fraction of stature) at the hem. */
 function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number, flare: number, radial: number, rings = 10): THREE.BufferGeometry {
-  const stations: SweepStation[] = []
-  const step = (bottom - top) / (rings - 1)
-  for (let i = 0; i < rings; i++) {
-    const t = i / (rings - 1)
-    const y = top + (bottom - top) * t
-    // Between two stations the cloth runs from one's girth to the other's, so
-    // each station takes the trunk's largest girth as far as its neighbours:
-    // the cloth then falls straight from a bust or a belly instead of cutting
-    // the chord through it.
-    let rx = 0
-    let rz = 0
-    const from = Math.max(bottom, y + step)
-    const to = Math.min(top, y - step)
-    for (let k = 0; k <= 16; k++) {
-      const [x, z] = trunkAt(p, to + ((from - to) * k) / 16)
-      rx = Math.max(rx, x)
-      rz = Math.max(rz, z)
+  const ys = Array.from({ length: rings }, (_, i) => top + ((bottom - top) * i) / (rings - 1))
+  const r = ys.map((y) => trunkAt(p, y))
+  // Between two stations the cloth's girth blends from one to the other
+  // (sweepTube's smoothstep), so a bust or a belly between them would poke
+  // through the chord: both stations rise by the largest shortfall, and the
+  // cloth falls straight from the bulge.
+  for (let i = 0; i < rings - 1; i++) {
+    for (const a of [0, 1]) {
+      let short = 0
+      for (let k = 1; k < 12; k++) {
+        const f = k / 12
+        const e = f * f * (3 - 2 * f)
+        const need = trunkAt(p, ys[i] + (ys[i + 1] - ys[i]) * f)[a]
+        short = Math.max(short, need - (r[i][a] + (r[i + 1][a] - r[i][a]) * e))
+      }
+      r[i][a] += short
+      r[i + 1][a] += short
     }
+  }
+  const stations = ys.map((y, i) => {
+    const t = i / (rings - 1)
     const out = ease + flare * p.stature * t * t
     // The hem flares mostly sideways: a deep front-back flare is what a
     // kneeling figure's shins turn into depth below the ground.
-    stations.push(st(y, rx + out, rz + ease * 0.8 + (out - ease) * 0.3))
-  }
+    return st(y, r[i][0] + out, r[i][1] + ease * 0.8 + (out - ease) * 0.3)
+  })
   return sweepTube(stations, { radial, rings: rings * 2 })
 }
 
