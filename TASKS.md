@@ -78,6 +78,7 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 - [ ] 1294. Villagers on a CC0 glTF base body with morph targets, prepared by a container-managed Blender
+  SPLIT 05.10.2026 (the point's own rule: "If the point does not converge, split along 'body and pipeline' / 'animation, dress and tool'"; the Opus 5.5 author did not converge in one session, report local/1294-author-report.md, branch feat/1294-gltf-villager-body @ bf2f99bd4): 1294 now owns items 1-5 and 7 (body and pipeline); items 6 and 8-13 (animation, dress and tool) move to point 1311 directly after it. Work already on the branch for 1311's items (retargeted Quaternius clips, garment build, penetration report) may land with 1294 as groundwork, provided every gate stays green; 1311 finishes and judges it. 1294 is done when items 1-5 and 7 hold, the game-side loader figure is wired for medium/high, and the low preset keeps the primitive figure.
   Queue position: at the very top of the open work order (user order 05.10.2026: "point 1294, extended by this text, moves to the very top of the open work order"); previously directly after point 1288 (user order 04.10.2026).
   Source: user decision 04.10.2026 on the figure-rendering proposal, variant 2b. Sketch: https://claude.ai/artifact/XcFmBv6Qz7SFTFKsiEeeez. Builds on point 1293 (queued after 1279): its appearance table, skeleton-bound dress, research results and low-preset rule are reused, not rebuilt.
   Final state:
@@ -99,6 +100,15 @@ put it is the mistake this line exists to stop.
   Verifiable (in addition to 1294's): the per-frame penetration report from Blender (zero beyond tolerance); a rendered Blender frame sheet of walk, sprint, dig and shovel-carry in side view; Vitest for speed→clip/rate mapping, walk/sprint threshold, heel-first contact in walk and no heel contact in sprint, tool attachment to the hand bone; Playwright on both backends: walking and sprinting side view, digging close-up across several frames (no flicker), a figure carrying a shovel (blade above ground), all picture-checked; the cross-vendor review record with its fixes.
   Low preset keeps the primitive figure (point 1301 covers it); items 6-11 apply to the medium/high skinned body.
   Criticality: high — new asset pipeline, load budget, every villager, both backends. If the point does not converge, split along "body and pipeline" / "animation, dress and tool".
+  Bundle: Dorfleben.
+
+- [ ] 1311. Villager glTF body: animation, dress and tool (split from 1294)
+  Queue position: directly after point 1294 (split 05.10.2026 under 1294's own rule; nothing goes ahead of 1294).
+  Source: point 1294, items 6 and 8-13, verbatim there; this point owns them from the split on. Author report: local/1294-author-report.md (open: garment penetration over tolerance, robe at kneel ~0.21 deep — rewrite the lost skirt-bone edit, exclude forearm/hand from the weight transfer; no-slide functions not wired; dig flicker not investigated; dig hook in PlaceLife.tsx; in-game tool is a hoe, make it a shovel; drop unused Quaternius UAL2 sources).
+  Final state: 1294 items 6 (no clothing clipping, per-frame penetration report zero beyond tolerance), 8 (natural gait from retargeted clips, walk/sprint threshold in balance.ts), 9 (1295's achievements stay binding), 10 (tools held in the hand, never below ground), 11 (no flicker, jitter or jumps; blended transitions), 12 (judged by looking) and 13 (cross-vendor second pair of eyes on figures and frame sheets) hold on the body 1294 landed.
+  Deviation to confirm in the work: no reachable CC0 shovel clip was found, so the dig is authored in the pipeline.
+  Verifiable: 1294's "Verifiable (in addition …)" list for these items — penetration report, Blender frame sheet of walk, sprint, dig and shovel-carry, the named Vitest cases, Playwright both backends picture-checked, the cross-vendor review record with its fixes.
+  Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
 
 - [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
