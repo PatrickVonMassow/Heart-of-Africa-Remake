@@ -482,7 +482,10 @@ export const DOC_BUDGETS = [
     // RAISED by the 25 measured words work-order 1280 owes §11.3 (user
     // 03.10.2026): the current's fine grain and flotsam, and its seasonal speed
     // — new decisions; the old bullet named the streaks only.
-    maxWords: 29940,
+    // RAISED by the 29 measured words work-order 1287 owes §2.1 (user
+    // 03.10.2026): the bird's-eye camera hangs further south so the view reaches
+    // as far south as north — a new decision; the old text placed no camera.
+    maxWords: 29969,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

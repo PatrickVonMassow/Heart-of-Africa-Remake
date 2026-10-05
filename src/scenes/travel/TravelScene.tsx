@@ -65,7 +65,7 @@ import { RiversAndLakes } from './Rivers'
 import { NILE_FLOOD, waterSurfaceY } from './waterSurface'
 import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
-import { followAt, followPose, stepFollow, type FollowState } from './followCamera'
+import { CAMERA_OFFSET, TRAVEL_CAMERA_FOV_DEG, followAt, followPose, southReachShift, stepFollow, type FollowState } from './followCamera'
 import {
   NATURAL_SITES_GROUP,
   PANORAMA_BAND_BY_KIND,
@@ -186,7 +186,13 @@ const PLACE_WORLD_POSITIONS = PLACES.map((p) => {
 // what FLORA_RANGE_MAX (floraStreaming.ts) covers so the streaming edge never
 // enters view.
 const VEGETATION_HIDE_ZOOM = 2.5
-const CAMERA_OFFSET = { y: 42, z: 24 }
+/** Zoom-1 southward aim shift for the live fov and balance compensation
+ *  (design.md §2.1): the view reaches about as far south as north. Read per
+ *  frame so a calibration change through window.__balance shows at once. */
+function travelSouthShift(cam: THREE.Camera): number {
+  const fov = cam instanceof THREE.PerspectiveCamera ? cam.fov : TRAVEL_CAMERA_FOV_DEG
+  return southReachShift(CAMERA_OFFSET, fov, balance.travelCameraFollow.southReachCompensation)
+}
 const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
 
 // The LOD segment rules (base resolution per ring plus the near-ring quality
@@ -2806,7 +2812,7 @@ export function TravelScene() {
   useEffect(() => {
     const pos = useGame.getState().pos
     follow.current = followAt(pos.x, pos.z, useUi.getState().travelZoom)
-    const pose = followPose(follow.current, CAMERA_OFFSET)
+    const pose = followPose(follow.current, CAMERA_OFFSET, travelSouthShift(camera))
     camera.position.set(...pose.position)
     camera.lookAt(...pose.target)
     return () => {
@@ -2875,9 +2881,13 @@ export function TravelScene() {
         const d = camera.getWorldDirection(new THREE.Vector3())
         return { x: d.x, y: d.y, z: d.z }
       },
+      // How far south of the traveller the camera aims at the current zoom
+      // (design.md §2.1 south reach): the frame centre is this far south, so
+      // the traveller sits above the picture centre.
+      aimShift: () => travelSouthShift(camera) * useUi.getState().travelZoom,
       // True once the bird's-eye camera has caught up to its lerp target in the
       // ground plane (point 177/165; the height eases on the same follow and is
-      // not checked): the camera eases toward (pos.x, .y*zoom, pos.z + .z*zoom)
+      // not checked): the camera eases toward (pos.x, .y*zoom, pos.z + (.z+shift)*zoom)
       // on a dt-scaled follow (point 1286), a jump snaps. A
       // teleport-then-fixed-sleep verification revealed just-seeded off-screen
       // animals purely by the still-moving camera under load; polling this before
@@ -2887,7 +2897,7 @@ export function TravelScene() {
         const zoom = useUi.getState().travelZoom
         return (
           Math.abs(camera.position.x - p.x) < 0.5 &&
-          Math.abs(camera.position.z - (p.z + CAMERA_OFFSET.z * zoom)) < 0.5
+          Math.abs(camera.position.z - (p.z + (CAMERA_OFFSET.z + travelSouthShift(camera)) * zoom)) < 0.5
         )
       },
     }
@@ -3104,7 +3114,7 @@ export function TravelScene() {
     // stays constant in every direction and on a stop (point 1286).
     // Uncapped frame time: the movement cap would slow the follow below 10 fps.
     follow.current = stepFollow(follow.current, pos.x, pos.z, zoom, rawDt, balance.travelCameraFollow)
-    const pose = followPose(follow.current, CAMERA_OFFSET)
+    const pose = followPose(follow.current, CAMERA_OFFSET, travelSouthShift(camera))
     camera.position.set(...pose.position)
     camera.lookAt(...pose.target)
     // In the debug zoom range nothing is closer than the zoomed-out camera

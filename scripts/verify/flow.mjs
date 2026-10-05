@@ -222,10 +222,12 @@ if (section('core-loop')) {
   await page.waitForFunction(() => (window.__ui.getState().prompt ?? '').includes('Kairo'), null, { timeout: 5000 })
   const cairoPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
   check('discovered port enter hint names it (no placeholder)', cairoPrompt.includes('Kairo') && !cairoPrompt.includes('?'))
-  // Point 317: the enter hint sits a little BELOW the screen centre — close to
-  // the action, but clear of the centre so it never covers the traveller — and
-  // still clear of the status bar and the inventory bar. Measured on the RENDERED
-  // boxes, not on the CSS rule.
+  // Point 317: the enter hint sits a little BELOW the traveller — close to the
+  // action, but clear of his figure — and still clear of the status bar and the
+  // inventory bar. The south-reach camera (design.md §2.1) lifts the traveller
+  // above the screen centre, so the band is measured from HIS projected row
+  // (55-65 % of the viewport height when he stood at the centre). Measured on
+  // the RENDERED boxes, not on the CSS rule.
   const hintBox = await page.evaluate(() => {
     const r = (sel) => {
       const el = document.querySelector(sel)
@@ -233,15 +235,18 @@ if (section('core-loop')) {
       const b = el.getBoundingClientRect()
       return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }
     }
-    return { hint: r('.prompt'), bar: r('.status-bar'), inv: r('.inventory-bar'), vh: window.innerHeight }
+    const p = window.__game.getState().pos
+    const n = window.__camera.ndc(p.x, p.z)
+    return { hint: r('.prompt'), bar: r('.status-bar'), inv: r('.inventory-bar'), vh: window.innerHeight, travellerFrac: (1 - n.y) / 2 }
   })
   const overlaps = (a, b) =>
     a !== null && b !== null && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
   const hintFrac = hintBox.hint ? (hintBox.hint.top + hintBox.hint.bottom) / 2 / hintBox.vh : -1
+  const below = hintFrac - hintBox.travellerFrac
   check(
-    'enter hint sits just below the screen centre (55-65 % of the viewport height)',
-    hintFrac >= 0.55 && hintFrac <= 0.65,
-    `${(hintFrac * 100).toFixed(1)} %`,
+    'enter hint sits just below the traveller (5-15 % of the viewport height under his projected row, clear of it)',
+    hintBox.hint !== null && below >= 0.05 && below <= 0.15 && hintBox.hint.top / hintBox.vh > hintBox.travellerFrac,
+    `hint ${(hintFrac * 100).toFixed(1)} %, traveller ${(hintBox.travellerFrac * 100).toFixed(1)} %`,
   )
   check(
     'enter hint clears the status bar and the inventory bar',

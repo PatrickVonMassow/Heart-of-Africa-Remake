@@ -5,7 +5,17 @@
  * smoothing is time-based (exponential in dt), so the lag is the same at any
  * frame rate. A jump farther than `snapDistance` (a teleport, a resumed save)
  * places the camera at once instead of sliding across the map.
+ *
+ * South reach (design.md §2.1): the oblique view reaches farther north than
+ * south of its aim point, so pose AND aim are moved south together by a
+ * zoom-scaled shift — the tilt is unchanged and the traveller sits above the
+ * picture centre, with (at full compensation) equal ground reach both ways.
  */
+
+/** Camera offset from its aim point at zoom 1: height and distance south (+z). */
+export const CAMERA_OFFSET = { y: 42, z: 24 } as const
+/** Vertical field of view of the shared scene camera (App.tsx). */
+export const TRAVEL_CAMERA_FOV_DEG = 50
 
 export interface FollowState {
   x: number
@@ -44,10 +54,50 @@ export function stepFollow(
   return { x: s.x + (x - s.x) * a, z: s.z + (z - s.z) * a, zoom: s.zoom + (zoom - s.zoom) * a }
 }
 
-/** Camera position and aim for a follow state: offset above/south of the point, looking at it. PURE. */
-export function followPose(s: FollowState, offset: { y: number; z: number }): FollowPose {
+/**
+ * Flat-ground reach of the frame's centre column, north and south of the aim
+ * point, for a camera at `offset` (zoom 1) looking at the aim with vertical
+ * field of view `fovDeg`. PURE.
+ */
+export function groundReach(offset: { y: number; z: number }, fovDeg: number): { north: number; south: number } {
+  const pitch = Math.atan2(offset.y, offset.z) // below the horizon
+  const half = (fovDeg * Math.PI) / 360
+  const far = offset.y / Math.tan(pitch - half) // camera → top-edge ground hit
+  const near = offset.y / Math.tan(pitch + half) // camera → bottom-edge ground hit
+  return { north: far - offset.z, south: offset.z - near }
+}
+
+/**
+ * The southward aim shift (world units at zoom 1) that compensates the given
+ * fraction of the north/south reach asymmetry: at 1 the frame reaches as far
+ * south as north of the follow point (≈ 7.5 for offset {42, 24}, fov 50). PURE.
+ */
+export function southReachShift(offset: { y: number; z: number }, fovDeg: number, compensation: number): number {
+  const r = groundReach(offset, fovDeg)
+  return ((r.north - r.south) / 2) * compensation
+}
+
+/**
+ * Camera position and aim for a follow state: offset above/south of the aim,
+ * the aim `southShift` (zoom-scaled) south of the follow point. PURE.
+ */
+export function followPose(s: FollowState, offset: { y: number; z: number }, southShift = 0): FollowPose {
+  const aimZ = s.z + southShift * s.zoom
   return {
-    position: [s.x, offset.y * s.zoom, s.z + offset.z * s.zoom],
-    target: [s.x, 0, s.z],
+    position: [s.x, offset.y * s.zoom, aimZ + offset.z * s.zoom],
+    target: [s.x, 0, aimZ],
   }
+}
+
+/**
+ * Where the follow point sits in the picture, as a fraction of the frame
+ * height from the top (0.5 = centre), for an aim `southShift` (zoom-1 units)
+ * south of it. Independent of the zoom and the aspect, since pose and shift
+ * scale together. PURE.
+ */
+export function followPointFromTop(offset: { y: number; z: number }, fovDeg: number, southShift: number): number {
+  const pitch = Math.atan2(offset.y, offset.z)
+  const rise = pitch - Math.atan2(offset.y, offset.z + southShift) // above the optical axis
+  const ndcY = Math.tan(rise) / Math.tan((fovDeg * Math.PI) / 360)
+  return (1 - ndcY) / 2
 }

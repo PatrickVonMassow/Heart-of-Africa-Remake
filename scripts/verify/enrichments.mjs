@@ -112,6 +112,22 @@ page.on('console', (m) => {
 })
 page.on('pageerror', (e) => errors.push(String(e)))
 
+// A pixel clip placed relative to the traveller's PROJECTED figure, not the
+// screen centre: the south-reach camera (design.md §2.1) lifts him above the
+// centre. (dx, dy) is the clip centre's offset from his picture position — the
+// offsets below keep each crop where it sat around him while he stood at the
+// centre (720, 450) of this 1440x900 page.
+const clipAroundTraveller = async (dx, dy, width, height) => {
+  const t = await page.evaluate(() => {
+    const p = window.__game.getState().pos
+    const n = window.__camera.ndc(p.x, p.z)
+    return { x: (n.x * 0.5 + 0.5) * window.innerWidth, y: (0.5 - n.y * 0.5) * window.innerHeight, w: window.innerWidth, h: window.innerHeight }
+  })
+  const x = Math.round(Math.min(t.w - width, Math.max(0, t.x + dx - width / 2)))
+  const y = Math.round(Math.min(t.h - height, Math.max(0, t.y + dy - height / 2)))
+  return { x, y, width, height }
+}
+
 // Point 249b — WebGPU navigation robustness. The point-249 harness converted
 // many staged-drama checks to POLL-until-state, either as a Node-side loop of
 // repeated `page.evaluate` reads (settleScalar) or as a single long in-page
@@ -489,7 +505,7 @@ if (section('cultural-landmarks')) {
     const deadline = Date.now() + 45000
     let buf
     do {
-      buf = await capturePixels(page, 'landmark chunk streamed in', { clip: { x: 480, y: 300, width: 320, height: 320 } })
+      buf = await capturePixels(page, 'landmark chunk streamed in', { clip: await clipAroundTraveller(-80, 10, 320, 320) })
       if (buf.length > 3000) break
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 250))))
     } while (Date.now() < deadline)
@@ -8751,7 +8767,7 @@ if (section('seasons')) {
     const SNOW_SETTLE_LEAD_SIM = 10
     const SNOW_SETTLE_STEP_SIM = 0.5
     const snowFrac = async () => {
-      const buf = await capturePixels(page, 'Toubkal snow cover fraction', { clip: { x: 400, y: 280, width: 560, height: 320 } })
+      const buf = await capturePixels(page, 'Toubkal snow cover fraction', { clip: await clipAroundTraveller(-40, -10, 560, 320) })
       const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
       return snowFraction(data, info)
     }
@@ -8815,7 +8831,7 @@ if (section('seasons')) {
       if (a !== null && b !== null && Math.abs(b - a) < 0.002) break
     }
     await page.waitForTimeout(400)
-    const buf = await capturePixels(page, 'season vegetation tint', { clip: { x: 300, y: 320, width: 680, height: 340 } })
+    const buf = await capturePixels(page, 'season vegetation tint', { clip: await clipAroundTraveller(-80, 40, 680, 340) })
     const { channels } = await sharp(buf).stats()
     return channels.slice(0, 3).map((c) => c.mean)
   }

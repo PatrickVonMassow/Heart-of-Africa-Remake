@@ -1,0 +1,135 @@
+{
+  "model": "GPT-6 Astra",
+  "entries": [
+    {
+      "id": "B1",
+      "file": "src/scenes/travel/TravelScene.tsx:189",
+      "defect": "The capped excerpt supplies CAMERA_OFFSET but omits camera placement, aiming, clipping and most streaming updates; their centre assumptions cannot be established from the attachment."
+    },
+    {
+      "id": "B2",
+      "file": "src/scenes/travel/wildlifeBehavior.ts:1064",
+      "defect": "Flight spawning starts on a traveller-centred viewR ring; without the optional offscreen predicate this substitutes distance for visibility and cannot account for the translated southern frame edge."
+    },
+    {
+      "id": "B3",
+      "file": "src/scenes/travel/wildlifeBehavior.ts:1068",
+      "defect": "Flight spawning stops its outward search after twelve steps even if still onscreen; the translated frame changes the required escape distance, while the documented fallthrough offers no final visibility guarantee."
+    },
+    {
+      "id": "B4",
+      "file": "src/scenes/travel/wildlifeBehavior.ts:1108",
+      "defect": "Flight despawning without isOffscreen substitutes the traveller-centred viewR plus margin for the frame boundary; the live-predicate branch protects visible birds and should not be classified as the same failure."
+    },
+    {
+      "id": "B5",
+      "file": "src/scenes/travel/wildlifeBehavior.ts:1990",
+      "defect": "Scripted predator placement without offScreen accepts the minR ring as outside the picture; whether its centre is the traveller and whether travel callers omit the predicate are outside the capped material."
+    },
+    {
+      "id": "B6",
+      "file": "src/scenes/travel/floraStreaming.ts:19",
+      "defect": "The streaming-margin and hard-cap comments promise an invisible fogged boundary; if the circle remains traveller-centred, moving the lens south changes fog depth at that boundary, so the existing coverage justification needs rechecking."
+    },
+    {
+      "id": "B7",
+      "file": "src/scenes/travel/TravelScene.tsx:183",
+      "defect": "VEGETATION_HIDE_ZOOM is justified by the bounded dressing area staying outside view; the translated footprint invalidates that unchanged justification unless coverage is checked with the new pose."
+    },
+    {
+      "id": "B8",
+      "file": "src/config/balance.ts:1662",
+      "defect": "driveOffDistance describes a 24-unit chase as “still on screen”; world distance alone cannot ensure this, and a chase ending in the formerly visible northern strip can now leave the picture."
+    },
+    {
+      "id": "B9",
+      "file": "src/scenes/travel/followCamera.ts",
+      "defect": "outside material — Inferred followPose assumption: deriving lookAt or pitch from the traveller after translating the camera would change tilt and re-centre the traveller, defeating the requested fixed-orientation shift."
+    },
+    {
+      "id": "B10",
+      "file": "src/scenes/travel/followCamera.ts",
+      "defect": "outside material — Inferred preceding-follow-point assumption: position and aim derived from different current/lagged follow points can introduce motion-dependent tilt if compensation is applied to only one of them."
+    },
+    {
+      "id": "B11",
+      "file": "src/scenes/travel/TravelScene.tsx",
+      "defect": "outside material — Camera initialization, follow updates and teleport/remount resets may independently reconstruct a traveller-centred pose; an unchanged path would briefly or persistently restore the old framing."
+    },
+    {
+      "id": "B12",
+      "file": "src/scenes/travel/TravelScene.tsx",
+      "defect": "outside material — Near/far-plane or clear-view calculations based on CAMERA_OFFSET’s original distance to the traveller would omit the added camera-to-traveller depth and could clip or fog intended subjects incorrectly."
+    },
+    {
+      "id": "B13",
+      "file": "src/scenes/travel/TravelScene.tsx",
+      "defect": "outside material — Terrain-window, build-priority, movement-prediction and refinement call sites may use the traveller as the visible-region centre; insufficient reserve would expose southern missing/coarse terrain while prioritizing northern terrain no longer shown."
+    },
+    {
+      "id": "B14",
+      "file": "src/scenes/travel/TravelScene.tsx",
+      "defect": "outside material — Flora rebuild origins, nearest-first filling and instance-cap selection may rank around the traveller instead of the translated view; constrained buffers could spend capacity outside the picture and leave visible southern dressing sparse."
+    },
+    {
+      "id": "B15",
+      "file": "src/scenes/travel/Wildlife.tsx",
+      "defect": "outside material — Ordinary wildlife chunk windows and nearest-instance selection may treat the traveller-centred population as the visible population; the translated southern strip could be underpopulated or lose render slots despite being visible."
+    },
+    {
+      "id": "B16",
+      "file": "src/scenes/travel/Wildlife.tsx",
+      "defect": "outside material — Vicinity and dry-shore guarantee seeders may choose/count their guaranteed animals in a traveller-centred region; an offscreen spawn guard protects insertion but does not guarantee that the promised wildlife appears in the new picture."
+    },
+    {
+      "id": "B17",
+      "file": "src/scenes/travel/Wildlife.tsx",
+      "defect": "outside material — Hunt, family-drama and scavenger target eligibility may use traveller distance as a visibility proxy; northern off-frame subjects could consume opportunities while newly visible southern subjects are excluded."
+    },
+    {
+      "id": "B18",
+      "file": "src/scenes/travel/Climate.tsx",
+      "defect": "outside material — Rain and other weather placement is absent from the excerpt; a traveller-centred particle volume sized for the old frame could leave the newly exposed southern area uncovered."
+    },
+    {
+      "id": "B19",
+      "file": "src/scenes/travel/TravelScene.tsx",
+      "defect": "outside material — Map/position queries or debug camera hooks that report the traveller as the screen-centre ground point would return incorrect coordinates after the shift; the traveller’s actual gameplay position remains valid."
+    },
+    {
+      "id": "B20",
+      "file": "src/scenes/travel/TravelScene.tsx",
+      "defect": "outside material — Any centre-ray picking, cursor-steering origin or screen-to-ground shortcut equating frame centre with traveller position would introduce a southward targeting error."
+    },
+    {
+      "id": "B21",
+      "file": "src/scenes/travel/TravelScene.tsx:1893",
+      "defect": "outside material — The enter-hint UI is not supplied; if it places the replacement hint at frame centre because the traveller previously occupied it, hiding the world-projected place label would leave the replacement visually misplaced."
+    },
+    {
+      "id": "B22",
+      "file": "src/scenes/travel/panoramaCapture.ts",
+      "defect": "outside material — Any capture implementation recovering its origin from the travel camera using the old offset would capture displaced scenery; the supplied TravelScene caller explicitly passes settlement coordinates, so that caller itself does not establish this defect."
+    },
+    {
+      "id": "B23",
+      "file": "scripts/verify/frameSubject.mjs",
+      "defect": "outside material — A travel screenshot subject test that substitutes traveller proximity for actual projection would approve subjects outside the translated picture or misjudge their centring; the helper’s implementation is not attached."
+    },
+    {
+      "id": "B24",
+      "file": "scripts/verify/_polish.mjs",
+      "defect": "outside material — Any travel framing helper that centres a requested subject by jumping the traveller onto it would now put that subject above centre; composing a shot requires accounting for the translated optical aim."
+    },
+    {
+      "id": "B25",
+      "file": "scripts/verify/enrichments.mjs:1439",
+      "defect": "The capped stain-verification excerpt omits the candidate-search and projection/clip construction; fixed traveller-centred screenshot coordinates cannot be asserted from it, and the shown “projected clear of the HUD” check indicates an existing projection safeguard."
+    },
+    {
+      "id": "B26",
+      "file": "scripts/verify",
+      "defect": "outside material — Fixed centre crops, centre-pixel probes, screenshot clicks and screenshot baselines intended to locate the traveller would sample the wrong screen position; no such travel-specific implementation is visible in the supplied excerpts."
+    }
+  ]
+}
