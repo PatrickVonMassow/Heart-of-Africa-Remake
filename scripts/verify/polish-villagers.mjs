@@ -4110,6 +4110,12 @@ if (section('villager-dress')) {
 // src/render/figureWalk.test.ts.
 if (section('village-walk')) {
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  // The measured numbers, also into a file when asked (a passing check prints no detail).
+  const { appendFileSync } = await import('node:fs')
+  const report = (line) => {
+    console.log(line)
+    if (process.env.VILLAGE_WALK_REPORT) appendFileSync(process.env.VILLAGE_WALK_REPORT, `${VERIFY_GL ?? 'webgpu'} ${line.trim()}\n`)
+  }
   const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
   // The camera side-on to a walker (index; null: the task walker), about
   // `near` off its flank: the left flank first, then the right, nearer or
@@ -4305,7 +4311,7 @@ if (section('village-walk')) {
     const armVsLeg = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', i)).toFixed(3)) : [0, 0]
     const armVsOther = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', 1 - i)).toFixed(3)) : [0, 0]
     const detail = JSON.stringify({ frames: samples.length, footVerts, worstGround: +worstGround.toFixed(4), worstPlantedSole: +worstPlantedSole.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
-    console.log(`  village-walk ${detail}`)
+    report(`  village-walk ${detail}`)
     check('village walk: measured over at least 30 walking frames', samples.length >= 30, detail)
     check(`village walk: the lowest drawn sole sits on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m, transformed foot geometry)`, samples.length > 0 && footVerts > 0 && worstGround <= FOOT_TOL, detail)
     check(`village walk: a planted foot’s drawn sole is on the ground (≤ ${FOOT_TOL.toFixed(3)} m)`, footVerts > 0 && worstPlantedSole <= FOOT_TOL, detail)
@@ -4405,9 +4411,13 @@ if (section('village-walk')) {
       const out = []
       let stage = 'walk' // walk → down → up → off
       let upAt = null
+      let ticks = 0
+      let shown = 0
       const tick = () => {
+        ticks++
         const g = window.__placeScene.getObjectByName('village-task-walker')
         if (g?.visible) {
+          shown++
           const V = g.position.constructor
           const figs = []
           g.traverse((o) => { if (o.name === 'inhabitant') figs.push(o) })
@@ -4426,6 +4436,26 @@ if (section('village-walk')) {
           }
           const sc = fig.getWorldScale(new V())
           const head = fig.getObjectByName('figure-head')
+          // The primitive's lowest drawn point of its BODY — the cone's base and
+          // the legs, what it stands or kneels on — over the ground it stands
+          // on (the group rides the ground); arms and head load left out.
+          let lowest = null
+          if (!mesh) {
+            fig.updateWorldMatrix(true, true)
+            const ground = g.getWorldPosition(new V()).y
+            const skip = new Set(['hand-left', 'hand-right'].map((n) => fig.getObjectByName(n)?.parent?.parent).filter(Boolean))
+            skip.add(fig.getObjectByName('figure-crown'))
+            fig.traverse((o) => {
+              if (!o.isMesh || !o.visible) return
+              for (let a = o.parent; a; a = a.parent) if (skip.has(a)) return
+              o.geometry.computeBoundingBox()
+              const b = o.geometry.boundingBox
+              for (const cx of [b.min.x, b.max.x]) for (const cy of [b.min.y, b.max.y]) for (const cz of [b.min.z, b.max.z]) {
+                const y = o.localToWorld(new V(cx, cy, cz)).y - ground
+                lowest = lowest === null ? y : Math.min(lowest, y)
+              }
+            })
+          }
           const hs = head?.getWorldScale(new V())
           out.push({
             x: g.position.x,
@@ -4435,18 +4465,19 @@ if (section('village-walk')) {
             figures: figs.length,
             skinned: !!mesh,
             uniform: Math.abs(sc.x - sc.y) < 1e-6 && Math.abs(sc.y - sc.z) < 1e-6,
+            lowest,
             headRound: !hs || (Math.abs(hs.x - hs.y) < 1e-3 && Math.abs(hs.y - hs.z) < 1e-3),
           })
           const r = out[out.length - 1]
           if (stage === 'walk' && r.k === 0 && out.length > 1 && Math.hypot(r.x - out[out.length - 2].x, r.z - out[out.length - 2].z) > 1e-4) stage = 'ready'
           else if (stage === 'ready' && r.k === 1) stage = 'down'
           else if (stage === 'down' && r.k === 0) { stage = 'up'; upAt = { x: r.x, z: r.z } }
-          else if (stage === 'up' && Math.hypot(r.x - upAt.x, r.z - upAt.z) > 0.3) return resolve({ complete: true, out })
+          else if (stage === 'up' && Math.hypot(r.x - upAt.x, r.z - upAt.z) > 0.3) return resolve({ complete: true, out, stage, ticks, shown })
         } else if (stage === 'walk' || stage === 'ready') {
           out.length = 0 // not out yet: start over when it comes out
           stage = 'walk'
         }
-        if (performance.now() - t0 > capMs) return resolve({ complete: false, out })
+        if (performance.now() - t0 > capMs) return resolve({ complete: false, out, stage, ticks, shown, found: !!window.__placeScene.getObjectByName('village-task-walker') })
         requestAnimationFrame(tick)
       }
       requestAnimationFrame(tick)
@@ -4476,6 +4507,10 @@ if (section('village-walk')) {
     const drop = standing !== null && knelt !== null ? standing - knelt : 0
     return {
       complete: seq.complete,
+      stage: seq.stage,
+      ticks: seq.ticks,
+      shown: seq.shown,
+      found: seq.found,
       frames: out.length,
       downFrames,
       upFrames,
@@ -4488,6 +4523,7 @@ if (section('village-walk')) {
       headRound: out.every((r) => r.headRound),
       skinned: [...new Set(out.map((r) => r.skinned))],
       kRead: out.every((r) => r.k !== null),
+      worstLowest: out.some((r) => r.lowest !== null) ? +Math.max(...out.filter((r) => r.lowest !== null).map((r) => Math.abs(r.lowest))).toFixed(4) : null,
       drop,
     }
   }
@@ -4500,7 +4536,7 @@ if (section('village-walk')) {
     check(`${label}: one figure throughout, uniformly scaled, the head round`, j.oneFigure && j.uniform && j.headRound, d)
   }
   const kneelSeen = judgeKneel(await kneelSequence(150000))
-  console.log(`  kneel sequence (medium) ${JSON.stringify(kneelSeen)}`)
+  report(`  kneel sequence (medium) ${JSON.stringify(kneelSeen)}`)
   check('kneel: the observed task walker is the skinned body', kneelSeen.skinned.length === 1 && kneelSeen.skinned[0] === true, JSON.stringify(kneelSeen))
   kneelChecks('kneel', kneelSeen)
   const halfway = await stepUntil(() => {
@@ -4547,15 +4583,23 @@ if (section('village-walk')) {
     }
   }
 
-  // THE LOW PRESET: the primitive kneels without a squash too.
+  // THE LOW PRESET keeps the primitive figure, and items 1 and 5 hold for it
+  // too: feet (the cone's base) on the ground, kneeling folded, never squashed
+  // or popped, and up again before the first step.
   await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
   await nextFrames(8)
-  const low = await page.evaluate(() => {
+  const census = await page.evaluate(() => {
     const V = window.__placeScene.position.constructor
-    const bad = []
+    let figures = 0
+    let skinnedFigures = 0
     let kneeling = 0
+    const bad = []
     window.__placeScene.traverse((o) => {
       if (o.name !== 'inhabitant' || !o.visible) return
+      figures++
+      let skinned = false
+      o.traverse((q) => { if (q.isSkinnedMesh) skinned = true })
+      if (skinned) skinnedFigures++
       const head = o.getObjectByName('figure-head')
       if (!head) return
       const local = o.worldToLocal(head.getWorldPosition(new V()))
@@ -4564,9 +4608,52 @@ if (section('village-walk')) {
       const s = o.getWorldScale(new V())
       if (Math.abs(s.x - s.y) > 1e-6 || Math.abs(s.y - s.z) > 1e-6 || Math.abs(s.x - s.z) > 1e-6) bad.push({ s: [s.x, s.y, s.z] })
     })
-    return { kneeling, bad }
+    return { figures, skinnedFigures, kneeling, bad }
   })
-  check('low preset: every kneeling primitive figure keeps a uniform scale', low.kneeling > 0 && low.bad.length === 0, JSON.stringify(low))
+  check('low preset: every villager drawn is the primitive figure (no skinned body)', census.figures > 0 && census.skinnedFigures === 0, JSON.stringify(census))
+  check('low preset: every kneeling primitive figure keeps a uniform scale', census.kneeling > 0 && census.bad.length === 0, JSON.stringify(census))
+  // Grounding of the walking primitives, every frame for a while: the lowest
+  // drawn point of each walker's body over the ground under it.
+  const lowGround = []
+  for (let f = 0; f < 60; f++) {
+    lowGround.push(...(await page.evaluate(() => {
+      const w = window.__placeWalkers
+      const V = window.__placeScene.position.constructor
+      const rows = []
+      for (let i = 0; w && i < w.states.length; i++) {
+        const s = w.sample(i)
+        const g = w.group(i)
+        if (!s || !g?.visible || s.mode !== 'walk') continue
+        let lowest = Infinity
+        let skinned = false
+        g.updateWorldMatrix(true, true)
+        // The body it stands on (cone base, legs): arms and head load left out.
+        const skip = new Set(['hand-left', 'hand-right'].map((n) => g.getObjectByName(n)?.parent?.parent).filter(Boolean))
+        skip.add(g.getObjectByName('figure-crown'))
+        g.traverse((o) => {
+          if (o.isSkinnedMesh) skinned = true
+          if (!o.isMesh || !o.visible) return
+          for (let a = o.parent; a; a = a.parent) if (skip.has(a)) return
+          o.geometry.computeBoundingBox()
+          const b = o.geometry.boundingBox
+          for (const cx of [b.min.x, b.max.x]) for (const cy of [b.min.y, b.max.y]) for (const cz of [b.min.z, b.max.z]) lowest = Math.min(lowest, o.localToWorld(new V(cx, cy, cz)).y)
+        })
+        rows.push({ i, skinned, off: lowest - s.groundHeight })
+      }
+      return rows
+    })))
+    await nextFrames(1)
+  }
+  const lowWorst = lowGround.reduce((m, r) => Math.max(m, Math.abs(r.off)), 0)
+  const lowDetail = JSON.stringify({ samples: lowGround.length, walkers: new Set(lowGround.map((r) => r.i)).size, skinned: lowGround.filter((r) => r.skinned).length, worstGround: +lowWorst.toFixed(4) })
+  report(`  low-preset walkers ${lowDetail}`)
+  check(`low preset: every walking primitive stands on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m)`, lowGround.length >= 30 && lowGround.every((r) => !r.skinned) && lowWorst <= FOOT_TOL, lowDetail)
+  // The task walker's whole kneel, on the primitive.
+  const lowKneel = judgeKneel(await kneelSequence(150000))
+  report(`  kneel sequence (low) ${JSON.stringify(lowKneel)}`)
+  check('low preset kneel: the observed task walker is the primitive figure', lowKneel.skinned.length === 1 && lowKneel.skinned[0] === false, JSON.stringify(lowKneel))
+  kneelChecks('low preset kneel', lowKneel)
+  check(`low preset kneel: the primitive stays on the ground through the kneel (≤ ${FOOT_TOL.toFixed(3)} m)`, lowKneel.worstLowest !== null && lowKneel.worstLowest <= FOOT_TOL, JSON.stringify(lowKneel))
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 

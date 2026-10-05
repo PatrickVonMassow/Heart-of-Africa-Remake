@@ -222,6 +222,9 @@ function PrimitiveFigure({
       applyLayout(shape.current)
       if (cone.current) cone.current.userData.laid = true
     }
+    // Dev: the kneel the village-walk verification reads (as the skinned
+    // walk's) — every frame, since a render replaces the group's userData.
+    if (import.meta.env.DEV && outer.current) outer.current.userData.kneel = kneelK.current
     let shown = pose?.current ?? null
     if (!shown && gesture?.current) {
       gesture.current = advanceGesture(gesture.current, dt)
