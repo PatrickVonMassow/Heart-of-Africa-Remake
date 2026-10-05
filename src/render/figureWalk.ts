@@ -395,12 +395,33 @@ export const restingMotion = (kneel = false): WalkMotion => ({
   plants: [freePlant(), freePlant()],
 })
 
+/** A hip joint as the rig holds it: the hips bone's place in the body frame
+ *  and the thigh's attachment offset in the hips' own frame. */
+export interface HipJoint {
+  hips: FootOffset
+  thigh: FootOffset
+}
+
+/**
+ * A hip joint in the body frame with the pelvis turned by `yaw` about +y: the
+ * hips' place plus the thigh's offset carried through the hips' rotation —
+ * exactly where three.js draws the thigh bone's origin under hips at
+ * `rotation.y = yaw` (figureWalk.test.ts measures it there).
+ */
+export function hipJointAt(j: HipJoint, yaw: number): FootOffset {
+  const c = Math.cos(yaw)
+  const s = Math.sin(yaw)
+  return { x: j.hips.x + j.thigh.x * c + j.thigh.z * s, z: j.hips.z - j.thigh.x * s + j.thigh.z * c }
+}
+
 /**
  * One frame of a figure's walk, from where it is drawn (`body`, world): every
  * walker gets its stride from how fast it really goes, whoever moves it. The
  * phase advances with the step along the facing; a pace change rephases it;
  * each stance foot is then held at its spot on the ground (`plantFoot`).
- * `joints` are the hip joints in the body frame at no pelvis turn. Mutates `m`.
+ * `joints` are the hips' place and each thigh's offset in the hips' frame; the
+ * pelvis turn of the pose this frame draws is applied here (`hipJointAt`),
+ * since only here is it known. Mutates `m`.
  */
 export function stepWalk(
   m: WalkMotion,
@@ -409,7 +430,7 @@ export function stepWalk(
   d: LegDims,
   age: AgeGroup,
   kneelWanted: boolean,
-  joints: readonly [FootOffset, FootOffset],
+  joints: readonly [HipJoint, HipJoint],
 ): void {
   const unit = body.unit || 1
   let walked = 0
@@ -439,11 +460,8 @@ export function stepWalk(
   m.phase += walked * phasePerDistance(Math.max(m.reach * m.weight, m.reach * 0.3))
   // ...and is held at its spot on the ground through a turn or a shove.
   const gait = walkPose(d, m.phase, m.reach, m.weight, age, m.crouch)
-  const c = Math.cos(gait.hipYaw)
-  const s = Math.sin(gait.hipYaw)
   m.plants = [0, 1].map((i) => {
-    const j = joints[i]
-    const hip = { x: j.x * c + j.z * s, z: -j.x * s + j.z * c }
+    const hip = hipJointAt(joints[i], gait.hipYaw)
     return plantFoot(m.plants[i], gait.feet[i], m.weight > 0 && m.kneel === 0, body, hip, { x: 0, z: gait.feet[i].z }, d.thigh + d.shin, dt)
   }) as [FootPlant, FootPlant]
 }

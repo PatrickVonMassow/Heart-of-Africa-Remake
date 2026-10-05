@@ -37,7 +37,7 @@ import {
   restingMotion,
   stepWalk,
   walkPose,
-  type FootOffset,
+  type HipJoint,
   type HeadLoadShape,
   type WalkMotion,
   type WalkPose,
@@ -465,11 +465,15 @@ export function SkinnedFigure({
       g.getWorldPosition(_here)
       const unit = g.getWorldScale(_scale).x || 1
       g.getWorldDirection(_facing)
+      // The hips' place and each thigh's offset in the hips' frame:
+      // `stepWalk` carries the offsets through the pelvis turn of the pose it
+      // is about to draw (`hipJointAt`) — the bones still hold last frame's
+      // turn, so their drawn positions would be a frame stale.
       const hips = rig.bones.hips.position
       const joints = (['L', 'R'] as const).map((side) => {
         const t = rig.bones[`thigh.${side}`].position
-        return { x: hips.x + t.x, z: hips.z + t.z }
-      }) as [FootOffset, FootOffset]
+        return { hips: { x: hips.x, z: hips.z }, thigh: { x: t.x, z: t.z } }
+      }) as [HipJoint, HipJoint]
       const body = { x: _here.x, z: _here.z, yaw: Math.atan2(_facing.x, _facing.z), unit }
       stepWalk(m, body, dt, dims, id.age, kneel || !!kneeling?.current, joints)
       // Dev: the walk the village-walk verification reads beside the bones.

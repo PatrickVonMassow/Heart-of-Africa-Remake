@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { VILLAGER_MOTION as M } from '../config/balance'
 import { AGE_GROUPS, SEXES, type AgeGroup } from '../systems/appearance'
@@ -9,6 +10,7 @@ import {
   crouchTarget,
   crownOffset,
   headLoadGrip,
+  hipJointAt,
   kneelBlend,
   legDims,
   legExtent,
@@ -24,6 +26,7 @@ import {
   walkPose,
   GRIP_CLEARANCE,
   type FootOffset,
+  type HipJoint,
   type LegDims,
   type WalkMotion,
 } from './figureWalk'
@@ -149,9 +152,9 @@ function walkRoute(
   opts: { speed: number; dt: number; shove?: (f: number) => FootOffset; speedAt?: (f: number) => number },
 ) {
   const m: WalkMotion = restingMotion()
-  const joints: [FootOffset, FootOffset] = [
-    { x: hipX, z: 0 },
-    { x: -hipX, z: 0 },
+  const joints: [HipJoint, HipJoint] = [
+    { hips: { x: 0, z: 0 }, thigh: { x: hipX, z: 0 } },
+    { hips: { x: 0, z: 0 }, thigh: { x: -hipX, z: 0 } },
   ]
   let x = route[0][0]
   let z = route[0][1]
@@ -186,13 +189,11 @@ function walkRoute(
     const pose = walkPose(d, m.phase, m.reach, m.weight, age, m.crouch, [m.plants[0].offset, m.plants[1].offset])
     // Moving at all (a turn nearly on the spot included).
     const walking = Math.hypot(x - before.x, z - before.z) > 0.01 * step
-    const c = Math.cos(pose.hipYaw)
-    const sn = Math.sin(pose.hipYaw)
     pose.legs.forEach((l, i) => {
       const a = ankleAt(d, l)
-      const j = joints[i]
-      const lx = j.x * c + j.z * sn - a.y * Math.sin(l.roll ?? 0)
-      const lz = -j.x * sn + j.z * c + a.z
+      const j = hipJointAt(joints[i], pose.hipYaw)
+      const lx = j.x - a.y * Math.sin(l.roll ?? 0)
+      const lz = j.z + a.z
       const world = { x: x + lx * Math.cos(yaw) + lz * Math.sin(yaw), z: z - lx * Math.sin(yaw) + lz * Math.cos(yaw) }
       if (!pose.feet[i].stance || !walking) {
         // A foot just lifting, still on the ground to the eye (2 mm, as the
@@ -212,6 +213,26 @@ function walkRoute(
   }
   return { worstSlip, stances, arrived: seg >= route.length - 1 }
 }
+
+describe('the hip joints are where the bones draw them', () => {
+  it('the thigh offset turns with the hips, about the hips’ own place', () => {
+    const hips = new THREE.Object3D()
+    const thigh = new THREE.Object3D()
+    hips.add(thigh)
+    for (const [hx, hz, tx, tz] of [[0, 0, 0.09, 0], [0.03, -0.02, -0.08, 0.01], [-0.05, 0.04, 0.1, -0.02]]) {
+      for (const yaw of [-0.3, -0.07, 0, 0.05, 0.4, 1.2]) {
+        hips.position.set(hx, 0.9, hz)
+        hips.rotation.set(0, yaw, 0)
+        thigh.position.set(tx, -0.05, tz)
+        hips.updateMatrixWorld(true)
+        const drawn = thigh.getWorldPosition(new THREE.Vector3())
+        const j = hipJointAt({ hips: { x: hx, z: hz }, thigh: { x: tx, z: tz } }, yaw)
+        expect(j.x).toBeCloseTo(drawn.x, 9)
+        expect(j.z).toBeCloseTo(drawn.z, 9)
+      }
+    }
+  })
+})
 
 describe('a walker turning a corner keeps its planted foot', () => {
   const corners: Array<[string, Array<[number, number]>]> = [
@@ -268,9 +289,9 @@ describe('the task walker gets up before it walks off', () => {
   it('no step is taken until the kneel has fully risen', () => {
     const d = legDims(bodyProportions('male', 'adult'))
     const p = bodyProportions('male', 'adult')
-    const joints: [FootOffset, FootOffset] = [
-      { x: p.hipX, z: 0 },
-      { x: -p.hipX, z: 0 },
+    const joints: [HipJoint, HipJoint] = [
+      { hips: { x: 0, z: 0 }, thigh: { x: p.hipX, z: 0 } },
+      { hips: { x: 0, z: 0 }, thigh: { x: -p.hipX, z: 0 } },
     ]
     for (const dt of [1 / 60, 1 / 24, 0.1]) {
       const m = restingMotion()
