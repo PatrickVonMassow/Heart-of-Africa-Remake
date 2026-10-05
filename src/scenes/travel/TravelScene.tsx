@@ -65,6 +65,7 @@ import { RiversAndLakes } from './Rivers'
 import { NILE_FLOOD, waterSurfaceY } from './waterSurface'
 import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
+import { followAt, followPose, stepFollow, type FollowState } from './followCamera'
 import {
   NATURAL_SITES_GROUP,
   PANORAMA_BAND_BY_KIND,
@@ -2795,6 +2796,8 @@ export function TravelScene() {
   /** Stall watch (work-order 604): a held input that gets nowhere raises the
    *  hint naming the escape key — it never frees the traveller by itself. */
   const travelStall = useRef(newStallState(useGame.getState().pos.x, useGame.getState().pos.z))
+  /** The smoothed point the bird's-eye camera hangs from and aims at (point 1286). */
+  const follow = useRef<FollowState>(followAt(useGame.getState().pos.x, useGame.getState().pos.z, useUi.getState().travelZoom))
 
   // Snap the camera to the follow pose on mount (no visible flight from the
   // previous first-person pose). On unmount the near plane returns to the
@@ -2802,9 +2805,10 @@ export function TravelScene() {
   // and the shared camera must never carry that into another scene.
   useEffect(() => {
     const pos = useGame.getState().pos
-    const zoom = useUi.getState().travelZoom
-    camera.position.set(pos.x, CAMERA_OFFSET.y * zoom, pos.z + CAMERA_OFFSET.z * zoom)
-    camera.lookAt(pos.x, 0, pos.z)
+    follow.current = followAt(pos.x, pos.z, useUi.getState().travelZoom)
+    const pose = followPose(follow.current, CAMERA_OFFSET)
+    camera.position.set(...pose.position)
+    camera.lookAt(...pose.target)
     return () => {
       camera.near = 0.1
       camera.updateProjectionMatrix()
@@ -2866,9 +2870,9 @@ export function TravelScene() {
         return proj.z < 1 && Math.abs(proj.x) <= 1 && Math.abs(proj.y) <= 1
       },
       // True once the bird's-eye camera has caught up to its lerp target in the
-      // ground plane (point 177/165; the height eases on the same lerp and is
-      // not checked): the camera eases toward (pos.x, .y*zoom, pos.z + .z*zoom) at a
-      // fixed 0.12/frame — NOT dt-scaled — so its settle is frame-count-bound. A
+      // ground plane (point 177/165; the height eases on the same follow and is
+      // not checked): the camera eases toward (pos.x, .y*zoom, pos.z + .z*zoom)
+      // on a dt-scaled follow (point 1286), a jump snaps. A
       // teleport-then-fixed-sleep verification revealed just-seeded off-screen
       // animals purely by the still-moving camera under load; polling this before
       // scanning removes that reveal-by-camera-motion false pop.
@@ -3090,8 +3094,12 @@ export function TravelScene() {
     // the debug unlock).
     const pos = useGame.getState().pos
     const zoom = useUi.getState().travelZoom
-    camera.position.lerp(new THREE.Vector3(pos.x, CAMERA_OFFSET.y * zoom, pos.z + CAMERA_OFFSET.z * zoom), 0.12)
-    camera.lookAt(pos.x, 0, pos.z)
+    // Position and aim share one smoothed follow point, so the viewing angle
+    // stays constant in every direction and on a stop (point 1286).
+    follow.current = stepFollow(follow.current, pos.x, pos.z, zoom, dt, balance.travelCameraFollow)
+    const pose = followPose(follow.current, CAMERA_OFFSET)
+    camera.position.set(...pose.position)
+    camera.lookAt(...pose.target)
     // In the debug zoom range nothing is closer than the zoomed-out camera
     // offset, so the near plane can move out — with near 0.1 the depth buffer
     // resolves only ~1 unit at continental distances and the far sheet's

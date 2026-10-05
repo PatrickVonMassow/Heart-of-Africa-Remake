@@ -380,6 +380,12 @@ interface BalanceConfig {
     /** Radius in degrees for reopening/discovering a camp. */
     campRadiusDeg: number
   }
+  /** Bird's-eye follow camera (point 1286): smoothing time constant (s) and
+   *  the follow lag (world units) beyond which it snaps instead of sliding. */
+  travelCameraFollow: {
+    tau: number
+    snapDistance: number
+  }
   /** First-person walk feel inside settlements (design.md §2, point 97). */
   walkFeel: {
     /** Velocity ease time constants (s): ramp up, settle down. */
@@ -1498,6 +1504,10 @@ export const balance: BalanceConfig = {
   camps: {
     lootChancePerDay: 0.03,
     campRadiusDeg: 0.3,
+  },
+  travelCameraFollow: {
+    tau: 0.13, // calibratable: the former 0.12/frame lerp at 60 fps (-1/(60·ln 0.88))
+    snapDistance: 30, // calibratable: far above the walking lag (~0.7), below any jump
   },
   walkFeel: {
     accelTau: 0.10, // brisk ramp-up, no rubber-banding
