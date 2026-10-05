@@ -62,6 +62,9 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
     want = set(only.split(',')) if only else None
     if not want or 'body' in want:
         body_sheet(out, body)
+    if garments and (not want or 'garments' in want):
+        garment_sheet(out, body, clips, garments, 'walk', 0.3, view='front')
+        garment_sheet(out, body, clips, garments, 'walk', 0.3, view='side')
     if clips:
         for name in clips['clips']:
             if not want or name in want or 'clips' in want:
@@ -138,3 +141,45 @@ def shovel_mesh(body, tool, wr, wp, sh):
     origin = pos - rot @ np.array([0, tool['grip'], 0])
     v, t = shovel_geometry(sh)
     return origin + v @ rot.T, t
+
+
+GARMENT_COLOURS = [(0.75, 0.68, 0.55, 1), (0.55, 0.25, 0.18, 1), (0.25, 0.3, 0.5, 1), (0.6, 0.5, 0.3, 1)]
+
+
+def dressed(body, garments, names, weights, q, hips):
+    """Skinned body + garments for one pose: list of (verts, tris, colour)."""
+    pos, j = morphed(body, weights)
+    wr, wp = rig.fk(j, q, hips)
+    jidx, jw = top4(body['W'])
+    out = [(rig.skin(pos, jidx, jw, j, wr, wp), body['tris'], SKIN)]
+    for k, n in enumerate(names):
+        g = garments['meshes'][n]
+        gp = g['pos'].copy()
+        for m, w in weights.items():
+            if w:
+                gp += w * g['morph_pos'][m]
+        gi, gw = top4(g['W'])
+        col = (0.08, 0.06, 0.05, 1) if g.get('part') == 'hair' else (0.95, 0.95, 0.92, 1) if g.get('part') == 'eyes' else GARMENT_COLOURS[k % len(GARMENT_COLOURS)]
+        out.append((rig.skin(gp, gi, gw, j, wr, wp), g['tris'], col))
+    return out
+
+
+def garment_sheet(out, body, clips, garments, clip='walk', t=0.3, per_row=8, view='side'):
+    names = [n for n in garments['meshes'] if n.startswith('g-')]
+    c = clips['clips'][clip]
+    q, hips = sample(c, c['duration'] * t)
+    w = corner_weights('male', 'adult')
+    rows = [names[i:i + per_row] for i in range(0, len(names), per_row)]
+    for r, row in enumerate(rows):
+        R.clear()
+        for k, n in enumerate(row):
+            for v, tr, col in dressed(body, garments, ['hair', 'eyes', n], w, q, hips):
+                v = v.copy()
+                if view == 'side':
+                    v[:, 2] += k * 0.8
+                else:
+                    v[:, 0] += k * 0.8
+                R.add_mesh(f'{n}-{len(v)}', v, tr, col)
+        span = (len(row) - 1) * 0.8
+        R.ground(-0.6, span + 0.6, -0.6, span + 0.6)
+        R.render(os.path.join(out, f'garments-{clip}-{view}-{r}.png'), (span / 2 if view != 'side' else 0, 0.68, span / 2 if view == 'side' else 0), span + 1.2, view, (int(240 * (span + 1.2)), 400))
