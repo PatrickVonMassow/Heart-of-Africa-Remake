@@ -3,7 +3,8 @@
 // the Figure component itself so the component module exports components only.
 
 import { createContext, useContext, useEffect, useMemo } from 'react'
-import { armAim, REST_POSE, type FigurePose } from '../../render/gesture'
+import type * as THREE from 'three/webgpu'
+import { REST_POSE, type FigurePose } from '../../render/gesture'
 import type { SpeechFloor } from '../../communication/speechFloor'
 import type { ColdDress } from './useColdCloaks'
 import type { DressDrivers } from '../../systems/dress'
@@ -107,12 +108,27 @@ export function useStandingBodies(spots: ReadonlyArray<{ x: number; z: number }>
 export const REST_POSE_ARMS = [REST_POSE.left, REST_POSE.right] as const
 
 /**
- * One hand up steadying a load carried on the head, the other hanging — the
- * period-true carrying posture, and the pose the figures with a basket or a
- * bundle on their heads take now that they have arms (point 479). A shared,
- * never-written constant: every head-carrier holds it identically, so one
- * object serves them all.
+ * The pose of a figure with a load on its head: both arms left free, the trunk
+ * upright. The load rests on the figure's crown (`headProp`), and where a hand
+ * steadies it the body places that hand on the rim itself (`headSteady`) — the
+ * primitive's raised arm pointed into the air beside a load floating over the
+ * head (work-order "walking villagers"). A shared, never-written constant.
  */
 export const HEAD_CARRY_POSE: { current: FigurePose } = {
-  current: { left: armAim(0.16, 1.3), right: { ...REST_POSE.right }, lean: 0.02, turn: 0 },
+  current: { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0.02, turn: 0 },
+}
+
+/**
+ * Where the crown of the figure under `group` is, in the coordinates of
+ * `frame` (a load's parent), with this frame's pose and transform — for a
+ * head load that cannot be mounted on the figure itself (the fishers' basket,
+ * which moves between people). False when the figure has no crown yet.
+ */
+export function crownIn(group: THREE.Object3D, frame: THREE.Object3D | null, out: THREE.Vector3): boolean {
+  group.updateMatrixWorld(true)
+  const crown = group.getObjectByName('figure-crown')
+  if (!crown) return false
+  crown.getWorldPosition(out)
+  if (frame) frame.worldToLocal(out)
+  return true
 }
