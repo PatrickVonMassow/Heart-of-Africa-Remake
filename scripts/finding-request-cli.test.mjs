@@ -169,6 +169,39 @@ describe('a carrier whose last entry lost its trailing newline', () => {
     expect(run(['--drain'])).toMatch(/1 waiting, 1 request\(s\), 0 landed/)
   })
 
+  it('keeps a recorded finding on its own line too', () => {
+    deposit()
+    const before = carrierText().replace(/\s+$/, '')
+    writeFileSync(join(dir, 'findings-carrier.md'), before, 'utf8')
+    run(['--record', 'Ein Befund', '--detail', 'Belegt.', '--session', 'deadbeefcafe'])
+    expect(carrierText().startsWith(`${before}\n\n`)).toBe(true)
+    expect(run(['--drain'])).toMatch(/1 waiting, 1 request\(s\), 0 landed/)
+  })
+
+  it('refuses to report a deposit the re-read cannot find', () => {
+    deposit('Eine andere Anfrage')
+    // The append is swallowed, so the file still holds only the unrelated request.
+    const preload = join(dir, 'lose-append.cjs')
+    writeFileSync(
+      preload,
+      `const fs = require('fs')
+const real = fs.appendFileSync
+fs.appendFileSync = function (target) {
+  if (String(target).endsWith('findings-carrier.md')) return
+  return real.apply(fs, arguments)
+}
+`,
+      'utf8',
+    )
+    const err = run(
+      ['--request', 'Verlorene Anfrage', '--spec-file', join(dir, 'spec.md'), '--session', 's'],
+      true,
+      { NODE_OPTIONS: `--require ${JSON.stringify(preload)}` },
+    )
+    expect(err).toMatch(/not pending in the carrier on re-read/)
+    expect(err).not.toMatch(/request deposited/)
+  })
+
   it('leaves a rewritten carrier ending in a newline', () => {
     deposit()
     writeFileSync(join(dir, 'findings-carrier.md'), carrierText().replace(/\s+$/, ''), 'utf8')
