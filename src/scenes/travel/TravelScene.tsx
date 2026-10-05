@@ -2869,6 +2869,12 @@ export function TravelScene() {
         proj.set(x, y, z).project(camera)
         return proj.z < 1 && Math.abs(proj.x) <= 1 && Math.abs(proj.y) <= 1
       },
+      // The camera's unit view direction (point 1286): constant while walking
+      // and on a stop, since position and aim share one follow point.
+      viewDir: () => {
+        const d = camera.getWorldDirection(new THREE.Vector3())
+        return { x: d.x, y: d.y, z: d.z }
+      },
       // True once the bird's-eye camera has caught up to its lerp target in the
       // ground plane (point 177/165; the height eases on the same follow and is
       // not checked): the camera eases toward (pos.x, .y*zoom, pos.z + .z*zoom)
