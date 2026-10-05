@@ -12,7 +12,6 @@
 import { useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal, useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { legSwingAngle } from '../../render/fauna'
 import { FIGURE_LIMBS } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
@@ -25,10 +24,29 @@ import {
 } from '../../render/figureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, gestureArmEuler, hangToward, kneelLegs, solveTwoBone, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, gestureArmEuler, hangToward, solveTwoBone, unsquashHead } from '../../render/figureRig'
+import {
+  approach,
+  armAtRest,
+  crouchTarget,
+  crownOffset,
+  headLoadGrip,
+  kneelBlend,
+  legDims,
+  legExtent,
+  restingMotion,
+  stepWalk,
+  walkPose,
+  type HipJoint,
+  type HeadLoadShape,
+  type WalkMotion,
+  type WalkPose,
+} from '../../render/figureWalk'
+import { VILLAGER_MOTION } from '../../config/balance'
 import { appearanceFor, skinTone, type AgeGroup, type DressLayer, type Sex } from '../../systems/appearance'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
+import { isLifeFrozen } from './lifeFreeze'
 import { REST_POSE_ARMS, type FigureLook } from './placeFigureContext'
 import { figureIdentity, type FigureIdentity } from './figureIdentity'
 
@@ -82,6 +100,8 @@ interface Rig {
   bones: Record<BoneName, THREE.Bone>
   skeleton: THREE.Skeleton
   head: THREE.Object3D
+  /** The top of the drawn head, on the head bone: where a head load rests. */
+  crown: THREE.Object3D
   hands: [THREE.Object3D, THREE.Object3D]
 }
 
@@ -108,7 +128,9 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     m.boundingSphere = bound
     return m
   }
-  const body = mesh(cachedFigure(p, layers, key, skin, paint === skin ? null : paint, look.radial), figureMaterial(), 'figure-body')
+  const geo = cachedFigure(p, layers, key, skin, paint === skin ? null : paint, look.radial)
+  if (!geo.boundingBox) geo.computeBoundingBox()
+  const body = mesh(geo, figureMaterial(), 'figure-body')
   body.add(bones.hips)
   body.bind(skeleton, new THREE.Matrix4())
   const meshes = [body]
@@ -119,6 +141,14 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   // Scaled so `0.16 × scale` above it is the crown, as on the primitive head.
   head.scale.setScalar(p.headHalfH / 0.16)
   bones.head.add(head)
+  const crown = new THREE.Object3D()
+  crown.name = 'figure-crown'
+  crown.position.set(0, crownOffset(p, geo.boundingBox?.max.y), 0)
+  bones.head.add(crown)
+  // The thighs turn against the pelvis's walking yaw before they swing, so the
+  // stride stays in the line of travel.
+  bones['thigh.L'].rotation.order = 'YXZ'
+  bones['thigh.R'].rotation.order = 'YXZ'
   const hand = (side: 'L' | 'R', name: string) => {
     const o = new THREE.Object3D()
     o.name = name
@@ -126,7 +156,7 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     bones[`hand.${side}`].add(o)
     return o
   }
-  return { p, layers, meshes, bones, skeleton, head, hands: [hand('L', 'hand-left'), hand('R', 'hand-right')] }
+  return { p, layers, meshes, bones, skeleton, head, crown, hands: [hand('L', 'hand-left'), hand('R', 'hand-right')] }
 }
 
 const _s = new THREE.Vector3()
@@ -138,6 +168,12 @@ const _fwd = new THREE.Vector3()
 const _q = new THREE.Quaternion()
 const _pole = new THREE.Vector3()
 const _euler = new THREE.Euler()
+const _here = new THREE.Vector3()
+const _scale = new THREE.Vector3()
+const _facing = new THREE.Vector3()
+const _grip = new THREE.Vector3()
+
+/** What the figure measured of its own walk, and its transitions in progress. */
 
 export function SkinnedFigure({
   look,
@@ -150,9 +186,11 @@ export function SkinnedFigure({
   gesture,
   pose,
   limbs,
-  gait,
   squat,
   handProp,
+  headProp,
+  headSteady,
+  kneeling,
   sex,
   age,
   identityKey,
@@ -167,9 +205,16 @@ export function SkinnedFigure({
   gesture?: RefObject<GestureState>
   pose?: RefObject<FigurePose | null>
   limbs?: RefObject<FigureLimbs | null>
+  /** The primitive's caller-driven gait; this body measures its own walk. */
   gait?: RefObject<number>
   squat?: RefObject<number>
   handProp?: ReactNode
+  /** A load carried on the head, mounted on the crown (it rides the head's bob). */
+  headProp?: ReactNode
+  /** Set when a hand steadies that load: its radius and height for the grip. */
+  headSteady?: HeadLoadShape | null
+  /** Kneels while true: down and up again as a short transition. */
+  kneeling?: RefObject<boolean>
   sex?: Sex
   age?: AgeGroup
   /** The outer Figure's id, stable across a detail-level switch. */
@@ -185,42 +230,55 @@ export function SkinnedFigure({
   const L = FIGURE_LIMBS
   // THE VIRTUAL PRIMITIVE RIG the poses are written onto — the primitive
   // figure's pivots exactly (placeFigure.tsx), drawing nothing.
-  const bodyH = kneel ? 0.55 : 1.0
-  const withLegs = legs && !kneel
-  const hipY = withLegs ? bodyH * L.hipY : 0
-  const armLen = bodyH * L.armLength
+  // A kneeling one keeps the former squashed pivots: every kneeling contact
+  // (the loom, the paddle, the gutting) was solved through them, and this rig
+  // is never drawn — the drawn body kneels by its bones. A figure that kneels
+  // down and gets up (`kneeling`) moves its pivots with its own kneel.
+  const virtualAt = (k: number) => {
+    const bodyH = 1 - 0.45 * k
+    return { bodyH, squash: 1 - 0.25 * k, hipY: legs ? bodyH * L.hipY * (1 - k) : 0, armLen: bodyH * L.armLength }
+  }
+  const { bodyH, squash: virtualSquash, hipY, armLen } = virtualAt(kneel ? 1 : 0)
+  const virtualRoot = useRef<THREE.Group>(null)
+  const virtualK = useRef(kneel ? 1 : 0)
+  const outer = useRef<THREE.Group>(null)
   const trunk = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const virtualHands = useRef<Array<THREE.Object3D | null>>([])
   const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
   const owned = !!(pose && limbs)
-  const contact = !!pose
-  const kneelLeg = useMemo(() => kneelLegs(rig.p.hipY - rig.p.kneeY, rig.p.calfR), [rig])
-  // The elder's give at the knees, feet kept on the ground: both leg segments
-  // tilt by the flex, so the hips sink by their summed length × (1 − cos).
-  const flex = rig.p.kneeFlex
-  const standDrop = (rig.p.hipY - rig.p.ankleY) * (1 - Math.cos(flex))
-  // THE CONTACT CROUCH: a human arm is shorter and hangs from a higher
-  // shoulder than the primitive's, so a contact the primitive reached at its
-  // ankles (the jar dipped at the water's edge) is out of reach even leaning.
-  // Then the knees bend and the hips drop, feet kept down, until it is.
-  const crouch = useRef(0)
-  // The standing legs: the flex and crouch, with the walking swing laid over
-  // them when the figure walks — one function, so the frame callback and an
-  // owning caller's retarget both leave the stride in place. The knee bend
-  // comes from the swing alone, so a stopped elder keeps both feet flat.
-  const setLegs = useMemo(() => {
+  const dims = useMemo(() => legDims(rig.p), [rig])
+  const motion = useRef<WalkMotion>(restingMotion(kneel))
+  // THE LEGS AND HIPS from the walk, the work crouch and the kneel — one
+  // function, so the frame callback and an owning caller's retarget both
+  // leave the stride in place. Returns the walk for the arms and shoulders.
+  const poseLegs = useMemo(() => {
     const b = rig.bones
-    return (c: number) => {
-      const f = flex + c
-      for (const [s, phase] of [['L', 0], ['R', Math.PI]] as const) {
-        const swing = gait ? legSwingAngle(gait.current, phase) : 0
-        b[`thigh.${s}`].rotation.x = swing - f
-        b[`shin.${s}`].rotation.x = Math.max(0, -swing) * 0.8 + 2 * f
-        b[`foot.${s}`].rotation.x = -f
+    return (): WalkPose => {
+      const m = motion.current
+      const walk = walkPose(dims, m.phase, m.reach, m.weight, id.age, m.crouch, [m.plants[0].offset, m.plants[1].offset])
+      let hip = walk.hipHeight
+      let legsNow = walk.legs
+      let yaw = walk.hipYaw
+      if (m.kneel > 0) {
+        const folded = walk.legs.map((l) => kneelBlend(dims, l, m.kneel))
+        hip = Math.max(folded[0].hipHeight, folded[1].hipHeight)
+        legsNow = [folded[0].legs, folded[1].legs]
+        yaw *= 1 - m.kneel
       }
+      b.hips.position.y = hip
+      b.hips.rotation.set(0, yaw, 0)
+      ;(['L', 'R'] as const).forEach((s, i) => {
+        // The hips' turn undone first, then the leg's sideways tilt, then its
+        // swing; the foot kept flat under both.
+        const roll = legsNow[i].roll ?? 0
+        b[`thigh.${s}`].rotation.set(legsNow[i].thigh, -yaw, roll, 'YZX')
+        b[`shin.${s}`].rotation.set(legsNow[i].shin, 0, 0)
+        b[`foot.${s}`].rotation.set(legsNow[i].foot, 0, -roll)
+      })
+      return { ...walk, hipYaw: yaw, chestYaw: walk.chestYaw * (1 - m.kneel) }
     }
-  }, [rig, flex, gait])
+  }, [rig, dims, id.age])
 
   // Carry the virtual pose onto the bones. Called by `applyFigurePose` in the
   // frame the pose is written, and by this figure's own frame for the rest.
@@ -231,12 +289,22 @@ export function SkinnedFigure({
       const vTrunk = trunk.current
       const root = b.hips.parent?.parent
       if (!vTrunk || !root) return
+      const m = motion.current
+      const kneelNow = kneel || !!kneeling?.current
+      // An arm is a CONTACT only where the pose put it somewhere: an arm the
+      // pose leaves hanging at rest has nothing to reach — it swings with the
+      // walk. (Every hanging arm used to count, and the primitive's hand at its
+      // knee drove the body into a full crouch to reach it: the "seated"
+      // walkers of the report.)
+      const contactArm = [0, 1].map((i) => {
+        const v = arms.current[i]
+        if (!pose || !v || !virtualHands.current[i]) return false
+        const rest = REST_POSE_ARMS[i]
+        return !armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, rest)
+      })
+      const contact = contactArm[0] || contactArm[1]
       // Trunk: the pose's lean and turn at the hips, the elder's stoop at the chest.
-      const legDrop = (c: number) => (p.hipY - p.ankleY) * (1 - Math.cos(flex + c))
-      // Every pose is solved from STANDING height: a contact's crouch is found
-      // afresh each time, never inherited, so a held contact cannot alternate
-      // between crouched and standing.
-      b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY - legDrop(0)
+      const standHip = (c: number) => dims.ankle + legExtent(dims, dims.flex + c)
       b.spine.rotation.set(vTrunk.rotation.x, vTrunk.rotation.y, 0)
       b.chest.rotation.set(p.stoop, 0, 0)
       b.neck.rotation.set(-p.stoop * 0.45, 0, 0)
@@ -261,83 +329,97 @@ export function SkinnedFigure({
         loc(b[`forearm.${s}`], _e).distanceTo(loc(b[`upperArm.${s}`], _s)) +
         loc(b[`hand.${s}`], _w).distanceTo(_e) +
         loc(rig.hands[s === 'L' ? 0 : 1], _t).distanceTo(_w)
-      if (contact) {
-        // The lean for the hips' present height: just enough to bring a
-        // contact into reach (contactLean), from the pose's own trunk angle.
-        const baseLean = b.spine.rotation.x
-        const leanIn = () => {
-          b.spine.rotation.x = baseLean
-          b.hips.updateWorldMatrix(false, true)
-          loc(b.spine, _pivot)
-          _fwd.set(0, 0, 1).applyQuaternion(qIn(b.spine, _q)).setY(0).normalize()
-          let lean = 0
-          ;(['L', 'R'] as const).forEach((s, i) => {
-            const vh = virtualHands.current[i]
-            if (!vh) return
-            const reach = reachOf(s)
-            loc(b[`upperArm.${s}`], _s)
-            loc(vh, _t)
-            lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
-          })
-          if (lean > 0) {
-            b.spine.rotation.x += lean
-            b.spine.updateWorldMatrix(false, true)
-          }
+      const baseLean = b.spine.rotation.x
+      const leanIn = () => {
+        b.spine.rotation.x = baseLean
+        b.hips.updateWorldMatrix(false, true)
+        loc(b.spine, _pivot)
+        _fwd.set(0, 0, 1).applyQuaternion(qIn(b.spine, _q)).setY(0).normalize()
+        let lean = 0
+        ;(['L', 'R'] as const).forEach((s, i) => {
+          const vh = virtualHands.current[i]
+          if (!vh || !contactArm[i]) return
+          const reach = reachOf(s)
+          loc(b[`upperArm.${s}`], _s)
+          loc(vh, _t)
+          lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
+        })
+        if (lean > 0) {
+          b.spine.rotation.x += lean
+          b.spine.updateWorldMatrix(false, true)
         }
+      }
+      if (contact && !kneelNow && Math.abs(m.speed) <= VILLAGER_MOTION.moveSpeed) {
+        // Every pose is solved from STANDING height: a contact's crouch is
+        // found afresh each time, never inherited, so a held contact cannot
+        // alternate between crouched and standing. Each crouch is tried WITH
+        // its own lean (a low contact takes both: bent knees and a bent back).
         const shortOf = () =>
           Math.max(
             ...(['L', 'R'] as const).map((s, i) => {
               const vh = virtualHands.current[i]
-              return vh ? loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) - reachOf(s) * 0.995 : -1
+              return vh && contactArm[i] ? loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) - reachOf(s) * 0.995 : -1
             }),
           )
-        // Each crouch is tried WITH its own lean (a low contact takes both:
-        // bent knees and a bent back), searched from standing every time.
         const tryAt = (cc: number) => {
-          b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY - legDrop(cc)
+          b.hips.position.y = standHip(cc)
           leanIn()
           return shortOf()
         }
-        const c = kneel ? 0 : contactCrouch(tryAt)
-        tryAt(c)
-        crouch.current = c
-        if (!kneel) {
-          setLegs(c)
-          b.hips.updateWorldMatrix(false, true)
-        }
-      } else if (crouch.current !== 0 && !kneel) {
-        crouch.current = 0
-        b.hips.position.y = p.hipY - standDrop
-        setLegs(0)
-        b.hips.updateWorldMatrix(false, true)
+        m.crouchTarget = crouchTarget(m.speed, contactCrouch(tryAt))
+      } else {
+        // Never a crouch on the move: released before the walk, resumed after.
+        m.crouchTarget = 0
       }
+      const walk = poseLegs()
+      b.spine.rotation.set(vTrunk.rotation.x, vTrunk.rotation.y - walk.hipYaw, 0)
+      b.chest.rotation.set(p.stoop, walk.chestYaw, 0)
+      b.hips.updateWorldMatrix(false, true)
+      if (contact) leanIn()
+      // THE STEADYING HAND on a head load: the free arm on the load's side.
+      const loadShown = rig.crown.children.some((c) => c.visible)
+      const steadyArm = headSteady && loadShown && m.kneel < 0.5 ? (!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1) : -1
       ;(['L', 'R'] as const).forEach((s, i) => {
         const up = b[`upperArm.${s}`]
         const fore = b[`forearm.${s}`]
         const vPivot = arms.current[i]
         const vh = virtualHands.current[i]
         let done = false
-        if (contact && vh) {
+        const chestQ = () => qIn(b.chest, new THREE.Quaternion())
+        const solveTo = (target: THREE.Vector3, pole: THREE.Vector3) => {
           const a = loc(fore, _e).distanceTo(loc(up, _s))
           const reach = reachOf(s)
           loc(up, _s)
+          const sol = solveTwoBone(_s, target, a, reach - a, pole)
+          if (!sol.reached) return false
+          const cq = chestQ()
+          up.quaternion.copy(hangToward(sol.upper, cq))
+          up.updateWorldMatrix(false, true)
+          fore.quaternion.copy(hangToward(sol.fore, qIn(up, new THREE.Quaternion())))
+          return true
+        }
+        if (i === steadyArm && headSteady) {
+          // A hand on the rim: the grip found in the crown's own frame (the
+          // load tilts with the head), brought into the body's.
+          rig.crown.updateWorldMatrix(true, false)
+          const sh = rig.crown.worldToLocal(up.getWorldPosition(_grip))
+          const g = headLoadGrip({ x: sh.x, y: sh.y, z: sh.z }, i === 0 ? 1 : -1, headSteady, reachOf(s))
+          body.worldToLocal(rig.crown.localToWorld(_grip.set(g.x, g.y, g.z)))
+          _pole.set(i === 0 ? 1 : -1, -0.3, 0.2).applyQuaternion(chestQ())
+          done = solveTo(_grip, _pole)
+        } else if (contactArm[i] && vh) {
           loc(vh, _t)
-          const chestQ = qIn(b.chest, new THREE.Quaternion())
-          _pole.set(s === 'L' ? 0.5 : -0.5, -0.4, -1).applyQuaternion(chestQ)
-          const sol = solveTwoBone(_s, _t, a, reach - a, _pole)
-          if (sol.reached) {
-            up.quaternion.copy(hangToward(sol.upper, chestQ))
-            up.updateWorldMatrix(false, true)
-            fore.quaternion.copy(hangToward(sol.fore, qIn(up, new THREE.Quaternion())))
-            done = true
-          }
+          _pole.set(s === 'L' ? 0.5 : -0.5, -0.4, -1).applyQuaternion(chestQ())
+          done = solveTo(_t.clone(), _pole)
         }
         if (!done && vPivot) {
           // A hanging arm hangs by gravity, not with the stooped chest (whose
-          // forward bend swings an arm fixed to it BACK by the same angle).
+          // forward bend swings an arm fixed to it BACK by the same angle); a
+          // free one swings against its leg.
           const hang = Math.abs(vPivot.rotation.x) < 0.3 ? -p.stoop : 0
-          up.quaternion.setFromEuler(gestureArmEuler({ pitch: vPivot.rotation.x + hang, yaw: vPivot.rotation.y, roll: vPivot.rotation.z }, _euler))
-          fore.rotation.set(-0.2, 0, 0)
+          const swing = contactArm[i] ? 0 : walk.arms[i]
+          up.quaternion.setFromEuler(gestureArmEuler({ pitch: vPivot.rotation.x + hang + swing, yaw: vPivot.rotation.y, roll: vPivot.rotation.z }, _euler))
+          fore.rotation.set(-0.2 - Math.max(0, -swing) * 0.6, 0, 0)
         }
         b[`hand.${s}`].quaternion.identity()
       })
@@ -351,14 +433,14 @@ export function SkinnedFigure({
       ;([0, 1] as const).forEach((i) => {
         const anchor = rig.hands[i]
         const vh = virtualHands.current[i]
-        if (contact && vh && anchor.parent) {
+        if (contactArm[i] && vh && anchor.parent) {
           const parentQ = anchor.parent.getWorldQuaternion(new THREE.Quaternion()).invert()
           anchor.quaternion.copy(parentQ.multiply(vh.getWorldQuaternion(new THREE.Quaternion())))
         } else anchor.quaternion.identity()
         anchor.updateWorldMatrix(false, true)
       })
     }
-  }, [rig, kneel, kneelLeg, contact, standDrop, squat, flex, setLegs])
+  }, [rig, dims, pose, squat, poseLegs, headSteady, kneel, kneeling])
 
   // Publish the virtual pivots to the caller that owns the pose.
   const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget })
@@ -371,18 +453,45 @@ export function SkinnedFigure({
     }
   }, [limbs, retarget])
 
-  // Kneeling legs are a fixed pose; standing ones swing with the gait.
-  useEffect(() => {
-    const b = rig.bones
-    for (const s of ['L', 'R'] as const) {
-      b[`thigh.${s}`].rotation.set(kneel ? kneelLeg.thigh : -flex, 0, 0)
-      b[`shin.${s}`].rotation.set(kneel ? kneelLeg.shin : 2 * flex, 0, 0)
-      b[`foot.${s}`].rotation.set(kneel ? kneelLeg.foot : -flex, 0, 0)
-    }
-  }, [rig, kneel, kneelLeg, flex])
-
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
+    const m = motion.current
+    // THE FIGURE'S OWN GROUND SPEED, measured where it is drawn: every walker
+    // gets its stride from how fast it really goes, whoever moves it.
+    const g = outer.current
+    // The dev life freeze holds a stride where it is, for the camera.
+    if (g && dt > 0 && !isLifeFrozen()) {
+      g.updateWorldMatrix(true, false)
+      g.getWorldPosition(_here)
+      const unit = g.getWorldScale(_scale).x || 1
+      g.getWorldDirection(_facing)
+      // The hips' place and each thigh's offset in the hips' frame:
+      // `stepWalk` carries the offsets through the pelvis turn of the pose it
+      // is about to draw (`hipJointAt`) — the bones still hold last frame's
+      // turn, so their drawn positions would be a frame stale.
+      const hips = rig.bones.hips.position
+      const joints = (['L', 'R'] as const).map((side) => {
+        const t = rig.bones[`thigh.${side}`].position
+        return { hips: { x: hips.x, z: hips.z }, thigh: { x: t.x, z: t.z } }
+      }) as [HipJoint, HipJoint]
+      const body = { x: _here.x, z: _here.z, yaw: Math.atan2(_facing.x, _facing.z), unit }
+      stepWalk(m, body, dt, dims, id.age, kneel || !!kneeling?.current, joints)
+      // Dev: the walk the village-walk verification reads beside the bones.
+      if (import.meta.env.DEV) g.userData.walk = m
+      m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
+      const actor = g.userData.actor as { height: number } | undefined
+      if (actor) actor.height = 1.45 - 0.45 * m.kneel // the label over the drawn crown
+    }
+    if (m.kneel !== virtualK.current && virtualRoot.current) {
+      virtualK.current = m.kneel
+      const v = virtualAt(m.kneel)
+      virtualRoot.current.scale.set(1, v.squash, 1)
+      trunk.current?.position.setY(v.hipY)
+      ;[0, 1].forEach((i) => {
+        arms.current[i]?.position.set((i === 0 ? 1 : -1) * v.bodyH * L.shoulderX, v.bodyH * L.shoulderY - v.hipY, 0)
+        virtualHands.current[i]?.position.setY(-v.armLen)
+      })
+    }
     let shown = pose?.current ?? null
     if (!shown && gesture?.current) {
       gesture.current = advanceGesture(gesture.current, dt)
@@ -394,19 +503,17 @@ export function SkinnedFigure({
     } else {
       retarget()
     }
-    const b = rig.bones
-    if (!kneel && gait) setLegs(crouch.current)
     // A squat shortens a person; it does not flatten the skull (work-order 1085).
-    unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
+    unsquashHead(rig.bones.head, [rig.bones.hips, rig.bones.spine, rig.bones.chest, rig.bones.neck], squat?.current ?? 1)
   })
 
   return (
-    <group name="inhabitant" scale={scale} userData={markActor({ kind: role, height: bodyH + 0.45 })}>
+    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: bodyH + 0.45 })}>
       {rig.meshes.map((m) => (
         <primitive key={m.uuid} object={m} />
       ))}
       {/* The virtual primitive rig — pivots only, nothing drawn. */}
-      <group scale={[1, kneel ? 0.75 : 1, 1]} visible={false}>
+      <group ref={virtualRoot} scale={[1, virtualSquash, 1]} visible={false}>
         <group ref={trunk} position={[0, hipY, 0]}>
           {[0, 1].map((i) => (
             <group key={i} position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]} ref={armRef[i]}>
@@ -421,6 +528,7 @@ export function SkinnedFigure({
         </group>
       </group>
       {handProp && createPortal(<>{handProp}</>, rig.hands[0])}
+      {headProp && createPortal(<>{headProp}</>, rig.crown)}
     </group>
   )
 }

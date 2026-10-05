@@ -12,6 +12,7 @@
 import {
   ENTSCHEIDUNGEN_ON_BOARD,
   ERLEDIGT_ON_BOARD,
+  QUEUE_STUB_BODY,
   QUEUE_STUB_META,
   parseNowCardPoints,
 } from './dashboard-guard-core.mjs'
@@ -330,7 +331,7 @@ export function renderCardCriticalities(html, tasksText) {
  */
 function escapeCardTitle(text) {
   return String(text ?? '')
-    .replace(/&(?!(?:[a-z]+|#\d+);)/gi, '&amp;')
+    .replace(/&(?!(?:[a-z][a-z0-9]*|#\d+|#x[0-9a-f]+);)/gi, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 }
@@ -845,20 +846,93 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
 /** The one sentence an unwritten stub says; renderNowStub may append carried prose after it. */
 const NOW_STUB_TEXT = 'Diese Karte braucht noch ihren handgeschriebenen Text.'
 
+/** The stub's title when nothing names the point — the last rung of `stubTitleSources`. */
+const NOW_STUB_TITLE = 'Text für diesen Punkt fehlt noch'
+
 /** A visible placeholder; its copy is explicitly not mistaken for authored prose.
  *  `carried` is authored text rescued from the idle card the render replaces —
  *  it rides in the stub's body so the transition never blanks what a session
- *  wrote (fifth cross-vendor round, pass 2). */
-function renderNowStub(point, { stamp = berlinStamp(), carried = '' } = {}) {
+ *  wrote (fifth cross-vendor round, pass 2). `title` and `queued` come from
+ *  `stubTitleSources`: the point keeps its name and its queue prose when the
+ *  projection moves it out of the queue (user 05.10.2026). */
+function renderNowStub(point, { stamp = berlinStamp(), carried = '', title = '', queued = '' } = {}) {
   const note = String(carried ?? '').trim()
-  const text = note ? `${NOW_STUB_TEXT}\n\nAus der Übergabekarte übernommen: ${note}` : NOW_STUB_TEXT
+  const fromQueue = String(queued ?? '').trim()
+  const text = [
+    NOW_STUB_TEXT,
+    fromQueue ? `Aus der Warteschlange übernommen: ${fromQueue}` : '',
+    note ? `Aus der Übergabekarte übernommen: ${note}` : '',
+  ].filter(Boolean).join('\n\n')
+  const heading = stripPointPrefix(String(title ?? '').trim(), point) || NOW_STUB_TITLE
   return (
     `<details class="now" data-state="stub">\n  <summary>${numberChip(point)}` +
-    `<span class="t">Text für diesen Punkt fehlt noch</span>` +
+    `<span class="t">${escapeCardTitle(heading)}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(text, { stamp })}\n` +
     '  </div>\n</details>\n'
   )
+}
+
+/** Plain text as card markup (the queue data file stores plain text). */
+const escapePlain = (text) => String(text ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** A first body line is a fallback title, so it is cut like a work-order headline. */
+function titleFromLine(line, maxLength = 90) {
+  const first = String(line ?? '').split('\n')[0].trim()
+  return first.length > maxLength ? `${first.slice(0, maxLength - 1).trimEnd()}…` : first
+}
+
+/**
+ * Where a newly projected stub takes its title and prose from (user 05.10.2026:
+ * a stub titled only "Text für diesen Punkt fehlt noch" hid for hours what was
+ * being worked on, although the queue card the projection removed had named it).
+ * In this order: the point's queue card on the board (title and body), the entry
+ * in `.claude/board-queue.json` (`queueData`; title, else the first body line),
+ * the work-order headline (`titles`). The placeholder stands only when none of
+ * them exists. The queue's own "Punkt N" fallback and its stub body name nothing
+ * and are skipped.
+ */
+function stubTitleSources(source, points, { queueData = null, titles = {} } = {}) {
+  const wanted = new Set(points)
+  const out = new Map()
+  const unnamed = (title, point) => !title || title === `Punkt ${point}`
+  const stubBodies = new Set([QUEUE_STUB_BODY, escapePlain(QUEUE_STUB_BODY)])
+  let cards = []
+  try {
+    const { from, end } = sectionBounds(source, 'queue')
+    cards = [...source.slice(from, end).matchAll(/<details>\s*<summary>[\s\S]*?<\/details>/g)].map((m) => m[0])
+  } catch {
+    cards = []
+  }
+  for (const card of cards) {
+    const point = Number((card.match(/class="num">\s*(\d+)/) ?? [])[1])
+    if (!wanted.has(point) || out.has(point)) continue
+    const title = ((card.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? '').trim()
+    const queued = cardBodyText(card)
+      .split('\n\n')
+      .filter((p) => !stubBodies.has(p))
+      .join('\n\n')
+    out.set(point, { title: unnamed(title, point) ? '' : title, queued })
+  }
+  const stored = queueData && typeof queueData === 'object' && queueData.points && typeof queueData.points === 'object'
+    ? queueData.points
+    : {}
+  for (const point of wanted) {
+    const have = out.get(point) ?? { title: '', queued: '' }
+    const entry = stored[point] && typeof stored[point] === 'object' ? stored[point] : {}
+    const body = (Array.isArray(entry.body) ? entry.body : [entry.body])
+      .filter((p) => typeof p === 'string' && p.trim())
+      .map((p) => p.trim())
+    const storedTitle = typeof entry.title === 'string' ? entry.title.trim() : ''
+    const headline = typeof titles?.[point] === 'string' ? titles[point].trim() : ''
+    const title = have.title
+      || (storedTitle ? escapePlain(storedTitle) : '')
+      || (body.length ? escapePlain(titleFromLine(body[0])) : '')
+      || escapePlain(headline)
+    const queued = have.queued || body.map(escapePlain).join('\n\n')
+    out.set(point, { title, queued })
+  }
+  return out
 }
 
 /** Remove queue copies for points whose membership is now derived as active. */
@@ -886,7 +960,13 @@ function stripProjectedQueueCards(html, points) {
 export function reconcileNowProjection(
   html,
   expectedPoints,
-  { focusPoint = null, stamp = berlinStamp(), transformExisting = (card) => card } = {},
+  {
+    focusPoint = null,
+    stamp = berlinStamp(),
+    transformExisting = (card) => card,
+    queueData = null,
+    titles = {},
+  } = {},
 ) {
   const source = String(html ?? '')
   // A missing now-section heading REFUSES (fifth cross-vendor round, pass 2):
@@ -1026,8 +1106,12 @@ export function reconcileNowProjection(
   }
   // The carried prose rides in the first CREATED stub, which is a question of
   // creation order, not of where the focus puts it on screen.
+  const named = stubTitleSources(source, newPoints, { queueData, titles })
   const stubs = new Map(
-    newPoints.map((point, index) => [point, renderNowStub(point, { stamp, carried: index === 0 ? carried : '' })]),
+    newPoints.map((point, index) => [
+      point,
+      renderNowStub(point, { stamp, carried: index === 0 ? carried : '', ...named.get(point) }),
+    ]),
   )
   const ordered = displayOrder.map((point) => ({ point, html: survivorMap.get(point) ?? stubs.get(point) }))
 
@@ -1083,7 +1167,11 @@ export function reconcileNowProjection(
 }
 
 /** Fail-closed publish preflight: source, render and exact check are one pure step. */
-export function projectNowForPublish(html, activeWork, { knownPoints = null, stamp = berlinStamp() } = {}) {
+export function projectNowForPublish(
+  html,
+  activeWork,
+  { knownPoints = null, stamp = berlinStamp(), queueData = null, titles = {} } = {},
+) {
   if (!activeWork || activeWork.ok !== true || !Array.isArray(activeWork.points)) {
     const why = activeWork?.errors?.join('; ') || 'the active-work source is unreadable'
     throw new Error(`active-work source unresolved: ${why}`)
@@ -1091,6 +1179,8 @@ export function projectNowForPublish(html, activeWork, { knownPoints = null, sta
   const projected = reconcileNowProjection(html, activeWork.points, {
     focusPoint: activeWork.focusPoint,
     stamp,
+    queueData,
+    titles,
   })
   const comparison = compareNowProjection(projected, activeWork.points, {
     knownPoints,

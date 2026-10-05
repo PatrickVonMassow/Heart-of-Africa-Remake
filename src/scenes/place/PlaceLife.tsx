@@ -65,6 +65,9 @@ import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
+import { workStop, type WorkStopMode } from './taskWalkerStop'
+import { steerHeading } from '../../render/figureWalk'
+import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
 import { isLifeFrozen } from './lifeFreeze'
@@ -399,9 +402,8 @@ function Loom({
     helperGait.current = phase
     if (helper.current) {
       if (import.meta.env.DEV) helper.current.userData.errand = work.errand ? { toward: work.errand.toward, phase: work.errand.phase } : null
-      // Dropped onto his stance leg, so the swinging feet ride the ground
-      // instead of hanging above it.
-      helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, gaitBodyLift(phase, FIGURE_LIMBS.hipY), picture.helperAt)
+      // On the ground; the figure drops onto its own stance leg.
+      helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, 0, picture.helperAt)
       // Walking, he faces the way he is going — which is the word. Working or
       // home, he faces the warp he is tending.
       const walking = work.errand !== null && work.errand.phase !== 'work' && moved > 1e-6
@@ -1102,8 +1104,9 @@ function Kids({
       // beside a stone rather than standing on one. The climb now carries its
       // own lift in metres, taken from the boulder the child is actually on, and
       // this only draws it.
-      const gaitLift = gaitBodyLift(phase, legLength)
-      const lift = round.bank ? bankChildBodyLift(c as BankChild, gaitLift, bankChildTouching(round.bank, i)) : gaitLift
+      // The stride's own drop onto the stance leg is the figure's (placeFigure /
+      // skinnedFigure): the group stands on the ground, plus any climb.
+      const lift = round.bank ? bankChildBodyLift(c as BankChild, 0, bankChildTouching(round.bank, i)) : 0
       g.position.set(c.x, groundHeight(c.x, c.z) + lift, c.z)
       // A TAGGED CHILD IS OUT OF PLAY (work-order 687 item 3, redrawn in 1239):
       // it stands at full height in the caught slump — trunk leaned forward,
@@ -1796,7 +1799,7 @@ function Porters({
       }
       const px = p.x
       const pz = p.z
-      g.position.set(px, groundHeight(px, pz) + Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
+      g.position.set(px, groundHeight(px, pz), pz)
       g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
     })
   })
@@ -2150,15 +2153,19 @@ function TaskWalker({
   home: HomeDef
   target: [number, number]
   cloth: string
-  carry: 'bundle' | 'jar'
+  carry: TaskLoad
   colliders: Collider[]
   startDelay: number
 }) {
   const groundHeight = usePlaceGround()
-  const standing = useRef<THREE.Group>(null)
-  const kneeling = useRef<THREE.Group>(null)
+  // ONE body that walks, kneels at its work and gets up again (work-order
+  // "walking villagers", from point 350): never two figures swapped by
+  // visibility, which made the kneel a pop between a standing and a squashed one.
+  const walker = useRef<THREE.Group>(null)
+  const kneels = useRef(false)
+  const load = useRef<THREE.Group>(null)
   const state = useRef({
-    mode: 'inside' as 'inside' | 'go' | 'work' | 'back',
+    mode: 'inside' as 'inside' | 'go' | WorkStopMode,
     seg: 0,
     x: home.x,
     z: home.z,
@@ -2174,13 +2181,13 @@ function TaskWalker({
     [colliders],
   )
 
+  // Before the figure's own frame, as the walkers' below: its stride reads this step.
   useFrame((_, rawDt) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const s = state.current
-    const stand = standing.current
-    const kneel = kneeling.current
-    if (!stand || !kneel) return
+    const stand = walker.current
+    if (!stand) return
     if (body) {
       body.active = s.mode !== 'inside'
       body.x = s.x
@@ -2194,12 +2201,11 @@ function TaskWalker({
 
     if (s.mode === 'inside') {
       stand.visible = false
-      kneel.visible = false
-      // Both bodies follow the state while it is at home (point 509): neither
-      // may keep the identity transform that would park it at the settlement
+      kneels.current = false
+      // The body follows the state while it is at home (point 509): it may not
+      // keep the identity transform that would park it at the settlement
       // origin until its first outing writes one.
       stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
-      kneel.position.set(s.x, groundHeight(s.x, s.z), s.z)
       s.timer -= dt
       if (s.timer <= 0) {
         s.mode = 'go'
@@ -2209,21 +2215,24 @@ function TaskWalker({
       }
       return
     }
-    if (s.mode === 'work') {
-      stand.visible = false
-      kneel.visible = true
-      kneel.position.set(s.x, groundHeight(s.x, s.z), s.z)
-      kneel.rotation.y = s.yaw
-      s.timer -= dt
-      if (s.timer <= 0) {
-        s.mode = 'back'
-        s.seg = 0
-      }
+    if (s.mode === 'work' || s.mode === 'rise') {
+      // Kneels where it stopped, the load set down; the figure folds down and
+      // stands up again on its own short transition — held on the spot until
+      // it is up, then it takes the load and walks.
+      const next = workStop(s.mode, s.timer, dt)
+      kneels.current = next.kneels
+      if (load.current) load.current.visible = next.mode !== 'work'
+      s.mode = next.mode
+      s.timer = next.timer
+      if (next.mode === 'back') s.seg = 0
+      stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
+      stand.rotation.y = s.yaw
       return
     }
 
     stand.visible = true
-    kneel.visible = false
+    kneels.current = false
+    if (load.current) load.current.visible = true
     const tgt = route[s.seg + 1]
     if (!tgt) {
       if (s.mode === 'go') {
@@ -2238,26 +2247,30 @@ function TaskWalker({
     const dx = tgt[0] - s.x
     const dz = tgt[1] - s.z
     const d = Math.hypot(dx, dz)
-    const step = 1.2 * dt
+    const speed = 1.2
+    const step = speed * dt
     // The home leg (center ↔ door) passes through the own dwelling.
     const throughDoor = s.mode === 'go' ? s.seg === 0 : s.seg === route.length - 2
     if (d <= step + (throughDoor ? 0.08 : 0.3)) {
       s.seg++
     } else if (throughDoor) {
-      s.x += (dx / d) * step
-      s.z += (dz / d) * step
-      s.yaw = Math.atan2(dx, dz)
+      // Turned toward the way, never snapped (a planted foot rides a snap).
+      const turn = steerHeading(s.yaw, Math.atan2(dx, dz), speed, dt)
+      s.yaw = turn.yaw
+      s.x += Math.sin(s.yaw) * step * turn.pace
+      s.z += Math.cos(s.yaw) * step * turn.pace
     } else {
       // Point 657: another inhabitant on the way is walked round, not walked
       // into.
       const want = body
         ? stepRoundBodies(bodySet, body, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
         : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
-      const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
-      if (Math.hypot(nx - s.x, nz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
-      s.x = nx
-      s.z = nz
-      s.yaw = Math.atan2(dx, dz)
+      const [tx, tz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
+      if (Math.hypot(tx - s.x, tz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
+      const way = wayHeading(s.x, s.z, tx, tz, dx, dz, step)
+      const turn = steerHeading(s.yaw, way, speed, dt)
+      s.yaw = turn.yaw
+      ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
       // Point 578: pushed clear of the other inhabitants where the step left it.
       // The door leg is left out — it runs through its own hut, where every
       // direction is blocked anyway.
@@ -2271,28 +2284,31 @@ function TaskWalker({
     }
     stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
     stand.rotation.y = s.yaw
-  })
+  }, -1)
 
   return (
-    <>
-      <group ref={standing} visible={false} position={figureStance(home)}>
-        <Figure cloth={cloth} pose={HEAD_CARRY_POSE} />
-        {carry === 'bundle' ? (
-          <mesh position={[0, 1.42, 0]} castShadow>
-            <boxGeometry args={[0.38, 0.22, 0.3]} />
-            <meshStandardMaterial color="#a3702e" roughness={0.95} />
-          </mesh>
-        ) : (
-          <mesh position={[0, 1.5, 0]} castShadow>
-            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-          </mesh>
-        )}
-      </group>
-      <group ref={kneeling} visible={false} position={figureStance(home)}>
-        <Figure cloth={cloth} kneel />
-      </group>
-    </>
+    <group ref={walker} name="village-task-walker" visible={false} position={figureStance(home)}>
+      <Figure
+        cloth={cloth}
+        kneeling={kneels}
+        headSteady={steadiedLoad(carry, taskLoadShape(carry))}
+        headProp={
+          <group ref={load}>
+            {carry === 'bundle' ? (
+              <mesh position={[0, TASK_BUNDLE.height / 2, 0]} castShadow>
+                <boxGeometry args={[TASK_BUNDLE.width, TASK_BUNDLE.height, TASK_BUNDLE.depth]} />
+                <meshStandardMaterial color="#a3702e" roughness={0.95} />
+              </mesh>
+            ) : (
+              <mesh position={[0, TASK_JAR.height / 2, 0]} castShadow>
+                <cylinderGeometry args={[TASK_JAR.top, TASK_JAR.bottom, TASK_JAR.height, 8]} />
+                <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+              </mesh>
+            )}
+          </group>
+        }
+      />
+    </group>
   )
 }
 
@@ -2414,6 +2430,9 @@ function Walkers({
     w.__placeWalkers = {
       states: states.current,
       homes: defs.map((d) => d.home),
+      carries: defs.map((d) => d.carries),
+      // The drawn group, for the walk's foot and stride measurements.
+      group: (who: number) => refs.current[who] ?? null,
       // Read the rendered body independently of the surface it should ride.
       sample: (who: number) => {
         const s = states.current[who]
@@ -2432,6 +2451,10 @@ function Walkers({
     }
   }, [defs, groundHeight])
 
+  // Priority −1: the walkers move before any figure reads its own ground speed
+  // (React subscribes the child figures first), so a stride is solved against
+  // this frame's step, not the last one's — a frame late, a planted foot rides
+  // forward with the body.
   useFrame(({ clock }, rawDt) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
@@ -2513,15 +2536,19 @@ function Walkers({
       // Door segments (home center ↔ door) pass through the own dwelling:
       // no collision there, the walker slips through the entrance door.
       const throughDoor = s.seg === 0 || s.seg === s.route.length - 2
+      let turning = false
       if (d <= step + (throughDoor ? 0.08 : 0.35)) {
         // Close enough (the exact point may sit inside a collider).
         s.seg++
         s.stuck = 0
         if (s.seg === 3) s.pause = 2.5 + Math.random() * 4 // linger at the errand
       } else if (throughDoor) {
-        s.x += (dx / d) * step
-        s.z += (dz / d) * step
-        s.yaw = Math.atan2(dx, dz)
+        // Turned toward the way, never snapped (a planted foot rides a snap).
+        const turn = steerHeading(s.yaw, Math.atan2(dx, dz), def.speed, dt)
+        s.yaw = turn.yaw
+        s.x += Math.sin(s.yaw) * step * turn.pace
+        s.z += Math.cos(s.yaw) * step * turn.pace
+        turning = turn.pace < 0.3
       } else {
         // Solid objects block inhabitants too; slide along and skip the
         // waypoint if blocked for too long (design.md §2 collision) — and
@@ -2530,11 +2557,14 @@ function Walkers({
         const want = b657
           ? stepRoundBodies(bodySet, b657, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
           : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
-        const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
-        const moved = Math.hypot(nx - s.x, nz - s.z)
-        s.x = nx
-        s.z = nz
-        s.yaw = Math.atan2(dx, dz)
+        const [tx, tz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
+        const moved = Math.hypot(tx - s.x, tz - s.z)
+        // The body turns toward where it can really go and steps along its
+        // heading: a snapped turn swings a planted foot across the ground.
+        const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, tx, tz, dx, dz, step), def.speed, dt)
+        s.yaw = turn.yaw
+        ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
+        turning = turn.pace < 0.3
         if (moved < step * 0.3) {
           s.stuck += dt
           if (s.stuck > 1.4) {
@@ -2549,6 +2579,8 @@ function Walkers({
       // blocks, but a walker wedged in a pocket keeps cycling waypoints while
       // physically pinned. When it has not actually moved for the calibratable
       // window, place it on free ground — inhabitants only, never the player.
+      // Turning nearly on the spot is not being wedged: the pinned clock holds.
+      if (turning) s.pinned -= dt
       if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
         s.pinned += dt
         if (s.pinned > balance.walkerUnstuckSeconds) {
@@ -2564,10 +2596,11 @@ function Walkers({
         s.pinned = 0
       }
       settleBody(i, s, !throughDoor)
-      g.position.set(s.x, groundHeight(s.x, s.z) + Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
+      // On the ground: the body's own stride carries the rise and fall.
+      g.position.set(s.x, groundHeight(s.x, s.z), s.z)
       g.rotation.y = s.yaw
     })
-  })
+  }, -1)
 
   return (
     <>
@@ -2582,18 +2615,31 @@ function Walkers({
             refs.current[i] = el
           }}
         >
-          <Figure cloth={def.cloth} pose={def.carries ? HEAD_CARRY_POSE : undefined} />
-          {/* Some carry a basket or bundle on the head */}
-          {def.carries && (
-            <mesh position={[0, 1.42, 0]} castShadow>
-              <cylinderGeometry args={[0.22, 0.16, 0.18, 8]} />
-              <meshStandardMaterial color="#a3702e" roughness={0.95} />
-            </mesh>
-          )}
+          {/* Some carry a basket on the head, resting on the crown. */}
+          <Figure
+            cloth={def.cloth}
+            headSteady={def.carries ? steadiedLoad('basket', { ...WALKER_BASKET }) : null}
+            headProp={
+              def.carries ? (
+                <mesh position={[0, WALKER_BASKET.height / 2, 0]} castShadow>
+                  <cylinderGeometry args={[WALKER_BASKET.top, WALKER_BASKET.bottom, WALKER_BASKET.height, 8]} />
+                  <meshStandardMaterial color="#a3702e" roughness={0.95} />
+                </mesh>
+              ) : undefined
+            }
+          />
         </group>
       ))}
     </>
   )
+}
+
+/** The heading a walker turns toward: where a full step toward its waypoint
+ *  really goes (slid along a wall, round another body) — unless that is
+ *  hardly a step, or a shove back, which never turns it about. */
+function wayHeading(x: number, z: number, tx: number, tz: number, dx: number, dz: number, step: number): number {
+  const ahead = (tx - x) * dx + (tz - z) * dz > 0
+  return Math.hypot(tx - x, tz - z) > step * 0.3 && ahead ? Math.atan2(tx - x, tz - z) : Math.atan2(dx, dz)
 }
 
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
@@ -3113,11 +3159,8 @@ function ErrandVillagers({
 
       const g = refs.current[i]
       if (g) {
-        // The same walking bob the other inhabitants ride, off the distance this
-        // villager has actually covered rather than off a wall clock.
-        // No bob while filling: he stands in the river (work-order 1117).
-        const bob = filling === null ? Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05 : 0
-        g.position.set(me.x, groundHeight(me.x, me.z) + bob, me.z)
+        // On the ground: the body's own stride carries the rise and fall.
+        g.position.set(me.x, groundHeight(me.x, me.z), me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
         if (facing !== null) yaws.current[i] = facing
         g.rotation.y = yaws.current[i]
@@ -3303,6 +3346,22 @@ function ErrandVillagers({
             pose={poses.current[i]}
             limbs={limbs.current[i]}
             squat={(squats.current[i] ??= { current: 1 })}
+            headSteady={steadiedLoad('jar', { bottom: JAR_WAIST_R, top: JAR_RIM_R, height: JAR_HEIGHT })}
+            headProp={
+              <group
+                ref={(el) => {
+                  headJars.current[i] = el
+                }}
+                visible={false}
+                position={[0, JAR_HEIGHT / 2, 0]}
+                // A carried jar is not a plumb cylinder: a small lean turns the
+                // mouth off the vertical, which is what lets any of the water in it
+                // be seen from a standing eye rather than only its rim edge-on.
+                rotation={[0.16, 0, 0.1]}
+              >
+                <Jar full />
+              </group>
+            }
             handProp={
               <>
                 <group
@@ -3342,19 +3401,6 @@ function ErrandVillagers({
               </>
             }
           />
-          <group
-            ref={(el) => {
-              headJars.current[i] = el
-            }}
-            visible={false}
-            position={[0, 1.5, 0]}
-            // A carried jar is not a plumb cylinder: a small lean turns the
-            // mouth off the vertical, which is what lets any of the water in it
-            // be seen from a standing eye rather than only its rim edge-on.
-            rotation={[0.16, 0, 0.1]}
-          >
-            <Jar full />
-          </group>
         </group>
       ))}
       {geography.waterStand && (

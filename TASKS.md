@@ -97,6 +97,20 @@ put it is the mistake this line exists to stop.
   Find and fix the cause, so that a card answer the user gives in the head session while it stands down is carried to the owner and acted on without any human step in another session.
   Done when: in a reproduction with a live headless owner, `vdzk-answer.mjs` records the head session's answer, and the owner (or the due-redeem path) removes the named card. A unit test covers the state shape that made activeSource fail. A SendMessage to a headless peer is not part of the solution.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1297. Investigate, and fix if confirmed, a calf-predation outcome reported by the user on 05.10.2026 (bug report /backup/hoa/local/hoa-state-2026-10-05-1928572142.zip, seed 1928572142, position 43.77/-100.17, build 69221cd, WebGPU): a lion hunted an antelope calf, the parent ran as a living shield between lion and calf, the lion visibly reached the PARENT, yet the CALF died although the lion was well away from it. The user adds: the calf was on the OTHER side of the river when it died.
+  Queue position: directly before point 1294 (user order 05.10.2026: "Reihe eine Untersuchung und eventuelle Behebung davon direkt vor 1294 ein.").
+  Evidence (snapshot taken after the event, hunt already in 'leave'): two antelope carcasses 1.89 apart at about (100, -122) — almost exactly PARENT_BLOCK_OFFSET = 1.8 — both with landed vultures (a land kill, not a drowning); no mourning calf and no vigil parent nearby, i.e. most likely BOTH died. The screenshot shows the kill stain right at the waterline of the FAR (east) bank, the traveller on the west bank.
+  Suspected mechanisms (unproven):
+  (a) The shield take (Wildlife.tsx ~2633-2701, Herds frame, PARENT_TAKE_DIST 1.0) reconstructs the lion's move segment with the full HUNT_LION_SPEED, while in a river the lion moves at the swim-braked pace (swimBrakedPace, ~5848) — the tested segment is not the lion's real one.
+  (b) The take and the calf catch (~5858, LionHunt frame, CALF_CATCH_DIST 0.9) are separate tests: a shielding parent slightly off the lion→calf line (> 1.0) is visibly overlapped but not taken; the lion catches the calf behind it, and the too-late rule (PARENT_TOO_LATE_DIST 3.2, caught countdown ~2487) kills both.
+  (c) The chaseSwim far-bank resolution (chaseSwimEscaped) and the orphan mourning (mournOrphan / mournAt pulling the calf back toward the parent's body at the water) interact with the shield across the river.
+  The feed pose snaps the lion to s.px + 0.7 beside its victim (~6014).
+  Final state:
+  1. A reproducing test stages the shield hunt at a river (calf swims across, the parent shields in or at the water, the lion follows) plus the variant with a laterally offset parent on land, and records which animal the lion contacts first and which dies where. If it does not reproduce, the point closes with that test as evidence and a note of what was ruled out.
+  2. If confirmed: the first body the lion actually reaches decides — also in water and at the braked swim pace. A hunter that visibly reaches the shielding parent meets the parent's defence roll (design.md §19 / §19.8) first; the calf is never caught through, past, or across the river from a shielding parent. No change to the defence roll, the too-late rule itself, or balance values.
+  3. The lion is never drawn snapping across to a victim it did not reach.
+  4. Right-layer tests: Vitest for the pure contact predicate; the existing wildlife Playwright suite for the staged river scene; picture check per §7.2.
+  Bundle: Tierverhalten.
 - [ ] 1294. Villagers on a CC0 glTF base body with morph targets, prepared by a container-managed Blender
   Queue position: directly after point 1288 (user order 04.10.2026).
   Source: user decision 04.10.2026 on the figure-rendering proposal, variant 2b. Sketch: https://claude.ai/artifact/XcFmBv6Qz7SFTFKsiEeeez. Builds on point 1293 (queued after 1279): its appearance table, skeleton-bound dress, research results and low-preset rule are reused, not rebuilt.
@@ -109,6 +123,53 @@ put it is the mistake this line exists to stop.
   Verifiable: the install command run twice (the second run is a no-op); the pipeline script reproduces the .glb files; Vitest for the morph mapping from the appearance table; Playwright, both backends: the same village frames as point 1293 plus a low-preset frame, judged by looking, and the before/after load-size and cost measurement.
   Criticality: high — new asset pipeline, load budget, every villager, both backends.
   Bundle: Dorfleben.
+
+- [ ] 1301. Low-preset primitive villager kneels with fixed limb lengths and stays above ground
+  Queue position: directly behind point 1294.
+  Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
+  (owner decision under the standing split rule, recorded for veto). Cross-vendor review at e8b17e850 (GPT-6 Astra,
+  pass 1/2, receipt 32873f1442e6ce05) and the round-3 author report leave three defects of the low-preset primitive
+  figure (`src/scenes/place/placeFigure.tsx`, `primitiveLayout()` in `src/render/figureWalk.ts`).
+  Final state:
+  1. The primitive kneel folds with fixed limb lengths: no arm-length, shoulder-width or body-height scaling
+     (today 55 % arms/shoulders, 0.4125 body, `placeFigure.tsx` ~196). The primitive arm gets an elbow and its
+     contacts are solved like the skinned figure's, so the low-preset kneel poses tuned for the short 0.242 arm
+     (loom weaver, griller, fish gutting, net seat) keep their hand targets without overshooting into the ground.
+  2. The leg fold (`acos(hipY / legLength)`, `placeFigure.tsx` ~204) leaves clearance for the leg radius: no tilted
+     rim and no lower half of a leg cylinder below the ground at full kneel.
+  3. Resting hands of a kneeling primitive stay on or above the ground (measured today ~4 cm below).
+  Not in scope: horizontal foot slide of the low-preset walk (rejected in 1295 under its item 6).
+  Test: `figureWalk.test.ts` stops accepting shortened arms (~404-415) and asserts constant limb lengths through a
+  kneel; the low-preset grounding check in `scripts/verify/polish-villagers.mjs` measures legs and hands, not only
+  the body; `polish --section=village-walk` green on both backends with a low-preset kneel frame picture-checked.
+  Bundle: Dorfleben.
+  Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
+
+- [ ] 1302. Board cards: separate description section from implementation status
+  Queue position: directly after point 1295 (landed; this slot follows its split-off 1301), ahead of point 1303 (user order 05.10.2026: "Ja, übernimm beide so. Reihe sie nach 1295 ein.").
+  Why: a card has one body field (board-core.mjs promoteToNow -> renderCardBody(status)); every status update overwrites the description, so texts like "Punkt erledigt, Abschlussarbeiten stehen noch aus" leave the user unable to see what the point is about.
+  User (05.10.2026): "Der Beschreibungstext von Karten auf dem Dashboard wird aktuell als Status-Angabe missbraucht. [...] Mit so einem Text kann ich nicht erkennen, was im Rahmen des Tickets überhaupt gemacht wird." / "Wie wäre es, den beim Aufklappen einer Karte angezeigten Text in zwei Sektionen aufzuteilen: Einen Bereich, der die Beschreibung enthält. Dieser sollte im Normalfall bereits vor dem Ziehen der Karte geschrieben werden. Während der Bearbeitung wird er nur geändert, wenn sich wider erwarten etwas an den Anforderungen ändert. Einen weiteren, optisch (z. B. durch eine Trennlinie) abgegrenzten Bereich mit dem aktuellen Status der Umsetzung. Dieser soll immer aktuell gehalten werden."
+  Final state: an expanded dashboard card (now/queue/done) shows two sections.
+  1. Description (top): 1-3 sentences on what the point delivers. Set when the card is created (promote/queue add), sourced from the point's TASKS.md text when not given. A status update can NOT touch it; only an explicit board.mjs command (e.g. `describe <point> --text-stdin`) changes it, used only when the requirement actually changes.
+  2. A visible divider (e.g. <hr> or bordered block), then "Stand der Umsetzung" with the "Stand <stamp>" lead. Every progress update replaces only this section.
+  A card without a description renders a visible "Beschreibung fehlt" placeholder instead of failing. No new guard (infrastructure freeze): the separation lives in the card format and in board-core.mjs (renderCardBody / promoteToNow / status-update paths) alone.
+  One-time migration: each existing card's current body becomes its status; its description is filled from the point's TASKS.md text.
+  Tests: node tests in board-core.test.mjs proving a status update leaves the description byte-identical and that both sections render with the divider.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1303. Board cards keep the original start time and show dates for long spans
+  Queue position: directly after point 1302 (user order 05.10.2026: "Ja, übernimm beide so. Reihe sie nach 1295 ein.").
+  Why: the card's times are a free string each session passes to `board.mjs promote <point> "<times>"` (board-core.mjs promoteToNow). A successor session writes its own takeover time, so a point worked for many hours shows e.g. "14:00 – 14:30". And a span over 24 h is indistinguishable from a short one without a date.
+  User (05.10.2026): "Wird eine Karte an eine Nachfolgesitzung übergeben, um den Kontext einer Sitzung nicht zu sehr wachsen zu lassen, schreibt die neue Sitzung ihre Übernahmezeit als Startzeit hinein. Dann kommt am Ende so etwas heraus wie dass in der Karte steht, der Task wäre von 14:00 bis 14:30 Uhr bearbeitet worden, obwohl die Bearbeitung eigentlich viele Stunden vor 14 Uhr begonnen hatte und nur die letzte Sitzung, die daran gearbeitet hat, um 14 Uhr begonnen hat." / "Wenn Start- und Endzeit mehr als 24 h auseinanderliegen, ist das nicht erkennbar. In diesem Fall soll auch das Datum mitangegeben werden - zunächst nur im Format DD.MM. Nur, wenn Start- und Endzeit mehr als ein Jahr auseinanderliegen, soll als Format DD.MM.YY verwendet werden."
+  Final state:
+  1. A card's start time is recorded once, at its first promotion to current work (fallback: the first commit on the point's feat/ branch). A session handover / re-promotion never overwrites it; the successor keeps the original start. board-core.mjs promoteToNow and the handover path read the existing start instead of taking the caller's free "<times>" string for it.
+  2. The number of sessions that worked the card is counted; when >1 the time line appends "· <n> Sitzungen".
+  3. Time-span format (Europe/Berlin), by distance between start and end (or now for running cards):
+     - <= 24 h: times only, "09:12 – 14:30" (also across midnight, "23:10 – 01:40")
+     - > 24 h: date added, "03.10. 09:12 – 05.10. 14:30"
+     - > 1 year: date with two-digit year, "03.10.25 09:12 – 05.10.26 14:30"
+  Tests: node tests in board-core.test.mjs for handover keeping the start, the session count, and all three format bands including the exact 24 h / 1 year boundaries.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
@@ -6146,32 +6207,6 @@ Build order, chosen so no two parallel agents own the same file:
   screenshot): the Zulu village forced into heavy rain shows the decided state rather
   than an uncovered burning fire, and the same village in dry weather is unchanged from
   today.
-
-- [ ] 350. The kneeling villager is a squashed villager (user 25.07.2026, deployed
-  build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
-  ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
-  kneeling with a NON-UNIFORM vertical squash — `scale={[scale, scale * (kneel ? 0.75 :
-  1), scale]}` (line ~60) on top of a shortened body cone (`bodyH = kneel ? 0.55 : 1.0`).
-  The squash applies to the WHOLE figure, the head included, so the head reads as a
-  flattened ellipsoid: kneeling shortens the legs, it does not compress the skull. And
-  the alternation the user sees is `TaskWalker` (line ~496) swapping the standing and
-  kneeling groups by VISIBILITY when it starts and ends its work at the well — an
-  instant pop between two different-looking figures.
-  TARGET: a kneeling pose built from PROPORTIONS, not from a vertical scale. The lower
-  body folds (a shorter, wider base) and the whole figure sits lower, while the head and
-  every other part keep their true shape — the group's scale stays UNIFORM. And the
-  transition reads as a movement rather than a swap: the figure lowers into the pose and
-  rises out of it over a short, calibratable time, so no frame shows one figure replaced
-  by another. Every user of `kneel` gets it — the cook, the fire tender and the errand
-  walker at the well.
-  VERIFIABLE: pure (`src/render/figures.test.ts` or a test beside it) — the kneeling
-  build applies no non-uniform scale (x, y and z factors equal) and its head radius
-  matches the standing figure's, while the pose is genuinely lower (a bounded overall
-  height reduction); the standing build is unchanged. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): across the frames in which a
-  task walker starts and finishes its work, no single frame changes the figure's
-  rendered height by more than the transition's per-frame step — the pop is what the
-  check is for.
 
 - [ ] 353. Sheltered ground stays less wet (user 25.07.2026). In the rain the whole
   settlement floor darkens uniformly, so the earth under a roof overhang or a tree crown
@@ -15510,6 +15545,7 @@ to land than a mechanism that needs a review.
 - [ ] 1242. The river beyond the plate rim is a different, darker water than at the bank (both backends)
   MEASURED 30.09.2026 07:14Z, `VERIFY_GL=webgl npm test -- polish --section=adult-errands` on feat/1152 6922bdb2c: `the water beyond the plate's rim is the SAME water as the water at the bank (<= 12/255 per channel)` RED, far 11/92/104 against near 139/157/147, median step 127.5; its sibling `the handover zone itself carries neither band's edge` RED, median step 68.3. This is a STEADY red, not point 568's rotation (568 straddled 12-19): the same pair was red at step 99.6-126.1 in the LARGE runs of 26.09 and 28.09 (on both backends at 28.09 18:09Z and 21:55Z). On WebGPU the check was green on feat/1152 at 05:07Z, after point 1151's sky/water fix. Point 1152 (foam patches) did not cause it.
   ALSO RED ON WebGPU, measured 02.10.2026: the same pair red in the full `polish-villagers` pass on feat/1108 d6a9d37aa (median step 148.8 / 75.9; WebGL 2 25.1 / 12.5) and already on feat/1117 06312849a at 19:52Z (step 133.2) — before point 1108, which only moves the errand shots' cameras.
+  STILL RED 05.10.2026, WebGPU full `polish-villagers` pass on feat/1295 b96a04e78 and on 85207f7c6 before any 1295 commit: median step 20.4 (beyond the rim) and 13.3 (rim-zone line).
   FINAL STATE: the far water continues the bank water's tone on BOTH backends and both checks are green there.
   Test: `polish --section=adult-errands` on both backends; a Vitest on the layer the fix touches.
   Refs: src/render/placeRiver.ts, scripts/verify/polish.mjs, point 568, point 1151.
@@ -15739,3 +15775,39 @@ to land than a mechanism that needs a review.
   able to fail on a strike that is truly silent.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side race, no player impact measured.
+- [ ] 1296. The full world suite crashes on WebGPU at the rock-relief click behind an open dialog
+  Measured 05.10.2026, 08:40-08:45, on main 69221cd36: `VERIFY_GL=webgpu` world (full suite) exits 1 twice in a row with
+  "7 pass, 0 fail" and an uncaught TimeoutError — `page.locator('[data-form="rock-relief"]').click()`
+  (`scripts/verify/world.mjs` ~412) retries 30× because `<div class="dialog-backdrop">` intercepts pointer events; last
+  frame written 19-worldmodel-communication-erratic. The same suite ran green on WebGL 2 in between. Log:
+  `local/verify-logs/2026-10-05T06-44-13-220-world.log`.
+  Done when: the dialog whose backdrop covers the click is identified (measured, not assumed), and either the staging
+  closes it before the act or a product defect that opens it there is fixed; the full world suite is green on both
+  backends with no check weakened.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — the world suite cannot cover a render change on WebGPU until it is fixed.
+- [ ] 1300. The loom station and the mute-shore boatman reading are red in polish-villagers independent of any branch
+  Queue position: end of the open work order.
+  MEASURED 05.10.2026, WebGPU full `polish-villagers` pass on feat/1295 b96a04e78, and with near-identical numbers on 85207f7c6 before any 1295 commit: `village-loom` station 52.8 px tall seen from the plaza (check needs 70); `mute-shore-scene` boatman reading taken at 9.7 s (red). Not yet reproduced on a quiet machine.
+  Final state:
+  1. Each of the two checks is reproduced on a quiet machine on WebGPU and WebGL 2, or shown to be a load transient (then recorded as such and closed).
+  2. A reproduced red is fixed at its cause (scene or check), not by loosening the threshold without a measured reason.
+  3. `polish --section=village-loom` and `polish --section=mute-shore-scene` green on both backends.
+  Test: the two sections above on both backends; a Vitest on the layer a fix touches.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1304. A request whose open questions read "none" is queued, not turned into a decision card
+  Source: findings carrier 05.10.2026 (session b8700b05): the requests that became 1302 and 1303 listed the literal "none" under open-questions; findings-request-core treated it as a non-empty open question, routed both to DECISION CARDS, and the user-approved requests sat blocked until a later session carried them by hand.
+  Final state:
+  1. In scripts/findings-request-core.mjs an open-questions field that is empty after trimming, or consists only of "none", "keine", "n/a" or "-" (case-insensitive, optional trailing period), counts as no open question: the request routes to the TASKS append, not to a decision card.
+  2. Vitest in scripts/findings-request-core.test.mjs: each of those literals routes to the TASKS append; a real question still routes to the decision card.
+  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1305. Deferring a carrier request at the context watermark must not mark it blocked
+  Source: findings carrier 05.10.2026 (session 512756ba): at the 1295 boundary past the context watermark the owner ran `finding.mjs --blocked` on the user-approved request "Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check" with a pure deferral reason. That put a decision card "Anfrage nicht übernehmbar: …" before the user and took the request out of the pending set, so no successor drain lists it.
+  Final state:
+  1. A deferral at the watermark leaves the request pending (no `--blocked`, no decision card); the boundary text (`scripts/batch-boundary.mjs --prepare`) and `docs/batch-owner-runbook.md` say so where they name the drain.
+  2. The approved request above is carried into the work order as its own point (re-opened from blocked) and its decision card removed.
+  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
+  Bundle: Session- & Repo-Hygiene.

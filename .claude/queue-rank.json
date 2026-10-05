@@ -1596,6 +1596,30 @@
       "why": "Low-criticality test-side race with its red charged; behind the user's ordered work is right.",
       "origin": "machine",
       "place": "last"
+    },
+    "1296": {
+      "at": "2026-10-05T06:47:26.283Z",
+      "why": "test-staging crash with no measured player impact; it stands with the other suite reds behind the feature work",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1300": {
+      "at": "2026-10-05T11:24:02.990Z",
+      "why": "unreproduced test reds that block no point; last is right until reproduced",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1304": {
+      "at": "2026-10-05T13:51:02.033Z",
+      "why": "process defect behind the carried requests; no player impact, end of queue is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1305": {
+      "at": "2026-10-05T14:22:05.501Z",
+      "why": "process defect; end of queue, carries the stuck approved request",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1625,7 +1649,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-05T05:32:24.369Z",
+    "at": "2026-10-05T14:22:05.511Z",
     "points": [
       184,
       200,
@@ -1656,7 +1680,6 @@
       346,
       347,
       348,
-      350,
       353,
       354,
       356,
@@ -2053,14 +2076,21 @@
       1268,
       1269,
       1270,
-      1286,
       1287,
       1288,
       1289,
       1290,
       1291,
       1292,
-      1294
+      1294,
+      1296,
+      1297,
+      1300,
+      1301,
+      1302,
+      1303,
+      1304,
+      1305
     ]
   }
 }

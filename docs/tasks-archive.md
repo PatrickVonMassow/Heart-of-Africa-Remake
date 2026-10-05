@@ -33544,3 +33544,76 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Tests: a Vitest for the pure follow step (constant camera-to-target direction at every heading and on a stop; the same lag at 30 and 60 fps); the existing travel Playwright suite on WebGPU with a picture check of a walk east, north, and a stop.
   Criticality: medium - visible to the player on every overland step; no data risk.
   Bundle: Steuerung & Performance.
+- [x] 350. The kneeling villager is a squashed villager (user 25.07.2026, deployed
+  build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
+  ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
+  kneeling with a NON-UNIFORM vertical squash — `scale={[scale, scale * (kneel ? 0.75 :
+  1), scale]}` (line ~60) on top of a shortened body cone (`bodyH = kneel ? 0.55 : 1.0`).
+  The squash applies to the WHOLE figure, the head included, so the head reads as a
+  flattened ellipsoid: kneeling shortens the legs, it does not compress the skull. And
+  the alternation the user sees is `TaskWalker` (line ~496) swapping the standing and
+  kneeling groups by VISIBILITY when it starts and ends its work at the well — an
+  instant pop between two different-looking figures.
+  TARGET: a kneeling pose built from PROPORTIONS, not from a vertical scale. The lower
+  body folds (a shorter, wider base) and the whole figure sits lower, while the head and
+  every other part keep their true shape — the group's scale stays UNIFORM. And the
+  transition reads as a movement rather than a swap: the figure lowers into the pose and
+  rises out of it over a short, calibratable time, so no frame shows one figure replaced
+  by another. Every user of `kneel` gets it — the cook, the fire tender and the errand
+  walker at the well.
+  VERIFIABLE: pure (`src/render/figures.test.ts` or a test beside it) — the kneeling
+  build applies no non-uniform scale (x, y and z factors equal) and its head radius
+  matches the standing figure's, while the pose is genuinely lower (a bounded overall
+  height reduction); the standing build is unchanged. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): across the frames in which a
+  task walker starts and finishes its work, no single frame changes the figure's
+  rendered height by more than the transition's per-frame step — the pop is what the
+  check is for.
+  Closed 05.10.2026 without its own landing: absorbed into point 1295 by user order ("Der Task 350 sollte dann in diesen zusammengeführt und der alte 350er gelöscht werden"); its kneeling requirement is item 5 there.
+
+- [x] 1298. Board now-card stub keeps the point's name
+  Queue position: directly after point 1295 (user order 05.10.2026).
+  Source: user 05.10.2026: "Warum gibt es immer wieder Karten, die seit Stunden in Arbeit sind mit Titel "chText für diesen Punkt fehlt noch"? So sehe ich nicht, woran gearbeitet wird." / "Setze deinen Vorschlag um, als neuen Punkt in der Warteschlange, direkt nach 1295." Measured 05.10.2026 11:47: point 1295 stood as such a stub since 10:57 although its queue text existed in .claude/board-queue.json. Cause: renderNowStub (scripts/board-core.mjs ~850) writes a fixed placeholder title, stripProjectedQueueCards removes the queue card that carried the title/prose; `board.mjs status` updates only the body.
+  Final state:
+  1. When reconcileNowProjection inserts a now-card for a derived active point, the card's title is taken, in this order, from: the point's queue card being removed (its title and body text), the entry in .claude/board-queue.json (title, else first body line), the work-order headline. The placeholder "Text für diesen Punkt fehlt noch" is used only when none of these exists.
+  2. Queue prose carried over appears in the card body, as the idle-card carry-over already does; nothing the queue card said is lost by the projection.
+  3. No new guards, audits or state fields (infrastructure freeze 01.09.2026); the change stays inside board-core.mjs's projection and its existing data reads.
+  4. Vitest in scripts/board-core.test.mjs: a derived active point with a queue card gets that card's title and text; one with only a board-queue.json entry gets that; one with neither keeps the placeholder. Existing stub-count tests adjusted where they rely on the placeholder.
+  Files: scripts/board-core.mjs renderNowStub ~850, stripProjectedQueueCards ~864, reconcileNowProjection ~886; scripts/board.mjs now/title/status; .claude/board-queue.json
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1295. Walking villagers: grounded feet, leg and arm swing, head loads on the head (absorbs point 350)
+  Queue position: AT THE TOP of the open work order, first point to be worked (user order 05.10.2026: "Das soll direkt als oberstes in die Queue"); in any case before point 1294, so 1294 carries finished movement onto its glTF body.
+  Source: user report 05.10.2026 with a village screenshot after point 1293 landed. ABSORBS POINT 350 (user order 05.10.2026: "Der Task 350 sollte dann in diesen zusammengeführt und der alte 350er gelöscht werden"): point 350 is deleted from TASKS.md when this point is appended; its kneel requirement is item 5 below.
+  The user saw on the skinned body of point 1293 (src/scenes/place/skinnedFigure.tsx, medium/high presets):
+  (a) some villagers move across the ground in a seated posture with strongly bent knees;
+  (b) figures hover above the ground, feet not touching it;
+  (c) the legs do not move while walking, although a swing exists in code (`setLegs` / `legSwingAngle(gait…)`, skinnedFigure.tsx ~208-220) — whether walkers get no `gait`, a too small amplitude, or the crouch/flex overrides it is to be MEASURED, not assumed;
+  (d) the arms hang stiff while walking;
+  (e) head carriers hold one arm straight up, with a large gap between the hand and a load that floats high above the head.
+  Final state:
+  1. FEET ON THE GROUND: every standing or walking villager's lowest foot point lies on the ground under it (within a calibratable tolerance in src/config/balance.ts); the hips sink by exactly what knee flex or crouch costs. No villager travels in a crouch: a work crouch (contact crouch, kneel) is released before the figure moves off and resumed only after it stops, as a short transition.
+  2. WALK CYCLE: every moving villager (errand, task walker, porter, child, chief) gets a phase-driven gait from its actual ground speed: thigh, shin and foot swing in counter-phase, a stance foot does not slide, stride length and cadence scale with speed and body size (children, elders shorter/slower). The settlement animals' gait is the reference for phase and foot-contact handling, not for its curves.
+  3. WHOLE-BODY MOTION: arms swing counter to the legs when not held by a pose; a slight hip/shoulder counter-rotation and a small vertical bob through the spine/chest/neck chain; elders reduced. Poses that own an arm (carrying, gesture, work) keep it; the free arm still swings.
+  4. HEAD LOADS: a basket, bundle or jar carried on the head sits on the head bone (contact with the crown, follows the head's bob), never at a fixed height. The supporting arm either is absent (balanced, hands-free) or rests its hand on the load's rim; no stretched arm pointing into the air. Which variant per people/load follows docs/peoples-1890.md where it says so, otherwise an educated guess marked calibratable.
+  5. KNEELING WITHOUT SQUASH (from point 350): kneeling is built from proportions/bones, never a non-uniform scale; the head keeps its shape; going down and getting up is a short calibratable transition, never a visibility swap between two figures (cook, fire tender, well walker in src/scenes/place/PlaceLife.tsx, TaskWalker ~line 496 at the time 350 was written). The low preset's primitive figure gets the same no-squash, no-pop rule.
+  6. LOW PRESET keeps the primitive figure; items 1 and 5 apply to it, items 2-4 only as far as its FigureLimbs already allow.
+  Verifiable: Vitest over the pure gait/pose functions (foot height at stance = ground within tolerance for every age group; arm phase opposite leg phase; no crouch while speed > 0; head-load anchor = head bone crown; kneel build has uniform scale and unchanged head radius). Playwright, both backends (backend-sensitive: skinned figures): a village walk section measuring per frame foot-to-ground distance and stance-foot slip of walking villagers, plus screenshots of walkers mid-stride, a head carrier, and a kneel transition, judged by looking (acceptance criteria 11 and 15).
+  Criticality: high — every villager in every settlement, both backends.
+  Bundle: Dorfleben.
+  --- the user’s own sentences, with their date ---
+  approved: "Bis auf eine Änderung passt es: Das soll direkt als oberstes in die Queue. Ansonsten okay und so einreihen."
+  --- proposed bundle (German name) ---
+  Dorfleben
+  --- files, points, design.md §§ ---
+  Point 1293 (archived), point 1294, point 350, src/scenes/place/skinnedFigure.tsx, src/scenes/place/figurePose.ts, src/scenes/place/figureRig.ts, src/scenes/place/PlaceLife.tsx
+
+- [x] 1299. Findings carrier appends keep each entry on its own line
+  Queue position: directly after point 1298 (user order 05.10.2026: "Reihe die Behebung von diesem Fehler direkt nach dem neuen Punkt ein.").
+  Final state:
+  1. Every append to the carrier in scripts/finding.mjs (request deposit and --record) separates the new entry from the previous one by a blank line regardless of how the file currently ends.
+  2. Every whole-file rewrite of the carrier (drain, queued, blocked markings) leaves the file ending in a newline.
+  3. After a request deposit, finding.mjs re-reads the carrier and fails loudly (non-zero exit, no "Request deposited") when the new request is not found pending by title.
+  4. Vitest (scripts/finding-request-cli.test.mjs): a carrier ending without a newline, then a deposit — `--requests` lists the new request and the previous entry is unchanged.
+  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
+  Bundle: Session- & Repo-Hygiene.

@@ -15,6 +15,7 @@ import { PLACE_RADIUS } from './layout'
 import { buildRiverBank, standsOnGroundPlate } from './riverBank'
 import { basketRingViolation } from './fishBaskets'
 import {
+  carrierKneels,
   createFishFire,
   createFisheryRing,
   fisherySites,
@@ -22,7 +23,10 @@ import {
   stepFishFire,
   stepPoundingDuo,
   walkSeconds,
+  type FishFireState,
 } from './fishFire'
+import { approach } from '../../render/figureWalk'
+import { VILLAGER_MOTION } from '../../config/balance'
 import { canoeCycleSeconds, canoeLane, canoeRangeGap, createCanoe, stepCanoe, type CanoeWord } from './villagerCanoe'
 import { mulberry32 } from '../../world/noise'
 import { fisheryStaticColliders } from './fisheryColliders'
@@ -44,7 +48,7 @@ function untilFirstFull(): number {
 }
 
 /** The boat and the fire together, for `rounds` of the boat. */
-function simulate(options: { village?: string; rounds?: number; seed?: number; held?: (word: CanoeWord, t: number) => boolean } = {}) {
+function simulate(options: { village?: string; rounds?: number; seed?: number; held?: (word: CanoeWord, t: number) => boolean; onStep?: (fire: FishFireState, dt: number) => void } = {}) {
   const village = options.village ?? 'bambara-village'
   const bank = buildRiverBank(PLACES.find((p) => p.id === village)!, PLACE_RADIUS)!
   const lane = canoeLane(bank)
@@ -77,6 +81,7 @@ function simulate(options: { village?: string; rounds?: number; seed?: number; h
     if (beforeHaul === 'down' && canoe.phase === 'haul') caught += canoe.catch
     stepFishFire(fire, sites, ring, dt, round, cfg)
     stepPoundingDuo(fire, sites, dt, cfg, rand)
+    options.onStep?.(fire, dt)
     t += dt
     expect(basketRingViolation(ring)).toBeNull()
     if (canoe.rounds !== lastRound) {
@@ -314,3 +319,32 @@ describe('nothing at the fire stands inside anything else (work-order 1245)', ()
   })
 })
 
+
+describe('the carrier kneels to gut and is up before he walks (work-order "walking villagers", from point 350)', () => {
+  it('one body: down at the fire, up again on the spot, the first step only once standing', () => {
+    // The figure's own kneel, drawn one frame behind the scene's (its frame runs first).
+    let k = 0
+    let wanted = false
+    let last: { x: number; z: number } | null = null
+    let fullKneels = 0
+    let walksOff = 0
+    simulate({
+      rounds: 4,
+      onStep: (fire, dt) => {
+        k = approach(k, wanted ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
+        const c = fire.carrier
+        if (last && Math.hypot(c.x - last.x, c.z - last.z) > 1e-9) {
+          // Any translation at all: he is standing.
+          expect(k).toBe(0)
+          if (c.phase === 'toBank') walksOff++
+        }
+        if (k === 1) fullKneels++
+        last = { x: c.x, z: c.z }
+        wanted = carrierKneels(c, cfg)
+        if (wanted) expect(c.phase).toBe('gut')
+      },
+    })
+    expect(fullKneels).toBeGreaterThan(0)
+    expect(walksOff).toBeGreaterThan(0)
+  })
+})

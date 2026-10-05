@@ -100,6 +100,21 @@ function ensureCarrier() {
   writeFileSync(CARRIER, HEADER, 'utf8')
 }
 
+/** Append one entry so it stands apart from the previous one by a blank line,
+ *  however the file currently ends — a hand edit may have dropped the newline,
+ *  and a glued entry is invisible to the parser. */
+function appendEntry(entry) {
+  const text = readCarrier()
+  const gap = text === '' || text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n'
+  appendFileSync(CARRIER, `${gap}${entry}\n\n`, 'utf8')
+}
+
+/** Every whole-file rewrite leaves the carrier ending in a newline, so the next
+ *  append starts on its own line. */
+function writeCarrier(text) {
+  writeFileSync(CARRIER, text.endsWith('\n') ? text : `${text}\n`, 'utf8')
+}
+
 /** The carrier is only durable if the index points at it — MEMORY.md is what a
  *  fresh session actually loads. */
 function ensureIndexed() {
@@ -212,7 +227,7 @@ function writeBack(result) {
         'Nothing was written; check: node scripts/finding.mjs --requests',
     )
   }
-  writeFileSync(CARRIER, landed.text, 'utf8')
+  writeCarrier(landed.text)
   return landed.text
 }
 
@@ -258,7 +273,7 @@ if (has('--request')) {
     if (existing) return false
     ensureCarrier()
     const at = new Date().toISOString()
-    appendFileSync(CARRIER, `${requestEntry({ at, session: sessionTag(), title, ...fields })}\n\n`, 'utf8')
+    appendEntry(requestEntry({ at, session: sessionTag(), title, ...fields }))
     return true
   }, { lockPath: `${CARRIER}.request-lock.json`, waitMs: 5000 })
   ensureIndexed()
@@ -268,6 +283,11 @@ if (has('--request')) {
     process.exit(0)
   }
   const waiting = pendingRequests(readCarrier())
+  // Read back: a deposit the parser cannot see is lost, so it must not be reported as filed.
+  const cleanTitle = title.replace(/\s+/g, ' ').trim()
+  if (!waiting.some((r) => r.title === cleanTitle)) {
+    fail(`"${cleanTitle}" was written but is not pending in the carrier on re-read — check ${CARRIER} by hand`)
+  }
   console.log(`request deposited (${waiting.length} waiting): ${title}`)
   console.log(`carrier: ${CARRIER}`)
   // Said HERE rather than left to the reader: a deposit missing its why or the
@@ -367,7 +387,7 @@ if (has('--record')) {
   if (!detail) fail('a finding without detail is a note, not a finding — add --detail "<…>"')
   ensureCarrier()
   const body = target ? `${detail}\nZiel: ${target}` : detail
-  appendFileSync(CARRIER, `${carrierEntry({ at: new Date().toISOString(), session: sessionTag(), title, detail: body })}\n\n`, 'utf8')
+  appendEntry(carrierEntry({ at: new Date().toISOString(), session: sessionTag(), title, detail: body }))
   ensureIndexed()
   const pending = parseCarrier(readCarrier()).pending.length
   console.log(`finding recorded (${pending} waiting): ${title}`)
@@ -397,7 +417,7 @@ if (has('--drained')) {
         result.ambiguous.map((t) => `  · ${t}`).join('\n'),
     )
   }
-  writeFileSync(CARRIER, result.text, 'utf8')
+  writeCarrier(result.text)
   // Echo the MATCHED title, never the search string: the difference is the
   // only way the caller can tell which entry actually went.
   console.log(`marked as landed: ${result.title} (${parseCarrier(result.text).pending.length} still waiting)`)

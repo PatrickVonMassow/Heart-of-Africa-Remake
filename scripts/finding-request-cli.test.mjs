@@ -158,6 +158,65 @@ describe('a non-owner deposits a request and the owner drains it', () => {
   })
 })
 
+describe('a carrier whose last entry lost its trailing newline', () => {
+  it('keeps the next deposit on its own line and the previous entry unchanged', () => {
+    run(['--record', 'Ein Befund', '--detail', 'Belegt.', '--session', 'deadbeefcafe'])
+    const before = carrierText().replace(/\s+$/, '')
+    writeFileSync(join(dir, 'findings-carrier.md'), before, 'utf8')
+    expect(deposit()).toMatch(/request deposited \(1 waiting\)/)
+    expect(run(['--requests'])).toContain('Anfragen aus einem Nebenfenster einreihen')
+    expect(carrierText().startsWith(`${before}\n\n`)).toBe(true)
+    expect(run(['--drain'])).toMatch(/1 waiting, 1 request\(s\), 0 landed/)
+  })
+
+  it('keeps a recorded finding on its own line too', () => {
+    deposit()
+    const before = carrierText().replace(/\s+$/, '')
+    writeFileSync(join(dir, 'findings-carrier.md'), before, 'utf8')
+    run(['--record', 'Ein Befund', '--detail', 'Belegt.', '--session', 'deadbeefcafe'])
+    expect(carrierText().startsWith(`${before}\n\n`)).toBe(true)
+    expect(run(['--drain'])).toMatch(/1 waiting, 1 request\(s\), 0 landed/)
+  })
+
+  it('refuses to report a deposit the re-read cannot find', () => {
+    deposit('Eine andere Anfrage')
+    // The append is swallowed, so the file still holds only the unrelated request.
+    const preload = join(dir, 'lose-append.cjs')
+    writeFileSync(
+      preload,
+      `const fs = require('fs')
+const real = fs.appendFileSync
+fs.appendFileSync = function (target) {
+  if (String(target).endsWith('findings-carrier.md')) return
+  return real.apply(fs, arguments)
+}
+`,
+      'utf8',
+    )
+    let failure
+    try {
+      execFileSync(process.execPath, ['scripts/finding.mjs', '--request', 'Verlorene Anfrage', '--spec-file', join(dir, 'spec.md'), '--session', 's'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        windowsHide: true,
+        env: { ...process.env, FINDINGS_MEMORY_DIR: dir, NODE_OPTIONS: `--require ${JSON.stringify(preload)}` },
+      })
+    } catch (e) {
+      failure = e
+    }
+    expect(failure?.status).toBe(1)
+    expect(String(failure.stderr)).toMatch(/not pending in the carrier on re-read/)
+    expect(String(failure.stdout)).not.toMatch(/request deposited/)
+  })
+
+  it('leaves a rewritten carrier ending in a newline', () => {
+    deposit()
+    writeFileSync(join(dir, 'findings-carrier.md'), carrierText().replace(/\s+$/, ''), 'utf8')
+    run(['--queued', 'Nebenfenster', '--point', '481'])
+    expect(carrierText().endsWith('\n')).toBe(true)
+  })
+})
+
 describe('a deposit that lands while the owner is draining', () => {
   it('survives the write-back instead of being erased by it', () => {
     deposit('Erste Anfrage aus dem Nebenfenster')

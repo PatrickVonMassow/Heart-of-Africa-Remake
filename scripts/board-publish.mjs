@@ -59,7 +59,14 @@ import { currentSetting, settingProblemLine } from './astra-share.mjs'
 import { applyFooterNote } from './astra-share-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
-import { ESTIMATE_CMD, TITLE_CMD, boardTitleReport, parseTaskTitles } from './board-queue-core.mjs'
+import {
+  ESTIMATE_CMD,
+  QUEUE_DATA_PATH,
+  TITLE_CMD,
+  boardTitleReport,
+  parseQueueDataFile,
+  parseTaskTitles,
+} from './board-queue-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { applyLivenessBlock } from './board-liveness-core.mjs'
 import { measureLiveness } from './board-liveness.mjs'
@@ -285,9 +292,21 @@ const fail = (reason) => {
     writeArchive: (html) => writeTextAtomic(archiveFile, html),
   }))
 
+  // A newly projected stub keeps its point's name and queue prose (user
+  // 05.10.2026). The queue data only NAMES a stub, so an unreadable file
+  // degrades to the next rung instead of refusing the publish.
+  let queueData = null
+  try {
+    const queuePath = resolve(REPO_ROOT, QUEUE_DATA_PATH)
+    queueData = existsSync(queuePath) ? parseQueueDataFile(readFileSync(queuePath, 'utf8')) : null
+  } catch {
+    queueData = null
+  }
   try {
     repoBytes = projectNowForPublish(repoBytes, gatherActiveWorkSource({ tasksText }), {
       knownPoints: openPointNumbers(tasksText),
+      queueData,
+      titles: parseTaskTitles(tasksText),
     }).html
   } catch (e) {
     console.error(`board-publish REFUSED — the derived now-section could not be rendered (${e.message}).`)

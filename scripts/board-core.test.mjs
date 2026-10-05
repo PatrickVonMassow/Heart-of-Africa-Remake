@@ -12,6 +12,7 @@ import {
   parseQueuePoints,
   parseTasks,
   sliceSections,
+  QUEUE_STUB_BODY,
   QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
@@ -734,7 +735,9 @@ describe('derived now-section membership', () => {
       { ok: true, points: [700], focusPoint: 700 },
     )
     expect(comparison).toMatchObject({ ok: true, idleCards: 0, emptyStateCount: 0 })
-    expect(html).toContain('Text für diesen Punkt fehlt noch')
+    // The stub keeps the name its queue card gave the point (user 05.10.2026).
+    expect(html).toContain('<span class="num">700</span><span class="t">Wartend</span>')
+    expect(html).not.toContain('Text für diesen Punkt fehlt noch')
     expect(html).not.toContain(NO_CURRENT_WORK_TITLE)
     // The AUTHORED handover prose survives the transition — carried into the
     // created stub, never dropped with the idle card (point 491's lesson;
@@ -879,7 +882,8 @@ describe('derived now-section membership', () => {
     const out = reconcileNowProjection(before, [700, 697, 711], { focusPoint: 700, stamp: '20:10' })
     expect(out).toContain(authored)
     expect(out).not.toContain('699 — Alt')
-    expect(out.match(/Text für diesen Punkt fehlt noch/g)).toHaveLength(2)
+    expect(out.match(/data-state="stub"/g)).toHaveLength(2)
+    expect(out.match(/<span class="t">Wartend<\/span>/g)).toHaveLength(2)
     expect(parseQueuePoints(out)).toEqual(new Set())
     expect(compareNowProjection(out, [700, 697, 711]).ok).toBe(true)
   })
@@ -889,6 +893,84 @@ describe('derived now-section membership', () => {
     expect(() => reconcileNowProjection(before, [700], {
       transformExisting: (card) => card.replace('Bleibt erhalten.', ''),
     })).toThrow(/rewrite or blank authored prose.*700/)
+  })
+
+  // User 05.10.2026: a stub titled only "Text für diesen Punkt fehlt noch"
+  // hid for hours what was being worked on, although the queue card the
+  // projection removed had named the point.
+  it('names a new stub from its queue card and carries the queue prose into its body', () => {
+    const before = fullBoard({ queue: queueEntry(1295, 'Laufende Dorfbewohner', '~3 h') })
+    const out = reconcileNowProjection(before, [1295], {
+      focusPoint: 1295,
+      stamp: '11:00',
+      queueData: { points: { 1295: { title: 'Anderer Titel', body: ['Anderer Text.'] } } },
+      titles: { 1295: 'Walking villagers' },
+    })
+    expect(out).toContain('<span class="num">1295</span><span class="t">Laufende Dorfbewohner</span>')
+    expect(out).toContain('data-state="stub"')
+    expect(out).toContain('Aus der Warteschlange übernommen: Warum das ansteht.')
+    expect(out).not.toContain('Text für diesen Punkt fehlt noch')
+    expect(out).not.toContain('Anderer')
+    expect(parseQueuePoints(out)).toEqual(new Set())
+    expect(compareNowProjection(out, [1295]).ok).toBe(true)
+    expect(reconcileNowProjection(out, [1295], { focusPoint: 1295, stamp: '12:00' })).toBe(out)
+  })
+
+  it('keeps decimal and hexadecimal entities of a copied queue title intact', () => {
+    const before = fullBoard({ queue: queueEntry(700, 'Ma&#xDF;nahmen &#223; &amp; mehr', '~1 h') })
+    const out = reconcileNowProjection(before, [700], { stamp: '11:00' })
+    expect(out).toContain('<span class="num">700</span><span class="t">Ma&#xDF;nahmen &#223; &amp; mehr</span>')
+    expect(out).not.toContain('&amp;#')
+  })
+
+  it('names a stub from the queue data file when no queue card stands, title else first body line', () => {
+    const queueData = {
+      points: {
+        700: { title: 'Titel aus der Datei', body: ['Erster Absatz.', 'Zweiter <Absatz>.'] },
+        697: { body: ['Nur ein Text, der als Titel dient.'] },
+      },
+    }
+    const out = reconcileNowProjection(fullBoard(), [700, 697], { focusPoint: 700, stamp: '11:00', queueData })
+    expect(out).toContain('<span class="num">700</span><span class="t">Titel aus der Datei</span>')
+    expect(out).toContain('Aus der Warteschlange übernommen: Erster Absatz.')
+    expect(out).toContain('Zweiter &lt;Absatz&gt;.')
+    expect(out).toContain('<span class="num">697</span><span class="t">Nur ein Text, der als Titel dient.</span>')
+    expect(out).not.toContain('Text für diesen Punkt fehlt noch')
+    expect(compareNowProjection(out, [700, 697]).ok).toBe(true)
+  })
+
+  it('falls back to the work-order headline, then to the placeholder', () => {
+    const out = reconcileNowProjection(fullBoard(), [700, 697], {
+      focusPoint: 700,
+      stamp: '11:00',
+      titles: { 700: 'Board now-card stub keeps the point name' },
+    })
+    expect(out).toContain('<span class="num">700</span><span class="t">Board now-card stub keeps the point name</span>')
+    expect(out).toContain('<span class="num">697</span><span class="t">Text für diesen Punkt fehlt noch</span>')
+    expect(out.match(/Text für diesen Punkt fehlt noch/g)).toHaveLength(1)
+    expect(out).not.toContain('Aus der Warteschlange')
+    expect(compareNowProjection(out, [700, 697]).ok).toBe(true)
+  })
+
+  it('skips a queue card that names nothing — the "Punkt N" fallback and the stub body', () => {
+    const escaped = QUEUE_STUB_BODY.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const stubCard = queueEntry(700, 'Punkt 700', '~? h').replace('Warum das ansteht.', escaped)
+    const out = reconcileNowProjection(fullBoard({ queue: stubCard }), [700], {
+      stamp: '11:00',
+      titles: { 700: 'Headline' },
+    })
+    expect(out).toContain('<span class="num">700</span><span class="t">Headline</span>')
+    expect(out).not.toContain('Aus der Warteschlange')
+  })
+
+  it('passes the queue data and headlines through the publish preflight', () => {
+    const { html, comparison } = projectNowForPublish(
+      fullBoard(),
+      { ok: true, points: [700], focusPoint: 700 },
+      { stamp: '11:00', queueData: { points: { 700: { title: 'Aus der Datei' } } }, titles: { 700: 'Headline' } },
+    )
+    expect(html).toContain('<span class="t">Aus der Datei</span>')
+    expect(comparison).toMatchObject({ ok: true })
   })
 
   it('puts focus first, keeps other survivors stable and is byte-idempotent', () => {
@@ -935,7 +1017,8 @@ describe('derived now-section membership', () => {
     const { html, comparison } = projectNowForPublish(before, { ok: true, points: [700, 697, 711], focusPoint: 700 })
     expect(html).toContain('<span class="t">700 — Kontext</span>')
     expect(html).toContain('Bleibt genau so stehen.')
-    expect(html.match(/Text für diesen Punkt fehlt noch/g)).toHaveLength(2)
+    expect(html.match(/data-state="stub"/g)).toHaveLength(2)
+    expect(html.match(/<span class="t">Wartend<\/span>/g)).toHaveLength(2)
     expect(comparison).toMatchObject({ ok: true })
   })
 

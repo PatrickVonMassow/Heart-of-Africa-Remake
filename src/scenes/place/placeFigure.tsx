@@ -7,13 +7,16 @@
 import { useContext, useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { legSwingAngle } from '../../render/fauna'
+import { gaitBodyLift, legSwingAngle } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
+import { approach, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
+import { VILLAGER_MOTION } from '../../config/balance'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
+import { isLifeFrozen } from './lifeFreeze'
 import { ColdCloaksContext, FigureLookContext, LimbDetailContext, REST_POSE_ARMS } from './placeFigureContext'
 import { SkinnedFigure } from './skinnedFigure'
 import type { AgeGroup, Sex } from '../../systems/appearance'
@@ -74,6 +77,8 @@ function PrimitiveFigure({
   gait,
   squat,
   handProp,
+  headProp,
+  kneeling,
 }: {
   cloth: string
   skin?: string
@@ -111,21 +116,41 @@ function PrimitiveFigure({
    * is the +x one, which is the side the jar was drawn on.
    */
   handProp?: ReactNode
+  /** A load carried on the head, resting on its crown. The primitive's arm
+   *  cannot reach above its head, so it balances the load hands-free. */
+  headProp?: ReactNode
+  /** Accepted for the skinned body's sake; the primitive balances its load. */
+  headSteady?: HeadLoadShape | null
+  /** Kneels while true: down and up again as a short transition. */
+  kneeling?: RefObject<boolean>
 }) {
-  const bodyH = kneel ? 0.55 : 1.0
   const cold = useContext(ColdCloaksContext)
   const segments = useContext(LimbDetailContext)
   const L = FIGURE_LIMBS
+  // KNEELING IS A FOLD OF THE PROPORTIONS, never a squash of the figure
+  // (work-order "walking villagers", from point 350): the group's scale stays
+  // uniform, the head keeps its shape, and going down or up is a transition.
+  const kneelK = useRef(kneel ? 1 : 0)
+  const shape = useRef<PrimitiveLayout>(primitiveLayout(kneelK.current, legs, L))
+  const lay = shape.current
   // Legs only on a standing figure — a kneeling one has folded them away.
   const withLegs = legs && !kneel
-  const hipY = withLegs ? bodyH * L.hipY : 0
-  const trunkH = bodyH - hipY
+  const hipY = lay.hipY
+  const trunkH = lay.height - hipY
   // Shrinking the cone's base radius by the same factor as its height keeps the
   // TAPER identical, so a legged figure is not a fatter one at shoulder height —
   // and the arm clearance pinned in figures.test.ts holds for every figure.
-  const trunkRadius = L.bodyRadius * (trunkH / bodyH)
+  const trunkRadius = (n: PrimitiveLayout) => L.bodyRadius * n.width * ((n.height - n.hipY) / n.height)
+  const outer = useRef<THREE.Group>(null)
+  const lifted = useRef<THREE.Group>(null)
   const trunk = useRef<THREE.Group>(null)
+  const cone = useRef<THREE.Mesh>(null)
+  const wrapMesh = useRef<THREE.Mesh>(null)
   const head = useRef<THREE.Mesh>(null)
+  const crown = useRef<THREE.Group>(null)
+  const armMeshes = useRef<Array<THREE.Object3D | null>>([])
+  const handEnds = useRef<Array<THREE.Object3D | null>>([])
+  const legGroup = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const legPivots = useRef<Array<THREE.Group | null>>([])
   // A PIVOT IS PUT AT REST WHEN IT IS BORN, NOT AT EVERY RENDER (work-order
@@ -149,8 +174,57 @@ function PrimitiveFigure({
     }
   }, [limbs])
 
+  // Lays the figure out at a kneel fraction: every height from the proportions.
+  const applyLayout = (n: PrimitiveLayout) => {
+    const wrapWear = cold?.wear === 'head'
+    trunk.current?.position.setY(n.hipY)
+    if (cone.current) {
+      const h = n.height - n.hipY
+      cone.current.position.y = h * 0.5
+      cone.current.scale.set(trunkRadius(n), h, trunkRadius(n))
+    }
+    if (wrapMesh.current) {
+      wrapMesh.current.position.y = n.height * (wrapWear ? 0.82 : 0.66) - n.hipY
+      wrapMesh.current.scale.set(1, n.height * (wrapWear ? 1.0 : 0.68), 1)
+    }
+    head.current?.position.setY(n.headY - n.hipY)
+    crown.current?.position.setY(n.headY + n.headRadius - n.hipY)
+    ;[0, 1].forEach((i) => {
+      arms.current[i]?.position.set((i === 0 ? 1 : -1) * n.width * L.shoulderX, n.height * L.shoulderY - n.hipY, 0)
+      const m = armMeshes.current[i]
+      if (m) {
+        m.position.y = -n.armLength * 0.5
+        m.scale.set(1, n.armLength, 1)
+      }
+      handEnds.current[i]?.position.setY(-n.armLength)
+    })
+    // The legs fold back under the sinking hips, their feet kept on the ground
+    // — never hidden in one frame (no pop): a rigid leg from a hip at `hipY`
+    // reaches the ground tilted back by acos(hipY / leg), the shin laid behind.
+    const fold = Math.acos(Math.min(1, Math.max(0, n.hipY / L.hipY)))
+    legPivots.current.forEach((p) => {
+      if (!p) return
+      p.position.y = n.hipY
+      if (kneelK.current > 0 || !gait) p.rotation.x = fold
+    })
+    const actor = outer.current?.userData.actor as { height: number } | undefined
+    if (actor) actor.height = n.labelHeight
+  }
+
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
+    const wanted = kneel || !!kneeling?.current
+    // The dev life freeze holds a transition where it is, for the camera.
+    const k = isLifeFrozen() ? kneelK.current : approach(kneelK.current, wanted ? 1 : 0, 1 / VILLAGER_MOTION.kneelSeconds, dt)
+    if (k !== kneelK.current || !cone.current?.userData.laid) {
+      kneelK.current = k
+      shape.current = primitiveLayout(k, legs, L)
+      applyLayout(shape.current)
+      if (cone.current) cone.current.userData.laid = true
+    }
+    // Dev: the kneel the village-walk verification reads (as the skinned
+    // walk's) — every frame, since a render replaces the group's userData.
+    if (import.meta.env.DEV && outer.current) outer.current.userData.kneel = kneelK.current
     let shown = pose?.current ?? null
     if (!shown && gesture?.current) {
       gesture.current = advanceGesture(gesture.current, dt)
@@ -179,13 +253,16 @@ function PrimitiveFigure({
       head.current.scale.y = flattened ? 1 / squash : 1
       head.current.rotation.x = flattened ? -(trunk.current?.rotation.x ?? 0) : 0
     }
-    if (withLegs && gait) {
+    if (withLegs && gait && kneelK.current === 0) {
       const phase = gait.current
       const a = legPivots.current[0]
       const b = legPivots.current[1]
       if (a) a.rotation.x = legSwingAngle(phase, 0)
       if (b) b.rotation.x = legSwingAngle(phase, Math.PI)
-    }
+      // Dropped onto the stance leg, so the swinging feet ride the ground
+      // instead of hanging above it (the drop callers used to apply).
+      lifted.current?.position.setY(gaitBodyLift(phase, L.hipY))
+    } else if (kneelK.current > 0) lifted.current?.position.setY(0)
   })
   // The wrap this figure actually wears — null when the season is off, and null
   // for most figures when the record gates the garment on RANK. Barth on the
@@ -197,91 +274,115 @@ function PrimitiveFigure({
   const wrap = cold && (!cold.rankOnly || wearsByRank(cloth, cold.palette))
     ? cloakForCloth(cold.cloaks, cold.palette, cloth)
     : null
-  const armLen = bodyH * L.armLength
+  const armLen = lay.armLength
+  const wrapHead = !!wrap && cold!.wear === 'head'
   return (
     // Named so a speaking figure can be found in the scene graph — the overhead
     // speech label rides on this object (design.md §13.4).
-    <group
-      name="inhabitant"
-      scale={[scale, scale * (kneel ? 0.75 : 1), scale]}
-      userData={markActor({ kind: role, height: bodyH + 0.45 })}
-    >
-      {/* The trunk pivots at the hip so a lean or a shake carries the arms and
-          the head with it, and the legs (below) stay planted. */}
-      <group ref={trunk} position={[0, hipY, 0]}>
-        <mesh position={[0, trunkH * 0.5, 0]} castShadow>
-          <coneGeometry args={[trunkRadius, trunkH, TESSELLATION.figureBody]} />
-          <meshStandardMaterial color={cloth} roughness={0.95} />
-        </mesh>
-        {/* The seasonal wrap goes OVER the everyday dress (Mayr): a shell around
-            the shoulders, leaving the dress showing below. Where the record says
-            the head is muffled in it (the Somali tobe in the karif), the shell
-            rises past the head instead — that is the one head-wear case, and the
-            shape difference IS the finding. */}
-        {wrap && (
-          <mesh position={[0, bodyH * (cold!.wear === 'head' ? 0.82 : 0.66) - hipY, 0]} castShadow>
-            <coneGeometry
-              args={[0.355, bodyH * (cold!.wear === 'head' ? 1.0 : 0.68), TESSELLATION.figureBody]}
-            />
-            <meshStandardMaterial
-              color={wrap}
-              roughness={0.8} // every wrap, hide or woven, sits a touch glossier than the body cloth
-            />
+    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: lay.labelHeight })}>
+      <group ref={lifted}>
+        {/* The trunk pivots at the hip so a lean or a shake carries the arms and
+            the head with it, and the legs (below) stay planted. The cone is a
+            unit one laid out to the trunk's proportions. */}
+        <group ref={trunk} position={[0, hipY, 0]}>
+          <mesh ref={cone} position={[0, trunkH * 0.5, 0]} scale={[trunkRadius(lay), trunkH, trunkRadius(lay)]} castShadow>
+            <coneGeometry args={[1, 1, TESSELLATION.figureBody]} />
+            <meshStandardMaterial color={cloth} roughness={0.95} />
           </mesh>
-        )}
-        {/* The head shows unless the wrap is drawn over it. */}
-        {!(wrap && cold!.wear === 'head') && (
-          <mesh name="figure-head" ref={head} position={[0, bodyH + 0.18 - hipY, 0]} castShadow>
-            <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
-            <meshStandardMaterial color={skin} roughness={0.85} />
-          </mesh>
-        )}
-        {/* Arms (point 479). One pivot per shoulder, the limb hanging down its
-            local −y, so a rotation IS the gesture. `YXZ` order because the pose
-            is stated as (bearing, elevation): yaw must apply to an arm that is
-            already raised, or it would spin a vertical limb about its own axis
-            and move nothing (see `armDirection` in render/gesture.ts). */}
-        {[0, 1].map((i) => (
-          <group
-            key={i}
-            position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]}
-            ref={armRef[i]}
-          >
-            <mesh position={[0, -armLen * 0.5, 0]} castShadow>
-              <cylinderGeometry args={[L.armRadius[0], L.armRadius[1], armLen, segments]} />
-              <meshStandardMaterial color={skin} roughness={0.88} />
+          {/* The seasonal wrap goes OVER the everyday dress (Mayr): a shell around
+              the shoulders, leaving the dress showing below. Where the record says
+              the head is muffled in it (the Somali tobe in the karif), the shell
+              rises past the head instead — that is the one head-wear case, and the
+              shape difference IS the finding. */}
+          {wrap && (
+            <mesh
+              ref={wrapMesh}
+              position={[0, lay.height * (wrapHead ? 0.82 : 0.66) - hipY, 0]}
+              scale={[1, lay.height * (wrapHead ? 1.0 : 0.68), 1]}
+              castShadow
+            >
+              <coneGeometry args={[0.355, 1, TESSELLATION.figureBody]} />
+              <meshStandardMaterial
+                color={wrap}
+                roughness={0.8} // every wrap, hide or woven, sits a touch glossier than the body cloth
+              />
             </mesh>
-            {/* Named so the verification can read where the hand ACTUALLY ended
-                up, rather than re-deriving it: a touch is judged by the drawn
-                hand meeting the drawn surface (work-order 1065). */}
-            <mesh name={i === 0 ? 'hand-left' : 'hand-right'} position={[0, -armLen, 0]} castShadow>
-              <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
+          )}
+          {/* The head shows unless the wrap is drawn over it. */}
+          {!wrapHead && (
+            <mesh name="figure-head" ref={head} position={[0, lay.headY - hipY, 0]} castShadow>
+              <sphereGeometry args={[lay.headRadius, ...TESSELLATION.figureHead]} />
               <meshStandardMaterial color={skin} roughness={0.85} />
             </mesh>
-            {/* What this hand is carrying, at the hand rather than beside it. */}
-            {i === 0 && handProp && <group position={[0, -armLen, 0]}>{handProp}</group>}
+          )}
+          {/* A head load rests on the crown and rides the trunk's lean. */}
+          <group ref={crown} name="figure-crown" position={[0, lay.headY + lay.headRadius - hipY, 0]}>
+            {headProp}
           </group>
-        ))}
+          {/* Arms (point 479). One pivot per shoulder, the limb hanging down its
+              local −y, so a rotation IS the gesture. `YXZ` order because the pose
+              is stated as (bearing, elevation): yaw must apply to an arm that is
+              already raised, or it would spin a vertical limb about its own axis
+              and move nothing (see `armDirection` in render/gesture.ts). */}
+          {[0, 1].map((i) => (
+            <group
+              key={i}
+              position={[(i === 0 ? 1 : -1) * lay.width * L.shoulderX, lay.height * L.shoulderY - hipY, 0]}
+              ref={armRef[i]}
+            >
+              <mesh
+                ref={(el) => {
+                  armMeshes.current[i] = el
+                }}
+                position={[0, -armLen * 0.5, 0]}
+                scale={[1, armLen, 1]}
+                castShadow
+              >
+                <cylinderGeometry args={[L.armRadius[0], L.armRadius[1], 1, segments]} />
+                <meshStandardMaterial color={skin} roughness={0.88} />
+              </mesh>
+              <group
+                ref={(el) => {
+                  handEnds.current[i] = el
+                }}
+                position={[0, -armLen, 0]}
+              >
+                {/* Named so the verification can read where the hand ACTUALLY ended
+                    up, rather than re-deriving it: a touch is judged by the drawn
+                    hand meeting the drawn surface (work-order 1065). */}
+                <mesh name={i === 0 ? 'hand-left' : 'hand-right'} castShadow>
+                  <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
+                  <meshStandardMaterial color={skin} roughness={0.85} />
+                </mesh>
+                {/* What this hand is carrying, at the hand rather than beside it. */}
+                {i === 0 && handProp}
+              </group>
+            </group>
+          ))}
+        </group>
+        {/* Legs, on the figures whose stride must read (point 479/480). They
+            swing about their hips on the DISTANCE-driven gait phase the fauna and the §2.5
+            silhouettes already use, so a faster child steps faster and a stopped
+            one stands still — never a wall-clock bob. */}
+        {withLegs && (
+          <group ref={legGroup}>
+            {[0, 1].map((i) => (
+              <group
+                key={i}
+                position={[(i === 0 ? 1 : -1) * L.hipX, L.hipY, 0]}
+                ref={(el) => {
+                  legPivots.current[i] = el
+                }}
+              >
+                <mesh position={[0, -L.hipY * 0.5, 0]} castShadow>
+                  <cylinderGeometry args={[L.legRadius[0], L.legRadius[1], L.hipY, segments]} />
+                  <meshStandardMaterial color={skin} roughness={0.88} />
+                </mesh>
+              </group>
+            ))}
+          </group>
+        )}
       </group>
-      {/* Legs, on the figures whose stride must read (point 479/480). They
-          swing about their hips on the DISTANCE-driven gait phase the fauna and the §2.5
-          silhouettes already use, so a faster child steps faster and a stopped
-          one stands still — never a wall-clock bob. */}
-      {withLegs &&
-        [0, 1].map((i) => (
-          <group
-            key={i}
-            position={[(i === 0 ? 1 : -1) * bodyH * L.hipX, hipY, 0]}
-            ref={(el) => {
-              legPivots.current[i] = el
-            }}
-          >
-            <mesh position={[0, -hipY * 0.5, 0]} castShadow>
-              <cylinderGeometry args={[L.legRadius[0], L.legRadius[1], hipY, segments]} />
-              <meshStandardMaterial color={skin} roughness={0.88} />
-            </mesh>
-          </group>
-        ))}
     </group>
   )
 }
