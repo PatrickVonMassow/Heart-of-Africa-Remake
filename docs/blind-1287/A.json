@@ -1,0 +1,375 @@
+{
+ "model": "Opus 5.5",
+ "entries": [
+  {
+   "id": "A1",
+   "file": "src/scenes/travel/TravelScene.tsx:189",
+   "defect": "`CAMERA_OFFSET {y:42,z:24}` is the only camera placement in the material, and its call site is not shown. If the pose is \"traveller + offset, lookAt(traveller)\", adding the south shift to the position alone re-aims the lens at the traveller and steepens the tilt instead of translating the view. The look target must shift with it, scaled by the same zoom factor."
+  },
+  {
+   "id": "A2",
+   "file": "src/scenes/travel/TravelScene.tsx:68",
+   "defect": "`followAt`/`followPose`/`stepFollow` (followCamera.ts, not attached) presumably steer toward the traveller as the view centre and smooth the offset. The shift has to enter both the pose and the follow target, or the camera lags or overshoots by ~7.5 units. The angle/no-jump rule may also read the shift as a heading change. (Call site in material, body outside.)"
+  },
+  {
+   "id": "A3",
+   "file": "src/scenes/travel/floraStreaming.ts:19",
+   "defect": "`FLORA_SPAWN_MARGIN 30` reserve: the plant circle is centred on the traveller while fog distance is measured from the camera. The camera was 24 south of the traveller and becomes ~31.5, so the south fog-visible rim (~fogFar+31.5) passes the circle edge (fogFar+30). The no-pop margin of ~6 turns into ~−1.5, and the streaming edge and rebuild pops can fall inside faint-fog view on the south side."
+  },
+  {
+   "id": "A4",
+   "file": "src/scenes/travel/floraStreaming.ts:66",
+   "defect": "`floraSpawnRadius` / `floraInSpawnCircle` / `floraShouldRebuild` take the traveller as the circle centre (\"beyond the visible ground\"). The shift scales with zoom, so the south deficit from B3 grows at every wider zoom up to FLORA_SPAWN_HARD_CAP."
+  },
+  {
+   "id": "A5",
+   "file": "src/scenes/travel/floraStreaming.ts:59",
+   "defect": "The low-preset claim \"tighter circle (~173) still sits beyond the frustum at zooms ≤0.5\" was argued from the traveller-centred view. It must be re-derived with the frame extending ~7.5×zoom-scale further south."
+  },
+  {
+   "id": "A6",
+   "file": "src/scenes/travel/TravelScene.tsx:183",
+   "defect": "`VEGETATION_HIDE_ZOOM 2.5` is \"kept at/below what FLORA_RANGE_MAX covers so the streaming edge never enters view\", with coverage measured around the traveller. At zoom 2.5 the scaled shift (~19 units if linear) pushes the south frame edge past that coverage before the hide threshold."
+  },
+  {
+   "id": "A7",
+   "file": "src/scenes/travel/TravelScene.tsx:52",
+   "defect": "`REFINE_RING_MAX` / `chunkNeedsRefine` LOD rings are centred on the traveller's chunk. The near-ring quality doubling now falls partly above the top of the picture, while the south part of the frame (up to 28 units vs ~21 before) gets coarser LOD."
+  },
+  {
+   "id": "A8",
+   "file": "src/scenes/travel/TravelScene.tsx:53",
+   "defect": "`planChunkWindow` / `predictedNextCenter` / `orderChunkJobs` build the terrain window and its nearest-first build order around the traveller as the view centre. Moving or jumping south, the newly visible south strip can be built late or not at all, showing holes or stand-in LOD at the bottom edge."
+  },
+  {
+   "id": "A9",
+   "file": "src/scenes/travel/TravelScene.tsx:900",
+   "defect": "The far-terrain sheet is skipped at `zoom <= 1` on the assumption that the detailed chunk window around the traveller covers the whole frame. With the frame reaching further south at zoom 1, the south edge can run off the chunk window with no far sheet beneath it."
+  },
+  {
+   "id": "A10",
+   "file": "src/scenes/travel/TravelScene.tsx:943",
+   "defect": "Sun/CSM: `maxFar 240`, shadow near/far 10/400, and the light `target` (set outside the excerpt, likely at the traveller) assume shadowed ground centred on the traveller. The cascades follow the camera, but a target or shadow box anchored on the traveller loses south-frame shadow coverage. (Target placement outside material.)"
+  },
+  {
+   "id": "A11",
+   "file": "src/scenes/ActorLabels.tsx:118",
+   "defect": "`nearestActors(visible, camera.position, maxLabels)` ranks by distance from the camera, standing in for \"nearest the traveller/centre\". With the camera 7.5 further south, the 24-label cap favours south-of-frame actors and drops ones beside the traveller (above centre)."
+  },
+  {
+   "id": "A12",
+   "file": "src/scenes/ActorLabels.tsx:131",
+   "defect": "The declutter `depth` is measured from `camera.position`, so the \"nearer name keeps it\" priority shifts toward the bottom of the picture rather than toward the traveller."
+  },
+  {
+   "id": "A13",
+   "file": "src/scenes/travel/frameVisibility.ts:1",
+   "defect": "The seeders/scripted spawns that call `isOnScreen` generate candidates around the traveller (rings or the vicinity), sized for the old north-heavy reach (~21 south). With 28 units of south reach, more south candidates are rejected. Guarantees like the dry-shore drinkers or vicinity herds silently under-fill or cluster north."
+  },
+  {
+   "id": "A14",
+   "file": "src/scenes/travel/Wildlife.tsx:44",
+   "defect": "Every Wildlife caller of `isOnScreen` (seeders, scripted spawns, streaming cull) pairs it with traveller-centred rings, per the frameVisibility header. Any fixed ring constant there sized below the new south reach (call sites not shown — excerpt capped) now relies entirely on the projection fallback."
+  },
+  {
+   "id": "A15",
+   "file": "src/config/balance.ts:408",
+   "defect": "`dryShoreMinDrinkers`: \"the nearest water in the traveller's view\" is chosen by distance from the traveller. Water north of the traveller beyond ~28 units is no longer in the picture, so the guarantee can fill a shore the player cannot see."
+  },
+  {
+   "id": "A16",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:1059",
+   "defect": "Flight spawn starts at `viewR + FLIGHT_SPAWN_OUT` along the traveller→target bearing and pushes outward at most 12 steps. If `viewR` was sized to the old picture around the traveller, south-bearing spawns need more steps. After 12 the bird \"spawns where it is\", possibly in view."
+  },
+  {
+   "id": "A17",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:1108",
+   "defect": "Flight despawn requires `d > viewR` from the traveller as a ring floor. The floor is traveller-centred, so south-bound birds are judged against a ring that no longer matches the frame's south extent. This holds only while the projection half stays correct; the no-predicate fallback `viewR + FLIGHT_DESPAWN_OUT` despawns in view on the south side."
+  },
+  {
+   "id": "A18",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:1990",
+   "defect": "The predator entry probe (`minR..maxR`, 16 bearings × 6 rings) is projection-gated, but `maxR` was sized for the old frame. For prey south of the traveller the extra south reach can exhaust all rings, and the fallback (TRUNCATED after line 1993, not visible) may place the predator on screen. With no predicate the bare `minR` ring assumes the frame is centred on the traveller."
+  },
+  {
+   "id": "A19",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:2018",
+   "defect": "`keepStreamedAnimal` keeps an animal while \"within the despawn ring of the PLAYER\" or on screen. The ring is traveller-centred; the projection backstop saves visibility, but the ring now over-retains north and under-retains south, and its sizing doc (\"debug wide-zoom corner where the ring lies inside the frame\") no longer covers the south-shifted case."
+  },
+  {
+   "id": "A20",
+   "file": "src/config/balance.ts:575",
+   "defect": "`hunt.leaveOvertimeSeconds`: the leaving predator's \"view ring\" is centred on the traveller. A predator walking off north leaves the picture well before the ring and paces off-screen until the overtime. One walking south can still be in the picture when the ring is passed."
+  },
+  {
+   "id": "A21",
+   "file": "src/scenes/travel/Wildlife.tsx:622",
+   "defect": "`ACTIVE_HERDS` lets `<LionHunt>` pick a \"nearby\" calf by distance to the player, so the drama is visible. Selection is traveller-centred, so a calf ~20–28 north now sits at the top edge or out of frame. `juvenilePreyBias` (\"fires more often near the player\", balance.ts:1615) inherits the same bias."
+  },
+  {
+   "id": "A22",
+   "file": "src/scenes/travel/Wildlife.tsx:5",
+   "defect": "Vultures \"circling the player\" (poor condition) circle the traveller, now ~37% from the top. A circle radius sized to the old centred frame can push the north half of the flock out of the top of the picture."
+  },
+  {
+   "id": "A23",
+   "file": "src/config/balance.ts:1662",
+   "defect": "`fight.driveOffDistance 24` claims the quarry stays \"still on screen\". This is a fixed distance with no projection, so a chase north of a near-traveller fight now runs out of the shortened north reach."
+  },
+  {
+   "id": "A24",
+   "file": "src/scenes/travel/TravelScene.tsx:1893",
+   "defect": "The enter hint replaces the place label \"while the traveller stands within the enter radius\". If the hint UI is anchored at screen centre or the traveller's projected spot (outside material), a centre-anchored hint now sits ~13% below the traveller and settlement."
+  },
+  {
+   "id": "A25",
+   "file": "scripts/verify/invariants.mjs:89",
+   "defect": "The I1 pop-in drive holds KeyW, presumably northward, and treats \"camera glued to the player\" as the view. The north reach shrinks, so spawns ahead are seeded and revealed differently. The check itself is projection-based and holds, but the coverage it was calibrated on (pop path toward north) shifts, so a passing run proves less."
+  },
+  {
+   "id": "A26",
+   "file": "scripts/verify/invariants.mjs:139",
+   "defect": "The `dist` from the traveller in pop findings is read as \"how far from view centre\". After the shift, triage of findings by distance misleads (a pop 25 north is at the edge, one 25 south is mid-lower picture)."
+  },
+  {
+   "id": "A27",
+   "file": "scripts/verify/enrichments.mjs:1435",
+   "defect": "The stain staging picks \"the steepest patch of clear land near the traveller\" within radius R, assuming that ring is in the picture. Spots north of ~28 are now out of frame and get rejected late by the HUD/projection gate (\"stain never projected clear of the HUD\"), which can stage nothing. TRUNCATED: R and spot loop at 1441–1510 not shown."
+  },
+  {
+   "id": "A28",
+   "file": "scripts/verify/enrichments.mjs:1368",
+   "defect": "The trample victim is injected \"at the player's spot\" and the following stain shots are framed on it. The stain now sits above centre; the projection clip still finds it, but any centre-of-frame clip or cell layout downstream (TRUNCATED) degrades."
+  },
+  {
+   "id": "A29",
+   "file": "outside material — scripts/verify/frameSubject.mjs",
+   "defect": "The travel shutter's subject/framing test likely uses the traveller (or `pos`) as default subject, possibly with an off-centre or NDC-near-0 tolerance like the place lane's RETURN_OFF_AXIS. Travel frames would be refused or mis-graded with the traveller at NDC y≈+0.26."
+  },
+  {
+   "id": "A30",
+   "file": "outside material — follow-camera verify (commits 1d8fd2faa / 8c8b76ced, WebGL 2 walk frames)",
+   "defect": "The preceding point samples the follow-camera angle per frame. Its assertions likely measure tilt as the camera→traveller direction (or traveller at NDC 0). After the shift the measured angle changes even though orientation is unchanged, so the check breaks or must switch to the camera's own forward vector."
+  },
+  {
+   "id": "A31",
+   "file": "outside material — debug jump / teleport camera lerp (invariants.mjs:96 \"big camera lerp\")",
+   "defect": "The jump lerp target is presumably traveller+offset looking at the traveller. It must carry the shift, or every jump ends with a re-aim snap; the verify settle waits assume the lerp ends centred."
+  },
+  {
+   "id": "A32",
+   "file": "outside material — zoom (wheel/pinch, setTravelZoom)",
+   "defect": "Zoom scales CAMERA_OFFSET about the traveller as fixed point. With the shift also scaling, the zoom pivot is no longer the picture centre, so the traveller slides vertically on screen during a zoom unless the shift's scaling matches exactly."
+  },
+  {
+   "id": "A33",
+   "file": "outside material — map / position query (`window.__camera` helpers, map overlay, \"where am I\")",
+   "defect": "Any helper returning the view centre as the traveller (e.g. camera target, or ground under NDC 0,0 equated with `pos`) now differs by ~7.5×zoom-scale units. This affects map recentre, the minimap viewport rectangle and debug readouts."
+  },
+  {
+   "id": "A34",
+   "file": "outside material — fog (TRAVEL_FOG near/far, zoom \"clearView\")",
+   "defect": "Fog distances were tuned with the camera ~48 from the traveller. At ~52.5 (more with zoom) the traveller and near field sit deeper in fog, and the far-north visible limit moves in."
+  },
+  {
+   "id": "A35",
+   "file": "outside material — Climate rain volume (Climate.tsx:382)",
+   "defect": "The rain instanced volume is presumably positioned at the traveller or camera target. Centred on the traveller, the lower picture (now 28 units south) can run past the rain box and show a rain-free band."
+  },
+  {
+   "id": "A36",
+   "file": "outside material — panorama capture readiness (TravelScene.tsx:1846, panoramaMath)",
+   "defect": "The capture gate reads the committed chunk set, which is built around the traveller. That still holds, but if the chunk window (B8) is re-centred on the new view centre to fix the south strip, chunks around the place may not be committed when the traveller is inside the ring, and the capture bakes a terrainless band. The two must be changed together."
+  },
+  {
+   "id": "A37",
+   "file": "outside material — audio listener / ambience",
+   "defect": "A positional-audio listener attached to the camera now sits ~7.5 further south of the traveller. Near sounds (footsteps, hunt, croc) pan or attenuate as if the player stood lower in the picture."
+  },
+  {
+   "id": "A1",
+   "file": "src/scenes/travel/TravelScene.tsx:189",
+   "defect": "`CAMERA_OFFSET {y:42,z:24}` is the only camera placement in the material, and its call site is not shown. If the pose is \"traveller + offset, lookAt(traveller)\", adding the south shift to the position alone re-aims the lens at the traveller and steepens the tilt instead of translating the view. The look target must shift with it, scaled by the same zoom factor."
+  },
+  {
+   "id": "A2",
+   "file": "src/scenes/travel/TravelScene.tsx:68",
+   "defect": "`followAt`/`followPose`/`stepFollow` (followCamera.ts, not attached) presumably steer toward the traveller as the view centre and smooth the offset. The shift has to enter both the pose and the follow target, or the camera lags or overshoots by ~7.5 units. The angle/no-jump rule may also read the shift as a heading change. (Call site in material, body outside.)"
+  },
+  {
+   "id": "A3",
+   "file": "src/scenes/travel/floraStreaming.ts:19",
+   "defect": "`FLORA_SPAWN_MARGIN 30` reserve: the plant circle is centred on the traveller while fog distance is measured from the camera. The camera was 24 south of the traveller and becomes ~31.5, so the south fog-visible rim (~fogFar+31.5) passes the circle edge (fogFar+30). The no-pop margin of ~6 turns into ~−1.5, and the streaming edge and rebuild pops can fall inside faint-fog view on the south side."
+  },
+  {
+   "id": "A4",
+   "file": "src/scenes/travel/floraStreaming.ts:66",
+   "defect": "`floraSpawnRadius` / `floraInSpawnCircle` / `floraShouldRebuild` take the traveller as the circle centre (\"beyond the visible ground\"). The shift scales with zoom, so the south deficit from B3 grows at every wider zoom up to FLORA_SPAWN_HARD_CAP."
+  },
+  {
+   "id": "A5",
+   "file": "src/scenes/travel/floraStreaming.ts:59",
+   "defect": "The low-preset claim \"tighter circle (~173) still sits beyond the frustum at zooms ≤0.5\" was argued from the traveller-centred view. It must be re-derived with the frame extending ~7.5×zoom-scale further south."
+  },
+  {
+   "id": "A6",
+   "file": "src/scenes/travel/TravelScene.tsx:183",
+   "defect": "`VEGETATION_HIDE_ZOOM 2.5` is \"kept at/below what FLORA_RANGE_MAX covers so the streaming edge never enters view\", with coverage measured around the traveller. At zoom 2.5 the scaled shift (~19 units if linear) pushes the south frame edge past that coverage before the hide threshold."
+  },
+  {
+   "id": "A7",
+   "file": "src/scenes/travel/TravelScene.tsx:52",
+   "defect": "`REFINE_RING_MAX` / `chunkNeedsRefine` LOD rings are centred on the traveller's chunk. The near-ring quality doubling now falls partly above the top of the picture, while the south part of the frame (up to 28 units vs ~21 before) gets coarser LOD."
+  },
+  {
+   "id": "A8",
+   "file": "src/scenes/travel/TravelScene.tsx:53",
+   "defect": "`planChunkWindow` / `predictedNextCenter` / `orderChunkJobs` build the terrain window and its nearest-first build order around the traveller as the view centre. Moving or jumping south, the newly visible south strip can be built late or not at all, showing holes or stand-in LOD at the bottom edge."
+  },
+  {
+   "id": "A9",
+   "file": "src/scenes/travel/TravelScene.tsx:900",
+   "defect": "The far-terrain sheet is skipped at `zoom <= 1` on the assumption that the detailed chunk window around the traveller covers the whole frame. With the frame reaching further south at zoom 1, the south edge can run off the chunk window with no far sheet beneath it."
+  },
+  {
+   "id": "A10",
+   "file": "src/scenes/travel/TravelScene.tsx:943",
+   "defect": "Sun/CSM: `maxFar 240`, shadow near/far 10/400, and the light `target` (set outside the excerpt, likely at the traveller) assume shadowed ground centred on the traveller. The cascades follow the camera, but a target or shadow box anchored on the traveller loses south-frame shadow coverage. (Target placement outside material.)"
+  },
+  {
+   "id": "A11",
+   "file": "src/scenes/ActorLabels.tsx:118",
+   "defect": "`nearestActors(visible, camera.position, maxLabels)` ranks by distance from the camera, standing in for \"nearest the traveller/centre\". With the camera 7.5 further south, the 24-label cap favours south-of-frame actors and drops ones beside the traveller (above centre)."
+  },
+  {
+   "id": "A12",
+   "file": "src/scenes/ActorLabels.tsx:131",
+   "defect": "The declutter `depth` is measured from `camera.position`, so the \"nearer name keeps it\" priority shifts toward the bottom of the picture rather than toward the traveller."
+  },
+  {
+   "id": "A13",
+   "file": "src/scenes/travel/frameVisibility.ts:1",
+   "defect": "The seeders/scripted spawns that call `isOnScreen` generate candidates around the traveller (rings or the vicinity), sized for the old north-heavy reach (~21 south). With 28 units of south reach, more south candidates are rejected. Guarantees like the dry-shore drinkers or vicinity herds silently under-fill or cluster north."
+  },
+  {
+   "id": "A14",
+   "file": "src/scenes/travel/Wildlife.tsx:44",
+   "defect": "Every Wildlife caller of `isOnScreen` (seeders, scripted spawns, streaming cull) pairs it with traveller-centred rings, per the frameVisibility header. Any fixed ring constant there sized below the new south reach (call sites not shown — excerpt capped) now relies entirely on the projection fallback."
+  },
+  {
+   "id": "A15",
+   "file": "src/config/balance.ts:408",
+   "defect": "`dryShoreMinDrinkers`: \"the nearest water in the traveller's view\" is chosen by distance from the traveller. Water north of the traveller beyond ~28 units is no longer in the picture, so the guarantee can fill a shore the player cannot see."
+  },
+  {
+   "id": "A16",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:1059",
+   "defect": "Flight spawn starts at `viewR + FLIGHT_SPAWN_OUT` along the traveller→target bearing and pushes outward at most 12 steps. If `viewR` was sized to the old picture around the traveller, south-bearing spawns need more steps. After 12 the bird \"spawns where it is\", possibly in view."
+  },
+  {
+   "id": "A17",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:1108",
+   "defect": "Flight despawn requires `d > viewR` from the traveller as a ring floor. The floor is traveller-centred, so south-bound birds are judged against a ring that no longer matches the frame's south extent. This holds only while the projection half stays correct; the no-predicate fallback `viewR + FLIGHT_DESPAWN_OUT` despawns in view on the south side."
+  },
+  {
+   "id": "A18",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:1990",
+   "defect": "The predator entry probe (`minR..maxR`, 16 bearings × 6 rings) is projection-gated, but `maxR` was sized for the old frame. For prey south of the traveller the extra south reach can exhaust all rings, and the fallback (TRUNCATED after line 1993, not visible) may place the predator on screen. With no predicate the bare `minR` ring assumes the frame is centred on the traveller."
+  },
+  {
+   "id": "A19",
+   "file": "src/scenes/travel/wildlifeBehavior.ts:2018",
+   "defect": "`keepStreamedAnimal` keeps an animal while \"within the despawn ring of the PLAYER\" or on screen. The ring is traveller-centred; the projection backstop saves visibility, but the ring now over-retains north and under-retains south, and its sizing doc (\"debug wide-zoom corner where the ring lies inside the frame\") no longer covers the south-shifted case."
+  },
+  {
+   "id": "A20",
+   "file": "src/config/balance.ts:575",
+   "defect": "`hunt.leaveOvertimeSeconds`: the leaving predator's \"view ring\" is centred on the traveller. A predator walking off north leaves the picture well before the ring and paces off-screen until the overtime. One walking south can still be in the picture when the ring is passed."
+  },
+  {
+   "id": "A21",
+   "file": "src/scenes/travel/Wildlife.tsx:622",
+   "defect": "`ACTIVE_HERDS` lets `<LionHunt>` pick a \"nearby\" calf by distance to the player, so the drama is visible. Selection is traveller-centred, so a calf ~20–28 north now sits at the top edge or out of frame. `juvenilePreyBias` (\"fires more often near the player\", balance.ts:1615) inherits the same bias."
+  },
+  {
+   "id": "A22",
+   "file": "src/scenes/travel/Wildlife.tsx:5",
+   "defect": "Vultures \"circling the player\" (poor condition) circle the traveller, now ~37% from the top. A circle radius sized to the old centred frame can push the north half of the flock out of the top of the picture."
+  },
+  {
+   "id": "A23",
+   "file": "src/config/balance.ts:1662",
+   "defect": "`fight.driveOffDistance 24` claims the quarry stays \"still on screen\". This is a fixed distance with no projection, so a chase north of a near-traveller fight now runs out of the shortened north reach."
+  },
+  {
+   "id": "A24",
+   "file": "src/scenes/travel/TravelScene.tsx:1893",
+   "defect": "The enter hint replaces the place label \"while the traveller stands within the enter radius\". If the hint UI is anchored at screen centre or the traveller's projected spot (outside material), a centre-anchored hint now sits ~13% below the traveller and settlement."
+  },
+  {
+   "id": "A25",
+   "file": "scripts/verify/invariants.mjs:89",
+   "defect": "The I1 pop-in drive holds KeyW, presumably northward, and treats \"camera glued to the player\" as the view. The north reach shrinks, so spawns ahead are seeded and revealed differently. The check itself is projection-based and holds, but the coverage it was calibrated on (pop path toward north) shifts, so a passing run proves less."
+  },
+  {
+   "id": "A26",
+   "file": "scripts/verify/invariants.mjs:139",
+   "defect": "The `dist` from the traveller in pop findings is read as \"how far from view centre\". After the shift, triage of findings by distance misleads (a pop 25 north is at the edge, one 25 south is mid-lower picture)."
+  },
+  {
+   "id": "A27",
+   "file": "scripts/verify/enrichments.mjs:1435",
+   "defect": "The stain staging picks \"the steepest patch of clear land near the traveller\" within radius R, assuming that ring is in the picture. Spots north of ~28 are now out of frame and get rejected late by the HUD/projection gate (\"stain never projected clear of the HUD\"), which can stage nothing. TRUNCATED: R and spot loop at 1441–1510 not shown."
+  },
+  {
+   "id": "A28",
+   "file": "scripts/verify/enrichments.mjs:1368",
+   "defect": "The trample victim is injected \"at the player's spot\" and the following stain shots are framed on it. The stain now sits above centre; the projection clip still finds it, but any centre-of-frame clip or cell layout downstream (TRUNCATED) degrades."
+  },
+  {
+   "id": "A29",
+   "file": "outside material — scripts/verify/frameSubject.mjs",
+   "defect": "The travel shutter's subject/framing test likely uses the traveller (or `pos`) as default subject, possibly with an off-centre or NDC-near-0 tolerance like the place lane's RETURN_OFF_AXIS. Travel frames would be refused or mis-graded with the traveller at NDC y≈+0.26."
+  },
+  {
+   "id": "A30",
+   "file": "outside material — follow-camera verify (commits 1d8fd2faa / 8c8b76ced, WebGL 2 walk frames)",
+   "defect": "The preceding point samples the follow-camera angle per frame. Its assertions likely measure tilt as the camera→traveller direction (or traveller at NDC 0). After the shift the measured angle changes even though orientation is unchanged, so the check breaks or must switch to the camera's own forward vector."
+  },
+  {
+   "id": "A31",
+   "file": "outside material — debug jump / teleport camera lerp (invariants.mjs:96 \"big camera lerp\")",
+   "defect": "The jump lerp target is presumably traveller+offset looking at the traveller. It must carry the shift, or every jump ends with a re-aim snap; the verify settle waits assume the lerp ends centred."
+  },
+  {
+   "id": "A32",
+   "file": "outside material — zoom (wheel/pinch, setTravelZoom)",
+   "defect": "Zoom scales CAMERA_OFFSET about the traveller as fixed point. With the shift also scaling, the zoom pivot is no longer the picture centre, so the traveller slides vertically on screen during a zoom unless the shift's scaling matches exactly."
+  },
+  {
+   "id": "A33",
+   "file": "outside material — map / position query (`window.__camera` helpers, map overlay, \"where am I\")",
+   "defect": "Any helper returning the view centre as the traveller (e.g. camera target, or ground under NDC 0,0 equated with `pos`) now differs by ~7.5×zoom-scale units. This affects map recentre, the minimap viewport rectangle and debug readouts."
+  },
+  {
+   "id": "A34",
+   "file": "outside material — fog (TRAVEL_FOG near/far, zoom \"clearView\")",
+   "defect": "Fog distances were tuned with the camera ~48 from the traveller. At ~52.5 (more with zoom) the traveller and near field sit deeper in fog, and the far-north visible limit moves in."
+  },
+  {
+   "id": "A35",
+   "file": "outside material — Climate rain volume (Climate.tsx:382)",
+   "defect": "The rain instanced volume is presumably positioned at the traveller or camera target. Centred on the traveller, the lower picture (now 28 units south) can run past the rain box and show a rain-free band."
+  },
+  {
+   "id": "A36",
+   "file": "outside material — panorama capture readiness (TravelScene.tsx:1846, panoramaMath)",
+   "defect": "The capture gate reads the committed chunk set, which is built around the traveller. That still holds, but if the chunk window (B8) is re-centred on the new view centre to fix the south strip, chunks around the place may not be committed when the traveller is inside the ring, and the capture bakes a terrainless band. The two must be changed together."
+  },
+  {
+   "id": "A37",
+   "file": "outside material — audio listener / ambience",
+   "defect": "A positional-audio listener attached to the camera now sits ~7.5 further south of the traveller. Near sounds (footsteps, hunt, croc) pan or attenuate as if the player stood lower in the picture."
+  }
+ ]
+}
