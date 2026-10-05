@@ -263,11 +263,13 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
     // A legged figure shortens the cone; scaling its base radius by the same
     // factor keeps the TAPER identical, which is what makes the clearance above
     // hold for the children too. (The Figure lives in placeFigure.tsx since
-    // work-order 1245.)
+    // work-order 1245.) The cone is a unit one laid out to the proportions
+    // (work-order "walking villagers": a kneel folds them, never a squash).
     const rel = '../scenes/place/placeFigure.tsx'
     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
-    expect(src.includes('L.bodyRadius * (trunkH / bodyH)')).toBe(true)
-    expect(src.includes('coneGeometry args={[trunkRadius')).toBe(true)
+    expect(src.includes('L.bodyRadius * n.width * ((n.height - n.hipY) / n.height)')).toBe(true)
+    expect(src.includes('scale={[trunkRadius(lay), trunkH, trunkRadius(lay)]}')).toBe(true)
+    expect(src.includes('coneGeometry args={[1, 1, TESSELLATION.figureBody]}')).toBe(true)
   })
 
   it('the two arms never overlap: the hips sit inside the shoulders', () => {
@@ -285,7 +287,8 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
     const figure = readFileSync(fileURLToPath(new URL(figureRel, import.meta.url)), 'utf8')
     expect(figure.includes('FIGURE_LIMBS')).toBe(true)
     expect(figure.includes('LimbDetailContext')).toBe(true)
-    expect(figure.includes('cylinderGeometry args={[L.armRadius[0], L.armRadius[1], armLen, segments]}')).toBe(true)
+    expect(figure.includes('cylinderGeometry args={[L.armRadius[0], L.armRadius[1], 1, segments]}')).toBe(true)
+    expect(figure.includes('scale={[1, armLen, 1]}')).toBe(true)
     const rel = '../scenes/place/PlaceLife.tsx'
     const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
     expect(src.includes('effectiveFigureLimbSegments')).toBe(true)
