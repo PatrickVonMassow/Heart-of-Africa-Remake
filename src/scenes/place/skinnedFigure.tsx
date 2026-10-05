@@ -243,10 +243,14 @@ export function SkinnedFigure({
   const L = FIGURE_LIMBS
   // THE VIRTUAL PRIMITIVE RIG the poses are written onto — the primitive
   // figure's pivots exactly (placeFigure.tsx), drawing nothing.
+  // A kneeling one keeps the former squashed pivots: every kneeling contact
+  // (the loom, the paddle, the gutting) was solved through them, and this rig
+  // is never drawn — the drawn body kneels by its bones.
+  const bodyH = kneel ? 0.55 : 1.0
   const withLegs = legs && !kneel
+  const hipY = withLegs ? bodyH * L.hipY : 0
+  const armLen = bodyH * L.armLength
   const layout = primitiveLayout(kneel ? 1 : 0, withLegs, L)
-  const hipY = layout.hipY
-  const armLen = layout.armLength
   const outer = useRef<THREE.Group>(null)
   const trunk = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
@@ -512,10 +516,10 @@ export function SkinnedFigure({
         <primitive key={m.uuid} object={m} />
       ))}
       {/* The virtual primitive rig — pivots only, nothing drawn. */}
-      <group visible={false}>
+      <group scale={[1, kneel ? 0.75 : 1, 1]} visible={false}>
         <group ref={trunk} position={[0, hipY, 0]}>
           {[0, 1].map((i) => (
-            <group key={i} position={[(i === 0 ? 1 : -1) * layout.width * L.shoulderX, layout.height * L.shoulderY - hipY, 0]} ref={armRef[i]}>
+            <group key={i} position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]} ref={armRef[i]}>
               <object3D
                 position={[0, -armLen, 0]}
                 ref={(el) => {
