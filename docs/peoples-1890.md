@@ -2414,7 +2414,8 @@ sources — and its notes) is kept current in `docs/design-reference.md` §19.15
 design.md §19.15 is the pointer to it. It left this document on the user's
 decision (17.07.2026), first for design.md and since 27.07.2026 (point 367) for
 design-reference.md: it documents the game design, not the research. This
-document remains the underlying research; only the loom subsection stays here.
+document remains the underlying research; only the loom, the canoe and the
+villager dress table (§8.3) stay here.
 
 ### 8.1 The weaver's loom: what the sources carry, and what the game adapts
 
@@ -2508,6 +2509,85 @@ guess (about 1.3 m/s through the water against a dry-season current of about
 0.5 m/s). **IMPLEMENTATION.** `src/scenes/place/villagerCanoe.ts` lays the lane
 and runs the cycle; `VillagerCanoe` in `src/scenes/place/PlaceLife.tsx` draws
 it; every value is in `balance.villageLife.canoe`.
+
+### 8.3 The villager dress table: people × sex × age × season × year (work-order 1293)
+
+The everyday dress of all 22 peoples now reaches the game through one table,
+`src/systems/appearance.ts` (`PEOPLE_DRESS`, `appearanceFor`), drawn on the
+skinned figure of `src/render/figureBody.ts` / `figureDress.ts` on the medium
+and high presets (low keeps the primitive figure). Every cell names the
+section it rests on or carries a GUESS with its reason; the seasonal wrap is
+still `systems/dress.ts` (§7), folded in rather than restated: it REPLACES an
+everyday shoulder layer (the San ‡nau is re-worn over both shoulders, not
+doubled), and is never put on a small child.
+
+**The research of the gaps (04.10.2026), in the order the user set: own
+period search first, then a second search by GPT-6 Astra, then guessing.**
+
+*Zulu* — the four named gaps:
+
+- **Men's everyday dress under the cloak — SETTLED (period-attested,
+  secondary wording).** The *umutsha*: a thin hide girdle with the *isinene*
+  (twisted strips of civet, genet or monkey fur hanging in front) and the
+  *ibheshu* (a calf-hide flap behind); married men wear the *isicoco* head-ring
+  (Shooter 1857, *The Kafirs of Natal and the Zulu Country*, and Mayr 1907, as
+  carried by the Met's umutsha record and the 1879 glossaries; the full texts
+  could not be fetched from this container). Astra (B9) adds the caution the
+  table follows: the head-ring marks the MARRIED man, not the elder — so the
+  young man goes without it and the adult and the elder wear it.
+- **Children's dress — PARTLY.** Girls up to about twelve wear only a beaded
+  loin-dress (Nkumane 2001, secondary, on the 19th-century dress); unmarried
+  girls a short bead/string skirt with bead strings, the upper body bare;
+  married women the *isidwaba* (§2.3) and a skin over the breast (*isicwaya*),
+  the hair dressed into a topknot. Astra (B3, B5, B12) could not settle small
+  boys or the breast cover by a period passage: **small boys = GUESS** (a small
+  hide flap); the breast cover stays sourced to the secondary record above.
+- **Does Mayr 1907 Natal transfer to Zululand 1890 — UNSETTLED.** Neither
+  search found a source; Astra (B6, B7) warns that "Zululand was more
+  conservative" is a hypothesis. The table therefore uses Mayr only where §2.3
+  already does (the isidwaba, the greased cloaks).
+- **Share of hide versus blanket wearers — UNSETTLED → GUESS.** No period
+  percentage exists (Astra B8). `VILLAGER_DRESS.zuluBlanketShare` in
+  `src/config/balance.ts` (calibratable): 30 % of the cold-weather cloaks are a
+  plain trade blanket in 1890, rising linearly to 50 % in 1895 — the direction
+  is Mayr's "Skin-Zulu → Blanket-Zulu", the rate is invented.
+
+*Nubians* — girls' leather-strip waist covering (*rahat*): Burckhardt 1819
+(travels 1813–14) per Astra B16; dated, so a working assumption for 1890.
+
+*Every other people* — Astra's second search (B13–B42) returned UNKNOWN for the
+children's dress and for any elder insignia of the whole roster, and for the
+women's dress of the Mongo (beyond §7.4), Mbuti, Banda, Bambundu, Lunda,
+Sidama and Wayeyi. Those cells are GUESSES in the table, each with its reason:
+a waist string of beads for small children where the record is silent, a small
+flap or apron of the people's own material for the rest.
+
+*Elders* — no source gives a garment that marks age (Astra B10, B47), so the
+elder wears the adult's dress and is told apart by the BODY: grey hair, a
+stoop, a thinner build (`figureBody.ts`). The Maasai elder's fur cloak is the
+one sourced exception (§7.1, Hollis Pl. II). Measured in the picture (Zulu
+village, the young man and the old man side by side, 4 to 32 m): from the
+front a stoop barely shows, so the body carries the read in front view too —
+the old man's narrower, sloping shoulders against the young man's square ones,
+a give at the knees, the head carried low, and a short grey beard (a GUESS of
+the hair, not a garment: no source in this document names an elder's beard,
+so it is a readability cue, calibratable). They are told
+apart reliably to about 14 m (drawn about 90 px tall at 900 px), still by the
+build alone at 22 m (~57 px), and no longer at 32 m (~40 px).
+
+*Year* — Astra (B43) knows no garment that arrives or vanishes inside 1890–1895
+for any people. The two year rules are therefore GUESSES, both calibratable:
+the Zulu blanket share above, and the white cotton kanzu for a Baganda man of
+rank from 1894 (`VILLAGER_DRESS.bagandaCottonFrom`; §2.5: the protectorate
+favoured cotton — rank-gated because Astra B44 finds no population-wide
+replacement).
+
+Sources of the own search: [Met, Belt (umutsha)](https://www.metmuseum.org/art/collection/search/314793);
+[Khumalo 2000, Isicoco as a symbol of Ubudoda](https://phambo.wiser.org.za/files/seminars/Khumalo2000.pdf);
+[Nkumane 2001, The traditional dress of Zulu women](https://datalib.usask.ca/iportal/2007.10.17/IKC-2001/IKC-2001-Nkumane.pdf);
+[1879 Zulu glossary](https://www.1879zuluwar.com/t36-a-list-of-common-zulu-terms-relevant-to-the-anglo-zulu-war-of-1879);
+Shooter 1857 and Mayr 1907 located (Internet Archive; emandulo UCT) but not
+readable from this container.
 
 ---
 

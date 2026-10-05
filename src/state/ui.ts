@@ -429,6 +429,8 @@ export const effectivePlaceRiverFlotsam = (s: UiState): number => currentQuality
 export const effectiveWaterDetailOctaves = (s: UiState): number => currentQuality(s).waterDetailOctaves
 /** Radial segments of the detailed ungulates' swept bodies (work-order 1284). */
 export const effectiveFaunaBodySegments = (s: UiState): number => currentQuality(s).faunaBodySegments
+/** The villagers' skinned-body resolution; 0 = the primitive figure (work-order "villager dress"). */
+export const effectiveFigureBodySegments = (s: UiState): number => currentQuality(s).figureBodySegments
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

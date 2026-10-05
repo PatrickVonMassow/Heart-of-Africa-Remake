@@ -124,7 +124,7 @@ const SEASONAL_DRESS: Record<string, DressRule> = {
 }
 
 /** This frame's seasonal drivers at a place (from systems/season.ts). */
-interface DressDrivers {
+export interface DressDrivers {
   coldness: number
   harmattan: number
   karif: number

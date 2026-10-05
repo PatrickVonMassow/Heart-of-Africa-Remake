@@ -6,10 +6,28 @@
 import { useEffect, useMemo } from 'react'
 import { START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
-import { seasonalDressFor, type SeasonalDress } from '../../systems/dress'
+import { seasonalDressFor, type DressDrivers, type SeasonalDress } from '../../systems/dress'
 import { coldnessAt, harmattanAt, karifAt } from '../../systems/season'
 import { placeById } from '../../world/geo'
 import { elevationAt } from '../../world/geodata'
+
+/**
+ * This visit's seasonal dress drivers at a settlement, from the PLACE's own
+ * coordinates and the date (shared by the cold cloaks below and the skinned
+ * villagers' appearance), and the game year the date falls in.
+ */
+export function placeDressDrivers(placeId: string, day: number): { drivers: DressDrivers; year: number } {
+  const place = placeById(placeId)
+  const el = elevationAt(place.lat, place.lon)
+  return {
+    drivers: {
+      coldness: coldnessAt(day, place.lat, place.lon, START_YEAR, el),
+      harmattan: harmattanAt(day, place.lat, place.lon, START_YEAR),
+      karif: karifAt(day, place.lat, place.lon, START_YEAR, el),
+    },
+    year: new Date(Date.UTC(START_YEAR, 0, 1) + Math.floor(day) * 86400000).getUTCFullYear(),
+  }
+}
 
 export interface ColdDress extends SeasonalDress {
   /** The settlement's everyday cloth palette, which keys the wrap's colour. */
@@ -37,13 +55,7 @@ export function useColdCloaks(
     if (!placeId) return null
     const place = placeById(placeId)
     if (!place.peopleId) return null
-    const day = useGame.getState().day
-    const el = elevationAt(place.lat, place.lon)
-    return seasonalDressFor(place.peopleId, {
-      coldness: coldnessAt(day, place.lat, place.lon, START_YEAR, el),
-      harmattan: harmattanAt(day, place.lat, place.lon, START_YEAR),
-      karif: karifAt(day, place.lat, place.lon, START_YEAR, el),
-    })
+    return seasonalDressFor(place.peopleId, placeDressDrivers(placeId, useGame.getState().day).drivers)
   }, [placeId])
 
   const dress = useMemo(() => (worn ? { ...worn, palette } : null), [worn, palette])

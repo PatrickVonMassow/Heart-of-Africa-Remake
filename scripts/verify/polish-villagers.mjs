@@ -3,12 +3,13 @@
 // well, the stations, the loom, the errands and the mortar (design.md §19.10).
 // Dev server only. Split out of polish.mjs by theme; the boot and the shared
 // helpers live in ./_polish.mjs, and every section below owns its staging.
-import { waitForSceneBuilt, assertBackend } from './_browser.mjs'
+import { waitForSceneBuilt, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { capturePixels } from './frameSubject.mjs'
 import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
 import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
+import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
@@ -559,11 +560,12 @@ if (section('villager-canoe')) {
         .then(() => true)
         .catch(() => false)
       check('the carrier guts the catch at the fishers’ fire', gutting)
-      await standAt(fireStand.at, fireStand.look)
-      const atFire = await inPlace()
-      check('the fire’s standing place is inside the settlement', atFire)
-      if (gutting && atFire) {
-        const seen = await page.evaluate(() => {
+      // The people at the fire have human bodies now (the villager-dress
+      // work): a chest hides the rack where a cone's thin top did not. So the
+      // stand is tried along the bank as well, and the first from which all
+      // four are seen is taken — the check itself stays as strict.
+      const readSeen = () =>
+        page.evaluate(() => {
           const f = window.__placeFishFire()
           const s = f.sites
           const seen = window.__canoeSeen
@@ -575,6 +577,19 @@ if (section('villager-canoe')) {
             fire: seen(s.fire.x, 0.2, s.fire.z, 0.8),
           }
         })
+      const bankDir = await page.evaluate(() => ({ fx: window.__placeLayout.bank.fx, fz: window.__placeLayout.bank.fz }))
+      let seen = null
+      let atFire = false
+      for (const shift of [0, -1.5, 1.5, -3, 3]) {
+        const at = { x: fireStand.at.x + bankDir.fx * shift, z: fireStand.at.z + bankDir.fz * shift }
+        await standAt(at, fireStand.look)
+        atFire = await inPlace()
+        if (!atFire) continue
+        seen = await readSeen()
+        if (seen.carrier && seen.griller && seen.rack && seen.fire) break
+      }
+      check('the fire’s standing place is inside the settlement', atFire)
+      if (gutting && atFire && seen) {
         check('the carrier, the griller, the fire and the smoking rack are in frame, nothing hiding them',
           seen.carrier && seen.griller && seen.rack && seen.fire, JSON.stringify(seen))
         check('and the rack carries fish', seen.rackFish >= 3, JSON.stringify(seen))
@@ -3765,6 +3780,323 @@ if (section('village-pounding')) {
       }
     }
   }
+}
+
+// --- The villagers' dress (work-order "villager dress") ---------------------------
+// Picture evidence, staged like the animal models' herd (1284): in every
+// people's village one villager of each sex and age group stands in a row in
+// front of the player (`window.__dressLineup`, dev only), drawn by the real
+// Figure with that settlement's look — child, girl / young man, married, old.
+// Then the low preset draws the same row as the primitive figure, and the
+// young man and the elder stand side by side at growing distances for the
+// age-readability judgement. The table, body and dress builders are pinned in
+// src/systems/appearance.test.ts and src/render/figure{Body,Dress,Rig}.test.ts.
+if (section('villager-dress')) {
+  // The measurements (distance heights, cost) leave the run only as a file:
+  // run-all keeps nothing of a suite's stdout but its summary.
+  const MEASURE = 'local/verify-measure/villager-dress.jsonl'
+  mkdirSync('local/verify-measure', { recursive: true })
+  const record = (what, data) => {
+    const line = { at: new Date().toISOString(), gl: VERIFY_GL ?? 'webgpu', what, ...data }
+    console.log(`  villager-dress ${JSON.stringify(line)}`)
+    appendFileSync(MEASURE, JSON.stringify(line) + '\n')
+  }
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  const PEOPLES = (process.env.DRESS_PEOPLES ?? 'zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai,somali,swahili,baganda,sidama,tuareg,berbers,nubians,hausa,bambara,mandinka,fang,mongo,mbuti,banda').split(',')
+  const villageOf = (p) => (p === 'berbers' ? 'berber' : p === 'nubians' ? 'nubian' : p) + '-village'
+  // A clear line of sight from the player to every figure of a row `d` metres
+  // ahead, on one of 16 bearings (and, failing that, a little nearer or
+  // farther): the probe's first surface must lie at or behind each figure, at
+  // a child's chest height and an adult's. The full row is 8 figures 0.9 m
+  // apart, so a fence or a hut that hides only the children is caught too.
+  // `exact`: stand the row at exactly `d` (the age-readability distances are
+  // the measurement, so no nearer or farther fallback may relabel them).
+  const stageRow = (d, only, exact = false) =>
+    page.evaluate(
+      ({ d, only, exact }) => {
+        const p = window.__placePlayer
+        const best = { score: -1 }
+        // the row staged before must not block the probes for the next one
+        const hidden = []
+        window.__placeScene.getObjectByName('dress-lineup')?.traverse((o) => {
+          if (o.visible) hidden.push(o)
+          o.visible = false
+        })
+        // The place's own people count as blockers too: a villager who walks
+        // up to address the player, or stands in a sight line for the whole
+        // wait, hid the 22 m pair (WebGL 2) and the Fang row (full suite).
+        const cam = window.__placeCamera.position
+        const people = []
+        window.__placeScene.traverse((o) => {
+          if (o.name !== 'figure-head') return
+          for (let n = o.parent; n; n = n.parent) if (n.name === 'dress-lineup') return // the row being re-staged
+          const h = o.getWorldPosition(new cam.constructor())
+          people.push(h, h.clone().setY(h.y - 0.5))
+        })
+        const personOnLine = (x, y, z) =>
+          people.some((h) => {
+            const sx = x - cam.x, sy = y - cam.y, sz = z - cam.z
+            const rx = h.x - cam.x, ry = h.y - cam.y, rz = h.z - cam.z
+            const k = (rx * sx + ry * sy + rz * sz) / (sx * sx + sy * sy + sz * sz)
+            if (k <= 0 || k >= 1) return false
+            return Math.hypot(rx - k * sx, ry - k * sy, rz - k * sz) < 0.8
+          })
+        const half = only ? 0.45 : 3.15
+        const lateral = only ? [-half, half] : [-half, -2.25, -1.35, -0.45, 0.45, 1.35, 2.25, half]
+        for (const dist of exact ? [d] : [d, d * 0.85, d * 1.2]) {
+          for (let k = 0; k < 16; k++) {
+            const yaw = p.yaw + (k * Math.PI) / 8
+            const fx = -Math.sin(yaw)
+            const fz = -Math.cos(yaw)
+            const cx = p.x + fx * dist
+            const cz = p.z + fz * dist
+            let clear = 0
+            for (const s of lateral) {
+              const x = cx + Math.cos(yaw) * s
+              const z = cz - Math.sin(yaw) * s
+              for (const y of [0.5, 1.0]) {
+                const hit = window.__placeRayHit?.(x, y, z)
+                // an absolute tolerance: a ratio would let a wall 0.6 m before
+                // a subject 32 m away pass as clear
+                const clearTo = !hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.15
+                if (clearTo && !personOnLine(x, y + 0.3, z)) clear++
+              }
+            }
+            if (clear > best.score) Object.assign(best, { score: clear, of: lateral.length * 2, yaw, cx, cz, dist })
+            if (clear === lateral.length * 2) break
+          }
+          if (best.score === best.of) break
+        }
+        for (const o of hidden) o.visible = true
+        p.yaw = best.yaw
+        p.pitch = -0.08
+        window.__dressLineup({ x: best.cx, z: best.cz, yaw: best.yaw, only })
+        return best
+      },
+      { d, only, exact },
+    )
+  // Whether a passer-by of the village's own life stands between the camera
+  // and a figure of the row (a carrier with a basket hid the Mongo young man):
+  // any other figure's head or chest (`figure-head`, on every drawn person — a
+  // villager, a porter, a vignette's actor) within 0.6 m of a sight line to a
+  // head or chest of the row, nearer than the row.
+  const rowHidden = () =>
+    page.evaluate(() => {
+      const scene = window.__placeScene
+      const cam = window.__placeCamera.position
+      const row = scene.getObjectByName('dress-lineup')
+      if (!row) return false
+      const V = cam.constructor
+      const inRow = (o) => {
+        for (let n = o.parent; n; n = n.parent) if (n === row) return true
+        return false
+      }
+      const targets = []
+      const others = []
+      scene.traverse((o) => {
+        if (o.name !== 'figure-head') return
+        // the head and the chest below it: a walker's body hides a child's
+        // head even where the walker's own head passes above the sight line
+        const h = o.getWorldPosition(new V())
+        ;(inRow(o) ? targets : others).push(h, h.clone().setY(h.y - 0.5))
+      })
+      const seg = new V()
+      const rel = new V()
+      let best = { d: Infinity }
+      for (const t of targets)
+        for (const p of others) {
+          seg.subVectors(t, cam)
+          rel.subVectors(p, cam)
+          const k = rel.dot(seg) / seg.lengthSq()
+          // the whole sight line up to the subject (row members are excluded by
+          // identity above, so a walker just in front of one still counts)
+          if (k <= 0 || k >= 1) continue
+          const d = rel.addScaledVector(seg, -k).length()
+          if (d < best.d) best = { d, k }
+        }
+      window.__rowHiddenDebug = { targets: targets.length, others: others.length, ...best }
+      return best.d < 0.6
+    })
+  const awaitRowClear = async () => {
+    for (let i = 0; i < 120 && (await rowHidden()); i++) await nextFrames(5)
+  }
+  // Stage, draw, wait for passers-by; a row still hidden is stood on a fresh
+  // bearing (up to three times) — the gate after it stays strict.
+  const stageClear = async (label, d, only, exact = false) => {
+    let at = null
+    for (let attempt = 0; attempt < 4; attempt++) {
+      at = await stageRow(d, only, exact)
+      await nextFrames(4)
+      await awaitPlaceDrawn(attempt ? `${label}, re-staged` : label)
+      await awaitRowClear()
+      if (!(await rowHidden())) break
+    }
+    return at
+  }
+  // What the row is drawn with: skinned meshes on medium/high, none on low.
+  const rowBodies = () =>
+    page.evaluate(() => {
+      const row = window.__placeScene.getObjectByName('dress-lineup')
+      if (!row) return null
+      let skinned = 0
+      let heads = 0
+      const meshes = new Set()
+      row.traverse((o) => {
+        if (o.isSkinnedMesh) {
+          skinned++
+          meshes.add(o.name)
+        }
+        if (o.name === 'figure-head') heads++
+      })
+      return { figures: row.children.length, skinned, heads, meshes: [...meshes].sort() }
+    })
+
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  for (const people of PEOPLES) {
+    await goToPlace(villageOf(people))
+    // drawn first (the pipeline wait steps frames, and walkers walk on), then
+    // clear, so the shutter below opens a few frames after the clear reading
+    const at = await stageClear(`${people} row`, 5.6)
+    const hidden = await rowHidden()
+    record('row-hidden', { people, ...(await page.evaluate(() => window.__rowHiddenDebug)) })
+    const got = await rowBodies()
+    check(
+      `${people}: every sex and age group stands in the row in view, each one skinned mesh (body and dress merged)`,
+      !!got && got.figures === 8 && got.heads === 8 && got.skinned === 8 && at.score === at.of && !hidden,
+      JSON.stringify({ ...got, clear: `${at.score}/${at.of}`, dist: at.dist, hidden }),
+    )
+    await frame(shot(`1293-dress-${people}`), {
+      local: { x: at.cx, y: 0.7, z: at.cz },
+      label: `${people}: staged row of villagers left to right girl child, boy, girl, young man, married woman, married man, old woman, old man, in the researched dress`,
+    })
+    await page.evaluate(() => window.__dressLineup(null))
+  }
+
+  // THE AGE-READABILITY DISTANCE: the young man and the elder side by side.
+  await goToPlace('zulu-village')
+  for (const d of [4, 8, 14, 22, 32]) {
+    const at = await stageClear(`elder/young man ${d} m`, d, ['male-youth', 'male-elder'], true)
+    const hidden = await rowHidden()
+    // An occluded pair would read as a lost age cue: the shot must be clear.
+    check(
+      `elder and young man at ${d} m: staged at exactly that distance with a clear view`,
+      at.dist === d && at.score === at.of && !hidden,
+      JSON.stringify({ dist: at.dist, clear: `${at.score}/${at.of}`, hidden }),
+    )
+    // Drawn crown height and shoulder span (px) of each: the measurable part
+    // of the age read — the rest is the frame, judged by looking.
+    const px = await page.evaluate(() => {
+      const cam = window.__placeCamera
+      const row = window.__placeScene.getObjectByName('dress-lineup')
+      const H = window.innerHeight
+      const W = window.innerWidth
+      const at = (o, dy = 0) => {
+        const v = o.getWorldPosition(new o.position.constructor())
+        v.y += dy
+        return v.project(cam)
+      }
+      const out = {}
+      for (const g of row.children) {
+        const find = (n) => g.getObjectByName(n)
+        const head = find('figure-head')
+        const crown = at(head, 0.16 * head.getWorldScale(new head.position.constructor()).y)
+        const foot = at(g)
+        const l = at(find('bone-upperArm.L'))
+        const r = at(find('bone-upperArm.R'))
+        out[g.name.replace('dress-lineup-', '')] = {
+          height: Math.round(((crown.y - foot.y) / 2) * H),
+          shoulders: Math.round((Math.abs(l.x - r.x) / 2) * W),
+        }
+      }
+      return out
+    })
+    record('elder-youth', { d, dist: at.dist, px })
+    await frame(shot(`1293-elder-youth-${String(d).padStart(2, '0')}m`), {
+      local: { x: at.cx, y: 0.7, z: at.cz },
+      label: `the Zulu young man (left) and the elder (right) side by side, ${d} m from the camera`,
+    })
+  }
+  await page.evaluate(() => window.__dressLineup(null))
+
+  // THE LOW PRESET keeps the primitive figure (user decision 04.10.2026).
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
+  await nextFrames(6)
+  const lowAt = await stageClear('low row', 5.6)
+  const lowHidden = await rowHidden()
+  const low = await rowBodies()
+  check(
+    'low preset: the row is the primitive figure in view — no skinned mesh, every head drawn',
+    !!low && low.figures === 8 && low.skinned === 0 && low.heads === 8 && lowAt.score === lowAt.of && !lowHidden,
+    JSON.stringify({ ...low, clear: `${lowAt.score}/${lowAt.of}`, hidden: lowHidden }),
+  )
+  await frame(shot('1293-dress-low-primitive'), {
+    local: { x: lowAt.cx, y: 0.7, z: lowAt.cz },
+    label: 'the low preset: the same Zulu row drawn as the primitive cone-and-sphere figure',
+  })
+  await page.evaluate(() => window.__dressLineup(null))
+
+  // THE COST PER VILLAGE (graphics-detail-levels.md): the same village, the
+  // same view, on each level, each once with the primitive figure (the
+  // "before": `figureBodySegments` forced to 0 in the dev server's live preset
+  // table) and once with the skinned body — so the difference is the figures'.
+  // Draw calls and triangles from the renderer's per-frame counters; the frame
+  // time is the median of 60 rendered frames (a shared, software-rendered
+  // machine: compare the levels, not the absolute milliseconds).
+  for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
+    await goToPlace(villageOf(people))
+    const row = {}
+    const runs = [['low', null], ['medium', 0], ['medium', null], ['high', 0], ['high', null]]
+    for (const [level, force] of runs) {
+      await page.evaluate(
+        async ({ l, force }) => {
+          const q = await import('/src/config/quality.ts')
+          window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
+          for (const k of ['medium', 'high']) q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
+          // through another level, so every figure re-reads the table
+          window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+          window.__ui.getState().setDetailLevel(l)
+        },
+        { l: level, force },
+      )
+      const name = force === 0 ? `${level}-primitive` : level
+      await nextFrames(10)
+      await awaitPlaceDrawn(`${people} ${name}`)
+      row[name] = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const times = []
+            const calls = []
+            const tris = []
+            let last = performance.now()
+            const tick = (t) => {
+              times.push(t - last)
+              last = t
+              const r = window.__renderer?.info?.render
+              calls.push(r?.drawCalls ?? 0)
+              tris.push(r?.triangles ?? 0)
+              if (times.length < 61) return requestAnimationFrame(tick)
+              const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
+              let figures = 0
+              let skinned = 0
+              window.__placeScene.traverse((o) => {
+                if (o.name === 'inhabitant') figures++
+                if (o.isSkinnedMesh) skinned++
+              })
+              resolve({ figures, skinned, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+            }
+            requestAnimationFrame(tick)
+          }),
+      )
+    }
+    record('cost', { village: `${people}-village`, row })
+    check(
+      `${people}: the cost probe read every level (low draws no skinned mesh, medium and high do)`,
+      row.low.skinned === 0 && row['medium-primitive'].skinned === 0 && row.medium.skinned > 0 && row.high.skinned > 0 && row.low.drawCalls > 0,
+      JSON.stringify(row),
+    )
+  }
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
 }
 
 await finishPolishSuite()

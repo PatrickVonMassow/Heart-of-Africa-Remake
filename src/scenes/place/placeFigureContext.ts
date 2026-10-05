@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useMemo } from 'react'
 import { armAim, REST_POSE, type FigurePose } from '../../render/gesture'
 import type { SpeechFloor } from '../../communication/speechFloor'
 import type { ColdDress } from './useColdCloaks'
+import type { DressDrivers } from '../../systems/dress'
 import {
   addBodies,
   createBodies,
@@ -32,6 +33,22 @@ export const ColdCloaksContext = createContext<ColdDress | null>(null)
  * read the same number, so PlaceLife subscribes once and hands it down.
  */
 export const LimbDetailContext = createContext<number>(8)
+
+/**
+ * What the skinned villagers of this settlement need to dress (work-order
+ * "villager dress"): its people, this visit's seasonal drivers and year, the
+ * cloth palette that keys rank, and the ring resolution of the body. Null on
+ * the LOW preset, and outside a settlement — the primitive figure is drawn then.
+ */
+export interface FigureLook {
+  peopleId: string | null
+  drivers: DressDrivers
+  year: number
+  palette: readonly string[]
+  /** Ring resolution of trunk and head (`QUALITY_PRESETS.figureBodySegments`). */
+  radial: number
+}
+export const FigureLookContext = createContext<FigureLook | null>(null)
 
 /**
  * The settlement's inhabitant bodies (work-order point 578). A context for the

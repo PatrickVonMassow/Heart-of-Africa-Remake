@@ -18,15 +18,16 @@ const source = readFileSync('src/scenes/place/PlaceLife.tsx', 'utf8')
 const component = source.slice(source.indexOf('export function PlaceLife(')).replace('export function', 'function').replaceAll('import.meta.env.DEV', 'true')
 const devAssert = vi.fn()
 const components = ['Kids', 'Porters', 'Traders', 'Talkers', 'Walkers', 'Cook', 'Loom', 'RiverFishery',
-  'ErrandVillagers', 'Goats', 'FireTender', 'Pounder', 'Drummer', 'Well', 'TaskWalker']
-const contexts = ['ColdCloaksContext', 'LimbDetailContext', 'InhabitantBodiesContext', 'SpeechFloorContext']
+  'ErrandVillagers', 'Goats', 'FireTender', 'Pounder', 'Drummer', 'Well', 'TaskWalker', 'DressLineup']
+const contexts = ['ColdCloaksContext', 'LimbDetailContext', 'FigureLookContext', 'InhabitantBodiesContext', 'SpeechFloorContext']
 const deps = {
   React: { createElement },
   ...Object.fromEntries(components.map(name => [name, name])),
   ...Object.fromEntries(contexts.map(name => [name, { Provider: name }])),
   useMemo: (fn: () => unknown) => fn(), useRef: (current: unknown) => ({ current }),
   useEffect: () => {}, useFrame: () => {}, useColdCloaks: () => false,
-  useUi: () => 1, effectiveFigureLimbSegments: () => 1,
+  useUi: () => 1, effectiveFigureLimbSegments: () => 1, effectiveFigureBodySegments: () => 1,
+  placeDressDrivers: () => ({ drivers: {}, year: 1890 }),
   useGame: () => 0, placeById: () => null, createInhabitantSet: () => ({}),
   SpeechFloor: class {}, placePlayerPosition: {}, useUnplacedInhabitantWatch: () => {},
   balance, devAssert, climbBoulder, playRockFlank,

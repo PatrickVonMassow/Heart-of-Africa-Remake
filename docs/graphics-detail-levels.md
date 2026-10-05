@@ -48,6 +48,7 @@ device pixel ratio is kept (no cap).
 | `placeRiverFlotsam` | 12 | 48 | 90 |
 | `waterDetailOctaves` | 1 | 3 | 4 |
 | `faunaBodySegments` | 12 | 18 | 24 |
+| `figureBodySegments` | 0 | 16 | 24 |
 
 ## What each setting does
 
@@ -146,6 +147,38 @@ added.
 
   So medium (the default) draws slightly fewer triangles per animal than the
   capsule build did, low about a quarter fewer, and high about a quarter more.
+
+- **`figureBodySegments`** — The villagers' body (work-order "villager dress"):
+  `0` keeps the primitive cone, sphere and cylinder figure (user decision
+  04.10.2026: the low level keeps it); otherwise the ring resolution of the
+  code-built skinned body — trunk and head; limbs take two thirds — and of the
+  dress layers drawn on it from the appearance table
+  (`src/systems/appearance.ts`, `src/render/figureBody.ts`,
+  `src/render/figureDress.ts`). Body and dress are merged into ONE skinned
+  mesh per inhabitant with one shared material, so a villager is one draw
+  (the primitive figure is about a dozen); geometries are cached per distinct
+  body and dress. Climbs 0 → 16 → 24. Cost per village, measured 04.10.2026
+  (`polish-villagers.mjs` section `villager-dress`; the same view of a village
+  on each level, once with `figureBodySegments` forced to
+  0 — the "before" — and once as shipped; per-frame draw calls / triangles,
+  WebGPU, WebGL 2 within a few percent):
+
+  | Village | Inhabitants | Low (primitive) | Medium before → after | High before → after |
+  | --- | --- | --- | --- | --- |
+  | Zulu | 25 | 37 / 43 k | 544 / 141 k → 344 / 269 k | 524 / 144 k → 354 / 351 k |
+  | Hausa | 25 | 295 / 75 k | 835 / 170 k → 489 / 392 k | 864 / 185 k → 519 / 549 k |
+  | Maasai | 25 | 289 / 90 k | 794 / 231 k → 464 / 422 k | 765 / 236 k → 470 / 518 k |
+
+  So on medium and high the skinned villagers cost about 40 % FEWER draw calls
+  than the primitive figures did and about twice the triangles (+130 k to
+  +360 k per village). These are OBSERVATIONS, not a controlled experiment:
+  the village keeps living while the variants are read one after the other,
+  so walkers and activities move between readings; the draw-call drop is far
+  larger than that drift (the primitive figure is about a dozen draws, the
+  skinned one one), the exact triangle difference less so. The median frame time did not separate the variants on
+  this shared, software-composited machine (16.7–66.7 ms in every column,
+  quantised to the display's vsync), so no frame-time cost is claimed either
+  way; low is unchanged by construction.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a

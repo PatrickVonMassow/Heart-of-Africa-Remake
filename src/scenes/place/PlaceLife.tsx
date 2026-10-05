@@ -49,8 +49,8 @@ import {
   type GestureKind,
   type GestureState,
 } from '../../render/gesture'
-import { effectiveFaunaBodySegments, effectiveFigureLimbSegments, useUi } from '../../state/ui'
-import { useColdCloaks } from './useColdCloaks'
+import { effectiveFaunaBodySegments, effectiveFigureBodySegments, effectiveFigureLimbSegments, useUi } from '../../state/ui'
+import { placeDressDrivers, useColdCloaks } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
 import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
@@ -167,8 +167,10 @@ import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 import { Figure } from './placeFigure'
+import { DressLineup } from './dressLineup'
 import {
   ColdCloaksContext,
+  FigureLookContext,
   HEAD_CARRY_POSE,
   InhabitantBodiesContext,
   LimbDetailContext,
@@ -176,6 +178,7 @@ import {
   useInhabitantBodies,
   useStandingBodies,
   useStandingBody,
+  type FigureLook,
 } from './placeFigureContext'
 
 /** Collision radius of inhabitants (WALKER_RADIUS; the player's own is PLAYER_RADIUS). */
@@ -189,7 +192,7 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   useStandingBody(x, z)
   return (
     <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.PI / 3, 0]}>
-      <Figure cloth={cloth} kneel />
+      <Figure cloth={cloth} kneel sex="female" age="adult" />
       {/* Tripod with pot over the embers */}
       <group position={[0.85, 0, -0.4]}>
         {[0, 1, 2].map((i) => {
@@ -1946,10 +1949,12 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   return (
     <group position={[x, groundHeight(x, z), z]}>
       <group ref={a} position={[-0.5, 0, 0]}>
-        <Figure cloth={cloth[0]} gesture={gestureA} />
+        {/* The conversing pair: the notable elder and a young man (work-order
+            "villager dress": the pair the age-readability judgement compares). */}
+        <Figure cloth={cloth[0]} gesture={gestureA} sex="male" age="elder" />
       </group>
       <group ref={b} position={[0.5, 0, 0]}>
-        <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} />
+        <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} sex="male" age="youth" />
       </group>
     </group>
   )
@@ -2061,7 +2066,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   })
   return (
     <group ref={group} name={DRUMMER_SPEAKER_ID} position={[x, groundHeight(x, z), z]} rotation={[0, yaw, 0]}>
-      <Figure cloth={cloth} pose={pose} />
+      <Figure cloth={cloth} pose={pose} sex="male" age="youth" />
       {/* The large low drum (`ba`) and the small high one (`BA`) — each on the
           side its own x puts it, which is the side its hand is read from. */}
       <Drum drum={LOW_DRUM} headRef={lowHead} />
@@ -3760,6 +3765,18 @@ export function PlaceLife({
   // here, not per figure: a settlement mounts a couple of dozen of them.
   const limbSegments = useUi(effectiveFigureLimbSegments)
 
+  // The skinned, dressed villagers' look (work-order "villager dress"): this
+  // settlement's people, the visit's season and year, its cloth palette. Null
+  // on the low preset, which keeps the primitive figure. Read once per visit,
+  // like the cloaks: time does not advance inside a settlement.
+  const bodySegments = useUi(effectiveFigureBodySegments)
+  const figureLook = useMemo<FigureLook | null>(() => {
+    const place = placeId ? placeById(placeId) : null
+    if (!bodySegments || !place) return null
+    const { drivers, year } = placeDressDrivers(place.id, useGame.getState().day)
+    return { peopleId: place.peopleId ?? null, drivers, year, palette: style.cloth, radial: bodySegments }
+  }, [bodySegments, placeId, style.cloth])
+
   // Whether this village has a well at all (point 1092) — the same answer the
   // layout's colliders and keep-clear spots are built from, so the drawn prop
   // and the reserved ground cannot disagree.
@@ -3903,6 +3920,7 @@ export function PlaceLife({
     return (
       <ColdCloaksContext.Provider value={cloaks}>
         <LimbDetailContext.Provider value={limbSegments}>
+      <FigureLookContext.Provider value={figureLook}>
           <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
             <Kids
@@ -3925,16 +3943,19 @@ export function PlaceLife({
             <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} radius={radius} bank={bank} observed={observed} />
           </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
-        </LimbDetailContext.Provider>
+        </FigureLookContext.Provider>
+      </LimbDetailContext.Provider>
       </ColdCloaksContext.Provider>
     )
   }
   return (
     <ColdCloaksContext.Provider value={cloaks}>
       <LimbDetailContext.Provider value={limbSegments}>
+      <FigureLookContext.Provider value={figureLook}>
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
+          <DressLineup cloth={style.cloth} />
           {loom && (
             <Loom
               key={`loom-${placeId}`}
@@ -4013,6 +4034,7 @@ export function PlaceLife({
           )}
         </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
+      </FigureLookContext.Provider>
       </LimbDetailContext.Provider>
     </ColdCloaksContext.Provider>
   )
