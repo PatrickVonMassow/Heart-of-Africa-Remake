@@ -124,7 +124,7 @@ put it is the mistake this line exists to stop.
   Criticality: high — new asset pipeline, load budget, every villager, both backends.
   Bundle: Dorfleben.
 
-- [ ] 1301. Low-preset primitive villager kneels with fixed limb lengths and stays above ground
+- [ ] 1301. Low-preset primitive villager kneels with constant limb lengths and stays above ground
   Queue position: directly behind point 1294.
   Source: split from point 1295 on 05.10.2026 after three review rounds did not converge on the primitive figure
   (owner decision under the standing split rule, recorded for veto). Cross-vendor review at e8b17e850 (GPT-6 Astra,
