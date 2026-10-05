@@ -9,11 +9,11 @@ import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
 import { VILLAGER_MOTION as M } from '../config/balance'
-import { AGE_GROUPS, SEXES } from '../systems/appearance'
+import { AGE_GROUPS, PEOPLE_DRESS, SEXES } from '../systems/appearance'
 import { BONE_NAMES, bodyProportions } from './figureBody'
 import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { codeBoneMap, createGltfSkeleton, gltfPerson, remapSkin } from './villagerFigureBody'
+import { codeBoneMap, createGltfSkeleton, gltfFigureGeometry, gltfPerson, remapSkin } from './villagerFigureBody'
 
 let asset: VillagerAsset
 
@@ -130,6 +130,38 @@ describe('the skeleton the figure binds', () => {
     g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(BONE_NAMES.slice(0, 4).map((_, i) => i), 4))
     remapSkin(g, map)
     expect(Array.from(g.getAttribute('skinIndex').array)).toEqual([0, 1, 2, 3].map((i) => map[i]))
+  })
+})
+
+describe('the dressed figure', () => {
+  it('every people’s dress of every sex and age merges with the glTF body into one geometry', () => {
+    for (const { sex, age } of people()) {
+      const person = gltfPerson(asset, sex, age)
+      const bodyCount = person.geometry.getAttribute('position').count
+      for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
+        // the table's 'cloth' colour is the figure's own cloth (appearanceFor resolves it)
+        const cloth = (c: string | undefined) => (c === 'cloth' ? '#b08850' : c)
+        const layers = table[sex][age].map((l) => ({ ...l, colour: cloth(l.colour)!, colour2: cloth(l.colour2) }))
+        const g = gltfFigureGeometry(asset, person, layers, '#5c3317', id === 'maasai' ? '#a0442a' : null, 16)
+        expect(g.getAttribute('position').count, `${id} ${sex} ${age}`).toBeGreaterThanOrEqual(bodyCount)
+        const si = g.getAttribute('skinIndex')
+        expect(Math.max(...(si.array as Uint16Array))).toBeLessThan(asset.bones.length)
+      }
+    }
+  })
+
+  it('paints the scalp in the hair colour and the rest in the skin', () => {
+    const person = gltfPerson(asset, 'male', 'elder')
+    const g = gltfFigureGeometry(asset, person, [], '#5c3317', null, 16)
+    const col = g.getAttribute('color')
+    const hair = new THREE.Color(person.p.hair)
+    let scalp = 0
+    for (let i = 0; i < col.count; i++) if (person.hair[i]) {
+      scalp++
+      expect(col.getX(i)).toBeCloseTo(hair.r, 5)
+    }
+    expect(scalp).toBeGreaterThan(50)
+    expect(scalp).toBeLessThan(col.count * 0.2)
   })
 })
 

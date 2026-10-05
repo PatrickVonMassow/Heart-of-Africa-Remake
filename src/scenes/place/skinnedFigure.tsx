@@ -20,13 +20,10 @@ import {
   buildBodyGeometry,
   createSkeleton,
   type BodyProportions,
-  mixHex,
-  paint as paintSurface,
-  tidy,
   type BoneName,
 } from '../../render/figureBody'
 import type { VillagerAsset } from '../../render/villagerAsset'
-import { codeBoneMap, createGltfSkeleton, gltfPerson, remapSkin, type GltfPerson } from '../../render/villagerFigureBody'
+import { createGltfSkeleton, gltfFigureGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
 import { contactCrouch, contactLean, gestureArmEuler, hangToward, solveTwoBone, unsquashHead } from '../../render/figureRig'
@@ -124,18 +121,7 @@ function cachedGltfFigure(asset: VillagerAsset, person: GltfPerson, layers: Dres
   let g = gltfFigureCache.get(k)
   if (!g) {
     const t0 = performance.now()
-    const body = paintSurface(person.geometry.clone(), paint ? mixHex(skin, paint, 0.55) : skin)
-    const col = body.getAttribute('color') as THREE.BufferAttribute
-    const hair = new THREE.Color(person.p.hair)
-    person.hair.forEach((h, i) => h && col.setXYZ(i, hair.r, hair.g, hair.b))
-    const parts = [tidy(body)]
-    const map = codeBoneMap(asset)
-    for (const l of layers) {
-      const lg = cachedLayer(l, person.p, `gltf|${key}`, radial)
-      if (lg) parts.push(remapSkin(lg.clone(), map))
-    }
-    g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
-    g.computeBoundingSphere()
+    g = gltfFigureGeometry(asset, person, layers, skin, paint, radial, (l) => cachedLayer(l, person.p, `gltf|${key}`, radial))
     gltfFigureCache.set(k, g)
     performance.measure?.('villager-gltf-figure', { start: t0, end: performance.now() })
   }

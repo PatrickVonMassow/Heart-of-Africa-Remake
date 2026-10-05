@@ -14,7 +14,10 @@
 import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
-import { bodyProportions, BONE_NAMES, type BodyProportions, type BoneName } from './figureBody'
+import { bodyProportions, BONE_NAMES, mixHex, paint as paintSurface, tidy, type BodyProportions, type BoneName } from './figureBody'
+import { buildLayerGeometry } from './figureDress'
+import type { DressLayer } from '../systems/appearance'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
 import { bakeMorphs, morphInfluences, restHeads } from './villagerBody'
 import { topoOrder } from './villagerAsset'
@@ -106,6 +109,7 @@ export function bakePose(geo: THREE.BufferGeometry, rest: Float32Array, heads: F
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4))
   g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wts, 4))
   g.morphAttributes = {}
+  g.morphTargetsRelative = false
   g.deleteAttribute('normal')
   g.computeVertexNormals()
   return g
@@ -377,4 +381,39 @@ export function createGltfSkeleton(asset: VillagerAsset, rest: Float32Array): { 
   const root = list[asset.parents.indexOf(-1)]
   root.updateMatrixWorld(true)
   return { skeleton: new THREE.Skeleton(list), bones }
+}
+
+/**
+ * A person's whole figure as ONE geometry skinned to the asset's bones: the
+ * glTF body painted (skin, or skin under body paint; the scalp in the hair
+ * colour) and every dress layer. The layers are point 1293's code-built ones,
+ * fitted to this body's measured proportions.
+ * OPEN: point 1311 replaces them with the pipeline's skinned garments.
+ * `layerOf` lets the caller cache the layer builds.
+ */
+export function gltfFigureGeometry(
+  asset: VillagerAsset,
+  person: GltfPerson,
+  layers: readonly DressLayer[],
+  skin: string,
+  paint: string | null,
+  radial: number,
+  layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => buildLayerGeometry(l, person.p, radial),
+): THREE.BufferGeometry {
+  const body = paintSurface(person.geometry.clone(), paint ? mixHex(skin, paint, 0.55) : skin)
+  const col = body.getAttribute('color') as THREE.BufferAttribute
+  const hair = new THREE.Color(person.p.hair)
+  person.hair.forEach((h, i) => {
+    if (h) col.setXYZ(i, hair.r, hair.g, hair.b)
+  })
+  const parts = [tidy(body)]
+  const map = codeBoneMap(asset)
+  for (const l of layers) {
+    const lg = layerOf(l)
+    if (lg) parts.push(remapSkin(lg.clone(), map))
+  }
+  const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
+  if (!g) throw new Error('glTF villager: body and dress layers do not merge')
+  g.computeBoundingSphere()
+  return g
 }
