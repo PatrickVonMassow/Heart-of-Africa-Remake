@@ -13,6 +13,7 @@ import {
   legDims,
   legExtent,
   lowestFoot,
+  loadRadiusAt,
   phasePerDistance,
   rephase,
   primitiveLayout,
@@ -22,10 +23,12 @@ import {
   stepWalk,
   strideReach,
   walkPose,
+  GRIP_CLEARANCE,
   type FootOffset,
   type LegDims,
   type WalkMotion,
 } from './figureWalk'
+import { TASK_BUNDLE, TASK_JAR, steadiedLoad, taskLoadShape } from '../scenes/place/headLoads'
 import { workStop, type WorkStopMode } from '../scenes/place/taskWalkerStop'
 
 const bodies = AGE_GROUPS.flatMap((age) => SEXES.map((sex) => ({ age, sex, p: bodyProportions(sex, age, 0) })))
@@ -364,13 +367,33 @@ describe('head loads sit on the crown', () => {
     }
   })
 
-  it('a steadying hand grips within reach, its elbow bent', () => {
+  it('a steadying hand grips within reach, its elbow bent, against the drawn side of either task load', () => {
     const p = bodyProportions('female', 'adult')
     const shoulder = { x: p.shoulderX, y: p.shoulderY - p.crownY, z: 0 }
     const reach = p.upperArm + p.forearm + p.hand * 0.9
-    const g = headLoadGrip(shoulder, 1, { radius: 0.16, height: 0.32 }, reach)
-    expect(Math.hypot(g.x - shoulder.x, g.y - shoulder.y, g.z)).toBeLessThanOrEqual(reach * 0.92 + 1e-9)
-    expect(g.y).toBeGreaterThan(0)
+    // The drawn outlines, read off the meshes' own numbers: the bundle a box,
+    // the jar a cylinder from its base radius to its rim.
+    const drawn = {
+      bundle: { height: TASK_BUNDLE.height, sideAt: () => TASK_BUNDLE.width / 2 },
+      jar: { height: TASK_JAR.height, sideAt: (y: number) => TASK_JAR.bottom + ((TASK_JAR.top - TASK_JAR.bottom) * y) / TASK_JAR.height },
+    }
+    for (const carry of ['bundle', 'jar'] as const) {
+      // Both configurations enabled, whatever the balance says today.
+      const shape = steadiedLoad(carry, taskLoadShape(carry), true)
+      expect(shape).not.toBeNull()
+      for (const side of [1, -1] as const) {
+        const sh = { ...shoulder, x: side * shoulder.x }
+        const g = headLoadGrip(sh, side, shape!, reach)
+        expect(Math.hypot(g.x - sh.x, g.y - sh.y, g.z)).toBeLessThanOrEqual(reach * 0.92 + 1e-9)
+        expect(g.y).toBeGreaterThan(0)
+        expect(g.y).toBeLessThanOrEqual(drawn[carry].height)
+        expect(Math.abs(g.x)).toBeCloseTo(drawn[carry].sideAt(g.y) + GRIP_CLEARANCE, 6)
+        expect(Math.sign(g.x)).toBe(side)
+      }
+      expect(loadRadiusAt(shape!, 0)).toBeCloseTo(drawn[carry].sideAt(0), 9)
+      expect(loadRadiusAt(shape!, drawn[carry].height)).toBeCloseTo(drawn[carry].sideAt(drawn[carry].height), 9)
+    }
+    expect(steadiedLoad('bundle', taskLoadShape('bundle'), false)).toBeNull()
   })
 })
 

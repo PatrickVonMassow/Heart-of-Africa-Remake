@@ -38,6 +38,7 @@ import {
   stepWalk,
   walkPose,
   type FootOffset,
+  type HeadLoadShape,
   type WalkMotion,
   type WalkPose,
 } from '../../render/figureWalk'
@@ -211,7 +212,7 @@ export function SkinnedFigure({
   /** A load carried on the head, mounted on the crown (it rides the head's bob). */
   headProp?: ReactNode
   /** Set when a hand steadies that load: its radius and height for the grip. */
-  headSteady?: { radius: number; height: number } | null
+  headSteady?: HeadLoadShape | null
   /** Kneels while true: down and up again as a short transition. */
   kneeling?: RefObject<boolean>
   sex?: Sex

@@ -56,7 +56,7 @@ import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR, VILLAGER_MOTION, balance } from '../../config/balance'
+import { START_YEAR, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
@@ -67,6 +67,7 @@ import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riv
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
 import { workStop, type WorkStopMode } from './taskWalkerStop'
 import { steerHeading } from '../../render/figureWalk'
+import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
 import { isLifeFrozen } from './lifeFreeze'
@@ -2152,7 +2153,7 @@ function TaskWalker({
   home: HomeDef
   target: [number, number]
   cloth: string
-  carry: 'bundle' | 'jar'
+  carry: TaskLoad
   colliders: Collider[]
   startDelay: number
 }) {
@@ -2290,17 +2291,17 @@ function TaskWalker({
       <Figure
         cloth={cloth}
         kneeling={kneels}
-        headSteady={VILLAGER_MOTION.headLoad[carry === 'bundle' ? 'bundle' : 'jar'].steady ? { radius: 0.16, height: 0.32 } : null}
+        headSteady={steadiedLoad(carry, taskLoadShape(carry))}
         headProp={
           <group ref={load}>
             {carry === 'bundle' ? (
-              <mesh position={[0, 0.11, 0]} castShadow>
-                <boxGeometry args={[0.38, 0.22, 0.3]} />
+              <mesh position={[0, TASK_BUNDLE.height / 2, 0]} castShadow>
+                <boxGeometry args={[TASK_BUNDLE.width, TASK_BUNDLE.height, TASK_BUNDLE.depth]} />
                 <meshStandardMaterial color="#a3702e" roughness={0.95} />
               </mesh>
             ) : (
-              <mesh position={[0, 0.16, 0]} castShadow>
-                <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+              <mesh position={[0, TASK_JAR.height / 2, 0]} castShadow>
+                <cylinderGeometry args={[TASK_JAR.top, TASK_JAR.bottom, TASK_JAR.height, 8]} />
                 <meshStandardMaterial color="#8a5a30" roughness={0.9} />
               </mesh>
             )}
@@ -2618,11 +2619,11 @@ function Walkers({
           {/* Some carry a basket on the head, resting on the crown. */}
           <Figure
             cloth={def.cloth}
-            headSteady={def.carries && VILLAGER_MOTION.headLoad.basket.steady ? { radius: 0.22, height: 0.18 } : null}
+            headSteady={def.carries ? steadiedLoad('basket', { ...WALKER_BASKET }) : null}
             headProp={
               def.carries ? (
-                <mesh position={[0, 0.09, 0]} castShadow>
-                  <cylinderGeometry args={[0.22, 0.16, 0.18, 8]} />
+                <mesh position={[0, WALKER_BASKET.height / 2, 0]} castShadow>
+                  <cylinderGeometry args={[WALKER_BASKET.top, WALKER_BASKET.bottom, WALKER_BASKET.height, 8]} />
                   <meshStandardMaterial color="#a3702e" roughness={0.95} />
                 </mesh>
               ) : undefined
@@ -3346,7 +3347,7 @@ function ErrandVillagers({
             pose={poses.current[i]}
             limbs={limbs.current[i]}
             squat={(squats.current[i] ??= { current: 1 })}
-            headSteady={VILLAGER_MOTION.headLoad.jar.steady ? { radius: JAR_RIM_R, height: JAR_HEIGHT } : null}
+            headSteady={steadiedLoad('jar', { bottom: JAR_WAIST_R, top: JAR_RIM_R, height: JAR_HEIGHT })}
             headProp={
               <group
                 ref={(el) => {

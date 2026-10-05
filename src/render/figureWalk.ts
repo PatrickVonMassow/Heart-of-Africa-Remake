@@ -438,24 +438,43 @@ export function stepWalk(
   }) as [FootPlant, FootPlant]
 }
 
+/** A head load's outline for the steadying hand: its half-width at the base
+ *  and at the top across the hand's side (a jar's waist and rim, a bundle's
+ *  half-width), and its height — the same numbers the load is drawn from. */
+export interface HeadLoadShape {
+  bottom: number
+  top: number
+  height: number
+}
+
+/** The load's half-width at height `y` above its base. */
+export function loadRadiusAt(load: HeadLoadShape, y: number): number {
+  const t = load.height > 0 ? Math.min(1, Math.max(0, y / load.height)) : 0
+  return load.bottom + (load.top - load.bottom) * t
+}
+
+/** The hand's clearance off the load's side (a palm's thickness). */
+export const GRIP_CLEARANCE = 0.02
+
 /**
  * The grip on a steadied head load, in the crown's frame (y up from the crown,
- * x to the hand's side): at the load's side, `gripFraction` up it, lowered
- * until the arm reaches with its elbow bent — a hand on the rim, never a
- * stretched arm. `shoulder` is the shoulder in the same frame.
+ * x to the hand's side): against the load's side, `gripFraction` up it,
+ * lowered until the arm reaches with its elbow bent — a hand on the rim, never
+ * a stretched arm. `shoulder` is the shoulder in the same frame.
  */
 export function headLoadGrip(
   shoulder: { x: number; y: number; z: number },
   side: 1 | -1,
-  load: { radius: number; height: number },
+  load: HeadLoadShape,
   reach: number,
 ): { x: number; y: number; z: number } {
-  const x = side * (load.radius + 0.02)
   const max = reach * 0.92
+  const xAt = (yy: number) => side * (loadRadiusAt(load, yy) + GRIP_CLEARANCE)
   let y = load.height * M.gripFraction
-  const dist = (yy: number) => Math.hypot(x - shoulder.x, yy - shoulder.y, -shoulder.z)
+  const dist = (yy: number) => Math.hypot(xAt(yy) - shoulder.x, yy - shoulder.y, -shoulder.z)
   while (y > 0 && dist(y) > max) y -= 0.01
-  return { x, y: Math.max(0, y), z: 0 }
+  y = Math.max(0, y)
+  return { x: xAt(y), y, z: 0 }
 }
 
 // ---- the low preset's primitive figure (render/figures.ts FIGURE_LIMBS) -----

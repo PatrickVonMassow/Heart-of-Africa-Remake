@@ -11,7 +11,7 @@ import { gaitBodyLift, legSwingAngle } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import { advanceGesture, gesturePose, type FigurePose, type GestureState } from '../../render/gesture'
-import { approach, primitiveLayout, type PrimitiveLayout } from '../../render/figureWalk'
+import { approach, primitiveLayout, type HeadLoadShape, type PrimitiveLayout } from '../../render/figureWalk'
 import { VILLAGER_MOTION } from '../../config/balance'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import type { ActorRoleKind } from '../../systems/actorLabels'
@@ -120,7 +120,7 @@ function PrimitiveFigure({
    *  cannot reach above its head, so it balances the load hands-free. */
   headProp?: ReactNode
   /** Accepted for the skinned body's sake; the primitive balances its load. */
-  headSteady?: { radius: number; height: number } | null
+  headSteady?: HeadLoadShape | null
   /** Kneels while true: down and up again as a short transition. */
   kneeling?: RefObject<boolean>
 }) {
