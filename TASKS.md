@@ -15803,3 +15803,11 @@ to land than a mechanism that needs a review.
   2. Vitest in scripts/findings-request-core.test.mjs: each of those literals routes to the TASKS append; a real question still routes to the decision card.
   No new guards, audits or state fields (infrastructure freeze 01.09.2026).
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1305. Deferring a carrier request at the context watermark must not mark it blocked
+  Source: findings carrier 05.10.2026 (session 512756ba): at the 1295 boundary past the context watermark the owner ran `finding.mjs --blocked` on the user-approved request "Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check" with a pure deferral reason. That put a decision card "Anfrage nicht übernehmbar: …" before the user and took the request out of the pending set, so no successor drain lists it.
+  Final state:
+  1. A deferral at the watermark leaves the request pending (no `--blocked`, no decision card); the boundary text (`scripts/batch-boundary.mjs --prepare`) and `docs/batch-owner-runbook.md` say so where they name the drain.
+  2. The approved request above is carried into the work order as its own point (re-opened from blocked) and its decision card removed.
+  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
+  Bundle: Session- & Repo-Hygiene.
