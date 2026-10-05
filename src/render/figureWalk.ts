@@ -185,27 +185,34 @@ export function plantFoot(
     const offset = { x: prev.offset.x * k, z: prev.offset.z * k }
     return { contact: toWorld(offset), offset, lifted: offset }
   }
+  // The offset that aims the ankle at a world spot from this frame's body,
+  // as far as the leg reaches (the limits bound the foot's place from the hip).
+  const side = M.plantSide * legLength
+  const fore = M.plantFore * legLength
+  const aim = (spot: { x: number; z: number }) => {
+    const dx = spot.x - body.x
+    const dz = spot.z - body.z
+    const want = { x: (dx * c - dz * s) / u - hip.x - gait.x, z: (dx * s + dz * c) / u - hip.z - gait.z }
+    const offset = {
+      x: Math.max(-side, Math.min(side, gait.x + want.x)) - gait.x,
+      z: Math.max(-fore, Math.min(fore, gait.z + want.z)) - gait.z,
+    }
+    return { offset, reached: offset.x === want.x && offset.z === want.z }
+  }
   if (!foot.stance) {
-    const lifted = prev.contact ? prev.offset : prev.lifted
+    // Lifting off, the swing starts from the spot it was held at, aimed from
+    // this frame's body — not from the last frame's.
+    const lifted = prev.contact ? aim(prev.contact).offset : prev.lifted
     const t = Math.min(1, Math.max(0, foot.swing))
     const keep = 1 - t * t * (3 - 2 * t)
     return { contact: null, offset: { x: lifted.x * keep, z: lifted.z * keep }, lifted }
   }
-  let contact = prev.contact
   // Touch-down: where the gait (and what is left of the lift-off offset) puts it.
-  if (!contact) contact = toWorld(prev.offset)
-  const dx = contact.x - body.x
-  const dz = contact.z - body.z
-  const want = { x: (dx * c - dz * s) / u - hip.x - gait.x, z: (dx * s + dz * c) / u - hip.z - gait.z }
-  const side = M.plantSide * legLength
-  const fore = M.plantFore * legLength
-  // The limits bound where the foot is from the hip, not how far off the gait.
-  const offset = {
-    x: Math.max(-side, Math.min(side, gait.x + want.x)) - gait.x,
-    z: Math.max(-fore, Math.min(fore, gait.z + want.z)) - gait.z,
-  }
+  let contact = prev.contact ?? toWorld(prev.offset)
+  const held = aim(contact)
+  const offset = held.offset
   // Out of the leg's reach: the foot is dragged along at the limit.
-  if (offset.x !== want.x || offset.z !== want.z) contact = toWorld(offset)
+  if (!held.reached) contact = toWorld(offset)
   return { contact, offset, lifted: offset }
 }
 

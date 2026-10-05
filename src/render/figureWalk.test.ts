@@ -158,7 +158,8 @@ describe('the walk keeps the feet on the ground', () => {
 
 /** Walks a body along a route as the village walkers do — turned by
  *  `steerHeading`, stepping along its heading — and measures, by forward
- *  kinematics of the drawn legs, how far each stance foot drifts in the world. */
+ *  kinematics of the drawn legs, how far each stance foot drifts in the world
+ *  until (and including) the frame it lifts off. */
 function walkRoute(
   d: LegDims,
   hipX: number,
@@ -212,6 +213,10 @@ function walkRoute(
       const lz = -j.x * sn + j.z * c + a.z
       const world = { x: x + lx * Math.cos(yaw) + lz * Math.sin(yaw), z: z - lx * Math.sin(yaw) + lz * Math.cos(yaw) }
       if (!pose.feet[i].stance || !walking) {
+        // A foot just lifting, still on the ground to the eye (2 mm, as the
+        // browser measures it), lifts off where it was held.
+        const sole = pose.hipHeight + a.y * Math.cos(l.roll ?? 0) - d.ankle
+        if (planted[i] && walking && sole <= 0.002) worstSlip = Math.max(worstSlip, Math.hypot(world.x - planted[i]!.x, world.z - planted[i]!.z))
         planted[i] = null
         return
       }
