@@ -15542,6 +15542,7 @@ to land than a mechanism that needs a review.
 - [ ] 1242. The river beyond the plate rim is a different, darker water than at the bank (both backends)
   MEASURED 30.09.2026 07:14Z, `VERIFY_GL=webgl npm test -- polish --section=adult-errands` on feat/1152 6922bdb2c: `the water beyond the plate's rim is the SAME water as the water at the bank (<= 12/255 per channel)` RED, far 11/92/104 against near 139/157/147, median step 127.5; its sibling `the handover zone itself carries neither band's edge` RED, median step 68.3. This is a STEADY red, not point 568's rotation (568 straddled 12-19): the same pair was red at step 99.6-126.1 in the LARGE runs of 26.09 and 28.09 (on both backends at 28.09 18:09Z and 21:55Z). On WebGPU the check was green on feat/1152 at 05:07Z, after point 1151's sky/water fix. Point 1152 (foam patches) did not cause it.
   ALSO RED ON WebGPU, measured 02.10.2026: the same pair red in the full `polish-villagers` pass on feat/1108 d6a9d37aa (median step 148.8 / 75.9; WebGL 2 25.1 / 12.5) and already on feat/1117 06312849a at 19:52Z (step 133.2) — before point 1108, which only moves the errand shots' cameras.
+  STILL RED 05.10.2026, WebGPU full `polish-villagers` pass on feat/1295 b96a04e78 and on 85207f7c6 before any 1295 commit: median step 20.4 (beyond the rim) and 13.3 (rim-zone line).
   FINAL STATE: the far water continues the bank water's tone on BOTH backends and both checks are green there.
   Test: `polish --section=adult-errands` on both backends; a Vitest on the layer the fix touches.
   Refs: src/render/placeRiver.ts, scripts/verify/polish.mjs, point 568, point 1151.
@@ -15782,3 +15783,12 @@ to land than a mechanism that needs a review.
   backends with no check weakened.
   Bundle: Testinfrastruktur.
   Criticality: medium — the world suite cannot cover a render change on WebGPU until it is fixed.
+- [ ] 1300. The loom station and the mute-shore boatman reading are red in polish-villagers independent of any branch
+  Queue position: end of the open work order.
+  MEASURED 05.10.2026, WebGPU full `polish-villagers` pass on feat/1295 b96a04e78, and with near-identical numbers on 85207f7c6 before any 1295 commit: `village-loom` station 52.8 px tall seen from the plaza (check needs 70); `mute-shore-scene` boatman reading taken at 9.7 s (red). Not yet reproduced on a quiet machine.
+  Final state:
+  1. Each of the two checks is reproduced on a quiet machine on WebGPU and WebGL 2, or shown to be a load transient (then recorded as such and closed).
+  2. A reproduced red is fixed at its cause (scene or check), not by loosening the threshold without a measured reason.
+  3. `polish --section=village-loom` and `polish --section=mute-shore-scene` green on both backends.
+  Test: the two sections above on both backends; a Vitest on the layer a fix touches.
+  Bundle: Testinfrastruktur.
