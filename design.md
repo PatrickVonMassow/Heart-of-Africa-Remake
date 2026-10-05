@@ -19,7 +19,7 @@ Contents: §1 Technical framework · §2 Perspectives and camera · §3 World mo
 
 ### 2.1 Bird's-eye view (journey through Africa)
 
-Navigation across the continent works as in the original from a bird's-eye view, but the surroundings are rendered as 3D graphics (terrain, rivers, vegetation, landmarks). The camera follows the player character from above. Visible is a section of the map — the character's field of view, i.e. the surroundings of the current position within Africa. The camera keeps its tilt but hangs a little further south, so the view reaches about as far south as north; the traveller therefore sits above the picture centre.
+Navigation across the continent works as in the original from a bird's-eye view, but the surroundings are rendered as 3D graphics (terrain, rivers, vegetation, landmarks). The camera follows the player character from above. Visible is a section of the map — the character's field of view, i.e. the surroundings of the current position within Africa. The camera keeps its tilt but hangs a little further south, compensating about half the oblique view's north/south reach asymmetry; the traveller therefore sits slightly above the picture centre.
 
 ### 2.2 First-person view (settlements)
 

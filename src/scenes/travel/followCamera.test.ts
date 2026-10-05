@@ -138,6 +138,22 @@ describe('bird\'s-eye south reach (design.md §2.1)', () => {
     expect(r.north - r.south).toBeCloseTo((r0.north - r0.south) / 2, 6)
   })
 
+  // The configured value (user choice 05.10.2026): about half compensated.
+  it('reaches between the uncompensated 1.7 : 1 and 1 : 1 at the configured compensation, traveller slightly above centre', () => {
+    const shift = southReachShift(CAMERA_OFFSET, 50, CFG.southReachCompensation)
+    const r0 = renderedReach(poseCamera(followAt(0, 0, 1), 0), 0)
+    const r = renderedReach(poseCamera(followAt(0, 0, 1), shift), 0)
+    expect(r.north / r.south).toBeGreaterThan(1.05)
+    expect(r.north / r.south).toBeLessThan(r0.north / r0.south - 0.05)
+    expect(r.north - r.south).toBeCloseTo((r0.north - r0.south) / 2, 6)
+    const d0 = poseCamera(followAt(0, 0, 1), 0).getWorldDirection(new THREE.Vector3())
+    const d = poseCamera(followAt(0, 0, 1), shift).getWorldDirection(new THREE.Vector3())
+    expect(d.angleTo(d0)).toBeCloseTo(0, 9)
+    const fromTop = (1 - new THREE.Vector3(0, 0, 0).project(poseCamera(followAt(0, 0, 1), shift)).y) / 2
+    expect(fromTop).toBeGreaterThan(0.41)
+    expect(fromTop).toBeLessThan(0.45)
+  })
+
   it('keeps the tilt unchanged', () => {
     const d0 = poseCamera(followAt(0, 0, 1), 0).getWorldDirection(new THREE.Vector3())
     const d1 = poseCamera(followAt(0, 0, 1), full).getWorldDirection(new THREE.Vector3())
