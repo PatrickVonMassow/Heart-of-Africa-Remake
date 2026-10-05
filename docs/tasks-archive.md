@@ -33581,3 +33581,29 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   4. Vitest in scripts/board-core.test.mjs: a derived active point with a queue card gets that card's title and text; one with only a board-queue.json entry gets that; one with neither keeps the placeholder. Existing stub-count tests adjusted where they rely on the placeholder.
   Files: scripts/board-core.mjs renderNowStub ~850, stripProjectedQueueCards ~864, reconcileNowProjection ~886; scripts/board.mjs now/title/status; .claude/board-queue.json
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1295. Walking villagers: grounded feet, leg and arm swing, head loads on the head (absorbs point 350)
+  Queue position: AT THE TOP of the open work order, first point to be worked (user order 05.10.2026: "Das soll direkt als oberstes in die Queue"); in any case before point 1294, so 1294 carries finished movement onto its glTF body.
+  Source: user report 05.10.2026 with a village screenshot after point 1293 landed. ABSORBS POINT 350 (user order 05.10.2026: "Der Task 350 sollte dann in diesen zusammengeführt und der alte 350er gelöscht werden"): point 350 is deleted from TASKS.md when this point is appended; its kneel requirement is item 5 below.
+  The user saw on the skinned body of point 1293 (src/scenes/place/skinnedFigure.tsx, medium/high presets):
+  (a) some villagers move across the ground in a seated posture with strongly bent knees;
+  (b) figures hover above the ground, feet not touching it;
+  (c) the legs do not move while walking, although a swing exists in code (`setLegs` / `legSwingAngle(gait…)`, skinnedFigure.tsx ~208-220) — whether walkers get no `gait`, a too small amplitude, or the crouch/flex overrides it is to be MEASURED, not assumed;
+  (d) the arms hang stiff while walking;
+  (e) head carriers hold one arm straight up, with a large gap between the hand and a load that floats high above the head.
+  Final state:
+  1. FEET ON THE GROUND: every standing or walking villager's lowest foot point lies on the ground under it (within a calibratable tolerance in src/config/balance.ts); the hips sink by exactly what knee flex or crouch costs. No villager travels in a crouch: a work crouch (contact crouch, kneel) is released before the figure moves off and resumed only after it stops, as a short transition.
+  2. WALK CYCLE: every moving villager (errand, task walker, porter, child, chief) gets a phase-driven gait from its actual ground speed: thigh, shin and foot swing in counter-phase, a stance foot does not slide, stride length and cadence scale with speed and body size (children, elders shorter/slower). The settlement animals' gait is the reference for phase and foot-contact handling, not for its curves.
+  3. WHOLE-BODY MOTION: arms swing counter to the legs when not held by a pose; a slight hip/shoulder counter-rotation and a small vertical bob through the spine/chest/neck chain; elders reduced. Poses that own an arm (carrying, gesture, work) keep it; the free arm still swings.
+  4. HEAD LOADS: a basket, bundle or jar carried on the head sits on the head bone (contact with the crown, follows the head's bob), never at a fixed height. The supporting arm either is absent (balanced, hands-free) or rests its hand on the load's rim; no stretched arm pointing into the air. Which variant per people/load follows docs/peoples-1890.md where it says so, otherwise an educated guess marked calibratable.
+  5. KNEELING WITHOUT SQUASH (from point 350): kneeling is built from proportions/bones, never a non-uniform scale; the head keeps its shape; going down and getting up is a short calibratable transition, never a visibility swap between two figures (cook, fire tender, well walker in src/scenes/place/PlaceLife.tsx, TaskWalker ~line 496 at the time 350 was written). The low preset's primitive figure gets the same no-squash, no-pop rule.
+  6. LOW PRESET keeps the primitive figure; items 1 and 5 apply to it, items 2-4 only as far as its FigureLimbs already allow.
+  Verifiable: Vitest over the pure gait/pose functions (foot height at stance = ground within tolerance for every age group; arm phase opposite leg phase; no crouch while speed > 0; head-load anchor = head bone crown; kneel build has uniform scale and unchanged head radius). Playwright, both backends (backend-sensitive: skinned figures): a village walk section measuring per frame foot-to-ground distance and stance-foot slip of walking villagers, plus screenshots of walkers mid-stride, a head carrier, and a kneel transition, judged by looking (acceptance criteria 11 and 15).
+  Criticality: high — every villager in every settlement, both backends.
+  Bundle: Dorfleben.
+  --- the user’s own sentences, with their date ---
+  approved: "Bis auf eine Änderung passt es: Das soll direkt als oberstes in die Queue. Ansonsten okay und so einreihen."
+  --- proposed bundle (German name) ---
+  Dorfleben
+  --- files, points, design.md §§ ---
+  Point 1293 (archived), point 1294, point 350, src/scenes/place/skinnedFigure.tsx, src/scenes/place/figurePose.ts, src/scenes/place/figureRig.ts, src/scenes/place/PlaceLife.tsx
