@@ -135,6 +135,7 @@ put it is the mistake this line exists to stop.
   2. If confirmed: the first body the lion actually reaches decides — also in water and at the braked swim pace. A hunter that visibly reaches the shielding parent meets the parent's defence roll (design.md §19 / §19.8) first; the calf is never caught through, past, or across the river from a shielding parent. No change to the defence roll, the too-late rule itself, or balance values.
   3. The lion is never drawn snapping across to a victim it did not reach.
   4. Right-layer tests: Vitest for the pure contact predicate; the existing wildlife Playwright suite for the staged river scene; picture check per §7.2.
+  Bundle: Tierverhalten.
 - [ ] 1294. Villagers on a CC0 glTF base body with morph targets, prepared by a container-managed Blender
   Queue position: directly after point 1288 (user order 04.10.2026).
   Source: user decision 04.10.2026 on the figure-rendering proposal, variant 2b. Sketch: https://claude.ai/artifact/XcFmBv6Qz7SFTFKsiEeeez. Builds on point 1293 (queued after 1279): its appearance table, skeleton-bound dress, research results and low-preset rule are reused, not rebuilt.
