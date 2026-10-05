@@ -2576,6 +2576,31 @@ export const VILLAGER_ASSET = {
   shovel: { top: 0.16, shaftBottom: -0.5, tip: -0.76, shaftRadius: 0.022, bladeWidth: 0.2, bladeThickness: 0.02 },
 } as const
 
+/**
+ * How the glTF villager (medium and high presets) is driven at run time
+ * (work-order "glTF villager body"). Figure units, seconds. CALIBRATABLE
+ * educated guesses, read off the frame sheets.
+ */
+export const VILLAGER_GLTF = {
+  /** How much of the adult man's build morph a build of ±1 gets, by age. */
+  buildByAge: { child: 0.5, youth: 0.8, adult: 1, elder: 0.9 },
+  /** The walk turns into the sprint around this ground speed, per unit of leg
+   *  (figure units per second at the basis body's leg length; a child's
+   *  shorter leg reaches it at a lower speed). */
+  sprintThreshold: 2.4,
+  /** Half-width of the band the two gaits cross-fade over, same units. */
+  sprintBand: 0.5,
+  /** A gait's stride grows with pace as speed^exponent over its natural
+   *  speed (the rest is cadence), bounded so the leg never over-reaches. */
+  strideExponent: 0.5,
+  strideMin: 0.75,
+  strideMax: 1.35,
+  /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
+  transitionSeconds: 0.35,
+  /** Ground speed (figure units / s) below which the figure stands. */
+  standSpeed: 0.08,
+} as const
+
 // Dev hook for the headless verification (the village-walk tolerances).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__villagerMotion = VILLAGER_MOTION

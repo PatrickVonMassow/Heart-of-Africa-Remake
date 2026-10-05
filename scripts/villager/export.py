@@ -112,6 +112,7 @@ def export(path, mh, body, clips, garments, cfg):
         'contactPoints': {s: {k: [float(x) for x in v] for k, v in d.items()} for s, d in (clips or {}).get('contact_points', {}).items()},
         'clips': clip_meta,
         'stature': cfg['VILLAGER_ASSET']['stature'],
+        'toolHold': tool_hold(body),
     }
     if garments:
         meta['garments'] = garments.get('meta', {})
@@ -119,6 +120,17 @@ def export(path, mh, body, clips, garments, cfg):
     w.j['scenes'][0]['extras'] = {'villager': meta}
     w.write(path)
     print(f'export: {path} — {len(w.bin) / 1024:.0f} KiB binary, {len(w.j["meshes"])} meshes, {len(w.j["animations"])} clips')
+
+
+def tool_hold(body):
+    """Per hand: the tool's axes in the hand bone's frame (as a quaternion)
+    and where the shaft passes through the closed fist."""
+    import toolclips as T
+    out = {}
+    for s in ('L', 'R'):
+        q = T._mat_quat(T.grip_rotation(body, s, True))
+        out[s] = {'rotation': [float(x) for x in q], 'offset': [float(x) for x in T.grip_offset(body, s)]}
+    return out
 
 
 EXPORT_CLIPS = ('idle', 'walk', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle')
