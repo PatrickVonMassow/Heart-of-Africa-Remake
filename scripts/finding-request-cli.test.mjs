@@ -193,13 +193,20 @@ fs.appendFileSync = function (target) {
 `,
       'utf8',
     )
-    const err = run(
-      ['--request', 'Verlorene Anfrage', '--spec-file', join(dir, 'spec.md'), '--session', 's'],
-      true,
-      { NODE_OPTIONS: `--require ${JSON.stringify(preload)}` },
-    )
-    expect(err).toMatch(/not pending in the carrier on re-read/)
-    expect(err).not.toMatch(/request deposited/)
+    let failure
+    try {
+      execFileSync(process.execPath, ['scripts/finding.mjs', '--request', 'Verlorene Anfrage', '--spec-file', join(dir, 'spec.md'), '--session', 's'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        windowsHide: true,
+        env: { ...process.env, FINDINGS_MEMORY_DIR: dir, NODE_OPTIONS: `--require ${JSON.stringify(preload)}` },
+      })
+    } catch (e) {
+      failure = e
+    }
+    expect(failure?.status).toBe(1)
+    expect(String(failure.stderr)).toMatch(/not pending in the carrier on re-read/)
+    expect(String(failure.stdout)).not.toMatch(/request deposited/)
   })
 
   it('leaves a rewritten carrier ending in a newline', () => {
