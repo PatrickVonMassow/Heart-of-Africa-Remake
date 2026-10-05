@@ -261,15 +261,24 @@ export function measureProportions(asset: VillagerAsset, g: THREE.BufferGeometry
   // The section as the dress draws it: an ellipse round the axis. The widest
   // and deepest points alone do not bound it — a bust or a belly off the
   // front line, a square flank, pokes through the ellipse through those two —
-  // so the ellipse of the section's own aspect grows until every point is in.
+  // so of the ellipses holding every point of the section, the one of least
+  // area: a bust deepens it rather than widening it into the hanging arms.
   const section = (yy: number): [number, number, number] | null => {
     const [wx, wz] = trunk(yy)
     if (!wx || !wz) return null
-    let k = 1
-    crossing(yy, (cx, cz) => {
-      k = Math.max(k, Math.hypot(cx / wx, cz / wz))
-    })
-    return [yy, wx * k, wz * k]
+    const pts: number[] = []
+    crossing(yy, (cx, cz) => pts.push(cx, cz))
+    let best: [number, number, number] | null = null
+    for (let i = 0; i <= 30; i++) {
+      const rx = wx * (1 + 0.01 * i)
+      let rz = wz
+      for (let k = 0; k < pts.length; k += 2) {
+        const f = 1 - (pts[k] / rx) ** 2
+        rz = Math.max(rz, f > 1e-6 ? Math.abs(pts[k + 1]) / Math.sqrt(f) : Infinity)
+      }
+      if (!best || rx * rz < best[1] * best[2]) best = [yy, rx, rz]
+    }
+    return best
   }
   const headI = at('head')
   let chin = Infinity

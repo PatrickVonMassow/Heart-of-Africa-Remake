@@ -155,12 +155,29 @@ function openFront(geo: THREE.BufferGeometry, cols: number, belowY: number): voi
 /** A tube round the trunk from `top` down to `bottom`, `ease` off the body
  *  and flaring by `flare` (fraction of stature) at the hem. */
 function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number, flare: number, radial: number, rings = 10): THREE.BufferGeometry {
-  const ys = Array.from({ length: rings }, (_, i) => top + ((bottom - top) * i) / (rings - 1))
+  // Stations evenly down the garment, each moved onto the bulge of the trunk
+  // (bust, belly, buttocks, hips) nearest it when one lies within half a
+  // step: a station on the bulge's crest carries the cloth over it, where
+  // two either side of it would cut the chord through it.
+  const step = (top - bottom) / (rings - 1)
+  const crests: number[] = []
+  const probe = 0.005 * p.stature
+  for (let y = top - probe; y > bottom + probe; y -= probe) {
+    const [x0, z0] = trunkAt(p, y + probe)
+    const [x1, z1] = trunkAt(p, y)
+    const [x2, z2] = trunkAt(p, y - probe)
+    if ((z1 > z0 && z1 >= z2) || (x1 > x0 && x1 >= x2)) crests.push(y)
+  }
+  const ys = Array.from({ length: rings }, (_, i) => top - step * i)
+  for (const c of crests) {
+    let best = -1
+    for (let i = 1; i < rings - 1; i++) if (Math.abs(ys[i] - c) < step / 2 && (best < 0 || Math.abs(ys[i] - c) < Math.abs(ys[best] - c))) best = i
+    if (best > 0) ys[best] = c
+  }
   const r = ys.map((y) => trunkAt(p, y))
   // Between two stations the cloth's girth blends from one to the other
-  // (sweepTube's smoothstep), so a bust or a belly between them would poke
-  // through the chord: both stations rise by the largest shortfall, and the
-  // cloth falls straight from the bulge.
+  // (sweepTube's smoothstep), so what still bulges between them would poke
+  // through the chord: both stations rise by the largest shortfall.
   for (let i = 0; i < rings - 1; i++) {
     for (const a of [0, 1]) {
       let short = 0
