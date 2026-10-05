@@ -278,14 +278,23 @@ export function measureProportions(asset: VillagerAsset, g: THREE.BufferGeometry
   // that much higher (lengths unchanged) and the soles land on the ground.
   const lift = y('hips') - y('thigh.L')
   const hipY = y('thigh.L') + lift
+  const chestLine = hipY + (p0.chestY - p0.hipY) * ((y('upperArm.L') - hipY) / (p0.shoulderY - p0.hipY))
   const waistY = hipY + (p0.waistY - p0.hipY) * ((y('upperArm.L') - hipY) / (p0.shoulderY - p0.hipY))
-  const chestY = hipY + (p0.chestY - p0.hipY) * ((y('upperArm.L') - hipY) / (p0.shoulderY - p0.hipY))
   const [pelvisW] = trunk(hipY + 0.01 * H)
   const [waistW] = trunk(waistY)
-  const [chestW, chestAt] = trunk(chestY)
-  // the depth the dress must clear: the deepest section from the chest line
-  // down through the bust (the women's breasts sit below it)
-  const chestD = Math.max(chestAt, ...[0.02, 0.035, 0.05].map((f) => trunk(chestY - (f + (p0.bustDrop / H)) * H)[1]))
+  // The dress's chest station sits at the trunk's deepest section between the
+  // waist and the shoulders — the women's bust, the men's chest — so a garment
+  // passes over the breasts instead of being pierced below its chest line.
+  let chestY = chestLine
+  let chestD = trunk(chestLine)[1]
+  for (let yy = waistY + 0.02 * H; yy < y('upperArm.L') - 0.04 * H; yy += 0.005 * H) {
+    const d = trunk(yy)[1]
+    if (d > chestD) {
+      chestD = d
+      chestY = yy
+    }
+  }
+  const [chestW] = trunk(chestY)
   return {
     ...p0,
     crownY: crown,
