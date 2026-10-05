@@ -158,6 +158,25 @@ describe('a non-owner deposits a request and the owner drains it', () => {
   })
 })
 
+describe('a carrier whose last entry lost its trailing newline', () => {
+  it('keeps the next deposit on its own line and the previous entry unchanged', () => {
+    run(['--record', 'Ein Befund', '--detail', 'Belegt.', '--session', 'deadbeefcafe'])
+    const before = carrierText().replace(/\s+$/, '')
+    writeFileSync(join(dir, 'findings-carrier.md'), before, 'utf8')
+    expect(deposit()).toMatch(/request deposited \(1 waiting\)/)
+    expect(run(['--requests'])).toContain('Anfragen aus einem Nebenfenster einreihen')
+    expect(carrierText().startsWith(`${before}\n\n`)).toBe(true)
+    expect(run(['--drain'])).toMatch(/1 waiting, 1 request\(s\), 0 landed/)
+  })
+
+  it('leaves a rewritten carrier ending in a newline', () => {
+    deposit()
+    writeFileSync(join(dir, 'findings-carrier.md'), carrierText().replace(/\s+$/, ''), 'utf8')
+    run(['--queued', 'Nebenfenster', '--point', '481'])
+    expect(carrierText().endsWith('\n')).toBe(true)
+  })
+})
+
 describe('a deposit that lands while the owner is draining', () => {
   it('survives the write-back instead of being erased by it', () => {
     deposit('Erste Anfrage aus dem Nebenfenster')
