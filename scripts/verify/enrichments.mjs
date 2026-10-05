@@ -7845,7 +7845,7 @@ if (section('calf-shield-river')) {
     }
   })
   const banks = await page.evaluate(() => window.__shieldRiver.banks(-100))
-  check('calf-shield-river probe: banks', false, JSON.stringify(banks))
+  check('the reported river is found on the staging row (west and east waterline)', banks.w !== null && banks.e - banks.w > 3, JSON.stringify(banks))
   const W = banks.w, E = banks.e
   const variants = [
     { name: 'swim-from-west-bank', calf: { x: W - 0.4, z: -100 }, parent: { x: W - 1.8, z: -100 }, lion: { x: W - 10, z: -100.4 } },
