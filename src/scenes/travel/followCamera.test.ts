@@ -178,6 +178,47 @@ describe('bird\'s-eye south reach (design.md §2.1)', () => {
     expect(followPointFromTop(CAMERA_OFFSET, 50, 0)).toBeCloseTo(0.5, 12)
   })
 
+  // The evidence for every traveller-centred consumer (seeders' rings, streaming
+  // windows, despawn rings, the nearest-first hunt pick): the picture is the
+  // old one translated south, so the frame's FARTHEST ground point from the
+  // traveller only comes closer and its NEAREST edge only moves away. A ring
+  // that cleared the old frame still clears it; "near the traveller" is in the
+  // picture in more directions than before.
+  it('shrinks the frame\'s farthest ground reach from the traveller and widens its nearest edge', () => {
+    const footprint = (aspect: number, zoom: number, c: number) => {
+      const cam = poseCamera(followAt(0, 0, zoom), southReachShift(CAMERA_OFFSET, 50, c))
+      cam.aspect = aspect
+      cam.updateProjectionMatrix()
+      const ray = new THREE.Raycaster()
+      let far = 0
+      let near = Infinity
+      for (let i = 0; i <= 40; i++) {
+        const u = -1 + i / 20
+        for (const [nx, ny] of [[u, 1], [u, -1], [1, u], [-1, u]]) {
+          ray.setFromCamera(new THREE.Vector2(nx, ny), cam)
+          const t = -ray.ray.origin.y / ray.ray.direction.y
+          const d = Math.hypot(ray.ray.origin.x + ray.ray.direction.x * t, ray.ray.origin.z + ray.ray.direction.z * t)
+          far = Math.max(far, d)
+          near = Math.min(near, d)
+        }
+      }
+      return { far, near }
+    }
+    for (const aspect of [9 / 16, 4 / 3, 16 / 9, 21 / 9]) {
+      for (const zoom of [0.125, 0.5, 1, 2.5]) {
+        const old = footprint(aspect, zoom, 0)
+        for (const c of [0.5, 1]) {
+          const now = footprint(aspect, zoom, c)
+          expect(now.far).toBeLessThanOrEqual(old.far + 1e-9)
+          expect(now.near).toBeGreaterThanOrEqual(old.near - 1e-9)
+        }
+      }
+    }
+    // At zoom 1 on 16:9: the old 20.5-unit south edge becomes 28.
+    expect(footprint(16 / 9, 1, 0).near).toBeCloseTo(20.5, 0)
+    expect(footprint(16 / 9, 1, 1).near).toBeCloseTo(28, 0)
+  })
+
   it('leaves the pose centred without a shift', () => {
     const { target } = followPose(followAt(4, 6, 1.5), CAMERA_OFFSET)
     expect(target).toEqual([4, 0, 6])
