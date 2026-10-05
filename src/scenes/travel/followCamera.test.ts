@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
-import { followAt, followPose, stepFollow, type FollowState } from './followCamera'
+import * as THREE from 'three'
+import { CAMERA_OFFSET, followAt, followPose, groundReach, southReachShift, stepFollow, type FollowState } from './followCamera'
 
 const OFFSET = { y: 42, z: 24 }
 const CFG = balance.travelCameraFollow
@@ -81,5 +82,86 @@ describe('bird\'s-eye follow camera (point 1286)', () => {
   it('snaps on a jump instead of sliding across the map', () => {
     const s = stepFollow(followAt(0, 0, 1), 500, -300, 1.5, 1 / 60, CFG)
     expect(s).toEqual({ x: 500, z: -300, zoom: 1.5 })
+  })
+})
+
+/** A 16:9 fov-50 camera placed by followPose. */
+function poseCamera(s: FollowState, shift: number): THREE.PerspectiveCamera {
+  const cam = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 2000)
+  const { position, target } = followPose(s, CAMERA_OFFSET, shift)
+  cam.position.set(...position)
+  cam.lookAt(...target)
+  cam.updateMatrixWorld()
+  return cam
+}
+
+/** Flat-ground reach of the rendered centre column, north (-z) and south (+z) of z. */
+function renderedReach(cam: THREE.PerspectiveCamera, z: number): { north: number; south: number } {
+  const hit = (ndcY: number) => {
+    const ray = new THREE.Raycaster()
+    ray.setFromCamera(new THREE.Vector2(0, ndcY), cam)
+    const t = -ray.ray.origin.y / ray.ray.direction.y
+    return ray.ray.origin.z + ray.ray.direction.z * t
+  }
+  return { north: z - hit(1), south: hit(-1) - z }
+}
+
+describe('bird\'s-eye south reach (design.md §2.1)', () => {
+  const full = southReachShift(CAMERA_OFFSET, 50, 1)
+
+  it('needs about 7.5 units of shift for full compensation at fov 50', () => {
+    expect(full).toBeGreaterThan(7)
+    expect(full).toBeLessThan(8)
+    const r = groundReach(CAMERA_OFFSET, 50)
+    expect(r.north / r.south).toBeGreaterThan(1.6) // the uncompensated 1.7 : 1
+  })
+
+  it('reaches equally far north and south of the traveller on flat ground at full compensation', () => {
+    const r = renderedReach(poseCamera(followAt(3, -5, 1), full), -5)
+    expect(r.north).toBeCloseTo(r.south, 6)
+    expect(r.north).toBeGreaterThan(27)
+    expect(r.north).toBeLessThan(29)
+  })
+
+  it('halves the asymmetry at compensation 0.5', () => {
+    const r0 = renderedReach(poseCamera(followAt(0, 0, 1), 0), 0)
+    const r = renderedReach(poseCamera(followAt(0, 0, 1), southReachShift(CAMERA_OFFSET, 50, 0.5)), 0)
+    expect(r.north - r.south).toBeCloseTo((r0.north - r0.south) / 2, 6)
+  })
+
+  it('keeps the tilt unchanged', () => {
+    const d0 = poseCamera(followAt(0, 0, 1), 0).getWorldDirection(new THREE.Vector3())
+    const d1 = poseCamera(followAt(0, 0, 1), full).getWorldDirection(new THREE.Vector3())
+    expect(d1.x).toBeCloseTo(d0.x, 9)
+    expect(d1.y).toBeCloseTo(d0.y, 9)
+    expect(d1.z).toBeCloseTo(d0.z, 9)
+  })
+
+  it('puts the traveller above the picture centre, about 37 % from the top', () => {
+    const p = new THREE.Vector3(0, 0, 0).project(poseCamera(followAt(0, 0, 1), full))
+    expect(p.x).toBeCloseTo(0, 9)
+    const fromTop = (1 - p.y) / 2
+    expect(fromTop).toBeGreaterThan(0.35)
+    expect(fromTop).toBeLessThan(0.39)
+  })
+
+  it('scales the shift with the zoom like the offset, keeping the traveller at the same picture height', () => {
+    for (const zoom of [0.5, 1, 2.5]) {
+      const s = followAt(10, 20, zoom)
+      const { position, target } = followPose(s, CAMERA_OFFSET, full)
+      expect(target[2] - s.z).toBeCloseTo(full * zoom, 9)
+      expect(position[2] - target[2]).toBeCloseTo(CAMERA_OFFSET.z * zoom, 9)
+      expect(position[1]).toBeCloseTo(CAMERA_OFFSET.y * zoom, 9)
+      const r = renderedReach(poseCamera(s, full), 20)
+      expect(r.north).toBeCloseTo(r.south, 6)
+      const p = new THREE.Vector3(10, 0, 20).project(poseCamera(s, full))
+      const ref = new THREE.Vector3(0, 0, 0).project(poseCamera(followAt(0, 0, 1), full))
+      expect(p.y).toBeCloseTo(ref.y, 6)
+    }
+  })
+
+  it('leaves the pose centred without a shift', () => {
+    const { target } = followPose(followAt(4, 6, 1.5), CAMERA_OFFSET)
+    expect(target).toEqual([4, 0, 6])
   })
 })
