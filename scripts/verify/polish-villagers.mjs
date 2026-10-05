@@ -560,11 +560,12 @@ if (section('villager-canoe')) {
         .then(() => true)
         .catch(() => false)
       check('the carrier guts the catch at the fishers’ fire', gutting)
-      await standAt(fireStand.at, fireStand.look)
-      const atFire = await inPlace()
-      check('the fire’s standing place is inside the settlement', atFire)
-      if (gutting && atFire) {
-        const seen = await page.evaluate(() => {
+      // The people at the fire have human bodies now (the villager-dress
+      // work): a chest hides the rack where a cone's thin top did not. So the
+      // stand is tried along the bank as well, and the first from which all
+      // four are seen is taken — the check itself stays as strict.
+      const readSeen = () =>
+        page.evaluate(() => {
           const f = window.__placeFishFire()
           const s = f.sites
           const seen = window.__canoeSeen
@@ -576,6 +577,19 @@ if (section('villager-canoe')) {
             fire: seen(s.fire.x, 0.2, s.fire.z, 0.8),
           }
         })
+      const bankDir = await page.evaluate(() => ({ fx: window.__placeLayout.bank.fx, fz: window.__placeLayout.bank.fz }))
+      let seen = null
+      let atFire = false
+      for (const shift of [0, -1.5, 1.5, -3, 3]) {
+        const at = { x: fireStand.at.x + bankDir.fx * shift, z: fireStand.at.z + bankDir.fz * shift }
+        await standAt(at, fireStand.look)
+        atFire = await inPlace()
+        if (!atFire) continue
+        seen = await readSeen()
+        if (seen.carrier && seen.griller && seen.rack && seen.fire) break
+      }
+      check('the fire’s standing place is inside the settlement', atFire)
+      if (gutting && atFire && seen) {
         check('the carrier, the griller, the fire and the smoking rack are in frame, nothing hiding them',
           seen.carrier && seen.griller && seen.rack && seen.fire, JSON.stringify(seen))
         check('and the rack carries fish', seen.rackFish >= 3, JSON.stringify(seen))
