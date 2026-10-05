@@ -262,22 +262,28 @@ export function SkinnedFigure({
         loc(b[`hand.${s}`], _w).distanceTo(_e) +
         loc(rig.hands[s === 'L' ? 0 : 1], _t).distanceTo(_w)
       if (contact) {
-        loc(b.spine, _pivot)
-        _fwd.set(0, 0, 1).applyQuaternion(qIn(b.spine, _q)).setY(0).normalize()
-        let lean = 0
-        ;(['L', 'R'] as const).forEach((s, i) => {
-          const vh = virtualHands.current[i]
-          if (!vh) return
-          const reach = reachOf(s)
-          loc(b[`upperArm.${s}`], _s)
-          loc(vh, _t)
-          lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
-        })
-        if (lean > 0) {
-          b.spine.rotation.x += lean
-          b.spine.updateWorldMatrix(false, true)
+        // The lean for the hips' present height: just enough to bring a
+        // contact into reach (contactLean), from the pose's own trunk angle.
+        const baseLean = b.spine.rotation.x
+        const leanIn = () => {
+          b.spine.rotation.x = baseLean
+          b.hips.updateWorldMatrix(false, true)
+          loc(b.spine, _pivot)
+          _fwd.set(0, 0, 1).applyQuaternion(qIn(b.spine, _q)).setY(0).normalize()
+          let lean = 0
+          ;(['L', 'R'] as const).forEach((s, i) => {
+            const vh = virtualHands.current[i]
+            if (!vh) return
+            const reach = reachOf(s)
+            loc(b[`upperArm.${s}`], _s)
+            loc(vh, _t)
+            lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
+          })
+          if (lean > 0) {
+            b.spine.rotation.x += lean
+            b.spine.updateWorldMatrix(false, true)
+          }
         }
-        // Still short after the lean: crouch (standing figures only).
         const shortOf = () =>
           Math.max(
             ...(['L', 'R'] as const).map((s, i) => {
@@ -285,16 +291,17 @@ export function SkinnedFigure({
               return vh ? loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) - reachOf(s) * 0.995 : -1
             }),
           )
-        const c = kneel
-          ? 0
-          : contactCrouch((cc) => {
-              b.hips.position.y = p.hipY - legDrop(cc)
-              b.hips.updateWorldMatrix(false, true)
-              return shortOf()
-            })
+        // Each crouch is tried WITH its own lean (a low contact takes both:
+        // bent knees and a bent back), searched from standing every time.
+        const tryAt = (cc: number) => {
+          b.hips.position.y = kneel ? kneelLeg.hipY : p.hipY - legDrop(cc)
+          leanIn()
+          return shortOf()
+        }
+        const c = kneel ? 0 : contactCrouch(tryAt)
+        tryAt(c)
         crouch.current = c
         if (!kneel) {
-          b.hips.position.y = p.hipY - legDrop(c)
           setLegs(c)
           b.hips.updateWorldMatrix(false, true)
         }
