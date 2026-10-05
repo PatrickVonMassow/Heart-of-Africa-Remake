@@ -148,15 +148,6 @@ put it is the mistake this line exists to stop.
   05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
   05.10.2026: "ja, aber nach 1294"
 
-- [ ] 1305. Deferring a carrier request at the context watermark must not mark it blocked
-  Queue position: directly after point 1308 (point 1306, user 05.10.2026: "order: 1294, new point, 1305, then the rest").
-  Source: findings carrier 05.10.2026 (session 512756ba): at the 1295 boundary past the context watermark the owner ran `finding.mjs --blocked` on the user-approved request "Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check" with a pure deferral reason. That put a decision card "Anfrage nicht übernehmbar: …" before the user and took the request out of the pending set, so no successor drain lists it.
-  Final state:
-  1. A deferral at the watermark leaves the request pending (no `--blocked`, no decision card); the boundary text (`scripts/batch-boundary.mjs --prepare`) and `docs/batch-owner-runbook.md` say so where they name the drain.
-  2. [satisfied 05.10.2026 by point 1306, which carried the request in as point 1308 and removed its decision card] The approved request above is carried into the work order as its own point (re-opened from blocked) and its decision card removed.
-  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1310. The bird's-eye camera compensates about half the south-reach asymmetry
   Queue position: directly after point 1305 (user card decision 05.10.2026; nothing goes ahead of 1294).
   Source: decision card "Kamera: volle oder halbe Südverschiebung" from point 1287, which landed with full compensation and left the choice to the user. User, 05.10.2026 20:14: "Zur Karte \"Kamera: volle oder halbe Südverschiebung\": Ich nehme die halbe Verschiebung."
