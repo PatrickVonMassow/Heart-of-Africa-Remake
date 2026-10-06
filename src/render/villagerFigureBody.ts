@@ -19,7 +19,7 @@ import { buildLayerGeometry } from './figureDress'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
-import { bakeMorphs, morphInfluences, restHeads } from './villagerBody'
+import { bakeMorphs, legScale, morphInfluences, restHeads } from './villagerBody'
 import { topoOrder } from './villagerAsset'
 
 const DOWN = new THREE.Vector3(0, -1, 0)
@@ -152,6 +152,21 @@ export interface GltfPerson {
   p: BodyProportions
   /** Per vertex: on the scalp (the hair painted there). */
   hair: Uint8Array
+  /** How the asset's clips reach this hung, scaled body (render/villagerClipPose.ts). */
+  frame: PersonFrame
+}
+
+/** A person's skeleton before the hang and the transform onto the drawn one:
+ *  a clip pose is solved on `rest0` (the file's A-pose with this person's
+ *  morphs), each bone's world turn taken through `hang`, and positions put on
+ *  the drawn body by (p − sole·ŷ) × scale. */
+export interface PersonFrame {
+  rest0: Float32Array
+  hang: THREE.Quaternion[]
+  sole: number
+  scale: number
+  /** Hip height over the basis body's (villagerBody.ts legScale). */
+  legScale: number
 }
 
 /**
@@ -195,7 +210,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
   g.computeBoundingBox()
   g.computeBoundingSphere()
   const p = measureProportions(asset, g, dom, rest, p0)
-  return { geometry: g, rest, p, hair: hairMask(asset, g, dom, p) }
+  return { geometry: g, rest, p, hair: hairMask(asset, g, dom, p), frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0) } }
 }
 
 /** Per-bone vertex samples of a hung body. */
