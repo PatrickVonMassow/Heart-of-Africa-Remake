@@ -121,6 +121,7 @@ export const NON_RENDER_VERIFY = new Set([
   'machine-load.mjs',
   'red-ownership-core.mjs', // whether a red holds, read off the charge ledger; it draws nothing
   'report-archive-names.mjs', // the names the F6 archive checks print; report.mjs does the downloading
+  'rowStaging.mjs', // when the villager-dress suite stands a row again; polish-villagers.mjs drives the page
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
   'run-logged-args.mjs', // pure CLI parsing and output-line caps for the logging wrapper
