@@ -151,7 +151,8 @@ export function applyClipLayers(
     blendInto(asset, bones, LEGS, c.local, w)
     blendHips(bones, c.hips, w)
     blendInto(asset, bones, ARM('L'), c.local, w * c.arms[0])
-    if (c.carry < 1) blendInto(asset, bones, ARM('R'), c.local, w * c.arms[1])
+    // under a carry too, so a carry partly overriding the arm stays continuous
+    blendInto(asset, bones, ARM('R'), c.local, w * c.arms[1])
   } else {
     // standing: the feet are where they stand, nothing held for the next walk
     releaseClipGait(c.gait)
@@ -193,9 +194,9 @@ export function placeShovel(asset: VillagerAsset, person: GltfPerson, c: ClipLay
   if (!tool.visible) return
   const dig = asset.clips.dig.tool?.grip ?? 0
   const carry = asset.clips.carry.tool?.grip ?? dig
-  const carried = c.dig < 1 ? c.carry * c.arms[1] * (1 - c.dig) : 0
-  const w = c.dig + carried > 0 ? c.dig / (c.dig + carried) : 0
-  const at = shovelOnHungHand(asset, person.frame, 'R', carry + (dig - carry) * w)
+  // the dig layers over everything below it, so its share of the arm is c.dig;
+  // the rest (carry, gait or code) holds the shovel at the carry's grip
+  const at = shovelOnHungHand(asset, person.frame, 'R', carry + (dig - carry) * c.dig)
   tool.position.copy(at.position)
   tool.quaternion.copy(at.quaternion)
   tool.scale.setScalar(person.frame.scale)

@@ -164,6 +164,31 @@ describe('the clip gait on the ground', () => {
     expect(worst).toBeLessThan(0.02)
   })
 
+  it('planting switched off holds nothing: no correction left over from earlier holds', () => {
+    const n = asset.bones.length
+    const f = adult.frame
+    const foot = ['L', 'R'].map((s) => asset.bones.indexOf(`foot.${s}`))
+    const g = newClipGait()
+    const pose = newPose(n)
+    const speed = 0.8
+    const dt = 1 / 60
+    let z = 0
+    for (let t = 0; t < 2; t += dt) {
+      z += speed * dt
+      stepClipGait(g, asset, f, speed * dt, speed)
+      // shoved sideways, so the held feet carry a correction
+      clipGaitPose(g, asset, f, speed, { x: t > 1 ? 0.1 * f.scale : 0, z, yaw: 0, unit: 1 }, pose)
+    }
+    expect(Math.hypot(g.slip[0].x, g.slip[1].x)).toBeGreaterThan(0)
+    // the same phase, planting off: as a gait that never held anything
+    const fresh = newClipGait()
+    fresh.phase = g.phase
+    fresh.slipPhase = g.phase
+    const a = forwardKinematics(asset, f.rest0, clipGaitPose(g, asset, f, speed, null, newPose(n)), newWorld(n))
+    const b = forwardKinematics(asset, f.rest0, clipGaitPose(fresh, asset, f, speed, null, newPose(n)), newWorld(n))
+    for (const i of foot) expect(a.p[i].distanceTo(b.p[i])).toBeLessThan(1e-9)
+  })
+
   it('the feet never sink below the ground', () => {
     for (const v of [0.6, 1.2, 3.4]) expect(walkStraight(adult, v).lowest).toBeGreaterThan(-0.01)
   })

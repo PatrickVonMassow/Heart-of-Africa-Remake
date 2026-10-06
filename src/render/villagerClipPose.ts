@@ -213,8 +213,9 @@ export function clipGaitPose(
     // correction eases toward what the lifting contacts still carry (none, once
     // the foot is in the air) by the cycle walked: the contacts lift within a
     // frame or two, so their height alone could not fade it.
+    // planting disabled (body null) holds nothing, not even a fading correction
     const slip = g.slip[i]
-    if (firm < 1) {
+    if (body && firm < 1) {
       _miss.x = slip.x + (_miss.x - slip.x) * fade
       _miss.z = slip.z + (_miss.z - slip.z) * fade
     }

@@ -107,7 +107,7 @@ describe('the clip layers on the glTF figure', () => {
     expect(f.c.arms).toEqual([1, 1])
     // the carry walk's own swing turns an arm bone by up to ~0.15 rad a frame
     // with no handover at all; a snap to the code's pose turned it by ~3 rad
-    expect(worst).toBeLessThan(0.2)
+    console.log("WORST", worst); expect(worst).toBeLessThan(0.2)
   })
 
   it('the shovel grip follows the arm pose: once the dig has the arm, it grips at the dig\'s grip while the carry still fades', () => {
@@ -125,6 +125,48 @@ describe('the clip layers on the glTF figure', () => {
     }
     expect(checked).toBe(true)
     expect(asset.clips.dig.tool!.grip).not.toBe(asset.clips.carry.tool!.grip)
+  })
+
+  it('a carry over a half-owned right arm is continuous where it reaches full weight', () => {
+    const f = figure()
+    const dt = 1 / 60
+    let z = 0
+    for (let k = 0; k < 90; k++) {
+      z += 1.1 * dt
+      frame(f, z, 1.1, { dig: false, tool: true }, dt)
+    }
+    // the same instant, the carry just short of and at full weight, the right arm half the code's
+    const arm = ['upperArm.R', 'forearm.R', 'hand.R']
+    const at = (carry: number) => {
+      for (const b of Object.values(f.bones)) b.quaternion.identity()
+      f.c.carry = carry
+      f.c.arms = [1, 0.5]
+      applyClipLayers(asset, person, f.bones, f.c, { speed: 1.1, weight: 1, kneel: 0 }, [true, true])
+      return arm.map((n) => f.bones[n].quaternion.clone())
+    }
+    const below = at(0.999)
+    const full = at(1)
+    for (let i = 0; i < arm.length; i++) expect(below[i].angleTo(full[i])).toBeLessThan(0.01)
+  })
+
+  it('with the right arm the code\'s, the grip slides with the dig weight, never jumps at its start or end', () => {
+    const f = figure()
+    const dt = 1 / 60
+    const code: [boolean, boolean] = [true, false]
+    for (let k = 0; k < 60; k++) frame(f, 0, 0, { dig: false, tool: true }, dt, code)
+    expect(f.c.arms[1]).toBe(0)
+    const full = shovelOnHungHand(asset, person.frame, 'R', asset.clips.dig.tool!.grip).position.distanceTo(
+      shovelOnHungHand(asset, person.frame, 'R', asset.clips.carry.tool!.grip).position,
+    )
+    let last = f.tool.position.clone()
+    let worst = 0
+    for (let k = 0; k < 120; k++) {
+      frame(f, 0, 0, { dig: k < 60, tool: true }, dt, code)
+      if (f.tool.visible) worst = Math.max(worst, last.distanceTo(f.tool.position))
+      last = f.tool.position.clone()
+    }
+    expect(full).toBeGreaterThan(0)
+    expect(worst).toBeLessThan(0.25 * full)
   })
 
   it('digging holds the shovel in the right hand with the other hand on the shaft', () => {
