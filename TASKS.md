@@ -123,16 +123,6 @@ put it is the mistake this line exists to stop.
   05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
   05.10.2026: "ja, aber nach 1294"
 
-- [ ] 1310. The bird's-eye camera compensates about half the south-reach asymmetry
-  Queue position: directly after point 1305 (user card decision 05.10.2026; nothing goes ahead of 1294).
-  Source: decision card "Kamera: volle oder halbe Südverschiebung" from point 1287, which landed with full compensation and left the choice to the user. User, 05.10.2026 20:14: "Zur Karte \"Kamera: volle oder halbe Südverschiebung\": Ich nehme die halbe Verschiebung."
-  Final state:
-  1. `src/config/balance.ts`: `travelCameraFollow.southReachCompensation` is 0.5, marked calibratable as the user's choice of 05.10.2026.
-  2. design.md §2.1: the camera sentence says the camera hangs a little further south so about half the north/south reach asymmetry is compensated (the view reaches noticeably further south than before, still less than north); the traveller sits slightly above the picture centre. "about as far south as north" is gone.
-  3. Tests that pin full compensation through an explicit 1.0 stay; a test that reads the balance value and expects equal north/south reach expects the half-compensation reach instead. No check is weakened.
-  Tests: Vitest for the camera placement at 0.5 (reach ratio between the uncompensated 1.7 : 1 and 1 : 1; tilt unchanged); Playwright travel frames walking north and south and at a settlement edge on both backends (camera framing is backend-sensitive), judged by looking.
-  Bundle: Steuerung & Performance.
-
 - [ ] 1288. Carry a card decision from the head session to the batch owner
   Queue position: directly before point 1081 (user order 03.10.2026, "Reihe außerdem einen neue Task direkt vor 1081 zum Fix dieses Nachrichtenzustellproblems ein.").
   Measured 03.10.2026, 21:16-21:21, head session 036dac43 standing down while f865e213 owned the batch: the user answered the card "Anfrage nicht übernehmbar: Recognisable pounding at the fish eater's mortar" with "verwerfen", and that decision could not reach the owner by any path:

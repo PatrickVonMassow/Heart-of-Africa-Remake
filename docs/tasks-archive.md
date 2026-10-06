@@ -33720,3 +33720,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — new asset pipeline, load budget, every villager, both backends. If the point does not converge, split along "body and pipeline" / "animation, dress and tool".
   Status 06.10.2026 (03:00): cross-vendor review run in 6 passes (records on branch); fixed: sleeve arm weights kept under trunk transfer, Blender/NumPy always in the install closure, per-invocation build config, windowsHide, command index, rowStaging classified browserless (unit gate was 3 red tooling tests, now green). OPEN before landing: confirming review pass 2/2 found mixed sleeve weights (e.g. 50% arm) still lose arm share at villagerFigureBody.ts:451 — keep arm weights, transfer only the non-arm remainder, add a mixed-weight Vitest, re-run confirming pass; then villager-dress section on both backends (render code changed after the d3867f618 pictures), full fast gate, landing.
   Bundle: Dorfleben.
+
+- [x] 1310. The bird's-eye camera compensates about half the south-reach asymmetry
+  Queue position: directly after point 1305 (user card decision 05.10.2026; nothing goes ahead of 1294).
+  Source: decision card "Kamera: volle oder halbe Südverschiebung" from point 1287, which landed with full compensation and left the choice to the user. User, 05.10.2026 20:14: "Zur Karte \"Kamera: volle oder halbe Südverschiebung\": Ich nehme die halbe Verschiebung."
+  Final state:
+  1. `src/config/balance.ts`: `travelCameraFollow.southReachCompensation` is 0.5, marked calibratable as the user's choice of 05.10.2026.
+  2. design.md §2.1: the camera sentence says the camera hangs a little further south so about half the north/south reach asymmetry is compensated (the view reaches noticeably further south than before, still less than north); the traveller sits slightly above the picture centre. "about as far south as north" is gone.
+  3. Tests that pin full compensation through an explicit 1.0 stay; a test that reads the balance value and expects equal north/south reach expects the half-compensation reach instead. No check is weakened.
+  Tests: Vitest for the camera placement at 0.5 (reach ratio between the uncompensated 1.7 : 1 and 1 : 1; tilt unchanged); Playwright travel frames walking north and south and at a settlement edge on both backends (camera framing is backend-sensitive), judged by looking.
+  Bundle: Steuerung & Performance.
