@@ -3,8 +3,9 @@
 
   body        MakeHuman base → decimated body, morphs, joints, weights (cached)
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
-  garments    each dress form built round the body, weights transferred (cached)
-  export      public/models/villager.glb
+  garments    each dress form built round the body, weights transferred, then
+              fitted to every clip frame at every body corner (fit.py) (cached)
+  export      public/models/villager.glb, body, clips and the fitted garments
   sheets      frame sheets under verification/villager-body/
   penetration the per-frame garment penetration report; the run FAILS (exit 1)
               when any garment lies deeper than the tolerance in any frame
@@ -63,14 +64,15 @@ def main():
     garments = None
     if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
         import garments as G
-        garments = cached(a.work, 'garments', lambda: G.build_garments(mh, body, clips, cfg), force='garments' in steps)
+        import fit as F
+        garments = cached(a.work, 'garments', lambda: F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), force='garments' in steps)
     if 'export' in steps:
         import export as E
-        # The game draws the code-built dress on the glTF body (render/
-        # villagerFigureBody.ts); the garments built here are measured
-        # (penetration report, frame sheets) but not shipped.
-        # OPEN: ship them once the game dresses the body from the pipeline.
-        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, None, cfg)
+        # the game dresses the body with exactly these garments (render/
+        # villagerFigureBody.ts gltfGarment) — the ones the report measures
+        # (the hair cap and eyes stay pipeline-only: the game paints the scalp)
+        dress = {'meshes': {n: g for n, g in garments['meshes'].items() if n.startswith('g-')}, 'meta': garments['meta']}
+        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, dress, cfg)
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)

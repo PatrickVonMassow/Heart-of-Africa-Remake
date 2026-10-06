@@ -15,7 +15,7 @@ import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
 import { bodyProportions, BONE_NAMES, mixHex, paint as paintSurface, tidy, type BodyProportions, type BoneName } from './figureBody'
-import { buildLayerGeometry } from './figureDress'
+import { buildLayerGeometry, surfaceOf } from './figureDress'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
@@ -167,6 +167,8 @@ export interface PersonFrame {
   scale: number
   /** Hip height over the basis body's (villagerBody.ts legScale). */
   legScale: number
+  /** The morph influences baked into this person (villagerBody.ts morphInfluences). */
+  influences: Record<string, number>
 }
 
 /**
@@ -210,7 +212,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
   g.computeBoundingBox()
   g.computeBoundingSphere()
   const p = measureProportions(asset, g, dom, rest, p0)
-  return { geometry: g, rest, p, hair: hairMask(asset, g, dom, p), frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0) } }
+  return { geometry: g, rest, p, hair: hairMask(asset, g, dom, p), frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0), influences: w } }
 }
 
 /** Per-bone vertex samples of a hung body. */
@@ -529,12 +531,61 @@ export function createGltfSkeleton(asset: VillagerAsset, rest: Float32Array): { 
   return { skeleton: new THREE.Skeleton(list), bones }
 }
 
+/** The pipeline's mesh name for a dress layer (scripts/villager/garments.py `mesh_name`). */
+export const garmentMeshName = (l: Pick<DressLayer, 'form' | 'wear'>): string => `g-${l.form}-${l.wear}`
+
+/**
+ * A pipeline garment on a person: the mesh scripts/villager/ built round this
+ * body, fitted to every clip (fit.py) and measured frame by frame in
+ * verification/villager-body/penetration-report.md — carried through exactly
+ * the body's morphs, hang, grounding and scale (gltfPerson), so it sits on the
+ * drawn body as it sat on the measured one, and painted as the layer.
+ * Null when the file holds no garment for the layer's form and wear.
+ */
+export function gltfGarment(asset: VillagerAsset, person: GltfPerson, l: DressLayer): THREE.BufferGeometry | null {
+  const name = garmentMeshName(l)
+  const src = asset.geometries[name]
+  if (!src || asset.parts[name] !== 'garment') return null
+  const { rest0, hang, sole, scale, influences } = person.frame
+  const g = bakePose(bakeMorphs(src, influences), rest0, hungHeads(asset, rest0, hang), hang)
+  const pos = g.getAttribute('position') as THREE.BufferAttribute
+  const arr = pos.array as Float32Array
+  let bottom = Infinity
+  for (let k = 0; k < pos.count; k++) {
+    arr[k * 3] *= scale
+    arr[k * 3 + 1] = (arr[k * 3 + 1] - sole) * scale
+    arr[k * 3 + 2] *= scale
+    bottom = Math.min(bottom, arr[k * 3 + 1])
+  }
+  pos.needsUpdate = true
+  const second = l.colour2 ?? mixHex(l.colour, '#000000', 0.35)
+  return tidy(paintSurface(g, l.colour, surfaceOf(l, person.p, bottom), second))
+}
+
+/**
+ * One dress layer of a person, skinned to the asset's bones: the pipeline's
+ * measured garment wherever the file has one (every form and wear of the
+ * appearance table — villagerFigureBody.test.ts holds that), else point
+ * 1293's code-built layer fitted to the measured proportions.
+ * `codeLayer` lets the caller cache the code-built builds.
+ */
+export function gltfLayerGeometry(
+  asset: VillagerAsset,
+  person: GltfPerson,
+  l: DressLayer,
+  radial: number,
+  codeLayer: (l: DressLayer) => THREE.BufferGeometry | null = (l) => buildLayerGeometry(l, person.p, radial),
+): THREE.BufferGeometry | null {
+  const g = gltfGarment(asset, person, l)
+  if (g) return g
+  const lg = codeLayer(l)
+  return lg ? transferTrunkWeights(asset, person, remapSkin(lg.clone(), codeBoneMap(asset))) : null
+}
+
 /**
  * A person's whole figure as ONE geometry skinned to the asset's bones: the
  * glTF body painted (skin, or skin under body paint; the scalp in the hair
- * colour) and every dress layer. The layers are point 1293's code-built ones,
- * fitted to this body's measured proportions.
- * OPEN: point 1311 replaces them with the pipeline's skinned garments.
+ * colour) and every dress layer (gltfLayerGeometry: the pipeline's garments).
  * `layerOf` lets the caller cache the layer builds.
  */
 export function gltfFigureGeometry(
@@ -544,7 +595,7 @@ export function gltfFigureGeometry(
   skin: string,
   paint: string | null,
   radial: number,
-  layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => buildLayerGeometry(l, person.p, radial),
+  layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => gltfLayerGeometry(asset, person, l, radial),
 ): THREE.BufferGeometry {
   const body = paintSurface(person.geometry.clone(), paint ? mixHex(skin, paint, 0.55) : skin)
   const col = body.getAttribute('color') as THREE.BufferAttribute
@@ -553,10 +604,9 @@ export function gltfFigureGeometry(
     if (h) col.setXYZ(i, hair.r, hair.g, hair.b)
   })
   const parts = [tidy(body)]
-  const map = codeBoneMap(asset)
   for (const l of layers) {
     const lg = layerOf(l)
-    if (lg) parts.push(transferTrunkWeights(asset, person, remapSkin(lg.clone(), map)))
+    if (lg) parts.push(lg)
   }
   const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
   if (!g) throw new Error('glTF villager: body and dress layers do not merge')

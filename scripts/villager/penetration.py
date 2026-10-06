@@ -4,7 +4,7 @@ corner and build extreme, every garment is skinned with the body exactly as the
 game skins it (same weights, same morphs, same skeleton), and each garment
 vertex's depth inside the body is measured against the skinned body's surface
 (nearest point, signed along its normal). The report lists, per garment, the
-deepest penetration and where; the pipeline fails the garment step when any
+deepest penetration and where; the pipeline fails the penetration step when any
 depth exceeds VILLAGER_ASSET.garmentPenetrationTolerance.
 
 Written to verification/villager-body/penetration-report.md (and .json).
@@ -17,17 +17,10 @@ import numpy as np
 import rig
 from body import top4
 from export import EXPORT_CLIPS
+from fit import garment_pos, nearest
 from sheets import corner_weights, morphed
 
 CORNERS = [(s, a, 0.0) for s in ('male', 'female') for a in ('child', 'youth', 'adult', 'elder')] + [('male', 'adult', -1.0), ('male', 'adult', 1.0)]
-
-
-def garment_pos(g, weights):
-    p = g['pos'].copy()
-    for m, w in weights.items():
-        if w:
-            p += w * g['morph_pos'][m]
-    return p
 
 
 def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, corners=None, log=print):
@@ -50,15 +43,10 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
                 for n in gnames:
                     gi, gw = gskin[n]
                     gv = rig.skin(gpos[n], gi, gw, j, wr, wp)
-                    deepest = 0.0
-                    over = 0
-                    for p in gv:
-                        co, nrm, _i, _d = tree.find_nearest(p)
-                        d = -float(np.dot(p - np.array(co), np.array(nrm)))
-                        if d > tol:
-                            over += 1
-                        if d > deepest:
-                            deepest = d
+                    co, nrm = nearest(tree, gv)
+                    d = -np.einsum('ij,ij->i', gv - co, nrm)
+                    deepest = max(0.0, float(d.max()))
+                    over = int((d > tol).sum())
                     r = worst[n]
                     r['checked'] += 1
                     r['over'] += 1 if over else 0
