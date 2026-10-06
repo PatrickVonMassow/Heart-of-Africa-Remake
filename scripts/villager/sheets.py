@@ -4,6 +4,7 @@ import os
 import numpy as np
 
 import render as R
+import gamepath as GP
 import rig
 import skeleton as SK
 from body import top4, MORPHS
@@ -63,14 +64,14 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
     if not want or 'body' in want:
         body_sheet(out, body)
     if garments and (not want or 'garments' in want):
-        garment_sheet(out, body, clips, garments, 'walk', 0.3, view='front')
-        garment_sheet(out, body, clips, garments, 'walk', 0.3, view='side')
+        garment_sheet(out, body, clips, garments, cfg, 'walk', 0.3, view='front')
+        garment_sheet(out, body, clips, garments, cfg, 'walk', 0.3, view='side')
     if garments and clips and (not want or 'dress' in want):
         # the shipped garments in motion: four outfits through walk, kneel and dig
         for name in DRESS_CLIPS:
             for k, (sex, age, outfit) in enumerate(OUTFITS):
                 clip_sheet(out, body, clips, name, frames=8, view=35, spacing=1.0, sex=sex, age=age,
-                           fname=f'dress-{name}-{k}.png', garments=garments, outfit=outfit)
+                           fname=f'dress-{name}-{k}.png', garments=garments, outfit=outfit, cfg=cfg)
     if clips:
         for name in clips['clips']:
             if not want or name in want or 'clips' in want:
@@ -94,11 +95,14 @@ def sample(clip, t):
     return q, hips
 
 
-def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex='male', age='adult', extra=None, fname=None, garments=None, outfit=()):
+def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex='male', age='adult', extra=None, fname=None, garments=None, outfit=(), cfg=None):
     R.clear()
     jidx, jw = top4(body['W'])
     cw = corner_weights(sex, age)
     pos, j = morphed(body, cw)
+    from resolve import drawn_garment, offsets_at
+    person = GP.Person(j)
+    baked = person.bake(pos, jidx, jw)
     c = clips['clips'][name]
     d = c['duration']
     spacing = spacing if spacing is not None else (0.55 if view == 'side' else 0.75)
@@ -106,8 +110,8 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
     for f in range(frames):
         t = d * f / frames if c['kind'] in ('gait', 'loop') else d * f / (frames - 1)
         q, hips = sample(c, t)
-        wr, wp = rig.fk(j, q, hips)
-        v = rig.skin(pos, jidx, jw, j, wr, wp)
+        wr, wp = person.pose(q, hips)
+        v = person.skin(baked, jidx, jw, wr, wp)
         if view == 'side':
             v[:, 2] += f * spacing - span / 2
         else:
@@ -115,17 +119,12 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
         R.add_mesh(f'f{f}', v, body['tris'], SKIN)
         for k, n in enumerate(outfit):
             g = garments['meshes'][n]
-            gp = g['pos'].copy()
-            for m, x in cw.items():
-                if x:
-                    gp += x * g['morph_pos'][m]
-            gi, gw = top4(g['W'])
-            gv = rig.skin(gp, gi, gw, j, wr, wp)
+            gv = drawn_garment(person, g, cw, wr, wp, offsets_at(g, cw, c, name, t))
             if view == 'side':
                 gv[:, 2] += f * spacing - span / 2
             else:
                 gv[:, 0] += f * spacing - span / 2
-            R.add_mesh(f'f{f}-{n}', gv, g['tris'], GARMENT_COLOURS[k % len(GARMENT_COLOURS)])
+            R.add_mesh(f'f{f}-{n}', gv, garments['meshes'][n]['tris'], GARMENT_COLOURS[k % len(GARMENT_COLOURS)])
         if c.get('tool'):
             tv, tt = shovel_mesh(body, c['tool'], wr, wp, cfg_shovel(clips))
             if view == 'side':
@@ -173,25 +172,25 @@ OUTFITS = [
 GARMENT_COLOURS = [(0.75, 0.68, 0.55, 1), (0.55, 0.25, 0.18, 1), (0.25, 0.3, 0.5, 1), (0.6, 0.5, 0.3, 1)]
 
 
-def dressed(body, garments, names, weights, q, hips):
-    """Skinned body + garments for one pose: list of (verts, tris, colour)."""
+def dressed(body, garments, names, weights, q, hips, clip=None, cname=None, t=0.0):
+    """Body + garments for one pose along the game's path (gamepath.py), the
+    garments' baked offsets at clip `cname`'s time `t` applied: list of
+    (verts, tris, colour)."""
+    from resolve import drawn_garment, offsets_at
     pos, j = morphed(body, weights)
-    wr, wp = rig.fk(j, q, hips)
+    person = GP.Person(j)
+    wr, wp = person.pose(q, hips)
     jidx, jw = top4(body['W'])
-    out = [(rig.skin(pos, jidx, jw, j, wr, wp), body['tris'], SKIN)]
+    out = [(person.skin(person.bake(pos, jidx, jw), jidx, jw, wr, wp), body['tris'], SKIN)]
     for k, n in enumerate(names):
         g = garments['meshes'][n]
-        gp = g['pos'].copy()
-        for m, w in weights.items():
-            if w:
-                gp += w * g['morph_pos'][m]
-        gi, gw = top4(g['W'])
         col = (0.08, 0.06, 0.05, 1) if g.get('part') == 'hair' else (0.95, 0.95, 0.92, 1) if g.get('part') == 'eyes' else GARMENT_COLOURS[k % len(GARMENT_COLOURS)]
-        out.append((rig.skin(gp, gi, gw, j, wr, wp), g['tris'], col))
+        off = offsets_at(g, weights, clip, cname, t) if clip is not None else None
+        out.append((drawn_garment(person, g, weights, wr, wp, off), g['tris'], col))
     return out
 
 
-def garment_sheet(out, body, clips, garments, clip='walk', t=0.3, per_row=8, view='side'):
+def garment_sheet(out, body, clips, garments, cfg, clip='walk', t=0.3, per_row=8, view='side'):
     names = [n for n in garments['meshes'] if n.startswith('g-')]
     c = clips['clips'][clip]
     q, hips = sample(c, c['duration'] * t)
@@ -200,7 +199,7 @@ def garment_sheet(out, body, clips, garments, clip='walk', t=0.3, per_row=8, vie
     for r, row in enumerate(rows):
         R.clear()
         for k, n in enumerate(row):
-            for v, tr, col in dressed(body, garments, ['hair', 'eyes', n], w, q, hips):
+            for v, tr, col in dressed(body, garments, ['hair', 'eyes', n], w, q, hips, c, clip, c['duration'] * t):
                 v = v.copy()
                 if view == 'side':
                     v[:, 2] += k * 0.8

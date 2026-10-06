@@ -2583,6 +2583,13 @@ export const VILLAGER_ASSET = {
    *  steps, so a vertex caught between two body parts does not swing from
    *  one to the other. Calibratable. */
   garmentFitStep: 0.01,
+  /** Rounds of the per-frame baked collision resolution
+   *  (scripts/villager/resolve.py) before what is left is moved vertex by
+   *  vertex along its shortest way out. Calibratable. */
+  garmentResolveRounds: 16,
+  /** How many mesh rings out a resolved vertex's push spreads (halving each
+   *  ring), so the cloth bends round the body instead of kinking. Calibratable. */
+  garmentResolveRings: 2,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive
