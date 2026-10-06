@@ -92,9 +92,10 @@ def _setup(body, clips, garments, cfg, corners, only=None):
     _S.update(body=body, cfg=cfg, jidx=jidx, jw=jw, names=names, skin=skin, people=people, frames=frames)
 
 
-def _frame(ci, pose, shapes, propose):
-    """Depth of every garment vertex in one frame and, with `propose`, each
-    vertex's projection onto its constraint (shape change, per garment)."""
+def _frame(ci, pose, active, propose):
+    """Depth of each active garment vertex in one frame and, with `propose`,
+    its projection onto its constraint. `active` {name: (vertex ids, their
+    shapes)}."""
     from mathutils.bvhtree import BVHTree
     S = _S
     c, j, person, bh, gh = S['people'][ci]
@@ -107,10 +108,11 @@ def _frame(ci, pose, shapes, propose):
     margin = S['cfg']['VILLAGER_ASSET']['garmentFitMargin']
     step = S['cfg']['VILLAGER_ASSET']['garmentCorrectStep']
     out = {}
-    for n in S['names']:
-        gi, gw = S['skin'][n]
-        X = shapes[n]
-        gv = person.skin(gh[n] + np.einsum('k,kvi->vi', a, X), gi, gw, wr, wp)
+    for n, (ids, X) in active.items():
+        if not len(ids):
+            continue
+        gi, gw = S['skin'][n][0][ids], S['skin'][n][1][ids]
+        gv = person.skin(gh[n][ids] + np.einsum('k,kvi->vi', a, X), gi, gw, wr, wp)
         d, _co, nrm = depths(tree, gv, -margin)
         prop = None
         if propose:
@@ -126,13 +128,12 @@ def _frame(ci, pose, shapes, propose):
 
 
 def _chunk(args):
-    lo, hi, shapes, propose = args
-    S = _S
-    deep = {n: np.full(len(shapes[n][0]), -np.inf) for n in S['names']}
-    acc = {n: np.zeros_like(shapes[n]) for n in S['names']}
-    most = {n: np.zeros(len(shapes[n][0])) for n in S['names']}
-    for ci, pose in S['frames'][lo:hi]:
-        for n, (d, prop) in _frame(ci, pose, shapes, propose).items():
+    lo, hi, active, propose = args
+    deep = {n: np.full(len(ids), -np.inf) for n, (ids, _X) in active.items()}
+    acc = {n: np.zeros_like(X) for n, (_ids, X) in active.items()}
+    most = {n: np.zeros(len(ids)) for n, (ids, _X) in active.items()}
+    for ci, pose in _S['frames'][lo:hi]:
+        for n, (d, prop) in _frame(ci, pose, active, propose).items():
             np.maximum(deep[n], d, out=deep[n])
             if prop is not None:
                 bad, need, dx = prop
@@ -142,20 +143,20 @@ def _chunk(args):
     return deep, acc, most
 
 
-def sweep(shapes, propose, workers):
-    """Every frame once, in parallel: per garment the worst depth of each
-    vertex and (with `propose`) its projection onto the constraint it
-    violates most."""
+def sweep(active, propose, workers):
+    """Every frame once, in parallel, for the active vertices: per garment
+    each one's worst depth and (with `propose`) its projection onto the
+    constraint it violates most (zero where it violates none)."""
     nf = len(_S['frames'])
     bounds = np.linspace(0, nf, workers * 2 + 1).astype(int)
-    jobs = [(int(lo), int(hi), shapes, propose) for lo, hi in zip(bounds[:-1], bounds[1:]) if hi > lo]
+    jobs = [(int(lo), int(hi), active, propose) for lo, hi in zip(bounds[:-1], bounds[1:]) if hi > lo]
     with mp.get_context('fork').Pool(workers) as pool:
         parts = pool.map(_chunk, jobs)
-    deep = {n: np.max([p[0][n] for p in parts], axis=0) for n in shapes}
+    deep = {n: np.max([p[0][n] for p in parts], axis=0) for n in active}
     prop = {}
-    for n in shapes:
+    for n, (ids, X) in active.items():
         pick = np.argmax([p[2][n] for p in parts], axis=0)
-        prop[n] = np.stack([parts[pick[v]][1][n][:, v] for v in range(len(pick))], axis=1)
+        prop[n] = np.stack([parts[pick[v]][1][n][:, v] for v in range(len(ids))], axis=1) if len(ids) else X.copy()
     return deep, prop
 
 
@@ -171,18 +172,24 @@ def correct(body, clips, garments, cfg, passes=None, corners=None, names=None, w
     G = garments['meshes']
     shapes = {n: np.zeros((K, len(G[n]['pos']), 3)) for n in (names or _S['names'])}
     best = {n: (np.full(len(G[n]['pos']), np.inf), shapes[n].copy()) for n in shapes}
+    # A vertex whose shapes did not move keeps every frame's depth, so a pass
+    # measures only the vertices the previous pass moved.
+    live = {n: np.arange(len(G[n]['pos'])) for n in shapes}
     for it in range(passes + 1):
-        deep, prop = sweep(shapes, it < passes, workers)
+        deep, prop = sweep({n: (live[n], shapes[n][:, live[n]]) for n in shapes}, it < passes, workers)
         for n in shapes:
-            better = deep[n] < best[n][0]
-            best[n][0][better] = deep[n][better]
-            best[n][1][:, better] = shapes[n][:, better]
+            ids = live[n]
+            better = deep[n] < best[n][0][ids]
+            best[n][0][ids[better]] = deep[n][better]
+            best[n][1][:, ids[better]] = shapes[n][:, ids[better]]
             if it < passes:
-                shapes[n] += prop[n]
+                moved = np.abs(prop[n]).sum(axis=(0, 2)) > 0
+                shapes[n][:, ids] += prop[n]
+                live[n] = ids[moved]
         over = {n: float(best[n][0].max()) for n in shapes}
-        log(f'correct pass {it + 1}: deepest {max(over.values()):.4f}, {sum(v > tol for v in over.values())} garments over {tol}; '
+        log(f'correct pass {it + 1}: {sum(len(v) for v in live.values())} vertices live, deepest {max(over.values()):.4f}, {sum(v > tol for v in over.values())} garments over {tol}; '
             + ', '.join(f'{n[2:]} {over[n]:.3f}/{int((best[n][0] > tol).sum())}v' for n in shapes if over[n] > tol))
-        if all(v <= tol for v in over.values()):
+        if all(v <= tol for v in over.values()) or not any(len(v) for v in live.values()):
             break
     for n in shapes:
         G[n]['shapes'] = best[n][1]
