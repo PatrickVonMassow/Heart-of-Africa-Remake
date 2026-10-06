@@ -48,6 +48,48 @@ def nearest(tree, pts):
     return co, nrm
 
 
+# Rays the inside test casts (unit vectors, none along an axis the body is
+# built round, so no ray runs along a seam of the mesh).
+RAYS = ((0.0, 1.0, 0.0), (0.57735, -0.57735, 0.57735), (-0.6, 0.0, -0.8))
+
+
+def winding(tree, p, d, hits=64):
+    """The body's winding number round `p` along one ray: +1 for every face
+    the ray leaves the body through, −1 for every face it enters by. The
+    posed body is closed but crosses itself (a hand pressed into the thigh),
+    so parity would call a point inside two shells outside; the signed count
+    does not."""
+    from mathutils import Vector
+    o, d = Vector(p), Vector(d)
+    w = 0
+    for _ in range(hits):
+        hit, n, _i, _d = tree.ray_cast(o, d)
+        if hit is None:
+            break
+        w += 1 if n.dot(d) > 0 else -1
+        o = hit + d * 1e-6
+    return w
+
+
+def inside(tree, p):
+    """Inside the body by the winding number on two of three rays. The sign of
+    the nearest face's normal alone is no inside test: near a toe tip, a
+    finger or the crotch it calls points outside the body inside (measured
+    06.10.2026: up to 0.19 deep on points no ray found inside)."""
+    return sum(1 for d in RAYS if winding(tree, p, d) > 0) >= 2
+
+
+def depths(tree, pts, floor):
+    """Signed depth of every point inside the body (negative: outside), the
+    sign checked by the winding number wherever the depth exceeds `floor`."""
+    co, nrm = nearest(tree, pts)
+    d = -np.einsum('ij,ij->i', pts - co, nrm)
+    for k in np.nonzero(d > floor)[0]:
+        if not inside(tree, pts[k].tolist()):
+            d[k] = -d[k]
+    return d, co, nrm
+
+
 def neighbours(n, tris, verts):
     """Each vertex's ring, vertices on the same spot (a uv seam) counted as one."""
     nb = [set() for _ in range(n)]

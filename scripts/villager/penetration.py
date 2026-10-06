@@ -3,7 +3,8 @@ final state 6): for EVERY frame of EVERY exported clip and for every age/sex
 corner and build extreme, every garment is skinned with the body exactly as the
 game skins it (same weights, same morphs, same skeleton), and each garment
 vertex's depth inside the body is measured against the skinned body's surface
-(nearest point, signed along its normal). The skinning is the GAME'S path
+(nearest point, signed along its normal; a point that deep is counted inside
+only when the body's winding number round it says so, fit.py `inside`). The skinning is the GAME'S path
 (gamepath.py): the corner's mesh hung and baked, then skinned by the hung
 bones; a gait's frames also at the shortest and longest stride the game warps
 it to. The report lists, per garment, the
@@ -21,7 +22,7 @@ import gamepath as GP
 import rig
 from body import top4
 from export import EXPORT_CLIPS
-from fit import garment_pos, nearest
+from fit import depths, garment_pos
 from sheets import corner_weights, morphed
 
 CORNERS = [(s, a, 0.0) for s in ('male', 'female') for a in ('child', 'youth', 'adult', 'elder')] + [('male', 'adult', -1.0), ('male', 'adult', 1.0)]
@@ -48,8 +49,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
             tree = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
             for n in gnames:
                 gv = person.skin(gh[n], *gskin[n], wr, wp)
-                co, nrm = nearest(tree, gv)
-                d = -np.einsum('ij,ij->i', gv - co, nrm)
+                d, _co, _n = depths(tree, gv, tol)
                 deepest = max(0.0, float(d.max()))
                 over = int((d > tol).sum())
                 r = worst[n]
