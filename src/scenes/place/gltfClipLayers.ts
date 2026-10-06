@@ -17,7 +17,7 @@
 import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF as G } from '../../config/balance'
 import type { VillagerAsset } from '../../render/villagerAsset'
-import { clipGaitPose, clipPoseAt, newClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
+import { clipGaitPose, clipPoseAt, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
 import type { GltfPerson } from '../../render/villagerFigureBody'
 import { blendPoses, newPose, type VillagerPose } from '../../render/villagerRig'
 import type { FigureWork } from './placeFigureContext'
@@ -144,7 +144,7 @@ export function applyClipLayers(
     if (free[1] && c.carry < 1) blendInto(asset, bones, ARM('R'), c.local, w)
   } else {
     // standing: the feet are where they stand, nothing held for the next walk
-    c.gait.held = [{ heel: null, ball: null, tip: null }, { heel: null, ball: null, tip: null }]
+    releaseClipGait(c.gait)
   }
   // THE SHOVEL CARRIED: the right arm from the carry, in step with the gait
   if (c.carry > 0 && under && free[1]) {

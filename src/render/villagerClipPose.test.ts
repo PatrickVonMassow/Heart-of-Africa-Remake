@@ -136,6 +136,34 @@ describe('the clip gait on the ground', () => {
     }
   })
 
+  it('a held foot shoved off its clip lets go by easing, never by a jump when its last contact lifts', () => {
+    const n = asset.bones.length
+    const f = adult.frame
+    const foot = ['L', 'R'].map((s) => asset.bones.indexOf(`foot.${s}`))
+    const g = newClipGait()
+    const pose = newPose(n)
+    const world = newWorld(n)
+    const speed = 0.8
+    const dt = 1 / 60
+    let z = 0
+    let shove = 0
+    let last: number[] | null = null
+    let worst = 0
+    for (let t = 0; t < 4; t += dt) {
+      z += speed * dt
+      // a sideways shove of the body while the feet stand held
+      if (t > 1.5 && shove === 0) shove = 0.1 * f.scale
+      stepClipGait(g, asset, f, speed * dt, speed)
+      clipGaitPose(g, asset, f, speed, { x: shove, z, yaw: 0, unit: 1 }, pose)
+      forwardKinematics(asset, f.rest0, pose, world)
+      const xs = foot.map((i) => world.p[i].x)
+      // the shove's own frame moves every held foot by design; judge the rest
+      if (last && !(t > 1.5 && t - dt <= 1.5)) worst = Math.max(worst, ...xs.map((x, k) => Math.abs(x - last![k])))
+      last = xs
+    }
+    expect(worst).toBeLessThan(0.02)
+  })
+
   it('the feet never sink below the ground', () => {
     for (const v of [0.6, 1.2, 3.4]) expect(walkStraight(adult, v).lowest).toBeGreaterThan(-0.01)
   })

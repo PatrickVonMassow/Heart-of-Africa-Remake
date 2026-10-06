@@ -53,9 +53,20 @@ export interface ClipGait {
   /** Cycle phase 0 … 1 (walk and sprint both start at the left foot's landing). */
   phase: number
   held: [HeldFoot, HeldFoot]
+  /** Per foot, the correction (person x, z) the hold puts on the clip's foot;
+   *  once the foot lifts it fades over VILLAGER_GLTF.plantFadeCycle. */
+  slip: [{ x: number; z: number }, { x: number; z: number }]
+  /** The phase the slip was last eased at. */
+  slipPhase: number
 }
 
-export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()] })
+export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0 })
+
+/** Let both feet go (standing: nothing is held for the next walk). */
+export function releaseClipGait(g: ClipGait): void {
+  g.held = [freeFoot(), freeFoot()]
+  g.slip = [{ x: 0, z: 0 }, { x: 0, z: 0 }]
+}
 
 /** How far a contact may lie above the ground and still carry (person units). */
 export const PLANT_TOUCH = 0.02
@@ -156,6 +167,10 @@ export function clipGaitPose(
   )
   forwardKinematics(asset, frame.rest0, out, world)
   const hips = asset.bones.indexOf('hips')
+  // how far a lifted foot's correction fades this call: by the cycle walked
+  const walkedPhase = (((g.phase - g.slipPhase) % 1) + 1) % 1
+  g.slipPhase = g.phase
+  const fade = Math.min(1, walkedPhase / Math.max(1e-6, G.plantFadeCycle))
   ;(['L', 'R'] as const).forEach((s, i) => {
     const thigh = asset.bones.indexOf(`thigh.${s}`)
     const shin = asset.bones.indexOf(`shin.${s}`)
@@ -171,6 +186,7 @@ export function clipGaitPose(
     const held = g.held[i]
     _miss.set(0, 0, 0)
     let down = 0
+    let firm = 0
     const touch = PLANT_TOUCH * frame.legScale
     for (const k of CONTACTS) {
       const p = c[k]
@@ -186,8 +202,22 @@ export function clipGaitPose(
       _miss.x += w * (_h.x - p.x)
       _miss.z += w * (_h.z - p.z)
       down += w
+      firm = Math.max(firm, w)
     }
-    if (down) _miss.multiplyScalar(1 / down)
+    // the contacts' weighted mean miss, held only as firmly as the firmest
+    // contact: a lone contact rising off lets the correction fade with it (the
+    // mean alone divided its own weight back out, and the foot jumped the
+    // whole miss when it lifted)
+    if (down) _miss.multiplyScalar(firm / down)
+    // Held firm, the foot sits exactly on its hold (no slide). Otherwise the
+    // correction eases toward what the lifting contacts still carry (none, once
+    // the foot is in the air) by the cycle walked: the contacts lift within a
+    // frame or two, so their height alone could not fade it.
+    const slip = g.slip[i]
+    if (firm < 1) {
+      _miss.x = slip.x + (_miss.x - slip.x) * fade
+      _miss.z = slip.z + (_miss.z - slip.z) * fade
+    }
     const far = Math.hypot(_miss.x, _miss.z)
     const limit = G.plantRelease * frame.legScale
     if (body && far > limit) {
@@ -203,6 +233,8 @@ export function clipGaitPose(
         if (p.y < touch && !held[k]) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
       }
     }
+    slip.x = _miss.x
+    slip.z = _miss.z
     _t.x += _miss.x
     _t.z += _miss.z
     _keep.copy(world.q[foot])

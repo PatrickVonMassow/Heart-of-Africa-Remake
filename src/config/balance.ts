@@ -2607,6 +2607,10 @@ export const VILLAGER_GLTF = {
    *  clip's own foot before it lets go and is planted afresh — a teleport or a
    *  shove too long to step through. Calibratable. */
   plantRelease: 0.18,
+  /** Share of the gait cycle over which a lifted foot's hold correction
+   *  fades back onto the clip's own foot (a shoved or turned foot eases home
+   *  in its swing, never jumps). Calibratable. */
+  plantFadeCycle: 0.15,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Ground speed (figure units / s) below which the figure stands. */
