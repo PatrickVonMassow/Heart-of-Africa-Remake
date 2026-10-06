@@ -51,6 +51,9 @@ import { markActor } from '../actorLabelSource'
 import { isLifeFrozen } from './lifeFreeze'
 import { REST_POSE_ARMS, type FigureLook } from './placeFigureContext'
 import { figureIdentity, type FigureIdentity } from './figureIdentity'
+import type { FigureWork } from './placeFigureContext'
+import { Shovel } from './shovel'
+import { applyClipLayers, clipLayers, placeShovel, stepClipLayers } from './gltfClipLayers'
 
 // ---- geometry caches: one build per distinct body and layer -----------------
 
@@ -139,6 +142,8 @@ interface Rig {
   /** The top of the drawn head, on the head bone: where a head load rests. */
   crown: THREE.Object3D
   hands: [THREE.Object3D, THREE.Object3D]
+  /** The glTF body's asset and person, whose clips this figure plays. */
+  gltf: { asset: VillagerAsset; person: GltfPerson } | null
 }
 
 function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string): Rig {
@@ -200,7 +205,17 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     bones[`hand.${side}`].add(o)
     return o
   }
-  return { p, layers, meshes, bones, skeleton, head, crown, hands: [hand('L', 'hand-left'), hand('R', 'hand-right')] }
+  return {
+    p,
+    layers,
+    meshes,
+    bones,
+    skeleton,
+    head,
+    crown,
+    hands: [hand('L', 'hand-left'), hand('R', 'hand-right')],
+    gltf: asset && person ? { asset, person } : null,
+  }
 }
 
 const _s = new THREE.Vector3()
@@ -238,6 +253,7 @@ export function SkinnedFigure({
   sex,
   age,
   identityKey,
+  work,
 }: {
   look: FigureLook
   cloth: string
@@ -263,6 +279,8 @@ export function SkinnedFigure({
   age?: AgeGroup
   /** The outer Figure's id, stable across a detail-level switch. */
   identityKey?: string
+  /** The hands' work: the glTF body digs and carries its shovel by its clips. */
+  work?: RefObject<FigureWork>
 }) {
   const ownKey = useId()
   const key = identityKey ?? ownKey
@@ -293,6 +311,11 @@ export function SkinnedFigure({
   const owned = !!(pose && limbs)
   const dims = useMemo(() => legDims(rig.p), [rig])
   const motion = useRef<WalkMotion>(restingMotion(kneel))
+  // THE glTF BODY'S CLIPS (work-order "villager glTF body: animation, dress
+  // and tool"): the gait, the dig and the shovel carry, layered over the
+  // code-built pose by weights that blend in and out — never a cut.
+  const clips = useMemo(() => (rig.gltf ? clipLayers(rig.gltf.asset) : null), [rig])
+  const shovel = useRef<THREE.Group>(null)
   // THE LEGS AND HIPS from the walk, the work crouch and the kneel — one
   // function, so the frame callback and an owning caller's retarget both
   // leave the stride in place. Returns the walk for the arms and shoulders.
@@ -467,6 +490,14 @@ export function SkinnedFigure({
         }
         b[`hand.${s}`].quaternion.identity()
       })
+      if (rig.gltf && clips) {
+        const free = ([0, 1] as const).map((i) => {
+          const v = arms.current[i]
+          return !contactArm[i] && i !== steadyArm && (!v || armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, REST_POSE_ARMS[i]))
+        }) as [boolean, boolean]
+        applyClipLayers(rig.gltf.asset, rig.gltf.person, b as unknown as Record<string, THREE.Bone>, clips, m, free)
+        placeShovel(rig.gltf.asset, rig.gltf.person, clips, shovel.current)
+      }
       // The head's squat correction depends on the chain just posed: renew it
       // here, so an owning caller's retarget never leaves a stale one.
       unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
@@ -484,7 +515,7 @@ export function SkinnedFigure({
         anchor.updateWorldMatrix(false, true)
       })
     }
-  }, [rig, dims, pose, squat, poseLegs, headSteady, kneel, kneeling])
+  }, [rig, dims, pose, squat, poseLegs, headSteady, kneel, kneeling, clips])
 
   // Publish the virtual pivots to the caller that owns the pose.
   const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget })
@@ -519,7 +550,8 @@ export function SkinnedFigure({
         return { hips: { x: hips.x, z: hips.z }, thigh: { x: t.x, z: t.z } }
       }) as [HipJoint, HipJoint]
       const body = { x: _here.x, z: _here.z, yaw: Math.atan2(_facing.x, _facing.z), unit }
-      stepWalk(m, body, dt, dims, id.age, kneel || !!kneeling?.current, joints)
+      const walked = stepWalk(m, body, dt, dims, id.age, kneel || !!kneeling?.current, joints)
+      if (rig.gltf && clips) stepClipLayers(rig.gltf.asset, rig.gltf.person, clips, walked, m.speed, body, work?.current ?? null, dt)
       // Dev: the walk the village-walk verification reads beside the bones.
       if (import.meta.env.DEV) g.userData.walk = m
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
@@ -572,6 +604,13 @@ export function SkinnedFigure({
         </group>
       </group>
       {handProp && createPortal(<>{handProp}</>, rig.hands[0])}
+      {rig.gltf &&
+        createPortal(
+          <group ref={shovel} visible={false} name="digging-tool">
+            <Shovel />
+          </group>,
+          rig.bones['hand.R'],
+        )}
       {headProp && createPortal(<>{headProp}</>, rig.crown)}
     </group>
   )

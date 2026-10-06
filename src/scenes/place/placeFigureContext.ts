@@ -55,6 +55,15 @@ export interface FigureLook {
 }
 export const FigureLookContext = createContext<FigureLook | null>(null)
 
+/** What a villager's hands are at, for the glTF body's clips (work-order
+ *  "villager glTF body: animation, dress and tool"): digging plays the dig, a
+ *  carried shovel the carry. Written by the caller each frame; the primitive
+ *  and the code-built bodies pose the same work through `pose`. */
+export interface FigureWork {
+  dig: boolean
+  tool: boolean
+}
+
 /**
  * The settlement's inhabitant bodies (work-order point 578). A context for the
  * reason the contexts above are: the life vignettes are a dozen separate components,

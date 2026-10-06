@@ -113,6 +113,7 @@ import {
   clearTask,
   createAdultWork,
   digProgressOf,
+  digBout,
   isDigging,
   goalOf,
   stepAdultWork,
@@ -171,6 +172,9 @@ import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 import { Figure } from './placeFigure'
+import { Shovel } from './shovel'
+import { PRIMITIVE_CARRY_TILT } from './shovelHold'
+import type { FigureWork } from './placeFigureContext'
 import { DressLineup } from './dressLineup'
 import {
   ColdCloaksContext,
@@ -2711,6 +2715,11 @@ function ErrandVillagers({
   const fillRingMeshes = useRef<Array<THREE.Mesh | null>>([])
   const fillRingShown = useRef(false)
   const digTools = useRef<Array<THREE.Object3D | null>>([])
+  /** What each figure's hands are doing, for the glTF body's clips. */
+  const works = useRef<Array<RefObject<FigureWork>>>([])
+  /** The glTF body draws (and holds) its own shovel; the hand prop is for the
+   *  primitive and the code-built bodies. */
+  const gltfBody = !!useContext(FigureLookContext)?.villager
   /** A villager PINNED into the fill, by index and progress — the dev route the
    *  verification poses one by. The errand's own fill phase drives the live dip;
    *  this only overrides which man is held and how far along it is. Null
@@ -2780,6 +2789,9 @@ function ErrandVillagers({
       pause: number
       walked: number
       dug: number
+      /** Seconds the dig pose is still held after the rim test last passed
+       *  (a shove across the rim's edge must not flicker the stroke). */
+      digHold: number
       stuck: number
       route: NavPoint[] | null
       routeTo: NavPoint | null
@@ -2795,6 +2807,7 @@ function ErrandVillagers({
           pause: 1 + i * 0.7,
           walked: 0,
           dug: 0,
+          digHold: 0,
           stuck: 0,
           route: null,
           routeTo: null,
@@ -3093,9 +3106,13 @@ function ErrandVillagers({
       const headJar = headJars.current[i]
       const handJar = handJars.current[i]
       const digTool = digTools.current[i]
+      const figureWork = (works.current[i] ??= { current: { dig: false, tool: false } }).current
+      figureWork.tool = carry === 'digTool'
+      figureWork.dig = false
+      if (digTool) digTool.rotation.x = PRIMITIVE_CARRY_TILT
       if (headJar) headJar.visible = carry === 'fullJar'
       if (handJar) handJar.visible = carry === 'emptyJar'
-      if (digTool) digTool.visible = carry === 'digTool'
+      if (digTool) digTool.visible = carry === 'digTool' && !gltfBody
       const filling = pinned ? pinned.progress : dipping
       if (handJar) {
         // The dip TIPS the jar so its mouth goes into the water, never the
@@ -3118,6 +3135,7 @@ function ErrandVillagers({
         if (headJar) headJar.visible = false
         if (handJar) handJar.visible = true
         if (digTool) digTool.visible = false
+        figureWork.tool = false
         const dip = fillPose(filling)
         if (pose) {
           pose.left = dip.left
@@ -3125,11 +3143,20 @@ function ErrandVillagers({
           pose.lean = dip.lean
           pose.turn = dip.turn
         }
-      } else if (isDigging(work, i, view)) {
+      } else if (digBout(state, isDigging(work, i, view), !!task && task.phase === 'dig' && task.arrived, dt)) {
+        // THE STROKE HOLDS THROUGH A SHOVE (the dig flicker): a body pushed a
+        // hand's breadth across the rim's edge by its partner or a passer-by
+        // used to drop the dig pose for that frame, reset the stroke and swing
+        // its facing to its walking yaw — a flicker every time. `digBout` keeps
+        // the bout for VILLAGER_GLTF.transitionSeconds past the last frame on
+        // the rim, and the stroke's clock runs on through it.
         state.dug += dt
+        figureWork.dig = true
         const siteIndex = task?.siteIndex
         const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
         if (site) yaws.current[i] = Math.atan2(site.x - me.x, site.z - me.z)
+        // the shaft along the digging arm: the stroke drives the blade into the pit
+        if (digTool) digTool.rotation.x = 0
         const dig = digPose(state.dug, i * 0.37)
         if (pose) {
           pose.left = dig.left
@@ -3346,6 +3373,7 @@ function ErrandVillagers({
             cloth={cloth[i % cloth.length]}
             pose={poses.current[i]}
             limbs={limbs.current[i]}
+            work={(works.current[i] ??= { current: { dig: false, tool: false } })}
             squat={(squats.current[i] ??= { current: 1 })}
             headSteady={steadiedLoad('jar', { bottom: JAR_WAIST_R, top: JAR_RIM_R, height: JAR_HEIGHT })}
             headProp={
@@ -3388,16 +3416,9 @@ function ErrandVillagers({
                     digTools.current[i] = el
                   }}
                   visible={false}
-                  position={[0, -0.34, 0]}
+                  rotation={[PRIMITIVE_CARRY_TILT, 0, 0]}
                 >
-                  <mesh castShadow>
-                    <cylinderGeometry args={[0.027, 0.035, 1.05, 6]} />
-                    <meshStandardMaterial color="#654522" roughness={0.95} />
-                  </mesh>
-                  <mesh position={[0, -0.48, 0.07]} rotation={[0.28, 0, 0]} castShadow>
-                    <boxGeometry args={[0.28, 0.055, 0.18]} />
-                    <meshStandardMaterial color="#51483d" roughness={0.82} />
-                  </mesh>
+                  <Shovel />
                 </group>
               </>
             }
