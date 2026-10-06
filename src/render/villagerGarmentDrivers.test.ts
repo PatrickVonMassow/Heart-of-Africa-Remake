@@ -52,6 +52,16 @@ describe('garment drivers', () => {
     expect(d[names.indexOf('thigh.R+z')]).toBe(0)
   })
 
+  it('multiply a thigh swung forward and a knee bent back into their pair driver', () => {
+    const local = ident()
+    local[BONES.indexOf('thigh.L')].setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2)
+    local[BONES.indexOf('shin.L')].setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 6)
+    const d = garmentDrivers(BONES, local)
+    const names = garmentDriverNames()
+    expect(d[names.indexOf('thigh.L+z*shin.L-z')]).toBeCloseTo(0.5, 6)
+    expect(d[names.indexOf('thigh.L+z*shin.L+z')]).toBe(0)
+  })
+
   it('read a trunk bent sideways by half its lean', () => {
     const local = ident()
     local[BONES.indexOf('spine')].setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 6)
@@ -60,7 +70,7 @@ describe('garment drivers', () => {
   })
 
   it('cover every configured bone', () => {
-    expect(garmentDriverNames().length).toBe(1 + 4 * VILLAGER_ASSET.garmentDriverBones.length)
+    expect(garmentDriverNames().length).toBe(1 + 4 * VILLAGER_ASSET.garmentDriverBones.length + 4 * VILLAGER_ASSET.garmentDriverPairs.length)
   })
 })
 

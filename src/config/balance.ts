@@ -2601,6 +2601,18 @@ export const VILLAGER_ASSET = {
     ['shin.L', 'down'],
     ['shin.R', 'down'],
   ],
+  /** Bone pairs whose forward and backward swings multiply into further
+   *  drivers (four per pair): a hem the calf or the other leg swings into
+   *  depends on both bones at once. Calibratable. */
+  garmentDriverPairs: [
+    ['thigh.L', 'shin.L'],
+    ['thigh.R', 'shin.R'],
+    ['thigh.L', 'thigh.R'],
+    ['upperArm.L', 'forearm.L'],
+    ['upperArm.R', 'forearm.R'],
+    ['spine', 'thigh.L'],
+    ['spine', 'thigh.R'],
+  ],
   /** Most passes of the corrective fit (it stops once every garment is
    *  within tolerance). Calibratable. */
   garmentCorrectPasses: 60,
@@ -2614,6 +2626,12 @@ export const VILLAGER_ASSET = {
   /** The corrective fit stops after this many passes that left every
    *  vertex's worst depth where it was. Calibratable. */
   garmentCorrectStall: 4,
+  /** Each corrective pass first draws every vertex's shapes this far toward
+   *  its mesh neighbours' mean and shrinks them by garmentCorrectShrink, then
+   *  fits the nearest shapes meeting the constraints: the correction spreads
+   *  smoothly over the cloth instead of kinking single vertices. Calibratable. */
+  garmentCorrectSmooth: 0.5,
+  garmentCorrectShrink: 0.95,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive
