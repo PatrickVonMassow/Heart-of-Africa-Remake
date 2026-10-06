@@ -28,6 +28,27 @@ const ALLOW = new Map([
       'unit tests — that upgrade is its own work-order point, not a midnight bump ' +
       'that would leave the repository unpushable either way.',
   ],
+  [
+    'GHSA-5gmw-xhrv-c9v3',
+    'tinypool (prototype-pollution gadget to RCE in worker options): a DEV ' +
+      'dependency of vitest 3.2.7 that never enters the shipped bundle; the gadget ' +
+      'needs an already-polluted Object.prototype inside our own test process, ' +
+      'which runs only repository code. The only fix offered on 06.10.2026 is ' +
+      'vitest 4.1.11 (tinypool 2.x), the semver-major jump owned by point 1079.',
+  ],
+  [
+    'GHSA-85c8-ppgw-ccpr',
+    'tinypool (prototype-pollution gadget to RCE in run() options): same DEV-only ' +
+      'path and the same deferred fix as GHSA-5gmw-xhrv-c9v3 — vitest 4.1.11, ' +
+      'point 1079.',
+  ],
+  [
+    'GHSA-hp3w-g68c-fv3c',
+    'sprintf-js (DoS via unbounded precision specifiers): a TRANSITIVE Node dep of ' +
+      'kokoro-js (onnxruntime-node > global-agent > roarr), like sharp above NOT in ' +
+      'the browser bundle, and its format strings are fixed logging templates, not ' +
+      'player input. No upstream fix as of 06.10.2026 (1.1.3 is the latest release).',
+  ],
 ])
 
 let json
