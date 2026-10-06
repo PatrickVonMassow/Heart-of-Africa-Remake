@@ -188,15 +188,27 @@ class Body:
                     out[k] = p + n * (clearance - d)
         return out
 
-    def weights_at(self, pts):
-        """Data transfer: the body's weights at the nearest surface point."""
+    def weights_at(self, pts, lower_arms=True):
+        """Data transfer: the body's weights at the nearest surface point.
+        Without `lower_arms` the forearms and hands are left out of the
+        search: a robe's side beside the hanging hand took the hand's weights
+        and swung through the thigh with every arm swing and stroke."""
         out = np.zeros((len(pts), len(SK.NAMES)))
+        if lower_arms:
+            tree, tris = self.tree, self.tris
+        else:
+            if not hasattr(self, 'tree_trunk'):
+                from mathutils.bvhtree import BVHTree
+                keep = (self.lower_arm[self.tris] < 0.3).all(1)
+                self.tris_trunk = self.tris[keep]
+                self.tree_trunk = BVHTree.FromPolygons(self.v.tolist(), self.tris_trunk.tolist(), all_triangles=True)
+            tree, tris = self.tree_trunk, self.tris_trunk
         for k, p in enumerate(pts):
-            co, _n, fi, _d = self.tree.find_nearest(p)
-            a, b, c = self.v[self.tris[fi]]
+            co, _n, fi, _d = tree.find_nearest(p)
+            a, b, c = self.v[tris[fi]]
             from body import barycentric
             bc = barycentric(np.array(co), a, b, c)
-            out[k] = (self.W[self.tris[fi]] * bc[:, None]).sum(0)
+            out[k] = (self.W[tris[fi]] * bc[:, None]).sum(0)
         return out
 
 
@@ -603,10 +615,12 @@ def skirt_weights(v, W, crotch, hem):
     return W / W.sum(1, keepdims=True)
 
 
-def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None):
-    """Push the garment off the body, transfer weights, unpose to rest, bind the morphs."""
+def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False):
+    """Push the garment off the body, transfer weights, unpose to rest, bind the morphs.
+    Only a garment worn on the lower arm (`lower_arms`: the limb rings) takes
+    weights from the forearms and hands."""
     v = B.push_out(v, 0.007)
-    W = B.weights_at(v)
+    W = B.weights_at(v, lower_arms)
     if rigid_head:
         W[:] = 0
         W[:, SK.INDEX['head']] = 1
@@ -674,7 +688,7 @@ def build_garments(mh, body, clips, cfg):
         name = mesh_name(form, wear)
         crotch = L['hip'] - 0.03 * H
         skirt = (crotch, float(v[:, 1].min())) if form in SKIRTS and v[:, 1].min() < crotch else None
-        g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt)
+        g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings')
         g['part'] = 'garment'
         g['extras'] = {'form': form, 'wear': wear, 'bottom': float(v[:, 1].min())}
         meshes[name] = g
