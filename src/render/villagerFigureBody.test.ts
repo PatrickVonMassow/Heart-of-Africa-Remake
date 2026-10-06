@@ -237,6 +237,37 @@ describe('the dressed figure', () => {
     expect(fails).toEqual([])
   }, 120_000)
 
+  it('a sleeve keeps its arm weights under the trunk transfer: a raised arm carries its sleeve', () => {
+    const map = codeBoneMap(asset)
+    const arms = new Set(['L', 'R'].flatMap((s) => [`upperArm.${s}`, `forearm.${s}`, `hand.${s}`].map((n) => asset.bones.indexOf(n))))
+    let checked = 0
+    for (const { sex, age } of people()) {
+      const person = gltfPerson(asset, sex, age)
+      for (const table of Object.values(PEOPLE_DRESS)) {
+        for (const l of table[sex][age]) {
+          const g = buildLayerGeometry(l, person.p, 16)
+          if (!g) continue
+          remapSkin(g, map)
+          const before = Array.from(g.getAttribute('skinIndex').array as Uint16Array)
+          const wBefore = Array.from(g.getAttribute('skinWeight').array as Float32Array)
+          transferTrunkWeights(asset, person, g)
+          const si = g.getAttribute('skinIndex')
+          const sw = g.getAttribute('skinWeight')
+          for (let k = 0; k < si.count; k++) {
+            let armBefore = 0
+            for (let j = 0; j < 4; j++) if (arms.has(before[k * 4 + j])) armBefore += wBefore[k * 4 + j]
+            if (armBefore < 0.99) continue
+            let armAfter = 0
+            for (let j = 0; j < 4; j++) if (arms.has(si.getComponent(k, j))) armAfter += sw.getComponent(k, j)
+            expect(armAfter, `${l.form} ${sex} ${age} vertex ${k}`).toBeGreaterThan(armBefore - 0.01)
+            checked++
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+
   it('paints the scalp in the hair colour and the rest in the skin', () => {
     const person = gltfPerson(asset, 'male', 'elder')
     const g = gltfFigureGeometry(asset, person, [], '#5c3317', null, 16)

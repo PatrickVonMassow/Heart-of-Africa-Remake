@@ -420,7 +420,10 @@ export function transferTrunkWeights(asset: VillagerAsset, person: GltfPerson, g
     const x = pos.getX(k)
     const y = pos.getY(k)
     const z = pos.getZ(k)
-    const s = Math.min(1, (y - lo + fade) / fade, (hi + fade - y) / fade)
+    // a sleeve's share on the arm bones stays: only the rest moves to the trunk
+    let armShare = 0
+    for (let j = 0; j < 4; j++) if (arms.has(si.getComponent(k, j))) armShare += sw.getComponent(k, j)
+    const s = Math.min(1, (y - lo + fade) / fade, (hi + fade - y) / fade) * (1 - Math.min(1, armShare))
     if (s <= 0) continue
     let best = -1
     let d = Infinity
