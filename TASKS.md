@@ -95,6 +95,14 @@ put it is the mistake this line exists to stop.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
 
+- [ ] 1320. Villager garments: compress the baked garment offsets to a shippable size (split from 1314)
+  Queue position: directly after point 1319, ahead of point 1315.
+  Source: point 1314's round-3 author report 06.10.2026 (branch feat/1314-garment-pose-correction): scripts/villager/resolve.py bakes per-pose garment offsets (every clip frame, gait strides 0.75/1/1.35, 10 body corners) that bring every garment within the 0.003 tolerance, but the table holds 5.69 M vertex offsets, ~43 MiB even at 16-bit index plus three 16-bit floats; it lives only in the pipeline cache and is not exported.
+  Final state: the baked offsets export at a size fit for the startup budget, read by src/render/villagerGarmentBaked.ts, with the pipeline penetration step still green on the DECODED (shipped) offsets. Candidates to weigh by measurement: per-garment low-rank shape basis with per-frame weights plus a sparse remainder, fewer keyframes, dropping offsets below tolerance, 8-bit quantisation.
+  Verifiable: exported size measured and stated; penetration report on the decoded data all within tolerance; Vitest parity between pipeline check JSON and the game decoder.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
+
 - [ ] 1315. Villager garments: ship the measured pipeline garments on the glTF body (split from 1312)
   Queue position: directly after point 1314; needs its green penetration report.
   Source: point 1312 commit af2c25d42 (shipping on the glTF body: gltfGarment / gltfLayerGeometry, cachedGltfLayer, garment-carrying villager.glb, 41 Vitest cases in src/render/villager*), rolled back in cd0400571 because the garments still clipped.
