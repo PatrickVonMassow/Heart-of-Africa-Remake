@@ -272,6 +272,31 @@ describe('the dressed figure', () => {
     expect(mixed).toBeGreaterThan(0)
   })
 
+  it('a sleeve vertex with two small arm weights keeps both when its four slots overflow', () => {
+    const map = codeBoneMap(asset)
+    const person = gltfPerson(asset, 'female', 'adult')
+    const l = PEOPLE_DRESS[Object.keys(PEOPLE_DRESS)[0] as keyof typeof PEOPLE_DRESS].female.adult[0]
+    const g = remapSkin(buildLayerGeometry(l, person.p, 16)!, map)
+    const [ua, fa, chest] = ['upperArm.L', 'forearm.L', 'chest'].map((n) => asset.bones.indexOf(n))
+    const si = g.getAttribute('skinIndex')
+    const sw = g.getAttribute('skinWeight')
+    for (let k = 0; k < si.count; k++) {
+      si.setXYZW(k, ua, fa, chest, 0)
+      sw.setXYZW(k, 0.1, 0.1, 0.8, 0)
+    }
+    transferTrunkWeights(asset, person, g)
+    for (let k = 0; k < si.count; k++) {
+      let arm = 0
+      let sum = 0
+      for (let j = 0; j < 4; j++) {
+        if (si.getComponent(k, j) === ua || si.getComponent(k, j) === fa) arm += sw.getComponent(k, j)
+        sum += sw.getComponent(k, j)
+      }
+      expect(arm, `vertex ${k}`).toBeCloseTo(0.2, 5)
+      expect(sum, `vertex ${k}`).toBeCloseTo(1, 5)
+    }
+  })
+
   it('paints the scalp in the hair colour and the rest in the skin', () => {
     const person = gltfPerson(asset, 'male', 'elder')
     const g = gltfFigureGeometry(asset, person, [], '#5c3317', null, 16)

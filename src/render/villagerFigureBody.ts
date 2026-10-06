@@ -452,11 +452,16 @@ export function transferTrunkWeights(asset: VillagerAsset, person: GltfPerson, g
       const v = sw.getComponent(k, j)
       if (v > 0) w.set(b, (w.get(b) ?? 0) + (arms.has(b) ? v : v * (1 - band)))
     }
-    const top = [...w].sort((a, b) => b[1] - a[1]).slice(0, 4)
-    const sum = top.reduce((t, [, v]) => t + v, 0)
+    // four slots: the arm influences keep theirs, the largest others share the rest
+    const byWeight = [...w].sort((a, b) => b[1] - a[1])
+    const armSlots = byWeight.filter(([b]) => arms.has(b))
+    const others = byWeight.filter(([b]) => !arms.has(b)).slice(0, 4 - armSlots.length)
+    const armSum = armSlots.reduce((t, [, v]) => t + v, 0)
+    const otherSum = others.reduce((t, [, v]) => t + v, 0)
+    const top = [...armSlots, ...others.map(([b, v]): [number, number] => [b, (v / otherSum) * (1 - armSum)])]
     for (let j = 0; j < 4; j++) {
       si.setComponent(k, j, top[j]?.[0] ?? 0)
-      sw.setComponent(k, j, top[j] ? top[j][1] / sum : 0)
+      sw.setComponent(k, j, top[j]?.[1] ?? 0)
     }
   }
   si.needsUpdate = true
