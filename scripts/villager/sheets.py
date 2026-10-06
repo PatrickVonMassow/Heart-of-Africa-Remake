@@ -123,7 +123,7 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
                 gv[:, 2] += f * spacing - span / 2
             else:
                 gv[:, 0] += f * spacing - span / 2
-            R.add_mesh(f'f{f}-{n}', gv, g['tris'], GARMENT_COLOURS[k % len(GARMENT_COLOURS)])
+            R.add_mesh(f'f{f}-{n}', gv, garments['meshes'][n]['tris'], GARMENT_COLOURS[k % len(GARMENT_COLOURS)])
         if c.get('tool'):
             tv, tt = shovel_mesh(body, c['tool'], wr, wp, cfg_shovel(clips))
             if view == 'side':
