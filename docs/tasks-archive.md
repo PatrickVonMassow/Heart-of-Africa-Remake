@@ -33730,3 +33730,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   3. Tests that pin full compensation through an explicit 1.0 stay; a test that reads the balance value and expects equal north/south reach expects the half-compensation reach instead. No check is weakened.
   Tests: Vitest for the camera placement at 0.5 (reach ratio between the uncompensated 1.7 : 1 and 1 : 1; tilt unchanged); Playwright travel frames walking north and south and at a settlement edge on both backends (camera framing is backend-sensitive), judged by looking.
   Bundle: Steuerung & Performance.
+
+- [x] 1311. Villager glTF body: animation, dress and tool (split from 1294)
+  Queue position: directly after point 1294 (split 05.10.2026 under 1294's own rule; nothing goes ahead of 1294).
+  Source: point 1294, items 6 and 8-13, verbatim there; this point owns them from the split on. Author report: local/1294-author-report.md (open: garment penetration over tolerance, robe at kneel ~0.21 deep — rewrite the lost skirt-bone edit, exclude forearm/hand from the weight transfer; no-slide functions not wired; dig flicker not investigated; dig hook in PlaceLife.tsx; in-game tool is a hoe, make it a shovel; drop unused Quaternius UAL2 sources). Also charged here (review of 1294, 06.10.2026): scripts/villager/pipeline.py discards penetration.report()'s failure count, so the penetration step never fails over tolerance.
+  Split 06.10.2026: item 6 (garment penetration) moved to point 1312 under the split rule; this point no longer owns it.
+  Final state: 1294 items 8 (natural gait from retargeted clips, walk/sprint threshold in balance.ts), 9 (1295's achievements stay binding), 10 (tools held in the hand, never below ground), 11 (no flicker, jitter or jumps; blended transitions), 12 (judged by looking) and 13 (cross-vendor second pair of eyes on figures and frame sheets) hold on the body 1294 landed.
+  Deviation to confirm in the work: no reachable CC0 shovel clip was found, so the dig is authored in the pipeline.
+  Verifiable: 1294's "Verifiable (in addition …)" list for these items — Blender frame sheet of walk, sprint, dig and shovel-carry, the named Vitest cases, Playwright both backends picture-checked, the cross-vendor review record with its fixes.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
