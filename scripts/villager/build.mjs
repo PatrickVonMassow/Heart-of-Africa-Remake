@@ -17,7 +17,7 @@
 // Blender is never a build or runtime dependency: the game loads the committed
 // .glb files with three's GLTFLoader.
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
@@ -95,11 +95,17 @@ async function main() {
   const cfg = await pipelineConfig()
   const work = join(mainRoot(repo), 'local', 'villager-build')
   mkdirSync(work, { recursive: true })
-  const cfgPath = join(work, 'config.json')
+  // per invocation: a build in another worktree must not swap our balance values
+  const cfgPath = join(work, `config-${process.pid}.json`)
   writeFileSync(cfgPath, JSON.stringify(cfg, null, 1))
   const args = ['--src', src, '--config', cfgPath, '--out', join(repo, 'public', 'models'), '--work', work, '--verification', join(repo, 'verification', 'villager-body')]
   const step = cmd === 'all' ? 'all' : cmd
-  const status = runBlender([join(here, 'pipeline.py'), '--step', step, ...args, ...rest])
+  let status
+  try {
+    status = runBlender([join(here, 'pipeline.py'), '--step', step, ...args, ...rest])
+  } finally {
+    rmSync(cfgPath, { force: true })
+  }
   if (status !== 0) return status
   for (const f of ['villager.glb']) {
     const p = join(repo, 'public', 'models', f)

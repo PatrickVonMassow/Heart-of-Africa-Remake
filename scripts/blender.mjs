@@ -30,7 +30,7 @@ export const BLENDER_VERSION = '3.4.1+dfsg-2+b1'
 export const EXTRA_PACKAGES = ['python3-numpy']
 
 function sh(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20, ...opts })
+  const r = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20, windowsHide: true, ...opts })
   if (r.status !== 0 && !opts.allowFail) {
     throw new Error(`${cmd} ${args.join(' ')} failed (${r.status}):\n${r.stderr || r.stdout}`)
   }
@@ -64,7 +64,8 @@ export function packageClosure() {
     const m = /^Inst (\S+)/.exec(line)
     if (m) names.add(m[1])
   }
-  for (const n of ['libpython3.11-stdlib', 'libpython3.11-minimal', 'python3.11-minimal', 'libpython3.11']) names.add(n)
+  // apt omits what the host already has; the prefix needs these regardless
+  for (const n of [BLENDER_PACKAGE, ...EXTRA_PACKAGES, 'libpython3.11-stdlib', 'libpython3.11-minimal', 'python3.11-minimal', 'libpython3.11']) names.add(n)
   return [...names].sort()
 }
 
@@ -107,7 +108,7 @@ exec "$R/usr/bin/blender" "$@"
 /** `blender --version`'s first line, or null when it does not run. */
 export function probe(dir) {
   if (!existsSync(wrapperPath(dir))) return null
-  const r = spawnSync(wrapperPath(dir), ['-b', '--factory-startup', '--version'], { encoding: 'utf8' })
+  const r = spawnSync(wrapperPath(dir), ['-b', '--factory-startup', '--version'], { encoding: 'utf8', windowsHide: true })
   const line = (r.stdout || '').split('\n').find((l) => /^Blender \d/.test(l))
   return r.status === 0 && line ? line.trim() : null
 }
@@ -148,6 +149,7 @@ export function run(args) {
   if (!py) throw new Error('usage: node scripts/blender.mjs run <script.py> [args…]')
   const r = spawnSync(wrapperPath(dir), ['-b', '--factory-startup', '--python-exit-code', '1', '--python', resolve(py), '--', ...rest], {
     stdio: 'inherit',
+    windowsHide: true,
   })
   return r.status ?? 1
 }
