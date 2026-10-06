@@ -11,11 +11,28 @@ import { VILLAGER_ASSET } from '../config/balance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { clipPoseAt, toHung } from './villagerClipPose'
 import { gltfPerson } from './villagerFigureBody'
-import { garmentDriverNames, garmentDrivers } from './villagerGarmentDrivers'
+import { morphInfluences } from './villagerBody'
+import { garmentCorrection, garmentDriverNames, garmentDrivers } from './villagerGarmentDrivers'
 import { newPose } from './villagerRig'
 
 const BONES = ['hips', 'spine', 'chest', 'neck', 'head', 'upperArm.L', 'upperArm.R', 'forearm.L', 'forearm.R', 'thigh.L', 'thigh.R', 'shin.L', 'shin.R']
 const ident = () => BONES.map(() => new THREE.Quaternion())
+
+describe('garment correction', () => {
+  const v = (...x: number[]) => new Float32Array(x)
+
+  it('weights each shape by its driver and lets the body morphs move the shapes', () => {
+    const shapes = [v(1, 0, 0), v(0, 2, 0)]
+    const morphs = { female: [v(0, 0, 1), v(0, 0, 0)], child: [v(0, 0, 0), v(1, 1, 1)] }
+    const out = garmentCorrection(shapes, morphs, { female: 1, child: 0.5 }, [1, 0.5])
+    expect(Array.from(out)).toEqual([1 + 0.25, 1 + 0.25, 1 + 0.25])
+  })
+
+  it('is zero with every driver zero', () => {
+    const out = garmentCorrection([v(1, 2, 3)], { female: [v(4, 5, 6)] }, { female: 1 }, [0])
+    expect(Array.from(out)).toEqual([0, 0, 0])
+  })
+})
 
 describe('garment drivers', () => {
   it('are the constant alone at the hung rest', () => {
@@ -69,6 +86,27 @@ describe('garment drivers against the pipeline', () => {
       toHung(asset, person.frame, pose, local, new THREE.Vector3())
       const d = garmentDrivers(asset.bones, local)
       p.drivers.forEach((x, k) => expect(d[k], `${p.clip} ${p.frame} ${check.names[k]}`).toBeCloseTo(x, 4))
+    }
+  })
+
+  it("reproduce the pipeline's corrective offsets on the adult man and the girl", () => {
+    type Corner = { sex: 'male' | 'female'; age: 'child' | 'youth' | 'adult' | 'elder'; poses: { clip: string; frame: number; drivers: number[]; offsets: number[][] }[] }
+    const check = JSON.parse(readFileSync(CHECK, 'utf8')) as {
+      correction: { garment: string; vertices: number[]; shapes: number[][][]; morphs: Record<string, number[][][]>; corners: Corner[] } | null
+    }
+    const c = check.correction
+    expect(c, 'the pipeline wrote no corrective sample').toBeTruthy()
+    if (!c) return
+    const flat = (k: number[][]) => new Float32Array(k.flat())
+    const shapes = c.shapes.map(flat)
+    const morphs = Object.fromEntries(Object.entries(c.morphs).map(([m, s]) => [m, s.map(flat)]))
+    expect(c.corners.length).toBe(2)
+    for (const corner of c.corners) {
+      const infl = morphInfluences(corner.sex, corner.age, 0)
+      for (const p of corner.poses) {
+        const out = garmentCorrection(shapes, morphs, infl, p.drivers)
+        p.offsets.flat().forEach((x, i) => expect(out[i], `${corner.sex} ${corner.age} ${p.clip} ${p.frame} [${i}]`).toBeCloseTo(x, 4))
+      }
     }
   })
 })

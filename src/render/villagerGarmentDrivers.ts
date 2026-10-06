@@ -47,3 +47,31 @@ export function garmentDrivers(
   })
   return out
 }
+
+/**
+ * A garment's corrective offsets in its hung, baked frame for one pose on one
+ * person: Σ_k driver_k · (shape_k + Σ_m influence_m · shapeMorph_m,k), the
+ * shapes following the body morphs as the garment does
+ * (scripts/villager/correct.py `person_shapes`). `shapes[k]` and
+ * `morphs[m][k]` are vertices × 3, flat; writes `out` and returns it.
+ */
+export function garmentCorrection(
+  shapes: readonly Float32Array[],
+  morphs: Readonly<Record<string, readonly Float32Array[]>>,
+  influences: Readonly<Record<string, number>>,
+  drivers: ArrayLike<number>,
+  out = new Float32Array(shapes[0]?.length ?? 0),
+): Float32Array {
+  out.fill(0)
+  const add = (src: Float32Array, w: number) => {
+    if (!w) return
+    for (let i = 0; i < out.length; i++) out[i] += w * src[i]
+  }
+  shapes.forEach((s, k) => add(s, drivers[k]))
+  for (const [m, w] of Object.entries(influences)) {
+    const sm = morphs[m]
+    if (!sm || !w) continue
+    sm.forEach((s, k) => add(s, w * drivers[k]))
+  }
+  return out
+}
