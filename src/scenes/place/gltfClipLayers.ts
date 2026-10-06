@@ -37,6 +37,11 @@ export interface ClipLayers {
   /** Layer weights, eased toward the work. */
   dig: number
   carry: number
+  /** Per arm (left, right), how far the clips own it: eased toward `free`
+   *  as the last applyClipLayers found it, so a hand taken for a gesture or a
+   *  contact (or given back) blends between the clip and the code. */
+  arms: [number, number]
+  free: [boolean, boolean]
   /** Seconds into the dig clip (a loop), and the carry-idle clip. */
   digT: number
   idleT: number
@@ -54,6 +59,8 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     ground: null,
     dig: 0,
     carry: 0,
+    arms: [1, 1],
+    free: [true, true],
     digT: 0,
     idleT: 0,
     pose: newPose(n),
@@ -88,6 +95,7 @@ export function stepClipLayers(
   c.carry = ease(c.carry, work?.tool && (!work.dig || c.dig < 1) ? 1 : 0, dt)
   // the stroke starts from its top when the dig begins, and runs on while it fades
   c.digT = c.dig > 0 ? c.digT + dt : 0
+  c.arms = [ease(c.arms[0], c.free[0] ? 1 : 0, dt), ease(c.arms[1], c.free[1] ? 1 : 0, dt)]
   c.idleT += dt
 }
 
@@ -113,7 +121,8 @@ function blendHips(bones: Record<string, THREE.Bone>, hips: THREE.Vector3, w: nu
 /**
  * Write the layers onto the bones, after the code-built pose has been written
  * (so each layer blends from it). `free` says which arm (left, right) the code
- * left hanging — only those take the gait's swing and the carry.
+ * left hanging — those take the gait's swing and the carry, eased in and out
+ * over the transition as an arm is taken or given back (`ClipLayers.arms`).
  */
 export function applyClipLayers(
   asset: VillagerAsset,
@@ -128,6 +137,7 @@ export function applyClipLayers(
   const h = asset.parents.indexOf(-1)
   bones.hips.position.x = person.rest[h * 3]
   bones.hips.position.z = person.rest[h * 3 + 2]
+  c.free = [free[0], free[1]]
   const f = person.frame
   const walking = m.weight * (1 - m.kneel)
   // Each layer blends from what the one below left, so the dig eases in from
@@ -140,14 +150,14 @@ export function applyClipLayers(
     const w = walking
     blendInto(asset, bones, LEGS, c.local, w)
     blendHips(bones, c.hips, w)
-    if (free[0]) blendInto(asset, bones, ARM('L'), c.local, w)
-    if (free[1] && c.carry < 1) blendInto(asset, bones, ARM('R'), c.local, w)
+    blendInto(asset, bones, ARM('L'), c.local, w * c.arms[0])
+    if (c.carry < 1) blendInto(asset, bones, ARM('R'), c.local, w * c.arms[1])
   } else {
     // standing: the feet are where they stand, nothing held for the next walk
     releaseClipGait(c.gait)
   }
   // THE SHOVEL CARRIED: the right arm from the carry, in step with the gait
-  if (c.carry > 0 && under && free[1]) {
+  if (c.carry > 0 && under && c.arms[1] > 0) {
     samplePhase(asset.clips.carry, c.gait.phase, f, c.pose2)
     clipPoseAt(asset, f, asset.clips.carryIdle, c.idleT % asset.clips.carryIdle.duration, c.pose3)
     blendPoses(
@@ -158,7 +168,7 @@ export function applyClipLayers(
       c.pose,
     )
     toHung(asset, f, c.pose, c.local, c.hips)
-    blendInto(asset, bones, ARM('R'), c.local, c.carry)
+    blendInto(asset, bones, ARM('R'), c.local, c.carry * c.arms[1])
   }
   // THE DIG, on the whole body
   if (c.dig > 0) {
