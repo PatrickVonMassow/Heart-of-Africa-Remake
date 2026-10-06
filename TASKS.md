@@ -84,6 +84,15 @@ put it is the mistake this line exists to stop.
   Verifiable: penetration report all within tolerance and the pipeline step green; dressed frame sheets walking, kneeling and digging without visible clipping; Vitest for any game-side correction; cross-vendor review record.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
+  Split 06.10.2026: body parts showing through a garment face (knees through the robe in walk, through the trousers in dig) are not seen by the garment-inside-body measurement; that direction moved to point 1319.
+
+- [ ] 1319. Villager garments: measure and remove body showing through a garment face (split from 1314)
+  Queue position: directly after point 1314.
+  Source: point 1314's author report 06.10.2026 (branch feat/1314-garment-pose-correction): penetration.py tests only garment vertices inside the body; in verification/villager-body/dress-walk-* the knees show through the robe and in dress-dig-* through the trousers although both measure clean.
+  Final state: the pipeline penetration report also measures body vertices outside an enclosing garment surface (same game skinning path, same 0.003 tolerance), the correction removes them, and the step stays green.
+  Verifiable: the extended report all within tolerance; dressed frame sheets walking, kneeling and digging without visible clipping on both backends; Vitest for any game-side change; cross-vendor review record.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
 
 - [ ] 1315. Villager garments: ship the measured pipeline garments on the glTF body (split from 1312)
   Queue position: directly after point 1314; needs its green penetration report.
