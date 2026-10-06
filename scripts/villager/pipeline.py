@@ -77,7 +77,7 @@ def main():
         import correct as CR
         base = garments
         garments = cached(a.work, 'corrected', lambda: CR.correct(body, clips, base, cfg), force=any(s in steps for s in ('correct', 'garments')))
-        CR.driver_check(a.verification, body, clips, cfg)
+        CR.driver_check(a.verification, body, clips, cfg, garments)
     if 'export' in steps:
         import export as E
         # The game still draws the code-built dress on the glTF body (render/

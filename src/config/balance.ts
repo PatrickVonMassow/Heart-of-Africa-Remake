@@ -2607,10 +2607,13 @@ export const VILLAGER_ASSET = {
   /** The most one corrective shape moves a garment vertex along one axis
    *  (figure units): bounds a vertex whose constraints contradict each other.
    *  Calibratable. */
-  garmentCorrectCap: 0.08,
+  garmentCorrectCap: 0.15,
   /** How many of the frames a garment vertex violates most each corrective
    *  pass adds to its constraints. Calibratable. */
   garmentCorrectFrames: 24,
+  /** The corrective fit stops after this many passes that left every
+   *  vertex's worst depth where it was. Calibratable. */
+  garmentCorrectStall: 4,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

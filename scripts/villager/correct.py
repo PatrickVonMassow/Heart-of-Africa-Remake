@@ -286,6 +286,7 @@ def correct(body, clips, garments, cfg, passes=None, corners=None, names=None, w
     best = {n: (np.full(C * V[n], np.inf), shapes[n].copy()) for n in V}
     cons = {n: Constraints() for n in V}
     live = {n: np.arange(V[n]) for n in V}
+    stall, last = 0, np.inf
     for it in range(passes + 1):
         active = {n: (live[n], shapes[n].reshape(C, V[n], K, 3)[:, live[n]]) for n in V}
         deep, new = sweep(active, workers, A['garmentCorrectFrames'])
@@ -299,7 +300,10 @@ def correct(body, clips, garments, cfg, passes=None, corners=None, names=None, w
         log(f'correct pass {it + 1}: {sum(len(v) for v in live.values())} vertices measured, deepest {max(over.values()):.4f}, '
             f'{sum(v > tol for v in over.values())} garments over {tol}; '
             + ', '.join(f'{n[2:]} {over[n]:.3f}/{int((best[n][0] > tol).sum())}' for n in V if over[n] > tol))
-        if it == passes or all(v <= tol for v in over.values()):
+        worst = sum(float(np.maximum(b[0] - tol, 0).sum()) for b in best.values())
+        stall = stall + 1 if worst >= last - 1e-6 else 0
+        last = min(last, worst)
+        if it == passes or all(v <= tol for v in over.values()) or stall >= A['garmentCorrectStall']:
             break
         for n in V:
             if n not in new:
@@ -310,10 +314,10 @@ def correct(body, clips, garments, cfg, passes=None, corners=None, names=None, w
             unit = ci * V[n] + live[n][lv]
             now = np.einsum('ck,cki,ci->c', drv[f], shapes[n][unit], u)
             cons[n].add(unit, f, u, now + need)
-            res, sw = cons[n].solve(shapes[n], drv, cap)
-            if res > 1e-4:
-                log(f'  {n[2:]}: {len(cons[n].v)} constraints, residual {res:.4f} after {sw} sweeps')
-            live[n] = np.unique(cons[n].v % V[n])
+            was = shapes[n].copy()
+            cons[n].solve(shapes[n], drv, cap)
+            moved = np.abs(shapes[n] - was).max(axis=(1, 2)) > 1e-7
+            live[n] = np.unique(np.nonzero(moved)[0] % V[n])
     morphs, inv = corner_basis(corners)
     for n in V:
         per = best[n][1].reshape(C, V[n], K, 3).transpose(0, 2, 1, 3)
@@ -324,18 +328,38 @@ def correct(body, clips, garments, cfg, passes=None, corners=None, names=None, w
     return garments
 
 
+CHECK_GARMENT = 'g-robe-chest'
 CHECK_POSES = (('kneelDown', 0), ('kneelDown', 11), ('kneelDown', 22), ('dig', 20), ('dig', 44), ('walk', 5), ('carry', 10), ('kneelUp', 8))
 
 
-def driver_check(out, body, clips, cfg):
-    """The drivers of a few clip frames on the adult man, for the game's own
-    evaluation to be checked against (villagerGarmentDrivers.test.ts)."""
+def driver_check(out, body, clips, cfg, garments=None):
+    """The drivers of a few clip frames, for the game's own evaluation to be
+    checked against (villagerGarmentDrivers.test.ts): on the adult man, and
+    with the corrective offsets of a garment's most corrected vertices on
+    the adult man and the girl."""
     import json
-    pos, j = morphed(body, corner_weights('male', 'adult'))
-    person = GP.Person(j)
     rows = []
-    for cname, f in CHECK_POSES:
-        c = clips['clips'][cname]
-        wr, _wp = rig.fk(j, c['q'][f], c['hips'][f])
-        rows.append({'clip': cname, 'frame': f, 'drivers': [round(float(x), 6) for x in drivers(person, wr, cfg)]})
-    json.dump({'names': driver_names(cfg), 'poses': rows}, open(os.path.join(out, 'garment-drivers-check.json'), 'w'), indent=1)
+    sample = None
+    g = garments['meshes'].get(CHECK_GARMENT) if garments else None
+    if g is not None and g.get('shapes') is not None:
+        ids = np.argsort(-np.abs(g['shapes']).sum(axis=(0, 2)) - sum(np.abs(x).sum(axis=(0, 2)) for x in g['shape_morphs'].values()))[:6]
+        r6 = lambda a: np.round(a, 6).tolist()  # noqa: E731
+        sample = {'garment': CHECK_GARMENT, 'vertices': ids.tolist(), 'shapes': r6(g['shapes'][:, ids]),
+                  'morphs': {m: r6(x[:, ids]) for m, x in g['shape_morphs'].items()}, 'corners': []}
+    for sex, age in (('male', 'adult'), ('female', 'child')):
+        w = corner_weights(sex, age)
+        _pos, j = morphed(body, w)
+        person = GP.Person(j)
+        poses = []
+        for cname, f in CHECK_POSES:
+            c = clips['clips'][cname]
+            wr, _wp = rig.fk(j, c['q'][f], c['hips'][f])
+            a = drivers(person, wr, cfg)
+            if (sex, age) == ('male', 'adult'):
+                rows.append({'clip': cname, 'frame': f, 'drivers': [round(float(x), 6) for x in a]})
+            if sample:
+                poses.append({'clip': cname, 'frame': f, 'drivers': [round(float(x), 6) for x in a],
+                              'offsets': np.round(np.einsum('k,kvi->vi', a, person_shapes(g, w)[:, sample['vertices']]), 6).tolist()})
+        if sample:
+            sample['corners'].append({'sex': sex, 'age': age, 'poses': poses})
+    json.dump({'names': driver_names(cfg), 'poses': rows, 'correction': sample}, open(os.path.join(out, 'garment-drivers-check.json'), 'w'), indent=1)
