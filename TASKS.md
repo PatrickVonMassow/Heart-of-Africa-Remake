@@ -83,6 +83,15 @@ put it is the mistake this line exists to stop.
   Final state: the pipeline penetration report also measures body vertices outside an enclosing garment surface (same game skinning path, same 0.003 tolerance), the correction removes them, and the step stays green.
   Verifiable: the extended report all within tolerance; dressed frame sheets walking, kneeling and digging without visible clipping on both backends; Vitest for any game-side change; cross-vendor review record.
   Criticality: high — every villager, both backends.
+  Split 07.10.2026 (author round 1): the knee show-through is fixed; the 13 thin-limb cases (cloth sheet cut through a calf or arm) and the wrapLong back patches moved to point 1322, which 1319 hands over by name in its report.
+  Bundle: Dorfleben.
+
+- [ ] 1322. Villager garments: cloth cut through a thin limb must not show the body (split from 1319)
+  Queue position: directly after point 1319, ahead of point 1320.
+  Source: point 1319's author report 07.10.2026 (branch feat/1319-garment-face-penetration): the body-outside-garment measure leaves 13 of 186,240 checks over 0.003, all where a sheet of cloth cuts through a thin limb (a calf kicked back in sprint, toga, hood dig, shirt kneelUp) and covering one side pushes the cloth into the body: wrapLong-chest 0.0132, toga 0.0072, wrapLong-waist 0.0046, robe 0.0045, hood 0.0040, shirt 0.0039, skirtKnee 0.0032. Also skin patches on the back in wrapLong sprint that the measure does not catch yet.
+  Final state: the correction resolves a cloth sheet crossing a thin limb (the limb carries the cloth on its outside), the measure catches the wrapLong back patches, and the penetration step is green with no case handed over by point 1319 left.
+  Verifiable: penetration report all within tolerance without exemptions; dressed sprint, dig and kneel frame sheets without body through cloth on both backends; cross-vendor review record.
+  Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
 
 - [ ] 1320. Villager garments: compress the baked garment offsets to a shippable size (split from 1314)
