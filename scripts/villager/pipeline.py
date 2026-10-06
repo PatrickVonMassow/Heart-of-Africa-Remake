@@ -37,12 +37,28 @@ def args():
     return p.parse_args(argv)
 
 
-def cached(work, name, make, force=False):
+def inputs(work, names, cfg):
+    """A digest of the cached steps `names` (their .pkl bytes) and the config."""
+    import hashlib
+    h = hashlib.sha256(json.dumps(cfg, sort_keys=True).encode())
+    for n in names:
+        h.update(open(os.path.join(work, n + '.pkl'), 'rb').read())
+    return h.hexdigest()
+
+
+def cached(work, name, make, force=False, key=None):
+    """A step's result from `work`, built when absent, forced, or — with a
+    `key` (inputs) — built from other inputs than the cached one."""
     path = os.path.join(work, name + '.pkl')
     if os.path.exists(path) and not force:
-        return pickle.load(open(path, 'rb'))
+        v = pickle.load(open(path, 'rb'))
+        if key is None or v.get('_inputs') == key:
+            return v
+        print(f'[{name}] cached from other inputs: rebuilding')
     t = time.time()
     v = make()
+    if key is not None:
+        v['_inputs'] = key
     pickle.dump(v, open(path, 'wb'))
     print(f'[{name}] built in {time.time() - t:.1f}s')
     return v
@@ -76,7 +92,11 @@ def main():
     if garments is not None:
         import resolve as RS
         fitted = garments
-        garments = cached(a.work, 'resolved', lambda: RS.resolve(body, clips, fitted, cfg), force=any(s in steps for s in ('garments', 'resolve')))
+        # rebuilt whenever the body, clips, fitted garments or config it was
+        # resolved from differ (a clips rebuild changes the poses it is keyed by)
+        garments = cached(a.work, 'resolved', lambda: RS.resolve(body, clips, fitted, cfg), force='resolve' in steps,
+                          key=inputs(a.work, ('body', 'clips', 'garments'), cfg))
+        RS.check_table(garments, clips, cfg)
         RS.baked_check(a.verification, clips, garments)
     if 'export' in steps:
         import export as E

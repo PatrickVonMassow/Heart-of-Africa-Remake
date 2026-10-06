@@ -8,10 +8,10 @@ cloth in every other pose (measured 06.10.2026: 8 of 32 garments still over
 tolerance after 60 passes). So every pose the report measures (each clip
 frame, a gait's at each measured stride, on each body corner) is resolved on
 its own: the garment drawn along the game's path (gamepath.py) is pushed out
-of the skinned body (along the nearest surface's normal, the push spread to
-its mesh ring; a vertex pushed back and forth, or on a crease, moved along
-its shortest way out instead) and above the ground, and the push is taken
-back into the hung, baked frame, where the game adds it like a morph target:
+of the skinned body (inside judged by the winding number for every vertex,
+pushed towards its nearest surface point, the push spread to its mesh ring;
+a vertex pushed back and forth moved along its shortest way out instead)
+and above the ground, and the push is taken back into the hung, baked frame, where the game adds it like a morph target:
 
     drawn = skin(baked + offset(clip, frame, stride, corner))
 
@@ -30,7 +30,7 @@ import gamepath as GP
 import rig
 from body import top4
 from export import EXPORT_CLIPS
-from fit import depths, garment_pos, inside
+from fit import depths, garment_pos
 from gltfio import qmat
 from sheets import corner_weights, morphed
 
@@ -117,35 +117,27 @@ def _spread(D, ring, rounds):
     return D
 
 
-def _strict(tree, pts, goal):
-    """fit.depths, but a point whose nearest surface point lies on a crease
-    (the offset to it not along the face's normal: two faces meet there and
-    either may be reported) is judged by the winding number alone: inside, it
-    is as deep as it is far from the surface, and has no push direction
-    (zero normal) — measured 06.10.2026, a point 0.006 inside read 0.006 deep
-    or 0.0057 outside depending on which face the nearest query returned."""
-    d, co, nrm = depths(tree, pts, 0.0)
-    dist = np.linalg.norm(pts - co, axis=1)
-    odd = np.nonzero((dist > goal) & (d <= goal) & (np.abs(d) < 0.995 * dist) & (dist < 0.05))[0]
-    for k in odd:
-        if inside(tree, pts[k].tolist()):
-            d[k] = dist[k]
-            nrm[k] = 0.0
-    return d, nrm
+def _depth(tree, pts):
+    """fit.depths (inside by the winding number, depth = distance to the
+    surface) and, per point, its way out: towards its nearest surface point
+    (the face normal where it lies on the surface)."""
+    d, co, nrm = depths(tree, pts)
+    dist = np.abs(d)[:, None]
+    out = np.where(dist > 1e-9, (co - pts) / np.maximum(dist, 1e-12), nrm)
+    return d, out
 
 
 def _way_out(tree, p, clear, floor, dirs=_DIRS, reach=0.15):
     """The shortest step out of the body for a point inside (or nearer than
-    `clear`): along each direction the first sample whose depth is below
-    −clear, the nearest of them."""
-    steps = np.arange(1, int(reach / 0.0025) + 1) * 0.0025
-    cand = p[None, None, :] + dirs[:, None, :] * steps[None, :, None]
-    flat = cand.reshape(-1, 3)
-    d, _n = _strict(tree, flat, clear)
-    ok = (d.reshape(len(dirs), len(steps)) <= -clear) & (cand[..., 1] >= floor)
-    first = np.where(ok.any(1), ok.argmax(1), len(steps))
-    k = int(first.argmin())
-    return None if first[k] == len(steps) else dirs[k] * steps[first[k]]
+    `clear`): the shortest step along any of `dirs` that lands at least
+    `clear` outside and above the ground, searched outward step by step."""
+    for s in np.arange(1, int(reach / 0.0025) + 1) * 0.0025:
+        cand = p[None, :] + dirs * s
+        d, _o = _depth(tree, cand)
+        ok = np.nonzero((d <= -clear) & (cand[:, 1] >= floor))[0]
+        if len(ok):
+            return dirs[ok[0]] * s
+    return None
 
 
 def _sphere(n):
@@ -183,7 +175,7 @@ def _resolve(fi):
         check = np.arange(len(w0))
         for _r in range(S['rounds']):
             pts = w0[check] + D[check]
-            d, nrm = _strict(tree, pts, goal)
+            d, nrm = _depth(tree, pts)
             under = floor - pts[:, 1]
             bad = (d > goal) | (under > 0)
             if not bad.any():
@@ -194,8 +186,8 @@ def _resolve(fi):
             v = check[bad]
             tries[v] += 1
             for k in np.nonzero(bad)[0]:
-                # pushed back and forth, or no direction: the shortest way out instead
-                if tries[check[k]] >= 3 or (d[k] > goal and not nrm[k].any()):
+                # pushed back and forth: the shortest way out instead
+                if tries[check[k]] >= 3:
                     w = _way_out(tree, pts[k], clear, floor)
                     if w is not None:
                         push[k] = w
@@ -207,17 +199,14 @@ def _resolve(fi):
             check = moved
         # what the rounds left: each such vertex alone along its shortest way
         # out, judged on the positions the game draws from the stored offsets
-        # (float32, skinned again) and also by the report's own test
-        # (penetration.py: a crease's two faces make the nearest query
-        # flip on the last bits of a position)
+        # (float32, skinned again) by the report's own test (penetration.py)
         A = np.einsum('vk,vkij->vij', gw, R[gi])
         Ainv = np.linalg.inv(A)
         for _r in range(6):
             off = np.einsum('vij,vj->vi', Ainv, D).astype(np.float32)
             pts = person.skin(gh[n] + off, gi, gw, wr, wp)
-            d, _n = _strict(tree, pts, goal)
-            dm, _co, _nm = depths(tree, pts, tol)
-            bad = np.nonzero((d > goal) | (dm > goal) | (pts[:, 1] < floor))[0]
+            d, _o = _depth(tree, pts)
+            bad = np.nonzero((d > goal) | (pts[:, 1] < floor))[0]
             if not len(bad):
                 break
             for v in bad:
@@ -255,10 +244,28 @@ def resolve(body, clips, garments, cfg, corners=None, names=None, workers=None, 
             ids_p.append([g[0] for g in got])
             off_p.append([g[1] for g in got])
             total += sum(len(g[0]) for g in got)
-        G[n]['baked'] = {'keys': keys, 'ids': ids_p, 'off': off_p, 'morphs': morphs, 'basis': inv}
+        G[n]['baked'] = {'keys': keys, 'ids': ids_p, 'off': off_p, 'morphs': morphs, 'basis': inv, 'corners': list(corners)}
     log(f'resolve: {total} baked vertex offsets over {P} poses, {C} corners and {len(_S["names"])} garments '
         f'(≈ {total * 8 / 2**20:.1f} MiB at a 16-bit index and three 16-bit floats each)')
     return garments
+
+
+def check_table(garments, clips, cfg):
+    """Fail loud when a garment's baked table does not belong to these clips
+    and body corners: its pose keys must be exactly the poses measured now
+    (clip, frame, stride, in order) and its corners the report's. Returns
+    the key → pose index map."""
+    from penetration import CORNERS
+    want = [(c, f, k) for c, f, k, _q, _h in GP.poses(clips, EXPORT_CLIPS, cfg)]
+    for n, g in garments['meshes'].items():
+        b = g.get('baked') if n.startswith('g-') else None
+        if b is None:
+            continue
+        if list(b['keys']) != want:
+            raise ValueError(f'baked offsets of {n}: {len(b["keys"])} pose keys do not match the {len(want)} poses of the current clips (rebuild step resolve)')
+        if list(b.get('corners', ())) != list(CORNERS):
+            raise ValueError(f'baked offsets of {n}: corners {b.get("corners")} are not the report\'s {CORNERS} (rebuild step resolve)')
+    return {key: i for i, key in enumerate(want)}
 
 
 def corner_blend(b, weights):

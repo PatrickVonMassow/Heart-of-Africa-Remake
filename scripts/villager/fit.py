@@ -72,22 +72,28 @@ def winding(tree, p, d, hits=64):
 
 
 def inside(tree, p):
-    """Inside the body by the winding number on two of three rays. The sign of
-    the nearest face's normal alone is no inside test: near a toe tip, a
-    finger or the crotch it calls points outside the body inside (measured
-    06.10.2026: up to 0.19 deep on points no ray found inside)."""
-    return sum(1 for d in RAYS if winding(tree, p, d) > 0) >= 2
+    """Inside the body by the winding number on two of three rays (the third
+    cast only when the first two disagree). The sign of the nearest face's
+    normal alone is no inside test: near a toe tip, a finger or the crotch it
+    calls points outside the body inside (measured 06.10.2026: up to 0.19
+    deep on points no ray found inside), and on a crease or where two body
+    parts cross it calls points inside the body outside."""
+    a = winding(tree, p, RAYS[0]) > 0
+    if a == (winding(tree, p, RAYS[1]) > 0):
+        return a
+    return winding(tree, p, RAYS[2]) > 0
 
 
-def depths(tree, pts, floor):
-    """Signed depth of every point inside the body (negative: outside), the
-    sign checked by the winding number wherever the depth exceeds `floor`."""
+def depths(tree, pts):
+    """Signed depth of every point inside the body (negative: outside): its
+    distance to the body's surface, inside or outside decided for EVERY point
+    by the winding number (`inside`) — never by the nearest face's normal,
+    which a crease or two crossing body parts flip. Also returns the nearest
+    surface points and their face normals."""
     co, nrm = nearest(tree, pts)
-    d = -np.einsum('ij,ij->i', pts - co, nrm)
-    for k in np.nonzero(d > max(floor, 0.0))[0]:
-        if not inside(tree, pts[k].tolist()):
-            d[k] = -d[k]
-    return d, co, nrm
+    dist = np.linalg.norm(pts - co, axis=1)
+    ins = np.fromiter((inside(tree, p) for p in pts.tolist()), bool, len(pts))
+    return np.where(ins, dist, -dist), co, nrm
 
 
 def neighbours(n, tris, verts):
