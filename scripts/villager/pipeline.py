@@ -9,6 +9,7 @@
   sheets      frame sheets under verification/villager-body/
   penetration the per-frame garment penetration report; the run FAILS (exit 1)
               when any garment lies deeper than the tolerance in any frame
+  selftest    the fit loop's own check (also run before every garments step)
   all         every step in order
 """
 import argparse
@@ -52,6 +53,11 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     os.makedirs(a.verification, exist_ok=True)
     steps = ['body', 'clips', 'garments', 'export', 'sheets', 'penetration'] if a.step == 'all' else a.step.split(',')
+    if 'garments' in steps or 'selftest' in steps:
+        import fit as F
+        F.selftest()
+    if steps == ['selftest']:
+        return
     from mhbody import MakeHuman
     mh = MakeHuman(a.src)
     import body as B
