@@ -33749,3 +33749,14 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: report per garment no deeper than the split state; dressed frame sheets present; cheap gate green; cross-vendor review record.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
+
+- [x] 1314. Villager garments: pose-driven correction to zero penetration (split from 1312)
+  Queue position: directly after point 1312.
+  Source: point 1312's author report 06.10.2026 (branch feat/1312-pipeline-garments): the rest-pose fit does not converge; zero penetration needs a pose-driven mechanism. Candidates to weigh by measurement, not a closed list: corrective garment morphs driven by leg/arm joint angles, evaluated identically in scripts/villager/penetration.py and the game; hiding body triangles fully covered by an opaque garment. Also owned here: penetration.py skins once while the game hangs the body into its rest pose, skins again and warps the stride with IK — the measurement must see what the game draws.
+  Final state: 1294 item 6 holds in the pipeline — the per-frame penetration report is zero beyond the 0.003 tolerance for every garment, clip and body corner, the pipeline penetration step is green, and the measurement uses the game's own skinning path.
+  Verifiable: penetration report all within tolerance and the pipeline step green; dressed frame sheets walking, kneeling and digging without visible clipping; Vitest for any game-side correction; cross-vendor review record.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
+  Split 06.10.2026: body parts showing through a garment face (knees through the robe in walk, through the trousers in dig) are not seen by the garment-inside-body measurement; that direction moved to point 1319.
+  Split 06.10.2026 (picture check): an inner garment showing through an outer one (the elder's shirt through the cloak in dress-dig-*) is not measured garment against garment; that direction moved to point 1321. 1314 keeps garment-inside-body.
+  Round 2 result 06.10.2026 (tip d329213cb): 24/32 garments within tolerance; pairwise drivers, smoothing and a ground bound left the knee skirts at 0.013, the kneel hem pinched between thigh and calf. Linear corrective shapes cannot reach zero without a flare; round 3 pursues per-clip-frame baked, collision-resolved garment vertex animation played back identically in the game.
