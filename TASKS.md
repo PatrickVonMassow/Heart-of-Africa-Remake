@@ -100,6 +100,7 @@ put it is the mistake this line exists to stop.
   Verifiable (in addition to 1294's): the per-frame penetration report from Blender (zero beyond tolerance); a rendered Blender frame sheet of walk, sprint, dig and shovel-carry in side view; Vitest for speed→clip/rate mapping, walk/sprint threshold, heel-first contact in walk and no heel contact in sprint, tool attachment to the hand bone; Playwright on both backends: walking and sprinting side view, digging close-up across several frames (no flicker), a figure carrying a shovel (blade above ground), all picture-checked; the cross-vendor review record with its fixes.
   Low preset keeps the primitive figure (point 1301 covers it); items 6-11 apply to the medium/high skinned body.
   Criticality: high — new asset pipeline, load budget, every villager, both backends. If the point does not converge, split along "body and pipeline" / "animation, dress and tool".
+  Status 06.10.2026: dress clipping fixed (Vitest on every people/build), children-games harness fixed (bc4f2bf6e), Mongo WebGL 2 sight-line red fixed by re-staging past passers-by (e836ab025); villager-dress green on both backends at e836ab025, pictures d3867f618. Before landing: cross-vendor review, covering tiers, landing.
   Bundle: Dorfleben.
 
 - [ ] 1311. Villager glTF body: animation, dress and tool (split from 1294)
@@ -147,15 +148,6 @@ put it is the mistake this line exists to stop.
   05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
   05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
   05.10.2026: "ja, aber nach 1294"
-
-- [ ] 1305. Deferring a carrier request at the context watermark must not mark it blocked
-  Queue position: directly after point 1308 (point 1306, user 05.10.2026: "order: 1294, new point, 1305, then the rest").
-  Source: findings carrier 05.10.2026 (session 512756ba): at the 1295 boundary past the context watermark the owner ran `finding.mjs --blocked` on the user-approved request "Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check" with a pure deferral reason. That put a decision card "Anfrage nicht übernehmbar: …" before the user and took the request out of the pending set, so no successor drain lists it.
-  Final state:
-  1. A deferral at the watermark leaves the request pending (no `--blocked`, no decision card); the boundary text (`scripts/batch-boundary.mjs --prepare`) and `docs/batch-owner-runbook.md` say so where they name the drain.
-  2. [satisfied 05.10.2026 by point 1306, which carried the request in as point 1308 and removed its decision card] The approved request above is carried into the work order as its own point (re-opened from blocked) and its decision card removed.
-  No new guards, audits or state fields (infrastructure freeze 01.09.2026).
-  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1310. The bird's-eye camera compensates about half the south-reach asymmetry
   Queue position: directly after point 1305 (user card decision 05.10.2026; nothing goes ahead of 1294).

@@ -22,6 +22,8 @@ import {
   tickedPointsInDiff,
   boundaryCardCommand,
   contextBoundaryCardCommands,
+  boundaryRequestDrainLine,
+  commitGatesRequests,
   handoverSurvivesCall,
   isClosingSetPath,
   isClosingSetCommand,
@@ -757,6 +759,21 @@ describe('the boundary card names where the batch actually goes', () => {
       'node scripts/board.mjs queue 1205',
       'node scripts/board.mjs none --text-stdin',
     ])
+  })
+
+  // A deferral at the watermark once ran `finding.mjs --blocked`, which put a
+  // decision card before the user and took the request out of the pending set.
+  it('the context boundary leaves a waiting request pending and never names --blocked as its drain', () => {
+    const ctx = boundaryRequestDrainLine({ cause: BOUNDARY_CAUSES.CONTEXT })
+    expect(ctx).toMatch(/finding\.mjs --requests/)
+    expect(ctx).toMatch(/stay PENDING at the watermark/)
+    expect(ctx).toMatch(/no `finding\.mjs --blocked`, no decision card/)
+    const pt = boundaryRequestDrainLine({ cause: BOUNDARY_CAUSES.POINT })
+    expect(pt).toMatch(/--queued "<title>" --point <N>/)
+    expect(pt).toMatch(/a deferral leaves it pending/)
+    expect(commitGatesRequests(['--commit', '1305'])).toBe(true)
+    expect(commitGatesRequests(['--commit', '--context', '--transcript', 'x'])).toBe(false)
+    expect(commitGatesRequests(['--prepare', '1305'])).toBe(false)
   })
 
   it('names the command that fits the board it is printed for', () => {
