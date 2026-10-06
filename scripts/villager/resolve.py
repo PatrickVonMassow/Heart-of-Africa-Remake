@@ -27,7 +27,6 @@ import os
 import numpy as np
 
 import gamepath as GP
-import rig
 from body import top4
 from export import EXPORT_CLIPS
 from fit import depths, garment_pos
@@ -57,7 +56,7 @@ def _pose(job):
     """One frame's drawn skeleton."""
     ci, (_cname, _f, k, q, hips) = job
     person = _S['people'][ci][2]
-    return rig.fk(person.h, GP.stride_pose(person.h, q, hips, k), hips)
+    return person.pose(q, hips, k)
 
 
 def _setup(body, clips, garments, cfg, corners, only, workers):

@@ -110,7 +110,7 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
     for f in range(frames):
         t = d * f / frames if c['kind'] in ('gait', 'loop') else d * f / (frames - 1)
         q, hips = sample(c, t)
-        wr, wp = rig.fk(j, q, hips)
+        wr, wp = person.pose(q, hips)
         v = person.skin(baked, jidx, jw, wr, wp)
         if view == 'side':
             v[:, 2] += f * spacing - span / 2
@@ -179,7 +179,7 @@ def dressed(body, garments, names, weights, q, hips, clip=None, cname=None, t=0.
     from resolve import drawn_garment, offsets_at
     pos, j = morphed(body, weights)
     person = GP.Person(j)
-    wr, wp = rig.fk(j, q, hips)
+    wr, wp = person.pose(q, hips)
     jidx, jw = top4(body['W'])
     out = [(person.skin(person.bake(pos, jidx, jw), jidx, jw, wr, wp), body['tris'], SKIN)]
     for k, n in enumerate(names):

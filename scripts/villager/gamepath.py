@@ -71,6 +71,12 @@ class Person:
     def bake(self, verts, jidx, jw):
         return bake(verts, jidx, jw, self.h, self.heads, self.hang)
 
+    def pose(self, q, hips, stride=1.0):
+        """A clip frame's world turns and heads (A-pose) on this person's
+        skeleton, a gait's stride warped by `stride` — the one pose path the
+        resolver, the report and the sheets share."""
+        return rig.fk(self.h, stride_pose(self.h, q, hips, stride), hips)
+
     def drawn(self, wr):
         """The hung bones' world turns for a pose's A-pose world turns."""
         return np.array([qnorm(qmul(wr[i], self.hang_inv[i])) for i in range(len(wr))])

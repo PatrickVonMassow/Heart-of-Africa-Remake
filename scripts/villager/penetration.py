@@ -21,7 +21,6 @@ import numpy as np
 
 import gamepath as GP
 import resolve as RS
-import rig
 from body import top4
 from export import EXPORT_CLIPS
 from fit import depths, garment_pos
@@ -50,7 +49,7 @@ def _corner(c):
             continue
         # the baked table's own index for this pose, whichever clips are measured
         pk = S['keys'].get((cname, f, kst)) if S['keys'] is not None else None
-        wr, wp = rig.fk(j, GP.stride_pose(person.h, q, hips, kst), hips)
+        wr, wp = person.pose(q, hips, kst)
         bv = person.skin(bh, S['jidx'], S['jw'], wr, wp)
         tree = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
         for n in gnames:
