@@ -85,6 +85,7 @@ put it is the mistake this line exists to stop.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
   Split 06.10.2026: body parts showing through a garment face (knees through the robe in walk, through the trousers in dig) are not seen by the garment-inside-body measurement; that direction moved to point 1319.
+  Split 06.10.2026 (picture check): an inner garment showing through an outer one (the elder's shirt through the cloak in dress-dig-*) is not measured garment against garment; that direction moved to point 1321. 1314 keeps garment-inside-body.
   Round 2 result 06.10.2026 (tip d329213cb): 24/32 garments within tolerance; pairwise drivers, smoothing and a ground bound left the knee skirts at 0.013, the kneel hem pinched between thigh and calf. Linear corrective shapes cannot reach zero without a flare; round 3 pursues per-clip-frame baked, collision-resolved garment vertex animation played back identically in the game.
 
 - [ ] 1319. Villager garments: measure and remove body showing through a garment face (split from 1314)
@@ -101,6 +102,14 @@ put it is the mistake this line exists to stop.
   Final state: the baked offsets export at a size fit for the startup budget, read by src/render/villagerGarmentBaked.ts, with the pipeline penetration step still green on the DECODED (shipped) offsets. Candidates to weigh by measurement: per-garment low-rank shape basis with per-frame weights plus a sparse remainder, fewer keyframes, dropping offsets below tolerance, 8-bit quantisation.
   Verifiable: exported size measured and stated; penetration report on the decoded data all within tolerance; Vitest parity between pipeline check JSON and the game decoder.
   Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1321. Villager garments: an inner garment must not show through an outer one (split from 1314)
+  Queue position: directly after point 1320, ahead of point 1315.
+  Source: point 1314's picture check 06.10.2026 (branch feat/1314-garment-pose-correction, verification/villager-body/dress-dig-*): the elder's red-brown g-shirt-chest shows in patches through the blue g-cloak-leftShoulder in every dig frame (also on main); penetration.py measures each garment only against the body, never against another garment worn over it.
+  Final state: the pipeline penetration report also measures inner-garment vertices outside the enclosing outer garment for every outfit layering (same game skinning path, same 0.003 tolerance), the correction removes them, and the step stays green.
+  Verifiable: the extended report all within tolerance; dressed frame sheets walking, kneeling and digging without an inner garment visible through an outer one; Vitest for any game-side change; cross-vendor review record.
+  Criticality: high — every layered villager outfit, both backends.
   Bundle: Dorfleben.
 
 - [ ] 1315. Villager garments: ship the measured pipeline garments on the glTF body (split from 1312)
