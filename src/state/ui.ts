@@ -431,6 +431,8 @@ export const effectiveWaterDetailOctaves = (s: UiState): number => currentQualit
 export const effectiveFaunaBodySegments = (s: UiState): number => currentQuality(s).faunaBodySegments
 /** The villagers' skinned-body resolution; 0 = the primitive figure (work-order "villager dress"). */
 export const effectiveFigureBodySegments = (s: UiState): number => currentQuality(s).figureBodySegments
+/** Whether the villagers' skinned body is the glTF one (work-order "glTF villager body"). */
+export const effectiveFigureGltfBody = (s: UiState): boolean => currentQuality(s).figureGltfBody
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

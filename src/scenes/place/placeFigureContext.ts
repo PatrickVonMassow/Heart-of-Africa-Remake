@@ -8,6 +8,7 @@ import { REST_POSE, type FigurePose } from '../../render/gesture'
 import type { SpeechFloor } from '../../communication/speechFloor'
 import type { ColdDress } from './useColdCloaks'
 import type { DressDrivers } from '../../systems/dress'
+import type { VillagerAsset } from '../../render/villagerAsset'
 import {
   addBodies,
   createBodies,
@@ -48,6 +49,9 @@ export interface FigureLook {
   palette: readonly string[]
   /** Ring resolution of trunk and head (`QUALITY_PRESETS.figureBodySegments`). */
   radial: number
+  /** The glTF villager body once loaded, where the level draws it
+   *  (`QUALITY_PRESETS.figureGltfBody`); null keeps the code-built body. */
+  villager: VillagerAsset | null
 }
 export const FigureLookContext = createContext<FigureLook | null>(null)
 

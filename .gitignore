@@ -232,3 +232,6 @@ scripts/.tile-cache
 # they were swept in by a commit that staged everything (a0c599b) and the README
 # serves its picture from the GitHub attachment CDN, not from here.
 /cover/
+
+# Python byte cache of the villager asset pipeline (scripts/villager)
+__pycache__/

@@ -93,6 +93,12 @@ export interface QualityPreset {
    *  body and its dress layers per inhabitant, so this prices vertices and
    *  draw calls per villager. */
   figureBodySegments: number
+  /** The villagers' body is the glTF one (public/models/villager.glb, work-order
+   *  "glTF villager body") instead of the code-built one; the dress layers and
+   *  every pose stay. Off where `figureBodySegments` is 0 (the primitive figure,
+   *  user decision 04.10.2026). The file loads on the first settlement visit,
+   *  never at start-up. */
+  figureGltfBody: boolean
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -125,6 +131,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     waterDetailOctaves: 1, // one octave: the water still moves, at the lowest shading cost
     faunaBodySegments: 12, // the frugal floor: 30° facets, the shapes and markings still read
     figureBodySegments: 0, // the primitive figure stays (user decision 04.10.2026)
+    figureGltfBody: false, // the primitive figure stays: no glTF body is loaded at all
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -151,6 +158,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     waterDetailOctaves: 3, // the field before the presets existed
     faunaBodySegments: 18, // round at the bird's-eye range
     figureBodySegments: 16, // the skinned, dressed villager; round at conversation range
+    figureGltfBody: true, // the CC0 glTF body under the dress
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -176,6 +184,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     waterDetailOctaves: 4, // one octave more structure on the water
     faunaBodySegments: 24, // no facet on the outline at the closest zoom
     figureBodySegments: 24, // no facet on a head or a hem the player stands beside
+    figureGltfBody: true, // the CC0 glTF body under the dress
   },
 }
 

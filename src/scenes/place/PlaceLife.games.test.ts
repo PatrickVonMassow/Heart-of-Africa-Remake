@@ -27,6 +27,7 @@ const deps = {
   useMemo: (fn: () => unknown) => fn(), useRef: (current: unknown) => ({ current }),
   useEffect: () => {}, useFrame: () => {}, useColdCloaks: () => false,
   useUi: () => 1, effectiveFigureLimbSegments: () => 1, effectiveFigureBodySegments: () => 1,
+  effectiveFigureGltfBody: () => true, useVillagerAsset: () => null,
   placeDressDrivers: () => ({ drivers: {}, year: 1890 }),
   useGame: () => 0, placeById: () => null, createInhabitantSet: () => ({}),
   SpeechFloor: class {}, placePlayerPosition: {}, useUnplacedInhabitantWatch: () => {},

@@ -2601,6 +2601,19 @@ at a fixed height read as neither. The walk, the kneel and the stride values
 are educated guesses in the same block; a period source naming a people's
 carrying posture would replace the guess for that people.
 
+### 8.5 The villager's body (work-order "glTF villager body")
+
+On the medium and high presets the villagers stand on a CC0 MakeHuman base body
+(`scripts/villager/`, sources and licences in `sources.json`), built headless in
+a pinned Blender (`node scripts/blender.mjs`) into `villager.glb` with morph
+targets for age, sex and build and a bust from MakeHuman's cup targets; the
+low preset keeps the primitive figure and never loads the file
+(`figureGltfBody`, `docs/graphics-detail-levels.md`). The dress table of §8.3
+is unchanged; only its fit follows the measured trunk sections of the new body.
+Each foot has an ankle and a ball joint. Proportions per age and sex are
+educated guesses in `VILLAGER_ASSET` (`src/config/balance.ts`), calibratable;
+this document names no people-specific stature, so one body serves all peoples.
+
 ---
 
 ## 9. Keeping the cook-fire alight in the rains (TASKS point 256)

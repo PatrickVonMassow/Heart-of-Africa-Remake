@@ -49,6 +49,7 @@ device pixel ratio is kept (no cap).
 | `waterDetailOctaves` | 1 | 3 | 4 |
 | `faunaBodySegments` | 12 | 18 | 24 |
 | `figureBodySegments` | 0 | 16 | 24 |
+| `figureGltfBody` | off | on | on |
 
 ## What each setting does
 
@@ -179,6 +180,47 @@ added.
   this shared, software-composited machine (16.7–66.7 ms in every column,
   quantised to the display's vsync), so no frame-time cost is claimed either
   way; low is unchanged by construction.
+
+- **`figureGltfBody`** — The villagers' body is the CC0 glTF one
+  (work-order "glTF villager body"; `public/models/villager.glb`, built by
+  `node scripts/villager/build.mjs` from MakeHuman/MPFB2 and Quaternius
+  sources) instead of the code-built one. Off on low, which keeps the
+  primitive figure and never fetches the file; on for medium and high, where
+  the body is the same 6 000-triangle mesh on both (`figureBodySegments`
+  still prices the dress layers). The file loads on the first medium/high
+  settlement visit, never with the start-up chunks; per distinct person
+  (sex × age × build, at most 24) its morphs are baked and it is re-posed into
+  the code-built rest on the CPU, so every pose, the dress layers and the
+  anchors carry over (`src/render/villagerFigureBody.ts`). Until it has
+  arrived — or if it cannot load — the code-built body stands in. Measured
+  05.10.2026 (`polish-villagers.mjs` section `villager-dress`, WebGPU, on a
+  machine other agents were loading — read the milliseconds as an upper
+  bound):
+
+  - **Load size:** `villager.glb` 694 968 bytes (679 KiB; body, 9 clips and
+    the extras — the clips belong to the follow-up animation work). Parse
+    13–22 ms.
+  - **Per-village build cost** (Zulu village, first visit): 21 distinct
+    persons in 189–228 ms together (~9–11 ms each) and 33 dressed figure
+    geometries in 144–207 ms together; geometries are cached for the
+    session, so a later visit builds only the persons and dress combinations
+    it has not seen. The long tasks overlapping that work were 469 ms and
+    1 168 ms (the latter shared with the settlement's own mount). Against the
+    load-freeze budget (`pictureFreezeBudgetMs`, 4 000 ms, design-reference
+    §21.2) the glTF body adds at most about 0.4 s of main-thread work, and
+    only on a settlement visit.
+  - **Per frame** (draw calls / triangles, the same view, code-built body →
+    glTF body; observations of a living village, see the caveat above):
+
+  | Village | Medium code → glTF | High code → glTF |
+  | --- | --- | --- |
+  | Zulu | 362 / 237 k → 347 / 348 k | 354 / 309 k → 370 / 451 k |
+  | Hausa | 512 / 391 k → 513 / 604 k | 495 / 465 k → 501 / 563 k |
+  | Maasai | 465 / 436 k → 472 / 648 k | 482 / 544 k → 483 / 667 k |
+
+  Draw calls are unchanged (still one skinned mesh per villager); the glTF
+  body costs about +100 k to +210 k triangles per village. The median frame
+  time did not separate the variants on this shared machine.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a
