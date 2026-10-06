@@ -40,10 +40,14 @@ const ESCAPE_SECONDS = 12 // balance.family.escapeSeconds
 const MOURNING_SECONDS = 30 // balance.family.mourningSeconds
 
 type P = { x: number; z: number }
+/** Which bank of the staged channel (x 0..5.4) a point lies on. */
+const bankSide = (x: number) => (x < 2.7 ? -1 : 1)
 type Outcome = 'parent-taken' | 'calf-caught' | 'far-bank' | 'open'
 type Calf = P & { swim?: P; corridor?: number }
 type Lion = P & { h: number }
-type Staged = { outcome: Outcome; calf: Calf; par: P; lion: Lion; startLionCalf: number; minLionCalf: number; dt: number }
+type Staged = { outcome: Outcome; calf: Calf; par: P; lion: Lion; startLionCalf: number; minLionCalf: number; dt: number
+  /** The bank (-1 west, 1 east) the calf last stood on LAND; whether it landed on the other one during the chase. */
+  calfLandSide: number; calfLandedAcross: boolean }
 
 /** One staged hunt; returns which body the lion reached first, the bodies at
  *  that frame, and the closest the lion ever came to the calf. */
@@ -53,7 +57,9 @@ function stage(river: (x: number, z: number) => string, calf0: P, parent0: P, li
   const lion: Lion = { ...lion0, h: Math.atan2(calf0.x - lion0.x, calf0.z - lion0.z) }
   const startLionCalf = Math.hypot(lion.x - calf.x, lion.z - calf.z)
   let minLionCalf = startLionCalf
-  const end = (outcome: Outcome): Staged => ({ outcome, calf, par, lion, startLionCalf, minLionCalf, dt })
+  let calfLandSide = river(calf.x, calf.z) === 'water' ? 0 : bankSide(calf.x)
+  let calfLandedAcross = false
+  const end = (outcome: Outcome): Staged => ({ outcome, calf, par, lion, startLionCalf, minLionCalf, dt, calfLandSide, calfLandedAcross })
   for (let f = 0; f < 30 / dt; f++) {
     // Herds pre-pass: the parent runs for its station, then the swept take.
     const h = blockHeading(par.x, par.z, calf.x, calf.z, lion.x, lion.z, PARENT_BLOCK_OFFSET)
@@ -74,6 +80,10 @@ function stage(river: (x: number, z: number) => string, calf0: P, parent0: P, li
     calf.x = cs.x
     calf.z = cs.z
     if (river(calf.x, calf.z) === 'water' && (fromT !== 'water' || !calf.swim)) calf.swim = from
+    if (river(calf.x, calf.z) !== 'water') {
+      if (calfLandSide !== 0 && bankSide(calf.x) !== calfLandSide) calfLandedAcross = true
+      calfLandSide = bankSide(calf.x)
+    }
     // Hunt frame: far-bank escape, steer, braked step, swept catch.
     if (chaseSwimEscaped(calf.swim, calf.x, calf.z, river)) return end('far-bank')
     const tx = calf.x - lion.x
@@ -97,92 +107,131 @@ function stage(river: (x: number, z: number) => string, calf0: P, parent0: P, li
 }
 
 type After = {
-  /** Frames on which a gate that can kill the calf / take the parent was open. */
-  catchGate: number
-  shieldGate: number
+  /** The calf entered the caught countdown (the only stained calf kill). */
+  calfCaught: boolean
+  /** The living parent was taken by the shield branch after the ending. */
+  parentTaken: boolean
   /** Frames on which the family pass would not mourn / would adopt mid-escape. */
   familyBroken: number
-  minLionCalf: number
-  calfCrossed: boolean
+  /** The calf stood on land on one bank and later on land on the other
+   *  (in the staged chase or its aftermath). */
+  landedAcross: boolean
+  /** Closest lion–calf distance AFTER that landing (Infinity without one). */
+  minLionCalfAfterLanding: number
   mournReached: boolean
 }
 
+type Hunt = { mode: 'chase' | 'feed' | 'leave'; victim: 'calf' | 'parent' | null; timer: number; dissolve?: number; heading: number }
+
+/** The hunt bookkeeping an ending applies (Wildlife.tsx). Swappable only so a
+ *  negative control can prove the aftermath assertions depend on it. */
+type Bookkeeping = {
+  /** Shield branch, outcome 'taken': `LION_STATE.victim = a`. */
+  take: (h: Hunt) => void
+  /** Hunt frame, chaseSwimEscaped: walk-off, `s.victim = null`. */
+  farBank: (h: Hunt, heading: number) => void
+}
+const PRODUCTION: Bookkeeping = {
+  take: (h) => {
+    h.victim = 'parent'
+  },
+  farBank: (h, heading) => {
+    h.mode = 'leave'
+    h.victim = null
+    h.heading = heading
+  },
+}
+
 /**
- * The aftermath of a staged ending, in the same frame order, for `seconds`:
- * - 'parent-taken': the take's own bookkeeping (Wildlife.tsx shield branch —
- *   bond cut, escape run, mournOrphan at the body, victim := parent), then the
- *   hunt frame's dead-victim close-out into the feed at feedFlank, the feed
- *   (dissolve, timer) and the walk-off away from the traveller.
- * - 'far-bank': the hunt frame's walk-off with no victim; the parent, alive,
- *   follows its calf (across the water too).
- * WORST CASE for the calf: it ignores its fear flight (fearYields) and its
- *   escape run and walks straight back to what it keeps to (juvenileAnchor:
- *   the living parent, or the mourned body) — swimming the river at the braked
- *   pace — so it comes as close to the feeding lion as it ever could.
- * The only calf kill with a stain is the caught countdown; `caught` is set only
- *   by the chase catch against the hunt's victim (a crocodile's sinks, a fall's
- *   leaves no stain); the parent's take only by the shield branch while the
- *   chase runs on its calf. Their gates are mirrored and counted, so a
- *   mechanism (c) kill would show as an open gate.
+ * The aftermath of a staged ending, in the same frame order, for `seconds`.
+ * The production gates run on live state, not on the ending's label: the
+ * shield (station run + swept take) whenever the parent lives, is bonded and
+ * the chase is on its calf; the calf's flight and the swept chase catch (with
+ * the far-bank check) whenever the chase is on the calf; the feed close-out on
+ * a dead victim; the feed (dissolve, timer); the walk-off away from the
+ * traveller. Only `book` decides which of them the ending leaves running.
+ * Off the chase, WORST CASE for the calf: it ignores its fear flight
+ * (fearYields) and escape run and walks straight back to what it keeps to
+ * (juvenileAnchor: the living parent, or the mourned body), swimming the river
+ * at the braked pace — as close to the feeding lion as it could ever come.
  */
-function aftermath(river: (x: number, z: number) => string, st: Staged, traveller: P, dt: number, seconds: number): After {
-  const calf = { ...st.calf, escape: undefined as number | undefined, mourn: undefined as number | undefined,
-    mournAt: undefined as P | undefined }
+function aftermath(
+  river: (x: number, z: number) => string,
+  st: Staged,
+  traveller: P,
+  dt: number,
+  seconds: number,
+  book: Bookkeeping = PRODUCTION,
+): After {
+  const calf: Calf & { escape?: number; mourn?: number; mournAt?: P; caught?: boolean } = { ...st.calf }
   const par = { ...st.par, dead: false }
-  const bond = { calfHasParent: true }
+  let bonded = true
   const lion = { ...st.lion }
-  const hunt = { mode: 'chase' as 'chase' | 'feed' | 'leave', victim: 'calf' as 'calf' | 'parent' | null, timer: 0, dissolve: undefined as number | undefined, heading: 0, px: 0, pz: 0 }
-  let catchGate = 0
-  let shieldGate = 0
-  let familyBroken = 0
-  if (st.outcome === 'parent-taken') {
-    // The shield branch's 'taken' bookkeeping, in the take frame.
-    bond.calfHasParent = false
+  const hunt: Hunt = { mode: 'chase', victim: 'calf', timer: 0, heading: 0 }
+  let parentTaken = false
+  const takeParent = () => {
+    // The shield branch's 'taken' bookkeeping (bond cut, escape run, mourning).
+    bonded = false
     calf.escape = ESCAPE_SECONDS
     calf.mourn = MOURNING_SECONDS
     calf.mournAt = { x: par.x, z: par.z }
     par.dead = true // takeAnimal → markKilled
-    hunt.victim = 'parent'
-  } else {
-    // chaseSwimEscaped in the hunt frame: the walk-off, victim cleared.
-    hunt.mode = 'leave'
-    hunt.victim = null
-    hunt.heading = Math.atan2(lion.x - traveller.x, lion.z - traveller.z)
+    book.take(hunt)
   }
-  const calfStartSide = Math.sign(calf.x - 2.7)
-  let calfCrossed = false
+  const walkOffHeading = (x: number, z: number) => Math.atan2(x - traveller.x, z - traveller.z)
+  if (st.outcome === 'parent-taken') takeParent()
+  else book.farBank(hunt, walkOffHeading(lion.x, lion.z))
+  let familyBroken = 0
+  let landSide = st.calfLandSide
+  let landedAcross = st.calfLandedAcross
+  let minAfter = Infinity
   let mournReached = false
-  let minLionCalf = Infinity
   for (let f = 0; f < seconds / dt; f++) {
-    // Herds pre-pass: the shield (and its take) runs only while the chase is
-    // on OUR calf (Wildlife.tsx: a.child && LION_STATE.mode === 'chase' &&
-    // LION_STATE.victim === a.child).
-    if (!par.dead && bond.calfHasParent && hunt.mode === 'chase' && hunt.victim === 'calf') shieldGate++
+    // Herds pre-pass: a caught calf dies in its countdown.
+    if (calf.caught) break
+    const chaseOnCalf = hunt.mode === 'chase' && hunt.victim === 'calf'
+    if (!par.dead && bonded && chaseOnCalf) {
+      const h = blockHeading(par.x, par.z, calf.x, calf.z, lion.x, lion.z, PARENT_BLOCK_OFFSET)
+      if (h !== null) {
+        const s = fleeWaterStep(par.x, par.z, h, swimBrakedPace(RESCUE_SPEED, river(par.x, par.z), SWIM_PACE) * dt, river, 0.8)
+        par.x = s.x
+        par.z = s.z
+      }
+      const lmv = HUNT_LION_SPEED * dt
+      if (segPointDist(lion.x - Math.sin(lion.h) * lmv, lion.z - Math.cos(lion.h) * lmv, lion.x, lion.z, par.x, par.z) < PARENT_TAKE_DIST) {
+        parentTaken = true
+        takeParent()
+      }
+    }
     calf.escape = tickEscapeRun(calf.escape, dt)
     calf.mourn = tickMourning(calf.mourn, dt)
     if (calf.mourn === undefined) calf.mournAt = undefined
-    // The family pass: a dead parent is mourned (armed at the take, never
-    // twice) and no adoption claims the calf while its escape run holds it.
     if (par.dead && !orphanMourns(par)) familyBroken++
     if (calf.escape !== undefined && !adoptionHeld(calf)) familyBroken++
-    // Render loop, worst case: straight back to what it keeps to.
-    const keep = juvenileAnchor({ parent: bond.calfHasParent ? par : undefined, mourn: calf.mourn, mournAt: calf.mournAt })
-    if (keep) {
-      const kx = keep.x - calf.x
-      const kz = keep.z - calf.z
-      const d = Math.hypot(kx, kz)
-      if (d > 0.3) {
-        const pace = swimBrakedPace(YOUNG_FOLLOW_SPEED, river(calf.x, calf.z), SWIM_PACE) * dt
-        const m = Math.min(pace, d - 0.3)
-        calf.x += (kx / d) * m
-        calf.z += (kz / d) * m
-      } else if (keep === calf.mournAt) mournReached = true
-    }
-    if (Math.sign(calf.x - 2.7) !== calfStartSide) calfCrossed = true
-    if (!bond.calfHasParent || par.dead) {
-      // nothing moves the body
+    // Render loop: the hunted calf flees; any other calf keeps (worst case).
+    if (hunt.mode === 'chase' && hunt.victim === 'calf') {
+      const fromT = river(calf.x, calf.z)
+      const from = { x: calf.x, z: calf.z }
+      const cs = chaseFleeStep(calf.x, calf.z, lion.x, lion.z, swimBrakedPace(CALF_FLEE_SPEED, fromT, SWIM_PACE) * dt, river, 0.8, calf.corridor)
+      calf.corridor = cs.corridor
+      calf.x = cs.x
+      calf.z = cs.z
+      if (river(calf.x, calf.z) === 'water' && (fromT !== 'water' || !calf.swim)) calf.swim = from
     } else {
-      // The living parent (far-bank case) walks after its calf.
+      const keep = juvenileAnchor({ parent: bonded ? par : undefined, mourn: calf.mourn, mournAt: calf.mournAt })
+      if (keep) {
+        const kx = keep.x - calf.x
+        const kz = keep.z - calf.z
+        const d = Math.hypot(kx, kz)
+        if (d > 0.3) {
+          const m = Math.min(swimBrakedPace(YOUNG_FOLLOW_SPEED, river(calf.x, calf.z), SWIM_PACE) * dt, d - 0.3)
+          calf.x += (kx / d) * m
+          calf.z += (kz / d) * m
+        } else if (keep === calf.mournAt) mournReached = true
+      }
+    }
+    if (bonded && !par.dead && !(hunt.mode === 'chase' && hunt.victim === 'calf')) {
+      // The living parent walks after its calf (far-bank case).
       const d = Math.hypot(calf.x - par.x, calf.z - par.z)
       if (d > 2) {
         const pace = swimBrakedPace(YOUNG_FOLLOW_SPEED, river(par.x, par.z), SWIM_PACE) * dt
@@ -193,14 +242,33 @@ function aftermath(river: (x: number, z: number) => string, st: Staged, travelle
     // Hunt frame.
     if (hunt.mode === 'chase') {
       if (hunt.victim === 'parent' && par.dead) {
-        hunt.px = par.x
-        hunt.pz = par.z
-        const fl = feedFlank(hunt.px, hunt.pz, lion.x, lion.z, FEED_FLANK_DIST)
+        const fl = feedFlank(par.x, par.z, lion.x, lion.z, FEED_FLANK_DIST)
         lion.x = fl.x
         lion.z = fl.z
         hunt.mode = 'feed'
         hunt.timer = 30
-      } else if (hunt.victim === 'calf') catchGate++ // the swept chase catch on the calf
+      } else if (hunt.victim === 'calf') {
+        if (chaseSwimEscaped(calf.swim, calf.x, calf.z, river)) {
+          calf.swim = undefined
+          book.farBank(hunt, walkOffHeading(lion.x, lion.z))
+        } else {
+          const tx = calf.x - lion.x
+          const tz = calf.z - lion.z
+          if (Math.hypot(tx, tz) < CALF_POUNCE_RADIUS) lion.h = Math.atan2(tx, tz)
+          else {
+            let dh = Math.atan2(tx, tz) - lion.h
+            while (dh > Math.PI) dh -= Math.PI * 2
+            while (dh < -Math.PI) dh += Math.PI * 2
+            lion.h += Math.max(-HUNT_LION_TURN * dt, Math.min(HUNT_LION_TURN * dt, dh))
+          }
+          const x0 = lion.x
+          const z0 = lion.z
+          const pace = swimBrakedPace(HUNT_LION_SPEED, river(lion.x, lion.z), SWIM_PACE)
+          lion.x += Math.sin(lion.h) * pace * dt
+          lion.z += Math.cos(lion.h) * pace * dt
+          if (segPointDist(x0, z0, lion.x, lion.z, calf.x, calf.z) < CALF_CATCH_DIST) calf.caught = true
+        }
+      }
     } else if (hunt.mode === 'feed') {
       hunt.timer -= dt
       const fl = feedFlank(par.x, par.z, lion.x, lion.z, FEED_FLANK_DIST)
@@ -211,15 +279,21 @@ function aftermath(river: (x: number, z: number) => string, st: Staged, travelle
       if (hunt.dissolve <= 0 || hunt.timer <= 0) {
         hunt.mode = 'leave'
         hunt.victim = null
-        hunt.heading = Math.atan2(par.x - traveller.x, par.z - traveller.z)
+        hunt.heading = walkOffHeading(par.x, par.z)
       }
     } else {
       lion.x += Math.sin(hunt.heading) * HUNT_LEAVE_SPEED * dt
       lion.z += Math.cos(hunt.heading) * HUNT_LEAVE_SPEED * dt
     }
-    minLionCalf = Math.min(minLionCalf, Math.hypot(lion.x - calf.x, lion.z - calf.z))
+    // A real bank-to-bank landing, and the distance only after it.
+    if (river(calf.x, calf.z) !== 'water') {
+      const sd = bankSide(calf.x)
+      if (landSide !== 0 && sd !== landSide) landedAcross = true
+      landSide = sd
+    }
+    if (landedAcross) minAfter = Math.min(minAfter, Math.hypot(lion.x - calf.x, lion.z - calf.z))
   }
-  return { catchGate, shieldGate, familyBroken, minLionCalf, calfCrossed, mournReached }
+  return { calfCaught: calf.caught === true, parentTaken, familyBroken, landedAcross, minLionCalfAfterLanding: minAfter, mournReached }
 }
 
 describe('the shield at the river (user report 05.10.2026)', () => {
@@ -272,21 +346,70 @@ describe('the shield at the river (user report 05.10.2026)', () => {
     const rows = staged
       .filter((x) => x.outcome === 'parent-taken' || x.outcome === 'far-bank')
       .map((st) => ({ o: st.outcome, a: aftermath(river, st, TRAVELLER, st.dt, 45) }))
-    const taken = rows.filter((x) => x.o === 'parent-taken')
-    const escaped = rows.filter((x) => x.o === 'far-bank')
     for (const r of rows) {
-      expect(r.a.catchGate).toBe(0) // the chase catch never again runs on the calf
-      expect(r.a.shieldGate).toBe(0) // nor the shield/take on its parent
+      expect(r.a.calfCaught).toBe(false)
+      expect(r.a.parentTaken).toBe(false)
       expect(r.a.familyBroken).toBe(0) // mourned, and not adopted mid-escape
     }
-    // The scenario is not vacuous: orphans reach the mourned body, some cross
-    // the river to it, and the worst-case calf does stand within catch reach of
-    // the feeding/leaving lion (measured: 1636 of 2168 taken, 44 of them after
-    // a crossing; 528 of 4132 far-bank escapes as the walk-off passes) — the
-    // gates, not the distance, keep it alive.
+    // Not vacuous. Measured: 1521 of the 2168 orphans reach the mourned body
+    // (none of these takes falls with the calf already landed across — that
+    // picture is staged in the next case); 1134 of the 4132 far-bank calves
+    // landed bank to bank, and 252 of those stand within catch reach of the
+    // walking-off lion AFTER the landing — the gates, not the distance, hold.
+    const taken = rows.filter((x) => x.o === 'parent-taken')
+    const near = (x: (typeof rows)[number]) => x.a.landedAcross && x.a.minLionCalfAfterLanding < CALF_CATCH_DIST
     expect(taken.filter((x) => x.a.mournReached).length).toBeGreaterThan(0)
-    expect(taken.filter((x) => x.a.calfCrossed && x.a.minLionCalf < CALF_CATCH_DIST).length).toBeGreaterThan(0)
-    expect(escaped.filter((x) => x.a.minLionCalf < CALF_CATCH_DIST).length).toBeGreaterThan(0)
+    expect(rows.filter(near).length).toBeGreaterThan(0)
+  })
+
+  it('the orphan that mourns ACROSS the river swims back to the feeding lion and is not caught', () => {
+    // The sweep's takes all fall with the calf still on the lion's bank or in
+    // the water (a calf that lands first ends the hunt at the far bank, in the
+    // same frame's later hunt pass). Stage the report's picture directly: the
+    // parent taken at the west waterline while the calf already stands on the
+    // east bank; its mourning return crosses the river to the body.
+    let crossings = 0
+    let near = 0
+    for (const dt of [1 / 60, 1 / 30, 0.1])
+      for (let cz = -3; cz <= 3; cz += 1)
+        for (const ex of [0.4, 1.5, 3])
+          for (const [px, pz] of [[-0.4, 0], [-0.8, 1.2], [-0.6, -1.5]]) {
+            const st: Staged = {
+              outcome: 'parent-taken',
+              calf: { x: 5.4 + ex, z: cz },
+              par: { x: px, z: pz },
+              lion: { x: px - 0.9, z: pz, h: Math.PI / 2 },
+              startLionCalf: 0,
+              minLionCalf: 0,
+              dt,
+              calfLandSide: 1,
+              calfLandedAcross: false,
+            }
+            const r = aftermath(river, st, TRAVELLER, dt, 45)
+            expect(r.calfCaught).toBe(false)
+            expect(r.parentTaken).toBe(false)
+            if (r.landedAcross) crossings++
+            if (r.landedAcross && r.minLionCalfAfterLanding < CALF_CATCH_DIST) near++
+          }
+    // Measured: all 189 land on the body's bank and all 189 come within catch
+    // reach of the feeding (later leaving) lion there — none is caught.
+    expect(crossings).toBe(189)
+    expect(near).toBeGreaterThan(0)
+  })
+
+  it('negative control: the aftermath assertions fail when the ending bookkeeping is broken', () => {
+    // Keep the chase on the calf after the take, or after the far-bank landing:
+    // the same production gates then catch the calf / take the parent.
+    const noSwitch: Bookkeeping = { ...PRODUCTION, take: () => {} }
+    const noWalkOff: Bookkeeping = { ...PRODUCTION, farBank: () => {} }
+    const taken = staged.filter((x) => x.outcome === 'parent-taken')
+    const escaped = staged.filter((x) => x.outcome === 'far-bank')
+    const caughtAfterTake = taken.filter((st) => aftermath(river, st, TRAVELLER, st.dt, 45, noSwitch).calfCaught).length
+    const brokenEscape = escaped.map((st) => aftermath(river, st, TRAVELLER, st.dt, 45, noWalkOff))
+    // Measured: the chase left on the calf catches it in 1526 of 2168 takes;
+    // left running past the landing, it takes the parent in all 4132.
+    expect(caughtAfterTake).toBeGreaterThan(0)
+    expect(brokenEscape.filter((a) => a.calfCaught || a.parentTaken).length).toBeGreaterThan(0)
   })
 })
 
