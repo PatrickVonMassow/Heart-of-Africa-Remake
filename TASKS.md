@@ -15884,3 +15884,9 @@ to land than a mechanism that needs a review.
   Final state: the cause is measured (game or check) and fixed; the section runs green on both backends.
   Verifiable: `--section=elephant-trampling` green on WebGPU and WebGL 2; a right-layer test for the corrected cause.
   Bundle: Tierverhalten.
+- [ ] 1318. The dressing-growth and channel-crossing checks are red on main
+  Source: findings carrier 06.10.2026 13:22, found on the enrichments run of point 1297.
+  On a quiet host, on main and feat/1297 alike: `--section=dressing-growth` reads samples [0,0,0,0,0] for "the streamed dressing does not grow over a session at a fixed anchor (point 278)" (nothing streamed at all); `--section=channel-crossing` reads sawOnWater false, sawLowY false, landed true for "a purposeful crossing swims the channel chest-deep and lands on the far bank (point 192)". With 1317 they keep a whole enrichments pass red.
+  Final state: each cause is measured (game or check) and fixed; both sections run green on both backends.
+  Verifiable: both sections green on WebGPU and WebGL 2; a right-layer test per corrected cause.
+  Bundle: Tierverhalten.
