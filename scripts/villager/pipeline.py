@@ -93,3 +93,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+    # Blender crashes on exit once a forked pool has run (correct.py); the
+    # work is done and written, so leave without its shutdown.
+    sys.stdout.flush()
+    os._exit(0)

@@ -2583,6 +2583,30 @@ export const VILLAGER_ASSET = {
    *  steps, so a vertex caught between two body parts does not swing from
    *  one to the other. Calibratable. */
   garmentFitStep: 0.01,
+  /** The bones whose drawn swing drives the garments' corrective shapes
+   *  (scripts/villager/correct.py, render/villagerGarmentDrivers.ts) and the
+   *  hung rest axis each swings: down for a limb, up for the trunk and head.
+   *  Four drivers per bone (its axis's lean to ±x and ±z). Calibratable. */
+  garmentDriverBones: [
+    ['spine', 'up'],
+    ['chest', 'up'],
+    ['neck', 'up'],
+    ['head', 'up'],
+    ['upperArm.L', 'down'],
+    ['upperArm.R', 'down'],
+    ['forearm.L', 'down'],
+    ['forearm.R', 'down'],
+    ['thigh.L', 'down'],
+    ['thigh.R', 'down'],
+    ['shin.L', 'down'],
+    ['shin.R', 'down'],
+  ],
+  /** Most passes of the corrective fit (it stops once every garment is
+   *  within tolerance). Calibratable. */
+  garmentCorrectPasses: 24,
+  /** The most one corrective pass moves a garment vertex (figure units).
+   *  Calibratable. */
+  garmentCorrectStep: 0.03,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

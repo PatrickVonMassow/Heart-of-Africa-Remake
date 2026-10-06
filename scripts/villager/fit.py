@@ -84,7 +84,7 @@ def depths(tree, pts, floor):
     sign checked by the winding number wherever the depth exceeds `floor`."""
     co, nrm = nearest(tree, pts)
     d = -np.einsum('ij,ij->i', pts - co, nrm)
-    for k in np.nonzero(d > floor)[0]:
+    for k in np.nonzero(d > max(floor, 0.0))[0]:
         if not inside(tree, pts[k].tolist()):
             d[k] = -d[k]
     return d, co, nrm
