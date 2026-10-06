@@ -105,7 +105,7 @@ function blendInto(asset: VillagerAsset, bones: Record<string, THREE.Bone>, name
   }
 }
 
-function blendHips(asset: VillagerAsset, bones: Record<string, THREE.Bone>, hips: THREE.Vector3, w: number) {
+function blendHips(bones: Record<string, THREE.Bone>, hips: THREE.Vector3, w: number) {
   if (w <= 0) return
   bones.hips.position.lerp(hips, Math.min(1, w))
 }
@@ -139,7 +139,7 @@ export function applyClipLayers(
     toHung(asset, f, c.pose, c.local, c.hips)
     const w = walking
     blendInto(asset, bones, LEGS, c.local, w)
-    blendHips(asset, bones, c.hips, w)
+    blendHips(bones, c.hips, w)
     if (free[0]) blendInto(asset, bones, ARM('L'), c.local, w)
     if (free[1] && c.carry < 1) blendInto(asset, bones, ARM('R'), c.local, w)
   } else {
@@ -165,7 +165,7 @@ export function applyClipLayers(
     clipPoseAt(asset, f, asset.clips.dig, c.digT % asset.clips.dig.duration, c.pose)
     toHung(asset, f, c.pose, c.local, c.hips)
     blendInto(asset, bones, asset.bones, c.local, c.dig)
-    blendHips(asset, bones, c.hips, c.dig)
+    blendHips(bones, c.hips, c.dig)
   }
 }
 
