@@ -15878,3 +15878,9 @@ to land than a mechanism that needs a review.
   Final state: the cause is measured in game (which mesh, overlay or shadow draws the rectangle) and removed; the burning-grass travel frame shows no straight-edged artefact on either backend.
   Verifiable: the burning-grass frame on both backends, picture-checked per §7.2; a right-layer test for the corrected cause.
   Bundle: Wetter & Wasser.
+- [ ] 1317. The staged lion feed in the elephant-trampling check never ends
+  Source: findings carrier 06.10.2026 12:46, found on the enrichments run of point 1297.
+  `npm test -- enrichments --section=elephant-trampling` is red on a quiet host on main (48a7e88) and on feat/1297 alike: "Lion moves on once the carcass is consumed (stain remains)" reads mode feed, prey false, stain false 1.2 s after staging `victim null`, mode feed, timer 0.4 (scripts/verify/enrichments.mjs:1326-1360). The no-victim feed branch of LionHunt in src/scenes/travel/Wildlife.tsx would leave at timer <= 0, so that branch apparently does not run for the staged state (inactive hunt, or a reset after staging).
+  Final state: the cause is measured (game or check) and fixed; the section runs green on both backends.
+  Verifiable: `--section=elephant-trampling` green on WebGPU and WebGL 2; a right-layer test for the corrected cause.
+  Bundle: Tierverhalten.
