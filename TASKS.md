@@ -117,6 +117,31 @@ put it is the mistake this line exists to stop.
   Criticality: medium - every village with affected peoples, both backends.
   Bundle: Dorfleben.
 
+- [ ] 1316. Natural villager motion: research, richer rig where needed, clip-preserving IK, distributed lean (six eyes with final check)
+  Queue position: after point 1312 and the clothing-rule point 1313 (both Dorfleben); the rig changes must keep the garment penetration gate (points 1312/1314) green.
+  Source: user report 06.10.2026: villager walking still looks very unnatural, like marionettes; the tag-game poses (port-city chaser reach, river-bank caught slump) are implausible. Scope by user order: ALL figure motion as natural as possible: walking, turning, running, and actions such as digging, picking up objects, pointing, and so on.
+  Measured state at the request (rev df8394e5e): scripts/villager/skeleton.py has 21 bones (hips, spine, chest, neck, head, shoulder/upperArm/forearm/hand, thigh/shin/foot/toe; no arm twist bones, no fingers, one spine segment). src/render/villagerClipPose.ts drives the gait phase purely by distance and re-solves the legs with two-bone IK onto the stride, so the clip's own leg motion is largely replaced. src/scenes/place/gltfClipLayers.ts:14-15 keeps the trunk lean and stoop, the head correction, kneel/crouch and contact hands code-built; the lean tips the trunk as one block (src/render/figureRig.ts contactLean, src/render/gesture.ts:447) and head/arms inherit it. The caught slump at src/scenes/place/PlaceLife.tsx:1116-1118 is "trunk leaned forward, arms hanging plumb".
+
+  PROCEDURE: six eyes with final check, ALREADY AT CONCEPT LEVEL (user 06.10.2026), before any implementation:
+   a. Two different models, ideally different vendors (Claude lane and GPT-6 Astra), do the research and concept BLIND and in parallel. Model B starts WITHOUT prior knowledge: only the neutral goal ("all villager motion as natural as possible: walk, turn, run, dig, pick up, point, tag-game chase and caught pose, ..."), the constraints below and access to the raw material (code, pipeline, clips, frame sheets it renders itself). B never sees the diagnosis or item list of this point, nor point-brief output containing them.
+   b. A third, distinct model checks both concepts thoroughly and merges them via scripts/blind-merge.mjs; disagreements are resolved with reasons, not by union.
+   c. The merged concept goes to a model of the OTHER vendor than the merger for a final "does this break anything" check. Only an approved concept is implemented; objections are fixed and re-checked first.
+   d. Implementation then gets the usual cross-vendor code review.
+
+  Final state:
+   1. RESEARCH DOCUMENT docs/research/natural-villager-motion.md: gait cycle (pelvic rotation, tilt and lateral shift, trunk counter-rotation, arm swing by pace, heel-to-toe roll, head stabilisation), turning (anticipation, head and eyes lead, step pivots instead of sliding), running, and the actions (dig, pick-up, point, carry, reach, slump); techniques (clip plus corrective IK, layered additive animation, look-at chains, spine distribution, motion matching where feasible for this POC); rig standards (Mixamo / UE mannequin bone counts) and reachable CC0 mocap sources. Ends with a measured diagnosis: our frame sheets next to a reference, every deficit named with its cause (rig too primitive, joints present but badly driven, clip overridden, missing secondary motion).
+   2. RIG upgraded where the diagnosis requires it (candidates: 2-3 spine segments, arm twist bones, ball/toe joint for the roll, coarse finger groups for grip and pointing). Bone additions keep the dress layers, glTF export, low preset and the garment penetration gate (1312/1314) green.
+   3. CLIP PRESERVED, IK CORRECTIVE: the leg IK corrects only foot placement (the delta after the clip) instead of re-solving the whole leg; pelvis, trunk, head and arms come from the clips, blended by pace. Point 1295's no-slide rule stays binding.
+   4. CLIP SOURCES widened where needed (CC0 mocap walk/run cycles at several paces, turns, pick-up, point, dig; age or load variants if reachable); every source recorded in scripts/villager/sources.json with its licence.
+   5. TURNING, RUNNING AND ACTIONS: walk, turn on the spot and in motion, run, dig, pick up an object, point, carry, reach each read natural when judged by looking; transitions blended, no snaps, no foot sliding.
+   6. LEAN DISTRIBUTED: every code-built trunk lean (contact reach, slump, stoop) is distributed over hips, spine and chest instead of folding at one joint; neck and head counter-rotate to hold a gaze target (horizon, the chased child, the hand or the work).
+   7. PORT-CITY TAG CHASER: looks straight ahead at the runner, neck and head extended back for it, the reaching arm points horizontally at the target, much smaller trunk lean (drive from the hips and stride).
+   8. RIVER-BANK TAG CAUGHT CHILD: trunk nearly upright, shoulders hanging forward (shoulder bones protracted and lowered), chest slightly sunk (spread over spine and chest, no fold at the hips), head slightly bowed, arms hanging loosely.
+  Verifiable: the research document with its diagnosis; the blind-merge record and the final-check verdict (procedure a-c) BEFORE the first implementation commit; Blender frame sheets and a video strip before/after of walk, turn, run, dig, pick-up, point, chaser and caught child; the named Vitest cases for the corrective IK, lean distribution and gaze hold; Playwright picture check in a port city and at a river bank on both backends, judged by looking; cross-vendor code review record with its fixes.
+  Criticality: high - every villager, both backends.
+  If the point does not converge, split along "research and concept" / "rig and clips" / "poses and actions".
+  Bundle: Dorfleben.
+
 - [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
   Queue position: directly after point 1294 (ahead of 1301); worked only once 1294 has landed (user 05.10.2026: "ja, aber nach 1294").
   Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:
