@@ -2593,15 +2593,25 @@ export const VILLAGER_GLTF = {
   buildByAge: { child: 0.5, youth: 0.8, adult: 1, elder: 0.9 },
   /** The walk turns into the sprint around this ground speed, per unit of leg
    *  (figure units per second at the basis body's leg length; a child's
-   *  shorter leg reaches it at a lower speed). */
-  sprintThreshold: 2.4,
+   *  shorter leg reaches it at a lower speed). Set where the walk's stride
+   *  reaches strideMax (its natural speed ≈ 0.83 × strideMax²): above it a walk
+   *  could only over-reach. Calibratable. */
+  sprintThreshold: 1.8,
   /** Half-width of the band the two gaits cross-fade over, same units. */
-  sprintBand: 0.5,
+  sprintBand: 0.35,
   /** A gait's stride grows with pace as speed^exponent over its natural
    *  speed (the rest is cadence), bounded so the leg never over-reaches. */
   strideExponent: 0.5,
   strideMin: 0.75,
   strideMax: 1.35,
+  /** How far (person units per unit of leg) a held foot may fall behind the
+   *  clip's own foot before it lets go and is planted afresh — a teleport or a
+   *  shove too long to step through. Calibratable. */
+  plantRelease: 0.18,
+  /** Share of the gait cycle over which a lifted foot's hold correction
+   *  fades back onto the clip's own foot (a shoved or turned foot eases home
+   *  in its swing, never jumps). Calibratable. */
+  plantFadeCycle: 0.15,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Ground speed (figure units / s) below which the figure stands. */

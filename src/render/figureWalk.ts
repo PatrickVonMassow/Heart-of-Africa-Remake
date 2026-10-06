@@ -421,7 +421,8 @@ export function hipJointAt(j: HipJoint, yaw: number): FootOffset {
  * each stance foot is then held at its spot on the ground (`plantFoot`).
  * `joints` are the hips' place and each thigh's offset in the hips' frame; the
  * pelvis turn of the pose this frame draws is applied here (`hipJointAt`),
- * since only here is it known. Mutates `m`.
+ * since only here is it known. Mutates `m`; returns the ground stepped this
+ * frame (figure units), which the glTF body's clip gait advances by.
  */
 export function stepWalk(
   m: WalkMotion,
@@ -431,7 +432,7 @@ export function stepWalk(
   age: AgeGroup,
   kneelWanted: boolean,
   joints: readonly [HipJoint, HipJoint],
-): void {
+): number {
   const unit = body.unit || 1
   let walked = 0
   if (m.last) {
@@ -464,6 +465,7 @@ export function stepWalk(
     const hip = hipJointAt(joints[i], gait.hipYaw)
     return plantFoot(m.plants[i], gait.feet[i], m.weight > 0 && m.kneel === 0, body, hip, { x: 0, z: gait.feet[i].z }, d.thigh + d.shin, dt)
   }) as [FootPlant, FootPlant]
+  return walked
 }
 
 /** A head load's outline for the steadying hand: its half-width at the base

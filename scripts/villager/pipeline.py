@@ -6,7 +6,8 @@
   garments    each dress form built round the body, weights transferred (cached)
   export      public/models/villager.glb
   sheets      frame sheets under verification/villager-body/
-  penetration the per-frame garment penetration report
+  penetration the per-frame garment penetration report; the run FAILS (exit 1)
+              when any garment lies deeper than the tolerance in any frame
   all         every step in order
 """
 import argparse
@@ -65,13 +66,20 @@ def main():
         garments = cached(a.work, 'garments', lambda: G.build_garments(mh, body, clips, cfg), force='garments' in steps)
     if 'export' in steps:
         import export as E
-        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, garments, cfg)
+        # The game draws the code-built dress on the glTF body (render/
+        # villagerFigureBody.ts); the garments built here are measured
+        # (penetration report, frame sheets) but not shipped.
+        # OPEN: ship them once the game dresses the body from the pipeline.
+        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, None, cfg)
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)
     if 'penetration' in steps:
         import penetration as P
-        P.report(a.verification, body, clips, garments, cfg)
+        bad = P.report(a.verification, body, clips, garments, cfg)
+        if bad:
+            # an exception, so Blender's --python-exit-code turns it into exit 1
+            raise RuntimeError(f'penetration: {bad} garment(s) over tolerance (see penetration-report.md)')
 
 
 if __name__ == '__main__':

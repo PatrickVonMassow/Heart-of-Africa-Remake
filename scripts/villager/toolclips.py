@@ -188,22 +188,80 @@ def catmull(keys, t, period):
 
 
 # The dig stroke (seconds; body frame: +z ahead, +x the figure's left, y up).
-# tool: where the upper (left) hand holds the shaft, the shaft's direction from
-# there down to the blade, and a hint for the blade's face (+z of the tool:
-# the side that carries the soil — toward the digger in the ground, up when
-# lifted, tipped to the right to throw).
+# tool: where the upper (left) hand holds the shaft and the shaft's direction
+# from there down to the blade. The blade's face (+z of the tool: the side that
+# carries the soil) is NOT keyed: it starts away from the digger (DIG_FACE0) and
+# is carried along the shaft's path with no turn about the shaft (parallel
+# transport, dig_faces), so the lever and the throw tip it only by swinging the
+# shaft. Keyed face hints rolled the tool ~68° and back ~78° about its shaft
+# between the lever and the throw, and both wrists twisted with it.
 # trunk: hip drop, forward lean of the spine, turn of the chest (+ to the left).
 DIG_PERIOD = 2.4
+DIG_FACE0 = (0.0, 0.5, 0.86)
 DIG_KEYS = [
-    # t,    upper hand (x, y, z),  shaft dir to blade,   face hint,       drop, lean, turn
-    (0.00, (-0.05, 0.80, 0.28), (0.04, -0.86, 0.50), (0.0, 0.0, -1.0), 0.05, 0.28, 0.00),
-    (0.45, (-0.05, 0.72, 0.32), (0.04, -0.90, 0.43), (0.0, 0.0, -1.0), 0.08, 0.26, 0.00),
-    (0.85, (-0.18, 0.66, 0.20), (0.15, -0.70, 0.70), (0.0, 0.5, -0.8), 0.10, 0.36, 0.05),
-    (1.30, (-0.16, 0.70, 0.24), (0.15, -0.38, 0.91), (0.0, 1.0, 0.0), 0.07, 0.34, 0.05),
-    (1.70, (-0.08, 0.76, 0.26), (-0.62, -0.28, 0.73), (-0.7, 0.3, 0.0), 0.05, 0.30, -0.40),
-    (2.00, (-0.04, 0.80, 0.28), (-0.20, -0.66, 0.72), (0.0, 0.2, -1.0), 0.05, 0.30, -0.20),
+    # t,    upper hand (x, y, z),  shaft dir to blade,   drop, lean, turn
+    (0.00, (-0.05, 0.80, 0.28), (0.04, -0.86, 0.50), 0.05, 0.28, 0.00),
+    (0.45, (-0.05, 0.72, 0.32), (0.04, -0.90, 0.43), 0.08, 0.26, 0.00),
+    (0.85, (-0.12, 0.66, 0.20), (0.15, -0.70, 0.70), 0.10, 0.36, 0.05),
+    (1.30, (-0.16, 0.70, 0.24), (0.15, -0.38, 0.91), 0.07, 0.34, 0.05),
+    (1.70, (-0.08, 0.76, 0.26), (-0.62, -0.28, 0.73), 0.05, 0.30, -0.40),
+    (2.00, (-0.04, 0.80, 0.28), (-0.20, -0.66, 0.72), 0.05, 0.30, -0.20),
 ]
 DIG_GRIP = {'R': -0.03, 'L': 0.13}
+
+
+def _transport(a0, a1, v):
+    """v carried from axis a0 to axis a1 by the shortest turn (no roll about the axis)."""
+    w = np.cross(a0, a1)
+    c = float(np.dot(a0, a1))
+    if np.linalg.norm(w) < 1e-12:
+        return v
+    K = np.array([[0, -w[2], w[1]], [w[2], 0, -w[0]], [-w[1], w[0], 0]])
+    return (np.eye(3) + K + K @ K / (1 + c)) @ v
+
+
+def shaft_roll(sdirs, faces):
+    """Per step, the tool's turn about its own shaft (rad) once the turn that
+    swings the shaft is taken out."""
+    out = []
+    for i in range(len(sdirs) - 1):
+        a1 = sdirs[i + 1]
+        p = _transport(sdirs[i], a1, faces[i])
+        p = unit(p - a1 * np.dot(p, a1))
+        f = unit(faces[i + 1] - a1 * np.dot(faces[i + 1], a1))
+        out.append(float(np.arctan2(np.dot(np.cross(p, f), a1), np.dot(p, f))))
+    return np.array(out)
+
+
+def dig_faces(sdirs):
+    """The blade's face along a closed loop of shaft directions (sdirs[-1] ==
+    sdirs[0]): DIG_FACE0 parallel-transported, and the loop's leftover turn
+    (its holonomy) spread evenly so the face meets itself at the seam."""
+    f = [unit(np.asarray(DIG_FACE0, float))]
+    for i in range(len(sdirs) - 1):
+        f.append(_transport(sdirs[i], sdirs[i + 1], f[-1]))
+    a = sdirs[-1]
+    p = unit(f[-1] - a * np.dot(f[-1], a))
+    g = unit(f[0] - a * np.dot(f[0], a))
+    hol = float(np.arctan2(np.dot(np.cross(p, g), a), np.dot(p, g)))
+    m = len(sdirs) - 1
+    out = []
+    for i, (v, d) in enumerate(zip(f, sdirs)):
+        ang = hol * i / m
+        v = v - d * np.dot(v, d)
+        out.append(unit(v * np.cos(ang) + np.cross(d, v) * np.sin(ang)))
+    return out, hol
+
+
+def max_turn_per_frame(Q):
+    """Per bone, the largest local turn between consecutive frames (rad) — a
+    flip of an IK hinge shows here as a jump far above the stroke's own speed."""
+    out = {}
+    for b in SK.NAMES:
+        i = SK.INDEX[b]
+        d = np.abs((Q[1:, i] * Q[:-1, i]).sum(1)).clip(0, 1)
+        out[b] = float(2 * np.arccos(d).max())
+    return out
 
 
 def dig_clip(body, clips, cfg):
@@ -222,12 +280,16 @@ def dig_clip(body, clips, cfg):
     P = np.zeros((n, 3))
     misses = []
     solvers, needs = [], []
+    keyed = [catmull([(kk[0], np.concatenate([kk[1], kk[2], kk[3:]])) for kk in DIG_KEYS], t, DIG_PERIOD) for t in times]
+    faces, hol = dig_faces([-unit(k[3:6]) for k in keyed])
+    roll = shaft_roll([-unit(k[3:6]) for k in keyed], faces)
+    print(f'dig: shaft roll max {np.degrees(np.abs(roll).max()):.2f} deg/frame, loop holonomy spread {np.degrees(hol):.1f} deg')
     for f, t in enumerate(times):
-        k = catmull([(kk[0], np.concatenate([kk[1], kk[2], kk[3], kk[4:]])) for kk in DIG_KEYS], t, DIG_PERIOD)
+        k = keyed[f]
         sdir = -unit(k[3:6])
-        face = unit(k[6:9])
+        face = faces[f]
         tip = k[0:3] - sdir * (DIG_GRIP['L'] - SHOVEL['tip'])
-        drop, lean, turn = k[9], k[10], k[11]
+        drop, lean, turn = k[6], k[7], k[8]
         # the tool, from its keyed blade tip and shaft
         rot = frame(sdir, face)
         y_ax = rot[:, 0]
@@ -250,8 +312,14 @@ def dig_clip(body, clips, cfg):
             # legs back onto their planted ankles, knees ahead
             for s_ in 'LR':
                 two_bone(joints, q, hips, 'thigh.' + s_, 'shin.' + s_, ankles[s_], np.array([0, 0, 1.0]), foot_rot[s_], 'foot.' + s_)
-            mr = hand_on_tool(body, joints, q, hips, 'R', tool_pos, tool_rot, DIG_GRIP['R'], np.array([-0.6, -0.5, -0.3]), thumb_up=True)
-            ml = hand_on_tool(body, joints, q, hips, 'L', tool_pos, tool_rot, DIG_GRIP['L'], np.array([0.6, -0.4, -0.4]), thumb_up=True)
+            # elbows out, down and back IN THE CHEST'S FRAME: a pole fixed in
+            # the world swung through the shoulder→wrist line as the trunk
+            # turned, and the hinge flipped (the left forearm jumped ~0.6 rad
+            # between two frames at the lever)
+            wr_, _wp = world_of(joints, q, hips)
+            Wc = _quat_mat(wr_[SK.INDEX['chest']])
+            mr = hand_on_tool(body, joints, q, hips, 'R', tool_pos, tool_rot, DIG_GRIP['R'], Wc @ np.array([-0.6, -0.5, -0.3]), thumb_up=True)
+            ml = hand_on_tool(body, joints, q, hips, 'L', tool_pos, tool_rot, DIG_GRIP['L'], Wc @ np.array([0.6, -0.4, -0.4]), thumb_up=True)
             solve.last = (mr, ml)
             return q, hips, max(mr, ml)
 
@@ -283,7 +351,9 @@ def dig_clip(body, clips, cfg):
         flip = (Q[f] * Q[f - 1]).sum(1) < 0
         Q[f, flip] *= -1
     clear = np.array(clear)
-    print('dig shaft clearance (min over frames, by key):', round(float(clear.min()), 3), [round(float(clear[int(round(k[0] * FPS))]), 3) for k in DIG_KEYS])
+    jumps = max_turn_per_frame(Q)
+    print('dig: largest turn between frames (rad):', {b: round(v, 3) for b, v in jumps.items() if v > 0.12})
+    print('dig shaft clearance (min over frames, by key):', round(float(clear.min()), 3), 'at t=%.2f' % times[int(np.argmin(clear))], [round(float(clear[int(round(k[0] * FPS))]), 3) for k in DIG_KEYS])
     print('dig needs', np.round(needs[::6], 2), 'last R/L', np.round(solvers[0].last if hasattr(solvers[0], 'last') else (0, 0), 3))
     print(f'dig: worst hand miss {max(misses):.4f} at t={times[int(np.argmax(misses))]:.2f}; misses at keys', [round(misses[int(round(k[0] * FPS))], 3) for k in DIG_KEYS])
     return {'times': times, 'q': Q, 'hips': P, 'duration': DIG_PERIOD, 'kind': 'loop', 'source': 'authored (scripts/villager/toolclips.py)',
