@@ -261,6 +261,50 @@ def rotate_to_contact(clip, an, side='L', touch=0.02):
     return land
 
 
+def close_loop(c):
+    """Make a loop's last frame its first again: a source loop whose end does
+    not quite meet its start (Quaternius' Sprint_Loop: the right shin ~1 rad
+    apart) jumps at the seam every cycle. The gap is spread over the cycle —
+    frame k turned by k/(n−1) of it — so the motion stays smooth."""
+    Q, P = c['q'], c['hips']
+    n = len(Q)
+    worst = 0.0
+    for i in range(Q.shape[1]):
+        d = qnorm(qmul(Q[0, i], qinv(Q[-1, i])))
+        if d[3] < 0:
+            d = -d
+        worst = max(worst, 2 * float(np.arccos(min(1.0, d[3]))))
+        for k in range(n):
+            Q[k, i] = qnorm(qmul(qslerp(np.array([0, 0, 0, 1.0]), d, k / (n - 1)), Q[k, i]))
+    gap = P[0] - P[-1]
+    gap[1] = 0  # the height is grounded per frame afterwards
+    for k in range(n):
+        P[k] = P[k] + gap * (k / (n - 1))
+    return worst
+
+
+def soften(c, passes=1):
+    """A circular [1 2 1]/4 filter over a loop's frames (rotations by
+    normalized weighted sums in one hemisphere, the hips linearly): the
+    Quaternius sprint snaps each knee straight at the strike — ~1 rad between
+    two frames and a little past straight — which reads as a pop at 30 fps."""
+    for _ in range(passes):
+        Q, P = c['q'], c['hips']
+        body_q, body_p = Q[:-1], P[:-1]  # the last frame repeats the first
+        n = len(body_q)
+        out_q = np.zeros_like(body_q)
+        out_p = np.zeros_like(body_p)
+        for k in range(n):
+            a, m, b = body_q[(k - 1) % n], body_q[k], body_q[(k + 1) % n]
+            sa = np.where((a * m).sum(1, keepdims=True) < 0, -1.0, 1.0)
+            sb = np.where((b * m).sum(1, keepdims=True) < 0, -1.0, 1.0)
+            q = sa * a + 2 * m + sb * b
+            out_q[k] = q / np.linalg.norm(q, axis=1, keepdims=True)
+            out_p[k] = (body_p[(k - 1) % n] + 2 * body_p[k] + body_p[(k + 1) % n]) / 4
+        c['q'] = np.concatenate([out_q, out_q[:1]])
+        c['hips'] = np.concatenate([out_p, out_p[:1]])
+
+
 def slice_clip(c, t0, t1, name):
     """A part of a clip, from t0 to t1, resampled at FPS (a hold when t0 = t1)."""
     from sheets import sample
@@ -292,6 +336,12 @@ def build_clips(src_dir, body, cfg, only=None):
         c = retarget(src, src.g.animation(clip_name), joints, ref)
         c['source'] = f'{lib}:{clip_name}'
         c['kind'] = kind
+        if kind in ('gait', 'loop'):
+            seam = close_loop(c)
+            if seam > 0.05:
+                print(f'clip {name}: loop seam closed ({seam:.2f} rad at the worst bone)')
+        if name == 'sprint':
+            soften(c, 2)
         if kind == 'gait':
             ground(c, joints, cp, per_frame=(name != 'sprint' and name != 'jog'))
             an = analyse_gait(c, joints, cp)

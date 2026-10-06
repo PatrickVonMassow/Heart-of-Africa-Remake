@@ -172,3 +172,22 @@ describe('the shovel on the drawn hand', () => {
     expect(VILLAGER_ASSET.shovel.tip).toBeLessThan(VILLAGER_ASSET.shovel.shaftBottom)
   })
 })
+
+describe('the clips themselves', () => {
+  it('no bone jumps between two frames of any clip (an IK flip would)', () => {
+    for (const [name, c] of Object.entries(asset.clips)) {
+      const n = c.times.length
+      c.rot.forEach((r, i) => {
+        if (!r.length) return
+        for (let k = 1; k < n; k++) {
+          const a = new THREE.Quaternion().fromArray(r, (k - 1) * 4)
+          const b = new THREE.Quaternion().fromArray(r, k * 4)
+          const step = c.times[k] - c.times[k - 1]
+          // 9 rad/s holds the dig's throw and the walk's swing; a sprinter's
+          // thigh swings at up to ~14 (its knee snapped at ~30 before the softening)
+          expect(a.angleTo(b) / step, `${name} ${asset.bones[i]} frame ${k}`).toBeLessThan(name === 'sprint' ? 16 : 9)
+        }
+      })
+    }
+  })
+})

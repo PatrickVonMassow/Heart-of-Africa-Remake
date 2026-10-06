@@ -66,7 +66,11 @@ def main():
         garments = cached(a.work, 'garments', lambda: G.build_garments(mh, body, clips, cfg), force='garments' in steps)
     if 'export' in steps:
         import export as E
-        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, garments, cfg)
+        # The game draws the code-built dress on the glTF body (render/
+        # villagerFigureBody.ts); the garments built here are measured
+        # (penetration report, frame sheets) but not shipped.
+        # OPEN: ship them once the game dresses the body from the pipeline.
+        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, None, cfg)
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)

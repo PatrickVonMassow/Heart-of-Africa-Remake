@@ -190,20 +190,34 @@ def catmull(keys, t, period):
 # The dig stroke (seconds; body frame: +z ahead, +x the figure's left, y up).
 # tool: where the upper (left) hand holds the shaft, the shaft's direction from
 # there down to the blade, and a hint for the blade's face (+z of the tool:
-# the side that carries the soil — toward the digger in the ground, up when
-# lifted, tipped to the right to throw).
+# the side that carries the soil — AWAY from the digger while the blade goes
+# in, so the lever turns it up with the soil on it, then tipped to the right
+# to throw). The face turns with the lever, never about the shaft: a hint that
+# began toward the digger and ended up turned the tool half round its own
+# shaft through the lever, and both wrists flipped (~0.8 rad in one frame).
 # trunk: hip drop, forward lean of the spine, turn of the chest (+ to the left).
 DIG_PERIOD = 2.4
 DIG_KEYS = [
     # t,    upper hand (x, y, z),  shaft dir to blade,   face hint,       drop, lean, turn
-    (0.00, (-0.05, 0.80, 0.28), (0.04, -0.86, 0.50), (0.0, 0.0, -1.0), 0.05, 0.28, 0.00),
-    (0.45, (-0.05, 0.72, 0.32), (0.04, -0.90, 0.43), (0.0, 0.0, -1.0), 0.08, 0.26, 0.00),
-    (0.85, (-0.18, 0.66, 0.20), (0.15, -0.70, 0.70), (0.0, 0.5, -0.8), 0.10, 0.36, 0.05),
+    (0.00, (-0.05, 0.80, 0.28), (0.04, -0.86, 0.50), (0.0, 0.5, 0.86), 0.05, 0.28, 0.00),
+    (0.45, (-0.05, 0.72, 0.32), (0.04, -0.90, 0.43), (0.0, 0.43, 0.9), 0.08, 0.26, 0.00),
+    (0.85, (-0.12, 0.66, 0.20), (0.15, -0.70, 0.70), (0.0, 0.7, 0.7), 0.10, 0.36, 0.05),
     (1.30, (-0.16, 0.70, 0.24), (0.15, -0.38, 0.91), (0.0, 1.0, 0.0), 0.07, 0.34, 0.05),
     (1.70, (-0.08, 0.76, 0.26), (-0.62, -0.28, 0.73), (-0.7, 0.3, 0.0), 0.05, 0.30, -0.40),
-    (2.00, (-0.04, 0.80, 0.28), (-0.20, -0.66, 0.72), (0.0, 0.2, -1.0), 0.05, 0.30, -0.20),
+    (2.00, (-0.04, 0.80, 0.28), (-0.20, -0.66, 0.72), (0.0, 0.6, 0.8), 0.05, 0.30, -0.20),
 ]
 DIG_GRIP = {'R': -0.03, 'L': 0.13}
+
+
+def max_turn_per_frame(Q):
+    """Per bone, the largest local turn between consecutive frames (rad) — a
+    flip of an IK hinge shows here as a jump far above the stroke's own speed."""
+    out = {}
+    for b in SK.NAMES:
+        i = SK.INDEX[b]
+        d = np.abs((Q[1:, i] * Q[:-1, i]).sum(1)).clip(0, 1)
+        out[b] = float(2 * np.arccos(d).max())
+    return out
 
 
 def dig_clip(body, clips, cfg):
@@ -250,8 +264,14 @@ def dig_clip(body, clips, cfg):
             # legs back onto their planted ankles, knees ahead
             for s_ in 'LR':
                 two_bone(joints, q, hips, 'thigh.' + s_, 'shin.' + s_, ankles[s_], np.array([0, 0, 1.0]), foot_rot[s_], 'foot.' + s_)
-            mr = hand_on_tool(body, joints, q, hips, 'R', tool_pos, tool_rot, DIG_GRIP['R'], np.array([-0.6, -0.5, -0.3]), thumb_up=True)
-            ml = hand_on_tool(body, joints, q, hips, 'L', tool_pos, tool_rot, DIG_GRIP['L'], np.array([0.6, -0.4, -0.4]), thumb_up=True)
+            # elbows out, down and back IN THE CHEST'S FRAME: a pole fixed in
+            # the world swung through the shoulder→wrist line as the trunk
+            # turned, and the hinge flipped (the left forearm jumped ~0.6 rad
+            # between two frames at the lever)
+            wr_, _wp = world_of(joints, q, hips)
+            Wc = _quat_mat(wr_[SK.INDEX['chest']])
+            mr = hand_on_tool(body, joints, q, hips, 'R', tool_pos, tool_rot, DIG_GRIP['R'], Wc @ np.array([-0.6, -0.5, -0.3]), thumb_up=True)
+            ml = hand_on_tool(body, joints, q, hips, 'L', tool_pos, tool_rot, DIG_GRIP['L'], Wc @ np.array([0.6, -0.4, -0.4]), thumb_up=True)
             solve.last = (mr, ml)
             return q, hips, max(mr, ml)
 
@@ -283,7 +303,9 @@ def dig_clip(body, clips, cfg):
         flip = (Q[f] * Q[f - 1]).sum(1) < 0
         Q[f, flip] *= -1
     clear = np.array(clear)
-    print('dig shaft clearance (min over frames, by key):', round(float(clear.min()), 3), [round(float(clear[int(round(k[0] * FPS))]), 3) for k in DIG_KEYS])
+    jumps = max_turn_per_frame(Q)
+    print('dig: largest turn between frames (rad):', {b: round(v, 3) for b, v in jumps.items() if v > 0.12})
+    print('dig shaft clearance (min over frames, by key):', round(float(clear.min()), 3), 'at t=%.2f' % times[int(np.argmin(clear))], [round(float(clear[int(round(k[0] * FPS))]), 3) for k in DIG_KEYS])
     print('dig needs', np.round(needs[::6], 2), 'last R/L', np.round(solvers[0].last if hasattr(solvers[0], 'last') else (0, 0), 3))
     print(f'dig: worst hand miss {max(misses):.4f} at t={times[int(np.argmax(misses))]:.2f}; misses at keys', [round(misses[int(round(k[0] * FPS))], 3) for k in DIG_KEYS])
     return {'times': times, 'q': Q, 'hips': P, 'duration': DIG_PERIOD, 'kind': 'loop', 'source': 'authored (scripts/villager/toolclips.py)',
