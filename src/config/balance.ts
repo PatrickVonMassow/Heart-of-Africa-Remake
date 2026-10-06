@@ -2583,55 +2583,13 @@ export const VILLAGER_ASSET = {
    *  steps, so a vertex caught between two body parts does not swing from
    *  one to the other. Calibratable. */
   garmentFitStep: 0.01,
-  /** The bones whose drawn swing drives the garments' corrective shapes
-   *  (scripts/villager/correct.py, render/villagerGarmentDrivers.ts) and the
-   *  hung rest axis each swings: down for a limb, up for the trunk and head.
-   *  Four drivers per bone (its axis's lean to ±x and ±z). Calibratable. */
-  garmentDriverBones: [
-    ['spine', 'up'],
-    ['chest', 'up'],
-    ['neck', 'up'],
-    ['head', 'up'],
-    ['upperArm.L', 'down'],
-    ['upperArm.R', 'down'],
-    ['forearm.L', 'down'],
-    ['forearm.R', 'down'],
-    ['thigh.L', 'down'],
-    ['thigh.R', 'down'],
-    ['shin.L', 'down'],
-    ['shin.R', 'down'],
-  ],
-  /** Bone pairs whose forward and backward swings multiply into further
-   *  drivers (four per pair): a hem the calf or the other leg swings into
-   *  depends on both bones at once. Calibratable. */
-  garmentDriverPairs: [
-    ['thigh.L', 'shin.L'],
-    ['thigh.R', 'shin.R'],
-    ['thigh.L', 'thigh.R'],
-    ['upperArm.L', 'forearm.L'],
-    ['upperArm.R', 'forearm.R'],
-    ['spine', 'thigh.L'],
-    ['spine', 'thigh.R'],
-  ],
-  /** Most passes of the corrective fit (it stops once every garment is
-   *  within tolerance). Calibratable. */
-  garmentCorrectPasses: 60,
-  /** The most one corrective shape moves a garment vertex along one axis
-   *  (figure units): bounds a vertex whose constraints contradict each other.
-   *  Calibratable. */
-  garmentCorrectCap: 0.15,
-  /** How many of the frames a garment vertex violates most each corrective
-   *  pass adds to its constraints. Calibratable. */
-  garmentCorrectFrames: 24,
-  /** The corrective fit stops after this many passes that left every
-   *  vertex's worst depth where it was. Calibratable. */
-  garmentCorrectStall: 4,
-  /** Each corrective pass first draws every vertex's shapes this far toward
-   *  its mesh neighbours' mean and shrinks them by garmentCorrectShrink, then
-   *  fits the nearest shapes meeting the constraints: the correction spreads
-   *  smoothly over the cloth instead of kinking single vertices. Calibratable. */
-  garmentCorrectSmooth: 0.5,
-  garmentCorrectShrink: 0.95,
+  /** Rounds of the per-frame baked collision resolution
+   *  (scripts/villager/resolve.py) before what is left is moved vertex by
+   *  vertex along its shortest way out. Calibratable. */
+  garmentResolveRounds: 16,
+  /** How many mesh rings out a resolved vertex's push spreads (halving each
+   *  ring), so the cloth bends round the body instead of kinking. Calibratable. */
+  garmentResolveRings: 2,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

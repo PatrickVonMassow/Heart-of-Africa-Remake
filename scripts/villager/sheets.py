@@ -100,7 +100,7 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
     jidx, jw = top4(body['W'])
     cw = corner_weights(sex, age)
     pos, j = morphed(body, cw)
-    from correct import drawn_garment
+    from resolve import drawn_garment, offsets_at
     person = GP.Person(j)
     baked = person.bake(pos, jidx, jw)
     c = clips['clips'][name]
@@ -118,7 +118,8 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
             v[:, 0] += f * spacing - span / 2
         R.add_mesh(f'f{f}', v, body['tris'], SKIN)
         for k, n in enumerate(outfit):
-            gv = drawn_garment(person, garments['meshes'][n], cw, wr, wp, cfg)
+            g = garments['meshes'][n]
+            gv = drawn_garment(person, g, cw, wr, wp, offsets_at(g, cw, c, name, t))
             if view == 'side':
                 gv[:, 2] += f * spacing - span / 2
             else:
@@ -171,10 +172,11 @@ OUTFITS = [
 GARMENT_COLOURS = [(0.75, 0.68, 0.55, 1), (0.55, 0.25, 0.18, 1), (0.25, 0.3, 0.5, 1), (0.6, 0.5, 0.3, 1)]
 
 
-def dressed(body, garments, names, weights, q, hips, cfg):
+def dressed(body, garments, names, weights, q, hips, clip=None, cname=None, t=0.0):
     """Body + garments for one pose along the game's path (gamepath.py), the
-    garments' corrective shapes applied: list of (verts, tris, colour)."""
-    from correct import drawn_garment
+    garments' baked offsets at clip `cname`'s time `t` applied: list of
+    (verts, tris, colour)."""
+    from resolve import drawn_garment, offsets_at
     pos, j = morphed(body, weights)
     person = GP.Person(j)
     wr, wp = rig.fk(j, q, hips)
@@ -183,7 +185,8 @@ def dressed(body, garments, names, weights, q, hips, cfg):
     for k, n in enumerate(names):
         g = garments['meshes'][n]
         col = (0.08, 0.06, 0.05, 1) if g.get('part') == 'hair' else (0.95, 0.95, 0.92, 1) if g.get('part') == 'eyes' else GARMENT_COLOURS[k % len(GARMENT_COLOURS)]
-        out.append((drawn_garment(person, g, weights, wr, wp, cfg), g['tris'], col))
+        off = offsets_at(g, weights, clip, cname, t) if clip is not None else None
+        out.append((drawn_garment(person, g, weights, wr, wp, off), g['tris'], col))
     return out
 
 
@@ -196,7 +199,7 @@ def garment_sheet(out, body, clips, garments, cfg, clip='walk', t=0.3, per_row=8
     for r, row in enumerate(rows):
         R.clear()
         for k, n in enumerate(row):
-            for v, tr, col in dressed(body, garments, ['hair', 'eyes', n], w, q, hips, cfg):
+            for v, tr, col in dressed(body, garments, ['hair', 'eyes', n], w, q, hips, c, clip, c['duration'] * t):
                 v = v.copy()
                 if view == 'side':
                     v[:, 2] += k * 0.8

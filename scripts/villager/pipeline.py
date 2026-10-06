@@ -5,7 +5,7 @@
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
   garments    each dress form built round the body, weights transferred, then
               fitted to every clip frame at every body corner (fit.py) (cached)
-  correct     the garments' pose-driven corrective shapes (correct.py) (cached)
+  resolve     the garments' per-frame baked collision offsets (resolve.py) (cached)
   export      public/models/villager.glb (body and clips; garments not yet shipped)
   sheets      frame sheets under verification/villager-body/
   penetration the per-frame garment penetration report; the run FAILS (exit 1)
@@ -53,7 +53,7 @@ def main():
     cfg = json.load(open(a.config))
     os.makedirs(a.out, exist_ok=True)
     os.makedirs(a.verification, exist_ok=True)
-    steps = ['body', 'clips', 'garments', 'correct', 'export', 'sheets', 'penetration'] if a.step == 'all' else a.step.split(',')
+    steps = ['body', 'clips', 'garments', 'resolve', 'export', 'sheets', 'penetration'] if a.step == 'all' else a.step.split(',')
     if 'garments' in steps or 'selftest' in steps:
         import fit as F
         F.selftest()
@@ -65,19 +65,19 @@ def main():
     body = cached(a.work, 'body', lambda: B.build_body(mh, cfg), force='body' in steps)
     have = lambda n: n in steps or os.path.exists(os.path.join(a.work, n + '.pkl'))  # noqa: E731
     clips = None
-    if have('clips') and any(s in steps for s in ('clips', 'export', 'sheets', 'penetration', 'garments', 'correct')):
+    if have('clips') and any(s in steps for s in ('clips', 'export', 'sheets', 'penetration', 'garments', 'resolve')):
         import clips as CL
         clips = cached(a.work, 'clips', lambda: CL.build_clips(a.src, body, cfg), force='clips' in steps)
     garments = None
-    if have('garments') and any(s in steps for s in ('garments', 'correct', 'export', 'sheets', 'penetration')):
+    if have('garments') and any(s in steps for s in ('garments', 'resolve', 'export', 'sheets', 'penetration')):
         import garments as G
         import fit as F
         garments = cached(a.work, 'garments', lambda: F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), force='garments' in steps)
     if garments is not None:
-        import correct as CR
-        base = garments
-        garments = cached(a.work, 'corrected', lambda: CR.correct(body, clips, base, cfg), force=any(s in steps for s in ('correct', 'garments')))
-        CR.driver_check(a.verification, body, clips, cfg, garments)
+        import resolve as RS
+        fitted = garments
+        garments = cached(a.work, 'resolved', lambda: RS.resolve(body, clips, fitted, cfg), force=any(s in steps for s in ('garments', 'resolve')))
+        RS.baked_check(a.verification, clips, garments)
     if 'export' in steps:
         import export as E
         # The game still draws the code-built dress on the glTF body (render/
@@ -99,7 +99,7 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # Blender crashes on exit once a forked pool has run (correct.py); the
+    # Blender crashes on exit once a forked pool has run (resolve.py); the
     # work is done and written, so leave without its shutdown.
     sys.stdout.flush()
     os._exit(0)
