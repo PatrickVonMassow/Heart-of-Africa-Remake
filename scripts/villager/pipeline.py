@@ -5,7 +5,7 @@
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
   garments    each dress form built round the body, weights transferred, then
               fitted to every clip frame at every body corner (fit.py) (cached)
-  export      public/models/villager.glb, body, clips and the fitted garments
+  export      public/models/villager.glb (body and clips; garments not yet shipped)
   sheets      frame sheets under verification/villager-body/
   penetration the per-frame garment penetration report; the run FAILS (exit 1)
               when any garment lies deeper than the tolerance in any frame
@@ -68,11 +68,12 @@ def main():
         garments = cached(a.work, 'garments', lambda: F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), force='garments' in steps)
     if 'export' in steps:
         import export as E
-        # the game dresses the body with exactly these garments (render/
-        # villagerFigureBody.ts gltfGarment) — the ones the report measures
-        # (the hair cap and eyes stay pipeline-only: the game paints the scalp)
-        dress = {'meshes': {n: g for n, g in garments['meshes'].items() if n.startswith('g-')}, 'meta': garments['meta']}
-        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, dress, cfg)
+        # The game still draws the code-built dress on the glTF body (render/
+        # villagerFigureBody.ts): the garments built and fitted here are
+        # measured (penetration report, dress-* frame sheets) but not shipped
+        # while they clip — shipping is ready in commit af2c25d42.
+        # OPEN: ship them once the report is zero beyond tolerance.
+        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, None, cfg)
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)

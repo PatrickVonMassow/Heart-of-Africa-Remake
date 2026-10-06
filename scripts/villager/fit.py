@@ -1,13 +1,22 @@
 """Step 3b: fit the dress to the motion — the garments, built round the body
-in one design pose (garments.py), are posed through every exported clip at
-every body corner (the same frames, corners and skinning the penetration
-report measures), and wherever a garment vertex comes closer to the skinned
-body than `garmentFitMargin` — or lies inside it — the push that would clear
-it is taken back into the rest pose through the inverse of that vertex's own
-bone blend. Per vertex the largest push over all frames is kept, spread a
-little onto its neighbours (no spike in the cloth), and added to the rest
-position; the morphs keep their deltas, so every corner moves with it. Passes
-repeat until no frame asks for a push.
+in one design pose (garments.py), are posed through the exported clips at
+every body corner (the frames, corners and skinning the penetration report
+measures), and wherever a garment vertex comes closer to the skinned body
+than `garmentFitMargin` — or lies inside it — the push that would clear it is
+taken back into the rest pose through the transpose of that vertex's bone
+blend, at most `garmentFitStep` per pass. Per vertex the largest push over
+the frames is kept, spread a little onto its neighbours (no spike in the
+cloth), and added to the rest position; the morphs keep their deltas, so
+every corner moves with it. A pass that leaves a garment deeper than before
+is undone for that garment, and the shallowest state is kept.
+
+Measured 06.10.2026: this lowers most garments' deepest point but cannot
+reach the tolerance. A static rest offset cannot follow a pose — a skirt's
+front stays where a lifted knee needs it gone, and cloth caught between two
+body parts (between the legs, under the arm) is pushed from one into the
+other — so the passes oscillate instead of converging.
+OPEN: zero penetration needs pose-driven correction (e.g. corrective morphs
+driven by the leg and arm angles, evaluated alike here and in the game).
 """
 import numpy as np
 
@@ -82,7 +91,7 @@ def corners():
     return CORNERS
 
 
-def fit(body, clips, garments, cfg, passes=6, stride=2, log=print):
+def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x, flush=True)):
     from mathutils.bvhtree import BVHTree
     margin = cfg['VILLAGER_ASSET']['garmentFitMargin']
     jidx, jw = top4(body['W'])
@@ -90,8 +99,11 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=print):
     G = garments['meshes']
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
+    step = cfg['VILLAGER_ASSET']['garmentFitStep']
+    best = {n: (np.inf, G[n]['pos'].copy()) for n in names}
     for it in range(passes):
         push = {n: np.zeros_like(G[n]['pos']) for n in names}
+        deep = {n: 0.0 for n in names}
         worst = 0.0
         for (sex, age, build) in corners():
             w = corner_weights(sex, age, build)
@@ -113,13 +125,25 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=print):
                         if not len(bad):
                             continue
                         worst = max(worst, float(-s[bad].min()))
+                        # back into the rest pose through the transpose of the
+                        # vertex's bone blend (its inverse for one bone; never
+                        # the blow-up a near-singular blend's inverse gives)
                         A = np.einsum('vk,vkij->vij', gw[bad], R[gi[bad]])
-                        d = np.linalg.solve(A, (nrm[bad] * (margin - s[bad])[:, None])[..., None])[..., 0]
+                        u = np.einsum('vji,vj->vi', A, nrm[bad])
+                        un = np.maximum(np.linalg.norm(u, axis=1), 0.5)
+                        d = u / un[:, None] * np.minimum(margin - s[bad], step)[:, None]
                         P = push[n]
+                        deep[n] = max(deep[n], float(-s[bad].min()))
                         take = np.einsum('ij,ij->i', d, d) > np.einsum('ij,ij->i', P[bad], P[bad])
                         P[bad[take]] = d[take]
         moved = 0
         for n in names:
+            # a pass that made a garment worse is undone, and the garment rests
+            if deep[n] <= best[n][0]:
+                best[n] = (deep[n], G[n]['pos'].copy())
+            else:
+                G[n]['pos'] = best[n][1].copy()
+                continue
             D = push[n]
             if not D.any():
                 continue
@@ -130,4 +154,6 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=print):
         log(f'fit pass {it + 1}: deepest {worst:.4f}, {moved} vertices pushed')
         if not moved:
             break
+    for n in names:
+        G[n]['pos'] = best[n][1]
     return garments

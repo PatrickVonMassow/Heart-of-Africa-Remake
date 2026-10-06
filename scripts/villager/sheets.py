@@ -65,6 +65,12 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
     if garments and (not want or 'garments' in want):
         garment_sheet(out, body, clips, garments, 'walk', 0.3, view='front')
         garment_sheet(out, body, clips, garments, 'walk', 0.3, view='side')
+    if garments and clips and (not want or 'dress' in want):
+        # the shipped garments in motion: four outfits through walk, kneel and dig
+        for name in DRESS_CLIPS:
+            for k, (sex, age, outfit) in enumerate(OUTFITS):
+                clip_sheet(out, body, clips, name, frames=8, view=35, spacing=1.0, sex=sex, age=age,
+                           fname=f'dress-{name}-{k}.png', garments=garments, outfit=outfit)
     if clips:
         for name in clips['clips']:
             if not want or name in want or 'clips' in want:
@@ -88,10 +94,11 @@ def sample(clip, t):
     return q, hips
 
 
-def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex='male', age='adult', extra=None, fname=None):
+def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex='male', age='adult', extra=None, fname=None, garments=None, outfit=()):
     R.clear()
     jidx, jw = top4(body['W'])
-    pos, j = morphed(body, corner_weights(sex, age))
+    cw = corner_weights(sex, age)
+    pos, j = morphed(body, cw)
     c = clips['clips'][name]
     d = c['duration']
     spacing = spacing if spacing is not None else (0.55 if view == 'side' else 0.75)
@@ -106,6 +113,19 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
         else:
             v[:, 0] += f * spacing - span / 2
         R.add_mesh(f'f{f}', v, body['tris'], SKIN)
+        for k, n in enumerate(outfit):
+            g = garments['meshes'][n]
+            gp = g['pos'].copy()
+            for m, x in cw.items():
+                if x:
+                    gp += x * g['morph_pos'][m]
+            gi, gw = top4(g['W'])
+            gv = rig.skin(gp, gi, gw, j, wr, wp)
+            if view == 'side':
+                gv[:, 2] += f * spacing - span / 2
+            else:
+                gv[:, 0] += f * spacing - span / 2
+            R.add_mesh(f'f{f}-{n}', gv, g['tris'], GARMENT_COLOURS[k % len(GARMENT_COLOURS)])
         if c.get('tool'):
             tv, tt = shovel_mesh(body, c['tool'], wr, wp, cfg_shovel(clips))
             if view == 'side':
@@ -143,6 +163,13 @@ def shovel_mesh(body, tool, wr, wp, sh):
     return origin + v @ rot.T, t
 
 
+DRESS_CLIPS = ('walk', 'kneelDown', 'kneel', 'kneelUp', 'dig')
+OUTFITS = [
+    ('male', 'adult', ('g-robe-chest', 'g-turban-aroundHead')),
+    ('female', 'adult', ('g-wrapLong-chest', 'g-neckBeads-neck', 'g-headband-aroundHead')),
+    ('male', 'elder', ('g-trousers-waist', 'g-shirt-chest', 'g-cloak-leftShoulder')),
+    ('female', 'youth', ('g-skirtKnee-waist', 'g-cape-bothShoulders', 'g-limbRings-limbs')),
+]
 GARMENT_COLOURS = [(0.75, 0.68, 0.55, 1), (0.55, 0.25, 0.18, 1), (0.25, 0.3, 0.5, 1), (0.6, 0.5, 0.3, 1)]
 
 
