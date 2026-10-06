@@ -10,7 +10,7 @@ import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { clipGaitPose, clipPoseAt, newClipGait, shovelOnHungHand, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
-import { contactPoints, forwardKinematics, newPose, newWorld } from './villagerRig'
+import { contactPoints, forwardKinematics, newPose, newWorld, toolInHand } from './villagerRig'
 
 let asset: VillagerAsset
 let adult: GltfPerson
@@ -174,6 +174,36 @@ describe('the shovel on the drawn hand', () => {
 })
 
 describe('the clips themselves', () => {
+  it('the dig never turns the shovel about its own shaft: per frame, once the shaft\'s swing is taken out', () => {
+    const c = asset.clips.dig
+    const n = asset.bones.length
+    const f = adult.frame
+    const hand = asset.bones.indexOf('hand.R')
+    const inHand = toolInHand(asset, 'R', c.tool!.grip).quaternion
+    const pose = newPose(n)
+    const world = newWorld(n)
+    const tools = Array.from(c.times, (t) => {
+      clipPoseAt(asset, f, c, t, pose)
+      forwardKinematics(asset, f.rest0, pose, world)
+      return world.q[hand].clone().multiply(inHand)
+    })
+    let worst = 0
+    let total = 0
+    for (let k = 1; k < tools.length; k++) {
+      const a0 = new THREE.Vector3(0, 1, 0).applyQuaternion(tools[k - 1])
+      const a1 = new THREE.Vector3(0, 1, 0).applyQuaternion(tools[k])
+      // the face carried by the shortest swing of the shaft, against the face itself
+      const carried = new THREE.Vector3(0, 0, 1).applyQuaternion(tools[k - 1]).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(a0, a1))
+      const face = new THREE.Vector3(0, 0, 1).applyQuaternion(tools[k])
+      const roll = Math.atan2(carried.clone().cross(face).dot(a1), carried.dot(face))
+      worst = Math.max(worst, Math.abs(roll))
+      total += roll
+    }
+    // the loop's leftover (holonomy, ~18°) is spread evenly: ~0.25° a frame
+    expect(worst).toBeLessThan((1 * Math.PI) / 180)
+    expect(Math.abs(total)).toBeLessThan((25 * Math.PI) / 180)
+  })
+
   it('no bone jumps between two frames of any clip (an IK flip would)', () => {
     for (const [name, c] of Object.entries(asset.clips)) {
       const n = c.times.length
