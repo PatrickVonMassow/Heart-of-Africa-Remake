@@ -85,7 +85,7 @@ export async function pipelineConfig() {
   })
   const code = out.outputFiles[0].text
   const mod = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
-  return { VILLAGER_ASSET: mod.VILLAGER_ASSET, FIGURE_STATURE: mod.VILLAGER_ASSET.stature }
+  return { VILLAGER_ASSET: mod.VILLAGER_ASSET, VILLAGER_GLTF: mod.VILLAGER_GLTF, FIGURE_STATURE: mod.VILLAGER_ASSET.stature }
 }
 
 async function main() {
