@@ -7,7 +7,7 @@
 //
 // Inputs are the PINNED CC0 sources in scripts/villager/sources.json (MakeHuman /
 // MPFB2 base mesh, macro targets and game_engine rig; Quaternius Universal
-// Animation Library 1 + 2), fetched into the git-ignored
+// Animation Library 1), fetched into the git-ignored
 // local/assets-src/villager/ of the main checkout and checked against their
 // sha256. Blender (scripts/blender.mjs, pinned, headless) runs the Python in
 // this directory; the numbers the pipeline is built from come from
