@@ -42,6 +42,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
         person = GP.Person(j)
         bh = person.bake(pos, jidx, jw)
         gh = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in gnames}
+        shp = {n: CR.person_shapes(garments['meshes'][n], w) for n in gnames}
         for k, (cname, f, kst, q, hips) in enumerate(GP.poses(clips, clip_names or EXPORT_CLIPS, cfg)):
             if k % stride:
                 continue
@@ -50,7 +51,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
             tree = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
             a = CR.drivers(person, wr, cfg)
             for n in gnames:
-                sh = garments['meshes'][n].get('shapes')
+                sh = shp[n]
                 gv = person.skin(gh[n] if sh is None else gh[n] + np.einsum('k,kvi->vi', a, sh), *gskin[n], wr, wp)
                 d, _co, _n = depths(tree, gv, tol)
                 deepest = max(0.0, float(d.max()))
