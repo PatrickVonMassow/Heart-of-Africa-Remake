@@ -178,6 +178,18 @@ put it is the mistake this line exists to stop.
   Find and fix the cause, so that a card answer the user gives in the head session while it stands down is carried to the owner and acted on without any human step in another session.
   Done when: in a reproduction with a live headless owner, `vdzk-answer.mjs` records the head session's answer, and the owner (or the due-redeem path) removes the named card. A unit test covers the state shape that made activeSource fail. A SendMessage to a headless peer is not part of the solution.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1317. The staged lion feed in the elephant-trampling check never ends
+  Source: findings carrier 06.10.2026 12:46, found on the enrichments run of point 1297.
+  `npm test -- enrichments --section=elephant-trampling` is red on a quiet host on main (48a7e88) and on feat/1297 alike: "Lion moves on once the carcass is consumed (stain remains)" reads mode feed, prey false, stain false 1.2 s after staging `victim null`, mode feed, timer 0.4 (scripts/verify/enrichments.mjs:1326-1360). The no-victim feed branch of LionHunt in src/scenes/travel/Wildlife.tsx would leave at timer <= 0, so that branch apparently does not run for the staged state (inactive hunt, or a reset after staging).
+  Final state: the cause is measured (game or check) and fixed; the section runs green on both backends.
+  Verifiable: `--section=elephant-trampling` green on WebGPU and WebGL 2; a right-layer test for the corrected cause.
+  Bundle: Tierverhalten.
+- [ ] 1318. The dressing-growth and channel-crossing checks are red on main
+  Source: findings carrier 06.10.2026 13:22, found on the enrichments run of point 1297.
+  On a quiet host, on main and feat/1297 alike: `--section=dressing-growth` reads samples [0,0,0,0,0] for "the streamed dressing does not grow over a session at a fixed anchor (point 278)" (nothing streamed at all); `--section=channel-crossing` reads sawOnWater false, sawLowY false, landed true for "a purposeful crossing swims the channel chest-deep and lands on the far bank (point 192)". With 1317 they keep a whole enrichments pass red.
+  Final state: each cause is measured (game or check) and fixed; both sections run green on both backends.
+  Verifiable: both sections green on WebGPU and WebGL 2; a right-layer test per corrected cause.
+  Bundle: Tierverhalten.
 - [ ] 1297. Investigate, and fix if confirmed, a calf-predation outcome reported by the user on 05.10.2026 (bug report /backup/hoa/local/hoa-state-2026-10-05-1928572142.zip, seed 1928572142, position 43.77/-100.17, build 69221cd, WebGPU): a lion hunted an antelope calf, the parent ran as a living shield between lion and calf, the lion visibly reached the PARENT, yet the CALF died although the lion was well away from it. The user adds: the calf was on the OTHER side of the river when it died.
   Queue position: directly before point 1294 (user order 05.10.2026: "Reihe eine Untersuchung und eventuelle Behebung davon direkt vor 1294 ein.").
   Evidence (snapshot taken after the event, hunt already in 'leave'): two antelope carcasses 1.89 apart at about (100, -122) — almost exactly PARENT_BLOCK_OFFSET = 1.8 — both with landed vultures (a land kill, not a drowning); no mourning calf and no vigil parent nearby, i.e. most likely BOTH died. The screenshot shows the kill stain right at the waterline of the FAR (east) bank, the traveller on the west bank.
