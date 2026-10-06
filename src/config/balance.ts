@@ -2575,6 +2575,14 @@ export const VILLAGER_ASSET = {
    *  at any morph extreme (figure units, ≈ 4 mm) — the penetration report's
    *  tolerance. */
   garmentPenetrationTolerance: 0.003,
+  /** How far off the skinned body the dress fit (scripts/villager/fit.py)
+   *  keeps every garment vertex in the frames it checks (figure units,
+   *  ≈ 3 mm) — the slack the frames between them may use. Calibratable. */
+  garmentFitMargin: 0.002,
+  /** The most one fit pass moves a garment vertex (figure units): small
+   *  steps, so a vertex caught between two body parts does not swing from
+   *  one to the other. Calibratable. */
+  garmentFitStep: 0.01,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

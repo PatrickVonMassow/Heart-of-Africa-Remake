@@ -3,11 +3,13 @@
 
   body        MakeHuman base → decimated body, morphs, joints, weights (cached)
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
-  garments    each dress form built round the body, weights transferred (cached)
-  export      public/models/villager.glb
+  garments    each dress form built round the body, weights transferred, then
+              fitted to every clip frame at every body corner (fit.py) (cached)
+  export      public/models/villager.glb (body and clips; garments not yet shipped)
   sheets      frame sheets under verification/villager-body/
   penetration the per-frame garment penetration report; the run FAILS (exit 1)
               when any garment lies deeper than the tolerance in any frame
+  selftest    the fit loop's own check (also run before every garments step)
   all         every step in order
 """
 import argparse
@@ -51,6 +53,11 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     os.makedirs(a.verification, exist_ok=True)
     steps = ['body', 'clips', 'garments', 'export', 'sheets', 'penetration'] if a.step == 'all' else a.step.split(',')
+    if 'garments' in steps or 'selftest' in steps:
+        import fit as F
+        F.selftest()
+    if steps == ['selftest']:
+        return
     from mhbody import MakeHuman
     mh = MakeHuman(a.src)
     import body as B
@@ -63,13 +70,15 @@ def main():
     garments = None
     if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
         import garments as G
-        garments = cached(a.work, 'garments', lambda: G.build_garments(mh, body, clips, cfg), force='garments' in steps)
+        import fit as F
+        garments = cached(a.work, 'garments', lambda: F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), force='garments' in steps)
     if 'export' in steps:
         import export as E
-        # The game draws the code-built dress on the glTF body (render/
-        # villagerFigureBody.ts); the garments built here are measured
-        # (penetration report, frame sheets) but not shipped.
-        # OPEN: ship them once the game dresses the body from the pipeline.
+        # The game still draws the code-built dress on the glTF body (render/
+        # villagerFigureBody.ts): the garments built and fitted here are
+        # measured (penetration report, dress-* frame sheets) but not shipped
+        # while they clip — shipping is ready in commit af2c25d42.
+        # OPEN: ship them once the report is zero beyond tolerance.
         E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, None, cfg)
     if 'sheets' in steps:
         import sheets as S
