@@ -100,7 +100,7 @@ put it is the mistake this line exists to stop.
   Verifiable (in addition to 1294's): the per-frame penetration report from Blender (zero beyond tolerance); a rendered Blender frame sheet of walk, sprint, dig and shovel-carry in side view; Vitest for speed→clip/rate mapping, walk/sprint threshold, heel-first contact in walk and no heel contact in sprint, tool attachment to the hand bone; Playwright on both backends: walking and sprinting side view, digging close-up across several frames (no flicker), a figure carrying a shovel (blade above ground), all picture-checked; the cross-vendor review record with its fixes.
   Low preset keeps the primitive figure (point 1301 covers it); items 6-11 apply to the medium/high skinned body.
   Criticality: high — new asset pipeline, load budget, every villager, both backends. If the point does not converge, split along "body and pipeline" / "animation, dress and tool".
-   Open before landing (06.10.2026, from the dress-clipping repair): the WebGL 2 `polish-villagers --section=villager-dress` run on d216b25e5 was RED on a staging check (Mongo village, a hut hides the leftmost child, sight lines 14/16; WebGPU green), and `src/scenes/place/PlaceLife.games.test.ts` failed in the worktree (passes on main, branch CI green) — fix or charge both before landing.
+  Status 06.10.2026: dress clipping fixed (Vitest on every people/build), children-games harness fixed (bc4f2bf6e), Mongo WebGL 2 sight-line red fixed by re-staging past passers-by (e836ab025); villager-dress green on both backends at e836ab025, pictures d3867f618. Before landing: cross-vendor review, covering tiers, landing.
   Bundle: Dorfleben.
 
 - [ ] 1311. Villager glTF body: animation, dress and tool (split from 1294)
