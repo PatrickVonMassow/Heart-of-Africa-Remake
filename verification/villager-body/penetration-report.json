@@ -3,27 +3,27 @@
  "stride": 1,
  "garments": {
   "g-loinFlap-waist": {
-   "depth": 0.017484927554186885,
-   "at": "kneelUp frame 4 (male child build +0)",
-   "over": 223,
+   "depth": 0.015828050470824296,
+   "at": "kneelUp frame 9 (female adult build +0)",
+   "over": 146,
    "checked": 3760
   },
   "g-girdleTails-waist": {
-   "depth": 0.012853116177367018,
-   "at": "kneelUp frame 4 (male adult build +1)",
-   "over": 114,
+   "depth": 0.007304369402893422,
+   "at": "kneelUp frame 0 (female adult build +0)",
+   "over": 32,
    "checked": 3760
   },
   "g-apron-waist": {
-   "depth": 0.04697206256876683,
-   "at": "kneelUp frame 11 (female child build +0)",
-   "over": 789,
+   "depth": 0.04702612741094046,
+   "at": "kneelUp frame 8 (female adult build +0)",
+   "over": 846,
    "checked": 3760
   },
   "g-skirtShort-waist": {
-   "depth": 0.053834918478149904,
-   "at": "sprint frame 5 (female child build +0)",
-   "over": 1459,
+   "depth": 0.04522514472977864,
+   "at": "walk frame 7 (male elder build +0)",
+   "over": 1231,
    "checked": 3760
   },
   "g-skirtKnee-waist": {
@@ -33,45 +33,45 @@
    "checked": 3760
   },
   "g-wrapLong-waist": {
-   "depth": 0.09492133257302587,
-   "at": "kneelDown frame 22 (male youth build +0)",
-   "over": 2082,
+   "depth": 0.0832736213741439,
+   "at": "kneelDown frame 11 (male elder build +0)",
+   "over": 3688,
    "checked": 3760
   },
   "g-wrapLong-chest": {
-   "depth": 0.08536203816469864,
-   "at": "kneelUp frame 2 (male child build +0)",
+   "depth": 0.10275112327600204,
+   "at": "kneel frame 0 (female elder build +0)",
    "over": 3760,
    "checked": 3760
   },
   "g-skirtShort-chest": {
-   "depth": 0.04054694848312413,
-   "at": "kneelUp frame 3 (female adult build +0)",
-   "over": 2454,
+   "depth": 0.044628652097089716,
+   "at": "sprint frame 4 (female adult build +0)",
+   "over": 2711,
    "checked": 3760
   },
   "g-skirtKnee-chest": {
-   "depth": 0.08231843948744592,
-   "at": "kneelUp frame 0 (male child build +0)",
-   "over": 3098,
+   "depth": 0.07855171373089438,
+   "at": "kneelUp frame 1 (male elder build +0)",
+   "over": 3760,
    "checked": 3760
   },
   "g-trousers-waist": {
-   "depth": 0.0244859947185613,
-   "at": "walk frame 31 (female elder build +0)",
-   "over": 1452,
+   "depth": 0.02271000483835086,
+   "at": "walk frame 10 (female elder build +0)",
+   "over": 1171,
    "checked": 3760
   },
   "g-breastCloth-chest": {
-   "depth": 0.061869019427526505,
-   "at": "kneelUp frame 2 (female youth build +0)",
-   "over": 2331,
+   "depth": 0.054737224633704985,
+   "at": "kneelUp frame 10 (female child build +0)",
+   "over": 3118,
    "checked": 3760
   },
   "g-shirt-chest": {
-   "depth": 0.06097919369955087,
-   "at": "kneelUp frame 11 (female elder build +0)",
-   "over": 3613,
+   "depth": 0.05384126046923687,
+   "at": "kneelUp frame 0 (female adult build +0)",
+   "over": 3611,
    "checked": 3760
   },
   "g-robe-chest": {
@@ -93,15 +93,15 @@
    "checked": 3760
   },
   "g-cloak-bothShoulders": {
-   "depth": 0.05928481993625957,
-   "at": "kneelDown frame 21 (male youth build +0)",
-   "over": 3583,
+   "depth": 0.06325826154221302,
+   "at": "kneelUp frame 0 (female child build +0)",
+   "over": 3730,
    "checked": 3760
   },
   "g-cloak-leftShoulder": {
-   "depth": 0.04632057883880395,
-   "at": "sprint frame 6 (female adult build +0)",
-   "over": 3617,
+   "depth": 0.05032870632388205,
+   "at": "kneelUp frame 17 (male adult build +1)",
+   "over": 3412,
    "checked": 3760
   },
   "g-cloak-rightShoulder": {
@@ -111,27 +111,27 @@
    "checked": 3760
   },
   "g-cape-bothShoulders": {
-   "depth": 0.0412203410229528,
-   "at": "kneelDown frame 21 (male adult build +1)",
-   "over": 2455,
+   "depth": 0.04076942705261986,
+   "at": "kneelDown frame 22 (male adult build +1)",
+   "over": 2246,
    "checked": 3760
   },
   "g-cape-leftShoulder": {
-   "depth": 0.06252214622757771,
-   "at": "kneelUp frame 0 (female adult build +0)",
-   "over": 2224,
+   "depth": 0.04038516766169096,
+   "at": "sprint frame 14 (male adult build +0)",
+   "over": 2176,
    "checked": 3760
   },
   "g-cape-rightShoulder": {
-   "depth": 0.04381115499023164,
-   "at": "sprint frame 14 (male adult build +0)",
-   "over": 1878,
+   "depth": 0.04815953257723635,
+   "at": "kneelDown frame 22 (male adult build +1)",
+   "over": 2110,
    "checked": 3760
   },
   "g-hood-overHead": {
-   "depth": 0.02788519645820121,
-   "at": "sprint frame 11 (male adult build +1)",
-   "over": 1751,
+   "depth": 0.03693905321547133,
+   "at": "kneelUp frame 14 (male adult build +0)",
+   "over": 3187,
    "checked": 3760
   },
   "g-turban-aroundHead": {
@@ -153,9 +153,9 @@
    "checked": 3760
   },
   "g-veil-face": {
-   "depth": 0.011314284314411938,
-   "at": "kneelDown frame 17 (male adult build +0)",
-   "over": 3507,
+   "depth": 0.014585927695384414,
+   "at": "sprint frame 8 (female adult build +0)",
+   "over": 125,
    "checked": 3760
   },
   "g-headRing-crown": {
@@ -179,19 +179,19 @@
   "g-neckBeads-neck": {
    "depth": 0.010403766891543565,
    "at": "kneelUp frame 0 (male child build +0)",
-   "over": 2319,
+   "over": 2247,
    "checked": 3760
   },
   "g-waistBeads-waist": {
-   "depth": 0.007911706932803273,
-   "at": "kneelUp frame 1 (female elder build +0)",
-   "over": 67,
+   "depth": 0.014216033761209682,
+   "at": "kneelUp frame 2 (female adult build +0)",
+   "over": 159,
    "checked": 3760
   },
   "g-limbRings-limbs": {
-   "depth": 0.013319890378873309,
-   "at": "dig frame 24 (male child build +0)",
-   "over": 1318,
+   "depth": 0.0132701690309148,
+   "at": "carry frame 32 (male adult build +1)",
+   "over": 1517,
    "checked": 3760
   }
  }
