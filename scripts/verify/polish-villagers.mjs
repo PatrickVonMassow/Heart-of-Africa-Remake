@@ -11,6 +11,7 @@ import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.m
 import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { ROW_STAGING, restageReason } from './rowStaging.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
@@ -3959,16 +3960,21 @@ if (section('villager-dress')) {
   const awaitRowClear = async () => {
     for (let i = 0; i < 120 && (await rowHidden()); i++) await nextFrames(5)
   }
-  // Stage, draw, wait for passers-by; a row still hidden is stood on a fresh
-  // bearing (up to three times) — the gate after it stays strict.
+  // Stage, draw, wait for passers-by; a row still hidden, or staged with no
+  // bearing fully clear (a walker or a child beside the camera crosses nearly
+  // every sight line), is waited out and stood again — bounded by
+  // ROW_STAGING (rowStaging.mjs); the gate after it stays strict.
   const stageClear = async (label, d, only, exact = false) => {
     let at = null
-    for (let attempt = 0; attempt < 4; attempt++) {
+    const t0 = Date.now()
+    for (let attempt = 0; ; attempt++) {
       at = await stageRow(d, only, exact)
       await nextFrames(4)
       await awaitPlaceDrawn(attempt ? `${label}, re-staged` : label)
       await awaitRowClear()
-      if (!(await rowHidden())) break
+      const why = restageReason(at, await rowHidden(), attempt, Date.now() - t0)
+      if (!why) break
+      if (why === 'blocked') await nextFrames(ROW_STAGING.waitFrames)
     }
     return at
   }
