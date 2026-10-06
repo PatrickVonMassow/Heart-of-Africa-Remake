@@ -8,6 +8,7 @@ import { REST_POSE, type FigurePose } from '../../render/gesture'
 import type { SpeechFloor } from '../../communication/speechFloor'
 import type { ColdDress } from './useColdCloaks'
 import type { DressDrivers } from '../../systems/dress'
+import type { VillagerAsset } from '../../render/villagerAsset'
 import {
   addBodies,
   createBodies,
@@ -48,8 +49,20 @@ export interface FigureLook {
   palette: readonly string[]
   /** Ring resolution of trunk and head (`QUALITY_PRESETS.figureBodySegments`). */
   radial: number
+  /** The glTF villager body once loaded, where the level draws it
+   *  (`QUALITY_PRESETS.figureGltfBody`); null keeps the code-built body. */
+  villager: VillagerAsset | null
 }
 export const FigureLookContext = createContext<FigureLook | null>(null)
+
+/** What a villager's hands are at, for the glTF body's clips (work-order
+ *  "villager glTF body: animation, dress and tool"): digging plays the dig, a
+ *  carried shovel the carry. Written by the caller each frame; the primitive
+ *  and the code-built bodies pose the same work through `pose`. */
+export interface FigureWork {
+  dig: boolean
+  tool: boolean
+}
 
 /**
  * The settlement's inhabitant bodies (work-order point 578). A context for the

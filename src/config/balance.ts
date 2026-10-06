@@ -387,7 +387,8 @@ interface BalanceConfig {
     snapDistance: number
     /** Fraction (0..1) of the oblique view's north/south ground-reach
      *  asymmetry the camera compensates by moving south with an unchanged
-     *  tilt (design.md §2.1): 1 = as far south as north (shift ≈ 7.5 units at
+     *  tilt (design.md §2.1): 0.5 = about half (traveller ≈ 43 % from the
+     *  top), 1 = as far south as north (shift ≈ 7.5 units at
      *  the default zoom, traveller ≈ 37 % from the top), 0 = traveller centred. */
     southReachCompensation: number
   }
@@ -1513,7 +1514,7 @@ export const balance: BalanceConfig = {
   travelCameraFollow: {
     tau: 0.13, // calibratable: the former 0.12/frame lerp at 60 fps (-1/(60·ln 0.88))
     snapDistance: 30, // calibratable: far above the walking lag (~0.7), below any jump
-    southReachCompensation: 1.0, // calibratable: full 1:1 reach; 0.5 = about half (user choice pending)
+    southReachCompensation: 0.5, // calibratable: about half the reach asymmetry (user choice 05.10.2026); 1 = full 1:1
   },
   walkFeel: {
     accelTau: 0.10, // brisk ramp-up, no rubber-banding
@@ -2532,6 +2533,101 @@ export const VILLAGER_MOTION = {
   /** The heading error (rad) at which a walker stops to turn; its pace eases
    *  from full (heading on its way) to nothing at this error. */
   turnStopAngle: 1.75,
+} as const
+
+/**
+ * The villager's glTF body as the asset pipeline builds it (work-order "glTF
+ * villager body"; scripts/villager/build.mjs reads this block). BUILD-time values:
+ * a change takes effect when the pipeline is re-run and the .glb committed.
+ * Every value is a CALIBRATABLE educated guess unless noted.
+ */
+export const VILLAGER_ASSET = {
+  /** Crown height of an adult man in figure units (render/figureBody.ts
+   *  FIGURE_STATURE: the primitive figure's cone 1 + head) — every caller sizes
+   *  and collides a figure by it. Not a guess: the figure contract. */
+  stature: 1.34,
+  /** Stature against an adult man's, by age and sex (anthropometric means, as
+   *  render/figureBody.ts); a child is built to the adult stature and drawn
+   *  small by its caller's scale. */
+  statureFactor: {
+    child: { male: 1, female: 1 },
+    youth: { male: 0.98, female: 0.94 },
+    adult: { male: 1, female: 0.94 },
+    elder: { male: 0.97, female: 0.91 },
+  },
+  /** MakeHuman's age slider (0 = 1 year, 0.1875 = 11, 0.5 = 25, 1 = 90) for
+   *  each age group: a child of about seven, a youth of about sixteen, an adult
+   *  of about thirty, an elder of about sixty-five. */
+  makeHumanAge: { child: 0.1125, youth: 0.3, adult: 0.54, elder: 0.81 },
+  /** The ethnic mix of MakeHuman's macro targets. */
+  makeHumanRace: { african: 1, asian: 0, caucasian: 0 },
+  /** The women's breast modifier per age group, as the share toward
+   *  MakeHuman's max cup (0 = its average, which the macro targets leave flat).
+   *  Where most of the roster goes bare above the waist this is what tells a
+   *  woman from a man at village distance (as render/figureBody.ts `bust`).
+   *  Calibratable, read off the frame sheets and the village frames. */
+  breastCup: { child: 0, youth: 0.55, adult: 0.8, elder: 0.75 },
+  /** How far a build of ±1 moves MakeHuman's weight slider off its average. */
+  buildWeight: 0.3,
+  /** Triangles of the decimated body (hands, feet and face kept finer). */
+  bodyTriangles: 6000,
+  /** How far a garment vertex may lie inside the body in any frame of any clip
+   *  at any morph extreme (figure units, ≈ 4 mm) — the penetration report's
+   *  tolerance. */
+  garmentPenetrationTolerance: 0.003,
+  /** How far off the skinned body the dress fit (scripts/villager/fit.py)
+   *  keeps every garment vertex in the frames it checks (figure units,
+   *  ≈ 3 mm) — the slack the frames between them may use. Calibratable. */
+  garmentFitMargin: 0.002,
+  /** The most one fit pass moves a garment vertex (figure units): small
+   *  steps, so a vertex caught between two body parts does not swing from
+   *  one to the other. Calibratable. */
+  garmentFitStep: 0.01,
+  /** The villagers' digging shovel in its own frame (figure units): +y along
+   *  the shaft to the handle, the blade at −y with its face toward +z; the
+   *  origin is where a one-handed carrier's hand holds it (the primitive
+   *  figure's hand). Shared by the game's tool (PlaceLife.tsx) and the clips
+   *  the pipeline solves the hands onto. */
+  shovel: { top: 0.16, shaftBottom: -0.5, tip: -0.76, shaftRadius: 0.022, bladeWidth: 0.2, bladeThickness: 0.02 },
+} as const
+
+/**
+ * How the glTF villager (medium and high presets) is driven at run time
+ * (work-order "glTF villager body"). Figure units, seconds. CALIBRATABLE
+ * educated guesses, read off the frame sheets.
+ */
+export const VILLAGER_GLTF = {
+  /** How much of the adult man's build morph a build of ±1 gets, by age. */
+  buildByAge: { child: 0.5, youth: 0.8, adult: 1, elder: 0.9 },
+  /** The walk turns into the sprint around this ground speed, per unit of leg
+   *  (figure units per second at the basis body's leg length; a child's
+   *  shorter leg reaches it at a lower speed). Set where the walk's stride
+   *  reaches strideMax (its natural speed ≈ 0.83 × strideMax²): above it a walk
+   *  could only over-reach. Calibratable. */
+  sprintThreshold: 1.8,
+  /** Half-width of the band the two gaits cross-fade over, same units. */
+  sprintBand: 0.35,
+  /** A gait's stride grows with pace as speed^exponent over its natural
+   *  speed (the rest is cadence), bounded so the leg never over-reaches. */
+  strideExponent: 0.5,
+  strideMin: 0.75,
+  strideMax: 1.35,
+  /** How far (person units per unit of leg) a held foot may fall behind the
+   *  clip's own foot before it lets go and is planted afresh — a teleport or a
+   *  shove too long to step through. Calibratable. */
+  plantRelease: 0.18,
+  /** Share of the gait cycle over which a lifted foot's hold correction
+   *  fades back onto the clip's own foot (a shoved or turned foot eases home
+   *  in its swing, never jumps). Calibratable. */
+  plantFadeCycle: 0.15,
+  /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
+  transitionSeconds: 0.35,
+  /** Ground speed (figure units / s) below which the figure stands. */
+  standSpeed: 0.08,
+  /** Where the hair is painted on the glTF head, as shares of chin → crown
+   *  (brow, and the nape behind the ears) and of the head's depth back → front
+   *  (what counts as behind). The body carries no hair mesh. Calibratable. */
+  hair: { brow: 0.62, nape: 0.3, back: 0.38 },
 } as const
 
 // Dev hook for the headless verification (the village-walk tolerances).

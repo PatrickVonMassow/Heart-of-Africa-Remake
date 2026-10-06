@@ -96,8 +96,10 @@ export function surfaceOf(l: DressLayer, p: BodyProportions, bottomY: number): [
 
 /** Half-width and half-depth of the trunk at height y (bind pose). */
 export function trunkAt(p: BodyProportions, y: number): [number, number] {
-  // the dress goes over the bust (the chest station), not through it
-  const st = trunkProfile(p).map(([y, x, z], i) => [y, x, i === 3 ? z + p.bust * 0.75 : z] as [number, number, number])
+  // A measured body: its own sections, bust and belly included. The
+  // code-built one: its profile, the dress going over the bust (the chest
+  // station), not through it.
+  const st = p.trunkSections ?? trunkProfile(p).map(([y, x, z], i) => [y, x, i === 3 ? z + p.bust * 0.75 : z] as [number, number, number])
   if (y <= st[0][0]) {
     // Below the crotch: both legs side by side.
     const legW = p.hipX + p.thighR * 1.15
@@ -153,16 +155,50 @@ function openFront(geo: THREE.BufferGeometry, cols: number, belowY: number): voi
 /** A tube round the trunk from `top` down to `bottom`, `ease` off the body
  *  and flaring by `flare` (fraction of stature) at the hem. */
 function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number, flare: number, radial: number, rings = 10): THREE.BufferGeometry {
-  const stations: SweepStation[] = []
-  for (let i = 0; i < rings; i++) {
+  // Stations evenly down the garment, each moved onto the bulge of the trunk
+  // (bust, belly, buttocks, hips) nearest it when one lies within half a
+  // step: a station on the bulge's crest carries the cloth over it, where
+  // two either side of it would cut the chord through it. Not the shoulders'
+  // crest: a station there spreads the cloth into a shelf over the arms.
+  const step = (top - bottom) / (rings - 1)
+  const crests: number[] = []
+  const probe = 0.005 * p.stature
+  for (let y = Math.min(top, p.shoulderY - 0.06 * p.stature) - probe; y > bottom + probe; y -= probe) {
+    const [x0, z0] = trunkAt(p, y + probe)
+    const [x1, z1] = trunkAt(p, y)
+    const [x2, z2] = trunkAt(p, y - probe)
+    if ((z1 > z0 && z1 >= z2) || (x1 > x0 && x1 >= x2)) crests.push(y)
+  }
+  const ys = Array.from({ length: rings }, (_, i) => top - step * i)
+  for (const c of crests) {
+    let best = -1
+    for (let i = 1; i < rings - 1; i++) if (Math.abs(ys[i] - c) < step / 2 && (best < 0 || Math.abs(ys[i] - c) < Math.abs(ys[best] - c))) best = i
+    if (best > 0) ys[best] = c
+  }
+  const r = ys.map((y) => trunkAt(p, y))
+  // Between two stations the cloth's girth blends from one to the other
+  // (sweepTube's smoothstep), so what still bulges between them would poke
+  // through the chord: both stations rise by the largest shortfall.
+  for (let i = 0; i < rings - 1; i++) {
+    for (const a of [0, 1]) {
+      let short = 0
+      for (let k = 1; k < 12; k++) {
+        const f = k / 12
+        const e = f * f * (3 - 2 * f)
+        const need = trunkAt(p, ys[i] + (ys[i + 1] - ys[i]) * f)[a]
+        short = Math.max(short, need - (r[i][a] + (r[i + 1][a] - r[i][a]) * e))
+      }
+      r[i][a] += short
+      r[i + 1][a] += short
+    }
+  }
+  const stations = ys.map((y, i) => {
     const t = i / (rings - 1)
-    const y = top + (bottom - top) * t
-    const [rx, rz] = trunkAt(p, y)
     const out = ease + flare * p.stature * t * t
     // The hem flares mostly sideways: a deep front-back flare is what a
     // kneeling figure's shins turn into depth below the ground.
-    stations.push(st(y, rx + out, rz + ease * 0.8 + (out - ease) * 0.3))
-  }
+    return st(y, r[i][0] + out, r[i][1] + ease * 0.8 + (out - ease) * 0.3)
+  })
   return sweepTube(stations, { radial, rings: rings * 2 })
 }
 

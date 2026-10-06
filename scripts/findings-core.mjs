@@ -404,7 +404,8 @@ function requestQueueRemedy(count, context) {
     'warten sie unbemerkt. Spec ansehen: node scripts/finding.mjs --show "<Titel>", dann VERBATIM in ' +
     'TASKS.md anhängen und node scripts/finding.mjs --queued "<Titel>" --point <N>. Offene Fragen ' +
     'gehen NIE in den Arbeitsauftrag, sondern als Karte an den Nutzer; undurchführbar: ' +
-    'node scripts/finding.mjs --blocked "<Titel>" --why "<Grund>".'
+    'node scripts/finding.mjs --blocked "<Titel>" --why "<Grund>". Vertagen ist kein --blocked: an der ' +
+    'Wassermarke bleibt die Anfrage offen, und batch-boundary.mjs --commit --context übergibt sie dem Nachfolger.'
   )
 }
 

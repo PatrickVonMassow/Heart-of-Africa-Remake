@@ -9,6 +9,7 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-10-06 pre-push gate — the unit gate for 124d7b9 (TASKS split only) went red while a Blender fit loaded the host, without naming the failing file or test; the superset run on f8cb1ab was green (588 files / 17299 tests) and the next gated push passed. Suspected load-sensitive unit test; the gate should print the failing test names.
 - 2026-10-01 parked work-order point 1257. On WebGL 2 the loom helper never walks the warp inside the section's waits — parked by point 1258 while the loom is
   switched off (`loom.placed: false`, user 29.09.2026); reopen as a point when it is switched on.
   Original text:
@@ -2143,3 +2144,5 @@ finer near mesh; TRAA shimmer of fine detail past ~60 m (shared with 1280).
 - Follow-camera frame-time wiring has no call-site test (05.10.2026, point 1286): `TravelScene` passes the uncapped `rawDt` to `stepFollow` while movement uses the 0.1 s cap; the Vitest covers only the pure step, so a revert to the capped `dt` would pass (GPT-6 Astra, receipt b8f515f1845b5b73). No player impact today; a jsdom harness for the scene's frame loop does not exist.
 
 - The WebGL 2 head-carrier frame of `village-walk` stands behind the village fence (05.10.2026, point 1295): two runs in a row framed `verification/1295-village-head-carrier-webgl2.png` from outside the fence, so only the carrier's head and load show. The load on the crown is visible and the WebGL 2 mid-stride frame shows the carrier whole; the standpoint search does not reject a fence between camera and subject. Verification framing only, no player impact.
+
+- The first WebGPU bird's-eye frame can show untextured grey ground under heavy machine load (05.10.2026, point 1310): two `flow --section=core-loop` runs at load 12–18 and 1–2 FPS shot `verification/01-birdseye-view.png` with pale grey ground; a quieter run (load 3.8) rendered sand at the same camera value. Likely the screenshot does not wait for the ground texture on WebGPU; verification timing only, no player impact shown.

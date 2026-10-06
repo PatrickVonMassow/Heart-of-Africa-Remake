@@ -17,7 +17,7 @@ import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import type { ActorRoleKind } from '../../systems/actorLabels'
 import { markActor } from '../actorLabelSource'
 import { isLifeFrozen } from './lifeFreeze'
-import { ColdCloaksContext, FigureLookContext, LimbDetailContext, REST_POSE_ARMS } from './placeFigureContext'
+import { ColdCloaksContext, FigureLookContext, LimbDetailContext, REST_POSE_ARMS, type FigureWork } from './placeFigureContext'
 import { SkinnedFigure } from './skinnedFigure'
 import type { AgeGroup, Sex } from '../../systems/appearance'
 
@@ -27,6 +27,8 @@ type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
    *  its scale (skinnedFigure.tsx `figureIdentity`). Read by the skinned body. */
   sex?: Sex
   age?: AgeGroup
+  /** The hands' work for the glTF body's clips (ignored by the primitive). */
+  work?: RefObject<FigureWork>
 }
 
 /**
@@ -36,13 +38,13 @@ type FigureProps = Parameters<typeof PrimitiveFigure>[0] & {
  * below, unchanged (user decision 04.10.2026). Both take the same props and
  * publish the same pivots, so a vignette never knows which one it drew.
  */
-export function Figure({ sex, age, ...props }: FigureProps) {
+export function Figure({ sex, age, work, ...props }: FigureProps) {
   const look = useContext(FigureLookContext)
   // Who this villager is, keyed HERE: this component stays mounted when the
   // detail level swaps the drawn body, so medium → low → medium keeps the person.
   const identityKey = useId()
   return look ? (
-    <SkinnedFigure look={look} sex={sex} age={age} identityKey={identityKey} {...props} />
+    <SkinnedFigure look={look} sex={sex} age={age} identityKey={identityKey} work={work} {...props} />
   ) : (
     <PrimitiveFigure {...props} />
   )

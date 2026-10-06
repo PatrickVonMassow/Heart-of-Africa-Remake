@@ -11,6 +11,7 @@ import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.m
 import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { ROW_STAGING, restageReason } from './rowStaging.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
@@ -3802,6 +3803,45 @@ if (section('villager-dress')) {
     appendFileSync(MEASURE, JSON.stringify(line) + '\n')
   }
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  // The frames carry the body they show: point 1293's code-built body is the
+  // committed "before" (1293-*.png); since the glTF body (work-order "glTF
+  // villager body") the same frames are 1294-*.png.
+  const TAG = '1294'
+  // The glTF body loads on the first medium/high visit; until it has arrived
+  // the code-built body stands in. Wait for it: a figure on it has toe bones.
+  const awaitGltfBody = async (label) => {
+    for (let i = 0; i < 200; i++) {
+      const n = await page.evaluate(() => {
+        let k = 0
+        window.__placeScene?.traverse((o) => {
+          if (o.name === 'bone-toe.L') k++
+        })
+        return k
+      })
+      if (n > 0) return n
+      await nextFrames(5)
+    }
+    // why not: the level's switch, and the load's own answer
+    const why = await page.evaluate(async () => {
+      const q = await import('/src/config/quality.ts')
+      const level = window.__ui.getState().detailLevel
+      const fetched = performance.getEntriesByType('resource').filter((e) => e.name.includes('villager.glb')).length
+      const persons = performance.getEntriesByName('villager-gltf-person').length
+      const skel = new Set()
+      window.__placeScene?.traverse((o) => o.isSkinnedMesh && skel.add(o.skeleton.bones.length))
+      const m = await import('/src/render/villagerAsset.ts')
+      let load
+      try {
+        const a = await m.loadVillagerAsset()
+        load = `loaded, ${a.bones.length} bones`
+      } catch (e) {
+        load = `failed: ${e}`
+      }
+      return { level, gltf: q.QUALITY_PRESETS[level]?.figureGltfBody, fetched, persons, skeletons: [...skel], load }
+    })
+    check(`${label}: the glTF villager body arrived`, false, `no figure with toe bones after 1000 frames: ${JSON.stringify(why)}`)
+    return 0
+  }
   const PEOPLES = (process.env.DRESS_PEOPLES ?? 'zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai,somali,swahili,baganda,sidama,tuareg,berbers,nubians,hausa,bambara,mandinka,fang,mongo,mbuti,banda').split(',')
   const villageOf = (p) => (p === 'berbers' ? 'berber' : p === 'nubians' ? 'nubian' : p) + '-village'
   // A clear line of sight from the player to every figure of a row `d` metres
@@ -3920,16 +3960,21 @@ if (section('villager-dress')) {
   const awaitRowClear = async () => {
     for (let i = 0; i < 120 && (await rowHidden()); i++) await nextFrames(5)
   }
-  // Stage, draw, wait for passers-by; a row still hidden is stood on a fresh
-  // bearing (up to three times) — the gate after it stays strict.
+  // Stage, draw, wait for passers-by; a row still hidden, or staged with no
+  // bearing fully clear (a walker or a child beside the camera crosses nearly
+  // every sight line), is waited out and stood again — bounded by
+  // ROW_STAGING (rowStaging.mjs); the gate after it stays strict.
   const stageClear = async (label, d, only, exact = false) => {
     let at = null
-    for (let attempt = 0; attempt < 4; attempt++) {
+    const t0 = Date.now()
+    for (let attempt = 0; ; attempt++) {
       at = await stageRow(d, only, exact)
       await nextFrames(4)
       await awaitPlaceDrawn(attempt ? `${label}, re-staged` : label)
       await awaitRowClear()
-      if (!(await rowHidden())) break
+      const why = restageReason(at, await rowHidden(), attempt, Date.now() - t0)
+      if (!why) break
+      if (why === 'blocked') await nextFrames(ROW_STAGING.waitFrames)
     }
     return at
   }
@@ -3940,20 +3985,73 @@ if (section('villager-dress')) {
       if (!row) return null
       let skinned = 0
       let heads = 0
+      let gltf = 0
       const meshes = new Set()
       row.traverse((o) => {
         if (o.isSkinnedMesh) {
           skinned++
           meshes.add(o.name)
+          if (o.skeleton.bones.some((b) => b.name === 'bone-toe.L')) gltf++
         }
         if (o.name === 'figure-head') heads++
       })
-      return { figures: row.children.length, skinned, heads, meshes: [...meshes].sort() }
+      return { figures: row.children.length, skinned, heads, gltf, meshes: [...meshes].sort() }
     })
 
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  // THE LOAD COST of the glTF body (graphics-detail-levels.md): the file's
+  // bytes, its parse, each distinct person's build, and every main-thread
+  // block (long task) from entering the first village until it is drawn.
+  await page.evaluate(() => {
+    window.__dressLongTasks = []
+    try {
+      new PerformanceObserver((l) => window.__dressLongTasks.push(...l.getEntries().map((e) => [Math.round(e.startTime), Math.round(e.duration)]))).observe({
+        type: 'longtask',
+      })
+    } catch {
+      window.__dressLongTasks = null
+    }
+  })
+  let loadRecorded = false
   for (const people of PEOPLES) {
     await goToPlace(villageOf(people))
+    await awaitGltfBody(people)
+    if (!loadRecorded) {
+      loadRecorded = true
+      await nextFrames(10)
+      const load = await page.evaluate(() => {
+        const res = performance.getEntriesByType('resource').find((e) => e.name.includes('villager.glb'))
+        const m = (n) => performance.getEntriesByName(n).map((e) => Math.round(e.duration * 10) / 10)
+        const sum = (a) => Math.round(a.reduce((s, x) => s + x, 0))
+        const parse = performance.getEntriesByName('villager-glb-parse')[0]
+        // the main-thread blocks the body's arrival caused: the long tasks
+        // overlapping its parse and its person/figure builds
+        const builds = ['villager-glb-parse', 'villager-gltf-person', 'villager-gltf-figure'].flatMap((n) => performance.getEntriesByName(n))
+        const from = Math.min(...builds.map((e) => e.startTime))
+        const to = Math.max(...builds.map((e) => e.startTime + e.duration))
+        const lt = window.__dressLongTasks ?? []
+        const during = lt.filter(([s, d]) => s < to && s + d > from).map(([, d]) => d)
+        return {
+          bytes: parse?.detail?.bytes ?? null,
+          transferSize: res?.transferSize ?? null,
+          fetchMs: res ? Math.round(res.duration) : null,
+          parseMs: parse ? Math.round(parse.duration) : null,
+          persons: m('villager-gltf-person').length,
+          personMsTotal: sum(m('villager-gltf-person')),
+          figures: m('villager-gltf-figure').length,
+          figureMsTotal: sum(m('villager-gltf-figure')),
+          longTasks: lt.map(([, d]) => d),
+          gltfSpanMs: Math.round(to - from),
+          longTasksDuringGltf: during,
+        }
+      })
+      record('gltf-load', { village: villageOf(people), ...load })
+      check(
+        'the glTF body loaded and was measured (bytes, parse, person builds)',
+        !!load.bytes && load.parseMs != null && load.persons > 0,
+        JSON.stringify(load),
+      )
+    }
     // drawn first (the pipeline wait steps frames, and walkers walk on), then
     // clear, so the shutter below opens a few frames after the clear reading
     const at = await stageClear(`${people} row`, 5.6)
@@ -3962,10 +4060,10 @@ if (section('villager-dress')) {
     const got = await rowBodies()
     check(
       `${people}: every sex and age group stands in the row in view, each one skinned mesh (body and dress merged)`,
-      !!got && got.figures === 8 && got.heads === 8 && got.skinned === 8 && at.score === at.of && !hidden,
+      !!got && got.figures === 8 && got.heads === 8 && got.skinned === 8 && got.gltf === 8 && at.score === at.of && !hidden,
       JSON.stringify({ ...got, clear: `${at.score}/${at.of}`, dist: at.dist, hidden }),
     )
-    await frame(shot(`1293-dress-${people}`), {
+    await frame(shot(`${TAG}-dress-${people}`), {
       local: { x: at.cx, y: 0.7, z: at.cz },
       label: `${people}: staged row of villagers left to right girl child, boy, girl, young man, married woman, married man, old woman, old man, in the researched dress`,
     })
@@ -4011,7 +4109,7 @@ if (section('villager-dress')) {
       return out
     })
     record('elder-youth', { d, dist: at.dist, px })
-    await frame(shot(`1293-elder-youth-${String(d).padStart(2, '0')}m`), {
+    await frame(shot(`${TAG}-elder-youth-${String(d).padStart(2, '0')}m`), {
       local: { x: at.cx, y: 0.7, z: at.cz },
       label: `the Zulu young man (left) and the elder (right) side by side, ${d} m from the camera`,
     })
@@ -4029,7 +4127,7 @@ if (section('villager-dress')) {
     !!low && low.figures === 8 && low.skinned === 0 && low.heads === 8 && lowAt.score === lowAt.of && !lowHidden,
     JSON.stringify({ ...low, clear: `${lowAt.score}/${lowAt.of}`, hidden: lowHidden }),
   )
-  await frame(shot('1293-dress-low-primitive'), {
+  await frame(shot(`${TAG}-dress-low-primitive`), {
     local: { x: lowAt.cx, y: 0.7, z: lowAt.cz },
     label: 'the low preset: the same Zulu row drawn as the primitive cone-and-sphere figure',
   })
@@ -4045,23 +4143,29 @@ if (section('villager-dress')) {
   for (const people of (process.env.DRESS_COST ?? 'zulu,hausa,maasai').split(',')) {
     await goToPlace(villageOf(people))
     const row = {}
-    const runs = [['low', null], ['medium', 0], ['medium', null], ['high', 0], ['high', null]]
-    for (const [level, force] of runs) {
+    // `code`: the glTF body switched off (`figureGltfBody` false) — point
+    // 1293's code-built body, the "before" of the glTF body.
+    const runs = [['low', null], ['medium', 0], ['medium', null, 'code'], ['medium', null], ['high', 0], ['high', null, 'code'], ['high', null]]
+    for (const [level, force, body] of runs) {
       await page.evaluate(
-        async ({ l, force }) => {
+        async ({ l, force, code }) => {
           const q = await import('/src/config/quality.ts')
           window.__figureSegs ??= { medium: q.QUALITY_PRESETS.medium.figureBodySegments, high: q.QUALITY_PRESETS.high.figureBodySegments }
-          for (const k of ['medium', 'high']) q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
+          for (const k of ['medium', 'high']) {
+            q.QUALITY_PRESETS[k].figureBodySegments = force ?? window.__figureSegs[k]
+            q.QUALITY_PRESETS[k].figureGltfBody = !code
+          }
           // through another level, so every figure re-reads the table
           window.__ui.getState().setDetailLevel(l === 'low' ? 'medium' : 'low')
           await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
           window.__ui.getState().setDetailLevel(l)
         },
-        { l: level, force },
+        { l: level, force, code: body === 'code' },
       )
-      const name = force === 0 ? `${level}-primitive` : level
+      const name = force === 0 ? `${level}-primitive` : body === 'code' ? `${level}-code` : level
       await nextFrames(10)
       await awaitPlaceDrawn(`${people} ${name}`)
+      if (level !== 'low' && force == null && body !== 'code') await awaitGltfBody(`${people} ${name}`)
       row[name] = await page.evaluate(
         () =>
           new Promise((resolve) => {
@@ -4079,11 +4183,13 @@ if (section('villager-dress')) {
               const med = (a) => [...a].sort((x, y) => x - y)[a.length >> 1]
               let figures = 0
               let skinned = 0
+              let gltf = 0
               window.__placeScene.traverse((o) => {
                 if (o.name === 'inhabitant') figures++
                 if (o.isSkinnedMesh) skinned++
+                if (o.isSkinnedMesh && o.skeleton.bones.some((b) => b.name === 'bone-toe.L')) gltf++
               })
-              resolve({ figures, skinned, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
+              resolve({ figures, skinned, gltf, drawCalls: med(calls), triangles: med(tris), frameMs: Math.round(med(times.slice(1)) * 10) / 10 })
             }
             requestAnimationFrame(tick)
           }),
@@ -4092,11 +4198,22 @@ if (section('villager-dress')) {
     record('cost', { village: `${people}-village`, row })
     check(
       `${people}: the cost probe read every level (low draws no skinned mesh, medium and high do)`,
-      row.low.skinned === 0 && row['medium-primitive'].skinned === 0 && row.medium.skinned > 0 && row.high.skinned > 0 && row.low.drawCalls > 0,
+      row.low.skinned === 0 &&
+        row['medium-primitive'].skinned === 0 &&
+        row.medium.skinned > 0 &&
+        row.high.skinned > 0 &&
+        row.low.drawCalls > 0 &&
+        row['medium-code'].gltf === 0 &&
+        row.medium.gltf === row.medium.skinned &&
+        row.high.gltf === row.high.skinned,
       JSON.stringify(row),
     )
   }
-  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  await page.evaluate(async () => {
+    const q = await import('/src/config/quality.ts')
+    for (const k of ['medium', 'high']) q.QUALITY_PRESETS[k].figureGltfBody = true
+    window.__ui.getState().setDetailLevel('medium')
+  })
 }
 
 // --- Walking villagers (work-order "walking villagers", absorbs point 350) ---

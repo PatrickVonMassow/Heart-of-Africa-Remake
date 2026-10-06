@@ -1126,6 +1126,32 @@ export function contextBoundaryCardCommands({ standingPoints = [] } = {}) {
   return [...points.map((p) => `${EDIT_CMD} queue ${p}`), `${NONE_CARD_CMD} --text-stdin`]
 }
 
+/** WHERE THE BOUNDARY NAMES THE REQUEST DRAIN (point 1305). A DEFERRAL IS
+ *  NOT A BLOCK: `finding.mjs --blocked` takes a request out of the pending set
+ *  and puts a decision card before the user, so it is reserved for a request
+ *  that cannot be carried out. Past the watermark the fence denies the
+ *  work-order append, so the context boundary leaves the request PENDING in
+ *  the carrier and the successor's request gate queues it. PURE. */
+export function boundaryRequestDrainLine({ cause = BOUNDARY_CAUSES.POINT } = {}) {
+  const head = 'WAITING USER REQUESTS (`node scripts/finding.mjs --requests`)'
+  return cause === BOUNDARY_CAUSES.CONTEXT
+    ? `${head} stay PENDING at the watermark: deferring one is not blocking it — no ` +
+        '`finding.mjs --blocked`, no decision card. `--commit --context` leaves them in the carrier, and ' +
+        'the successor queues them.'
+    : `${head} are drained now: \`finding.mjs --show "<title>"\`, append it VERBATIM to TASKS.md, ` +
+        '`finding.mjs --queued "<title>" --point <N>`; `--commit` refuses while one waits. `--blocked` is ' +
+        'only for a request that cannot be carried out — a deferral leaves it pending (past the watermark ' +
+        'take the `--context` boundary instead).'
+}
+
+/** Does this `batch-boundary.mjs` call refuse while carrier requests wait?
+ *  Only the POINT commit: the context commit runs where the fence denies the
+ *  work-order append, so it hands the requests on pending (see
+ *  `boundaryRequestDrainLine`). PURE. */
+export function commitGatesRequests(argv = []) {
+  return argv[0] === '--commit' && argv[1] !== '--context'
+}
+
 /**
  * THE BOUNDARY CARD, in German, one text per state. PURE.
  *

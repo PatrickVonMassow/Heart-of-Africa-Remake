@@ -100,6 +100,10 @@ export interface BodyProportions {
   bust: number
   /** How far the breasts sit below the chest line (the elder's lower). */
   bustDrop: number
+  /** The trunk's measured cross-sections [y, half-width, half-depth], bottom
+   *  to top, each an ellipse enclosing the mesh there — the glTF body's; the
+   *  code-built body has none and the dress follows `trunkProfile`. */
+  trunkSections?: Array<[number, number, number]>
 }
 
 /** Stature against an adult man's, by sex and age (anthropometric means). */

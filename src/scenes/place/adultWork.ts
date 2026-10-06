@@ -24,7 +24,7 @@
 import type { Vocabulary } from '../../communication/lexicon'
 import { atDigStand, DIG_ARRIVE_RADIUS, digStandingPlaces } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
-import { balance } from '../../config/balance'
+import { balance, VILLAGER_GLTF } from '../../config/balance'
 import { instructionDelay } from '../../communication/speaking'
 import type { ConceptId } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
@@ -221,6 +221,26 @@ export function isDigging(state: AdultWorkState, index: number, view: AdultWorkV
   const site = view.geography.digSites[t.siteIndex]
   const me = view.villagers[index]
   return !!site && !!me && atDigStand(site, me.x, me.z)
+}
+
+/**
+ * Whether a body in its dig bout shows the stroke this frame: on the rim it
+ * does, and it keeps doing so for VILLAGER_GLTF.transitionSeconds after a
+ * shove carried it across the rim's edge — the rim test alone flickered the
+ * pose (and reset the stroke) whenever the pair or a passer-by jostled it.
+ * Out of the bout (`inBout` false) it never does. Mutates `hold.digHold`.
+ */
+export function digBout(hold: { digHold: number }, onRim: boolean, inBout: boolean, dt: number): boolean {
+  if (!inBout) {
+    hold.digHold = 0
+    return false
+  }
+  if (onRim) {
+    hold.digHold = VILLAGER_GLTF.transitionSeconds
+    return true
+  }
+  hold.digHold = Math.max(0, hold.digHold - dt)
+  return hold.digHold > 0
 }
 
 export function carryOf(state: AdultWorkState, index: number): AdultCarry {
