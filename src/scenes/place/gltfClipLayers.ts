@@ -181,8 +181,10 @@ export function applyClipLayers(
 
 /**
  * The shovel on the right hand bone: shown while the hands hold it, gripped
- * where the dig's or the carry's clip grips it (blended with the layers, so
- * the shaft slides through the fist rather than jumping).
+ * where the dig's or the carry's clip grips it, by each clip's share of the
+ * arm's pose as applyClipLayers layers it (the dig over the carry over the
+ * code), so the shaft slides through the fist with the arm, never jumping and
+ * never sliding on once the dig has the arm to itself.
  */
 export function placeShovel(asset: VillagerAsset, person: GltfPerson, c: ClipLayers, tool: THREE.Object3D | null): void {
   if (!tool) return
@@ -191,7 +193,8 @@ export function placeShovel(asset: VillagerAsset, person: GltfPerson, c: ClipLay
   if (!tool.visible) return
   const dig = asset.clips.dig.tool?.grip ?? 0
   const carry = asset.clips.carry.tool?.grip ?? dig
-  const w = c.dig + c.carry > 0 ? c.dig / (c.dig + c.carry) : 0
+  const carried = c.dig < 1 ? c.carry * c.arms[1] * (1 - c.dig) : 0
+  const w = c.dig + carried > 0 ? c.dig / (c.dig + carried) : 0
   const at = shovelOnHungHand(asset, person.frame, 'R', carry + (dig - carry) * w)
   tool.position.copy(at.position)
   tool.quaternion.copy(at.quaternion)

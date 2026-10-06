@@ -8,6 +8,7 @@ import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../../config/balance'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
+import { shovelOnHungHand } from '../../render/villagerClipPose'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { applyClipLayers, clipLayers, placeShovel, stepClipLayers, type ClipLayers } from './gltfClipLayers'
 
@@ -107,6 +108,23 @@ describe('the clip layers on the glTF figure', () => {
     // the carry walk's own swing turns an arm bone by up to ~0.15 rad a frame
     // with no handover at all; a snap to the code's pose turned it by ~3 rad
     expect(worst).toBeLessThan(0.2)
+  })
+
+  it('the shovel grip follows the arm pose: once the dig has the arm, it grips at the dig\'s grip while the carry still fades', () => {
+    const f = figure()
+    const dt = 1 / 60
+    for (let k = 0; k < 60; k++) frame(f, 0, 0, { dig: false, tool: true }, dt)
+    let checked = false
+    for (let k = 0; k < 60; k++) {
+      frame(f, 0, 0, { dig: true, tool: true }, dt)
+      if (f.c.dig === 1 && f.c.carry > 0) {
+        const want = shovelOnHungHand(asset, person.frame, 'R', asset.clips.dig.tool!.grip)
+        expect(f.tool.position.distanceTo(want.position)).toBeLessThan(1e-6)
+        checked = true
+      }
+    }
+    expect(checked).toBe(true)
+    expect(asset.clips.dig.tool!.grip).not.toBe(asset.clips.carry.tool!.grip)
   })
 
   it('digging holds the shovel in the right hand with the other hand on the shaft', () => {
