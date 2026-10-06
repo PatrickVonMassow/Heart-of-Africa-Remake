@@ -7,7 +7,7 @@ vertex's depth inside the body is measured against the skinned body's surface
 only when the body's winding number round it says so, fit.py `inside`). The skinning is the GAME'S path
 (gamepath.py): the corner's mesh hung and baked, then skinned by the hung
 bones; a gait's frames also at the shortest and longest stride the game warps
-it to. The report lists, per garment, the
+it to; each garment with its corrective shapes (correct.py). The report lists, per garment, the
 deepest penetration and where; the pipeline fails the penetration step when any
 depth exceeds VILLAGER_ASSET.garmentPenetrationTolerance.
 
@@ -18,6 +18,7 @@ import os
 
 import numpy as np
 
+import correct as CR
 import gamepath as GP
 import rig
 from body import top4
@@ -47,8 +48,10 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
             wr, wp = rig.fk(j, GP.stride_pose(person.h, q, hips, kst), hips)
             bv = person.skin(bh, jidx, jw, wr, wp)
             tree = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
+            a = CR.drivers(person, wr, cfg)
             for n in gnames:
-                gv = person.skin(gh[n], *gskin[n], wr, wp)
+                sh = garments['meshes'][n].get('shapes')
+                gv = person.skin(gh[n] if sh is None else gh[n] + np.einsum('k,kvi->vi', a, sh), *gskin[n], wr, wp)
                 d, _co, _n = depths(tree, gv, tol)
                 deepest = max(0.0, float(d.max()))
                 over = int((d > tol).sum())

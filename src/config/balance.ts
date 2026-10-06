@@ -2603,7 +2603,7 @@ export const VILLAGER_ASSET = {
   ],
   /** Most passes of the corrective fit (it stops once every garment is
    *  within tolerance). Calibratable. */
-  garmentCorrectPasses: 24,
+  garmentCorrectPasses: 60,
   /** The most one corrective pass moves a garment vertex (figure units).
    *  Calibratable. */
   garmentCorrectStep: 0.03,

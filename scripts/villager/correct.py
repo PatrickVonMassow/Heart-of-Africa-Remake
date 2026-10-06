@@ -19,8 +19,10 @@ in each frame where a vertex comes closer to the skinned body than
 that clears it — the push taken into the baked frame through the transpose of
 the vertex's bone blend, shared out over the drivers in proportion to their
 values. Each pass takes, per vertex, the projection onto the constraint it
-violates most (Kaczmarz's maximal-residual rule); a vertex whose worst depth over ALL frames grows is put back and its step
-halved, so no vertex ends deeper than it began.
+violates most (Kaczmarz's maximal-residual rule). The passes run on freely
+(a veto on any pass that deepened a vertex stalled the fit, measured
+06.10.2026); each vertex keeps the shapes of the pass its worst depth over
+ALL frames was least in, so no vertex ends deeper than it began.
 """
 import multiprocessing as mp
 import os
@@ -36,7 +38,6 @@ from fit import depths, garment_pos
 from gltfio import qinv, qmat, qmul
 from sheets import corner_weights, morphed
 
-VETO = os.environ.get('VETO', '1') == '1'
 UP = np.array([0.0, 1.0, 0.0])
 DOWN = np.array([0.0, -1.0, 0.0])
 
@@ -59,6 +60,17 @@ def drivers(person, wr, cfg):
         u = qmat(q) @ (UP if axis == 'up' else DOWN)
         out += [max(0.0, u[0]), max(0.0, -u[0]), max(0.0, u[2]), max(0.0, -u[2])]
     return np.array(out)
+
+
+def drawn_garment(person, g, weights, wr, wp, cfg):
+    """A garment as the game draws it on `person` in a pose: morphed, hung and
+    baked, its corrective shapes weighted by the pose's drivers, skinned by the
+    hung bones."""
+    gi, gw = top4(g['W'])
+    v = person.bake(garment_pos(g, weights), gi, gw)
+    if g.get('shapes') is not None:
+        v = v + np.einsum('k,kvi->vi', drivers(person, wr, cfg), g['shapes'])
+    return person.skin(v, gi, gw, wr, wp)
 
 
 # ---- the per-frame work (forked workers read the module state) ---------------------
@@ -159,22 +171,14 @@ def correct(body, clips, garments, cfg, passes=None, corners=None, names=None, w
     G = garments['meshes']
     shapes = {n: np.zeros((K, len(G[n]['pos']), 3)) for n in (names or _S['names'])}
     best = {n: (np.full(len(G[n]['pos']), np.inf), shapes[n].copy()) for n in shapes}
-    rate = {n: np.ones(len(G[n]['pos'])) for n in shapes}
     for it in range(passes + 1):
         deep, prop = sweep(shapes, it < passes, workers)
         for n in shapes:
             better = deep[n] < best[n][0]
             best[n][0][better] = deep[n][better]
             best[n][1][:, better] = shapes[n][:, better]
-            if VETO:
-                worse = deep[n] > np.maximum(best[n][0], tol)
-                shapes[n][:, worse] = best[n][1][:, worse]
-                rate[n][worse] *= 0.5
-                keep = ~worse
-            else:
-                keep = np.ones(len(rate[n]), bool)
             if it < passes:
-                shapes[n] += prop[n] * (rate[n] * keep)[None, :, None]
+                shapes[n] += prop[n]
         over = {n: float(best[n][0].max()) for n in shapes}
         log(f'correct pass {it + 1}: deepest {max(over.values()):.4f}, {sum(v > tol for v in over.values())} garments over {tol}; '
             + ', '.join(f'{n[2:]} {over[n]:.3f}/{int((best[n][0] > tol).sum())}v' for n in shapes if over[n] > tol))
