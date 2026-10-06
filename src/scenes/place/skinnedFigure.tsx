@@ -23,7 +23,7 @@ import {
   type BoneName,
 } from '../../render/figureBody'
 import type { VillagerAsset } from '../../render/villagerAsset'
-import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
+import { createGltfSkeleton, gltfFigureGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
 import { contactCrouch, contactLean, gestureArmEuler, hangToward, solveTwoBone, unsquashHead } from '../../render/figureRig'
@@ -101,15 +101,6 @@ function cachedFigure(p: BodyProportions, layers: DressLayer[], key: string, ski
 
 const personCache = new Map<string, GltfPerson>()
 const gltfFigureCache = new Map<string, THREE.BufferGeometry>()
-const gltfLayerCache = new Map<string, THREE.BufferGeometry | null>()
-
-/** One dress layer on a person's glTF body: the pipeline's measured garment
- *  (render/villagerFigureBody.ts gltfLayerGeometry). */
-function cachedGltfLayer(asset: VillagerAsset, person: GltfPerson, l: DressLayer, key: string, radial: number) {
-  const k = layerKey(l, `gltf|${key}`, radial)
-  if (!gltfLayerCache.has(k)) gltfLayerCache.set(k, gltfLayerGeometry(asset, person, l, radial, (c) => cachedLayer(c, person.p, `gltf|${key}`, radial)))
-  return gltfLayerCache.get(k) ?? null
-}
 
 function cachedPerson(asset: VillagerAsset, id: FigureIdentity): GltfPerson {
   const k = `${id.sex}|${id.age}|${id.build}`
@@ -125,14 +116,15 @@ function cachedPerson(asset: VillagerAsset, id: FigureIdentity): GltfPerson {
 }
 
 /** The glTF body painted (skin, scalp) with every dress layer, as ONE geometry
- *  skinned to the asset's bones. The layers are the pipeline's garments,
- *  fitted to every clip and measured (scripts/villager/, penetration report). */
+ *  skinned to the asset's bones. The layers are the code-built ones of point
+ *  1293, fitted to this body's measured proportions — the glTF garments are
+ *  point 1311's (OPEN: replaced there by the pipeline's skinned garments). */
 function cachedGltfFigure(asset: VillagerAsset, person: GltfPerson, layers: DressLayer[], key: string, skin: string, paint: string | null, radial: number) {
   const k = `gltf|${key}|${skin}|${paint}|${radial}|${layers.map((l) => layerKey(l, '', radial)).join('/')}`
   let g = gltfFigureCache.get(k)
   if (!g) {
     const t0 = performance.now()
-    g = gltfFigureGeometry(asset, person, layers, skin, paint, radial, (l) => cachedGltfLayer(asset, person, l, key, radial))
+    g = gltfFigureGeometry(asset, person, layers, skin, paint, radial, (l) => cachedLayer(l, person.p, `gltf|${key}`, radial))
     gltfFigureCache.set(k, g)
     performance.measure?.('villager-gltf-figure', { start: t0, end: performance.now() })
   }
