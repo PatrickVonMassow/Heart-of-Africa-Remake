@@ -241,6 +241,7 @@ describe('the dressed figure', () => {
     const map = codeBoneMap(asset)
     const arms = new Set(['L', 'R'].flatMap((s) => [`upperArm.${s}`, `forearm.${s}`, `hand.${s}`].map((n) => asset.bones.indexOf(n))))
     let checked = 0
+    let mixed = 0
     for (const { sex, age } of people()) {
       const person = gltfPerson(asset, sex, age)
       for (const table of Object.values(PEOPLE_DRESS)) {
@@ -256,16 +257,19 @@ describe('the dressed figure', () => {
           for (let k = 0; k < si.count; k++) {
             let armBefore = 0
             for (let j = 0; j < 4; j++) if (arms.has(before[k * 4 + j])) armBefore += wBefore[k * 4 + j]
-            if (armBefore < 0.99) continue
+            // mixed sleeve weights too: the arm share stays whole, not only on a pure arm vertex
+            if (armBefore < 0.2) continue
             let armAfter = 0
             for (let j = 0; j < 4; j++) if (arms.has(si.getComponent(k, j))) armAfter += sw.getComponent(k, j)
             expect(armAfter, `${l.form} ${sex} ${age} vertex ${k}`).toBeGreaterThan(armBefore - 0.01)
             checked++
+            if (armBefore < 0.99) mixed++
           }
         }
       }
     }
     expect(checked).toBeGreaterThan(0)
+    expect(mixed).toBeGreaterThan(0)
   })
 
   it('paints the scalp in the hair colour and the rest in the skin', () => {

@@ -423,8 +423,9 @@ export function transferTrunkWeights(asset: VillagerAsset, person: GltfPerson, g
     // a sleeve's share on the arm bones stays: only the rest moves to the trunk
     let armShare = 0
     for (let j = 0; j < 4; j++) if (arms.has(si.getComponent(k, j))) armShare += sw.getComponent(k, j)
-    const s = Math.min(1, (y - lo + fade) / fade, (hi + fade - y) / fade) * (1 - Math.min(1, armShare))
-    if (s <= 0) continue
+    const band = Math.min(1, (y - lo + fade) / fade, (hi + fade - y) / fade)
+    const rest = 1 - Math.min(1, armShare)
+    if (band <= 0 || rest <= 0) continue
     let best = -1
     let d = Infinity
     for (const n of near) {
@@ -445,10 +446,11 @@ export function transferTrunkWeights(asset: VillagerAsset, person: GltfPerson, g
       }
     }
     if (own <= 0) continue
-    for (const [b, v] of w) w.set(b, (v / own) * s)
+    for (const [b, v] of w) w.set(b, (v / own) * band * rest)
     for (let j = 0; j < 4; j++) {
+      const b = si.getComponent(k, j)
       const v = sw.getComponent(k, j)
-      if (v > 0) w.set(si.getComponent(k, j), (w.get(si.getComponent(k, j)) ?? 0) + v * (1 - s))
+      if (v > 0) w.set(b, (w.get(b) ?? 0) + (arms.has(b) ? v : v * (1 - band)))
     }
     const top = [...w].sort((a, b) => b[1] - a[1]).slice(0, 4)
     const sum = top.reduce((t, [, v]) => t + v, 0)
