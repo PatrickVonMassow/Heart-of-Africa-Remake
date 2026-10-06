@@ -33740,3 +33740,12 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: 1294's "Verifiable (in addition …)" list for these items — Blender frame sheet of walk, sprint, dig and shovel-carry, the named Vitest cases, Playwright both backends picture-checked, the cross-vendor review record with its fixes.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
+
+- [x] 1312. Villager pipeline garments: step-limited fit pass and dressed frame sheets (split from 1311)
+  Queue position: directly after point 1311 (split 06.10.2026 under the split rule).
+  Source: point 1294 item 6, owned by 1311 until the split. State at the split (branch feat/1311-villager-body-motion, 8cf7319d5): verification/villager-body/penetration-report.md shows 6 of 32 garments within the 0.003 tolerance, robe/toga ~0.13 deep at kneelUp, wraps/skirts/shirt over tolerance in every frame; scripts/villager/pipeline.py now fails its penetration step over tolerance; the game draws the code-built dress on the glTF body (src/render/villagerFigureBody.ts), the pipeline garments are measured but not exported (OPEN in pipeline.py).
+  Split 06.10.2026 (did not converge): a rest-pose offset fit cannot follow a pose — cloth caught between two body parts is pushed from one into the other and the passes oscillate; still 6 of 32 within tolerance, robe/toga ~0.13. Zero penetration moved to point 1314, shipping to point 1315; this point keeps what branch feat/1312-pipeline-garments (459bd04de) delivers.
+  Final state: scripts/villager/fit.py runs a step-limited garment fit that keeps each garment's best state and never deepens a garment's worst penetration; the penetration measurement is faster; frame sheets of dressed villagers (walk, kneelDown, kneel, kneelUp, dig) and the refreshed report are in verification/villager-body/; fit margin and step are calibratable in balance.ts; the game picture is unchanged.
+  Verifiable: report per garment no deeper than the split state; dressed frame sheets present; cheap gate green; cross-vendor review record.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
