@@ -77,16 +77,33 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1312. Villager pipeline garments: zero penetration, then shipped on the glTF body (split from 1311)
+- [ ] 1312. Villager pipeline garments: step-limited fit pass and dressed frame sheets (split from 1311)
   Queue position: directly after point 1311 (split 06.10.2026 under the split rule).
-  Source: point 1294 item 6, owned by 1311 until the split. State at the split (branch feat/1311-villager-body-motion, 8cf7319d5): verification/villager-body/penetration-report.md shows 6 of 32 garments within the 0.003 tolerance, robe/toga ~0.13 deep at kneelUp, wraps/skirts/shirt over tolerance in every frame; scripts/villager/pipeline.py now fails its penetration step over tolerance; the game draws the code-built dress on the glTF body (render/villagerFigureBody.ts), the pipeline garments are measured but not exported (OPEN in pipeline.py).
-  Final state: 1294 item 6 holds — no clothing clipping; the per-frame penetration report is zero beyond tolerance for every garment, clip and body corner, and the garments the player sees are the measured ones.
-  Verifiable: penetration report all within tolerance and the pipeline step green; frame sheets with dress; Playwright both backends picture-checked on dressed villagers walking, kneeling and digging; cross-vendor review record.
+  Source: point 1294 item 6, owned by 1311 until the split. State at the split (branch feat/1311-villager-body-motion, 8cf7319d5): verification/villager-body/penetration-report.md shows 6 of 32 garments within the 0.003 tolerance, robe/toga ~0.13 deep at kneelUp, wraps/skirts/shirt over tolerance in every frame; scripts/villager/pipeline.py now fails its penetration step over tolerance; the game draws the code-built dress on the glTF body (src/render/villagerFigureBody.ts), the pipeline garments are measured but not exported (OPEN in pipeline.py).
+  Split 06.10.2026 (did not converge): a rest-pose offset fit cannot follow a pose — cloth caught between two body parts is pushed from one into the other and the passes oscillate; still 6 of 32 within tolerance, robe/toga ~0.13. Zero penetration moved to point 1314, shipping to point 1315; this point keeps what branch feat/1312-pipeline-garments (459bd04de) delivers.
+  Final state: scripts/villager/fit.py runs a step-limited garment fit that keeps each garment's best state and never deepens a garment's worst penetration; the penetration measurement is faster; frame sheets of dressed villagers (walk, kneelDown, kneel, kneelUp, dig) and the refreshed report are in verification/villager-body/; fit margin and step are calibratable in balance.ts; the game picture is unchanged.
+  Verifiable: report per garment no deeper than the split state; dressed frame sheets present; cheap gate green; cross-vendor review record.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1314. Villager garments: pose-driven correction to zero penetration (split from 1312)
+  Queue position: directly after point 1312.
+  Source: point 1312's author report 06.10.2026 (branch feat/1312-pipeline-garments): the rest-pose fit does not converge; zero penetration needs a pose-driven mechanism. Candidates to weigh by measurement, not a closed list: corrective garment morphs driven by leg/arm joint angles, evaluated identically in scripts/villager/penetration.py and the game; hiding body triangles fully covered by an opaque garment. Also owned here: penetration.py skins once while the game hangs the body into its rest pose, skins again and warps the stride with IK — the measurement must see what the game draws.
+  Final state: 1294 item 6 holds in the pipeline — the per-frame penetration report is zero beyond the 0.003 tolerance for every garment, clip and body corner, the pipeline penetration step is green, and the measurement uses the game's own skinning path.
+  Verifiable: penetration report all within tolerance and the pipeline step green; dressed frame sheets walking, kneeling and digging without visible clipping; Vitest for any game-side correction; cross-vendor review record.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1315. Villager garments: ship the measured pipeline garments on the glTF body (split from 1312)
+  Queue position: directly after point 1314; needs its green penetration report.
+  Source: point 1312 commit af2c25d42 (shipping on the glTF body: gltfGarment / gltfLayerGeometry, cachedGltfLayer, garment-carrying villager.glb, 41 Vitest cases in src/render/villager*), rolled back in cd0400571 because the garments still clipped.
+  Final state: the game draws the pipeline garments 1314 measured on the glTF body, no code-built dress layer reaches it, and garments follow the body's morph, hang, ground and scale; the glb growth (0.7 → 2.3 MB at af2c25d42) is measured and justified or reduced.
+  Verifiable: the Vitest cases from af2c25d42 green; Playwright both backends picture-checked on dressed villagers walking, kneeling and digging; cross-vendor review record.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
 
 - [ ] 1313. Clothing rule for women and children: covered upper body and hip layer without visible censorship
-  Queue position: directly after point 1311 and its split-off garment point 1312 (user 06.10.2026: "so einreihen", on the proposal "direkt hinter 1311"); the new garments need 1312's pipeline and penetration gate.
+  Queue position: directly after point 1311 and its split-off garment points 1312, 1314 and 1315 (user 06.10.2026: "so einreihen", on the proposal "direkt hinter 1311"); the new garments need 1312's pipeline and penetration gate.
   Source: user report 06.10.2026: since point 1294 (glTF base body with a real bust form) women are partly shown with exposed breasts, and children's pelvic area reads as naked although no genitals are modelled. Wanted: change it without losing too much authenticity and without visible censorship. The backlog already foresaw this ("a depiction would have to clothe deliberately against its own source, and that choice would have to be argued rather than made silently", docs/backlog.md).
   Final state:
   1. DESIGN RULE RECORDED: design.md states: youth, adult and elder women never show an uncovered upper body; children always wear a hip layer; where the source says otherwise or is silent, the nearest attested layer of the same people is chosen. docs/peoples-1890.md notes the deliberate deviation at each affected people.
@@ -98,6 +115,31 @@ put it is the mistake this line exists to stop.
   7. NO VISIBLE CENSORSHIP: no nudity toggle, no blur, no camera tricks.
   Verifiable: the dress.test.ts invariant; Playwright picture check of affected villages (Zulu, Mongo, Mbuti, San at least) on both backends, judged by looking incl. kneel/run poses; Blender frame sheet of the new garments through 1312's penetration gate.
   Criticality: medium - every village with affected peoples, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1316. Natural villager motion: research, richer rig where needed, clip-preserving IK, distributed lean (six eyes with final check)
+  Queue position: after point 1312 and the clothing-rule point 1313 (both Dorfleben); the rig changes must keep the garment penetration gate (points 1312/1314) green.
+  Source: user report 06.10.2026: villager walking still looks very unnatural, like marionettes; the tag-game poses (port-city chaser reach, river-bank caught slump) are implausible. Scope by user order: ALL figure motion as natural as possible: walking, turning, running, and actions such as digging, picking up objects, pointing, and so on.
+  Measured state at the request (rev df8394e5e): scripts/villager/skeleton.py has 21 bones (hips, spine, chest, neck, head, shoulder/upperArm/forearm/hand, thigh/shin/foot/toe; no arm twist bones, no fingers, one spine segment). src/render/villagerClipPose.ts drives the gait phase purely by distance and re-solves the legs with two-bone IK onto the stride, so the clip's own leg motion is largely replaced. src/scenes/place/gltfClipLayers.ts:14-15 keeps the trunk lean and stoop, the head correction, kneel/crouch and contact hands code-built; the lean tips the trunk as one block (src/render/figureRig.ts contactLean, src/render/gesture.ts:447) and head/arms inherit it. The caught slump at src/scenes/place/PlaceLife.tsx:1116-1118 is "trunk leaned forward, arms hanging plumb".
+
+  PROCEDURE: six eyes with final check, ALREADY AT CONCEPT LEVEL (user 06.10.2026), before any implementation:
+   a. Two different models, ideally different vendors (Claude lane and GPT-6 Astra), do the research and concept BLIND and in parallel. Model B starts WITHOUT prior knowledge: only the neutral goal ("all villager motion as natural as possible: walk, turn, run, dig, pick up, point, tag-game chase and caught pose, ..."), the constraints below and access to the raw material (code, pipeline, clips, frame sheets it renders itself). B never sees the diagnosis or item list of this point, nor point-brief output containing them.
+   b. A third, distinct model checks both concepts thoroughly and merges them via scripts/blind-merge.mjs; disagreements are resolved with reasons, not by union.
+   c. The merged concept goes to a model of the OTHER vendor than the merger for a final "does this break anything" check. Only an approved concept is implemented; objections are fixed and re-checked first.
+   d. Implementation then gets the usual cross-vendor code review.
+
+  Final state:
+   1. RESEARCH DOCUMENT docs/research/natural-villager-motion.md: gait cycle (pelvic rotation, tilt and lateral shift, trunk counter-rotation, arm swing by pace, heel-to-toe roll, head stabilisation), turning (anticipation, head and eyes lead, step pivots instead of sliding), running, and the actions (dig, pick-up, point, carry, reach, slump); techniques (clip plus corrective IK, layered additive animation, look-at chains, spine distribution, motion matching where feasible for this POC); rig standards (Mixamo / UE mannequin bone counts) and reachable CC0 mocap sources. Ends with a measured diagnosis: our frame sheets next to a reference, every deficit named with its cause (rig too primitive, joints present but badly driven, clip overridden, missing secondary motion).
+   2. RIG upgraded where the diagnosis requires it (candidates: 2-3 spine segments, arm twist bones, ball/toe joint for the roll, coarse finger groups for grip and pointing). Bone additions keep the dress layers, glTF export, low preset and the garment penetration gate (1312/1314) green.
+   3. CLIP PRESERVED, IK CORRECTIVE: the leg IK corrects only foot placement (the delta after the clip) instead of re-solving the whole leg; pelvis, trunk, head and arms come from the clips, blended by pace. Point 1295's no-slide rule stays binding.
+   4. CLIP SOURCES widened where needed (CC0 mocap walk/run cycles at several paces, turns, pick-up, point, dig; age or load variants if reachable); every source recorded in scripts/villager/sources.json with its licence.
+   5. TURNING, RUNNING AND ACTIONS: walk, turn on the spot and in motion, run, dig, pick up an object, point, carry, reach each read natural when judged by looking; transitions blended, no snaps, no foot sliding.
+   6. LEAN DISTRIBUTED: every code-built trunk lean (contact reach, slump, stoop) is distributed over hips, spine and chest instead of folding at one joint; neck and head counter-rotate to hold a gaze target (horizon, the chased child, the hand or the work).
+   7. PORT-CITY TAG CHASER: looks straight ahead at the runner, neck and head extended back for it, the reaching arm points horizontally at the target, much smaller trunk lean (drive from the hips and stride).
+   8. RIVER-BANK TAG CAUGHT CHILD: trunk nearly upright, shoulders hanging forward (shoulder bones protracted and lowered), chest slightly sunk (spread over spine and chest, no fold at the hips), head slightly bowed, arms hanging loosely.
+  Verifiable: the research document with its diagnosis; the blind-merge record and the final-check verdict (procedure a-c) BEFORE the first implementation commit; Blender frame sheets and a video strip before/after of walk, turn, run, dig, pick-up, point, chaser and caught child; the named Vitest cases for the corrective IK, lean distribution and gaze hold; Playwright picture check in a port city and at a river bank on both backends, judged by looking; cross-vendor code review record with its fixes.
+  Criticality: high - every villager, both backends.
+  If the point does not converge, split along "research and concept" / "rig and clips" / "poses and actions".
   Bundle: Dorfleben.
 
 - [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
