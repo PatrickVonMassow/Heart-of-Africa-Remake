@@ -85,6 +85,21 @@ put it is the mistake this line exists to stop.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
 
+- [ ] 1313. Clothing rule for women and children: covered upper body and hip layer without visible censorship
+  Queue position: directly after point 1311 and its split-off garment point 1312 (user 06.10.2026: "so einreihen", on the proposal "direkt hinter 1311"); the new garments need 1312's pipeline and penetration gate.
+  Source: user report 06.10.2026: since point 1294 (glTF base body with a real bust form) women are partly shown with exposed breasts, and children's pelvic area reads as naked although no genitals are modelled. Wanted: change it without losing too much authenticity and without visible censorship. The backlog already foresaw this ("a depiction would have to clothe deliberately against its own source, and that choice would have to be argued rather than made silently", docs/backlog.md).
+  Final state:
+  1. DESIGN RULE RECORDED: design.md states: youth, adult and elder women never show an uncovered upper body; children always wear a hip layer; where the source says otherwise or is silent, the nearest attested layer of the same people is chosen. docs/peoples-1890.md notes the deliberate deviation at each affected people.
+  2. GUESSED ROWS (source G(...) in src/systems/appearance.ts, e.g. Mbuti, Lunda, San, Bambundu, Banda women): the female youth/adult cells get a covering layer that fits the people's material (wrapLong worn at 'chest', breastCloth, or a hide/bark shoulder cape); each row's source note names the reason.
+  3. SOURCED ROWS (Zulu youth, Pedi youth, Wayeyi, Bemba, Fang, Mongo women etc.): covered with items attested for that people, not a uniform garment: hide/fur cloaks worn by women (Zulu isipuku, San nau) worn beyond the cold season; wide, deep bead collars / layered neck beads (neckBeads built wider); a baby sling carrying an infant for a share of adult women. Varied per people so no village reads as "everyone got a shirt". Never foreign dress (no European blouse, no other people's robe).
+  4. CHILDREN: every child cell (the childBeads-only rows and the Mongo paint-only rows) gets a hip layer: the adults' hip garment of the same people, scaled down (bark cloth for Mbuti/Banda, raffia for Mongo, hide for Wayeyi/San, ...). The waist beads stay as ornament.
+  5. BODY SAFETY NET: the glTF base body bust is stylised (no nipple geometry or detail in normal/colour), its breast morph capped; the child pelvis is smooth and stylised. Detail level matches the rest of the figure. Safety net only for poses where a layer shifts; it never replaces items 2-4.
+  6. INVARIANT TEST in src/systems/dress.test.ts (no new guard or infrastructure): for every people, season and year, every child and every female figure has a hip layer, and every female youth/adult/elder has a layer covering the chest. The low preset (primitive figure) follows the same table.
+  7. NO VISIBLE CENSORSHIP: no nudity toggle, no blur, no camera tricks.
+  Verifiable: the dress.test.ts invariant; Playwright picture check of affected villages (Zulu, Mongo, Mbuti, San at least) on both backends, judged by looking incl. kneel/run poses; Blender frame sheet of the new garments through 1312's penetration gate.
+  Criticality: medium - every village with affected peoples, both backends.
+  Bundle: Dorfleben.
+
 - [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
   Queue position: directly after point 1294 (ahead of 1301); worked only once 1294 has landed (user 05.10.2026: "ja, aber nach 1294").
   Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:
