@@ -85,6 +85,7 @@ put it is the mistake this line exists to stop.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
   Split 06.10.2026: body parts showing through a garment face (knees through the robe in walk, through the trousers in dig) are not seen by the garment-inside-body measurement; that direction moved to point 1319.
+  Round 2 result 06.10.2026 (tip d329213cb): 24/32 garments within tolerance; pairwise drivers, smoothing and a ground bound left the knee skirts at 0.013, the kneel hem pinched between thigh and calf. Linear corrective shapes cannot reach zero without a flare; round 3 pursues per-clip-frame baked, collision-resolved garment vertex animation played back identically in the game.
 
 - [ ] 1319. Villager garments: measure and remove body showing through a garment face (split from 1314)
   Queue position: directly after point 1314.
