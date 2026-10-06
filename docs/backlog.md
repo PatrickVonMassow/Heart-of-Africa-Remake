@@ -9,6 +9,7 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-10-06 pre-push gate — the unit gate for 124d7b9 (TASKS split only) went red while a Blender fit loaded the host, without naming the failing file or test; the superset run on f8cb1ab was green (588 files / 17299 tests) and the next gated push passed. Suspected load-sensitive unit test; the gate should print the failing test names.
 - 2026-10-01 parked work-order point 1257. On WebGL 2 the loom helper never walks the warp inside the section's waits — parked by point 1258 while the loom is
   switched off (`loom.placed: false`, user 29.09.2026); reopen as a point when it is switched on.
   Original text:
