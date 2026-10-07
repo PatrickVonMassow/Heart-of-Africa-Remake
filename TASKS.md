@@ -91,6 +91,13 @@ put it is the mistake this line exists to stop.
   Gate 07.10.2026 (main session, merge candidate 4ba43968a): handover review GPT-6 Astra merge (receipt 372a789f496f91f1); tsc, lint, build, test:unit (17299) and the pipeline selftest green. Picture check FAILED against main: the walk/dig knee show-through is gone, but dress-dig-2 shows new cloth spikes off the shoulder garment (frames 2, 3, 8) and dress-walk-1 shows body showing through the robe's top edge at the breasts, neither on main. Not mergeable as is. Asked the user 07.10. (board chat) whether to replace the per-pose resolver route with masking the covered body (pipeline mask per body vertex, hidden or pushed inward in the TSL vertex shader) and fold 1323-1325 into one point; 1319 waits for that answer. The game draws none of these garments yet (pipeline.py export), so there is no player impact either way.
   Bundle: Dorfleben.
 
+- [ ] 1326. Villager garments: hide the body a garment covers instead of correcting every pose
+  Queue position: directly after point 1319, ahead of point 1322; replaces points 1323-1325.
+  Source: user 07.10.2026 (board chat): "Gibt es keinen effizienteren Ansatz? Das kann doch keine Raketenwissenschaft sein."; answered with the proposal to hide the covered body as games usually do, accepted with "Ja" the same evening.
+  Final state: the villager pipeline marks per body vertex which garment covers it in its build pose; the game hides those body faces, or pushes the covered vertices a few millimetres inward along their normal in the TSL vertex shader, while the garment is worn, so no covered skin can show through the cloth in any pose; the per-pose resolver keeps only the coarse corrections it needs, and the 0.003 all-pose criterion for the handed cases (scripts/villager/handed-1323/1324/1325.json) is replaced by the picture.
+  Verifiable: dressed frame sheets walking, kneeling, digging and sprinting without visible show-through or cloth spikes, no worse than main elsewhere; the game picture on both backends once the garments ship; Vitest for the game-side mask; cross-vendor review record.
+  Criticality: high - every villager, both backends.
+  Bundle: Dorfleben.
 - [ ] 1322. Villager garments: cloth cut through a thin limb must not show the body (split from 1319)
   Queue position: directly after point 1319, ahead of point 1320.
   Source: point 1319's author report 07.10.2026 (branch feat/1319-garment-face-penetration): the body-outside-garment measure leaves 13 of 186,240 checks over 0.003, all where a sheet of cloth cuts through a thin limb (a calf kicked back in sprint, toga, hood dig, shirt kneelUp) and covering one side pushes the cloth into the body: wrapLong-chest 0.0132, toga 0.0072, wrapLong-waist 0.0046, robe 0.0045, hood 0.0040, shirt 0.0039, skirtKnee 0.0032. Also skin patches on the back in wrapLong sprint that the measure does not catch yet.
@@ -106,6 +113,7 @@ put it is the mistake this line exists to stop.
   Verifiable: the report's hood row within tolerance without exemption; dressed sprint, carry and carryIdle frame sheets without head or shoulder through the hood on both backends; cross-vendor review record.
   Criticality: high — every hooded villager, both backends.
   Bundle: Dorfleben.
+  Held 07.10.2026: superseded by point 1326 (user "Ja" in the board chat on hiding the covered body instead of per-pose correction); close with 1326's landing.
 
 - [ ] 1324. Villager garments: capes, cloaks and togas must not cut into or show the shoulders and back (split from 1319)
   Queue position: directly after point 1323, ahead of point 1320.
@@ -114,6 +122,7 @@ put it is the mistake this line exists to stop.
   Verifiable: those eight report rows within tolerance without exemption; dressed walk, sprint, dig and kneelUp frame sheets without shoulder or back through cloth on both backends; cross-vendor review record.
   Criticality: high — every villager wearing one, both backends.
   Bundle: Dorfleben.
+  Held 07.10.2026: superseded by point 1326 (user "Ja" in the board chat on hiding the covered body instead of per-pose correction); close with 1326's landing.
 
 - [ ] 1325. Villager garments: robes, shirts, skirts, wraps and breast cloths must not cut into or show the torso and hips (split from 1319)
   Queue position: directly after point 1324, ahead of point 1320.
@@ -122,6 +131,7 @@ put it is the mistake this line exists to stop.
   Verifiable: those nine report rows within tolerance without exemption; dressed sprint, carry and kneel frame sheets without torso or hip through cloth on both backends; cross-vendor review record.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
+  Held 07.10.2026: superseded by point 1326 (user "Ja" in the board chat on hiding the covered body instead of per-pose correction); close with 1326's landing.
 
 - [ ] 1320. Villager garments: compress the baked garment offsets to a shippable size (split from 1314)
   Queue position: directly after point 1319, ahead of point 1315.
