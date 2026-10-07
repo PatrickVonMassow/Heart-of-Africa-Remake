@@ -178,6 +178,7 @@ put it is the mistake this line exists to stop.
   Verifiable: the dress.test.ts invariant; Playwright picture check of affected villages (Zulu, Mongo, Mbuti, San at least) on both backends, judged by looking incl. kneel/run poses; Blender frame sheet of the new garments through 1312's penetration gate.
   Criticality: medium - every village with affected peoples, both backends.
   Bundle: Dorfleben.
+  Author round 2 07.10.2026 (Opus 5.5, 02ab16e90 + d2b4321ad, merge candidate 6517332d7, pushed): item 5 done. villager.glb carries no maps; the raw geometry has nipple-like breast tips (~8 mm) and a pointed child crotch, flattened at build time by `stylisePeaks` in src/render/villagerBody.ts (trunkPeakSharpnessMax 0.22, inward only); breast morph capped (breastCupMax 0.8, the current adult value, .glb unchanged); Vitest src/render/villagerBodySafety.test.ts. Gate on 6517332d7: tsc, lint, build, test:unit (17314) green. Open: cross-vendor review (scripts/review-astra.mjs), picture check both backends (polish-villagers --section=villager-dress, DRESS_PEOPLES=zulu,mongo,mbuti,san,pedi,banda; polish-children children-motion for run poses); low-preset primitive bust (figureBody.ts) untouched.
 
 - [ ] 1316. Natural villager motion: research, richer rig where needed, clip-preserving IK, distributed lean (six eyes with final check)
   Queue position: after point 1312 and the clothing-rule point 1313 (both Dorfleben); the rig changes must keep the garment penetration gate (points 1312/1314) green.
