@@ -2460,6 +2460,10 @@ export const VILLAGER_DRESS = {
    *  the bark cloth: the protectorate (1894) favoured cotton (§2.5, MODERN). The
    *  record gives no population-wide date (Astra B44), so it is rank-gated. */
   bagandaCottonFrom: 1894,
+  /** Share of San adult women drawn with an infant carried in the mantle
+   *  (Passarge: "infants are carried in it", §7.3 San). The share is a
+   *  calibratable GUESS: no source gives a number. */
+  babySlingShare: 0.3,
 } as const
 
 /**
