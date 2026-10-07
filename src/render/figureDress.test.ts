@@ -281,3 +281,64 @@ describe('a cloak over both shoulders', () => {
     expect(back.length).toBeGreaterThan(0)
   })
 })
+
+describe('a cover tied over the breast (wear "chest", docs/peoples-1890.md §8.6)', () => {
+  const woman = bodyProportions('female', 'adult')
+  const H = woman.stature
+  const bustY = woman.chestY - woman.bustDrop
+  // Does a ray from the trunk's axis straight forward (+z) at height y meet the
+  // garment, and how far out?
+  const frontHit = (g: THREE.BufferGeometry, y: number, x = 0) => {
+    const ray = new THREE.Ray(new THREE.Vector3(x, y, 0), new THREE.Vector3(0, 0, 1))
+    const pos = g.getAttribute('position')
+    const idx = g.getIndex()!
+    const [a, b, c, hit] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+    let far = -Infinity
+    for (let t = 0; t < idx.count; t += 3) {
+      a.fromBufferAttribute(pos, idx.getX(t))
+      b.fromBufferAttribute(pos, idx.getX(t + 1))
+      c.fromBufferAttribute(pos, idx.getX(t + 2))
+      if (ray.intersectTriangle(a, b, c, false, hit)) far = Math.max(far, hit.z)
+    }
+    return far
+  }
+
+  for (const [form, slot, material] of [
+    ['cape', 'shoulder', 'hide'],
+    ['cloak', 'shoulder', 'hide'],
+    ['neckBeads', 'ornament', 'beads'],
+  ] as const) {
+    it(`a ${form} worn at the chest closes over the bust, clear of it`, () => {
+      const g = buildLayerGeometry(layer({ slot, form, material, wear: 'chest' }), woman, 16)!
+      for (const x of [0, woman.chestHalfW * 0.45]) {
+        const z = frontHit(g, bustY, x)
+        // the bust's front: the trunk's chest station plus the bust itself
+        expect(z, `${form} x ${x}`).toBeGreaterThan(woman.chestHalfD * 0.82 + woman.bust * 0.8)
+      }
+      g.computeBoundingBox()
+      expect(g.boundingBox!.min.y).toBeLessThan(bustY - woman.bust - 0.02 * H)
+    })
+  }
+
+  it('the open cloak keeps its front opening; the closed one opens only below the waist', () => {
+    const open = buildLayerGeometry(layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear: 'bothShoulders' }), woman, 16)!
+    const closed = buildLayerGeometry(layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear: 'chest' }), woman, 16)!
+    expect(frontHit(open, bustY)).toBe(-Infinity)
+    expect(frontHit(closed, bustY)).toBeGreaterThan(0)
+    expect(frontHit(closed, (woman.waistY + woman.kneeY) / 2)).toBe(-Infinity)
+  })
+
+  it('a baby sling carries the infant behind the back, outside a closed mantle', () => {
+    const sling = buildLayerGeometry(layer({ slot: 'shoulder', form: 'babySling', material: 'hide', wear: 'bothShoulders' }), woman, 16)!
+    const mantle = buildLayerGeometry(layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear: 'chest' }), woman, 16)!
+    sling.computeBoundingBox()
+    mantle.computeBoundingBox()
+    expect(sling.boundingBox!.max.z).toBeLessThan(0)
+    expect(sling.boundingBox!.max.z).toBeLessThan(-woman.chestHalfD)
+    // every infant vertex lies behind the mantle's back at its height
+    expect(sling.boundingBox!.min.z).toBeLessThan(mantle.boundingBox!.min.z)
+    // rigid on the chest bone: it rides the stoop and the kneel as one piece
+    const i = sling.getAttribute('skinIndex')
+    for (let k = 0; k < i.count; k += 5) expect(i.getX(k)).toBe(boneIndex('chest'))
+  })
+})

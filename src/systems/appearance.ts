@@ -50,6 +50,7 @@ export type LayerForm =
   | 'waistBeads'
   | 'limbRings'
   | 'bodyPaint' // a colour on the skin itself (ochre, camwood, red clay)
+  | 'babySling' // an infant carried on the back in the mantle
 
 export type DressMaterial =
   | 'hide'
@@ -70,7 +71,7 @@ export type DressPattern = 'plain' | 'bands' | 'stripes' | 'checks' | 'mottle' |
 
 export type DressWear =
   | 'waist'
-  | 'chest'
+  | 'chest' // a wrap from the chest; a cape, cloak or bead collar tied closed over the breast
   | 'bothShoulders'
   | 'leftShoulder'
   | 'rightShoulder'
