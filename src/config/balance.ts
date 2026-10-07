@@ -2621,6 +2621,13 @@ export const VILLAGER_GLTF = {
   sprintThreshold: 1.8,
   /** Half-width of the band the two gaits cross-fade over, same units. */
   sprintBand: 0.35,
+  /** Body safety net (design.md clothing rule): no vertex of the chest front
+   *  or of a child's pelvis midline may peak sharper than this — its offset above
+   *  its neighbours' mean along the normal, over their mean edge length. The
+   *  asset's breast apex measures ≈ 0.40 (a nipple-like point) against ≈ 0.21
+   *  on the men's chest; the clamp only pulls such a point inward, so no dress
+   *  layer can newly intersect. Calibratable. */
+  trunkPeakSharpnessMax: 0.22,
   /** A gait's stride grows with pace as speed^exponent over its natural
    *  speed (the rest is cadence), bounded so the leg never over-reaches. */
   strideExponent: 0.5,

@@ -19,7 +19,7 @@ import { buildLayerGeometry } from './figureDress'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
-import { bakeMorphs, legScale, morphInfluences, restHeads } from './villagerBody'
+import { bakeMorphs, legScale, morphInfluences, restHeads, stylisePeaks } from './villagerBody'
 import { topoOrder } from './villagerAsset'
 
 const DOWN = new THREE.Vector3(0, -1, 0)
@@ -201,6 +201,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
     arr[k * 3 + 2] *= s
   }
   pos.needsUpdate = true
+  stylisePeaks(g, age === 'child')
   const rest = new Float32Array(heads.length)
   for (let i = 0; i < heads.length / 3; i++) {
     rest[i * 3] = heads[i * 3] * s

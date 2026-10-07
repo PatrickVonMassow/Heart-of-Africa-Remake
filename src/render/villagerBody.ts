@@ -85,3 +85,84 @@ export function bakeMorphs(src: THREE.BufferGeometry, influences: Record<string,
   g.computeVertexNormals()
   return g
 }
+
+/** Where the body safety net applies, as shares of the body's height and
+ *  half-widths over it: every chest front, and a child's pelvis midline. */
+const CHEST_REGION = { y0: 0.62, y1: 0.78, halfWidth: 0.1, minFacing: 0.3 } as const
+const PELVIS_REGION = { y0: 0.36, y1: 0.52, halfWidth: 0.04, minFacing: -0.2 } as const
+
+/** How sharply a vertex peaks: its offset above its neighbours' mean along
+ *  its normal, over their mean edge length (0 on a plane, > 0 on a bump). */
+export function peakSharpness(p: THREE.Vector3, n: THREE.Vector3, ring: readonly THREE.Vector3[]): number {
+  const m = new THREE.Vector3()
+  let edge = 0
+  for (const q of ring) {
+    m.add(q)
+    edge += q.distanceTo(p)
+  }
+  m.divideScalar(ring.length)
+  edge /= ring.length
+  return edge > 0 ? m.sub(p).dot(n) / -edge : 0
+}
+
+/** The region test of the safety net, per vertex of a standing body (+z the front). */
+export function inPeakRegion(p: THREE.Vector3, n: THREE.Vector3, yMin: number, height: number, child: boolean): boolean {
+  const f = (p.y - yMin) / height
+  const regions = child ? [CHEST_REGION, PELVIS_REGION] : [CHEST_REGION]
+  return regions.some((r) => f > r.y0 && f < r.y1 && Math.abs(p.x) < r.halfWidth * height && n.z > r.minFacing)
+}
+
+/** Each vertex's neighbours over an indexed geometry's triangles. */
+export function vertexRings(g: THREE.BufferGeometry): Set<number>[] {
+  const idx = g.index
+  if (!idx) throw new Error('vertexRings: indexed geometry expected')
+  const rings = Array.from({ length: g.getAttribute('position').count }, () => new Set<number>())
+  for (let t = 0; t < idx.count; t += 3) {
+    const v = [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)]
+    for (let k = 0; k < 3; k++) {
+      rings[v[k]].add(v[(k + 1) % 3])
+      rings[v[(k + 1) % 3]].add(v[k])
+    }
+  }
+  return rings
+}
+
+/**
+ * The body safety net (design.md clothing rule): a stylised bust and a child's
+ * smooth pelvis. Every vertex of the chest front (and a child's pelvis
+ * midline) that peaks sharper than VILLAGER_GLTF.trunkPeakSharpnessMax — the
+ * breast apex the MakeHuman breast target leaves as a point, the crotch apex — is pulled
+ * inward along its normal until it does not. Inward only, so a dress layer
+ * fitted outside the body stays outside. On the grounded body (y = 0 the
+ * sole); in place, normals recomputed.
+ */
+export function stylisePeaks(g: THREE.BufferGeometry, child: boolean, passes = 32): THREE.BufferGeometry {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute
+  const nor = g.getAttribute('normal') as THREE.BufferAttribute
+  const cap = VILLAGER_GLTF.trunkPeakSharpnessMax
+  const rings = vertexRings(g)
+  g.computeBoundingBox()
+  const yMin = g.boundingBox!.min.y
+  const height = g.boundingBox!.max.y - yMin
+  const P = Array.from({ length: pos.count }, (_, i) => new THREE.Vector3().fromBufferAttribute(pos, i))
+  const N = Array.from({ length: pos.count }, (_, i) => new THREE.Vector3().fromBufferAttribute(nor, i).normalize())
+  const region = P.map((p, i) => rings[i].size >= 3 && inPeakRegion(p, N[i], yMin, height, child))
+  for (let pass = 0; pass < passes; pass++) {
+    const moves: [number, number][] = []
+    for (let i = 0; i < P.length; i++) {
+      if (!region[i]) continue
+      const ring = [...rings[i]].map((j) => P[j])
+      const s = peakSharpness(P[i], N[i], ring)
+      if (s <= cap) continue
+      const edge = ring.reduce((a, q) => a + q.distanceTo(P[i]), 0) / ring.length
+      moves.push([i, (s - cap) * edge])
+    }
+    if (!moves.length) break
+    for (const [i, d] of moves) P[i].addScaledVector(N[i], -d)
+  }
+  P.forEach((p, i) => pos.setXYZ(i, p.x, p.y, p.z))
+  pos.needsUpdate = true
+  g.deleteAttribute('normal')
+  g.computeVertexNormals()
+  return g
+}
