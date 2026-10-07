@@ -33,7 +33,7 @@ def corner_shapes(mh, cfg):
 
     def make(sex, age, build):
         w = 0.5 + build * A['buildWeight']
-        cup = A['breastCup'][age] if sex == 'female' else 0.0
+        cup = min(A['breastCup'][age], A['breastCupMax']) if sex == 'female' else 0.0
         v = mh.shape(1.0 if sex == 'male' else 0.0, A['makeHumanAge'][age], w, A['makeHumanRace'], cup)
         lo = v[body, 1].min()
         hi = v[body, 1].max()

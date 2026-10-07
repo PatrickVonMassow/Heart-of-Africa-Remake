@@ -2571,6 +2571,9 @@ export const VILLAGER_ASSET = {
    *  woman from a man at village distance (as render/figureBody.ts `bust`).
    *  Calibratable, read off the frame sheets and the village frames. */
   breastCup: { child: 0, youth: 0.55, adult: 0.8, elder: 0.75 },
+  /** The cap on breastCup the pipeline builds with (scripts/villager/body.py
+   *  clamps to it): a stylised bust, never MakeHuman's full cup. Calibratable. */
+  breastCupMax: 0.8,
   /** How far a build of ±1 moves MakeHuman's weight slider off its average. */
   buildWeight: 0.3,
   /** Triangles of the decimated body (hands, feet and face kept finer). */
