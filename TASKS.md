@@ -113,7 +113,7 @@ put it is the mistake this line exists to stop.
   Verifiable: the report's hood row within tolerance without exemption; dressed sprint, carry and carryIdle frame sheets without head or shoulder through the hood on both backends; cross-vendor review record.
   Criticality: high — every hooded villager, both backends.
   Bundle: Dorfleben.
-  Held 07.10.2026: superseded by point 1326 (user "Ja" in the board chat on hiding the covered body instead of per-pose correction); close with 1326's landing.
+  Held 07.10.2026: point 1326 (hiding the covered body, user "Ja" in the board chat) covers this case; it closes with 1326's landing.
 
 - [ ] 1324. Villager garments: capes, cloaks and togas must not cut into or show the shoulders and back (split from 1319)
   Queue position: directly after point 1323, ahead of point 1320.
@@ -122,7 +122,7 @@ put it is the mistake this line exists to stop.
   Verifiable: those eight report rows within tolerance without exemption; dressed walk, sprint, dig and kneelUp frame sheets without shoulder or back through cloth on both backends; cross-vendor review record.
   Criticality: high — every villager wearing one, both backends.
   Bundle: Dorfleben.
-  Held 07.10.2026: superseded by point 1326 (user "Ja" in the board chat on hiding the covered body instead of per-pose correction); close with 1326's landing.
+  Held 07.10.2026: point 1326 (hiding the covered body, user "Ja" in the board chat) covers this case; it closes with 1326's landing.
 
 - [ ] 1325. Villager garments: robes, shirts, skirts, wraps and breast cloths must not cut into or show the torso and hips (split from 1319)
   Queue position: directly after point 1324, ahead of point 1320.
@@ -131,7 +131,7 @@ put it is the mistake this line exists to stop.
   Verifiable: those nine report rows within tolerance without exemption; dressed sprint, carry and kneel frame sheets without torso or hip through cloth on both backends; cross-vendor review record.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
-  Held 07.10.2026: superseded by point 1326 (user "Ja" in the board chat on hiding the covered body instead of per-pose correction); close with 1326's landing.
+  Held 07.10.2026: point 1326 (hiding the covered body, user "Ja" in the board chat) covers this case; it closes with 1326's landing.
 
 - [ ] 1320. Villager garments: compress the baked garment offsets to a shippable size (split from 1314)
   Queue position: directly after point 1319, ahead of point 1315.
