@@ -15954,3 +15954,15 @@ to land than a mechanism that needs a review.
   Final state: the cause is measured in game (which mesh, overlay or shadow draws the rectangle) and removed; the burning-grass travel frame shows no straight-edged artefact on either backend.
   Verifiable: the burning-grass frame on both backends, picture-checked per §7.2; a right-layer test for the corrected cause.
   Bundle: Wetter & Wasser.
+
+- [ ] 1327. Villager garments: fold the remaining clipping points into the covered-body mask (1326)
+  Queue position: directly after point 1326.
+  Final state: points 1319 (body showing through a garment face), 1322 (cloth cut through a thin limb) and 1321 (inner garment showing through an outer one) carry a "Held: covered by 1326" line and close with 1326's landing. 1326's acceptance names these cases: a body vertex under any garment is hidden or pushed inward in every pose, including thin limbs, and the same mask hides an inner garment's faces under an outer garment. Point 1320 (compress baked per-pose garment offsets) is closed as obsolete if 1326 removes the per-pose offsets, otherwise it stays with a note. 1315 and 1313 are unchanged.
+  Source: user 07.10.2026 (board chat): "Ich frage, ob nicht alle anderen Tasks zum Clippingproblem der Kleidung auch damit zusammengeführt/behoben werden sollten." Answered with the proposal above; accepted with "Ja".
+  Bundle: Dorfleben.
+
+- [ ] 1328. A chat-answer session recorded as batch-lock holder cannot end
+  Source: findings carrier 07.10.2026 22:10: answer session ea5bbc16 (started by the chat watcher for one message, told not to hold the batch lock) stood in .claude/batch-lock.json as lock holder, so push-arrival, decision-card, dashboard, dashboard-integrity and batch-progress guards demanded batch work at every stop that its start order forbids; the session could not end. The real batch session was a53218c2.
+  Final state: a session started by the chat watcher for a single answer never becomes batch-lock holder, and the lock-bound Stop guards stand down for it; reproduced and fixed at the lock acquisition, no new guard (infrastructure freeze 01.09.2026).
+  Verifiable: Vitest reproducing an answer-session start that leaves the lock with the batch session.
+  Bundle: Session- & Repo-Hygiene.
