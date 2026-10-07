@@ -400,10 +400,13 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
     }
     case 'babySling': {
       // An infant carried on the back in the mantle (Passarge, §7.3 San): a
-      // hide bundle outside the mantle's back, the small head above it.
+      // hide bundle outside the mantle's back, the small head above it. Rigid
+      // on the chest while the mantle's back blends toward the spine and hips,
+      // so it stands off far enough that a forward bend (a work lean, a
+      // stoop) does not swing the mantle into it.
       const r = 0.07 * H
       const y = p.chestY - 0.06 * H
-      const z = -(Math.max(p.chestHalfD * 1.5, trunkAt(p, y)[1] + 0.03 * H) + r * 0.6)
+      const z = -(Math.max(p.chestHalfD * 1.5, trunkAt(p, y)[1] + 0.03 * H) + r * 0.6 + 0.01 * H)
       const bundle = new THREE.SphereGeometry(r, radial, 8).scale(1, 1.2, 0.7)
       bundle.translate(0, y, z)
       parts.push({ geo: bundle, weigh: rigid('chest') })

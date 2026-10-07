@@ -557,7 +557,11 @@ export function gltfFigureGeometry(
   const map = codeBoneMap(asset)
   for (const l of layers) {
     const lg = layerOf(l)
-    if (lg) parts.push(transferTrunkWeights(asset, person, remapSkin(lg.clone(), map)))
+    if (!lg) continue
+    // The infant in its sling rides the chest bone as one rigid piece: the
+    // trunk transfer would blend it toward the spine and hips and bend it.
+    const own = remapSkin(lg.clone(), map)
+    parts.push(l.form === 'babySling' ? own : transferTrunkWeights(asset, person, own))
   }
   const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
   if (!g) throw new Error('glTF villager: body and dress layers do not merge')

@@ -11,6 +11,7 @@ import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
 import { VILLAGER_MOTION as M } from '../config/balance'
 import { AGE_GROUPS, PEOPLE_DRESS, SEXES } from '../systems/appearance'
 import { BONE_NAMES, bodyProportions } from './figureBody'
+import { kneelLegs } from './figureRig'
 import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { buildLayerGeometry } from './figureDress'
@@ -177,8 +178,8 @@ describe('the dressed figure', () => {
     }
   })
 
-  it('on the glTF body the bead collar lies inside the seasonal cloak, open or tied', () => {
-    const shoulderLayer = (form: 'cloak' | 'neckBeads', wear: 'bothShoulders' | 'chest') => ({
+  it('on the glTF body the bead collar lies inside the seasonal cloak, open or tied, and an infant in its sling outside the tied one', () => {
+    const shoulderLayer = (form: 'cloak' | 'neckBeads' | 'babySling', wear: 'bothShoulders' | 'chest') => ({
       ...PEOPLE_DRESS.zulu.female.youth[0],
       slot: form === 'neckBeads' ? ('ornament' as const) : ('shoulder' as const),
       form,
@@ -195,7 +196,85 @@ describe('the dressed figure', () => {
           expect(count, `${age} ${radial} ${wear}`).toBeGreaterThan(collar.getAttribute('position').count * 0.75)
           expect(min / p.stature, `${age} ${radial} ${wear}`).toBeGreaterThan(0.004)
         }
+        const sling = buildLayerGeometry(shoulderLayer('babySling', 'bothShoulders'), p, radial)!
+        const mantle = buildLayerGeometry(shoulderLayer('cloak', 'chest'), p, radial)!
+        const { min, count } = axisClearance(sling, mantle, 'outside')
+        expect(count, `${age} ${radial} sling`).toBeGreaterThan(0)
+        expect(min / p.stature, `${age} ${radial} sling`).toBeGreaterThan(0.008)
       }
+    }
+  })
+
+  it('in the dressed glTF figure the infant rides the chest bone alone, rigid and clear of the tied mantle when bent, leaning or kneeling', () => {
+    const person = gltfPerson(asset, 'female', 'adult')
+    const { p } = person
+    const H = p.stature
+    const base = PEOPLE_DRESS.san.female.adult[0]
+    const mantle = { ...base, slot: 'shoulder' as const, form: 'cloak' as const, material: 'hide' as const, wear: 'chest' as const }
+    const sling = { ...mantle, form: 'babySling' as const, wear: 'bothShoulders' as const }
+    const g = gltfFigureGeometry(asset, person, [mantle, sling], '#5c3317', null, 16)
+    const n = buildLayerGeometry(sling, p, 16)!.getAttribute('position').count
+    const m = buildLayerGeometry(mantle, p, 16)!.getAttribute('position').count
+    const total = g.getAttribute('position').count
+    const [s0, m0] = [total - n, total - n - m]
+    // all four skin slots of every infant vertex: the chest at 1, the rest 0
+    const chest = asset.bones.indexOf('chest')
+    const si = g.getAttribute('skinIndex')
+    const sw = g.getAttribute('skinWeight')
+    for (let k = s0; k < total; k++) {
+      let on = 0
+      let off = 0
+      for (let j = 0; j < 4; j++) {
+        if (si.getComponent(k, j) === chest) on += sw.getComponent(k, j)
+        else off += sw.getComponent(k, j)
+      }
+      expect(on, `vertex ${k}`).toBeCloseTo(1, 6)
+      expect(off, `vertex ${k}`).toBeCloseTo(0, 6)
+    }
+    const part = (from: number, to: number, at: Float32Array) => {
+      const out = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(at.slice(from * 3, to * 3), 3))
+      const idx = buildLayerGeometry(from === s0 ? sling : mantle, p, 16)!.getIndex()!
+      return out.setIndex(idx.clone())
+    }
+    const poses: Array<[string, (b: Record<string, THREE.Bone>) => void]> = [
+      ['rest', () => {}],
+      ['chest bent by the elder’s stoop', (b) => b.chest.rotation.set(0.42, 0, 0)],
+      ['trunk leaning into a work pose', (b) => b.spine.rotation.set(0.5, 0, 0)],
+      [
+        'kneeling',
+        (b) => {
+          const k = kneelLegs(p.hipY - p.kneeY, p.calfR)
+          b.hips.position.y += k.hipY - p.hipY
+          for (const sd of ['L', 'R'] as const) {
+            b[`thigh.${sd}`].rotation.x = k.thigh
+            b[`shin.${sd}`].rotation.x = k.shin
+            b[`foot.${sd}`].rotation.x = k.foot
+          }
+        },
+      ],
+    ]
+    const rest = g.getAttribute('position')
+    for (const [name, pose] of poses) {
+      const { skeleton, bones } = createGltfSkeleton(asset, person.rest)
+      pose(bones as unknown as Record<string, THREE.Bone>)
+      let root: THREE.Object3D = bones.hips
+      while (root.parent) root = root.parent
+      root.updateMatrixWorld(true)
+      // back into the chest bone's bind frame
+      const back = bones.chest.matrixWorld.clone().multiply(skeleton.boneInverses[skeleton.bones.indexOf(bones.chest)]).invert()
+      const at = skinned(g, skeleton)
+      const v = new THREE.Vector3()
+      for (let k = m0; k < total; k++) {
+        v.fromArray(at, k * 3).applyMatrix4(back)
+        at[k * 3] = v.x
+        at[k * 3 + 1] = v.y
+        at[k * 3 + 2] = v.z
+        if (k >= s0) expect(v.distanceTo(new THREE.Vector3().fromBufferAttribute(rest, k)), `${name} vertex ${k}`).toBeLessThan(1e-4)
+      }
+      // measured 0.016-0.023 H over these poses
+      const { min, count } = axisClearance(part(s0, total, at), part(m0, s0, at), 'outside')
+      expect(count, name).toBe(n)
+      expect(min / H, name).toBeGreaterThan(0.01)
     }
   })
 
