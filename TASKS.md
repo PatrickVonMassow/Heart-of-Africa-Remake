@@ -87,6 +87,7 @@ put it is the mistake this line exists to stop.
   Review round 1 07.10.2026 (GPT-6 Astra, branch head 5a715799e, receipt 78fbf295c9e3d777): passes 2-4 merge, pass 1 do-not-merge with three P1 findings to answer on the branch: (a) enclose.py:204 probes up to 0.005 behind the nearest cloth and can cross a thin enclosed region, so a real over-tolerance exposure reads zero — find the side directly behind the cloth without crossing another surface; (b) enclose.py:129 drops build-pose-enclosed vertices near an opening for good, and line 199 excuses exposure near a posed edge even when the nearest surface is cloth — tell passage through an opening from penetration of the adjacent cloth; (c) penetration.py:167/177 exempts a whole garment/clip for a 1322 handoff and checks only its maximum — scope each exemption to the recorded poses/body samples and fail any newly failing case. Picture check of the current sheets: knees covered in dress-walk/dress-dig; the kneel wrap's hip gap is unchanged from main.
   Author round 2 07.10.2026 (Opus 5.5, 226a03a2d + f179c54ed, pushed): all three findings answered with pipeline selftests; the stricter test now reports 16 of 32 garments over tolerance (worst 0.0219 g-wrapLong-waist sprint; capes/cloaks kneelUp, shirt shoulder in idle, robe, hood, skirts) that the old opening excuses hid. Decision (main session, recorded for veto): the resolver is extended for these cloth-cut-through-body cases inside 1319 rather than handing ~250 non-thin-limb pose cases to 1322 under a wrong label; the half-way settling oscillates 0.004/0.006 on the idle shirt and needs a convergent rule. Note: local/villager-build/resolved.pkl holds this branch's resolve and its key ignores code changes — rebuild resolve before any penetration run on main.
   Author round 3 07.10.2026 (Opus 5.5, 7ed6534c3..336fab1a0): face-cut triangles resolved, damped settling keeps the best state, resolve cache keyed on resolver sources; all 32 garments within 0.003, nothing handed to 1322. Review round 2 (GPT-6 Astra, 4 passes at 336fab1): passes 2-3 merge; pass 1 do-not-merge (P1 resolve.py residual() drops face depths, solve(None) skips face strategies; P2 report zeroes sub-tolerance exposure), pass 4 merge-with-fixes (same P2). Picture check: dig show-through gone vs main; kneel hip gap unchanged.
+  Split 07.10.2026 (main session, after author round 3; no convergence: 16 over in round 2, 18 of 32 over at 93a330e69 once the face-depth and exposure fixes measure honestly): 1319 now ends with the honest measurement (vertex depth, cloth between vertices, body shown), the walk/dig knee fix, and every remaining over-tolerance case handed over by name per garment, pose and sample to points 1323-1325 (handover extended from body-shown to both depth columns), the step green, the frame sheets no worse than main on both backends, a cross-vendor review of the handover; the correction of the handed cases moves to 1323 (hood), 1324 (shoulder-draped garments) and 1325 (chest and waist garments).
   Bundle: Dorfleben.
 
 - [ ] 1322. Villager garments: cloth cut through a thin limb must not show the body (split from 1319)
@@ -94,6 +95,30 @@ put it is the mistake this line exists to stop.
   Source: point 1319's author report 07.10.2026 (branch feat/1319-garment-face-penetration): the body-outside-garment measure leaves 13 of 186,240 checks over 0.003, all where a sheet of cloth cuts through a thin limb (a calf kicked back in sprint, toga, hood dig, shirt kneelUp) and covering one side pushes the cloth into the body: wrapLong-chest 0.0132, toga 0.0072, wrapLong-waist 0.0046, robe 0.0045, hood 0.0040, shirt 0.0039, skirtKnee 0.0032. Also skin patches on the back in wrapLong sprint that the measure does not catch yet.
   Final state: the correction resolves a cloth sheet crossing a thin limb (the limb carries the cloth on its outside), the measure catches the wrapLong back patches, and the penetration step is green with no case handed over by point 1319 left.
   Verifiable: penetration report all within tolerance without exemptions; dressed sprint, dig and kneel frame sheets without body through cloth on both backends; cross-vendor review record.
+  Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1323. Villager garments: the hood must not cut into or show the head and shoulders (split from 1319)
+  Queue position: directly after point 1322, ahead of point 1320.
+  Source: point 1319's penetration report at 93a330e69 (branch feat/1319-garment-face-penetration): g-hood-overHead deepest 0.0533 (sprint frame 6 stride 1.35, male child), cloth between vertices 0.0634 (carryIdle frame 49, male elder), body shown 0.0378 (carry frame 7, adult build +1); 113/1150/962 of 5820 frames over 0.003.
+  Final state: the hood follows head and shoulders in every clip and body corner, and the penetration step is green with no hood case handed over by point 1319 left.
+  Verifiable: the report's hood row within tolerance without exemption; dressed sprint, carry and carryIdle frame sheets without head or shoulder through the hood on both backends; cross-vendor review record.
+  Criticality: high — every hooded villager, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1324. Villager garments: capes, cloaks and togas must not cut into or show the shoulders and back (split from 1319)
+  Queue position: directly after point 1323, ahead of point 1320.
+  Source: point 1319's penetration report at 93a330e69: g-cape-bothShoulders/leftShoulder/rightShoulder, g-cloak-bothShoulders/leftShoulder/rightShoulder, g-toga-leftShoulder/rightShoulder over 0.003 (worst cloth between vertices 0.0138 g-cloak-leftShoulder walk; g-cape-leftShoulder 936 of 5820 frames in dig/kneelUp).
+  Final state: the shoulder-draped garments stay outside the body in every clip and body corner, and the penetration step is green with none of their cases handed over by point 1319 left.
+  Verifiable: those eight report rows within tolerance without exemption; dressed walk, sprint, dig and kneelUp frame sheets without shoulder or back through cloth on both backends; cross-vendor review record.
+  Criticality: high — every villager wearing one, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1325. Villager garments: robes, shirts, skirts, wraps and breast cloths must not cut into or show the torso and hips (split from 1319)
+  Queue position: directly after point 1324, ahead of point 1320.
+  Source: point 1319's penetration report at 93a330e69: g-robe-chest (0.0146 sprint), g-shirt-chest (0.0130 sprint), g-breastCloth-chest, g-skirtKnee-chest/-waist, g-skirtShort-chest/-waist, g-wrapLong-chest/-waist over 0.003, mostly sprint, carry/carryIdle and kneelDown/kneelUp.
+  Final state: these garments stay outside the torso and hips in every clip and body corner, and the penetration step is green with none of their cases handed over by point 1319 left.
+  Verifiable: those nine report rows within tolerance without exemption; dressed sprint, carry and kneel frame sheets without torso or hip through cloth on both backends; cross-vendor review record.
   Criticality: high — every villager, both backends.
   Bundle: Dorfleben.
 
