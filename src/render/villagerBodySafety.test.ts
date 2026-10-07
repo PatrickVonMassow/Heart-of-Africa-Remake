@@ -56,6 +56,24 @@ function sharpestPeak(g: THREE.BufferGeometry, child = false) {
   return best
 }
 
+/** The sharpest peak on the front of the pelvis midline, selected by the
+ *  body's own joints rather than by the safety net's region predicate (a test
+ *  through that predicate would lose the pelvis with it). */
+function sharpestPelvisFront(g: THREE.BufferGeometry, p: { hipY: number; hipX: number; stature: number }) {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute
+  const nor = g.getAttribute('normal') as THREE.BufferAttribute
+  const rings = vertexRings(g)
+  const H = p.stature
+  const P = (i: number) => new THREE.Vector3().fromBufferAttribute(pos, i)
+  let best = -Infinity
+  for (let i = 0; i < pos.count; i++) {
+    const v = P(i)
+    if (rings[i].size < 3 || v.z <= 0 || Math.abs(v.x) > p.hipX * 0.6 || v.y < p.hipY - 0.1 * H || v.y > p.hipY + 0.03 * H) continue
+    best = Math.max(best, peakSharpness(v, new THREE.Vector3().fromBufferAttribute(nor, i).normalize(), [...rings[i]].map(P)))
+  }
+  return best
+}
+
 describe('the body safety net', () => {
   it('ships no texture, normal or colour map that could carry nipple detail', () => {
     const len = glb.readUInt32LE(12)
@@ -85,6 +103,18 @@ describe('the body safety net', () => {
       // the clamp works on fixed normals and the normals are recomputed after,
       // so the measure may land a little above the cap
       expect(sharpestPeak(gltfPerson(asset, sex, age).geometry, age === 'child').s, `${sex} ${age}`).toBeLessThan(cap * 1.2)
+    }
+  })
+
+  it('blunts a child’s sharp crotch apex below the cap, found by the body’s own joints', () => {
+    // Measured 08.10.2026: 0.32-0.35 raw on the children, 0.22-0.23 after.
+    for (const sex of SEXES) {
+      const { raw, person } = rawBody(sex, 'child')
+      const before = sharpestPelvisFront(raw, person.p)
+      const after = sharpestPelvisFront(person.geometry, person.p)
+      expect(before, `${sex} raw`).toBeGreaterThan(0.3)
+      expect(after, sex).toBeLessThan(cap * 1.2)
+      expect(before - after, sex).toBeGreaterThan(0.08)
     }
   })
 
