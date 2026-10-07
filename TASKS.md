@@ -77,87 +77,17 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1319. Villager garments: measure and remove body showing through a garment face (split from 1314)
-  Queue position: directly after point 1314.
-  Source: point 1314's author report 06.10.2026 (branch feat/1314-garment-pose-correction): penetration.py tests only garment vertices inside the body; in verification/villager-body/dress-walk-* the knees show through the robe and in dress-dig-* through the trousers although both measure clean.
-  Final state: the pipeline penetration report also measures body vertices outside an enclosing garment surface (same game skinning path, same 0.003 tolerance), the correction removes them, and the step stays green.
-  Verifiable: the extended report all within tolerance; dressed frame sheets walking, kneeling and digging without visible clipping on both backends; Vitest for any game-side change; cross-vendor review record.
-  Criticality: high — every villager, both backends.
-  Split 07.10.2026 (author round 1): the knee show-through is fixed; the 13 thin-limb cases (cloth sheet cut through a calf or arm) and the wrapLong back patches moved to point 1322, which 1319 hands over by name in its report.
-  Review round 1 07.10.2026 (GPT-6 Astra, branch head 5a715799e, receipt 78fbf295c9e3d777): passes 2-4 merge, pass 1 do-not-merge with three P1 findings to answer on the branch: (a) enclose.py:204 probes up to 0.005 behind the nearest cloth and can cross a thin enclosed region, so a real over-tolerance exposure reads zero — find the side directly behind the cloth without crossing another surface; (b) enclose.py:129 drops build-pose-enclosed vertices near an opening for good, and line 199 excuses exposure near a posed edge even when the nearest surface is cloth — tell passage through an opening from penetration of the adjacent cloth; (c) penetration.py:167/177 exempts a whole garment/clip for a 1322 handoff and checks only its maximum — scope each exemption to the recorded poses/body samples and fail any newly failing case. Picture check of the current sheets: knees covered in dress-walk/dress-dig; the kneel wrap's hip gap is unchanged from main.
-  Author round 2 07.10.2026 (Opus 5.5, 226a03a2d + f179c54ed, pushed): all three findings answered with pipeline selftests; the stricter test now reports 16 of 32 garments over tolerance (worst 0.0219 g-wrapLong-waist sprint; capes/cloaks kneelUp, shirt shoulder in idle, robe, hood, skirts) that the old opening excuses hid. Decision (main session, recorded for veto): the resolver is extended for these cloth-cut-through-body cases inside 1319 rather than handing ~250 non-thin-limb pose cases to 1322 under a wrong label; the half-way settling oscillates 0.004/0.006 on the idle shirt and needs a convergent rule. Note: local/villager-build/resolved.pkl holds this branch's resolve and its key ignores code changes — rebuild resolve before any penetration run on main.
-  Author round 3 07.10.2026 (Opus 5.5, 7ed6534c3..336fab1a0): face-cut triangles resolved, damped settling keeps the best state, resolve cache keyed on resolver sources; all 32 garments within 0.003, nothing handed to 1322. Review round 2 (GPT-6 Astra, 4 passes at 336fab1): passes 2-3 merge; pass 1 do-not-merge (P1 resolve.py residual() drops face depths, solve(None) skips face strategies; P2 report zeroes sub-tolerance exposure), pass 4 merge-with-fixes (same P2). Picture check: dig show-through gone vs main; kneel hip gap unchanged.
-  Split 07.10.2026 (main session, after author round 3; no convergence: 16 over in round 2, 18 of 32 over at 93a330e69 once the face-depth and exposure fixes measure honestly): 1319 now ends with the honest measurement (vertex depth, cloth between vertices, body shown), the walk/dig knee fix, and every remaining over-tolerance case handed over by name per garment, pose and sample to points 1323-1325 (handover extended from body-shown to both depth columns), the step green, the frame sheets no worse than main on both backends, a cross-vendor review of the handover; the correction of the handed cases moves to 1323 (hood), 1324 (shoulder-draped garments) and 1325 (chest and waist garments).
-  Gate 07.10.2026 (main session, merge candidate 4ba43968a): handover review GPT-6 Astra merge (receipt 372a789f496f91f1); tsc, lint, build, test:unit (17299) and the pipeline selftest green. Picture check FAILED against main: the walk/dig knee show-through is gone, but dress-dig-2 shows new cloth spikes off the shoulder garment (frames 2, 3, 8) and dress-walk-1 shows body showing through the robe's top edge at the breasts, neither on main. Not mergeable as is. Asked the user 07.10. (board chat) whether to replace the per-pose resolver route with masking the covered body (pipeline mask per body vertex, hidden or pushed inward in the TSL vertex shader) and fold 1323-1325 into one point; 1319 waits for that answer. The game draws none of these garments yet (pipeline.py export), so there is no player impact either way.
-  Bundle: Dorfleben.
-
-- [ ] 1326. Villager garments: hide the body a garment covers instead of correcting every pose
-  Queue position: directly after point 1319, ahead of point 1322; replaces points 1323-1325.
-  Source: user 07.10.2026 (board chat): "Gibt es keinen effizienteren Ansatz? Das kann doch keine Raketenwissenschaft sein."; answered with the proposal to hide the covered body as games usually do, accepted with "Ja" the same evening.
-  Final state: the villager pipeline marks per body vertex which garment covers it in its build pose; the game hides those body faces, or pushes the covered vertices a few millimetres inward along their normal in the TSL vertex shader, while the garment is worn, so no covered skin can show through the cloth in any pose; the per-pose resolver keeps only the coarse corrections it needs, and the 0.003 all-pose criterion for the handed cases (scripts/villager/handed-1323/1324/1325.json) is replaced by the picture.
-  Verifiable: dressed frame sheets walking, kneeling, digging and sprinting without visible show-through or cloth spikes, no worse than main elsewhere; the game picture on both backends once the garments ship; Vitest for the game-side mask; cross-vendor review record.
+- [ ] 1329. Villager garments: hide the covered body and inner garments with a mask instead of correcting every pose
+  Queue position: first point of the Dorfleben garment work, ahead of points 1315 and 1313; replaces points 1319-1327, which were removed unimplemented on 07.10.2026 (user order).
+  Source: user 07.10.2026 (board chat): "Gibt es keinen effizienteren Ansatz? Das kann doch keine Raketenwissenschaft sein." (proposal to hide the covered body as games usually do, accepted with "Ja"), then the same evening: "ersetze alle Punkte zum Clippings-Problem der Kleidung durch einen Punkt, der das per Maske löst und entferne alle noch offenen Punkte zu dem Thema."
+  Background: the per-pose resolver route did not converge (point 1319: 16, then 18 of 32 garments over the 0.003 tolerance once measured honestly; its merge candidate 4ba43968a fixed the walk/dig knees, but its picture check failed with new shoulder-garment cloth spikes in dress-dig-2 and body showing through the robe's top edge in dress-walk-1). Its branch feat/1319-garment-face-penetration (head 4ba43968a) holds the honest penetration measurement (enclose.py, penetration.py: vertex depth, cloth between vertices, body shown) and may be reused; it is not merged as is and is deleted when this point lands. The game draws none of these garments yet (pipeline.py export), so no player sees the clipping today.
+  Final state: the villager pipeline marks per body vertex which garment covers it in its build pose, and per inner-garment vertex which outer garment covers it in every outfit layering; the game hides those faces, or pushes the covered vertices a few millimetres inward along their normal in the TSL vertex shader, while the covering garment is worn. No covered skin and no covered inner garment shows through cloth in any pose, including thin limbs (calf, forearm) and garment openings (hood, cape, robe and wrap edges). The per-pose garment offsets and their resolver are removed, or kept only where the mask provably cannot reach a case and that case is named; no baked per-pose offset table ships. Skin visible at openings (neck, arms, legs below a hem) stays drawn.
+  Verifiable: Vitest for the mask decode and the shader path's input; the pipeline penetration step green on what the game draws (masked body and inner garments); dressed frame sheets walking, kneeling, digging and running without body or inner garment showing through cloth and without new cloth spikes, compared against main; Playwright both backends picture-checked on dressed villagers in those poses; cross-vendor review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
 
-- [ ] 1327. Villager garments: fold the remaining clipping points into the covered-body mask (1326)
-  Queue position: directly after point 1326.
-  Final state: points 1319 (body showing through a garment face), 1322 (cloth cut through a thin limb) and 1321 (inner garment showing through an outer one) carry a "Held: covered by 1326" line and close with 1326's landing. 1326's acceptance names these cases: a body vertex under any garment is hidden or pushed inward in every pose, including thin limbs, and the same mask hides an inner garment's faces under an outer garment. Point 1320 (compress baked per-pose garment offsets) is closed as obsolete if 1326 removes the per-pose offsets, otherwise it stays with a note. 1315 and 1313 are unchanged.
-  Source: user 07.10.2026 (board chat): "Ich frage, ob nicht alle anderen Tasks zum Clippingproblem der Kleidung auch damit zusammengeführt/behoben werden sollten." Answered with the proposal above; accepted with "Ja".
-  Bundle: Dorfleben.
-
-- [ ] 1322. Villager garments: cloth cut through a thin limb must not show the body (split from 1319)
-  Queue position: directly after point 1319, ahead of point 1320.
-  Source: point 1319's author report 07.10.2026 (branch feat/1319-garment-face-penetration): the body-outside-garment measure leaves 13 of 186,240 checks over 0.003, all where a sheet of cloth cuts through a thin limb (a calf kicked back in sprint, toga, hood dig, shirt kneelUp) and covering one side pushes the cloth into the body: wrapLong-chest 0.0132, toga 0.0072, wrapLong-waist 0.0046, robe 0.0045, hood 0.0040, shirt 0.0039, skirtKnee 0.0032. Also skin patches on the back in wrapLong sprint that the measure does not catch yet.
-  Final state: the correction resolves a cloth sheet crossing a thin limb (the limb carries the cloth on its outside), the measure catches the wrapLong back patches, and the penetration step is green with no case handed over by point 1319 left.
-  Verifiable: penetration report all within tolerance without exemptions; dressed sprint, dig and kneel frame sheets without body through cloth on both backends; cross-vendor review record.
-  Criticality: high — every villager, both backends.
-  Bundle: Dorfleben.
-
-- [ ] 1323. Villager garments: the hood must not cut into or show the head and shoulders (split from 1319)
-  Queue position: directly after point 1322, ahead of point 1320.
-  Source: point 1319's penetration report at 93a330e69 (branch feat/1319-garment-face-penetration): g-hood-overHead deepest 0.0533 (sprint frame 6 stride 1.35, male child), cloth between vertices 0.0634 (carryIdle frame 49, male elder), body shown 0.0378 (carry frame 7, adult build +1); 113/1150/962 of 5820 frames over 0.003.
-  Final state: the hood follows head and shoulders in every clip and body corner, and the penetration step is green with no hood case handed over by point 1319 left.
-  Verifiable: the report's hood row within tolerance without exemption; dressed sprint, carry and carryIdle frame sheets without head or shoulder through the hood on both backends; cross-vendor review record.
-  Criticality: high — every hooded villager, both backends.
-  Bundle: Dorfleben.
-  Held 07.10.2026: point 1326 (hiding the covered body, user "Ja" in the board chat) covers this case; it closes with 1326's landing.
-
-- [ ] 1324. Villager garments: capes, cloaks and togas must not cut into or show the shoulders and back (split from 1319)
-  Queue position: directly after point 1323, ahead of point 1320.
-  Source: point 1319's penetration report at 93a330e69: g-cape-bothShoulders/leftShoulder/rightShoulder, g-cloak-bothShoulders/leftShoulder/rightShoulder, g-toga-leftShoulder/rightShoulder over 0.003 (worst cloth between vertices 0.0138 g-cloak-leftShoulder walk; g-cape-leftShoulder 936 of 5820 frames in dig/kneelUp).
-  Final state: the shoulder-draped garments stay outside the body in every clip and body corner, and the penetration step is green with none of their cases handed over by point 1319 left.
-  Verifiable: those eight report rows within tolerance without exemption; dressed walk, sprint, dig and kneelUp frame sheets without shoulder or back through cloth on both backends; cross-vendor review record.
-  Criticality: high — every villager wearing one, both backends.
-  Bundle: Dorfleben.
-  Held 07.10.2026: point 1326 (hiding the covered body, user "Ja" in the board chat) covers this case; it closes with 1326's landing.
-
-- [ ] 1325. Villager garments: robes, shirts, skirts, wraps and breast cloths must not cut into or show the torso and hips (split from 1319)
-  Queue position: directly after point 1324, ahead of point 1320.
-  Source: point 1319's penetration report at 93a330e69: g-robe-chest (0.0146 sprint), g-shirt-chest (0.0130 sprint), g-breastCloth-chest, g-skirtKnee-chest/-waist, g-skirtShort-chest/-waist, g-wrapLong-chest/-waist over 0.003, mostly sprint, carry/carryIdle and kneelDown/kneelUp.
-  Final state: these garments stay outside the torso and hips in every clip and body corner, and the penetration step is green with none of their cases handed over by point 1319 left.
-  Verifiable: those nine report rows within tolerance without exemption; dressed sprint, carry and kneel frame sheets without torso or hip through cloth on both backends; cross-vendor review record.
-  Criticality: high — every villager, both backends.
-  Bundle: Dorfleben.
-  Held 07.10.2026: point 1326 (hiding the covered body, user "Ja" in the board chat) covers this case; it closes with 1326's landing.
-
-- [ ] 1320. Villager garments: compress the baked garment offsets to a shippable size (split from 1314)
-  Queue position: directly after point 1319, ahead of point 1315.
-  Source: point 1314's round-3 author report 06.10.2026 (branch feat/1314-garment-pose-correction): scripts/villager/resolve.py bakes per-pose garment offsets (every clip frame, gait strides 0.75/1/1.35, 10 body corners) that bring every garment within the 0.003 tolerance, but the table holds 5.69 M vertex offsets, ~43 MiB even at 16-bit index plus three 16-bit floats; it lives only in the pipeline cache and is not exported.
-  Final state: the baked offsets export at a size fit for the startup budget, read by src/render/villagerGarmentBaked.ts, with the pipeline penetration step still green on the DECODED (shipped) offsets. Candidates to weigh by measurement: per-garment low-rank shape basis with per-frame weights plus a sparse remainder, fewer keyframes, dropping offsets below tolerance, 8-bit quantisation.
-  Verifiable: exported size measured and stated; penetration report on the decoded data all within tolerance; Vitest parity between pipeline check JSON and the game decoder.
-  Criticality: high — every villager, both backends.
-  Bundle: Dorfleben.
-
-- [ ] 1321. Villager garments: an inner garment must not show through an outer one (split from 1314)
-  Queue position: directly after point 1320, ahead of point 1315.
-  Source: point 1314's picture check 06.10.2026 (branch feat/1314-garment-pose-correction, verification/villager-body/dress-dig-*): the elder's red-brown g-shirt-chest shows in patches through the blue g-cloak-leftShoulder in every dig frame (also on main); penetration.py measures each garment only against the body, never against another garment worn over it.
-  Final state: the pipeline penetration report also measures inner-garment vertices outside the enclosing outer garment for every outfit layering (same game skinning path, same 0.003 tolerance), the correction removes them, and the step stays green.
-  Verifiable: the extended report all within tolerance; dressed frame sheets walking, kneeling and digging without an inner garment visible through an outer one; Vitest for any game-side change; cross-vendor review record.
-  Criticality: high — every layered villager outfit, both backends.
-  Bundle: Dorfleben.
-
 - [ ] 1315. Villager garments: ship the measured pipeline garments on the glTF body (split from 1312)
-  Queue position: directly after point 1314; needs its green penetration report.
+  Queue position: directly after point 1329 (which replaced 1319-1327 on 07.10.2026); needs its green penetration report on the masked body.
   Source: point 1312 commit af2c25d42 (shipping on the glTF body: gltfGarment / gltfLayerGeometry, cachedGltfLayer, garment-carrying villager.glb, 41 Vitest cases in src/render/villager*), rolled back in cd0400571 because the garments still clipped.
   Final state: the game draws the pipeline garments 1314 measured on the glTF body, no code-built dress layer reaches it, and garments follow the body's morph, hang, ground and scale; the glb growth (0.7 → 2.3 MB at af2c25d42) is measured and justified or reduced.
   Verifiable: the Vitest cases from af2c25d42 green; Playwright both backends picture-checked on dressed villagers walking, kneeling and digging; cross-vendor review record.
