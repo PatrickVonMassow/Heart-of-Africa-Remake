@@ -98,6 +98,13 @@ put it is the mistake this line exists to stop.
   Verifiable: dressed frame sheets walking, kneeling, digging and sprinting without visible show-through or cloth spikes, no worse than main elsewhere; the game picture on both backends once the garments ship; Vitest for the game-side mask; cross-vendor review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
+
+- [ ] 1327. Villager garments: fold the remaining clipping points into the covered-body mask (1326)
+  Queue position: directly after point 1326.
+  Final state: points 1319 (body showing through a garment face), 1322 (cloth cut through a thin limb) and 1321 (inner garment showing through an outer one) carry a "Held: covered by 1326" line and close with 1326's landing. 1326's acceptance names these cases: a body vertex under any garment is hidden or pushed inward in every pose, including thin limbs, and the same mask hides an inner garment's faces under an outer garment. Point 1320 (compress baked per-pose garment offsets) is closed as obsolete if 1326 removes the per-pose offsets, otherwise it stays with a note. 1315 and 1313 are unchanged.
+  Source: user 07.10.2026 (board chat): "Ich frage, ob nicht alle anderen Tasks zum Clippingproblem der Kleidung auch damit zusammengeführt/behoben werden sollten." Answered with the proposal above; accepted with "Ja".
+  Bundle: Dorfleben.
+
 - [ ] 1322. Villager garments: cloth cut through a thin limb must not show the body (split from 1319)
   Queue position: directly after point 1319, ahead of point 1320.
   Source: point 1319's author report 07.10.2026 (branch feat/1319-garment-face-penetration): the body-outside-garment measure leaves 13 of 186,240 checks over 0.003, all where a sheet of cloth cuts through a thin limb (a calf kicked back in sprint, toga, hood dig, shirt kneelUp) and covering one side pushes the cloth into the body: wrapLong-chest 0.0132, toga 0.0072, wrapLong-waist 0.0046, robe 0.0045, hood 0.0040, shirt 0.0039, skirtKnee 0.0032. Also skin patches on the back in wrapLong sprint that the measure does not catch yet.
@@ -15954,12 +15961,6 @@ to land than a mechanism that needs a review.
   Final state: the cause is measured in game (which mesh, overlay or shadow draws the rectangle) and removed; the burning-grass travel frame shows no straight-edged artefact on either backend.
   Verifiable: the burning-grass frame on both backends, picture-checked per §7.2; a right-layer test for the corrected cause.
   Bundle: Wetter & Wasser.
-
-- [ ] 1327. Villager garments: fold the remaining clipping points into the covered-body mask (1326)
-  Queue position: directly after point 1326.
-  Final state: points 1319 (body showing through a garment face), 1322 (cloth cut through a thin limb) and 1321 (inner garment showing through an outer one) carry a "Held: covered by 1326" line and close with 1326's landing. 1326's acceptance names these cases: a body vertex under any garment is hidden or pushed inward in every pose, including thin limbs, and the same mask hides an inner garment's faces under an outer garment. Point 1320 (compress baked per-pose garment offsets) is closed as obsolete if 1326 removes the per-pose offsets, otherwise it stays with a note. 1315 and 1313 are unchanged.
-  Source: user 07.10.2026 (board chat): "Ich frage, ob nicht alle anderen Tasks zum Clippingproblem der Kleidung auch damit zusammengeführt/behoben werden sollten." Answered with the proposal above; accepted with "Ja".
-  Bundle: Dorfleben.
 
 - [ ] 1328. A chat-answer session recorded as batch-lock holder cannot end
   Source: findings carrier 07.10.2026 22:10: answer session ea5bbc16 (started by the chat watcher for one message, told not to hold the batch lock) stood in .claude/batch-lock.json as lock holder, so push-arrival, decision-card, dashboard, dashboard-integrity and batch-progress guards demanded batch work at every stop that its start order forbids; the session could not end. The real batch session was a53218c2.
