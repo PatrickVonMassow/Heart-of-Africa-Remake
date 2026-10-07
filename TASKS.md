@@ -95,7 +95,7 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
 
 - [ ] 1313. Clothing rule for women and children: covered upper body and hip layer without visible censorship
-  Queue position: directly after point 1311 and its split-off garment points 1312, 1314 and 1315 (user 06.10.2026: "so einreihen", on the proposal "direkt hinter 1311"); the new garments need 1312's pipeline and penetration gate.
+  Queue position: directly after point 1314, ahead of point 1329 (in review since 07.10.2026; originally user 06.10.2026: "so einreihen", on the proposal "direkt hinter 1311"); the new garments need 1312's pipeline and penetration gate.
   Source: user report 06.10.2026: since point 1294 (glTF base body with a real bust form) women are partly shown with exposed breasts, and children's pelvic area reads as naked although no genitals are modelled. Wanted: change it without losing too much authenticity and without visible censorship. The backlog already foresaw this ("a depiction would have to clothe deliberately against its own source, and that choice would have to be argued rather than made silently", docs/backlog.md).
   Final state:
   1. DESIGN RULE RECORDED: design.md states: youth, adult and elder women never show an uncovered upper body; children always wear a hip layer; where the source says otherwise or is silent, the nearest attested layer of the same people is chosen. docs/peoples-1890.md notes the deliberate deviation at each affected people.
