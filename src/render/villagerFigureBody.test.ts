@@ -14,6 +14,7 @@ import { BONE_NAMES, bodyProportions } from './figureBody'
 import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { buildLayerGeometry } from './figureDress'
+import { axisClearance } from '../test/axisClearance'
 import { codeBoneMap, createGltfSkeleton, dominantBones, gltfFigureGeometry, gltfPerson, remapSkin, transferTrunkWeights } from './villagerFigureBody'
 
 let asset: VillagerAsset
@@ -172,6 +173,28 @@ describe('the dressed figure', () => {
         expect(g.getAttribute('position').count, `${id} ${sex} ${age}`).toBeGreaterThanOrEqual(bodyCount)
         const si = g.getAttribute('skinIndex')
         expect(Math.max(...(si.array as Uint16Array))).toBeLessThan(asset.bones.length)
+      }
+    }
+  })
+
+  it('on the glTF body the bead collar lies inside the seasonal cloak, open or tied', () => {
+    const shoulderLayer = (form: 'cloak' | 'neckBeads', wear: 'bothShoulders' | 'chest') => ({
+      ...PEOPLE_DRESS.zulu.female.youth[0],
+      slot: form === 'neckBeads' ? ('ornament' as const) : ('shoulder' as const),
+      form,
+      material: form === 'neckBeads' ? ('beads' as const) : ('hide' as const),
+      wear,
+    })
+    for (const age of ['youth', 'adult', 'elder'] as const) {
+      const { p } = gltfPerson(asset, 'female', age)
+      for (const radial of [16, 24]) {
+        const collar = buildLayerGeometry(shoulderLayer('neckBeads', 'chest'), p, radial)!
+        for (const wear of ['bothShoulders', 'chest'] as const) {
+          const cloak = buildLayerGeometry(shoulderLayer('cloak', wear), p, radial)!
+          const { min, count } = axisClearance(collar, cloak, 'inside')
+          expect(count, `${age} ${radial} ${wear}`).toBeGreaterThan(collar.getAttribute('position').count * 0.75)
+          expect(min / p.stature, `${age} ${radial} ${wear}`).toBeGreaterThan(0.004)
+        }
       }
     }
   })

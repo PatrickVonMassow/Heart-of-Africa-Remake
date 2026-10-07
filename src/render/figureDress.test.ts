@@ -4,6 +4,7 @@ import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/app
 import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
 import { buildLayerGeometry, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
+import { axisClearance } from '../test/axisClearance'
 
 const adultMan = bodyProportions('male', 'adult')
 const layer = (over: Partial<DressLayer>): DressLayer => ({
@@ -326,6 +327,30 @@ describe('a cover tied over the breast (wear "chest", docs/peoples-1890.md §8.6
     expect(frontHit(open, bustY)).toBe(-Infinity)
     expect(frontHit(closed, bustY)).toBeGreaterThan(0)
     expect(frontHit(closed, (woman.waistY + woman.kneeY) / 2)).toBe(-Infinity)
+  })
+
+  it('the bead collar lies inside the seasonal cloak, open or tied, and outside the trunk', () => {
+    // Measured 07.10.2026 before the fix: built on the tied cloak's stations
+    // with its full hem flare, the collar stood 0.011-0.014 H through both.
+    for (const age of ['youth', 'adult', 'elder'] as const) {
+      const p = bodyProportions('female', age)
+      for (const radial of [16, 24]) {
+        const collar = buildLayerGeometry(layer({ slot: 'ornament', form: 'neckBeads', material: 'beads', wear: 'chest' }), p, radial)!
+        for (const wear of ['bothShoulders', 'chest'] as const) {
+          const cloak = buildLayerGeometry(layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear }), p, radial)!
+          const { min, count } = axisClearance(collar, cloak, 'inside')
+          // (the open cloak's front opening meets no ray)
+          expect(count, `${age} ${radial} ${wear}`).toBeGreaterThan(collar.getAttribute('position').count * 0.75)
+          expect(min / p.stature, `${age} ${radial} ${wear}`).toBeGreaterThan(0.002)
+        }
+        // the trunk under the collar's fitted part, from its lower edge to
+        // where the shoulders slope off
+        const body = buildBodyGeometry(p, { skin: '#6b4a32', paint: null }, radial)
+        const trunk = axisClearance(body, collar, 'inside', [p.chestY - 0.09 * p.stature, p.shoulderY - 0.03 * p.stature])
+        expect(trunk.count, `${age} ${radial} body`).toBeGreaterThan(0)
+        expect(trunk.min, `${age} ${radial} body`).toBeGreaterThan(0)
+      }
+    }
   })
 
   it('a baby sling carries the infant behind the back, outside a closed mantle', () => {
