@@ -80,6 +80,9 @@ def main():
         import fit as F
         F.selftest()
         MK.selftest_volume()
+    if 'penetration' in steps or 'selftest' in steps:
+        import penetration as P
+        P.selftest()
     if steps == ['selftest']:
         return
     from mhbody import MakeHuman
