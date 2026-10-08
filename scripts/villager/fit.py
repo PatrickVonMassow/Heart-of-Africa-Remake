@@ -17,8 +17,9 @@ reach the tolerance. A static rest offset cannot follow a pose — a skirt's
 front stays where a lifted knee needs it gone, and cloth caught between two
 body parts (between the legs, under the arm) is pushed from one into the
 other — so the passes oscillate instead of converging.
-OPEN: zero penetration needs pose-driven correction (e.g. corrective morphs
-driven by the leg and arm angles, evaluated alike here and in the game).
+What the fit leaves is not corrected per pose: the body and inner garments a
+garment covers are hidden or pushed in under it (mask.py), and the report
+measures what the game draws.
 """
 import numpy as np
 
