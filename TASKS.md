@@ -15900,3 +15900,11 @@ to land than a mechanism that needs a review.
   Verifiable: Vitest reproducing an answer-session start that leaves the lock with the batch session.
   Also (findings carrier 07.10.2026 23:20): session 9696d681 released its claim to 06667ad0 via the hand-back bound while .claude/batch-lock.json was absent, so heldByOtherLiveOwner() read false and dashboard-guard (focus reconcile) and retro-currency-guard kept blocking the released session's Stop, demanding batch mutations its hand-back forbids; and a session that took the batch only to edit the work order re-acquired the lock through its heartbeat after `batch-singleton.mjs release`, so it could not hand back without a ticked point or the context watermark. Stand-down honours a claim this session released, and a manual release stays released.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1333. Water-carrying adult dips the jar's mouth under the water surface while filling
+  Queue position: after point 1330, in the same village-errands block.
+  Source: findings carrier 08.10.2026 20:23Z: `polish-villagers --section=adult-errands` fails "the jar's mouth is tipped under the water surface" on feat/1331 aceda635f (WebGPU mouth -0.197 m, WebGL 2 -0.221 m, surface -0.25 m) and identically on origin/main 6bd36687f at 20:45Z (mouth -0.200 m); runtime-identical to main, so pre-existing and not charged to 1331. Logs local/verify-logs/2026-10-08T20-40-46-090- and 2026-10-08T20-45-25-112-polish-villagers.log. The two water checks in the same runs belong to points 1242 and 568.
+  Final state: while a villager fills a jar at the bank, the jar's mouth dips below the water surface as the check requires, on both backends, without changing the carry pose elsewhere.
+  Verifiable: `polish-villagers --section=adult-errands` jar check green on both backends; the filling frame picture-checked.
+  Criticality: medium - a standing red in the village suite; visible at every water stand.
+  Bundle: Dorfleben.
