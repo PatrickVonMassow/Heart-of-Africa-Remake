@@ -3,11 +3,10 @@
 
   body        MakeHuman base → decimated body, morphs, joints, weights (cached)
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
-  garments    each dress form built round the body in the build pose as the
-              game draws it, weights transferred, then fitted to every pose
-              the report measures at every body corner (fit.py) (cached)
+  garments    each dress form built round the body, weights transferred, then
+              fitted to every clip frame at every body corner (fit.py) (cached)
   (mask)      each garment's cover mask over the body and the garments of
-              other slots (mask.py), computed whenever the garments are read
+              outer layers (mask.py), computed whenever the garments are read
   export      public/models/villager.glb (body with its cover mask, clips;
               garments not yet shipped)
   sheets      frame sheets under verification/villager-body/

@@ -23,8 +23,10 @@ measures what the game draws.
 """
 import numpy as np
 
+import rig
 from body import top4
 from export import EXPORT_CLIPS
+from gltfio import qmat
 from sheets import corner_weights, morphed
 
 
@@ -140,27 +142,7 @@ def corners():
     return CORNERS
 
 
-_D = {}
-
-
-def _reduce(ks):
-    """One pass's deepest values and largest pushes over the frames `ks`
-    (indices), the pass's arguments read from _D (set before a fork)."""
-    state, frames, sample, it, passes, stride, done = (_D[k] for k in ('state', 'frames', 'sample', 'it', 'passes', 'stride', 'done'))
-    deep = {n: 0.0 for n in state}
-    push = {n: np.zeros_like(state[n]) for n in state}
-    for k in ks:
-        res = sample(state, frames[k])
-        proposing = it < passes and k % stride == it % stride
-        for n, (d, p) in res.items():
-            deep[n] = max(deep[n], d)
-            if proposing and p is not None and n not in done:
-                take = np.einsum('ij,ij->i', p, p) > np.einsum('ij,ij->i', push[n], push[n])
-                push[n][take] = p[take]
-    return deep, push
-
-
-def descend(state, frames, sample, apply, passes, stride, log=print, workers=1):
+def descend(state, frames, sample, apply, passes, stride, log=print):
     """The fit loop, free of geometry so it can be checked on its own.
 
     `state` {name: rest positions}; `frames` every frame the report measures;
@@ -170,27 +152,22 @@ def descend(state, frames, sample, apply, passes, stride, log=print, workers=1):
     every candidate on the same frames as the report — while the pushes are
     proposed from every `stride`-th frame only (offset by the pass). A
     candidate deeper than the garment's best is undone and that garment stops,
-    so the returned state is never deeper than the one handed in. `workers`
-    > 1 measures the frames in forked processes (the same result)."""
+    so the returned state is never deeper than the one handed in."""
     names = list(state)
     best = {n: (np.inf, state[n].copy()) for n in names}
     done = set()
     idle = 0
     for it in range(passes + 1):
-        _D.update(state=state, frames=frames, sample=sample, it=it, passes=passes, stride=stride, done=done)
-        if workers > 1:
-            import multiprocessing as mp
-            chunks = [range(c, len(frames), workers * 4) for c in range(workers * 4)]
-            with mp.get_context('fork').Pool(workers) as pool:
-                parts = pool.map(_reduce, chunks)
-        else:
-            parts = [_reduce(range(len(frames)))]
-        deep = {n: max(pd[n] for pd, _pp in parts) for n in names}
+        deep = {n: 0.0 for n in names}
         push = {n: np.zeros_like(state[n]) for n in names}
-        for _pd, pp in parts:
-            for n in names:
-                take = np.einsum('ij,ij->i', pp[n], pp[n]) > np.einsum('ij,ij->i', push[n], push[n])
-                push[n][take] = pp[n][take]
+        for k, fr in enumerate(frames):
+            res = sample(state, fr)
+            proposing = it < passes and k % stride == it % stride
+            for n, (d, p) in res.items():
+                deep[n] = max(deep[n], d)
+                if proposing and p is not None and n not in done:
+                    take = np.einsum('ij,ij->i', p, p) > np.einsum('ij,ij->i', push[n], push[n])
+                    push[n][take] = p[take]
         moved = 0
         for n in names:
             if deep[n] <= best[n][0]:
@@ -211,10 +188,6 @@ def descend(state, frames, sample, apply, passes, stride, log=print, workers=1):
 
 
 def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x, flush=True)):
-    """The fit on the game's own posing (gamepath.py): every pose the report
-    measures (a gait's at each stride), every body corner, the body and the
-    garments hung, baked and skinned by the hung bones as the game draws them."""
-    import gamepath as GP
     from mathutils.bvhtree import BVHTree
     margin = cfg['VILLAGER_ASSET']['garmentFitMargin']
     step = cfg['VILLAGER_ASSET']['garmentFitStep']
@@ -223,26 +196,22 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     G = garments['meshes']
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
-    people = {}
-    for c in corners():
-        pos, j = morphed(body, corner_weights(*c))
-        person = GP.Person(j)
-        people[c] = (person, person.bake(pos, jidx, jw))
-    frames = [(c, k) for c in corners() for k in range(sum(1 for _ in GP.poses(clips, EXPORT_CLIPS, cfg)))]
-    pose_list = list(GP.poses(clips, EXPORT_CLIPS, cfg))
+    shapes = {c: morphed(body, corner_weights(*c)) for c in corners()}
+    frames = [(c, cname, f) for c in corners() for cname in EXPORT_CLIPS for f in range(len(clips['clips'][cname]['times']))]
 
     def sample(state, fr):
-        corner, k = fr
+        corner, cname, f = fr
         w = corner_weights(*corner)
-        person, baked = people[corner]
-        _cn, _f, kst, q, hips = pose_list[k]
-        wr, wp = person.pose(q, hips, kst)
-        bv = person.skin(baked, jidx, jw, wr, wp)
+        pos, j = shapes[corner]
+        c = clips['clips'][cname]
+        wr, wp = rig.fk(j, c['q'][f], c['hips'][f])
+        bv = rig.skin(pos, jidx, jw, j, wr, wp)
         tree = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
+        R = np.array([qmat(q) for q in wr])
         out = {}
         for n in names:
             gi, gw = skin[n]
-            gv = person.draw(garment_pos({'pos': state[n], 'morph_pos': G[n]['morph_pos']}, w), gi, gw, wr, wp)
+            gv = rig.skin(garment_pos({'pos': state[n], 'morph_pos': G[n]['morph_pos']}, w), gi, gw, j, wr, wp)
             co, nrm = nearest(tree, gv)
             s = np.einsum('ij,ij->i', gv - co, nrm)
             depth = max(0.0, float(-s.min()))
@@ -251,9 +220,9 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
                 out[n] = (depth, None)
                 continue
             # back into the rest pose through the transpose of the vertex's
-            # blend along the game's path (never the blow-up a near-singular
-            # blend's inverse gives)
-            A = person.blend(gi[bad], gw[bad], wr)
+            # bone blend (its inverse for one bone; never the blow-up a
+            # near-singular blend's inverse gives)
+            A = np.einsum('vk,vkij->vij', gw[bad], R[gi[bad]])
             u = np.einsum('vji,vj->vi', A, nrm[bad])
             un = np.maximum(np.linalg.norm(u, axis=1), 0.5)
             p = np.zeros_like(state[n])
@@ -266,8 +235,7 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
         return pos + spread(push, nb, twins)
 
     state = {n: G[n]['pos'].copy() for n in names}
-    import os
-    state, deep = descend(state, frames, sample, apply, passes, stride, log, workers=max(1, (os.cpu_count() or 2) - 1))
+    state, deep = descend(state, frames, sample, apply, passes, stride, log)
     for n in names:
         G[n]['pos'] = state[n]
     return garments
@@ -297,26 +265,4 @@ def selftest():
     state, deep = descend({'g': np.zeros((1, 3))}, frames, lambda st, fr: {'g': (0.05 - st['g'][0, 0], np.array([[0.01, 0, 0]])) if fr == 'A' else (10 * st['g'][0, 0], None)},
                           lambda n, p, d: p + d, passes=6, stride=2, log=lambda *a: None)
     assert state['g'][0, 0] == 0.0 and abs(deep['g'] - 0.05) < 1e-12, (state, deep)
-    selftest_build()
     print('fit selftest: ok')
-
-
-def selftest_build():
-    """The game's path unposed exactly (gamepath.Person.undraw)."""
-    import gamepath as GP
-    import skeleton as SK
-    rng = np.random.default_rng(1)
-    n = len(SK.NAMES)
-    joints = np.zeros((n, 6))
-    for i, name in enumerate(SK.NAMES):
-        joints[i, :3] = rng.normal(0, 0.2, 3)
-    person = GP.Person(joints)
-    q = rng.normal(0, 1, (n, 4))
-    q /= np.linalg.norm(q, axis=1)[:, None]
-    wr, wp = person.pose(q, None)
-    v = rng.normal(0, 0.3, (50, 3))
-    ji = rng.integers(0, n, (50, 4))
-    jw = rng.random((50, 4))
-    jw /= jw.sum(1)[:, None]
-    back = person.undraw(person.draw(v, ji, jw, wr, wp), ji, jw, wr, wp)
-    assert np.abs(back - v).max() < 1e-9, np.abs(back - v).max()

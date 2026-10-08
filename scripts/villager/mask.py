@@ -9,7 +9,7 @@ trouser leg's top inside the seat) is a seam between parts; every other loop
 is an OPENING (neck, sleeve, hem, a cape's outline).
 
 THE MASK, read in the BUILD POSE (garments.design_pose, the pose every
-garment is tailored in) as the game draws it at every body corner. A point inside the volume that moves with the
+garment is tailored in) at every body corner. A point inside the volume that moves with the
 cloth (its skin weights within VILLAGER_ASSET.garmentMaskWeightGap of the
 nearest cloth's: a hand hanging inside a skirt's outline does not) is
 covered:
@@ -40,6 +40,7 @@ opening is a hole.
 import numpy as np
 
 import garments as G
+import rig
 from body import top4
 
 # The garment's slot (src/systems/appearance.ts LayerSlot), by form: two
@@ -83,11 +84,10 @@ def garment_names(garments):
 
 def build_pose(body, joints=None):
     """Skinning in the build pose (on a person's `joints`): a function
-    (verts, W) → posed verts along the game's path (gamepath.py)."""
-    import gamepath as GP
-    person = GP.Person(body['joints'] if joints is None else joints)
-    wr, wp = person.build_pose(G.design_pose(body))
-    return lambda v, W: person.draw(v, *top4(W), wr, wp)
+    (verts, W) → posed verts, skinned as the game skins (top four bones)."""
+    j = body['joints'] if joints is None else joints
+    wr, wp = rig.fk(j, G.design_pose(body), None)
+    return lambda v, W: rig.skin(v, *top4(W), j, wr, wp)
 
 
 # ---- the volume -----------------------------------------------------------------

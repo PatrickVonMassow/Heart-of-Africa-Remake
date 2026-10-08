@@ -6,9 +6,7 @@ body's morph targets (work-order "glTF villager body", final states 3 and 6).
 How a garment is made:
 1. The body is posed into a DESIGN POSE — the arms hanging at the sides, as a
    garment is worn — because a cloak or a robe tailored round MakeHuman's
-   A-pose would stand off the arms like a tent once they hang. It is posed
-   along the game's own path (gamepath.py), so the build pose is the one the
-   game draws.
+   A-pose would stand off the arms like a tent once they hang.
 2. The garment is swept as rings: at each height the body's horizontal outline
    (the convex hull of the body's section there: the torso, the legs together
    below the crotch, the arms too for a cloak), eased off it and flared toward
@@ -19,16 +17,17 @@ How a garment is made:
    Blender's Data Transfer "nearest face interpolated"), then they are smoothed
    along the garment (a skirt spans both legs, so its weights must blend from
    one thigh to the other, never tear between them).
-4. The garment is UNPOSED into the rest pose by inverting the game's path
-   with its own four bones, so in the game it is skinned exactly like the body.
+4. The garment is UNPOSED into the rest pose by inverting its own blend of bone
+   transforms, so in the game it is skinned exactly like the body.
 5. Morphs: each garment vertex is bound to the rest body's surface and follows
    every morph target there, so a child's or a woman's dress fits that body.
 """
 import numpy as np
 
+import rig
 import skeleton as SK
 from body import MORPHS, apply_map, surface_map, triangulate
-from gltfio import qfrom_to, qinv, qmul, qnorm
+from gltfio import qfrom_to, qinv, qmul, qnorm, qmat
 
 N_RADIAL = 24
 
@@ -52,6 +51,35 @@ def design_pose(body):
         q[iu] = Wu
         q[il] = qnorm(qmul(qinv(Wu), Wf))
     return q
+
+
+def skin_full(verts, W, joints, wr, wp):
+    """Linear blend skinning with every bone's weight (n × bones)."""
+    h = joints[:, :3]
+    out = np.zeros_like(verts)
+    for b in range(len(SK.NAMES)):
+        w = W[:, b]
+        m = w > 1e-6
+        if not m.any():
+            continue
+        R = qmat(wr[b])
+        out[m] += w[m, None] * ((verts[m] - h[b]) @ R.T + wp[b])
+    return out
+
+
+def unskin(verts, W, joints, wr, wp):
+    """Invert the blend: the rest position that `W` skins to `verts`."""
+    h = joints[:, :3]
+    out = np.zeros_like(verts)
+    Rs = [qmat(q) for q in wr]
+    for k, v in enumerate(verts):
+        A = np.zeros((3, 3))
+        t = np.zeros(3)
+        for b in np.nonzero(W[k] > 1e-6)[0]:
+            A += W[k, b] * Rs[b]
+            t += W[k, b] * (wp[b] - Rs[b] @ h[b])
+        out[k] = np.linalg.solve(A, v - t)
+    return out
 
 
 # ---- outlines --------------------------------------------------------------------------
@@ -109,22 +137,17 @@ class Body:
         self.j = body['joints']
         self.idx = mh.groups['body']
         self.W = body['Wfull']
-        # posed along the game's own path (gamepath.py: hung, baked, skinned
-        # by the hung bones), so a garment is tailored round the body the
-        # game draws in this pose, not round a single blend of it
-        import gamepath as GP
-        from body import top4
-        self.person = GP.Person(self.j)
-        wr, wp = self.person.build_pose(q)
+        wr, wp = rig.fk(self.j, q, None)
         self.wr, self.wp = wr, wp
-        self.v = self.person.draw(body['basis_full'], *top4(self.W), wr, wp)
+        self.v = skin_full(body['basis_full'], self.W, self.j, wr, wp)
         self.tris = np.array([t for t, _ in triangulate(mh.body_quads())])
         from mathutils.bvhtree import BVHTree
         self.tree = BVHTree.FromPolygons(self.v.tolist(), self.tris.tolist(), all_triangles=True)
         # the body the game draws (decimated) in the same pose: a garment must
         # clear it too — decimation moves the surface by up to ~2 cm
+        from body import top4
         di, dw = top4(body['W'])
-        self.dv = self.person.draw(body['pos'], di, dw, wr, wp)
+        self.dv = rig.skin(body['pos'], di, dw, self.j, wr, wp)
         self.dtree = BVHTree.FromPolygons(self.dv.tolist(), body['tris'].tolist(), all_triangles=True)
         W = self.W
 
@@ -386,6 +409,7 @@ def build_form(B, form, wear, L):
         for k, y in enumerate(ys):
             # over the shoulders the outline holds the arms too: it drapes them
             m = allm if y < L['shoulder'] + 0.005 * H else (B.arm < 0.2)
+            m = m & (B.lower_arm < 0.4)
             ease = (0.02 + 0.012 * k / len(ys)) * H if k else 0.012 * H
             c, r = B.ring(y, m & (B.head < 0.3), ease)
             t = (k / (len(ys) - 1))
@@ -608,16 +632,11 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
         W = skirt_weights(v, W, *skirt)
     W[W < 0.02] = 0
     W /= W.sum(1, keepdims=True)
-    # unposed through the game's path with the four bones the game skins by
-    from body import top4
-    rest = B.person.undraw(v, *top4(W), B.wr, B.wp)
+    rest = unskin(v, W, B.j, B.wr, B.wp)
     idx, bary, off = surface_map(mh, body['basis_full'], rest)
     pos = apply_map(body['basis_full'], idx, bary, off)
     morph = {k: apply_map(body['basis_full'] + body['deltas_full'][k], idx, bary, off) - pos for k in MORPHS}
-    # how far the game draws the garment in the build pose from where it was
-    # tailored (the build-pose difference the penetration report states)
-    drift = float(np.linalg.norm(B.person.draw(pos, *top4(W), B.wr, B.wp) - v, axis=1).max())
-    return {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph, 'build_drift': drift}
+    return {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph}
 
 
 def hair_cap(mh, body, B):

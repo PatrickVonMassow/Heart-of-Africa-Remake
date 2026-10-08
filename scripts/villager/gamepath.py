@@ -85,29 +85,6 @@ class Person:
         """villagerClipPose.ts toHung + three's skinning of the baked mesh."""
         return rig.skin(baked, jidx, jw, self.heads, self.drawn(wr), wp)
 
-    def draw(self, verts, jidx, jw, wr, wp):
-        """Rest positions as the game draws them in a pose: baked, then skinned."""
-        return self.skin(self.bake(verts, jidx, jw), jidx, jw, wr, wp)
-
-    def blend(self, jidx, jw, wr):
-        """Per vertex the linear part (n × 3 × 3) of `draw`: the skinning
-        blend after the bake blend (both normalised by the total weight)."""
-        Rh = np.array([qmat(q) for q in self.hang])
-        Rd = np.array([qmat(q) for q in self.drawn(wr)])
-        t = np.maximum(jw.sum(1), 1e-12)[:, None, None]
-        A1 = np.einsum('vk,vkij->vij', jw, Rh[jidx]) / t
-        A2 = np.einsum('vk,vkij->vij', jw, Rd[jidx])
-        return np.einsum('vij,vjk->vik', A2, A1)
-
-    def undraw(self, posed, jidx, jw, wr, wp):
-        """The rest positions `draw` takes to `posed` (it is affine per vertex)."""
-        zero = self.draw(np.zeros_like(posed), jidx, jw, wr, wp)
-        return np.linalg.solve(self.blend(jidx, jw, wr), (posed - zero)[:, :, None])[:, :, 0]
-
-    def build_pose(self, q):
-        """The A-pose world turns and heads of the build (design) pose."""
-        return self.pose(q, None)
-
 
 # ---- the gait's stride warp (villagerClipPose.ts clipGaitPose, body null) ----------
 
