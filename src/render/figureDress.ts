@@ -26,6 +26,7 @@ import {
 } from 'three/tsl'
 import type { DressLayer, DressPattern } from '../systems/appearance'
 import { merge, sweepTube, type SweepStation } from './faunaGeometry'
+import { garmentPushPosition } from './villagerGarmentMask'
 import {
   boneIndex,
   boneSegments,
@@ -617,20 +618,27 @@ function figureColorNode() {
   })()
 }
 
-let figureMat: THREE.MeshStandardNodeMaterial | null = null
+const figureMats: { plain: THREE.MeshStandardNodeMaterial | null; masked: THREE.MeshStandardNodeMaterial | null } = { plain: null, masked: null }
 
 /**
  * The ONE material every skinned villager is drawn with — body and dress
  * merged into a single mesh per figure, so a villager is one draw (and one per
  * shadow pass), not one per layer. Double-sided: a hem or a cloak's edge is
  * seen from below and inside; the closed body never shows its back faces.
+ * `masked`: the glTF body's variant, whose vertex shader pushes the vertices
+ * a worn garment covers inward (render/villagerGarmentMask.ts; the geometry
+ * carries their push).
  */
-export function figureMaterial(): THREE.MeshStandardNodeMaterial {
-  if (!figureMat) {
-    figureMat = new THREE.MeshStandardNodeMaterial({ vertexColors: false, side: THREE.DoubleSide })
-    figureMat.colorNode = figureColorNode()
-    figureMat.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w
-    figureMat.name = 'figure'
+export function figureMaterial(masked = false): THREE.MeshStandardNodeMaterial {
+  const key = masked ? 'masked' : 'plain'
+  let mat = figureMats[key]
+  if (!mat) {
+    mat = new THREE.MeshStandardNodeMaterial({ vertexColors: false, side: THREE.DoubleSide })
+    mat.colorNode = figureColorNode()
+    mat.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w
+    if (masked) mat.positionNode = garmentPushPosition()
+    mat.name = masked ? 'figure-masked' : 'figure'
+    figureMats[key] = mat
   }
-  return figureMat
+  return mat
 }

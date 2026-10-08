@@ -105,6 +105,9 @@ def main():
         # measured (penetration report, dress-* frame sheets) but not shipped
         # (work-order point 1315); the body carries their cover mask.
         E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, None, cfg, mask=garments and garments['mask'])
+        if garments:
+            import sheets as S
+            MK.check(a.verification, garments['mask'], body, [o for _s, _a, o in S.OUTFITS])
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)

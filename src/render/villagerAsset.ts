@@ -69,6 +69,8 @@ export interface VillagerAsset {
   /** The tool-in-hand rotation and the fist's hole per hand (hand bone frame). */
   toolHold: { L: { rotation: THREE.Quaternion; offset: THREE.Vector3 }; R: { rotation: THREE.Quaternion; offset: THREE.Vector3 } }
   stature: number
+  /** The garments of the body's cover mask, in bit order (render/villagerGarmentMask.ts); empty without one. */
+  garmentMask: string[]
 }
 
 /** The bone name a glTF node carries ('.' is reserved by three's
@@ -90,6 +92,7 @@ interface Meta {
   clips: Record<string, { duration: number; kind: VillagerClipKind; speed?: number; tool?: ToolGrip; grip?: { L?: number; R?: number } }>
   toolHold: Record<'L' | 'R', { rotation: number[]; offset: number[] }>
   stature: number
+  garmentMask?: { garments: string[] }
 }
 
 /** Turn a parsed glTF into the villager asset. */
@@ -178,6 +181,7 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
     contactPoints: { L: cp('L'), R: cp('R') },
     toolHold: { L: hold('L'), R: hold('R') },
     stature: meta.stature,
+    garmentMask: meta.garmentMask?.garments ?? [],
   }
 }
 

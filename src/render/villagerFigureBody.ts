@@ -12,7 +12,7 @@
 // Pure: plain geometry and arrays, no scene graph; the tests read it directly.
 
 import * as THREE from 'three/webgpu'
-import { VILLAGER_GLTF } from '../config/balance'
+import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
 import { bodyProportions, BONE_NAMES, mixHex, paint as paintSurface, tidy, type BodyProportions, type BoneName } from './figureBody'
 import { buildLayerGeometry } from './figureDress'
@@ -21,6 +21,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
 import { bakeMorphs, legScale, morphInfluences, restHeads, stylisePeaks } from './villagerBody'
 import { topoOrder } from './villagerAsset'
+import { applyGarmentMask, COVER_ATTRIBUTE } from './villagerGarmentMask'
 
 const DOWN = new THREE.Vector3(0, -1, 0)
 
@@ -154,6 +155,8 @@ export interface GltfPerson {
   hair: Uint8Array
   /** How the asset's clips reach this hung, scaled body (render/villagerClipPose.ts). */
   frame: PersonFrame
+  /** The body's garment cover mask (vertices × 4, render/villagerGarmentMask.ts), or null. */
+  cover: Uint16Array | null
 }
 
 /** A person's skeleton before the hang and the transform onto the drawn one:
@@ -211,7 +214,15 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
   g.computeBoundingBox()
   g.computeBoundingSphere()
   const p = measureProportions(asset, g, dom, rest, p0)
-  return { geometry: g, rest, p, hair: hairMask(asset, g, dom, p), frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0) } }
+  const cov = asset.geometries.body.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
+  return {
+    geometry: g,
+    rest,
+    p,
+    hair: hairMask(asset, g, dom, p),
+    frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0) },
+    cover: cov ? Uint16Array.from(cov.array as ArrayLike<number>) : null,
+  }
 }
 
 /** Per-bone vertex samples of a hung body. */
@@ -546,6 +557,7 @@ export function gltfFigureGeometry(
   paint: string | null,
   radial: number,
   layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => buildLayerGeometry(l, person.p, radial),
+  worn: readonly string[] = [],
 ): THREE.BufferGeometry {
   const body = paintSurface(person.geometry.clone(), paint ? mixHex(skin, paint, 0.55) : skin)
   const col = body.getAttribute('color') as THREE.BufferAttribute
@@ -565,6 +577,10 @@ export function gltfFigureGeometry(
   }
   const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
   if (!g) throw new Error('glTF villager: body and dress layers do not merge')
+  // The pipeline garments `worn` hide and push the body they cover. The
+  // code-built layers drawn here have no mask entry, so nothing is worn yet.
+  // OPEN: point 1315 passes the pipeline garments it draws.
+  applyGarmentMask(g, person.cover, asset.garmentMask, worn, VILLAGER_ASSET.garmentMaskPush * person.frame.scale)
   g.computeBoundingSphere()
   return g
 }

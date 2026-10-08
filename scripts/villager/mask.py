@@ -413,6 +413,22 @@ def pushed(v, tris, push, depth):
     return v - depth * push[:, None] * vertex_normals(v, np.asarray(tris))
 
 
+def check(out, mk, body, outfits):
+    """What the game's decode must give for the body's mask (villagerGarmentMask.test.ts):
+    per worn set its covered vertices and drawn triangles."""
+    import json
+    import os
+    sets = [[n] for n in mk['garments']] + [list(o) for o in outfits]
+    rows = []
+    for worn in sets:
+        hide, push = decode(mk['body'], mk['garments'], worn)
+        drawn = drawn_tris(body['tris'], hide)
+        rows.append({'worn': worn, 'hidden': int(hide.sum()), 'covered': int(push.sum()), 'drawnTriangles': int(drawn.sum()),
+                     'coveredIds': np.nonzero(push)[0][:16].tolist()})
+    json.dump({'garments': list(mk['garments']), 'vertices': len(body['pos']), 'triangles': len(body['tris']), 'sets': rows},
+              open(os.path.join(out, 'garment-mask-check.json'), 'w'), indent=1)
+
+
 def selftest():
     """to_bits / decode round trip (no Blender needed)."""
     names = [f'g-x{k}-w' for k in range(20)]
