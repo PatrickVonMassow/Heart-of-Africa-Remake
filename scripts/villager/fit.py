@@ -21,9 +21,12 @@ What the fit leaves is not corrected per pose: the body and inner garments a
 garment covers are hidden or pushed in under it (mask.py), and the report
 measures what the game draws.
 """
+import os
+
 import numpy as np
 
 import rig
+import skeleton as SK
 from body import top4
 from export import EXPORT_CLIPS
 from gltfio import qmat
@@ -241,6 +244,274 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     return garments
 
 
+# The body corners in the order their morphs can be settled: each corner's
+# morph weights are those of a corner before it plus ONE morph of its own (None:
+# the neutral corner, the rest positions), so a corner settled later never
+# moves one settled before it.
+SETTLE_ORDER = (
+    (('male', 'adult', 0.0), None), (('female', 'adult', 0.0), 'female'), (('male', 'child', 0.0), 'child'),
+    (('male', 'youth', 0.0), 'youth'), (('male', 'elder', 0.0), 'elder'), (('male', 'adult', -1.0), 'slight'),
+    (('male', 'adult', 1.0), 'stout'), (('female', 'child', 0.0), 'child_f'), (('female', 'youth', 0.0), 'youth_f'),
+    (('female', 'elder', 0.0), 'elder_f'),
+)
+
+
+def face_pushes(n, tris, fw, fi, need, dirs):
+    """Per vertex the largest push that moves the cloth points between the
+    vertices (`fi` vertex ids, `fw` barycentric weights) by `need` along
+    `dirs`: a linear point moves by Σ w·d, so each vertex takes w / Σ w²."""
+    out = np.zeros((n, 3))
+    mag = np.zeros(n)
+    k = need[:, None] * dirs / np.einsum('kj,kj->k', fw, fw)[:, None]
+    for c in range(3):
+        d = fw[:, c, None] * k
+        m = np.linalg.norm(d, axis=1)
+        for v, dv, mv in zip(fi[:, c], d, m):
+            if mv > mag[v]:
+                mag[v], out[v] = mv, dv
+    return out
+
+
+def way_out(tree, p, d, hits=64):
+    """How far point `p` must move along `d` to leave the body: the distance
+    to the hit where the winding number along the ray falls to zero (inf when
+    it never does)."""
+    from mathutils import Vector
+    o, dv = Vector(p), Vector(d)
+    hs = []
+    for _ in range(hits):
+        hit, n, _i, _d = tree.ray_cast(o, dv)
+        if hit is None:
+            break
+        hs.append(((hit - Vector(p)).length, 1 if n.dot(dv) > 0 else -1))
+        o = hit + dv * 1e-6
+    w = sum(s for _l, s in hs)
+    for length, s in hs:
+        w -= s
+        if w <= 0:
+            return length
+    return np.inf
+
+
+def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
+    """Every edge split to garmentEdgeMax (garments.refine), the cloth an arm
+    passes through in the build pose cut (garments.armholes); then
+    settle_once and settle_layers, every edge the settling stretched split
+    again and settled again, until none is."""
+    import mask as M
+    from garments import armholes, refine
+    G = garments['meshes']
+    for n in [n for n in G if n.startswith('g-')]:
+        G[n] = refine(G[n], cfg['VILLAGER_ASSET']['garmentEdgeMax'])
+        # an armhole where an upper arm passes the trunk cloth; a garment of
+        # the shoulder layer drapes the arms instead (garments.build_form)
+        if M.form(n) != 'limbRings' and M.layer(n) < M.LAYER['shoulder']:
+            G[n], cut = armholes(body, G[n])
+            if cut:
+                log(f'settle {n}: {cut} triangles cut where an arm passes through')
+    for k in range(passes):
+        settle_once(body, garments, cfg, log=log)
+        settle_layers(body, garments, cfg, log=log)
+        settle_once(body, garments, cfg, log=log)
+        split = 0
+        if k < passes - 1:
+            for n in [n for n in G if n.startswith('g-')]:
+                nv = len(G[n]['pos'])
+                G[n] = refine(G[n], cfg['VILLAGER_ASSET']['garmentEdgeMax'])
+                split += len(G[n]['pos']) - nv
+            log(f'settle pass {k + 1}: {split} vertices added where the settling stretched the cloth')
+        if not split:
+            break
+    return garments
+
+
+_ST = {}
+
+
+def _settle_one(n):
+    """settle_once for one garment at the corner in _ST: its new rest
+    positions (or the corner's morph) and how deep its cloth still lies."""
+    from mathutils.bvhtree import BVHTree
+    from penetration import face_points
+    S = _ST
+    G, w, morph, person, wr, wp, a = S['G'], S['w'], S['morph'], S['person'], S['wr'], S['wp'], S['a']
+    tree = BVHTree.FromPolygons(S['bv'].tolist(), S['tris'].tolist(), all_triangles=True)
+    axis, clear = S['axis'], S['clear']
+    g = dict(G[n])
+    g['morph_pos'] = dict(g['morph_pos'])
+    gi, gw = S['skin'][n]
+    fi, fw = face_points(g['tris'], g['pos'], a['garmentFaceSpacing'])
+    for _r in range(S['rounds']):
+        gv = person.draw(garment_pos(g, w), gi, gw, wr, wp)
+        d, _co, nrm = depths(tree, gv)
+        need = clear[n] + d
+        bad = np.nonzero(need > 1e-6)[0]
+        # the cloth between the vertices: a point of it still inside
+        # (a curve tighter than the edges follow) moves its vertices
+        fp = np.einsum('kj,kji->ki', fw, gv[fi])
+        fd, _fc, fn = depths(tree, fp)
+        fb = np.nonzero(fd > 0)[0]
+        if not len(bad) and not len(fb):
+            break
+        dirs = nrm.copy()
+        for k in bad[d[bad] > 0]:
+            if way_out(tree, gv[k], nrm[k]) > 1.5 * d[k] + 0.005:
+                r = np.array([gv[k][0] - axis[0], 0.0, gv[k][2] - axis[2]])
+                r /= max(np.linalg.norm(r), 1e-9)
+                out = way_out(tree, gv[k], r)
+                if out < np.inf:
+                    need[k], dirs[k] = out + clear[n], r
+        push = np.zeros_like(gv)
+        push[bad] = need[bad, None] * dirs[bad]
+        if len(fb):
+            pf = face_pushes(len(gv), g['tris'], fw[fb], fi[fb], fd[fb] + a['garmentFitMargin'], fn[fb])
+            take = np.einsum('ij,ij->i', pf, pf) > np.einsum('ij,ij->i', push, push)
+            push[take] = pf[take]
+        nb, twins = S['topo'][n]
+        push = spread(push, nb, twins)
+        rest = person.undraw(gv + push, gi, gw, wr, wp) - person.undraw(gv, gi, gw, wr, wp)
+        if morph is None:
+            g['pos'] = g['pos'] + rest
+        else:
+            g['morph_pos'][morph] = g['morph_pos'][morph] + rest
+    gv = person.draw(garment_pos(g, w), gi, gw, wr, wp)
+    last = float(max(0.0, depths(tree, np.concatenate([gv, np.einsum('kj,kji->ki', fw, gv[fi])]))[0].max()))
+    return n, (g['pos'] if morph is None else g['morph_pos'][morph]), last
+
+
+def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=True)):
+    """Settle every garment round the body in the BUILD POSE as the game draws
+    it, at every body corner: every garment vertex at least its layer's
+    clearance (VILLAGER_ASSET.garmentSettleClearance + garmentLayerGap per
+    mask.LAYER) outside the drawn body, so with edges no longer than garmentEdgeMax
+    (garments.refine) the cloth between the vertices clears it too. A vertex
+    short of it moves out along the body's normal at its nearest point — or,
+    inside where that way leads into another body part (the armpit, where the
+    arm meets the trunk), outward from the body's axis, over the limb. The
+    move is taken back to the rest pose through the game's blend at that
+    corner (gamepath.Person.undraw) and added to the corner's own morph
+    (SETTLE_ORDER), spread a little onto the neighbours so no spike rises in
+    the cloth."""
+    import gamepath as GP
+    import mask as M
+    from garments import design_pose
+    from mathutils.bvhtree import BVHTree
+    from penetration import face_points
+    a = cfg['VILLAGER_ASSET']
+    jidx, jw = top4(body['W'])
+    q = design_pose(body)
+    G = garments['meshes']
+    names = [n for n in G if n.startswith('g-')]
+    skin = {n: top4(G[n]['W']) for n in names}
+    topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
+    clear = {n: a['garmentSettleClearance'] + a['garmentLayerGap'] * M.layer(n) for n in names}
+    import multiprocessing as mp
+    for corner, morph in SETTLE_ORDER:
+        w = corner_weights(*corner)
+        pos, j = morphed(body, w)
+        person = GP.Person(j)
+        wr, wp = person.build_pose(q)
+        _ST.update(G=G, w=w, morph=morph, person=person, wr=wr, wp=wp, bv=person.draw(pos, jidx, jw, wr, wp), tris=body['tris'],
+                   axis=wp[SK.INDEX['hips']], skin=skin, topo=topo, clear=clear, a=a, rounds=rounds)
+        # the garments settle independently of each other: one worker each
+        with mp.get_context('fork').Pool(max(1, min(len(names), (os.cpu_count() or 2) - 1))) as pool:
+            done = pool.map(_settle_one, names)
+        worst = 0.0
+        for n, new, last in done:
+            if morph is None:
+                G[n]['pos'] = new
+            else:
+                G[n]['morph_pos'][morph] = new
+            worst = max(worst, last)
+            if last > 1e-9:
+                log(f'settle {corner[0]} {corner[1]} {corner[2]:+.0f} {n}: cloth {last:.4f} inside')
+        log(f'settle {corner[0]} {corner[1]} {corner[2]:+.0f}: deepest {worst:.4f}')
+    return garments
+
+
+def settle_layers(body, garments, cfg, rounds=6, log=print):
+    """The same for every layering, in the build pose at every body corner: a
+    point of an inner garment its cover mask leaves drawn under an outer one
+    (mask.py) and outside that outer garment through its cloth pushes the
+    outer cloth nearest to it out past it by `garmentFitMargin`."""
+    import gamepath as GP
+    import mask as M
+    from mathutils.bvhtree import BVHTree
+    from penetration import Masked
+    from body import barycentric
+    a = cfg['VILLAGER_ASSET']
+    margin, reach = a['garmentFitMargin'], a['garmentMaskOpening']
+    G = garments['meshes']
+    mk = M.masks(body, garments, cfg, log=lambda *x: None)
+    names = mk['garments']
+    skin = {n: top4(G[n]['W']) for n in names}
+    topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
+    from garments import design_pose
+    q = design_pose(body)
+    pose = M.build_pose(body)
+    vol = {n: M.Volume(pose(G[n]['pos'], G[n]['W']), G[n]['tris']) for n in names}
+    pairs = {}
+    for i in names:
+        for o in names:
+            if M.layer(i) < M.layer(o):
+                mi = Masked(mk['inner'][i], G[i]['tris'], names, o)
+                if mi.any:
+                    pairs.setdefault(o, []).append((i, mi))
+    for corner, morph in SETTLE_ORDER:
+        w = corner_weights(*corner)
+        _pos, j = morphed(body, w)
+        person = GP.Person(j)
+        wr, wp = person.build_pose(q)
+        bpos, _j = morphed(body, w)
+        bjidx, bjw = top4(body['W'])
+        btree = BVHTree.FromPolygons(person.draw(bpos, bjidx, bjw, wr, wp).tolist(), body['tris'].tolist(), all_triangles=True)
+        first = None
+        for _r in range(rounds + 1):
+            gv = {n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names}
+            moved = 0
+            cur = 0.0
+            # the inner layers' outer garments first: a hip garment settled
+            # over the beads before a robe settles over it
+            for o, inner in sorted(pairs.items(), key=lambda p: M.layer(p[0])):
+                to = np.asarray(G[o]['tris'])
+                cloth = BVHTree.FromPolygons(gv[o].tolist(), to.tolist(), all_triangles=True)
+                trees = vol[o].trees(gv[o])
+                fi, fw, need, dirs = [], [], [], []
+                for i, mi in inner:
+                    smp = np.concatenate([gv[i], gv[i][mi.tris].mean(1)])
+                    place, dist = vol[o].where(gv[o], smp, reach, ids=mi.shown, trees=trees)
+                    for k in mi.shown[(place[mi.shown] == M.THROUGH) & (dist[mi.shown] > 0)]:
+                        co, _n, ti, _d = cloth.find_nearest(smp[k].tolist())
+                        co = np.array(co)
+                        u = smp[k] - co
+                        # only ever out from the body: an inner point past a
+                        # fold of the outer cloth never pulls it into the body
+                        _bc, bn, _bi, _bd = btree.find_nearest(co.tolist())
+                        if u @ np.array(bn) <= 0:
+                            continue
+                        fi.append(to[ti])
+                        fw.append(barycentric(co, *gv[o][to[ti]]))
+                        need.append(np.linalg.norm(u) + margin)
+                        dirs.append(u / max(np.linalg.norm(u), 1e-12))
+                        cur = max(cur, float(dist[k]))
+                if not need or _r == rounds:
+                    continue
+                push = face_pushes(len(gv[o]), to, np.clip(np.array(fw), 0, 1), np.array(fi), np.array(need), np.array(dirs))
+                nb, twins = topo[o]
+                push = spread(push, nb, twins)
+                gi, gw = skin[o]
+                rest = person.undraw(gv[o] + push, gi, gw, wr, wp) - person.undraw(gv[o], gi, gw, wr, wp)
+                if morph is None:
+                    G[o]['pos'] = G[o]['pos'] + rest
+                else:
+                    G[o]['morph_pos'][morph] = G[o]['morph_pos'][morph] + rest
+                moved += 1
+            first = cur if first is None else first
+            if not moved:
+                break
+        log(f'settle layers {corner[0]} {corner[1]} {corner[2]:+.0f}: inner through outer {first:.4f} -> {cur:.4f}')
+
+
 def selftest():
     """descend() on a toy garment of one vertex, x its rest height: frame A
     wants it higher (depth 0.05 − x), skipped frame B punishes height (depth
@@ -265,4 +536,44 @@ def selftest():
     state, deep = descend({'g': np.zeros((1, 3))}, frames, lambda st, fr: {'g': (0.05 - st['g'][0, 0], np.array([[0.01, 0, 0]])) if fr == 'A' else (10 * st['g'][0, 0], None)},
                           lambda n, p, d: p + d, passes=6, stride=2, log=lambda *a: None)
     assert state['g'][0, 0] == 0.0 and abs(deep['g'] - 0.05) < 1e-12, (state, deep)
+    selftest_build()
     print('fit selftest: ok')
+
+
+def selftest_build():
+    """The game's path unposed exactly (gamepath.Person.undraw), refine()
+    leaving no edge over its limit and the cloth where it was, face_pushes
+    moving a cloth point by exactly what it asks."""
+    import gamepath as GP
+    import skeleton as SK
+    from garments import refine
+    rng = np.random.default_rng(1)
+    n = len(SK.NAMES)
+    joints = np.zeros((n, 6))
+    for i, name in enumerate(SK.NAMES):
+        joints[i, :3] = rng.normal(0, 0.2, 3)
+    person = GP.Person(joints)
+    q = rng.normal(0, 1, (n, 4))
+    q /= np.linalg.norm(q, axis=1)[:, None]
+    wr, wp = person.pose(q, None)
+    v = rng.normal(0, 0.3, (50, 3))
+    ji = rng.integers(0, n, (50, 4))
+    jw = rng.random((50, 4))
+    jw /= jw.sum(1)[:, None]
+    back = person.undraw(person.draw(v, ji, jw, wr, wp), ji, jw, wr, wp)
+    assert np.abs(back - v).max() < 1e-9, np.abs(back - v).max()
+    # two triangles of a 1 × 1 square: every edge ≤ 0.3 after, the area kept
+    g = {'pos': np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0.0]]), 'tris': np.array([[0, 1, 2], [0, 2, 3]]),
+         'uv': np.zeros((4, 2)), 'W': np.eye(4), 'morph_pos': {'m': np.ones((4, 3))}}
+    r = refine(g, 0.3)
+    t, p = r['tris'], r['pos']
+    e = np.concatenate([np.linalg.norm(p[t[:, i]] - p[t[:, (i + 1) % 3]], axis=1) for i in range(3)])
+    area = 0.5 * np.linalg.norm(np.cross(p[t[:, 1]] - p[t[:, 0]], p[t[:, 2]] - p[t[:, 0]]), axis=1).sum()
+    assert e.max() <= 0.3 + 1e-12 and abs(area - 1) < 1e-12 and np.allclose(r['morph_pos']['m'], 1), (e.max(), area)
+    # no T-junction: every edge is in two triangles or on the square's border
+    ed = np.sort(np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]]), axis=1)
+    u, c = np.unique(ed, axis=0, return_counts=True)
+    border = [((p[a][0] in (0, 1)) and p[b][0] == p[a][0]) or ((p[a][1] in (0, 1)) and p[b][1] == p[a][1]) for a, b in u[c == 1]]
+    assert all(border), 'refine left an edge with a vertex in its middle'
+    fp = face_pushes(3, np.array([[0, 1, 2]]), np.array([[0.2, 0.3, 0.5]]), np.array([[0, 1, 2]]), np.array([0.01]), np.array([[0, 0, 1.0]]))
+    assert abs(np.array([0.2, 0.3, 0.5]) @ fp[:, 2] - 0.01) < 1e-12, fp
