@@ -25,11 +25,14 @@ Per garment, alone on the masked body:
           hiding is for — judged against its own, wider tolerance
           VILLAGER_ASSET.garmentMaskCutTolerance (a limb visibly cut off).
 
-And per garment worn under each garment of another slot that covers part of
-it (every outfit layering), the same with the inner garment's own mask:
-`inner` how far a drawn covered point of it shows through the outer cloth,
-`inner hole` how far a hidden one has left the outer garment by an opening;
-per pose the worst outer garment, so a frame counts once.
+And per garment worn under each garment of an OUTER layer (mask.LAYER) that
+covers part of it (every outfit layering), the same with the inner garment's
+own mask: `inner` how far a drawn covered point of it shows through the outer
+cloth, unless the body as drawn while both are worn (pushed, its hidden
+triangles left out) covers it on every line of sight (`Sight`); `inner hole`
+how far a hidden one has left the outer garment by an opening. A column
+counts a frame once (its worst outer garment); every failing outer garment and
+body part of a frame is named as its own case.
 
 Every value is the measured maximum, below tolerance too: the tolerance
 decides `over` and the failure, never what is recorded.
@@ -124,12 +127,50 @@ def inside_body(tree, q):
     return inside(tree, list(q))
 
 
-def _inner_seen(full, drawn, q):
-    """Whether an inner garment's point `q` through the outer cloth is seen:
-    not when it lies inside the body (`full`, every triangle) and its nearest
-    skin is drawn (`drawn`, per triangle, while both garments are worn)."""
-    f = full.find_nearest(list(q))[2]
-    return f is None or not (drawn[f] and inside_body(full, q))
+def _sphere(n):
+    """`n` directions spread evenly over the sphere (Fibonacci)."""
+    k = np.arange(n) + 0.5
+    z = 1 - 2 * k / n
+    r = np.sqrt(1 - z * z)
+    a = np.pi * (1 + 5 ** 0.5) * k
+    return np.stack([r * np.cos(a), r * np.sin(a), z], 1)
+
+
+SIGHT_DIRS = _sphere(64)
+
+
+class Sight:
+    """Lines of sight out of the body as drawn: `pos` (pushed as the game
+    pushes it), `tris`, and per triangle `drawn`. A point is COVERED only when
+    it lies inside the body and every ray out of it meets drawn skin first:
+    rays toward every hidden triangle's centre (nearest first, so a hole is
+    found at once) and an even spread of directions. Nearest drawn skin alone
+    proves nothing: a partly hidden surface lets a point inside show through
+    its hole."""
+
+    def __init__(self, pos, tris, drawn):
+        from mathutils.bvhtree import BVHTree
+        t = np.asarray(tris)
+        self.full = BVHTree.FromPolygons(np.asarray(pos).tolist(), t.tolist(), all_triangles=True)
+        self.drawn = np.asarray(drawn, bool)
+        self.holes = np.asarray(pos)[t[~self.drawn]].mean(1) if (~self.drawn).any() else np.zeros((0, 3))
+
+    def covered(self, q):
+        from mathutils import Vector
+        q = np.asarray(q, float)
+        if not inside_body(self.full, q):
+            return False
+        if not len(self.holes):
+            return True
+        to = self.holes - q
+        dist = np.linalg.norm(to, axis=1)
+        dirs = np.concatenate([(to / np.maximum(dist, 1e-12)[:, None])[np.argsort(dist)], SIGHT_DIRS])
+        o = Vector(q.tolist())
+        for d in dirs.tolist():
+            f = self.full.ray_cast(o, Vector(d))[2]
+            if f is None or not self.drawn[f]:
+                return False
+        return True
 
 
 def _first_shown(ids, dist, keep):
@@ -145,31 +186,51 @@ def _empty():
     return {c: {'value': 0.0, 'at': None, 'over': 0, 'part': None} for c in COLUMNS} | {'checked': 0, 'cases': {}, 'clips': {}}
 
 
-def _note(r, col, v, at, tol, part=None, case=None):
-    """Record value `v` of column `col`; over tolerance it is also counted as a
-    named CASE (column, clip, body part, outer garment): its worst value, where,
-    and in how many frames."""
+def _note(r, col, v, at, tol, part=None, clip=None, cases=()):
+    """Record value `v` of column `col` once for this pose (and per clip);
+    every (body part, outer garment, value, where) of `cases` over tolerance
+    is counted as a named CASE (column, clip, body part, outer garment): its
+    worst value, where, and in how many frames."""
     c = r[col]
-    if case is not None:
-        k = f'{col} {case[0]}'
+    if clip is not None:
+        k = f'{col} {clip}'
         r['clips'][k] = max(r['clips'].get(k, 0.0), float(v))
     if v > tol:
         c['over'] += 1
-        if case is not None:
-            e = r['cases'].setdefault((col, *case), {'value': 0.0, 'at': None, 'over': 0})
-            e['over'] += 1
-            if v > e['value']:
-                e['value'], e['at'] = float(v), at
     if v > c['value']:
         c['value'], c['at'], c['part'] = float(v), at, part
+    for p, o, cv, cat in cases:
+        if cv > tol:
+            e = r['cases'].setdefault((col, clip, p, o), {'value': 0.0, 'at': None, 'over': 0})
+            e['over'] += 1
+            if cv > e['value']:
+                e['value'], e['at'] = float(cv), cat
 
 
-def _worst(ids, dist, part):
-    """The largest `dist` over the sample ids and the body part (bone) of that sample."""
-    if not len(ids):
-        return 0.0, None
-    k = ids[np.argmax(dist[ids])]
-    return float(dist[k]), part(k)
+def _per_part(ids, dist, part_of, keep, lim):
+    """The largest `dist` over the sample ids that `keep` accepts, with its
+    id, and per body part (`part_of`) its own largest accepted value over
+    `lim` as [(part, value, id)] — every failing body part, not only the worst."""
+    memo = {}
+
+    def k(x):
+        if x not in memo:
+            memo[x] = keep(x)
+        return memo[x]
+    v, x = _first_shown(ids, dist, k)
+    found = []
+    if v > lim:
+        over = ids[dist[ids] > lim]
+        parts = np.array([part_of(int(y)) for y in over])
+        for p in sorted(set(parts.tolist())):
+            pv, px = _first_shown(over[parts == p], dist, k)
+            if px is not None:
+                found.append((p, pv, px))
+    return v, x, found
+
+
+def _always(_x):
+    return True
 
 
 def _corner(c):
@@ -191,10 +252,11 @@ def _corner(c):
     pairs = [(i, o, Masked(mk['inner'][i], garments['meshes'][i]['tris'], mk['garments'], o)) for i in names for o in names
              if M.layer(i) < M.layer(o)]
     pairs = [p for p in pairs if p[2].any]
-    # the body's triangles drawn while both garments of a layering are worn:
-    # an inner garment's point inside the body under them is not seen
+    # the body as the game draws it while both garments of a layering are
+    # worn (hidden triangles left out, covered vertices pushed in): an inner
+    # garment's point is seen unless that body covers it on every line of sight
     btris = np.asarray(body['tris'])
-    both_drawn = {(i, o): M.drawn_tris(btris, M.decode(mk['body'], mk['garments'], [i, o])[0]) for i, o, _m in pairs}
+    both = {(i, o): M.decode(mk['body'], mk['garments'], [i, o]) for i, o, _m in pairs}
     worst = {n: _empty() for n in names}
     nv = len(body['pos'])
     bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
@@ -230,9 +292,9 @@ def _corner(c):
                 if dtree is not None and not mb.drawn[ti]:
                     _c, _nn, dti, dd = dtree.find_nearest(pts[x].tolist())
                     val[x], tri[x], under[x] = (dd, mb.drawn_ids[dti], False) if dti is not None else (0.0, ti, False)
-            v, x = _first_shown(cand, val, lambda x: under[x] or _occluded(tree, dtree, pts[x]))
-            bp_ = bone(int(body['tris'][tri[x]][0])) if x is not None else None
-            _note(r, 'cloth', v, at, tol, bp_, (cname, bp_, None))
+            cpart = lambda x: bone(int(body['tris'][tri[x]][0]))  # noqa: E731
+            v, x, found = _per_part(cand, val, cpart, lambda x: under[x] or _occluded(tree, dtree, pts[x]), tol)
+            _note(r, 'cloth', v, at, tol, cpart(x) if x is not None else None, cname, [(p, None, pv, at) for p, pv, _x in found])
             if not mb.any:
                 continue
             # covered skin through the cloth (unless drawn skin of another body
@@ -245,37 +307,45 @@ def _corner(c):
                 if fn is None:
                     fn = np.concatenate([nrm, vertex_normals_faces(bp, body['tris'])])
                 return not _occluded(tree, dtree, smp[x] + PROBE * fn[x])
-            v, x = _first_shown(thr, dist, visible)
-            bp_ = bone(x) if x is not None else None
-            _note(r, 'shown', v, at, tol, bp_, (cname, bp_, None))
+            for col, ids, keep, lim in (('shown', thr, visible, tol),):
+                v, x, found = _per_part(ids, dist, bone, keep, lim)
+                _note(r, col, v, at, lim, bone(x) if x is not None else None, cname, [(p, None, pv, at) for p, pv, _x in found])
             place, dist = S['vol'][n].where(gv[n], smp, reach, ids=mb.hidden, trees=trees[n])
-            out = mb.hidden[place[mb.hidden] == M.OUT]
-            v, part = _worst(out, dist, bone)
-            _note(r, 'hole', v, at, tol, part, (cname, part, None))
-            thr = mb.hidden[place[mb.hidden] == M.THROUGH]
-            v, part = _worst(thr, dist, bone)
-            _note(r, 'cut', v, at, S['cut'], part, (cname, part, None))
-        # every layering, counted once per pose and inner garment: the worst
-        # outer garment over it, so "frames over" never exceeds "checked"
-        lay = {}
+            for col, ids, lim in (('hole', mb.hidden[place[mb.hidden] == M.OUT], tol), ('cut', mb.hidden[place[mb.hidden] == M.THROUGH], S['cut'])):
+                v, x, found = _per_part(ids, dist, bone, _always, lim)
+                _note(r, col, v, at, lim, bone(x) if x is not None else None, cname, [(p, None, pv, at) for p, pv, _x in found])
+        # every layering: the column counts once per pose and inner garment
+        # (its worst outer garment, so "frames over" never exceeds "checked");
+        # every failing outer garment and body part is named as its own case
+        lay, cases = {}, {}
+        bnrm = None
+        sight = {}
         for i, o, mi in pairs:
             _ip, smp, _nrm = mi.drawn_at(gv[i], depth)
             ipart = lambda k, i=i, mi=mi: S['bones'][S['gdom'][i][k if k < S['gnv'][i] else mi.tris[k - S['gnv'][i]][0]]]  # noqa: E731
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.shown, trees=trees[o])
             thr = mi.shown[place[mi.shown] == M.THROUGH]
-            # only what is seen: an inner point inside the body, its nearest
-            # skin drawn while both garments are worn, is hidden by that skin
-            v, x = _first_shown(thr, dist, lambda x, i=i, o=o: _inner_seen(full, both_drawn[i, o], smp[x]))
-            part = ipart(x) if x is not None else None
+
+            def seen(x, i=i, o=o, smp=smp):
+                nonlocal bnrm
+                if (i, o) not in sight:
+                    hide, push = both[i, o]
+                    if bnrm is None:
+                        bnrm = vertex_normals(bv, btris)
+                    sight[i, o] = Sight(bv - depth * push[:, None] * bnrm, btris, M.drawn_tris(btris, hide))
+                return not sight[i, o].covered(smp[x])
+            where = f'under {o}, {at}'
+            v, x, found = _per_part(thr, dist, ipart, seen, tol)
             if v > lay.get((i, 'inner'), (-1,))[0]:
-                lay[i, 'inner'] = (v, f'under {o}, {at}', part, o)
+                lay[i, 'inner'] = (v, where, ipart(x) if x is not None else None)
+            cases.setdefault((i, 'inner'), []).extend((p, o, pv, where) for p, pv, _x in found)
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.hidden, trees=trees[o])
-            out = mi.hidden[place[mi.hidden] == M.OUT]
-            v, part = _worst(out, dist, ipart)
+            v, x, found = _per_part(mi.hidden[place[mi.hidden] == M.OUT], dist, ipart, _always, tol)
             if v > lay.get((i, 'innerHole'), (-1,))[0]:
-                lay[i, 'innerHole'] = (v, f'under {o}, {at}', part, o)
-        for (i, col), (v, where, part, o) in lay.items():
-            _note(worst[i], col, v, where, tol, part, (cname, part, o))
+                lay[i, 'innerHole'] = (v, where, ipart(x) if x is not None else None)
+            cases.setdefault((i, 'innerHole'), []).extend((p, o, pv, where) for p, pv, _x in found)
+        for (i, col), (v, where, part) in lay.items():
+            _note(worst[i], col, v, where, tol, part, cname, cases.get((i, col), ()))
     return c, worst
 
 
@@ -313,19 +383,51 @@ def selftest():
     _note(r, 'shown', 0.001, 'x', 0.003)
     assert r['shown']['value'] == 0.001 and r['shown']['over'] == 0
     # a case over tolerance is named (column, clip, part, outer garment); every
-    # value, below tolerance too, is kept per column and clip
-    _note(r, 'inner', 0.01, 'a', 0.003, 'thigh', ('walk', 'thigh', 'g-cloak'))
-    _note(r, 'inner', 0.02, 'b', 0.003, 'thigh', ('walk', 'thigh', 'g-cloak'))
-    _note(r, 'inner', 0.002, 'c', 0.003, 'arm', ('dig', 'arm', 'g-cloak'))
-    assert r['cases'] == {('inner', 'walk', 'thigh', 'g-cloak'): {'value': 0.02, 'at': 'b', 'over': 2}}, r['cases']
+    # value, below tolerance too, is kept per column and clip; the column counts
+    # a pose once, every failing body part and outer garment is its own case
+    _note(r, 'inner', 0.01, 'a', 0.003, 'thigh', 'walk', [('thigh', 'g-cloak', 0.01, 'a')])
+    _note(r, 'inner', 0.02, 'b', 0.003, 'thigh', 'walk', [('thigh', 'g-cloak', 0.02, 'b'), ('hip', 'g-cape', 0.005, 'b'),
+                                                           ('arm', 'g-cape', 0.002, 'b')])
+    _note(r, 'inner', 0.002, 'c', 0.003, 'arm', 'dig', [('arm', 'g-cloak', 0.002, 'c')])
+    assert r['cases'] == {('inner', 'walk', 'thigh', 'g-cloak'): {'value': 0.02, 'at': 'b', 'over': 2},
+                          ('inner', 'walk', 'hip', 'g-cape'): {'value': 0.005, 'at': 'b', 'over': 1}}, r['cases']
     assert r['clips'] == {'inner walk': 0.02, 'inner dig': 0.002}, r['clips']
-    # visible only: an inner point inside the body under drawn skin is hidden
-    # by that skin; under skin the worn garments' mask hides, or outside the
-    # body, it is seen
-    drawn = np.ones(len(tris), bool)
-    assert not _inner_seen(full, drawn, (0.2, 0.0, 0.5)), 'inside a drawn thigh'
-    assert _inner_seen(full, np.zeros(len(tris), bool), (0.2, 0.0, 0.5)), 'inside a hidden thigh'
-    assert _inner_seen(full, drawn, (0.6, 0.0, 0.5)), 'outside the body'
+    assert r['inner']['over'] == 2
+    # every failing body part is found, each with its own worst ACCEPTED value
+    ids, dist = np.array([0, 1, 2, 3]), np.array([0.05, 0.04, 0.02, 0.001])
+    part = {0: 'thigh', 1: 'thigh', 2: 'hip', 3: 'arm'}.get
+    assert _per_part(ids, dist, part, lambda k: k != 0, 0.003) == (0.04, 1, [('hip', 0.02, 2), ('thigh', 0.04, 1)])
+    assert _per_part(ids, dist, part, lambda k: False, 0.003) == (0.0, None, [])
+    # visible only: a point inside the body is covered only when drawn skin
+    # meets every line of sight out of it
+    bv_, bt_ = box(0.0, 0.4, -0.2, 0.2, 0.3, 0.7)
+    bt_ = np.array(bt_)
+    inner_pt, outside = (0.02, 0.0, 0.5), (0.6, 0.0, 0.5)
+    allv = np.ones(len(bt_), bool)
+    assert Sight(bv_, bt_, allv).covered(inner_pt), 'inside a fully drawn thigh'
+    assert not Sight(bv_, bt_, allv).covered(outside), 'outside the body'
+    assert not Sight(bv_, bt_, ~allv).covered(inner_pt), 'inside a hidden thigh'
+    # partly masked: the nearest skin (the x = 0 side) is drawn, the far side
+    # (x = 0.4) hidden — seen through that hole, also through half of it
+    far = np.array([all(bv_[k][0] == 0.4 for k in t) for t in bt_])
+    full_ = BVHTree.FromPolygons(bv_, bt_.tolist(), all_triangles=True)
+    assert far[full_.find_nearest(inner_pt)[2]] == False, 'the nearest skin is drawn'  # noqa: E712
+    assert not Sight(bv_, bt_, ~far).covered(inner_pt), 'seen through a hidden far side'
+    half = far & (np.cumsum(far) == 1)
+    assert not Sight(bv_, bt_, ~half).covered(inner_pt), 'seen through half a hidden side'
+    # a small hole far down a long limb, narrower than the spread of
+    # directions: still found (rays toward every hidden triangle)
+    lv, lt = box(0.0, 4.0, -0.05, 0.05, -0.05, 0.05)
+    lt = np.array(lt)
+    cap = np.array([all(lv[k][0] == 4.0 for k in t) for t in lt])
+    one = cap & (np.cumsum(cap) == 1)
+    assert not Sight(lv, lt, ~one).covered((0.03, 0.0, 0.0)), 'seen through a small far hole'
+    assert Sight(lv, lt, np.ones(len(lt), bool)).covered((0.03, 0.0, 0.0))
+    # the pushed body is what is drawn: a point between the skin as built and
+    # the skin pushed in lies outside the drawn body and is seen
+    pushed_v = np.array(bv_)
+    pushed_v[pushed_v[:, 0] == 0.0, 0] = 0.03
+    assert Sight(bv_, bt_, allv).covered(inner_pt) and not Sight(pushed_v, bt_, allv).covered(inner_pt)
     print('penetration selftest: ok')
 
 
@@ -431,11 +533,12 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
         'ONLY WHAT IS SEEN COUNTS. Cloth = how deep a garment vertex or a point of the cloth between its vertices (about garmentFaceSpacing = '
         f'{a["garmentFaceSpacing"]} apart) lies under DRAWN skin (skin the mask hides shows nothing). Shown = how far a drawn body point the garment covers lies outside it '
         'through the cloth, unless drawn skin of another body part encloses it. Inner = how far a drawn point of a garment of an inner layer (mask.LAYER: '
-        'ornament, then hip and head, torso, shoulder) shows through a garment of an outer layer covering it, unless it lies inside the body under skin drawn '
-        'while both are worn; the part of it the outer garment\'s mask hides does not count. Hole / inner hole = how far a hidden body point / hidden inner-garment point has '
+        'ornament, then hip and head, torso, shoulder) shows through a garment of an outer layer covering it, unless the body as drawn while both are worn (pushed in, its hidden triangles left out) '
+        'meets every line of sight out of it; the part of it the outer garment\'s mask hides does not count. Hole / inner hole = how far a hidden body point / hidden inner-garment point has '
         'left the garment by an opening (a hole where skin or cloth should be is seen). Cut = how far a hidden body point lies past the cloth '
         f'(tolerance garmentMaskCutTolerance = {a["garmentMaskCutTolerance"]}: the cloth drawn where the body bulges past it is what hiding is for, '
-        'a limb cut off is not). Per pose the worst layering of a garment counts, named by the outer garment and the inner garment\'s body part. '
+        'a limb cut off is not). A column counts a frame once per garment (its worst layering); every failing body part — and for a layering every '
+        'failing outer garment — is named as its own case. '
         'Every value is the measured maximum, below tolerance too. Figure units (1 unit ≈ 1.3 m); '
         f'tolerance (VILLAGER_ASSET.garmentPenetrationTolerance): {tol}.',
         '',
