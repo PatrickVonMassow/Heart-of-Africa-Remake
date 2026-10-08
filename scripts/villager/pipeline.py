@@ -3,8 +3,7 @@
 
   body        MakeHuman base → decimated body, morphs, joints, weights (cached)
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
-  garments    each dress form built round the body, weights transferred, the
-              rigid ornaments sized to every pose (envelope.py), then the rest
+  garments    each dress form built round the body, weights transferred, then
               fitted to every clip frame at every body corner (fit.py) (cached)
   (mask)      each garment's cover mask over the body and the garments of
               other slots (mask.py), computed whenever the garments are read
@@ -77,8 +76,6 @@ def main():
     steps = ['body', 'clips', 'garments', 'export', 'sheets', 'penetration'] if a.step == 'all' else a.step.split(',')
     import mask as MK
     MK.selftest()
-    import envelope as EN
-    EN.selftest()
     if 'garments' in steps or 'selftest' in steps:
         import fit as F
         F.selftest()
@@ -101,9 +98,7 @@ def main():
     if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
         import garments as G
         import fit as F
-        import envelope as EN
-        garments = cached(a.work, 'garments', lambda: F.fit(body, clips, EN.envelope(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg),
-                          force='garments' in steps)
+        garments = cached(a.work, 'garments', lambda: F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), force='garments' in steps)
     if garments is not None:
         garments['mask'] = MK.masks(body, garments, cfg)
     if 'export' in steps:
