@@ -476,8 +476,9 @@ def build_form(B, form, wear, L):
             ai = SK.INDEX['foot.' + s]
             fa = SK.INDEX['forearm.' + s]
             for k in range(4):
-                # wrist rings along the forearm, ankle rings above the ankle
-                p = B.wp[wi] + (B.wp[fa] - B.wp[wi]) * (0.08 + 0.09 * k)
+                # wrist rings along the forearm (clear of the wrist: a bent
+                # hand folds into a ring worn on it), ankle rings above the ankle
+                p = B.wp[wi] + (B.wp[fa] - B.wp[wi]) * (0.16 + 0.09 * k)
                 parts.append(torus((p[0], p[2]), p[1], np.full(12, 0.024), 0.004 * H, n=12))
                 a = B.wp[ai]
                 parts.append(torus((a[0], a[2] + 0.004), a[1] + 0.02 * H + 0.012 * H * k, np.full(12, 0.03), 0.004 * H, n=12))

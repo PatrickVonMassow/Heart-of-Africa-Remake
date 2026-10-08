@@ -192,7 +192,9 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     margin = cfg['VILLAGER_ASSET']['garmentFitMargin']
     step = cfg['VILLAGER_ASSET']['garmentFitStep']
     jidx, jw = top4(body['W'])
-    names = [n for n in garments['meshes'] if n.startswith('g-')]
+    from envelope import FORMS
+    # the rigid ornaments are sized to every pose already (envelope.py)
+    names = [n for n in garments['meshes'] if n.startswith('g-') and n.split('-')[1] not in FORMS]
     G = garments['meshes']
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
