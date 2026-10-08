@@ -74,7 +74,7 @@ class Person:
     def pose(self, q, hips, stride=1.0):
         """A clip frame's world turns and heads (A-pose) on this person's
         skeleton, a gait's stride warped by `stride` — the one pose path the
-        resolver, the report and the sheets share."""
+        fit, the report and the sheets share."""
         return rig.fk(self.h, stride_pose(self.h, q, hips, stride), hips)
 
     def drawn(self, wr):
@@ -170,3 +170,15 @@ def poses(clips, names, cfg):
         for f in range(len(c['times'])):
             for k in ks:
                 yield cname, f, k, c['q'][f], c['hips'][f]
+
+
+def drawn_garment(person, g, weights, wr, wp):
+    """A garment as the game draws it on `person` in a pose: morphed, hung and
+    baked, skinned by the hung bones."""
+    from body import top4
+    gi, gw = top4(g['W'])
+    p = g['pos'].copy()
+    for m, x in weights.items():
+        if x:
+            p += x * g['morph_pos'][m]
+    return person.skin(person.bake(p, gi, gw), gi, gw, wr, wp)
