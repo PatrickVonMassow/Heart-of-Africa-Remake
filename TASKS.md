@@ -142,6 +142,14 @@ put it is the mistake this line exists to stop.
   Criticality: medium - every walking villager on medium/high presets; a standing red in the village suite.
   Bundle: Dorfleben.
 
+- [ ] 1333. Water-carrying adult dips the jar's mouth under the water surface while filling
+  Queue position: after point 1330, in the same village-errands block.
+  Source: findings carrier 08.10.2026 20:23Z: `polish-villagers --section=adult-errands` fails "the jar's mouth is tipped under the water surface" on feat/1331 aceda635f (WebGPU mouth -0.197 m, WebGL 2 -0.221 m, surface -0.25 m) and identically on origin/main 6bd36687f at 20:45Z (mouth -0.200 m); runtime-identical to main, so pre-existing and not charged to 1331. Logs local/verify-logs/2026-10-08T20-40-46-090- and 2026-10-08T20-45-25-112-polish-villagers.log. The two water checks in the same runs belong to points 1242 and 568.
+  Final state: while a villager fills a jar at the bank, the jar's mouth dips below the water surface as the check requires, on both backends, without changing the carry pose elsewhere.
+  Verifiable: `polish-villagers --section=adult-errands` jar check green on both backends; the filling frame picture-checked.
+  Criticality: medium - a standing red in the village suite; visible at every water stand.
+  Bundle: Dorfleben.
+
 - [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
   Queue position: directly after point 1294 (ahead of 1301); worked only once 1294 has landed (user 05.10.2026: "ja, aber nach 1294").
   Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:

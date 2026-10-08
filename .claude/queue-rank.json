@@ -1626,6 +1626,12 @@
       "why": "Hygiene defect blocking no point; last is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1333": {
+      "at": "2026-10-08T21:05:41.599Z",
+      "why": "moved directly after 1330: same village-errands suite, pre-existing red on main",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1655,7 +1661,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-08T07:11:17.801Z",
+    "at": "2026-10-08T21:05:41.610Z",
     "points": [
       184,
       200,
@@ -2102,7 +2108,8 @@
       1328,
       1330,
       1331,
-      1332
+      1332,
+      1333
     ]
   }
 }
