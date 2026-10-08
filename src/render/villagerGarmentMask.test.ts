@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
+import { normalLocal, positionLocal } from 'three/tsl'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET } from '../config/balance'
 import { PEOPLE_DRESS } from '../systems/appearance'
@@ -125,10 +126,67 @@ describe('the figure geometry and the vertex shader input', () => {
 
   it('the masked figure material moves the position by the push; the plain one does not', () => {
     expect(figureMaterial(true)).toBe(figureMaterial(true))
-    expect(figureMaterial(true)).not.toBe(figureMaterial())
     expect(figureMaterial(true).positionNode).toBeTruthy()
     expect(figureMaterial().positionNode).toBeFalsy()
     expect(VILLAGER_ASSET.garmentMaskPush).toBeGreaterThan(0)
     expect(VILLAGER_ASSET.garmentMaskPush).toBeLessThan(0.01)
+  })
+})
+
+// The vertex shader's push evaluated on the CPU: a small interpreter over the
+// TSL graph of the masked material's positionNode. It knows the nodes the push
+// may use and throws on any other, so a changed expression fails here.
+type Vec = number[]
+function evalNode(node: unknown, env: { position: Vec; normal: Vec; attributes: Record<string, number> }): Vec {
+  const n = node as Record<string, unknown> & { constructor: { name: string } }
+  if (node === positionLocal) return env.position
+  if (node === normalLocal) return env.normal
+  if (n.constructor.name === 'AttributeNode') {
+    const name = (n as unknown as { getAttributeName(): string }).getAttributeName()
+    if (!(name in env.attributes)) throw new Error(`unknown attribute ${name}`)
+    return [env.attributes[name]]
+  }
+  if (n.constructor.name === 'VarNode') return evalNode(n.node, env)
+  if (n.constructor.name === 'OperatorNode') {
+    const a = evalNode(n.aNode, env)
+    const b = evalNode(n.bNode, env)
+    const at = (v: Vec, i: number) => (v.length === 1 ? v[0] : v[i])
+    const len = Math.max(a.length, b.length)
+    const f = { '-': (x: number, y: number) => x - y, '+': (x: number, y: number) => x + y, '*': (x: number, y: number) => x * y }[n.op as string]
+    if (!f) throw new Error(`operator ${String(n.op)}`)
+    return Array.from({ length: len }, (_, i) => f(at(a, i), at(b, i)))
+  }
+  throw new Error(`node ${n.constructor.name} not expected in the push`)
+}
+
+describe('the vertex shader push, evaluated', () => {
+  // a posed vertex: a bone turned 90° about z skins (1, 0, 0) with normal (1, 0, 0)
+  const bone = new THREE.Bone()
+  bone.rotation.z = Math.PI / 2
+  bone.updateMatrixWorld(true)
+  const posed = new THREE.Vector3(1, 0, 0).applyMatrix4(bone.matrixWorld)
+  const normal = new THREE.Vector3(1, 0, 0).transformDirection(bone.matrixWorld)
+  const env = (push: number) => ({ position: posed.toArray(), normal: normal.toArray(), attributes: { [GARMENT_PUSH_ATTRIBUTE]: push } })
+
+  it('moves a posed covered vertex inward along its skinned normal by its push', () => {
+    const push = VILLAGER_ASSET.garmentMaskPush
+    const out = new THREE.Vector3(...evalNode(figureMaterial(true).positionNode, env(push)))
+    const moved = out.clone().sub(posed)
+    expect(moved.length()).toBeCloseTo(push, 9)
+    expect(moved.dot(normal)).toBeCloseTo(-push, 9)
+  })
+
+  it('leaves a vertex with zero push where it is', () => {
+    expect(evalNode(figureMaterial(true).positionNode, env(0))).toEqual(posed.toArray())
+  })
+
+  it('reads the skinned position and normal: three skins them before it applies positionNode', () => {
+    // NodeMaterial.setupPosition: skinning() assigns positionLocal/normalLocal,
+    // then positionLocal.assign(positionNode); a three upgrade that reorders
+    // them would push the bind-pose vertex.
+    const src = readFileSync(resolve(__dirname, '../../node_modules/three/src/materials/nodes/NodeMaterial.js'), 'utf8')
+    const setup = src.slice(src.indexOf('\tsetupPosition( builder ) {'))
+    expect(setup.indexOf('skinning( object )')).toBeGreaterThan(0)
+    expect(setup.indexOf('skinning( object )')).toBeLessThan(setup.indexOf('this.positionNode !== null'))
   })
 })
