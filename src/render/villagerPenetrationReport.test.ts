@@ -16,6 +16,7 @@ interface Garment {
 }
 interface Report {
   tolerance: number
+  build: Record<string, Garment & Record<Column, { value: number }>>
   garments: Record<string, Garment & Record<Column, { value: number }>>
 }
 
@@ -63,7 +64,7 @@ describe('the visible-only penetration report', () => {
   })
 
   it('names every value over tolerance as a case: column, clip, body part, outer garment', () => {
-    for (const [n, g] of Object.entries(now.garments)) {
+    for (const [n, g] of [...Object.entries(now.build), ...Object.entries(now.garments)]) {
       for (const [key, v] of Object.entries(g.clips)) {
         if (v <= limit(key.split(' ')[0])) continue
         const named = Object.entries(g.cases).filter(([k]) => k.startsWith(key + ' '))
@@ -98,7 +99,7 @@ describe('the visible-only penetration report', () => {
     const section = md.split('## Remaining visible cases (handed to work-order point 1332)')[1]
     expect(section).toBeDefined()
     for (const [n, g] of Object.entries(now.garments)) {
-      if (Object.keys(g.cases).length) expect(section, n).toContain('`' + n + '`')
+      if (Object.keys(g.cases).length || Object.keys(now.build[n].cases).length) expect(section, n).toContain('`' + n + '`')
     }
   })
 })

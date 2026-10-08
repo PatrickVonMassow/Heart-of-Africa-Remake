@@ -28,8 +28,8 @@ Per garment, alone on the masked body:
 And per garment worn under each garment of an OUTER layer (mask.LAYER) that
 covers part of it (every outfit layering), the same with the inner garment's
 own mask: `inner` how far a drawn covered point of it shows through the outer
-cloth, unless the body as drawn while both are worn (pushed, its hidden
-triangles left out) covers it on every line of sight (`Sight`); `inner hole`
+cloth, unless it lies inside the body as drawn while both are worn (pushed)
+and that body hides no triangle (`Sight`); `inner hole`
 how far a hidden one has left the outer garment by an opening. A column
 counts a frame once (its worst outer garment); every failing outer garment and
 body part of a frame is named as its own case.
@@ -127,50 +127,22 @@ def inside_body(tree, q):
     return inside(tree, list(q))
 
 
-def _sphere(n):
-    """`n` directions spread evenly over the sphere (Fibonacci)."""
-    k = np.arange(n) + 0.5
-    z = 1 - 2 * k / n
-    r = np.sqrt(1 - z * z)
-    a = np.pi * (1 + 5 ** 0.5) * k
-    return np.stack([r * np.cos(a), r * np.sin(a), z], 1)
-
-
-SIGHT_DIRS = _sphere(64)
-
-
 class Sight:
-    """Lines of sight out of the body as drawn: `pos` (pushed as the game
-    pushes it), `tris`, and per triangle `drawn`. A point is COVERED only when
-    it lies inside the body and every ray out of it meets drawn skin first:
-    rays toward every hidden triangle's centre (nearest first, so a hole is
-    found at once) and an even spread of directions. Nearest drawn skin alone
-    proves nothing: a partly hidden surface lets a point inside show through
-    its hole."""
+    """The body as drawn: `pos` (pushed as the game pushes it), `tris`, and
+    per triangle `drawn`. A point is COVERED only when it lies inside the body
+    and the body hides no triangle: through a hidden triangle a point inside
+    is seen, and no finite set of rays proves a partly hidden surface blocks
+    every line of sight, so any hole counts the point as seen (conservative:
+    a residual may be over-counted, never hidden)."""
 
     def __init__(self, pos, tris, drawn):
         from mathutils.bvhtree import BVHTree
-        t = np.asarray(tris)
-        self.full = BVHTree.FromPolygons(np.asarray(pos).tolist(), t.tolist(), all_triangles=True)
-        self.drawn = np.asarray(drawn, bool)
-        self.holes = np.asarray(pos)[t[~self.drawn]].mean(1) if (~self.drawn).any() else np.zeros((0, 3))
+        self.closed = bool(np.asarray(drawn, bool).all())
+        if self.closed:
+            self.full = BVHTree.FromPolygons(np.asarray(pos).tolist(), np.asarray(tris).tolist(), all_triangles=True)
 
     def covered(self, q):
-        from mathutils import Vector
-        q = np.asarray(q, float)
-        if not inside_body(self.full, q):
-            return False
-        if not len(self.holes):
-            return True
-        to = self.holes - q
-        dist = np.linalg.norm(to, axis=1)
-        dirs = np.concatenate([(to / np.maximum(dist, 1e-12)[:, None])[np.argsort(dist)], SIGHT_DIRS])
-        o = Vector(q.tolist())
-        for d in dirs.tolist():
-            f = self.full.ray_cast(o, Vector(d))[2]
-            if f is None or not self.drawn[f]:
-                return False
-        return True
+        return self.closed and inside_body(self.full, np.asarray(q, float))
 
 
 def _first_shown(ids, dist, keep):
@@ -254,7 +226,7 @@ def _corner(c):
     pairs = [p for p in pairs if p[2].any]
     # the body as the game draws it while both garments of a layering are
     # worn (hidden triangles left out, covered vertices pushed in): an inner
-    # garment's point is seen unless that body covers it on every line of sight
+    # garment's point is seen unless it lies inside that body and nothing is hidden
     btris = np.asarray(body['tris'])
     both = {(i, o): M.decode(mk['body'], mk['garments'], [i, o]) for i, o, _m in pairs}
     worst = {n: _empty() for n in names}
@@ -398,8 +370,9 @@ def selftest():
     part = {0: 'thigh', 1: 'thigh', 2: 'hip', 3: 'arm'}.get
     assert _per_part(ids, dist, part, lambda k: k != 0, 0.003) == (0.04, 1, [('hip', 0.02, 2), ('thigh', 0.04, 1)])
     assert _per_part(ids, dist, part, lambda k: False, 0.003) == (0.0, None, [])
-    # visible only: a point inside the body is covered only when drawn skin
-    # meets every line of sight out of it
+    # visible only: a point inside the body is covered only when the body as
+    # drawn is closed; any hidden triangle — far, small, or behind a drawn
+    # part that blocks its centre — counts the point as seen
     bv_, bt_ = box(0.0, 0.4, -0.2, 0.2, 0.3, 0.7)
     bt_ = np.array(bt_)
     inner_pt, outside = (0.02, 0.0, 0.5), (0.6, 0.0, 0.5)
@@ -407,22 +380,16 @@ def selftest():
     assert Sight(bv_, bt_, allv).covered(inner_pt), 'inside a fully drawn thigh'
     assert not Sight(bv_, bt_, allv).covered(outside), 'outside the body'
     assert not Sight(bv_, bt_, ~allv).covered(inner_pt), 'inside a hidden thigh'
-    # partly masked: the nearest skin (the x = 0 side) is drawn, the far side
-    # (x = 0.4) hidden — seen through that hole, also through half of it
     far = np.array([all(bv_[k][0] == 0.4 for k in t) for t in bt_])
-    full_ = BVHTree.FromPolygons(bv_, bt_.tolist(), all_triangles=True)
-    assert far[full_.find_nearest(inner_pt)[2]] == False, 'the nearest skin is drawn'  # noqa: E712
-    assert not Sight(bv_, bt_, ~far).covered(inner_pt), 'seen through a hidden far side'
     half = far & (np.cumsum(far) == 1)
     assert not Sight(bv_, bt_, ~half).covered(inner_pt), 'seen through half a hidden side'
-    # a small hole far down a long limb, narrower than the spread of
-    # directions: still found (rays toward every hidden triangle)
-    lv, lt = box(0.0, 4.0, -0.05, 0.05, -0.05, 0.05)
-    lt = np.array(lt)
-    cap = np.array([all(lv[k][0] == 4.0 for k in t) for t in lt])
-    one = cap & (np.cumsum(cap) == 1)
-    assert not Sight(lv, lt, ~one).covered((0.03, 0.0, 0.0)), 'seen through a small far hole'
-    assert Sight(lv, lt, np.ones(len(lt), bool)).covered((0.03, 0.0, 0.0))
+    # a partly obstructed opening: a drawn plate inside the thigh blocks the
+    # line toward the hole's centre while its edge stays in sight
+    pv, pt = box(0.3, 0.31, -0.05, 0.05, 0.45, 0.55)
+    ov = bv_ + pv
+    ot = np.concatenate([bt_, np.array(pt) + len(bv_)])
+    od = np.concatenate([~half, np.ones(len(pt), bool)])
+    assert not Sight(ov, ot, od).covered(inner_pt), 'seen past a part blocking the hole centre'
     # the pushed body is what is drawn: a point between the skin as built and
     # the skin pushed in lies outside the drawn body and is seen
     pushed_v = np.array(bv_)
@@ -533,8 +500,8 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
         'ONLY WHAT IS SEEN COUNTS. Cloth = how deep a garment vertex or a point of the cloth between its vertices (about garmentFaceSpacing = '
         f'{a["garmentFaceSpacing"]} apart) lies under DRAWN skin (skin the mask hides shows nothing). Shown = how far a drawn body point the garment covers lies outside it '
         'through the cloth, unless drawn skin of another body part encloses it. Inner = how far a drawn point of a garment of an inner layer (mask.LAYER: '
-        'ornament, then hip and head, torso, shoulder) shows through a garment of an outer layer covering it, unless the body as drawn while both are worn (pushed in, its hidden triangles left out) '
-        'meets every line of sight out of it; the part of it the outer garment\'s mask hides does not count. Hole / inner hole = how far a hidden body point / hidden inner-garment point has '
+        'ornament, then hip and head, torso, shoulder) shows through a garment of an outer layer covering it, unless it lies inside the body as drawn while both are worn (pushed in) '
+        'and that body hides no triangle (through any hidden one it is seen); the part of it the outer garment\'s mask hides does not count. Hole / inner hole = how far a hidden body point / hidden inner-garment point has '
         'left the garment by an opening (a hole where skin or cloth should be is seen). Cut = how far a hidden body point lies past the cloth '
         f'(tolerance garmentMaskCutTolerance = {a["garmentMaskCutTolerance"]}: the cloth drawn where the body bulges past it is what hiding is for, '
         'a limb cut off is not). A column counts a frame once per garment (its worst layering); every failing body part — and for a layering every '
@@ -558,9 +525,9 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
                   f'({worst[next(iter(worst))]["checked"]} poses × corners each).', '',
                   '## Remaining visible cases (handed to work-order point 1332)', '',
                   'Every case over its tolerance, by garment: what is seen, the body part (of the inner garment for a layering), the clip, the outer garment of a '
-                  'layering, its worst value with where, and in how many frames it is over. Each is handed to work-order point 1332 (garment motion cases).', '']
+                  'layering, its worst value with where, and in how many frames it is over (clip `build`: the build pose). Each is handed to work-order point 1332 (garment motion cases).', '']
     for n, r in sorted(worst.items()):
-        cases = sorted(r['cases'].items(), key=lambda kv: -kv[1]['value'])
+        cases = sorted((build[n]['cases'] | r['cases']).items(), key=lambda kv: -kv[1]['value'])
         if not cases:
             continue
         lines.append(f'- `{n}`: ' + '; '.join(
@@ -590,4 +557,5 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     json.dump({'tolerance': tol, 'stride': stride, 'build': plain(build), 'garments': plain(worst)},
               open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
     print('\n'.join(lines))
-    return bad
+    # a garment failing only in the build pose fails the step too
+    return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS))
