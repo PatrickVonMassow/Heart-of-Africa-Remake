@@ -38,6 +38,35 @@ const LAYER: Record<string, number> = {
 const layer = (name: string) => LAYER[name.split('-')[1]]
 const limit = (col: string) => (col === 'cut' ? VILLAGER_ASSET.garmentMaskCutTolerance : now.tolerance)
 
+// penetration.py NAMES: how the report's md names each column
+const NAMES: Record<Column, string> = {
+  cloth: 'cloth in the body',
+  shown: 'skin through the cloth',
+  hole: 'hidden skin out by an opening',
+  cut: 'hidden skin past the cloth',
+  inner: 'inner garment through the cloth',
+  innerHole: 'hidden inner garment out by an opening',
+}
+
+/** Every garment, column and clip of `r` over tolerance and more than 0.0005
+ *  above `base` (penetration.py report): the build pose against main's build
+ *  pose, every other pose against main's. */
+function worseThanMain(r: Report, base: Report): string[] {
+  const out: string[] = []
+  for (const [part, b] of [
+    [r.build, base.build],
+    [r.garments, base.garments],
+  ] as const) {
+    for (const [n, g] of Object.entries(part)) {
+      for (const [key, v] of Object.entries(g.clips)) {
+        const was = b[n]?.clips[key] ?? 0
+        if (v > limit(key.split(' ')[0]) && v > was + 0.0005) out.push(`${n} ${key}: ${was} → ${v}`)
+      }
+    }
+  }
+  return out
+}
+
 describe('the visible-only penetration report', () => {
   it('measures every garment main measured, per column and clip', () => {
     expect(Object.keys(now.garments).sort()).toEqual(Object.keys(main.garments).sort())
@@ -84,22 +113,39 @@ describe('the visible-only penetration report', () => {
     }
   })
 
-  it('no garment, column and clip is worse than on main', () => {
-    const worse: string[] = []
-    for (const [n, g] of Object.entries(now.garments)) {
-      for (const [key, v] of Object.entries(g.clips)) {
-        const b = main.garments[n].clips[key] ?? 0
-        if (v > limit(key.split(' ')[0]) && v > b + 0.0005) worse.push(`${n} ${key}: ${b} → ${v}`)
-      }
-    }
-    expect(worse).toEqual([])
+  it('no garment, column and clip is worse than on main, in the build pose or any other', () => {
+    expect(main.build, 'main measured the build pose').toBeDefined()
+    expect(worseThanMain(now, main)).toEqual([])
+    const against = md.split('## Against main')[1]
+    expect(against).toContain('No garment, column and clip is worse than on main, in the build pose or any other.')
+  })
+
+  it('a build-pose regression is worse than main though every other pose is unchanged', () => {
+    const g = 'g-robe-chest'
+    const raised = structuredClone(now)
+    raised.garments = structuredClone(main.garments)
+    raised.build[g].clips['cloth build'] = (main.build[g].clips['cloth build'] ?? 0) + now.tolerance + 0.01
+    expect(worseThanMain(raised, main)).toEqual([expect.stringContaining(`${g} cloth build`)])
   })
 
   it('the report hands every remaining case to point 1332 by name', () => {
-    const section = md.split('## Remaining visible cases (handed to work-order point 1332)')[1]
+    const section = md.split('## Remaining visible cases (handed to work-order point 1332)')[1]?.split('\n## ')[0]
     expect(section).toBeDefined()
+    const lines = section!.split('\n')
+    let checked = 0
     for (const [n, g] of Object.entries(now.garments)) {
-      if (Object.keys(g.cases).length || Object.keys(now.build[n].cases).length) expect(section, n).toContain('`' + n + '`')
+      const line = lines.find((l) => l.startsWith('- `' + n + '`: '))
+      for (const [key, e] of [...Object.entries(now.build[n].cases), ...Object.entries(g.cases)]) {
+        // the case's garment, column, clip, body part and outer garment, together
+        const [col, clip, part, outer] = key.split(' ')
+        const under = outer && outer !== 'None' ? ` under \`${outer}\`` : ''
+        const text = `${NAMES[col as Column]} — ${part} — ${clip}${under} — ${e.value.toFixed(4)} (${e.at}), ${e.over} frames`
+        expect(line, `${n} ${key}`).toBeDefined()
+        expect(line!.includes(text), `${n} ${key}: ${text}`).toBe(true)
+        checked++
+      }
     }
+    expect(Object.values(now.build).some((g) => Object.keys(g.cases).length), 'a build-pose case is checked').toBe(true)
+    expect(checked).toBeGreaterThan(0)
   })
 })

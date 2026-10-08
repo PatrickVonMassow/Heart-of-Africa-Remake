@@ -536,19 +536,25 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     lines.append('')
     worse = []
     if baseline:
-        base = json.load(open(baseline))['garments']
+        main = json.load(open(baseline))
+        if 'build' not in main:
+            raise RuntimeError(f'penetration: the baseline {baseline} has no build-pose measurement (`build`)')
         lines += ['## Against main', '',
-                  'Main\'s garments measured by this same step (same poses, corners and rules). A garment, column and clip is WORSE when it is over tolerance '
-                  'and more than 0.0005 above main\'s value.', '']
-        for n, r in sorted(worst.items()):
-            for key, v in sorted(r['clips'].items()):
-                col = key.split(' ')[0]
-                b = base.get(n, {}).get('clips', {}).get(key, 0.0)
-                if v > _limit(col, a, tol) and v > b + 0.0005:
-                    worse.append(f'- `{n}` {key}: {b:.4f} on main → {v:.4f}')
-        n_base = sum(1 for n, r in base.items() if all(r[c]['value'] <= _limit(c, a, tol) for c in COLUMNS))
-        lines += [f'Main: {n_base} of {len(base)} garments within tolerance in every frame and layering; now {len(worst) - bad}.', '']
-        lines += (worse or ['No garment, column and clip is worse than on main.']) + ['']
+                  'Main\'s garments measured by this same step (same poses, corners and rules), in the build pose and in every pose. A garment, column and '
+                  'clip is WORSE when it is over tolerance and more than 0.0005 above main\'s value (clip `build`: the build pose).', '']
+        for now, base in ((build, main['build']), (worst, main['garments'])):
+            for n, r in sorted(now.items()):
+                for key, v in sorted(r['clips'].items()):
+                    col = key.split(' ')[0]
+                    b = base.get(n, {}).get('clips', {}).get(key, 0.0)
+                    if v > _limit(col, a, tol) and v > b + 0.0005:
+                        worse.append(f'- `{n}` {key}: {b:.4f} on main → {v:.4f}')
+
+        def within(w):
+            return sum(1 for r in w.values() if all(r[c]['value'] <= _limit(c, a, tol) for c in COLUMNS))
+        lines += [f'Main: {within(main["build"])} of {len(main["build"])} garments within tolerance in the build pose, '
+                  f'{within(main["garments"])} of {len(main["garments"])} in every frame and layering; now {len(build) - bad_build} and {len(worst) - bad}.', '']
+        lines += (worse or ['No garment, column and clip is worse than on main, in the build pose or any other.']) + ['']
     os.makedirs(out, exist_ok=True)
     open(os.path.join(out, 'penetration-report.md'), 'w').write('\n'.join(lines))
 
