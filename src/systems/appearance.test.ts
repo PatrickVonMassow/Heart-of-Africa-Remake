@@ -197,3 +197,35 @@ describe('the year switches the layers (VILLAGER_DRESS, calibratable)', () => {
     ).toBe('barkCloth')
   })
 })
+
+describe('the covered upper body (docs/peoples-1890.md §8.6)', () => {
+  it('the San woman’s mantle stays tied over the breast in the cold, re-worn rather than doubled', () => {
+    const q = { peopleId: 'san', sex: 'female', age: 'adult' } as const
+    for (const drivers of [WARM, COLD]) {
+      const mantles = appearanceFor(query({ ...q, drivers })).filter((l) => l.form === 'cloak')
+      expect(mantles.map((l) => l.wear)).toEqual(['chest'])
+    }
+  })
+
+  it('a share of San mothers carries an infant in the mantle; nobody else does', () => {
+    const picks = Array.from({ length: 200 }, (_, i) => (i + 0.5) / 200)
+    const share = (over: Partial<AppearanceQuery>) =>
+      picks.filter((pick) => appearanceFor(query({ ...over, pick })).some((l) => l.form === 'babySling')).length / picks.length
+    const san = share({ peopleId: 'san', sex: 'female', age: 'adult' })
+    expect(san).toBeGreaterThan(VILLAGER_DRESS.babySlingShare - 0.05)
+    expect(san).toBeLessThan(VILLAGER_DRESS.babySlingShare + 0.05)
+    expect(share({ peopleId: 'san', sex: 'female', age: 'youth' })).toBe(0)
+    expect(share({ peopleId: 'san', sex: 'male', age: 'adult' })).toBe(0)
+    expect(share({ peopleId: 'zulu', sex: 'female', age: 'adult' })).toBe(0)
+  })
+
+  it('the covers differ by people — no village gets the same garment as every other', () => {
+    const cover = (p: string) =>
+      PEOPLE_DRESS[p].female.adult
+        .filter((l) => l.slot !== 'hip' || l.wear === 'chest')
+        .map((l) => `${l.form}/${l.material}`)
+        .join('+')
+    const kinds = new Set(['zulu', 'pedi', 'san', 'wayeyi', 'bemba', 'fang', 'mongo', 'mbuti', 'lunda', 'banda'].map(cover))
+    expect(kinds.size).toBeGreaterThanOrEqual(8)
+  })
+})

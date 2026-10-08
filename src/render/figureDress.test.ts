@@ -4,6 +4,7 @@ import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/app
 import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
 import { buildLayerGeometry, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
+import { axisClearance } from '../test/axisClearance'
 
 const adultMan = bodyProportions('male', 'adult')
 const layer = (over: Partial<DressLayer>): DressLayer => ({
@@ -279,5 +280,161 @@ describe('a cloak over both shoulders', () => {
     const back = cs.filter((c) => c.y < below - 0.02 && c.z < 0 && Math.abs(c.x) < 0.03)
     expect(front).toHaveLength(0)
     expect(back.length).toBeGreaterThan(0)
+  })
+})
+
+describe('a cover tied over the breast (wear "chest", docs/peoples-1890.md §8.6)', () => {
+  const woman = bodyProportions('female', 'adult')
+  const H = woman.stature
+  const bustY = woman.chestY - woman.bustDrop
+  // Does a ray from the trunk's axis straight forward (+z) at height y meet the
+  // garment, and how far out?
+  const frontHit = (g: THREE.BufferGeometry, y: number, x = 0) => {
+    const ray = new THREE.Ray(new THREE.Vector3(x, y, 0), new THREE.Vector3(0, 0, 1))
+    const pos = g.getAttribute('position')
+    const idx = g.getIndex()!
+    const [a, b, c, hit] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+    let far = -Infinity
+    for (let t = 0; t < idx.count; t += 3) {
+      a.fromBufferAttribute(pos, idx.getX(t))
+      b.fromBufferAttribute(pos, idx.getX(t + 1))
+      c.fromBufferAttribute(pos, idx.getX(t + 2))
+      if (ray.intersectTriangle(a, b, c, false, hit)) far = Math.max(far, hit.z)
+    }
+    return far
+  }
+
+  for (const [form, slot, material] of [
+    ['cape', 'shoulder', 'hide'],
+    ['cloak', 'shoulder', 'hide'],
+    ['neckBeads', 'ornament', 'beads'],
+  ] as const) {
+    it(`a ${form} worn at the chest closes over the bust, clear of it`, () => {
+      const g = buildLayerGeometry(layer({ slot, form, material, wear: 'chest' }), woman, 16)!
+      for (const x of [0, woman.chestHalfW * 0.45]) {
+        const z = frontHit(g, bustY, x)
+        // the bust's front: the trunk's chest station plus the bust itself
+        expect(z, `${form} x ${x}`).toBeGreaterThan(woman.chestHalfD * 0.82 + woman.bust * 0.8)
+      }
+      g.computeBoundingBox()
+      expect(g.boundingBox!.min.y).toBeLessThan(bustY - woman.bust - 0.02 * H)
+    })
+  }
+
+  it('the open cloak keeps its front opening; the closed one opens only below the waist', () => {
+    const open = buildLayerGeometry(layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear: 'bothShoulders' }), woman, 16)!
+    const closed = buildLayerGeometry(layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear: 'chest' }), woman, 16)!
+    expect(frontHit(open, bustY)).toBe(-Infinity)
+    expect(frontHit(closed, bustY)).toBeGreaterThan(0)
+    expect(frontHit(closed, (woman.waistY + woman.kneeY) / 2)).toBe(-Infinity)
+  })
+
+  it('the bead collar lies inside the seasonal cloak, open or tied, and outside the trunk', () => {
+    // Measured 07.10.2026 before the fix: built on the tied cloak's stations
+    // with its full hem flare, the collar stood 0.011-0.014 H through both.
+    for (const age of ['youth', 'adult', 'elder'] as const) {
+      const p = bodyProportions('female', age)
+      for (const radial of [16, 24]) {
+        const collar = buildLayerGeometry(layer({ slot: 'ornament', form: 'neckBeads', material: 'beads', wear: 'chest' }), p, radial)!
+        for (const wear of ['bothShoulders', 'chest'] as const) {
+          const cloak = buildLayerGeometry(layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear }), p, radial)!
+          const { min, count } = axisClearance(collar, cloak, 'inside')
+          // (the open cloak's front opening meets no ray)
+          expect(count, `${age} ${radial} ${wear}`).toBeGreaterThan(collar.getAttribute('position').count * 0.75)
+          expect(min / p.stature, `${age} ${radial} ${wear}`).toBeGreaterThan(0.002)
+        }
+        // the trunk under the collar's fitted part, from its lower edge to
+        // where the shoulders slope off
+        const body = buildBodyGeometry(p, { skin: '#6b4a32', paint: null }, radial)
+        const trunk = axisClearance(body, collar, 'inside', [p.chestY - 0.09 * p.stature, p.shoulderY - 0.03 * p.stature])
+        expect(trunk.count, `${age} ${radial} body`).toBeGreaterThan(0)
+        expect(trunk.min, `${age} ${radial} body`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  describe('a baby sling carries the infant behind the back, outside a closed mantle', () => {
+    const slingLayer = layer({ slot: 'shoulder', form: 'babySling', material: 'hide', wear: 'bothShoulders' })
+    const mantleLayer = layer({ slot: 'shoulder', form: 'cloak', material: 'hide', wear: 'chest' })
+    const sling = buildLayerGeometry(slingLayer, woman, 16)!
+    const mantle = buildLayerGeometry(mantleLayer, woman, 16)!
+
+    it('every infant vertex lies beyond the mantle’s surface on its own ray from the axis', () => {
+      sling.computeBoundingBox()
+      expect(sling.boundingBox!.max.z).toBeLessThan(-woman.chestHalfD)
+      const { min, count } = axisClearance(sling, mantle, 'outside')
+      expect(count).toBe(sling.getAttribute('position').count)
+      // measured 0.0136 H; 0.0036 H before the stand-off for a bend
+      expect(min / H).toBeGreaterThan(0.008)
+    })
+
+    it('the clearance check sees a sling pushed into the mantle', () => {
+      const pushed = sling.clone().translate(0, 0, 0.03 * H)
+      expect(axisClearance(pushed, mantle, 'outside').min).toBeLessThan(0)
+    })
+
+    it('rides the chest bone alone: all four skin slots, chest at weight 1 and the rest 0', () => {
+      const si = sling.getAttribute('skinIndex')
+      const sw = sling.getAttribute('skinWeight')
+      for (let k = 0; k < si.count; k++) {
+        let chest = 0
+        let other = 0
+        for (let j = 0; j < 4; j++) {
+          if (si.getComponent(k, j) === boneIndex('chest')) chest += sw.getComponent(k, j)
+          else other += sw.getComponent(k, j)
+        }
+        expect(chest, `vertex ${k}`).toBeCloseTo(1, 6)
+        expect(other, `vertex ${k}`).toBeCloseTo(0, 6)
+      }
+    })
+
+    // The posed vertices taken back into the chest bone's bind frame: the
+    // sling must come back unchanged (one rigid piece), and the mantle, whose
+    // back blends toward the spine and hips, must stay clear of it there.
+    const inChestFrame = (g: THREE.BufferGeometry, pose: (b: ReturnType<typeof createSkeleton>['bones']) => void) => {
+      const { skeleton, bones } = createSkeleton(woman)
+      const m = new THREE.SkinnedMesh(g, new THREE.MeshBasicMaterial())
+      m.add(bones.hips)
+      m.bind(skeleton, new THREE.Matrix4())
+      pose(bones)
+      m.updateMatrixWorld(true)
+      skeleton.update()
+      const back = bones.chest.matrixWorld.clone().multiply(skeleton.boneInverses[skeleton.bones.indexOf(bones.chest)]).invert()
+      const out = g.clone()
+      const pos = out.getAttribute('position')
+      const v = new THREE.Vector3()
+      for (let i = 0; i < pos.count; i++) {
+        m.applyBoneTransform(i, v.fromBufferAttribute(g.getAttribute('position'), i)).applyMatrix4(back)
+        pos.setXYZ(i, v.x, v.y, v.z)
+      }
+      return out
+    }
+    const poses: Array<[string, (b: ReturnType<typeof createSkeleton>['bones']) => void]> = [
+      ['chest bent by the elder’s stoop', (b) => b.chest.rotation.set(0.42, 0, 0)],
+      ['trunk leaning into a work pose', (b) => b.spine.rotation.set(0.5, 0, 0)],
+      [
+        'kneeling',
+        (b) => {
+          const k = kneelLegs(woman.hipY - woman.kneeY, woman.calfR)
+          b.hips.position.y = k.hipY
+          for (const sd of ['L', 'R'] as const) {
+            b[`thigh.${sd}`].rotation.x = k.thigh
+            b[`shin.${sd}`].rotation.x = k.shin
+            b[`foot.${sd}`].rotation.x = k.foot
+          }
+        },
+      ],
+    ]
+    for (const [name, pose] of poses)
+      it(`keeps its shape and its clearance with the ${name}`, () => {
+        const s = inChestFrame(sling, pose)
+        const a = sling.getAttribute('position')
+        const b = s.getAttribute('position')
+        for (let k = 0; k < a.count; k++) {
+          expect(Math.abs(b.getX(k) - a.getX(k)) + Math.abs(b.getY(k) - a.getY(k)) + Math.abs(b.getZ(k) - a.getZ(k))).toBeLessThan(1e-5)
+        }
+        // measured 0.0062 H at the stoop (−0.0038 before the stand-off)
+        expect(axisClearance(s, inChestFrame(mantle, pose), 'outside').min / H).toBeGreaterThan(0.003)
+      })
   })
 })

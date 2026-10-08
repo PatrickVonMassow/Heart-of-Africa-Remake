@@ -114,6 +114,26 @@ export function trunkAt(p: BodyProportions, y: number): [number, number] {
   return trunkInterp(st, y)
 }
 
+/** The trunk's half-depth BEHIND the axis at height y: the code-built body's
+ *  bust deepens only its front (trunkAt carries it both ways); a measured
+ *  section is one ellipse round the axis. */
+function trunkBackAt(p: BodyProportions, y: number): number {
+  return p.trunkSections ? trunkAt(p, y)[1] : trunkInterp(trunkProfile(p), y)[1]
+}
+
+/** A sweep's half-width and half-depth at height y between its stations,
+ *  eased as sweepTube eases them (top-down stations). */
+function radiiAt(rows: readonly SweepStation[], y: number): [number, number] {
+  for (let i = 0; i < rows.length - 1; i++) {
+    const [a, b] = [rows[i], rows[i + 1]]
+    if (y < b.p[1]) continue
+    const f = (a.p[1] - y) / (a.p[1] - b.p[1])
+    const e = f * f * (3 - 2 * f)
+    return [a.rx + (b.rx - a.rx) * e, a.ry + (b.ry - a.ry) * e]
+  }
+  return [rows[rows.length - 1].rx, rows[rows.length - 1].ry]
+}
+
 function trunkInterp(st: Array<[number, number, number]>, y: number): [number, number] {
   for (let i = 0; i < st.length - 1; i++) {
     const [y0, x0, z0] = st[i]
@@ -202,6 +222,49 @@ function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number,
   return sweepTube(stations, { radial, rings: rings * 2 })
 }
 
+/** The infant's skin in a baby sling (a placeholder tone, calibratable). */
+const INFANT_SKIN = '#5a3a26'
+
+/**
+ * The stations of a draped cape or cloak: from a collar round the neck down
+ * the slope of the shoulders (the trunk's own profile, eased off it), over the
+ * shoulder point and falling with a slight flare. A flat shelf from the neck
+ * straight out to shoulder width and walls straight down read as a cardboard
+ * box. `tie`: tied over the breast, so the stations run dense below the
+ * shoulders and each clears the trunk (bust included) by an ease. `hem`: the
+ * mantle's hem the flare grows toward; a part that stops above it (the bead
+ * collar under a cloak) follows the mantle's profile, without the hem flare.
+ */
+function capeRows(p: BodyProportions, bottom: number, { tie: closed, hem = bottom }: { tie: boolean; hem?: number }): SweepStation[] {
+  const H = p.stature
+  const rows: SweepStation[] = [
+    st(p.neckY + 0.012 * H, p.neckR * 1.5, p.neckR * 1.45),
+    st(p.shoulderY + 0.006 * H, p.shoulderX * 0.78, p.chestHalfD * 1.08),
+    st(p.shoulderY - 0.03 * H, p.shoulderX + p.armR * 1.45, p.chestHalfD * 1.22),
+    st(p.chestY - 0.02 * H, p.shoulderX + p.armR * 1.75, p.chestHalfD * 1.3),
+  ]
+  // a station of the fall from the chest toward the hem
+  const fall = (y: number) => {
+    const t = (p.chestY - y) / (p.chestY - hem)
+    return st(y, p.shoulderX + p.armR * (1.8 + 0.5 * t), p.chestHalfD * (1.32 + 0.15 * t))
+  }
+  const step = (closed ? 0.025 : 0.08) * H
+  for (let y = p.chestY - (closed ? 0.045 : 0.1) * H; y > bottom + 0.02 * H; y -= step) {
+    rows.push(fall(y))
+  }
+  rows.push(hem === bottom ? st(bottom, p.shoulderX + p.armR * 2.4, p.chestHalfD * 1.5) : fall(bottom))
+  if (closed) {
+    const ease = 0.014 * H
+    for (const r of rows) {
+      if (r.p[1] > p.shoulderY - 0.03 * H + 1e-6) continue
+      const [x, z] = trunkAt(p, r.p[1])
+      r.rx = Math.max(r.rx, x + ease)
+      r.ry = Math.max(r.ry, z + ease)
+    }
+  }
+  return rows
+}
+
 const LOWER: readonly BoneName[] = ['hips', 'spine', 'thigh.L', 'thigh.R', 'shin.L', 'shin.R']
 const UPPER: readonly BoneName[] = ['hips', 'spine', 'chest', 'neck', 'upperArm.L', 'upperArm.R', 'thigh.L', 'thigh.R']
 /** A garment from the chest past the knee: its lower part follows the shins,
@@ -221,7 +284,7 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
   const hc = p.chinY + p.headHalfH
   const girdleY = p.hipY + 0.06 * H
   const chestTop = p.chestY + 0.035 * H
-  const parts: Array<{ geo: THREE.BufferGeometry; weigh: (v: THREE.Vector3) => Array<[number, number]> }> = []
+  const parts: Array<{ geo: THREE.BufferGeometry; weigh: (v: THREE.Vector3) => Array<[number, number]>; colour?: string }> = []
   let bottom = 0
 
   const girdle = (y: number, thick = 0.008 * H) => {
@@ -312,33 +375,45 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
     case 'cloak':
     case 'cape': {
       bottom = l.form === 'cloak' ? p.kneeY + 0.03 * H : p.waistY - 0.02 * H
-      // DRAPED: from a collar round the neck down the slope of the shoulders
-      // (the trunk's own profile, eased off it), over the shoulder point and
-      // falling with a slight flare. A flat shelf from the neck straight out
-      // to shoulder width and walls straight down read as a cardboard box.
-      const rows: SweepStation[] = [
-        st(p.neckY + 0.012 * H, p.neckR * 1.5, p.neckR * 1.45),
-        st(p.shoulderY + 0.006 * H, p.shoulderX * 0.78, p.chestHalfD * 1.08),
-        st(p.shoulderY - 0.03 * H, p.shoulderX + p.armR * 1.45, p.chestHalfD * 1.22),
-        st(p.chestY - 0.02 * H, p.shoulderX + p.armR * 1.75, p.chestHalfD * 1.3),
-      ]
-      for (let y = p.chestY - 0.1 * H; y > bottom + 0.02 * H; y -= 0.08 * H) {
-        const t = (p.chestY - y) / (p.chestY - bottom)
-        rows.push(st(y, p.shoulderX + p.armR * (1.8 + 0.5 * t), p.chestHalfD * (1.32 + 0.15 * t)))
-      }
-      rows.push(st(bottom, p.shoulderX + p.armR * 2.4, p.chestHalfD * 1.5))
+      // Worn 'chest': tied closed over the breast (docs/peoples-1890.md §8.6);
+      // a knee-long one opens only below the waist.
+      const closed = l.wear === 'chest'
+      const rows = capeRows(p, bottom, { tie: closed })
       const geo = sweepTube(rows, { radial, rings: rows.length * 3 })
-      // Over both shoulders it hangs OPEN in front below the shoulders, so the
-      // body and the hip dress show through as on a worn skin. The opening is
-      // whole columns of the tube either side of the front (+z, a vertex line
-      // at a quarter turn): a slanted cut through the triangles left a sawtooth.
-      // A knee-long cloak hangs open too, whichever shoulder it is knotted on
-      // (closed, a one-shoulder kaross read as a barrel).
-      if (l.wear === 'bothShoulders' || l.form === 'cloak') openFront(geo, Math.max(1, Math.round(radial / 16)), p.shoulderY - 0.03 * H)
-      // Knotted over one shoulder: the other shoulder is bare above the chest.
-      if (l.wear === 'rightShoulder') sector(geo, (c) => !(c.x > 0.01 * H && c.y > p.chestY))
-      if (l.wear === 'leftShoulder') sector(geo, (c) => !(c.x < -0.01 * H && c.y > p.chestY))
+      const cols = Math.max(1, Math.round(radial / 16))
+      if (closed) {
+        if (l.form === 'cloak') openFront(geo, cols, p.waistY)
+      } else {
+        // Over both shoulders it hangs OPEN in front below the shoulders, so the
+        // body and the hip dress show through as on a worn skin. The opening is
+        // whole columns of the tube either side of the front (+z, a vertex line
+        // at a quarter turn): a slanted cut through the triangles left a sawtooth.
+        // A knee-long cloak hangs open too, whichever shoulder it is knotted on
+        // (closed, a one-shoulder kaross read as a barrel).
+        if (l.wear === 'bothShoulders' || l.form === 'cloak') openFront(geo, cols, p.shoulderY - 0.03 * H)
+        // Knotted over one shoulder: the other shoulder is bare above the chest.
+        if (l.wear === 'rightShoulder') sector(geo, (c) => !(c.x > 0.01 * H && c.y > p.chestY))
+        if (l.wear === 'leftShoulder') sector(geo, (c) => !(c.x < -0.01 * H && c.y > p.chestY))
+      }
       parts.push({ geo, weigh: near(UPPER) })
+      break
+    }
+    case 'babySling': {
+      // An infant carried on the back in the mantle (Passarge, §7.3 San): a
+      // hide bundle outside the mantle's back, the small head above it. Rigid
+      // on the chest while the mantle's back blends toward the spine and hips,
+      // so it stands off far enough that a forward bend (a work lean, a
+      // stoop) does not swing the mantle into it.
+      const r = 0.07 * H
+      const y = p.chestY - 0.06 * H
+      const z = -(Math.max(p.chestHalfD * 1.5, trunkAt(p, y)[1] + 0.03 * H) + r * 0.6 + 0.01 * H)
+      const bundle = new THREE.SphereGeometry(r, radial, 8).scale(1, 1.2, 0.7)
+      bundle.translate(0, y, z)
+      parts.push({ geo: bundle, weigh: rigid('chest') })
+      const head = new THREE.SphereGeometry(0.036 * H, radial, 8)
+      head.translate(0, y + r * 1.2 + 0.02 * H, z + 0.01 * H)
+      parts.push({ geo: head, weigh: rigid('chest'), colour: INFANT_SKIN })
+      bottom = y - r * 1.2
       break
     }
     case 'hood': {
@@ -410,6 +485,40 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
       break
     }
     case 'neckBeads': {
+      if (l.wear === 'chest') {
+        // Layered strings built into a wide, deep collar that lies over the
+        // breast (Grenfell 1890 via §7.4 Mongo; the rule of §8.6).
+        // It lies UNDER the seasonal cloak (the Zulu isipuku in the cold),
+        // open or tied: it follows the cloak's own stations down to its own
+        // lower edge, drawn in by an inset from both, without the hem flare,
+        // and clear of the trunk; where the bust deepens only the trunk's
+        // front (the code-built body) its centre moves forward.
+        bottom = p.chestY - 0.09 * H
+        const inset = 0.008 * H
+        const hem = p.kneeY + 0.03 * H
+        const open = capeRows(p, hem, { tie: false })
+        const rows = capeRows(p, bottom, { tie: true, hem })
+        // Between the trunk (plus an ease) and the narrower cloak (less the
+        // inset); where the two leave less room, midway between them.
+        const ease = 0.005 * H
+        const between = (body: number, cloak: number) => (body + ease <= cloak - inset ? cloak - inset : (body + cloak) / 2)
+        for (const r of rows) {
+          const y = r.p[1]
+          const [ox, oz] = radiiAt(open, y)
+          const [cx, cz] = [Math.min(r.rx, ox), Math.min(r.ry, oz)]
+          r.rx = cx - inset
+          r.ry = cz - inset
+          if (y > p.shoulderY - 0.03 * H + 1e-6) continue
+          const [x, front] = trunkAt(p, y)
+          r.rx = between(x, cx)
+          const ahead = between(front, cz)
+          const behind = between(trunkBackAt(p, y), cz)
+          r.p[2] = (ahead - behind) / 2
+          r.ry = (ahead + behind) / 2
+        }
+        parts.push({ geo: sweepTube(rows, { radial, rings: rows.length * 3 }), weigh: near(UPPER) })
+        break
+      }
       const g = new THREE.TorusGeometry(p.neckR * 1.9, 0.012 * H, 6, radial).rotateX(Math.PI / 2 - 0.25)
       g.translate(0, p.neckY - 0.005 * H, 0.01 * H)
       parts.push({ geo: g, weigh: near(['chest', 'neck']) })
@@ -443,7 +552,9 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
 
   const second = l.colour2 ?? mixHex(l.colour, '#000000', 0.35)
   const surface = surfaceOf(l, p, bottom)
-  const built = parts.map(({ geo, weigh }) => tidy(skinGeometry(paint(geo, l.colour, surface, second), weigh)))
+  const built = parts.map(({ geo, weigh, colour }) =>
+    tidy(skinGeometry(colour ? paint(geo, colour) : paint(geo, l.colour, surface, second), weigh)),
+  )
   const geo = built.length === 1 ? built[0] : merge(built)
   geo.computeBoundingSphere()
   return geo

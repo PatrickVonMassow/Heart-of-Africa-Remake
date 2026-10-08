@@ -2559,8 +2559,9 @@ period search first, then a second search by GPT-6 Astra, then guessing.**
 children's dress and for any elder insignia of the whole roster, and for the
 women's dress of the Mongo (beyond §7.4), Mbuti, Banda, Bambundu, Lunda,
 Sidama and Wayeyi. Those cells are GUESSES in the table, each with its reason:
-a waist string of beads for small children where the record is silent, a small
-flap or apron of the people's own material for the rest.
+a waist string of beads for small children where the record is silent (since
+§8.6 always over a hip layer), a small flap or apron of the people's own
+material for the rest.
 
 *Elders* — no source gives a garment that marks age (Astra B10, B47), so the
 elder wears the adult's dress and is told apart by the BODY: grey hair, a
@@ -2613,6 +2614,51 @@ is unchanged; only its fit follows the measured trunk sections of the new body.
 Each foot has an ankle and a ball joint. Proportions per age and sex are
 educated guesses in `VILLAGER_ASSET` (`src/config/balance.ts`), calibratable;
 this document names no people-specific stature, so one body serves all peoples.
+
+### 8.6 Covered upper body and hip layer: the deliberate deviation (work-order "covered women and children")
+
+Since the body of §8.5 carries a real bust form, a figure dressed by the record
+alone showed women with bare breasts and children whose pelvis read as naked.
+The game now clothes deliberately AGAINST its source here, and says so (the
+caution the backlog recorded: the choice has to be argued, not made silently).
+**The rule** (design.md §19.15): youth, adult and elder women never show an
+uncovered upper body; children always wear a hip layer; where the source says
+otherwise or is silent, the nearest attested layer of the same people is chosen
+— never foreign dress, never a uniform shirt. No censorship device stands in for
+it: no blur, no toggle, no camera trick. The deviation, people by people:
+
+- *Zulu* — unmarried girls went bare above the bead skirt (§8.3); their bead
+  strings are built into a wide, deep collar lying over the breast. Married
+  women keep the attested skin over the breast (§8.3).
+- *Pedi* — Merensky's women wear "eine Art ledernen Fracks" (§7.3); it is
+  drawn as a hide cape tied closed over the breast, for girls too.
+- *San* — Passarge's women's Ledermantel, "often larger", knotted under the
+  chin over both shoulders (§7.3), is worn so the year round instead of from
+  one shoulder; for a share of adult women an infant rides in it on the back
+  ("infants are carried in it"; `VILLAGER_DRESS.babySlingShare`, a guess).
+- *Wayeyi* — Andersson's light goat-skin caross (§7.3) as a cape tied over the
+  breast, all year, not only in the cool months.
+- *Bemba* — the camwood-red bark cloth of the "poorer rustic woman" (§7.3) is
+  wound from the chest instead of the waist.
+- *Fang* — a second strip of the red-dyed "Fan cloth" (§7.4) over the breast.
+- *Mongo* — Grenfell's February 1890 women "wear many more strings of beads
+  round their necks" (§7.4): the strings are built into a deep collar.
+- *Guessed rows* (each with its reason in the table): Lunda women a calico
+  breast cloth (Arnot's commoner's yard of calico, §7.3 — never a kaross);
+  Bambundu women the village cloth over the breast; Maasai girls and Sidama
+  girls a hide over the breast; Nubian girls the women's dark cotton over the
+  rahat; Mbuti women a bark-cloth shoulder cape; Banda women a second piece of
+  bark pagne.
+- *Children* — every child cell without one gets its people's adult hip
+  garment, scaled down: hide for Wayeyi, Lunda and Sidama, bark cloth for Bemba
+  (the girls' buchushi apron), Fang, Mbuti and Banda, raffia for the Mongo, the
+  village cotton for Bambundu, Bambara and Mandinka, the indigo wrapper for
+  Hausa girls. The waist beads stay as ornament.
+
+The invariant is pinned by `src/systems/dress.test.ts`. The low preset's
+primitive figure draws its trunk in the figure's cloth and so never shows a
+bare body. OPEN: the glTF body's bust and the child's pelvis are not yet
+stylised in the asset (a Blender re-bake under `scripts/villager/`).
 
 ---
 

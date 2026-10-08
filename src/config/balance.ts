@@ -2460,6 +2460,10 @@ export const VILLAGER_DRESS = {
    *  the bark cloth: the protectorate (1894) favoured cotton (§2.5, MODERN). The
    *  record gives no population-wide date (Astra B44), so it is rank-gated. */
   bagandaCottonFrom: 1894,
+  /** Share of San adult women drawn with an infant carried in the mantle
+   *  (Passarge: "infants are carried in it", §7.3 San). The share is a
+   *  calibratable GUESS: no source gives a number. */
+  babySlingShare: 0.3,
 } as const
 
 /**
@@ -2567,6 +2571,9 @@ export const VILLAGER_ASSET = {
    *  woman from a man at village distance (as render/figureBody.ts `bust`).
    *  Calibratable, read off the frame sheets and the village frames. */
   breastCup: { child: 0, youth: 0.55, adult: 0.8, elder: 0.75 },
+  /** The cap on breastCup the pipeline builds with (scripts/villager/body.py
+   *  clamps to it): a stylised bust, never MakeHuman's full cup. Calibratable. */
+  breastCupMax: 0.8,
   /** How far a build of ±1 moves MakeHuman's weight slider off its average. */
   buildWeight: 0.3,
   /** Triangles of the decimated body (hands, feet and face kept finer). */
@@ -2614,6 +2621,13 @@ export const VILLAGER_GLTF = {
   sprintThreshold: 1.8,
   /** Half-width of the band the two gaits cross-fade over, same units. */
   sprintBand: 0.35,
+  /** Body safety net (design.md clothing rule): no vertex of the chest front
+   *  or of a child's pelvis midline may peak sharper than this — its offset above
+   *  its neighbours' mean along the normal, over their mean edge length. The
+   *  asset's breast apex measures ≈ 0.40 (a nipple-like point) against ≈ 0.21
+   *  on the men's chest; the clamp only pulls such a point inward, so no dress
+   *  layer can newly intersect. Calibratable. */
+  trunkPeakSharpnessMax: 0.22,
   /** A gait's stride grows with pace as speed^exponent over its natural
    *  speed (the rest is cadence), bounded so the leg never over-reaches. */
   strideExponent: 0.5,
