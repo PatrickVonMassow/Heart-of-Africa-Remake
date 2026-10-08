@@ -33788,3 +33788,10 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: Vitest for the mask decode and the shader path's input; the pipeline penetration step run on what the game draws (masked body and inner garments) with every residual named; dressed frame sheets walking, kneeling, digging and running no worse than main and without new cloth spikes; Playwright both backends picture-checked on dressed villagers in those poses; cross-vendor review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
+
+- [x] 1317. The staged lion feed in the elephant-trampling check never ends
+  Source: findings carrier 06.10.2026 12:46, found on the enrichments run of point 1297.
+  `npm test -- enrichments --section=elephant-trampling` is red on a quiet host on main (48a7e88) and on feat/1297 alike: "Lion moves on once the carcass is consumed (stain remains)" reads mode feed, prey false, stain false 1.2 s after staging `victim null`, mode feed, timer 0.4 (scripts/verify/enrichments.mjs:1326-1360). The no-victim feed branch of LionHunt in src/scenes/travel/Wildlife.tsx would leave at timer <= 0, so that branch apparently does not run for the staged state (inactive hunt, or a reset after staging).
+  Final state: the cause is measured (game or check) and fixed; the section runs green on both backends.
+  Verifiable: `--section=elephant-trampling` green on WebGPU and WebGL 2; a right-layer test for the corrected cause.
+  Bundle: Tierverhalten.

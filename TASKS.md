@@ -171,12 +171,6 @@ put it is the mistake this line exists to stop.
   Find and fix the cause, so that a card answer the user gives in the head session while it stands down is carried to the owner and acted on without any human step in another session.
   Done when: in a reproduction with a live headless owner, `vdzk-answer.mjs` records the head session's answer, and the owner (or the due-redeem path) removes the named card. A unit test covers the state shape that made activeSource fail. A SendMessage to a headless peer is not part of the solution.
   Bundle: Session- & Repo-Hygiene.
-- [ ] 1317. The staged lion feed in the elephant-trampling check never ends
-  Source: findings carrier 06.10.2026 12:46, found on the enrichments run of point 1297.
-  `npm test -- enrichments --section=elephant-trampling` is red on a quiet host on main (48a7e88) and on feat/1297 alike: "Lion moves on once the carcass is consumed (stain remains)" reads mode feed, prey false, stain false 1.2 s after staging `victim null`, mode feed, timer 0.4 (scripts/verify/enrichments.mjs:1326-1360). The no-victim feed branch of LionHunt in src/scenes/travel/Wildlife.tsx would leave at timer <= 0, so that branch apparently does not run for the staged state (inactive hunt, or a reset after staging).
-  Final state: the cause is measured (game or check) and fixed; the section runs green on both backends.
-  Verifiable: `--section=elephant-trampling` green on WebGPU and WebGL 2; a right-layer test for the corrected cause.
-  Bundle: Tierverhalten.
 - [ ] 1318. The dressing-growth and channel-crossing checks are red on main
   Source: findings carrier 06.10.2026 13:22, found on the enrichments run of point 1297.
   On a quiet host, on main and feat/1297 alike: `--section=dressing-growth` reads samples [0,0,0,0,0] for "the streamed dressing does not grow over a session at a fixed anchor (point 278)" (nothing streamed at all); `--section=channel-crossing` reads sawOnWater false, sawLowY false, landed true for "a purposeful crossing swims the channel chest-deep and lands on the far bank (point 192)". With 1317 they keep a whole enrichments pass red.
