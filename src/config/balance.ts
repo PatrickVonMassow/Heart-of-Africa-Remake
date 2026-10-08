@@ -2612,18 +2612,6 @@ export const VILLAGER_ASSET = {
   /** How far apart the penetration report samples the cloth between a
    *  garment's vertices (figure units, ≈ 5 cm). Calibratable. */
   garmentFaceSpacing: 0.04,
-  /** The longest cloth edge the pipeline leaves in a garment (figure units,
-   *  ≈ 4 cm): a longer one is split, so the cloth between two vertices follows
-   *  a curved body part instead of cutting it by a chord. Calibratable. */
-  garmentEdgeMax: 0.03,
-  /** How far outside the drawn body the pipeline settles a garment's
-   *  vertices in the build pose at every body corner, innermost layer
-   *  (figure units, ≈ 6 mm). Calibratable. */
-  garmentSettleClearance: 0.005,
-  /** How much farther each layer outward is settled (ornament, hip and head,
-   *  torso, shoulder), so an inner garment never settles where an outer one
-   *  lies (figure units, ≈ 5 mm). Calibratable. */
-  garmentLayerGap: 0.004,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

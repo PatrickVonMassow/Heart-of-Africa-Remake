@@ -45,8 +45,8 @@ def design_pose(body):
         iu, il, ih = SK.INDEX['upperArm.' + s], SK.INDEX['forearm.' + s], SK.INDEX['hand.' + s]
         u0 = j[il, :3] - j[iu, :3]
         f0 = j[ih, :3] - j[il, :3]
-        u1 = np.array([sx * 0.26, -1.0, 0.0])
-        f1 = np.array([sx * 0.20, -1.0, 0.12])
+        u1 = np.array([sx * 0.16, -1.0, 0.0])
+        f1 = np.array([sx * 0.10, -1.0, 0.12])
         Wu = qfrom_to(u0, u1)
         Wf = qfrom_to(f0, f1)
         q[iu] = Wu
@@ -618,96 +618,6 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
     # tailored (the build-pose difference the penetration report states)
     drift = float(np.linalg.norm(B.person.draw(pos, *top4(W), B.wr, B.wp) - v, axis=1).max())
     return {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph, 'build_drift': drift}
-
-
-def refine(g, maxlen):
-    """Split every cloth edge longer than `maxlen` at its midpoint (every
-    attribute interpolated there) until none is: the same cloth, but with
-    vertices close enough that it can follow a curved body part instead of
-    cutting it by a chord. A triangle is split by how many of its edges are
-    (one: two triangles, two: three across the shorter diagonal, three: four),
-    so no edge is left with a vertex in its middle."""
-    attrs = {'pos': g['pos'], 'uv': g['uv'], 'W': g['W'], **{'m:' + k: v for k, v in g['morph_pos'].items()}}
-    t = np.asarray(g['tris'])
-    while True:
-        p = attrs['pos']
-        e = np.sort(np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]]), axis=1)
-        u = np.unique(e, axis=0)
-        long = u[np.linalg.norm(p[u[:, 0]] - p[u[:, 1]], axis=1) > maxlen]
-        if not len(long):
-            break
-        mid = {(int(a), int(b)): len(p) + k for k, (a, b) in enumerate(long)}
-        attrs = {k: np.concatenate([v, 0.5 * (v[long[:, 0]] + v[long[:, 1]])]) for k, v in attrs.items()}
-        p = attrs['pos']
-        out = []
-        for tri in t.tolist():
-            m = [mid.get((min(tri[i], tri[(i + 1) % 3]), max(tri[i], tri[(i + 1) % 3]))) for i in range(3)]
-            n = sum(x is not None for x in m)
-            if n == 0:
-                out.append(tri)
-                continue
-            if n == 3:
-                a, b, c = tri
-                ab, bc, ca = m
-                out += [[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]
-                continue
-            # rotate so edge 0 (a→b) is split and, with two, edge 1 (b→c) too
-            r = next(i for i in range(3) if m[i] is not None and (n == 1 or m[(i + 1) % 3] is not None))
-            a, b, c = tri[r:] + tri[:r]
-            ab, bc = m[r], m[(r + 1) % 3]
-            if n == 1:
-                out += [[a, ab, c], [ab, b, c]]
-                continue
-            out.append([ab, b, bc])
-            if np.linalg.norm(p[a] - p[bc]) <= np.linalg.norm(p[ab] - p[c]):
-                out += [[a, ab, bc], [a, bc, c]]
-            else:
-                out += [[a, ab, c], [ab, bc, c]]
-        t = np.array(out)
-    g = dict(g)
-    g['pos'], g['uv'], g['W'], g['tris'] = attrs['pos'], attrs['uv'], attrs['W'], t
-    g['morph_pos'] = {k[2:]: v for k, v in attrs.items() if k.startswith('m:')}
-    return g
-
-
-ARM_BONES = tuple(f'{b}.{s}' for b in ('upperArm', 'forearm', 'hand') for s in 'LR')
-
-
-def armholes(body, g):
-    """Cut the cloth an arm passes through in the build pose: every triangle
-    whose centre lies inside the drawn body where that is an arm (the
-    nearest body triangle's bone). Cloth round the trunk would otherwise cut
-    through the upper arm where it meets the trunk at the armpit — no
-    settling can take a surface across that crease without folding it into
-    one or the other — and the arm comes out through an opening instead."""
-    import gamepath as GP
-    from body import top4
-    from fit import inside
-    from mathutils.bvhtree import BVHTree
-    arm = {SK.INDEX[b] for b in ARM_BONES}
-    dom = np.argmax(body['W'], 1)
-    person = GP.Person(body['joints'])
-    wr, wp = person.build_pose(design_pose(body))
-    bv = person.draw(body['pos'], *top4(body['W']), wr, wp)
-    tree = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
-    gv = person.draw(g['pos'], *top4(g['W']), wr, wp)
-    t = np.asarray(g['tris'])
-    keep = np.ones(len(t), bool)
-    for k, c in enumerate(gv[t].mean(1).tolist()):
-        _co, _n, fi, _d = tree.find_nearest(c)
-        if dom[body['tris'][fi][0]] in arm and inside(tree, c):
-            keep[k] = False
-    if keep.all():
-        return g, 0
-    used = np.unique(t[keep])
-    remap = np.full(len(g['pos']), -1)
-    remap[used] = np.arange(len(used))
-    out = dict(g)
-    out['tris'] = remap[t[keep]]
-    for key in ('pos', 'uv', 'W'):
-        out[key] = g[key][used]
-    out['morph_pos'] = {m: d[used] for m, d in g['morph_pos'].items()}
-    return out, int((~keep).sum())
 
 
 def hair_cap(mh, body, B):
