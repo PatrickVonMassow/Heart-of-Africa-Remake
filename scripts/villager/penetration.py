@@ -124,6 +124,14 @@ def inside_body(tree, q):
     return inside(tree, list(q))
 
 
+def _inner_seen(full, drawn, q):
+    """Whether an inner garment's point `q` through the outer cloth is seen:
+    not when it lies inside the body (`full`, every triangle) and its nearest
+    skin is drawn (`drawn`, per triangle, while both garments are worn)."""
+    f = full.find_nearest(list(q))[2]
+    return f is None or not (drawn[f] and inside_body(full, q))
+
+
 def _first_shown(ids, dist, keep):
     """The largest `dist` over the sample ids that `keep` accepts, tested in
     descending order (only up to the first accepted), and its id."""
@@ -257,10 +265,7 @@ def _corner(c):
             thr = mi.shown[place[mi.shown] == M.THROUGH]
             # only what is seen: an inner point inside the body, its nearest
             # skin drawn while both garments are worn, is hidden by that skin
-            def seen(x, i=i, o=o):
-                f = full.find_nearest(smp[x].tolist())[2]
-                return f is None or not (both_drawn[i, o][f] and inside_body(full, smp[x]))
-            v, x = _first_shown(thr, dist, seen)
+            v, x = _first_shown(thr, dist, lambda x, i=i, o=o: _inner_seen(full, both_drawn[i, o], smp[x]))
             part = ipart(x) if x is not None else None
             if v > lay.get((i, 'inner'), (-1,))[0]:
                 lay[i, 'inner'] = (v, f'under {o}, {at}', part, o)
@@ -307,6 +312,20 @@ def selftest():
     r = _empty()
     _note(r, 'shown', 0.001, 'x', 0.003)
     assert r['shown']['value'] == 0.001 and r['shown']['over'] == 0
+    # a case over tolerance is named (column, clip, part, outer garment); every
+    # value, below tolerance too, is kept per column and clip
+    _note(r, 'inner', 0.01, 'a', 0.003, 'thigh', ('walk', 'thigh', 'g-cloak'))
+    _note(r, 'inner', 0.02, 'b', 0.003, 'thigh', ('walk', 'thigh', 'g-cloak'))
+    _note(r, 'inner', 0.002, 'c', 0.003, 'arm', ('dig', 'arm', 'g-cloak'))
+    assert r['cases'] == {('inner', 'walk', 'thigh', 'g-cloak'): {'value': 0.02, 'at': 'b', 'over': 2}}, r['cases']
+    assert r['clips'] == {'inner walk': 0.02, 'inner dig': 0.002}, r['clips']
+    # visible only: an inner point inside the body under drawn skin is hidden
+    # by that skin; under skin the worn garments' mask hides, or outside the
+    # body, it is seen
+    drawn = np.ones(len(tris), bool)
+    assert not _inner_seen(full, drawn, (0.2, 0.0, 0.5)), 'inside a drawn thigh'
+    assert _inner_seen(full, np.zeros(len(tris), bool), (0.2, 0.0, 0.5)), 'inside a hidden thigh'
+    assert _inner_seen(full, drawn, (0.6, 0.0, 0.5)), 'outside the body'
     print('penetration selftest: ok')
 
 

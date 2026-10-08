@@ -74,6 +74,14 @@ def form(name):
     return name.split('-')[1]
 
 
+def combine(classes):
+    """One class per point (0 free, 1 hidden, 2 pushed) from its classes at
+    every body corner: hidden only where hidden at every corner, pushed where
+    covered at any."""
+    c = np.asarray(classes)
+    return np.where((c == 1).all(0), 1, np.where((c > 0).any(0), 2, 0)).astype(np.uint8)
+
+
 def garment_names(garments):
     """The masked garments in bit order (the pipeline's garment order)."""
     names = [n for n in garments['meshes'] if n.startswith('g-')]
@@ -380,12 +388,10 @@ def masks(body, garments, cfg, log=print):
     G = garments['meshes']
     wd = {n: dense(G[n]['W']) for n in names}
     bw = dense(body['W'])
-    hide_all, cover_any, covering = {}, {}, None
+    seen, covering = {}, None
 
     def merge(key, c):
-        h, v = c == 1, c > 0
-        hide_all[key] = h if key not in hide_all else hide_all[key] & h
-        cover_any[key] = v if key not in cover_any else cover_any[key] | v
+        seen.setdefault(key, []).append(c)
     for corner in CORNERS:
         w = corner_weights(*corner)
         pos, j = morphed(body, w)
@@ -406,10 +412,10 @@ def masks(body, garments, cfg, log=print):
                     merge((n, o), vol[o].classify(gv[o], gv[n], reach, follower(wd[n], wd[o], gap)))
 
     def cls(key):
-        return np.where(hide_all[key], 1, np.where(cover_any[key], 2, 0)).astype(np.uint8)
+        return combine(seen[key])
     body_cls = {}
     for b, n in enumerate(names):
-        if ('body', n) in hide_all:
+        if ('body', n) in seen:
             c = cls(('body', n))
             if c.any():
                 body_cls[b] = c
@@ -418,7 +424,7 @@ def masks(body, garments, cfg, log=print):
     for n in names:
         per = {}
         for b, o in enumerate(names):
-            if (n, o) in hide_all:
+            if (n, o) in seen:
                 c = cls((n, o))
                 if c.any():
                     per[b] = c
@@ -478,6 +484,11 @@ def selftest():
     h, p = decode(m, names, ['g-x0-w'])
     assert h.tolist() == [True, False, False, False] and p.tolist() == [True, False, True, False], (h, p)
     assert drawn_tris([[0, 3, 0], [0, 1, 2]], np.array([True, False, False, True])).tolist() == [False, True]
+    # read per body corner: hidden only where hidden at every corner
+    assert combine([[1, 1, 0, 2, 0], [1, 2, 0, 1, 1]]).tolist() == [1, 2, 0, 2, 2]
+    # only an outer layer's garment masks an inner one
+    assert layer('g-waistBeads-x') < layer('g-skirtKnee-x') < layer('g-robe-chest') < layer('g-cloak-x')
+    assert layer('g-hood-x') == layer('g-cloak-x') and layer('g-cap-x') < layer('g-hood-x')
     print('mask selftest: ok')
 
 
