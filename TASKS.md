@@ -84,6 +84,8 @@ put it is the mistake this line exists to stop.
   Verifiable: the pipeline penetration step green at 0.003 on what the game draws; dressed frame sheets walking, kneeling, digging and running without show-through and without new cloth spikes, compared against main; Playwright both backends picture-checked on dressed villagers in those poses; cross-vendor review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
+  Escalation 08.10.2026 (Opus 5.5 author, feat/1331-garment-follows-limb, net diff empty): shape and skin weights closed no residual (27/32 over 0.003 before and after). Even the build pose fails 25/32: garments are fitted on a posing that differs from the game's by up to 0.018, and cloth between vertices cuts curved parts (robe 0.038, hood 0.075); fixing both gave 16 in build pose but no gain across poses. Enclosing outer around inner garments spiked beyond main; widening rings/beads deepened them (the residual is another body part folding in). Knee/skirt in stride, upper arm/cloak in dig, chest/toga when bending (0.04-0.16) are motion one rest shape cannot follow to 4 mm.
+  Owner decision for the next session (decide-and-record, veto open): split this point - first align the fit posing with the game's and count only VISIBLE show-through (cloth over skin the 1329 mask hides does not count), re-measure, then put only the remaining visible motion cases into a cloth-simulation-or-offset-surface point.
 
 - [ ] 1315. Villager garments: ship the measured pipeline garments on the glTF body (split from 1312)
   Queue position: directly after point 1331, which follows point 1329 (which replaced 1319-1327 on 07.10.2026); needs the green penetration report point 1331 delivers.
