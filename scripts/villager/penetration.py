@@ -103,6 +103,12 @@ class Masked:
         return p, np.concatenate([p, p[self.tris].mean(1)]), nrm
 
 
+# how far a shown skin sample is stepped off its own surface before the
+# occlusion test: far below any gap between body parts, independent of the
+# tolerance, so a residual is never dropped by a probe that crossed a small gap
+PROBE = 1e-4
+
+
 def _occluded(full, drawn, q):
     """Whether point `q` lies inside the body under DRAWN skin: inside the whole
     body (`full`, every triangle) and inside by the drawn triangles alone
@@ -209,7 +215,7 @@ def _corner(c):
                 nonlocal fn
                 if fn is None:
                     fn = np.concatenate([nrm, vertex_normals_faces(bp, body['tris'])])
-                return not _occluded(tree, dtree, smp[x] + tol * fn[x])
+                return not _occluded(tree, dtree, smp[x] + PROBE * fn[x])
             v, x = _first_shown(thr, dist, visible)
             _note(r, 'shown', v, at, tol, bone(x) if x is not None else None)
             place, dist = S['vol'][n].where(gv[n], smp, reach, ids=mb.hidden, trees=trees[n])
@@ -260,6 +266,13 @@ def selftest():
     q = (0.05 + 0.003, 0.0, 0.5)
     assert _occluded(full, None, q) and _occluded(full, full, q)
     assert not _occluded(full, arm_only, q), 'a hidden thigh occludes nothing'
+    # a shown sample 0.002 from a drawn thigh is not buried by its probe,
+    # whatever the tolerance (0.003 would have crossed the gap)
+    gv, gt = box(0.052, 0.4, -0.2, 0.2, 0.3, 0.7)
+    gap = BVHTree.FromPolygons(av + gv, at + [tuple(i + len(av) for i in t) for t in gt], all_triangles=True)
+    s, n = np.array([0.05, 0.0, 0.5]), np.array([1.0, 0.0, 0.0])
+    assert _occluded(gap, None, s + 0.003 * n), 'the old tolerance probe crossed the gap'
+    assert not _occluded(gap, None, s + PROBE * n), 'a probe off its own skin stays outside'
     # the largest accepted value is kept, below tolerance too
     ids, dist = np.array([0, 1, 2]), np.array([0.002, 0.001, 0.0005])
     assert _first_shown(ids, dist, lambda k: k != 0) == (0.001, 1)
