@@ -1341,7 +1341,16 @@ if (section('elephant-trampling')) {
     s.mode = 'feed'
     s.timer = 0.4
   })
-  await page.waitForTimeout(1200)
+  // Wait on the GAME, not the wall clock (point 1317). Measured: on the fresh
+  // page this section starts from, the jump's cold first render draws single
+  // frames 2.5-9.5 s apart for ~30 s, and the hunt clamps dt to 0.1 s, so the
+  // staged 0.4 s feed takes ~30 s of wall time; the old fixed 1.2 s wait read
+  // 'feed' every time. The bound only catches a feed that genuinely never ends.
+  const leaveT0 = Date.now()
+  await page
+    .waitForFunction(() => window.__lionHunt?.state.mode !== 'feed', null, { timeout: 60000 })
+    .catch(() => {})
+  const leaveWaitMs = Date.now() - leaveT0
   const leave = await page.evaluate(() => {
     const h = window.__lionHunt
     return {
@@ -1355,7 +1364,7 @@ if (section('elephant-trampling')) {
   check(
     'Lion moves on once the carcass is consumed (stain remains)',
     leave.mode === 'leave' && leave.preyVisible === false && leave.stainActive === true && leave.lionVisible === true,
-    `mode ${leave.mode}, prey ${leave.preyVisible}, stain ${leave.stainActive}`,
+    `mode ${leave.mode}, prey ${leave.preyVisible}, stain ${leave.stainActive}, lion ${leave.lionVisible}, after ${leaveWaitMs} ms`,
   )
   await page.evaluate(() => {
     window.__lionHunt.state.mode = 'idle'
