@@ -120,8 +120,8 @@ Every case over its tolerance, by garment: what is seen, the body part (of the i
 
 ## Against main
 
-Main's garments measured by this same step (same poses, corners and rules). A garment, column and clip is WORSE when it is over tolerance and more than 0.0005 above main's value.
+Main's garments measured by this same step (same poses, corners and rules), in the build pose and in every pose. A garment, column and clip is WORSE when it is over tolerance and more than 0.0005 above main's value (clip `build`: the build pose).
 
-Main: 5 of 32 garments within tolerance in every frame and layering; now 5.
+Main: 5 of 32 garments within tolerance in the build pose, 5 of 32 in every frame and layering; now 5 and 5.
 
-No garment, column and clip is worse than on main.
+No garment, column and clip is worse than on main, in the build pose or any other.
