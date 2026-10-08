@@ -2709,5 +2709,1474 @@
     "cloth carryIdle": 0.01346638071614403
    }
   }
+ },
+ "build": {
+  "g-loinFlap-waist": {
+   "cloth": {
+    "value": 0.005871621393901687,
+    "at": "build frame 0 (female child build +0)",
+    "over": 1,
+    "part": "forearm.L"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0077706510201096535,
+    "at": "under g-toga-rightShoulder, build frame 0 (female elder build +0)",
+    "over": 9,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.005871621393901687,
+    "shown build": 0.0,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.0077706510201096535,
+    "innerHole build": 0.0
+   }
+  },
+  "g-girdleTails-waist": {
+   "cloth": {
+    "value": 0.00952810543926297,
+    "at": "build frame 0 (female child build +0)",
+    "over": 1,
+    "part": "forearm.L"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.00881913397461176,
+    "at": "under g-toga-rightShoulder, build frame 0 (female elder build +0)",
+    "over": 10,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.00952810543926297,
+    "shown build": 0.0,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.00881913397461176,
+    "innerHole build": 0.0
+   }
+  },
+  "g-apron-waist": {
+   "cloth": {
+    "value": 0.007115170584361473,
+    "at": "build frame 0 (female child build +0)",
+    "over": 1,
+    "part": "forearm.L"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.009345016442239285,
+    "at": "under g-robe-chest, build frame 0 (female adult build +0)",
+    "over": 9,
+    "part": "thigh.L"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.007115170584361473,
+    "shown build": 0.0,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.009345016442239285,
+    "innerHole build": 0.0
+   }
+  },
+  "g-skirtShort-waist": {
+   "cloth": {
+    "value": 0.014348216078063013,
+    "at": "build frame 0 (female child build +0)",
+    "over": 10,
+    "part": "hand.L"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0039191110990941525,
+    "at": "under g-robe-chest, build frame 0 (female adult build +0)",
+    "over": 1,
+    "part": "thigh.L"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.014348216078063013,
+    "shown build": 0.0,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.0039191110990941525,
+    "innerHole build": 0.0
+   }
+  },
+  "g-skirtKnee-waist": {
+   "cloth": {
+    "value": 0.008322802997634467,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 4,
+    "part": "hand.R"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0016489294357597828,
+    "at": "under g-toga-leftShoulder, build frame 0 (female elder build +0)",
+    "over": 0,
+    "part": "thigh.L"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.008322802997634467,
+    "shown build": 0.0,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.0016489294357597828,
+    "innerHole build": 0.0
+   }
+  },
+  "g-wrapLong-waist": {
+   "cloth": {
+    "value": 0.014872779121868863,
+    "at": "build frame 0 (female child build +0)",
+    "over": 10,
+    "part": "hand.R"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0035261695738881826,
+    "at": "under g-toga-rightShoulder, build frame 0 (female adult build +0)",
+    "over": 1,
+    "part": "thigh.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.014872779121868863,
+    "shown build": 0.0,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.0035261695738881826,
+    "innerHole build": 0.0
+   }
+  },
+  "g-wrapLong-chest": {
+   "cloth": {
+    "value": 0.013111989040507706,
+    "at": "build frame 0 (female child build +0)",
+    "over": 8,
+    "part": "forearm.R"
+   },
+   "shown": {
+    "value": 0.01389237865805626,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 3,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.021150430664420128,
+    "at": "under g-cloak-rightShoulder, build frame 0 (female elder build +0)",
+    "over": 5,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0014594345120713115,
+    "at": "under g-toga-leftShoulder, build frame 0 (female adult build +0)",
+    "over": 0,
+    "part": "thigh.L"
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.013111989040507706,
+    "shown build": 0.01389237865805626,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.021150430664420128,
+    "innerHole build": 0.0014594345120713115
+   }
+  },
+  "g-skirtShort-chest": {
+   "cloth": {
+    "value": 0.014180257415953617,
+    "at": "build frame 0 (female child build +0)",
+    "over": 10,
+    "part": "hand.L"
+   },
+   "shown": {
+    "value": 0.010974666103720665,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 3,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.03185931593179703,
+    "at": "under g-cloak-leftShoulder, build frame 0 (female adult build +0)",
+    "over": 5,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.014180257415953617,
+    "shown build": 0.010974666103720665,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.03185931593179703,
+    "innerHole build": 0.0
+   }
+  },
+  "g-skirtKnee-chest": {
+   "cloth": {
+    "value": 0.015384767478261707,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 10,
+    "part": "chest"
+   },
+   "shown": {
+    "value": 0.015803778544068336,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 3,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.021327534690499306,
+    "at": "under g-cloak-rightShoulder, build frame 0 (female elder build +0)",
+    "over": 5,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.015384767478261707,
+    "shown build": 0.015803778544068336,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.021327534690499306,
+    "innerHole build": 0.0
+   }
+  },
+  "g-trousers-waist": {
+   "cloth": {
+    "value": 0.013593942555458063,
+    "at": "build frame 0 (female child build +0)",
+    "over": 9,
+    "part": "hand.L"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0006245539989322424,
+    "at": "under g-shirt-chest, build frame 0 (female adult build +0)",
+    "over": 0,
+    "part": "thigh.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.013593942555458063,
+    "shown build": 0.0,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.0006245539989322424,
+    "innerHole build": 0.0
+   }
+  },
+  "g-breastCloth-chest": {
+   "cloth": {
+    "value": 0.01579014694942671,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 10,
+    "part": "upperArm.R"
+   },
+   "shown": {
+    "value": 0.00955217331647873,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 3,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.03484345227479935,
+    "at": "under g-hood-overHead, build frame 0 (female adult build +0)",
+    "over": 6,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.01579014694942671,
+    "shown build": 0.00955217331647873,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.03484345227479935,
+    "innerHole build": 0.0
+   }
+  },
+  "g-shirt-chest": {
+   "cloth": {
+    "value": 0.0348468675631274,
+    "at": "build frame 0 (male adult build +1)",
+    "over": 10,
+    "part": "upperArm.L"
+   },
+   "shown": {
+    "value": 0.01448535080999136,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 3,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.018940581008791924,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 2,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.018878845497965813,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 0,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.01966278813779354,
+    "at": "under g-cape-leftShoulder, build frame 0 (female adult build +0)",
+    "over": 9,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.0348468675631274,
+    "shown build": 0.01448535080999136,
+    "hole build": 0.018940581008791924,
+    "cut build": 0.018878845497965813,
+    "inner build": 0.01966278813779354,
+    "innerHole build": 0.0
+   }
+  },
+  "g-robe-chest": {
+   "cloth": {
+    "value": 0.034743395430436017,
+    "at": "build frame 0 (male adult build +1)",
+    "over": 10,
+    "part": "upperArm.R"
+   },
+   "shown": {
+    "value": 0.015362058766186237,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 3,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.018644897267222404,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 2,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.01902950368821621,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 0,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.01759285107254982,
+    "at": "under g-cloak-rightShoulder, build frame 0 (female elder build +0)",
+    "over": 9,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.034743395430436017,
+    "shown build": 0.015362058766186237,
+    "hole build": 0.018644897267222404,
+    "cut build": 0.01902950368821621,
+    "inner build": 0.01759285107254982,
+    "innerHole build": 0.0
+   }
+  },
+  "g-toga-leftShoulder": {
+   "cloth": {
+    "value": 0.038814223661174894,
+    "at": "build frame 0 (male adult build +1)",
+    "over": 10,
+    "part": "upperArm.L"
+   },
+   "shown": {
+    "value": 0.020269442349672318,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 5,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.020937394350767136,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 1,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.009683250449597836,
+    "at": "under g-cloak-bothShoulders, build frame 0 (female adult build +0)",
+    "over": 2,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.038814223661174894,
+    "shown build": 0.020269442349672318,
+    "hole build": 0.0,
+    "cut build": 0.020937394350767136,
+    "inner build": 0.009683250449597836,
+    "innerHole build": 0.0
+   }
+  },
+  "g-toga-rightShoulder": {
+   "cloth": {
+    "value": 0.03714728646674928,
+    "at": "build frame 0 (male adult build +1)",
+    "over": 10,
+    "part": "upperArm.R"
+   },
+   "shown": {
+    "value": 0.021677913144230843,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 4,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.02059701643884182,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 2,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.01023468654602766,
+    "at": "under g-cloak-rightShoulder, build frame 0 (female adult build +0)",
+    "over": 4,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.03714728646674928,
+    "shown build": 0.021677913144230843,
+    "hole build": 0.0,
+    "cut build": 0.02059701643884182,
+    "inner build": 0.01023468654602766,
+    "innerHole build": 0.0
+   }
+  },
+  "g-cloak-bothShoulders": {
+   "cloth": {
+    "value": 0.025534210436934896,
+    "at": "build frame 0 (male child build +0)",
+    "over": 10,
+    "part": "forearm.R"
+   },
+   "shown": {
+    "value": 0.02043726295232773,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 4,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.001300889765843749,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 0,
+    "part": "upperArm.L"
+   },
+   "inner": {
+    "value": 0.0018250945722684264,
+    "at": "under g-veil-face, build frame 0 (male child build +0)",
+    "over": 0,
+    "part": "upperArm.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.025534210436934896,
+    "shown build": 0.02043726295232773,
+    "hole build": 0.0,
+    "cut build": 0.001300889765843749,
+    "inner build": 0.0018250945722684264,
+    "innerHole build": 0.0
+   }
+  },
+  "g-cloak-leftShoulder": {
+   "cloth": {
+    "value": 0.027244886845054377,
+    "at": "build frame 0 (male adult build +0)",
+    "over": 10,
+    "part": "forearm.L"
+   },
+   "shown": {
+    "value": 0.009624811820685863,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 2,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.002331634983420372,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 0,
+    "part": "upperArm.L"
+   },
+   "inner": {
+    "value": 0.0022906812373548746,
+    "at": "under g-veil-face, build frame 0 (male youth build +0)",
+    "over": 0,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.027244886845054377,
+    "shown build": 0.009624811820685863,
+    "hole build": 0.0,
+    "cut build": 0.002331634983420372,
+    "inner build": 0.0022906812373548746,
+    "innerHole build": 0.0
+   }
+  },
+  "g-cloak-rightShoulder": {
+   "cloth": {
+    "value": 0.02593051652472609,
+    "at": "build frame 0 (female child build +0)",
+    "over": 10,
+    "part": "forearm.L"
+   },
+   "shown": {
+    "value": 0.02044009603559971,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 4,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0005276777083054185,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 0,
+    "part": "upperArm.R"
+   },
+   "inner": {
+    "value": 0.0018250819994136691,
+    "at": "under g-veil-face, build frame 0 (male child build +0)",
+    "over": 0,
+    "part": "upperArm.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.02593051652472609,
+    "shown build": 0.02044009603559971,
+    "hole build": 0.0,
+    "cut build": 0.0005276777083054185,
+    "inner build": 0.0018250819994136691,
+    "innerHole build": 0.0
+   }
+  },
+  "g-cape-bothShoulders": {
+   "cloth": {
+    "value": 0.018045853419889995,
+    "at": "build frame 0 (male adult build +1)",
+    "over": 10,
+    "part": "shoulder.R"
+   },
+   "shown": {
+    "value": 0.014353001490235329,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 2,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0021173416171222925,
+    "at": "under g-veil-face, build frame 0 (male child build +0)",
+    "over": 0,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.018045853419889995,
+    "shown build": 0.014353001490235329,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.0021173416171222925,
+    "innerHole build": 0.0
+   }
+  },
+  "g-cape-leftShoulder": {
+   "cloth": {
+    "value": 0.019455954027329816,
+    "at": "build frame 0 (male child build +0)",
+    "over": 10,
+    "part": "forearm.L"
+   },
+   "shown": {
+    "value": 0.002283176640048623,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 0,
+    "part": "forearm.R"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0034486986696720123,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 0,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.019455954027329816,
+    "shown build": 0.002283176640048623,
+    "hole build": 0.0,
+    "cut build": 0.0034486986696720123,
+    "inner build": 0.0,
+    "innerHole build": 0.0
+   }
+  },
+  "g-cape-rightShoulder": {
+   "cloth": {
+    "value": 0.016667678082033704,
+    "at": "build frame 0 (male child build +0)",
+    "over": 10,
+    "part": "shoulder.R"
+   },
+   "shown": {
+    "value": 0.0033125069458037615,
+    "at": "build frame 0 (male child build +0)",
+    "over": 1,
+    "part": "forearm.R"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0041854544542729855,
+    "at": "under g-robe-chest, build frame 0 (female child build +0)",
+    "over": 1,
+    "part": "upperArm.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.016667678082033704,
+    "shown build": 0.0033125069458037615,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.0041854544542729855,
+    "innerHole build": 0.0
+   }
+  },
+  "g-hood-overHead": {
+   "cloth": {
+    "value": 0.0724853853992731,
+    "at": "build frame 0 (male child build +0)",
+    "over": 10,
+    "part": "chest"
+   },
+   "shown": {
+    "value": 0.009228887036442757,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 3,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.001982109621167183,
+    "at": "build frame 0 (female elder build +0)",
+    "over": 0,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.03282025083899498,
+    "at": "build frame 0 (female adult build +0)",
+    "over": 2,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.006230566650629044,
+    "at": "under g-skirtShort-chest, build frame 0 (female youth build +0)",
+    "over": 10,
+    "part": "upperArm.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.0724853853992731,
+    "shown build": 0.009228887036442757,
+    "hole build": 0.001982109621167183,
+    "cut build": 0.03282025083899498,
+    "inner build": 0.006230566650629044,
+    "innerHole build": 0.0
+   }
+  },
+  "g-turban-aroundHead": {
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.0
+   }
+  },
+  "g-cap-crown": {
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.0
+   }
+  },
+  "g-headband-aroundHead": {
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.0
+   }
+  },
+  "g-veil-face": {
+   "cloth": {
+    "value": 0.0052768540850063415,
+    "at": "build frame 0 (male adult build -1)",
+    "over": 9,
+    "part": "head"
+   },
+   "shown": {
+    "value": 0.007041512057185173,
+    "at": "build frame 0 (female child build +0)",
+    "over": 5,
+    "part": "head"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.009686416946351528,
+    "at": "under g-hood-overHead, build frame 0 (male child build +0)",
+    "over": 10,
+    "part": "head"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.0052768540850063415,
+    "shown build": 0.007041512057185173,
+    "hole build": 0.0,
+    "cut build": 0.0,
+    "inner build": 0.009686416946351528,
+    "innerHole build": 0.0
+   }
+  },
+  "g-headRing-crown": {
+   "cloth": {
+    "value": 0.00021603129572671237,
+    "at": "build frame 0 (male child build +0)",
+    "over": 0,
+    "part": "head"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.00388830597512424,
+    "at": "under g-hood-overHead, build frame 0 (female youth build +0)",
+    "over": 6,
+    "part": "head"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.00021603129572671237,
+    "inner build": 0.00388830597512424,
+    "innerHole build": 0.0
+   }
+  },
+  "g-topknot-crown": {
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0016656118677929044,
+    "at": "under g-hood-overHead, build frame 0 (male child build +0)",
+    "over": 0,
+    "part": "head"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.0,
+    "inner build": 0.0016656118677929044,
+    "innerHole build": 0.0
+   }
+  },
+  "g-hairBag-crown": {
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.0
+   }
+  },
+  "g-neckBeads-neck": {
+   "cloth": {
+    "value": 0.008961905734605804,
+    "at": "build frame 0 (male adult build -1)",
+    "over": 10,
+    "part": "neck"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.009091437794268131,
+    "at": "under g-cape-rightShoulder, build frame 0 (female child build +0)",
+    "over": 10,
+    "part": "shoulder.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.008961905734605804,
+    "inner build": 0.009091437794268131,
+    "innerHole build": 0.0
+   }
+  },
+  "g-waistBeads-waist": {
+   "cloth": {
+    "value": 0.003326784347128319,
+    "at": "build frame 0 (female child build +0)",
+    "over": 1,
+    "part": "forearm.L"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.006393259856849909,
+    "at": "under g-skirtKnee-chest, build frame 0 (female elder build +0)",
+    "over": 10,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.003326784347128319,
+    "inner build": 0.006393259856849909,
+    "innerHole build": 0.0
+   }
+  },
+  "g-limbRings-limbs": {
+   "cloth": {
+    "value": 0.009137801218648326,
+    "at": "build frame 0 (male child build +0)",
+    "over": 6,
+    "part": "shin.L"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "checked": 10,
+   "clips": {
+    "cloth build": 0.009137801218648326
+   }
+  }
  }
 }
