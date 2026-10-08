@@ -23,8 +23,8 @@ covered:
         visible and the cloth lying on it wins.
 
 The body gets one mask per vertex (hide and push bits over the garments);
-every garment the same over the garments of OTHER slots that cover it (every
-outfit layering: a figure wears at most one garment per slot). The game reads
+every garment the same over the garments of an OUTER layer (LAYER) that cover
+it (every outfit layering: a figure wears at most one garment per slot). The game reads
 the body's mask from villager.glb — attribute _COVER, unsigned shorts (hide
 bits 0-15, hide bits 16-31, push bits 0-15, push bits 16-31); bit k is
 scene.extras.villager.garmentMask.garments[k] (src/render/villagerGarmentMask.ts).
@@ -52,6 +52,17 @@ SLOT = {
     **{f: 'head' for f in ('cap', 'hairBag', 'headRing', 'headband', 'topknot', 'turban', 'veil')},
     **{f: 'ornament' for f in ('limbRings', 'neckBeads', 'waistBeads')},
 }
+# The layer a slot is worn in, innermost first: in a layering the garment of
+# the outer layer lies over the inner one (an ornament under everything, the
+# head pieces under a hood). Only an outer layer's garment hides or pushes in
+# an inner one; the reverse contact is the outer garment seen over it.
+LAYER = {'ornament': 0, 'hip': 1, 'head': 1, 'torso': 2, 'shoulder': 3}
+
+
+def layer(name):
+    return LAYER[SLOT[form(name)]]
+
+
 # The mask attribute holds 32 garments (two unsigned shorts per class).
 BITS = 32
 # Rays of the inside test (fit.RAYS: no ray along an axis the body is built round)
@@ -353,8 +364,8 @@ def to_bits(cls, n):
 
 
 def masks(body, garments, cfg, log=print):
-    """The body's mask and every garment's mask over the garments of other
-    slots: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}."""
+    """The body's mask and every garment's mask over the garments of outer
+    layers: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}."""
     names = garment_names(garments)
     reach = cfg['VILLAGER_ASSET']['garmentMaskOpening']
     gap = cfg['VILLAGER_ASSET']['garmentMaskWeightGap']
@@ -379,7 +390,7 @@ def masks(body, garments, cfg, log=print):
     for n in names:
         cls = {}
         for b, o in enumerate(names):
-            if o not in covering or SLOT[form(o)] == SLOT[form(n)]:
+            if o not in covering or layer(o) <= layer(n):
                 continue
             c = vol[o].classify(gv[o], gv[n], reach, follower(wd[n], wd[o], gap))
             if c.any():
@@ -440,6 +451,9 @@ def selftest():
     h, p = decode(m, names, ['g-x0-w'])
     assert h.tolist() == [True, False, False, False] and p.tolist() == [True, False, True, False], (h, p)
     assert drawn_tris([[0, 3, 0], [0, 1, 2]], np.array([True, False, False, True])).tolist() == [False, True]
+    # only an outer layer's garment masks an inner one
+    assert layer('g-waistBeads-x') < layer('g-skirtKnee-x') < layer('g-robe-chest') < layer('g-cloak-x')
+    assert layer('g-hood-x') == layer('g-cloak-x') and layer('g-cap-x') < layer('g-hood-x')
     print('mask selftest: ok')
 
 

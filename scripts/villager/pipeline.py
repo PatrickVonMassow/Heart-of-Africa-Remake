@@ -6,13 +6,14 @@
   garments    each dress form built round the body, weights transferred, then
               fitted to every clip frame at every body corner (fit.py) (cached)
   (mask)      each garment's cover mask over the body and the garments of
-              other slots (mask.py), computed whenever the garments are read
+              outer layers (mask.py), computed whenever the garments are read
   export      public/models/villager.glb (body with its cover mask, clips;
               garments not yet shipped)
   sheets      frame sheets under verification/villager-body/
   penetration the per-frame garment penetration report on the masked body and
               garments; the run FAILS (exit 1) when any value exceeds the
-              tolerance in any frame (--stride N: every Nth pose, a quick look)
+              tolerance in any frame (--stride N: every Nth pose, a quick look;
+              --baseline <json>: main's report json, for the comparison)
   selftest    the fit loop's own check (also run before every garments step)
   all         every step in order
 """
@@ -38,6 +39,7 @@ def args():
     p.add_argument('--verification', required=True)
     p.add_argument('--only', default='')
     p.add_argument('--stride', type=int, default=1)
+    p.add_argument('--baseline', default='')
     return p.parse_args(argv)
 
 
@@ -116,7 +118,7 @@ def main():
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)
     if 'penetration' in steps:
         import penetration as P
-        bad = P.report(a.verification, body, clips, garments, cfg, a.stride)
+        bad = P.report(a.verification, body, clips, garments, cfg, a.stride, baseline=a.baseline or None)
         if bad:
             # an exception, so Blender's --python-exit-code turns it into exit 1
             raise RuntimeError(f'penetration: {bad} garment(s) over tolerance (see penetration-report.md)')
