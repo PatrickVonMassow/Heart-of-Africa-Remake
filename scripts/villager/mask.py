@@ -9,7 +9,7 @@ trouser leg's top inside the seat) is a seam between parts; every other loop
 is an OPENING (neck, sleeve, hem, a cape's outline).
 
 THE MASK, read in the BUILD POSE (garments.design_pose, the pose every
-garment is tailored in) at every body corner. A point inside the volume that moves with the
+garment is tailored in). A point inside the volume that moves with the
 cloth (its skin weights within VILLAGER_ASSET.garmentMaskWeightGap of the
 nearest cloth's: a hand hanging inside a skirt's outline does not) is
 covered:
@@ -72,14 +72,6 @@ IN, THROUGH, OUT = 0, 1, 2
 
 def form(name):
     return name.split('-')[1]
-
-
-def combine(classes):
-    """One class per point (0 free, 1 hidden, 2 pushed) from its classes at
-    every body corner: hidden only where hidden at every corner, pushed where
-    covered at any."""
-    c = np.asarray(classes)
-    return np.where((c == 1).all(0), 1, np.where((c > 0).any(0), 2, 0)).astype(np.uint8)
 
 
 def garment_names(garments):
@@ -373,63 +365,38 @@ def to_bits(cls, n):
 
 def masks(body, garments, cfg, log=print):
     """The body's mask and every garment's mask over the garments of outer
-    layers: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}.
-    Read in the build pose at EVERY body corner (penetration.CORNERS), each
-    with its morphs as the game draws it: a point is hidden only where it is
-    hidden at every corner, and pushed where it is covered at any other —
-    a woman's or an elder's body covered otherwise than the neutral one's
-    never shows a hole by an opening the neutral body keeps it away from."""
-    from fit import garment_pos
-    from penetration import CORNERS
-    from sheets import corner_weights, morphed
+    layers: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}."""
     names = garment_names(garments)
     reach = cfg['VILLAGER_ASSET']['garmentMaskOpening']
     gap = cfg['VILLAGER_ASSET']['garmentMaskWeightGap']
-    G = garments['meshes']
-    wd = {n: dense(G[n]['W']) for n in names}
+    pose = build_pose(body)
+    bv = pose(body['pos'], body['W'])
+    gv = {n: pose(garments['meshes'][n]['pos'], garments['meshes'][n]['W']) for n in names}
+    vol = {n: Volume(gv[n], garments['meshes'][n]['tris']) for n in names}
+    wd = {n: dense(garments['meshes'][n]['W']) for n in names}
     bw = dense(body['W'])
-    seen, covering = {}, None
-
-    def merge(key, c):
-        seen.setdefault(key, []).append(c)
-    for corner in CORNERS:
-        w = corner_weights(*corner)
-        pos, j = morphed(body, w)
-        pose = build_pose(body, j)
-        bv = pose(pos, body['W'])
-        gv = {n: pose(garment_pos(G[n], w), G[n]['W']) for n in names}
-        vol = {n: Volume(gv[n], G[n]['tris']) for n in names}
-        # a closed piece (a ring, beads, a head ring) has no opening and covers
-        # nothing but its own solid: it hides nothing
-        if covering is None:
-            covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
-        for n in names:
-            if n in covering:
-                merge(('body', n), vol[n].classify(gv[n], bv, reach, follower(bw, wd[n], gap)))
-        for n in names:
-            for o in names:
-                if o in covering and layer(o) > layer(n):
-                    merge((n, o), vol[o].classify(gv[o], gv[n], reach, follower(wd[n], wd[o], gap)))
-
-    def cls(key):
-        return combine(seen[key])
+    # a closed piece (a ring, beads, a head ring) has no opening and covers
+    # nothing but its own solid: it hides nothing
+    covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
     body_cls = {}
     for b, n in enumerate(names):
-        if ('body', n) in seen:
-            c = cls(('body', n))
-            if c.any():
-                body_cls[b] = c
-            log(f'mask: body under {n}: {int((c == 1).sum())} hidden, {int((c == 2).sum())} pushed')
+        if n not in covering:
+            continue
+        c = vol[n].classify(gv[n], bv, reach, follower(bw, wd[n], gap))
+        if c.any():
+            body_cls[b] = c
+        log(f'mask: body under {n}: {int((c == 1).sum())} hidden, {int((c == 2).sum())} pushed')
     inner = {}
     for n in names:
-        per = {}
+        cls = {}
         for b, o in enumerate(names):
-            if (n, o) in seen:
-                c = cls((n, o))
-                if c.any():
-                    per[b] = c
-        inner[n] = to_bits(per, len(G[n]['pos']))
-    return {'garments': names, 'body': to_bits(body_cls, len(body['pos'])), 'inner': inner}
+            if o not in covering or layer(o) <= layer(n):
+                continue
+            c = vol[o].classify(gv[o], gv[n], reach, follower(wd[n], wd[o], gap))
+            if c.any():
+                cls[b] = c
+        inner[n] = to_bits(cls, len(gv[n]))
+    return {'garments': names, 'body': to_bits(body_cls, len(bv)), 'inner': inner}
 
 
 def decode(m, names, worn):
@@ -484,8 +451,6 @@ def selftest():
     h, p = decode(m, names, ['g-x0-w'])
     assert h.tolist() == [True, False, False, False] and p.tolist() == [True, False, True, False], (h, p)
     assert drawn_tris([[0, 3, 0], [0, 1, 2]], np.array([True, False, False, True])).tolist() == [False, True]
-    # read per body corner: hidden only where hidden at every corner
-    assert combine([[1, 1, 0, 2, 0], [1, 2, 0, 1, 1]]).tolist() == [1, 2, 0, 2, 2]
     # only an outer layer's garment masks an inner one
     assert layer('g-waistBeads-x') < layer('g-skirtKnee-x') < layer('g-robe-chest') < layer('g-cloak-x')
     assert layer('g-hood-x') == layer('g-cloak-x') and layer('g-cap-x') < layer('g-hood-x')

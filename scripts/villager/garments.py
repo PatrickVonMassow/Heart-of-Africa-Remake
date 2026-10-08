@@ -436,9 +436,7 @@ def build_form(B, form, wear, L):
             rings.append((y, c, r))
         face_lo = L['chin'] - 0.02 * H
         face_hi = L['chin'] + 0.10 * H
-        # the rings run from the waist up: the crown, the LAST ring, is the
-        # closed end (a cap on the first ring was a disc through the chest)
-        return sweep(rings, closed_bottom=True, keep=lambda k, i: not (abs(ang(i)) < 0.7 and face_lo < rings[k][0] < face_hi)), 2
+        return sweep(rings, closed_top=True, keep=lambda k, i: not (abs(ang(i)) < 0.7 and face_lo < rings[k][0] < face_hi)), 2
     if form in ('turban', 'cap', 'headband'):
         hc = L['chin'] + 0.07 * H
         lo = hc + (0.02 if form == 'headband' else 0.01 if form == 'turban' else 0.03) * H
