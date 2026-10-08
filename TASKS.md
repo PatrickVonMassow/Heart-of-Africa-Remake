@@ -77,20 +77,37 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1332. Villager garments: let the cloth follow the limb in the remaining visible motion cases
-  Queue position: directly after point 1331 and ahead of point 1315, whose green penetration report it delivers.
-  Source: owner split of point 1331 on 08.10.2026 (decide-and-record rule, veto open): one rest shape cannot follow knee/skirt in stride, upper arm/cloak in dig or chest/toga when bending to 4 mm (0.04-0.16 measured on feat/1331-garment-follows-limb).
-  Final state: the build pose is fitted on the posing the game draws only where measurement shows it lowers residuals (round 3 of 1331 showed alignment alone moves them: robe sprint 0.046 -> 0.122); the hood crown is closed and the cover mask read per body corner where measurement shows no case gets worse (round 4 of 1331: +28 and +94 cases on a plain attempt); every visible case point 1331 leaves named in verification/villager-body/penetration-report.md is closed by an offset surface or a cloth simulation in the villager pipeline or the TSL vertex path, chosen per case and justified by measurement; no per-pose offset table ships. No covered skin and no covered inner garment shows through cloth in any pose, thin limbs and garment openings included; skin at openings stays drawn.
-  Verifiable: the pipeline penetration step green at 0.003 on what the game draws (visible-only count); dressed frame sheets walking, kneeling, digging and running without show-through and without new cloth spikes, compared against main; Playwright both backends picture-checked on dressed villagers in those poses; cross-vendor review record.
+- [ ] 1332. Villager garments: fit and repair every garment in its own build pose
+  Queue position: directly after point 1331 (landed), ahead of point 1334 (motion correction in the pipeline) and point 1315.
+  Source: owner split of point 1331 on 08.10.2026 (decide-and-record rule), cut again on 08.10.2026 after the authoring escalation below (split rule; veto open).
+  Escalation 08.10.2026 (Opus 5.5 author, feat/1332-garment-motion-cases, no commits): the residuals are not motion-only. In the build pose itself 27 of 32 garments exceed 0.003 (hood 0.0725, toga 0.0388, shirt/breast cloth/robe ~0.035); motion grows them (27/32, 0.0135-0.1553; ~4,400 visible case entries). Frame sheets dress-sprint-0.png and dress-dig-0.png show sleeves detached from the arm and holes in chest, thighs and hem, which no offset surface or cloth simulation repairs. The game draws no pipeline garment before point 1315, so no in-game picture check is possible yet.
+  Final state: every pipeline garment fits its own build pose to 0.003 in the penetration step (cloth in body, skin and inner garment through cloth, cut, hole, inner hole), and torn or detached geometry (sleeves off the arm, holes in chest, thighs and hem) is repaired; no motion mechanism is part of this point.
+  Verifiable: the pipeline penetration step green at 0.003 in the build pose for all 32 garments; build-pose and dressed frame sheets without detached sleeves or holes, compared against main; cross-vendor review record.
+  Criticality: high - every villager, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1334. Villager garments: correct the posed cloth against the body in the pipeline
+  Queue position: directly after point 1332 and ahead of point 1315, whose green penetration report it delivers.
+  Source: owner split of point 1332 on 08.10.2026 (split rule; veto open); measured residuals in motion 0.0135-0.1553 (long wrap at the chest while digging worst), knee/skirt in stride, upper arm/cloak in dig, chest/toga when bending.
+  Final state: one mechanism, chosen by measurement, pushes posed cloth out of the body in the villager pipeline (posed cloth against simplified per-bone capsules, or a short per-clip cloth simulation); no per-pose offset table ships. No covered skin and no covered inner garment shows through cloth in any pose, thin limbs and garment openings included; skin at openings stays drawn.
+  Verifiable: the pipeline penetration step green at 0.003 on the visible-only count across all poses; dressed frame sheets walking, kneeling, digging and running without show-through and without new cloth spikes, compared against main; cross-vendor review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
 
 - [ ] 1315. Villager garments: ship the measured pipeline garments on the glTF body (split from 1312)
-  Queue position: directly after point 1332, which follows points 1329 and 1331 (1329 replaced 1319-1327 on 07.10.2026); needs the green penetration report point 1332 delivers.
+  Queue position: directly after points 1332 and 1334 (split of 1332 on 08.10.2026); needs the green penetration report point 1334 delivers; point 1335 follows it.
   Source: point 1312 commit af2c25d42 (shipping on the glTF body: gltfGarment / gltfLayerGeometry, cachedGltfLayer, garment-carrying villager.glb, 41 Vitest cases in src/render/villager*), rolled back in cd0400571 because the garments still clipped.
   Final state: the game draws the pipeline garments 1314 measured on the glTF body, no code-built dress layer reaches it, and garments follow the body's morph, hang, ground and scale; the glb growth (0.7 → 2.3 MB at af2c25d42) is measured and justified or reduced.
   Verifiable: the Vitest cases from af2c25d42 green; Playwright both backends picture-checked on dressed villagers walking, kneeling and digging; cross-vendor review record.
   Criticality: high — every villager, both backends.
+  Bundle: Dorfleben.
+
+- [ ] 1335. Villager garments: carry the cloth correction into the game's TSL vertex path
+  Queue position: directly after point 1315, which first puts the pipeline garments into the game.
+  Source: owner split of point 1332 on 08.10.2026 (split rule; veto open): the in-game correction has no garment to act on before point 1315.
+  Final state: the mechanism point 1334 chose acts in the game's TSL vertex path where the game's posing differs from the pipeline's, so no covered skin or inner garment shows through cloth on dressed villagers walking, kneeling, digging and running; no raw GLSL/WGSL.
+  Verifiable: Vitest on the correction inputs; Playwright both backends picture-checked on dressed villagers in those poses, compared against main; cross-vendor review record.
+  Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
 
 - [ ] 1316. Natural villager motion: research, richer rig where needed, clip-preserving IK, distributed lean (six eyes with final check)
