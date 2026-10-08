@@ -17,7 +17,11 @@ Per garment, alone on the masked body:
           covers lies outside the cloth, through it (mask.Volume.where; a
           point pressed into another body part is hidden there);
   hole    how far a hidden body point has left the garment by an opening
-          (missing skin seen at a hem or a sleeve).
+          (missing skin seen at a hem or a sleeve);
+  cut     how far a hidden body point lies outside the garment through
+          its cloth: the cloth drawn where the body bulges past it — what
+          hiding is for — judged against its own, wider tolerance
+          VILLAGER_ASSET.garmentMaskCutTolerance (a limb visibly cut off).
 
 And per garment worn under each garment of another slot that covers part of
 it (every outfit layering), the same with the inner garment's own mask:
@@ -41,7 +45,7 @@ from fit import depths, garment_pos
 from sheets import corner_weights, morphed
 
 CORNERS = [(s, a, 0.0) for s in ('male', 'female') for a in ('child', 'youth', 'adult', 'elder')] + [('male', 'adult', -1.0), ('male', 'adult', 1.0)]
-COLUMNS = ('cloth', 'shown', 'hole', 'inner', 'innerHole')
+COLUMNS = ('cloth', 'shown', 'hole', 'cut', 'inner', 'innerHole')
 
 _S = {}
 
@@ -100,15 +104,23 @@ def _buried(tree, pts, nrm, eps):
 
 
 def _empty():
-    return {c: {'value': 0.0, 'at': None, 'over': 0} for c in COLUMNS} | {'checked': 0}
+    return {c: {'value': 0.0, 'at': None, 'over': 0, 'part': None} for c in COLUMNS} | {'checked': 0}
 
 
-def _note(r, col, v, at, tol):
+def _note(r, col, v, at, tol, part=None):
     c = r[col]
     if v > tol:
         c['over'] += 1
     if v > c['value']:
-        c['value'], c['at'] = float(v), at
+        c['value'], c['at'], c['part'] = float(v), at, part
+
+
+def _worst(ids, dist, part):
+    """The largest `dist` over the sample ids and the body part (bone) of that sample."""
+    if not len(ids):
+        return 0.0, None
+    k = ids[np.argmax(dist[ids])]
+    return float(dist[k]), part(k)
 
 
 def _corner(c):
@@ -131,6 +143,8 @@ def _corner(c):
              if i != o and M.SLOT[M.form(i)] != M.SLOT[M.form(o)]]
     pairs = [p for p in pairs if p[2].any]
     worst = {n: _empty() for n in names}
+    nv = len(body['pos'])
+    bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
     for k, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
         if k % S['stride']:
             continue
@@ -154,7 +168,8 @@ def _corner(c):
                 for i in np.nonzero(d > tol)[0]:
                     if not mb.drawn[tree.find_nearest(pts[i].tolist())[2]]:
                         d[i] = 0.0
-            _note(r, 'cloth', max(0.0, float(d.max())), at, tol)
+            i = int(np.argmax(d))
+            _note(r, 'cloth', max(0.0, float(d[i])), at, tol, bone(int(body['tris'][tree.find_nearest(pts[i].tolist())[2]][0])) if d[i] > 0 else None)
             if not mb.any:
                 continue
             # covered skin through the cloth; hidden skin out by an opening
@@ -163,10 +178,12 @@ def _corner(c):
             if len(thr):
                 fn = np.concatenate([nrm, vertex_normals_faces(bp, body['tris'])])
                 thr = thr[~_buried(tree, smp[thr], fn[thr], tol)]
-            _note(r, 'shown', float(dist[thr].max()) if len(thr) else 0.0, at, tol)
+            _note(r, 'shown', *_worst(thr, dist, bone)[:1], at, tol, _worst(thr, dist, bone)[1])
             place, dist = S['vol'][n].where(gv[n], smp, reach, ids=mb.hidden, trees=trees[n])
             out = mb.hidden[place[mb.hidden] == M.OUT]
-            _note(r, 'hole', float(dist[out].max()) if len(out) else 0.0, at, tol)
+            _note(r, 'hole', *_worst(out, dist, bone)[:1], at, tol, _worst(out, dist, bone)[1])
+            thr = mb.hidden[place[mb.hidden] == M.THROUGH]
+            _note(r, 'cut', *_worst(thr, dist, bone)[:1], at, S['cut'], _worst(thr, dist, bone)[1])
         for i, o, mi in pairs:
             _ip, smp, _nrm = mi.drawn_at(gv[i], depth)
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.shown, trees=trees[o])
@@ -194,7 +211,8 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
     a = cfg['VILLAGER_ASSET']
     _S.update(body=body, clips=clips, garments=garments, cfg=cfg, stride=stride, names=names,
               gskin={n: top4(garments['meshes'][n]['W']) for n in names}, jidx=jidx, jw=jw,
-              tol=a['garmentPenetrationTolerance'], clip_names=clip_names or EXPORT_CLIPS,
+              dom=np.argmax(body['W'], 1), bones=__import__('skeleton').NAMES,
+              tol=a['garmentPenetrationTolerance'], cut=a['garmentMaskCutTolerance'], clip_names=clip_names or EXPORT_CLIPS,
               vol={n: M.Volume(pose(garments['meshes'][n]['pos'], garments['meshes'][n]['W']), garments['meshes'][n]['tris']) for n in names},
               faces={n: face_points(garments['meshes'][n]['tris'], garments['meshes'][n]['pos'], a['garmentFaceSpacing']) for n in names})
     corners = corners or CORNERS
@@ -208,7 +226,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
                 for col in COLUMNS:
                     t[col]['over'] += r[col]['over']
                     if r[col]['value'] > t[col]['value']:
-                        t[col]['value'], t[col]['at'] = r[col]['value'], r[col]['at']
+                        t[col].update(value=r[col]['value'], at=r[col]['at'], part=r[col]['part'])
             log(f'penetration: {sex} {age} {build:+.0f} done')
     return worst, _S['tol']
 
@@ -229,11 +247,13 @@ def report(out, body, clips, garments, cfg, stride=1):
         '',
         'Cloth = how deep a garment vertex or a point of the cloth between its vertices (about garmentFaceSpacing = '
         f'{a["garmentFaceSpacing"]} apart) lies inside the drawn body. Shown = how far a drawn body point the garment covers lies outside it '
-        'through the cloth. Hole = how far a hidden body point has left the garment by an opening. Inner / inner hole = the same for the garment '
+        'through the cloth. Hole = how far a hidden body point has left the garment by an opening. Cut = how far a hidden body point lies past the cloth '
+        f'(tolerance garmentMaskCutTolerance = {a["garmentMaskCutTolerance"]}: the cloth drawn where the body bulges past it is what hiding is for, '
+        'a limb cut off is not). Inner / inner hole = the same for the garment '
         'worn under each garment of another slot covering part of it (its worst layering). Figure units (1 unit ≈ 1.3 m); '
         f'tolerance (VILLAGER_ASSET.garmentPenetrationTolerance): {tol}.',
         '',
-        '| Garment | ' + ' | '.join(f'{c} | where | frames over' for c in ('Cloth', 'Shown', 'Hole', 'Inner', 'Inner hole')) + ' |',
+        '| Garment | ' + ' | '.join(f'{c} | where | frames over' for c in ('Cloth', 'Shown', 'Hole', 'Cut', 'Inner', 'Inner hole')) + ' |',
         '| --- |' + ' --- | --- | --- |' * len(COLUMNS),
     ]
     bad = 0
@@ -241,9 +261,10 @@ def report(out, body, clips, garments, cfg, stride=1):
         cells, fine = [], True
         for col in COLUMNS:
             v = r[col]
-            ok = v['value'] <= tol
+            ok = v['value'] <= (a['garmentMaskCutTolerance'] if col == 'cut' else tol)
             fine = fine and ok
-            cells.append(f'{v["value"]:.4f}{"" if ok else " ✗"} | {v["at"] or "—"} | {v["over"]}')
+            where = (v['at'] or '—') + (' — ' + v['part'] if v.get('part') else '')
+            cells.append(f'{v["value"]:.4f}{"" if ok else " ✗"} | {where} | {v["over"]}')
         bad += 0 if fine else 1
         lines.append(f'| `{n}` | ' + ' | '.join(cells) + ' |')
     lines += ['', f'**{len(worst) - bad} of {len(worst)} garments within tolerance in every frame and layering** '

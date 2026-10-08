@@ -2599,6 +2599,16 @@ export const VILLAGER_ASSET = {
    *  normal while the covering garment is worn (render/villagerGarmentMask.ts;
    *  figure units, ≈ 5 mm). Calibratable. */
   garmentMaskPush: 0.004,
+  /** How far a body or inner-garment vertex's skin weights may differ from
+   *  the covering cloth's (L1: 0 alike, 2 disjoint) and it still counts as
+   *  covered: a hand hanging inside a skirt's outline swings out of it and is
+   *  never hidden (scripts/villager/mask.py). Calibratable. */
+  garmentMaskWeightGap: 1.2,
+  /** How far a hidden body vertex may pass through the cloth that hides it
+   *  (the penetration report's "cut"): the cloth is drawn where the body
+   *  bulges past it, which is what hiding is for, until a limb looks cut off
+   *  (figure units, ≈ 2.6 cm). Calibratable. */
+  garmentMaskCutTolerance: 0.02,
   /** How far apart the penetration report samples the cloth between a
    *  garment's vertices (figure units, ≈ 5 cm). Calibratable. */
   garmentFaceSpacing: 0.04,

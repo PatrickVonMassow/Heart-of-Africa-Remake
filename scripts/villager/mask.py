@@ -9,7 +9,10 @@ trouser leg's top inside the seat) is a seam between parts; every other loop
 is an OPENING (neck, sleeve, hem, a cape's outline).
 
 THE MASK, read in the BUILD POSE (garments.design_pose, the pose every
-garment is tailored in). A point inside the volume is covered:
+garment is tailored in). A point inside the volume that moves with the
+cloth (its skin weights within VILLAGER_ASSET.garmentMaskWeightGap of the
+nearest cloth's: a hand hanging inside a skirt's outline does not) is
+covered:
 
   hide  covered and farther than VILLAGER_ASSET.garmentMaskOpening from
         every opening's cap: while the garment is worn, a triangle whose
@@ -211,13 +214,26 @@ class Volume:
             return None, []
         return BVHTree.FromPolygons(np.concatenate(v).tolist(), np.concatenate(tt).tolist(), all_triangles=True), centres
 
-    def classify(self, gv, pts, reach):
-        """Per point (build pose): 0 not covered, 1 hide, 2 push."""
+    def classify(self, gv, pts, reach, follows=None):
+        """Per point (build pose): 0 not covered, 1 hide, 2 push. `follows`
+        (point, nearest cloth triangle, its barycentric weights) → whether
+        the point moves with the cloth there; one that does not (a hand
+        hanging inside a skirt's outline) is never covered."""
         trees = self.trees(gv)
         caps, _c = self.caps(gv)
+        cloth = None
+        if follows is not None:
+            from mathutils.bvhtree import BVHTree
+            cloth = BVHTree.FromPolygons(gv.tolist(), np.concatenate([P['tris'] for P in self.parts]).tolist(), all_triangles=True)
+            tris = np.concatenate([P['tris'] for P in self.parts])
         out = np.zeros(len(pts), np.uint8)
         for k, p in enumerate(pts.tolist()):
             if any(_inside(tr, p) for tr, _n in trees):
+                if cloth is not None:
+                    co, _n, i, _d = cloth.find_nearest(p)
+                    t = tris[i]
+                    if not follows(k, t, barycentric(np.array(co), gv[t[0]], gv[t[1]], gv[t[2]])):
+                        continue
                 near = caps is not None and caps.find_nearest(p)[3] <= reach
                 out[k] = 2 if near else 1
         return out
@@ -296,6 +312,32 @@ class Volume:
         return True
 
 
+def barycentric(p, a, b, c):
+    v0, v1, v2 = b - a, c - a, p - a
+    d00, d01, d11, d20, d21 = v0 @ v0, v0 @ v1, v1 @ v1, v2 @ v0, v2 @ v1
+    den = d00 * d11 - d01 * d01
+    if abs(den) < 1e-18:
+        return np.array([1.0, 0.0, 0.0])
+    v = (d11 * d20 - d01 * d21) / den
+    w = (d00 * d21 - d01 * d20) / den
+    return np.clip([1 - v - w, v, w], 0, 1)
+
+
+def dense(W):
+    """Skin weights as the game skins (top four bones), dense (n × bones)."""
+    idx, w = top4(W)
+    out = np.zeros((len(W), W.shape[1]))
+    np.put_along_axis(out, idx, w, 1)
+    return out
+
+
+def follower(Wp, Wg, gap):
+    """`follows` for Volume.classify: a point (weights `Wp`) moves with the
+    cloth (vertex weights `Wg`) when their skin weights differ by at most
+    `gap` (L1; 0 alike, 2 disjoint)."""
+    return lambda k, t, bc: np.abs(Wp[k] - bc @ Wg[t]).sum() <= gap
+
+
 # ---- the mask --------------------------------------------------------------------
 
 
@@ -315,13 +357,21 @@ def masks(body, garments, cfg, log=print):
     slots: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}."""
     names = garment_names(garments)
     reach = cfg['VILLAGER_ASSET']['garmentMaskOpening']
+    gap = cfg['VILLAGER_ASSET']['garmentMaskWeightGap']
     pose = build_pose(body)
     bv = pose(body['pos'], body['W'])
     gv = {n: pose(garments['meshes'][n]['pos'], garments['meshes'][n]['W']) for n in names}
     vol = {n: Volume(gv[n], garments['meshes'][n]['tris']) for n in names}
+    wd = {n: dense(garments['meshes'][n]['W']) for n in names}
+    bw = dense(body['W'])
+    # a closed piece (a ring, beads, a head ring) has no opening and covers
+    # nothing but its own solid: it hides nothing
+    covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
     body_cls = {}
     for b, n in enumerate(names):
-        c = vol[n].classify(gv[n], bv, reach)
+        if n not in covering:
+            continue
+        c = vol[n].classify(gv[n], bv, reach, follower(bw, wd[n], gap))
         if c.any():
             body_cls[b] = c
         log(f'mask: body under {n}: {int((c == 1).sum())} hidden, {int((c == 2).sum())} pushed')
@@ -329,9 +379,9 @@ def masks(body, garments, cfg, log=print):
     for n in names:
         cls = {}
         for b, o in enumerate(names):
-            if SLOT[form(o)] == SLOT[form(n)]:
+            if o not in covering or SLOT[form(o)] == SLOT[form(n)]:
                 continue
-            c = vol[o].classify(gv[o], gv[n], reach)
+            c = vol[o].classify(gv[o], gv[n], reach, follower(wd[n], wd[o], gap))
             if c.any():
                 cls[b] = c
         inner[n] = to_bits(cls, len(gv[n]))
