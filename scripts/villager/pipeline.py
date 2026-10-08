@@ -3,8 +3,10 @@
 
   body        MakeHuman base → decimated body, morphs, joints, weights (cached)
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
-  garments    each dress form built round the body, weights transferred, then
-              fitted to every clip frame at every body corner (fit.py) (cached)
+  garments    each dress form built round the body in the build pose as the
+              game draws it, weights transferred, fitted to every pose the
+              report measures at every body corner, then settled clear of the
+              body in the build pose at every corner (fit.py) (cached)
   (mask)      each garment's cover mask over the body and the garments of
               other slots (mask.py), computed whenever the garments are read
   export      public/models/villager.glb (body with its cover mask, clips;
@@ -98,7 +100,7 @@ def main():
     if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
         import garments as G
         import fit as F
-        garments = cached(a.work, 'garments', lambda: F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), force='garments' in steps)
+        garments = cached(a.work, 'garments', lambda: F.settle(body, F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg), force='garments' in steps)
     if garments is not None:
         garments['mask'] = MK.masks(body, garments, cfg)
     if 'export' in steps:

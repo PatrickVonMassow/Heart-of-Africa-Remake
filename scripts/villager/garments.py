@@ -6,7 +6,9 @@ body's morph targets (work-order "glTF villager body", final states 3 and 6).
 How a garment is made:
 1. The body is posed into a DESIGN POSE — the arms hanging at the sides, as a
    garment is worn — because a cloak or a robe tailored round MakeHuman's
-   A-pose would stand off the arms like a tent once they hang.
+   A-pose would stand off the arms like a tent once they hang. It is posed
+   along the game's own path (gamepath.py), so the build pose is the one the
+   game draws.
 2. The garment is swept as rings: at each height the body's horizontal outline
    (the convex hull of the body's section there: the torso, the legs together
    below the crotch, the arms too for a cloak), eased off it and flared toward
@@ -17,17 +19,16 @@ How a garment is made:
    Blender's Data Transfer "nearest face interpolated"), then they are smoothed
    along the garment (a skirt spans both legs, so its weights must blend from
    one thigh to the other, never tear between them).
-4. The garment is UNPOSED into the rest pose by inverting its own blend of bone
-   transforms, so in the game it is skinned exactly like the body.
+4. The garment is UNPOSED into the rest pose by inverting the game's path
+   with its own four bones, so in the game it is skinned exactly like the body.
 5. Morphs: each garment vertex is bound to the rest body's surface and follows
    every morph target there, so a child's or a woman's dress fits that body.
 """
 import numpy as np
 
-import rig
 import skeleton as SK
 from body import MORPHS, apply_map, surface_map, triangulate
-from gltfio import qfrom_to, qinv, qmul, qnorm, qmat
+from gltfio import qfrom_to, qinv, qmul, qnorm
 
 N_RADIAL = 24
 
@@ -44,42 +45,13 @@ def design_pose(body):
         iu, il, ih = SK.INDEX['upperArm.' + s], SK.INDEX['forearm.' + s], SK.INDEX['hand.' + s]
         u0 = j[il, :3] - j[iu, :3]
         f0 = j[ih, :3] - j[il, :3]
-        u1 = np.array([sx * 0.16, -1.0, 0.0])
-        f1 = np.array([sx * 0.10, -1.0, 0.12])
+        u1 = np.array([sx * 0.26, -1.0, 0.0])
+        f1 = np.array([sx * 0.20, -1.0, 0.12])
         Wu = qfrom_to(u0, u1)
         Wf = qfrom_to(f0, f1)
         q[iu] = Wu
         q[il] = qnorm(qmul(qinv(Wu), Wf))
     return q
-
-
-def skin_full(verts, W, joints, wr, wp):
-    """Linear blend skinning with every bone's weight (n × bones)."""
-    h = joints[:, :3]
-    out = np.zeros_like(verts)
-    for b in range(len(SK.NAMES)):
-        w = W[:, b]
-        m = w > 1e-6
-        if not m.any():
-            continue
-        R = qmat(wr[b])
-        out[m] += w[m, None] * ((verts[m] - h[b]) @ R.T + wp[b])
-    return out
-
-
-def unskin(verts, W, joints, wr, wp):
-    """Invert the blend: the rest position that `W` skins to `verts`."""
-    h = joints[:, :3]
-    out = np.zeros_like(verts)
-    Rs = [qmat(q) for q in wr]
-    for k, v in enumerate(verts):
-        A = np.zeros((3, 3))
-        t = np.zeros(3)
-        for b in np.nonzero(W[k] > 1e-6)[0]:
-            A += W[k, b] * Rs[b]
-            t += W[k, b] * (wp[b] - Rs[b] @ h[b])
-        out[k] = np.linalg.solve(A, v - t)
-    return out
 
 
 # ---- outlines --------------------------------------------------------------------------
@@ -137,17 +109,22 @@ class Body:
         self.j = body['joints']
         self.idx = mh.groups['body']
         self.W = body['Wfull']
-        wr, wp = rig.fk(self.j, q, None)
+        # posed along the game's own path (gamepath.py: hung, baked, skinned
+        # by the hung bones), so a garment is tailored round the body the
+        # game draws in this pose, not round a single blend of it
+        import gamepath as GP
+        from body import top4
+        self.person = GP.Person(self.j)
+        wr, wp = self.person.build_pose(q)
         self.wr, self.wp = wr, wp
-        self.v = skin_full(body['basis_full'], self.W, self.j, wr, wp)
+        self.v = self.person.draw(body['basis_full'], *top4(self.W), wr, wp)
         self.tris = np.array([t for t, _ in triangulate(mh.body_quads())])
         from mathutils.bvhtree import BVHTree
         self.tree = BVHTree.FromPolygons(self.v.tolist(), self.tris.tolist(), all_triangles=True)
         # the body the game draws (decimated) in the same pose: a garment must
         # clear it too — decimation moves the surface by up to ~2 cm
-        from body import top4
         di, dw = top4(body['W'])
-        self.dv = rig.skin(body['pos'], di, dw, self.j, wr, wp)
+        self.dv = self.person.draw(body['pos'], di, dw, wr, wp)
         self.dtree = BVHTree.FromPolygons(self.dv.tolist(), body['tris'].tolist(), all_triangles=True)
         W = self.W
 
@@ -409,7 +386,6 @@ def build_form(B, form, wear, L):
         for k, y in enumerate(ys):
             # over the shoulders the outline holds the arms too: it drapes them
             m = allm if y < L['shoulder'] + 0.005 * H else (B.arm < 0.2)
-            m = m & (B.lower_arm < 0.4)
             ease = (0.02 + 0.012 * k / len(ys)) * H if k else 0.012 * H
             c, r = B.ring(y, m & (B.head < 0.3), ease)
             t = (k / (len(ys) - 1))
@@ -436,7 +412,9 @@ def build_form(B, form, wear, L):
             rings.append((y, c, r))
         face_lo = L['chin'] - 0.02 * H
         face_hi = L['chin'] + 0.10 * H
-        return sweep(rings, closed_top=True, keep=lambda k, i: not (abs(ang(i)) < 0.7 and face_lo < rings[k][0] < face_hi)), 2
+        # the rings run from the waist up: the crown, the LAST ring, is the
+        # closed end (a cap on the first ring was a disc through the chest)
+        return sweep(rings, closed_bottom=True, keep=lambda k, i: not (abs(ang(i)) < 0.7 and face_lo < rings[k][0] < face_hi)), 2
     if form in ('turban', 'cap', 'headband'):
         hc = L['chin'] + 0.07 * H
         lo = hc + (0.02 if form == 'headband' else 0.01 if form == 'turban' else 0.03) * H
@@ -630,11 +608,100 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
         W = skirt_weights(v, W, *skirt)
     W[W < 0.02] = 0
     W /= W.sum(1, keepdims=True)
-    rest = unskin(v, W, B.j, B.wr, B.wp)
+    # unposed through the game's path with the four bones the game skins by
+    from body import top4
+    rest = B.person.undraw(v, *top4(W), B.wr, B.wp)
     idx, bary, off = surface_map(mh, body['basis_full'], rest)
     pos = apply_map(body['basis_full'], idx, bary, off)
     morph = {k: apply_map(body['basis_full'] + body['deltas_full'][k], idx, bary, off) - pos for k in MORPHS}
-    return {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph}
+    # how far the game draws the garment in the build pose from where it was
+    # tailored (the build-pose difference the penetration report states)
+    drift = float(np.linalg.norm(B.person.draw(pos, *top4(W), B.wr, B.wp) - v, axis=1).max())
+    return {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph, 'build_drift': drift}
+
+
+def refine(g, maxlen):
+    """Split every cloth edge longer than `maxlen` at its midpoint (every
+    attribute interpolated there) until none is: the same cloth, but with
+    vertices close enough that it can follow a curved body part instead of
+    cutting it by a chord. A triangle is split by how many of its edges are
+    (one: two triangles, two: three across the shorter diagonal, three: four),
+    so no edge is left with a vertex in its middle."""
+    attrs = {'pos': g['pos'], 'uv': g['uv'], 'W': g['W'], **{'m:' + k: v for k, v in g['morph_pos'].items()}}
+    t = np.asarray(g['tris'])
+    while True:
+        p = attrs['pos']
+        e = np.sort(np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]]), axis=1)
+        u = np.unique(e, axis=0)
+        long = u[np.linalg.norm(p[u[:, 0]] - p[u[:, 1]], axis=1) > maxlen]
+        if not len(long):
+            break
+        mid = {(int(a), int(b)): len(p) + k for k, (a, b) in enumerate(long)}
+        attrs = {k: np.concatenate([v, 0.5 * (v[long[:, 0]] + v[long[:, 1]])]) for k, v in attrs.items()}
+        p = attrs['pos']
+        out = []
+        for tri in t.tolist():
+            m = [mid.get((min(tri[i], tri[(i + 1) % 3]), max(tri[i], tri[(i + 1) % 3]))) for i in range(3)]
+            n = sum(x is not None for x in m)
+            if n == 0:
+                out.append(tri)
+                continue
+            if n == 3:
+                a, b, c = tri
+                ab, bc, ca = m
+                out += [[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]
+                continue
+            # rotate so edge 0 (a→b) is split and, with two, edge 1 (b→c) too
+            r = next(i for i in range(3) if m[i] is not None and (n == 1 or m[(i + 1) % 3] is not None))
+            a, b, c = tri[r:] + tri[:r]
+            ab, bc = m[r], m[(r + 1) % 3]
+            if n == 1:
+                out += [[a, ab, c], [ab, b, c]]
+                continue
+            out.append([ab, b, bc])
+            if np.linalg.norm(p[a] - p[bc]) <= np.linalg.norm(p[ab] - p[c]):
+                out += [[a, ab, bc], [a, bc, c]]
+            else:
+                out += [[a, ab, c], [ab, bc, c]]
+        t = np.array(out)
+    g = dict(g)
+    g['pos'], g['uv'], g['W'], g['tris'] = attrs['pos'], attrs['uv'], attrs['W'], t
+    g['morph_pos'] = {k[2:]: v for k, v in attrs.items() if k.startswith('m:')}
+    return g
+
+
+ARM_BONES = tuple(f'{b}.{s}' for b in ('upperArm', 'forearm', 'hand') for s in 'LR')
+
+
+def armholes(B, g):
+    """Cut the cloth an arm passes through in the build pose: every triangle
+    whose centre lies inside the drawn body where that is an arm (the
+    nearest body triangle's bone). Cloth round the trunk would otherwise cut
+    through the upper arm where it meets the trunk at the armpit — no
+    settling can take a surface across that crease without folding it into
+    one or the other — and the arm comes out through an opening instead."""
+    from body import top4
+    from fit import inside
+    arm = {SK.INDEX[b] for b in ARM_BONES}
+    dom = np.argmax(B.body['W'], 1)
+    gv = B.person.draw(g['pos'], *top4(g['W']), B.wr, B.wp)
+    t = np.asarray(g['tris'])
+    keep = np.ones(len(t), bool)
+    for k, c in enumerate(gv[t].mean(1).tolist()):
+        _co, _n, fi, _d = B.dtree.find_nearest(c)
+        if dom[B.body['tris'][fi][0]] in arm and inside(B.dtree, c):
+            keep[k] = False
+    if keep.all():
+        return g, 0
+    used = np.unique(t[keep])
+    remap = np.full(len(g['pos']), -1)
+    remap[used] = np.arange(len(used))
+    out = dict(g)
+    out['tris'] = remap[t[keep]]
+    for key in ('pos', 'uv', 'W'):
+        out[key] = g[key][used]
+    out['morph_pos'] = {m: d[used] for m, d in g['morph_pos'].items()}
+    return out, int((~keep).sum())
 
 
 def hair_cap(mh, body, B):
@@ -689,6 +756,11 @@ def build_garments(mh, body, clips, cfg):
         crotch = L['hip'] - 0.03 * H
         skirt = (crotch, float(v[:, 1].min())) if form in SKIRTS and v[:, 1].min() < crotch else None
         g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings')
+        g = refine(g, cfg['VILLAGER_ASSET']['garmentEdgeMax'])
+        if form != 'limbRings':
+            g, cut_n = armholes(B, g)
+            if cut_n:
+                print(f'garment {mesh_name(form, wear)}: {cut_n} triangles cut where an arm passes through')
         g['part'] = 'garment'
         g['extras'] = {'form': form, 'wear': wear, 'bottom': float(v[:, 1].min())}
         meshes[name] = g
