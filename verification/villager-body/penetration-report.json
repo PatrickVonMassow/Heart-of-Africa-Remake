@@ -3,195 +3,1251 @@
  "stride": 1,
  "garments": {
   "g-loinFlap-waist": {
-   "depth": 0.0026964350796237265,
-   "at": "dig frame 15 (male adult build +1)",
-   "over": 0,
+   "cloth": {
+    "value": 0.01681053676432513,
+    "at": "kneelUp frame 5 (male adult build +1)",
+    "over": 171,
+    "part": "chest"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.04491233453154564,
+    "at": "under g-toga-leftShoulder, kneelUp frame 0 (female child build +0)",
+    "over": 5820,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.03539657965302467,
+    "at": "under g-toga-leftShoulder, kneelUp frame 5 (male child build +0)",
+    "over": 515,
+    "part": "spine"
+   },
    "checked": 5820
   },
   "g-girdleTails-waist": {
-   "depth": 0.0025586083262448193,
-   "at": "kneelUp frame 4 (male adult build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.015133985968780931,
+    "at": "kneelUp frame 0 (female adult build +0)",
+    "over": 279,
+    "part": "spine"
+   },
+   "shown": {
+    "value": 0.004194478038698435,
+    "at": "sprint frame 12 stride 1.35 (male child build +0)",
+    "over": 3,
+    "part": "hips"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.040647268295288086,
+    "at": "under g-toga-rightShoulder, sprint frame 4 stride 1.35 (female child build +0)",
+    "over": 5820,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.033224642276763916,
+    "at": "under g-toga-leftShoulder, kneelUp frame 5 (male child build +0)",
+    "over": 517,
+    "part": "spine"
+   },
    "checked": 5820
   },
   "g-apron-waist": {
-   "depth": 0.002688022623615392,
-   "at": "dig frame 21 (male youth build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.03704691852823947,
+    "at": "sprint frame 3 stride 1.35 (male elder build +0)",
+    "over": 2340,
+    "part": "thigh.L"
+   },
+   "shown": {
+    "value": 3.0811806936981156e-05,
+    "at": "sprint frame 13 stride 1.35 (male child build +0)",
+    "over": 0,
+    "part": "hips"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.04156629368662834,
+    "at": "under g-robe-chest, sprint frame 4 stride 1.35 (female child build +0)",
+    "over": 5820,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.03386485204100609,
+    "at": "under g-toga-leftShoulder, kneelUp frame 5 (male child build +0)",
+    "over": 647,
+    "part": "spine"
+   },
    "checked": 5820
   },
   "g-skirtShort-waist": {
-   "depth": 0.0026963557995394916,
-   "at": "kneelUp frame 1 (female adult build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.050662159739788666,
+    "at": "sprint frame 7 stride 1.35 (male adult build +1)",
+    "over": 1682,
+    "part": "thigh.R"
+   },
+   "shown": {
+    "value": 0.03140076994895935,
+    "at": "sprint frame 6 stride 1.35 (male adult build +0)",
+    "over": 95,
+    "part": "thigh.R"
+   },
+   "hole": {
+    "value": 0.0076941316947340965,
+    "at": "sprint frame 13 stride 1.35 (male child build +0)",
+    "over": 3,
+    "part": "hips"
+   },
+   "cut": {
+    "value": 0.00024261213548015803,
+    "at": "sprint frame 4 stride 1.35 (male elder build +0)",
+    "over": 0,
+    "part": "hips"
+   },
+   "inner": {
+    "value": 0.03745682165026665,
+    "at": "under g-toga-leftShoulder, kneelUp frame 4 (male child build +0)",
+    "over": 5584,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.028804179280996323,
+    "at": "under g-toga-leftShoulder, kneelUp frame 5 (male child build +0)",
+    "over": 240,
+    "part": "spine"
+   },
    "checked": 5820
   },
   "g-skirtKnee-waist": {
-   "depth": 0.002699140136303263,
-   "at": "dig frame 54 (male child build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.06056554242968559,
+    "at": "sprint frame 13 stride 1.35 (female child build +0)",
+    "over": 5814,
+    "part": "thigh.R"
+   },
+   "shown": {
+    "value": 0.10460129380226135,
+    "at": "sprint frame 4 stride 1.35 (female child build +0)",
+    "over": 3142,
+    "part": "thigh.R"
+   },
+   "hole": {
+    "value": 0.037281788885593414,
+    "at": "sprint frame 13 stride 1.35 (male child build +0)",
+    "over": 70,
+    "part": "thigh.R"
+   },
+   "cut": {
+    "value": 0.044612396508455276,
+    "at": "sprint frame 4 stride 1.35 (male child build +0)",
+    "over": 148,
+    "part": "thigh.R"
+   },
+   "inner": {
+    "value": 0.055055923759937286,
+    "at": "under g-robe-chest, sprint frame 13 stride 1.35 (male adult build +1)",
+    "over": 5592,
+    "part": "thigh.L"
+   },
+   "innerHole": {
+    "value": 0.037276022136211395,
+    "at": "under g-toga-leftShoulder, kneelUp frame 8 (male child build +0)",
+    "over": 660,
+    "part": "spine"
+   },
    "checked": 5820
   },
   "g-wrapLong-waist": {
-   "depth": 0.0026990482353299963,
-   "at": "sprint frame 12 (male adult build -1)",
-   "over": 0,
+   "cloth": {
+    "value": 0.06650053709745407,
+    "at": "kneelUp frame 9 (male adult build +1)",
+    "over": 5820,
+    "part": "thigh.L"
+   },
+   "shown": {
+    "value": 0.04588477313518524,
+    "at": "sprint frame 5 stride 1.35 (female child build +0)",
+    "over": 1322,
+    "part": "shin.R"
+   },
+   "hole": {
+    "value": 0.013827444985508919,
+    "at": "sprint frame 13 stride 1.35 (male child build +0)",
+    "over": 9,
+    "part": "thigh.L"
+   },
+   "cut": {
+    "value": 0.04147074371576309,
+    "at": "sprint frame 5 stride 1.35 (female child build +0)",
+    "over": 84,
+    "part": "shin.R"
+   },
+   "inner": {
+    "value": 0.05558568239212036,
+    "at": "under g-shirt-chest, sprint frame 4 stride 1.35 (male child build +0)",
+    "over": 5767,
+    "part": "thigh.R"
+   },
+   "innerHole": {
+    "value": 0.02405478246510029,
+    "at": "under g-robe-chest, sprint frame 2 stride 1.35 (female youth build +0)",
+    "over": 1297,
+    "part": "thigh.L"
+   },
    "checked": 5820
   },
   "g-wrapLong-chest": {
-   "depth": 0.0026998978354943,
-   "at": "walk frame 18 stride 0.75 (male child build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.1553325206041336,
+    "at": "dig frame 28 (female child build +0)",
+    "over": 5820,
+    "part": "chest"
+   },
+   "shown": {
+    "value": 0.05968526750802994,
+    "at": "kneelUp frame 11 (female youth build +0)",
+    "over": 5540,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.01691283844411373,
+    "at": "kneelUp frame 1 (female adult build +0)",
+    "over": 57,
+    "part": "thigh.L"
+   },
+   "cut": {
+    "value": 0.04769464582204819,
+    "at": "sprint frame 5 stride 1.35 (female child build +0)",
+    "over": 362,
+    "part": "shin.R"
+   },
+   "inner": {
+    "value": 0.04038648307323456,
+    "at": "under g-cloak-leftShoulder, kneel frame 0 (female child build +0)",
+    "over": 5811,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.014525262638926506,
+    "at": "under g-robe-chest, sprint frame 16 (female elder build +0)",
+    "over": 567,
+    "part": "thigh.R"
+   },
    "checked": 5820
   },
   "g-skirtShort-chest": {
-   "depth": 0.002699915003994665,
-   "at": "dig frame 44 (female elder build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.0479174128670477,
+    "at": "sprint frame 6 stride 1.35 (male adult build +0)",
+    "over": 4456,
+    "part": "thigh.R"
+   },
+   "shown": {
+    "value": 0.033470768481492996,
+    "at": "kneelUp frame 13 (female adult build +0)",
+    "over": 3607,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.013574041426181793,
+    "at": "dig frame 37 (male elder build +0)",
+    "over": 0,
+    "part": "spine"
+   },
+   "inner": {
+    "value": 0.0671224519610405,
+    "at": "under g-cape-bothShoulders, dig frame 9 (female adult build +0)",
+    "over": 5652,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.03198782354593277,
+    "at": "under g-cape-leftShoulder, kneelUp frame 2 (female elder build +0)",
+    "over": 283,
+    "part": "chest"
+   },
    "checked": 5820
   },
   "g-skirtKnee-chest": {
-   "depth": 0.002699666038142912,
-   "at": "walk frame 35 (male adult build -1)",
-   "over": 0,
+   "cloth": {
+    "value": 0.11975987255573273,
+    "at": "kneelDown frame 12 (female child build +0)",
+    "over": 5820,
+    "part": "thigh.L"
+   },
+   "shown": {
+    "value": 0.10328047722578049,
+    "at": "sprint frame 4 stride 1.35 (female child build +0)",
+    "over": 5690,
+    "part": "thigh.R"
+   },
+   "hole": {
+    "value": 0.03731902688741684,
+    "at": "sprint frame 13 stride 1.35 (male child build +0)",
+    "over": 112,
+    "part": "thigh.R"
+   },
+   "cut": {
+    "value": 0.04725554585456848,
+    "at": "sprint frame 4 stride 1.35 (male child build +0)",
+    "over": 182,
+    "part": "thigh.R"
+   },
+   "inner": {
+    "value": 0.05916057899594307,
+    "at": "under g-cape-bothShoulders, dig frame 10 (female adult build +0)",
+    "over": 5777,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.03434383124113083,
+    "at": "under g-toga-rightShoulder, walk frame 3 stride 1.35 (female elder build +0)",
+    "over": 465,
+    "part": "thigh.L"
+   },
    "checked": 5820
   },
   "g-trousers-waist": {
-   "depth": 0.002699608842428777,
-   "at": "kneelDown frame 19 (male youth build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.026964327320456505,
+    "at": "kneelDown frame 15 (female youth build +0)",
+    "over": 1529,
+    "part": "thigh.L"
+   },
+   "shown": {
+    "value": 0.020587116479873657,
+    "at": "kneelUp frame 6 (female child build +0)",
+    "over": 2389,
+    "part": "hips"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0112061258405447,
+    "at": "kneel frame 0 (female child build +0)",
+    "over": 0,
+    "part": "thigh.L"
+   },
+   "inner": {
+    "value": 0.11211075633764267,
+    "at": "under g-shirt-chest, sprint frame 4 stride 1.35 (male child build +0)",
+    "over": 5742,
+    "part": "thigh.R"
+   },
+   "innerHole": {
+    "value": 0.04166797176003456,
+    "at": "under g-shirt-chest, sprint frame 13 stride 1.35 (male child build +0)",
+    "over": 421,
+    "part": "thigh.R"
+   },
    "checked": 5820
   },
   "g-breastCloth-chest": {
-   "depth": 0.0026999524443734346,
-   "at": "walk frame 34 (male adult build -1)",
-   "over": 0,
+   "cloth": {
+    "value": 0.03299981883699718,
+    "at": "dig frame 59 (male child build +0)",
+    "over": 5153,
+    "part": "upperArm.R"
+   },
+   "shown": {
+    "value": 0.0669589638710022,
+    "at": "kneelUp frame 4 (female adult build +0)",
+    "over": 5759,
+    "part": "upperArm.L"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.07325036078691483,
+    "at": "under g-cape-bothShoulders, dig frame 11 (female adult build +0)",
+    "over": 5820,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.05517788603901863,
+    "at": "under g-cape-leftShoulder, kneelUp frame 0 (female adult build +0)",
+    "over": 915,
+    "part": "chest"
+   },
    "checked": 5820
   },
   "g-shirt-chest": {
-   "depth": 0.0026999424281620513,
-   "at": "carryIdle frame 19 (female elder build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.07762906700372696,
+    "at": "kneelUp frame 21 (male child build +0)",
+    "over": 5820,
+    "part": "chest"
+   },
+   "shown": {
+    "value": 0.09041821956634521,
+    "at": "sprint frame 4 stride 1.35 (female adult build +0)",
+    "over": 4630,
+    "part": "thigh.R"
+   },
+   "hole": {
+    "value": 0.04116927832365036,
+    "at": "dig frame 36 (female adult build +0)",
+    "over": 1947,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.0410221666097641,
+    "at": "dig frame 34 (female adult build +0)",
+    "over": 1497,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.04934358224272728,
+    "at": "under g-trousers-waist, walk frame 37 stride 1.35 (male adult build +1)",
+    "over": 5820,
+    "part": "thigh.L"
+   },
+   "innerHole": {
+    "value": 0.028246616944670677,
+    "at": "under g-cape-leftShoulder, kneelUp frame 4 (male elder build +0)",
+    "over": 487,
+    "part": "chest"
+   },
    "checked": 5820
   },
   "g-robe-chest": {
-   "depth": 0.0026999424281620513,
-   "at": "carryIdle frame 19 (female elder build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.0664217621088028,
+    "at": "sprint frame 3 (male child build +0)",
+    "over": 5820,
+    "part": "spine"
+   },
+   "shown": {
+    "value": 0.047601308673620224,
+    "at": "kneelDown frame 20 (female adult build +0)",
+    "over": 4042,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.04662705957889557,
+    "at": "kneelDown frame 18 (female adult build +0)",
+    "over": 1950,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.05183839052915573,
+    "at": "kneelDown frame 19 (female adult build +0)",
+    "over": 1980,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.07800330221652985,
+    "at": "under g-wrapLong-chest, sprint frame 4 stride 1.35 (female adult build +0)",
+    "over": 5820,
+    "part": "thigh.R"
+   },
+   "innerHole": {
+    "value": 0.028246616944670677,
+    "at": "under g-cape-leftShoulder, kneelUp frame 4 (male elder build +0)",
+    "over": 183,
+    "part": "chest"
+   },
    "checked": 5820
   },
   "g-toga-leftShoulder": {
-   "depth": 0.002699060156850855,
-   "at": "kneelUp frame 16 (male adult build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.12054498493671417,
+    "at": "kneelDown frame 13 (male elder build +0)",
+    "over": 5820,
+    "part": "chest"
+   },
+   "shown": {
+    "value": 0.05098376050591469,
+    "at": "kneelUp frame 19 (female adult build +0)",
+    "over": 3613,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.04215981438755989,
+    "at": "sprint frame 5 stride 1.35 (female elder build +0)",
+    "over": 142,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.05195914953947067,
+    "at": "kneelUp frame 18 (female adult build +0)",
+    "over": 2030,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.07805146276950836,
+    "at": "under g-wrapLong-chest, sprint frame 4 stride 1.35 (female adult build +0)",
+    "over": 5820,
+    "part": "thigh.R"
+   },
+   "innerHole": {
+    "value": 0.015239838510751724,
+    "at": "under g-cape-leftShoulder, kneelUp frame 4 (female elder build +0)",
+    "over": 269,
+    "part": "chest"
+   },
    "checked": 5820
   },
   "g-toga-rightShoulder": {
-   "depth": 0.002699924758226742,
-   "at": "idle frame 36 (male child build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.12898969650268555,
+    "at": "sprint frame 11 stride 0.75 (female child build +0)",
+    "over": 5820,
+    "part": "hips"
+   },
+   "shown": {
+    "value": 0.05306222289800644,
+    "at": "kneelDown frame 18 (female adult build +0)",
+    "over": 4178,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.033901724964380264,
+    "at": "sprint frame 13 (female youth build +0)",
+    "over": 154,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.05343885347247124,
+    "at": "kneelDown frame 19 (female adult build +0)",
+    "over": 2072,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.07805146276950836,
+    "at": "under g-wrapLong-chest, sprint frame 4 stride 1.35 (female adult build +0)",
+    "over": 5819,
+    "part": "thigh.R"
+   },
+   "innerHole": {
+    "value": 0.015154371969401836,
+    "at": "under g-wrapLong-waist, sprint frame 4 (male adult build +1)",
+    "over": 205,
+    "part": "thigh.R"
+   },
    "checked": 5820
   },
   "g-cloak-bothShoulders": {
-   "depth": 0.002698195341029324,
-   "at": "idle frame 57 (male adult build +1)",
-   "over": 0,
+   "cloth": {
+    "value": 0.04322465530683938,
+    "at": "sprint frame 3 stride 1.35 (female child build +0)",
+    "over": 5820,
+    "part": "thigh.L"
+   },
+   "shown": {
+    "value": 0.09317050874233246,
+    "at": "dig frame 45 (male adult build -1)",
+    "over": 5728,
+    "part": "upperArm.R"
+   },
+   "hole": {
+    "value": 0.07766088843345642,
+    "at": "dig frame 44 (female child build +0)",
+    "over": 695,
+    "part": "upperArm.R"
+   },
+   "cut": {
+    "value": 0.08833117038011551,
+    "at": "dig frame 45 (male adult build -1)",
+    "over": 1314,
+    "part": "upperArm.R"
+   },
+   "inner": {
+    "value": 0.022354058921337128,
+    "at": "under g-veil-face, dig frame 26 (female adult build +0)",
+    "over": 3238,
+    "part": "upperArm.L"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-cloak-leftShoulder": {
-   "depth": 0.0026999417130648875,
-   "at": "sprint frame 13 (female adult build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.04574757306502572,
+    "at": "sprint frame 4 stride 1.35 (male adult build +1)",
+    "over": 5820,
+    "part": "thigh.R"
+   },
+   "shown": {
+    "value": 0.08282021433115005,
+    "at": "kneelUp frame 3 (male adult build -1)",
+    "over": 5031,
+    "part": "forearm.L"
+   },
+   "hole": {
+    "value": 0.07362477481365204,
+    "at": "kneelUp frame 2 (male adult build +1)",
+    "over": 174,
+    "part": "upperArm.L"
+   },
+   "cut": {
+    "value": 0.07338882237672806,
+    "at": "kneelUp frame 3 (male adult build -1)",
+    "over": 952,
+    "part": "upperArm.L"
+   },
+   "inner": {
+    "value": 0.030498014762997627,
+    "at": "under g-veil-face, dig frame 34 (male adult build +0)",
+    "over": 3116,
+    "part": "upperArm.L"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-cloak-rightShoulder": {
-   "depth": 0.00269947546997806,
-   "at": "walk frame 37 stride 1.35 (male adult build +1)",
-   "over": 0,
+   "cloth": {
+    "value": 0.04828732652391246,
+    "at": "sprint frame 4 stride 1.35 (male adult build +1)",
+    "over": 5820,
+    "part": "thigh.R"
+   },
+   "shown": {
+    "value": 0.09317170083522797,
+    "at": "dig frame 45 (male adult build -1)",
+    "over": 4873,
+    "part": "upperArm.R"
+   },
+   "hole": {
+    "value": 0.0806959792971611,
+    "at": "dig frame 43 (female child build +0)",
+    "over": 447,
+    "part": "upperArm.R"
+   },
+   "cut": {
+    "value": 0.08833237737417221,
+    "at": "dig frame 45 (male adult build -1)",
+    "over": 1081,
+    "part": "upperArm.R"
+   },
+   "inner": {
+    "value": 0.014447609893977642,
+    "at": "under g-veil-face, carry frame 25 stride 0.75 (male adult build +0)",
+    "over": 2440,
+    "part": "upperArm.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-cape-bothShoulders": {
-   "depth": 0.0026968501161587903,
-   "at": "carry frame 29 stride 0.75 (male adult build -1)",
-   "over": 0,
+   "cloth": {
+    "value": 0.051500472540636846,
+    "at": "kneelUp frame 7 (male adult build +1)",
+    "over": 5820,
+    "part": "thigh.L"
+   },
+   "shown": {
+    "value": 0.06814351677894592,
+    "at": "dig frame 9 (female adult build +0)",
+    "over": 2616,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.03165113553404808,
+    "at": "kneelUp frame 5 (male child build +0)",
+    "over": 267,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.012609756551682949,
+    "at": "dig frame 59 (female adult build +0)",
+    "over": 0,
+    "part": "upperArm.R"
+   },
+   "inner": {
+    "value": 0.03943799063563347,
+    "at": "under g-veil-face, dig frame 30 (female elder build +0)",
+    "over": 4397,
+    "part": "upperArm.L"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-cape-leftShoulder": {
-   "depth": 0.002698177163772976,
-   "at": "walk frame 29 stride 0.75 (female adult build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.050027966154584186,
+    "at": "kneelUp frame 6 (male adult build +1)",
+    "over": 5820,
+    "part": "thigh.L"
+   },
+   "shown": {
+    "value": 0.03298627585172653,
+    "at": "dig frame 26 (male child build +0)",
+    "over": 1913,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.05306793376803398,
+    "at": "kneel frame 0 (female adult build +0)",
+    "over": 795,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.024943774566054344,
+    "at": "dig frame 26 (female adult build +0)",
+    "over": 38,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.04441040754318237,
+    "at": "under g-veil-face, dig frame 38 (male adult build +0)",
+    "over": 3812,
+    "part": "upperArm.L"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-cape-rightShoulder": {
-   "depth": 0.002699873697713281,
-   "at": "dig frame 20 (male youth build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.05095461820033919,
+    "at": "kneelUp frame 8 (male adult build +0)",
+    "over": 5820,
+    "part": "thigh.L"
+   },
+   "shown": {
+    "value": 0.07057107239961624,
+    "at": "kneel frame 0 (female adult build +0)",
+    "over": 2393,
+    "part": "chest"
+   },
+   "hole": {
+    "value": 0.05949734151363373,
+    "at": "dig frame 59 (female elder build +0)",
+    "over": 1278,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.02327766828238964,
+    "at": "dig frame 58 (male adult build +0)",
+    "over": 38,
+    "part": "upperArm.R"
+   },
+   "inner": {
+    "value": 0.020956842228770256,
+    "at": "under g-veil-face, carryIdle frame 55 (male adult build +0)",
+    "over": 2650,
+    "part": "chest"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-hood-overHead": {
-   "depth": 0.0026971902861904194,
-   "at": "dig frame 41 (female adult build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.07744526257770509,
+    "at": "walk frame 20 stride 0.75 (male child build +0)",
+    "over": 5820,
+    "part": "chest"
+   },
+   "shown": {
+    "value": 0.05546505004167557,
+    "at": "kneelUp frame 2 (female adult build +0)",
+    "over": 4197,
+    "part": "upperArm.L"
+   },
+   "hole": {
+    "value": 0.03366566449403763,
+    "at": "kneel frame 0 (female elder build +0)",
+    "over": 998,
+    "part": "chest"
+   },
+   "cut": {
+    "value": 0.044573523104190826,
+    "at": "kneel frame 0 (female adult build +0)",
+    "over": 1969,
+    "part": "chest"
+   },
+   "inner": {
+    "value": 0.03298899903893471,
+    "at": "under g-skirtShort-chest, sprint frame 8 stride 0.75 (female child build +0)",
+    "over": 5819,
+    "part": "upperArm.R"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-turban-aroundHead": {
-   "depth": 0.0,
-   "at": null,
-   "over": 0,
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-cap-crown": {
-   "depth": 0.0,
-   "at": null,
-   "over": 0,
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-headband-aroundHead": {
-   "depth": 0.0,
-   "at": null,
-   "over": 0,
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-veil-face": {
-   "depth": 0.0026682997953857515,
-   "at": "kneelDown frame 15 (male adult build -1)",
-   "over": 0,
+   "cloth": {
+    "value": 0.0066410242799033545,
+    "at": "sprint frame 0 stride 0.75 (female child build +0)",
+    "over": 5106,
+    "part": "head"
+   },
+   "shown": {
+    "value": 0.01041580643504858,
+    "at": "kneelDown frame 12 (female child build +0)",
+    "over": 3039,
+    "part": "head"
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.04424765706062317,
+    "at": "under g-cloak-rightShoulder, kneelDown frame 21 (male child build +0)",
+    "over": 5820,
+    "part": "shoulder.R"
+   },
+   "innerHole": {
+    "value": 0.001644041039980948,
+    "at": "under g-hood-overHead, kneelDown frame 20 (female youth build +0)",
+    "over": 0,
+    "part": "chest"
+   },
    "checked": 5820
   },
   "g-headRing-crown": {
-   "depth": 0.0,
-   "at": null,
-   "over": 0,
+   "cloth": {
+    "value": 0.00021615811519353295,
+    "at": "walk frame 36 stride 0.75 (male child build +0)",
+    "over": 0,
+    "part": "head"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.006180000025779009,
+    "at": "under g-hood-overHead, kneelUp frame 6 (female child build +0)",
+    "over": 3378,
+    "part": "head"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-topknot-crown": {
-   "depth": 0.0,
-   "at": null,
-   "over": 0,
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.001665850286372006,
+    "at": "under g-hood-overHead, dig frame 1 (male child build +0)",
+    "over": 0,
+    "part": "head"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-hairBag-crown": {
-   "depth": 0.0,
-   "at": null,
-   "over": 0,
+   "cloth": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-neckBeads-neck": {
-   "depth": 0.0026989594498729396,
-   "at": "carry frame 15 stride 0.75 (male adult build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.008260560468241206,
+    "at": "walk frame 27 stride 0.75 (male adult build -1)",
+    "over": 5816,
+    "part": "neck"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.03244499862194061,
+    "at": "under g-toga-rightShoulder, kneelDown frame 20 (male child build +0)",
+    "over": 5820,
+    "part": "neck"
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   },
   "g-waistBeads-waist": {
-   "depth": 0.0026680820425780106,
-   "at": "sprint frame 4 (male youth build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.015951384972723325,
+    "at": "kneelUp frame 2 (female adult build +0)",
+    "over": 163,
+    "part": "spine"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0481712780892849,
+    "at": "under g-wrapLong-chest, sprint frame 4 stride 1.35 (female child build +0)",
+    "over": 5820,
+    "part": "spine"
+   },
+   "innerHole": {
+    "value": 0.03815792500972748,
+    "at": "under g-wrapLong-chest, kneelUp frame 11 (male adult build -1)",
+    "over": 443,
+    "part": "spine"
+   },
    "checked": 5820
   },
   "g-limbRings-limbs": {
-   "depth": 0.0026943011501399747,
-   "at": "dig frame 61 (female child build +0)",
-   "over": 0,
+   "cloth": {
+    "value": 0.013466391615433665,
+    "at": "carry frame 2 stride 0.75 (male child build +0)",
+    "over": 4539,
+    "part": "forearm.R"
+   },
+   "shown": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "hole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "cut": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "inner": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
+   "innerHole": {
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
+   },
    "checked": 5820
   }
  }

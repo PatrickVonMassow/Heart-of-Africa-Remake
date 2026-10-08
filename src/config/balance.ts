@@ -2590,13 +2590,28 @@ export const VILLAGER_ASSET = {
    *  steps, so a vertex caught between two body parts does not swing from
    *  one to the other. Calibratable. */
   garmentFitStep: 0.01,
-  /** Rounds of the per-frame baked collision resolution
-   *  (scripts/villager/resolve.py) before what is left is moved vertex by
-   *  vertex along its shortest way out. Calibratable. */
-  garmentResolveRounds: 16,
-  /** How many mesh rings out a resolved vertex's push spreads (halving each
-   *  ring), so the cloth bends round the body instead of kinking. Calibratable. */
-  garmentResolveRings: 2,
+  /** How near a garment's opening (neck, sleeve, hem, a cape's outline) a
+   *  covered body or inner-garment vertex stays drawn, only pushed inward,
+   *  instead of hidden under the worn garment (scripts/villager/mask.py; figure
+   *  units, ≈ 9 cm): skin at an opening stays visible. Calibratable. */
+  garmentMaskOpening: 0.07,
+  /** How far the game pushes a covered vertex it still draws inward along its
+   *  normal while the covering garment is worn (render/villagerGarmentMask.ts;
+   *  figure units, ≈ 5 mm). Calibratable. */
+  garmentMaskPush: 0.004,
+  /** How far a body or inner-garment vertex's skin weights may differ from
+   *  the covering cloth's (L1: 0 alike, 2 disjoint) and it still counts as
+   *  covered: a hand hanging inside a skirt's outline swings out of it and is
+   *  never hidden (scripts/villager/mask.py). Calibratable. */
+  garmentMaskWeightGap: 1.2,
+  /** How far a hidden body vertex may pass through the cloth that hides it
+   *  (the penetration report's "cut"): the cloth is drawn where the body
+   *  bulges past it, which is what hiding is for, until a limb looks cut off
+   *  (figure units, ≈ 2.6 cm). Calibratable. */
+  garmentMaskCutTolerance: 0.02,
+  /** How far apart the penetration report samples the cloth between a
+   *  garment's vertices (figure units, ≈ 5 cm). Calibratable. */
+  garmentFaceSpacing: 0.04,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

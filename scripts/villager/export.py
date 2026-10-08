@@ -6,7 +6,8 @@ mesh with its morph targets (POSITION only, sparse where a target moves few
 vertices; names in mesh.extras.targetNames — the game bakes the fixed sex, age
 and build morphs per figure on load and recomputes the normals, leaving only the
 closing hands as live morphs), every garment as a skinned mesh on the same skin with
-the same morph targets, the clips as animations (bone rotations, hips
+the same morph targets, the garment cover mask (mask.py) as attribute _COVER
+with its garment order in scene.extras.villager.garmentMask, the clips as animations (bone rotations, hips
 translation), and the runtime metadata in scene.extras.villager: the joints'
 morph deltas, the feet's contact points, each clip's natural ground speed and
 tool grip. src/render/villagerAsset.ts reads it.
@@ -24,7 +25,7 @@ def node_name(b):
     return b.replace('.', '_')
 
 
-def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=True, extra_attrs=None, extras=None):
+def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=True, extra_attrs=None, extras=None, cover=None):
     jidx, jw = top4(W)
     attrs = {
         'POSITION': w.accessor(pos.astype(np.float32), FLOAT, 'VEC3', target=34962, minmax=True),
@@ -36,6 +37,9 @@ def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=T
         attrs['NORMAL'] = w.accessor(n0.astype(np.float32), FLOAT, 'VEC3', target=34962)
     for k, v in (extra_attrs or {}).items():
         attrs[k] = w.accessor(v.astype(np.float32), FLOAT, 'VEC2' if v.shape[1] == 2 else 'VEC3' if v.shape[1] == 3 else 'VEC4', target=34962)
+    if cover is not None:
+        # the garment cover mask (mask.py): hide lo, hide hi, push lo, push hi
+        attrs['_COVER'] = w.accessor(np.asarray(cover, np.uint16), U16, 'VEC4', target=34962)
     targets = []
     for m in MORPHS:
         d = morphs[m]
@@ -64,7 +68,7 @@ def write_clip(w, name, clip, bone_nodes):
     w.j['animations'].append({'name': name, 'samplers': samplers, 'channels': channels})
 
 
-def export(path, mh, body, clips, garments, cfg):
+def export(path, mh, body, clips, garments, cfg, mask=None):
     w = GlbWriter()
     w.j['materials'].append({'name': 'villager', 'pbrMetallicRoughness': {'baseColorFactor': [0.4, 0.27, 0.18, 1], 'metallicFactor': 0, 'roughnessFactor': 0.85}})
     j = body['joints']
@@ -88,9 +92,11 @@ def export(path, mh, body, clips, garments, cfg):
             'inverseBindMatrices': w.accessor(ibm, FLOAT, 'MAT4')}
     w.j['skins'].append(skin)
     roots = [bone_nodes['hips']]
-    add_skinned_mesh(w, 'body', body['pos'], body['tris'], body['W'], body['morph_pos'], 0, roots, extras={'part': 'skin'})
+    add_skinned_mesh(w, 'body', body['pos'], body['tris'], body['W'], body['morph_pos'], 0, roots, extras={'part': 'skin'},
+                     cover=None if mask is None else mask['body'])
     for name, g in (garments or {}).get('meshes', {}).items():
-        add_skinned_mesh(w, name, g['pos'], g['tris'], g['W'], g['morph_pos'], 0, roots, extras={'part': g.get('part', 'garment'), **g.get('extras', {})})
+        add_skinned_mesh(w, name, g['pos'], g['tris'], g['W'], g['morph_pos'], 0, roots, extras={'part': g.get('part', 'garment'), **g.get('extras', {})},
+                         cover=None if mask is None else mask['inner'].get(name))
     clip_meta = {}
     for name, c in (clips or {}).get('clips', {}).items():
         if name not in EXPORT_CLIPS:
@@ -116,6 +122,8 @@ def export(path, mh, body, clips, garments, cfg):
     }
     if garments:
         meta['garments'] = garments.get('meta', {})
+    if mask is not None:
+        meta['garmentMask'] = {'garments': list(mask['garments'])}
     w.j['scenes'][0]['nodes'] = roots
     w.j['scenes'][0]['extras'] = {'villager': meta}
     w.write(path)

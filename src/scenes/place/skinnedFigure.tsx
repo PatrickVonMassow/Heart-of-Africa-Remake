@@ -179,7 +179,7 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
       ? cachedGltfFigure(asset, person, layers, key, skin, paint === skin ? null : paint, look.radial)
       : cachedFigure(p, layers, key, skin, paint === skin ? null : paint, look.radial)
   if (!geo.boundingBox) geo.computeBoundingBox()
-  const body = mesh(geo, figureMaterial(), 'figure-body')
+  const body = mesh(geo, figureMaterial(!!(asset && person)), 'figure-body')
   body.add(bones.hips)
   body.bind(skeleton, new THREE.Matrix4())
   const meshes = [body]
