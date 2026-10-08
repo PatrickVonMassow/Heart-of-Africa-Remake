@@ -176,7 +176,7 @@ GARMENT_COLOURS = [(0.75, 0.68, 0.55, 1), (0.55, 0.25, 0.18, 1), (0.25, 0.3, 0.5
 def masked(body, garments, worn, cfg):
     """The game's cover mask for an outfit `worn` (mask.py): the body's drawn
     triangles and pushed vertices, and per worn garment the same under the
-    others of another slot — (tris, push, {name: (tris, push)})."""
+    worn garments of an outer layer — (tris, push, {name: (tris, push)})."""
     import mask as MK
     mk = (garments or {}).get('mask')
     worn = [n for n in worn if n.startswith('g-')]
@@ -185,7 +185,7 @@ def masked(body, garments, worn, cfg):
     hide, push = MK.decode(mk['body'], mk['garments'], worn)
     inner = {}
     for n in worn:
-        over = [o for o in worn if MK.SLOT[MK.form(o)] != MK.SLOT[MK.form(n)]]
+        over = [o for o in worn if MK.layer(o) > MK.layer(n)]
         h, p = MK.decode(mk['inner'][n], mk['garments'], over)
         t = garments['meshes'][n]['tris']
         inner[n] = (t[MK.drawn_tris(t, h)], p)

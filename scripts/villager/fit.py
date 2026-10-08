@@ -340,6 +340,7 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
     for k in range(passes):
         settle_once(body, garments, cfg, log=log)
         settle_layers(body, garments, cfg, log=log)
+        settle_once(body, garments, cfg, log=log)
         split = 0
         if k < passes - 1:
             for n in [n for n in G if n.startswith('g-')]:
@@ -466,6 +467,9 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
         _pos, j = morphed(body, w)
         person = GP.Person(j)
         wr, wp = person.build_pose(q)
+        bpos, _j = morphed(body, w)
+        bjidx, bjw = top4(body['W'])
+        btree = BVHTree.FromPolygons(person.draw(bpos, bjidx, bjw, wr, wp).tolist(), body['tris'].tolist(), all_triangles=True)
         first = None
         for _r in range(rounds + 1):
             gv = {n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names}
@@ -485,6 +489,11 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                         co, _n, ti, _d = cloth.find_nearest(smp[k].tolist())
                         co = np.array(co)
                         u = smp[k] - co
+                        # only ever out from the body: an inner point past a
+                        # fold of the outer cloth never pulls it into the body
+                        _bc, bn, _bi, _bd = btree.find_nearest(co.tolist())
+                        if u @ np.array(bn) <= 0:
+                            continue
                         fi.append(to[ti])
                         fw.append(barycentric(co, *gv[o][to[ti]]))
                         need.append(np.linalg.norm(u) + margin)
