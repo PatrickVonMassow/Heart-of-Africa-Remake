@@ -46,6 +46,22 @@ describe('the visible-only penetration report', () => {
     }
   })
 
+  it('drops no column and clip main measured, except layerings of the outermost layer', () => {
+    // only a garment of an outer layer masks an inner one, so a garment of
+    // the outermost layer has no layering left; every other key must remain
+    const outermost = Math.max(...Object.values(LAYER))
+    const missing: string[] = []
+    for (const [n, g] of Object.entries(main.garments)) {
+      for (const key of Object.keys(g.clips)) {
+        if (key in now.garments[n].clips) continue
+        const col = key.split(' ')[0]
+        if ((col === 'inner' || col === 'innerHole') && layer(n) === outermost) continue
+        missing.push(`${n} ${key}`)
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
   it('names every value over tolerance as a case: column, clip, body part, outer garment', () => {
     for (const [n, g] of Object.entries(now.garments)) {
       for (const [key, v] of Object.entries(g.clips)) {
