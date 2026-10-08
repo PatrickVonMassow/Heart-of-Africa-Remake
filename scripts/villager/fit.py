@@ -141,7 +141,27 @@ def corners():
     return CORNERS
 
 
-def descend(state, frames, sample, apply, passes, stride, log=print):
+_D = {}
+
+
+def _reduce(ks):
+    """One pass's deepest values and largest pushes over the frames `ks`
+    (indices), the pass's arguments read from _D (set before a fork)."""
+    state, frames, sample, it, passes, stride, done = (_D[k] for k in ('state', 'frames', 'sample', 'it', 'passes', 'stride', 'done'))
+    deep = {n: 0.0 for n in state}
+    push = {n: np.zeros_like(state[n]) for n in state}
+    for k in ks:
+        res = sample(state, frames[k])
+        proposing = it < passes and k % stride == it % stride
+        for n, (d, p) in res.items():
+            deep[n] = max(deep[n], d)
+            if proposing and p is not None and n not in done:
+                take = np.einsum('ij,ij->i', p, p) > np.einsum('ij,ij->i', push[n], push[n])
+                push[n][take] = p[take]
+    return deep, push
+
+
+def descend(state, frames, sample, apply, passes, stride, log=print, workers=1):
     """The fit loop, free of geometry so it can be checked on its own.
 
     `state` {name: rest positions}; `frames` every frame the report measures;
@@ -151,22 +171,27 @@ def descend(state, frames, sample, apply, passes, stride, log=print):
     every candidate on the same frames as the report — while the pushes are
     proposed from every `stride`-th frame only (offset by the pass). A
     candidate deeper than the garment's best is undone and that garment stops,
-    so the returned state is never deeper than the one handed in."""
+    so the returned state is never deeper than the one handed in. `workers`
+    > 1 measures the frames in forked processes (the same result)."""
     names = list(state)
     best = {n: (np.inf, state[n].copy()) for n in names}
     done = set()
     idle = 0
     for it in range(passes + 1):
-        deep = {n: 0.0 for n in names}
+        _D.update(state=state, frames=frames, sample=sample, it=it, passes=passes, stride=stride, done=done)
+        if workers > 1:
+            import multiprocessing as mp
+            chunks = [range(c, len(frames), workers * 4) for c in range(workers * 4)]
+            with mp.get_context('fork').Pool(workers) as pool:
+                parts = pool.map(_reduce, chunks)
+        else:
+            parts = [_reduce(range(len(frames)))]
+        deep = {n: max(pd[n] for pd, _pp in parts) for n in names}
         push = {n: np.zeros_like(state[n]) for n in names}
-        for k, fr in enumerate(frames):
-            res = sample(state, fr)
-            proposing = it < passes and k % stride == it % stride
-            for n, (d, p) in res.items():
-                deep[n] = max(deep[n], d)
-                if proposing and p is not None and n not in done:
-                    take = np.einsum('ij,ij->i', p, p) > np.einsum('ij,ij->i', push[n], push[n])
-                    push[n][take] = p[take]
+        for _pd, pp in parts:
+            for n in names:
+                take = np.einsum('ij,ij->i', pp[n], pp[n]) > np.einsum('ij,ij->i', push[n], push[n])
+                push[n][take] = pp[n][take]
         moved = 0
         for n in names:
             if deep[n] <= best[n][0]:
@@ -242,7 +267,8 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
         return pos + spread(push, nb, twins)
 
     state = {n: G[n]['pos'].copy() for n in names}
-    state, deep = descend(state, frames, sample, apply, passes, stride, log)
+    import os
+    state, deep = descend(state, frames, sample, apply, passes, stride, log, workers=max(1, (os.cpu_count() or 2) - 1))
     for n in names:
         G[n]['pos'] = state[n]
     return garments
@@ -297,26 +323,30 @@ def way_out(tree, p, d, hits=64):
     return np.inf
 
 
-# The layer a garment's slot lies in, innermost first (src/systems/appearance.ts
-# LayerSlot; the head pieces sit under a hood): the clearance it is settled to
-# grows by VILLAGER_ASSET.garmentLayerGap per layer, so an inner garment never
-# settles where an outer one lies.
-LAYER = {'ornament': 0, 'hip': 1, 'head': 1, 'torso': 2, 'shoulder': 3}
-
-
-def settle(body, garments, cfg, passes=3, log=lambda *x: print(*x, flush=True)):
-    """settle_once, then every edge the settling stretched past garmentEdgeMax
-    split again (garments.refine) and settled again, until none is."""
-    from garments import refine
+def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
+    """Every edge split to garmentEdgeMax (garments.refine), the cloth an arm
+    passes through in the build pose cut (garments.armholes); then
+    settle_once and settle_layers, every edge the settling stretched split
+    again and settled again, until none is."""
+    import mask as M
+    from garments import armholes, refine
     G = garments['meshes']
+    for n in [n for n in G if n.startswith('g-')]:
+        G[n] = refine(G[n], cfg['VILLAGER_ASSET']['garmentEdgeMax'])
+        if M.form(n) != 'limbRings':
+            G[n], cut = armholes(body, G[n])
+            if cut:
+                log(f'settle {n}: {cut} triangles cut where an arm passes through')
     for k in range(passes):
         settle_once(body, garments, cfg, log=log)
+        settle_layers(body, garments, cfg, log=log)
         split = 0
-        for n in [n for n in G if n.startswith('g-')]:
-            nv = len(G[n]['pos'])
-            G[n] = refine(G[n], cfg['VILLAGER_ASSET']['garmentEdgeMax'])
-            split += len(G[n]['pos']) - nv
-        log(f'settle pass {k + 1}: {split} vertices added where the settling stretched the cloth')
+        if k < passes - 1:
+            for n in [n for n in G if n.startswith('g-')]:
+                nv = len(G[n]['pos'])
+                G[n] = refine(G[n], cfg['VILLAGER_ASSET']['garmentEdgeMax'])
+                split += len(G[n]['pos']) - nv
+            log(f'settle pass {k + 1}: {split} vertices added where the settling stretched the cloth')
         if not split:
             break
     return garments
@@ -326,7 +356,7 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
     """Settle every garment round the body in the BUILD POSE as the game draws
     it, at every body corner: every garment vertex at least its layer's
     clearance (VILLAGER_ASSET.garmentSettleClearance + garmentLayerGap per
-    LAYER) outside the drawn body, so with edges no longer than garmentEdgeMax
+    mask.LAYER) outside the drawn body, so with edges no longer than garmentEdgeMax
     (garments.refine) the cloth between the vertices clears it too. A vertex
     short of it moves out along the body's normal at its nearest point — or,
     inside where that way leads into another body part (the armpit, where the
@@ -347,7 +377,7 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
     names = [n for n in G if n.startswith('g-')]
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
-    clear = {n: a['garmentSettleClearance'] + a['garmentLayerGap'] * LAYER[M.SLOT[M.form(n)]] for n in names}
+    clear = {n: a['garmentSettleClearance'] + a['garmentLayerGap'] * M.layer(n) for n in names}
     for corner, morph in SETTLE_ORDER:
         w = corner_weights(*corner)
         pos, j = morphed(body, w)
@@ -360,12 +390,18 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
         for n in names:
             g = G[n]
             gi, gw = skin[n]
+            fi, fw = face_points(g['tris'], g['pos'], a['garmentFaceSpacing'])
             for _r in range(rounds):
                 gv = person.draw(garment_pos(g, w), gi, gw, wr, wp)
                 d, _co, nrm = depths(tree, gv)
                 need = clear[n] + d
                 bad = np.nonzero(need > 1e-6)[0]
-                if not len(bad):
+                # the cloth between the vertices: a point of it still inside
+                # (a curve tighter than the edges follow) moves its vertices
+                fp = np.einsum('kj,kji->ki', fw, gv[fi])
+                fd, _fc, fn = depths(tree, fp)
+                fb = np.nonzero(fd > 0)[0]
+                if not len(bad) and not len(fb):
                     break
                 dirs = nrm.copy()
                 for k in bad[d[bad] > 0]:
@@ -377,6 +413,10 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
                             need[k], dirs[k] = out + clear[n], r
                 push = np.zeros_like(gv)
                 push[bad] = need[bad, None] * dirs[bad]
+                if len(fb):
+                    pf = face_pushes(len(gv), g['tris'], fw[fb], fi[fb], fd[fb] + a['garmentFitMargin'], fn[fb])
+                    take = np.einsum('ij,ij->i', pf, pf) > np.einsum('ij,ij->i', push, push)
+                    push[take] = pf[take]
                 nb, twins = topo[n]
                 push = spread(push, nb, twins)
                 rest = person.undraw(gv + push, gi, gw, wr, wp) - person.undraw(gv, gi, gw, wr, wp)
@@ -384,7 +424,6 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
                     g['pos'] = g['pos'] + rest
                 else:
                     g['morph_pos'][morph] = g['morph_pos'][morph] + rest
-            fi, fw = face_points(g['tris'], g['pos'], a['garmentFaceSpacing'])
             gv = person.draw(garment_pos(g, w), gi, gw, wr, wp)
             last = float(max(0.0, depths(tree, np.concatenate([gv, np.einsum('kj,kji->ki', fw, gv[fi])]))[0].max()))
             worst = max(worst, last)
@@ -394,7 +433,7 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
     return garments
 
 
-def settle_layers(body, garments, cfg, q, rounds=3, log=print):
+def settle_layers(body, garments, cfg, rounds=6, log=print):
     """The same for every layering, in the build pose at every body corner: a
     point of an inner garment its cover mask leaves drawn under an outer one
     (mask.py) and outside that outer garment through its cloth pushes the
@@ -411,12 +450,14 @@ def settle_layers(body, garments, cfg, q, rounds=3, log=print):
     names = mk['garments']
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
+    from garments import design_pose
+    q = design_pose(body)
     pose = M.build_pose(body)
     vol = {n: M.Volume(pose(G[n]['pos'], G[n]['W']), G[n]['tris']) for n in names}
     pairs = {}
     for i in names:
         for o in names:
-            if i != o and M.SLOT[M.form(i)] != M.SLOT[M.form(o)]:
+            if M.layer(i) < M.layer(o):
                 mi = Masked(mk['inner'][i], G[i]['tris'], names, o)
                 if mi.any:
                     pairs.setdefault(o, []).append((i, mi))
@@ -425,11 +466,14 @@ def settle_layers(body, garments, cfg, q, rounds=3, log=print):
         _pos, j = morphed(body, w)
         person = GP.Person(j)
         wr, wp = person.build_pose(q)
-        worst = 0.0
-        for _r in range(rounds):
+        first = None
+        for _r in range(rounds + 1):
             gv = {n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names}
             moved = 0
-            for o, inner in pairs.items():
+            cur = 0.0
+            # the inner layers' outer garments first: a hip garment settled
+            # over the beads before a robe settles over it
+            for o, inner in sorted(pairs.items(), key=lambda p: M.layer(p[0])):
                 to = np.asarray(G[o]['tris'])
                 cloth = BVHTree.FromPolygons(gv[o].tolist(), to.tolist(), all_triangles=True)
                 trees = vol[o].trees(gv[o])
@@ -445,8 +489,8 @@ def settle_layers(body, garments, cfg, q, rounds=3, log=print):
                         fw.append(barycentric(co, *gv[o][to[ti]]))
                         need.append(np.linalg.norm(u) + margin)
                         dirs.append(u / max(np.linalg.norm(u), 1e-12))
-                        worst = max(worst, float(dist[k])) if _r == 0 else worst
-                if not need:
+                        cur = max(cur, float(dist[k]))
+                if not need or _r == rounds:
                     continue
                 push = face_pushes(len(gv[o]), to, np.clip(np.array(fw), 0, 1), np.array(fi), np.array(need), np.array(dirs))
                 nb, twins = topo[o]
@@ -458,9 +502,10 @@ def settle_layers(body, garments, cfg, q, rounds=3, log=print):
                 else:
                     G[o]['morph_pos'][morph] = G[o]['morph_pos'][morph] + rest
                 moved += 1
+            first = cur if first is None else first
             if not moved:
                 break
-        log(f'settle layers {corner[0]} {corner[1]} {corner[2]:+.0f}: deepest inner {worst:.4f}')
+        log(f'settle layers {corner[0]} {corner[1]} {corner[2]:+.0f}: inner through outer {first:.4f} -> {cur:.4f}')
 
 
 def selftest():
@@ -487,4 +532,44 @@ def selftest():
     state, deep = descend({'g': np.zeros((1, 3))}, frames, lambda st, fr: {'g': (0.05 - st['g'][0, 0], np.array([[0.01, 0, 0]])) if fr == 'A' else (10 * st['g'][0, 0], None)},
                           lambda n, p, d: p + d, passes=6, stride=2, log=lambda *a: None)
     assert state['g'][0, 0] == 0.0 and abs(deep['g'] - 0.05) < 1e-12, (state, deep)
+    selftest_build()
     print('fit selftest: ok')
+
+
+def selftest_build():
+    """The game's path unposed exactly (gamepath.Person.undraw), refine()
+    leaving no edge over its limit and the cloth where it was, face_pushes
+    moving a cloth point by exactly what it asks."""
+    import gamepath as GP
+    import skeleton as SK
+    from garments import refine
+    rng = np.random.default_rng(1)
+    n = len(SK.NAMES)
+    joints = np.zeros((n, 6))
+    for i, name in enumerate(SK.NAMES):
+        joints[i, :3] = rng.normal(0, 0.2, 3)
+    person = GP.Person(joints)
+    q = rng.normal(0, 1, (n, 4))
+    q /= np.linalg.norm(q, axis=1)[:, None]
+    wr, wp = person.pose(q, None)
+    v = rng.normal(0, 0.3, (50, 3))
+    ji = rng.integers(0, n, (50, 4))
+    jw = rng.random((50, 4))
+    jw /= jw.sum(1)[:, None]
+    back = person.undraw(person.draw(v, ji, jw, wr, wp), ji, jw, wr, wp)
+    assert np.abs(back - v).max() < 1e-9, np.abs(back - v).max()
+    # two triangles of a 1 × 1 square: every edge ≤ 0.3 after, the area kept
+    g = {'pos': np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0.0]]), 'tris': np.array([[0, 1, 2], [0, 2, 3]]),
+         'uv': np.zeros((4, 2)), 'W': np.eye(4), 'morph_pos': {'m': np.ones((4, 3))}}
+    r = refine(g, 0.3)
+    t, p = r['tris'], r['pos']
+    e = np.concatenate([np.linalg.norm(p[t[:, i]] - p[t[:, (i + 1) % 3]], axis=1) for i in range(3)])
+    area = 0.5 * np.linalg.norm(np.cross(p[t[:, 1]] - p[t[:, 0]], p[t[:, 2]] - p[t[:, 0]]), axis=1).sum()
+    assert e.max() <= 0.3 + 1e-12 and abs(area - 1) < 1e-12 and np.allclose(r['morph_pos']['m'], 1), (e.max(), area)
+    # no T-junction: every edge is in two triangles or on the square's border
+    ed = np.sort(np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]]), axis=1)
+    u, c = np.unique(ed, axis=0, return_counts=True)
+    border = [((p[a][0] in (0, 1)) and p[b][0] == p[a][0]) or ((p[a][1] in (0, 1)) and p[b][1] == p[a][1]) for a, b in u[c == 1]]
+    assert all(border), 'refine left an edge with a vertex in its middle'
+    fp = face_pushes(3, np.array([[0, 1, 2]]), np.array([[0.2, 0.3, 0.5]]), np.array([[0, 1, 2]]), np.array([0.01]), np.array([[0, 0, 1.0]]))
+    assert abs(np.array([0.2, 0.3, 0.5]) @ fp[:, 2] - 0.01) < 1e-12, fp

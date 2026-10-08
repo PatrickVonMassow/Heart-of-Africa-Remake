@@ -119,6 +119,11 @@ def _occluded(full, drawn, q):
     return inside(full, q) and (drawn is None or inside(drawn, q))
 
 
+def inside_body(tree, q):
+    from fit import inside
+    return inside(tree, list(q))
+
+
 def _first_shown(ids, dist, keep):
     """The largest `dist` over the sample ids that `keep` accepts, tested in
     descending order (only up to the first accepted), and its id."""
@@ -129,13 +134,24 @@ def _first_shown(ids, dist, keep):
 
 
 def _empty():
-    return {c: {'value': 0.0, 'at': None, 'over': 0, 'part': None} for c in COLUMNS} | {'checked': 0}
+    return {c: {'value': 0.0, 'at': None, 'over': 0, 'part': None} for c in COLUMNS} | {'checked': 0, 'cases': {}, 'clips': {}}
 
 
-def _note(r, col, v, at, tol, part=None):
+def _note(r, col, v, at, tol, part=None, case=None):
+    """Record value `v` of column `col`; over tolerance it is also counted as a
+    named CASE (column, clip, body part, outer garment): its worst value, where,
+    and in how many frames."""
     c = r[col]
+    if case is not None:
+        k = f'{col} {case[0]}'
+        r['clips'][k] = max(r['clips'].get(k, 0.0), float(v))
     if v > tol:
         c['over'] += 1
+        if case is not None:
+            e = r['cases'].setdefault((col, *case), {'value': 0.0, 'at': None, 'over': 0})
+            e['over'] += 1
+            if v > e['value']:
+                e['value'], e['at'] = float(v), at
     if v > c['value']:
         c['value'], c['at'], c['part'] = float(v), at, part
 
@@ -165,8 +181,12 @@ def _corner(c):
     bm = {n: Masked(mk['body'], body['tris'], mk['garments'], n) for n in names}
     # every layering: (inner, outer) with the inner's mask under that outer
     pairs = [(i, o, Masked(mk['inner'][i], garments['meshes'][i]['tris'], mk['garments'], o)) for i in names for o in names
-             if i != o and M.SLOT[M.form(i)] != M.SLOT[M.form(o)]]
+             if M.layer(i) < M.layer(o)]
     pairs = [p for p in pairs if p[2].any]
+    # the body's triangles drawn while both garments of a layering are worn:
+    # an inner garment's point inside the body under them is not seen
+    btris = np.asarray(body['tris'])
+    both_drawn = {(i, o): M.drawn_tris(btris, M.decode(mk['body'], mk['garments'], [i, o])[0]) for i, o, _m in pairs}
     worst = {n: _empty() for n in names}
     nv = len(body['pos'])
     bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
@@ -203,7 +223,8 @@ def _corner(c):
                     _c, _nn, dti, dd = dtree.find_nearest(pts[x].tolist())
                     val[x], tri[x], under[x] = (dd, mb.drawn_ids[dti], False) if dti is not None else (0.0, ti, False)
             v, x = _first_shown(cand, val, lambda x: under[x] or _occluded(tree, dtree, pts[x]))
-            _note(r, 'cloth', v, at, tol, bone(int(body['tris'][tri[x]][0])) if x is not None else None)
+            bp_ = bone(int(body['tris'][tri[x]][0])) if x is not None else None
+            _note(r, 'cloth', v, at, tol, bp_, (cname, bp_, None))
             if not mb.any:
                 continue
             # covered skin through the cloth (unless drawn skin of another body
@@ -217,14 +238,15 @@ def _corner(c):
                     fn = np.concatenate([nrm, vertex_normals_faces(bp, body['tris'])])
                 return not _occluded(tree, dtree, smp[x] + PROBE * fn[x])
             v, x = _first_shown(thr, dist, visible)
-            _note(r, 'shown', v, at, tol, bone(x) if x is not None else None)
+            bp_ = bone(x) if x is not None else None
+            _note(r, 'shown', v, at, tol, bp_, (cname, bp_, None))
             place, dist = S['vol'][n].where(gv[n], smp, reach, ids=mb.hidden, trees=trees[n])
             out = mb.hidden[place[mb.hidden] == M.OUT]
             v, part = _worst(out, dist, bone)
-            _note(r, 'hole', v, at, tol, part)
+            _note(r, 'hole', v, at, tol, part, (cname, part, None))
             thr = mb.hidden[place[mb.hidden] == M.THROUGH]
             v, part = _worst(thr, dist, bone)
-            _note(r, 'cut', v, at, S['cut'], part)
+            _note(r, 'cut', v, at, S['cut'], part, (cname, part, None))
         # every layering, counted once per pose and inner garment: the worst
         # outer garment over it, so "frames over" never exceeds "checked"
         lay = {}
@@ -233,16 +255,22 @@ def _corner(c):
             ipart = lambda k, i=i, mi=mi: S['bones'][S['gdom'][i][k if k < S['gnv'][i] else mi.tris[k - S['gnv'][i]][0]]]  # noqa: E731
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.shown, trees=trees[o])
             thr = mi.shown[place[mi.shown] == M.THROUGH]
-            v, part = _worst(thr, dist, ipart)
+            # only what is seen: an inner point inside the body, its nearest
+            # skin drawn while both garments are worn, is hidden by that skin
+            def seen(x, i=i, o=o):
+                f = full.find_nearest(smp[x].tolist())[2]
+                return f is None or not (both_drawn[i, o][f] and inside_body(full, smp[x]))
+            v, x = _first_shown(thr, dist, seen)
+            part = ipart(x) if x is not None else None
             if v > lay.get((i, 'inner'), (-1,))[0]:
-                lay[i, 'inner'] = (v, f'under {o}, {at}', part)
+                lay[i, 'inner'] = (v, f'under {o}, {at}', part, o)
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.hidden, trees=trees[o])
             out = mi.hidden[place[mi.hidden] == M.OUT]
             v, part = _worst(out, dist, ipart)
             if v > lay.get((i, 'innerHole'), (-1,))[0]:
-                lay[i, 'innerHole'] = (v, f'under {o}, {at}', part)
-        for (i, col), (v, where, part) in lay.items():
-            _note(worst[i], col, v, where, tol, part)
+                lay[i, 'innerHole'] = (v, f'under {o}, {at}', part, o)
+        for (i, col), (v, where, part, o) in lay.items():
+            _note(worst[i], col, v, where, tol, part, (cname, part, o))
     return c, worst
 
 
@@ -311,6 +339,13 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
             for n, r in part.items():
                 t = worst[n]
                 t['checked'] += r['checked']
+                for key, v in r['clips'].items():
+                    t['clips'][key] = max(t['clips'].get(key, 0.0), v)
+                for key, e in r['cases'].items():
+                    m = t['cases'].setdefault(key, {'value': 0.0, 'at': None, 'over': 0})
+                    m['over'] += e['over']
+                    if e['value'] > m['value']:
+                        m['value'], m['at'] = e['value'], e['at']
                 for col in COLUMNS:
                     t[col]['over'] += r[col]['over']
                     if r[col]['value'] > t[col]['value']:
@@ -319,35 +354,23 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
     return worst, _S['tol']
 
 
-def report(out, body, clips, garments, cfg, stride=1):
-    worst, tol = measure(body, clips, garments, cfg, stride)
-    a = cfg['VILLAGER_ASSET']
-    frames = sum(1 for _ in GP.poses(clips, EXPORT_CLIPS, cfg))
+def build_pose_clips(body, clips):
+    """`clips` with the build pose (garments.design_pose, its hips at rest)
+    as a one-frame clip named 'build'."""
+    from garments import design_pose
+    c = dict(clips)
+    c['clips'] = dict(clips['clips'])
+    c['clips']['build'] = {'kind': 'pose', 'times': [0.0], 'q': [design_pose(body)], 'hips': [None]}
+    return c
+
+
+def _limit(col, a, tol):
+    return a['garmentMaskCutTolerance'] if col == 'cut' else tol
+
+
+def _table(worst, a, tol, checked_label):
     lines = [
-        '# Garment penetration report',
-        '',
-        f'Generated by `node scripts/villager/build.mjs` (step `penetration`). Every frame of the clips {", ".join(EXPORT_CLIPS)} '
-        f'({frames} poses: every frame, a gait\'s at strides {", ".join(f"{k:g}" for k in GP.strides(cfg))}{"" if stride == 1 else f"; every {stride}th"}), '
-        f'at {len(CORNERS)} body corners (both sexes × four age groups, and the adult man at build −1 and +1), skinned along the game\'s own path '
-        f'(scripts/villager/gamepath.py), on WHAT THE GAME DRAWS: each garment\'s cover mask (scripts/villager/mask.py) applied — the body\'s triangles '
-        f'hidden under it left out, its covered vertices pushed VILLAGER_ASSET.garmentMaskPush = {a["garmentMaskPush"]} inward; covered within '
-        f'garmentMaskOpening = {a["garmentMaskOpening"]} of an opening means pushed, not hidden. No per-pose garment offsets.',
-        '',
-        'Cloth = how deep a garment vertex or a point of the cloth between its vertices (about garmentFaceSpacing = '
-        f'{a["garmentFaceSpacing"]} apart) lies inside the drawn body. Shown = how far a drawn body point the garment covers lies outside it '
-        'through the cloth. Hole = how far a hidden body point has left the garment by an opening. Cut = how far a hidden body point lies past the cloth '
-        f'(tolerance garmentMaskCutTolerance = {a["garmentMaskCutTolerance"]}: the cloth drawn where the body bulges past it is what hiding is for, '
-        'a limb cut off is not). Inner / inner hole = the same for the garment '
-        'worn under each garment of another slot covering part of it: per pose the worst of its layerings, named by the outer garment '
-        'and the inner garment\'s body part. Every value is the measured maximum, below tolerance too; drawn skin occludes, hidden skin '
-        'does not. Figure units (1 unit ≈ 1.3 m); '
-        f'tolerance (VILLAGER_ASSET.garmentPenetrationTolerance): {tol}.',
-        '',
-        f'Frames over (of N) = the frames (pose × corner; N = {worst[next(iter(worst))]["checked"]} per garment, every '
-        f'{"" if stride == 1 else f"{stride}th of the "}{frames} poses at {len(CORNERS)} corners) in which that column exceeds its tolerance; '
-        'a frame counts once per garment however many layerings or samples fail in it.',
-        '',
-        '| Garment | ' + ' | '.join(f'{c} | where | frames over (of {worst[next(iter(worst))]["checked"]})' for c in ('Cloth', 'Shown', 'Hole', 'Cut', 'Inner', 'Inner hole')) + ' |',
+        '| Garment | ' + ' | '.join(f'{c} | where | frames over (of {checked_label})' for c in ('Cloth', 'Shown', 'Hole', 'Cut', 'Inner', 'Inner hole')) + ' |',
         '| --- |' + ' --- | --- | --- |' * len(COLUMNS),
     ]
     bad = 0
@@ -355,16 +378,98 @@ def report(out, body, clips, garments, cfg, stride=1):
         cells, fine = [], True
         for col in COLUMNS:
             v = r[col]
-            ok = v['value'] <= (a['garmentMaskCutTolerance'] if col == 'cut' else tol)
+            ok = v['value'] <= _limit(col, a, tol)
             fine = fine and ok
             where = (v['at'] or '—') + (' — ' + v['part'] if v.get('part') else '')
             cells.append(f'{v["value"]:.4f}{"" if ok else " ✗"} | {where} | {v["over"]}')
         bad += 0 if fine else 1
         lines.append(f'| `{n}` | ' + ' | '.join(cells) + ' |')
-    lines += ['', f'**{len(worst) - bad} of {len(worst)} garments within tolerance in every frame and layering** '
-              f'({worst[next(iter(worst))]["checked"]} poses × corners each).', '']
+    return lines, bad
+
+
+NAMES = {'cloth': 'cloth in the body', 'shown': 'skin through the cloth', 'hole': 'hidden skin out by an opening',
+         'cut': 'hidden skin past the cloth', 'inner': 'inner garment through the cloth', 'innerHole': 'hidden inner garment out by an opening'}
+
+
+def report(out, body, clips, garments, cfg, stride=1, baseline=None):
+    """The report: the build pose, every pose, every remaining case named, and
+    — with `baseline` (a penetration-report.json of main's garments measured by
+    this same step) — every garment, column and clip worse than there."""
+    a = cfg['VILLAGER_ASSET']
+    build, tol = measure(body, build_pose_clips(body, clips), garments, cfg, clip_names=['build'])
+    worst, tol = measure(body, clips, garments, cfg, stride)
+    frames = sum(1 for _ in GP.poses(clips, EXPORT_CLIPS, cfg))
+    G = garments['meshes']
+    drift = {n: G[n].get('build_drift') for n in worst}
+    lines = [
+        '# Garment penetration report',
+        '',
+        f'Generated by `node scripts/villager/build.mjs` (step `penetration`). Every frame of the clips {", ".join(EXPORT_CLIPS)} '
+        f'({frames} poses: every frame, a gait\'s at strides {", ".join(f"{k:g}" for k in GP.strides(cfg))}{"" if stride == 1 else f"; every {stride}th"}), '
+        f'at {len(CORNERS)} body corners (both sexes × four age groups, and the adult man at build −1 and +1), skinned along the game\'s own path '
+        f'(scripts/villager/gamepath.py) — the same posing the garments are tailored, fitted and settled on — on WHAT THE GAME DRAWS: each garment\'s cover mask (scripts/villager/mask.py) applied — the body\'s triangles '
+        f'hidden under it left out, its covered vertices pushed VILLAGER_ASSET.garmentMaskPush = {a["garmentMaskPush"]} inward; covered within '
+        f'garmentMaskOpening = {a["garmentMaskOpening"]} of an opening means pushed, not hidden. No per-pose garment offsets.',
+        '',
+        'ONLY WHAT IS SEEN COUNTS. Cloth = how deep a garment vertex or a point of the cloth between its vertices (about garmentFaceSpacing = '
+        f'{a["garmentFaceSpacing"]} apart) lies under DRAWN skin (skin the mask hides shows nothing). Shown = how far a drawn body point the garment covers lies outside it '
+        'through the cloth, unless drawn skin of another body part encloses it. Inner = how far a drawn point of a garment of an inner layer (mask.LAYER: '
+        'ornament, then hip and head, torso, shoulder) shows through a garment of an outer layer covering it, unless it lies inside the body under skin drawn '
+        'while both are worn; the part of it the outer garment\'s mask hides does not count. Hole / inner hole = how far a hidden body point / hidden inner-garment point has '
+        'left the garment by an opening (a hole where skin or cloth should be is seen). Cut = how far a hidden body point lies past the cloth '
+        f'(tolerance garmentMaskCutTolerance = {a["garmentMaskCutTolerance"]}: the cloth drawn where the body bulges past it is what hiding is for, '
+        'a limb cut off is not). Per pose the worst layering of a garment counts, named by the outer garment and the inner garment\'s body part. '
+        'Every value is the measured maximum, below tolerance too. Figure units (1 unit ≈ 1.3 m); '
+        f'tolerance (VILLAGER_ASSET.garmentPenetrationTolerance): {tol}.',
+        '',
+        '## Build pose',
+        '',
+        'The pose every garment is tailored in (garments.design_pose), as the game draws it, at every body corner. Build-pose difference = how far the game '
+        'draws a garment in this pose from where it was tailored (scripts/villager/garments.py `build_drift`): '
+        f'at most **{max((d for d in drift.values() if d is not None), default=float("nan")):.4f}** over the garments (tolerance {tol}).',
+        '',
+    ]
+    t, bad_build = _table(build, a, tol, build[next(iter(build))]['checked'])
+    lines += t + ['', f'**{len(build) - bad_build} of {len(build)} garments within tolerance in the build pose at every body corner and layering.**', '',
+                  '## Every pose', '',
+                  f'Frames over (of N) = the frames (pose × corner; N = {worst[next(iter(worst))]["checked"]} per garment, every '
+                  f'{"" if stride == 1 else f"{stride}th of the "}{frames} poses at {len(CORNERS)} corners) in which that column exceeds its tolerance; '
+                  'a frame counts once per garment however many layerings or samples fail in it.', '']
+    t, bad = _table(worst, a, tol, worst[next(iter(worst))]['checked'])
+    lines += t + ['', f'**{len(worst) - bad} of {len(worst)} garments within tolerance in every frame and layering** '
+                  f'({worst[next(iter(worst))]["checked"]} poses × corners each).', '',
+                  '## Remaining visible cases', '',
+                  'Every case over its tolerance, by garment: what is seen, the body part (of the inner garment for a layering), the clip, the outer garment of a '
+                  'layering, its worst value with where, and in how many frames it is over.', '']
+    for n, r in sorted(worst.items()):
+        cases = sorted(r['cases'].items(), key=lambda kv: -kv[1]['value'])
+        if not cases:
+            continue
+        lines.append(f'- `{n}`: ' + '; '.join(
+            f'{NAMES[col]} — {part} — {clip}{f" under `{o}`" if o else ""} — {e["value"]:.4f} ({e["at"]}), {e["over"]} frames'
+            for (col, clip, part, o), e in cases))
+    lines.append('')
+    worse = []
+    if baseline:
+        base = json.load(open(baseline))['garments']
+        lines += ['## Against main', '',
+                  'Main\'s garments measured by this same step (same poses, corners and rules). A garment, column and clip is WORSE when it is over tolerance '
+                  'and more than 0.0005 above main\'s value.', '']
+        for n, r in sorted(worst.items()):
+            for key, v in sorted(r['clips'].items()):
+                col = key.split(' ')[0]
+                b = base.get(n, {}).get('clips', {}).get(key, 0.0)
+                if v > _limit(col, a, tol) and v > b + 0.0005:
+                    worse.append(f'- `{n}` {key}: {b:.4f} on main → {v:.4f}')
+        n_base = sum(1 for n, r in base.items() if all(r[c]['value'] <= _limit(c, a, tol) for c in COLUMNS))
+        lines += [f'Main: {n_base} of {len(base)} garments within tolerance in every frame and layering; now {len(worst) - bad}.', '']
+        lines += (worse or ['No garment, column and clip is worse than on main.']) + ['']
     os.makedirs(out, exist_ok=True)
     open(os.path.join(out, 'penetration-report.md'), 'w').write('\n'.join(lines))
-    json.dump({'tolerance': tol, 'stride': stride, 'garments': worst}, open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
+
+    def plain(w):
+        return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
+    json.dump({'tolerance': tol, 'stride': stride, 'build': plain(build), 'drift': drift, 'garments': plain(worst)},
+              open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
     print('\n'.join(lines))
     return bad

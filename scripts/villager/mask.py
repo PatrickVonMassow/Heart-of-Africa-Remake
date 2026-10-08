@@ -9,7 +9,7 @@ trouser leg's top inside the seat) is a seam between parts; every other loop
 is an OPENING (neck, sleeve, hem, a cape's outline).
 
 THE MASK, read in the BUILD POSE (garments.design_pose, the pose every
-garment is tailored in). A point inside the volume that moves with the
+garment is tailored in) as the game draws it at every body corner. A point inside the volume that moves with the
 cloth (its skin weights within VILLAGER_ASSET.garmentMaskWeightGap of the
 nearest cloth's: a hand hanging inside a skirt's outline does not) is
 covered:
@@ -23,8 +23,8 @@ covered:
         visible and the cloth lying on it wins.
 
 The body gets one mask per vertex (hide and push bits over the garments);
-every garment the same over the garments of OTHER slots that cover it (every
-outfit layering: a figure wears at most one garment per slot). The game reads
+every garment the same over the garments of an OUTER layer (LAYER) that cover
+it (every outfit layering: a figure wears at most one garment per slot). The game reads
 the body's mask from villager.glb — attribute _COVER, unsigned shorts (hide
 bits 0-15, hide bits 16-31, push bits 0-15, push bits 16-31); bit k is
 scene.extras.villager.garmentMask.garments[k] (src/render/villagerGarmentMask.ts).
@@ -51,6 +51,17 @@ SLOT = {
     **{f: 'head' for f in ('cap', 'hairBag', 'headRing', 'headband', 'topknot', 'turban', 'veil')},
     **{f: 'ornament' for f in ('limbRings', 'neckBeads', 'waistBeads')},
 }
+# The layer a slot is worn in, innermost first: in a layering the garment of
+# the outer layer lies over the inner one (an ornament under everything, the
+# head pieces under a hood). Only an outer layer's garment hides or pushes in
+# an inner one; the reverse contact is the outer garment seen over it.
+LAYER = {'ornament': 0, 'hip': 1, 'head': 1, 'torso': 2, 'shoulder': 3}
+
+
+def layer(name):
+    return LAYER[SLOT[form(name)]]
+
+
 # The mask attribute holds 32 garments (two unsigned shorts per class).
 BITS = 32
 # Rays of the inside test (fit.RAYS: no ray along an axis the body is built round)
@@ -353,39 +364,66 @@ def to_bits(cls, n):
 
 
 def masks(body, garments, cfg, log=print):
-    """The body's mask and every garment's mask over the garments of other
-    slots: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}."""
+    """The body's mask and every garment's mask over the garments of outer
+    layers: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}.
+    Read in the build pose at EVERY body corner (penetration.CORNERS), each
+    with its morphs as the game draws it: a point is hidden only where it is
+    hidden at every corner, and pushed where it is covered at any other —
+    a woman's or an elder's body covered otherwise than the neutral one's
+    never shows a hole by an opening the neutral body keeps it away from."""
+    from fit import garment_pos
+    from penetration import CORNERS
+    from sheets import corner_weights, morphed
     names = garment_names(garments)
     reach = cfg['VILLAGER_ASSET']['garmentMaskOpening']
     gap = cfg['VILLAGER_ASSET']['garmentMaskWeightGap']
-    pose = build_pose(body)
-    bv = pose(body['pos'], body['W'])
-    gv = {n: pose(garments['meshes'][n]['pos'], garments['meshes'][n]['W']) for n in names}
-    vol = {n: Volume(gv[n], garments['meshes'][n]['tris']) for n in names}
-    wd = {n: dense(garments['meshes'][n]['W']) for n in names}
+    G = garments['meshes']
+    wd = {n: dense(G[n]['W']) for n in names}
     bw = dense(body['W'])
-    # a closed piece (a ring, beads, a head ring) has no opening and covers
-    # nothing but its own solid: it hides nothing
-    covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
+    hide_all, cover_any, covering = {}, {}, None
+
+    def merge(key, c):
+        h, v = c == 1, c > 0
+        hide_all[key] = h if key not in hide_all else hide_all[key] & h
+        cover_any[key] = v if key not in cover_any else cover_any[key] | v
+    for corner in CORNERS:
+        w = corner_weights(*corner)
+        pos, j = morphed(body, w)
+        pose = build_pose(body, j)
+        bv = pose(pos, body['W'])
+        gv = {n: pose(garment_pos(G[n], w), G[n]['W']) for n in names}
+        vol = {n: Volume(gv[n], G[n]['tris']) for n in names}
+        # a closed piece (a ring, beads, a head ring) has no opening and covers
+        # nothing but its own solid: it hides nothing
+        if covering is None:
+            covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
+        for n in names:
+            if n in covering:
+                merge(('body', n), vol[n].classify(gv[n], bv, reach, follower(bw, wd[n], gap)))
+        for n in names:
+            for o in names:
+                if o in covering and layer(o) > layer(n):
+                    merge((n, o), vol[o].classify(gv[o], gv[n], reach, follower(wd[n], wd[o], gap)))
+
+    def cls(key):
+        return np.where(hide_all[key], 1, np.where(cover_any[key], 2, 0)).astype(np.uint8)
     body_cls = {}
     for b, n in enumerate(names):
-        if n not in covering:
-            continue
-        c = vol[n].classify(gv[n], bv, reach, follower(bw, wd[n], gap))
-        if c.any():
-            body_cls[b] = c
-        log(f'mask: body under {n}: {int((c == 1).sum())} hidden, {int((c == 2).sum())} pushed')
+        if ('body', n) in hide_all:
+            c = cls(('body', n))
+            if c.any():
+                body_cls[b] = c
+            log(f'mask: body under {n}: {int((c == 1).sum())} hidden, {int((c == 2).sum())} pushed')
     inner = {}
     for n in names:
-        cls = {}
+        per = {}
         for b, o in enumerate(names):
-            if o not in covering or SLOT[form(o)] == SLOT[form(n)]:
-                continue
-            c = vol[o].classify(gv[o], gv[n], reach, follower(wd[n], wd[o], gap))
-            if c.any():
-                cls[b] = c
-        inner[n] = to_bits(cls, len(gv[n]))
-    return {'garments': names, 'body': to_bits(body_cls, len(bv)), 'inner': inner}
+            if (n, o) in hide_all:
+                c = cls((n, o))
+                if c.any():
+                    per[b] = c
+        inner[n] = to_bits(per, len(G[n]['pos']))
+    return {'garments': names, 'body': to_bits(body_cls, len(body['pos'])), 'inner': inner}
 
 
 def decode(m, names, worn):

@@ -673,23 +673,29 @@ def refine(g, maxlen):
 ARM_BONES = tuple(f'{b}.{s}' for b in ('upperArm', 'forearm', 'hand') for s in 'LR')
 
 
-def armholes(B, g):
+def armholes(body, g):
     """Cut the cloth an arm passes through in the build pose: every triangle
     whose centre lies inside the drawn body where that is an arm (the
     nearest body triangle's bone). Cloth round the trunk would otherwise cut
     through the upper arm where it meets the trunk at the armpit — no
     settling can take a surface across that crease without folding it into
     one or the other — and the arm comes out through an opening instead."""
+    import gamepath as GP
     from body import top4
     from fit import inside
+    from mathutils.bvhtree import BVHTree
     arm = {SK.INDEX[b] for b in ARM_BONES}
-    dom = np.argmax(B.body['W'], 1)
-    gv = B.person.draw(g['pos'], *top4(g['W']), B.wr, B.wp)
+    dom = np.argmax(body['W'], 1)
+    person = GP.Person(body['joints'])
+    wr, wp = person.build_pose(design_pose(body))
+    bv = person.draw(body['pos'], *top4(body['W']), wr, wp)
+    tree = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
+    gv = person.draw(g['pos'], *top4(g['W']), wr, wp)
     t = np.asarray(g['tris'])
     keep = np.ones(len(t), bool)
     for k, c in enumerate(gv[t].mean(1).tolist()):
-        _co, _n, fi, _d = B.dtree.find_nearest(c)
-        if dom[B.body['tris'][fi][0]] in arm and inside(B.dtree, c):
+        _co, _n, fi, _d = tree.find_nearest(c)
+        if dom[body['tris'][fi][0]] in arm and inside(tree, c):
             keep[k] = False
     if keep.all():
         return g, 0
@@ -756,11 +762,6 @@ def build_garments(mh, body, clips, cfg):
         crotch = L['hip'] - 0.03 * H
         skirt = (crotch, float(v[:, 1].min())) if form in SKIRTS and v[:, 1].min() < crotch else None
         g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings')
-        g = refine(g, cfg['VILLAGER_ASSET']['garmentEdgeMax'])
-        if form != 'limbRings':
-            g, cut_n = armholes(B, g)
-            if cut_n:
-                print(f'garment {mesh_name(form, wear)}: {cut_n} triangles cut where an arm passes through')
         g['part'] = 'garment'
         g['extras'] = {'form': form, 'wear': wear, 'bottom': float(v[:, 1].min())}
         meshes[name] = g
