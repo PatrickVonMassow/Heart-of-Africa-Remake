@@ -505,7 +505,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     import gamepath as GP
     import mask as M
     from mathutils.bvhtree import BVHTree
-    from penetration import Masked, loose
+    from penetration import Masked
     from body import barycentric
     from mathutils import Vector
     a = cfg['VILLAGER_ASSET']
@@ -522,13 +522,17 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     q = design_pose(body)
     pose = M.build_pose(body)
     vol = {n: M.Volume(pose(G[n]['pos'], G[n]['W']), G[n]['tris']) for n in names}
-    # every layering (inner, outer): the inner's covered samples, and — per
-    # body corner (`loose`) — its uncovered ones near the outer cloth, which
-    # count within garmentLayerReach: there the mask leaves it uncovered, and
-    # it is the inner garment drawn over the outer one (farther off it is
-    # another part of the figure, a skirt below a hood's hem)
+    # every layering whose inner garment the outer one covers, or whose drawn
+    # inner garment lies outside the outer one through its cloth by at most
+    # garmentLayerReach in the neutral build pose: there the mask leaves it
+    # uncovered, and it is the inner garment drawn over the outer one (one
+    # farther off is another part of the figure, a skirt below a hood's hem).
+    # The penetration step counts covered samples only; these uncovered ones
+    # are settled for the picture, on the body the mask is read on (taken per
+    # corner they set the layer settle oscillating, measured 09.10.2026).
+    gn = {n: pose(G[n]['pos'], G[n]['W']) for n in names}
     covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
-    layered = []
+    pairs = {}
     for i in names:
         for o in names:
             # a head piece lies under a hood alone: a cape's or cloak's collar
@@ -536,10 +540,19 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
             if M.SLOT[M.form(i)] == 'head' and M.form(o) != 'hood':
                 continue
             if M.layer(i) < M.layer(o) and o in covering:
-                layered.append((i, o, Masked(mk['inner'][i], G[i]['tris'], names, o)))
+                mi = Masked(mk['inner'][i], G[i]['tris'], names, o)
+                ids = mi.drawn_samples
+                smp = mi.drawn_at(gn[i], a['garmentMaskPush'])[1]
+                place, dist = vol[o].where(gn[o], smp, reach, ids=ids)
+                near = ids[(place[ids] == M.THROUGH) & (dist[ids] <= stick) & ~np.isin(ids, mi.shown)]
+                if mi.any or len(near):
+                    pairs.setdefault(o, []).append((i, mi, np.union1d(mi.shown, near)))
     # the body is the innermost layer: skin the mask leaves drawn under a
     # garment and outside it through its cloth (`shown`) pushes the cloth too
-    bodies = [(o, Masked(mk['body'], body['tris'], names, o)) for o in sorted(covering)]
+    for o in sorted(covering):
+        mb = Masked(mk['body'], body['tris'], names, o)
+        if mb.any:
+            pairs.setdefault(o, []).append(('body', mb, mb.shown))
     found = 0.0
     for corner, morph in SETTLE_ORDER:
         w = corner_weights(*corner)
@@ -549,16 +562,6 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
         bpos, _j = morphed(body, w)
         bjidx, bjw = top4(body['W'])
         btree = BVHTree.FromPolygons(person.draw(bpos, bjidx, bjw, wr, wp).tolist(), body['tris'].tolist(), all_triangles=True)
-        g0 = {n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names}
-        cl0 = {o: BVHTree.FromPolygons(g0[o].tolist(), np.asarray(G[o]['tris']).tolist(), all_triangles=True) for o in covering}
-        pairs = {}
-        for i, o, mi in layered:
-            cand = loose(mi, mi.drawn_at(g0[i], a['garmentMaskPush'])[1], cl0[o], reach)
-            if mi.any or len(cand):
-                pairs.setdefault(o, []).append((i, mi, np.union1d(mi.shown, cand)))
-        for o, mb in bodies:
-            if mb.any:
-                pairs.setdefault(o, []).append(('body', mb, mb.shown))
         first = None
         for _r in range(rounds + 1):
             gv = {n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names}
