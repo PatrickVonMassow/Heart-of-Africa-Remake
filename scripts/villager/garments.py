@@ -177,15 +177,21 @@ class Body:
     def push_out(self, pts, clearance):
         """Every garment vertex at least `clearance` outside the body's surface
         (along the surface normal at its nearest point)."""
+        from fit import inside
         out = pts.copy()
         for tree in (self.tree, self.dtree, self.tree, self.dtree):
             for k, p in enumerate(out):
-                co, n, _fi, _d = tree.find_nearest(p)
+                co, n, _fi, dist = tree.find_nearest(p)
                 co = np.array(co)
                 n = np.array(n)
-                d = np.dot(p - co, n)
-                if d < clearance:
-                    out[k] = p + n * (clearance - d)
+                if dist >= clearance:
+                    continue
+                if inside(tree, p.tolist()):
+                    out[k] = p + n * (clearance + dist)
+                elif dist > 1e-9:
+                    # outside: away from the nearest skin, never along a face
+                    # normal that points into a cavity (the mouth's slit)
+                    out[k] = co + (p - co) * (clearance / dist)
         return out
 
     def weights_on_arm(self, pts, side):
@@ -474,7 +480,12 @@ def build_form(B, form, wear, L):
         return sweep(rings, closed_top=form != 'headband'), 0
     if form == 'veil':
         rings = []
-        for y, e in ((L['neck'], 0.012), (L['chin'], 0.012), (L['chin'] + 0.055 * H, 0.01)):
+        # rings close enough that the chin, the lips and the nose between
+        # them lie inside the face's outline at their own height (three rings
+        # left a chord the chin came through: `chin` is the head joint, above
+        # the chin's tip)
+        lo, hi = L['neck'], L['chin'] + 0.055 * H
+        for y, e in [(lo + (hi - lo) * k / 9, 0.012 - 0.0002 * k) for k in range(10)]:
             c, r = B.ring(y, B.arm < 0.2, e * H)
             rings.append((y, c, r))
         return sweep(rings), 1

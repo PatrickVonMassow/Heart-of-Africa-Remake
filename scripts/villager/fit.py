@@ -352,9 +352,17 @@ def _settle_one(n):
     fi, fw = face_points(g['tris'], g['pos'], a['garmentFaceSpacing'])
     for _r in range(S['rounds']):
         gv = person.draw(garment_pos(g, w), gi, gw, wr, wp)
-        d, _co, nrm = depths(tree, gv)
+        d, co, nrm = depths(tree, gv)
         need = clear[n] + d
         bad = np.nonzero(need > 1e-6)[0]
+        # a point outside but short of its clearance moves away from the
+        # nearest skin, not along that face's normal (which in the mouth's
+        # slit points into the cavity)
+        off = gv - co
+        ln = np.linalg.norm(off, axis=1)
+        out_ = (d < 0) & (ln > 1e-9)
+        nrm = nrm.copy()
+        nrm[out_] = off[out_] / ln[out_, None]
         # the cloth between the vertices: a point of it still inside
         # (a curve tighter than the edges follow) moves its vertices
         fp = np.einsum('kj,kji->ki', fw, gv[fi])
