@@ -160,10 +160,35 @@ class Body:
         self.leg = {s: w('thigh.' + s, 'shin.' + s, 'foot.' + s, 'toe.' + s) for s in 'LR'}
         self.mask_body = np.zeros(len(W), bool)
         self.mask_body[self.idx] = True
+        self._hulls = {}
 
     def section(self, y, mask, slab=0.012):
         m = self.mask_body & mask & (np.abs(self.v[:, 1] - y) < slab)
         return self.v[m][:, [0, 2]]
+
+    def outline(self, y, mask, slab=0.012):
+        """The body's section outline at height y (convex hull) and its centre."""
+        key = ('o', round(float(y), 4), hash(mask.tobytes()))
+        if key not in self._hulls:
+            pts = self.section(y, mask, slab)
+            if len(pts) < 3:
+                pts = self.section(y, mask, slab * 3)
+            h = hull2d(pts)
+            self._hulls[key] = (h, h.mean(0))
+        return self._hulls[key]
+
+    def outline_down(self, y0, y, mask):
+        """The outline of everything in `mask` between heights y0 and y
+        (below y0): what cloth hanging from y0 must clear at y."""
+        key = ('d', round(float(y0), 4), round(float(y), 4), hash(mask.tobytes()))
+        if key not in self._hulls:
+            m = self.mask_body & mask & (self.v[:, 1] <= y0 + 0.012) & (self.v[:, 1] >= y - 0.012)
+            h = hull2d(self.v[m][:, [0, 2]])
+            # centred on the body's axis (the hips): a centre taken from each
+            # section wanders from height to height and rippled the cloth
+            hips = self.wp[SK.INDEX['hips']]
+            self._hulls[key] = (h, np.array([hips[0], hips[2]]))
+        return self._hulls[key]
 
     def ring(self, y, mask, ease, center=None, n=N_RADIAL, slab=0.012):
         pts = self.section(y, mask, slab)
@@ -280,6 +305,44 @@ def sweep(rings, closed_top=False, closed_bottom=False, keep=None):
         tris += [[bot, base + i + 1, base + i] for i in range(n)]
     v, t, u = verts, np.array(tris), uv
     return compact(v, t, u)
+
+
+def diagonal(side, top, low, start=-0.1, power=1.0):
+    """The top of a column on a bare shoulder's diagonal edge: `top` on the
+    covered side (side ≤ start), falling to `low` under the bare arm (side 1)
+    — linearly, or faster at first with a `power` below 1."""
+    return top - (top - low) * min(1.0, max(0.0, (side - start) / (1 - start))) ** power
+
+
+def column_sweep(ring_at, top_of, bottom, rows, n=N_RADIAL, opening=None):
+    """A sweep whose every column runs from its own top down to `bottom` in
+    `rows` rows, so an edge across the columns (a bare shoulder's diagonal)
+    is a straight line through the column tops, never a staircase of quads.
+    `ring_at(y, angles)` → (centre, radii) of the outline at height y;
+    `top_of(angle)` a column's top; `opening(y)` (optional) the half-angle of
+    a front opening at height y: the columns spread over the rest of the ring
+    and its two edges (the first and last column) part there."""
+    verts, uv = [], []
+    base = 2 * np.pi * np.arange(n + 1) / n
+    tops = np.array([top_of(a) for a in base])
+    for k in range(rows):
+        f = k / (rows - 1)
+        for i in range(n + 1):
+            y = tops[i] + (bottom - tops[i]) * f
+            a0 = opening(y) if opening else 0.0
+            th = a0 + (2 * np.pi - 2 * a0) * i / n
+            c, r = ring_at(y, np.array([th]))
+            verts.append([c[0] + np.sin(th) * r[0], y, c[1] + np.cos(th) * r[0]])
+            uv.append([i / n, f])
+    tris = []
+    for k in range(rows - 1):
+        for i in range(n):
+            a = k * (n + 1) + i
+            b = a + 1
+            c2 = a + n + 1
+            d = c2 + 1
+            tris += [[a, c2, b], [b, c2, d]]
+    return np.array(verts), np.array(tris), np.array(uv)
 
 
 def compact(v, t, u):
@@ -413,14 +476,34 @@ def build_form(B, form, wear, L):
         return sweep(tube(B, L['chestTop'], L['waist'] - 0.01 * H, 0.011 * H, 0.01, trunk, 6)), 3
     if form in ('shirt', 'robe', 'toga'):
         bottom = L['knee'] + 0.02 * H if form == 'shirt' else L['ankle'] + 0.03 * H
-        rings = tube(B, L['neck'] - 0.01 * H, bottom, 0.013 * H, 0.03 if form == 'shirt' else 0.06, trunk, 16)
+        top = L['neck'] - 0.01 * H
+        flare = 0.03 if form == 'shirt' else 0.06
         if form == 'toga':
             bare = 1 if wear == 'rightShoulder' else -1  # the figure's left is +x
+            m = trunk & (B.arm < 0.3)
 
-            def keep_toga(k, i):
-                side = np.sin(ang(i)) * bare
-                return not (side > 0.05 and rings[k][0] > L['chestTop'] - 0.08 * H * side)
-            return sweep(rings, keep=keep_toga), 8
+            def toga_ring(y, th):
+                h, c = B.outline(y, m)
+                t = (top - y) / (top - bottom)
+                fl = flare * B.body['joints'][0, 1] * t * t * (0.45 + 0.55 * np.abs(np.sin(th)))
+                return c, np.array([ray_hull(h, c, (np.sin(a), np.cos(a))) for a in th]) + 0.013 * H + fl
+            # the bare shoulder's edge runs diagonally from the covered
+            # shoulder's neck to under the bare arm: every column has its own
+            # top on that line (dropping whole quads left it stair-stepped)
+            low = L['chestTop'] - 0.08 * H
+            return column_sweep(toga_ring, lambda th: diagonal(np.sin(th) * bare, top, low), bottom, 24), 8
+        # the yoke: down to the chest's top the outline holds the shoulders'
+        # arm caps too, so the cloth covers the tops of the shoulders and the
+        # sleeves begin under it (the upper arm comes out through the armhole
+        # fit.settle cuts); below it the trunk alone
+        yoke = L['chestTop']
+        ys = list(np.linspace(top, yoke, 5)) + list(np.linspace(yoke, bottom, 15))[1:]
+        rings = []
+        for y in ys:
+            t = (top - y) / (top - bottom)
+            c, r = B.ring(y, trunk & ((B.lower_arm < 0.3) if y > yoke + 1e-9 else (B.arm < 0.3)), 0.013 * H)
+            A = angles(len(r))
+            rings.append((y, c, r + flare * B.body['joints'][0, 1] * t * t * (0.45 + 0.55 * np.abs(A[:, 0]))))
         parts.append(sweep(rings))
         for s in 'LR':
             parts.append(sleeve(B, s, L))
@@ -430,35 +513,37 @@ def build_form(B, form, wear, L):
         return merge(parts), 8, limb
     if form in ('cloak', 'cape'):
         bottom = L['knee'] + 0.03 * H if form == 'cloak' else L['waist'] - 0.02 * H
-        rings = []
-        # the collar below the jaw: one ring higher, a woman's or an elder's
-        # chin came down into it
-        ys = [L['neck'] - 0.005 * H, L['shoulder'] + 0.012 * H]
-        y = L['shoulder'] - 0.03 * H
-        while y > bottom + 0.02 * H:
-            ys.append(y)
-            y -= 0.06 * H
-        ys.append(bottom)
-        for k, y in enumerate(ys):
-            # over the shoulders the outline holds the arms too: it drapes them
-            m = allm if y < L['shoulder'] + 0.005 * H else (B.arm < 0.2)
-            ease = (0.02 + 0.012 * k / len(ys)) * H if k else 0.012 * H
-            c, r = B.ring(y, m & (B.head < 0.3), ease)
-            t = (k / (len(ys) - 1))
-            r = r + 0.03 * H * t * t
-            rings.append((y, c, r))
-        y_open = L['shoulder'] - 0.03 * H
+        # the collar below the jaw: a woman's or an elder's chin came down
+        # into a higher one
+        collar, cap = L['neck'] - 0.005 * H, L['shoulder'] + 0.012 * H
+        drape = L['shoulder'] + 0.005 * H
+        # below the shoulders the outline holds the upper arms (it drapes
+        # them) and everything above it: the cloth falls straight from its
+        # widest point instead of tucking back in under the elbows, and the
+        # forearms and hands stay out of it (an outline round the hanging
+        # hands ballooned the cloth out to them)
+        below = B.head < 0.3
+        above = (B.arm < 0.2) & (B.head < 0.3)
+
+        def cloak_ring(y, th):
+            if y >= drape:
+                h, c = B.outline(y, above)
+            else:
+                h, c = B.outline_down(drape, y, below)
+            ease = 0.012 * H + (0.008 * H) * min(1.0, (collar - y) / (collar - cap)) + 0.012 * H * max(0.0, (cap - y) / (cap - bottom))
+            t = (collar - y) / (collar - bottom)
+            return c, np.array([ray_hull(h, c, (np.sin(a), np.cos(a))) for a in th]) + ease + 0.03 * H * t * t
         opened = wear == 'bothShoulders' or form == 'cloak'
         bare = 1 if wear == 'rightShoulder' else -1 if wear == 'leftShoulder' else 0
-
-        def keep_cloak(k, i):
-            y = rings[k][0]
-            if opened and abs(ang(i)) < 0.36 and y < y_open:
-                return False
-            if bare and np.sin(ang(i)) * bare > 0.05 and y > L['waist'] + 0.05 * H:
-                return False
-            return True
-        return sweep(rings, keep=keep_cloak), 6
+        # an open front parts from the collar down, widening toward the hem
+        # (a straight-sided opening read as a notch cut into the chest)
+        widest = 0.3 if form == 'cloak' else 0.2
+        opening = (lambda y: widest * min(1.0, max(0.0, (cap - y) / (cap - bottom)))) if opened else None
+        # a bare shoulder's edge runs diagonally from the collar over the
+        # covered side to under the bare arm
+        low = L['waist'] + 0.05 * H
+        top = (lambda th: diagonal(np.sin(th) * bare, collar, low, power=0.5)) if bare else (lambda th: collar)
+        return column_sweep(cloak_ring, top, bottom, 18, opening=opening), 6
     if form == 'hood':
         rings = []
         for y, ease in ((L['waist'] + 0.04 * H, 0.025), (L['shoulder'] + 0.01 * H, 0.022), (L['neck'] + 0.01 * H, 0.03),
@@ -574,6 +659,9 @@ def blob(center, r, scale, n=12, m=8):
     return np.array(verts), np.array(tris), np.array(uv)
 
 
+SLEEVE_CAP = 0.12  # how far above the shoulder joint a sleeve begins (of the upper arm's length)
+
+
 def sleeve(B, s, L):
     """A short sleeve round the upper arm (to just above the elbow)."""
     iu, il = SK.INDEX['upperArm.' + s], SK.INDEX['forearm.' + s]
@@ -590,6 +678,11 @@ def sleeve(B, s, L):
         sl = pts[np.abs(along) < 0.015]
         rad = np.max(np.linalg.norm((sl - p) - np.outer((sl - p) @ ax, ax), axis=1)) if len(sl) else 0.035
         rings.append((p, rad * 1.25 + 0.006 + 0.004 * k))
+    # a cap over the shoulder joint, reaching under the body cloth's rim: a
+    # sleeve begun below the joint left the top of the shoulder bare between
+    # the two, and the sleeve read as floating off the arm
+    p0, r0 = rings[0]
+    rings.insert(0, (a - (b - a) * SLEEVE_CAP, r0 * 1.12))
     # sweep round the arm axis
     n = 12
     e1 = np.cross(ax, [0, 0, 1.0])
@@ -600,7 +693,7 @@ def sleeve(B, s, L):
         for i in range(n + 1):
             th = 2 * np.pi * (i % n) / n
             verts.append(p + rad * (np.cos(th) * e1 + np.sin(th) * e2))
-            uv.append([i / n, k / 2])
+            uv.append([i / n, k / (len(rings) - 1)])
     for k in range(len(rings) - 1):
         for i in range(n):
             a0 = k * (n + 1) + i
