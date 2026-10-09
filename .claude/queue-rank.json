@@ -1661,7 +1661,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-08T21:39:07.283Z",
+    "at": "2026-10-08T22:07:58.956Z",
     "points": [
       184,
       200,
@@ -2108,7 +2108,9 @@
       1328,
       1330,
       1332,
-      1333
+      1333,
+      1334,
+      1335
     ]
   }
 }

@@ -1,7 +1,7 @@
 {
-  "lastReviewedAt": 1790300477220,
-  "reviewedCount": 146,
-  "evidence": "Read hooks, settings.json Stop list, MEMORY.md + 101 memory files, CLAUDE.md §2-§9 against code. Fable 5.1 in fable-switch-core:9; runbook:116/119 stale 'Fable 5'. resume-hook:216 BOTH-backends contradicts isBackendSensitivePath; :218-223 delegation/main-push contradicts §2 freeze/§6. mechanism/criticality Stop guards never fire (656/783). 51 unindexed memories, 8 dangling links, 4 superseded. CLAUDE.md:81 vs :180 fence wording. Fixes filed as work-order request (deletions/contradictions), not yet applied.",
+  "lastReviewedAt": 1791538717282,
+  "reviewedCount": 154,
+  "evidence": "Geprüft gegen Code: dashboard-reminder-hook/-core, batch-resume-hook/-core (RESUME_BODY, Header, Pausentext, Responder), alle 29 Stop-Registrierungen in .claude/settings.json, batch-progress-guard, timestamp-guard vs User-Scope-Hooks, settings-Dateien, MEMORY.md + 15 Memories, Existenz aller in CLAUDE.md §2/§4/§6/§7/§9 genannten Skripte/Flags/Docs. 13 Befunde. Geändert: Runbook und Brief nennen Fable 5.1 / Opus 5.5 (c7273495a); Sitzungsstarttext: Backends nach CLAUDE.md §6 statt pauschal beide, Fable-Schwelle verweist auf author-routing-core (be3020c06); Memories fable-sparingly (Schwellenverweis), batch-stops-only-on-explicit-order (echter Pausen-Ausweg, --awaiting-user-Ausnahme), track-permission-prompts (gemessener bypass-Stand, Prompt-Flood-Abschnitt ZURÜCKGEZOGEN). Rest (Responder-Widerspruch, toter Pausenbefehl im Hook, abgeschaltete Stop-Wächter, Hook-Drift, Memory-Index 42/111, Freeze-Ausnahmen, §8-Lücke) als Finding im Carrier.",
   "history": [
     {
       "at": "2026-07-25T18:02:18.088Z",
@@ -47,6 +47,11 @@
       "at": "2026-09-25T01:41:17.220Z",
       "entryCount": 146,
       "evidence": "Read hooks, settings.json Stop list, MEMORY.md + 101 memory files, CLAUDE.md §2-§9 against code. Fable 5.1 in fable-switch-core:9; runbook:116/119 stale 'Fable 5'. resume-hook:216 BOTH-backends contradicts isBackendSensitivePath; :218-223 delegation/main-push contradicts §2 freeze/§6. mechanism/criticality Stop guards never fire (656/783). 51 unindexed memories, 8 dangling links, 4 superseded. CLAUDE.md:81 vs :180 fence wording. Fixes filed as work-order request (deletions/contradictions), not yet applied."
+    },
+    {
+      "at": "2026-10-09T09:38:37.282Z",
+      "entryCount": 154,
+      "evidence": "Geprüft gegen Code: dashboard-reminder-hook/-core, batch-resume-hook/-core (RESUME_BODY, Header, Pausentext, Responder), alle 29 Stop-Registrierungen in .claude/settings.json, batch-progress-guard, timestamp-guard vs User-Scope-Hooks, settings-Dateien, MEMORY.md + 15 Memories, Existenz aller in CLAUDE.md §2/§4/§6/§7/§9 genannten Skripte/Flags/Docs. 13 Befunde. Geändert: Runbook und Brief nennen Fable 5.1 / Opus 5.5 (c7273495a); Sitzungsstarttext: Backends nach CLAUDE.md §6 statt pauschal beide, Fable-Schwelle verweist auf author-routing-core (be3020c06); Memories fable-sparingly (Schwellenverweis), batch-stops-only-on-explicit-order (echter Pausen-Ausweg, --awaiting-user-Ausnahme), track-permission-prompts (gemessener bypass-Stand, Prompt-Flood-Abschnitt ZURÜCKGEZOGEN). Rest (Responder-Widerspruch, toter Pausenbefehl im Hook, abgeschaltete Stop-Wächter, Hook-Drift, Memory-Index 42/111, Freeze-Ausnahmen, §8-Lücke) als Finding im Carrier."
     }
   ]
 }
