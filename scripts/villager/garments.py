@@ -705,7 +705,7 @@ def sleeve(B, s, L):
         along = rel @ ax
         sl = pts[np.abs(along) < 0.015]
         rad = np.max(np.linalg.norm((sl - p) - np.outer((sl - p) @ ax, ax), axis=1)) if len(sl) else 0.035
-        rings.append((p, rad * 1.25 + 0.006 + 0.004 * k))
+        rings.append((p, rad * 1.12 + 0.006 + 0.004 * k))
     # a cap ring at the shoulder joint, under the body cloth's yoke: a
     # sleeve begun below the joint left the top of the shoulder bare between
     # the two (one begun above it lay in the shoulder, and the settle pulled

@@ -628,12 +628,8 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                         # point may be a hand beside it): an inner point past a
                         # fold of the outer cloth never pulls it into the body
                         _bc, bn, _bi, _bd = btree.find_nearest(smp[k].tolist())
-                        bn = np.array(bn)
-                        if u @ bn <= 0:
-                            # it moves out along the body's normal instead:
-                            # skipped, a sleeve's underside stayed through a
-                            # cloak (measured 09.10.2026)
-                            u = bn * float(np.linalg.norm(u))
+                        if u @ np.array(bn) <= 0:
+                            continue
                         # nor across the body: an inner point on another side
                         # of the figure (a hair bag behind the head under a
                         # cape's collar) is no reason to pull the cloth there
