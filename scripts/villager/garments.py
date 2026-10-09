@@ -44,8 +44,8 @@ def design_pose(body):
         iu, il, ih = SK.INDEX['upperArm.' + s], SK.INDEX['forearm.' + s], SK.INDEX['hand.' + s]
         u0 = j[il, :3] - j[iu, :3]
         f0 = j[ih, :3] - j[il, :3]
-        u1 = np.array([sx * 0.26, -1.0, 0.0])
-        f1 = np.array([sx * 0.20, -1.0, 0.12])
+        u1 = np.array([sx * 0.34, -1.0, 0.0])
+        f1 = np.array([sx * 0.28, -1.0, 0.12])
         Wu = qfrom_to(u0, u1)
         Wf = qfrom_to(f0, f1)
         q[iu] = Wu
@@ -500,7 +500,9 @@ def build_form(B, form, wear, L):
         c, r = B.ring(L['neck'] - 0.012 * H, B.arm < 0.2, 0.012 * H)
         return torus(c, L['neck'] - 0.012 * H, r, 0.01 * H), 2
     if form == 'waistBeads':
-        return girdle(B, L['hip'] + 0.05 * H, 0.011 * H), 2
+        # below the girdle of a loin flap, apron or girdle tails (hip + 0.06 H):
+        # two rings at one height cross each other whatever settles them
+        return girdle(B, L['hip'] + 0.03 * H, 0.011 * H), 2
     if form == 'limbRings':
         for s in 'LR':
             wi = SK.INDEX['hand.' + s]

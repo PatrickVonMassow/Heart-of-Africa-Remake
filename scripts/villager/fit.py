@@ -120,8 +120,9 @@ def neighbours(n, tris, verts):
     return [np.array(sorted(s), int) for s in nb], [g for g in key.values() if len(g) > 1]
 
 
-def spread(D, nb, twins, rounds=2):
-    """Every vertex keeps at least its own push; its neighbours take part of it."""
+def spread(D, nb, twins, rounds=2, keep=0.5):
+    """Every vertex keeps at least its own push; its neighbours take part of
+    it (`keep` of it per ring, over `rounds` rings)."""
     out = D.copy()
     for _ in range(rounds):
         mag = np.linalg.norm(out, axis=1)
@@ -131,7 +132,7 @@ def spread(D, nb, twins, rounds=2):
                 continue
             m = mag[nb[i]]
             k = nb[i][np.argmax(m)]
-            cand = 0.5 * out[k]
+            cand = keep * out[k]
             if np.linalg.norm(cand) > mag[i]:
                 nxt[i] = cand
         out = nxt
@@ -385,7 +386,7 @@ def _settle_one(n):
             take = np.einsum('ij,ij->i', pf, pf) > np.einsum('ij,ij->i', push, push)
             push[take] = pf[take]
         nb, twins = S['topo'][n]
-        push = spread(push, nb, twins)
+        push = spread(push, nb, twins, a['garmentSettleSpreadRings'], a['garmentSettleSpreadKeep'])
         rest = person.undraw(gv + push, gi, gw, wr, wp) - person.undraw(gv, gi, gw, wr, wp)
         if morph is None:
             g['pos'] = g['pos'] + rest
@@ -544,7 +545,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                     continue
                 push = face_pushes(len(gv[o]), to, np.clip(np.array(fw), 0, 1), np.array(fi), np.array(need), np.array(dirs))
                 nb, twins = topo[o]
-                push = spread(push, nb, twins)
+                push = spread(push, nb, twins, a['garmentSettleSpreadRings'], a['garmentSettleSpreadKeep'])
                 gi, gw = skin[o]
                 rest = person.undraw(gv[o] + push, gi, gw, wr, wp) - person.undraw(gv[o], gi, gw, wr, wp)
                 if morph is None:

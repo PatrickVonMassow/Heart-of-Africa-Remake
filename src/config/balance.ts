@@ -2629,6 +2629,12 @@ export const VILLAGER_ASSET = {
    *  (figure units, ≈ 2.6 cm): it is the inner garment drawn over the outer
    *  one; farther off it is another part of the figure. Calibratable. */
   garmentLayerReach: 0.02,
+  /** How a settle push spreads over the cloth round the vertex that asked
+   *  for it: over this many rings of neighbours, each taking this share of
+   *  the ring before (a narrower spread left the cloth lumpy, and its folds
+   *  confused the cover mask's inside test). Calibratable. */
+  garmentSettleSpreadRings: 5,
+  garmentSettleSpreadKeep: 0.7,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive
