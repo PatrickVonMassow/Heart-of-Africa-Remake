@@ -365,11 +365,15 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
     # the layers again, under the masks the settled garments give, until
     # neither moves anything (a layer push spread near a collar can dip the
     # cloth into the body, a body push lift an inner garment)
+    # It ends only on a state both have validated: the layer settle found
+    # nothing to push (so it changed nothing) after a body settle that left
+    # no cloth inside. Short of that after the last round, the penetration
+    # step measures what is left.
     for k in range(12):
-        deep = settle_once(body, garments, cfg, log=log)
+        before, after = settle_once(body, garments, cfg, log=log)
         found = settle_layers(body, garments, cfg, log=log)
-        log(f'settle again {k + 1}: cloth {deep:.4f} inside, inner through outer {found:.4f} before')
-        if found <= 0.0005 and deep <= 0.0005:
+        log(f'settle again {k + 1}: cloth {before:.4f} inside before, {after:.4f} after; inner through outer {found:.4f} before')
+        if found <= 0.0 and after <= 1e-4:
             break
     return garments
 
@@ -489,16 +493,8 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
                 log(f'settle {corner[0]} {corner[1]} {corner[2]:+.0f} {n}: cloth {last:.4f} inside')
         log(f'settle {corner[0]} {corner[1]} {corner[2]:+.0f}: deepest {worst:.4f}')
         deepest = max(deepest, worst)
-    # how deep the deepest cloth lay before this settle (after it: `deepest`)
-    return before
-
-
-def drawn_samples(mi, nv):
-    """The sample ids (vertices, then triangle centres) of a masked garment
-    `mi` (penetration.Masked) that are drawn."""
-    v = np.zeros(nv, bool)
-    v[mi.tris[mi.drawn].ravel()] = True
-    return np.concatenate([np.nonzero(v)[0], nv + np.nonzero(mi.drawn)[0]])
+    # how deep the deepest cloth lay before this settle, and after it
+    return before, deepest
 
 
 def settle_layers(body, garments, cfg, rounds=6, log=print):
@@ -509,7 +505,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     import gamepath as GP
     import mask as M
     from mathutils.bvhtree import BVHTree
-    from penetration import Masked
+    from penetration import Masked, loose
     from body import barycentric
     from mathutils import Vector
     a = cfg['VILLAGER_ASSET']
@@ -526,14 +522,13 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     q = design_pose(body)
     pose = M.build_pose(body)
     vol = {n: M.Volume(pose(G[n]['pos'], G[n]['W']), G[n]['tris']) for n in names}
-    # every layering whose inner garment the outer one covers, or whose drawn
-    # inner garment lies outside the outer one through its cloth by at most
-    # garmentLayerReach in the build pose: there the mask leaves it
-    # uncovered, and it is the inner garment drawn over the outer one (one
-    # farther off is another part of the figure, a skirt below a hood's hem)
-    gn = {n: pose(G[n]['pos'], G[n]['W']) for n in names}
+    # every layering (inner, outer): the inner's covered samples, and — per
+    # body corner (`loose`) — its uncovered ones near the outer cloth, which
+    # count within garmentLayerReach: there the mask leaves it uncovered, and
+    # it is the inner garment drawn over the outer one (farther off it is
+    # another part of the figure, a skirt below a hood's hem)
     covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
-    pairs = {}
+    layered = []
     for i in names:
         for o in names:
             # a head piece lies under a hood alone: a cape's or cloak's collar
@@ -541,19 +536,10 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
             if M.SLOT[M.form(i)] == 'head' and M.form(o) != 'hood':
                 continue
             if M.layer(i) < M.layer(o) and o in covering:
-                mi = Masked(mk['inner'][i], G[i]['tris'], names, o)
-                ids = drawn_samples(mi, len(G[i]['pos']))
-                smp = mi.drawn_at(gn[i], a['garmentMaskPush'])[1]
-                place, dist = vol[o].where(gn[o], smp, reach, ids=ids)
-                near = ids[(place[ids] == M.THROUGH) & (dist[ids] <= stick) & ~np.isin(ids, mi.shown)]
-                if mi.any or len(near):
-                    pairs.setdefault(o, []).append((i, mi, np.union1d(mi.shown, near)))
+                layered.append((i, o, Masked(mk['inner'][i], G[i]['tris'], names, o)))
     # the body is the innermost layer: skin the mask leaves drawn under a
     # garment and outside it through its cloth (`shown`) pushes the cloth too
-    for o in sorted(covering):
-        mb = Masked(mk['body'], body['tris'], names, o)
-        if mb.any:
-            pairs.setdefault(o, []).append(('body', mb, mb.shown))
+    bodies = [(o, Masked(mk['body'], body['tris'], names, o)) for o in sorted(covering)]
     found = 0.0
     for corner, morph in SETTLE_ORDER:
         w = corner_weights(*corner)
@@ -563,6 +549,16 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
         bpos, _j = morphed(body, w)
         bjidx, bjw = top4(body['W'])
         btree = BVHTree.FromPolygons(person.draw(bpos, bjidx, bjw, wr, wp).tolist(), body['tris'].tolist(), all_triangles=True)
+        g0 = {n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names}
+        cl0 = {o: BVHTree.FromPolygons(g0[o].tolist(), np.asarray(G[o]['tris']).tolist(), all_triangles=True) for o in covering}
+        pairs = {}
+        for i, o, mi in layered:
+            cand = loose(mi, mi.drawn_at(g0[i], a['garmentMaskPush'])[1], cl0[o], reach)
+            if mi.any or len(cand):
+                pairs.setdefault(o, []).append((i, mi, np.union1d(mi.shown, cand)))
+        for o, mb in bodies:
+            if mb.any:
+                pairs.setdefault(o, []).append(('body', mb, mb.shown))
         first = None
         for _r in range(rounds + 1):
             gv = {n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names}

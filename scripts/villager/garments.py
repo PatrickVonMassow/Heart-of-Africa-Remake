@@ -184,10 +184,10 @@ class Body:
                 co, n, _fi, dist = tree.find_nearest(p)
                 co = np.array(co)
                 n = np.array(n)
-                if dist >= clearance:
-                    continue
                 if inside(tree, p.tolist()):
                     out[k] = p + n * (clearance + dist)
+                elif dist >= clearance:
+                    continue
                 elif dist > 1e-9:
                     # outside: away from the nearest skin, never along a face
                     # normal that points into a cavity (the mouth's slit)

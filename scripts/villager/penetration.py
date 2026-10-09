@@ -96,6 +96,8 @@ class Masked:
         self.shown = np.concatenate([np.nonzero(vdrawn & push)[0], len(m) + np.nonzero(drawn & tcov)[0]])
         # hidden: out by an opening is a hole
         self.hidden = np.concatenate([np.nonzero(hide & ~vdrawn)[0], len(m) + np.nonzero(~drawn)[0]])
+        # every drawn sample, covered or not
+        self.drawn_samples = np.concatenate([np.nonzero(vdrawn)[0], len(m) + np.nonzero(drawn)[0]])
         self.any = bool(push.any())
 
     def drawn_at(self, v, depth):
@@ -110,6 +112,18 @@ class Masked:
 # occlusion test: far below any gap between body parts, independent of the
 # tolerance, so a residual is never dropped by a probe that crossed a small gap
 PROBE = 1e-4
+
+
+def loose(mi, smp, cloth, radius):
+    """The drawn samples of an inner garment (Masked `mi`, sample positions
+    `smp`) its mask leaves UNCOVERED under an outer garment but within
+    `radius` of that garment's cloth (`cloth`: its BVH): an inner garment
+    already lying outside the outer one where the mask is read is never
+    covered, yet drawn over the outer cloth it is the same defect as one
+    showing through it. Judged in the build pose, the candidates are then
+    measured in every pose (garmentLayerReach bounds how far out they count)."""
+    shown = set(mi.shown.tolist())
+    return np.array([k for k in mi.drawn_samples.tolist() if k not in shown and cloth.find_nearest(smp[k].tolist())[3] <= radius], int)
 
 
 def _occluded(full, drawn, q):
@@ -220,15 +234,32 @@ def _corner(c):
     bh = person.bake(pos, S['jidx'], S['jw'])
     gh = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in names}
     bm = {n: Masked(mk['body'], body['tris'], mk['garments'], n) for n in names}
-    # every layering: (inner, outer) with the inner's mask under that outer
-    pairs = [(i, o, Masked(mk['inner'][i], garments['meshes'][i]['tris'], mk['garments'], o)) for i in names for o in names
-             if M.layer(i) < M.layer(o)]
-    pairs = [p for p in pairs if p[2].any]
+    # every layering: (inner, outer) with the inner's mask under that outer,
+    # and the inner garment's uncovered samples near the outer cloth in this
+    # corner's build pose (`loose`)
+    from garments import design_pose
+    wr0, wp0 = person.pose(design_pose(body), None)
+    gb = {n: person.skin(gh[n], *gskin[n], wr0, wp0) for n in names}
+    covering = {n for n in names if any(op for P in S['vol'][n].parts for op in P['opening'])}
+    cloth0 = {}
+    pairs = []
+    for i in names:
+        for o in names:
+            if M.layer(i) >= M.layer(o):
+                continue
+            mi = Masked(mk['inner'][i], garments['meshes'][i]['tris'], mk['garments'], o)
+            cand = np.zeros(0, int)
+            if o in covering:
+                if o not in cloth0:
+                    cloth0[o] = BVHTree.FromPolygons(gb[o].tolist(), np.asarray(garments['meshes'][o]['tris']).tolist(), all_triangles=True)
+                cand = loose(mi, mi.drawn_at(gb[i], depth)[1], cloth0[o], reach)
+            if mi.any or len(cand):
+                pairs.append((i, o, mi, cand))
     # the body as the game draws it while both garments of a layering are
     # worn (hidden triangles left out, covered vertices pushed in): an inner
     # garment's point is seen unless it lies inside that body and nothing is hidden
     btris = np.asarray(body['tris'])
-    both = {(i, o): M.decode(mk['body'], mk['garments'], [i, o]) for i, o, _m in pairs}
+    both = {(i, o): M.decode(mk['body'], mk['garments'], [i, o]) for i, o, _m, _c in pairs}
     worst = {n: _empty() for n in names}
     nv = len(body['pos'])
     bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
@@ -292,11 +323,14 @@ def _corner(c):
         lay, cases = {}, {}
         bnrm = None
         sight = {}
-        for i, o, mi in pairs:
+        for i, o, mi, cand in pairs:
             _ip, smp, _nrm = mi.drawn_at(gv[i], depth)
             ipart = lambda k, i=i, mi=mi: S['bones'][S['gdom'][i][k if k < S['gnv'][i] else mi.tris[k - S['gnv'][i]][0]]]  # noqa: E731
-            place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.shown, trees=trees[o])
-            thr = mi.shown[place[mi.shown] == M.THROUGH]
+            ids = np.union1d(mi.shown, cand)
+            place, dist = S['vol'][o].where(gv[o], smp, reach, ids=ids, trees=trees[o])
+            # a covered sample through the cloth at any distance; an
+            # uncovered one within garmentLayerReach of it
+            thr = ids[(place[ids] == M.THROUGH) & (np.isin(ids, mi.shown) | (dist[ids] <= S['stick']))]
 
             def seen(x, i=i, o=o, smp=smp):
                 nonlocal bnrm
@@ -395,6 +429,14 @@ def selftest():
     pushed_v = np.array(bv_)
     pushed_v[pushed_v[:, 0] == 0.0, 0] = 0.03
     assert Sight(bv_, bt_, allv).covered(inner_pt) and not Sight(pushed_v, bt_, allv).covered(inner_pt)
+    # an uncovered drawn sample near the outer cloth is a candidate, a covered
+    # one is already measured, a far or undrawn one is not
+    class _Mi:
+        shown = np.array([0])
+        drawn_samples = np.array([0, 1, 2])
+    plate = BVHTree.FromPolygons([(0, 0, 0), (1, 0, 0), (0, 1, 0)], [(0, 1, 2)], all_triangles=True)
+    pts = np.array([[0.1, 0.1, 0.001], [0.1, 0.1, 0.01], [0.1, 0.1, 0.5], [0.1, 0.1, 0.0]])
+    assert loose(_Mi, pts, plate, 0.07).tolist() == [1], loose(_Mi, pts, plate, 0.07)
     print('penetration selftest: ok')
 
 
@@ -416,7 +458,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
               gskin={n: top4(garments['meshes'][n]['W']) for n in names}, jidx=jidx, jw=jw,
               dom=np.argmax(body['W'], 1), bones=__import__('skeleton').NAMES,
               gdom={n: np.argmax(garments['meshes'][n]['W'], 1) for n in names}, gnv={n: len(garments['meshes'][n]['pos']) for n in names},
-              tol=a['garmentPenetrationTolerance'], cut=a['garmentMaskCutTolerance'], clip_names=clip_names or EXPORT_CLIPS,
+              tol=a['garmentPenetrationTolerance'], cut=a['garmentMaskCutTolerance'], stick=a['garmentLayerReach'], clip_names=clip_names or EXPORT_CLIPS,
               vol={n: M.Volume(pose(garments['meshes'][n]['pos'], garments['meshes'][n]['W']), garments['meshes'][n]['tris']) for n in names},
               faces={n: face_points(garments['meshes'][n]['tris'], garments['meshes'][n]['pos'], a['garmentFaceSpacing']) for n in names})
     corners = corners or CORNERS
