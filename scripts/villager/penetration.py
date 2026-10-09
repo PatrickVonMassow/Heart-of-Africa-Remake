@@ -523,9 +523,9 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     t, bad = _table(worst, a, tol, worst[next(iter(worst))]['checked'])
     lines += t + ['', f'**{len(worst) - bad} of {len(worst)} garments within tolerance in every frame and layering** '
                   f'({worst[next(iter(worst))]["checked"]} poses × corners each).', '',
-                  '## Remaining visible cases (handed to work-order point 1332)', '',
+                  '## Remaining visible cases (handed to work-order point 1334)', '',
                   'Every case over its tolerance, by garment: what is seen, the body part (of the inner garment for a layering), the clip, the outer garment of a '
-                  'layering, its worst value with where, and in how many frames it is over (clip `build`: the build pose). Each is handed to work-order point 1332 (garment motion cases).', '']
+                  'layering, its worst value with where, and in how many frames it is over (clip `build`: the build pose). Each is handed to work-order point 1334 (garment motion cases).', '']
     for n, r in sorted(worst.items()):
         cases = sorted((build[n]['cases'] | r['cases']).items(), key=lambda kv: -kv[1]['value'])
         if not cases:

@@ -128,8 +128,20 @@ describe('the visible-only penetration report', () => {
     expect(worseThanMain(raised, main)).toEqual([expect.stringContaining(`${g} cloth build`)])
   })
 
-  it('the report hands every remaining case to point 1332 by name', () => {
-    const section = md.split('## Remaining visible cases (handed to work-order point 1332)')[1]?.split('\n## ')[0]
+  it('every garment fits its own build pose within tolerance at every body corner and layering', () => {
+    const over: string[] = []
+    for (const [n, g] of Object.entries(now.build)) {
+      for (const col of Object.keys(NAMES) as Column[]) {
+        if (g[col].value > limit(col)) over.push(`${n} ${col} ${g[col].value}`)
+      }
+      expect(Object.keys(g.cases), n).toEqual([])
+    }
+    expect(over).toEqual([])
+    expect(md).toContain(`**${Object.keys(now.build).length} of ${Object.keys(now.build).length} garments within tolerance in the build pose`)
+  })
+
+  it('the report hands every remaining case to point 1334 by name', () => {
+    const section = md.split('## Remaining visible cases (handed to work-order point 1334)')[1]?.split('\n## ')[0]
     expect(section).toBeDefined()
     const lines = section!.split('\n')
     let checked = 0
@@ -145,7 +157,6 @@ describe('the visible-only penetration report', () => {
         checked++
       }
     }
-    expect(Object.values(now.build).some((g) => Object.keys(g.cases).length), 'a build-pose case is checked').toBe(true)
     expect(checked).toBeGreaterThan(0)
   })
 })

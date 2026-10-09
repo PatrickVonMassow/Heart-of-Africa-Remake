@@ -2624,6 +2624,11 @@ export const VILLAGER_ASSET = {
    *  torso, shoulder), so an inner garment never settles where an outer one
    *  lies (figure units, ≈ 5 mm). Calibratable. */
   garmentLayerGap: 0.004,
+  /** How far an inner garment the build-pose mask leaves uncovered may lie
+   *  outside an outer one through its cloth and still be settled under it
+   *  (figure units, ≈ 2.6 cm): it is the inner garment drawn over the outer
+   *  one; farther off it is another part of the figure. Calibratable. */
+  garmentLayerReach: 0.02,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

@@ -468,7 +468,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     # an outer cloth settles a whole layer gap past the inner one: a gap of
     # garmentFitMargin left the two coincident to the eye (patches of the inner
     # garment through the outer within tolerance)
-    margin, reach = a['garmentLayerGap'], a['garmentMaskOpening']
+    margin, reach, stick = a['garmentLayerGap'], a['garmentMaskOpening'], a['garmentLayerReach']
     G = garments['meshes']
     mk = M.masks(body, garments, cfg, log=lambda *x: None)
     names = mk['garments']
@@ -479,9 +479,10 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     pose = M.build_pose(body)
     vol = {n: M.Volume(pose(G[n]['pos'], G[n]['W']), G[n]['tris']) for n in names}
     # every layering whose inner garment the outer one covers, or whose drawn
-    # inner garment lies outside the outer one through its cloth within reach
-    # in the build pose: there the mask leaves it uncovered, and it is the
-    # inner garment drawn over the outer one
+    # inner garment lies outside the outer one through its cloth by at most
+    # garmentLayerReach in the build pose: there the mask leaves it
+    # uncovered, and it is the inner garment drawn over the outer one (one
+    # farther off is another part of the figure, a skirt below a hood's hem)
     gn = {n: pose(G[n]['pos'], G[n]['W']) for n in names}
     covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
     pairs = {}
@@ -492,7 +493,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                 ids = drawn_samples(mi, len(G[i]['pos']))
                 smp = mi.drawn_at(gn[i], a['garmentMaskPush'])[1]
                 place, dist = vol[o].where(gn[o], smp, reach, ids=ids)
-                near = ids[(place[ids] == M.THROUGH) & (dist[ids] <= reach) & ~np.isin(ids, mi.shown)]
+                near = ids[(place[ids] == M.THROUGH) & (dist[ids] <= stick) & ~np.isin(ids, mi.shown)]
                 if mi.any or len(near):
                     pairs.setdefault(o, []).append((i, mi, np.union1d(mi.shown, near)))
     found = 0.0
@@ -523,7 +524,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                     # is toward the outer cloth)
                     smp = mi.drawn_at(gv[i], a['garmentMaskPush'])[1]
                     place, dist = vol[o].where(gv[o], smp, reach, ids=ids, trees=trees)
-                    for k in ids[(place[ids] == M.THROUGH) & (dist[ids] > 0) & (dist[ids] <= reach)]:
+                    for k in ids[(place[ids] == M.THROUGH) & (dist[ids] > 0) & ((dist[ids] <= stick) | np.isin(ids, mi.shown))]:
                         co, _n, ti, _d = cloth.find_nearest(smp[k].tolist())
                         co = np.array(co)
                         u = smp[k] - co
