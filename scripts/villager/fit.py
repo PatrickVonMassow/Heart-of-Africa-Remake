@@ -294,6 +294,39 @@ def way_out(tree, p, d, hits=64):
     return np.inf
 
 
+def smooth_cloth(garments, rounds, lam=0.5, mu=-0.53):
+    """Taubin smoothing (`rounds` λ/μ pairs, no shrinking) of every garment's
+    rest positions and each morph's offsets alike, its open edges (hems,
+    openings) held: the settle's pushes leave the cloth dented, and the
+    next settle pass takes it clear of the body again."""
+    G = garments['meshes']
+    for n in [n for n in G if n.startswith('g-')]:
+        g = G[n]
+        nb, twins = neighbours(len(g['pos']), g['tris'], g['pos'])
+        rep = np.arange(len(g['pos']))
+        for grp in twins:
+            rep[grp] = min(grp)
+        t = rep[np.asarray(g['tris'])]
+        e = np.sort(np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]]), axis=1)
+        u, c = np.unique(e, axis=0, return_counts=True)
+        edge = np.zeros(len(g['pos']), bool)
+        edge[u[c == 1].ravel()] = True
+        edge = edge[rep]
+        free = np.nonzero(~edge & np.array([len(x) > 0 for x in nb]))[0]
+
+        def step(a, f):
+            mean = np.array([a[nb[i]].mean(0) for i in free])
+            out = a.copy()
+            out[free] = a[free] + f * (mean - a[free])
+            return out
+        arrays = [g['pos']] + [g['morph_pos'][m] for m in g['morph_pos']]
+        for _ in range(rounds):
+            arrays = [step(step(a, lam), mu) for a in arrays]
+        g['pos'] = arrays[0]
+        for m, a in zip(g['morph_pos'], arrays[1:]):
+            g['morph_pos'][m] = a
+
+
 def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
     """Every edge split to garmentEdgeMax (garments.refine), the cloth an arm
     passes through in the build pose cut (garments.armholes); then
@@ -311,6 +344,8 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
             if cut:
                 log(f'settle {n}: {cut} triangles cut where an arm passes through')
     for k in range(passes):
+        if k:
+            smooth_cloth(garments, cfg['VILLAGER_ASSET']['garmentSettleSmooth'])
         settle_once(body, garments, cfg, log=log)
         # the layers last: an outer garment only ever moves out, so it keeps
         # its body clearance, while an inner one settled after it could rise
@@ -325,6 +360,8 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
             log(f'settle pass {k + 1}: {split} vertices added where the settling stretched the cloth')
         if not split:
             break
+    smooth_cloth(garments, cfg['VILLAGER_ASSET']['garmentSettleSmooth'])
+    settle_once(body, garments, cfg, log=log)
     # the cover masks follow the settled cloth: settle the layers again under
     # the masks the settled garments give until none shows through
     for k in range(12):
@@ -465,6 +502,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     from mathutils.bvhtree import BVHTree
     from penetration import Masked
     from body import barycentric
+    from mathutils import Vector
     a = cfg['VILLAGER_ASSET']
     # an outer cloth settles a whole layer gap past the inner one: a gap of
     # garmentFitMargin left the two coincident to the eye (patches of the inner
@@ -542,6 +580,12 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                         # fold of the outer cloth never pulls it into the body
                         _bc, bn, _bi, _bd = btree.find_nearest(smp[k].tolist())
                         if u @ np.array(bn) <= 0:
+                            continue
+                        # nor across the body: an inner point on another side
+                        # of the figure (a hair bag behind the head under a
+                        # cape's collar) is no reason to pull the cloth there
+                        ln = float(np.linalg.norm(u))
+                        if ln > 1e-9 and btree.ray_cast(Vector(co.tolist()), Vector((u / ln).tolist()), ln)[0] is not None:
                             continue
                         fi.append(to[ti])
                         fw.append(barycentric(co, *gv[o][to[ti]]))

@@ -2635,6 +2635,9 @@ export const VILLAGER_ASSET = {
    *  confused the cover mask's inside test). Calibratable. */
   garmentSettleSpreadRings: 5,
   garmentSettleSpreadKeep: 0.7,
+  /** Taubin smoothing rounds over the settled cloth between settle passes
+   *  (the pushes leave it dented). Calibratable. */
+  garmentSettleSmooth: 4,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive
