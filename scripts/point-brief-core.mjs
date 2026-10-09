@@ -1254,7 +1254,7 @@ const HOUSE_FACTS = [
   '  only machine-readable evidence `scripts/model-guard.mjs` has, so the bare',
   '  `Co-Authored-By: Claude <noreply@anthropic.com>` names no model and trips the tripwire,',
   '  which STOPS the batch. Write the name of the model YOU are, in this form:',
-  '  `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.',
+  '  `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`.',
   '- Point titles use sentence case rather than full uppercase; acronyms and individual',
   '  emphasised words may stay capitalised.',
 ]
