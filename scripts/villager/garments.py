@@ -239,6 +239,22 @@ class Body:
             out[k] = (self.W[tris[fi]] * bc[:, None]).sum(0)
         return out
 
+    def weights_trunk(self, pts):
+        """Data transfer from the skin off the arms alone (every arm bone
+        under 0.3): cloth over a shoulder that took the upper arm's weights
+        lifted off as a flap with every arm swing once the armhole was cut."""
+        from mathutils.bvhtree import BVHTree
+        from body import barycentric
+        if not hasattr(self, 'tree_noarm'):
+            self.tris_noarm = self.tris[(self.arm[self.tris] < 0.3).all(1)]
+            self.tree_noarm = BVHTree.FromPolygons(self.v.tolist(), self.tris_noarm.tolist(), all_triangles=True)
+        out = np.zeros((len(pts), len(SK.NAMES)))
+        for k, p in enumerate(pts):
+            co, _n, fi, _d = self.tree_noarm.find_nearest(p)
+            bc = barycentric(np.array(co), *self.v[self.tris_noarm[fi]])
+            out[k] = (self.W[self.tris_noarm[fi]] * bc[:, None]).sum(0)
+        return out
+
     def weights_at(self, pts, lower_arms=True):
         """Data transfer: the body's weights at the nearest surface point.
         Without `lower_arms` the forearms and hands are left out of the
@@ -492,7 +508,9 @@ def build_form(B, form, wear, L):
             # shoulder's neck to under the bare arm: every column has its own
             # top on that line (dropping whole quads left it stair-stepped)
             low = L['chestTop'] - 0.08 * H
-            return column_sweep(toga_ring, lambda th: diagonal(np.sin(th) * bare, top, low), bottom, 24), 8
+            v = column_sweep(toga_ring, lambda th: diagonal(np.sin(th) * bare, top, low), bottom, 24)
+            # all of it body cloth: weights off the arms (finish)
+            return v, 8, np.zeros(len(v[0]), int)
         # the yoke: down to the chest's top the outline holds the shoulders'
         # arm caps too, so the cloth covers the tops of the shoulders and the
         # sleeves begin under it (the upper arm comes out through the armhole
@@ -509,7 +527,8 @@ def build_form(B, form, wear, L):
         for s in 'LR':
             parts.append(sleeve(B, s, L))
         # the sleeves' vertices, by side (1 left, 2 right): they take their
-        # weights from their own arm (finish)
+        # weights from their own arm, the body cloth (0) from the skin off
+        # the arms (finish)
         limb = np.concatenate([np.full(len(p[0]), k) for k, p in enumerate(parts)])
         return merge(parts), 8, limb
     if form in ('cloak', 'cape'):
@@ -760,6 +779,8 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
     v = B.push_out(v, 0.007)
     W = B.weights_at(v, lower_arms)
     if limb is not None:
+        if (limb == 0).any():
+            W[limb == 0] = B.weights_trunk(v[limb == 0])
         for k, s in ((1, 'L'), (2, 'R')):
             m = limb == k
             if m.any():
