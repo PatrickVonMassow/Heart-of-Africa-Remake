@@ -511,8 +511,9 @@ def build_form(B, form, wear, L):
             v = column_sweep(toga_ring, lambda th: diagonal(np.sin(th) * bare, top, low), bottom, 24)
             # all of it body cloth: weights off the arms (finish)
             return v, 8, np.zeros(len(v[0]), int)
-        # the yoke: down to the chest's top the outline holds the shoulders'
-        # arm caps too, so the cloth covers the tops of the shoulders and the
+        # the yoke: below the neckline (kept as it was: neck beads lie on
+        # it) down to the chest's top the outline holds the shoulders' arm
+        # caps too, so the cloth covers the tops of the shoulders and the
         # sleeves begin under it (the upper arm comes out through the armhole
         # fit.settle cuts); below it the trunk alone
         yoke = L['chestTop']
@@ -520,7 +521,7 @@ def build_form(B, form, wear, L):
         rings = []
         for y in ys:
             t = (top - y) / (top - bottom)
-            c, r = B.ring(y, trunk & ((B.lower_arm < 0.3) if y > yoke + 1e-9 else (B.arm < 0.3)), 0.013 * H)
+            c, r = B.ring(y, trunk & ((B.lower_arm < 0.3) if yoke + 1e-9 < y < top - 1e-9 else (B.arm < 0.3)), 0.013 * H)
             A = angles(len(r))
             rings.append((y, c, r + flare * B.body['joints'][0, 1] * t * t * (0.45 + 0.55 * np.abs(A[:, 0]))))
         parts.append(sweep(rings))
@@ -551,11 +552,13 @@ def build_form(B, form, wear, L):
             ease = 0.012 * H + (0.008 * H) * min(1.0, (collar - y) / (collar - cap)) + 0.012 * H * max(0.0, (cap - y) / (cap - bottom))
             t = (collar - y) / (collar - bottom)
             return c, np.array([ray_hull(h, c, (np.sin(a), np.cos(a))) for a in th]) + ease + 0.03 * H * t * t
-        opened = wear == 'bothShoulders' or form == 'cloak'
+        # a cloak opens in front; a cape is closed (its opening, narrow at the
+        # chest, let a breast cloth under it bulge out of it)
+        opened = form == 'cloak'
         bare = 1 if wear == 'rightShoulder' else -1 if wear == 'leftShoulder' else 0
         # an open front parts from the collar down, widening toward the hem
         # (a straight-sided opening read as a notch cut into the chest)
-        widest = 0.3 if form == 'cloak' else 0.2
+        widest = 0.3
         opening = (lambda y: widest * min(1.0, max(0.0, (cap - y) / (cap - bottom)))) if opened else None
         # a bare shoulder's edge runs diagonally from the collar over the
         # covered side to under the bare arm

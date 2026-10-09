@@ -196,7 +196,12 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     margin = cfg['VILLAGER_ASSET']['garmentFitMargin']
     step = cfg['VILLAGER_ASSET']['garmentFitStep']
     jidx, jw = top4(body['W'])
-    names = [n for n in garments['meshes'] if n.startswith('g-')]
+    import mask as M
+    # the shoulder layer (capes, cloaks, the hood) drapes the arms: the arms
+    # swing under it in every clip, and pushing it clear of them in the rest
+    # pose crumpled it into lumpy blobs (measured 09.10.2026); it is settled
+    # in the build pose alone (settle)
+    names = [n for n in garments['meshes'] if n.startswith('g-') and M.layer(n) < M.LAYER['shoulder']]
     G = garments['meshes']
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
