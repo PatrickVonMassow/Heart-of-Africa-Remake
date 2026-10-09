@@ -687,7 +687,6 @@ def blob(center, r, scale, n=12, m=8):
     return np.array(verts), np.array(tris), np.array(uv)
 
 
-SLEEVE_CAP = 0.12  # how far above the shoulder joint a sleeve begins (of the upper arm's length)
 SLEEVE_RING = 13  # vertices per sleeve ring (12 columns and the uv seam)
 
 
@@ -707,11 +706,11 @@ def sleeve(B, s, L):
         sl = pts[np.abs(along) < 0.015]
         rad = np.max(np.linalg.norm((sl - p) - np.outer((sl - p) @ ax, ax), axis=1)) if len(sl) else 0.035
         rings.append((p, rad * 1.25 + 0.006 + 0.004 * k))
-    # a cap over the shoulder joint, reaching under the body cloth's rim: a
+    # a cap ring at the shoulder joint, under the body cloth's yoke: a
     # sleeve begun below the joint left the top of the shoulder bare between
-    # the two, and the sleeve read as floating off the arm
-    p0, r0 = rings[0]
-    rings.insert(0, (a - (b - a) * SLEEVE_CAP, r0))
+    # the two (one begun above it lay in the shoulder, and the settle pulled
+    # it out into ribbons)
+    rings.insert(0, (a, rings[0][1]))
     # sweep round the arm axis
     n = 12
     e1 = np.cross(ax, [0, 0, 1.0])
