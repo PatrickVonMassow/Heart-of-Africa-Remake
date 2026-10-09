@@ -556,6 +556,12 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     # corner they set the layer settle oscillating, measured 09.10.2026).
     gn = {n: pose(G[n]['pos'], G[n]['W']) for n in names}
     covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
+    drawn_at_corners = [gn]
+    for corner, _m in SETTLE_ORDER[1:]:
+        w = corner_weights(*corner)
+        person = GP.Person(morphed(body, w)[1])
+        wr, wp = person.build_pose(q)
+        drawn_at_corners.append({n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names})
     pairs = {}
     for i in names:
         for o in names:
@@ -566,9 +572,16 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
             if M.layer(i) < M.layer(o) and o in covering:
                 mi = Masked(mk['inner'][i], G[i]['tris'], names, o)
                 ids = mi.drawn_samples
-                smp = mi.drawn_at(gn[i], a['garmentMaskPush'])[1]
-                place, dist = vol[o].where(gn[o], smp, reach, ids=ids)
-                near = ids[(place[ids] == M.THROUGH) & (dist[ids] <= stick) & ~np.isin(ids, mi.shown)]
+                # near the outer cloth at ANY body corner: one picked on the
+                # neutral body alone came through it at another corner (a
+                # robe's sleeve cap through a cloak on an elder woman,
+                # measured 09.10.2026); the set stays fixed through the
+                # corners below, so it cannot oscillate
+                near = np.zeros(0, int)
+                for gc in drawn_at_corners:
+                    smp = mi.drawn_at(gc[i], a['garmentMaskPush'])[1]
+                    place, dist = vol[o].where(gc[o], smp, reach, ids=ids)
+                    near = np.union1d(near, ids[(place[ids] == M.THROUGH) & (dist[ids] <= stick) & ~np.isin(ids, mi.shown)])
                 if mi.any or len(near):
                     pairs.setdefault(o, []).append((i, mi, np.union1d(mi.shown, near)))
     # the body is the innermost layer: skin the mask leaves drawn under a
