@@ -27,6 +27,11 @@ import type { ArmPose } from './gesture'
 export const HANGING_ROLL_KEEP = 0.18
 /** The most the chest may lean forward to bring a contact into reach (rad). */
 export const CONTACT_LEAN_MAX = 0.5
+/** The lean allowed once the crouch is already at `CROUCH_MAX` (rad): a body in
+ *  a full squat that still cannot reach — the jar dipped into the water at its
+ *  feet — bends further over rather than leaving the hand hanging short.
+ *  Every contact reached at a shallower crouch is untouched by it. */
+export const CONTACT_LEAN_DEEP = 0.8
 /** The deepest contact crouch (rad of knee flex per joint): a full squat at
  *  the water's edge, feet on the ground. */
 export const CROUCH_MAX = 1.1
@@ -101,10 +106,24 @@ export function solveTwoBone(
   return { upper, fore, reached: true }
 }
 
-/** The extra forward chest lean (rad) that brings `t` within `reach` of a
- *  shoulder at `s` when the chest pivots about `pivot`; 0 when it already is
- *  or when the target is not a reachable contact in front (see the limits). */
-export function contactLean(s: THREE.Vector3, t: THREE.Vector3, reach: number, pivot: THREE.Vector3, forward: THREE.Vector3): number {
+/** The most extra lean a contact may take at knee flex `crouch`:
+ *  `CONTACT_LEAN_DEEP` only in the full squat, `CONTACT_LEAN_MAX` otherwise. */
+export function contactLeanMax(crouch: number): number {
+  return crouch >= CROUCH_MAX - 1e-9 ? CONTACT_LEAN_DEEP : CONTACT_LEAN_MAX
+}
+
+/** The extra forward chest lean (rad, at most `max`) that brings `t` within
+ *  `reach` of a shoulder at `s` when the chest pivots about `pivot`; 0 when it
+ *  already is or when the target is not a reachable contact in front (see the
+ *  limits). */
+export function contactLean(
+  s: THREE.Vector3,
+  t: THREE.Vector3,
+  reach: number,
+  pivot: THREE.Vector3,
+  forward: THREE.Vector3,
+  max = CONTACT_LEAN_MAX,
+): number {
   const d = s.distanceTo(t)
   if (d <= reach) return 0
   if (d - reach > CONTACT_LEAN_REACH) return 0
@@ -112,7 +131,7 @@ export function contactLean(s: THREE.Vector3, t: THREE.Vector3, reach: number, p
   const axis = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize()
   const q = new THREE.Quaternion()
   const p = new THREE.Vector3()
-  for (let lean = 0.05; lean <= CONTACT_LEAN_MAX + 1e-9; lean += 0.05) {
+  for (let lean = 0.05; lean <= max + 1e-9; lean += 0.05) {
     q.setFromAxisAngle(axis, lean)
     p.copy(s).sub(pivot).applyQuaternion(q).add(pivot)
     if (p.distanceTo(t) <= reach) return lean

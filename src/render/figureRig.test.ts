@@ -6,6 +6,8 @@ import {
   CROUCH_MAX,
   unsquashHead,
   CONTACT_LEAN_MAX,
+  CONTACT_LEAN_DEEP,
+  contactLeanMax,
   contactLean,
   gestureArmEuler,
   hangToward,
@@ -78,6 +80,20 @@ describe('the contact lean', () => {
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 0.75, -0.45), 0.5, pivot, fwd)).toBe(0)
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 0.8, 0.2), 0.5, pivot, fwd)).toBe(0)
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(0)
+  })
+  it('bends further over only in the full squat, for a target the normal lean cannot reach', () => {
+    expect(contactLeanMax(0)).toBe(CONTACT_LEAN_MAX)
+    expect(contactLeanMax(CROUCH_MAX - 0.1)).toBe(CONTACT_LEAN_MAX)
+    expect(contactLeanMax(CROUCH_MAX)).toBe(CONTACT_LEAN_DEEP)
+    expect(CONTACT_LEAN_DEEP).toBeGreaterThan(CONTACT_LEAN_MAX)
+    // Low in front of the feet: out of reach at CONTACT_LEAN_MAX, reached deeper.
+    const s = v(0.12, 0.65, 0.1)
+    const t = v(0.2, 0.15, 0.18)
+    const p0 = v(0, 0.35, 0)
+    expect(contactLean(s, t, 0.42, p0, fwd)).toBe(0)
+    const deep = contactLean(s, t, 0.42, p0, fwd, CONTACT_LEAN_DEEP)
+    expect(deep).toBeGreaterThan(CONTACT_LEAN_MAX)
+    expect(deep).toBeLessThanOrEqual(CONTACT_LEAN_DEEP + 1e-9)
   })
 })
 

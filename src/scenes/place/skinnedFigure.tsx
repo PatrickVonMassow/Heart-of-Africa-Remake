@@ -26,7 +26,7 @@ import type { VillagerAsset } from '../../render/villagerAsset'
 import { createGltfSkeleton, gltfFigureGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, gestureArmEuler, hangToward, solveTwoBone, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, contactLeanMax, gestureArmEuler, hangToward, solveTwoBone, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -397,7 +397,7 @@ export function SkinnedFigure({
         loc(b[`hand.${s}`], _w).distanceTo(_e) +
         loc(rig.hands[s === 'L' ? 0 : 1], _t).distanceTo(_w)
       const baseLean = b.spine.rotation.x
-      const leanIn = () => {
+      const leanIn = (crouch: number) => {
         b.spine.rotation.x = baseLean
         b.hips.updateWorldMatrix(false, true)
         loc(b.spine, _pivot)
@@ -409,7 +409,7 @@ export function SkinnedFigure({
           const reach = reachOf(s)
           loc(b[`upperArm.${s}`], _s)
           loc(vh, _t)
-          lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
+          lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd, contactLeanMax(crouch)))
         })
         if (lean > 0) {
           b.spine.rotation.x += lean
@@ -430,7 +430,7 @@ export function SkinnedFigure({
           )
         const tryAt = (cc: number) => {
           b.hips.position.y = standHip(cc)
-          leanIn()
+          leanIn(cc)
           return shortOf()
         }
         m.crouchTarget = crouchTarget(m.speed, contactCrouch(tryAt))
@@ -442,7 +442,7 @@ export function SkinnedFigure({
       b.spine.rotation.set(vTrunk.rotation.x, vTrunk.rotation.y - walk.hipYaw, 0)
       b.chest.rotation.set(p.stoop, walk.chestYaw, 0)
       b.hips.updateWorldMatrix(false, true)
-      if (contact) leanIn()
+      if (contact) leanIn(m.crouch)
       // THE STEADYING HAND on a head load: the free arm on the load's side.
       const loadShown = rig.crown.children.some((c) => c.visible)
       const steadyArm = headSteady && loadShown && m.kneel < 0.5 ? (!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1) : -1
