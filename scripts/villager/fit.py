@@ -311,8 +311,10 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
                 log(f'settle {n}: {cut} triangles cut where an arm passes through')
     for k in range(passes):
         settle_once(body, garments, cfg, log=log)
+        # the layers last: an outer garment only ever moves out, so it keeps
+        # its body clearance, while an inner one settled after it could rise
+        # through it again
         settle_layers(body, garments, cfg, log=log)
-        settle_once(body, garments, cfg, log=log)
         split = 0
         if k < passes - 1:
             for n in [n for n in G if n.startswith('g-')]:
@@ -321,6 +323,13 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
                 split += len(G[n]['pos']) - nv
             log(f'settle pass {k + 1}: {split} vertices added where the settling stretched the cloth')
         if not split:
+            break
+    # the cover masks follow the settled cloth: settle the layers again under
+    # the masks the settled garments give until none shows through
+    for k in range(12):
+        found = settle_layers(body, garments, cfg, log=log)
+        log(f'settle layers again {k + 1}: inner through outer {found:.4f} before')
+        if found <= 0.0:
             break
     return garments
 
@@ -429,6 +438,14 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
     return garments
 
 
+def drawn_samples(mi, nv):
+    """The sample ids (vertices, then triangle centres) of a masked garment
+    `mi` (penetration.Masked) that are drawn."""
+    v = np.zeros(nv, bool)
+    v[mi.tris[mi.drawn].ravel()] = True
+    return np.concatenate([np.nonzero(v)[0], nv + np.nonzero(mi.drawn)[0]])
+
+
 def settle_layers(body, garments, cfg, rounds=6, log=print):
     """The same for every layering, in the build pose at every body corner: a
     point of an inner garment its cover mask leaves drawn under an outer one
@@ -440,7 +457,10 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     from penetration import Masked
     from body import barycentric
     a = cfg['VILLAGER_ASSET']
-    margin, reach = a['garmentFitMargin'], a['garmentMaskOpening']
+    # an outer cloth settles a whole layer gap past the inner one: a gap of
+    # garmentFitMargin left the two coincident to the eye (patches of the inner
+    # garment through the outer within tolerance)
+    margin, reach = a['garmentLayerGap'], a['garmentMaskOpening']
     G = garments['meshes']
     mk = M.masks(body, garments, cfg, log=lambda *x: None)
     names = mk['garments']
@@ -450,13 +470,24 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     q = design_pose(body)
     pose = M.build_pose(body)
     vol = {n: M.Volume(pose(G[n]['pos'], G[n]['W']), G[n]['tris']) for n in names}
+    # every layering whose inner garment the outer one covers, or whose drawn
+    # inner garment lies outside the outer one through its cloth within reach
+    # in the build pose: there the mask leaves it uncovered, and it is the
+    # inner garment drawn over the outer one
+    gn = {n: pose(G[n]['pos'], G[n]['W']) for n in names}
+    covering = {n for n in names if any(op for P in vol[n].parts for op in P['opening'])}
     pairs = {}
     for i in names:
         for o in names:
-            if M.layer(i) < M.layer(o):
+            if M.layer(i) < M.layer(o) and o in covering:
                 mi = Masked(mk['inner'][i], G[i]['tris'], names, o)
-                if mi.any:
-                    pairs.setdefault(o, []).append((i, mi))
+                ids = drawn_samples(mi, len(G[i]['pos']))
+                smp = mi.drawn_at(gn[i], a['garmentMaskPush'])[1]
+                place, dist = vol[o].where(gn[o], smp, reach, ids=ids)
+                near = ids[(place[ids] == M.THROUGH) & (dist[ids] <= reach) & ~np.isin(ids, mi.shown)]
+                if mi.any or len(near):
+                    pairs.setdefault(o, []).append((i, mi, np.union1d(mi.shown, near)))
+    found = 0.0
     for corner, morph in SETTLE_ORDER:
         w = corner_weights(*corner)
         _pos, j = morphed(body, w)
@@ -477,16 +508,22 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                 cloth = BVHTree.FromPolygons(gv[o].tolist(), to.tolist(), all_triangles=True)
                 trees = vol[o].trees(gv[o])
                 fi, fw, need, dirs = [], [], [], []
-                for i, mi in inner:
-                    smp = np.concatenate([gv[i], gv[i][mi.tris].mean(1)])
-                    place, dist = vol[o].where(gv[o], smp, reach, ids=mi.shown, trees=trees)
-                    for k in mi.shown[(place[mi.shown] == M.THROUGH) & (dist[mi.shown] > 0)]:
+                for i, mi, ids in inner:
+                    # the inner garment as the game draws it under this outer
+                    # one: its covered points pushed in along its own normals
+                    # (which for a closed piece or an inward-facing sheet
+                    # is toward the outer cloth)
+                    smp = mi.drawn_at(gv[i], a['garmentMaskPush'])[1]
+                    place, dist = vol[o].where(gv[o], smp, reach, ids=ids, trees=trees)
+                    for k in ids[(place[ids] == M.THROUGH) & (dist[ids] > 0) & (dist[ids] <= reach)]:
                         co, _n, ti, _d = cloth.find_nearest(smp[k].tolist())
                         co = np.array(co)
                         u = smp[k] - co
-                        # only ever out from the body: an inner point past a
+                        # only ever out from the body (the normal of the body
+                        # nearest the inner point: the cloth's nearest body
+                        # point may be a hand beside it): an inner point past a
                         # fold of the outer cloth never pulls it into the body
-                        _bc, bn, _bi, _bd = btree.find_nearest(co.tolist())
+                        _bc, bn, _bi, _bd = btree.find_nearest(smp[k].tolist())
                         if u @ np.array(bn) <= 0:
                             continue
                         fi.append(to[ti])
@@ -510,6 +547,8 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
             if not moved:
                 break
         log(f'settle layers {corner[0]} {corner[1]} {corner[2]:+.0f}: inner through outer {first:.4f} -> {cur:.4f}')
+        found = max(found, first)
+    return found
 
 
 def selftest():
