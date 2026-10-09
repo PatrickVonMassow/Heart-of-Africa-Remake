@@ -184,10 +184,15 @@ class Body:
                 co, n, _fi, dist = tree.find_nearest(p)
                 co = np.array(co)
                 n = np.array(n)
+                # a point deeper than the clearance is left where it is: it is
+                # cloth an upper arm passes through (fit.settle cuts it as an
+                # armhole) or cloth the settle takes out at every body corner;
+                # pushed out here it lay folded in the armpit crease, which no
+                # settle cleared (measured 09.10.2026)
+                if dist >= clearance:
+                    continue
                 if inside(tree, p.tolist()):
                     out[k] = p + n * (clearance + dist)
-                elif dist >= clearance:
-                    continue
                 elif dist > 1e-9:
                     # outside: away from the nearest skin, never along a face
                     # normal that points into a cavity (the mouth's slit)
