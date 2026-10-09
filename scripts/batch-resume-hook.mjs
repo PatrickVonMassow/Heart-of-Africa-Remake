@@ -231,8 +231,8 @@ const RESUME_BODY =
   'owner runbook. MAXIMAL DELEGATION: delegate implementation and infra/guard/doc/dashboard work to ' +
   'at most 3 concurrent WORKTREE-ISOLATED agents on NON-OVERLAPPING files under the model policy ' +
   '(throttle DOWN if report volume threatens context, never up; tightly-coupled same-file points go ' +
-  'TOGETHER on ONE branch sequentially); the main session keeps picture verification on both ' +
-  'backends, the serial merge -> fast-gate -> tick -> deploy -> cleanup, and the board publish. ' +
+  'TOGETHER on ONE branch sequentially); the main session keeps picture verification (backends per ' +
+  'CLAUDE.md §6), the serial merge -> fast-gate -> tick -> deploy -> cleanup, and the board publish. ' +
   'Every defect the user reports on the deployed build is APPENDED as its own ready TASKS point on ' +
   'main and delegated (append-and-defer), never fixed ad hoc or dropped. ' +
   'POINT BOUNDARY: once the point you were landing is LANDED (merged and ticked), run ' +
@@ -286,7 +286,7 @@ try {
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'scripts/author-routing-core.mjs makes that cut from point text and recorded review history; ' +
       'a point\'s `Author lane:` tag stays an operator decision (ordinary-lane tags yield only to a ' +
-      'reached §6 Fable escalation threshold). scripts/astra-share.mjs --status says what routes now; ' +
+      'reached Fable escalation threshold in scripts/author-routing-core.mjs). scripts/astra-share.mjs --status says what routes now; ' +
       'an UNREACHABLE Astra lane (exhausted OpenAI volume included) authors on Opus 5.5 instead of ' +
       'waiting. REVIEW is CROSS-VENDOR (scripts/review-astra.mjs for Anthropic-authored work, Claude ' +
       'for Astra-authored work); no model reviews its own. AN ASTRA-LANE POINT IS COMMISSIONED, NOT ' +
