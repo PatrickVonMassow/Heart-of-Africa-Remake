@@ -531,6 +531,13 @@ def build_form(B, form, wear, L):
         # weights from their own arm, the body cloth (0) from the skin off
         # the arms (finish)
         limb = np.concatenate([np.full(len(p[0]), k) for k, p in enumerate(parts)])
+        # a sleeve's cap ring lies above the shoulder joint: weighted to the
+        # upper arm it swung the other way round the joint and stood off the
+        # shoulder as a shard; it takes the shoulder's own skin weights (3)
+        start = len(parts[0][0])
+        for p in parts[1:]:
+            limb[start:start + SLEEVE_RING] = 3
+            start += len(p[0])
         return merge(parts), 8, limb
     if form in ('cloak', 'cape'):
         bottom = L['knee'] + 0.03 * H if form == 'cloak' else L['waist'] - 0.02 * H
@@ -681,6 +688,7 @@ def blob(center, r, scale, n=12, m=8):
 
 
 SLEEVE_CAP = 0.12  # how far above the shoulder joint a sleeve begins (of the upper arm's length)
+SLEEVE_RING = 13  # vertices per sleeve ring (12 columns and the uv seam)
 
 
 def sleeve(B, s, L):
@@ -788,6 +796,8 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
             m = limb == k
             if m.any():
                 W[m] = B.weights_on_arm(v[m], s)
+        if (limb == 3).any():
+            W[limb == 3] = B.weights_at(v[limb == 3], False)
     if rigid_head:
         W[:] = 0
         W[:, SK.INDEX['head']] = 1
