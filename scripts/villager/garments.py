@@ -393,7 +393,9 @@ def build_form(B, form, wear, L):
         return sweep(tube(B, top, bottom, 0.012 * H, 0.05 if form == 'wrapLong' else 0.035, trunk, 12)), 8
     if form == 'trousers':
         bottom = L['knee'] - 0.5 * (L['knee'] - L['ankle'])
-        parts.append(sweep(tube(B, L['girdle'], L['hip'] - 0.06 * H, 0.013 * H, 0, trunk, 5)))
+        # the seat reaches below a child's crotch too: skin between the leg
+        # tubes and above the seat's hem would lie outside every part
+        parts.append(sweep(tube(B, L['girdle'], L['hip'] - 0.08 * H, 0.013 * H, 0, trunk, 6)))
         for s in 'LR':
             rings = []
             for k in range(8):
@@ -501,8 +503,9 @@ def build_form(B, form, wear, L):
         return torus(c, L['neck'] - 0.012 * H, r, 0.01 * H), 2
     if form == 'waistBeads':
         # below the girdle of a loin flap, apron or girdle tails (hip + 0.06 H):
-        # two rings at one height cross each other whatever settles them
-        return girdle(B, L['hip'] + 0.03 * H, 0.011 * H), 2
+        # two rings at one height cross each other whatever settles them, and
+        # beads tucked under the girdle's tube read as through its solid
+        return girdle(B, L['hip'] + 0.02 * H, 0.007 * H), 2
     if form == 'limbRings':
         for s in 'LR':
             wi = SK.INDEX['hand.' + s]

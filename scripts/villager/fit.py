@@ -497,6 +497,12 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                 near = ids[(place[ids] == M.THROUGH) & (dist[ids] <= stick) & ~np.isin(ids, mi.shown)]
                 if mi.any or len(near):
                     pairs.setdefault(o, []).append((i, mi, np.union1d(mi.shown, near)))
+    # the body is the innermost layer: skin the mask leaves drawn under a
+    # garment and outside it through its cloth (`shown`) pushes the cloth too
+    for o in sorted(covering):
+        mb = Masked(mk['body'], body['tris'], names, o)
+        if mb.any:
+            pairs.setdefault(o, []).append(('body', mb, mb.shown))
     found = 0.0
     for corner, morph in SETTLE_ORDER:
         w = corner_weights(*corner)
@@ -509,6 +515,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
         first = None
         for _r in range(rounds + 1):
             gv = {n: person.draw(garment_pos(G[n], w), *skin[n], wr, wp) for n in names}
+            gv['body'] = person.draw(bpos, bjidx, bjw, wr, wp)
             moved = 0
             cur = 0.0
             # the inner layers' outer garments first: a hip garment settled
