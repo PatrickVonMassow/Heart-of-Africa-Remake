@@ -426,7 +426,9 @@ def build_form(B, form, wear, L):
     if form in ('cloak', 'cape'):
         bottom = L['knee'] + 0.03 * H if form == 'cloak' else L['waist'] - 0.02 * H
         rings = []
-        ys = [L['neck'] + 0.01 * H, L['shoulder'] + 0.012 * H]
+        # the collar below the jaw: one ring higher, a woman's or an elder's
+        # chin came down into it
+        ys = [L['neck'] - 0.005 * H, L['shoulder'] + 0.012 * H]
         y = L['shoulder'] - 0.03 * H
         while y > bottom + 0.02 * H:
             ys.append(y)

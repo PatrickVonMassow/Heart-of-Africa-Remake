@@ -361,13 +361,15 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
         if not split:
             break
     smooth_cloth(garments, cfg['VILLAGER_ASSET']['garmentSettleSmooth'])
-    settle_once(body, garments, cfg, log=log)
-    # the cover masks follow the settled cloth: settle the layers again under
-    # the masks the settled garments give until none shows through
+    # the cover masks follow the settled cloth: settle the body clearance and
+    # the layers again, under the masks the settled garments give, until
+    # neither moves anything (a layer push spread near a collar can dip the
+    # cloth into the body, a body push lift an inner garment)
     for k in range(12):
+        deep = settle_once(body, garments, cfg, log=log)
         found = settle_layers(body, garments, cfg, log=log)
-        log(f'settle layers again {k + 1}: inner through outer {found:.4f} before')
-        if found <= 0.0:
+        log(f'settle again {k + 1}: cloth {deep:.4f} inside, inner through outer {found:.4f} before')
+        if found <= 0.0005 and deep <= 0.0005:
             break
     return garments
 
@@ -388,6 +390,7 @@ def _settle_one(n):
     g['morph_pos'] = dict(g['morph_pos'])
     gi, gw = S['skin'][n]
     fi, fw = face_points(g['tris'], g['pos'], a['garmentFaceSpacing'])
+    first = None
     for _r in range(S['rounds']):
         gv = person.draw(garment_pos(g, w), gi, gw, wr, wp)
         d, co, nrm = depths(tree, gv)
@@ -406,6 +409,8 @@ def _settle_one(n):
         fp = np.einsum('kj,kji->ki', fw, gv[fi])
         fd, _fc, fn = depths(tree, fp)
         fb = np.nonzero(fd > 0)[0]
+        if first is None:
+            first = float(max(0.0, d.max(), fd.max() if len(fd) else 0.0))
         if not len(bad) and not len(fb):
             break
         dirs = nrm.copy()
@@ -431,7 +436,7 @@ def _settle_one(n):
             g['morph_pos'][morph] = g['morph_pos'][morph] + rest
     gv = person.draw(garment_pos(g, w), gi, gw, wr, wp)
     last = float(max(0.0, depths(tree, np.concatenate([gv, np.einsum('kj,kji->ki', fw, gv[fi])]))[0].max()))
-    return n, (g['pos'] if morph is None else g['morph_pos'][morph]), last
+    return n, (g['pos'] if morph is None else g['morph_pos'][morph]), last, first or 0.0
 
 
 def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=True)):
@@ -461,6 +466,7 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
     clear = {n: a['garmentSettleClearance'] + a['garmentLayerGap'] * M.layer(n) for n in names}
     import multiprocessing as mp
+    deepest = before = 0.0
     for corner, morph in SETTLE_ORDER:
         w = corner_weights(*corner)
         pos, j = morphed(body, w)
@@ -472,7 +478,8 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
         with mp.get_context('fork').Pool(max(1, min(len(names), (os.cpu_count() or 2) - 1))) as pool:
             done = pool.map(_settle_one, names)
         worst = 0.0
-        for n, new, last in done:
+        for n, new, last, first in done:
+            before = max(before, first)
             if morph is None:
                 G[n]['pos'] = new
             else:
@@ -481,7 +488,9 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
             if last > 1e-9:
                 log(f'settle {corner[0]} {corner[1]} {corner[2]:+.0f} {n}: cloth {last:.4f} inside')
         log(f'settle {corner[0]} {corner[1]} {corner[2]:+.0f}: deepest {worst:.4f}')
-    return garments
+        deepest = max(deepest, worst)
+    # how deep the deepest cloth lay before this settle (after it: `deepest`)
+    return before
 
 
 def drawn_samples(mi, nv):
@@ -527,6 +536,10 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     pairs = {}
     for i in names:
         for o in names:
+            # a head piece lies under a hood alone: a cape's or cloak's collar
+            # pulled toward a turban or a hair bag dragged its cloth into the head
+            if M.SLOT[M.form(i)] == 'head' and M.form(o) != 'hood':
+                continue
             if M.layer(i) < M.layer(o) and o in covering:
                 mi = Masked(mk['inner'][i], G[i]['tris'], names, o)
                 ids = drawn_samples(mi, len(G[i]['pos']))
