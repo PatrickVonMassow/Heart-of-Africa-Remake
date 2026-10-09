@@ -75,6 +75,19 @@ def winding(tree, p, d, hits=64):
     return w
 
 
+def nearest_face(tree, pts):
+    """Nearest surface point, its normal and its face index for every point."""
+    co = np.empty_like(pts)
+    nrm = np.empty_like(pts)
+    fi = np.empty(len(pts), int)
+    for k, p in enumerate(pts.tolist()):
+        c, n, i, _d = tree.find_nearest(p)
+        co[k] = c
+        nrm[k] = n
+        fi[k] = i
+    return co, nrm, fi
+
+
 def inside(tree, p):
     """Inside the body by the winding number on two of three rays (the third
     cast only when the first two disagree). The sign of the nearest face's
@@ -205,6 +218,9 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     G = garments['meshes']
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
+    arm = [SK.INDEX[f'{b}.{x}'] for b in ('upperArm', 'forearm', 'hand') for x in 'LR']
+    arm_face = np.isin(np.argmax(body['W'], 1)[body['tris']], arm).any(1)
+    on_arm = {n: G[n]['W'][:, arm].sum(1) > 0.05 for n in names}
     shapes = {c: morphed(body, corner_weights(*c)) for c in corners()}
     frames = [(c, cname, f) for c in corners() for cname in EXPORT_CLIPS for f in range(len(clips['clips'][cname]['times']))]
 
@@ -221,10 +237,13 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
         for n in names:
             gi, gw = skin[n]
             gv = rig.skin(garment_pos({'pos': state[n], 'morph_pos': G[n]['morph_pos']}, w), gi, gw, j, wr, wp)
-            co, nrm = nearest(tree, gv)
+            co, nrm, fi = nearest_face(tree, gv)
             s = np.einsum('ij,ij->i', gv - co, nrm)
             depth = max(0.0, float(-s.min()))
-            bad = np.nonzero(s < margin)[0]
+            # cloth that does not follow an arm is never pushed off it: the
+            # arm swings under it, and the push lifted a robe's shoulder strip
+            # beside the armhole into a flap (measured 09.10.2026)
+            bad = np.nonzero((s < margin) & ~(arm_face[fi] & ~on_arm[n]))[0]
             if not len(bad):
                 out[n] = (depth, None)
                 continue

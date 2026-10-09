@@ -703,7 +703,7 @@ def sleeve(B, s, L):
     # sleeve begun below the joint left the top of the shoulder bare between
     # the two, and the sleeve read as floating off the arm
     p0, r0 = rings[0]
-    rings.insert(0, (a - (b - a) * SLEEVE_CAP, r0 * 1.12))
+    rings.insert(0, (a - (b - a) * SLEEVE_CAP, r0))
     # sweep round the arm axis
     n = 12
     e1 = np.cross(ax, [0, 0, 1.0])
