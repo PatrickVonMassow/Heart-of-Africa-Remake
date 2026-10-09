@@ -480,10 +480,11 @@ def build_form(B, form, wear, L):
         flare = 0.03 if form == 'shirt' else 0.06
         if form == 'toga':
             bare = 1 if wear == 'rightShoulder' else -1  # the figure's left is +x
-            m = trunk & (B.arm < 0.3)
+            body_only, yoke = trunk & (B.arm < 0.3), trunk & (B.lower_arm < 0.3)
 
             def toga_ring(y, th):
-                h, c = B.outline(y, m)
+                # the covered shoulder's cap inside the outline, as a robe's yoke
+                h, c = B.outline(y, yoke if y > L['chestTop'] else body_only)
                 t = (top - y) / (top - bottom)
                 fl = flare * B.body['joints'][0, 1] * t * t * (0.45 + 0.55 * np.abs(np.sin(th)))
                 return c, np.array([ray_hull(h, c, (np.sin(a), np.cos(a))) for a in th]) + 0.013 * H + fl
@@ -517,17 +518,15 @@ def build_form(B, form, wear, L):
         # into a higher one
         collar, cap = L['neck'] - 0.005 * H, L['shoulder'] + 0.012 * H
         drape = L['shoulder'] + 0.005 * H
-        # below the shoulders the outline holds the upper arms (it drapes
-        # them) and everything above it: the cloth falls straight from its
-        # widest point instead of tucking back in under the elbows, and the
-        # forearms and hands stay out of it (an outline round the hanging
-        # hands ballooned the cloth out to them)
+        # below the shoulders the outline holds the arms (it drapes them) and
+        # everything above it: the cloth falls straight from its widest point
+        # instead of tucking back in under the hands (that hull ballooned)
         below = B.head < 0.3
-        above = (B.arm < 0.2) & (B.head < 0.3)
 
         def cloak_ring(y, th):
             if y >= drape:
-                h, c = B.outline(y, above)
+                # the collar and the shoulders' tops, arm caps included
+                h, c = B.outline(y, below)
             else:
                 h, c = B.outline_down(drape, y, below)
             ease = 0.012 * H + (0.008 * H) * min(1.0, (collar - y) / (collar - cap)) + 0.012 * H * max(0.0, (cap - y) / (cap - bottom))
