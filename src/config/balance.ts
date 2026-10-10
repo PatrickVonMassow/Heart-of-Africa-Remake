@@ -2644,8 +2644,10 @@ export const VILLAGER_ASSET = {
    *  lay in the build pose. Calibratable. */
   garmentCapsuleClearance: 0.002,
   /** Passes of the pose-time capsule push over the bones (cloth caught
-   *  between two capsules settles over a few). Calibratable. */
-  garmentCapsulePasses: 3,
+   *  between two capsules settles over a few); 0 turns the push off.
+   *  OFF: measured 10.10.2026 it deepens more report columns than it clears
+   *  and lumps the cloth (scripts/villager/capsules.py). Calibratable. */
+  garmentCapsulePasses: 0,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

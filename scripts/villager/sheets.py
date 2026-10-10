@@ -109,6 +109,7 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
     person = GP.Person(j)
     baked = person.bake(pos, jidx, jw)
     btris, bpush, inner = masked(body, garments, outfit, cfg)
+    dress = _dresser(person, baked, body, cfg) if outfit else None
     c = clips['clips'][name]
     d = c['duration']
     spacing = spacing if spacing is not None else (0.55 if view == 'side' else 0.75)
@@ -126,7 +127,7 @@ def clip_sheet(out, body, clips, name, frames=10, view='side', spacing=None, sex
         for k, n in enumerate(outfit):
             g = garments['meshes'][n]
             gt, gp = inner[n]
-            gv = push_in(GP.drawn_garment(person, g, cw, wr, wp), g['tris'], gp, cfg)
+            gv = push_in(GP.drawn_garment(person, g, cw, wr, wp, dress, n if n.startswith('g-') else None), g['tris'], gp, cfg)
             if view == 'side':
                 gv[:, 2] += f * spacing - span / 2
             else:
@@ -198,6 +199,15 @@ def masked(body, garments, worn, cfg):
     return body['tris'][MK.drawn_tris(body['tris'], hide)], push, inner
 
 
+def _dresser(person, baked, body, cfg):
+    """The pose-time capsule push (gamepath.Dresser) for `person`, or None
+    without a config."""
+    if cfg is None:
+        return None
+    from garments import design_pose
+    return GP.Dresser(person, baked, body['W'], design_pose(body), cfg)
+
+
 def push_in(v, tris, push, cfg):
     """Posed positions with the mask's pushed vertices moved inward (the game's vertex shader)."""
     if push is None or not push.any():
@@ -214,12 +224,14 @@ def dressed(body, garments, names, weights, q, hips, cfg=None):
     wr, wp = person.pose(q, hips)
     jidx, jw = top4(body['W'])
     btris, bpush, inner = masked(body, garments, names, cfg)
-    out = [(push_in(person.skin(person.bake(pos, jidx, jw), jidx, jw, wr, wp), body['tris'], bpush, cfg), btris, SKIN)]
+    baked = person.bake(pos, jidx, jw)
+    dress = _dresser(person, baked, body, cfg)
+    out = [(push_in(person.skin(baked, jidx, jw, wr, wp), body['tris'], bpush, cfg), btris, SKIN)]
     for k, n in enumerate(names):
         g = garments['meshes'][n]
         col = (0.08, 0.06, 0.05, 1) if g.get('part') == 'hair' else (0.95, 0.95, 0.92, 1) if g.get('part') == 'eyes' else GARMENT_COLOURS[k % len(GARMENT_COLOURS)]
         gt, gp = inner.get(n, (g['tris'], None))
-        out.append((push_in(GP.drawn_garment(person, g, weights, wr, wp), g['tris'], gp, cfg), gt, col))
+        out.append((push_in(GP.drawn_garment(person, g, weights, wr, wp, dress, n if n.startswith('g-') else None), g['tris'], gp, cfg), gt, col))
     return out
 
 

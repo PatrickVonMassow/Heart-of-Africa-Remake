@@ -8,10 +8,10 @@ a per-pose offset table is not shippable; this push runs per pose on the
 posed cloth, from a handful of numbers per bone, as a vertex shader can.
 
 THE CAPSULES. Each bone gets one, fitted per body corner in the baked (hung)
-frame the game skins from: a segment along the bone (head to tail, extended
-to cover every vertex the bone dominates), an elliptic cross-section whose
-two radii follow the bone's principal directions and taper linearly along
-the segment, and ellipsoidal end caps. Every vertex the bone dominates lies
+frame the game skins from: a segment along the bone (head to tail, spanning
+every vertex the bone dominates) and an elliptic cross-section along the
+bone's principal directions whose centre and two radii are set at KNOTS
+points and interpolated between them. Every vertex the bone dominates lies
 inside it (`fit`): cloth outside a capsule is clear of that bone's body.
 
 THE PUSH. In a pose each garment vertex is taken into each bone's baked frame
@@ -25,6 +25,19 @@ it was tailored, and the build pose is never moved. A vertex below its target
 is moved out radially from the capsule's axis onto it; a few passes over the
 bones settle cloth caught between two capsules. No per-pose data: per
 vertex the build-pose distances (fixed), per bone the capsule (per corner).
+
+MEASURED 10.10.2026 (every 20th pose of walk, sprint, kneel and dig, all
+ten corners, against the same run without the push): the deepest cloth in
+the body falls for the long wrap (0.155 → 0.039) and summed over all
+garments by 15 %, but 53 garment columns get worse (skin through the cloth
+and hidden skin out by an opening rise as the pushed cloth leaves the skin
+the cover mask pushed in or hid), the inner-garment columns stay at
+0.06-0.13 (a capsule knows no inner garment), and the frame sheets show the
+pushed torso cloth lumpy. Two limits of the model, by diagnosis: the
+linearly blended body at a bent joint bulges past the rigid capsule of its
+dominant bone (a kneeling thigh, 1-2 cm), and cloth tailored inside a
+capsule's slack keeps that slack. Without the build-pose cap the numbers
+barely move. So the push ships OFF (garmentCapsulePasses 0).
 """
 import numpy as np
 
@@ -34,14 +47,21 @@ def _unit(v):
     return v / n if n > 1e-12 else v
 
 
+# Cross-section knots along a capsule (radii and centre interpolated linearly).
+KNOTS = 4
+
+
 def fit(baked, W, heads, tails, min_verts=12):
-    """Capsules (one per bone with at least `min_verts` dominated vertices) of
-    the baked body `baked` (n × 3) with weights `W` (n × bones), bone heads
-    and tails in the same frame. Returns a dict of per-capsule arrays."""
+    """Capsules (one per bone dominating at least `min_verts` vertices) of the
+    baked body `baked` (n × 3) with weights `W` (n × bones), bone heads and
+    tails in the same frame: every vertex lies inside its dominant bone's
+    capsule. Returns a dict of per-capsule arrays (knot arrays K wide)."""
     dom = np.argmax(W, 1)
-    out = {k: [] for k in ('bone', 'head', 'e', 'u', 'v', 'lo', 'hi', 'r0', 'r1', 'aspect')}
+    keys = ('bone', 'head', 'e', 'u', 'v', 'lo', 'hi', 'cu', 'cv', 'ru', 'rv')
+    out = {k: [] for k in keys}
+    kx = np.linspace(0, 1, KNOTS)
     for b in range(W.shape[1]):
-        sel = (dom == b) & (W[:, b] >= 0.4)
+        sel = dom == b
         if sel.sum() < min_verts:
             continue
         p = baked[sel] - heads[b]
@@ -50,54 +70,63 @@ def fit(baked, W, heads, tails, min_verts=12):
             e = _unit(np.linalg.svd(p - p.mean(0), full_matrices=False)[2][0])
         t = p @ e
         off = p - t[:, None] * e
-        # principal directions of the cross-section
         _s, _sv, vt = np.linalg.svd(off - off.mean(0), full_matrices=False)
         u = _unit(vt[0] - (vt[0] @ e) * e)
         v = np.cross(e, u)
         du, dv = off @ u, off @ v
-        aspect = max(np.std(du), 1e-4) / max(np.std(dv), 1e-4)
-        rad = np.sqrt(du * du + (dv * aspect) ** 2)
         lo, hi = float(t.min()), float(t.max())
-        span = max(hi - lo, 1e-6)
-        x = (t - lo) / span
-        r0, r1 = _envelope(x, rad)
-        for k, val in (('bone', b), ('head', heads[b]), ('e', e), ('u', u), ('v', v), ('lo', lo), ('hi', hi),
-                       ('r0', r0), ('r1', r1), ('aspect', aspect)):
-            out[k].append(val)
+        x = (t - lo) / max(hi - lo, 1e-6)
+        cu, cv, ru, rv = (np.zeros(KNOTS) for _ in range(4))
+        for k, x0 in enumerate(kx):
+            m = np.abs(x - x0) <= 1.0 / (KNOTS - 1)
+            if not m.any():
+                m = np.ones(len(x), bool)
+            cu[k] = (du[m].min() + du[m].max()) / 2
+            cv[k] = (dv[m].min() + dv[m].max()) / 2
+            ru[k] = max((du[m].max() - du[m].min()) / 2, 1e-3)
+            rv[k] = max((dv[m].max() - dv[m].min()) / 2, 1e-3)
+        c = dict(bone=[b], head=[heads[b]], e=[e], u=[u], v=[v], lo=[lo], hi=[hi], cu=[cu], cv=[cv], ru=[ru], rv=[rv])
+        c = {k: np.array(val) for k, val in c.items()}
+        # the half-range box's inscribed ellipse leaves corners out: widen the
+        # knots round every vertex still outside until none is
+        for _ in range(60):
+            sv = _measure(c, 0, p + heads[b])[0]
+            if sv.max() <= 1.0 + 1e-9:
+                break
+            f = np.clip(x * (KNOTS - 1), 0, KNOTS - 1 - 1e-9)
+            i0 = f.astype(int)
+            for k in range(KNOTS):
+                near = ((i0 == k) | (i0 + 1 == k)) & (sv > 1.0)
+                if near.any():
+                    g = min(float(sv[near].max()), 1.05)
+                    c['ru'][0, k] *= g
+                    c['rv'][0, k] *= g
+        for k in keys:
+            out[k].append(c[k][0])
     return {k: np.array(v) for k, v in out.items()}
-
-
-def _envelope(x, rad):
-    """The line r(x) = r0 + (r1 − r0) x over x ∈ [0, 1] with r ≥ `rad` at
-    every sample and the least mean radius (a slope search)."""
-    top = float(rad.max())
-    best = (2 * top, top, top)
-    for slope in np.linspace(-2 * top, 2 * top, 161):
-        r0 = float(np.max(rad - slope * x))
-        r1 = r0 + slope
-        if min(r0, r1) <= 0.2 * top:
-            continue
-        if r0 + r1 < best[0]:
-            best = (r0 + r1, r0, r1)
-    return best[1], best[2]
 
 
 def _measure(c, k, x):
     """Capsule k's normalised distance `s` of baked-frame points `x` (m × 3),
-    the axis point each is measured from, and the local u-radius there."""
+    the cross-section centre each is measured from, and the local smaller
+    radius there."""
     p = x - c['head'][k]
     e, u, v = c['e'][k], c['u'][k], c['v'][k]
     lo, hi = c['lo'][k], c['hi'][k]
     t = p @ e
     tc = np.clip(t, lo, hi)
     f = (tc - lo) / max(hi - lo, 1e-6)
-    ru = c['r0'][k] + (c['r1'][k] - c['r0'][k]) * f
-    rv = ru / c['aspect'][k]
+    kx = np.linspace(0, 1, c['ru'].shape[1])
+    ru = np.interp(f, kx, c['ru'][k])
+    rv = np.interp(f, kx, c['rv'][k])
+    cu = np.interp(f, kx, c['cu'][k])
+    cv = np.interp(f, kx, c['cv'][k])
     rc = np.minimum(ru, rv)
-    off = p - tc[:, None] * e
+    centre = tc[:, None] * e + cu[:, None] * u + cv[:, None] * v
+    off = p - centre
     du, dv, da = off @ u, off @ v, t - tc
     s = np.sqrt((du / ru) ** 2 + (dv / rv) ** 2 + (da / rc) ** 2)
-    return s, c['head'][k] + tc[:, None] * e, ru
+    return s, c['head'][k] + centre, rc
 
 
 def to_bone(posed, Rd, wp, heads, b):
@@ -121,7 +150,7 @@ def push(c, posed, Rd, wp, heads, s_rest, margin, passes=3):
             b = c['bone'][k]
             x = to_bone(out, Rd, wp, heads, b)
             s, axis, ru = _measure(c, k, x)
-            target = np.minimum(1.0 + margin / ru, s_rest[:, k])
+            target = 1.0 + margin / ru if s_rest is None else np.minimum(1.0 + margin / ru, s_rest[:, k])
             m = s < target - 1e-9
             if not m.any():
                 continue
