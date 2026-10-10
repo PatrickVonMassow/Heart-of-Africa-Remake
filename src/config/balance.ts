@@ -2638,6 +2638,14 @@ export const VILLAGER_ASSET = {
   /** Taubin smoothing rounds over the settled cloth between settle passes
    *  (the pushes leave it dented). Calibratable. */
   garmentSettleSmooth: 4,
+  /** How far outside a bone's capsule the pose-time push sets posed cloth,
+   *  innermost layer (figure units, ≈ 3 mm; scripts/villager/capsules.py);
+   *  each layer outward adds garmentLayerGap. Never beyond where the cloth
+   *  lay in the build pose. Calibratable. */
+  garmentCapsuleClearance: 0.002,
+  /** Passes of the pose-time capsule push over the bones (cloth caught
+   *  between two capsules settles over a few). Calibratable. */
+  garmentCapsulePasses: 3,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

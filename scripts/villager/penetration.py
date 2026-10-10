@@ -221,6 +221,9 @@ def _corner(c):
     person = GP.Person(j)
     bh = person.bake(pos, S['jidx'], S['jw'])
     gh = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in names}
+    dress = GP.Dresser(person, bh, body['W'], S['q_build'], cfg)
+    for n in names:
+        dress.rest(n, gh[n], *gskin[n])
     bm = {n: Masked(mk['body'], body['tris'], mk['garments'], n) for n in names}
     # every layering: (inner, outer) with the inner's mask under that outer
     pairs = [(i, o, Masked(mk['inner'][i], garments['meshes'][i]['tris'], mk['garments'], o)) for i in names for o in names
@@ -241,7 +244,7 @@ def _corner(c):
         wr, wp = person.pose(q, hips, kst)
         bv = person.skin(bh, S['jidx'], S['jw'], wr, wp)
         full = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
-        gv = {n: person.skin(gh[n], *gskin[n], wr, wp) for n in names}
+        gv = {n: dress(n, person.skin(gh[n], *gskin[n], wr, wp), wr, wp) for n in names}
         trees = {n: S['vol'][n].trees(gv[n]) for n in names}
         for n in names:
             r = worst[n]
@@ -414,7 +417,8 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
     jidx, jw = top4(body['W'])
     pose = M.build_pose(body)
     a = cfg['VILLAGER_ASSET']
-    _S.update(body=body, clips=clips, garments=garments, cfg=cfg, stride=stride, names=names,
+    from garments import design_pose
+    _S.update(body=body, clips=clips, garments=garments, cfg=cfg, stride=stride, names=names, q_build=design_pose(body),
               gskin={n: top4(garments['meshes'][n]['W']) for n in names}, jidx=jidx, jw=jw,
               dom=np.argmax(body['W'], 1), bones=__import__('skeleton').NAMES,
               gdom={n: np.argmax(garments['meshes'][n]['W'], 1) for n in names}, gnv={n: len(garments['meshes'][n]['pos']) for n in names},

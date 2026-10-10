@@ -12,6 +12,10 @@ see what the game draws:
 Two linear blends in a row are not one: a vertex blended between bones moves
 otherwise than a single blend would move it. The game's uniform scale and sole
 offset are left out (the report states depths in the pipeline's units).
+
+4. a garment's skinned cloth is pushed out of the body's per-bone capsules
+   (capsules.py, `Dresser`): the pose-time push the game is to run on the
+   posed cloth (work-order point 1315 ships it).
 """
 import numpy as np
 
@@ -64,6 +68,7 @@ class Person:
 
     def __init__(self, joints):
         self.h = joints[:, :3].copy()
+        self.t = joints[:, 3:6].copy()
         self.hang = hang_rotations(self.h)
         self.heads = hung_heads(self.h, self.hang)
         self.hang_inv = np.array([qinv(q) for q in self.hang])
@@ -103,6 +108,11 @@ class Person:
         """The rest positions `draw` takes to `posed` (it is affine per vertex)."""
         zero = self.draw(np.zeros_like(posed), jidx, jw, wr, wp)
         return np.linalg.solve(self.blend(jidx, jw, wr), (posed - zero)[:, :, None])[:, :, 0]
+
+    def hung_tails(self):
+        """Every bone's tail on the hanging skeleton (the baked frame)."""
+        R = np.array([qmat(q) for q in self.hang])
+        return self.heads + np.einsum('bij,bj->bi', R, self.t - self.h)
 
     def build_pose(self, q):
         """The A-pose world turns and heads of the build (design) pose."""
@@ -195,13 +205,61 @@ def poses(clips, names, cfg):
                 yield cname, f, k, c['q'][f], c['hips'][f]
 
 
-def drawn_garment(person, g, weights, wr, wp):
+def garment_margin(name, cfg):
+    """How far outside the capsules the push sets a garment's cloth: the
+    clearance, and a layer gap per layer outward (mask.LAYER)."""
+    import mask as M
+    a = cfg['VILLAGER_ASSET']
+    return a['garmentCapsuleClearance'] + M.layer(name) * a['garmentLayerGap']
+
+
+class Dresser:
+    """The pose-time capsule push (capsules.py) for one person: the body's
+    capsules fitted on its baked mesh, each garment's build-pose distances to
+    them, and the push of a posed garment. `garmentCapsulePasses` 0 turns it off."""
+
+    def __init__(self, person, baked_body, W, q_build, cfg):
+        import capsules as CP
+        self.person, self.cfg = person, cfg
+        self.passes = int(cfg['VILLAGER_ASSET']['garmentCapsulePasses'])
+        self.caps = CP.fit(baked_body, W, person.heads, person.hung_tails())
+        self.build = person.build_pose(q_build)
+        self.s_rest = {}
+
+    def _frame(self, wr):
+        return np.array([qmat(q) for q in self.person.drawn(wr)])
+
+    def rest(self, name, baked, gi, gw):
+        """Garment `name`'s build-pose distances (its cloth baked as `baked`)."""
+        import capsules as CP
+        if name not in self.s_rest and self.passes:
+            wr, wp = self.build
+            posed = self.person.skin(baked, gi, gw, wr, wp)
+            self.s_rest[name] = CP.rest(self.caps, posed, self._frame(wr), wp, self.person.heads)
+        return self.s_rest.get(name)
+
+    def __call__(self, name, posed, wr, wp):
+        """Garment `name` posed (skinned) in a pose, pushed out of the capsules."""
+        import capsules as CP
+        if not self.passes:
+            return posed
+        return CP.push(self.caps, posed, self._frame(wr), wp, self.person.heads, self.s_rest[name],
+                       garment_margin(name, self.cfg), self.passes)
+
+
+def drawn_garment(person, g, weights, wr, wp, dress=None, name=None):
     """A garment as the game draws it on `person` in a pose: morphed, hung and
-    baked, skinned by the hung bones."""
+    baked, skinned by the hung bones, pushed out of the body's capsules by
+    `dress` (a Dresser; None: not pushed — hair, eyes)."""
     from body import top4
     gi, gw = top4(g['W'])
     p = g['pos'].copy()
     for m, x in weights.items():
         if x:
             p += x * g['morph_pos'][m]
-    return person.skin(person.bake(p, gi, gw), gi, gw, wr, wp)
+    baked = person.bake(p, gi, gw)
+    posed = person.skin(baked, gi, gw, wr, wp)
+    if dress is None or name is None:
+        return posed
+    dress.rest(name, baked, gi, gw)
+    return dress(name, posed, wr, wp)
