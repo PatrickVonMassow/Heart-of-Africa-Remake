@@ -22,6 +22,16 @@ covered:
         triangle), so the skin at a neckline, a sleeve or a hem stays
         visible and the cloth lying on it wins.
 
+OVER EVERY POSE (`motion`, `decide`): the body's classes are then checked
+against each garment posed in every pose of the exported clips at every body
+corner, skinned as the game skins: a point keeps its build-pose class while
+that leaves no defect in any pose, else takes the choice that leaves none —
+hidden when it never leaves by an opening, never passes the cloth past the
+cut tolerance and never comes near an opening; pushed when it never passes
+through the cloth. A point with no clean choice (out by an opening in one
+pose, through the cloth in another) keeps its build-pose class: only the
+cloth itself can fix it. One mask per vertex ships, no per-pose data.
+
 The body gets one mask per vertex (hide and push bits over the garments);
 every garment the same over the garments of an OUTER layer (LAYER) that cover
 it (every outfit layering: a figure wears at most one garment per slot). The game reads
@@ -363,9 +373,11 @@ def to_bits(cls, n):
     return np.stack([hide & m, hide >> np.uint64(16), push & m, push >> np.uint64(16)], 1).astype(np.uint16)
 
 
-def masks(body, garments, cfg, log=print):
+def masks(body, garments, cfg, clips=None, log=print):
     """The body's mask and every garment's mask over the garments of outer
-    layers: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}."""
+    layers: {'garments': names in bit order, 'body': (n, 4), 'inner': {name: (n, 4)}}.
+    With `clips` (and VILLAGER_ASSET.garmentMaskPoseStride > 0) the body's
+    mask is decided over every pose (`motion`, `decide`)."""
     names = garment_names(garments)
     reach = cfg['VILLAGER_ASSET']['garmentMaskOpening']
     gap = cfg['VILLAGER_ASSET']['garmentMaskWeightGap']
@@ -386,6 +398,21 @@ def masks(body, garments, cfg, log=print):
         if c.any():
             body_cls[b] = c
         log(f'mask: body under {n}: {int((c == 1).sum())} hidden, {int((c == 2).sum())} pushed')
+    stride = cfg['VILLAGER_ASSET'].get('garmentMaskPoseStride', 0)
+    if clips is not None and stride > 0:
+        a = cfg['VILLAGER_ASSET']
+        build = {n: body_cls.get(b, np.zeros(len(bv), np.uint8)) for b, n in enumerate(names) if n in covering}
+        seen = motion(body, garments, clips, cfg, build, vol, gv, bv, wd, bw, stride, log)
+        for b, n in enumerate(names):
+            if n not in seen:
+                continue
+            ids, st = seen[n]
+            c = build[n].copy()
+            c[ids] = decide(c[ids], st, a['garmentPenetrationTolerance'], a['garmentMaskCutTolerance'])
+            if c.any():
+                body_cls[b] = c
+            log(f'mask: body under {n} in every pose: {int((c == 1).sum())} hidden, {int((c == 2).sum())} pushed '
+                f'(build pose {int((build[n] == 1).sum())}, {int((build[n] == 2).sum())})')
     inner = {}
     for n in names:
         cls = {}
@@ -397,6 +424,114 @@ def masks(body, garments, cfg, log=print):
                 cls[b] = c
         inner[n] = to_bits(cls, len(gv[n]))
     return {'garments': names, 'body': to_bits(body_cls, len(bv)), 'inner': inner}
+
+
+# ---- the mask over every pose ------------------------------------------------------
+
+_MO = {}
+
+
+def decide(c, st, tol, cut):
+    """The classes (0 not covered, 1 hide, 2 push) of points with build-pose
+    classes `c`, from their places over every pose `st` (`motion`: deepest out
+    by an opening, deepest through the cloth, poses inside, poses near an
+    opening). A choice is CLEAN when it leaves no defect in any pose: hiding
+    when the point never leaves by an opening (hole), never passes the cloth
+    farther than `cut` and never comes near an opening (skin at an opening
+    stays drawn); pushing when it never passes through the cloth (shown).
+    A point keeps its build-pose class while that is clean or neither is; else
+    it takes the clean one. A point not covered in the build pose but inside
+    the garment in some pose is covered when a choice is clean (hiding first)."""
+    out, thr, nin, near = st
+    hide = (out <= tol) & (thr <= cut) & (near == 0)
+    push = thr <= tol
+    k = np.asarray(c, np.uint8).copy()
+    k[(c == 1) & ~hide & push] = 2
+    k[(c == 2) & ~push & hide] = 1
+    new = (c == 0) & (nin > 0)
+    k[new & hide] = 1
+    k[new & ~hide & push] = 2
+    return k
+
+
+def _motion_corner(corner):
+    """One body corner: per covering garment and candidate point its deepest
+    out, deepest through, poses inside and poses near an opening."""
+    import gamepath as GP
+    from fit import garment_pos
+    from sheets import corner_weights, morphed
+    S = _MO
+    body, garments, cand, vol, reach = S['body'], S['garments'], S['cand'], S['vol'], S['reach']
+    w = corner_weights(*corner)
+    pos, j = morphed(body, w)
+    person = GP.Person(j)
+    bh = person.bake(pos, *S['bskin'])
+    gh = {n: person.bake(garment_pos(garments['meshes'][n], w), *S['gskin'][n]) for n in cand}
+    st = {n: (np.zeros(len(ids)), np.zeros(len(ids)), np.zeros(len(ids), int), np.zeros(len(ids), int)) for n, ids in cand.items()}
+    for q, hips, kst in S['poses']:
+        wr, wp = person.pose(q, hips, kst)
+        bv = person.skin(bh, *S['bskin'], wr, wp)
+        for n, ids in cand.items():
+            g = person.skin(gh[n], *S['gskin'][n], wr, wp)
+            place, dist = vol[n].where(g, bv, reach, ids=ids)
+            pl, d = place[ids], dist[ids]
+            caps, _c = vol[n].caps(g)
+            out, thr, nin, near = st[n]
+            np.maximum(out, np.where(pl == OUT, d, 0.0), out=out)
+            np.maximum(thr, np.where(pl == THROUGH, d, 0.0), out=thr)
+            nin += pl == IN
+            near += np.array([caps.find_nearest(bv[k].tolist())[3] <= reach for k in ids.tolist()], int)
+    return st
+
+
+def motion(body, garments, clips, cfg, build, vol, gv, bv, wd, bw, stride, log=print):
+    """Each covering garment's candidate body points (covered in the build
+    pose, or following the cloth within VILLAGER_ASSET.garmentMaskMotionReach
+    of it) and their places (`decide`) over every `stride`th pose of every
+    exported clip and the build pose, at every body corner of the penetration
+    report, skinned along the game's path: {name: (ids, (out, thr, nin, near))}.
+    Only the decision ships, no per-pose data."""
+    import multiprocessing as mp
+    import os
+    from mathutils.bvhtree import BVHTree
+
+    import gamepath as GP
+    from export import EXPORT_CLIPS
+    from penetration import CORNERS, build_pose_clips
+    a = cfg['VILLAGER_ASSET']
+    near = a['garmentMaskMotionReach']
+    cand = {}
+    for n, c in build.items():
+        tris = np.concatenate([P['tris'] for P in vol[n].parts])
+        cloth = BVHTree.FromPolygons(gv[n].tolist(), tris.tolist(), all_triangles=True)
+        fol = follower(bw, wd[n], a['garmentMaskWeightGap'])
+        ids = []
+        for k, p in enumerate(bv.tolist()):
+            if not c[k]:
+                co, _n, i, _d = cloth.find_nearest(p, near)
+                if co is None:
+                    continue
+                t = tris[i]
+                if not fol(k, t, barycentric(np.array(co), gv[n][t[0]], gv[n][t[1]], gv[n][t[2]])):
+                    continue
+            ids.append(k)
+        cand[n] = np.array(ids, int)
+    every = build_pose_clips(body, clips)
+    poses = [(q, hips, kst) for k, (_c, _f, kst, q, hips) in enumerate(GP.poses(every, EXPORT_CLIPS, cfg)) if k % stride == 0]
+    poses += [(q, hips, kst) for _c, _f, kst, q, hips in GP.poses(every, ['build'], cfg)]
+    _MO.update(body=body, garments=garments, cand=cand, vol=vol, reach=a['garmentMaskOpening'], poses=poses,
+               bskin=top4(body['W']), gskin={n: top4(garments['meshes'][n]['W']) for n in cand})
+    total = None
+    with mp.get_context('fork').Pool(max(1, min(len(CORNERS), (os.cpu_count() or 2) - 1))) as pool:
+        for st in pool.imap(_motion_corner, CORNERS):
+            if total is None:
+                total = st
+                continue
+            for n, (out, thr, nin, nr) in st.items():
+                t = total[n]
+                total[n] = (np.maximum(t[0], out), np.maximum(t[1], thr), t[2] + nin, t[3] + nr)
+    log(f'mask: every pose: {len(poses)} poses at {len(CORNERS)} corners')
+    return {n: (cand[n], total[n]) for n in cand}
 
 
 def decode(m, names, worn):
@@ -454,6 +589,19 @@ def selftest():
     # only an outer layer's garment masks an inner one
     assert layer('g-waistBeads-x') < layer('g-skirtKnee-x') < layer('g-robe-chest') < layer('g-cloak-x')
     assert layer('g-hood-x') == layer('g-cloak-x') and layer('g-cap-x') < layer('g-hood-x')
+    # over every pose: a clean choice wins, a point with none keeps its build class
+    tol, cut = 0.003, 0.02
+    c = np.array([1, 1, 1, 2, 2, 2, 0, 0, 0, 0], np.uint8)
+    out = np.array([0.0, 0.01, 0.01, 0.0, 0.0, 0.01, 0.0, 0.01, 0.0, 0.0])
+    thr = np.array([0.0, 0.0, 0.01, 0.01, 0.03, 0.01, 0.01, 0.0, 0.0, 0.0])
+    nin = np.array([5, 5, 5, 5, 5, 5, 3, 3, 0, 3])
+    near = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 2])
+    k = decide(c, (out, thr, nin, near), tol, cut)
+    # hidden clean; out by an opening → pushed; out and through → kept hidden;
+    # through → hidden; through past the cut → kept pushed; neither → kept;
+    # inside in motion → hidden, or pushed when it leaves; never inside → not
+    # covered; near an opening in some pose → pushed, not hidden
+    assert k.tolist() == [1, 2, 1, 1, 2, 2, 1, 2, 0, 2], k.tolist()
     print('mask selftest: ok')
 
 

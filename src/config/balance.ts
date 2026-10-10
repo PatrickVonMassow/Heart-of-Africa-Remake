@@ -2609,6 +2609,15 @@ export const VILLAGER_ASSET = {
    *  bulges past it, which is what hiding is for, until a limb looks cut off
    *  (figure units, ≈ 2.6 cm). Calibratable. */
   garmentMaskCutTolerance: 0.02,
+  /** Every how many poses of the exported clips (and the build pose) the
+   *  body's cover mask is checked in, at every body corner, instead of the
+   *  build pose alone (scripts/villager/mask.py `motion`; 0: build pose only).
+   *  Calibratable. */
+  garmentMaskPoseStride: 1,
+  /** How near a garment's cloth in the build pose a body vertex not covered
+   *  there is still checked over every pose, so skin a garment covers only in
+   *  motion is found (figure units, ≈ 10 cm). Calibratable. */
+  garmentMaskMotionReach: 0.08,
   /** How far apart the penetration report samples the cloth between a
    *  garment's vertices (figure units, ≈ 5 cm). Calibratable. */
   garmentFaceSpacing: 0.04,
