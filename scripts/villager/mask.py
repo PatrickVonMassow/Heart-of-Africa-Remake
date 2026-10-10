@@ -440,15 +440,16 @@ def decide(c, st, tol, cut, tris=None):
     opening). A choice is CLEAN when it leaves no defect in any pose: hiding
     when the point never leaves by an opening (hole), never passes the cloth
     farther than `cut` and never comes near an opening (skin at an opening
-    stays drawn); pushing when it never passes through the cloth (shown).
+    stays drawn); pushing when it never passes through the cloth (shown) and
+    no cloth sinks under it into the body (drawn, it would hide that cloth).
     A point keeps its build-pose class while that is clean or neither is; else
     it takes the clean one. A point not covered in the build pose but inside
     the garment in some pose is covered when a choice is clean (hiding first).
     With the mesh's `tris` (all points), un-hiding is checked for what it
     exposes (`exposed`)."""
-    out, thr, nin, near = st
+    out, thr, nin, near, sink = st
     hide = (out <= tol) & (thr <= cut) & (near == 0)
-    push = thr <= tol
+    push = (thr <= tol) & (sink <= tol)
     k = np.asarray(c, np.uint8).copy()
     k[(c == 1) & ~hide & push] = 2
     k[(c == 2) & ~push & hide] = 1
@@ -456,16 +457,16 @@ def decide(c, st, tol, cut, tris=None):
     k[new & hide] = 1
     k[new & ~hide & push] = 2
     if tris is not None:
-        k = exposed(c, k, thr, tris, tol)
+        k = exposed(c, k, ~push, tris)
     return k
 
 
-def exposed(c, k, thr, tris, tol):
+def exposed(c, k, unclean, tris):
     """`k` with every point drawn again (from hidden in `c`) taken back while
-    it would expose a hidden neighbour that passes through the cloth: a
-    triangle with one drawn corner is drawn whole, and its hidden corners are
-    drawn with it (pushed), so un-hiding a point is clean only when every
-    hidden corner it draws is."""
+    it would expose a hidden neighbour that cannot be drawn cleanly
+    (`unclean`): a triangle with one drawn corner is drawn whole, and its
+    hidden corners are drawn with it (pushed), so un-hiding a point is clean
+    only when every hidden corner it draws is."""
     t = np.asarray(tris)
     k = k.copy()
     before = ~(c[t] == 1).all(1)
@@ -475,7 +476,7 @@ def exposed(c, k, thr, tris, tol):
         seen[t[drawn].ravel()] = True
         was = np.zeros(len(k), bool)
         was[t[before].ravel()] = True
-        bad = seen & ~was & (k == 1) & (thr > tol)
+        bad = seen & ~was & (k == 1) & unclean
         if not bad.any():
             return k
         # the triangles drawn anew round a bad corner: their un-hidden corners hide again
@@ -491,7 +492,11 @@ def exposed(c, k, thr, tris, tol):
 def _motion_corner(corner):
     """One body corner: per covering garment and candidate point its deepest
     out, deepest through, poses inside and poses near an opening."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+
     import gamepath as GP
+    from body import vertex_normals
     from fit import garment_pos
     from sheets import corner_weights, morphed
     S = _MO
@@ -501,20 +506,30 @@ def _motion_corner(corner):
     person = GP.Person(j)
     bh = person.bake(pos, *S['bskin'])
     gh = {n: person.bake(garment_pos(garments['meshes'][n], w), *S['gskin'][n]) for n in cand}
-    st = {n: (np.zeros(len(ids)), np.zeros(len(ids)), np.zeros(len(ids), int), np.zeros(len(ids), int)) for n, ids in cand.items()}
+    st = {n: (np.zeros(len(ids)), np.zeros(len(ids)), np.zeros(len(ids), int), np.zeros(len(ids), int), np.zeros(len(ids)))
+          for n, ids in cand.items()}
     for q, hips, kst in S['poses']:
         wr, wp = person.pose(q, hips, kst)
         bv = person.skin(bh, *S['bskin'], wr, wp)
+        bn = vertex_normals(bv, body['tris'])
         for n, ids in cand.items():
             g = person.skin(gh[n], *S['gskin'][n], wr, wp)
             place, dist = vol[n].where(g, bv, reach, ids=ids)
             pl, d = place[ids], dist[ids]
             caps, _c = vol[n].caps(g)
-            out, thr, nin, near = st[n]
+            out, thr, nin, near, sink = st[n]
             np.maximum(out, np.where(pl == OUT, d, 0.0), out=out)
             np.maximum(thr, np.where(pl == THROUGH, d, 0.0), out=thr)
             nin += pl == IN
             near += np.array([caps.find_nearest(bv[k].tolist())[3] <= reach for k in ids.tolist()], int)
+            # cloth under the skin: the nearest cloth straight inward from it
+            cloth = BVHTree.FromPolygons(g.tolist(), S['tris'][n], all_triangles=True)
+            for x, k in enumerate(ids.tolist()):
+                if pl[x] != IN:
+                    continue
+                hit = cloth.ray_cast(Vector(bv[k].tolist()), Vector((-bn[k]).tolist()), S['sink'])
+                if hit[0] is not None and hit[3] > sink[x]:
+                    sink[x] = hit[3]
     return st
 
 
@@ -523,7 +538,9 @@ def motion(body, garments, clips, cfg, build, vol, gv, bv, wd, bw, stride, log=p
     pose, or following the cloth within VILLAGER_ASSET.garmentMaskMotionReach
     of it) and their places (`decide`) over every `stride`th pose of every
     exported clip and the build pose, at every body corner of the penetration
-    report, skinned along the game's path: {name: (ids, (out, thr, nin, near))}.
+    report, skinned along the game's path: {name: (ids, (out, thr, nin, near,
+    sink))}; `sink` how deep cloth lies under the skin straight inward (up to
+    VILLAGER_ASSET.garmentMaskSinkReach) while the point is inside the garment.
     Only the decision ships, no per-pose data."""
     import multiprocessing as mp
     import os
@@ -554,16 +571,17 @@ def motion(body, garments, clips, cfg, build, vol, gv, bv, wd, bw, stride, log=p
     poses = [(q, hips, kst) for k, (_c, _f, kst, q, hips) in enumerate(GP.poses(every, EXPORT_CLIPS, cfg)) if k % stride == 0]
     poses += [(q, hips, kst) for _c, _f, kst, q, hips in GP.poses(every, ['build'], cfg)]
     _MO.update(body=body, garments=garments, cand=cand, vol=vol, reach=a['garmentMaskOpening'], poses=poses,
-               bskin=top4(body['W']), gskin={n: top4(garments['meshes'][n]['W']) for n in cand})
+               bskin=top4(body['W']), gskin={n: top4(garments['meshes'][n]['W']) for n in cand},
+               tris={n: np.concatenate([P['tris'] for P in vol[n].parts]).tolist() for n in cand}, sink=a['garmentMaskSinkReach'])
     total = None
     with mp.get_context('fork').Pool(max(1, min(len(CORNERS), (os.cpu_count() or 2) - 1))) as pool:
         for st in pool.imap(_motion_corner, CORNERS):
             if total is None:
                 total = st
                 continue
-            for n, (out, thr, nin, nr) in st.items():
+            for n, (out, thr, nin, nr, sk) in st.items():
                 t = total[n]
-                total[n] = (np.maximum(t[0], out), np.maximum(t[1], thr), t[2] + nin, t[3] + nr)
+                total[n] = (np.maximum(t[0], out), np.maximum(t[1], thr), t[2] + nin, t[3] + nr, np.maximum(t[4], sk))
     log(f'mask: every pose: {len(poses)} poses at {len(CORNERS)} corners')
     return {n: (cand[n], total[n]) for n in cand}
 
@@ -630,7 +648,7 @@ def selftest():
     thr = np.array([0.0, 0.0, 0.01, 0.01, 0.03, 0.01, 0.01, 0.0, 0.0, 0.0])
     nin = np.array([5, 5, 5, 5, 5, 5, 3, 3, 0, 3])
     near = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 2])
-    k = decide(c, (out, thr, nin, near), tol, cut)
+    k = decide(c, (out, thr, nin, near, np.zeros(10)), tol, cut)
     # hidden clean; out by an opening → pushed; out and through → kept hidden;
     # through → hidden; through past the cut → kept pushed; neither → kept;
     # inside in motion → hidden, or pushed when it leaves; never inside → not
@@ -639,10 +657,15 @@ def selftest():
     # un-hiding a point draws its triangles: not while a hidden corner of one
     # passes through the cloth (point 1 would expose point 2)
     c = np.array([1, 1, 1, 1], np.uint8)
-    st = (np.array([0.0, 0.01, 0.0, 0.0]), np.array([0.0, 0.0, 0.01, 0.0]), np.array([5, 5, 5, 5]), np.zeros(4))
+    st = (np.array([0.0, 0.01, 0.0, 0.0]), np.array([0.0, 0.0, 0.01, 0.0]), np.array([5, 5, 5, 5]), np.zeros(4), np.zeros(4))
     assert decide(c, st, tol, cut).tolist() == [1, 2, 1, 1]
     assert decide(c, st, tol, cut, [[0, 1, 2], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
     assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 2, 1, 1]
+    # cloth sunk under a point (or under a hidden neighbour it would draw) keeps it hidden
+    st = st[:4] + (np.array([0.0, 0.01, 0.0, 0.0]),)
+    assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
+    st = st[:4] + (np.array([0.0, 0.0, 0.0, 0.01]),)
+    assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
     print('mask selftest: ok')
 
 
