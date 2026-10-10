@@ -547,18 +547,25 @@ def _motion_corner(corner):
     return st
 
 
+# Every module `motion` and `_motion_corner` import; motion_key hashes their code
+MOTION_MODULES = ('body', 'export', 'fit', 'gamepath', 'garments', 'penetration', 'sheets')
+
+
 def motion_key(body):
     """A digest of what `motion` reads beyond the cached steps and the config:
-    the game path's code, the exported clips, the body corners with their
-    morph weights and the build pose (for the mask cache, pipeline.py)."""
+    the code of every module it imports (MOTION_MODULES), the exported clips,
+    the body corners with their morph weights and the build pose (for the mask
+    cache, pipeline.py)."""
     import hashlib
+    import importlib
 
-    import gamepath as GP
     from export import EXPORT_CLIPS
     from garments import design_pose
     from penetration import CORNERS
     from sheets import corner_weights
-    h = hashlib.sha256(open(GP.__file__, 'rb').read())
+    h = hashlib.sha256()
+    for m in MOTION_MODULES:
+        h.update(open(importlib.import_module(m).__file__, 'rb').read())
     h.update(repr((EXPORT_CLIPS, CORNERS, [sorted(corner_weights(*c).items()) for c in CORNERS])).encode())
     h.update(np.ascontiguousarray(design_pose(body), np.float64).tobytes())
     return h.hexdigest()
