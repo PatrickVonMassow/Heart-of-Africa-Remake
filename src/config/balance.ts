@@ -2612,6 +2612,32 @@ export const VILLAGER_ASSET = {
   /** How far apart the penetration report samples the cloth between a
    *  garment's vertices (figure units, ≈ 5 cm). Calibratable. */
   garmentFaceSpacing: 0.04,
+  /** The longest cloth edge the pipeline leaves in a garment (figure units,
+   *  ≈ 4 cm): a longer one is split, so the cloth between two vertices follows
+   *  a curved body part instead of cutting it by a chord. Calibratable. */
+  garmentEdgeMax: 0.03,
+  /** How far outside the drawn body the pipeline settles a garment's
+   *  vertices in the build pose at every body corner, innermost layer
+   *  (figure units, ≈ 6 mm). Calibratable. */
+  garmentSettleClearance: 0.005,
+  /** How much farther each layer outward is settled (ornament, hip and head,
+   *  torso, shoulder), so an inner garment never settles where an outer one
+   *  lies (figure units, ≈ 5 mm). Calibratable. */
+  garmentLayerGap: 0.004,
+  /** How far an inner garment the build-pose mask leaves uncovered may lie
+   *  outside an outer one through its cloth and still be settled under it
+   *  (figure units, ≈ 2.6 cm): it is the inner garment drawn over the outer
+   *  one; farther off it is another part of the figure. Calibratable. */
+  garmentLayerReach: 0.02,
+  /** How a settle push spreads over the cloth round the vertex that asked
+   *  for it: over this many rings of neighbours, each taking this share of
+   *  the ring before (a narrower spread left the cloth lumpy, and its folds
+   *  confused the cover mask's inside test). Calibratable. */
+  garmentSettleSpreadRings: 5,
+  garmentSettleSpreadKeep: 0.7,
+  /** Taubin smoothing rounds over the settled cloth between settle passes
+   *  (the pushes leave it dented). Calibratable. */
+  garmentSettleSmooth: 4,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive

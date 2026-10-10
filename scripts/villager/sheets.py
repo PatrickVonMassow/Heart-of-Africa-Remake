@@ -66,6 +66,12 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
     if garments and (not want or 'garments' in want):
         garment_sheet(out, body, clips, garments, cfg, 'walk', 0.3, view='front')
         garment_sheet(out, body, clips, garments, cfg, 'walk', 0.3, view='side')
+    if garments and (not want or 'build' in want):
+        # every garment in its own build pose, on the neutral man and the
+        # body corners farthest from him (a girl, a stout man)
+        for corner, tag in ((('male', 'adult'), 'man'), (('female', 'child'), 'girl'), (('male', 'adult', 1.0), 'stout')):
+            for view in ('front', 'side'):
+                garment_sheet(out, body, clips, garments, cfg, 'build', view=view, corner=corner, fname=f'garments-build-{tag}-{view}')
     if garments and clips and (not want or 'dress' in want):
         # the shipped garments in motion: four outfits through walk, kneel and dig
         for name in DRESS_CLIPS:
@@ -217,11 +223,16 @@ def dressed(body, garments, names, weights, q, hips, cfg=None):
     return out
 
 
-def garment_sheet(out, body, clips, garments, cfg, clip='walk', t=0.3, per_row=8, view='side'):
+def garment_sheet(out, body, clips, garments, cfg, clip='walk', t=0.3, per_row=8, view='side', corner=('male', 'adult'), fname=None):
     names = [n for n in garments['meshes'] if n.startswith('g-')]
-    c = clips['clips'][clip]
-    q, hips = sample(c, c['duration'] * t)
-    w = corner_weights('male', 'adult')
+    if clip == 'build':
+        # the build pose every garment is tailored in (garments.design_pose)
+        from garments import design_pose
+        q, hips = design_pose(body), None
+    else:
+        c = clips['clips'][clip]
+        q, hips = sample(c, c['duration'] * t)
+    w = corner_weights(*corner)
     rows = [names[i:i + per_row] for i in range(0, len(names), per_row)]
     for r, row in enumerate(rows):
         R.clear()
@@ -235,4 +246,4 @@ def garment_sheet(out, body, clips, garments, cfg, clip='walk', t=0.3, per_row=8
                 R.add_mesh(f'{n}-{len(v)}', v, tr, col)
         span = (len(row) - 1) * 0.8
         R.ground(-0.6, span + 0.6, -0.6, span + 0.6)
-        R.render(os.path.join(out, f'garments-{clip}-{view}-{r}.png'), (span / 2 if view != 'side' else 0, 0.68, span / 2 if view == 'side' else 0), span + 1.2, view, (int(240 * (span + 1.2)), 400))
+        R.render(os.path.join(out, (fname or f'garments-{clip}-{view}') + f'-{r}.png'), (span / 2 if view != 'side' else 0, 0.68, span / 2 if view == 'side' else 0), span + 1.2, view, (int(240 * (span + 1.2)), 400))

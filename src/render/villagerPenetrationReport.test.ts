@@ -51,11 +51,11 @@ const NAMES: Record<Column, string> = {
 /** Every garment, column and clip of `r` over tolerance and more than 0.0005
  *  above `base` (penetration.py report): the build pose against main's build
  *  pose, every other pose against main's. */
-function worseThanMain(r: Report, base: Report): string[] {
+function worseThanMain(r: Report, base: Report, buildOnly = false): string[] {
   const out: string[] = []
   for (const [part, b] of [
     [r.build, base.build],
-    [r.garments, base.garments],
+    ...(buildOnly ? [] : [[r.garments, base.garments] as const]),
   ] as const) {
     for (const [n, g] of Object.entries(part)) {
       for (const [key, v] of Object.entries(g.clips)) {
@@ -113,7 +113,16 @@ describe('the visible-only penetration report', () => {
     }
   })
 
-  it('no garment, column and clip is worse than on main, in the build pose or any other', () => {
+  // Owner decision 10.10.2026 (TASKS.md point 1332): point 1332 is gated
+  // against main in the build pose only; the motion comparison below is the
+  // merge gate of point 1334, which un-skips it.
+  it('no garment, column and clip is worse than on main in the build pose', () => {
+    expect(main.build, 'main measured the build pose').toBeDefined()
+    expect(worseThanMain(now, main, true)).toEqual([])
+  })
+
+  // PENDING (point 1334 restores it): the motion comparison against main.
+  it.skip('no garment, column and clip is worse than on main, in the build pose or any other', () => {
     expect(main.build, 'main measured the build pose').toBeDefined()
     expect(worseThanMain(now, main)).toEqual([])
     const against = md.split('## Against main')[1]
@@ -128,8 +137,48 @@ describe('the visible-only penetration report', () => {
     expect(worseThanMain(raised, main)).toEqual([expect.stringContaining(`${g} cloth build`)])
   })
 
-  it('the report hands every remaining case to point 1332 by name', () => {
-    const section = md.split('## Remaining visible cases (handed to work-order point 1332)')[1]?.split('\n## ')[0]
+  it('measures the build pose of every garment at every body corner, per column', () => {
+    // an empty or partial build entry would pass the tolerance check below
+    const outermost = Math.max(...Object.values(LAYER))
+    expect(Object.keys(now.build).sort()).toEqual(Object.keys(now.garments).sort())
+    expect(Object.keys(now.build).sort()).toEqual(Object.keys(main.build).sort())
+    for (const [n, g] of Object.entries(now.build)) {
+      expect(g.checked, n).toBeGreaterThan(0)
+      expect(g.checked, n).toBe(main.build[n].checked)
+      expect(Object.keys(g.clips).length, n).toBeGreaterThan(0)
+      // every column main measured in the build pose, except layerings of the
+      // outermost layer (as for the motion keys above)
+      for (const key of Object.keys(main.build[n].clips)) {
+        const col = key.split(' ')[0]
+        if ((col === 'inner' || col === 'innerHole') && layer(n) === outermost) continue
+        expect(Object.keys(g.clips), n).toContain(key)
+      }
+    }
+  })
+
+  it('every garment fits its own build pose within tolerance at every body corner and layering', () => {
+    // garmentPenetrationTolerance (0.003) for every column, cut too:
+    // garmentMaskCutTolerance is the motion allowance, never the build pose's;
+    // the report's own tolerance must be that value, not set the bar
+    const tol = VILLAGER_ASSET.garmentPenetrationTolerance
+    expect(now.tolerance).toBe(tol)
+    expect(tol).toBeLessThanOrEqual(0.003)
+    const over: string[] = []
+    for (const [n, g] of Object.entries(now.build)) {
+      for (const col of Object.keys(NAMES) as Column[]) {
+        if (g[col].value > tol) over.push(`${n} ${col} ${g[col].value}`)
+      }
+      for (const [key, v] of Object.entries(g.clips)) {
+        if (v > tol) over.push(`${n} ${key} ${v}`)
+      }
+      expect(Object.keys(g.cases), n).toEqual([])
+    }
+    expect(over).toEqual([])
+    expect(md).toContain(`**${Object.keys(now.build).length} of ${Object.keys(now.build).length} garments within tolerance in the build pose`)
+  })
+
+  it('the report hands every remaining case to point 1334 by name', () => {
+    const section = md.split('## Remaining visible cases (handed to work-order point 1334)')[1]?.split('\n## ')[0]
     expect(section).toBeDefined()
     const lines = section!.split('\n')
     let checked = 0
@@ -145,7 +194,6 @@ describe('the visible-only penetration report', () => {
         checked++
       }
     }
-    expect(Object.values(now.build).some((g) => Object.keys(g.cases).length), 'a build-pose case is checked').toBe(true)
     expect(checked).toBeGreaterThan(0)
   })
 })
