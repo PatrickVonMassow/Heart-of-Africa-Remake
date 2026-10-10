@@ -105,9 +105,10 @@ def main():
         import fit as F
         garments = cached(a.work, 'garments', lambda: F.settle(body, F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg), force='garments' in steps)
     if garments is not None:
-        # the mask over every pose costs minutes: cached on its inputs
-        garments['mask'] = cached(a.work, 'mask', lambda: MK.masks(body, garments, cfg, clips),
-                                  key=inputs(a.work, ['body', 'clips', 'garments'], cfg)) if clips is not None else MK.masks(body, garments, cfg)
+        # the mask over every pose costs minutes: cached on its inputs and its own code
+        import hashlib
+        key = inputs(a.work, ['body', 'clips', 'garments'], cfg) + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest()
+        garments['mask'] = cached(a.work, 'mask', lambda: MK.masks(body, garments, cfg, clips), key=key) if clips is not None else MK.masks(body, garments, cfg)
     if 'export' in steps:
         import export as E
         # The game still draws the code-built dress on the glTF body (render/
