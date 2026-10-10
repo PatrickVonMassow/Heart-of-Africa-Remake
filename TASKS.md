@@ -81,7 +81,8 @@ put it is the mistake this line exists to stop.
   Queue position: first of the three-way split of point 1334 (10.10.2026), ahead of points 1337 and 1334; points 1315 and 1335 follow all three.
   Source: owner split of point 1334 on 10.10.2026 (split rule, veto open): its author measured that most remaining penetration cases sit in the hole and shown columns, because the cover mask is read in the build pose only (branch feat/1334-garment-body-push, commit 96dfe8296, scripts/villager/capsules.py docstring).
   Final state: the villager pipeline decides per vertex whether skin is covered from every pose of walk, sprint, kneel and dig, not from the build pose alone, so skin a garment covers in motion is hidden and skin at garment openings stays drawn in every pose; no per-pose data ships.
-  Verifiable: the pipeline penetration step's hole and shown columns at or below 0.003 on the visible-only count across all poses with no other column worse than main; dressed frame sheets walking, kneeling, digging and running compared against main; cross-vendor review record.
+  Owner decision 10.10.2026 (split rule, veto open): the author measured the mask over every pose at no column worse than main and hole frames 7313 to 7209, with the hole and shown maxima (0.067, 0.106) bounded by points that leave by an opening in one pose and pass through the cloth in another, which a per-vertex mask cannot fix (commit 4d010b700); the 0.003 floor for both columns moves to point 1334, which moves the cloth.
+  Verifiable: the pipeline penetration step's hole and shown columns no worse than main and the hole frame count lower, with no other column worse than main; dressed frame sheets walking, kneeling, digging and running compared against main; cross-vendor review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
 
