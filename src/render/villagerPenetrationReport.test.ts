@@ -137,11 +137,35 @@ describe('the visible-only penetration report', () => {
     expect(worseThanMain(raised, main)).toEqual([expect.stringContaining(`${g} cloth build`)])
   })
 
+  it('measures the build pose of every garment at every body corner, per column', () => {
+    // an empty or partial build entry would pass the tolerance check below
+    const outermost = Math.max(...Object.values(LAYER))
+    expect(Object.keys(now.build).sort()).toEqual(Object.keys(now.garments).sort())
+    expect(Object.keys(now.build).sort()).toEqual(Object.keys(main.build).sort())
+    for (const [n, g] of Object.entries(now.build)) {
+      expect(g.checked, n).toBeGreaterThan(0)
+      expect(g.checked, n).toBe(main.build[n].checked)
+      expect(Object.keys(g.clips).length, n).toBeGreaterThan(0)
+      // every column main measured in the build pose, except layerings of the
+      // outermost layer (as for the motion keys above)
+      for (const key of Object.keys(main.build[n].clips)) {
+        const col = key.split(' ')[0]
+        if ((col === 'inner' || col === 'innerHole') && layer(n) === outermost) continue
+        expect(Object.keys(g.clips), n).toContain(key)
+      }
+    }
+  })
+
   it('every garment fits its own build pose within tolerance at every body corner and layering', () => {
+    // 0.003 for every column, cut too: garmentMaskCutTolerance is the motion
+    // allowance, never the build pose's
     const over: string[] = []
     for (const [n, g] of Object.entries(now.build)) {
       for (const col of Object.keys(NAMES) as Column[]) {
-        if (g[col].value > limit(col)) over.push(`${n} ${col} ${g[col].value}`)
+        if (g[col].value > now.tolerance) over.push(`${n} ${col} ${g[col].value}`)
+      }
+      for (const [key, v] of Object.entries(g.clips)) {
+        if (v > now.tolerance) over.push(`${n} ${key} ${v}`)
       }
       expect(Object.keys(g.cases), n).toEqual([])
     }
