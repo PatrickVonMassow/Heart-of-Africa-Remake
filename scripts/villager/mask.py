@@ -444,7 +444,7 @@ def decide(c, st, tol, cut, tris=None):
     Neither is clean while cloth sinks under the point into the body in some
     pose (the report measures that cloth against the skin drawn round it).
     A point keeps its build-pose class while that is clean or neither is; else
-    it takes the clean one. A point not covered in the build pose but inside
+    it takes the clean one (a hidden point only when it leaves by an opening). A point not covered in the build pose but inside
     the garment in some pose is covered when a choice is clean (hiding first).
     With the mesh's `tris` (all points), un-hiding is checked for what it
     exposes (`exposed`)."""
@@ -452,7 +452,9 @@ def decide(c, st, tol, cut, tris=None):
     hide = (out <= tol) & (thr <= cut) & (near == 0) & (sink <= tol)
     push = (thr <= tol) & (sink <= tol)
     k = np.asarray(c, np.uint8).copy()
-    k[(c == 1) & ~hide & push] = 2
+    # a hidden point is drawn again only to close a hole: drawing skin changes
+    # what the drawn body encloses round it, so not merely for being near an opening
+    k[(c == 1) & (out > tol) & push] = 2
     k[(c == 2) & ~push & hide] = 1
     new = (c == 0) & (nin > 0)
     k[new & hide] = 1
