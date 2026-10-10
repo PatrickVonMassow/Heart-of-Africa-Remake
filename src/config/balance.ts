@@ -2620,9 +2620,10 @@ export const VILLAGER_ASSET = {
   garmentMaskMotionReach: 0.08,
   /** How deep under a covered body vertex (straight inward) the cover mask
    *  looks for cloth sunk into the body in any pose: such a vertex stays
-   *  hidden rather than drawn over that cloth (figure units, ≈ 4 cm).
-   *  Calibratable. */
-  garmentMaskSinkReach: 0.03,
+   *  hidden rather than drawn over that cloth (figure units, ≈ 16 cm: a
+   *  kneeling thigh can swallow the cloth 10 cm deep; cloth past a thin limb
+   *  found too only keeps a point hidden as in the build pose). Calibratable. */
+  garmentMaskSinkReach: 0.12,
   /** How far apart the penetration report samples the cloth between a
    *  garment's vertices (figure units, ≈ 5 cm). Calibratable. */
   garmentFaceSpacing: 0.04,
