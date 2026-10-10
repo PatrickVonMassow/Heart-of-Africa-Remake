@@ -811,8 +811,8 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
     pos = apply_map(body['basis_full'], idx, bary, off)
     morph = {k: apply_map(body['basis_full'] + body['deltas_full'][k], idx, bary, off) - pos for k in MORPHS}
     g = {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph}
-    # which vertices are a sleeve's (its cap ring included): armholes cuts
-    # the body cloth alone
+    # which vertices are a sleeve's (its cap ring included): armholes reports
+    # the sleeve cloth it cuts
     if limb is not None and (limb != 0).any():
         g['sleeve'] = np.asarray(limb) != 0
     return g
@@ -877,17 +877,20 @@ ARM_BONES = tuple(f'upperArm.{s}' for s in 'LR')
 
 
 def armhole_keep(t, sleeve, vin, cin):
-    """The triangles armholes keeps: of the body cloth, none with a vertex
-    inside an upper arm (`vin`, per vertex) or its centre inside one (`cin`,
-    called per triangle index); a sleeve's triangles (any vertex in `sleeve`)
-    always — a sleeve is settled off the arm it wraps, never cut open."""
+    """The triangles armholes keeps — none with a vertex inside an upper arm
+    (`vin`, per vertex) or its centre inside one (`cin`, called per triangle
+    index) — and how many of those cut are a sleeve's (any vertex in
+    `sleeve`). A sleeve's cloth inside its arm is cut too: kept, the settle
+    could not take it out (measured 10.10.2026: 133 shirt and 144 robe
+    sleeve triangles kept left up to 0.0237 of cloth in the arm after five
+    rounds of settling again, 0.0000 cut), and the opening it leaves is
+    what the penetration step's hole and cut columns measure."""
     t = np.asarray(t)
-    torso = ~sleeve[t].any(1)
-    keep = ~(torso & vin[t].any(1))
-    for k in np.flatnonzero(keep & torso):
+    keep = ~vin[t].any(1)
+    for k in np.flatnonzero(keep):
         if cin(k):
             keep[k] = False
-    return keep, int((~torso & vin[t].any(1)).sum())
+    return keep, int((~keep & sleeve[t].any(1)).sum())
 
 
 def armholes(body, g):
@@ -897,8 +900,8 @@ def armholes(body, g):
     trunk would otherwise cut through the upper arm where it meets the trunk
     at the armpit — no settling can take a surface across that crease without
     folding it into one or the other — and the arm comes out through an
-    opening instead. A sleeve is never cut (armhole_keep). Returns the
-    garment, the triangles cut and the sleeve triangles inside an arm kept."""
+    opening instead, its sleeve's cloth inside the arm too (armhole_keep).
+    Returns the garment, the triangles cut and how many are a sleeve's."""
     import gamepath as GP
     from body import top4
     from fit import inside
@@ -919,9 +922,9 @@ def armholes(body, g):
     vin = np.fromiter((in_arm(p) for p in gv.tolist()), bool, len(gv))
     sleeve = np.asarray(g.get('sleeve', np.zeros(len(gv), bool)), bool)
     cen = gv[t].mean(1)
-    keep, kept = armhole_keep(t, sleeve, vin, lambda k: in_arm(cen[k].tolist()))
+    keep, of_sleeve = armhole_keep(t, sleeve, vin, lambda k: in_arm(cen[k].tolist()))
     if keep.all():
-        return g, 0, kept
+        return g, 0, 0
     used = np.unique(t[keep])
     remap = np.full(len(g['pos']), -1)
     remap[used] = np.arange(len(used))
@@ -932,7 +935,7 @@ def armholes(body, g):
     out['morph_pos'] = {m: d[used] for m, d in g['morph_pos'].items()}
     if 'sleeve' in g:
         out['sleeve'] = sleeve[used]
-    return out, int((~keep).sum()), kept
+    return out, int((~keep).sum()), of_sleeve
 
 
 def hair_cap(mh, body, B):

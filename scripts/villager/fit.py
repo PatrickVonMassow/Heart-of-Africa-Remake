@@ -362,9 +362,9 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
         # an armhole where an upper arm passes the trunk cloth; a garment of
         # the shoulder layer drapes the arms instead (garments.build_form)
         if M.form(n) != 'limbRings' and M.layer(n) < M.LAYER['shoulder']:
-            G[n], cut, kept = armholes(body, G[n])
-            if cut or kept:
-                log(f'settle {n}: {cut} triangles cut where an arm passes through; {kept} sleeve triangles inside an arm kept for the settle')
+            G[n], cut, of_sleeve = armholes(body, G[n])
+            if cut:
+                log(f'settle {n}: {cut} triangles cut where an arm passes through, {of_sleeve} of them a sleeve\'s')
     for k in range(passes):
         if k:
             smooth_cloth(garments, cfg['VILLAGER_ASSET']['garmentSettleSmooth'])
@@ -706,18 +706,21 @@ def selftest():
 
 
 def selftest_armholes():
-    """armhole_keep cuts the body cloth an arm passes through and never a
-    sleeve; refine carries a sleeve's membership to its new vertices."""
+    """armhole_keep cuts the cloth an arm passes through (by a vertex or the
+    centre) and counts the sleeve's; refine carries a sleeve's membership to
+    its new vertices."""
     from garments import armhole_keep, refine
     # a body-cloth square (0-3) and a sleeve square (4-7), all inside an arm
     sq = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0.0]])
     t = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]])
     sleeve = np.arange(8) >= 4
-    keep, kept = armhole_keep(t, sleeve, np.ones(8, bool), lambda k: True)
-    assert keep.tolist() == [False, False, True, True] and kept == 2, (keep, kept)
-    # a centre inside the arm cuts a body-cloth triangle with no vertex in it
-    keep, kept = armhole_keep(t, sleeve, np.zeros(8, bool), lambda k: k in (0, 2))
-    assert keep.tolist() == [False, True, True, True] and kept == 0, (keep, kept)
+    vin = np.zeros(8, bool)
+    vin[[1, 5]] = True
+    keep, of_sleeve = armhole_keep(t, sleeve, vin, lambda k: False)
+    assert keep.tolist() == [False, True, False, True] and of_sleeve == 1, (keep, of_sleeve)
+    # a centre inside the arm cuts a triangle with no vertex in it
+    keep, of_sleeve = armhole_keep(t, sleeve, np.zeros(8, bool), lambda k: k in (1, 3))
+    assert keep.tolist() == [True, False, True, False] and of_sleeve == 1, (keep, of_sleeve)
     g = {'pos': np.vstack([sq, sq + [5, 0, 0]]), 'tris': t, 'uv': np.zeros((8, 2)), 'W': np.ones((8, 1)),
          'morph_pos': {}, 'sleeve': sleeve}
     r = refine(g, 0.3)
