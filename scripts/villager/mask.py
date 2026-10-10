@@ -440,15 +440,16 @@ def decide(c, st, tol, cut, tris=None):
     opening). A choice is CLEAN when it leaves no defect in any pose: hiding
     when the point never leaves by an opening (hole), never passes the cloth
     farther than `cut` and never comes near an opening (skin at an opening
-    stays drawn); pushing when it never passes through the cloth (shown) and
-    no cloth sinks under it into the body (drawn, it would hide that cloth).
+    stays drawn); pushing when it never passes through the cloth (shown).
+    Neither is clean while cloth sinks under the point into the body in some
+    pose (the report measures that cloth against the skin drawn round it).
     A point keeps its build-pose class while that is clean or neither is; else
     it takes the clean one. A point not covered in the build pose but inside
     the garment in some pose is covered when a choice is clean (hiding first).
     With the mesh's `tris` (all points), un-hiding is checked for what it
     exposes (`exposed`)."""
     out, thr, nin, near, sink = st
-    hide = (out <= tol) & (thr <= cut) & (near == 0)
+    hide = (out <= tol) & (thr <= cut) & (near == 0) & (sink <= tol)
     push = (thr <= tol) & (sink <= tol)
     k = np.asarray(c, np.uint8).copy()
     k[(c == 1) & ~hide & push] = 2
@@ -661,7 +662,9 @@ def selftest():
     assert decide(c, st, tol, cut).tolist() == [1, 2, 1, 1]
     assert decide(c, st, tol, cut, [[0, 1, 2], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
     assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 2, 1, 1]
-    # cloth sunk under a point (or under a hidden neighbour it would draw) keeps it hidden
+    # cloth sunk under a point (or under a hidden neighbour it would draw) keeps
+    # it hidden; a pushed point with cloth sunk under it is not hidden either
+    assert decide(np.array([2], np.uint8), (np.zeros(1), np.array([0.01]), np.ones(1), np.zeros(1), np.array([0.01])), tol, cut).tolist() == [2]
     st = st[:4] + (np.array([0.0, 0.01, 0.0, 0.0]),)
     assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
     st = st[:4] + (np.array([0.0, 0.0, 0.0, 0.01]),)
