@@ -454,7 +454,7 @@ def decide(c, st, tol, cut, tris=None):
     Neither is clean while cloth sinks under the point into the body in some
     pose (the report measures that cloth against the skin drawn round it).
     A point keeps its build-pose class while that is clean or neither is; else
-    it takes the clean one. A point not covered in the build pose but inside
+    it takes the clean one (a hidden point only when it leaves by an opening). A point not covered in the build pose but inside
     the garment in some pose is hidden when that is clean.
     With the mesh's `tris` (all points), un-hiding is checked for what it
     exposes (`exposed`)."""
@@ -462,9 +462,9 @@ def decide(c, st, tol, cut, tris=None):
     hide = (out <= tol) & (thr <= cut) & (near == 0) & (sink <= tol)
     push = (thr <= tol) & (sink <= tol)
     k = np.asarray(c, np.uint8).copy()
-    # a hidden point whose hiding is not clean (it leaves by an opening, passes
-    # the cloth past the cut or comes near an opening) is drawn when that is clean
-    k[(c == 1) & ~hide & push] = 2
+    # a hidden point is drawn again only to close a hole: drawing skin changes
+    # what the drawn body encloses round it, so not merely for being near an opening
+    k[(c == 1) & (out > tol) & push] = 2
     k[(c == 2) & ~push & hide] = 1
     new = (c == 0) & (nin > 0)
     # skin covered only in motion is hidden when that is clean; pushing it
@@ -706,11 +706,6 @@ def selftest():
     assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
     st = st[:4] + (np.array([0.0, 0.0, 0.0, 0.01]),)
     assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
-    # skin at an opening: hidden in the build pose, never out or through, but
-    # near an opening in some pose → drawn (pushed), its triangle drawn whole
-    st = (np.zeros(3), np.zeros(3), np.array([5, 5, 5]), np.ones(3), np.zeros(3))
-    k = decide(np.array([1, 1, 1], np.uint8), st, tol, cut, [[0, 1, 2]])
-    assert k.tolist() == [2, 2, 2], k.tolist()
     print('mask selftest: ok')
 
 
