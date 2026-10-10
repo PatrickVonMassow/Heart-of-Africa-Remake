@@ -445,7 +445,7 @@ def decide(c, st, tol, cut, tris=None):
     pose (the report measures that cloth against the skin drawn round it).
     A point keeps its build-pose class while that is clean or neither is; else
     it takes the clean one (a hidden point only when it leaves by an opening). A point not covered in the build pose but inside
-    the garment in some pose is covered when a choice is clean (hiding first).
+    the garment in some pose is hidden when that is clean.
     With the mesh's `tris` (all points), un-hiding is checked for what it
     exposes (`exposed`)."""
     out, thr, nin, near, sink = st
@@ -457,8 +457,9 @@ def decide(c, st, tol, cut, tris=None):
     k[(c == 1) & (out > tol) & push] = 2
     k[(c == 2) & ~push & hide] = 1
     new = (c == 0) & (nin > 0)
+    # skin covered only in motion is hidden when that is clean; pushing it
+    # would move drawn skin under cloth the build pose never put there
     k[new & hide] = 1
-    k[new & ~hide & push] = 2
     if tris is not None:
         k = exposed(c, k, ~push, tris)
     return k
@@ -654,9 +655,9 @@ def selftest():
     k = decide(c, (out, thr, nin, near, np.zeros(10)), tol, cut)
     # hidden clean; out by an opening → pushed; out and through → kept hidden;
     # through → hidden; through past the cut → kept pushed; neither → kept;
-    # inside in motion → hidden, or pushed when it leaves; never inside → not
-    # covered; near an opening in some pose → pushed, not hidden
-    assert k.tolist() == [1, 2, 1, 1, 2, 2, 1, 2, 0, 2], k.tolist()
+    # inside in motion → hidden, not covered when it leaves; never inside → not
+    # covered; near an opening in some pose → not hidden
+    assert k.tolist() == [1, 2, 1, 1, 2, 2, 1, 0, 0, 0], k.tolist()
     # un-hiding a point draws its triangles: not while a hidden corner of one
     # passes through the cloth (point 1 would expose point 2)
     c = np.array([1, 1, 1, 1], np.uint8)
