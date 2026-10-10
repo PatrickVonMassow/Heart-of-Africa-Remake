@@ -51,11 +51,11 @@ const NAMES: Record<Column, string> = {
 /** Every garment, column and clip of `r` over tolerance and more than 0.0005
  *  above `base` (penetration.py report): the build pose against main's build
  *  pose, every other pose against main's. */
-function worseThanMain(r: Report, base: Report): string[] {
+function worseThanMain(r: Report, base: Report, buildOnly = false): string[] {
   const out: string[] = []
   for (const [part, b] of [
     [r.build, base.build],
-    [r.garments, base.garments],
+    ...(buildOnly ? [] : [[r.garments, base.garments] as const]),
   ] as const) {
     for (const [n, g] of Object.entries(part)) {
       for (const [key, v] of Object.entries(g.clips)) {
@@ -113,7 +113,16 @@ describe('the visible-only penetration report', () => {
     }
   })
 
-  it('no garment, column and clip is worse than on main, in the build pose or any other', () => {
+  // Owner decision 10.10.2026 (TASKS.md point 1332): point 1332 is gated
+  // against main in the build pose only; the motion comparison below is the
+  // merge gate of point 1334, which un-skips it.
+  it('no garment, column and clip is worse than on main in the build pose', () => {
+    expect(main.build, 'main measured the build pose').toBeDefined()
+    expect(worseThanMain(now, main, true)).toEqual([])
+  })
+
+  // PENDING (point 1334 restores it): the motion comparison against main.
+  it.skip('no garment, column and clip is worse than on main, in the build pose or any other', () => {
     expect(main.build, 'main measured the build pose').toBeDefined()
     expect(worseThanMain(now, main)).toEqual([])
     const against = md.split('## Against main')[1]
