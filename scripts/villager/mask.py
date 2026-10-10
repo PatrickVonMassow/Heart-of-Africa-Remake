@@ -407,8 +407,10 @@ def masks(body, garments, cfg, clips=None, log=print):
             if n not in seen:
                 continue
             ids, st = seen[n]
-            c = build[n].copy()
-            c[ids] = decide(c[ids], st, a['garmentPenetrationTolerance'], a['garmentMaskCutTolerance'])
+            full = [np.zeros(len(bv)) for _ in st]
+            for f, x in zip(full, st):
+                f[ids] = x
+            c = decide(build[n], full, a['garmentPenetrationTolerance'], a['garmentMaskCutTolerance'], body['tris'])
             if c.any():
                 body_cls[b] = c
             log(f'mask: body under {n} in every pose: {int((c == 1).sum())} hidden, {int((c == 2).sum())} pushed '
@@ -431,7 +433,7 @@ def masks(body, garments, cfg, clips=None, log=print):
 _MO = {}
 
 
-def decide(c, st, tol, cut):
+def decide(c, st, tol, cut, tris=None):
     """The classes (0 not covered, 1 hide, 2 push) of points with build-pose
     classes `c`, from their places over every pose `st` (`motion`: deepest out
     by an opening, deepest through the cloth, poses inside, poses near an
@@ -441,7 +443,9 @@ def decide(c, st, tol, cut):
     stays drawn); pushing when it never passes through the cloth (shown).
     A point keeps its build-pose class while that is clean or neither is; else
     it takes the clean one. A point not covered in the build pose but inside
-    the garment in some pose is covered when a choice is clean (hiding first)."""
+    the garment in some pose is covered when a choice is clean (hiding first).
+    With the mesh's `tris` (all points), un-hiding is checked for what it
+    exposes (`exposed`)."""
     out, thr, nin, near = st
     hide = (out <= tol) & (thr <= cut) & (near == 0)
     push = thr <= tol
@@ -451,7 +455,37 @@ def decide(c, st, tol, cut):
     new = (c == 0) & (nin > 0)
     k[new & hide] = 1
     k[new & ~hide & push] = 2
+    if tris is not None:
+        k = exposed(c, k, thr, tris, tol)
     return k
+
+
+def exposed(c, k, thr, tris, tol):
+    """`k` with every point drawn again (from hidden in `c`) taken back while
+    it would expose a hidden neighbour that passes through the cloth: a
+    triangle with one drawn corner is drawn whole, and its hidden corners are
+    drawn with it (pushed), so un-hiding a point is clean only when every
+    hidden corner it draws is."""
+    t = np.asarray(tris)
+    k = k.copy()
+    before = ~(c[t] == 1).all(1)
+    while True:
+        drawn = ~(k[t] == 1).all(1)
+        seen = np.zeros(len(k), bool)
+        seen[t[drawn].ravel()] = True
+        was = np.zeros(len(k), bool)
+        was[t[before].ravel()] = True
+        bad = seen & ~was & (k == 1) & (thr > tol)
+        if not bad.any():
+            return k
+        # the triangles drawn anew round a bad corner: their un-hidden corners hide again
+        hit = drawn & ~before & bad[t].any(1)
+        back = np.zeros(len(k), bool)
+        back[t[hit].ravel()] = True
+        back &= (c == 1) & (k != 1)
+        if not back.any():
+            return k
+        k[back] = 1
 
 
 def _motion_corner(corner):
@@ -602,6 +636,13 @@ def selftest():
     # inside in motion → hidden, or pushed when it leaves; never inside → not
     # covered; near an opening in some pose → pushed, not hidden
     assert k.tolist() == [1, 2, 1, 1, 2, 2, 1, 2, 0, 2], k.tolist()
+    # un-hiding a point draws its triangles: not while a hidden corner of one
+    # passes through the cloth (point 1 would expose point 2)
+    c = np.array([1, 1, 1, 1], np.uint8)
+    st = (np.array([0.0, 0.01, 0.0, 0.0]), np.array([0.0, 0.0, 0.01, 0.0]), np.array([5, 5, 5, 5]), np.zeros(4))
+    assert decide(c, st, tol, cut).tolist() == [1, 2, 1, 1]
+    assert decide(c, st, tol, cut, [[0, 1, 2], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
+    assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 2, 1, 1]
     print('mask selftest: ok')
 
 
