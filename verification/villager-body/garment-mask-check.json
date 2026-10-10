@@ -81,9 +81,9 @@
    "worn": [
     "g-skirtShort-waist"
    ],
-   "hidden": 23,
+   "hidden": 14,
    "covered": 37,
-   "drawnTriangles": 5980,
+   "drawnTriangles": 5997,
    "coveredIds": [
     1047,
     1048,
@@ -107,9 +107,9 @@
    "worn": [
     "g-skirtKnee-waist"
    ],
-   "hidden": 41,
+   "hidden": 39,
    "covered": 64,
-   "drawnTriangles": 5953,
+   "drawnTriangles": 5958,
    "coveredIds": [
     1047,
     1048,
@@ -185,9 +185,9 @@
    "worn": [
     "g-skirtShort-chest"
    ],
-   "hidden": 81,
+   "hidden": 76,
    "covered": 236,
-   "drawnTriangles": 5878,
+   "drawnTriangles": 5897,
    "coveredIds": [
     589,
     621,
@@ -237,7 +237,7 @@
    "worn": [
     "g-trousers-waist"
    ],
-   "hidden": 37,
+   "hidden": 33,
    "covered": 77,
    "drawnTriangles": 5966,
    "coveredIds": [
@@ -289,9 +289,9 @@
    "worn": [
     "g-shirt-chest"
    ],
-   "hidden": 443,
+   "hidden": 420,
    "covered": 527,
-   "drawnTriangles": 5218,
+   "drawnTriangles": 5277,
    "coveredIds": [
     318,
     335,
@@ -315,9 +315,9 @@
    "worn": [
     "g-robe-chest"
    ],
-   "hidden": 455,
+   "hidden": 438,
    "covered": 526,
-   "drawnTriangles": 5199,
+   "drawnTriangles": 5241,
    "coveredIds": [
     318,
     335,
@@ -341,9 +341,9 @@
    "worn": [
     "g-toga-leftShoulder"
    ],
-   "hidden": 210,
+   "hidden": 203,
    "covered": 374,
-   "drawnTriangles": 5647,
+   "drawnTriangles": 5652,
    "coveredIds": [
     533,
     534,
@@ -367,9 +367,9 @@
    "worn": [
     "g-toga-rightShoulder"
    ],
-   "hidden": 215,
+   "hidden": 192,
    "covered": 370,
-   "drawnTriangles": 5643,
+   "drawnTriangles": 5685,
    "coveredIds": [
     509,
     510,
@@ -393,9 +393,9 @@
    "worn": [
     "g-cloak-bothShoulders"
    ],
-   "hidden": 407,
+   "hidden": 390,
    "covered": 634,
-   "drawnTriangles": 5307,
+   "drawnTriangles": 5335,
    "coveredIds": [
     316,
     318,
@@ -419,9 +419,9 @@
    "worn": [
     "g-cloak-leftShoulder"
    ],
-   "hidden": 260,
+   "hidden": 241,
    "covered": 545,
-   "drawnTriangles": 5586,
+   "drawnTriangles": 5615,
    "coveredIds": [
     531,
     532,
@@ -445,9 +445,9 @@
    "worn": [
     "g-cloak-rightShoulder"
    ],
-   "hidden": 264,
+   "hidden": 240,
    "covered": 553,
-   "drawnTriangles": 5577,
+   "drawnTriangles": 5628,
    "coveredIds": [
     335,
     383,
@@ -471,9 +471,9 @@
    "worn": [
     "g-cape-bothShoulders"
    ],
-   "hidden": 402,
+   "hidden": 359,
    "covered": 588,
-   "drawnTriangles": 5310,
+   "drawnTriangles": 5389,
    "coveredIds": [
     316,
     318,
@@ -497,9 +497,9 @@
    "worn": [
     "g-cape-leftShoulder"
    ],
-   "hidden": 190,
+   "hidden": 182,
    "covered": 500,
-   "drawnTriangles": 5679,
+   "drawnTriangles": 5686,
    "coveredIds": [
     335,
     531,
@@ -523,9 +523,9 @@
    "worn": [
     "g-cape-rightShoulder"
    ],
-   "hidden": 202,
+   "hidden": 184,
    "covered": 504,
-   "drawnTriangles": 5655,
+   "drawnTriangles": 5692,
    "coveredIds": [
     335,
     383,
@@ -549,9 +549,9 @@
    "worn": [
     "g-hood-overHead"
    ],
-   "hidden": 157,
+   "hidden": 109,
    "covered": 1767,
-   "drawnTriangles": 5789,
+   "drawnTriangles": 5861,
    "coveredIds": [
     2,
     5,
@@ -602,9 +602,9 @@
    "worn": [
     "g-veil-face"
    ],
-   "hidden": 83,
+   "hidden": 52,
    "covered": 1383,
-   "drawnTriangles": 5977,
+   "drawnTriangles": 5989,
    "coveredIds": [
     0,
     1,
@@ -683,9 +683,9 @@
     "g-robe-chest",
     "g-turban-aroundHead"
    ],
-   "hidden": 455,
+   "hidden": 438,
    "covered": 526,
-   "drawnTriangles": 5199,
+   "drawnTriangles": 5241,
    "coveredIds": [
     318,
     335,
@@ -739,9 +739,9 @@
     "g-shirt-chest",
     "g-cloak-leftShoulder"
    ],
-   "hidden": 586,
+   "hidden": 566,
    "covered": 643,
-   "drawnTriangles": 4930,
+   "drawnTriangles": 4984,
    "coveredIds": [
     318,
     335,
@@ -767,9 +767,9 @@
     "g-cape-bothShoulders",
     "g-limbRings-limbs"
    ],
-   "hidden": 443,
+   "hidden": 398,
    "covered": 652,
-   "drawnTriangles": 5265,
+   "drawnTriangles": 5349,
    "coveredIds": [
     316,
     318,
