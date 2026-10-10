@@ -391,21 +391,30 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
     # nothing to push (so it changed nothing) after a body settle that left
     # no cloth inside. Short of that after the last round, the penetration
     # step measures what is left.
-    done = False
+    verdict = None
     for k in range(12):
         before, after = settle_once(body, garments, cfg, log=log)
         found, held = settle_layers(body, garments, cfg, log=log)
         log(f'settle again {k + 1}: cloth {before:.4f} inside before, {after:.4f} after; inner through outer {found:.4f} before, {held:.4f} refused')
-        if found <= 0.0 and after <= 1e-4:
-            done = True
+        verdict = settle_verdict(found, after, held)
+        if verdict:
             break
     # what the settle could not resolve is said, never taken as settled: the
     # penetration step measures it (it applies no refusal)
-    if not done:
-        log(f'settle: NOT CONVERGED after 12 rounds (cloth {after:.4f} inside, inner through outer {found:.4f})')
-    if held > 0:
-        log(f'settle: inner through outer {held:.4f} left where a push into or across the body was refused')
+    if verdict != 'converged':
+        log(f'settle: NOT CONVERGED ({verdict or "12 rounds"}): cloth {after:.4f} inside, inner through outer {found:.4f}, '
+            f'{held:.4f} left where a push into or across the body was refused')
     return garments
+
+
+def settle_verdict(found, after, held):
+    """How a round of settling again ends the loop: 'converged' when the
+    layer settle found nothing to push, none refused, and the body settle left
+    no cloth inside; 'stalled' when only refused intersections remain (no
+    further round can move them); None to settle again."""
+    if found > 0.0 or after > 1e-4:
+        return None
+    return 'converged' if held <= 0.0 else 'stalled'
 
 
 _ST = {}
@@ -763,5 +772,9 @@ def selftest_build():
     border = [((p[a][0] in (0, 1)) and p[b][0] == p[a][0]) or ((p[a][1] in (0, 1)) and p[b][1] == p[a][1]) for a, b in u[c == 1]]
     assert all(border), 'refine left an edge with a vertex in its middle'
     selftest_armholes()
+    # a refusal-only exit is no convergence
+    assert settle_verdict(0.0, 0.0, 0.0) == 'converged'
+    assert settle_verdict(0.0, 0.0, 0.01) == 'stalled'
+    assert settle_verdict(0.0, 0.001, 0.0) is None and settle_verdict(0.002, 0.0, 0.01) is None
     fp = face_pushes(3, np.array([[0, 1, 2]]), np.array([[0.2, 0.3, 0.5]]), np.array([[0, 1, 2]]), np.array([0.01]), np.array([[0, 0, 1.0]]))
     assert abs(np.array([0.2, 0.3, 0.5]) @ fp[:, 2] - 0.01) < 1e-12, fp

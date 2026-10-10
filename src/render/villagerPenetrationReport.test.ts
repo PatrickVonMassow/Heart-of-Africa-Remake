@@ -157,15 +157,19 @@ describe('the visible-only penetration report', () => {
   })
 
   it('every garment fits its own build pose within tolerance at every body corner and layering', () => {
-    // 0.003 for every column, cut too: garmentMaskCutTolerance is the motion
-    // allowance, never the build pose's
+    // garmentPenetrationTolerance (0.003) for every column, cut too:
+    // garmentMaskCutTolerance is the motion allowance, never the build pose's;
+    // the report's own tolerance must be that value, not set the bar
+    const tol = VILLAGER_ASSET.garmentPenetrationTolerance
+    expect(now.tolerance).toBe(tol)
+    expect(tol).toBeLessThanOrEqual(0.003)
     const over: string[] = []
     for (const [n, g] of Object.entries(now.build)) {
       for (const col of Object.keys(NAMES) as Column[]) {
-        if (g[col].value > now.tolerance) over.push(`${n} ${col} ${g[col].value}`)
+        if (g[col].value > tol) over.push(`${n} ${col} ${g[col].value}`)
       }
       for (const [key, v] of Object.entries(g.clips)) {
-        if (v > now.tolerance) over.push(`${n} ${key} ${v}`)
+        if (v > tol) over.push(`${n} ${key} ${v}`)
       }
       expect(Object.keys(g.cases), n).toEqual([])
     }
