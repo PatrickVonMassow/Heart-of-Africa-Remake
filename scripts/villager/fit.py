@@ -210,17 +210,14 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     step = cfg['VILLAGER_ASSET']['garmentFitStep']
     jidx, jw = top4(body['W'])
     import mask as M
-    # the shoulder layer (capes, cloaks, the hood) drapes the arms: the arms
-    # swing under it in every clip, and pushing it clear of them in the rest
-    # pose crumpled it into lumpy blobs (measured 09.10.2026); it is settled
-    # in the build pose alone (settle)
-    names = [n for n in garments['meshes'] if n.startswith('g-') and M.layer(n) < M.LAYER['shoulder']]
+    names = [n for n in garments['meshes'] if n.startswith('g-')]
     G = garments['meshes']
     skin = {n: top4(G[n]['W']) for n in names}
     topo = {n: neighbours(len(G[n]['pos']), G[n]['tris'], G[n]['pos']) for n in names}
     arm = [SK.INDEX[f'{b}.{x}'] for b in ('upperArm', 'forearm', 'hand') for x in 'LR']
     arm_face = np.isin(np.argmax(body['W'], 1)[body['tris']], arm).any(1)
     on_arm = {n: G[n]['W'][:, arm].sum(1) > 0.05 for n in names}
+    drapes = {n: M.layer(n) == M.LAYER['shoulder'] for n in names}
     shapes = {c: morphed(body, corner_weights(*c)) for c in corners()}
     frames = [(c, cname, f) for c in corners() for cname in EXPORT_CLIPS for f in range(len(clips['clips'][cname]['times']))]
 
@@ -240,10 +237,11 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
             co, nrm, fi = nearest_face(tree, gv)
             s = np.einsum('ij,ij->i', gv - co, nrm)
             depth = max(0.0, float(-s.min()))
-            # cloth that does not follow an arm is never pushed off it: the
-            # arm swings under it, and the push lifted a robe's shoulder strip
-            # beside the armhole into a flap (measured 09.10.2026)
-            bad = np.nonzero((s < margin) & ~(arm_face[fi] & ~on_arm[n]))[0]
+            # the shoulder layer (capes, cloaks, the hood) drapes the arms
+            # and does not follow them: the arms swing under it in every
+            # clip, and pushing it off them in the rest pose crumpled it into
+            # lumpy blobs (measured 09.10.2026)
+            bad = np.nonzero((s < margin) & ~(arm_face[fi] & ~on_arm[n] & drapes[n]))[0]
             if not len(bad):
                 out[n] = (depth, None)
                 continue
