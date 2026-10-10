@@ -32,6 +32,16 @@ through the cloth. A point with no clean choice (out by an opening in one
 pose, through the cloth in another) keeps its build-pose class: only the
 cloth itself can fix it. One mask per vertex ships, no per-pose data.
 
+MEASURED 10.10.2026 (every pose, all ten corners, against the build-pose
+mask): such conflict points bound what any per-vertex mask can reach — the
+smaller of their deepest out and deepest through is up to 0.07 (capes,
+cloaks), 0.10 (shirt, knee skirts) — so hole and shown stay at main's maxima
+(0.067, 0.106); hole frames fall 7313 → 7209 (hood 0.031 → 0.026, short skirt
+0.009 → 0), no column is worse. Freer rules (un-hiding near an opening,
+pushing skin covered only in motion) worsened the cloth column: drawing skin
+changes what the drawn body encloses round sunk cloth. The rest belongs to
+the cloth (work-order points 1337, 1334).
+
 The body gets one mask per vertex (hide and push bits over the garments);
 every garment the same over the garments of an OUTER layer (LAYER) that cover
 it (every outfit layering: a figure wears at most one garment per slot). The game reads
