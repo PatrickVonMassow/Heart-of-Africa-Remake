@@ -105,9 +105,10 @@ def main():
         import fit as F
         garments = cached(a.work, 'garments', lambda: F.settle(body, F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg), force='garments' in steps)
     if garments is not None and clips is not None:
-        # the mask over every pose costs minutes: cached on its inputs and its own code
+        # the mask over every pose costs minutes: cached on its inputs, its own
+        # code and what its motion evaluation reads (MK.motion_key)
         import hashlib
-        key = inputs(a.work, ['body', 'clips', 'garments'], cfg) + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest()
+        key = inputs(a.work, ['body', 'clips', 'garments'], cfg) + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest() + MK.motion_key(body)
         garments['mask'] = cached(a.work, 'mask', lambda: MK.masks(body, garments, cfg, clips), key=key)
     elif garments is not None:
         garments['mask'] = MK.masks(body, garments, cfg)
