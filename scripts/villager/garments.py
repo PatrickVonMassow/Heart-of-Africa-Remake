@@ -810,7 +810,12 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
     idx, bary, off = surface_map(mh, body['basis_full'], rest)
     pos = apply_map(body['basis_full'], idx, bary, off)
     morph = {k: apply_map(body['basis_full'] + body['deltas_full'][k], idx, bary, off) - pos for k in MORPHS}
-    return {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph}
+    g = {'pos': pos, 'tris': np.asarray(t), 'uv': uv, 'W': W, 'morph_pos': morph}
+    # which vertices are a sleeve's (its cap ring included): armholes cuts
+    # the body cloth alone
+    if limb is not None and (limb != 0).any():
+        g['sleeve'] = np.asarray(limb) != 0
+    return g
 
 
 def refine(g, maxlen):
@@ -819,8 +824,11 @@ def refine(g, maxlen):
     vertices close enough that it can follow a curved body part instead of
     cutting it by a chord. A triangle is split by how many of its edges are
     (one: two triangles, two: three across the shorter diagonal, three: four),
-    so no edge is left with a vertex in its middle."""
+    so no edge is left with a vertex in its middle. A sleeve's membership
+    (`sleeve`) carries over: a sleeve and the body cloth share no edge."""
     attrs = {'pos': g['pos'], 'uv': g['uv'], 'W': g['W'], **{'m:' + k: v for k, v in g['morph_pos'].items()}}
+    if 'sleeve' in g:
+        attrs['sleeve'] = np.asarray(g['sleeve'], float)
     t = np.asarray(g['tris'])
     while True:
         p = attrs['pos']
@@ -860,19 +868,37 @@ def refine(g, maxlen):
     g = dict(g)
     g['pos'], g['uv'], g['W'], g['tris'] = attrs['pos'], attrs['uv'], attrs['W'], t
     g['morph_pos'] = {k[2:]: v for k, v in attrs.items() if k.startswith('m:')}
+    if 'sleeve' in attrs:
+        g['sleeve'] = attrs['sleeve'] > 0
     return g
 
 
 ARM_BONES = tuple(f'upperArm.{s}' for s in 'LR')
 
 
+def armhole_keep(t, sleeve, vin, cin):
+    """The triangles armholes keeps: of the body cloth, none with a vertex
+    inside an upper arm (`vin`, per vertex) or its centre inside one (`cin`,
+    called per triangle index); a sleeve's triangles (any vertex in `sleeve`)
+    always — a sleeve is settled off the arm it wraps, never cut open."""
+    t = np.asarray(t)
+    torso = ~sleeve[t].any(1)
+    keep = ~(torso & vin[t].any(1))
+    for k in np.flatnonzero(keep & torso):
+        if cin(k):
+            keep[k] = False
+    return keep, int((~torso & vin[t].any(1)).sum())
+
+
 def armholes(body, g):
-    """Cut the cloth an upper arm passes through in the build pose: every
-    triangle whose centre lies inside the drawn body where that is an upper
-    arm (the nearest body triangle's bone). Cloth round the trunk would otherwise cut
-    through the upper arm where it meets the trunk at the armpit — no
-    settling can take a surface across that crease without folding it into
-    one or the other — and the arm comes out through an opening instead."""
+    """Cut the body cloth an upper arm passes through in the build pose:
+    every triangle with a vertex or its centre inside the drawn body where
+    that is an upper arm (the nearest body triangle's bone). Cloth round the
+    trunk would otherwise cut through the upper arm where it meets the trunk
+    at the armpit — no settling can take a surface across that crease without
+    folding it into one or the other — and the arm comes out through an
+    opening instead. A sleeve is never cut (armhole_keep). Returns the
+    garment, the triangles cut and the sleeve triangles inside an arm kept."""
     import gamepath as GP
     from body import top4
     from fit import inside
@@ -885,19 +911,17 @@ def armholes(body, g):
     tree = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
     gv = person.draw(g['pos'], *top4(g['W']), wr, wp)
     t = np.asarray(g['tris'])
-    keep = np.ones(len(t), bool)
     # a vertex inside an upper arm takes every triangle round it along, so no
     # cloth is left inside the arm at the hole's edge
     def in_arm(p):
         _co, _n, fi, _d = tree.find_nearest(p)
         return dom[body['tris'][fi][0]] in arm and inside(tree, p)
     vin = np.fromiter((in_arm(p) for p in gv.tolist()), bool, len(gv))
-    keep &= ~vin[t].any(1)
-    for k, c in enumerate(gv[t].mean(1).tolist()):
-        if keep[k] and in_arm(c):
-            keep[k] = False
+    sleeve = np.asarray(g.get('sleeve', np.zeros(len(gv), bool)), bool)
+    cen = gv[t].mean(1)
+    keep, kept = armhole_keep(t, sleeve, vin, lambda k: in_arm(cen[k].tolist()))
     if keep.all():
-        return g, 0
+        return g, 0, kept
     used = np.unique(t[keep])
     remap = np.full(len(g['pos']), -1)
     remap[used] = np.arange(len(used))
@@ -906,7 +930,9 @@ def armholes(body, g):
     for key in ('pos', 'uv', 'W'):
         out[key] = g[key][used]
     out['morph_pos'] = {m: d[used] for m, d in g['morph_pos'].items()}
-    return out, int((~keep).sum())
+    if 'sleeve' in g:
+        out['sleeve'] = sleeve[used]
+    return out, int((~keep).sum()), kept
 
 
 def hair_cap(mh, body, B):

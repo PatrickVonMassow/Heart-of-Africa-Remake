@@ -362,9 +362,9 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
         # an armhole where an upper arm passes the trunk cloth; a garment of
         # the shoulder layer drapes the arms instead (garments.build_form)
         if M.form(n) != 'limbRings' and M.layer(n) < M.LAYER['shoulder']:
-            G[n], cut = armholes(body, G[n])
-            if cut:
-                log(f'settle {n}: {cut} triangles cut where an arm passes through')
+            G[n], cut, kept = armholes(body, G[n])
+            if cut or kept:
+                log(f'settle {n}: {cut} triangles cut where an arm passes through; {kept} sleeve triangles inside an arm kept for the settle')
     for k in range(passes):
         if k:
             smooth_cloth(garments, cfg['VILLAGER_ASSET']['garmentSettleSmooth'])
@@ -391,12 +391,20 @@ def settle(body, garments, cfg, passes=4, log=lambda *x: print(*x, flush=True)):
     # nothing to push (so it changed nothing) after a body settle that left
     # no cloth inside. Short of that after the last round, the penetration
     # step measures what is left.
+    done = False
     for k in range(12):
         before, after = settle_once(body, garments, cfg, log=log)
-        found = settle_layers(body, garments, cfg, log=log)
-        log(f'settle again {k + 1}: cloth {before:.4f} inside before, {after:.4f} after; inner through outer {found:.4f} before')
+        found, held = settle_layers(body, garments, cfg, log=log)
+        log(f'settle again {k + 1}: cloth {before:.4f} inside before, {after:.4f} after; inner through outer {found:.4f} before, {held:.4f} refused')
         if found <= 0.0 and after <= 1e-4:
+            done = True
             break
+    # what the settle could not resolve is said, never taken as settled: the
+    # penetration step measures it (it applies no refusal)
+    if not done:
+        log(f'settle: NOT CONVERGED after 12 rounds (cloth {after:.4f} inside, inner through outer {found:.4f})')
+    if held > 0:
+        log(f'settle: inner through outer {held:.4f} left where a push into or across the body was refused')
     return garments
 
 
@@ -523,7 +531,11 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
     """The same for every layering, in the build pose at every body corner: a
     point of an inner garment its cover mask leaves drawn under an outer one
     (mask.py) and outside that outer garment through its cloth pushes the
-    outer cloth nearest to it out past it by `garmentFitMargin`."""
+    outer cloth nearest to it out past it by `garmentFitMargin`.
+    Returns the deepest such point before the first push at any corner, and
+    the deepest one left after the last round whose push was refused (into
+    or across the body): no push resolves those, so they are reported, never
+    counted as settled."""
     import gamepath as GP
     import mask as M
     from mathutils.bvhtree import BVHTree
@@ -589,6 +601,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
         if mb.any:
             pairs.setdefault(o, []).append(('body', mb, mb.shown))
     found = 0.0
+    held = 0.0
     for corner, morph in SETTLE_ORDER:
         w = corner_weights(*corner)
         _pos, j = morphed(body, w)
@@ -603,6 +616,7 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
             gv['body'] = person.draw(bpos, bjidx, bjw, wr, wp)
             moved = 0
             cur = 0.0
+            refused = 0.0
             # the inner layers' outer garments first: a hip garment settled
             # over the beads before a robe settles over it
             for o, inner in sorted(pairs.items(), key=lambda p: M.layer(p[0])):
@@ -627,12 +641,14 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
                         # fold of the outer cloth never pulls it into the body
                         _bc, bn, _bi, _bd = btree.find_nearest(smp[k].tolist())
                         if u @ np.array(bn) <= 0:
+                            refused = max(refused, float(dist[k]))
                             continue
                         # nor across the body: an inner point on another side
                         # of the figure (a hair bag behind the head under a
                         # cape's collar) is no reason to pull the cloth there
                         ln = float(np.linalg.norm(u))
                         if ln > 1e-9 and btree.ray_cast(Vector(co.tolist()), Vector((u / ln).tolist()), ln)[0] is not None:
+                            refused = max(refused, float(dist[k]))
                             continue
                         fi.append(to[ti])
                         fw.append(barycentric(co, *gv[o][to[ti]]))
@@ -654,9 +670,11 @@ def settle_layers(body, garments, cfg, rounds=6, log=print):
             first = cur if first is None else first
             if not moved:
                 break
-        log(f'settle layers {corner[0]} {corner[1]} {corner[2]:+.0f}: inner through outer {first:.4f} -> {cur:.4f}')
+        log(f'settle layers {corner[0]} {corner[1]} {corner[2]:+.0f}: inner through outer {first:.4f} -> {cur:.4f}'
+            + (f'; {refused:.4f} left where the push was refused' if refused > 0 else ''))
         found = max(found, first)
-    return found
+        held = max(held, refused)
+    return found, held
 
 
 def selftest():
@@ -685,6 +703,25 @@ def selftest():
     assert state['g'][0, 0] == 0.0 and abs(deep['g'] - 0.05) < 1e-12, (state, deep)
     selftest_build()
     print('fit selftest: ok')
+
+
+def selftest_armholes():
+    """armhole_keep cuts the body cloth an arm passes through and never a
+    sleeve; refine carries a sleeve's membership to its new vertices."""
+    from garments import armhole_keep, refine
+    # a body-cloth square (0-3) and a sleeve square (4-7), all inside an arm
+    sq = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0.0]])
+    t = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]])
+    sleeve = np.arange(8) >= 4
+    keep, kept = armhole_keep(t, sleeve, np.ones(8, bool), lambda k: True)
+    assert keep.tolist() == [False, False, True, True] and kept == 2, (keep, kept)
+    # a centre inside the arm cuts a body-cloth triangle with no vertex in it
+    keep, kept = armhole_keep(t, sleeve, np.zeros(8, bool), lambda k: k in (0, 2))
+    assert keep.tolist() == [False, True, True, True] and kept == 0, (keep, kept)
+    g = {'pos': np.vstack([sq, sq + [5, 0, 0]]), 'tris': t, 'uv': np.zeros((8, 2)), 'W': np.ones((8, 1)),
+         'morph_pos': {}, 'sleeve': sleeve}
+    r = refine(g, 0.3)
+    assert len(r['pos']) > 8 and (r['sleeve'] == (r['pos'][:, 0] > 2.5)).all(), r['sleeve']
 
 
 def selftest_build():
@@ -722,5 +759,6 @@ def selftest_build():
     u, c = np.unique(ed, axis=0, return_counts=True)
     border = [((p[a][0] in (0, 1)) and p[b][0] == p[a][0]) or ((p[a][1] in (0, 1)) and p[b][1] == p[a][1]) for a, b in u[c == 1]]
     assert all(border), 'refine left an edge with a vertex in its middle'
+    selftest_armholes()
     fp = face_pushes(3, np.array([[0, 1, 2]]), np.array([[0.2, 0.3, 0.5]]), np.array([[0, 1, 2]]), np.array([0.01]), np.array([[0, 0, 1.0]]))
     assert abs(np.array([0.2, 0.3, 0.5]) @ fp[:, 2] - 0.01) < 1e-12, fp
