@@ -883,8 +883,9 @@ def armhole_keep(t, sleeve, vin, cin):
     `sleeve`). A sleeve's cloth inside its arm is cut too: kept, the settle
     could not take it out (measured 10.10.2026: 133 shirt and 144 robe
     sleeve triangles kept left up to 0.0237 of cloth in the arm after five
-    rounds of settling again, 0.0000 cut), and the opening it leaves is
-    what the penetration step's hole and cut columns measure."""
+    rounds of settling again, 0.0000 cut). The penetration step's hole and
+    cut columns count only hidden skin, so they do not prove that such an
+    opening stays covered where skin shows."""
     t = np.asarray(t)
     keep = ~vin[t].any(1)
     for k in np.flatnonzero(keep):
