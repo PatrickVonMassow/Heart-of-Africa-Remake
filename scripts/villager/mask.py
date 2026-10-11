@@ -706,6 +706,11 @@ def selftest():
     assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
     st = st[:4] + (np.array([0.0, 0.0, 0.0, 0.01]),)
     assert decide(c, st, tol, cut, [[0, 1, 3], [0, 2, 3]]).tolist() == [1, 1, 1, 1]
+    # skin at an opening: hidden in the build pose, never out or through, only
+    # near an opening in some pose → stays hidden (drawing it moves cloth under skin)
+    st = (np.zeros(3), np.zeros(3), np.array([5, 5, 5]), np.ones(3), np.zeros(3))
+    k = decide(np.array([1, 1, 1], np.uint8), st, tol, cut, [[0, 1, 2]])
+    assert k.tolist() == [1, 1, 1], k.tolist()
     print('mask selftest: ok')
 
 
