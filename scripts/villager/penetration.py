@@ -115,7 +115,8 @@ class Masked:
 # occlusion test: far below any gap between body parts, independent of the
 # tolerance, so a residual is never dropped by a probe that crossed a small gap
 PROBE = 1e-4
-# a point closer than this to a surface lies on it (lines of sight pass it)
+# a point closer than this to a surface lies on it (lines of sight pass it;
+# a surface at this distance or beyond blocks)
 CONTACT = 1e-6
 
 
@@ -181,16 +182,16 @@ class Scene:
 
     def _clear(self, q, d):
         """A line of sight from `q` along `d` leaves past body and outer
-        cloth; a surface the point lies on (a hit within CONTACT of `q`
-        itself) is passed. A step never passes q + d·CONTACT, so no surface
-        beyond the contact distance is stepped over."""
+        cloth; a surface the point lies on (a hit closer than CONTACT to `q`
+        itself) is passed. A surface at CONTACT or beyond blocks, and a step
+        never passes q + d·CONTACT, so none is stepped over."""
         p = q
         for _ in range(8):
             hit = self.tree.ray_cast(p, d)[0]
             if hit is None:
                 return True
             t = (hit - q).dot(d)
-            if t > CONTACT:
+            if t >= CONTACT:
                 return False
             p = q + d * min(t + CONTACT / 16, CONTACT)
         return False
@@ -509,6 +510,7 @@ def selftest():
     sheet = lambda z: ([(-1, -1, z), (1, -1, z), (1, 1, z), (-1, 1, z)], [(0, 1, 2), (0, 2, 3)])  # noqa: E731
     assert not Scene([sheet(0.99e-6), sheet(1.02e-6)])._clear(Vector((0, 0, 0)), Vector((0, 0, 1))), 'stepped over a blocker'
     assert Scene([sheet(0.99e-6)])._clear(Vector((0, 0, 0)), Vector((0, 0, 1))), 'contact passed'
+    assert not Scene([sheet(CONTACT)])._clear(Vector((0, 0, 0)), Vector((0, 0, 1))), 'a surface at CONTACT blocks'
     # a point on its own drawn cloth outside the cape is seen past that cloth
     own_v, own_t = box(-0.05, 0.05, 0.45, 0.55, -0.12, -0.115)
     assert Scene([(cv, ct), (tv, tt)], own=(own_v, own_t)).seen(shown)
