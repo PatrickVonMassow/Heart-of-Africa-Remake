@@ -297,7 +297,8 @@ export const DOC_BUDGETS = [
     // one line of margin that stood here is left untouched.
     // Two new §7 lines describe excavation purpose, results and walkable spoil.
     // RAISED by 2 measured lines for the §19.15 dress rule (user 06.10.2026).
-    maxLines: 856,
+    // RAISED by 2 measured lines for the §19.15 open outer garment rule (user 11.10.2026).
+    maxLines: 858,
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -489,7 +490,10 @@ export const DOC_BUDGETS = [
     // RAISED by the 79 measured words of the §19.15 covered-body rule (user
     // 06.10.2026): women never uncovered above, children always a hip layer —
     // a new decision; no earlier text set any dress rule by sex or age.
-    maxWords: 30048,
+    // RAISED by the 97 measured words of the §19.15 open outer garment rule
+    // (user 11.10.2026): no revealable inner top under an everyday open cape or
+    // cloak, the seasonal wrap its masked exemption — a new decision.
+    maxWords: 30145,
     // A hundred words across nearly 30k: design.md is edited section by section and a
     // genuine new decision runs 30–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
