@@ -181,14 +181,16 @@ class Scene:
 
     def _clear(self, q, d):
         """A line of sight from `q` along `d` leaves past body and outer
-        cloth; a surface the point lies on (a hit within CONTACT) is passed."""
-        for _ in range(4):
-            hit, _n, _f, dist = self.tree.ray_cast(q, d)
+        cloth; a surface the point lies on (a hit within CONTACT of `q`
+        itself) is passed."""
+        p = q
+        for _ in range(8):
+            hit = self.tree.ray_cast(p, d)[0]
             if hit is None:
                 return True
-            if dist > CONTACT:
+            if (hit - q).length > CONTACT:
                 return False
-            q = hit + d * CONTACT
+            p = hit + d * (CONTACT / 16)
         return False
 
 
@@ -496,6 +498,10 @@ def selftest():
     assert not sc.seen((0.0, 0.5, -0.09995)), 'tucked against the cape'
     # lying on the body's exposed front or on the cape's outside: seen
     assert sc.seen((0.0, 0.5, 0.2)) and sc.seen((0.0, 0.5, -0.1)), 'on a surface it lies on'
+    # a second surface just past CONTACT round the body still blocks
+    e = 1.5e-6
+    wrap = box(-0.21 - e, 0.21 + e, -0.01 - e, 1.01 + e, -e, 0.2 + e)
+    assert not Scene([(cv, ct), (tv, tt), wrap]).seen((0.0, 0.5, 0.2)), 'blocked just past contact'
     # a point on its own drawn cloth outside the cape is seen past that cloth
     own_v, own_t = box(-0.05, 0.05, 0.45, 0.55, -0.12, -0.115)
     assert Scene([(cv, ct), (tv, tt)], own=(own_v, own_t)).seen(shown)
