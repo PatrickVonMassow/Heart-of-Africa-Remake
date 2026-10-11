@@ -6,12 +6,17 @@ import { PLACES } from '../world/geo'
 import {
   AGE_GROUPS,
   appearanceFor,
+  isOpenOuter,
+  isRevealableTop,
   LAYER_SLOTS,
   PEOPLE_DRESS,
   SEXES,
+  withOpenOuterRule,
   zuluBlanketShare,
   type AppearanceQuery,
+  type DressLayer,
 } from './appearance'
+import { seasonalDressFor } from './dress'
 
 const DOC = readFileSync(resolve(process.cwd(), 'docs/peoples-1890.md'), 'utf8')
 const SOUTH = ['#3a5a8a', '#8a4a2a', '#c2b090']
@@ -227,5 +232,57 @@ describe('the covered upper body (docs/peoples-1890.md §8.6)', () => {
         .join('+')
     const kinds = new Set(['zulu', 'pedi', 'san', 'wayeyi', 'bemba', 'fang', 'mongo', 'mbuti', 'lunda', 'banda'].map(cover))
     expect(kinds.size).toBeGreaterThanOrEqual(8)
+  })
+})
+
+describe('the open outer garment rule (design.md §19.15)', () => {
+  const PALETTE = ['#3a5a8a', '#8a4a2a', '#c2b090']
+  const DRIVERS = [0, 1].flatMap((coldness) => [0, 1].flatMap((harmattan) => [0, 1].map((karif) => ({ coldness, harmattan, karif }))))
+
+  it('no everyday outfit puts a revealable inner top under an open outer garment; every such pairing is the seasonal wrap', () => {
+    const fails: string[] = []
+    const pairs = new Set<string>()
+    let checked = 0
+    for (const peopleId of [...Object.keys(PEOPLE_DRESS), null])
+      for (const sex of SEXES)
+        for (const age of AGE_GROUPS)
+          for (const drivers of DRIVERS)
+            for (let year = 1890; year <= 1895; year++)
+              for (const cloth of PALETTE)
+                for (const pick of [0.05, 0.35, 0.65, 0.95]) {
+                  const ls = appearanceFor({ peopleId, sex, age, drivers, year, cloth, palette: PALETTE, pick })
+                  checked++
+                  const outer = ls.filter(isOpenOuter)
+                  if (!outer.length || !ls.some(isRevealableTop)) continue
+                  const who = `${peopleId} ${sex} ${age}`
+                  pairs.add(who)
+                  // Only the seasonal wrap may sit over a top: a two-shoulder cloak, and only in its season.
+                  const seasonal = peopleId ? seasonalDressFor(peopleId, drivers) : null
+                  if (!seasonal || outer.some((l) => l.form !== 'cloak' || l.wear !== 'bothShoulders')) fails.push(`${who} ${JSON.stringify(drivers)}`)
+                }
+    expect(checked).toBeGreaterThan(30_000)
+    expect(fails).toEqual([])
+    // The recorded exemption, exactly: the seasonal two-shoulder wrap over its period inner garment.
+    expect([...pairs].sort()).toEqual(
+      [
+        'hausa female youth', 'hausa female adult', 'hausa female elder',
+        'hausa male youth', 'hausa male adult', 'hausa male elder',
+        'tuareg female youth', 'tuareg female adult', 'tuareg female elder',
+        'tuareg male youth', 'tuareg male adult', 'tuareg male elder',
+        'zulu female adult', 'zulu female elder',
+      ].sort(),
+    )
+  })
+
+  it('leaves a revealable top off under an everyday open cape, and keeps it under a cape tied over the breast', () => {
+    const l = (slot: DressLayer['slot'], form: DressLayer['form'], wear: DressLayer['wear']): DressLayer =>
+      ({ slot, form, material: 'hide', colour: '#000000', colour2: null, pattern: 'plain', wear, source: { guess: 'test' } })
+    const hip = l('hip', 'skirtKnee', 'waist')
+    const top = l('torso', 'breastCloth', 'chest')
+    const wrap = l('hip', 'wrapLong', 'chest')
+    expect(withOpenOuterRule([hip, top, wrap, l('shoulder', 'cape', 'leftShoulder')]).map((x) => x.form)).toEqual(['skirtKnee', 'cape'])
+    expect(withOpenOuterRule([hip, top, l('shoulder', 'cloak', 'bothShoulders')]).map((x) => x.form)).toEqual(['skirtKnee', 'cloak'])
+    expect(withOpenOuterRule([hip, top, l('shoulder', 'cape', 'chest')]).map((x) => x.form)).toEqual(['skirtKnee', 'breastCloth', 'cape'])
+    expect(withOpenOuterRule([hip, top]).map((x) => x.form)).toEqual(['skirtKnee', 'breastCloth'])
   })
 })
