@@ -709,6 +709,22 @@ const BABY_SLING_PEOPLES = new Set(['san'])
 const bySlot = (a: DressLayer, b: DressLayer) => LAYER_SLOTS.indexOf(a.slot) - LAYER_SLOTS.indexOf(b.slot)
 
 /**
+ * The open outer garment rule (design.md §19.15): a cape or cloak not tied
+ * closed over the breast hangs open, and an inner top under it — a torso
+ * garment, or a hip wrap worn from the chest — would show through the opening
+ * against the outer cloth. The everyday dress never combines the two; the
+ * seasonal two-shoulder wrap is the recorded exemption, its inner top left to
+ * the garment cover mask (render/villagerGarmentMask.ts).
+ */
+export const isOpenOuter = (l: DressLayer): boolean => l.slot === 'shoulder' && (l.form === 'cape' || l.form === 'cloak') && l.wear !== 'chest'
+export const isRevealableTop = (l: DressLayer): boolean => l.slot === 'torso' || (l.slot === 'hip' && l.wear === 'chest')
+/** The everyday dress with the rule enforced: under an open outer garment the
+ *  revealable inner tops are left off. */
+export function withOpenOuterRule(layers: DressLayer[]): DressLayer[] {
+  return layers.some(isOpenOuter) ? layers.filter((l) => !isRevealableTop(l)) : layers
+}
+
+/**
  * The ordered dress layers this figure wears today: the people's everyday
  * cell, the year's changes, and the season's wrap from systems/dress.ts — which
  * REPLACES an everyday shoulder layer (the San ‡nau closes over both shoulders,
@@ -726,6 +742,10 @@ export function appearanceFor(q: AppearanceQuery): DressLayer[] {
     layers = layers.filter((l) => l.slot !== 'torso')
     layers.push(layer('torso', 'robe', 'cotton', C.cotton, 'chest', G('cotton for the rank from the protectorate, §2.5 / VILLAGER_DRESS')))
   }
+
+  // OUTFIT RULE: no revealable inner top under an everyday open outer garment.
+  // Applied before the season, so the seasonal wrap is its masked exemption.
+  layers = withOpenOuterRule(layers)
 
   // SEASON: the wrap the record supports, from dress.ts.
   const seasonal = q.peopleId ? seasonalDressFor(q.peopleId, q.drivers) : null
