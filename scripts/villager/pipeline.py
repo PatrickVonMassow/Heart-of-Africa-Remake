@@ -8,7 +8,8 @@
               clear of the body and the inner layers in the build pose at
               every body corner (fit.py) (cached)
   (mask)      each garment's cover mask over the body and the garments of
-              outer layers (mask.py), computed whenever the garments are read
+              outer layers (mask.py), the body's checked over every pose
+              (cached on its inputs), computed whenever the garments are read
   export      public/models/villager.glb (body with its cover mask, clips;
               garments not yet shipped)
   sheets      frame sheets under verification/villager-body/
@@ -103,7 +104,13 @@ def main():
         import garments as G
         import fit as F
         garments = cached(a.work, 'garments', lambda: F.settle(body, F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg), force='garments' in steps)
-    if garments is not None:
+    if garments is not None and clips is not None:
+        # the mask over every pose costs minutes: cached on its inputs, its own
+        # code and what its motion evaluation reads (MK.motion_key)
+        import hashlib
+        key = inputs(a.work, ['body', 'clips', 'garments'], cfg) + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest() + MK.motion_key(body)
+        garments['mask'] = cached(a.work, 'mask', lambda: MK.masks(body, garments, cfg, clips), key=key)
+    elif garments is not None:
         garments['mask'] = MK.masks(body, garments, cfg)
     if 'export' in steps:
         import export as E

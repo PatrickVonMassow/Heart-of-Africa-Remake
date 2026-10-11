@@ -3102,10 +3102,10 @@
     "part": "thigh.R"
    },
    "hole": {
-    "value": 0.009266349487006664,
-    "at": "sprint frame 13 stride 1.35 (male child build +0)",
-    "over": 2,
-    "part": "hips"
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
    },
    "cut": {
     "value": 0.0013331372756510973,
@@ -3203,9 +3203,9 @@
      "over": 23
     },
     "cloth sprint spine None": {
-     "value": 0.04473191127181053,
+     "value": 0.02510989108598463,
      "at": "sprint frame 4 stride 1.35 (male elder build +0)",
-     "over": 57
+     "over": 56
     },
     "inner sprint thigh.L g-cloak-bothShoulders": {
      "value": 0.03751504421234131,
@@ -3241,11 +3241,6 @@
      "value": 0.018589407205581665,
      "at": "under g-robe-chest, sprint frame 13 (male child build +0)",
      "over": 13
-    },
-    "hole sprint hips None": {
-     "value": 0.009266349487006664,
-     "at": "sprint frame 13 stride 1.35 (male child build +0)",
-     "over": 2
     },
     "cloth kneelDown hand.R None": {
      "value": 0.0045390995241501855,
@@ -3673,7 +3668,7 @@
     "innerHole walk": 0.0,
     "cloth sprint": 0.053502291290615456,
     "shown sprint": 0.021585112437605858,
-    "hole sprint": 0.009266349487006664,
+    "hole sprint": 0.0,
     "cut sprint": 0.0013331372756510973,
     "inner sprint": 0.03751504421234131,
     "innerHole sprint": 0.023548975586891174,
@@ -22116,8 +22111,8 @@
   },
   "g-cape-bothShoulders": {
    "cloth": {
-    "value": 0.06223701685667038,
-    "at": "dig frame 34 (female adult build +0)",
+    "value": 0.05829061567783356,
+    "at": "dig frame 37 (female adult build +0)",
     "over": 3575,
     "part": "chest"
    },
@@ -22130,7 +22125,7 @@
    "hole": {
     "value": 0.06493610143661499,
     "at": "kneelUp frame 3 (female elder build +0)",
-    "over": 1729,
+    "over": 1727,
     "part": "chest"
    },
    "cut": {
@@ -22184,8 +22179,8 @@
      "over": 22
     },
     "cloth kneel chest None": {
-     "value": 0.02461206540465355,
-     "at": "kneel frame 0 (female adult build +0)",
+     "value": 0.03024819679558277,
+     "at": "kneel frame 0 (male child build +0)",
      "over": 20
     },
     "cloth kneel forearm.R None": {
@@ -22194,7 +22189,7 @@
      "over": 20
     },
     "cloth kneel neck None": {
-     "value": 0.014018476009368896,
+     "value": 0.013329429551959038,
      "at": "kneel frame 0 (male child build +0)",
      "over": 14
     },
@@ -22203,18 +22198,13 @@
      "at": "kneel frame 0 (male youth build +0)",
      "over": 20
     },
-    "cloth kneel spine None": {
-     "value": 0.04237191751599312,
-     "at": "kneel frame 0 (male child build +0)",
-     "over": 4
-    },
     "cloth kneel upperArm.L None": {
      "value": 0.007838182151317596,
      "at": "kneel frame 0 (female adult build +0)",
-     "over": 8
+     "over": 6
     },
     "cloth kneel upperArm.R None": {
-     "value": 0.04231933131814003,
+     "value": 0.029008643701672554,
      "at": "kneel frame 0 (male child build +0)",
      "over": 20
     },
@@ -22278,14 +22268,9 @@
      "at": "kneelUp frame 5 (female elder build +0)",
      "over": 58
     },
-    "hole kneelUp shoulder.L None": {
-     "value": 0.008390343748033047,
-     "at": "kneelUp frame 5 (male elder build +0)",
-     "over": 8
-    },
     "cloth dig forearm.L None": {
-     "value": 0.06217759847640991,
-     "at": "dig frame 32 (female adult build +0)",
+     "value": 0.05685856193304062,
+     "at": "dig frame 27 (female adult build +0)",
      "over": 729
     },
     "cloth dig forearm.R None": {
@@ -22294,9 +22279,9 @@
      "over": 730
     },
     "cloth dig upperArm.L None": {
-     "value": 0.061384763568639755,
-     "at": "dig frame 27 (female adult build +0)",
-     "over": 645
+     "value": 0.046231724321842194,
+     "at": "dig frame 37 (female youth build +0)",
+     "over": 552
     },
     "cloth dig upperArm.R None": {
      "value": 0.025354552304301003,
@@ -22316,7 +22301,7 @@
     "hole dig chest None": {
      "value": 0.06266199797391891,
      "at": "dig frame 11 (female adult build +0)",
-     "over": 671
+     "over": 669
     },
     "cloth dig hand.L None": {
      "value": 0.0208637085927067,
@@ -22329,9 +22314,9 @@
      "over": 112
     },
     "cloth dig chest None": {
-     "value": 0.06223701685667038,
-     "at": "dig frame 34 (female adult build +0)",
-     "over": 154
+     "value": 0.05829061567783356,
+     "at": "dig frame 37 (female adult build +0)",
+     "over": 185
     },
     "shown dig chest None": {
      "value": 0.004239472560584545,
@@ -22416,7 +22401,7 @@
     "cloth carry upperArm.R None": {
      "value": 0.011295815178030811,
      "at": "carry frame 1 stride 0.75 (female elder build +0)",
-     "over": 223
+     "over": 224
     },
     "hole carry chest None": {
      "value": 0.018363527953624725,
@@ -22432,6 +22417,11 @@
      "value": 0.005271664820611477,
      "at": "idle frame 31 (female elder build +0)",
      "over": 45
+    },
+    "cloth kneel spine None": {
+     "value": 0.003522027782133151,
+     "at": "kneel frame 0 (female elder build +0)",
+     "over": 2
     },
     "shown kneel shoulder.R None": {
      "value": 0.003263831604272127,
@@ -22449,9 +22439,9 @@
      "over": 4
     },
     "cloth carryIdle upperArm.R None": {
-     "value": 0.008072338998317719,
-     "at": "carryIdle frame 2 (female elder build +0)",
-     "over": 41
+     "value": 0.008042140863835812,
+     "at": "carryIdle frame 42 (female elder build +0)",
+     "over": 40
     }
    },
    "clips": {
@@ -22471,7 +22461,7 @@
     "shown kneelDown": 0.0,
     "hole kneelDown": 0.05486660450696945,
     "cut kneelDown": 0.055760107934474945,
-    "cloth kneel": 0.04237191751599312,
+    "cloth kneel": 0.03024819679558277,
     "shown kneel": 0.013161170296370983,
     "hole kneel": 0.059637848287820816,
     "cut kneel": 0.05938686430454254,
@@ -22479,7 +22469,7 @@
     "shown kneelUp": 0.049615561962127686,
     "hole kneelUp": 0.06493610143661499,
     "cut kneelUp": 0.0663784071803093,
-    "cloth dig": 0.06223701685667038,
+    "cloth dig": 0.05829061567783356,
     "shown dig": 0.036023132503032684,
     "hole dig": 0.06266199797391891,
     "cut dig": 0.0625518187880516,
@@ -22495,8 +22485,8 @@
   },
   "g-cape-leftShoulder": {
    "cloth": {
-    "value": 0.06431390345096588,
-    "at": "dig frame 31 (female adult build +0)",
+    "value": 0.06123378127813339,
+    "at": "dig frame 28 (female adult build +0)",
     "over": 3601,
     "part": "forearm.L"
    },
@@ -22509,7 +22499,7 @@
    "hole": {
     "value": 0.06686949729919434,
     "at": "kneelUp frame 1 (female adult build +0)",
-    "over": 1450,
+    "over": 1411,
     "part": "chest"
    },
    "cut": {
@@ -22637,14 +22627,9 @@
      "at": "kneelUp frame 5 (female elder build +0)",
      "over": 89
     },
-    "hole kneelUp shoulder.L None": {
-     "value": 0.009825480170547962,
-     "at": "kneelUp frame 5 (male elder build +0)",
-     "over": 14
-    },
     "cloth dig forearm.L None": {
-     "value": 0.06431390345096588,
-     "at": "dig frame 31 (female adult build +0)",
+     "value": 0.06123378127813339,
+     "at": "dig frame 28 (female adult build +0)",
      "over": 729
     },
     "cloth dig forearm.R None": {
@@ -22655,7 +22640,7 @@
     "cloth dig upperArm.L None": {
      "value": 0.05684179812669754,
      "at": "dig frame 37 (female adult build +0)",
-     "over": 647
+     "over": 581
     },
     "cloth dig upperArm.R None": {
      "value": 0.025650074557775737,
@@ -22675,7 +22660,7 @@
     "hole dig chest None": {
      "value": 0.06207650154829025,
      "at": "dig frame 12 (female adult build +0)",
-     "over": 586
+     "over": 547
     },
     "shown dig upperArm.L None": {
      "value": 0.005591675639152527,
@@ -22685,7 +22670,7 @@
     "cloth dig chest None": {
      "value": 0.060482464730739594,
      "at": "dig frame 39 (female adult build +0)",
-     "over": 190
+     "over": 193
     },
     "cloth dig hand.L None": {
      "value": 0.020221698752078125,
@@ -22858,7 +22843,7 @@
     "shown kneelUp": 0.04547369107604027,
     "hole kneelUp": 0.06686949729919434,
     "cut kneelUp": 0.06830418109893799,
-    "cloth dig": 0.06431390345096588,
+    "cloth dig": 0.06123378127813339,
     "shown dig": 0.021593354642391205,
     "hole dig": 0.06207650154829025,
     "cut dig": 0.061727624386548996,
@@ -22888,7 +22873,7 @@
    "hole": {
     "value": 0.0605398528277874,
     "at": "dig frame 12 (female elder build +0)",
-    "over": 1489,
+    "over": 1482,
     "part": "chest"
    },
    "cut": {
@@ -22947,8 +22932,8 @@
      "over": 76
     },
     "cloth kneel chest None": {
-     "value": 0.02706265263259411,
-     "at": "kneel frame 0 (male child build +0)",
+     "value": 0.025372153148055077,
+     "at": "kneel frame 0 (female youth build +0)",
      "over": 20
     },
     "cloth kneel forearm.L None": {
@@ -22962,7 +22947,7 @@
      "over": 20
     },
     "cloth kneel neck None": {
-     "value": 0.012375419028103352,
+     "value": 0.01237311027944088,
      "at": "kneel frame 0 (male child build +0)",
      "over": 14
     },
@@ -22977,7 +22962,7 @@
      "over": 20
     },
     "cloth kneel upperArm.R None": {
-     "value": 0.025674667209386826,
+     "value": 0.024637727066874504,
      "at": "kneel frame 0 (female child build +0)",
      "over": 20
     },
@@ -23024,7 +23009,7 @@
     "hole kneelUp chest None": {
      "value": 0.05427389219403267,
      "at": "kneelUp frame 3 (female adult build +0)",
-     "over": 186
+     "over": 185
     },
     "shown kneelUp chest None": {
      "value": 0.064182348549366,
@@ -23064,7 +23049,7 @@
     "hole dig chest None": {
      "value": 0.0605398528277874,
      "at": "dig frame 12 (female elder build +0)",
-     "over": 665
+     "over": 659
     },
     "cloth dig hand.L None": {
      "value": 0.02247953983774546,
@@ -23187,8 +23172,8 @@
      "over": 1
     },
     "cloth carry upperArm.R None": {
-     "value": 0.011768260970711708,
-     "at": "carry frame 0 stride 0.75 (female elder build +0)",
+     "value": 0.012117734178900719,
+     "at": "carry frame 2 stride 0.75 (female elder build +0)",
      "over": 118
     },
     "hole carry chest None": {
@@ -23234,7 +23219,7 @@
     "shown kneelDown": 0.048399798572063446,
     "hole kneelDown": 0.05473078414797783,
     "cut kneelDown": 0.05621183291077614,
-    "cloth kneel": 0.02706265263259411,
+    "cloth kneel": 0.025372153148055077,
     "shown kneel": 0.05497782304883003,
     "hole kneel": 0.051735084503889084,
     "cut kneel": 0.05450504273176193,
@@ -23270,10 +23255,10 @@
     "part": "upperArm.L"
    },
    "hole": {
-    "value": 0.031039472669363022,
-    "at": "kneelUp frame 1 (male elder build +0)",
-    "over": 579,
-    "part": "chest"
+    "value": 0.026094799861311913,
+    "at": "kneelUp frame 3 (male elder build +0)",
+    "over": 525,
+    "part": "upperArm.L"
    },
    "cut": {
     "value": 0.008705472573637962,
@@ -23325,30 +23310,15 @@
      "at": "kneel frame 0 (male child build +0)",
      "over": 20
     },
-    "hole kneel chest None": {
-     "value": 0.020341530442237854,
-     "at": "kneel frame 0 (male elder build +0)",
-     "over": 20
-    },
     "cloth kneelUp thigh.L None": {
      "value": 0.04230364402789419,
      "at": "kneelUp frame 5 (male adult build +1)",
      "over": 103
     },
-    "hole kneelUp chest None": {
-     "value": 0.031039472669363022,
-     "at": "kneelUp frame 1 (male elder build +0)",
-     "over": 136
-    },
-    "hole kneelUp shoulder.L None": {
-     "value": 0.026481712237000465,
-     "at": "kneelUp frame 0 (male elder build +0)",
-     "over": 104
-    },
     "hole kneelUp upperArm.L None": {
-     "value": 0.02857222408056259,
-     "at": "kneelUp frame 1 (male elder build +0)",
-     "over": 111
+     "value": 0.026094799861311913,
+     "at": "kneelUp frame 3 (male elder build +0)",
+     "over": 91
     },
     "cloth dig forearm.L None": {
      "value": 0.028251882666797148,
@@ -23368,7 +23338,7 @@
     "hole dig chest None": {
      "value": 0.017975373193621635,
      "at": "dig frame 5 (female elder build +0)",
-     "over": 416
+     "over": 407
     },
     "cloth dig upperArm.R None": {
      "value": 0.023445170791308978,
@@ -23405,15 +23375,15 @@
      "at": "carryIdle frame 20 (male adult build +1)",
      "over": 760
     },
+    "hole kneel chest None": {
+     "value": 0.019837146624922752,
+     "at": "kneel frame 0 (female elder build +0)",
+     "over": 18
+    },
     "cloth kneelUp chest None": {
      "value": 0.039502296770371745,
      "at": "kneelUp frame 5 (male adult build +1)",
      "over": 23
-    },
-    "hole kneelDown chest None": {
-     "value": 0.009251095354557037,
-     "at": "kneelDown frame 22 (female elder build +0)",
-     "over": 7
     },
     "cloth kneel thigh.L None": {
      "value": 0.009075070058750667,
@@ -23440,10 +23410,20 @@
      "at": "kneelDown frame 16 (male elder build +0)",
      "over": 7
     },
+    "hole kneelDown chest None": {
+     "value": 0.009251095354557037,
+     "at": "kneelDown frame 22 (female elder build +0)",
+     "over": 3
+    },
     "shown kneelUp upperArm.L None": {
      "value": 0.01198716089129448,
      "at": "kneelUp frame 0 (male elder build +0)",
      "over": 1
+    },
+    "hole kneelUp shoulder.L None": {
+     "value": 0.00428056949749589,
+     "at": "kneelUp frame 5 (male elder build +0)",
+     "over": 5
     },
     "cloth kneel forearm.R None": {
      "value": 0.01675045634834862,
@@ -23459,6 +23439,11 @@
      "value": 0.009108457029948447,
      "at": "carryIdle frame 49 (female child build +0)",
      "over": 199
+    },
+    "hole kneelUp chest None": {
+     "value": 0.015295769087970257,
+     "at": "kneelUp frame 0 (female elder build +0)",
+     "over": 14
     },
     "cloth kneel spine None": {
      "value": 0.005002207185204381,
@@ -23485,11 +23470,11 @@
     "cut kneelDown": 0.0,
     "cloth kneel": 0.024707824796304956,
     "shown kneel": 0.012805933132767677,
-    "hole kneel": 0.020341530442237854,
+    "hole kneel": 0.019837146624922752,
     "cut kneel": 0.008705472573637962,
     "cloth kneelUp": 0.04230364402789419,
     "shown kneelUp": 0.01198716089129448,
-    "hole kneelUp": 0.031039472669363022,
+    "hole kneelUp": 0.026094799861311913,
     "cut kneelUp": 0.0,
     "cloth dig": 0.029206343258074904,
     "shown dig": 0.012365002185106277,
