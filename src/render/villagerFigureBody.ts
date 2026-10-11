@@ -15,7 +15,7 @@ import * as THREE from 'three/webgpu'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
 import { bodyProportions, BONE_NAMES, mixHex, paint as paintSurface, tidy, type BodyProportions, type BoneName } from './figureBody'
-import { buildLayerGeometry } from './figureDress'
+import { INFANT_SKIN, surfaceOf } from './figureDress'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
@@ -170,6 +170,8 @@ export interface PersonFrame {
   scale: number
   /** Hip height over the basis body's (villagerBody.ts legScale). */
   legScale: number
+  /** The morph influences baked into this person (villagerBody.ts morphInfluences). */
+  influences: Record<string, number>
 }
 
 /**
@@ -220,7 +222,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
     rest,
     p,
     hair: hairMask(asset, g, dom, p),
-    frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0) },
+    frame: { rest0, hang: world, sole, scale: s, legScale: legScale(asset, rest0), influences: w },
     cover: cov ? Uint16Array.from(cov.array as ArrayLike<number>) : null,
   }
 }
@@ -541,13 +543,85 @@ export function createGltfSkeleton(asset: VillagerAsset, rest: Float32Array): { 
   return { skeleton: new THREE.Skeleton(list), bones }
 }
 
+/** A baby sling's infant-head flag per vertex (scripts/villager/export.py
+ *  _INFANT; GLTFLoader lower-cases a custom attribute's name). */
+export const INFANT_ATTRIBUTE = '_infant'
+
+/** The pipeline's mesh name for a dress layer (scripts/villager/garments.py `mesh_name`). */
+export const garmentMeshName = (l: Pick<DressLayer, 'form' | 'wear'>): string => `g-${l.form}-${l.wear}`
+
+/** The layer a dress slot is worn in, innermost first (scripts/villager/mask.py
+ *  LAYER): only a garment of an outer layer hides or pushes an inner one. */
+const SLOT_LAYER: Record<DressLayer['slot'], number> = { ornament: 0, hip: 1, head: 1, torso: 2, shoulder: 3 }
+export const garmentLayer = (l: Pick<DressLayer, 'slot'>): number => SLOT_LAYER[l.slot]
+
+/** Dress layers that are no garment (paint on the skin): never a mesh. */
+const isPaint = (l: Pick<DressLayer, 'form'>) => l.form === 'bodyPaint'
+
+/**
+ * A pipeline garment on a person: the mesh scripts/villager/ built round this
+ * body, fitted to every clip (fit.py) and measured frame by frame in
+ * verification/villager-body/penetration-report.md — carried through exactly
+ * the body's morphs, hang, grounding and scale (gltfPerson), so it sits on the
+ * drawn body as it sat on the measured one, and painted as the layer (a baby
+ * sling's infant head in the infant's skin). Vertex order is the file's, so
+ * the garment's own cover mask still indexes it. Null when the file holds no
+ * garment for the layer's form and wear.
+ */
+export function gltfGarment(asset: VillagerAsset, person: GltfPerson, l: DressLayer): THREE.BufferGeometry | null {
+  const name = garmentMeshName(l)
+  const src = asset.geometries[name]
+  if (!src || asset.parts[name] !== 'garment') return null
+  const { rest0, hang, sole, scale, influences } = person.frame
+  const g = bakePose(bakeMorphs(src, influences), rest0, hungHeads(asset, rest0, hang), hang)
+  const pos = g.getAttribute('position') as THREE.BufferAttribute
+  const arr = pos.array as Float32Array
+  let bottom = Infinity
+  for (let k = 0; k < pos.count; k++) {
+    arr[k * 3] *= scale
+    arr[k * 3 + 1] = (arr[k * 3 + 1] - sole) * scale
+    arr[k * 3 + 2] *= scale
+    bottom = Math.min(bottom, arr[k * 3 + 1])
+  }
+  pos.needsUpdate = true
+  const second = l.colour2 ?? mixHex(l.colour, '#000000', 0.35)
+  const out = paintSurface(g, l.colour, surfaceOf(l, person.p, bottom), second)
+  const infant = src.getAttribute(INFANT_ATTRIBUTE) as THREE.BufferAttribute | undefined
+  if (infant) {
+    const col = out.getAttribute('color') as THREE.BufferAttribute
+    const c = new THREE.Color(INFANT_SKIN)
+    for (let k = 0; k < infant.count; k++) if (infant.getX(k) > 0.5) col.setXYZ(k, c.r, c.g, c.b)
+  }
+  return tidy(out)
+}
+
+const missingGarments = new Set<string>()
+
+/**
+ * One dress layer of a person, skinned to the asset's bones: the pipeline's
+ * measured garment. No code-built layer reaches the glTF body; a layer the
+ * file holds no garment for is left off (a product defect, reported once in
+ * development — villagerFigureBody.test.ts holds every generated pair to a
+ * mesh), body paint is no mesh at all.
+ */
+export function gltfLayerGeometry(asset: VillagerAsset, person: GltfPerson, l: DressLayer): THREE.BufferGeometry | null {
+  if (isPaint(l)) return null
+  const g = gltfGarment(asset, person, l)
+  if (!g && import.meta.env.DEV && !missingGarments.has(garmentMeshName(l))) {
+    missingGarments.add(garmentMeshName(l))
+    console.error(`[villager] villager.glb holds no garment ${garmentMeshName(l)}: the layer is left off`)
+  }
+  return g
+}
+
 /**
  * A person's whole figure as ONE geometry skinned to the asset's bones: the
  * glTF body painted (skin, or skin under body paint; the scalp in the hair
- * colour) and every dress layer. The layers are point 1293's code-built ones,
- * fitted to this body's measured proportions.
- * OPEN: point 1311 replaces them with the pipeline's skinned garments.
- * `layerOf` lets the caller cache the layer builds.
+ * colour) and every dress layer as the pipeline's garment
+ * (gltfLayerGeometry). The cover mask of the worn garments hides and pushes
+ * the body, and each worn garment under the worn garments of an outer layer
+ * (render/villagerGarmentMask.ts; scripts/villager/sheets.py `masked`).
+ * `layerOf` lets the caller cache the garment builds (it must not mutate them).
  */
 export function gltfFigureGeometry(
   asset: VillagerAsset,
@@ -555,9 +629,8 @@ export function gltfFigureGeometry(
   layers: readonly DressLayer[],
   skin: string,
   paint: string | null,
-  radial: number,
-  layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => buildLayerGeometry(l, person.p, radial),
-  worn: readonly string[] = [],
+  _radial: number,
+  layerOf: (l: DressLayer) => THREE.BufferGeometry | null = (l) => gltfLayerGeometry(asset, person, l),
 ): THREE.BufferGeometry {
   const body = paintSurface(person.geometry.clone(), paint ? mixHex(skin, paint, 0.55) : skin)
   const col = body.getAttribute('color') as THREE.BufferAttribute
@@ -565,22 +638,20 @@ export function gltfFigureGeometry(
   person.hair.forEach((h, i) => {
     if (h) col.setXYZ(i, hair.r, hair.g, hair.b)
   })
-  const parts = [tidy(body)]
-  const map = codeBoneMap(asset)
-  for (const l of layers) {
-    const lg = layerOf(l)
-    if (!lg) continue
-    // The infant in its sling rides the chest bone as one rigid piece: the
-    // trunk transfer would blend it toward the spine and hips and bend it.
-    const own = remapSkin(lg.clone(), map)
-    parts.push(l.form === 'babySling' ? own : transferTrunkWeights(asset, person, own))
+  const depth = VILLAGER_ASSET.garmentMaskPush * person.frame.scale
+  const drawn = layers.flatMap((l) => {
+    const g = layerOf(l)
+    return g ? [{ l, g }] : []
+  })
+  const worn = drawn.map(({ l }) => garmentMeshName(l))
+  const parts = [applyGarmentMask(tidy(body), person.cover, asset.garmentMask, worn, depth)]
+  for (const { l, g } of drawn) {
+    const over = drawn.filter((o) => garmentLayer(o.l) > garmentLayer(l)).map((o) => garmentMeshName(o.l))
+    const cov = asset.geometries[garmentMeshName(l)]?.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
+    parts.push(applyGarmentMask(g.clone(), cov ? (cov.array as ArrayLike<number>) : null, asset.garmentMask, over, depth))
   }
   const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
-  if (!g) throw new Error('glTF villager: body and dress layers do not merge')
-  // The pipeline garments `worn` hide and push the body they cover. The
-  // code-built layers drawn here have no mask entry, so nothing is worn yet.
-  // OPEN: point 1315 passes the pipeline garments it draws.
-  applyGarmentMask(g, person.cover, asset.garmentMask, worn, VILLAGER_ASSET.garmentMaskPush * person.frame.scale)
+  if (!g) throw new Error('glTF villager: body and garments do not merge')
   g.computeBoundingSphere()
   return g
 }

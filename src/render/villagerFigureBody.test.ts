@@ -9,14 +9,25 @@ import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
 import { VILLAGER_MOTION as M } from '../config/balance'
-import { AGE_GROUPS, PEOPLE_DRESS, SEXES } from '../systems/appearance'
+import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
 import { BONE_NAMES, bodyProportions } from './figureBody'
 import { kneelLegs } from './figureRig'
 import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { buildLayerGeometry } from './figureDress'
+import { buildLayerGeometry, INFANT_SKIN } from './figureDress'
 import { axisClearance } from '../test/axisClearance'
-import { codeBoneMap, createGltfSkeleton, dominantBones, gltfFigureGeometry, gltfPerson, remapSkin, transferTrunkWeights } from './villagerFigureBody'
+import {
+  codeBoneMap,
+  createGltfSkeleton,
+  dominantBones,
+  garmentMeshName,
+  gltfFigureGeometry,
+  gltfGarment,
+  gltfPerson,
+  remapSkin,
+  transferTrunkWeights,
+} from './villagerFigureBody'
+import { GARMENT_PUSH_ATTRIBUTE } from './villagerGarmentMask'
 
 let asset: VillagerAsset
 
@@ -213,8 +224,9 @@ describe('the dressed figure', () => {
     const mantle = { ...base, slot: 'shoulder' as const, form: 'cloak' as const, material: 'hide' as const, wear: 'chest' as const }
     const sling = { ...mantle, form: 'babySling' as const, wear: 'bothShoulders' as const }
     const g = gltfFigureGeometry(asset, person, [mantle, sling], '#5c3317', null, 16)
-    const n = buildLayerGeometry(sling, p, 16)!.getAttribute('position').count
-    const m = buildLayerGeometry(mantle, p, 16)!.getAttribute('position').count
+    // the pipeline's garments, in layer order behind the body
+    const n = asset.geometries[garmentMeshName(sling)].getAttribute('position').count
+    const m = asset.geometries[garmentMeshName(mantle)].getAttribute('position').count
     const total = g.getAttribute('position').count
     const [s0, m0] = [total - n, total - n - m]
     // all four skin slots of every infant vertex: the chest at 1, the rest 0
@@ -233,7 +245,7 @@ describe('the dressed figure', () => {
     }
     const part = (from: number, to: number, at: Float32Array) => {
       const out = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(at.slice(from * 3, to * 3), 3))
-      const idx = buildLayerGeometry(from === s0 ? sling : mantle, p, 16)!.getIndex()!
+      const idx = asset.geometries[garmentMeshName(from === s0 ? sling : mantle)].getIndex()!
       return out.setIndex(idx.clone())
     }
     const poses: Array<[string, (b: Record<string, THREE.Bone>) => void]> = [
@@ -411,6 +423,103 @@ describe('the dressed figure', () => {
     }
     expect(scalp).toBeGreaterThan(50)
     expect(scalp).toBeLessThan(col.count * 0.2)
+  })
+})
+
+describe('the pipeline garments on the glTF body', () => {
+  const PALETTE = ['#3a5a8a', '#8a4a2a', '#c2b090']
+  const DRIVERS = [0, 1].flatMap((coldness) => [0, 1].flatMap((harmattan) => [0, 1].map((karif) => ({ coldness, harmattan, karif }))))
+  /** Every dress layer the outfit generator puts on a figure, one per form and wear. */
+  const generated = () => {
+    const out = new Map<string, DressLayer>()
+    for (const peopleId of [...Object.keys(PEOPLE_DRESS), null])
+      for (const sex of SEXES)
+        for (const age of AGE_GROUPS)
+          for (const drivers of DRIVERS)
+            for (let year = 1890; year <= 1895; year++)
+              for (const pick of [0.05, 0.35, 0.65, 0.95])
+                for (const l of appearanceFor({ peopleId, sex, age, drivers, year, cloth: PALETTE[0], palette: PALETTE, pick })) out.set(garmentMeshName(l), l)
+    // the San infant sling is drawn by a pick share the sweep need not meet
+    const mantle = PEOPLE_DRESS.san.female.adult[0]
+    out.set('g-babySling-bothShoulders', { ...mantle, slot: 'shoulder', form: 'babySling', wear: 'bothShoulders' })
+    return out
+  }
+
+  it('the file holds a garment for every form and wear the outfit generator puts on a figure', () => {
+    const missing = [...generated().entries()].filter(([n, l]) => l.form !== 'bodyPaint' && asset.parts[n] !== 'garment').map(([n]) => n)
+    expect(missing).toEqual([])
+    // every garment the file ships is in the cover mask's order
+    const shipped = Object.keys(asset.parts).filter((n) => asset.parts[n] === 'garment')
+    expect([...shipped].sort()).toEqual([...asset.garmentMask].sort())
+  })
+
+  it('no code-built layer reaches the glTF body: the figure is the body and exactly the pipeline garments', () => {
+    for (const { sex, age } of people()) {
+      const person = gltfPerson(asset, sex, age)
+      for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
+        const layers = table[sex][age].map((l) => ({ ...l, colour: l.colour === 'cloth' ? '#b08850' : l.colour, colour2: l.colour2 === 'cloth' ? '#b08850' : l.colour2 }))
+        const g = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
+        const garments = layers.filter((l) => l.form !== 'bodyPaint')
+        const want = garments.reduce((t, l) => t + asset.geometries[garmentMeshName(l)].getAttribute('position').count, person.geometry.getAttribute('position').count)
+        expect(g.getAttribute('position').count, `${id} ${sex} ${age}`).toBe(want)
+      }
+    }
+  })
+
+  it('a garment follows the body’s morphs, hang, ground and scale: it sits on every person as on the measured body', () => {
+    const fails: string[] = []
+    for (const { sex, age } of people()) {
+      for (const build of [-1, 0, 1]) {
+        const person = gltfPerson(asset, sex, age, build)
+        const H = person.p.stature
+        person.geometry.computeBoundingBox()
+        const box = person.geometry.boundingBox!.clone().expandByScalar(0.12 * H)
+        for (const n of asset.garmentMask) {
+          const [, form, wear] = n.split('-')
+          const g = gltfGarment(asset, person, { ...PEOPLE_DRESS.zulu.male.adult[0], form, wear } as DressLayer)!
+          g.computeBoundingBox()
+          const gb = g.boundingBox!
+          if (!box.containsBox(gb)) fails.push(`${n} ${sex} ${age} ${build}: outside the body's box`)
+          // the hung, grounded body under it: a garment never floats below the soles
+          if (gb.min.y < -0.02 * H) fails.push(`${n} ${sex} ${age} ${build}: ${(gb.min.y / H).toFixed(3)} H below the ground`)
+        }
+        // a robe reaches from the shoulders to the shins of this very body
+        const robe = gltfGarment(asset, person, { ...PEOPLE_DRESS.zulu.male.adult[0], form: 'robe', wear: 'chest' } as DressLayer)!
+        robe.computeBoundingBox()
+        expect(robe.boundingBox!.max.y, `${sex} ${age} ${build}`).toBeGreaterThan(person.p.shoulderY - 0.08 * H)
+        expect(robe.boundingBox!.max.y, `${sex} ${age} ${build}`).toBeLessThan(person.p.chinY)
+        expect(robe.boundingBox!.min.y, `${sex} ${age} ${build}`).toBeLessThan(person.p.kneeY)
+      }
+    }
+    expect(fails).toEqual([])
+  })
+
+  it('an outer garment hides and pushes the inner one it covers; worn alone the inner one is whole', () => {
+    const person = gltfPerson(asset, 'male', 'elder')
+    const base = PEOPLE_DRESS.hausa.male.elder[0]
+    const robe = { ...base, slot: 'torso' as const, form: 'robe' as const, wear: 'chest' as const }
+    const cloak = { ...base, slot: 'shoulder' as const, form: 'cloak' as const, wear: 'bothShoulders' as const }
+    const bodyCount = person.geometry.getAttribute('position').count
+    const robeCount = asset.geometries['g-robe-chest'].getAttribute('position').count
+    const pushOnRobe = (g: THREE.BufferGeometry) => (g.getAttribute(GARMENT_PUSH_ATTRIBUTE).array as Float32Array).slice(bodyCount, bodyCount + robeCount).filter((x) => x > 0).length
+    const alone = gltfFigureGeometry(asset, person, [robe], '#5c3317', null, 16)
+    const under = gltfFigureGeometry(asset, person, [robe, cloak], '#5c3317', null, 16)
+    expect(pushOnRobe(alone)).toBe(0)
+    expect(pushOnRobe(under)).toBeGreaterThan(0)
+    // and the body under the robe loses triangles it hides
+    expect(alone.index!.count).toBeLessThan(person.geometry.index!.count + asset.geometries['g-robe-chest'].index!.count)
+  })
+
+  it('the infant in a baby sling is painted in its skin, the bundle in the mantle', () => {
+    const person = gltfPerson(asset, 'female', 'adult')
+    const mantle = PEOPLE_DRESS.san.female.adult[0]
+    const g = gltfGarment(asset, person, { ...mantle, slot: 'shoulder', form: 'babySling', wear: 'bothShoulders', colour: '#c09060' })!
+    const col = g.getAttribute('color')
+    const infant = new THREE.Color(INFANT_SKIN)
+    let head = 0
+    for (let k = 0; k < col.count; k++) if (Math.abs(col.getX(k) - infant.r) < 1e-4 && Math.abs(col.getY(k) - infant.g) < 1e-4) head++
+    expect(head).toBeGreaterThan(10)
+    expect(head).toBeLessThan(col.count * 0.5)
   })
 })
 

@@ -224,7 +224,7 @@ function wrapTube(p: BodyProportions, top: number, bottom: number, ease: number,
 }
 
 /** The infant's skin in a baby sling (a placeholder tone, calibratable). */
-const INFANT_SKIN = '#5a3a26'
+export const INFANT_SKIN = '#5a3a26'
 
 /**
  * The stations of a draped cape or cloak: from a collar round the neck down
