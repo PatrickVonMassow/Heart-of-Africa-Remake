@@ -77,8 +77,16 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1338. Villager garments: judge show-through under open capes and cloaks by what the eye sees
+  Queue position: ahead of point 1337, whose acceptance numbers it makes trustworthy (split of 1337 on 11.10.2026).
+  Source: owner split of point 1337 on 11.10.2026 (split rule, veto open). Measured on branch feat/1337-outer-cloth-over-inner at stride 20: a per-frame layer resolve (head 7e29080b5) removes the red shirt showing through the blue one-shoulder cloak at the shoulder in the dig sheets, yet the penetration report scores it worse (skirtShort-waist inner 0.0236 to 0.0276, skirtKnee-waist 0.0538 to 0.0634), while the volume-only variant (de609d0ad) scores better (inner 0.086 to 0.053, inner-hole 0.078 to 0.025) and leaves the visible show-through. The author's diagnosis: the report caps an open cape or cloak's edges into a closed bag, which at the one-shoulder edge lies on the outer side of the cloth, so a visible inner garment counts as hidden and a tucked one as through.
+  Final state: the penetration report's inner and inner-hole judgement agrees with the rendered dressed sheets for open outer garments (capes, one-shoulder cloaks), confirmed or refuted from the measured cases above; closed outer garments keep their verdicts unchanged.
+  Verifiable: a pipeline selftest case with a toy open cape where a visible inner patch counts as shown and a tucked one as hidden; both 1337 variants re-scored at stride 20 against main; dig frame crops showing that the report's verdict matches the picture; cross-vendor review record.
+  Criticality: high - a measurement that can pass a visible defect is a possible false approval.
+  Bundle: Dorfleben.
+
 - [ ] 1337. Villager garments: keep outer cloth outside the inner garment in every pose
-  Queue position: directly after point 1336 and ahead of point 1334 (split of 1334 on 10.10.2026).
+  Queue position: after point 1338 and ahead of point 1334 (split of 1334 on 10.10.2026; re-scored after point 1338 per the split of 11.10.2026, branch feat/1337-outer-cloth-over-inner parked with both measured variants).
   Source: owner split of point 1334 on 10.10.2026 (split rule, veto open): inner garment through outer cloth measured at 0.06-0.13 in motion, untouched by a body push because a body capsule knows no inner garment (commit 96dfe8296).
   Final state: one mechanism, chosen by measurement, keeps each outer garment outside the inner garment it covers in every pose of the villager pipeline; no per-pose offset table ships; no new cloth spikes or lumps.
   Verifiable: the pipeline penetration step's inner and inner-hole columns at or below 0.003 on the visible-only count across all poses with no other column worse than main; dressed frame sheets in the four poses compared against main; cross-vendor review record.
