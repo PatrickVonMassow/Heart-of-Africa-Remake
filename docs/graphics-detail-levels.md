@@ -200,6 +200,15 @@ added.
   - **Load size:** `villager.glb` 694 968 bytes (679 KiB; body, 9 clips and
     the extras — the clips belong to the follow-up animation work). Parse
     13–22 ms.
+  - **Load size with the pipeline garments** (12.10.2026): the 32 fitted
+    garments add 56 124 vertices (the settle's edge refinement), each with
+    9 dense body-shape morph deltas — 10.90 MB written like the body. They
+    ship without normals (recomputed after the morph bake), weights and
+    morph deltas as normalized shorts (KHR_mesh_quantization, 0.04 mm
+    steps, deltas under 0.25 mm left out): `villager.glb` 6 902 076 bytes,
+    gzip 4.3 MB. Measured further: meshopt compression
+    (EXT_meshopt_compression, decoder in three) would bring it to about
+    4 MB; OPEN, not done (an encoder dev dependency).
   - **Per-village build cost** (Zulu village, first visit): 21 distinct
     persons in 189–228 ms together (~9–11 ms each) and 33 dressed figure
     geometries in 144–207 ms together; geometries are cached for the
