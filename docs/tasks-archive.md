@@ -33832,3 +33832,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: the pipeline penetration step's hole and shown columns no worse than main and the hole frame count lower, with no other column worse than main; dressed frame sheets walking, kneeling, digging and running compared against main; cross-vendor review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
+
+- [x] 1338. Villager garments: judge show-through under open capes and cloaks by what the eye sees
+  Queue position: ahead of point 1337, whose acceptance numbers it makes trustworthy (split of 1337 on 11.10.2026).
+  Source: owner split of point 1337 on 11.10.2026 (split rule, veto open). Measured on branch feat/1337-outer-cloth-over-inner at stride 20: a per-frame layer resolve (head 7e29080b5) removes the red shirt showing through the blue one-shoulder cloak at the shoulder in the dig sheets, yet the penetration report scores it worse (skirtShort-waist inner 0.0236 to 0.0276, skirtKnee-waist 0.0538 to 0.0634), while the volume-only variant (de609d0ad) scores better (inner 0.086 to 0.053, inner-hole 0.078 to 0.025) and leaves the visible show-through. The author's diagnosis: the report caps an open cape or cloak's edges into a closed bag, which at the one-shoulder edge lies on the outer side of the cloth, so a visible inner garment counts as hidden and a tucked one as through.
+  Final state: the penetration report's inner and inner-hole judgement agrees with the rendered dressed sheets for open outer garments (capes, one-shoulder cloaks), confirmed or refuted from the measured cases above; closed outer garments keep their verdicts unchanged.
+  Verifiable: a pipeline selftest case with a toy open cape where a visible inner patch counts as shown and a tucked one as hidden; both 1337 variants re-scored at stride 20 against main; dig frame crops showing that the report's verdict matches the picture; cross-vendor review record.
+  Criticality: high - a measurement that can pass a visible defect is a possible false approval.
+  Bundle: Dorfleben.
