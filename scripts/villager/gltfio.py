@@ -233,15 +233,29 @@ class GlbWriter:
         self.j['accessors'].append(acc)
         return len(self.j['accessors']) - 1
 
-    def sparse_accessor(self, delta, atype='VEC3'):
-        """A morph delta as a sparse accessor over zeros: only moved vertices."""
-        moved = np.nonzero(np.abs(delta).max(1) > 1e-6)[0]
+    def sparse_accessor(self, delta, atype='VEC3', eps=1e-6, quantize=False):
+        """A morph delta as a sparse accessor over zeros: only the vertices it
+        moves by more than `eps` (figure units). `quantize`: the values as
+        normalized shorts (KHR_mesh_quantization; |delta| < 1 figure unit,
+        steps of 1/32767 ≈ 0.04 mm)."""
+        moved = np.nonzero(np.abs(delta).max(1) > eps)[0]
         count = int(delta.shape[0])
-        acc = {'componentType': 5126, 'count': count, 'type': atype}
+        acc = {'componentType': 5122 if quantize else 5126, 'count': count, 'type': atype}
         if len(moved) == 0:
             moved = np.array([0])
         idx = self._view(moved.astype(np.uint32 if count > 65535 else np.uint16).tobytes())
-        val = self._view(np.ascontiguousarray(delta[moved]).astype(np.float32).tobytes())
+        if quantize:
+            if np.abs(delta).max() >= 1:
+                raise ValueError('a quantized morph delta must stay under 1 figure unit')
+            delta = np.round(np.asarray(delta) * 32767)
+            acc['normalized'] = True
+            for e in ('KHR_mesh_quantization',):
+                for k in ('extensionsUsed', 'extensionsRequired'):
+                    if e not in self.j.setdefault(k, []):
+                        self.j[k].append(e)
+            val = self._view(np.ascontiguousarray(delta[moved]).astype(np.int16).tobytes())
+        else:
+            val = self._view(np.ascontiguousarray(delta[moved]).astype(np.float32).tobytes())
         acc['sparse'] = {'count': int(len(moved)), 'indices': {'bufferView': idx, 'componentType': 5125 if count > 65535 else 5123},
                          'values': {'bufferView': val}}
         acc['min'] = [float(x) for x in delta.min(0)]

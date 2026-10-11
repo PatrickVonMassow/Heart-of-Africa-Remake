@@ -644,7 +644,7 @@ def build_form(B, form, wear, L):
         y = L['chestTop'] - 0.06 * H
         h, c = B.outline(y, B.arm < 0.3)
         back = ray_hull(h, c, (0.0, -1.0))
-        z = c[1] - (back + 0.045 * H + r * 0.6)
+        z = c[1] - (back + 0.065 * H + r * 0.6)
         bv, bt, bu = blob((c[0], y, z), r, (1, 1.2, 0.7))
         hv, ht, hu = blob((c[0], y + r * 1.2 + 0.02 * H, z + 0.01 * H), 0.036 * H, (1, 1, 1))
         hu = hu + [0.0, 2.0]

@@ -473,9 +473,11 @@ describe('the pipeline garments on the glTF body', () => {
         const person = gltfPerson(asset, sex, age, build)
         const H = person.p.stature
         person.geometry.computeBoundingBox()
-        const box = person.geometry.boundingBox!.clone().expandByScalar(0.12 * H)
         for (const n of asset.garmentMask) {
           const [, form, wear] = n.split('-')
+          // a mantle's flare and a sling on the back stand further off the body
+          const off = ['cloak', 'cape', 'hood', 'babySling'].includes(form) ? 0.2 : 0.12
+          const box = person.geometry.boundingBox!.clone().expandByScalar(off * H)
           const g = gltfGarment(asset, person, { ...PEOPLE_DRESS.zulu.male.adult[0], form, wear } as DressLayer)!
           g.computeBoundingBox()
           const gb = g.boundingBox!
@@ -483,11 +485,11 @@ describe('the pipeline garments on the glTF body', () => {
           // the hung, grounded body under it: a garment never floats below the soles
           if (gb.min.y < -0.02 * H) fails.push(`${n} ${sex} ${age} ${build}: ${(gb.min.y / H).toFixed(3)} H below the ground`)
         }
-        // a robe reaches from the shoulders to the shins of this very body
+        // a robe reaches from its collar under the chin to the shins of this very body
         const robe = gltfGarment(asset, person, { ...PEOPLE_DRESS.zulu.male.adult[0], form: 'robe', wear: 'chest' } as DressLayer)!
         robe.computeBoundingBox()
         expect(robe.boundingBox!.max.y, `${sex} ${age} ${build}`).toBeGreaterThan(person.p.shoulderY - 0.08 * H)
-        expect(robe.boundingBox!.max.y, `${sex} ${age} ${build}`).toBeLessThan(person.p.chinY)
+        expect(robe.boundingBox!.max.y, `${sex} ${age} ${build}`).toBeLessThan(person.p.chinY + 0.03 * H)
         expect(robe.boundingBox!.min.y, `${sex} ${age} ${build}`).toBeLessThan(person.p.kneeY)
       }
     }

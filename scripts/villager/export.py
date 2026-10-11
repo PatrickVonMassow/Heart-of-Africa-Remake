@@ -19,18 +19,36 @@ from body import MORPHS, top4, vertex_normals
 from gltfio import GlbWriter
 
 FLOAT, U8, U16, U32 = 5126, 5121, 5123, 5125
+# A garment's morph delta below this (figure units, ≈ 0.25 mm) is left out of
+# the file: far under the garments' fit margin, and it keeps the shipped file
+# small (the hand-closing morphs barely touch any garment).
+GARMENT_MORPH_EPS = 2e-4
+
+
+def unit_shorts(jw):
+    """Weights as normalized unsigned shorts summing to exactly 65535 (the
+    rounding remainder on each vertex's largest weight)."""
+    q = np.round(jw * 65535).astype(np.int64)
+    top = q.argmax(1)
+    q[np.arange(len(q)), top] += 65535 - q.sum(1)
+    return q.astype(np.uint16)
 
 
 def node_name(b):
     return b.replace('.', '_')
 
 
-def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=True, extra_attrs=None, extras=None, cover=None):
+def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=True, extra_attrs=None, extras=None, cover=None, compact=False):
+    """`compact` (the garments): weights as normalized unsigned shorts, morph
+    deltas as normalized shorts with those under GARMENT_MORPH_EPS left out
+    — the game reads no file normal of a garment (it recomputes them after
+    baking the morphs)."""
     jidx, jw = top4(W)
     attrs = {
         'POSITION': w.accessor(pos.astype(np.float32), FLOAT, 'VEC3', target=34962, minmax=True),
         'JOINTS_0': w.accessor(jidx.astype(np.uint8), U8, 'VEC4', target=34962),
-        'WEIGHTS_0': w.accessor(jw.astype(np.float32), FLOAT, 'VEC4', target=34962),
+        'WEIGHTS_0': (w.accessor(unit_shorts(jw), U16, 'VEC4', target=34962, normalized=True) if compact
+                      else w.accessor(jw.astype(np.float32), FLOAT, 'VEC4', target=34962)),
     }
     n0 = vertex_normals(pos, tris)
     if normals:
@@ -44,7 +62,7 @@ def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=T
     targets = []
     for m in MORPHS:
         d = morphs[m]
-        t = {'POSITION': w.sparse_accessor(d.astype(np.float32))}
+        t = {'POSITION': w.sparse_accessor(d.astype(np.float32), eps=GARMENT_MORPH_EPS if compact else 1e-6, quantize=compact)}
         targets.append(t)
     idx = w.accessor(tris.reshape(-1).astype(np.uint16 if len(pos) < 65536 else np.uint32), U16 if len(pos) < 65536 else U32, 'SCALAR', target=34963)
     mesh = {'name': name, 'primitives': [{'attributes': attrs, 'indices': idx, 'targets': targets, 'material': 0}],
@@ -101,7 +119,7 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
         infant = np.asarray(g['uv'])[:, 1] >= 2 if (g.get('extras') or {}).get('form') == 'babySling' else None
         add_skinned_mesh(w, name, g['pos'], g['tris'], g['W'], g['morph_pos'], 0, roots, extras={'part': g.get('part', 'garment'), **g.get('extras', {})},
                          cover=None if mask is None else mask['inner'].get(name),
-                         extra_attrs=None if infant is None else {'_INFANT': infant.astype(np.float32)})
+                         extra_attrs=None if infant is None else {'_INFANT': infant.astype(np.float32)}, normals=False, compact=True)
     clip_meta = {}
     for name, c in (clips or {}).get('clips', {}).items():
         if name not in EXPORT_CLIPS:
