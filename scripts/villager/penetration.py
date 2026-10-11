@@ -31,8 +31,9 @@ own mask: `inner` how far a drawn covered point of it shows through the outer
 cloth, unless it lies inside the body as drawn while both are worn (pushed)
 and that body hides no triangle (`Sight`); `inner hole`
 how far a hidden one has left the outer garment by an opening. Under an
-open outer garment (a cape or cloak, `is_open`) both read the side of the
-nearest cloth instead of the capped volume (`sheet_where`). A column
+open outer garment (a cape or cloak, `is_open`) both count a point only
+where some line of sight past the drawn body and cloth reaches it (`Scene`):
+its capped bag counts cloth tucked under it as through. A column
 counts a frame once (its worst outer garment); every failing outer garment and
 body part of a frame is named as its own case.
 
@@ -128,12 +129,13 @@ def _occluded(full, drawn, q):
 
 # Open outer garments: a sheet over the shoulders that does not close round
 # the body (a cape, a cloak, one- or two-shouldered). Capped into a bag
-# (mask.Volume) its ray parity, in a bent pose, no longer tells the cloth's
-# outer side from its body side: measured 11.10.2026 on the shirt under the
-# one-shoulder cloak (dig, male elder), inner points the eye sees over the
-# cloak read IN or OUT and points tucked under it THROUGH. A garment worn
-# under one is judged by the side of the nearest cloth (sheet_where); closed
-# garments keep the capped volume.
+# (mask.Volume) it no longer bounds what the eye sees in a bent pose:
+# measured 11.10.2026 (shirt under the one-shoulder cloak, dig sheet frames
+# 1-5, male elder) 0-52 % of the inner samples the bag puts THROUGH the
+# cloak on main, and 80-100 % on a per-frame layer resolve, are seen from no
+# direction past the drawn body and cloth — tucked under it. Under an open
+# garment an inner point counts only where some line of sight reaches it
+# (`Scene`); closed outer garments keep the bag alone.
 OPEN_FORMS = ('cape', 'cloak')
 
 
@@ -141,35 +143,30 @@ def is_open(name):
     return M.form(name) in OPEN_FORMS
 
 
-def sheet_cloth(vol, gv):
-    """An open garment's cloth alone (no caps) at `gv`: BVH, welded triangles."""
-    from mathutils.bvhtree import BVHTree
-    t = np.concatenate([P['tris'] for P in vol.parts])
-    return BVHTree.FromPolygons(np.asarray(gv).tolist(), t.tolist(), all_triangles=True), t
+# the lines of sight a point is looked at along: the 26 directions of a cube
+# round it (axes, face and space diagonals)
+SIGHT = np.array([(x, y, z) for x in (-1, 0, 1) for y in (-1, 0, 1) for z in (-1, 0, 1) if (x, y, z) != (0, 0, 0)], float)
+SIGHT /= np.linalg.norm(SIGHT, axis=1)[:, None]
 
 
-def sheet_where(vol, gv, pts, ids, cloth):
-    """mask.Volume.where for an OPEN garment, by what the eye sees: each
-    point's place against its nearest point of the posed cloth (`cloth`,
-    sheet_cloth) — on an opening's edge OUT (seen by the opening), on the
-    cloth's outer side THROUGH, else IN — and its distance from the cloth
-    (0 IN). Outer side = the winding's: outward on every cape and cloak
-    (99-100 % of triangles away from the body, build pose, 11.10.2026)."""
-    tree, t = cloth
-    place = np.full(len(pts), M.IN, np.uint8)
-    dist = np.zeros(len(pts))
-    for k in ids:
-        p = np.asarray(pts[k], float)
-        co, n, i, d = tree.find_nearest(p.tolist())
-        if co is None:
-            continue
-        co, tri = np.array(co), t[i]
-        if any(vol.edges.get((min(tri[a], tri[(a + 1) % 3]), max(tri[a], tri[(a + 1) % 3]))) and
-               M._on_segment(co, gv[tri[a]], gv[tri[(a + 1) % 3]]) for a in range(3)):
-            place[k], dist[k] = M.OUT, d
-        elif (p - co) @ np.array(n) > 0:
-            place[k], dist[k] = M.THROUGH, d
-    return place, dist
+class Scene:
+    """What is drawn while a layering is worn — meshes [(pos, tris)]: a point
+    is seen when a line of sight (SIGHT), stepped PROBE off it, leaves past
+    every drawn triangle."""
+
+    def __init__(self, meshes):
+        from mathutils.bvhtree import BVHTree
+        v, t, off = [], [], 0
+        for pos, tris in meshes:
+            v.append(np.asarray(pos, float))
+            t.append(np.asarray(tris).reshape(-1, 3) + off)
+            off += len(pos)
+        self.tree = BVHTree.FromPolygons(np.concatenate(v).tolist(), np.concatenate(t).tolist(), all_triangles=True)
+
+    def seen(self, q):
+        from mathutils import Vector
+        q = Vector(np.asarray(q, float).tolist())
+        return any(self.tree.ray_cast(q + Vector(d) * PROBE, Vector(d))[0] is None for d in SIGHT.tolist())
 
 
 def inside_body(tree, q):
@@ -342,34 +339,42 @@ def _corner(c):
         lay, cases = {}, {}
         bnrm = None
         sight = {}
-        sheets = {}
         for i, o, mi in pairs:
-            _ip, smp, _nrm = mi.drawn_at(gv[i], depth)
+            ip, smp, _nrm = mi.drawn_at(gv[i], depth)
             ipart = lambda k, i=i, mi=mi: S['bones'][S['gdom'][i][k if k < S['gnv'][i] else mi.tris[k - S['gnv'][i]][0]]]  # noqa: E731
-            if is_open(o):
-                if o not in sheets:
-                    sheets[o] = sheet_cloth(S['vol'][o], gv[o])
-                where_o = lambda ids, o=o, smp=smp: sheet_where(S['vol'][o], gv[o], smp, ids, sheets[o])  # noqa: E731
-            else:
-                where_o = lambda ids, o=o, smp=smp: S['vol'][o].where(gv[o], smp, reach, ids=ids, trees=trees[o])  # noqa: E731
-            place, dist = where_o(mi.shown)
+            place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.shown, trees=trees[o])
             thr = mi.shown[place[mi.shown] == M.THROUGH]
+            scene = {}
 
-            def seen(x, i=i, o=o, smp=smp):
+            def pushed_body(i=i, o=o):
                 nonlocal bnrm
+                hide, push = both[i, o]
+                if bnrm is None:
+                    bnrm = vertex_normals(bv, btris)
+                return bv - depth * push[:, None] * bnrm, M.drawn_tris(btris, hide)
+
+            def in_sight(x, i=i, o=o, mi=mi, ip=ip, smp=smp, scene=scene, pushed_body=pushed_body):
+                """Under an open outer garment: some line of sight past the
+                drawn body, inner and outer cloth reaches the point."""
+                if not is_open(o):
+                    return True
+                if 's' not in scene:
+                    bp, bd = pushed_body()
+                    scene['s'] = Scene([(bp, btris[bd]), (ip, mi.tris[mi.drawn]), (gv[o], garments['meshes'][o]['tris'])])
+                return scene['s'].seen(smp[x])
+
+            def seen(x, i=i, o=o, smp=smp, in_sight=in_sight, pushed_body=pushed_body):
                 if (i, o) not in sight:
-                    hide, push = both[i, o]
-                    if bnrm is None:
-                        bnrm = vertex_normals(bv, btris)
-                    sight[i, o] = Sight(bv - depth * push[:, None] * bnrm, btris, M.drawn_tris(btris, hide))
-                return not sight[i, o].covered(smp[x])
+                    bp, bd = pushed_body(i, o)
+                    sight[i, o] = Sight(bp, btris, bd)
+                return not sight[i, o].covered(smp[x]) and in_sight(x)
             where = f'under {o}, {at}'
             v, x, found = _per_part(thr, dist, ipart, seen, tol)
             if v > lay.get((i, 'inner'), (-1,))[0]:
                 lay[i, 'inner'] = (v, where, ipart(x) if x is not None else None)
             cases.setdefault((i, 'inner'), []).extend((p, o, pv, where) for p, pv, _x in found)
-            place, dist = where_o(mi.hidden)
-            v, x, found = _per_part(mi.hidden[place[mi.hidden] == M.OUT], dist, ipart, _always, tol)
+            place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.hidden, trees=trees[o])
+            v, x, found = _per_part(mi.hidden[place[mi.hidden] == M.OUT], dist, ipart, in_sight, tol)
             if v > lay.get((i, 'innerHole'), (-1,))[0]:
                 lay[i, 'innerHole'] = (v, where, ipart(x) if x is not None else None)
             cases.setdefault((i, 'innerHole'), []).extend((p, o, pv, where) for p, pv, _x in found)
@@ -452,23 +457,20 @@ def selftest():
     pushed_v = np.array(bv_)
     pushed_v[pushed_v[:, 0] == 0.0, 0] = 0.03
     assert Sight(bv_, bt_, allv).covered(inner_pt) and not Sight(pushed_v, bt_, allv).covered(inner_pt)
-    # an open cape (is_open): roof over the shoulders, back and sides, open
-    # in front and below — a garment under it is judged by the side of the
-    # nearest cloth: a patch outside the back is shown through it, a tucked
-    # one under it hidden, one past the front edge seen by the opening
+    # an open cape (is_open) over a body: back, sides, roof and floor, open in
+    # front where the body closes it. Its bag may call both inner patches
+    # through; only the one outside its back is in sight — the one tucked
+    # between back and body is seen from nowhere and counts as hidden
     cv, ct = box(-0.2, 0.2, 0.0, 1.0, -0.1, 0.1)
-    ct = np.array([t for k, t in enumerate(ct) if k // 2 not in (2, 4)])
-    cv = np.array(cv, float)
-    cape = M.Volume(cv, ct)
-    assert [len(P['loops']) for P in cape.parts] == [1] and cape.parts[0]['opening'] == [True], cape.parts
-    pts = np.array([[0.0, 0.5, -0.12], [0.0, 0.5, -0.08], [0.0, 0.5, 0.15], [0.0, 1.02, 0.0], [0.0, 0.97, 0.0]])
-    place, dist = sheet_where(cape, cv, pts, range(len(pts)), sheet_cloth(cape, cv))
-    assert place.tolist() == [M.THROUGH, M.IN, M.OUT, M.THROUGH, M.IN], place
-    assert abs(dist[0] - 0.02) < 1e-6 and dist[1] == 0.0 and abs(dist[3] - 0.02) < 1e-6, dist
-    ids = np.arange(len(pts))
-    v, _x, found = _per_part(ids[place == M.THROUGH], dist, lambda k: 'chest', _always, 0.003)
-    assert abs(v - 0.02) < 1e-6 and [p for p, _v, _k in found] == ['chest'], (v, found)
-    # only capes and cloaks are open; closed outer garments keep the capped volume
+    ct = [t for k, t in enumerate(ct) if k // 2 != 4]
+    tv, tt = box(-0.21, 0.21, -0.01, 1.01, 0.0, 0.2)
+    sc = Scene([(cv, ct), (tv, tt)])
+    shown, tucked = (0.0, 0.5, -0.12), (0.0, 0.5, -0.05)
+    assert sc.seen(shown) and not sc.seen(tucked)
+    assert sc.seen((0.0, 0.5, 0.25)), 'in front of the body'
+    pts = np.array([shown, tucked])
+    assert _per_part(np.array([0, 1]), np.array([0.02, 0.05]), lambda k: 'chest', lambda k: sc.seen(pts[k]), 0.003) == (0.02, 0, [('chest', 0.02, 0)])
+    # only capes and cloaks are open; a closed outer garment keeps the bag alone
     assert [is_open(n) for n in ('g-cape-leftShoulder', 'g-cloak-bothShoulders', 'g-hood-overHead', 'g-toga-leftShoulder', 'g-shirt-chest')] == \
         [True, True, False, False, False]
     print('penetration selftest: ok')
@@ -578,8 +580,8 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
         'through the cloth, unless drawn skin of another body part encloses it. Inner = how far a drawn point of a garment of an inner layer (mask.LAYER: '
         'ornament, then hip and head, torso, shoulder) shows through a garment of an outer layer covering it, unless it lies inside the body as drawn while both are worn (pushed in) '
         'and that body hides no triangle (through any hidden one it is seen); the part of it the outer garment\'s mask hides does not count. Hole / inner hole = how far a hidden body point / hidden inner-garment point has '
-        'left the garment by an opening (a hole where skin or cloth should be is seen). Under a cape or cloak (an open sheet) inner and inner hole read the side of the nearest cloth: '
-        'on its outer side through it, past its edge out by the opening, else covered — its capped bag tells neither in a bent pose. Cut = how far a hidden body point lies past the cloth '
+        'left the garment by an opening (a hole where skin or cloth should be is seen). Under a cape or cloak (an open sheet; its capped bag counts cloth tucked under it as through) '
+        'inner and inner hole count a point only where one of 26 lines of sight past the drawn body and cloth reaches it. Cut = how far a hidden body point lies past the cloth '
         f'(tolerance garmentMaskCutTolerance = {a["garmentMaskCutTolerance"]}: the cloth drawn where the body bulges past it is what hiding is for, '
         'a limb cut off is not). A column counts a frame once per garment (its worst layering); every failing body part — and for a layering every '
         'failing outer garment — is named as its own case. '
