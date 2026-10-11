@@ -182,15 +182,17 @@ class Scene:
     def _clear(self, q, d):
         """A line of sight from `q` along `d` leaves past body and outer
         cloth; a surface the point lies on (a hit within CONTACT of `q`
-        itself) is passed."""
+        itself) is passed. A step never passes q + d·CONTACT, so no surface
+        beyond the contact distance is stepped over."""
         p = q
         for _ in range(8):
             hit = self.tree.ray_cast(p, d)[0]
             if hit is None:
                 return True
-            if (hit - q).length > CONTACT:
+            t = (hit - q).dot(d)
+            if t > CONTACT:
                 return False
-            p = hit + d * (CONTACT / 16)
+            p = q + d * min(t + CONTACT / 16, CONTACT)
         return False
 
 
@@ -502,6 +504,11 @@ def selftest():
     e = 1.5e-6
     wrap = box(-0.21 - e, 0.21 + e, -0.01 - e, 1.01 + e, -e, 0.2 + e)
     assert not Scene([(cv, ct), (tv, tt), wrap]).seen((0.0, 0.5, 0.2)), 'blocked just past contact'
+    # a first hit just inside CONTACT does not step over a second just outside
+    from mathutils import Vector
+    sheet = lambda z: ([(-1, -1, z), (1, -1, z), (1, 1, z), (-1, 1, z)], [(0, 1, 2), (0, 2, 3)])  # noqa: E731
+    assert not Scene([sheet(0.99e-6), sheet(1.02e-6)])._clear(Vector((0, 0, 0)), Vector((0, 0, 1))), 'stepped over a blocker'
+    assert Scene([sheet(0.99e-6)])._clear(Vector((0, 0, 0)), Vector((0, 0, 1))), 'contact passed'
     # a point on its own drawn cloth outside the cape is seen past that cloth
     own_v, own_t = box(-0.05, 0.05, 0.45, 0.55, -0.12, -0.115)
     assert Scene([(cv, ct), (tv, tt)], own=(own_v, own_t)).seen(shown)
