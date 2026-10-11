@@ -97,15 +97,6 @@ put it is the mistake this line exists to stop.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
 
-- [ ] 1337. Villager garments: keep outer cloth outside the inner garment in every pose
-  Queue position: after point 1338 and ahead of point 1334 (split of 1334 on 10.10.2026; re-scored after point 1338 per the split of 11.10.2026, branch feat/1337-outer-cloth-over-inner parked with both measured variants).
-  Source: owner split of point 1334 on 10.10.2026 (split rule, veto open): inner garment through outer cloth measured at 0.06-0.13 in motion, untouched by a body push because a body capsule knows no inner garment (commit 96dfe8296).
-  Final state: one mechanism, chosen by measurement, keeps each outer garment outside the inner garment it covers in every pose of the villager pipeline; no per-pose offset table ships; no new cloth spikes or lumps.
-  Verifiable: the pipeline penetration step's inner and inner-hole columns at or below 0.003 on the visible-only count across all poses with no other column worse than main; dressed frame sheets in the four poses compared against main; cross-vendor review record.
-  Criticality: high - every villager, both backends.
-  Bundle: Dorfleben.
-  Removed unimplemented 11.10.2026 by user order (point 1339): branch feat/1337-outer-cloth-over-inner head 7e29080b5 (both measured variants), deleted per branch hygiene.
-
 - [ ] 1334. Villager garments: correct the posed cloth against the body in the pipeline
   Queue position: after points 1336 and 1337 (split of 1334 on 10.10.2026) and ahead of point 1315, whose green penetration report the three deliver together.
   Owner decision 10.10.2026 (split rule, veto open): the first round measured a per-bone capsule push (branch feat/1334-garment-body-push, switched off at 96dfe8296) as insufficient alone - long-wrap depth 0.155 to 0.039, but 53 columns worse, lumpy torso cloth, a bent joint's body bulging 1-2 cm past its rigid capsule; the mask and inner-garment cases move to points 1336 and 1337, and this point keeps the body column, building on or replacing that groundwork.

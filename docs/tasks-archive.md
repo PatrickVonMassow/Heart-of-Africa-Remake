@@ -33840,3 +33840,12 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: a pipeline selftest case with a toy open cape where a visible inner patch counts as shown and a tucked one as hidden; both 1337 variants re-scored at stride 20 against main; dig frame crops showing that the report's verdict matches the picture; cross-vendor review record.
   Criticality: high - a measurement that can pass a visible defect is a possible false approval.
   Bundle: Dorfleben.
+
+- [x] 1337. Villager garments: keep outer cloth outside the inner garment in every pose
+  Queue position: after point 1338 and ahead of point 1334 (split of 1334 on 10.10.2026; re-scored after point 1338 per the split of 11.10.2026, branch feat/1337-outer-cloth-over-inner parked with both measured variants).
+  Source: owner split of point 1334 on 10.10.2026 (split rule, veto open): inner garment through outer cloth measured at 0.06-0.13 in motion, untouched by a body push because a body capsule knows no inner garment (commit 96dfe8296).
+  Final state: one mechanism, chosen by measurement, keeps each outer garment outside the inner garment it covers in every pose of the villager pipeline; no per-pose offset table ships; no new cloth spikes or lumps.
+  Verifiable: the pipeline penetration step's inner and inner-hole columns at or below 0.003 on the visible-only count across all poses with no other column worse than main; dressed frame sheets in the four poses compared against main; cross-vendor review record.
+  Criticality: high - every villager, both backends.
+  Bundle: Dorfleben.
+  Removed unimplemented 11.10.2026 by user order (point 1339): branch feat/1337-outer-cloth-over-inner head 7e29080b5 (both measured variants), deleted per branch hygiene.
