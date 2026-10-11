@@ -115,6 +115,8 @@ class Masked:
 # occlusion test: far below any gap between body parts, independent of the
 # tolerance, so a residual is never dropped by a probe that crossed a small gap
 PROBE = 1e-4
+# a point closer than this to a surface lies on it (lines of sight pass it)
+CONTACT = 1e-6
 
 
 def _occluded(full, drawn, q):
@@ -174,8 +176,20 @@ class Scene:
     def seen(self, q):
         from mathutils import Vector
         q = Vector(np.asarray(q, float).tolist())
-        return any(self.tree.ray_cast(q, Vector(d))[0] is None
+        return any(self._clear(q, Vector(d))
                    and (self.own is None or self.own.ray_cast(q + Vector(d) * PROBE, Vector(d))[0] is None) for d in SIGHT.tolist())
+
+    def _clear(self, q, d):
+        """A line of sight from `q` along `d` leaves past body and outer
+        cloth; a surface the point lies on (a hit within CONTACT) is passed."""
+        for _ in range(4):
+            hit, _n, _f, dist = self.tree.ray_cast(q, d)
+            if hit is None:
+                return True
+            if dist > CONTACT:
+                return False
+            q = hit + d * CONTACT
+        return False
 
 
 def inside_body(tree, q):
@@ -480,6 +494,8 @@ def selftest():
     # tucked within PROBE of the cape's back: still under it (the step off
     # the point is for its own surface only)
     assert not sc.seen((0.0, 0.5, -0.09995)), 'tucked against the cape'
+    # lying on the body's exposed front or on the cape's outside: seen
+    assert sc.seen((0.0, 0.5, 0.2)) and sc.seen((0.0, 0.5, -0.1)), 'on a surface it lies on'
     # a point on its own drawn cloth outside the cape is seen past that cloth
     own_v, own_t = box(-0.05, 0.05, 0.45, 0.55, -0.12, -0.115)
     assert Scene([(cv, ct), (tv, tt)], own=(own_v, own_t)).seen(shown)
