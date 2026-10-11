@@ -97,16 +97,6 @@ put it is the mistake this line exists to stop.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
 
-- [ ] 1334. Villager garments: correct the posed cloth against the body in the pipeline
-  Queue position: after points 1336 and 1337 (split of 1334 on 10.10.2026) and ahead of point 1315, whose green penetration report the three deliver together.
-  Owner decision 10.10.2026 (split rule, veto open): the first round measured a per-bone capsule push (branch feat/1334-garment-body-push, switched off at 96dfe8296) as insufficient alone - long-wrap depth 0.155 to 0.039, but 53 columns worse, lumpy torso cloth, a bent joint's body bulging 1-2 cm past its rigid capsule; the mask and inner-garment cases move to points 1336 and 1337, and this point keeps the body column, building on or replacing that groundwork.
-  Source: owner split of point 1332 on 08.10.2026 (split rule; veto open); measured residuals in motion 0.0135-0.1553 (long wrap at the chest while digging worst), knee/skirt in stride, upper arm/cloak in dig, chest/toga when bending.
-  Final state: one mechanism, chosen by measurement, pushes posed cloth out of the body in the villager pipeline (posed cloth against simplified per-bone capsules, or a short per-clip cloth simulation); no per-pose offset table ships. No covered skin and no covered inner garment shows through cloth in any pose, thin limbs and garment openings included; skin at openings stays drawn.
-  Verifiable: the pipeline penetration step green at 0.003 on the visible-only count across all poses; dressed frame sheets walking, kneeling, digging and running without show-through and without new cloth spikes, compared against main; cross-vendor review record.
-  Criticality: high - every villager, both backends.
-  Bundle: Dorfleben.
-  Removed unimplemented 11.10.2026 by user order (point 1339): branch feat/1334-garment-body-push head 96dfe8296 (capsule push, switched off), deleted per branch hygiene.
-
 - [ ] 1335. Villager garments: carry the cloth correction into the game's TSL vertex path
   Queue position: directly after point 1315, which first puts the pipeline garments into the game.
   Source: owner split of point 1332 on 08.10.2026 (split rule; veto open): the in-game correction has no garment to act on before point 1315.
