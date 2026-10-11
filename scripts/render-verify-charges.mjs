@@ -1828,4 +1828,24 @@ export const RED_CHARGES = [
       + 'tried, sight clear but every tail off its anchor — first occurrence since point 1238 landed, the '
       + 'section alone green on the same head; point 1270 owns the pair staging. The charge dies with point 1270.',
   },
+  {
+    point: 1333,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /the jar's mouth is tipped under the water surface/i,
+    why:
+      'FILED AS 1333 ON 08.10.2026: red on origin/main 6bd36687f (mouth -0.200 m, surface -0.25 m) '
+      + 'and on both backends; measured again 11.10.2026 on feat/1336 43515f095, webgpu (mouth -0.196 m). '
+      + 'The charge dies with point 1333.',
+  },
+  {
+    point: 1330,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^village walk: (the lowest drawn sole sits on the ground|planted stances were observed|a planted foot does not slide)/i,
+    why:
+      'FILED AS 1330 ON 08.10.2026: red on origin/main d22f82796 (worstGround 0.108 m, stances 0) since '
+      + 'the glTF body; measured again 11.10.2026 on feat/1336 49f836d8f, webgpu (worstGround 0.198 m, '
+      + 'stances 1). The charge dies with point 1330.',
+  },
 ]
