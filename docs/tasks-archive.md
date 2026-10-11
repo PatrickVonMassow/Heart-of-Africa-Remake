@@ -33868,3 +33868,16 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
   Removed unimplemented 11.10.2026 by user order (point 1339): re-filed only if the in-game picture after point 1315 shows a defect it would fix.
+
+- [x] 1339. Villager garments: end the 3 mm chase - picture gate, outfit rule, ship 1315 now
+  Queue position: ahead of point 1337 (user order 11.10.2026: it removes 1337, 1334 and 1335 and rewrites 1315).
+  Source: user 11.10.2026 21:13 (chat): "Es hört und hört nicht auf mit mehr Zeit und zusätzlichen Tickets für die Kleidung. Dabei hatte ich mir vom Wechsel den Ansatzes auf Maskierung erhofft, dass das Thema damit endlich schnell vom Tisch ist." Proposal approved with "ja" (21:19), request title approved with "ja" (21:21).
+  Measured state: since 05.10.2026 ~170 garment commits, points 1312, 1314, 1329, 1331, 1332, 1336 closed, 1338, 1337, 1334, 1315, 1335 open; no pipeline garment reaches the game (1315 rolled back in cd0400571). The mask (1329) alone met 0.003 on 5 of 32 garments; the remainder is cloth not following the limb, which no mask hides, and each residual was split into a new point.
+  Actions for the owner:
+  1. Remove points 1338, 1337 and 1334 from TASKS.md unimplemented (user order); clean up branches feat/1337-outer-cloth-over-inner and feat/1334-garment-body-push per branch hygiene after noting their heads in the archive entry.
+  2. Remove point 1335 unimplemented; it is re-filed only if the in-game picture after 1315 shows a defect it would fix.
+  3. design.md: add an outfit rule - under an open outer garment (cape, one-shoulder cloak) a villager wears no inner top that the opening can reveal against the outer cloth, or the inner top is fully masked where the outer garment covers it; the outfit generator enforces it. Vitest on the outfit generator for the rule.
+  4. Rewrite point 1315 and move it to the front of Dorfleben: the pipeline garments ship on the glTF body at today's state with the 1329/1336 mask. The pipeline penetration report stays as information only and is NOT a merge gate (no 0.003 threshold in 1315's acceptance). Acceptance is the picture check: Playwright both backends, dressed villagers walking, kneeling, digging and running at the game's normal camera distances (port city and village), compared against main; a defect visible at that distance is named per garment/pose and either fixed in 1315 or filed as ONE targeted follow-up point, not split further.
+  5. No further garment point uses a numeric penetration threshold as its acceptance gate without a new user decision.
+  Bundle: Dorfleben.
+  Owner note 11.10.2026 21:49: point 1338 was landed at 21:41 (report-only line-of-sight rule under open capes, no game change) before this request was drained, so action 1 finds it already closed; reverting it needs a user order.
