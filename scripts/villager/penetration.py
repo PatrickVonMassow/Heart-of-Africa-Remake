@@ -30,7 +30,10 @@ covers part of it (every outfit layering), the same with the inner garment's
 own mask: `inner` how far a drawn covered point of it shows through the outer
 cloth, unless it lies inside the body as drawn while both are worn (pushed)
 and that body hides no triangle (`Sight`); `inner hole`
-how far a hidden one has left the outer garment by an opening. A column
+how far a hidden one has left the outer garment by an opening. Under an
+open outer garment (a cape or cloak, `is_open`) both count a point only
+where some line of sight past the drawn body and cloth reaches it (`Scene`):
+its capped bag counts cloth tucked under it as through. A column
 counts a frame once (its worst outer garment); every failing outer garment and
 body part of a frame is named as its own case.
 
@@ -112,6 +115,9 @@ class Masked:
 # occlusion test: far below any gap between body parts, independent of the
 # tolerance, so a residual is never dropped by a probe that crossed a small gap
 PROBE = 1e-4
+# a point closer than this to a surface lies on it (lines of sight pass it;
+# a surface at this distance or beyond blocks)
+CONTACT = 1e-6
 
 
 def _occluded(full, drawn, q):
@@ -122,6 +128,73 @@ def _occluded(full, drawn, q):
     from fit import inside
     q = list(q)
     return inside(full, q) and (drawn is None or inside(drawn, q))
+
+
+# Open outer garments: a sheet over the shoulders that does not close round
+# the body (a cape, a cloak, one- or two-shouldered). Capped into a bag
+# (mask.Volume) it no longer bounds what the eye sees in a bent pose:
+# measured 11.10.2026 (shirt under the one-shoulder cloak, dig sheet frames
+# 1-5, male elder) 0-52 % of the inner samples the bag puts THROUGH the
+# cloak on main, and 80-100 % on a per-frame layer resolve, are seen from no
+# direction past the drawn body and cloth — tucked under it. Under an open
+# garment an inner point counts only where some line of sight reaches it
+# (`Scene`); closed outer garments keep the bag alone.
+OPEN_FORMS = ('cape', 'cloak')
+
+
+def is_open(name):
+    return M.form(name) in OPEN_FORMS
+
+
+# the lines of sight a point is looked at along: the 26 directions of a cube
+# round it (axes, face and space diagonals)
+SIGHT = np.array([(x, y, z) for x in (-1, 0, 1) for y in (-1, 0, 1) for z in (-1, 0, 1) if (x, y, z) != (0, 0, 0)], float)
+SIGHT /= np.linalg.norm(SIGHT, axis=1)[:, None]
+
+
+class Scene:
+    """What is drawn while a layering is worn — meshes [(pos, tris)]: a point
+    is seen when a line of sight (SIGHT) leaves past every drawn triangle.
+    `own` is the mesh the looked-at points lie on: only its lines of sight
+    start PROBE off the point (its own surface is no occluder there); every
+    other mesh is cast from the point itself, so cloth or skin within PROBE
+    of it still blocks."""
+
+    def __init__(self, meshes, own=None):
+        self.tree = self._tree(meshes)
+        self.own = self._tree([own]) if own is not None else None
+
+    @staticmethod
+    def _tree(meshes):
+        from mathutils.bvhtree import BVHTree
+        v, t, off = [], [], 0
+        for pos, tris in meshes:
+            v.append(np.asarray(pos, float))
+            t.append(np.asarray(tris).reshape(-1, 3) + off)
+            off += len(pos)
+        return BVHTree.FromPolygons(np.concatenate(v).tolist(), np.concatenate(t).tolist(), all_triangles=True)
+
+    def seen(self, q):
+        from mathutils import Vector
+        q = Vector(np.asarray(q, float).tolist())
+        return any(self._clear(q, Vector(d))
+                   and (self.own is None or self.own.ray_cast(q + Vector(d) * PROBE, Vector(d))[0] is None) for d in SIGHT.tolist())
+
+    def _clear(self, q, d):
+        """A line of sight from `q` along `d` leaves past body and outer
+        cloth; a surface the point lies on (a hit closer than CONTACT to `q`
+        itself) is passed. A surface at CONTACT or beyond blocks, and a step
+        never passes q + d·CONTACT, so none is stepped over."""
+        p = q
+        for _ in range(8):
+            hit = self.tree.ray_cast(p, d)[0]
+            if hit is None:
+                return True
+            t = (hit - q).dot(d)
+            if t >= CONTACT:
+                return False
+            p = q + d * min(t + CONTACT / 16, CONTACT)
+        return False
 
 
 def inside_body(tree, q):
@@ -295,26 +368,41 @@ def _corner(c):
         bnrm = None
         sight = {}
         for i, o, mi in pairs:
-            _ip, smp, _nrm = mi.drawn_at(gv[i], depth)
+            ip, smp, _nrm = mi.drawn_at(gv[i], depth)
             ipart = lambda k, i=i, mi=mi: S['bones'][S['gdom'][i][k if k < S['gnv'][i] else mi.tris[k - S['gnv'][i]][0]]]  # noqa: E731
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.shown, trees=trees[o])
             thr = mi.shown[place[mi.shown] == M.THROUGH]
+            scene = {}
 
-            def seen(x, i=i, o=o, smp=smp):
+            def pushed_body(i=i, o=o):
                 nonlocal bnrm
+                hide, push = both[i, o]
+                if bnrm is None:
+                    bnrm = vertex_normals(bv, btris)
+                return bv - depth * push[:, None] * bnrm, M.drawn_tris(btris, hide)
+
+            def in_sight(x, i=i, o=o, mi=mi, ip=ip, smp=smp, scene=scene, pushed_body=pushed_body):
+                """Under an open outer garment: some line of sight past the
+                drawn body, inner and outer cloth reaches the point."""
+                if not is_open(o):
+                    return True
+                if 's' not in scene:
+                    bp, bd = pushed_body()
+                    scene['s'] = Scene([(bp, btris[bd]), (gv[o], garments['meshes'][o]['tris'])], own=(ip, mi.tris[mi.drawn]))
+                return scene['s'].seen(smp[x])
+
+            def seen(x, i=i, o=o, smp=smp, in_sight=in_sight, pushed_body=pushed_body):
                 if (i, o) not in sight:
-                    hide, push = both[i, o]
-                    if bnrm is None:
-                        bnrm = vertex_normals(bv, btris)
-                    sight[i, o] = Sight(bv - depth * push[:, None] * bnrm, btris, M.drawn_tris(btris, hide))
-                return not sight[i, o].covered(smp[x])
+                    bp, bd = pushed_body(i, o)
+                    sight[i, o] = Sight(bp, btris, bd)
+                return not sight[i, o].covered(smp[x]) and in_sight(x)
             where = f'under {o}, {at}'
             v, x, found = _per_part(thr, dist, ipart, seen, tol)
             if v > lay.get((i, 'inner'), (-1,))[0]:
                 lay[i, 'inner'] = (v, where, ipart(x) if x is not None else None)
             cases.setdefault((i, 'inner'), []).extend((p, o, pv, where) for p, pv, _x in found)
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.hidden, trees=trees[o])
-            v, x, found = _per_part(mi.hidden[place[mi.hidden] == M.OUT], dist, ipart, _always, tol)
+            v, x, found = _per_part(mi.hidden[place[mi.hidden] == M.OUT], dist, ipart, in_sight, tol)
             if v > lay.get((i, 'innerHole'), (-1,))[0]:
                 lay[i, 'innerHole'] = (v, where, ipart(x) if x is not None else None)
             cases.setdefault((i, 'innerHole'), []).extend((p, o, pv, where) for p, pv, _x in found)
@@ -397,6 +485,40 @@ def selftest():
     pushed_v = np.array(bv_)
     pushed_v[pushed_v[:, 0] == 0.0, 0] = 0.03
     assert Sight(bv_, bt_, allv).covered(inner_pt) and not Sight(pushed_v, bt_, allv).covered(inner_pt)
+    # an open cape (is_open) over a body: back, sides, roof and floor, open in
+    # front where the body closes it. Its bag may call both inner patches
+    # through; only the one outside its back is in sight — the one tucked
+    # between back and body is seen from nowhere and counts as hidden
+    cv, ct = box(-0.2, 0.2, 0.0, 1.0, -0.1, 0.1)
+    ct = [t for k, t in enumerate(ct) if k // 2 != 4]
+    tv, tt = box(-0.21, 0.21, -0.01, 1.01, 0.0, 0.2)
+    sc = Scene([(cv, ct), (tv, tt)])
+    shown, tucked = (0.0, 0.5, -0.12), (0.0, 0.5, -0.05)
+    assert sc.seen(shown) and not sc.seen(tucked)
+    assert sc.seen((0.0, 0.5, 0.25)), 'in front of the body'
+    # tucked within PROBE of the cape's back: still under it (the step off
+    # the point is for its own surface only)
+    assert not sc.seen((0.0, 0.5, -0.09995)), 'tucked against the cape'
+    # lying on the body's exposed front or on the cape's outside: seen
+    assert sc.seen((0.0, 0.5, 0.2)) and sc.seen((0.0, 0.5, -0.1)), 'on a surface it lies on'
+    # a second surface just past CONTACT round the body still blocks
+    e = 1.5e-6
+    wrap = box(-0.21 - e, 0.21 + e, -0.01 - e, 1.01 + e, -e, 0.2 + e)
+    assert not Scene([(cv, ct), (tv, tt), wrap]).seen((0.0, 0.5, 0.2)), 'blocked just past contact'
+    # a first hit just inside CONTACT does not step over a second just outside
+    from mathutils import Vector
+    sheet = lambda z: ([(-1, -1, z), (1, -1, z), (1, 1, z), (-1, 1, z)], [(0, 1, 2), (0, 2, 3)])  # noqa: E731
+    assert not Scene([sheet(0.99e-6), sheet(1.02e-6)])._clear(Vector((0, 0, 0)), Vector((0, 0, 1))), 'stepped over a blocker'
+    assert Scene([sheet(0.99e-6)])._clear(Vector((0, 0, 0)), Vector((0, 0, 1))), 'contact passed'
+    assert not Scene([sheet(CONTACT)])._clear(Vector((0, 0, 0)), Vector((0, 0, 1))), 'a surface at CONTACT blocks'
+    # a point on its own drawn cloth outside the cape is seen past that cloth
+    own_v, own_t = box(-0.05, 0.05, 0.45, 0.55, -0.12, -0.115)
+    assert Scene([(cv, ct), (tv, tt)], own=(own_v, own_t)).seen(shown)
+    pts = np.array([shown, tucked])
+    assert _per_part(np.array([0, 1]), np.array([0.02, 0.05]), lambda k: 'chest', lambda k: sc.seen(pts[k]), 0.003) == (0.02, 0, [('chest', 0.02, 0)])
+    # only capes and cloaks are open; a closed outer garment keeps the bag alone
+    assert [is_open(n) for n in ('g-cape-leftShoulder', 'g-cloak-bothShoulders', 'g-hood-overHead', 'g-toga-leftShoulder', 'g-shirt-chest')] == \
+        [True, True, False, False, False]
     print('penetration selftest: ok')
 
 
@@ -504,7 +626,8 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
         'through the cloth, unless drawn skin of another body part encloses it. Inner = how far a drawn point of a garment of an inner layer (mask.LAYER: '
         'ornament, then hip and head, torso, shoulder) shows through a garment of an outer layer covering it, unless it lies inside the body as drawn while both are worn (pushed in) '
         'and that body hides no triangle (through any hidden one it is seen); the part of it the outer garment\'s mask hides does not count. Hole / inner hole = how far a hidden body point / hidden inner-garment point has '
-        'left the garment by an opening (a hole where skin or cloth should be is seen). Cut = how far a hidden body point lies past the cloth '
+        'left the garment by an opening (a hole where skin or cloth should be is seen). Under a cape or cloak (an open sheet; its capped bag counts cloth tucked under it as through) '
+        'inner and inner hole count a point only where one of 26 lines of sight past the drawn body and cloth reaches it. Cut = how far a hidden body point lies past the cloth '
         f'(tolerance garmentMaskCutTolerance = {a["garmentMaskCutTolerance"]}: the cloth drawn where the body bulges past it is what hiding is for, '
         'a limb cut off is not). A column counts a frame once per garment (its worst layering); every failing body part — and for a layering every '
         'failing outer garment — is named as its own case. '
