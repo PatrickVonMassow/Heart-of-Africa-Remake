@@ -33859,3 +33859,12 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
   Removed unimplemented 11.10.2026 by user order (point 1339): branch feat/1334-garment-body-push head 96dfe8296 (capsule push, switched off), deleted per branch hygiene.
+
+- [x] 1335. Villager garments: carry the cloth correction into the game's TSL vertex path
+  Queue position: directly after point 1315, which first puts the pipeline garments into the game.
+  Source: owner split of point 1332 on 08.10.2026 (split rule; veto open): the in-game correction has no garment to act on before point 1315.
+  Final state: the mechanism point 1334 chose acts in the game's TSL vertex path where the game's posing differs from the pipeline's, so no covered skin or inner garment shows through cloth on dressed villagers walking, kneeling, digging and running; no raw GLSL/WGSL.
+  Verifiable: Vitest on the correction inputs; Playwright both backends picture-checked on dressed villagers in those poses, compared against main; cross-vendor review record.
+  Criticality: high - every villager, both backends.
+  Bundle: Dorfleben.
+  Removed unimplemented 11.10.2026 by user order (point 1339): re-filed only if the in-game picture after point 1315 shows a defect it would fix.
