@@ -68,7 +68,7 @@ from body import top4
 SLOT = {
     **{f: 'hip' for f in ('loinFlap', 'girdleTails', 'apron', 'skirtShort', 'skirtKnee', 'wrapLong', 'trousers')},
     **{f: 'torso' for f in ('breastCloth', 'shirt', 'robe', 'toga')},
-    **{f: 'shoulder' for f in ('cape', 'cloak', 'hood')},
+    **{f: 'shoulder' for f in ('cape', 'cloak', 'hood', 'babySling')},
     **{f: 'head' for f in ('cap', 'hairBag', 'headRing', 'headband', 'topknot', 'turban', 'veil')},
     **{f: 'ornament' for f in ('limbRings', 'neckBeads', 'waistBeads')},
 }

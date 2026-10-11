@@ -36,7 +36,8 @@ def add_skinned_mesh(w, name, pos, tris, W, morphs, skin, parent_list, normals=T
     if normals:
         attrs['NORMAL'] = w.accessor(n0.astype(np.float32), FLOAT, 'VEC3', target=34962)
     for k, v in (extra_attrs or {}).items():
-        attrs[k] = w.accessor(v.astype(np.float32), FLOAT, 'VEC2' if v.shape[1] == 2 else 'VEC3' if v.shape[1] == 3 else 'VEC4', target=34962)
+        kind = 'SCALAR' if v.ndim == 1 else 'VEC2' if v.shape[1] == 2 else 'VEC3' if v.shape[1] == 3 else 'VEC4'
+        attrs[k] = w.accessor(v.astype(np.float32), FLOAT, kind, target=34962)
     if cover is not None:
         # the garment cover mask (mask.py): hide lo, hide hi, push lo, push hi
         attrs['_COVER'] = w.accessor(np.asarray(cover, np.uint16), U16, 'VEC4', target=34962)
@@ -95,8 +96,12 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
     add_skinned_mesh(w, 'body', body['pos'], body['tris'], body['W'], body['morph_pos'], 0, roots, extras={'part': 'skin'},
                      cover=None if mask is None else mask['body'])
     for name, g in (garments or {}).get('meshes', {}).items():
+        # the infant's head in a baby sling (garments.py babySling: uv v ≥ 2),
+        # painted in the infant's skin by the game
+        infant = np.asarray(g['uv'])[:, 1] >= 2 if (g.get('extras') or {}).get('form') == 'babySling' else None
         add_skinned_mesh(w, name, g['pos'], g['tris'], g['W'], g['morph_pos'], 0, roots, extras={'part': g.get('part', 'garment'), **g.get('extras', {})},
-                         cover=None if mask is None else mask['inner'].get(name))
+                         cover=None if mask is None else mask['inner'].get(name),
+                         extra_attrs=None if infant is None else {'_INFANT': infant.astype(np.float32)})
     clip_meta = {}
     for name, c in (clips or {}).get('clips', {}).items():
         if name not in EXPORT_CLIPS:
