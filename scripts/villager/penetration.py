@@ -151,22 +151,31 @@ SIGHT /= np.linalg.norm(SIGHT, axis=1)[:, None]
 
 class Scene:
     """What is drawn while a layering is worn — meshes [(pos, tris)]: a point
-    is seen when a line of sight (SIGHT), stepped PROBE off it, leaves past
-    every drawn triangle."""
+    is seen when a line of sight (SIGHT) leaves past every drawn triangle.
+    `own` is the mesh the looked-at points lie on: only its lines of sight
+    start PROBE off the point (its own surface is no occluder there); every
+    other mesh is cast from the point itself, so cloth or skin within PROBE
+    of it still blocks."""
 
-    def __init__(self, meshes):
+    def __init__(self, meshes, own=None):
+        self.tree = self._tree(meshes)
+        self.own = self._tree([own]) if own is not None else None
+
+    @staticmethod
+    def _tree(meshes):
         from mathutils.bvhtree import BVHTree
         v, t, off = [], [], 0
         for pos, tris in meshes:
             v.append(np.asarray(pos, float))
             t.append(np.asarray(tris).reshape(-1, 3) + off)
             off += len(pos)
-        self.tree = BVHTree.FromPolygons(np.concatenate(v).tolist(), np.concatenate(t).tolist(), all_triangles=True)
+        return BVHTree.FromPolygons(np.concatenate(v).tolist(), np.concatenate(t).tolist(), all_triangles=True)
 
     def seen(self, q):
         from mathutils import Vector
         q = Vector(np.asarray(q, float).tolist())
-        return any(self.tree.ray_cast(q + Vector(d) * PROBE, Vector(d))[0] is None for d in SIGHT.tolist())
+        return any(self.tree.ray_cast(q, Vector(d))[0] is None
+                   and (self.own is None or self.own.ray_cast(q + Vector(d) * PROBE, Vector(d))[0] is None) for d in SIGHT.tolist())
 
 
 def inside_body(tree, q):
@@ -360,7 +369,7 @@ def _corner(c):
                     return True
                 if 's' not in scene:
                     bp, bd = pushed_body()
-                    scene['s'] = Scene([(bp, btris[bd]), (ip, mi.tris[mi.drawn]), (gv[o], garments['meshes'][o]['tris'])])
+                    scene['s'] = Scene([(bp, btris[bd]), (gv[o], garments['meshes'][o]['tris'])], own=(ip, mi.tris[mi.drawn]))
                 return scene['s'].seen(smp[x])
 
             def seen(x, i=i, o=o, smp=smp, in_sight=in_sight, pushed_body=pushed_body):
@@ -468,6 +477,12 @@ def selftest():
     shown, tucked = (0.0, 0.5, -0.12), (0.0, 0.5, -0.05)
     assert sc.seen(shown) and not sc.seen(tucked)
     assert sc.seen((0.0, 0.5, 0.25)), 'in front of the body'
+    # tucked within PROBE of the cape's back: still under it (the step off
+    # the point is for its own surface only)
+    assert not sc.seen((0.0, 0.5, -0.09995)), 'tucked against the cape'
+    # a point on its own drawn cloth outside the cape is seen past that cloth
+    own_v, own_t = box(-0.05, 0.05, 0.45, 0.55, -0.12, -0.115)
+    assert Scene([(cv, ct), (tv, tt)], own=(own_v, own_t)).seen(shown)
     pts = np.array([shown, tucked])
     assert _per_part(np.array([0, 1]), np.array([0.02, 0.05]), lambda k: 'chest', lambda k: sc.seen(pts[k]), 0.003) == (0.02, 0, [('chest', 0.02, 0)])
     # only capes and cloaks are open; a closed outer garment keeps the bag alone
