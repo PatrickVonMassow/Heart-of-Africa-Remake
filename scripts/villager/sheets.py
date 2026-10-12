@@ -1,4 +1,5 @@
 """Frame sheets of the villager body, its clips and its dress (judged by eye)."""
+import math
 import os
 
 import numpy as np
@@ -75,7 +76,7 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
     if garments and clips and (not want or 'dress' in want):
         # the shipped garments in motion: four outfits through walk, kneel and dig
         for name in DRESS_CLIPS:
-            for k, (sex, age, outfit) in enumerate(OUTFITS):
+            for k, (sex, age, outfit) in enumerate(outfits(garments)):
                 clip_sheet(out, body, clips, name, frames=8, view=35, spacing=1.0, sex=sex, age=age,
                            fname=f'dress-{name}-{k}.png', garments=garments, outfit=outfit, cfg=cfg)
     if clips:
@@ -176,6 +177,27 @@ OUTFITS = [
     ('male', 'elder', ('g-trousers-waist', 'g-shirt-chest', 'g-cloak-chest')),
     ('female', 'youth', ('g-skirtKnee-waist', 'g-cape-chest', 'g-limbRings-limbs')),
 ]
+
+
+def outfits(garments):
+    """OUTFITS resolved against the built garments: each id itself when it
+    was built, else the same form in another wear (the first built); a form
+    no longer built at all raises (a renamed garment never silently empties
+    an outfit)."""
+    have = [n for n in garments['meshes'] if n.startswith('g-')]
+    out = []
+    for sex, age, outfit in OUTFITS:
+        worn = []
+        for n in outfit:
+            form = n.split('-')[1]
+            alt = n if n in have else next((m for m in have if m.split('-')[1] == form), None)
+            if alt is None:
+                raise RuntimeError(f'sheets: outfit garment {n} (form {form}) is not built (garments: {", ".join(have)})')
+            worn.append(alt)
+        out.append((sex, age, tuple(worn)))
+    return out
+
+
 GARMENT_COLOURS = [(0.75, 0.68, 0.55, 1), (0.55, 0.25, 0.18, 1), (0.25, 0.3, 0.5, 1), (0.6, 0.5, 0.3, 1)]
 
 
@@ -247,3 +269,87 @@ def garment_sheet(out, body, clips, garments, cfg, clip='walk', t=0.3, per_row=8
         span = (len(row) - 1) * 0.8
         R.ground(-0.6, span + 0.6, -0.6, span + 0.6)
         R.render(os.path.join(out, (fname or f'garments-{clip}-{view}') + f'-{r}.png'), (span / 2 if view != 'side' else 0, 0.68, span / 2 if view == 'side' else 0), span + 1.2, view, (int(240 * (span + 1.2)), 400))
+
+
+# ---- the runtime composition (gamepath.py runtime_*; build.mjs exports it) -------
+
+
+LABEL = (0.98, 0.95, 0.6, 1)
+
+
+def _view_name(view, elevation):
+    name = 'side (from the right)' if view == 'side' else view if isinstance(view, str) else f'azimuth {view:g}°'
+    return name + (f', elev {elevation:g}°' if elevation else '')
+
+
+def runtime_sheets(out, body, clips, garments, cfg, rt):
+    """Per subject and camera a strip of the game's OWN composed pose (the
+    runtime export, its round trip already checked): body, worn garments with
+    their cover mask and the shovel, skinned by the exported bones exactly as
+    three skins them, the root's rotation and scale kept and its travel taken
+    out. Every frame labelled with its time and camera.
+    verification/villager-body/runtime-<subject>-<view>.png"""
+    import mask as MK
+    from fit import garment_pos
+    a = cfg['VILLAGER_ASSET']
+    jidx, jw = top4(body['W'])
+    sv, st = shovel_geometry(a['shovel'])
+    for s in rt['subjects']:
+        person, pos, w = GP.runtime_person(body, s, cfg)
+        baked = person.bake(pos, jidx, jw)
+        missing = [n for n in s['garments'] if not garments or n not in garments['meshes']]
+        if missing:
+            raise RuntimeError(f"runtime sheets: {s['id']} wears {missing}, absent from the built garments — rebuild them (--step garments)")
+        worn = list(s['garments'])
+        btris, bpush, inner = masked(body, garments, worn, cfg)
+        gskin = {n: top4(garments['meshes'][n]['W']) for n in worn}
+        gbaked = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in worn}
+        h = s['identity']['scale']
+        elev = s.get('elevation', 0)
+
+        def drawn(f, v, ji, jw_, tris, push):
+            # the mask push in the figure mesh's own space (pipeline unit → figure:
+            # the person's scale), THEN the root with its squash, as three draws it
+            v = GP.runtime_skin(s, f, v, ji, jw_, 'figure')
+            if push is not None and push.any():
+                v = MK.pushed(v, tris, push.astype(float), a['garmentMaskPush'] * s['person']['scale'])
+            root = GP.runtime_root(f)
+            return v @ root[:3, :3].T + root[:3, 3]
+        for view in s['views']:
+            R.clear()
+            side = view == 'side'
+            # the side strip from the figure's right (+z to the right): time and travel run left to right
+            cam_view = 'other' if side else view
+            az = math.radians({'other': -90.0, 'front': 0.0}.get(cam_view, cam_view))
+            # the strip runs along the camera's screen-right (horizontal at any elevation)
+            right = np.array([math.cos(az), 0.0, -math.sin(az)])
+            spacing = (0.6 if side else 0.8 if view == 'front' else 1.0) * h
+            n = len(s['frames'])
+            span = spacing * (n - 1)
+            cam = _view_name(view, elev)
+            top = 0.0
+            for k, f in enumerate(s['frames']):
+                off = right * (k * spacing - span / 2)
+                at = np.array([f['root']['p'][0], 0.0, f['root']['p'][2]])
+                move = off - at
+                bv = drawn(f, baked, jidx, jw, body['tris'], bpush)
+                R.add_mesh(f'f{k}', bv + move, btris, SKIN)
+                top = max(top, float(bv[:, 1].max()))
+                for c, g in enumerate(worn):
+                    gt, gp = inner[g]
+                    gv = drawn(f, gbaked[g], *gskin[g], garments['meshes'][g]['tris'], gp)
+                    R.add_mesh(f'f{k}-{g}', gv + move, gt, GARMENT_COLOURS[c % len(GARMENT_COLOURS)])
+                    top = max(top, float(gv[:, 1].max()))
+                tool = GP.runtime_tool(f)
+                if tool is not None:
+                    R.add_mesh(f't{k}', sv @ tool[:3, :3].T + tool[:3, 3] + move, st, (0.42, 0.3, 0.16, 1))
+                R.label(f"{f['t']:.2f} s", off + [0, -0.13 * h, 0], 0.085 * h, cam_view, LABEL)
+            # the title above the tallest frame, the image tall enough for it
+            title_y = top + 0.06 * h
+            R.label(f"{s['title']} | camera {cam} | runtime composition (game code), travel removed",
+                    np.array([0.0, title_y, 0.0]), 0.075 * h, cam_view, LABEL)
+            R.ground(-span / 2 - 0.5 * h, span / 2 + 0.5 * h, -span / 2 - 0.5 * h, span / 2 + 0.5 * h)
+            wide = span + 1.1 * h
+            lo, hi = -0.22 * h, title_y + 0.14 * h
+            R.render(os.path.join(out, f"runtime-{s['id']}-{view if isinstance(view, str) else 'az' + str(view)}.png"),
+                     (0, (lo + hi) / 2, 0), wide, cam_view, (int(300 * wide / h), int(300 * (hi - lo) / h)), elevation=elev)

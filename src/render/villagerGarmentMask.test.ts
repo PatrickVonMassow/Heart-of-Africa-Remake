@@ -198,17 +198,28 @@ describe('the pipeline mask cache key', () => {
     const dir = resolve(__dirname, '../../scripts/villager')
     const src = readFileSync(resolve(dir, 'mask.py'), 'utf8')
     const hashed = /^MOTION_MODULES = \(([^)]*)\)/m.exec(src)?.[1].match(/'([^']+)'/g)?.map((m) => m.slice(1, -1)) ?? []
-    const imported = new Set<string>()
+    // of a module not hashed whole, only these functions are (their source), and
+    // motion_key hashes these imported values by repr
+    const functions = [...(/^MOTION_FUNCTIONS = \((.*)\)$/m.exec(src)?.[1] ?? '').matchAll(/\('(\w+)', '(\w+)'\)/g)].map((m) => `${m[1]}.${m[2]}`)
+    const keyBody = new RegExp('^def motion_key\\(.*?(?=^\\S)', 'ms').exec(src)?.[0] ?? ''
+    const values = (/h\.update\(repr\(\((.*)$/m.exec(keyBody)?.[1] ?? '').match(/\b[A-Z_]+\b/g) ?? []
+    expect(functions.length).toBeGreaterThan(0)
+    const uncovered: string[] = []
+    let imports = 0
     for (const fn of ['motion_key', 'motion', '_motion_corner']) {
       const body = new RegExp(`^def ${fn}\\(.*?(?=^\\S)`, 'ms').exec(src)?.[0] ?? ''
       expect(body, fn).not.toBe('')
-      for (const m of body.matchAll(/^\s+(?:from (\w+) import|import (\w+))/gm)) {
-        const mod = m[1] ?? m[2]
+      for (const m of body.matchAll(/^\s+(?:from (\w+) import ([\w, ]+)|import (\w+))/gm)) {
+        const mod = m[1] ?? m[3]
         // mask.py itself is hashed by pipeline.py; stdlib and Blender modules have no file here
-        if (mod !== 'mask' && existsSync(resolve(dir, `${mod}.py`))) imported.add(mod)
+        if (mod === 'mask' || !existsSync(resolve(dir, `${mod}.py`))) continue
+        imports++
+        if (hashed.includes(mod)) continue
+        const names = m[2] ? m[2].split(',').map((n) => n.trim()) : [mod]
+        for (const n of names) if (!functions.includes(`${mod}.${n}`) && !values.includes(n)) uncovered.push(`${mod}.${n}`)
       }
     }
-    expect(imported.size).toBeGreaterThan(0)
-    expect([...imported].filter((m) => !hashed.includes(m))).toEqual([])
+    expect(imports).toBeGreaterThan(0)
+    expect(uncovered).toEqual([])
   })
 })

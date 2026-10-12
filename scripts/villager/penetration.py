@@ -103,12 +103,27 @@ class Masked:
         self.drawn_samples = np.concatenate([np.nonzero(vdrawn)[0], len(m) + np.nonzero(drawn)[0]])
         self.any = bool(push.any())
 
-    def drawn_at(self, v, depth):
+    def drawn_at(self, v, depth, post=None):
         """Pushed positions and samples (vertices, then triangle centres) for
-        posed positions `v`, and the vertex normals used."""
+        posed positions `v`, and the vertex normals of the drawn surface.
+        `post` (a runtime root's squash, gamepath.runtime_squash) is applied
+        after the push, as three applies the root after the shader's local push."""
         nrm = vertex_normals(v, self.tris)
         p = v - depth * self.push[:, None] * nrm
+        if post is not None:
+            p = post(p)
+            nrm = vertex_normals(post(v), self.tris)
         return p, np.concatenate([p, p[self.tris].mean(1)]), nrm
+
+
+def pushed_surface(v, tris, push, depth, post=None, nrm=None):
+    """Positions `v` pushed in along their normals by `push` × `depth` in the
+    unsquashed pose, THEN `post` (a runtime root's squash) applied — the order
+    three draws it, as Masked.drawn_at. `nrm`: the normals of `v`, if known."""
+    if nrm is None:
+        nrm = vertex_normals(v, tris)
+    p = v - depth * np.asarray(push, float)[:, None] * nrm
+    return p if post is None else post(p)
 
 
 # how far a shown skin sample is stepped off its own surface before the
@@ -280,6 +295,26 @@ def _always(_x):
     return True
 
 
+def _poses(S, c, person, cfg, ident):
+    """(clip, where, skin, post) for every measured pose of a corner: the
+    clips' frames (GP.poses) — or, for a runtime subject, the game's own
+    composed frames (gamepath.runtime_skin, in pipeline units) with the root's
+    squash as `post`, applied after the mask push (Masked.drawn_at)."""
+    rt = S.get('runtime')
+    sex, age, build = ident
+    if rt is not None:
+        s = rt[c]
+        for f in s['frames']:
+            yield s['id'], f"{s['id']} t {f['t']:.2f} s ({sex} {age} build {build:+.1f})", (lambda v, i, w, f=f: GP.runtime_skin(s, f, v, i, w, 'pipeline')), GP.runtime_squash(s, f)
+        return
+    for k, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
+        if k % S['stride']:
+            continue
+        at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
+        wr, wp = person.pose(q, hips, kst)
+        yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp)), None
+
+
 def _corner(c):
     """One body corner: every pose, every garment and layering, its worst values."""
     from mathutils.bvhtree import BVHTree
@@ -288,8 +323,14 @@ def _corner(c):
     a = cfg['VILLAGER_ASSET']
     depth, reach = a['garmentMaskPush'], a['garmentMaskOpening']
     mk = garments['mask']
-    sex, age, build = c
-    w = corner_weights(sex, age, build)
+    rt = S.get('runtime')
+    if rt is None:
+        sex, age, build = c
+        w = corner_weights(sex, age, build)
+    else:
+        # a runtime subject (gamepath.runtime_*): its own body, by the game's morph rule
+        sex, age, build = (rt[c]['identity'][k] for k in ('sex', 'age', 'build'))
+        w = GP.runtime_weights(rt[c]['identity'], cfg)
     pos, j = morphed(body, w)
     person = GP.Person(j)
     bh = person.bake(pos, S['jidx'], S['jw'])
@@ -307,20 +348,19 @@ def _corner(c):
     worst = {n: _empty() for n in names}
     nv = len(body['pos'])
     bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
-    for k, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
-        if k % S['stride']:
-            continue
-        at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
-        wr, wp = person.pose(q, hips, kst)
-        bv = person.skin(bh, S['jidx'], S['jw'], wr, wp)
+    for cname, at, skin, post in _poses(S, c, person, cfg, (sex, age, build)):
+        # unpushed: before the root's squash (`post`), which follows the mask push
+        bvu = skin(bh, S['jidx'], S['jw'])
+        gvu = {n: skin(gh[n], *gskin[n]) for n in names}
+        bv = bvu if post is None else post(bvu)
+        gv = gvu if post is None else {n: post(x) for n, x in gvu.items()}
         full = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
-        gv = {n: person.skin(gh[n], *gskin[n], wr, wp) for n in names}
         trees = {n: S['vol'][n].trees(gv[n]) for n in names}
         for n in names:
             r = worst[n]
             r['checked'] += 1
             mb = bm[n]
-            bp, smp, nrm = mb.drawn_at(bv, depth)
+            bp, smp, nrm = mb.drawn_at(bvu, depth, post)
             # the pushed body: every triangle (inside test), and the drawn ones
             tree = full if not mb.any else BVHTree.FromPolygons(bp.tolist(), body['tris'].tolist(), all_triangles=True)
             dtree = None if not mb.any else BVHTree.FromPolygons(bp.tolist(), body['tris'][mb.drawn].tolist(), all_triangles=True)
@@ -368,7 +408,7 @@ def _corner(c):
         bnrm = None
         sight = {}
         for i, o, mi in pairs:
-            ip, smp, _nrm = mi.drawn_at(gv[i], depth)
+            ip, smp, _nrm = mi.drawn_at(gvu[i], depth, post)
             ipart = lambda k, i=i, mi=mi: S['bones'][S['gdom'][i][k if k < S['gnv'][i] else mi.tris[k - S['gnv'][i]][0]]]  # noqa: E731
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.shown, trees=trees[o])
             thr = mi.shown[place[mi.shown] == M.THROUGH]
@@ -378,8 +418,8 @@ def _corner(c):
                 nonlocal bnrm
                 hide, push = both[i, o]
                 if bnrm is None:
-                    bnrm = vertex_normals(bv, btris)
-                return bv - depth * push[:, None] * bnrm, M.drawn_tris(btris, hide)
+                    bnrm = vertex_normals(bvu, btris)
+                return pushed_surface(bvu, btris, push, depth, post, bnrm), M.drawn_tris(btris, hide)
 
             def in_sight(x, i=i, o=o, mi=mi, ip=ip, smp=smp, scene=scene, pushed_body=pushed_body):
                 """Under an open outer garment: some line of sight past the
@@ -414,12 +454,26 @@ def _corner(c):
 def selftest():
     """Occlusion counts only drawn skin; a residual below tolerance stays
     measured (needs Blender's mathutils)."""
+    from types import SimpleNamespace
+
     from mathutils.bvhtree import BVHTree
 
     def box(x0, x1, y0, y1, z0, z1):
         v = [(x, y, z) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
         q = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (1, 5, 7, 3), (0, 2, 6, 4)]
         return v, [t for a, b, c, d in q for t in ((a, b, c), (a, c, d))]
+    # a squashed runtime frame: the mask push runs in the unsquashed pose, the
+    # squash after it — for the covered body (Masked.drawn_at) and the layering
+    # scene's pushed body (pushed_surface) alike
+    bx, bt = box(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0)
+    bx, bt = np.array(bx, float), np.array(bt)
+    squash = lambda x: x * np.array([1.0, 0.5, 1.0])  # noqa: E731
+    push, d = np.ones(len(bx), bool), 0.1
+    want = squash(bx - d * vertex_normals(bx, bt))
+    assert np.allclose(pushed_surface(bx, bt, push, d, squash), want)
+    assert np.allclose(Masked.drawn_at(SimpleNamespace(tris=bt, push=push), bx, d, squash)[0], want)
+    sq = squash(bx)
+    assert not np.allclose(want, sq - d * vertex_normals(sq, bt)), 'the push after the squash is the old, wrong order'
     # an arm point pressed into a thigh: occluded while the thigh is drawn,
     # shown once the mask hides the thigh's triangles
     av, at = box(-0.05, 0.05, -0.05, 0.05, 0.0, 1.0)
@@ -547,7 +601,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
     workers = workers or max(1, min(len(corners), (os.cpu_count() or 2) - 1))
     worst = {n: _empty() for n in names}
     with mp.get_context('fork').Pool(workers) as pool:
-        for (sex, age, build), part in pool.imap(_corner, corners):
+        for c, part in pool.imap(_corner, corners):
             for n, r in part.items():
                 t = worst[n]
                 t['checked'] += r['checked']
@@ -562,7 +616,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
                     t[col]['over'] += r[col]['over']
                     if r[col]['value'] > t[col]['value']:
                         t[col].update(value=r[col]['value'], at=r[col]['at'], part=r[col]['part'])
-            log(f'penetration: {sex} {age} {build:+.0f} done')
+            log(f'penetration: {c if isinstance(c, str) else "{} {} {:+.0f}".format(*c)} done')
     return worst, _S['tol']
 
 
@@ -690,3 +744,48 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     print('\n'.join(lines))
     # a garment failing only in the build pose fails the step too
     return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS))
+
+
+def runtime_report(out, body, garments, cfg, rt):
+    """The same evaluator over the game's OWN composed poses (the runtime
+    export, round trip checked): per subject its worn garments on its own
+    body in every recorded frame. REPORT ONLY — it gates nothing (the gate is
+    `report`); written to runtime-penetration-report.md (and .json)."""
+    a = cfg['VILLAGER_ASSET']
+    subjects = {s['id']: s for s in rt['subjects']}
+    rows, tol = {}, a['garmentPenetrationTolerance']
+    _S['runtime'] = subjects
+    try:
+        for sid, s in subjects.items():
+            missing = [n for n in s['garments'] if n not in garments['meshes']]
+            if missing:
+                raise RuntimeError(f'runtime penetration: {sid} wears {missing}, absent from the built garments — rebuild them (--step garments)')
+            names = list(s['garments'])
+            if names:
+                rows[sid], tol = measure(body, None, garments, cfg, names=names, corners=[sid], workers=1)
+    finally:
+        _S.pop('runtime', None)
+    lines = [
+        '# Garment penetration on the runtime composition (report only)',
+        '',
+        'Generated by `node scripts/villager/build.mjs penetration` from the game\'s own composed poses '
+        '(src/render/villagerRuntimePose.test.tsx, round trip checked by gamepath.runtime_check): per subject its worn garments on its own body, '
+        'every recorded frame, measured by the same evaluator and columns as penetration-report.md (figure units, the root\'s y-squash applied after the mask push). '
+        f'Tolerance {tol}. This report gates nothing; the gate is penetration-report.md.',
+        '',
+    ]
+    for sid, worst in rows.items():
+        s = subjects[sid]
+        i = s['identity']
+        lines += [f'## {s["title"]}', '', f'{i["sex"]} {i["age"]}, build {i["build"]:+.1f}, figure scale {i["scale"]:g}; '
+                  f'{len(s["frames"])} frames {s["frames"][0]["t"]:.2f}–{s["frames"][-1]["t"]:.2f} s.', '']
+        t, bad = _table(worst, a, tol, worst[next(iter(worst))]['checked'])
+        lines += t + ['', f'{len(worst) - bad} of {len(worst)} worn garments within tolerance in every frame.', '']
+    os.makedirs(out, exist_ok=True)
+    open(os.path.join(out, 'runtime-penetration-report.md'), 'w').write('\n'.join(lines))
+
+    def plain(w):
+        return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
+    json.dump({'tolerance': tol, 'subjects': {sid: plain(w) for sid, w in rows.items()}},
+              open(os.path.join(out, 'runtime-penetration-report.json'), 'w'), indent=1)
+    print('\n'.join(lines))
