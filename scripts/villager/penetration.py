@@ -116,6 +116,16 @@ class Masked:
         return p, np.concatenate([p, p[self.tris].mean(1)]), nrm
 
 
+def pushed_surface(v, tris, push, depth, post=None, nrm=None):
+    """Positions `v` pushed in along their normals by `push` × `depth` in the
+    unsquashed pose, THEN `post` (a runtime root's squash) applied — the order
+    three draws it, as Masked.drawn_at. `nrm`: the normals of `v`, if known."""
+    if nrm is None:
+        nrm = vertex_normals(v, tris)
+    p = v - depth * np.asarray(push, float)[:, None] * nrm
+    return p if post is None else post(p)
+
+
 # how far a shown skin sample is stepped off its own surface before the
 # occlusion test: far below any gap between body parts, independent of the
 # tolerance, so a residual is never dropped by a probe that crossed a small gap
@@ -408,8 +418,8 @@ def _corner(c):
                 nonlocal bnrm
                 hide, push = both[i, o]
                 if bnrm is None:
-                    bnrm = vertex_normals(bv, btris)
-                return bv - depth * push[:, None] * bnrm, M.drawn_tris(btris, hide)
+                    bnrm = vertex_normals(bvu, btris)
+                return pushed_surface(bvu, btris, push, depth, post, bnrm), M.drawn_tris(btris, hide)
 
             def in_sight(x, i=i, o=o, mi=mi, ip=ip, smp=smp, scene=scene, pushed_body=pushed_body):
                 """Under an open outer garment: some line of sight past the
@@ -444,12 +454,26 @@ def _corner(c):
 def selftest():
     """Occlusion counts only drawn skin; a residual below tolerance stays
     measured (needs Blender's mathutils)."""
+    from types import SimpleNamespace
+
     from mathutils.bvhtree import BVHTree
 
     def box(x0, x1, y0, y1, z0, z1):
         v = [(x, y, z) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
         q = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (1, 5, 7, 3), (0, 2, 6, 4)]
         return v, [t for a, b, c, d in q for t in ((a, b, c), (a, c, d))]
+    # a squashed runtime frame: the mask push runs in the unsquashed pose, the
+    # squash after it — for the covered body (Masked.drawn_at) and the layering
+    # scene's pushed body (pushed_surface) alike
+    bx, bt = box(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0)
+    bx, bt = np.array(bx, float), np.array(bt)
+    squash = lambda x: x * np.array([1.0, 0.5, 1.0])  # noqa: E731
+    push, d = np.ones(len(bx), bool), 0.1
+    want = squash(bx - d * vertex_normals(bx, bt))
+    assert np.allclose(pushed_surface(bx, bt, push, d, squash), want)
+    assert np.allclose(Masked.drawn_at(SimpleNamespace(tris=bt, push=push), bx, d, squash)[0], want)
+    sq = squash(bx)
+    assert not np.allclose(want, sq - d * vertex_normals(sq, bt)), 'the push after the squash is the old, wrong order'
     # an arm point pressed into a thigh: occluded while the thigh is drawn,
     # shown once the mask hides the thigh's triangles
     av, at = box(-0.05, 0.05, -0.05, 0.05, 0.0, 1.0)
