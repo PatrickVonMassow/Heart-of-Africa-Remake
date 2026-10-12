@@ -132,7 +132,7 @@ def main():
         E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, dress, cfg, mask=garments and garments['mask'])
         if garments:
             import sheets as S
-            MK.check(a.verification, garments['mask'], body, [o for _s, _a, o in S.OUTFITS])
+            MK.check(a.verification, garments['mask'], body, [o for _s, _a, o in S.outfits(garments)])
     rt = None
     if a.runtime and any(s in steps for s in ('runtime', 'sheets', 'penetration')):
         import gamepath as GP

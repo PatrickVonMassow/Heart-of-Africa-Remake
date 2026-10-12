@@ -75,7 +75,7 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
     if garments and clips and (not want or 'dress' in want):
         # the shipped garments in motion: four outfits through walk, kneel and dig
         for name in DRESS_CLIPS:
-            for k, (sex, age, outfit) in enumerate(OUTFITS):
+            for k, (sex, age, outfit) in enumerate(outfits(garments)):
                 clip_sheet(out, body, clips, name, frames=8, view=35, spacing=1.0, sex=sex, age=age,
                            fname=f'dress-{name}-{k}.png', garments=garments, outfit=outfit, cfg=cfg)
     if clips:
@@ -176,6 +176,27 @@ OUTFITS = [
     ('male', 'elder', ('g-trousers-waist', 'g-shirt-chest', 'g-cloak-chest')),
     ('female', 'youth', ('g-skirtKnee-waist', 'g-cape-chest', 'g-limbRings-limbs')),
 ]
+
+
+def outfits(garments):
+    """OUTFITS resolved against the built garments: each id itself when it
+    was built, else the same form in another wear (the first built); a form
+    no longer built at all raises (a renamed garment never silently empties
+    an outfit)."""
+    have = [n for n in garments['meshes'] if n.startswith('g-')]
+    out = []
+    for sex, age, outfit in OUTFITS:
+        worn = []
+        for n in outfit:
+            form = n.split('-')[1]
+            alt = n if n in have else next((m for m in have if m.split('-')[1] == form), None)
+            if alt is None:
+                raise RuntimeError(f'sheets: outfit garment {n} (form {form}) is not built (garments: {", ".join(have)})')
+            worn.append(alt)
+        out.append((sex, age, tuple(worn)))
+    return out
+
+
 GARMENT_COLOURS = [(0.75, 0.68, 0.55, 1), (0.55, 0.25, 0.18, 1), (0.25, 0.3, 0.5, 1), (0.6, 0.5, 0.3, 1)]
 
 
