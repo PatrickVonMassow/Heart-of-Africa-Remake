@@ -77,13 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1346. The garment penetration gate compares against a stale main report
-  Queue position: Dorfleben, after point 1316; before the rig points 1342/1343 rely on the gate.
-  Source: findings carrier 12.10.2026 10:37, measured on feat/1316-natural-villager-motion (clip path unchanged against main): `node scripts/villager/build.mjs penetration` on the 31 garments main builds since 83d5e49fa is red in absolute terms: 29 of 31 within tolerance in the build pose (g-veil-face inner 0.0369 under g-shirt-chest, g-wrapLong-chest inner 0.0061 under g-breastCloth-chest), 5 of 31 in every pose. Main's committed verification/villager-body/penetration-report.md/json (43515f095, 11.10.2026) still lists the earlier 32-garment set (g-cape-bothShoulders, g-cloak-leftShoulder/rightShoulder, g-skirtKnee-chest, g-skirtShort-chest), so the `--baseline` "no worse than main" comparison of points 1312/1314 has no baseline row for g-cape-chest, g-cloak-chest, g-neckBeads-chest and g-babySling-bothShoulders and can pass a new garment unchecked (possible false approval).
-  Final state: main's penetration report is measured on the garment set the shipped villager.glb carries; the comparison names a garment absent from the baseline as unchecked instead of passing it; the two build-pose layering failures are fixed or each named as a residual with its missing information.
-  Verifiable: `build.mjs penetration --baseline <main json>` on main reports every shipped garment with a baseline row; a selftest case where a garment missing from the baseline fails the comparison.
-  Criticality: medium - the garment gate every villager rig point leans on.
-  Bundle: Dorfleben.
 - [ ] 1342. Natural villager motion b: three-segment spine, hand morphs, jog and clip style, dig action, one pose pipeline, distributed lean and gaze, corrective leg IK
   Queue position: directly after point 1316 (its sub-point a supplies the runtime sheets and pose exporter every step here is judged with).
   Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 2, 3, 5-11 with the step-4 forearm-twist decision after step 9, and step 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
