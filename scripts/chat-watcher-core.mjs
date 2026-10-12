@@ -371,16 +371,44 @@ export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } 
   return hash.digest('hex').slice(0, 16)
 }
 
-/** The launcher's restart request (`WATCHER_RESTART_SIGNAL`). Honoured by the
- *  watcher itself: it admits no new responder from then on and exits only once
- *  its running responder has, so a responder spawned after the launcher read
- *  the claim is never killed by the restart. */
-export const WATCHER_RESTART_SIGNAL = 'SIGUSR2'
+/** The launcher's restart request: a file naming the target pid ({ pid, at }),
+ *  by NAME like `WATCHER_PID_FILE`. A file, not a signal, so it works the same
+ *  on Windows. The watcher checks it every `WATCHER_RESTART_POLL_MS`, admits no
+ *  new responder from then on and exits once its responder has (`drainPlan`),
+ *  so a responder spawned after the launcher read the claim is not killed. */
+export const WATCHER_RESTART_FILE = 'chat-watcher-restart.json'
+export const WATCHER_RESTART_POLL_MS = 1000
 
-/** What a watcher does on a restart request, or on a responder exit after one. */
-export function restartRequestAction({ requested = false, responderLive = false } = {}) {
+/** The restart protocol a watcher advertises in its pidfile. A watcher without
+ *  it (legacy) does not read the request file and can only be stopped. */
+export const WATCHER_RESTART_PROTOCOL = 1
+
+/** Grace between the drain's SIGTERM and its SIGKILL to the responder. */
+export const RESPONDER_KILL_GRACE_MS = 10_000
+
+/**
+ * WHAT A WATCHER DOES UNDER A RESTART REQUEST. PURE. The drain is bounded by
+ * `RESPONDER_MAX_MS` from the responder's spawn: then SIGTERM, and after
+ * `RESPONDER_KILL_GRACE_MS` SIGKILL and exit regardless.
+ *
+ * Returns 'run' | 'exit' | 'wait' | 'term' | 'kill-exit'.
+ */
+export function drainPlan({ requested = false, responderLive = false, spawnedAt = null, termSentAt = null, now } = {}) {
   if (!requested) return 'run'
-  return responderLive ? 'drain' : 'exit'
+  if (!responderLive) return 'exit'
+  const spawned = stampOf(spawnedAt)
+  if (Number.isFinite(spawned) && now - spawned < RESPONDER_MAX_MS) return 'wait'
+  const term = stampOf(termSentAt)
+  if (!Number.isFinite(term)) return 'term'
+  return now - term < RESPONDER_KILL_GRACE_MS ? 'wait' : 'kill-exit'
+}
+
+/** The launcher's verdict after a restart request: start the new watcher once
+ *  the old one has exited; a request that was never delivered is a failure,
+ *  never "draining". */
+export function restartOutcome({ delivered = false, exited = false } = {}) {
+  if (exited) return 'start'
+  return delivered ? 'draining' : 'request-failed'
 }
 
 /**
@@ -432,12 +460,14 @@ export function watcherSupervision({ paused = false, record = null, probe = null
   // CODE CHANGED UNDER A LIVE WATCHER (a merge): restart it, paused or not. A
   // record without a fingerprint counts as changed once — the new watcher writes
   // one. Not while its responder runs (the watcher also drains one itself, see
-  // `restartRequestAction`), not on an incomplete fingerprint, not on a pid
-  // whose identity is unproven.
+  // `drainPlan`), not on an incomplete fingerprint, not on a pid whose identity
+  // is unproven. `stop` says how: the request file, or — for a legacy watcher
+  // without `restartProtocol`, which never reads it — a plain stop, once.
   if (identified && fingerprint === null) return { action: 'none', reason: 'fingerprint-unreadable', pid }
   if (identified && typeof fingerprint === 'string' && fingerprint !== '' && record?.codeFingerprint !== fingerprint) {
     if (adoptDecision({ claim, probe }).adopt) return { action: 'none', reason: 'code-changed-responder-busy', pid }
-    return { action: 'restart', reason: 'code-changed', pid }
+    const stop = record?.restartProtocol === WATCHER_RESTART_PROTOCOL ? 'request' : 'legacy-stop'
+    return { action: 'restart', reason: 'code-changed', pid, stop }
   }
   // A paused batch still needs its inbox listener: user mail is the only input
   // that can authorize the pause to end. Keeping (or restarting) this zero-model

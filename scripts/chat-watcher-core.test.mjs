@@ -19,7 +19,11 @@ import {
   sweepPlan,
   wakeDecision,
   watcherCodeFingerprint,
-  restartRequestAction,
+  drainPlan,
+  RESPONDER_MAX_MS,
+  restartOutcome,
+  RESPONDER_KILL_GRACE_MS,
+  WATCHER_RESTART_PROTOCOL,
   watcherSupervision,
   isWatcherCommand,
 } from './chat-watcher-core.mjs'
@@ -455,7 +459,13 @@ describe('watcherSupervision — a watcher whose code a merge changed is restart
   const probeOf = (map) => (pid) => map[pid] ?? { exists: false, startedAt: null }
   const cmd = '/usr/local/bin/node /workspace/hoa/scripts/chat-watcher.mjs'
   const live = { 900: { exists: true, startedAt: now - 10_000, command: cmd } }
-  const record = { pid: 900, pidStartedAt: now - 10_000, at: now - 10_000, codeFingerprint: 'aaaa' }
+  const record = {
+    pid: 900,
+    pidStartedAt: now - 10_000,
+    at: now - 10_000,
+    codeFingerprint: 'aaaa',
+    restartProtocol: WATCHER_RESTART_PROTOCOL,
+  }
   const busyClaim = { by: CLAIM_BY, responderPid: 901 }
 
   it('leaves a watcher alone whose fingerprint matches', () => {
@@ -471,6 +481,7 @@ describe('watcherSupervision — a watcher whose code a merge changed is restart
       action: 'restart',
       reason: 'code-changed',
       pid: 900,
+      stop: 'request',
     })
   })
 
@@ -480,11 +491,32 @@ describe('watcherSupervision — a watcher whose code a merge changed is restart
     expect(watcherSupervision({ record: old, probe: probeOf(live), fingerprint: 'aaaa' }).action).toBe('restart')
   })
 
+  it('a legacy watcher (no restart protocol) is stopped plainly, once', () => {
+    const { restartProtocol, ...legacy } = record
+    expect(restartProtocol).toBe(1)
+    expect(watcherSupervision({ record: legacy, probe: probeOf(live), fingerprint: 'bbbb' })).toEqual({
+      action: 'restart',
+      reason: 'code-changed',
+      pid: 900,
+      stop: 'legacy-stop',
+    })
+  })
+
+  it('a legacy watcher is not stopped while the claim shows a live responder', () => {
+    const { restartProtocol, ...legacy } = record
+    expect(restartProtocol).toBe(1)
+    const busy = probeOf({ ...live, 901: { exists: true, startedAt: now - 1000 } })
+    expect(
+      watcherSupervision({ record: legacy, probe: busy, fingerprint: 'bbbb', claim: { by: CLAIM_BY, responderPid: 901 } }),
+    ).toEqual({ action: 'none', reason: 'code-changed-responder-busy', pid: 900 })
+  })
+
   it('restarts a stale watcher in a paused batch too', () => {
     expect(watcherSupervision({ paused: true, record, probe: probeOf(live), fingerprint: 'bbbb' })).toEqual({
       action: 'restart',
       reason: 'code-changed',
       pid: 900,
+      stop: 'request',
     })
   })
 
@@ -571,25 +603,76 @@ describe('watcherCodeFingerprint — the watcher and the modules it imports', ()
   })
 })
 
-describe('restartRequestAction — the watcher drains its responder before a restart', () => {
+describe('drainPlan — the watcher drains its responder before a restart, bounded', () => {
+  const t0 = 1_700_000_000_000
+
   it('runs on without a request', () => {
-    expect(restartRequestAction({ requested: false, responderLive: true })).toBe('run')
+    expect(drainPlan({ requested: false, responderLive: true, now: t0 })).toBe('run')
   })
 
   it('exits at once with no responder', () => {
-    expect(restartRequestAction({ requested: true, responderLive: false })).toBe('exit')
+    expect(drainPlan({ requested: true, responderLive: false, now: t0 })).toBe('exit')
   })
 
-  it('drains a running responder — even one spawned after the launcher read the claim', () => {
-    expect(restartRequestAction({ requested: true, responderLive: true })).toBe('drain')
+  it('waits for a running responder — even one spawned after the launcher read the claim', () => {
+    expect(drainPlan({ requested: true, responderLive: true, spawnedAt: t0, now: t0 + 1000 })).toBe('wait')
   })
 
-  it('is wired: the watcher honours the signal and refuses admission, the launcher sends it', () => {
+  it('a responder that ignores SIGTERM is killed and the watcher exits after the bound', () => {
+    // Injected child: stays live whatever it is sent until SIGKILL.
+    const child = { live: true, signals: [] }
+    const st = { termSentAt: null, exited: false }
+    const step = 1000
+    let t = t0
+    for (; t <= t0 + RESPONDER_MAX_MS + RESPONDER_KILL_GRACE_MS + 5 * step && !st.exited; t += step) {
+      const plan = drainPlan({ requested: true, responderLive: child.live, spawnedAt: t0, termSentAt: st.termSentAt, now: t })
+      if (plan === 'term') {
+        st.termSentAt = t
+        child.signals.push(['SIGTERM', t])
+      } else if (plan === 'kill-exit') {
+        child.signals.push(['SIGKILL', t])
+        child.live = false
+        st.exited = true
+      } else if (plan === 'exit') st.exited = true
+    }
+    expect(st.exited).toBe(true)
+    expect(child.signals).toEqual([
+      ['SIGTERM', t0 + RESPONDER_MAX_MS],
+      ['SIGKILL', t0 + RESPONDER_MAX_MS + RESPONDER_KILL_GRACE_MS],
+    ])
+  })
+
+  it('a responder that obeys SIGTERM lets the watcher exit plainly', () => {
+    const t = t0 + RESPONDER_MAX_MS
+    expect(drainPlan({ requested: true, responderLive: true, spawnedAt: t0, now: t })).toBe('term')
+    expect(drainPlan({ requested: true, responderLive: false, spawnedAt: t0, termSentAt: t, now: t + 1000 })).toBe('exit')
+  })
+
+  it('is wired: the watcher reads the request file and refuses admission, the launcher writes it', () => {
     const watcher = readFileSync(new URL('./chat-watcher.mjs', import.meta.url), 'utf8')
-    expect(watcher).toMatch(/process\.on\(WATCHER_RESTART_SIGNAL/)
+    expect(watcher).toMatch(/readJson\(RESTART_PATH\)\?\.pid !== process\.pid/)
+    expect(watcher).toMatch(/setInterval\(checkRestartRequest, WATCHER_RESTART_POLL_MS\)/)
+    expect(watcher).toMatch(/restartProtocol: WATCHER_RESTART_PROTOCOL/)
     expect(watcher).toMatch(/if \(state\.restartRequested\) \{\s*log\(\{ event: 'spawn-refused'/)
+    expect(watcher).not.toMatch(/SIGUSR2/)
     const launcher = readFileSync(new URL('./batch-autostart.mjs', import.meta.url), 'utf8')
-    expect(launcher).toMatch(/process\.kill\(sup\.pid, WATCHER_RESTART_SIGNAL\)/)
+    expect(launcher).toMatch(/writeJsonAtomic\(C\(WATCHER_RESTART_FILE\), \{ pid: sup\.pid/)
+    expect(launcher).toMatch(/legacy-stop pid/)
+  })
+})
+
+describe('restartOutcome — a failed request is reported, never called draining', () => {
+  it('starts the new watcher once the old one exited', () => {
+    expect(restartOutcome({ delivered: true, exited: true })).toBe('start')
+    expect(restartOutcome({ delivered: false, exited: true })).toBe('start')
+  })
+
+  it('a delivered request to a live watcher is a drain', () => {
+    expect(restartOutcome({ delivered: true, exited: false })).toBe('draining')
+  })
+
+  it('an undelivered request is a failure', () => {
+    expect(restartOutcome({ delivered: false, exited: false })).toBe('request-failed')
   })
 })
 
