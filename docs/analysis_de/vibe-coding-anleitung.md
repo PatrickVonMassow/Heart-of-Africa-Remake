@@ -671,12 +671,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Lösung wird erst eingereiht, wenn du sie mir **gezeigt** und ich **danach**
   zugestimmt habe. Mein **Wortlaut** reist mit dem Auftrag. Ein Wächter dafür bleibt **einfach**
   und sperrt im Zweifel — er schützt gegen Vergessen, nicht gegen einen Angreifer."
-- **Gemergt heißt nicht laufend.** Die Korrektur für einen Dauerprozess ist gelandet und getestet,
-  doch der Prozess läuft seit Stunden mit dem alten Code weiter. Eine Live-Messung prüft dann
-  den Fehler, den es schon nicht mehr gibt.
-  → *Prompt:* „Bevor du etwas **live** misst, prüf, ob der laufende Prozess **nach** dem Merge
-  gestartet wurde. Wenn nicht, starte ihn neu, und sorg dafür, dass die Aufsicht das künftig
-  selbst tut.“
+- **Gemergt heißt nicht laufend.** Ein Dauerprozess läuft nach dem Merge mit altem Code weiter.
+  → *Prompt:* „Vor einer **Live**-Messung: Startete der Prozess **nach** dem Merge? Sonst neu
+  starten — und die Aufsicht tut das künftig selbst.“
 
 ---
 
