@@ -280,6 +280,25 @@ def _always(_x):
     return True
 
 
+def _poses(S, c, person, cfg, ident):
+    """(clip, where, skin) for every measured pose of a corner: the clips'
+    frames (GP.poses) — or, for a runtime subject, the game's own composed
+    frames (gamepath.runtime_skin, in pipeline units)."""
+    rt = S.get('runtime')
+    sex, age, build = ident
+    if rt is not None:
+        s = rt[c]
+        for f in s['frames']:
+            yield s['id'], f"{s['id']} t {f['t']:.2f} s ({sex} {age} build {build:+.1f})", (lambda v, i, w, f=f: GP.runtime_skin(s, f, v, i, w, 'pipeline'))
+        return
+    for k, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
+        if k % S['stride']:
+            continue
+        at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
+        wr, wp = person.pose(q, hips, kst)
+        yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp))
+
+
 def _corner(c):
     """One body corner: every pose, every garment and layering, its worst values."""
     from mathutils.bvhtree import BVHTree
@@ -288,8 +307,14 @@ def _corner(c):
     a = cfg['VILLAGER_ASSET']
     depth, reach = a['garmentMaskPush'], a['garmentMaskOpening']
     mk = garments['mask']
-    sex, age, build = c
-    w = corner_weights(sex, age, build)
+    rt = S.get('runtime')
+    if rt is None:
+        sex, age, build = c
+        w = corner_weights(sex, age, build)
+    else:
+        # a runtime subject (gamepath.runtime_*): its own body, by the game's morph rule
+        sex, age, build = (rt[c]['identity'][k] for k in ('sex', 'age', 'build'))
+        w = GP.runtime_weights(rt[c]['identity'], cfg)
     pos, j = morphed(body, w)
     person = GP.Person(j)
     bh = person.bake(pos, S['jidx'], S['jw'])
@@ -307,14 +332,10 @@ def _corner(c):
     worst = {n: _empty() for n in names}
     nv = len(body['pos'])
     bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
-    for k, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
-        if k % S['stride']:
-            continue
-        at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
-        wr, wp = person.pose(q, hips, kst)
-        bv = person.skin(bh, S['jidx'], S['jw'], wr, wp)
+    for cname, at, skin in _poses(S, c, person, cfg, (sex, age, build)):
+        bv = skin(bh, S['jidx'], S['jw'])
         full = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
-        gv = {n: person.skin(gh[n], *gskin[n], wr, wp) for n in names}
+        gv = {n: skin(gh[n], *gskin[n]) for n in names}
         trees = {n: S['vol'][n].trees(gv[n]) for n in names}
         for n in names:
             r = worst[n]
@@ -547,7 +568,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
     workers = workers or max(1, min(len(corners), (os.cpu_count() or 2) - 1))
     worst = {n: _empty() for n in names}
     with mp.get_context('fork').Pool(workers) as pool:
-        for (sex, age, build), part in pool.imap(_corner, corners):
+        for c, part in pool.imap(_corner, corners):
             for n, r in part.items():
                 t = worst[n]
                 t['checked'] += r['checked']
@@ -562,7 +583,7 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
                     t[col]['over'] += r[col]['over']
                     if r[col]['value'] > t[col]['value']:
                         t[col].update(value=r[col]['value'], at=r[col]['at'], part=r[col]['part'])
-            log(f'penetration: {sex} {age} {build:+.0f} done')
+            log(f'penetration: {c if isinstance(c, str) else "{} {} {:+.0f}".format(*c)} done')
     return worst, _S['tol']
 
 
@@ -690,3 +711,45 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     print('\n'.join(lines))
     # a garment failing only in the build pose fails the step too
     return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS))
+
+
+def runtime_report(out, body, garments, cfg, rt):
+    """The same evaluator over the game's OWN composed poses (the runtime
+    export, round trip checked): per subject its worn garments on its own
+    body in every recorded frame. REPORT ONLY — it gates nothing (the gate is
+    `report`); written to runtime-penetration-report.md (and .json)."""
+    a = cfg['VILLAGER_ASSET']
+    subjects = {s['id']: s for s in rt['subjects']}
+    rows, tol = {}, a['garmentPenetrationTolerance']
+    _S['runtime'] = subjects
+    try:
+        for sid, s in subjects.items():
+            names = [n for n in s['garments'] if n in garments['meshes']]
+            if names:
+                rows[sid], tol = measure(body, None, garments, cfg, names=names, corners=[sid], workers=1)
+    finally:
+        _S.pop('runtime', None)
+    lines = [
+        '# Garment penetration on the runtime composition (report only)',
+        '',
+        'Generated by `node scripts/villager/build.mjs penetration` from the game\'s own composed poses '
+        '(src/render/villagerRuntimePose.test.tsx, round trip checked by gamepath.runtime_check): per subject its worn garments on its own body, '
+        'every recorded frame, measured by the same evaluator and columns as penetration-report.md (figure units, the root\'s y-squash kept). '
+        f'Tolerance {tol}. This report gates nothing; the gate is penetration-report.md.',
+        '',
+    ]
+    for sid, worst in rows.items():
+        s = subjects[sid]
+        i = s['identity']
+        lines += [f'## {s["title"]}', '', f'{i["sex"]} {i["age"]}, build {i["build"]:+.1f}, figure scale {i["scale"]:g}; '
+                  f'{len(s["frames"])} frames {s["frames"][0]["t"]:.2f}–{s["frames"][-1]["t"]:.2f} s.', '']
+        t, bad = _table(worst, a, tol, worst[next(iter(worst))]['checked'])
+        lines += t + ['', f'{len(worst) - bad} of {len(worst)} worn garments within tolerance in every frame.', '']
+    os.makedirs(out, exist_ok=True)
+    open(os.path.join(out, 'runtime-penetration-report.md'), 'w').write('\n'.join(lines))
+
+    def plain(w):
+        return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
+    json.dump({'tolerance': tol, 'subjects': {sid: plain(w) for sid, w in rows.items()}},
+              open(os.path.join(out, 'runtime-penetration-report.json'), 'w'), indent=1)
+    print('\n'.join(lines))

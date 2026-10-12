@@ -16,6 +16,8 @@ def clear():
         bpy.data.objects.remove(ob)
     for me in list(bpy.data.meshes):
         bpy.data.meshes.remove(me)
+    for cu in list(bpy.data.curves):
+        bpy.data.curves.remove(cu)
 
 
 def add_mesh(name, verts, tris, rgba):
@@ -27,6 +29,22 @@ def add_mesh(name, verts, tris, rgba):
     bpy.context.scene.collection.objects.link(ob)
     for p in me.polygons:
         p.use_smooth = True
+    return ob
+
+
+def label(text, pos, size, view='side', rgba=(0.08, 0.08, 0.1, 1)):
+    """Upright text at `pos` (game coords, its centre at the bottom),
+    facing a camera of `view` (as `render`'s)."""
+    az = {'side': 90.0, 'front': 0.0, 'back': 180.0, 'other': -90.0}.get(view, view)
+    cu = bpy.data.curves.new('label', 'FONT')
+    cu.body = text
+    cu.size = size
+    cu.align_x = 'CENTER'
+    ob = bpy.data.objects.new('label', cu)
+    ob.color = rgba
+    ob.location = _to_blender([pos])[0].tolist()
+    ob.rotation_euler = (math.pi / 2, 0.0, math.radians(float(az)))
+    bpy.context.scene.collection.objects.link(ob)
     return ob
 
 

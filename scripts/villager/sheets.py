@@ -247,3 +247,72 @@ def garment_sheet(out, body, clips, garments, cfg, clip='walk', t=0.3, per_row=8
         span = (len(row) - 1) * 0.8
         R.ground(-0.6, span + 0.6, -0.6, span + 0.6)
         R.render(os.path.join(out, (fname or f'garments-{clip}-{view}') + f'-{r}.png'), (span / 2 if view != 'side' else 0, 0.68, span / 2 if view == 'side' else 0), span + 1.2, view, (int(240 * (span + 1.2)), 400))
+
+
+# ---- the runtime composition (gamepath.py runtime_*; build.mjs exports it) -------
+
+
+LABEL = (0.98, 0.95, 0.6, 1)
+
+
+def _view_name(view, elevation):
+    name = 'side (from the right)' if view == 'side' else view if isinstance(view, str) else f'azimuth {view:g}°'
+    return name + (f', elev {elevation:g}°' if elevation else '')
+
+
+def runtime_sheets(out, body, clips, garments, cfg, rt):
+    """Per subject and camera a strip of the game's OWN composed pose (the
+    runtime export, its round trip already checked): body, worn garments with
+    their cover mask and the shovel, skinned by the exported bones exactly as
+    three skins them, the root's rotation and scale kept and its travel taken
+    out. Every frame labelled with its time and camera.
+    verification/villager-body/runtime-<subject>-<view>.png"""
+    import mask as MK
+    from fit import garment_pos
+    a = cfg['VILLAGER_ASSET']
+    jidx, jw = top4(body['W'])
+    sv, st = shovel_geometry(a['shovel'])
+    for s in rt['subjects']:
+        person, pos, w = GP.runtime_person(body, s, cfg)
+        baked = person.bake(pos, jidx, jw)
+        worn = [n for n in s['garments'] if garments and n in garments['meshes']]
+        btris, bpush, inner = masked(body, garments, worn, cfg)
+        gskin = {n: top4(garments['meshes'][n]['W']) for n in worn}
+        gbaked = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in worn}
+        h = s['identity']['scale']
+        unit = s['person']['scale'] * h  # pipeline unit → world
+        elev = s.get('elevation', 0)
+
+        def pushed(v, tris, push):
+            if push is None or not push.any():
+                return v
+            return MK.pushed(v, tris, push.astype(float), a['garmentMaskPush'] * unit)
+        for view in s['views']:
+            R.clear()
+            side = view == 'side'
+            # the side strip from the figure's right (+z to the right): time and travel run left to right
+            cam_view = 'other' if side else view
+            spacing = (0.6 if side else 0.8 if view == 'front' else 1.0) * h
+            n = len(s['frames'])
+            span = spacing * (n - 1)
+            cam = _view_name(view, elev)
+            for k, f in enumerate(s['frames']):
+                off = np.array([0.0, 0, k * spacing - span / 2]) if side else np.array([k * spacing - span / 2, 0, 0])
+                at = np.array([f['root']['p'][0], 0.0, f['root']['p'][2]])
+                move = off - at
+                bv = pushed(GP.runtime_skin(s, f, baked, jidx, jw, 'world'), body['tris'], bpush)
+                R.add_mesh(f'f{k}', bv + move, btris, SKIN)
+                for c, g in enumerate(worn):
+                    gt, gp = inner[g]
+                    gv = pushed(GP.runtime_skin(s, f, gbaked[g], *gskin[g], 'world'), garments['meshes'][g]['tris'], gp)
+                    R.add_mesh(f'f{k}-{g}', gv + move, gt, GARMENT_COLOURS[c % len(GARMENT_COLOURS)])
+                tool = GP.runtime_tool(f)
+                if tool is not None:
+                    R.add_mesh(f't{k}', sv @ tool[:3, :3].T + tool[:3, 3] + move, st, (0.42, 0.3, 0.16, 1))
+                R.label(f"{f['t']:.2f} s", off + [0, -0.13 * h, 0], 0.085 * h, cam_view, LABEL)
+            R.label(f"{s['title']} | camera {cam} | runtime composition (game code), travel removed",
+                    (np.array([0, 0, 0.0]) + [0, 1.27 * h, 0]), 0.075 * h, cam_view, LABEL)
+            R.ground(-span / 2 - 0.5 * h, span / 2 + 0.5 * h, -span / 2 - 0.5 * h, span / 2 + 0.5 * h)
+            wide = span + 1.1 * h
+            R.render(os.path.join(out, f"runtime-{s['id']}-{view if isinstance(view, str) else 'az' + str(view)}.png"),
+                     (0, 0.6 * h, 0), wide, cam_view, (int(300 * wide / h), int(300 * 1.55)), elevation=elev)

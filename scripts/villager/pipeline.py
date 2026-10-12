@@ -146,9 +146,13 @@ def main():
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)
+        if rt is not None and (not a.only or 'runtime' in a.only.split(',')):
+            S.runtime_sheets(a.verification, body, clips, garments, cfg, rt)
     if 'penetration' in steps:
         import penetration as P
         bad = P.report(a.verification, body, clips, garments, cfg, a.stride, baseline=a.baseline or None)
+        if rt is not None:
+            P.runtime_report(a.verification, body, garments, cfg, rt)
         if bad:
             # an exception, so Blender's --python-exit-code turns it into exit 1
             raise RuntimeError(f'penetration: {bad} garment(s) over tolerance (see penetration-report.md)')
