@@ -33881,3 +33881,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   5. No further garment point uses a numeric penetration threshold as its acceptance gate without a new user decision.
   Bundle: Dorfleben.
   Owner note 11.10.2026 21:49: point 1338 was landed at 21:41 (report-only line-of-sight rule under open capes, no game change) before this request was drained, so action 1 finds it already closed; reverting it needs a user order.
+
+- [x] 1315. Villager garments: ship the pipeline garments on the glTF body at today's state, picture-gated
+  Queue position: front of Dorfleben, directly after point 1339 (user order 11.10.2026, rewritten by point 1339; points 1337, 1334 and 1335 removed unimplemented).
+  Source: point 1312 commit af2c25d42 (shipping on the glTF body: gltfGarment / gltfLayerGeometry, cachedGltfLayer, garment-carrying villager.glb, 41 Vitest cases in src/render/villager*), rolled back in cd0400571 because the garments still clipped; user order 11.10.2026 (point 1339): ship now with the 1329/1336 mask, no numeric threshold.
+  Final state: the game draws the pipeline garments on the glTF body at today's pipeline state with the 1329/1336 mask and the design.md outfit rule for open outer garments; no code-built dress layer reaches it; garments follow the body's morph, hang, ground and scale; the glb growth (0.7 -> 2.3 MB at af2c25d42) is measured and justified or reduced. The pipeline penetration report stays information only and is NOT a merge gate.
+  Verifiable: the Vitest cases from af2c25d42 green; Playwright both backends picture-checked on dressed villagers walking, kneeling, digging and running at the game's normal camera distances in the port city and the village, compared against main; a defect visible at that distance is named per garment/pose and either fixed here or filed as ONE targeted follow-up point, not split further; cross-vendor review record.
+  Criticality: high - every villager, both backends.
+  Bundle: Dorfleben.
