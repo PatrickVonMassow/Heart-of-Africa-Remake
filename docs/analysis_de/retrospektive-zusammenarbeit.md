@@ -1749,7 +1749,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 12.10.2026, 08:06 · Quellen-Fingerprint: `9d23c6997ade…`
+Zuletzt aktualisiert: Montag, 12.10.2026, 13:28 · Quellen-Fingerprint: `841827c4a5c3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1795,7 +1795,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Pure read/search delegations (locate or summarize only) use subagent_type Explore, not general-purpose; writing, committing, verifying, authoring, review and suites keep their agent types | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 123 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 125 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1866,8 +1866,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 107 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 9 Revert-/Reapply-Commits · 149 Prozess-/Meta-TASKS-Punkte (davon 71 offen).
 
-<!-- RETRO-FINGERPRINT: 9d23c6997adec6bdbedc9de06ff942b01fb9750a0bc9a318178fdae652e425a3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-12T06:06:09.378Z -->
+<!-- RETRO-FINGERPRINT: 841827c4a5c39b22819a68b78ce3dbff928b8710943d986f490867942c67f546 -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-12T11:28:18.380Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
