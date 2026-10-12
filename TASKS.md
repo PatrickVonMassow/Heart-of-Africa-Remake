@@ -77,6 +77,14 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1348. Board chat messages are answered within 15 minutes, also while a long gate or suite blocks the batch session
+  Queue position: queue front (communication first).
+  Source: user board chat 12.10.2026 19:26: "Warum hat es 38 Minuten gedauert, meine Nachricht zu beantworten. Das sollte maximal 15 min dauern."
+  Final state: a board chat message reaches an answer within 15 minutes of being sent, also while the batch session sits in a blocking call (landing fast gate, main pre-push full gate, suite await); the delivery path and its latency are measured, not assumed.
+  Verifiable: a measured case where a message sent during a >15 min blocking gate is answered within 15 minutes; a test for the delivery path that is changed.
+  Criticality: medium - the user's only live channel to the batch.
+  Bundle: Dorfleben.
+
 - [ ] 1342. Natural villager motion b: three-segment spine, hand morphs, jog and clip style, dig action, one pose pipeline, distributed lean and gaze, corrective leg IK
   Queue position: directly after point 1316 (its sub-point a supplies the runtime sheets and pose exporter every step here is judged with).
   Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 2, 3, 5-11 with the step-4 forearm-twist decision after step 9, and step 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
