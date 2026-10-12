@@ -340,9 +340,9 @@ export function isWatcherCommand(command) {
 }
 
 /** Relative imports of one module source: static, side-effect and dynamic.
- *  Comments are stripped first, so a commented-out import is not followed. */
+ *  Not syntax-aware: an import inside a comment or string is followed too, which
+ *  only widens the hash; a nonexistent one is skipped by the caller. */
 function relativeImports(source) {
-  source = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
   const out = []
   const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.\/[^'"]+)['"]/g
   for (let m; (m = re.exec(source)); ) out.push(m[1].slice(2))
@@ -374,6 +374,15 @@ export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } 
   const hash = createHash('sha256')
   for (const name of [...seen.keys()].sort()) hash.update(`${name}\0${seen.get(name)}\0`)
   return hash.digest('hex').slice(0, 16)
+}
+
+/** The start fingerprint a watcher may vouch for. The ESM loader read its
+ *  sources before this fingerprint was taken, so a file modified in between
+ *  (mtime from `processStartMs` to `nowMs`) makes it `untrusted`, and the
+ *  first idle check restarts once. A future mtime (clock set back) is ignored. */
+export function startFingerprint({ fingerprint, mtimesMs = [], processStartMs, nowMs, untrusted }) {
+  if (fingerprint === null) return null
+  return mtimesMs.some((m) => m >= processStartMs && m <= nowMs) ? untrusted : fingerprint
 }
 
 /** How often an idle watcher recomputes its code fingerprint (calibratable). */

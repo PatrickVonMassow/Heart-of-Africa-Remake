@@ -19,6 +19,7 @@ import {
   sweepPlan,
   wakeDecision,
   selfRestartDecision,
+  startFingerprint,
   watcherCodeFingerprint,
   watcherSupervision,
   isWatcherCommand,
@@ -732,15 +733,24 @@ describe('watcherCodeFingerprint — the watcher and the modules it imports', ()
     return watcherCodeFingerprint({ readText: (n) => all[n] ?? null })
   }
 
-  it('follows no commented-out import and skips an import whose file does not exist', () => {
+  it('skips an import whose file does not exist, commented out or not', () => {
     const base = fp()
-    const commented = fp({ 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\n// import './gone.mjs'\n/* import './gone2.mjs' */" })
+    const gone = (n) => (n === 'gone.mjs' || n === 'gone2.mjs' ? undefined : null)
+    const commented = watcherCodeFingerprint({
+      readText: (n) => ({ ...files, 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\n// import './gone.mjs'\n/* import './gone2.mjs' */" })[n] ?? gone(n),
+    })
     expect(commented).not.toBeNull()
     const missing = watcherCodeFingerprint({
       readText: (n) => (n === 'gone.mjs' ? undefined : { ...files, 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\nimport './gone.mjs'" }[n] ?? null),
     })
     expect(missing).not.toBeNull()
     expect(base).not.toBeNull()
+  })
+
+  it('keeps an import that sits between comment-like markers in strings', () => {
+    const src = "const open = '/*'\nimport './a.mjs'\nconst close = '*/'"
+    const withA = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': src, 'a.mjs': a })[n] ?? null })
+    expect(withA('export const a = 1')).not.toBe(withA('export const a = 2'))
   })
 
   it('still yields null for an unreadable entry or an unreadable existing import', () => {
@@ -813,5 +823,21 @@ describe('selfRestartDecision — an idle watcher whose code a merge changed exi
     expect(src).toContain('setInterval(checkSelfRestart, SELF_RESTART_CHECK_MS)')
     expect(src).toContain("'chat watcher: exiting (code-changed)'")
     expect(src).toContain("shutdown('code-changed')")
+  })
+})
+
+describe('startFingerprint — a fingerprint read after the code changed is not vouched for', () => {
+  const base = { fingerprint: 'abcd', processStartMs: 1000, nowMs: 2000, untrusted: 'U' }
+  it('trusts files older than the process', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 999] })).toBe('abcd')
+  })
+  it('distrusts a file modified while the process started', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 1500] })).toBe('U')
+  })
+  it('ignores a future mtime, so a clock set back cannot distrust every start', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 9000] })).toBe('abcd')
+  })
+  it('keeps an unreadable fingerprint null', () => {
+    expect(startFingerprint({ ...base, fingerprint: null, mtimesMs: [1500] })).toBeNull()
   })
 })

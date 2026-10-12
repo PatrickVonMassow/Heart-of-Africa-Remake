@@ -7,7 +7,7 @@
 import { readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { watcherCodeFingerprint } from './chat-watcher-core.mjs'
+import { startFingerprint, watcherCodeFingerprint } from './chat-watcher-core.mjs'
 
 const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -34,10 +34,15 @@ export const UNTRUSTED_FINGERPRINT = 'loaded-before-change'
 
 /** The fingerprint at this process's module evaluation. The ESM loader read the
  *  sources before this read, so a merge in between would record new code over
- *  old: a file modified after the process started makes it UNTRUSTED. */
-const processStartMs = Date.now() - process.uptime() * 1000
-let changedSinceStart = false
-const loaded = readWatcherFingerprint(SCRIPTS_DIR, (_name, mtimeMs) => {
-  if (mtimeMs >= processStartMs) changedSinceStart = true
+ *  old: a file modified after the process started makes it UNTRUSTED. A future
+ *  mtime (a clock set back) is ignored, so it cannot make every start untrusted. */
+const mtimesMs = []
+const loaded = readWatcherFingerprint(SCRIPTS_DIR, (_name, mtimeMs) => mtimesMs.push(mtimeMs))
+const nowMs = Date.now()
+export const LOADED_FINGERPRINT = startFingerprint({
+  fingerprint: loaded,
+  mtimesMs,
+  processStartMs: nowMs - process.uptime() * 1000,
+  nowMs,
+  untrusted: UNTRUSTED_FINGERPRINT,
 })
-export const LOADED_FINGERPRINT = loaded !== null && changedSinceStart ? UNTRUSTED_FINGERPRINT : loaded
