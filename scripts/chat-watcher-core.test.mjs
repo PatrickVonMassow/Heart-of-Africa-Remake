@@ -690,6 +690,13 @@ describe.runIf(process.platform === 'linux')('holdExclusiveAddress — the OS ad
     again.server.close()
   })
 
+  it('fails CLOSED on a listen error other than in-use', async () => {
+    // A filesystem path in a directory that does not exist cannot be bound.
+    const r = await holdExclusiveAddress(`/nonexistent-${process.pid}/watcher.sock`)
+    expect(r.held).toBe(false)
+    expect(r.reason).toMatch(/^listen-error: /)
+  })
+
   it('names one address per checkout and none where the platform has no exclusive one', () => {
     expect(watcherAddress('/a', 'linux')).not.toBe(watcherAddress('/b', 'linux'))
     expect(watcherAddress('/a', 'linux').startsWith('\0')).toBe(true)

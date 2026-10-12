@@ -580,10 +580,11 @@ async function run() {
     // responders for one message, and a pidfile cannot elect without races.
     const hold = await holdExclusiveAddress(watcherAddress(REPO_ROOT))
     if (!hold.held) {
-      log({ event: 'already-watching', pid: readJson(PID_PATH)?.pid ?? null })
-      process.exit(0)
+      if (hold.reason === 'in-use') log({ event: 'already-watching', pid: readJson(PID_PATH)?.pid ?? null })
+      else log({ event: 'singleton-failed', reason: hold.reason })
+      process.exit(hold.reason === 'in-use' ? 0 : 1)
     }
-    if (hold.reason !== 'held') log({ event: 'singleton-unavailable', reason: hold.reason })
+    if (hold.reason !== 'held') log({ event: 'singleton-unguarded', reason: hold.reason })
   }
   state.identity = ownIdentity()
   installShutdownHandlers()

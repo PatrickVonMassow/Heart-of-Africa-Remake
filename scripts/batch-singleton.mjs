@@ -850,15 +850,17 @@ export function cheapProbePid(pid) {
  * HOLD AN OS-EXCLUSIVE ADDRESS for this process's lifetime: a Linux abstract
  * socket or a Windows named pipe. The kernel admits one listener and frees the
  * address when the process dies, so there is no stale file and no takeover
- * race. Resolves { held, reason }; a null address (platform without one) or a
- * listen error other than "in use" fails OPEN — the pidfile still supervises.
+ * race. Resolves { held, reason }. Any listen error fails CLOSED: a watcher
+ * that cannot prove it is alone does not run (the owner's hook still delivers).
+ * Only a null address — a platform with no such primitive, none in use here —
+ * runs unguarded.
  */
 export function holdExclusiveAddress(address) {
   if (!address) return Promise.resolve({ held: true, reason: 'no-address' })
   return new Promise((resolve) => {
     const server = createServer((socket) => socket.destroy())
     server.once('error', (e) =>
-      resolve(e && e.code === 'EADDRINUSE' ? { held: false, reason: 'in-use' } : { held: true, reason: `fail-open: ${e?.code ?? e}` }),
+      resolve({ held: false, reason: e && e.code === 'EADDRINUSE' ? 'in-use' : `listen-error: ${e?.code ?? e}` }),
     )
     server.listen(address, () => {
       server.unref()
