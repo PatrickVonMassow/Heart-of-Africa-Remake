@@ -197,12 +197,12 @@ describe('the pipeline mask cache key', () => {
   it('hashes the code of every pipeline module the motion evaluation imports', () => {
     const dir = resolve(__dirname, '../../scripts/villager')
     const src = readFileSync(resolve(dir, 'mask.py'), 'utf8')
-    const hashed = /^MOTION_MODULES = \(([^)]*)\)/m.exec(src)?.[1].match(/'([^']+)'/g)?.map((m) => m.slice(1, -1)) ?? []
+    const hashed: string[] = /^MOTION_MODULES = \(([^)]*)\)/m.exec(src)?.[1].match(/'([^']+)'/g)?.map((m) => m.slice(1, -1)) ?? []
     // of a module not hashed whole, only these functions are (their source), and
     // motion_key hashes these imported values by repr
     const functions = [...(/^MOTION_FUNCTIONS = \((.*)\)$/m.exec(src)?.[1] ?? '').matchAll(/\('(\w+)', '(\w+)'\)/g)].map((m) => `${m[1]}.${m[2]}`)
     const keyBody = new RegExp('^def motion_key\\(.*?(?=^\\S)', 'ms').exec(src)?.[0] ?? ''
-    const values = (/h\.update\(repr\(\((.*)$/m.exec(keyBody)?.[1] ?? '').match(/\b[A-Z_]+\b/g) ?? []
+    const values: string[] = (/h\.update\(repr\(\((.*)$/m.exec(keyBody)?.[1] ?? '').match(/\b[A-Z_]+\b/g) ?? []
     expect(functions.length).toBeGreaterThan(0)
     const uncovered: string[] = []
     let imports = 0

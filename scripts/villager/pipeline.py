@@ -146,12 +146,14 @@ def main():
             S.runtime_sheets(a.verification, body, clips, garments, cfg, rt)
     if 'penetration' in steps:
         import penetration as P
-        bad = P.report(a.verification, body, clips, garments, cfg, a.stride, baseline=a.baseline or None)
+        bad, unchecked = P.report(a.verification, body, clips, garments, cfg, a.stride, baseline=a.baseline or None)
         if rt is not None:
             P.runtime_report(a.verification, body, garments, cfg, rt)
-        if bad:
+        if bad or unchecked:
             # an exception, so Blender's --python-exit-code turns it into exit 1
-            raise RuntimeError(f'penetration: {bad} garment(s) over tolerance (see penetration-report.md)')
+            raise RuntimeError(f'penetration: {bad} garment(s) over tolerance'
+                               + (f', {len(unchecked)} without a baseline row (unchecked: {", ".join(unchecked)})' if unchecked else '')
+                               + ' (see penetration-report.md)')
 
 
 if __name__ == '__main__':

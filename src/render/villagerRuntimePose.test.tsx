@@ -371,7 +371,7 @@ async function play(s: Subject) {
 
 describe('the runtime-pose exporter', () => {
   it('records all eight subjects through the game\'s own figure, and the export is complete', async () => {
-    const out = []
+    const out: Awaited<ReturnType<typeof play>>[] = []
     for (const s of SUBJECTS) out.push(await play(s))
     expect(out.map((s) => s.id)).toEqual(['walk', 'turn', 'run', 'dig', 'pickup', 'point', 'chaser', 'caught'])
     for (const s of out) {
