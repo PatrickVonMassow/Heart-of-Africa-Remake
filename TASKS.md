@@ -86,9 +86,86 @@ put it is the mistake this line exists to stop.
   Also (author measurement 12.10.2026, branch feat/1348-chat-answer-bound d4581b8de): the 38 min came from a background subagent whose PostToolUse hook consumed the message into its own context (isSubagentHook missed agent_id), fixed on the branch; still open there: 15 concurrent chat-watcher.mjs processes (every log line ~14x, three responders for one message at 16:35:45-51Z, one killed 143, the user got two answers), and responders exit "acked 0, stillPending 1" after answering. Live >15 min measurement procedure is in the branch report: blocking owner call >15 min with a busy subagent, message must stay in .claude/chat-spool/, defer-sweep spawn ~3 min after receivedAt, chat-reply-receipt at minus receivedAt <= 15 min.
   Bundle: Dorfleben.
 
+- [ ] 1053. A session the user opened for something else silently becomes the batch owner
+  (user 03.09.2026, on seeing this session announce "Batch übernommen": »Wieso hast du die
+  Batch übernommen, ich habe dich nicht dazu aufgefordert. Manchmal fällt sie dir
+  anscheinend einfach irgendwie zu.«).
+  Queue position: after point 1348 (user 12.10.2026 21:23: »Ziehe 1053 und 1033 vor«).
+  MEASURED 03.09.2026 on this very session: the process had been running since 16:17:48; a
+  `/clear` gave it a new session id, `scripts/batch-resume-hook.mjs` ran on SessionStart
+  and won the ordinary atomic `acquire` at 21:00:46 — three and a half minutes before the
+  session's first tool call. The lock it wrote carries `"kind": "session"`, NOT the
+  launcher's `pending-spawn`. The same hook then injects the hard-coded sentence "Standing
+  user instruction: continue the batch autonomously"
+  (scripts/batch-resume-hook.mjs ~436), which the session reads as an order the user never
+  gave in that conversation.
+  WHY IT MATTERS: the batch is the machine's most expensive activity, and it starts without
+  anyone deciding that it should. Every window the user opens to ask a question becomes an
+  owner that dispatches agents, merges and pushes.
+  Final state:
+  - Ownership on SessionStart requires an INVITATION: the launcher's `pending-spawn`
+    reservation converted for THIS session (`acquired-spawn`), or a lock this same process
+    already held across a compaction (`mine`). A bare `acquire` in a session with no
+    reservation orients the session — repository state, open points, runbook — and says how
+    to take the batch, but does not take it.
+  - THE LAUNCHER'S AUTONOMY IS NOT WEAKENED. A spawned successor that reaches the hook with
+    its reservation lost must not leave the batch ownerless: the fallback is measured
+    against the spawn token the launcher already writes, and a successor that proves it,
+    acquires. Whatever cannot prove it raises the launcher's existing `lockConverted`
+    telemetry rather than silently taking or silently dropping the batch.
+  - The injected "Standing user instruction" sentence stops asserting a user order for a
+    session that was not invited; an uninvited session is told the batch is available and
+    by which word the user starts it.
+  Test: Vitest over the hook's ownership branch — a pending-spawn conversion still owns, a
+  compaction of the owning process still owns, a bare session start does NOT own and gets
+  the orientation text without the standing-instruction sentence, and a spawned successor
+  whose reservation is gone but whose spawn token holds still owns.
+  Criticality: high — it decides who may spend the machine, and getting the fallback wrong
+  stalls the batch instead.
+  Refs: scripts/batch-resume-hook.mjs (~372-440), scripts/batch-singleton.mjs (acquire,
+  convertPendingSpawn), scripts/batch-autostart.mjs (~1637 the pending-spawn writer, ~988
+  lockConverted), scripts/batch-lock.mjs
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1033. The free lock lands silently in the window the user is sitting at (measured
+  31.08.2026, this session).
+  Queue position: after point 1053 (user 12.10.2026 21:23: »Ziehe 1053 und 1033 vor«).
+  WHAT HAPPENED: `batch-progress-guard` runs at the END OF EVERY TURN and calls the atomic
+  acquire. When the owning session dies, the next Stop run of ANY live session takes the batch.
+  Measured: the previous owner claimed at 22:52:50 and died around 23:00; at 23:03:02 the lock
+  named the INTERACTIVE session the user was chatting in, which had never asked for it and whose
+  own SessionStart notice still said STAND DOWN. The session learned about it only from a
+  subordinate clause inside a guard's refusal text, and kept obeying the stale stand-down.
+  WHY IT BLOCKS: the acquire is correct in its intent — the batch must never be ownerless — but
+  it cannot tell an unattended worker from the window a person is talking to. The user's window
+  is then driven into merges, dashboard writes and TASKS edits it was never asked to do, and the
+  reservation path of point 395 does not help because it only fires for a claim the user made.
+  FINAL STATE: (1) a session that did not request the batch and is demonstrably interactive does
+  not silently acquire a freed lock; it either asks or takes it only after saying so in the
+  answer, and the launcher's fresh worker remains the normal successor; (2) when a session DOES
+  become the owner without asking, that fact is stated as its own visible line, never as a
+  subordinate clause in another guard's refusal; (3) an unattended session is unaffected — the
+  never-ownerless guarantee holds for every path where nobody is sitting.
+  VERIFIABLE: unit cases over the acquire decision proving an interactive non-claimant does not
+  take a freed lock while an unattended session does; a case proving the ownership change is
+  announced on its own; a drill that kills an owner beside a live interactive session and asserts
+  the launcher's worker, not that window, becomes the successor. Plus `npm run test:unit`, lint,
+  build.
+  Criticality: high — it is the batch singleton, and its failure direction hands a user's
+  interactive window a role it never accepted.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1351. The batch is paused only on the user's explicit stop order
+  Queue position: after point 1033.
+  Source: user 12.10.2026 21:23: »stelle außerdem sicher, dass die Batch nicht wieder ohne meine Ausdrückliche Freigabe angehalten wird.« Trigger 21:04: asked »Hast du die Batch bekommen? Dazu habe ich dich nicht aufgefordert.«, the session ran `batch-pause.mjs --user-stop` with that quote; user: »Nein, nicht anhalten … Niemals in irgendeine meiner Fragen oder Anweisungen hineininterpretieren, dass ich das vielleicht wollen könnte.« Same error 24.09.2026 (»Erstmal nur darüber reden«). The memory rule held neither time, and `batch-progress-guard` names `--user-stop` as a legitimate turn end, which invites it.
+  Final state: no session can pause the batch on a user utterance that is not an explicit order to stop or pause it; a question, a complaint or a discussion remark is refused as a stop reason. The stop guard's list of legitimate ends no longer offers the user stop to a session whose user did not order one.
+  Verifiable: unit cases — the two quoted utterances above are refused as stop reasons, an explicit order (»Halte die Batch an«, »Stopp die Batch«) is accepted; the guard text case.
+  Criticality: high — a false stop idles the machine until the user notices.
+  Refs: scripts/batch-pause.mjs, scripts/batch-pause-core.mjs (namesUserUtterance), scripts/batch-progress-guard.mjs.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1349. The CI status guard reports a red feature-branch run as green
-  Queue position: after point 1348.
+  Queue position: after point 1351.
   Source: findings carrier 12.10.2026 17:07: run 38277768235 (feat/1346-penetration-baseline c96ee475a) failed unit shard fast (1) (villagerPenetrationReport.test.ts:174) and set commit status ci/gate (branch)=failure, but every job concludes success on feat/** because .github/workflows/ci.yml marks each step continue-on-error; scripts/ci-status-guard-core.mjs classifyRuns reads only run conclusions, and batch-autostart-core.mjs ciTerminalPrompt hands that success on.
   Final state: ci-status-guard and the CI-terminal handoff judge a feature-branch ref by its ci/gate commit status (or an equivalent failing signal), so a red branch is never reported green; main behaviour unchanged.
   Verifiable: a Vitest case with a success-concluded run and a failing ci/gate status that the guard classifies red.
@@ -596,46 +673,6 @@ put it is the mistake this line exists to stop.
   docs/analysis_de/vibe-coding-anleitung.md, scripts/land-point.mjs
   Bundle: Session- & Repo-Hygiene (it edits the board, finding and landing commands
   that bundle already owns).
-- [ ] 1053. A session the user opened for something else silently becomes the batch owner
-  (user 03.09.2026, on seeing this session announce "Batch übernommen": »Wieso hast du die
-  Batch übernommen, ich habe dich nicht dazu aufgefordert. Manchmal fällt sie dir
-  anscheinend einfach irgendwie zu.«).
-  MEASURED 03.09.2026 on this very session: the process had been running since 16:17:48; a
-  `/clear` gave it a new session id, `scripts/batch-resume-hook.mjs` ran on SessionStart
-  and won the ordinary atomic `acquire` at 21:00:46 — three and a half minutes before the
-  session's first tool call. The lock it wrote carries `"kind": "session"`, NOT the
-  launcher's `pending-spawn`. The same hook then injects the hard-coded sentence "Standing
-  user instruction: continue the batch autonomously"
-  (scripts/batch-resume-hook.mjs ~436), which the session reads as an order the user never
-  gave in that conversation.
-  WHY IT MATTERS: the batch is the machine's most expensive activity, and it starts without
-  anyone deciding that it should. Every window the user opens to ask a question becomes an
-  owner that dispatches agents, merges and pushes.
-  Final state:
-  - Ownership on SessionStart requires an INVITATION: the launcher's `pending-spawn`
-    reservation converted for THIS session (`acquired-spawn`), or a lock this same process
-    already held across a compaction (`mine`). A bare `acquire` in a session with no
-    reservation orients the session — repository state, open points, runbook — and says how
-    to take the batch, but does not take it.
-  - THE LAUNCHER'S AUTONOMY IS NOT WEAKENED. A spawned successor that reaches the hook with
-    its reservation lost must not leave the batch ownerless: the fallback is measured
-    against the spawn token the launcher already writes, and a successor that proves it,
-    acquires. Whatever cannot prove it raises the launcher's existing `lockConverted`
-    telemetry rather than silently taking or silently dropping the batch.
-  - The injected "Standing user instruction" sentence stops asserting a user order for a
-    session that was not invited; an uninvited session is told the batch is available and
-    by which word the user starts it.
-  Test: Vitest over the hook's ownership branch — a pending-spawn conversion still owns, a
-  compaction of the owning process still owns, a bare session start does NOT own and gets
-  the orientation text without the standing-instruction sentence, and a spawned successor
-  whose reservation is gone but whose spawn token holds still owns.
-  Criticality: high — it decides who may spend the machine, and getting the fallback wrong
-  stalls the batch instead.
-  Refs: scripts/batch-resume-hook.mjs (~372-440), scripts/batch-singleton.mjs (acquire,
-  convertPendingSpawn), scripts/batch-autostart.mjs (~1637 the pending-spawn writer, ~988
-  lockConverted), scripts/batch-lock.mjs
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1049. A user front-order and the communication-first rule both failed to order the
   queue: the bank-round point was filed carrying "worked NEXT, at the FRONT" in its own
   text and still stood LAST of 360 open points (user, 03.09.2026: "Ich hatte zum einen
@@ -13676,33 +13713,6 @@ to land than a mechanism that needs a review.
   test:unit`, lint, build.
   Criticality: high — it is the turn-end chain itself, and its failure direction is an unattended
   session that spends its whole budget refusing.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1033. The free lock lands silently in the window the user is sitting at (measured
-  31.08.2026, this session).
-  WHAT HAPPENED: `batch-progress-guard` runs at the END OF EVERY TURN and calls the atomic
-  acquire. When the owning session dies, the next Stop run of ANY live session takes the batch.
-  Measured: the previous owner claimed at 22:52:50 and died around 23:00; at 23:03:02 the lock
-  named the INTERACTIVE session the user was chatting in, which had never asked for it and whose
-  own SessionStart notice still said STAND DOWN. The session learned about it only from a
-  subordinate clause inside a guard's refusal text, and kept obeying the stale stand-down.
-  WHY IT BLOCKS: the acquire is correct in its intent — the batch must never be ownerless — but
-  it cannot tell an unattended worker from the window a person is talking to. The user's window
-  is then driven into merges, dashboard writes and TASKS edits it was never asked to do, and the
-  reservation path of point 395 does not help because it only fires for a claim the user made.
-  FINAL STATE: (1) a session that did not request the batch and is demonstrably interactive does
-  not silently acquire a freed lock; it either asks or takes it only after saying so in the
-  answer, and the launcher's fresh worker remains the normal successor; (2) when a session DOES
-  become the owner without asking, that fact is stated as its own visible line, never as a
-  subordinate clause in another guard's refusal; (3) an unattended session is unaffected — the
-  never-ownerless guarantee holds for every path where nobody is sitting.
-  VERIFIABLE: unit cases over the acquire decision proving an interactive non-claimant does not
-  take a freed lock while an unattended session does; a case proving the ownership change is
-  announced on its own; a drill that kills an owner beside a live interactive session and asserts
-  the launcher's worker, not that window, becomes the successor. Plus `npm run test:unit`, lint,
-  build.
-  Criticality: high — it is the batch singleton, and its failure direction hands a user's
-  interactive window a role it never accepted.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1039. The run is redirected: freeze, intake rule, and the checklist that stops gating
