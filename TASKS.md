@@ -100,10 +100,28 @@ put it is the mistake this line exists to stop.
   Verifiable: the research document with its diagnosis; the blind-merge record and the final-check verdict (procedure a-c) BEFORE the first implementation commit; Blender frame sheets and a video strip before/after of walk, turn, run, dig, pick-up, point, chaser and caught child; the named Vitest cases for the corrective IK, lean distribution and gaze hold; Playwright picture check in a port city and at a river bank on both backends, judged by looking; cross-vendor code review record with its fixes.
   Criticality: high - every villager, both backends.
   If the point does not converge, split along "research and concept" / "rig and clips" / "poses and actions".
+  Split (owner decision 12.10.2026 under the standing split rule, recorded for veto): the merged concept docs/natural-villager-motion-concept.md (branch feat/1316-natural-villager-motion) passed procedure a-c — blind halves Opus 5.5 / GPT-6 Astra, merge Fable 5.1, final check GPT-6 Astra do-not-merge twice, then merge at b231b21 (receipt 8d567ce5bbb66aa0). Following its §6, THIS point now owes only sub-point a: final state 1 (the research document with its measured diagnosis), concept step 1 (verification baseline: sheets.py outfit repair, runtime-pose exporter with root scale, bone translation/rotation/scale and morph weights plus the 1e-4 Python round-trip check, runtime-composition sheets for the eight subjects, cache keys) and the recorded concept/final-check evidence. Final states 2-8 moved to points 1342 and 1343. Gates: Vitest, the Python round-trip, `build.mjs sheets`, the penetration gate and today's no-slide test stay green; build and lint.
+  Handover 12.10.2026 07:40: branch feat/1316-natural-villager-motion carries c8307c0ff (runtime-pose exporter, src/render/villagerRuntimePose.test.tsx), 4b89b0d8a (Python round-trip, `build.mjs runtime` green: 8 subjects, 92 frames, error 0) and the WIP rescue 3d17ec2c7. Still owed: the runtime penetration feed has never run; scripts/villager/cachekeys.py is not wired into pipeline.py (the first keyed run rebuilds garments, 25-60 min); research document §6 diagnosis is a placeholder; only the walk sheets were looked at (g-cap-crown floats as a ring above the head — check in game); sheet title below the strip; mask.pkl is rebuilt on every sheets run (~7 min); full test:unit and `build.mjs penetration` not run.
+  Bundle: Dorfleben.
+
+- [ ] 1342. Natural villager motion b: three-segment spine, hand morphs, jog and clip style, dig action, one pose pipeline, distributed lean and gaze, corrective leg IK
+  Queue position: directly after point 1316 (its sub-point a supplies the runtime sheets and pose exporter every step here is judged with).
+  Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 2, 3, 5-11 with the step-4 forearm-twist decision after step 9, and step 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
+  Final state: point 1316's final states 2 (rig upgraded where the diagnosis requires it), 3 (clip preserved, IK corrective), 4 (clip sources widened, recorded in scripts/villager/sources.json) and 6 (lean distributed over hips/spine/spine1/chest, neck and head hold a gaze target), as the concept's steps specify them.
+  Verifiable: each step's *Verified* list in the concept; every mergeable commit range keeps the penetration gate and the no-slide test current at its place in the order green (today's test before step 5, the full-ramp test from step 5 on); Vitest `lean is distributed`, `gaze hold`, `corrective leg IK keeps the clip's leg when nothing is held`, `hands land on the final body`, `held foot still holds`; runtime sheets before/after; village-walk and digging pictures on both backends; cross-vendor code review record.
+  Criticality: high - every villager, both backends; HIGH rig change. If it stalls, cut again along steps 2-7 (pipeline) and 8-11 (runtime).
+  Bundle: Dorfleben.
+
+- [ ] 1343. Natural villager motion c: turning, point and reach, port-city tag chaser, river-bank caught child, pick-up, carry, calibration sweep
+  Queue position: directly after point 1342 (every step here is judged on its composed body).
+  Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 12, 14-19 and step 20's remaining evidence, as approved by the GPT-6 Astra final check at b231b21.
+  Final state: point 1316's final states 5 (walk, turn on the spot and in motion, run, dig, pick up, point, carry, reach read natural; blended transitions, no snaps, no foot sliding), 7 (port-city tag chaser) and 8 (river-bank tag caught child), as the concept's steps specify them; the concept's §7 open items decided or filed.
+  Verifiable: each step's *Verified* list in the concept; penetration gate and the full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point, chaser and caught child; Playwright picture check in a port city and at a river bank on both backends, judged by looking; cross-vendor code review record.
+  Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
 
 - [ ] 1330. Skinned villager walk keeps the drawn soles on the ground and shows planted stances
-  Queue position: directly after point 1316, whose gait and IK rework touches the same walk; if 1316 lands with `polish-villagers --section=village-walk` green, this point closes with that run as evidence.
+  Queue position: directly after point 1342, whose gait and IK rework touches the same walk; if 1342 lands with `polish-villagers --section=village-walk` green, this point closes with that run as evidence.
   Source: owner finding 08.10.2026 during point 1313's suites: `village-walk` is RED on origin/main d22f82796 (baseline log local/verify-baseline-logs/polish-villagers-baseline-d22f82796fb1-run1.log: worstGround 0.108 m, stances 0) and on the point 1294 branch already on 06.10.2026 (worstGround 0.205 m, stances 2), so it is pre-existing since the glTF body and not charged to 1313.
   Final state: on the skinned (medium/high) villager walk the lowest drawn sole of the transformed foot geometry stays within 0.040 m of the ground every frame, at least six planted stances are observed, and a planted foot slides at most 0.040 m per stance; no change to the low-preset primitive (point 1301).
   Verifiable: `polish-villagers --section=village-walk` green on both backends; Vitest for any gait/IK change in src/render/villagerClipPose.ts; walking frame picture-checked.
@@ -116,6 +134,31 @@ put it is the mistake this line exists to stop.
   Final state: while a villager fills a jar at the bank, the jar's mouth dips below the water surface as the check requires, on both backends, without changing the carry pose elsewhere.
   Verifiable: `polish-villagers --section=adult-errands` jar check green on both backends; the filling frame picture-checked.
   Criticality: medium - a standing red in the village suite; visible at every water stand.
+  Bundle: Dorfleben.
+
+- [ ] 1340. Tag catcher's hands at chest height and on the caught child at the catch frame
+  Queue position: after point 1333; point 1343 reworks the port-city chaser pose (point 1316's item 7) — if 1343 lands with `polish-children --section=tag-catch` green on both backends, this point closes with that run as evidence.
+  Source: findings carrier 12.10.2026 02:47Z: polish-children --section=tag-catch (Cairo) is red on main 8a477d931 and on feat/1315 alike. WebGPU: "the catcher's two hands are held forward at chest height, read off the drawn pivots" fails (hand y 0.889/0.895); WebGL 2 on feat/1315: "at the catch frame the catcher's drawn hand is ON the caught child" fails. Not in the classified baseline. Logs: local/1315-main-port-webgpu.log, local/1315-port-webgl.log.
+  Final state: in the port-city tag game the catcher's drawn hands are held forward at chest height while chasing and one drawn hand is on the caught child at the catch frame, on both backends.
+  Verifiable: `polish-children --section=tag-catch` green on both backends; the catch frame picture-checked.
+  Criticality: medium - a standing red in the children suite; visible in every port city's tag game.
+  Bundle: Dorfleben.
+
+- [ ] 1344. Children's hand contacts in polish-children: runner hands at its sides, bank-tap hand on the flank, arriving runner's hand on the far stone
+  Queue position: directly after point 1340 (same suite and the same children's pose write).
+  Source: findings carrier 12.10.2026 04:48Z: full WebGPU polish-children run 06:19 on main 06c727d21 red with three checks not in the classified baseline and owned by no point — tag-catch "while a runner's hands hang at its sides"; children-bank-game "the tapping hand stays within 5 mm of the flank over the whole hold" (22 cm off); arriving runner "DRAWN hand stays within 5 mm of the far stone, including the word frame" (24.6 cm off). Machine quietness of that run is unverified; the WebGL 2 full run is still owed.
+  Final state:
+  1. polish-children re-run alone on a quiet machine on both backends; a red that does not reproduce closes with that run as evidence.
+  2. For each reproduced red the cause is named and fixed: the drawn hand lands on its contact (flank, far stone) within the suite's 5 mm over the whole hold and word frame, and a runner's hands hang at its sides, with no change to the tag or bank-game rules.
+  Verifiable: polish-children sections tag-catch and children-bank-game green on both backends, frames judged by looking; Vitest for any pose-solve change.
+  Criticality: medium - visible hands off their contacts in two children's games.
+  Bundle: Dorfleben.
+- [ ] 1341. Pipeline garments: smooth the crumpled fold surface, fit the head cover, measure the garment frame cost
+  Queue position: after point 1340.
+  Source: findings carrier 12.10.2026 02:47Z, picture check of point 1315 (feat/1315 8aaf9ac28, 1294-dress-swahili.png WebGPU vs main): kanzu and kanga/buibui robes show a lumpy crumpled-paper fold surface at the normal camera distance, and the red women's head cover rises to a peak above the head. The same frame read 10 FPS on the branch against 21 on main (one snapshot on an unquiet host) with villager.glb at 6.9 MB.
+  Final state: the coastal robes' fold surface reads smooth cloth at the normal camera distance; the head cover follows the head without a peak; the frame cost of the garment glb is measured on a quiet host against the pre-1315 main, and reduced if it costs measurably. Zulu/Bambara walk, kneel, dig, run and the Cairo children stay clean.
+  Verifiable: Blender frame sheet and 1294-dress-swahili.png before/after on both backends, judged by looking; the recorded FPS comparison; garment penetration gate green.
+  Criticality: medium - every coastal villager; possible frame-rate cost on all villager scenes.
   Bundle: Dorfleben.
 
 - [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
@@ -15876,3 +15919,10 @@ to land than a mechanism that needs a review.
   Verifiable: Vitest reproducing an answer-session start that leaves the lock with the batch session.
   Also (findings carrier 07.10.2026 23:20): session 9696d681 released its claim to 06667ad0 via the hand-back bound while .claude/batch-lock.json was absent, so heldByOtherLiveOwner() read false and dashboard-guard (focus reconcile) and retro-currency-guard kept blocking the released session's Stop, demanding batch mutations its hand-back forbids; and a session that took the batch only to edit the work order re-acquired the lock through its heartbeat after `batch-singleton.mjs release`, so it could not hand back without a ticked point or the context watermark. Stand-down honours a claim this session released, and a manual release stays released.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1345. Child tag chaser at sprint speed squats without a stride (teleport threshold in figure units)
+  Queue position: with the tag poses of point 1343 (Dorfleben); may land before it on its own.
+  Source: findings carrier 12.10.2026 05:58, measured on feat/1316-natural-villager-motion (runtime sheets runtime-chaser-*.png, hips height per frame from the export): at 3.4 u/s the child chaser's hips sit at 0.50 of standing height in every frame with no stride; the same subject at 3.2 u/s (5.8 < 6) runs normally (hips 0.96-1.07, feet alternating +-0.4). Player impact: every child chaser of the port-city tag game at full sprint is drawn squatting and sliding. Related: the river-bank caught child (hips 0.52) and the point gesture's release frame (hips 0.50 at 2.11 s) reach the same CROUCH_MAX fallback.
+  Final state: A child figure (CHILD_FIGURE_SCALE 0.55) moved at the port-city tag sprint speed (TAG.sprintSpeed 3.4 u/s) gets no gait and sinks into a full squat. stepWalk (src/render/figureWalk.ts:441) measures ground speed in units of the figure's world scale (skinnedFigure.tsx:551 unit = world scale), so 3.4 / 0.55 = 6.18 person units/s exceeds VILLAGER_MOTION.teleportSpeed = 6 (balance.ts:2493): every frame counts as "placed, not walked", m.speed stays 0, the figure is "standing", CHASER_ARMS count as contact arms, no knee flex reaches them and contactCrouch (figureRig.ts:39) falls back to CROUCH_MAX (full squat). Fix: compare the teleport threshold against a speed no child or adult gait can reach (or in world units), and do not let contactCrouch return CROUCH_MAX for an arm that no crouch can bring into reach (the same fallback squats the river-bank caught child and the last frame of a point gesture).
+  Verifiable: in the runtime-pose export (src/render/villagerRuntimePose.test.tsx) the chaser's hips stay near standing height (they are 0.50-0.65 of it now) and its feet alternate; a Vitest case at 3.4 u/s for a child figure.
+  Criticality: high - every child chaser of the port-city tag game at full sprint.
+  Bundle: Dorfleben.

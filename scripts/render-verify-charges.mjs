@@ -65,6 +65,27 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1344,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /while a runner's hands hang at its sides/i,
+    why: 'Filed 12.10.2026 from the findings carrier: full WebGPU polish-children run on main 06c727d21 red, not in the baseline, machine quietness unverified. Point 1344 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1344,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /the tapping hand stays within 5 mm of the flank over the whole hold/i,
+    why: 'Filed 12.10.2026 from the findings carrier: full WebGPU polish-children run on main 06c727d21 red, not in the baseline, machine quietness unverified. Point 1344 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1344,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /the arriving runner.s DRAWN hand stays within 5 mm of the far stone/i,
+    why: 'Filed 12.10.2026 from the findings carrier: full WebGPU polish-children run on main 06c727d21 red, not in the baseline, machine quietness unverified. Point 1344 owns the cause; the charge dies with it.',
+  },
+  {
     point: 1236,
     suite: 'enrichments',
     kind: 'check',
