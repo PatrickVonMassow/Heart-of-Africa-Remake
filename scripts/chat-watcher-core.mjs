@@ -351,7 +351,8 @@ function relativeImports(source) {
  * THE WATCHER'S CODE FINGERPRINT. PURE — `readText(name)` returns a `scripts/`
  * file's content or null. Hashes the entry and every module it imports from
  * `scripts/`, transitively (`./x.mjs` only; `../` and packages are outside), so
- * any merge into code the watcher runs changes it. Read once at watcher start.
+ * any merge into code the watcher runs changes it. Null when any file is
+ * unreadable. Read once at watcher start (`chat-watcher-fingerprint.mjs`).
  */
 export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } = {}) {
   const seen = new Map()
@@ -360,12 +361,26 @@ export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } 
     const name = queue.shift()
     if (seen.has(name)) continue
     const text = typeof readText === 'function' ? readText(name) : null
-    seen.set(name, typeof text === 'string' ? text : null)
-    if (typeof text === 'string') queue.push(...relativeImports(text))
+    // An unreadable file makes the fingerprint incomplete: null, never a hash.
+    if (typeof text !== 'string') return null
+    seen.set(name, text)
+    queue.push(...relativeImports(text))
   }
   const hash = createHash('sha256')
-  for (const name of [...seen.keys()].sort()) hash.update(`${name}\0${seen.get(name) ?? '<missing>'}\0`)
+  for (const name of [...seen.keys()].sort()) hash.update(`${name}\0${seen.get(name)}\0`)
   return hash.digest('hex').slice(0, 16)
+}
+
+/** The launcher's restart request (`WATCHER_RESTART_SIGNAL`). Honoured by the
+ *  watcher itself: it admits no new responder from then on and exits only once
+ *  its running responder has, so a responder spawned after the launcher read
+ *  the claim is never killed by the restart. */
+export const WATCHER_RESTART_SIGNAL = 'SIGUSR2'
+
+/** What a watcher does on a restart request, or on a responder exit after one. */
+export function restartRequestAction({ requested = false, responderLive = false } = {}) {
+  if (!requested) return 'run'
+  return responderLive ? 'drain' : 'exit'
 }
 
 /**
@@ -377,14 +392,18 @@ export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } 
  * whole family of probes was written to avoid. Only when the record or the probe
  * carries no start time does a live pid count by existence (the lenient branch).
  *
- * `fingerprint` is the current `watcherCodeFingerprint` (null skips the code
- * check); `claim` is the batch claim, read for a running responder.
+ * `fingerprint` is the current `watcherCodeFingerprint` (undefined skips the
+ * code check, null defers it); `claim` is the batch claim, read for a running
+ * responder.
  *
  * Returns { action: 'start' | 'restart' | 'none', reason, pid }.
  */
-export function watcherSupervision({ paused = false, record = null, probe = null, fingerprint = null, claim = null } = {}) {
+export function watcherSupervision({ paused = false, record = null, probe = null, fingerprint, claim = null } = {}) {
   const pid = Number(record?.pid)
   let alive = false
+  // Positive identity (command line, or a matching start time). Only that may
+  // authorize a restart; the lenient branch only prevents a second start.
+  let identified = false
   if (Number.isInteger(pid) && pid > 0 && typeof probe === 'function') {
     const p = probe(pid)
     if (p && p.exists === true && (typeof p.command === 'string' || Array.isArray(p.command))) {
@@ -392,6 +411,7 @@ export function watcherSupervision({ paused = false, record = null, probe = null
       // start time drifts against the wall clock (WSL measured -1.2 s in 5 h),
       // crossed the tolerance, and every tick then started one more watcher.
       alive = isWatcherCommand(p.command)
+      identified = alive
     } else if (p && p.exists === true) {
       // `stampOf`, not `Number` — see its note. A pidfile with no start time is
       // meant to fall through to the LENIENT branch (unknown identity, treat the
@@ -403,12 +423,19 @@ export function watcherSupervision({ paused = false, record = null, probe = null
         !Number.isFinite(recorded) ||
         typeof p.startedAt !== 'number' ||
         Math.abs(p.startedAt - recorded) <= WATCHER_PID_TOLERANCE_MS
+      identified =
+        Number.isFinite(recorded) &&
+        typeof p.startedAt === 'number' &&
+        Math.abs(p.startedAt - recorded) <= WATCHER_PID_TOLERANCE_MS
     }
   }
   // CODE CHANGED UNDER A LIVE WATCHER (a merge): restart it, paused or not. A
   // record without a fingerprint counts as changed once — the new watcher writes
-  // one. Not while its responder runs: the watcher's shutdown kills it.
-  if (alive && typeof fingerprint === 'string' && fingerprint !== '' && record?.codeFingerprint !== fingerprint) {
+  // one. Not while its responder runs (the watcher also drains one itself, see
+  // `restartRequestAction`), not on an incomplete fingerprint, not on a pid
+  // whose identity is unproven.
+  if (identified && fingerprint === null) return { action: 'none', reason: 'fingerprint-unreadable', pid }
+  if (identified && typeof fingerprint === 'string' && fingerprint !== '' && record?.codeFingerprint !== fingerprint) {
     if (adoptDecision({ claim, probe }).adopt) return { action: 'none', reason: 'code-changed-responder-busy', pid }
     return { action: 'restart', reason: 'code-changed', pid }
   }

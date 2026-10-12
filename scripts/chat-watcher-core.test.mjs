@@ -19,6 +19,7 @@ import {
   sweepPlan,
   wakeDecision,
   watcherCodeFingerprint,
+  restartRequestAction,
   watcherSupervision,
   isWatcherCommand,
 } from './chat-watcher-core.mjs'
@@ -27,6 +28,8 @@ import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
 import { claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
+import { LOADED_FINGERPRINT, readWatcherFingerprint } from './chat-watcher-fingerprint.mjs'
+import { readFileSync } from 'node:fs'
 
 const ok = { accepted: true, paused: false, formatAlarm: false, ownerAlive: false, responderLive: false, claimHonoured: false }
 
@@ -497,6 +500,31 @@ describe('watcherSupervision — a watcher whose code a merge changed is restart
     )
   })
 
+  it('never restarts a pid whose identity is unproven (lenient liveness only)', () => {
+    const unknown = probeOf({ 900: { exists: true, startedAt: null } })
+    expect(watcherSupervision({ record, probe: unknown, fingerprint: 'bbbb' })).toEqual({
+      action: 'none',
+      reason: 'alive',
+      pid: 900,
+    })
+    const noStamp = { ...record, pidStartedAt: null }
+    const stamped = probeOf({ 900: { exists: true, startedAt: now - 10_000 } })
+    expect(watcherSupervision({ record: noStamp, probe: stamped, fingerprint: 'bbbb' }).action).toBe('none')
+  })
+
+  it('a matching start time without a command line is positive identity', () => {
+    const stamped = probeOf({ 900: { exists: true, startedAt: record.pidStartedAt } })
+    expect(watcherSupervision({ record, probe: stamped, fingerprint: 'bbbb' }).action).toBe('restart')
+  })
+
+  it('defers on an incomplete (unreadable) fingerprint', () => {
+    expect(watcherSupervision({ record, probe: probeOf(live), fingerprint: null })).toEqual({
+      action: 'none',
+      reason: 'fingerprint-unreadable',
+      pid: 900,
+    })
+  })
+
   it('never restarts a dead watcher — that stays a plain start', () => {
     expect(watcherSupervision({ record, probe: probeOf({}), fingerprint: 'bbbb' }).action).toBe('start')
   })
@@ -527,6 +555,41 @@ describe('watcherCodeFingerprint — the watcher and the modules it imports', ()
 
   it('ignores files the watcher does not import', () => {
     expect(fp({ 'unrelated.mjs': 'export const u = 2' })).toBe(fp())
+  })
+
+  it('is null when an imported file is unreadable', () => {
+    expect(fp({ 'c.mjs': null })).toBe(null)
+    expect(fp({ 'chat-watcher.mjs': null })).toBe(null)
+  })
+
+  it('is read at the watcher module\'s first import, and complete on this tree', () => {
+    const src = readFileSync(new URL('./chat-watcher.mjs', import.meta.url), 'utf8')
+    const firstImport = src.split('\n').find((l) => l.startsWith('import '))
+    expect(firstImport).toContain("from './chat-watcher-fingerprint.mjs'")
+    expect(LOADED_FINGERPRINT).toMatch(/^[0-9a-f]{16}$/)
+    expect(readWatcherFingerprint()).toBe(LOADED_FINGERPRINT)
+  })
+})
+
+describe('restartRequestAction — the watcher drains its responder before a restart', () => {
+  it('runs on without a request', () => {
+    expect(restartRequestAction({ requested: false, responderLive: true })).toBe('run')
+  })
+
+  it('exits at once with no responder', () => {
+    expect(restartRequestAction({ requested: true, responderLive: false })).toBe('exit')
+  })
+
+  it('drains a running responder — even one spawned after the launcher read the claim', () => {
+    expect(restartRequestAction({ requested: true, responderLive: true })).toBe('drain')
+  })
+
+  it('is wired: the watcher honours the signal and refuses admission, the launcher sends it', () => {
+    const watcher = readFileSync(new URL('./chat-watcher.mjs', import.meta.url), 'utf8')
+    expect(watcher).toMatch(/process\.on\(WATCHER_RESTART_SIGNAL/)
+    expect(watcher).toMatch(/if \(state\.restartRequested\) \{\s*log\(\{ event: 'spawn-refused'/)
+    const launcher = readFileSync(new URL('./batch-autostart.mjs', import.meta.url), 'utf8')
+    expect(launcher).toMatch(/process\.kill\(sup\.pid, WATCHER_RESTART_SIGNAL\)/)
   })
 })
 

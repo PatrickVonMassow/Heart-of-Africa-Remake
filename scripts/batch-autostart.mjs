@@ -104,7 +104,8 @@ import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { classifyPause, describePause, formatPauseRecord, pauseRecovery } from './batch-pause-core.mjs'
-import { WATCHER_PID_FILE, watcherCodeFingerprint, watcherSupervision } from './chat-watcher-core.mjs'
+import { WATCHER_PID_FILE, WATCHER_RESTART_SIGNAL, watcherSupervision } from './chat-watcher-core.mjs'
+import { readWatcherFingerprint } from './chat-watcher-fingerprint.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
@@ -735,15 +736,7 @@ const watcherProbe = (pid) => {
 // work; its decision gate admits only verified mail to a bounded responder.
 try {
   const rec = readJson(C(WATCHER_PID_FILE))
-  const fingerprint = watcherCodeFingerprint({
-    readText: (name) => {
-      try {
-        return readFileSync(R(name), 'utf8')
-      } catch {
-        return null
-      }
-    },
-  })
+  const fingerprint = readWatcherFingerprint()
   const sup = watcherSupervision({
     paused: batchParked,
     record: rec,
@@ -766,19 +759,28 @@ try {
     // The live watcher read the secret at its start; a replacement could not.
     log('chat watcher: stale code kept running (the chat secret is unreadable)')
   } else if (sup.action === 'restart' || sup.action === 'start') {
-    // A RESTART STOPS FIRST AND WAITS: the old watcher holds the singleton
-    // address until it exits, and a replacement started earlier would exit on it.
+    // A RESTART IS A REQUEST, AND THE TICK WAITS FOR IT: the watcher exits on
+    // `WATCHER_RESTART_SIGNAL` only once no responder of its own runs, and it
+    // holds the singleton address until then — a replacement started earlier
+    // would exit on it. Still running after the wait: it is draining a
+    // responder, exits by itself, and the next tick starts the new one.
     let stopped = true
     if (sup.action === 'restart') {
-      try { process.kill(sup.pid) } catch { /* already gone */ }
+      try {
+        process.kill(sup.pid, WATCHER_RESTART_SIGNAL)
+      } catch (e) {
+        log(`chat watcher: restart request to pid ${sup.pid} failed (${(e && e.code) || e})`)
+      }
       const deadline = Date.now() + 10_000
       while (watcherProbe(sup.pid).exists && Date.now() < deadline) await new Promise((r) => setTimeout(r, 200))
       stopped = !watcherProbe(sup.pid).exists
-      if (!stopped) log(`chat watcher: pid ${sup.pid} did not exit for a restart (${sup.reason}) — retried next tick`)
+      if (!stopped) log(`chat watcher: pid ${sup.pid} still running after a restart request (${sup.reason}) — draining its responder`)
     }
     if (stopped) startWatcher(sup)
   } else if (sup.reason === 'code-changed-responder-busy') {
     log(`chat watcher: restart of pid ${sup.pid} deferred (its responder is still running)`)
+  } else if (sup.reason === 'fingerprint-unreadable') {
+    log(`chat watcher: restart check of pid ${sup.pid} deferred (a watcher source file is unreadable)`)
   }
 } catch (e) {
   log(`chat watcher supervision skipped (${(e && e.message) || e})`)

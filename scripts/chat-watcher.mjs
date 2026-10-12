@@ -26,6 +26,8 @@
 // rewrote a document as empty from one: loud and free, rather than silently
 // wrong. The dry run is exempt — it changes nothing, and being able to watch the
 // channel from a worktree is exactly what it is for.
+// FIRST import: the code fingerprint is read before the rest evaluates.
+import { LOADED_FINGERPRINT } from './chat-watcher-fingerprint.mjs'
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -69,7 +71,8 @@ import {
   claimIsOurs,
   reconnectDelayMs,
   responderClaim,
-  watcherCodeFingerprint,
+  WATCHER_RESTART_SIGNAL,
+  restartRequestAction,
   sweepPlan,
   wakeDecision,
 } from './chat-watcher-core.mjs'
@@ -201,6 +204,7 @@ const state = {
   sessionId: `${CLAIM_SESSION_PREFIX}-${randomUUID()}`,
   identity: { pid: process.pid, pidStartedAt: null },
   codeFingerprint: null,
+  restartRequested: false,
   child: null,
   childTimer: null,
   sweepTimer: null,
@@ -270,10 +274,19 @@ function onResponderExit(code) {
   state.handed = []
   state.spawnedAt = null
   releaseClaim('responder-exit')
+  if (restartRequestAction({ requested: state.restartRequested, responderLive: false }) === 'exit') {
+    shutdown('restart-requested')
+  }
 }
 
 /** Wake a responder for `messages`. Returns true when a process was started. */
 function spawnResponder(messages) {
+  // A restart is pending: admit nothing new. The message stays on the spool for
+  // the next watcher.
+  if (state.restartRequested) {
+    log({ event: 'spawn-refused', reason: 'restart-requested', messages: messages.length })
+    return false
+  }
   const prompt = buildResponderPrompt(messages)
   if (!prompt) return false
   const exe = resolveClaudeCli({
@@ -417,20 +430,17 @@ function installShutdownHandlers() {
     shutdown('unhandled-rejection', 1)
   })
   process.on('exit', () => releaseClaim('exit'))
-}
-
-/** The code this process runs, read at its start: the launcher restarts the
- *  watcher once the files on disk no longer match (`watcherSupervision`). */
-function readWatcherFingerprint() {
-  return watcherCodeFingerprint({
-    readText: (name) => {
-      try {
-        return readFileSync(repoPath('scripts', name), 'utf8')
-      } catch {
-        return null
-      }
-    },
-  })
+  // The launcher's restart request: exit now, or once the running responder has.
+  try {
+    process.on(WATCHER_RESTART_SIGNAL, () => {
+      state.restartRequested = true
+      const action = restartRequestAction({ requested: true, responderLive: state.child !== null })
+      log({ event: 'restart-requested', action })
+      if (action === 'exit') shutdown('restart-requested')
+    })
+  } catch {
+    /* not every signal exists on every platform */
+  }
 }
 
 function writePidFile() {
@@ -608,7 +618,7 @@ async function run() {
     if (hold.reason !== 'held') log({ event: 'singleton-unguarded', reason: hold.reason })
   }
   state.identity = ownIdentity()
-  state.codeFingerprint = readWatcherFingerprint()
+  state.codeFingerprint = LOADED_FINGERPRINT
   installShutdownHandlers()
   const { inbox } = await deriveTopics(secret)
   // The ledger the spool already holds: what is waiting AND what was consumed.
