@@ -18,6 +18,7 @@ import {
   stampOf,
   sweepPlan,
   wakeDecision,
+  selfRestartDecision,
   watcherCodeFingerprint,
   watcherSupervision,
   isWatcherCommand,
@@ -756,5 +757,45 @@ describe('watcherCodeFingerprint — the watcher and the modules it imports', ()
     expect(firstImport).toContain("from './chat-watcher-fingerprint.mjs'")
     expect(LOADED_FINGERPRINT).toMatch(/^[0-9a-f]{16}$/)
     expect(readWatcherFingerprint()).toBe(LOADED_FINGERPRINT)
+  })
+})
+
+describe('selfRestartDecision — an idle watcher whose code a merge changed exits', () => {
+  const idle = { startFingerprint: 'aaaa', currentFingerprint: 'bbbb', childAlive: false, adoptedResponderAlive: false, pending: 0 }
+
+  it('stays on a matching fingerprint', () => {
+    expect(selfRestartDecision({ ...idle, currentFingerprint: 'aaaa' })).toEqual({ exit: false, reason: 'code-unchanged' })
+  })
+
+  it('exits on a mismatch while idle', () => {
+    expect(selfRestartDecision(idle)).toEqual({ exit: true, reason: 'code-changed' })
+  })
+
+  it('never exits on an unreadable current fingerprint', () => {
+    expect(selfRestartDecision({ ...idle, currentFingerprint: null })).toEqual({ exit: false, reason: 'fingerprint-unreadable' })
+    expect(selfRestartDecision({ ...idle, currentFingerprint: '' }).exit).toBe(false)
+  })
+
+  it('waits for a live spawned responder', () => {
+    expect(selfRestartDecision({ ...idle, childAlive: true })).toEqual({ exit: false, reason: 'responder-live' })
+  })
+
+  it('waits for a live adopted responder', () => {
+    expect(selfRestartDecision({ ...idle, adoptedResponderAlive: true })).toEqual({ exit: false, reason: 'responder-live' })
+  })
+
+  it('waits while a message is in its hands', () => {
+    expect(selfRestartDecision({ ...idle, pending: 1 })).toEqual({ exit: false, reason: 'message-in-hand' })
+  })
+
+  it('a watcher started without a fingerprint exits on the first readable one', () => {
+    expect(selfRestartDecision({ ...idle, startFingerprint: null }).exit).toBe(true)
+  })
+
+  it('is wired: the watcher checks it on its own timer and logs the exit', () => {
+    const src = readFileSync(new URL('./chat-watcher.mjs', import.meta.url), 'utf8')
+    expect(src).toContain('setInterval(checkSelfRestart, SELF_RESTART_CHECK_MS)')
+    expect(src).toContain("'chat watcher: exiting (code-changed)'")
+    expect(src).toContain("shutdown('code-changed')")
   })
 })

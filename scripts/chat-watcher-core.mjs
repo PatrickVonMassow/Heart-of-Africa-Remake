@@ -372,6 +372,35 @@ export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } 
   return hash.digest('hex').slice(0, 16)
 }
 
+/** How often an idle watcher recomputes its code fingerprint (calibratable). */
+export const SELF_RESTART_CHECK_MS = 30_000
+
+/**
+ * SHOULD AN IDLE WATCHER EXIT BECAUSE A MERGE CHANGED ITS CODE? PURE.
+ *
+ * Exit only on a readable current fingerprint that differs from the one taken
+ * at start, while no responder it spawned or adopted is alive and no message is
+ * in its hands. An unreadable fingerprint (null) never exits. After the exit the
+ * launcher's dead-watcher branch (`watcherSupervision`) starts the new code.
+ *
+ * Returns { exit, reason }.
+ */
+export function selfRestartDecision({
+  startFingerprint = null,
+  currentFingerprint = null,
+  childAlive = false,
+  adoptedResponderAlive = false,
+  pending = 0,
+} = {}) {
+  if (typeof currentFingerprint !== 'string' || currentFingerprint === '') {
+    return { exit: false, reason: 'fingerprint-unreadable' }
+  }
+  if (currentFingerprint === startFingerprint) return { exit: false, reason: 'code-unchanged' }
+  if (childAlive || adoptedResponderAlive) return { exit: false, reason: 'responder-live' }
+  if (pending > 0) return { exit: false, reason: 'message-in-hand' }
+  return { exit: true, reason: 'code-changed' }
+}
+
 /**
  * IS THE WATCHER ALIVE, AND WHAT SHOULD THE TICK DO? PURE — `probe` is injected.
  *
