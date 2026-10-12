@@ -344,7 +344,9 @@ export function isWatcherCommand(command) {
  *  only widens the hash; a nonexistent one is skipped by the caller. */
 function relativeImports(source) {
   const out = []
-  const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.\/[^'"\r\n]+)['"]/g
+  // The path sits in a lookahead: a match consumes only its keyword, so a false
+  // match (say, in a comment) can never swallow the quote of a real import.
+  const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(?=['"](\.\/[^'"\r\n]+)['"])/g
   for (let m; (m = re.exec(source)); ) out.push(m[1].slice(2))
   return out
 }
