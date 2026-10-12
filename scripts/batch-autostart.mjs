@@ -104,7 +104,7 @@ import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { classifyPause, describePause, formatPauseRecord, pauseRecovery } from './batch-pause-core.mjs'
-import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
+import { WATCHER_PID_FILE, watcherCodeFingerprint, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
@@ -735,7 +735,22 @@ const watcherProbe = (pid) => {
 // work; its decision gate admits only verified mail to a bounded responder.
 try {
   const rec = readJson(C(WATCHER_PID_FILE))
-  const sup = watcherSupervision({ paused: batchParked, record: rec, probe: watcherProbe })
+  const fingerprint = watcherCodeFingerprint({
+    readText: (name) => {
+      try {
+        return readFileSync(R(name), 'utf8')
+      } catch {
+        return null
+      }
+    },
+  })
+  const sup = watcherSupervision({
+    paused: batchParked,
+    record: rec,
+    probe: watcherProbe,
+    fingerprint,
+    claim: readClaim(),
+  })
   // A WATCHER CANNOT RUN WITHOUT A READABLE SECRET, and one started anyway exits
   // before it writes its pidfile — so the supervision would read "not running"
   // and start another doomed process at every tick, for ever, with nothing
@@ -747,21 +762,40 @@ try {
   } else if (sup.action === 'stop') {
     try { process.kill(sup.pid) } catch { /* already gone */ }
     log(`chat watcher: stopped pid ${sup.pid} (${sup.reason})`)
-  } else if (sup.action === 'start') {
-    const out = openSync(C('chat-watcher.log'), 'a')
-    const child = spawn(process.execPath, [R('chat-watcher.mjs')], {
-      cwd: REPO,
-      detached: true,
-      stdio: ['ignore', out, out],
-      // point 401 — a console window popping up while the user works elsewhere
-      // steals their focus, and this process starts unattended by definition.
-      windowsHide: true,
-    })
-    child.unref()
-    log(`chat watcher: started pid ${child.pid} (${sup.reason})`)
+  } else if (sup.action === 'restart' && chatSecretBroken) {
+    // The live watcher read the secret at its start; a replacement could not.
+    log('chat watcher: stale code kept running (the chat secret is unreadable)')
+  } else if (sup.action === 'restart' || sup.action === 'start') {
+    // A RESTART STOPS FIRST AND WAITS: the old watcher holds the singleton
+    // address until it exits, and a replacement started earlier would exit on it.
+    let stopped = true
+    if (sup.action === 'restart') {
+      try { process.kill(sup.pid) } catch { /* already gone */ }
+      const deadline = Date.now() + 10_000
+      while (watcherProbe(sup.pid).exists && Date.now() < deadline) await new Promise((r) => setTimeout(r, 200))
+      stopped = !watcherProbe(sup.pid).exists
+      if (!stopped) log(`chat watcher: pid ${sup.pid} did not exit for a restart (${sup.reason}) — retried next tick`)
+    }
+    if (stopped) startWatcher(sup)
+  } else if (sup.reason === 'code-changed-responder-busy') {
+    log(`chat watcher: restart of pid ${sup.pid} deferred (its responder is still running)`)
   }
 } catch (e) {
   log(`chat watcher supervision skipped (${(e && e.message) || e})`)
+}
+
+function startWatcher(sup) {
+  const out = openSync(C('chat-watcher.log'), 'a')
+  const child = spawn(process.execPath, [R('chat-watcher.mjs')], {
+    cwd: REPO,
+    detached: true,
+    stdio: ['ignore', out, out],
+    // point 401 — a console window popping up while the user works elsewhere
+    // steals their focus, and this process starts unattended by definition.
+    windowsHide: true,
+  })
+  child.unref()
+  log(`chat watcher: ${sup.action === 'restart' ? `restarted pid ${sup.pid} as` : 'started'} pid ${child.pid} (${sup.reason})`)
 }
 
 // --- BOARD REPUBLISH ON AGE OR PROGRESS (user order 24.09.2026) ---------------

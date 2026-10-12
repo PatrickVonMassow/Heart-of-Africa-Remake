@@ -69,6 +69,7 @@ import {
   claimIsOurs,
   reconnectDelayMs,
   responderClaim,
+  watcherCodeFingerprint,
   sweepPlan,
   wakeDecision,
 } from './chat-watcher-core.mjs'
@@ -199,6 +200,7 @@ function gatherState(sessionId, responderLive) {
 const state = {
   sessionId: `${CLAIM_SESSION_PREFIX}-${randomUUID()}`,
   identity: { pid: process.pid, pidStartedAt: null },
+  codeFingerprint: null,
   child: null,
   childTimer: null,
   sweepTimer: null,
@@ -417,8 +419,27 @@ function installShutdownHandlers() {
   process.on('exit', () => releaseClaim('exit'))
 }
 
+/** The code this process runs, read at its start: the launcher restarts the
+ *  watcher once the files on disk no longer match (`watcherSupervision`). */
+function readWatcherFingerprint() {
+  return watcherCodeFingerprint({
+    readText: (name) => {
+      try {
+        return readFileSync(repoPath('scripts', name), 'utf8')
+      } catch {
+        return null
+      }
+    },
+  })
+}
+
 function writePidFile() {
-  writeJsonAtomic(PID_PATH, { ...state.identity, at: Date.now(), sessionId: state.sessionId })
+  writeJsonAtomic(PID_PATH, {
+    ...state.identity,
+    at: Date.now(),
+    sessionId: state.sessionId,
+    codeFingerprint: state.codeFingerprint,
+  })
 }
 function clearPidFile() {
   try {
@@ -587,6 +608,7 @@ async function run() {
     if (hold.reason !== 'held') log({ event: 'singleton-unguarded', reason: hold.reason })
   }
   state.identity = ownIdentity()
+  state.codeFingerprint = readWatcherFingerprint()
   installShutdownHandlers()
   const { inbox } = await deriveTopics(secret)
   // The ledger the spool already holds: what is waiting AND what was consumed.

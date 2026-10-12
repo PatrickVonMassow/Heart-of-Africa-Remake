@@ -50,6 +50,8 @@
 // by process), and would then acquire the owner lock — precisely the outcome
 // this module exists to prevent.
 
+import { createHash } from 'node:crypto'
+
 /**
  * Every reason a decision can carry, in one place so the live path, the dry run
  * and the tests all speak the same words. The verification drops (`malformed`,
@@ -337,6 +339,35 @@ export function isWatcherCommand(command) {
   return script !== undefined && base(script) === 'chat-watcher.mjs'
 }
 
+/** Relative imports of one module source: static, side-effect and dynamic. */
+function relativeImports(source) {
+  const out = []
+  const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.\/[^'"]+)['"]/g
+  for (let m; (m = re.exec(source)); ) out.push(m[1].slice(2))
+  return out
+}
+
+/**
+ * THE WATCHER'S CODE FINGERPRINT. PURE — `readText(name)` returns a `scripts/`
+ * file's content or null. Hashes the entry and every module it imports from
+ * `scripts/`, transitively (`./x.mjs` only; `../` and packages are outside), so
+ * any merge into code the watcher runs changes it. Read once at watcher start.
+ */
+export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } = {}) {
+  const seen = new Map()
+  const queue = [entry]
+  while (queue.length) {
+    const name = queue.shift()
+    if (seen.has(name)) continue
+    const text = typeof readText === 'function' ? readText(name) : null
+    seen.set(name, typeof text === 'string' ? text : null)
+    if (typeof text === 'string') queue.push(...relativeImports(text))
+  }
+  const hash = createHash('sha256')
+  for (const name of [...seen.keys()].sort()) hash.update(`${name}\0${seen.get(name) ?? '<missing>'}\0`)
+  return hash.digest('hex').slice(0, 16)
+}
+
 /**
  * IS THE WATCHER ALIVE, AND WHAT SHOULD THE TICK DO? PURE — `probe` is injected.
  *
@@ -346,9 +377,12 @@ export function isWatcherCommand(command) {
  * whole family of probes was written to avoid. Only when the record or the probe
  * carries no start time does a live pid count by existence (the lenient branch).
  *
- * Returns { action: 'start' | 'none', reason, pid }.
+ * `fingerprint` is the current `watcherCodeFingerprint` (null skips the code
+ * check); `claim` is the batch claim, read for a running responder.
+ *
+ * Returns { action: 'start' | 'restart' | 'none', reason, pid }.
  */
-export function watcherSupervision({ paused = false, record = null, probe = null } = {}) {
+export function watcherSupervision({ paused = false, record = null, probe = null, fingerprint = null, claim = null } = {}) {
   const pid = Number(record?.pid)
   let alive = false
   if (Number.isInteger(pid) && pid > 0 && typeof probe === 'function') {
@@ -370,6 +404,13 @@ export function watcherSupervision({ paused = false, record = null, probe = null
         typeof p.startedAt !== 'number' ||
         Math.abs(p.startedAt - recorded) <= WATCHER_PID_TOLERANCE_MS
     }
+  }
+  // CODE CHANGED UNDER A LIVE WATCHER (a merge): restart it, paused or not. A
+  // record without a fingerprint counts as changed once — the new watcher writes
+  // one. Not while its responder runs: the watcher's shutdown kills it.
+  if (alive && typeof fingerprint === 'string' && fingerprint !== '' && record?.codeFingerprint !== fingerprint) {
+    if (adoptDecision({ claim, probe }).adopt) return { action: 'none', reason: 'code-changed-responder-busy', pid }
+    return { action: 'restart', reason: 'code-changed', pid }
   }
   // A paused batch still needs its inbox listener: user mail is the only input
   // that can authorize the pause to end. Keeping (or restarting) this zero-model

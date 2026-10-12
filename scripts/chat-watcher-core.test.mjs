@@ -18,6 +18,7 @@ import {
   stampOf,
   sweepPlan,
   wakeDecision,
+  watcherCodeFingerprint,
   watcherSupervision,
   isWatcherCommand,
 } from './chat-watcher-core.mjs'
@@ -443,6 +444,89 @@ describe('watcherSupervision — the launcher tick is the whole lifecycle', () =
 
   it('but the leniency never extends to a pid the probe says is GONE', () => {
     expect(watcherSupervision({ record: { pid: 900, pidStartedAt: null }, probe: probeOf({}) }).action).toBe('start')
+  })
+})
+
+describe('watcherSupervision — a watcher whose code a merge changed is restarted', () => {
+  const now = Date.now()
+  const probeOf = (map) => (pid) => map[pid] ?? { exists: false, startedAt: null }
+  const cmd = '/usr/local/bin/node /workspace/hoa/scripts/chat-watcher.mjs'
+  const live = { 900: { exists: true, startedAt: now - 10_000, command: cmd } }
+  const record = { pid: 900, pidStartedAt: now - 10_000, at: now - 10_000, codeFingerprint: 'aaaa' }
+  const busyClaim = { by: CLAIM_BY, responderPid: 901 }
+
+  it('leaves a watcher alone whose fingerprint matches', () => {
+    expect(watcherSupervision({ record, probe: probeOf(live), fingerprint: 'aaaa' })).toEqual({
+      action: 'none',
+      reason: 'alive',
+      pid: 900,
+    })
+  })
+
+  it('restarts a watcher whose fingerprint differs', () => {
+    expect(watcherSupervision({ record, probe: probeOf(live), fingerprint: 'bbbb' })).toEqual({
+      action: 'restart',
+      reason: 'code-changed',
+      pid: 900,
+    })
+  })
+
+  it('counts a pidfile without a fingerprint as changed', () => {
+    const { codeFingerprint, ...old } = record
+    expect(codeFingerprint).toBe('aaaa')
+    expect(watcherSupervision({ record: old, probe: probeOf(live), fingerprint: 'aaaa' }).action).toBe('restart')
+  })
+
+  it('restarts a stale watcher in a paused batch too', () => {
+    expect(watcherSupervision({ paused: true, record, probe: probeOf(live), fingerprint: 'bbbb' })).toEqual({
+      action: 'restart',
+      reason: 'code-changed',
+      pid: 900,
+    })
+  })
+
+  it('waits while the watcher\'s responder is still running, then restarts', () => {
+    const busy = probeOf({ ...live, 901: { exists: true, startedAt: now - 1000 } })
+    expect(watcherSupervision({ record, probe: busy, fingerprint: 'bbbb', claim: busyClaim })).toEqual({
+      action: 'none',
+      reason: 'code-changed-responder-busy',
+      pid: 900,
+    })
+    expect(watcherSupervision({ record, probe: probeOf(live), fingerprint: 'bbbb', claim: busyClaim }).action).toBe(
+      'restart',
+    )
+  })
+
+  it('never restarts a dead watcher — that stays a plain start', () => {
+    expect(watcherSupervision({ record, probe: probeOf({}), fingerprint: 'bbbb' }).action).toBe('start')
+  })
+})
+
+describe('watcherCodeFingerprint — the watcher and the modules it imports', () => {
+  const files = {
+    'chat-watcher.mjs': "import { a } from './a.mjs'\nimport x from 'node:fs'\nawait import('./b.mjs')",
+    'a.mjs': "import './c.mjs'\nimport { y } from '../src/y.ts'",
+    'b.mjs': 'export const b = 1',
+    'c.mjs': 'export const c = 1',
+    'unrelated.mjs': 'export const u = 1',
+  }
+  const fp = (over = {}) => {
+    const all = { ...files, ...over }
+    return watcherCodeFingerprint({ readText: (n) => all[n] ?? null })
+  }
+
+  it('is stable for unchanged files', () => {
+    expect(fp()).toBe(fp())
+  })
+
+  it('changes with the entry and with a transitive import', () => {
+    expect(fp({ 'chat-watcher.mjs': files['chat-watcher.mjs'] + '\n' })).not.toBe(fp())
+    expect(fp({ 'c.mjs': 'export const c = 2' })).not.toBe(fp())
+    expect(fp({ 'b.mjs': 'export const b = 2' })).not.toBe(fp())
+  })
+
+  it('ignores files the watcher does not import', () => {
+    expect(fp({ 'unrelated.mjs': 'export const u = 2' })).toBe(fp())
   })
 })
 
