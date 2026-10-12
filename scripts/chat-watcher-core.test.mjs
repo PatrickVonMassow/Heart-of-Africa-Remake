@@ -747,6 +747,12 @@ describe('watcherCodeFingerprint — the watcher and the modules it imports', ()
     expect(base).not.toBeNull()
   })
 
+  it('does not let an unterminated quote in a comment swallow the next import', () => {
+    const src = "// import './unfinished\nimport './a.mjs'"
+    const withA = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': src, 'a.mjs': a })[n] })
+    expect(withA('export const a = 1')).not.toBe(withA('export const a = 2'))
+  })
+
   it('keeps an import that sits between comment-like markers in strings', () => {
     const src = "const open = '/*'\nimport './a.mjs'\nconst close = '*/'"
     const withA = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': src, 'a.mjs': a })[n] ?? null })
