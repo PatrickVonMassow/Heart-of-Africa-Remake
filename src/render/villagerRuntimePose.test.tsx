@@ -390,9 +390,10 @@ describe('the runtime-pose exporter', () => {
           const b = f.bones[i]
           const local = new THREE.Matrix4().compose(new THREE.Vector3(...b.p), new THREE.Quaternion(...b.q), new THREE.Vector3(...b.s))
           world[i] = (par < 0 ? m.clone() : world[par].clone()).multiply(local)
-          const got = new THREE.Vector3().setFromMatrixPosition(world[i])
-          const want = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(f.world[i]))
-          expect(got.distanceTo(want)).toBeLessThan(1e-6)
+          // the whole matrix: a wrong leaf rotation or scale keeps the joint's position
+          const want = f.world[i]
+          const err = Math.max(...world[i].elements.map((x, k) => Math.abs(x - want[k])))
+          expect(err).toBeLessThan(1e-6)
         })
       }
     }
