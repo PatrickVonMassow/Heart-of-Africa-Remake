@@ -85,6 +85,9 @@ def main():
         import fit as F
         F.selftest()
         MK.selftest_volume()
+    if 'export' in steps or 'selftest' in steps:
+        import gltfio as GI
+        GI.selftest()
     if 'penetration' in steps or 'selftest' in steps:
         import penetration as P
         P.selftest()
@@ -114,6 +117,10 @@ def main():
         garments['mask'] = MK.masks(body, garments, cfg)
     if 'export' in steps:
         import export as E
+        if garments is None:
+            # the game draws no code-built dress any more: a body-only asset
+            # would undress every villager
+            raise RuntimeError('export: no garments (build them with --step garments first)')
         # The game dresses the glTF body with exactly these garments (render/
         # villagerFigureBody.ts gltfGarment), the ones the penetration report
         # and the dress-* frame sheets measure; body and garments carry their

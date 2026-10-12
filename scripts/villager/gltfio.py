@@ -201,6 +201,27 @@ def world_pose(parents, local_t, local_r):
 # ---- writing ------------------------------------------------------------------
 
 
+def sparse_bounds(stored, moved, count):
+    """min/max of a sparse accessor as glTF requires: over the substituted
+    values (as stored, i.e. quantized when normalized) and, when any vertex is
+    left out, the implicit zeros."""
+    vals = np.asarray(stored)[moved].reshape(len(moved), -1)
+    if len(moved) < count:
+        vals = np.vstack([vals, np.zeros((1, vals.shape[1]))])
+    return [float(x) for x in vals.min(0)], [float(x) for x in vals.max(0)]
+
+
+def selftest():
+    # deltas under eps are dropped: their values must not widen the bounds,
+    # and the implicit zeros must be inside them (point 1315 review)
+    d = np.array([[0.0001, 0, 0], [0.001, 0.5, -0.25], [0, 0, 0]]) * 32767
+    moved = np.nonzero(np.abs(d).max(1) > 0.0005 * 32767)[0]
+    lo, hi = sparse_bounds(np.round(d), moved, 3)
+    assert lo == [0.0, 0.0, round(-0.25 * 32767)] and hi == [round(0.001 * 32767), round(0.5 * 32767), 0.0], (lo, hi)
+    lo, hi = sparse_bounds(np.array([[1.0, 2, 3], [4, 5, 6]]), np.array([0, 1]), 2)
+    assert lo == [1.0, 2.0, 3.0] and hi == [4.0, 5.0, 6.0], (lo, hi)
+
+
 class GlbWriter:
     def __init__(self):
         self.j = {'asset': {'version': '2.0', 'generator': 'hoa scripts/villager'}, 'scene': 0, 'scenes': [{'nodes': []}],
@@ -258,8 +279,7 @@ class GlbWriter:
             val = self._view(np.ascontiguousarray(delta[moved]).astype(np.float32).tobytes())
         acc['sparse'] = {'count': int(len(moved)), 'indices': {'bufferView': idx, 'componentType': 5125 if count > 65535 else 5123},
                          'values': {'bufferView': val}}
-        acc['min'] = [float(x) for x in delta.min(0)]
-        acc['max'] = [float(x) for x in delta.max(0)]
+        acc['min'], acc['max'] = sparse_bounds(np.asarray(delta), moved, count)
         self.j['accessors'].append(acc)
         return len(self.j['accessors']) - 1
 
