@@ -81,9 +81,17 @@ put it is the mistake this line exists to stop.
   Queue position: queue front (communication first).
   Source: user board chat 12.10.2026 19:26: "Warum hat es 38 Minuten gedauert, meine Nachricht zu beantworten. Das sollte maximal 15 min dauern."
   Final state: a board chat message reaches an answer within 15 minutes of being sent, also while the batch session sits in a blocking call (landing fast gate, main pre-push full gate, suite await); the delivery path and its latency are measured, not assumed.
-  Verifiable: a measured case where a message sent during a >15 min blocking gate is answered within 15 minutes; a test for the delivery path that is changed.
+  Verifiable: a test for each delivery-path change (subagent hook, watcher singleton, still-pending count). The live >15 min measurement is split off to point 1352 (12.10.2026): it needs a genuine user message against the merged watcher.
   Criticality: medium - the user's only live channel to the batch.
   Also (author measurement 12.10.2026, branch feat/1348-chat-answer-bound d4581b8de): the 38 min came from a background subagent whose PostToolUse hook consumed the message into its own context (isSubagentHook missed agent_id), fixed on the branch; still open there: 15 concurrent chat-watcher.mjs processes (every log line ~14x, three responders for one message at 16:35:45-51Z, one killed 143, the user got two answers), and responders exit "acked 0, stillPending 1" after answering. Live >15 min measurement procedure is in the branch report: blocking owner call >15 min with a busy subagent, message must stay in .claude/chat-spool/, defer-sweep spawn ~3 min after receivedAt, chat-reply-receipt at minus receivedAt <= 15 min.
+  Bundle: Dorfleben.
+
+- [ ] 1352. Live measurement: a board chat message sent during a >15 min blocking call is answered within 15 minutes
+  Queue position: queue front, after point 1348 (communication first).
+  Source: split from point 1348 (12.10.2026): its fixes are unit-tested, but the user's acceptance needs a measured live case against the merged watcher.
+  Final state: one recorded case in which a genuine user board chat message arrived while the owner session sat in a blocking call over 15 minutes, and the reply receipt lies at most 15 minutes after its receivedAt; a miss is diagnosed and fixed here.
+  Verifiable: .claude/chat-watcher.log shows one defer-sweep spawn per message (no duplicate lines), a single responder, responder-exit with stillPending 0, and chat-reply-receipt minus receivedAt <= 15 min; the numbers go into the point's closing note. Procedure: blocking owner call >15 min with a busy subagent; the message must stay in .claude/chat-spool/ until the defer sweep (~3 min after receivedAt).
+  Criticality: medium - the user's only live channel to the batch.
   Bundle: Dorfleben.
 
 - [ ] 1053. A session the user opened for something else silently becomes the batch owner
