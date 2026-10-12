@@ -679,7 +679,9 @@ describe('watcherSuperseded — a second watcher stands down', () => {
 
   it('recognises the watcher command and nothing else', () => {
     expect(isWatcherCommand(cmd)).toBe(true)
-    expect(isWatcherCommand('C:\\hoa\\scripts\\chat-watcher.mjs')).toBe(true)
+    expect(isWatcherCommand('C:\\node\\node.exe C:\\hoa\\scripts\\chat-watcher.mjs')).toBe(true)
+    expect(isWatcherCommand('/usr/bin/tail -f /repo/scripts/chat-watcher.mjs')).toBe(false)
+    expect(isWatcherCommand('/usr/bin/vim /repo/scripts/chat-watcher.mjs')).toBe(false)
     expect(isWatcherCommand('node scripts/chat-watcher.mjs --dry-run')).toBe(true)
     expect(isWatcherCommand('node scripts/chat-watcher-core.test.mjs')).toBe(false)
     expect(isWatcherCommand(null)).toBe(false)

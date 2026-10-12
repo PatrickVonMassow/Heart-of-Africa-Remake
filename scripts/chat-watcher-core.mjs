@@ -323,9 +323,10 @@ export const WATCHER_PID_TOLERANCE_MS = 2000
  *  name from this pure module rather than importing the watcher wrapper. */
 export const WATCHER_PID_FILE = 'chat-watcher.json'
 
-/** Does a process command line belong to a chat watcher? */
+/** Does a process command line belong to a chat watcher? Only node EXECUTING
+ *  the watcher script counts — an editor or `tail` naming the file does not. */
 export function isWatcherCommand(command) {
-  return typeof command === 'string' && /(^|[\\/\s])chat-watcher\.mjs(\s|$)/.test(command)
+  return typeof command === 'string' && /^(\S*[\\/])?node(\.exe)?\s+(\S*[\\/])?chat-watcher\.mjs(\s|$)/.test(command)
 }
 
 /**

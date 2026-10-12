@@ -499,8 +499,8 @@ async function handleLine(secret, maxAgeMs, line) {
     ...gathered,
   })
   const record = { event: verdict.accept ? verdict.message.id : (verdict.ntfyId ?? null), ...decision }
-  say(dryRun ? { ...record, dryRun: true } : record)
-  appendLog(JSON.stringify({ at: new Date().toISOString(), ...record }))
+  if (dryRun) say({ ...record, dryRun: true })
+  else log(record)
   if (dryRun || !verdict.accept) return
 
   // SPOOL FIRST, whatever the decision. The spool is the shared record the
@@ -509,6 +509,10 @@ async function handleLine(secret, maxAgeMs, line) {
   // otherwise the next poll would accept it again and deliver it twice.
   spoolMessage(verdict.message)
   if (decision.decision !== 'spawn') return
+  // Two watchers started together both pass the start check; the one whose
+  // pidfile was overwritten must not wake a second responder. The message is
+  // already on the spool for the watcher that stays.
+  if (superseded()) return shutdown('superseded')
   spawnResponder([verdict.message])
 }
 
