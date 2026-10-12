@@ -118,6 +118,22 @@ put it is the mistake this line exists to stop.
   Criticality: medium - a standing red in the village suite; visible at every water stand.
   Bundle: Dorfleben.
 
+- [ ] 1340. Tag catcher's hands at chest height and on the caught child at the catch frame
+  Queue position: after point 1333; point 1316 reworks the port-city chaser pose (its item 7) — if 1316 lands with `polish-children --section=tag-catch` green on both backends, this point closes with that run as evidence.
+  Source: findings carrier 12.10.2026 02:47Z: polish-children --section=tag-catch (Cairo) is red on main 8a477d931 and on feat/1315 alike. WebGPU: "the catcher's two hands are held forward at chest height, read off the drawn pivots" fails (hand y 0.889/0.895); WebGL 2 on feat/1315: "at the catch frame the catcher's drawn hand is ON the caught child" fails. Not in the classified baseline. Logs: local/1315-main-port-webgpu.log, local/1315-port-webgl.log.
+  Final state: in the port-city tag game the catcher's drawn hands are held forward at chest height while chasing and one drawn hand is on the caught child at the catch frame, on both backends.
+  Verifiable: `polish-children --section=tag-catch` green on both backends; the catch frame picture-checked.
+  Criticality: medium - a standing red in the children suite; visible in every port city's tag game.
+  Bundle: Dorfleben.
+
+- [ ] 1341. Pipeline garments: smooth the crumpled fold surface, fit the head cover, measure the garment frame cost
+  Queue position: after point 1340.
+  Source: findings carrier 12.10.2026 02:47Z, picture check of point 1315 (feat/1315 8aaf9ac28, 1294-dress-swahili.png WebGPU vs main): kanzu and kanga/buibui robes show a lumpy crumpled-paper fold surface at the normal camera distance, and the red women's head cover rises to a peak above the head. The same frame read 10 FPS on the branch against 21 on main (one snapshot on an unquiet host) with villager.glb at 6.9 MB.
+  Final state: the coastal robes' fold surface reads smooth cloth at the normal camera distance; the head cover follows the head without a peak; the frame cost of the garment glb is measured on a quiet host against the pre-1315 main, and reduced if it costs measurably. Zulu/Bambara walk, kneel, dig, run and the Cairo children stay clean.
+  Verifiable: Blender frame sheet and 1294-dress-swahili.png before/after on both backends, judged by looking; the recorded FPS comparison; garment penetration gate green.
+  Criticality: medium - every coastal villager; possible frame-rate cost on all villager scenes.
+  Bundle: Dorfleben.
+
 - [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
   Queue position: directly after point 1294 (ahead of 1301); worked only once 1294 has landed (user 05.10.2026: "ja, aber nach 1294").
   Source: user-approved findings-carrier request (entry 2026-10-05T13:19:04.653Z, session 512756ba, rev 2eb4f1384), wrongly deferred as blocked at a watermark and carried in by point 1306; point text is that entry's original #spec, verbatim:
