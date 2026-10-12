@@ -53,6 +53,8 @@ import {
   statSync,
 } from 'node:fs'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { createServer } from 'node:net'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
 import { commonRepoPath } from './repo-paths.mjs'
@@ -842,6 +844,35 @@ export function cheapProbePid(pid) {
   } catch (e) {
     return { exists: !!(e && e.code === 'EPERM'), startedAt: null }
   }
+}
+
+/**
+ * HOLD AN OS-EXCLUSIVE ADDRESS for this process's lifetime: a Linux abstract
+ * socket or a Windows named pipe. The kernel admits one listener and frees the
+ * address when the process dies, so there is no stale file and no takeover
+ * race. Resolves { held, reason }; a null address (platform without one) or a
+ * listen error other than "in use" fails OPEN — the pidfile still supervises.
+ */
+export function holdExclusiveAddress(address) {
+  if (!address) return Promise.resolve({ held: true, reason: 'no-address' })
+  return new Promise((resolve) => {
+    const server = createServer((socket) => socket.destroy())
+    server.once('error', (e) =>
+      resolve(e && e.code === 'EADDRINUSE' ? { held: false, reason: 'in-use' } : { held: true, reason: `fail-open: ${e?.code ?? e}` }),
+    )
+    server.listen(address, () => {
+      server.unref()
+      resolve({ held: true, reason: 'held', server })
+    })
+  })
+}
+
+/** The watcher's exclusive address for one checkout, or null off Linux/Windows. */
+export function watcherAddress(repoRoot, platform = process.platform) {
+  const tag = createHash('sha256').update(String(repoRoot)).digest('hex').slice(0, 16)
+  if (platform === 'win32') return `\\\\.\\pipe\\hoa-chat-watcher-${tag}`
+  if (platform === 'linux') return `\0hoa-chat-watcher-${tag}`
+  return null
 }
 
 /** The process argument vector, or null where the OS gives none cheaply

@@ -325,7 +325,9 @@ export const WATCHER_PID_FILE = 'chat-watcher.json'
 
 /** Does a process command line belong to a chat watcher? Only node EXECUTING
  *  the watcher script counts — an editor or `tail` naming the file does not.
- *  `command` is the argument vector, or a string split on whitespace. */
+ *  `command` is the argument vector, or a string split on whitespace. A miss
+ *  (say, a node option with an operand) costs one extra start, which exits at
+ *  once on the held address (`holdExclusiveAddress`); it cannot double a watcher. */
 export function isWatcherCommand(command) {
   const argv = Array.isArray(command) ? command : typeof command === 'string' ? command.split(/\s+/) : null
   if (!argv || argv.length < 2) return false
@@ -333,35 +335,6 @@ export function isWatcherCommand(command) {
   if (!/^node(\.exe)?$/i.test(base(argv[0]))) return false
   const script = argv.slice(1).find((a) => !String(a).startsWith('-'))
   return script !== undefined && base(script) === 'chat-watcher.mjs'
-}
-
-/**
- * WIN THE PIDFILE, ATOMICALLY. Exclusive create is the election: of two
- * watchers starting together exactly one creates the file. A file left by a
- * dead watcher is moved aside under a name only one remover can take, then the
- * create is retried once. `fs` is injected: { create(path, json) → boolean
- * (false when it exists), read(path) → record|null, takeAside(path, expected) → boolean, true only
- * when the file it moved was `expected` }.
- * Returns { won, reason }.
- */
-export function electWatcher({ path, record, probe, fs }) {
-  const json = JSON.stringify(record)
-  if (fs.create(path, json)) return { won: true, reason: 'created' }
-  const held = fs.read(path)
-  if (watcherSupervision({ record: held, probe }).action === 'none') return { won: false, reason: 'incumbent-alive' }
-  if (!fs.takeAside(path, held)) return { won: false, reason: 'lost-takeover' }
-  return fs.create(path, json) ? { won: true, reason: 'replaced-dead' } : { won: false, reason: 'lost-create' }
-}
-
-/**
- * HAS ANOTHER LIVE WATCHER TAKEN THE PIDFILE? PURE. A watcher that is not the
- * one the pidfile names, while the named one is alive, is surplus: two watchers
- * wake two responders for one message, so the surplus one stands down.
- */
-export function watcherSuperseded({ record = null, ownPid, probe = null } = {}) {
-  const pid = Number(record?.pid)
-  if (!Number.isInteger(pid) || pid <= 0 || pid === ownPid) return false
-  return watcherSupervision({ record, probe }).action === 'none'
 }
 
 /**

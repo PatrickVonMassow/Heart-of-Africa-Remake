@@ -26,7 +26,7 @@
 // rewrote a document as empty from one: loud and free, rather than silently
 // wrong. The dry run is exempt — it changes nothing, and being able to watch the
 // channel from a worktree is exactly what it is for.
-import { closeSync, existsSync, openSync, readFileSync, readdirSync, linkSync, renameSync, rmSync, statSync, writeSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
@@ -49,7 +49,7 @@ import {
 import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { knownMessages, claimMessage, readPending, spoolMessage } from './chat-spool.mjs'
 import { readReplyReceipt } from './chat-reply.mjs'
-import { assessOwner, bootTimeMs, probePid, processCommand, readOwnerLock } from './batch-singleton.mjs'
+import { assessOwner, bootTimeMs, holdExclusiveAddress, probePid, readOwnerLock, watcherAddress } from './batch-singleton.mjs'
 import { clearClaim, maxAgeMs as claimMaxAgeMs, readClaim, writeClaim } from './batch-claim.mjs'
 import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
@@ -69,9 +69,7 @@ import {
   reconnectDelayMs,
   responderClaim,
   sweepPlan,
-  electWatcher,
   wakeDecision,
-  watcherSuperseded,
 } from './chat-watcher-core.mjs'
 
 const PID_PATH = repoPath('.claude', WATCHER_PID_FILE)
@@ -422,45 +420,6 @@ function installShutdownHandlers() {
 function writePidFile() {
   writeJsonAtomic(PID_PATH, { ...state.identity, at: Date.now(), sessionId: state.sessionId })
 }
-const pidFileOps = {
-  create(path, json) {
-    try {
-      const fd = openSync(path, 'wx')
-      try {
-        writeSync(fd, json)
-      } finally {
-        closeSync(fd)
-      }
-      return true
-    } catch (e) {
-      if (e && e.code === 'EEXIST') return false
-      throw e
-    }
-  },
-  read: (path) => readJson(path),
-  // Rename is atomic, so one remover takes the file. A rename that took a
-  // FRESH file (a rival replaced the dead one meanwhile) links it back.
-  takeAside(path, expected) {
-    const aside = `${path}.dead-${process.pid}`
-    try {
-      renameSync(path, aside)
-    } catch {
-      return false
-    }
-    const taken = readJson(aside)
-    const ours = taken?.pid === expected?.pid && taken?.pidStartedAt === expected?.pidStartedAt
-    if (!ours) {
-      try {
-        linkSync(aside, path)
-      } catch {
-        /* a third watcher created it; that one stands */
-      }
-    }
-    rmSync(aside, { force: true })
-    return ours
-  },
-}
-
 function clearPidFile() {
   try {
     const rec = readJson(PID_PATH)
@@ -549,10 +508,6 @@ async function handleLine(secret, maxAgeMs, line) {
   // otherwise the next poll would accept it again and deliver it twice.
   spoolMessage(verdict.message)
   if (decision.decision !== 'spawn') return
-  // Two watchers started together both pass the start check; the one whose
-  // pidfile was overwritten must not wake a second responder. The message is
-  // already on the spool for the watcher that stays.
-  if (superseded()) return shutdown('superseded')
   spawnResponder([verdict.message])
 }
 
@@ -577,22 +532,11 @@ function deferralMs() {
   return Number.isFinite(raw) && raw > 0 ? raw : DEFERRAL_MS
 }
 
-const watcherProbe = (pid) => {
-  const p = probePid(pid)
-  return p.exists ? { ...p, command: processCommand(pid) } : p
-}
-
-/** True when another live watcher holds the pidfile; this one is then surplus. */
-function superseded() {
-  return watcherSuperseded({ record: readJson(PID_PATH), ownPid: process.pid, probe: watcherProbe })
-}
-
 /** One sweep: take what the owner did not. Total — a sweep must never throw
  *  inside a timer and take the watcher down with it. */
 function sweepDeferred() {
   try {
     if (state.child) return // our own responder is answering; `woken` covers its messages
-    if (superseded()) return shutdown('superseded')
     const plan = sweepPlan({ pending: readPending(), now: Date.now(), windowMs: deferralMs(), wokenIds: state.woken })
     if (plan.overdue.length === 0) return
     const gathered = gatherState(state.sessionId, false)
@@ -631,6 +575,16 @@ async function run() {
   }
   const secret = status.secret
   const maxAge = Number(process.env.HOA_CHAT_MAX_AGE_MS) > 0 ? Number(process.env.HOA_CHAT_MAX_AGE_MS) : DEFAULT_MAX_AGE_MS
+  if (!dryRun) {
+    // ONE WATCHER PER CHECKOUT, held by the OS: two watchers wake two
+    // responders for one message, and a pidfile cannot elect without races.
+    const hold = await holdExclusiveAddress(watcherAddress(REPO_ROOT))
+    if (!hold.held) {
+      log({ event: 'already-watching', pid: readJson(PID_PATH)?.pid ?? null })
+      process.exit(0)
+    }
+    if (hold.reason !== 'held') log({ event: 'singleton-unavailable', reason: hold.reason })
+  }
   state.identity = ownIdentity()
   installShutdownHandlers()
   const { inbox } = await deriveTopics(secret)
@@ -644,18 +598,6 @@ async function run() {
     { now: Date.now(), retentionMs: envelopeRetentionMs(maxAge) },
   )
 
-  if (!dryRun) {
-    const election = electWatcher({
-      path: PID_PATH,
-      record: { ...state.identity, at: Date.now(), sessionId: state.sessionId },
-      probe: watcherProbe,
-      fs: pidFileOps,
-    })
-    if (!election.won) {
-      log({ event: 'superseded-at-start', reason: election.reason, pid: readJson(PID_PATH)?.pid })
-      process.exit(0)
-    }
-  }
   if (!dryRun) {
     // A responder orphaned by a crashed predecessor is ADOPTED rather than
     // duplicated: re-file the claim under this process and wait for it.

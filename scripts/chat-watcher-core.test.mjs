@@ -18,10 +18,9 @@ import {
   sweepPlan,
   wakeDecision,
   watcherSupervision,
-  watcherSuperseded,
   isWatcherCommand,
-  electWatcher,
 } from './chat-watcher-core.mjs'
+import { holdExclusiveAddress, watcherAddress } from './batch-singleton.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
 import { claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
@@ -661,22 +660,8 @@ describe('openPointStatus — the format alarm both spawners read', () => {
   })
 })
 
-describe('watcherSuperseded — a second watcher stands down', () => {
+describe('the watcher singleton', () => {
   const cmd = 'node /workspace/hoa/scripts/chat-watcher.mjs'
-  const probe = (map) => (pid) => map[pid] ?? { exists: false, startedAt: null }
-  const record = { pid: 900, pidStartedAt: 1 }
-
-  it('is surplus while the pidfile names another live watcher', () => {
-    expect(watcherSuperseded({ record, ownPid: 901, probe: probe({ 900: { exists: true, startedAt: 9, command: cmd } }) })).toBe(true)
-  })
-
-  it('is not surplus when the pidfile names itself, a dead pid, or a stranger', () => {
-    const live = probe({ 900: { exists: true, startedAt: 9, command: cmd } })
-    expect(watcherSuperseded({ record, ownPid: 900, probe: live })).toBe(false)
-    expect(watcherSuperseded({ record, ownPid: 901, probe: probe({}) })).toBe(false)
-    expect(watcherSuperseded({ record, ownPid: 901, probe: probe({ 900: { exists: true, startedAt: 9, command: 'bash' } }) })).toBe(false)
-    expect(watcherSuperseded({ record: null, ownPid: 901, probe: live })).toBe(false)
-  })
 
   it('recognises the watcher command and nothing else', () => {
     expect(isWatcherCommand(cmd)).toBe(true)
@@ -693,53 +678,22 @@ describe('watcherSuperseded — a second watcher stands down', () => {
   })
 })
 
-describe('electWatcher — exactly one of two simultaneous starters wins the pidfile', () => {
-  const cmd = ['node', '/repo/scripts/chat-watcher.mjs']
-  // One shared in-memory file system; create is exclusive, takeAside is a rename.
-  const memFs = () => {
-    const files = new Map()
-    return {
-      files,
-      create: (p, json) => (files.has(p) ? false : (files.set(p, JSON.parse(json)), true)),
-      read: (p) => files.get(p) ?? null,
-      takeAside(p, expected) {
-        const taken = files.get(p)
-        if (!taken) return false
-        files.delete(p)
-        if (taken.pid !== expected?.pid) {
-          if (!files.has(p)) files.set(p, taken)
-          return false
-        }
-        return true
-      },
-    }
-  }
-  const live = (pids) => (pid) => (pids.includes(pid) ? { exists: true, startedAt: 1, command: cmd } : { exists: false })
-
-  it('lets the first create win and refuses the second while the first lives', () => {
-    const fs = memFs()
-    const probe = live([1, 2])
-    expect(electWatcher({ path: 'w', record: { pid: 1 }, probe, fs })).toEqual({ won: true, reason: 'created' })
-    expect(electWatcher({ path: 'w', record: { pid: 2 }, probe, fs })).toEqual({ won: false, reason: 'incumbent-alive' })
+describe.runIf(process.platform === 'linux')('holdExclusiveAddress — the OS admits one watcher per checkout', () => {
+  it('holds the address once and refuses a second holder until the first lets go', async () => {
+    const address = watcherAddress(`/test/${process.pid}/${Date.now()}`)
+    const first = await holdExclusiveAddress(address)
+    expect(first).toMatchObject({ held: true, reason: 'held' })
+    expect(await holdExclusiveAddress(address)).toEqual({ held: false, reason: 'in-use' })
+    await new Promise((r) => first.server.close(r))
+    const again = await holdExclusiveAddress(address)
+    expect(again.held).toBe(true)
+    again.server.close()
   })
 
-  it('replaces a dead watcher once, even when two starters race the takeover', () => {
-    const fs = memFs()
-    fs.files.set('w', { pid: 9 })
-    const probe = live([1, 2])
-    // Both read the dead record before either moves it: interleave by hand.
-    const held = fs.read('w')
-    expect(fs.takeAside('w', held)).toBe(true)
-    expect(fs.create('w', JSON.stringify({ pid: 1 }))).toBe(true)
-    // The rival's takeover now finds a FRESH file and must put it back.
-    expect(fs.takeAside('w', held)).toBe(false)
-    expect(fs.read('w')).toEqual({ pid: 1 })
-    expect(electWatcher({ path: 'w', record: { pid: 2 }, probe, fs }).won).toBe(false)
-  })
-
-  it('takes over a dead pidfile when alone', () => {
-    const fs = memFs()
-    fs.files.set('w', { pid: 9 })
-    expect(electWatcher({ path: 'w', record: { pid: 1 }, probe: live([1]), fs })).toEqual({ won: true, reason: 'replaced-dead' })
+  it('names one address per checkout and none where the platform has no exclusive one', () => {
+    expect(watcherAddress('/a', 'linux')).not.toBe(watcherAddress('/b', 'linux'))
+    expect(watcherAddress('/a', 'linux').startsWith('\0')).toBe(true)
+    expect(watcherAddress('/a', 'win32')).toMatch(/^\\\\\.\\pipe\\/)
+    expect(watcherAddress('/a', 'darwin')).toBe(null)
   })
 })
