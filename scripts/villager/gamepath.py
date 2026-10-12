@@ -13,6 +13,8 @@ Two linear blends in a row are not one: a vertex blended between bones moves
 otherwise than a single blend would move it. The game's uniform scale and sole
 offset are left out (the report states depths in the pipeline's units).
 """
+import math
+
 import numpy as np
 
 import rig
@@ -296,9 +298,14 @@ def runtime_check(body, rt, cfg, tol=RUNTIME_TOLERANCE, log=print):
         for f in s['frames']:
             got = runtime_bones(f)
             want = np.array([np.asarray(m, float).reshape(4, 4).T for m in f['world']])
+            # a NaN (JSON null) would pass `max` unseen: a nonfinite matrix fails outright
+            if not (np.isfinite(got).all() and np.isfinite(want).all()):
+                raise RuntimeError(f'runtime check FAILED: {s["id"]} t {f["t"]} carries a nonfinite bone matrix')
             worst['joint'] = max(worst['joint'], float(np.linalg.norm(got[:, :3, 3] - want[:, :3, 3], axis=1).max()))
             worst['matrix'] = max(worst['matrix'], float(np.abs(got - want).max()))
             exported = f['morph']['influences']
+            if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in exported.values()):
+                raise RuntimeError(f'runtime check FAILED: {s["id"]} t {f["t"]} carries a nonfinite morph weight')
             names = set(exported) | {k for k, x in w.items() if x}
             worst['morph'] = max([worst['morph']] + [abs(exported.get(k, 0.0) - w.get(k, 0.0)) for k in names])
             if f['morph']['mesh']:
@@ -317,8 +324,8 @@ def runtime_skin(subject, frame, baked, jidx, jw, space='figure'):
     three skins them (bone world · bind inverse, the bind the hung rest with
     identity rotations). `space`: 'world' (the root included), 'figure' (in
     the figure-body mesh's frame, the root left out) or 'pipeline' (figure
-    space back in pipeline units, the root's squash relative to its uniform
-    scale kept — what the penetration evaluator measures)."""
+    space back in pipeline units, the root's squash left to runtime_squash,
+    which three applies after the shader's local mask push)."""
     root = runtime_root(frame)
     bones = runtime_bones(frame, root)
     rest = np.asarray(subject['person']['rest'], float).reshape(-1, 3)
@@ -334,14 +341,25 @@ def runtime_skin(subject, frame, baked, jidx, jw, space='figure'):
     out = np.where(t[:, None] > 0, out / np.maximum(t, 1e-12)[:, None], v)
     if space != 'pipeline':
         return out
-    lin = trs_matrix(frame['root'])[:3, :3]
-    sx = np.linalg.norm(lin[:, 0])
-    sy = np.linalg.norm(lin[:, 1])
-    out[:, 1] *= sy / sx
     pr = subject['person']
     out = out / pr['scale']
     out[:, 1] += pr['sole']
     return out
+
+
+def runtime_squash(subject, frame):
+    """The root's y-squash relative to its uniform scale, on pipeline
+    positions (runtime_skin 'pipeline'): applied AFTER the mask push, as three
+    applies the root after the shader pushes in the mesh's local space."""
+    lin = trs_matrix(frame['root'])[:3, :3]
+    r = np.linalg.norm(lin[:, 1]) / np.linalg.norm(lin[:, 0])
+    sole = subject['person']['sole']
+
+    def apply(v):
+        out = np.array(v, float)
+        out[..., 1] = (out[..., 1] - sole) * r + sole
+        return out
+    return apply
 
 
 def runtime_tool(frame):

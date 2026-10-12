@@ -297,18 +297,24 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
     for s in rt['subjects']:
         person, pos, w = GP.runtime_person(body, s, cfg)
         baked = person.bake(pos, jidx, jw)
-        worn = [n for n in s['garments'] if garments and n in garments['meshes']]
+        missing = [n for n in s['garments'] if not garments or n not in garments['meshes']]
+        if missing:
+            raise RuntimeError(f"runtime sheets: {s['id']} wears {missing}, absent from the built garments — rebuild them (--step garments)")
+        worn = list(s['garments'])
         btris, bpush, inner = masked(body, garments, worn, cfg)
         gskin = {n: top4(garments['meshes'][n]['W']) for n in worn}
         gbaked = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in worn}
         h = s['identity']['scale']
-        unit = s['person']['scale'] * h  # pipeline unit → world
         elev = s.get('elevation', 0)
 
-        def pushed(v, tris, push):
-            if push is None or not push.any():
-                return v
-            return MK.pushed(v, tris, push.astype(float), a['garmentMaskPush'] * unit)
+        def drawn(f, v, ji, jw_, tris, push):
+            # the mask push in the figure mesh's own space (pipeline unit → figure:
+            # the person's scale), THEN the root with its squash, as three draws it
+            v = GP.runtime_skin(s, f, v, ji, jw_, 'figure')
+            if push is not None and push.any():
+                v = MK.pushed(v, tris, push.astype(float), a['garmentMaskPush'] * s['person']['scale'])
+            root = GP.runtime_root(f)
+            return v @ root[:3, :3].T + root[:3, 3]
         for view in s['views']:
             R.clear()
             side = view == 'side'
@@ -326,12 +332,12 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
                 off = right * (k * spacing - span / 2)
                 at = np.array([f['root']['p'][0], 0.0, f['root']['p'][2]])
                 move = off - at
-                bv = pushed(GP.runtime_skin(s, f, baked, jidx, jw, 'world'), body['tris'], bpush)
+                bv = drawn(f, baked, jidx, jw, body['tris'], bpush)
                 R.add_mesh(f'f{k}', bv + move, btris, SKIN)
                 top = max(top, float(bv[:, 1].max()))
                 for c, g in enumerate(worn):
                     gt, gp = inner[g]
-                    gv = pushed(GP.runtime_skin(s, f, gbaked[g], *gskin[g], 'world'), garments['meshes'][g]['tris'], gp)
+                    gv = drawn(f, gbaked[g], *gskin[g], garments['meshes'][g]['tris'], gp)
                     R.add_mesh(f'f{k}-{g}', gv + move, gt, GARMENT_COLOURS[c % len(GARMENT_COLOURS)])
                     top = max(top, float(gv[:, 1].max()))
                 tool = GP.runtime_tool(f)

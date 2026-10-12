@@ -103,11 +103,16 @@ class Masked:
         self.drawn_samples = np.concatenate([np.nonzero(vdrawn)[0], len(m) + np.nonzero(drawn)[0]])
         self.any = bool(push.any())
 
-    def drawn_at(self, v, depth):
+    def drawn_at(self, v, depth, post=None):
         """Pushed positions and samples (vertices, then triangle centres) for
-        posed positions `v`, and the vertex normals used."""
+        posed positions `v`, and the vertex normals of the drawn surface.
+        `post` (a runtime root's squash, gamepath.runtime_squash) is applied
+        after the push, as three applies the root after the shader's local push."""
         nrm = vertex_normals(v, self.tris)
         p = v - depth * self.push[:, None] * nrm
+        if post is not None:
+            p = post(p)
+            nrm = vertex_normals(post(v), self.tris)
         return p, np.concatenate([p, p[self.tris].mean(1)]), nrm
 
 
@@ -281,22 +286,23 @@ def _always(_x):
 
 
 def _poses(S, c, person, cfg, ident):
-    """(clip, where, skin) for every measured pose of a corner: the clips'
-    frames (GP.poses) — or, for a runtime subject, the game's own composed
-    frames (gamepath.runtime_skin, in pipeline units)."""
+    """(clip, where, skin, post) for every measured pose of a corner: the
+    clips' frames (GP.poses) — or, for a runtime subject, the game's own
+    composed frames (gamepath.runtime_skin, in pipeline units) with the root's
+    squash as `post`, applied after the mask push (Masked.drawn_at)."""
     rt = S.get('runtime')
     sex, age, build = ident
     if rt is not None:
         s = rt[c]
         for f in s['frames']:
-            yield s['id'], f"{s['id']} t {f['t']:.2f} s ({sex} {age} build {build:+.1f})", (lambda v, i, w, f=f: GP.runtime_skin(s, f, v, i, w, 'pipeline'))
+            yield s['id'], f"{s['id']} t {f['t']:.2f} s ({sex} {age} build {build:+.1f})", (lambda v, i, w, f=f: GP.runtime_skin(s, f, v, i, w, 'pipeline')), GP.runtime_squash(s, f)
         return
     for k, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
         if k % S['stride']:
             continue
         at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
         wr, wp = person.pose(q, hips, kst)
-        yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp))
+        yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp)), None
 
 
 def _corner(c):
@@ -332,16 +338,19 @@ def _corner(c):
     worst = {n: _empty() for n in names}
     nv = len(body['pos'])
     bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
-    for cname, at, skin in _poses(S, c, person, cfg, (sex, age, build)):
-        bv = skin(bh, S['jidx'], S['jw'])
+    for cname, at, skin, post in _poses(S, c, person, cfg, (sex, age, build)):
+        # unpushed: before the root's squash (`post`), which follows the mask push
+        bvu = skin(bh, S['jidx'], S['jw'])
+        gvu = {n: skin(gh[n], *gskin[n]) for n in names}
+        bv = bvu if post is None else post(bvu)
+        gv = gvu if post is None else {n: post(x) for n, x in gvu.items()}
         full = BVHTree.FromPolygons(bv.tolist(), body['tris'].tolist(), all_triangles=True)
-        gv = {n: skin(gh[n], *gskin[n]) for n in names}
         trees = {n: S['vol'][n].trees(gv[n]) for n in names}
         for n in names:
             r = worst[n]
             r['checked'] += 1
             mb = bm[n]
-            bp, smp, nrm = mb.drawn_at(bv, depth)
+            bp, smp, nrm = mb.drawn_at(bvu, depth, post)
             # the pushed body: every triangle (inside test), and the drawn ones
             tree = full if not mb.any else BVHTree.FromPolygons(bp.tolist(), body['tris'].tolist(), all_triangles=True)
             dtree = None if not mb.any else BVHTree.FromPolygons(bp.tolist(), body['tris'][mb.drawn].tolist(), all_triangles=True)
@@ -389,7 +398,7 @@ def _corner(c):
         bnrm = None
         sight = {}
         for i, o, mi in pairs:
-            ip, smp, _nrm = mi.drawn_at(gv[i], depth)
+            ip, smp, _nrm = mi.drawn_at(gvu[i], depth, post)
             ipart = lambda k, i=i, mi=mi: S['bones'][S['gdom'][i][k if k < S['gnv'][i] else mi.tris[k - S['gnv'][i]][0]]]  # noqa: E731
             place, dist = S['vol'][o].where(gv[o], smp, reach, ids=mi.shown, trees=trees[o])
             thr = mi.shown[place[mi.shown] == M.THROUGH]
@@ -724,7 +733,10 @@ def runtime_report(out, body, garments, cfg, rt):
     _S['runtime'] = subjects
     try:
         for sid, s in subjects.items():
-            names = [n for n in s['garments'] if n in garments['meshes']]
+            missing = [n for n in s['garments'] if n not in garments['meshes']]
+            if missing:
+                raise RuntimeError(f'runtime penetration: {sid} wears {missing}, absent from the built garments — rebuild them (--step garments)')
+            names = list(s['garments'])
             if names:
                 rows[sid], tol = measure(body, None, garments, cfg, names=names, corners=[sid], workers=1)
     finally:
@@ -734,7 +746,7 @@ def runtime_report(out, body, garments, cfg, rt):
         '',
         'Generated by `node scripts/villager/build.mjs penetration` from the game\'s own composed poses '
         '(src/render/villagerRuntimePose.test.tsx, round trip checked by gamepath.runtime_check): per subject its worn garments on its own body, '
-        'every recorded frame, measured by the same evaluator and columns as penetration-report.md (figure units, the root\'s y-squash kept). '
+        'every recorded frame, measured by the same evaluator and columns as penetration-report.md (figure units, the root\'s y-squash applied after the mask push). '
         f'Tolerance {tol}. This report gates nothing; the gate is penetration-report.md.',
         '',
     ]
