@@ -83,6 +83,7 @@ put it is the mistake this line exists to stop.
   Final state: a board chat message reaches an answer within 15 minutes of being sent, also while the batch session sits in a blocking call (landing fast gate, main pre-push full gate, suite await); the delivery path and its latency are measured, not assumed.
   Verifiable: a measured case where a message sent during a >15 min blocking gate is answered within 15 minutes; a test for the delivery path that is changed.
   Criticality: medium - the user's only live channel to the batch.
+  Also (author measurement 12.10.2026, branch feat/1348-chat-answer-bound d4581b8de): the 38 min came from a background subagent whose PostToolUse hook consumed the message into its own context (isSubagentHook missed agent_id), fixed on the branch; still open there: 15 concurrent chat-watcher.mjs processes (every log line ~14x, three responders for one message at 16:35:45-51Z, one killed 143, the user got two answers), and responders exit "acked 0, stillPending 1" after answering. Live >15 min measurement procedure is in the branch report: blocking owner call >15 min with a busy subagent, message must stay in .claude/chat-spool/, defer-sweep spawn ~3 min after receivedAt, chat-reply-receipt at minus receivedAt <= 15 min.
   Bundle: Dorfleben.
 
 
