@@ -18,7 +18,7 @@ beforeEach(() => {
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-const keys = () => JSON.parse(execFileSync('python3', [join(dir, 'cachekeys.py'), join(dir, 'config.json'), dir], { encoding: 'utf8', windowsHide: true }))
+const keys = () => JSON.parse(execFileSync('python3', [join(dir, 'cachekeys.py'), join(dir, 'config.json'), dir], { encoding: 'utf8', windowsHide: true, timeout: 20000 }))
 
 describe('the villager pipeline cache keys', () => {
   it('are the same cold and warm: built caches beside them change nothing', () => {
@@ -73,6 +73,21 @@ describe('the villager pipeline cache keys', () => {
     const base = keys()
     edit('sheets.py', 'runtime_sheets')
     expect(keys().garments).not.toBe(base.garments)
+  })
+
+  it('swapping two re-export bindings moves the key', () => {
+    writeFileSync(join(dir, 'facade.py'), 'from sheets import runtime_sheets as f, sample as g\n')
+    appendFileSync(join(dir, 'fit.py'), '\nfrom facade import f, g\n')
+    const base = keys()
+    writeFileSync(join(dir, 'facade.py'), 'from sheets import sample as f, runtime_sheets as g\n')
+    expect(keys().garments).not.toBe(base.garments)
+  })
+
+  it('a re-export cycle ends', () => {
+    writeFileSync(join(dir, 'ra.py'), 'from sheets import sample as f\n\ndef unused():\n    from rb import f\n    return f\n')
+    writeFileSync(join(dir, 'rb.py'), 'from ra import f\n')
+    appendFileSync(join(dir, 'fit.py'), '\nfrom rb import f as _cyclic\n')
+    expect(Object.keys(keys()).sort()).toEqual(['body', 'clips', 'garments'])
   })
 
   it('a helper no step reaches moves no key', () => {

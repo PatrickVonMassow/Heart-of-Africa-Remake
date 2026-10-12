@@ -92,19 +92,24 @@ def code_digest(names, here=HERE, mods=None):
         h.update(m.encode() + b'\0')
         h.update(open(os.path.join(here, m + '.py'), 'rb').read())
         todo |= mods[m].refs(mods[m].tree)
-    seen = set()
+    seen, visited, binds = set(), set(), set()
     while todo:
         m, n = todo.pop()
-        if m in own or (m, n) in seen:
+        if m in own or (m, n) in visited:
             continue
+        visited.add((m, n))  # every name once: re-export cycles end
         if n not in mods[m].defs:
-            # a re-export (`from impl import f` in m): follow it to its definition
+            # a re-export (`from impl import f as g` in m): its binding is
+            # hashed, and followed to its definition
             if n in mods[m].froms:
+                binds.add((m, n) + mods[m].froms[n])
                 todo.add(mods[m].froms[n])
             continue
         seen.add((m, n))
         for _seg, node in mods[m].defs[n]:
             todo |= mods[m].refs(node)
+    for b in sorted(binds):
+        h.update(('re-export ' + ' '.join(b)).encode() + b'\0')
     for m, n in sorted(seen):
         h.update(f'{m}.{n}'.encode() + b'\0')
         for seg, _node in mods[m].defs[n]:
