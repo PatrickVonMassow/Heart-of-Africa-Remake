@@ -732,6 +732,22 @@ describe('watcherCodeFingerprint — the watcher and the modules it imports', ()
     return watcherCodeFingerprint({ readText: (n) => all[n] ?? null })
   }
 
+  it('follows no commented-out import and skips an import whose file does not exist', () => {
+    const base = fp()
+    const commented = fp({ 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\n// import './gone.mjs'\n/* import './gone2.mjs' */" })
+    expect(commented).not.toBeNull()
+    const missing = watcherCodeFingerprint({
+      readText: (n) => (n === 'gone.mjs' ? undefined : { ...files, 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\nimport './gone.mjs'" }[n] ?? null),
+    })
+    expect(missing).not.toBeNull()
+    expect(base).not.toBeNull()
+  })
+
+  it('still yields null for an unreadable entry or an unreadable existing import', () => {
+    expect(watcherCodeFingerprint({ readText: (n) => (n === 'chat-watcher.mjs' ? undefined : files[n]) })).toBeNull()
+    expect(fp({ 'b.mjs': null })).toBeNull()
+  })
+
   it('is stable for unchanged files', () => {
     expect(fp()).toBe(fp())
   })

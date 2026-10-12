@@ -339,8 +339,10 @@ export function isWatcherCommand(command) {
   return script !== undefined && base(script) === 'chat-watcher.mjs'
 }
 
-/** Relative imports of one module source: static, side-effect and dynamic. */
+/** Relative imports of one module source: static, side-effect and dynamic.
+ *  Comments are stripped first, so a commented-out import is not followed. */
 function relativeImports(source) {
+  source = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
   const out = []
   const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.\/[^'"]+)['"]/g
   for (let m; (m = re.exec(source)); ) out.push(m[1].slice(2))
@@ -352,7 +354,8 @@ function relativeImports(source) {
  * file's content or null. Hashes the entry and every module it imports from
  * `scripts/`, transitively (`./x.mjs` only; `../` and packages are outside), so
  * any merge into code the watcher runs changes it. Null when any file is
- * unreadable. Read at watcher start and at its idle self-restart check
+ * unreadable; an import whose file does not exist (`readText` gives undefined)
+ * is skipped — such a module could not load, so it is not code the watcher runs. Read at watcher start and at its idle self-restart check
  * (`chat-watcher-fingerprint.mjs`, `selfRestartDecision`).
  */
 export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } = {}) {
@@ -362,6 +365,7 @@ export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } 
     const name = queue.shift()
     if (seen.has(name)) continue
     const text = typeof readText === 'function' ? readText(name) : null
+    if (text === undefined && name !== entry) continue
     // An unreadable file makes the fingerprint incomplete: null, never a hash.
     if (typeof text !== 'string') return null
     seen.set(name, text)
