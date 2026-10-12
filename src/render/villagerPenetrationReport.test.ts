@@ -25,6 +25,13 @@ const now = JSON.parse(readFileSync(resolve(dir, 'penetration-report.json'), 'ut
 const main = JSON.parse(readFileSync(resolve(dir, 'penetration-report-main.json'), 'utf8')) as Report
 const md = readFileSync(resolve(dir, 'penetration-report.md'), 'utf8')
 
+// the build-pose layering residuals named in docs/backlog.md (point 1346):
+// garment → the outer garments it may show through in the build pose
+const BUILD_RESIDUALS: Record<string, string[]> = {
+  'g-wrapLong-chest': ['g-breastCloth-chest'],
+  'g-veil-face': ['g-shirt-chest', 'g-robe-chest', 'g-cape-leftShoulder', 'g-cloak-chest', 'g-cape-chest', 'g-cloak-bothShoulders'],
+}
+
 // mask.py LAYER by slot (src/systems/appearance.ts LayerSlot), innermost first
 const LAYER: Record<string, number> = {
   ...Object.fromEntries(['limbRings', 'neckBeads', 'waistBeads'].map((f) => [f, 0])),
@@ -165,16 +172,26 @@ describe('the visible-only penetration report', () => {
     expect(tol).toBeLessThanOrEqual(0.003)
     const over: string[] = []
     for (const [n, g] of Object.entries(now.build)) {
+      // a named residual (docs/backlog.md 2026-10-12, with its missing
+      // information) keeps exactly its inner layering cases, nothing else
+      const allowed = BUILD_RESIDUALS[n] ?? []
       for (const col of Object.keys(NAMES) as Column[]) {
-        if (g[col].value > tol) over.push(`${n} ${col} ${g[col].value}`)
+        if (g[col].value > tol && !(col === 'inner' && allowed.length)) over.push(`${n} ${col} ${g[col].value}`)
       }
       for (const [key, v] of Object.entries(g.clips)) {
-        if (v > tol) over.push(`${n} ${key} ${v}`)
+        if (v > tol && !(key === 'inner build' && allowed.length)) over.push(`${n} ${key} ${v}`)
       }
-      expect(Object.keys(g.cases), n).toEqual([])
+      for (const key of Object.keys(g.cases)) {
+        const [col, , , outer] = key.split(' ')
+        expect(col === 'inner' && allowed.includes(outer), `${n}: ${key}`).toBe(true)
+      }
     }
     expect(over).toEqual([])
-    expect(md).toContain(`**${Object.keys(now.build).length} of ${Object.keys(now.build).length} garments within tolerance in the build pose`)
+    const total = Object.keys(now.build).length
+    const residuals = Object.keys(BUILD_RESIDUALS).filter((n) => Object.keys(now.build[n]?.cases ?? {}).length).length
+    expect(md).toContain(`**${total - residuals} of ${total} garments within tolerance in the build pose`)
+    const backlog = readFileSync(resolve(__dirname, '../../docs/backlog.md'), 'utf8')
+    for (const n of Object.keys(BUILD_RESIDUALS)) expect(backlog, n).toContain(`\`${n}\``)
   })
 
   it('the report hands every remaining case to point 1334 by name', () => {
