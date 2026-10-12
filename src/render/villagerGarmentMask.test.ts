@@ -3,7 +3,7 @@
 // what the pipeline measured with (verification/villager-body/
 // garment-mask-check.json, scripts/villager/mask.py `check`), the hidden
 // triangles leave the index, and the vertex shader's push input is the
-// covered vertices' depth — zero while no pipeline garment is worn.
+// covered vertices' depth — zero where no worn garment covers it.
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
@@ -114,14 +114,16 @@ describe('the figure geometry and the vertex shader input', () => {
     expect(push.filter((x) => x !== 0 && x !== depth).length).toBe(0)
   })
 
-  it('every glTF figure carries the push, zero while it wears no pipeline garment', () => {
+  it('every glTF figure carries the push on every vertex: zero undressed, the worn garments’ mask dressed', () => {
     const person = gltfPerson(asset, 'female', 'adult')
+    const bare = gltfFigureGeometry(asset, person, [], '#6b4a33', null, 8)
+    expect((bare.getAttribute(GARMENT_PUSH_ATTRIBUTE).array as Float32Array).every((x) => x === 0)).toBe(true)
+    expect(bare.index!.count).toBe(person.geometry.index!.count)
     const layers = Object.values(PEOPLE_DRESS)[0].female.adult
     const g = gltfFigureGeometry(asset, person, layers, '#6b4a33', null, 8)
     const push = g.getAttribute(GARMENT_PUSH_ATTRIBUTE)
     expect(push.count).toBe(g.getAttribute('position').count)
-    expect((push.array as Float32Array).every((x) => x === 0)).toBe(true)
-    expect(g.index!.count).toBeGreaterThanOrEqual(person.geometry.index!.count)
+    expect((push.array as Float32Array).some((x) => x > 0)).toBe(true)
   })
 
   it('the masked figure material moves the position by the push; the plain one does not', () => {

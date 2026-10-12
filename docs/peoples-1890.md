@@ -2610,8 +2610,10 @@ a pinned Blender (`node scripts/blender.mjs`) into `villager.glb` with morph
 targets for age, sex and build and a bust from MakeHuman's cup targets; the
 low preset keeps the primitive figure and never loads the file
 (`figureGltfBody`, `docs/graphics-detail-levels.md`). The dress table of §8.3
-is unchanged; only its fit follows the measured trunk sections of the new body.
-Each foot has an ankle and a ball joint. Proportions per age and sex are
+is unchanged; on this body every layer is drawn as the pipeline's garment for
+its form and wear, fitted round the body over every clip and carried through
+its morphs (no code-built layer reaches it; the low preset's primitive figure
+keeps the code-built dress). Each foot has an ankle and a ball joint. Proportions per age and sex are
 educated guesses in `VILLAGER_ASSET` (`src/config/balance.ts`), calibratable;
 this document names no people-specific stature, so one body serves all peoples.
 

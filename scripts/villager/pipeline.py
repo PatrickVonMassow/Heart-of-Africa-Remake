@@ -10,8 +10,8 @@
   (mask)      each garment's cover mask over the body and the garments of
               outer layers (mask.py), the body's checked over every pose
               (cached on its inputs), computed whenever the garments are read
-  export      public/models/villager.glb (body with its cover mask, clips;
-              garments not yet shipped)
+  export      public/models/villager.glb (body, clips and the garments, each
+              with its cover mask)
   sheets      frame sheets under verification/villager-body/
   penetration the per-frame garment penetration report on the masked body and
               garments; the run FAILS (exit 1) when any value exceeds the
@@ -85,6 +85,9 @@ def main():
         import fit as F
         F.selftest()
         MK.selftest_volume()
+    if 'export' in steps or 'selftest' in steps:
+        import gltfio as GI
+        GI.selftest()
     if 'penetration' in steps or 'selftest' in steps:
         import penetration as P
         P.selftest()
@@ -114,11 +117,17 @@ def main():
         garments['mask'] = MK.masks(body, garments, cfg)
     if 'export' in steps:
         import export as E
-        # The game still draws the code-built dress on the glTF body (render/
-        # villagerFigureBody.ts): the garments built and fitted here are
-        # measured (penetration report, dress-* frame sheets) but not shipped
-        # (work-order point 1315); the body carries their cover mask.
-        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, None, cfg, mask=garments and garments['mask'])
+        if garments is None:
+            # the game draws no code-built dress any more: a body-only asset
+            # would undress every villager
+            raise RuntimeError('export: no garments (build them with --step garments first)')
+        # The game dresses the glTF body with exactly these garments (render/
+        # villagerFigureBody.ts gltfGarment), the ones the penetration report
+        # and the dress-* frame sheets measure; body and garments carry their
+        # cover mask. The hair cap and the eyes stay pipeline-only (the game
+        # paints the scalp).
+        dress = garments and {'meshes': {n: g for n, g in garments['meshes'].items() if n.startswith('g-')}, 'meta': garments['meta']}
+        E.export(os.path.join(a.out, 'villager.glb'), mh, body, clips, dress, cfg, mask=garments and garments['mask'])
         if garments:
             import sheets as S
             MK.check(a.verification, garments['mask'], body, [o for _s, _a, o in S.OUTFITS])

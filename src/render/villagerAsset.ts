@@ -132,6 +132,13 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
     const mesh = o as THREE.SkinnedMesh
     if (!mesh.isMesh) return
     const g = mesh.geometry
+    // A garment's weights and morph deltas ship as normalized shorts
+    // (scripts/villager/export.py `compact`): as floats here, so every part
+    // merges with the body and the morph bake reads plain deltas.
+    const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute | undefined
+    if (sw?.normalized) g.setAttribute('skinWeight', toFloat(sw))
+    const morphs = g.morphAttributes.position
+    if (morphs) g.morphAttributes.position = morphs.map((m) => (m.normalized ? toFloat(m as THREE.BufferAttribute) : m))
     // three keeps the morph names on the mesh; carry them on the geometry.
     g.userData.targetNames = Object.keys(mesh.morphTargetDictionary ?? {}).sort((a, b) => mesh.morphTargetDictionary![a] - mesh.morphTargetDictionary![b])
     geometries[mesh.name] = g
@@ -183,6 +190,13 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
     stature: meta.stature,
     garmentMask: meta.garmentMask?.garments ?? [],
   }
+}
+
+/** A normalized attribute as plain floats. */
+function toFloat(a: THREE.BufferAttribute): THREE.BufferAttribute {
+  const f = new Float32Array(a.count * a.itemSize)
+  for (let k = 0; k < a.count; k++) for (let c = 0; c < a.itemSize; c++) f[k * a.itemSize + c] = a.getComponent(k, c)
+  return new THREE.BufferAttribute(f, a.itemSize)
 }
 
 /** Bone indices with every parent before its children. */

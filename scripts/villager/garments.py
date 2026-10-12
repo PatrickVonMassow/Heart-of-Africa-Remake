@@ -566,7 +566,10 @@ def build_form(B, form, wear, L):
         # an open front parts from the collar down, widening toward the hem
         # (a straight-sided opening read as a notch cut into the chest)
         widest = 0.3
-        opening = (lambda y: widest * min(1.0, max(0.0, (cap - y) / (cap - bottom)))) if opened else None
+        # tied over the breast ('chest', figureDress.ts): a cape stays closed,
+        # a knee-long cloak opens only below the waist
+        start = L['waist'] if wear == 'chest' else cap
+        opening = (lambda y: widest * min(1.0, max(0.0, (start - y) / (start - bottom)))) if opened else None
         # a bare shoulder's edge runs diagonally from the collar over the
         # covered side to under the bare arm
         low = L['waist'] + 0.05 * H
@@ -618,9 +621,34 @@ def build_form(B, form, wear, L):
         return blob((0, L['crown'] + 0.005 * H, -0.01 * H), 0.04 * H, (1, 0.8, 0.95)), 0
     if form == 'hairBag':
         return blob((0, L['chin'] + 0.09 * H, -0.075 * H), 0.045 * H, (1, 0.8, 0.9)), 0
+    if form == 'neckBeads' and wear == 'chest':
+        # layered strings built into a wide, deep collar over the breast
+        # (figureDress.ts neckBeads 'chest'): close on the body, so a cloak
+        # tied or open over it keeps it inside (the layer settle)
+        lo, hi = L['chestTop'] - 0.06 * H, L['neck'] - 0.008 * H
+        rings = []
+        for k in range(6):
+            y = hi - (hi - lo) * k / 5
+            c, r = B.ring(y, B.arm < 0.2, 0.008 * H)
+            rings.append((y, c, r))
+        return sweep(rings), 2
     if form == 'neckBeads':
         c, r = B.ring(L['neck'] - 0.012 * H, B.arm < 0.2, 0.012 * H)
         return torus(c, L['neck'] - 0.012 * H, r, 0.01 * H), 2
+    if form == 'babySling':
+        # an infant carried on the back in the mantle (figureDress.ts
+        # babySling): a hide bundle standing off the mantle's back, the small
+        # head above it; its uv v lifted by 2 marks the head, which the game
+        # paints in the infant's skin (export.py _INFANT)
+        r = 0.07 * H
+        y = L['chestTop'] - 0.06 * H
+        h, c = B.outline(y, B.arm < 0.3)
+        back = ray_hull(h, c, (0.0, -1.0))
+        z = c[1] - (back + 0.065 * H + r * 0.6)
+        bv, bt, bu = blob((c[0], y, z), r, (1, 1.2, 0.7))
+        hv, ht, hu = blob((c[0], y + r * 1.2 + 0.02 * H, z + 0.01 * H), 0.036 * H, (1, 1, 1))
+        hu = hu + [0.0, 2.0]
+        return merge([(bv, bt, bu), (hv, ht, hu)]), 0
     if form == 'waistBeads':
         # below the girdle of a loin flap, apron or girdle tails (hip + 0.06 H):
         # two rings at one height cross each other whatever settles them, and
@@ -733,17 +761,24 @@ def sleeve(B, s, L):
 
 GARMENTS = [
     ('loinFlap', 'waist'), ('girdleTails', 'waist'), ('apron', 'waist'), ('skirtShort', 'waist'), ('skirtKnee', 'waist'),
-    ('wrapLong', 'waist'), ('wrapLong', 'chest'), ('skirtShort', 'chest'), ('skirtKnee', 'chest'), ('trousers', 'waist'), ('breastCloth', 'chest'),
+    ('wrapLong', 'waist'), ('wrapLong', 'chest'), ('trousers', 'waist'), ('breastCloth', 'chest'),
     ('shirt', 'chest'), ('robe', 'chest'), ('toga', 'leftShoulder'), ('toga', 'rightShoulder'),
-    ('cloak', 'bothShoulders'), ('cloak', 'leftShoulder'), ('cloak', 'rightShoulder'),
-    ('cape', 'bothShoulders'), ('cape', 'leftShoulder'), ('cape', 'rightShoulder'),
+    ('cloak', 'bothShoulders'), ('cloak', 'chest'), ('cape', 'chest'), ('cape', 'leftShoulder'), ('cape', 'rightShoulder'),
+    ('babySling', 'bothShoulders'),
     ('hood', 'overHead'), ('turban', 'aroundHead'), ('cap', 'crown'), ('headband', 'aroundHead'), ('veil', 'face'),
-    ('headRing', 'crown'), ('topknot', 'crown'), ('hairBag', 'crown'), ('neckBeads', 'neck'), ('waistBeads', 'waist'), ('limbRings', 'limbs'),
+    ('headRing', 'crown'), ('topknot', 'crown'), ('hairBag', 'crown'), ('neckBeads', 'neck'), ('neckBeads', 'chest'),
+    ('waistBeads', 'waist'), ('limbRings', 'limbs'),
 ]
+# The set is the (form, wear) pairs the game's outfit generator puts on a
+# figure (src/systems/appearance.ts appearanceFor; villagerFigureBody.test.ts
+# holds every generated pair to a mesh here): the game draws only these, no
+# code-built layer, and the cover mask holds at most 32 (mask.BITS).
 # The slot's ease order: an outer layer stands off the inner one.
 OUTER = {'cloak': 0.012, 'cape': 0.012, 'hood': 0.006}
 SKIRTS = {'apron', 'girdleTails', 'skirtShort', 'skirtKnee', 'wrapLong', 'shirt', 'robe', 'toga', 'cloak'}
 RIGID_HEAD = {'turban', 'cap', 'headband', 'headRing', 'topknot', 'hairBag'}
+# rigid on the chest bone: the infant rides it as one piece (figureDress.ts babySling)
+RIGID_CHEST = {'babySling'}
 
 
 def mesh_name(form, wear):
@@ -779,7 +814,7 @@ def skirt_weights(v, W, crotch, hem):
     return W / W.sum(1, keepdims=True)
 
 
-def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False, limb=None):
+def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=None, lower_arms=False, limb=None, rigid_chest=False):
     """Push the garment off the body, transfer weights, unpose to rest, bind the morphs.
     Only a garment worn on the lower arm (`lower_arms`: the limb rings) takes
     weights from the forearms and hands; a sleeve (`limb`: 1 left, 2 right)
@@ -797,9 +832,9 @@ def finish(mh, body, B, v, t, uv, smooth, rigid_head=False, hair=False, skirt=No
                 W[m] = B.weights_on_arm(v[m], s)
         if (limb == 3).any():
             W[limb == 3] = B.weights_at(v[limb == 3], False)
-    if rigid_head:
+    if rigid_head or rigid_chest:
         W[:] = 0
-        W[:, SK.INDEX['head']] = 1
+        W[:, SK.INDEX['head' if rigid_head else 'chest']] = 1
     elif smooth:
         W = smooth_weights(v, t, W, smooth)
     if skirt is not None:
@@ -991,7 +1026,8 @@ def build_garments(mh, body, clips, cfg):
         name = mesh_name(form, wear)
         crotch = L['hip'] - 0.03 * H
         skirt = (crotch, float(v[:, 1].min())) if form in SKIRTS and v[:, 1].min() < crotch else None
-        g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings', limb=limb)
+        g = finish(mh, body, B, v, t, uv, smooth, rigid_head=form in RIGID_HEAD, skirt=skirt, lower_arms=form == 'limbRings', limb=limb,
+                   rigid_chest=form in RIGID_CHEST)
         g['part'] = 'garment'
         g['extras'] = {'form': form, 'wear': wear, 'bottom': float(v[:, 1].min())}
         meshes[name] = g

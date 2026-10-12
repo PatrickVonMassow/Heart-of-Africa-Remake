@@ -173,8 +173,8 @@ DRESS_CLIPS = ('walk', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig')
 OUTFITS = [
     ('male', 'adult', ('g-robe-chest', 'g-turban-aroundHead')),
     ('female', 'adult', ('g-wrapLong-chest', 'g-neckBeads-neck', 'g-headband-aroundHead')),
-    ('male', 'elder', ('g-trousers-waist', 'g-shirt-chest', 'g-cloak-leftShoulder')),
-    ('female', 'youth', ('g-skirtKnee-waist', 'g-cape-bothShoulders', 'g-limbRings-limbs')),
+    ('male', 'elder', ('g-trousers-waist', 'g-shirt-chest', 'g-cloak-chest')),
+    ('female', 'youth', ('g-skirtKnee-waist', 'g-cape-chest', 'g-limbRings-limbs')),
 ]
 GARMENT_COLOURS = [(0.75, 0.68, 0.55, 1), (0.55, 0.25, 0.18, 1), (0.25, 0.3, 0.5, 1), (0.6, 0.5, 0.3, 1)]
 
