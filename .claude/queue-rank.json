@@ -1632,36 +1632,22 @@
       "why": "moved directly after 1330: same village-errands suite, pre-existing red on main",
       "origin": "machine",
       "place": "last"
+    },
+    "1349": {
+      "at": "2026-10-12T17:57:20.518Z",
+      "why": "possible false approval, directly after the communication point",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1350": {
+      "at": "2026-10-12T17:57:20.629Z",
+      "why": "chat answer path blockade, beside the communication point",
+      "origin": "machine",
+      "place": "last"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-10-12T17:55:23.110Z",
+    "at": "2026-10-12T17:57:20.528Z",
     "points": [
       184,
       200,
@@ -2113,7 +2099,35 @@
       1344,
       1345,
       1347,
-      1348
+      1348,
+      1349,
+      1350
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

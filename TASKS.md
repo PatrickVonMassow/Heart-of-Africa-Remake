@@ -85,6 +85,23 @@ put it is the mistake this line exists to stop.
   Criticality: medium - the user's only live channel to the batch.
   Bundle: Dorfleben.
 
+
+- [ ] 1349. The CI status guard reports a red feature-branch run as green
+  Queue position: after point 1348.
+  Source: findings carrier 12.10.2026 17:07: run 38277768235 (feat/1346-penetration-baseline c96ee475a) failed unit shard fast (1) (villagerPenetrationReport.test.ts:174) and set commit status ci/gate (branch)=failure, but every job concludes success on feat/** because .github/workflows/ci.yml marks each step continue-on-error; scripts/ci-status-guard-core.mjs classifyRuns reads only run conclusions, and batch-autostart-core.mjs ciTerminalPrompt hands that success on.
+  Final state: ci-status-guard and the CI-terminal handoff judge a feature-branch ref by its ci/gate commit status (or an equivalent failing signal), so a red branch is never reported green; main behaviour unchanged.
+  Verifiable: a Vitest case with a success-concluded run and a failing ci/gate status that the guard classifies red.
+  Criticality: medium - possible false approval of a landing.
+  Bundle: Modell & Wächter.
+
+- [ ] 1350. The decision-card guard deadlocks a stand-down chat session
+  Queue position: after point 1349.
+  Source: findings carrier 12.10.2026 16:36: chat-only session 994859ad (STAND DOWN, batch owned by 4dc5437a) answered a board message; Stop hook decision-card-guard demanded `board.mjs vdzk-keep` for three cards, which the stand-down PreToolUse hook refuses.
+  Final state: decision-card-guard stands down for a session that does not own the batch lock (house rule for session guards), leaving the card review to the owner.
+  Verifiable: a Vitest case where a non-owner session with open cards passes the guard.
+  Criticality: medium - a real blockade of the chat answer path.
+  Bundle: Chat & Tafel.
+
 - [ ] 1342. Natural villager motion b: three-segment spine, hand morphs, jog and clip style, dig action, one pose pipeline, distributed lean and gaze, corrective leg IK
   Queue position: directly after point 1316 (its sub-point a supplies the runtime sheets and pose exporter every step here is judged with).
   Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 2, 3, 5-11 with the step-4 forearm-twist decision after step 9, and step 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
@@ -15925,19 +15942,3 @@ to land than a mechanism that needs a review.
   Verifiable: Vitest reproducing an answer-session start that leaves the lock with the batch session.
   Also (findings carrier 07.10.2026 23:20): session 9696d681 released its claim to 06667ad0 via the hand-back bound while .claude/batch-lock.json was absent, so heldByOtherLiveOwner() read false and dashboard-guard (focus reconcile) and retro-currency-guard kept blocking the released session's Stop, demanding batch mutations its hand-back forbids; and a session that took the batch only to edit the work order re-acquired the lock through its heartbeat after `batch-singleton.mjs release`, so it could not hand back without a ticked point or the context watermark. Stand-down honours a claim this session released, and a manual release stays released.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1349. The CI status guard reports a red feature-branch run as green
-  Queue position: after point 1348.
-  Source: findings carrier 12.10.2026 17:07: run 38277768235 (feat/1346-penetration-baseline c96ee475a) failed unit shard fast (1) (villagerPenetrationReport.test.ts:174) and set commit status ci/gate (branch)=failure, but every job concludes success on feat/** because .github/workflows/ci.yml marks each step continue-on-error; scripts/ci-status-guard-core.mjs classifyRuns reads only run conclusions, and batch-autostart-core.mjs ciTerminalPrompt hands that success on.
-  Final state: ci-status-guard and the CI-terminal handoff judge a feature-branch ref by its ci/gate commit status (or an equivalent failing signal), so a red branch is never reported green; main behaviour unchanged.
-  Verifiable: a Vitest case with a success-concluded run and a failing ci/gate status that the guard classifies red.
-  Criticality: medium - possible false approval of a landing.
-  Bundle: Modell & Wächter.
-
-- [ ] 1350. The decision-card guard deadlocks a stand-down chat session
-  Queue position: after point 1349.
-  Source: findings carrier 12.10.2026 16:36: chat-only session 994859ad (STAND DOWN, batch owned by 4dc5437a) answered a board message; Stop hook decision-card-guard demanded `board.mjs vdzk-keep` for three cards, which the stand-down PreToolUse hook refuses.
-  Final state: decision-card-guard stands down for a session that does not own the batch lock (house rule for session guards), leaving the card review to the owner.
-  Verifiable: a Vitest case where a non-owner session with open cards passes the guard.
-  Criticality: medium - a real blockade of the chat answer path.
-  Bundle: Chat & Tafel.
