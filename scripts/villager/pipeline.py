@@ -52,15 +52,6 @@ def args():
     return p.parse_args(argv)
 
 
-def inputs(work, names, cfg):
-    """A digest of the cached steps `names` (their .pkl bytes) and the config."""
-    import hashlib
-    h = hashlib.sha256(json.dumps(cfg, sort_keys=True).encode())
-    for n in names:
-        h.update(open(os.path.join(work, n + '.pkl'), 'rb').read())
-    return h.hexdigest()
-
-
 def cached(work, name, make, force=False, key=None):
     """A step's result from `work`, built when absent, forced, or — with a
     `key` (inputs) — built from other inputs than the cached one."""
@@ -102,22 +93,27 @@ def main():
     from mhbody import MakeHuman
     mh = MakeHuman(a.src)
     import body as B
-    body = cached(a.work, 'body', lambda: B.build_body(mh, cfg), force='body' in steps)
+    import cachekeys as CK
+    # each cache keyed on its inputs (sources, config, its own code, the keys
+    # of the steps it reads): a cache built from other inputs is rebuilt
+    keys = CK.step_keys(cfg)
+    body = cached(a.work, 'body', lambda: B.build_body(mh, cfg), force='body' in steps, key=keys['body'])
     have = lambda n: n in steps or os.path.exists(os.path.join(a.work, n + '.pkl'))  # noqa: E731
     clips = None
     if have('clips') and any(s in steps for s in ('clips', 'export', 'sheets', 'penetration', 'garments')):
         import clips as CL
-        clips = cached(a.work, 'clips', lambda: CL.build_clips(a.src, body, cfg), force='clips' in steps)
+        clips = cached(a.work, 'clips', lambda: CL.build_clips(a.src, body, cfg), force='clips' in steps, key=keys['clips'])
     garments = None
     if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
         import garments as G
         import fit as F
-        garments = cached(a.work, 'garments', lambda: F.settle(body, F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg), force='garments' in steps)
+        garments = cached(a.work, 'garments', lambda: F.settle(body, F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg),
+                          force='garments' in steps, key=keys['garments'])
     if garments is not None and clips is not None:
         # the mask over every pose costs minutes: cached on its inputs, its own
         # code and what its motion evaluation reads (MK.motion_key)
         import hashlib
-        key = inputs(a.work, ['body', 'clips', 'garments'], cfg) + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest() + MK.motion_key(body)
+        key = keys['garments'] + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest() + MK.motion_key(body)
         garments['mask'] = cached(a.work, 'mask', lambda: MK.masks(body, garments, cfg, clips), key=key)
     elif garments is not None:
         garments['mask'] = MK.masks(body, garments, cfg)
