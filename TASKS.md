@@ -186,6 +186,7 @@ put it is the mistake this line exists to stop.
   Final state: decision-card-guard stands down for a session that does not own the batch lock (house rule for session guards), leaving the card review to the owner.
   Verifiable: a Vitest case where a non-owner session with open cards passes the guard.
   Criticality: medium - a real blockade of the chat answer path.
+  Also (findings carrier 12.10.2026 19:46-19:47, responder 19043d77 on probe message 2eaa0509): reproduced with four cards; scripts/decision-card-guard.mjs:366 evaluateCardReviews blocks before the nonOwner exit at :382, so the responder looped on Stop.
   Bundle: Chat & Tafel.
 
 - [ ] 1342. Natural villager motion b: three-segment spine, hand morphs, jog and clip style, dig action, one pose pipeline, distributed lean and gaze, corrective leg IK
