@@ -10,22 +10,18 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
 import { VILLAGER_MOTION as M } from '../config/balance'
 import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
-import { BONE_NAMES, bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
+import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
 import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { buildLayerGeometry, INFANT_SKIN } from './figureDress'
 import { axisClearance } from '../test/axisClearance'
 import {
-  codeBoneMap,
   createGltfSkeleton,
-  dominantBones,
   garmentMeshName,
   gltfFigureGeometry,
   gltfGarment,
   gltfPerson,
-  remapSkin,
-  transferTrunkWeights,
 } from './villagerFigureBody'
 import { GARMENT_PUSH_ATTRIBUTE } from './villagerGarmentMask'
 
@@ -137,14 +133,6 @@ describe('the skeleton the figure binds', () => {
     expect(geometry.getAttribute('position').count).toBeGreaterThan(1000)
   })
 
-  it('carries the code-built dress layers onto the asset’s bones by name', () => {
-    const map = codeBoneMap(asset)
-    BONE_NAMES.forEach((n, i) => expect(asset.bones[map[i]]).toBe(n))
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(BONE_NAMES.slice(0, 4).map((_, i) => i), 4))
-    remapSkin(g, map)
-    expect(Array.from(g.getAttribute('skinIndex').array)).toEqual([0, 1, 2, 3].map((i) => map[i]))
-  })
 })
 
 /** A skinned geometry's positions under the skeleton's current pose (CPU). */
@@ -287,127 +275,6 @@ describe('the dressed figure', () => {
       const { min, count } = axisClearance(part(s0, total, at), part(m0, s0, at), 'outside')
       expect(count, name).toBe(n)
       expect(min / H, name).toBeGreaterThan(0.01)
-    }
-  })
-
-  it('every people’s dress clears the glTF body’s trunk for every sex, age and build, at rest and stooped: no skin through the cloth', () => {
-    // A ray from the trunk's axis out through each trunk vertex: where it meets
-    // a layer's cloth, the outermost cloth lies beyond the skin (a sleeve's
-    // inner wall may cross the trunk; its outer wall does not). Checked in the
-    // hanging rest and with the chest bent by the elder's stoop (the pose the
-    // settlement gives every elder), body and cloth skinned alike.
-    const ray = new THREE.Ray()
-    const hit = new THREE.Vector3()
-    const [a, b, c] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
-    const map = codeBoneMap(asset)
-    const fails: string[] = []
-    for (const { sex, age } of people()) {
-      for (const build of [-1, 0, 1]) {
-        const person = gltfPerson(asset, sex, age, build)
-        const p = person.p
-        const H = p.stature
-        const dom = dominantBones(person.geometry)
-        const trunkBones = new Set(['hips', 'spine', 'chest'].map((n) => asset.bones.indexOf(n)))
-        const { skeleton, bones } = createGltfSkeleton(asset, person.rest)
-        for (const stoop of p.stoop > 0 ? [0, p.stoop] : [0]) {
-          bones.chest.rotation.set(stoop, 0, 0)
-          bones.neck.rotation.set(-stoop * 0.45, 0, 0)
-          let root: THREE.Object3D = bones.hips
-          while (root.parent) root = root.parent
-          root.updateMatrixWorld(true)
-          const body = skinned(person.geometry, skeleton)
-          const skin: THREE.Vector3[] = []
-          for (let k = 0; k < dom.length; k++) {
-            const y = body[k * 3 + 1]
-            if (trunkBones.has(dom[k]) && y > p.hipY && y < p.shoulderY - 0.03 * H) skin.push(new THREE.Vector3().fromArray(body, k * 3))
-          }
-          for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
-            for (const l of table[sex][age]) {
-              const g = buildLayerGeometry(l, p, 32)
-              if (!g) continue
-              const gp = skinned(transferTrunkWeights(asset, person, remapSkin(g, map)), skeleton)
-              const idx = g.getIndex()!
-              let worst = 0
-              for (const v of skin) {
-                const r = Math.hypot(v.x, v.z)
-                ray.origin.set(0, v.y, 0)
-                ray.direction.set(v.x, 0, v.z).normalize()
-                let far = -Infinity
-                for (let t = 0; t < idx.count; t += 3) {
-                  a.fromArray(gp, idx.getX(t) * 3)
-                  b.fromArray(gp, idx.getX(t + 1) * 3)
-                  c.fromArray(gp, idx.getX(t + 2) * 3)
-                  if (Math.min(a.y, b.y, c.y) > v.y || Math.max(a.y, b.y, c.y) < v.y) continue
-                  if (ray.intersectTriangle(a, b, c, false, hit)) far = Math.max(far, hit.distanceTo(ray.origin))
-                }
-                if (far > -Infinity) worst = Math.max(worst, r - far)
-              }
-              if (worst > 0) fails.push(`${id} ${sex} ${age} build ${build} stoop ${stoop.toFixed(2)} ${l.form}: skin ${(worst / H).toFixed(4)} H through`)
-            }
-          }
-        }
-      }
-    }
-    expect(fails).toEqual([])
-  }, 120_000)
-
-  it('a sleeve keeps its arm weights under the trunk transfer: a raised arm carries its sleeve', () => {
-    const map = codeBoneMap(asset)
-    const arms = new Set(['L', 'R'].flatMap((s) => [`upperArm.${s}`, `forearm.${s}`, `hand.${s}`].map((n) => asset.bones.indexOf(n))))
-    let checked = 0
-    let mixed = 0
-    for (const { sex, age } of people()) {
-      const person = gltfPerson(asset, sex, age)
-      for (const table of Object.values(PEOPLE_DRESS)) {
-        for (const l of table[sex][age]) {
-          const g = buildLayerGeometry(l, person.p, 16)
-          if (!g) continue
-          remapSkin(g, map)
-          const before = Array.from(g.getAttribute('skinIndex').array as Uint16Array)
-          const wBefore = Array.from(g.getAttribute('skinWeight').array as Float32Array)
-          transferTrunkWeights(asset, person, g)
-          const si = g.getAttribute('skinIndex')
-          const sw = g.getAttribute('skinWeight')
-          for (let k = 0; k < si.count; k++) {
-            let armBefore = 0
-            for (let j = 0; j < 4; j++) if (arms.has(before[k * 4 + j])) armBefore += wBefore[k * 4 + j]
-            // mixed sleeve weights too: the arm share stays whole, not only on a pure arm vertex
-            if (armBefore < 0.2) continue
-            let armAfter = 0
-            for (let j = 0; j < 4; j++) if (arms.has(si.getComponent(k, j))) armAfter += sw.getComponent(k, j)
-            expect(armAfter, `${l.form} ${sex} ${age} vertex ${k}`).toBeGreaterThan(armBefore - 0.01)
-            checked++
-            if (armBefore < 0.99) mixed++
-          }
-        }
-      }
-    }
-    expect(checked).toBeGreaterThan(0)
-    expect(mixed).toBeGreaterThan(0)
-  })
-
-  it('a sleeve vertex with two small arm weights keeps both when its four slots overflow', () => {
-    const map = codeBoneMap(asset)
-    const person = gltfPerson(asset, 'female', 'adult')
-    const l = PEOPLE_DRESS[Object.keys(PEOPLE_DRESS)[0] as keyof typeof PEOPLE_DRESS].female.adult[0]
-    const g = remapSkin(buildLayerGeometry(l, person.p, 16)!, map)
-    const [ua, fa, chest] = ['upperArm.L', 'forearm.L', 'chest'].map((n) => asset.bones.indexOf(n))
-    const si = g.getAttribute('skinIndex')
-    const sw = g.getAttribute('skinWeight')
-    for (let k = 0; k < si.count; k++) {
-      si.setXYZW(k, ua, fa, chest, 0)
-      sw.setXYZW(k, 0.1, 0.1, 0.8, 0)
-    }
-    transferTrunkWeights(asset, person, g)
-    for (let k = 0; k < si.count; k++) {
-      let arm = 0
-      let sum = 0
-      for (let j = 0; j < 4; j++) {
-        if (si.getComponent(k, j) === ua || si.getComponent(k, j) === fa) arm += sw.getComponent(k, j)
-        sum += sw.getComponent(k, j)
-      }
-      expect(arm, `vertex ${k}`).toBeCloseTo(0.2, 5)
-      expect(sum, `vertex ${k}`).toBeCloseTo(1, 5)
     }
   })
 

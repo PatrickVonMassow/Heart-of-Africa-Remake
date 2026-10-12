@@ -14,7 +14,7 @@
 import * as THREE from 'three/webgpu'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
-import { bodyProportions, BONE_NAMES, mixHex, paint as paintSurface, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE, tidy, type BodyProportions, type BoneName } from './figureBody'
+import { bodyProportions, mixHex, paint as paintSurface, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE, tidy, type BodyProportions } from './figureBody'
 import { INFANT_SKIN, surfaceOf } from './figureDress'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
@@ -411,110 +411,6 @@ function hairMask(asset: VillagerAsset, g: THREE.BufferGeometry, dom: Uint16Arra
     if (yy > brow || (yy > nape && pos.getZ(k) < back)) out[k] = 1
   }
   return out
-}
-
-/**
- * The trunk's cloth takes its skin weights from the body beneath it (the
- * nearest trunk vertex's), so a bent trunk — the elder's stoop — carries skin
- * and cloth alike; the code-built weights, measured to the code-built bones,
- * moved the cloth at the belly otherwise than the skin under it and the skin
- * came through. Only the band from the hips to below the shoulders is
- * transferred, faded in and out over its edges, and without the arm bones
- * (a raised arm must not drag the cloth's waist up); the hem and the
- * shoulders keep the weights that fold a robe with the legs and the arms.
- * In place on a layer already re-indexed onto the asset's bones.
- */
-export function transferTrunkWeights(asset: VillagerAsset, person: GltfPerson, g: THREE.BufferGeometry): THREE.BufferGeometry {
-  const { p, geometry: body } = person
-  const H = p.stature
-  const lo = p.hipY + 0.02 * H
-  const hi = p.shoulderY - 0.06 * H
-  const fade = 0.03 * H
-  const bp = body.getAttribute('position') as THREE.BufferAttribute
-  const bi = body.getAttribute('skinIndex') as THREE.BufferAttribute
-  const bw = body.getAttribute('skinWeight') as THREE.BufferAttribute
-  const dom = dominantBones(body)
-  const trunk = new Set(['hips', 'spine', 'chest'].map((n) => asset.bones.indexOf(n)))
-  const arms = new Set(['L', 'R'].flatMap((s) => [`upperArm.${s}`, `forearm.${s}`, `hand.${s}`].map((n) => asset.bones.indexOf(n))))
-  const near: number[] = []
-  for (let k = 0; k < bp.count; k++) {
-    const y = bp.getY(k)
-    if (trunk.has(dom[k]) && y > lo - fade && y < hi + fade) near.push(k)
-  }
-  const pos = g.getAttribute('position') as THREE.BufferAttribute
-  const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
-  const sw = g.getAttribute('skinWeight') as THREE.BufferAttribute
-  if (!near.length || !si || !sw) return g
-  for (let k = 0; k < pos.count; k++) {
-    const x = pos.getX(k)
-    const y = pos.getY(k)
-    const z = pos.getZ(k)
-    // a sleeve's share on the arm bones stays: only the rest moves to the trunk
-    let armShare = 0
-    for (let j = 0; j < 4; j++) if (arms.has(si.getComponent(k, j))) armShare += sw.getComponent(k, j)
-    const band = Math.min(1, (y - lo + fade) / fade, (hi + fade - y) / fade)
-    const rest = 1 - Math.min(1, armShare)
-    if (band <= 0 || rest <= 0) continue
-    let best = -1
-    let d = Infinity
-    for (const n of near) {
-      const e = (bp.getX(n) - x) ** 2 + (bp.getY(n) - y) ** 2 + (bp.getZ(n) - z) ** 2
-      if (e < d) {
-        d = e
-        best = n
-      }
-    }
-    const w = new Map<number, number>()
-    let own = 0
-    for (let j = 0; j < 4; j++) {
-      const b = bi.getComponent(best, j)
-      const v = bw.getComponent(best, j)
-      if (v > 0 && !arms.has(b)) {
-        w.set(b, (w.get(b) ?? 0) + v)
-        own += v
-      }
-    }
-    if (own <= 0) continue
-    for (const [b, v] of w) w.set(b, (v / own) * band * rest)
-    for (let j = 0; j < 4; j++) {
-      const b = si.getComponent(k, j)
-      const v = sw.getComponent(k, j)
-      if (v > 0) w.set(b, (w.get(b) ?? 0) + (arms.has(b) ? v : v * (1 - band)))
-    }
-    // four slots: the arm influences keep theirs, the largest others share the rest
-    const byWeight = [...w].sort((a, b) => b[1] - a[1])
-    const armSlots = byWeight.filter(([b]) => arms.has(b))
-    const others = byWeight.filter(([b]) => !arms.has(b)).slice(0, 4 - armSlots.length)
-    const armSum = armSlots.reduce((t, [, v]) => t + v, 0)
-    const otherSum = others.reduce((t, [, v]) => t + v, 0)
-    const top = [...armSlots, ...others.map(([b, v]): [number, number] => [b, (v / otherSum) * (1 - armSum)])]
-    for (let j = 0; j < 4; j++) {
-      si.setComponent(k, j, top[j]?.[0] ?? 0)
-      sw.setComponent(k, j, top[j]?.[1] ?? 0)
-    }
-  }
-  si.needsUpdate = true
-  sw.needsUpdate = true
-  return g
-}
-
-/** The 17 code-built bone names onto the asset's bone indices (the dress
- *  layers are skinned by BONE_NAMES order). */
-export function codeBoneMap(asset: VillagerAsset): Uint16Array {
-  return Uint16Array.from(BONE_NAMES, (n: BoneName) => {
-    const i = asset.bones.indexOf(n)
-    if (i < 0) throw new Error(`villager.glb: no bone ${n}`)
-    return i
-  })
-}
-
-/** Re-index a geometry skinned by BONE_NAMES onto the asset's bones (in place). */
-export function remapSkin(g: THREE.BufferGeometry, map: Uint16Array): THREE.BufferGeometry {
-  const si = g.getAttribute('skinIndex') as THREE.BufferAttribute
-  const out = new Uint16Array(si.count * 4)
-  for (let k = 0; k < si.count; k++) for (let c = 0; c < 4; c++) out[k * 4 + c] = map[si.getComponent(k, c)]
-  g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(out, 4))
-  return g
 }
 
 /**
