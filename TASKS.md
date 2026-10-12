@@ -143,6 +143,15 @@ put it is the mistake this line exists to stop.
   Criticality: medium - a standing red in the children suite; visible in every port city's tag game.
   Bundle: Dorfleben.
 
+- [ ] 1344. Children's hand contacts in polish-children: runner hands at its sides, bank-tap hand on the flank, arriving runner's hand on the far stone
+  Queue position: directly after point 1340 (same suite and the same children's pose write).
+  Source: findings carrier 12.10.2026 04:48Z: full WebGPU polish-children run 06:19 on main 06c727d21 red with three checks not in the classified baseline and owned by no point — tag-catch "while a runner's hands hang at its sides"; children-bank-game "the tapping hand stays within 5 mm of the flank over the whole hold" (22 cm off); arriving runner "DRAWN hand stays within 5 mm of the far stone, including the word frame" (24.6 cm off). Machine quietness of that run is unverified; the WebGL 2 full run is still owed.
+  Final state:
+  1. polish-children re-run alone on a quiet machine on both backends; a red that does not reproduce closes with that run as evidence.
+  2. For each reproduced red the cause is named and fixed: the drawn hand lands on its contact (flank, far stone) within the suite's 5 mm over the whole hold and word frame, and a runner's hands hang at its sides, with no change to the tag or bank-game rules.
+  Verifiable: polish-children sections tag-catch and children-bank-game green on both backends, frames judged by looking; Vitest for any pose-solve change.
+  Criticality: medium - visible hands off their contacts in two children's games.
+  Bundle: Dorfleben.
 - [ ] 1341. Pipeline garments: smooth the crumpled fold surface, fit the head cover, measure the garment frame cost
   Queue position: after point 1340.
   Source: findings carrier 12.10.2026 02:47Z, picture check of point 1315 (feat/1315 8aaf9ac28, 1294-dress-swahili.png WebGPU vs main): kanzu and kanga/buibui robes show a lumpy crumpled-paper fold surface at the normal camera distance, and the red women's head cover rises to a peak above the head. The same frame read 10 FPS on the branch against 21 on main (one snapshot on an unquiet host) with villager.glb at 6.9 MB.
