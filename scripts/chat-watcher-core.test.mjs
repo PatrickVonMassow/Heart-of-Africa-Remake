@@ -18,6 +18,8 @@ import {
   sweepPlan,
   wakeDecision,
   watcherSupervision,
+  watcherSuperseded,
+  isWatcherCommand,
 } from './chat-watcher-core.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
@@ -384,6 +386,15 @@ describe('watcherSupervision — the launcher tick is the whole lifecycle', () =
     expect(r.pid).toBe(null)
   })
 
+  it('trusts the command line over a start time that drifted past the tolerance', () => {
+    const drifted = { exists: true, startedAt: record.pidStartedAt - 5000 }
+    const cmd = '/usr/local/bin/node /workspace/hoa/scripts/chat-watcher.mjs'
+    expect(watcherSupervision({ record, probe: probeOf({ 900: { ...drifted, command: cmd } }) }).action).toBe('none')
+    expect(
+      watcherSupervision({ record, probe: probeOf({ 900: { ...drifted, command: '/usr/bin/vim notes' } }) }).action,
+    ).toBe('start')
+  })
+
   it('keeps a live inbox listener through a pause, so the user can end it', () => {
     expect(
       watcherSupervision({
@@ -646,5 +657,31 @@ describe('openPointStatus — the format alarm both spawners read', () => {
 
   it('is total', () => {
     expect(openPointStatus()).toEqual({ open: 0, alarm: false })
+  })
+})
+
+describe('watcherSuperseded — a second watcher stands down', () => {
+  const cmd = 'node /workspace/hoa/scripts/chat-watcher.mjs'
+  const probe = (map) => (pid) => map[pid] ?? { exists: false, startedAt: null }
+  const record = { pid: 900, pidStartedAt: 1 }
+
+  it('is surplus while the pidfile names another live watcher', () => {
+    expect(watcherSuperseded({ record, ownPid: 901, probe: probe({ 900: { exists: true, startedAt: 9, command: cmd } }) })).toBe(true)
+  })
+
+  it('is not surplus when the pidfile names itself, a dead pid, or a stranger', () => {
+    const live = probe({ 900: { exists: true, startedAt: 9, command: cmd } })
+    expect(watcherSuperseded({ record, ownPid: 900, probe: live })).toBe(false)
+    expect(watcherSuperseded({ record, ownPid: 901, probe: probe({}) })).toBe(false)
+    expect(watcherSuperseded({ record, ownPid: 901, probe: probe({ 900: { exists: true, startedAt: 9, command: 'bash' } }) })).toBe(false)
+    expect(watcherSuperseded({ record: null, ownPid: 901, probe: live })).toBe(false)
+  })
+
+  it('recognises the watcher command and nothing else', () => {
+    expect(isWatcherCommand(cmd)).toBe(true)
+    expect(isWatcherCommand('C:\\hoa\\scripts\\chat-watcher.mjs')).toBe(true)
+    expect(isWatcherCommand('node scripts/chat-watcher.mjs --dry-run')).toBe(true)
+    expect(isWatcherCommand('node scripts/chat-watcher-core.test.mjs')).toBe(false)
+    expect(isWatcherCommand(null)).toBe(false)
   })
 })

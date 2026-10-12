@@ -49,7 +49,7 @@ import {
 import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { knownMessages, claimMessage, readPending, spoolMessage } from './chat-spool.mjs'
 import { readReplyReceipt } from './chat-reply.mjs'
-import { assessOwner, bootTimeMs, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { assessOwner, bootTimeMs, probePid, processCommand, readOwnerLock } from './batch-singleton.mjs'
 import { clearClaim, maxAgeMs as claimMaxAgeMs, readClaim, writeClaim } from './batch-claim.mjs'
 import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
@@ -70,6 +70,7 @@ import {
   responderClaim,
   sweepPlan,
   wakeDecision,
+  watcherSuperseded,
 } from './chat-watcher-core.mjs'
 
 const PID_PATH = repoPath('.claude', WATCHER_PID_FILE)
@@ -109,7 +110,9 @@ function appendLog(line) {
 
 const log = (o) => {
   const line = JSON.stringify({ at: new Date().toISOString(), ...o })
-  process.stdout.write(`${line}\n`)
+  // The launcher points stdout at the same log file, so a detached watcher
+  // writes the line once, not twice.
+  if (dryRun || process.stdout.isTTY) process.stdout.write(`${line}\n`)
   appendLog(line)
 }
 
@@ -258,8 +261,11 @@ function onResponderExit(code) {
   const acked = ackHanded()
   // A responder that sent NO reply leaves its messages PENDING, on purpose — and
   // says so here, because that is the one shape in which a message could
-  // otherwise pass unnoticed. The next session is handed it.
-  log({ event: 'responder-exit', code, handed, acked, stillPending: handed - acked })
+  // otherwise pass unnoticed. The next session is handed it. Counted on the
+  // spool: the responder's own delivery hook consumes what it was handed.
+  const pendingIds = new Set(readPending().map((m) => m.id))
+  const stillPending = state.handed.filter((m) => pendingIds.has(m.id)).length
+  log({ event: 'responder-exit', code, handed, acked, stillPending })
   state.handed = []
   state.spawnedAt = null
   releaseClaim('responder-exit')
@@ -527,11 +533,22 @@ function deferralMs() {
   return Number.isFinite(raw) && raw > 0 ? raw : DEFERRAL_MS
 }
 
+const watcherProbe = (pid) => {
+  const p = probePid(pid)
+  return p.exists ? { ...p, command: processCommand(pid) } : p
+}
+
+/** True when another live watcher holds the pidfile; this one is then surplus. */
+function superseded() {
+  return watcherSuperseded({ record: readJson(PID_PATH), ownPid: process.pid, probe: watcherProbe })
+}
+
 /** One sweep: take what the owner did not. Total — a sweep must never throw
  *  inside a timer and take the watcher down with it. */
 function sweepDeferred() {
   try {
     if (state.child) return // our own responder is answering; `woken` covers its messages
+    if (superseded()) return shutdown('superseded')
     const plan = sweepPlan({ pending: readPending(), now: Date.now(), windowMs: deferralMs(), wokenIds: state.woken })
     if (plan.overdue.length === 0) return
     const gathered = gatherState(state.sessionId, false)
@@ -583,6 +600,10 @@ async function run() {
     { now: Date.now(), retentionMs: envelopeRetentionMs(maxAge) },
   )
 
+  if (!dryRun && superseded()) {
+    log({ event: 'superseded-at-start', pid: readJson(PID_PATH)?.pid })
+    process.exit(0)
+  }
   if (!dryRun) {
     // A responder orphaned by a crashed predecessor is ADOPTED rather than
     // duplicated: re-file the claim under this process and wait for it.

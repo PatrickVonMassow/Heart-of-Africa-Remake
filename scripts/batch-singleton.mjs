@@ -844,6 +844,17 @@ export function cheapProbePid(pid) {
   }
 }
 
+/** The process command line (arguments joined by spaces), or null where the OS
+ *  gives none cheaply (no /proc). */
+export function processCommand(pid) {
+  if (process.platform === 'win32') return null
+  try {
+    return readFileSync(`/proc/${Number(pid)}/cmdline`, 'utf8').split('\0').filter(Boolean).join(' ')
+  } catch {
+    return null
+  }
+}
+
 /** Epoch ms the process started, or null. Linux: /proc stat start time
  *  (assumes a 100 Hz clock tick); Windows: PowerShell FileTime. */
 export function processStartTime(pid) {

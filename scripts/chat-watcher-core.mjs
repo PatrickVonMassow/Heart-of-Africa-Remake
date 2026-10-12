@@ -323,6 +323,22 @@ export const WATCHER_PID_TOLERANCE_MS = 2000
  *  name from this pure module rather than importing the watcher wrapper. */
 export const WATCHER_PID_FILE = 'chat-watcher.json'
 
+/** Does a process command line belong to a chat watcher? */
+export function isWatcherCommand(command) {
+  return typeof command === 'string' && /(^|[\\/\s])chat-watcher\.mjs(\s|$)/.test(command)
+}
+
+/**
+ * HAS ANOTHER LIVE WATCHER TAKEN THE PIDFILE? PURE. A watcher that is not the
+ * one the pidfile names, while the named one is alive, is surplus: two watchers
+ * wake two responders for one message, so the surplus one stands down.
+ */
+export function watcherSuperseded({ record = null, ownPid, probe = null } = {}) {
+  const pid = Number(record?.pid)
+  if (!Number.isInteger(pid) || pid <= 0 || pid === ownPid) return false
+  return watcherSupervision({ record, probe }).action === 'none'
+}
+
 /**
  * IS THE WATCHER ALIVE, AND WHAT SHOULD THE TICK DO? PURE — `probe` is injected.
  *
@@ -339,7 +355,12 @@ export function watcherSupervision({ paused = false, record = null, probe = null
   let alive = false
   if (Number.isInteger(pid) && pid > 0 && typeof probe === 'function') {
     const p = probe(pid)
-    if (p && p.exists === true) {
+    if (p && p.exists === true && typeof p.command === 'string') {
+      // The command line, where the OS gives one, is the identity: the probed
+      // start time drifts against the wall clock (WSL measured -1.2 s in 5 h),
+      // crossed the tolerance, and every tick then started one more watcher.
+      alive = isWatcherCommand(p.command)
+    } else if (p && p.exists === true) {
       // `stampOf`, not `Number` — see its note. A pidfile with no start time is
       // meant to fall through to the LENIENT branch (unknown identity, treat the
       // live pid as ours); `Number(null)` is 0, which is finite, so the old form
