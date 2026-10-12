@@ -63,6 +63,7 @@ import {
   RESPONDER_MAX_MS,
   WATCHER_PID_FILE,
   ackPlan,
+  stillPendingCount,
   adoptDecision,
   buildResponderPrompt,
   claimIsOurs,
@@ -262,8 +263,7 @@ function onResponderExit(code) {
   // says so here, because that is the one shape in which a message could
   // otherwise pass unnoticed. The next session is handed it. Counted on the
   // spool: the responder's own delivery hook consumes what it was handed.
-  const pendingIds = new Set(readPending().map((m) => m.id))
-  const stillPending = state.handed.filter((m) => pendingIds.has(m.id)).length
+  const stillPending = stillPendingCount(state.handed, readPending())
   log({ event: 'responder-exit', code, handed, acked, stillPending })
   state.handed = []
   state.spawnedAt = null

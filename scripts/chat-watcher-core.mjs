@@ -493,3 +493,13 @@ export function ackPlan({ handed = [], pending = [], spawnedAt = null, actedAt =
   const ids = new Set((Array.isArray(handed) ? handed : []).map((m) => m?.id).filter(Boolean))
   return (Array.isArray(pending) ? pending : []).filter((m) => m && ids.has(m.id) && typeof m.file === 'string')
 }
+
+/**
+ * HOW MANY HANDED MESSAGES ARE STILL ON THE SPOOL? PURE. Measured, not derived
+ * as handed - acked: a responder's own delivery hook consumes its message
+ * before the watcher acks, which logged an answered message as still pending.
+ */
+export function stillPendingCount(handed = [], pending = []) {
+  const ids = new Set((Array.isArray(pending) ? pending : []).map((m) => m?.id).filter(Boolean))
+  return (Array.isArray(handed) ? handed : []).filter((m) => m?.id && ids.has(m.id)).length
+}

@@ -8,6 +8,7 @@ import {
   WAKE_REASONS,
   WATCHER_PID_TOLERANCE_MS,
   ackPlan,
+  stillPendingCount,
   adoptDecision,
   buildResponderPrompt,
   claimIsOurs,
@@ -702,5 +703,14 @@ describe.runIf(process.platform === 'linux')('holdExclusiveAddress — the OS ad
     expect(watcherAddress('/a', 'linux').startsWith('\0')).toBe(true)
     expect(watcherAddress('/a', 'win32')).toMatch(/^\\\\\.\\pipe\\/)
     expect(watcherAddress('/a', 'darwin')).toBe(null)
+  })
+})
+
+describe('stillPendingCount — measured on the spool, not handed minus acked', () => {
+  it('counts an answered message the responder consumed itself as no longer pending', () => {
+    expect(stillPendingCount([{ id: 'a' }], [])).toBe(0)
+  })
+  it('counts only handed messages that are still spooled', () => {
+    expect(stillPendingCount([{ id: 'a' }, { id: 'b' }], [{ id: 'b' }, { id: 'c' }])).toBe(1)
   })
 })
