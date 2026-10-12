@@ -10,7 +10,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
 import { VILLAGER_MOTION as M } from '../config/balance'
 import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
-import { BONE_NAMES, bodyProportions } from './figureBody'
+import { BONE_NAMES, bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
 import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
@@ -522,6 +522,14 @@ describe('the pipeline garments on the glTF body', () => {
     for (let k = 0; k < col.count; k++) if (Math.abs(col.getX(k) - infant.r) < 1e-4 && Math.abs(col.getY(k) - infant.g) < 1e-4) head++
     expect(head).toBeGreaterThan(10)
     expect(head).toBeLessThan(col.count * 0.5)
+    // no garment pattern reaches the skin: second colour and surface are plain
+    const col2 = g.getAttribute(SECOND_COLOUR_ATTRIBUTE)
+    const surf = g.getAttribute(SURFACE_ATTRIBUTE)
+    for (let k = 0; k < col.count; k++) {
+      if (Math.abs(col.getX(k) - infant.r) >= 1e-4 || Math.abs(col.getY(k) - infant.g) >= 1e-4) continue
+      expect(col2.getX(k)).toBeCloseTo(infant.r, 4)
+      expect([surf.getX(k), surf.getY(k), surf.getZ(k), surf.getW(k)]).toEqual(PLAIN_SURFACE.map((v) => expect.closeTo(v, 4)))
+    }
   })
 })
 

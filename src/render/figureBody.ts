@@ -324,10 +324,13 @@ export const SURFACE_ATTRIBUTE = 'figureSurface'
 export const SECOND_COLOUR_ATTRIBUTE = 'figureColour2'
 
 /** Colour a part and give it a surface: one pattern kind + params + roughness. */
+/** The surface paint() gives skin and any part without a garment pattern. */
+export const PLAIN_SURFACE: [number, number, number, number] = [0, 0, 0, 0.85]
+
 export function paint(
   geo: THREE.BufferGeometry,
   hex: string,
-  surface: [number, number, number, number] = [0, 0, 0, 0.85],
+  surface: [number, number, number, number] = PLAIN_SURFACE,
   hex2: string = hex,
 ): THREE.BufferGeometry {
   const n = geo.getAttribute('position').count

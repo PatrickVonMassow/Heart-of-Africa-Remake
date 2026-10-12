@@ -14,7 +14,7 @@
 import * as THREE from 'three/webgpu'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
-import { bodyProportions, BONE_NAMES, mixHex, paint as paintSurface, tidy, type BodyProportions, type BoneName } from './figureBody'
+import { bodyProportions, BONE_NAMES, mixHex, paint as paintSurface, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE, tidy, type BodyProportions, type BoneName } from './figureBody'
 import { INFANT_SKIN, surfaceOf } from './figureDress'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
@@ -588,9 +588,17 @@ export function gltfGarment(asset: VillagerAsset, person: GltfPerson, l: DressLa
   const out = paintSurface(g, l.colour, surfaceOf(l, person.p, bottom), second)
   const infant = src.getAttribute(INFANT_ATTRIBUTE) as THREE.BufferAttribute | undefined
   if (infant) {
+    // the infant is skin, not cloth: no garment pattern, second colour or sheen
     const col = out.getAttribute('color') as THREE.BufferAttribute
+    const col2 = out.getAttribute(SECOND_COLOUR_ATTRIBUTE) as THREE.BufferAttribute
+    const surf = out.getAttribute(SURFACE_ATTRIBUTE) as THREE.BufferAttribute
     const c = new THREE.Color(INFANT_SKIN)
-    for (let k = 0; k < infant.count; k++) if (infant.getX(k) > 0.5) col.setXYZ(k, c.r, c.g, c.b)
+    for (let k = 0; k < infant.count; k++) {
+      if (infant.getX(k) <= 0.5) continue
+      col.setXYZ(k, c.r, c.g, c.b)
+      col2.setXYZ(k, c.r, c.g, c.b)
+      surf.setXYZW(k, ...PLAIN_SURFACE)
+    }
   }
   return tidy(out)
 }
