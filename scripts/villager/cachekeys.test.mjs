@@ -18,7 +18,7 @@ beforeEach(() => {
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-const keys = () => JSON.parse(execFileSync('python3', [join(dir, 'cachekeys.py'), join(dir, 'config.json'), dir], { encoding: 'utf8' }))
+const keys = () => JSON.parse(execFileSync('python3', [join(dir, 'cachekeys.py'), join(dir, 'config.json'), dir], { encoding: 'utf8', windowsHide: true }))
 
 describe('the villager pipeline cache keys', () => {
   it('are the same cold and warm: built caches beside them change nothing', () => {

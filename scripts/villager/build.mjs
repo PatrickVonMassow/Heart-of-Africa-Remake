@@ -101,6 +101,7 @@ export function exportRuntimePoses(path) {
     cwd: repo,
     env: { ...process.env, VILLAGER_RUNTIME_POSES: path },
     stdio: 'inherit',
+    windowsHide: true,
   })
   if (r.status !== 0 || !existsSync(path)) throw new Error(`runtime-pose export failed (vitest exit ${r.status})`)
 }
