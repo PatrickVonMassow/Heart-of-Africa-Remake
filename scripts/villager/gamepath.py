@@ -205,3 +205,148 @@ def drawn_garment(person, g, weights, wr, wp):
         if x:
             p += x * g['morph_pos'][m]
     return person.skin(person.bake(p, gi, gw), gi, gw, wr, wp)
+
+
+# ---- the runtime's composed poses (src/render/villagerRuntimePose.test.tsx) --------
+#
+# The Vitest exporter records the game's own figure (SkinnedFigure) frame by
+# frame: the root group's transform with its scale, the chain from the root to
+# the skeleton, every hung bone's local translation/rotation/scale, the morph
+# weights and three's world matrices. Positions are the game's: the drawn body
+# in figure units, (p − sole·ŷ) × scale of the pipeline's (villagerFigureBody.ts
+# gltfPerson). Nothing below may be used as evidence before `runtime_check`
+# has passed on the same export.
+
+RUNTIME_TOLERANCE = 1e-4
+
+
+def load_runtime(path):
+    import json
+    with open(path) as f:
+        rt = json.load(f)
+    if rt.get('version') != 1:
+        raise RuntimeError(f'runtime poses {path}: unknown version {rt.get("version")}')
+    if list(rt['bones']) != list(SK.NAMES):
+        raise RuntimeError(f'runtime poses {path}: bone list differs from the pipeline skeleton')
+    return rt
+
+
+def trs_matrix(t):
+    """three's Object3D.matrix: translation · rotation · scale."""
+    m = np.eye(4)
+    m[:3, :3] = qmat(np.asarray(t['q'], float)) * np.asarray(t['s'], float)[None, :]
+    m[:3, 3] = t['p']
+    return m
+
+
+def runtime_root(frame):
+    """The figure-body mesh's world matrix: the root group, then the chain."""
+    m = trs_matrix(frame['root'])
+    for c in frame['chain']:
+        m = m @ trs_matrix(c)
+    return m
+
+
+def runtime_bones(frame, root=None):
+    """Every bone's world matrix (bones × 4 × 4), from the exported locals."""
+    root = runtime_root(frame) if root is None else root
+    out = np.zeros((len(SK.NAMES), 4, 4))
+    for i in rig.ORDER:
+        p = rig.PARENT_IDX[i]
+        out[i] = (root if p < 0 else out[p]) @ trs_matrix(frame['bones'][i])
+    return out
+
+
+def runtime_weights(identity, cfg):
+    """villagerBody.ts morphInfluences: the body's morph weights for a figure."""
+    from sheets import corner_weights
+    by_age = cfg['VILLAGER_GLTF']['buildByAge'][identity['age']]
+    b = max(-1.0, min(1.0, identity['build'])) * by_age
+    return corner_weights(identity['sex'], identity['age'], b)
+
+
+def runtime_person(body, subject, cfg):
+    """The pipeline's person for a subject, with its morph weights."""
+    from sheets import morphed
+    w = runtime_weights(subject['identity'], cfg)
+    pos, j = morphed(body, w)
+    return Person(j), pos, w
+
+
+def to_game(subject, v):
+    """Pipeline (hung, baked) positions onto the drawn body's: (p − sole·ŷ) × scale."""
+    pr = subject['person']
+    out = np.asarray(v, float).copy()
+    out[:, 1] -= pr['sole']
+    return out * pr['scale']
+
+
+def runtime_check(body, rt, cfg, tol=RUNTIME_TOLERANCE, log=print):
+    """THE ROUND TRIP. For every subject and frame: the world joints rebuilt
+    here from the exported root, chain and bone locals match three's
+    (matrixWorld) within `tol`; the morph weights rebuilt from the identity
+    by the game's rule match the exported ones; and the pipeline's hung rest
+    heads of that body, put on the drawn body, match the runtime's rest. Raises
+    on any miss; returns the worst values."""
+    worst = {'joint': 0.0, 'matrix': 0.0, 'morph': 0.0, 'rest': 0.0}
+    for s in rt['subjects']:
+        person, _pos, w = runtime_person(body, s, cfg)
+        rest = to_game(s, person.heads)
+        worst['rest'] = max(worst['rest'], float(np.abs(rest - np.asarray(s['person']['rest']).reshape(-1, 3)).max()))
+        for f in s['frames']:
+            got = runtime_bones(f)
+            want = np.array([np.asarray(m, float).reshape(4, 4).T for m in f['world']])
+            worst['joint'] = max(worst['joint'], float(np.linalg.norm(got[:, :3, 3] - want[:, :3, 3], axis=1).max()))
+            worst['matrix'] = max(worst['matrix'], float(np.abs(got - want).max()))
+            exported = f['morph']['influences']
+            names = set(exported) | {k for k, x in w.items() if x}
+            worst['morph'] = max([worst['morph']] + [abs(exported.get(k, 0.0) - w.get(k, 0.0)) for k in names])
+            if f['morph']['mesh']:
+                raise RuntimeError(f'runtime check: {s["id"]} draws {len(f["morph"]["mesh"])} mesh morph weights; the round trip does not reproduce them')
+    frames = sum(len(s['frames']) for s in rt['subjects'])
+    log(f'runtime check: {len(rt["subjects"])} subjects, {frames} frames; worst joint {worst["joint"]:.2e}, matrix {worst["matrix"]:.2e}, '
+        f'morph {worst["morph"]:.2e}, rest {worst["rest"]:.2e} (tolerance {tol:g})')
+    bad = {k: v for k, v in worst.items() if not v <= tol}
+    if bad:
+        raise RuntimeError(f'runtime check FAILED: {bad} over {tol:g} — the runtime export is no evidence until the round trip matches')
+    return worst
+
+
+def runtime_skin(subject, frame, baked, jidx, jw, space='figure'):
+    """Baked pipeline positions (Person.bake) skinned by the frame's bones as
+    three skins them (bone world · bind inverse, the bind the hung rest with
+    identity rotations). `space`: 'world' (the root included), 'figure' (in
+    the figure-body mesh's frame, the root left out) or 'pipeline' (figure
+    space back in pipeline units, the root's squash relative to its uniform
+    scale kept — what the penetration evaluator measures)."""
+    root = runtime_root(frame)
+    bones = runtime_bones(frame, root)
+    rest = np.asarray(subject['person']['rest'], float).reshape(-1, 3)
+    v = to_game(subject, baked)
+    if space != 'world':
+        bones = np.einsum('ij,bjk->bik', np.linalg.inv(root), bones)
+    out = np.zeros_like(v)
+    t = jw.sum(1)
+    for k in range(jidx.shape[1]):
+        b = jidx[:, k]
+        rel = v - rest[b]
+        out += jw[:, k, None] * (np.einsum('vij,vj->vi', bones[b][:, :3, :3], rel) + bones[b][:, :3, 3])
+    out = np.where(t[:, None] > 0, out / np.maximum(t, 1e-12)[:, None], v)
+    if space != 'pipeline':
+        return out
+    lin = trs_matrix(frame['root'])[:3, :3]
+    sx = np.linalg.norm(lin[:, 0])
+    sy = np.linalg.norm(lin[:, 1])
+    out[:, 1] *= sy / sx
+    pr = subject['person']
+    out = out / pr['scale']
+    out[:, 1] += pr['sole']
+    return out
+
+
+def runtime_tool(frame):
+    """The shovel's world matrix (4 × 4) when drawn, else None."""
+    t = frame.get('tool')
+    if not t or not t['visible']:
+        return None
+    return np.asarray(t['matrix'], float).reshape(4, 4).T

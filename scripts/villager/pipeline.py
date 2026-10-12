@@ -17,6 +17,11 @@
               garments; the run FAILS (exit 1) when any value exceeds the
               tolerance in any frame (--stride N: every Nth pose, a quick look;
               --baseline <json>: main's report json, for the comparison)
+  runtime     the round trip of the runtime-pose export (--runtime <json>,
+              written by src/render/villagerRuntimePose.test.tsx): world joints
+              and morph weights rebuilt here must match the game's within
+              1e-4 (gamepath.runtime_check); the sheets and penetration steps
+              run it before they use the export
   selftest    the fit loop's own check (also run before every garments step)
   all         every step in order
 """
@@ -43,6 +48,7 @@ def args():
     p.add_argument('--only', default='')
     p.add_argument('--stride', type=int, default=1)
     p.add_argument('--baseline', default='')
+    p.add_argument('--runtime', default='')
     return p.parse_args(argv)
 
 
@@ -131,6 +137,12 @@ def main():
         if garments:
             import sheets as S
             MK.check(a.verification, garments['mask'], body, [o for _s, _a, o in S.OUTFITS])
+    rt = None
+    if a.runtime and any(s in steps for s in ('runtime', 'sheets', 'penetration')):
+        import gamepath as GP
+        rt = GP.load_runtime(a.runtime)
+        # the export is evidence only once the round trip matches (raises otherwise)
+        GP.runtime_check(body, rt, cfg)
     if 'sheets' in steps:
         import sheets as S
         S.sheets(a.verification, mh, body, clips, garments, cfg, only=a.only)
