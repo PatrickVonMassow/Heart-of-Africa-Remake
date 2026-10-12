@@ -67,6 +67,14 @@ describe('the villager pipeline cache keys', () => {
     expect(keys().garments).not.toBe(direct.garments)
   })
 
+  it('a helper reached through a re-export moves the key', () => {
+    writeFileSync(join(dir, 'facade.py'), 'from sheets import runtime_sheets\n')
+    appendFileSync(join(dir, 'fit.py'), '\nfrom facade import runtime_sheets as _reexported\n')
+    const base = keys()
+    edit('sheets.py', 'runtime_sheets')
+    expect(keys().garments).not.toBe(base.garments)
+  })
+
   it('a helper no step reaches moves no key', () => {
     const base = keys()
     edit('sheets.py', 'runtime_sheets')

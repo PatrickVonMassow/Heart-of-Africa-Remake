@@ -7,7 +7,7 @@ before a step is built (cold) equals the one computed after (warm).
 A step's code is its OWN modules (STEPS) whole, plus every top-level
 definition of another local module they reach — through `from m import f`,
 `import m as M` and `M.f`, followed transitively through what those
-definitions reference. A helper edit that a step's result can depend on moves
+definitions reference and through re-exports. A helper edit that a step's result can depend on moves
 its key; an edit of a sheet or report function no step reaches does not turn
 into an hour's garment rebuild.
 
@@ -95,7 +95,12 @@ def code_digest(names, here=HERE, mods=None):
     seen = set()
     while todo:
         m, n = todo.pop()
-        if m in own or (m, n) in seen or n not in mods[m].defs:
+        if m in own or (m, n) in seen:
+            continue
+        if n not in mods[m].defs:
+            # a re-export (`from impl import f` in m): follow it to its definition
+            if n in mods[m].froms:
+                todo.add(mods[m].froms[n])
             continue
         seen.add((m, n))
         for _seg, node in mods[m].defs[n]:
