@@ -71,16 +71,11 @@ import {
   claimIsOurs,
   reconnectDelayMs,
   responderClaim,
-  WATCHER_RESTART_FILE,
-  WATCHER_RESTART_POLL_MS,
-  WATCHER_RESTART_PROTOCOL,
-  drainPlan,
   sweepPlan,
   wakeDecision,
 } from './chat-watcher-core.mjs'
 
 const PID_PATH = repoPath('.claude', WATCHER_PID_FILE)
-const RESTART_PATH = repoPath('.claude', WATCHER_RESTART_FILE)
 const LOG_PATH = repoPath('.claude', 'chat-watcher.log')
 const RUN_LOG_PATH = repoPath('.claude', 'chat-responder-run.log')
 
@@ -207,9 +202,6 @@ const state = {
   sessionId: `${CLAIM_SESSION_PREFIX}-${randomUUID()}`,
   identity: { pid: process.pid, pidStartedAt: null },
   codeFingerprint: null,
-  restartRequested: false,
-  restartTimer: null,
-  termSentAt: null,
   child: null,
   childTimer: null,
   sweepTimer: null,
@@ -279,17 +271,10 @@ function onResponderExit(code) {
   state.handed = []
   state.spawnedAt = null
   releaseClaim('responder-exit')
-  if (state.restartRequested) shutdown('restart-requested')
 }
 
 /** Wake a responder for `messages`. Returns true when a process was started. */
 function spawnResponder(messages) {
-  // A restart is pending: admit nothing new. The message stays on the spool for
-  // the next watcher.
-  if (state.restartRequested) {
-    log({ event: 'spawn-refused', reason: 'restart-requested', messages: messages.length })
-    return false
-  }
   const prompt = buildResponderPrompt(messages)
   if (!prompt) return false
   const exe = resolveClaudeCli({
@@ -395,7 +380,6 @@ function shutdown(why, code = 0) {
   try {
     if (state.childTimer) clearTimeout(state.childTimer)
     if (state.sweepTimer) clearInterval(state.sweepTimer)
-    if (state.restartTimer) clearInterval(state.restartTimer)
     // A responder is OURS, so an orderly stop takes it with us. The launcher
     // keeps this process through a batch pause so user mail can end that pause;
     // any other shutdown still must not leave a headless session under a claim
@@ -436,52 +420,15 @@ function installShutdownHandlers() {
   process.on('exit', () => releaseClaim('exit'))
 }
 
-/** One restart-request check: the launcher's request file naming THIS pid, then
- *  the bounded drain (`drainPlan`). Total — it runs inside a timer. */
-function checkRestartRequest() {
-  try {
-    if (!state.restartRequested) {
-      if (readJson(RESTART_PATH)?.pid !== process.pid) return
-      state.restartRequested = true
-      log({ event: 'restart-requested', responderLive: state.child !== null })
-    }
-    const plan = drainPlan({
-      requested: true,
-      responderLive: state.child !== null,
-      spawnedAt: state.spawnedAt,
-      termSentAt: state.termSentAt,
-      now: Date.now(),
-    })
-    if (plan === 'exit') shutdown('restart-requested')
-    else if (plan === 'term') {
-      state.termSentAt = Date.now()
-      log({ event: 'restart-drain-term', pid: state.child.pid })
-      try { process.kill(state.child.pid, 'SIGTERM') } catch { /* already gone */ }
-    } else if (plan === 'kill-exit') {
-      log({ event: 'restart-drain-kill', pid: state.child.pid })
-      try { process.kill(state.child.pid, 'SIGKILL') } catch { /* already gone */ }
-      shutdown('restart-drain-bound')
-    }
-  } catch (e) {
-    log({ event: 'restart-check-failed', reason: (e && e.message) || String(e) })
-  }
-}
-
 function writePidFile() {
   writeJsonAtomic(PID_PATH, {
     ...state.identity,
     at: Date.now(),
     sessionId: state.sessionId,
     codeFingerprint: state.codeFingerprint,
-    restartProtocol: WATCHER_RESTART_PROTOCOL,
   })
 }
 function clearPidFile() {
-  try {
-    if (readJson(RESTART_PATH)?.pid === process.pid) rmSync(RESTART_PATH, { force: true })
-  } catch {
-    /* best effort */
-  }
   try {
     const rec = readJson(PID_PATH)
     if (rec && rec.pid === process.pid) rmSync(PID_PATH, { force: true })
@@ -684,8 +631,6 @@ async function run() {
     // RUN gets no sweep — it decides and reports, and spawns nothing.
     state.sweepTimer = setInterval(sweepDeferred, sweepIntervalMs())
     if (typeof state.sweepTimer.unref === 'function') state.sweepTimer.unref()
-    state.restartTimer = setInterval(checkRestartRequest, WATCHER_RESTART_POLL_MS)
-    if (typeof state.restartTimer.unref === 'function') state.restartTimer.unref()
   }
   log({ event: 'watching', mode: dryRun ? 'dry-run' : 'live', sessionId: state.sessionId, deferralMs: deferralMs() })
 

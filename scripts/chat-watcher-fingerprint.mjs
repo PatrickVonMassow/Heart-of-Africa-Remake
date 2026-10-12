@@ -1,8 +1,8 @@
 // The chat watcher's code fingerprint, read from disk. Imported FIRST by
 // scripts/chat-watcher.mjs, so `LOADED_FINGERPRINT` is taken at the first module
-// evaluation — before the watcher's own awaits — and the launcher reads the
-// current one through `readWatcherFingerprint`. The decision is pure in
-// `chat-watcher-core.mjs` (`watcherCodeFingerprint`, `watcherSupervision`).
+// evaluation — before the watcher's own awaits — and the watcher re-reads the
+// current one through `readWatcherFingerprint` when idle. The decisions are pure
+// in `chat-watcher-core.mjs` (`watcherCodeFingerprint`, `selfRestartDecision`).
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

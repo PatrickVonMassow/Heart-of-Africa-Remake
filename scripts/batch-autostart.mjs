@@ -104,8 +104,7 @@ import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { classifyPause, describePause, formatPauseRecord, pauseRecovery } from './batch-pause-core.mjs'
-import { WATCHER_PID_FILE, WATCHER_RESTART_FILE, restartOutcome, watcherSupervision } from './chat-watcher-core.mjs'
-import { readWatcherFingerprint } from './chat-watcher-fingerprint.mjs'
+import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
@@ -736,14 +735,7 @@ const watcherProbe = (pid) => {
 // work; its decision gate admits only verified mail to a bounded responder.
 try {
   const rec = readJson(C(WATCHER_PID_FILE))
-  const fingerprint = readWatcherFingerprint()
-  const sup = watcherSupervision({
-    paused: batchParked,
-    record: rec,
-    probe: watcherProbe,
-    fingerprint,
-    claim: readClaim(),
-  })
+  const sup = watcherSupervision({ paused: batchParked, record: rec, probe: watcherProbe })
   // A WATCHER CANNOT RUN WITHOUT A READABLE SECRET, and one started anyway exits
   // before it writes its pidfile — so the supervision would read "not running"
   // and start another doomed process at every tick, for ever, with nothing
@@ -755,55 +747,21 @@ try {
   } else if (sup.action === 'stop') {
     try { process.kill(sup.pid) } catch { /* already gone */ }
     log(`chat watcher: stopped pid ${sup.pid} (${sup.reason})`)
-  } else if (sup.action === 'restart' && chatSecretBroken) {
-    // The live watcher read the secret at its start; a replacement could not.
-    log('chat watcher: stale code kept running (the chat secret is unreadable)')
-  } else if (sup.action === 'restart' || sup.action === 'start') {
-    // A RESTART IS A REQUEST, AND THE TICK WAITS FOR IT: the watcher reads the
-    // request file, exits once no responder of its own runs (bounded,
-    // `drainPlan`), and holds the singleton address until then — a replacement
-    // started earlier would exit on it. A legacy watcher (no `restartProtocol`)
-    // never reads the file and is stopped plainly, once (`legacy-stop`).
-    let outcome = 'start'
-    if (sup.action === 'restart') {
-      let delivered = true
-      try {
-        if (sup.stop === 'legacy-stop') {
-          log(`chat watcher: legacy-stop pid ${sup.pid} (no restart protocol)`)
-          process.kill(sup.pid)
-        } else writeJsonAtomic(C(WATCHER_RESTART_FILE), { pid: sup.pid, at: Date.now() })
-      } catch (e) {
-        delivered = false
-        log(`chat watcher: restart request to pid ${sup.pid} failed (${(e && (e.code || e.message)) || e})`)
-      }
-      const deadline = Date.now() + 10_000
-      while (delivered && watcherProbe(sup.pid).exists && Date.now() < deadline) await new Promise((r) => setTimeout(r, 200))
-      outcome = restartOutcome({ delivered, exited: !watcherProbe(sup.pid).exists })
-      if (outcome === 'draining') log(`chat watcher: pid ${sup.pid} still running after a restart request (${sup.reason}) — draining its responder`)
-    }
-    if (outcome === 'start') startWatcher(sup)
-  } else if (sup.reason === 'code-changed-responder-busy') {
-    log(`chat watcher: restart of pid ${sup.pid} deferred (its responder is still running)`)
-  } else if (sup.reason === 'fingerprint-unreadable') {
-    log(`chat watcher: restart check of pid ${sup.pid} deferred (a watcher source file is unreadable)`)
+  } else if (sup.action === 'start') {
+    const out = openSync(C('chat-watcher.log'), 'a')
+    const child = spawn(process.execPath, [R('chat-watcher.mjs')], {
+      cwd: REPO,
+      detached: true,
+      stdio: ['ignore', out, out],
+      // point 401 — a console window popping up while the user works elsewhere
+      // steals their focus, and this process starts unattended by definition.
+      windowsHide: true,
+    })
+    child.unref()
+    log(`chat watcher: started pid ${child.pid} (${sup.reason})`)
   }
 } catch (e) {
   log(`chat watcher supervision skipped (${(e && e.message) || e})`)
-}
-
-function startWatcher(sup) {
-  try { rmSync(C(WATCHER_RESTART_FILE), { force: true }) } catch { /* no request pending */ }
-  const out = openSync(C('chat-watcher.log'), 'a')
-  const child = spawn(process.execPath, [R('chat-watcher.mjs')], {
-    cwd: REPO,
-    detached: true,
-    stdio: ['ignore', out, out],
-    // point 401 — a console window popping up while the user works elsewhere
-    // steals their focus, and this process starts unattended by definition.
-    windowsHide: true,
-  })
-  child.unref()
-  log(`chat watcher: ${sup.action === 'restart' ? `restarted pid ${sup.pid} as` : 'started'} pid ${child.pid} (${sup.reason})`)
 }
 
 // --- BOARD REPUBLISH ON AGE OR PROGRESS (user order 24.09.2026) ---------------
