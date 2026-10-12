@@ -160,11 +160,16 @@ export function hookStdout(messages) {
 
 /**
  * A delegated agent receives the parent's session id in its hook payload, so
- * ownership alone cannot tell its PostToolUse call from the owner's. The
- * transcript path can: delegated transcripts are `agent-*.jsonl` files below
- * a `subagents` directory, while the top-level owner's transcript is not.
+ * ownership alone cannot tell its PostToolUse call from the owner's. The hook
+ * contract's `agent_id` can (see session-context-ceiling-core.mjs). Measured
+ * 12.10.2026: a subagent's payload carried the PARENT's transcript path, so the
+ * path test alone missed it, the subagent consumed a user message and never
+ * answered, and the watcher saw nothing pending — 38 minutes to an answer.
+ * The `agent-*.jsonl` path test stays as a second signal.
  */
 export function isSubagentHook(payload) {
+  const agentId = payload?.agent_id ?? payload?.agentId
+  if (typeof agentId === 'string' && agentId.trim() !== '') return true
   const path = payload?.transcript_path ?? payload?.transcriptPath
   if (typeof path !== 'string' || path === '') return false
   const segments = path.replaceAll('\\', '/').split('/')
