@@ -77,15 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1348. Board chat messages are answered within 15 minutes, also while a long gate or suite blocks the batch session
-  Queue position: queue front (communication first).
-  Source: user board chat 12.10.2026 19:26: "Warum hat es 38 Minuten gedauert, meine Nachricht zu beantworten. Das sollte maximal 15 min dauern."
-  Final state: a board chat message reaches an answer within 15 minutes of being sent, also while the batch session sits in a blocking call (landing fast gate, main pre-push full gate, suite await); the delivery path and its latency are measured, not assumed.
-  Verifiable: a test for each delivery-path change (subagent hook, watcher singleton, still-pending count). The live >15 min measurement is split off to point 1352 (12.10.2026): it needs a genuine user message against the merged watcher.
-  Criticality: medium - the user's only live channel to the batch.
-  Also (author measurement 12.10.2026, branch feat/1348-chat-answer-bound d4581b8de): the 38 min came from a background subagent whose PostToolUse hook consumed the message into its own context (isSubagentHook missed agent_id), fixed on the branch; still open there: 15 concurrent chat-watcher.mjs processes (every log line ~14x, three responders for one message at 16:35:45-51Z, one killed 143, the user got two answers), and responders exit "acked 0, stillPending 1" after answering. Live >15 min measurement procedure is in the branch report: blocking owner call >15 min with a busy subagent, message must stay in .claude/chat-spool/, defer-sweep spawn ~3 min after receivedAt, chat-reply-receipt at minus receivedAt <= 15 min.
-  Bundle: Dorfleben.
-
 - [ ] 1352. Live measurement: a board chat message sent during a >15 min blocking call is answered within 15 minutes
   Queue position: queue front, after point 1348 (communication first).
   Source: split from point 1348 (12.10.2026): its fixes are unit-tested, but the user's acceptance needs a measured live case against the merged watcher.
