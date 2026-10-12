@@ -547,17 +547,22 @@ def _motion_corner(corner):
     return st
 
 
-# Every module `motion` and `_motion_corner` import; motion_key hashes their code
-MOTION_MODULES = ('body', 'export', 'fit', 'gamepath', 'garments', 'penetration', 'sheets')
+# Every module `motion` and `_motion_corner` import; motion_key hashes their code.
+# Of the report and sheet modules only the functions read are hashed: hashing
+# their whole source rebuilt the mask (minutes) on every edit of a sheet or a
+# report, and on every switch between worktrees sharing the cache.
+MOTION_MODULES = ('body', 'export', 'fit', 'gamepath', 'garments')
+MOTION_FUNCTIONS = (('penetration', 'build_pose_clips'), ('sheets', 'corner_weights'), ('sheets', 'morphed'))
 
 
 def motion_key(body):
     """A digest of what `motion` reads beyond the cached steps and the config:
-    the code of every module it imports (MOTION_MODULES), the exported clips,
+    the code it imports (MOTION_MODULES, MOTION_FUNCTIONS), the exported clips,
     the body corners with their morph weights and the build pose (for the mask
     cache, pipeline.py)."""
     import hashlib
     import importlib
+    import inspect
 
     from export import EXPORT_CLIPS
     from garments import design_pose
@@ -566,6 +571,8 @@ def motion_key(body):
     h = hashlib.sha256()
     for m in MOTION_MODULES:
         h.update(open(importlib.import_module(m).__file__, 'rb').read())
+    for m, f in MOTION_FUNCTIONS:
+        h.update(inspect.getsource(getattr(importlib.import_module(m), f)).encode())
     h.update(repr((EXPORT_CLIPS, CORNERS, [sorted(corner_weights(*c).items()) for c in CORNERS])).encode())
     h.update(np.ascontiguousarray(design_pose(body), np.float64).tobytes())
     return h.hexdigest()
