@@ -2,7 +2,7 @@
 // the inputs, never on the cache files — the same key before a step is built
 // (cold) and after (warm) — and each key moves with exactly its own inputs.
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync, appendFileSync } from 'node:fs'
+import { appendFileSync, copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -44,6 +44,34 @@ describe('the villager pipeline cache keys', () => {
     appendFileSync(join(dir, 'sources.json'), '\n')
     const src = keys()
     for (const k of ['body', 'clips', 'garments']) expect(src[k]).not.toBe(cfg[k])
+  })
+
+  // a body edit: a statement prepended to the function (the source stays valid Python)
+  const edit = (file, def) => {
+    const p = join(dir, file)
+    const text = readFileSync(p, 'utf8')
+    const at = text.indexOf(`\ndef ${def}(`)
+    expect(at).toBeGreaterThan(-1)
+    const body = text.indexOf(':\n', at) + 2
+    writeFileSync(p, `${text.slice(0, body)}    _edited = 1\n${text.slice(body)}`)
+  }
+
+  it('a helper a step reaches moves its key, through the helper it calls in turn', () => {
+    // fit.py imports sheets.morphed (direct) and gamepath.Person reaches gamepath.bake (transitive)
+    const base = keys()
+    edit('sheets.py', 'morphed')
+    const direct = keys()
+    expect(direct.body).toBe(base.body)
+    expect(direct.garments).not.toBe(base.garments)
+    edit('gamepath.py', 'bake')
+    expect(keys().garments).not.toBe(direct.garments)
+  })
+
+  it('a helper no step reaches moves no key', () => {
+    const base = keys()
+    edit('sheets.py', 'runtime_sheets')
+    edit('penetration.py', 'runtime_report')
+    expect(keys()).toEqual(base)
   })
 
   it('a garment-code edit moves only the garments key', () => {
