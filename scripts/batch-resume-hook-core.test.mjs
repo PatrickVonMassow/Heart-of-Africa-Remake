@@ -3,12 +3,17 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  BATCH_START_WORD,
   STAND_DOWN_KINDS,
   allGatedMessage,
   openPointsHeadline,
   ownerRunbookContext,
+  ownerStartText,
+  sessionStartOwnership,
+  spawnTokenProof,
   standDownKind,
   standDownMessage,
+  uninvitedSessionMessage,
 } from './batch-resume-hook-core.mjs'
 import { CLAIM_BY, responderClaim } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
@@ -334,5 +339,64 @@ describe('the open-point headline (point 440)', () => {
     expect(runbook).toMatch(/transfers pushed author\s+checkpoints/)
     expect(runbook).toContain('batch-in-flight.mjs --agent-check')
     expect(runbook).toContain('unreadable output is unknown, not death')
+  })
+})
+
+describe('SessionStart ownership needs an invitation (user 03.09.2026)', () => {
+  const auth = { at: now, pid: 4242, spawnToken: 'tok-1', startReason: 'owner dead' }
+  const lastSpawn = { at: now, pid: 4242, spawnToken: 'tok-1' }
+
+  it('a pending-spawn conversion owns without a second acquire', () => {
+    const plan = sessionStartOwnership({ converted: true, auth, spawnProof: spawnTokenProof({ auth, lastSpawn, ancestorPid: 4242 }) })
+    expect(plan).toEqual({ invitation: 'pending-spawn', mayAcquire: false, unproven: false })
+    expect(ownerStartText({ ownership: 'acquired-spawn', startEvidence: 'owner dead' })).toContain('OS autostart launcher')
+  })
+
+  it('a compaction of the owning process keeps the batch and its standing instruction', () => {
+    const plan = sessionStartOwnership({ converted: false, heldHere: true, spawnProof: spawnTokenProof({}) })
+    expect(plan.mayAcquire).toBe(true)
+    expect(plan.invitation).toBe('held')
+    expect(ownerStartText({ ownership: 'mine' })).toContain('Standing user instruction')
+  })
+
+  it('a bare session start does NOT acquire and is oriented without the standing instruction', () => {
+    const plan = sessionStartOwnership({ converted: false, heldHere: false, spawnProof: spawnTokenProof({ auth: null, lastSpawn, ancestorPid: 4242 }) })
+    expect(plan).toEqual({ invitation: null, mayAcquire: false, unproven: false })
+    const text = uninvitedSessionMessage({ sessionId: 'sess-9' })
+    expect(text).not.toContain('Standing user instruction')
+    expect(text).toContain('AVAILABLE')
+    expect(text).toContain(`"${BATCH_START_WORD}"`)
+    expect(text).toContain('node scripts/batch-claim.mjs --take --session sess-9')
+    expect(text).toContain('docs/batch-owner-runbook.md')
+  })
+
+  it('a spawned successor whose reservation is gone but whose spawn token holds still owns', () => {
+    const proof = spawnTokenProof({ auth, lastSpawn, ancestorPid: 4242 })
+    expect(proof.proven).toBe(true)
+    const plan = sessionStartOwnership({ converted: false, heldHere: false, spawnProof: proof, auth })
+    expect(plan).toEqual({ invitation: 'spawn-token', mayAcquire: true, unproven: false })
+    // It is told it was launched, never that the user gave a standing order.
+    const opening = ownerStartText({ ownership: 'acquired', startEvidence: 'owner dead' })
+    expect(opening).toContain('OS autostart launcher')
+    expect(opening).not.toContain('Standing user instruction')
+  })
+
+  it.each([
+    ['a foreign token', { ...lastSpawn, spawnToken: 'tok-2' }, 4242],
+    ['another process', lastSpawn, 999],
+    ['no start record', null, 4242],
+    ['no ancestor', lastSpawn, null],
+  ])('an unproven spawn (%s) takes nothing and is reported for lockConverted', (_label, record, pid) => {
+    const proof = spawnTokenProof({ auth, lastSpawn: record, ancestorPid: pid })
+    expect(proof.proven).toBe(false)
+    expect(sessionStartOwnership({ converted: false, heldHere: false, spawnProof: proof, auth })).toEqual({
+      invitation: null,
+      mayAcquire: false,
+      unproven: true,
+    })
+  })
+
+  it('a marker without a token proves nothing', () => {
+    expect(spawnTokenProof({ auth: { ...auth, spawnToken: '' }, lastSpawn, ancestorPid: 4242 }).proven).toBe(false)
   })
 })
