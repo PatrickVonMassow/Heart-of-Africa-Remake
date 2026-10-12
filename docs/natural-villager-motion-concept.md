@@ -10,7 +10,8 @@ on, decided the disagreements with reasons and counted the fold through
 `docs/four-eyes/1316-blind-{a-opus55,b-astra}.{md,json}`, provenance is
 `docs/four-eyes/1316-provenance.md`. This document is the concept the final
 cross-vendor "does this break anything" check (procedure c) judges before the first
-implementation commit.
+implementation commit. The first check (GPT-6 Astra, 055dab0, do-not-merge) raised six
+objections; §8 records how each was answered.
 
 ## 1. What was re-measured (worktree at 7a64a6747)
 
@@ -46,7 +47,8 @@ folds, not either half's word.
    penetration` — build pose no worse than main, and the motion comparison the moment
    point 1334 un-skips it. Never a raised tolerance, a wider mask or a dropped layer.
 2. **No foot sliding (point 1295):** the held-contact rule stays; the test limit
-   0.004 person units per frame, extended to the whole speed ramp once the jog lands.
+   0.004 person units per frame; from step 5 on (the jog) the limit holds across the
+   whole speed ramp and is a merge requirement of every step that moves a gait.
 3. **CC0 sources only**, each recorded in `scripts/villager/sources.json` with origin,
    immutable URL, licence id and the sha256 of the downloaded bytes.
 4. **Calibratable values in `src/config/balance.ts`** with units, never scattered in
@@ -74,15 +76,20 @@ step is judged on the composed runtime pose rather than on a raw clip.
 **Step 1 (U1) — Verification baseline.** Repair `OUTFITS` in `scripts/villager/sheets.py`
 (derive the outfit ids from the garment list so a renamed garment can never break the
 sheet again); add a runtime-composition sheet fed by pose sequences exported from the
-game's own pose code (a Vitest-side exporter writing per-bone local rotations and hips
-as JSON through `gamepath.py`) for walk, turn, run, dig, pick-up, point, chaser and
-caught child — the before/after strip; feed those same composed poses through the
-Python penetration evaluator; label every frame with time and camera; key the body,
+game's own pose code (a Vitest-side exporter writing, per frame, the figure group's
+root transform including its scale — the jar-fill y-squash — every bone's local
+translation, rotation and scale, and the active morph weights, as JSON through
+`gamepath.py`) for walk, turn, run, dig, pick-up, point, chaser and caught child — the
+before/after strip; feed those same composed poses through the Python penetration
+evaluator; label every frame with time and camera; key the body,
 clips and garments caches on their inputs as the mask already is.
 *Files:* `scripts/villager/{sheets.py,gamepath.py,pipeline.py,penetration.py}`, a small
 exporter beside `src/render/villagerClipPose.test.ts`.
 *Verified:* `build.mjs sheets` exits 0; the runtime sheet exists for all eight
-subjects; identical cold/warm cache digests (unit); penetration report unchanged.
+subjects; a round-trip check reconstructs world joint positions and morph weights in
+Python and matches the runtime's within 1e-4 before any sheet or penetration run uses
+the export as evidence; identical cold/warm cache digests (unit); penetration report
+unchanged.
 *Keeps:* constraint 1 (this step defines its scope), 4.
 
 ### Stage 1 — rig
@@ -110,10 +117,7 @@ from the MH finger weights. No finger bones.
 around the shovel in the runtime sheet; penetration gate with the morphs active.
 *Keeps:* 1, 6.
 
-**Step 4 (U4, conditional) — Forearm twist.** Only if the dig and point runtime sheets
-after steps 3 and 9 still show the wrist wringing: `forearmTwist.L/R`, weights split
-from the MH forearm by distance; a second rig change under the same gate.
-*Keeps:* 1.
+Step 4 is a conditional decision and does not run here; it follows step 9 (below).
 
 ### Stage 2 — clips
 
@@ -126,9 +130,12 @@ calibratable limit instead of smearing it.
 *Files:* `scripts/villager/{sources.json,clips.py,skeleton.py,export.py}`,
 `src/render/{villagerRig.ts,villagerAsset.ts}`, `src/config/balance.ts`.
 *Verified:* `build.mjs fetch` checks the hashes; Vitest `gaitAt` weights sum to 1 and
-`phasePerUnit` is continuous across both bands; contact-fraction and knee plots per
-clip; jog sheet.
-*Keeps:* 3, 4.
+`phasePerUnit` is continuous across both bands; the no-slide test's walk↔sprint band
+exemption removed and the 0.004 limit held across the whole speed ramp (both sexes,
+all ages, build extremes, 30/60/120 Hz) as this step's merge requirement — if it
+fails, the contact correction it needs lands in this step; contact-fraction and knee
+plots per clip; jog sheet.
+*Keeps:* 2, 3, 4.
 
 **Step 6 (U6) — Clip style normalisation.** `VILLAGER_ASSET.clipStyle` offsets applied
 in the pipeline: walk chest −12° and arm hang (elbow 15–25°, upper arm closer);
@@ -160,8 +167,10 @@ penetration gate (dig is a dressed pose).
 **Step 8 (U9) — One pose pipeline.** A fixed evaluation order in `retarget`: full-body
 clip base (idle/walk/jog/sprint/kneel/dig including trunk, neck, head and clavicles)
 → masked action layers (carry arm, pick-up) → additive deltas (step 9's lean and gaze,
-step 11's shoulders, the elder stoop, the gesture turn) → contact solves (hands, then
-the feet of step 10) → hand shapes and props last. One gait clock: the code walk's
+step 11's shoulders, the elder stoop, the gesture turn) → pelvis height and the
+corrective leg solve of step 10 (the last pass that moves the pelvis or trunk) → hand
+contact solves on that final body → hand shapes and props last. Every hand-contact
+error is measured on the fully composed pose. One gait clock: the code walk's
 counter-yaw and arm swing are dropped for the glTF body where the clip supplies them,
 the stray `−walk.hipYaw` goes, `m.phase` stays for the primitive figure and the plant
 bookkeeping; `unsquashHead` moves to the end and composes with the gaze. The exported
@@ -189,19 +198,30 @@ target under a 0.3 rad lean and a gait cycle; limits respected; no flip behind/a
 look-while-walk sheet; in-game picture.
 *Keeps:* 1 (garments twist with the chain — the gate decides), 4.
 
+**Step 4 (U4, conditional; decided after steps 3, 7 and 9) — Forearm twist.** Only
+if the dig and point runtime sheets taken after steps 3, 7 and 9 still show the wrist
+wringing: `forearmTwist.L/R`, weights split from the MH forearm by distance; a second
+rig change. If the bones are added it repeats step 2's whole acceptance: axes, bind
+matrices, normalized weights, Vitest bone list, penetration gate, garment and dress
+sheets, low preset, glb load on both backends. If not, the decision and its sheets are
+recorded and the step closes without code.
+*Keeps:* 1, 6, 7.
+
 **Step 10 (U8) — Corrective leg IK and contacts.** In `clipGaitPose`: the pole from the
 clip's own knee (blended to the forward pole as the leg straightens); the solve only
 when the held target misses the clip's ankle by more than a calibratable ~2 mm; the
 pelvis lowered to what the warped stride needs and back to clip height when not; the
 toe re-written at push-off so the ball stays flat while the heel rises; contact state
 from step 5's support intervals with the height threshold as fallback; persistent
-per-contact anchors; the solve as the last pass after every layer. The 1295 holds and
-`plantRelease` stay as the safety net; once the jog removes the walk↔sprint hybrid,
-the test's band exemption is removed.
+per-contact anchors; the leg solve as the last pass that moves the pelvis, after
+every trunk layer and before the hand contacts (step 8's order). The 1295 holds and
+`plantRelease` stay as the safety net; the test's band exemption is already gone with
+step 5.
 *Files:* `src/render/villagerClipPose.ts`, `src/render/villagerClipPose.test.ts`,
 `src/config/balance.ts`.
 *Verified:* Vitest `corrective leg IK keeps the clip's leg when nothing is held`
-(locals equal the clip's within 1e-4), `held foot still holds` (< 1 mm drift over a
+(locals equal the clip's within 1e-4), `hands land on the final body` (hand-contact
+error after the pelvis drop within the contact tolerance), `held foot still holds` (< 1 mm drift over a
 cycle at 0.75/1.0/1.35 stride), the no-slide limit across the whole speed ramp, both
 sexes, all ages, build extremes, at 30/60/120 Hz; Playwright `walk-move` section.
 *Keeps:* 2, 4.
@@ -216,15 +236,16 @@ as an additive after the clip; clavicle poses enter the penetration pose list.
 **Step 12 (U11) — Turning.** For the glTF body track travel, facing and turn phase
 separately; the gaze takes the steering's desired heading (head lead); on the move a
 roll of the distributed chain proportional to yaw-rate × speed (`curveLeanMax` ~6°) and
-a shortened inside stride; at rest a procedural step turn (steps ≤ 35°, inner foot
+a shortened inside stride; at rest a procedural step turn (a step is one foot's lift and plant; each step
+rotates that foot ≤ 90° and the body heading ≤ 45°, both in `balance.ts`; inner foot
 lifted with the walk's swing-phase foot shape played sideways and planted at the new
 heading under the hip, outer foot follows, held contacts pivot on the ball), replacing
 the `turned·turnStep` distance; signed travel. Authored turn clips only later, if the
 step turn does not read.
 *Files:* `src/render/{figureWalk.ts,villagerClipPose.ts}`, `src/scenes/place/{skinnedFigure.tsx,PlaceLife.tsx,tagGame.ts}`,
 `src/config/balance.ts`.
-*Verified:* Vitest a 180° spot turn takes 3–5 steps with no planted contact moving more
-than 1 mm; idle 45/90/180° and S-curve scenarios; turn sheet; in-game picture of a
+*Verified:* Vitest a 180° spot turn takes 4–6 steps (≥ 4 by the 45° heading bound)
+with no planted contact moving more than 1 mm; idle 45/90/180° and S-curve scenarios; turn sheet; in-game picture of a
 villager turning to face the player, both backends.
 *Keeps:* 2, 4.
 
@@ -324,8 +345,8 @@ and river-bank pictures on both backends; the cross-vendor code review record.
 
 | Topic | Half A | Half B | Decision and reason |
 |---|---|---|---|
-| Rig topology | A3: three-segment spine (22 bones), A4: forearm twist | B2: keep 21 joints; add a bone only after a demonstrated failure redistribution cannot solve | **A3 kept, A4 conditional.** Measured: hips and spine share one head, so a hips/spine/chest distribution has two pivots and cannot curve — exactly B2's precondition, met. B2's safeguards (axes, bind, weights, gate) are U2's acceptance. A4's evidence is a sheet whose hands are the dead-morph rest hand folded onto the shaft by the lean search; it waits for the runtime sheet after U3/U7. |
-| Leg IK | A13: corrective solve (clip-knee pole, solve on miss, pelvis height, toe roll), holds unchanged | B5: contact windows from support events, world anchors with terrain height, bounded pelvis, final-pose IK | **Both, in A13's order with B5's events and ordering.** Per-foot terrain height deferred to the backlog: the group stands at the root's ground height, no slope defect is measured, final state 3 asks for placement correction. `plantRelease` stays as the safety net; the band exemption of the test is removed once the jog lands. |
+| Rig topology | A3: three-segment spine (22 bones), A4: forearm twist | B2: keep 21 joints; add a bone only after a demonstrated failure redistribution cannot solve | **A3 kept, A4 conditional.** Measured: hips and spine share one head, so a hips/spine/chest distribution has two pivots and cannot curve — exactly B2's precondition, met. B2's safeguards (axes, bind, weights, gate) are U2's acceptance. A4's evidence is a sheet whose hands are the dead-morph rest hand folded onto the shaft by the lean search; it is decided on the runtime sheets after steps 3, 7 and 9 (U3/U7/U10) and placed after step 9. |
+| Leg IK | A13: corrective solve (clip-knee pole, solve on miss, pelvis height, toe roll), holds unchanged | B5: contact windows from support events, world anchors with terrain height, bounded pelvis, final-pose IK | **Both, in A13's order with B5's events and ordering.** Per-foot terrain height deferred to the backlog: the group stands at the root's ground height, no slope defect is measured, final state 3 asks for placement correction. `plantRelease` stays as the safety net; the band exemption of the test is removed in step 5, where the jog lands. |
 | Upper body | A15: blend trunk/neck/head from the clip, code lean additive after | B4: one ordered evaluator, contacts last | **Folded (U9).** Same mechanism; B4 supplies the order, A14/A15 the measured defects. |
 | Walk style | A8: pipeline offsets incl. a hip-abduction step-width fix for "feet crossing the midline" | B3: audition sources, author offline | **A8 kept minus the crossover; B3's audition not required.** Measured: the feet never cross (constant ±0.085). The pinned UAL1 stays (B3's own rule against swapping a pinned hash). |
 | Sprint | A9: strip the hips pitch, scale chest | B3: replace or rework the sprint, add a moderate run | **Jog added (A7/B3), sprint normalised (A9).** The tag game's top pace lives in the jog band; the sprint only above it. |
@@ -370,15 +391,16 @@ the composed body and cannot start before it.
 
 | Sub-point | Steps | Why it stands alone |
 |---|---|---|
-| **1316a — research and concept** | step 1, step 20's research document, the final-check record | measurement tools and the document the point owes; no gameplay change; docs suite only |
-| **1316b — rig, clips and the pose pipeline** | steps 2–7, 8–11, 13 | the one topology change, its gate, the clip library and the evaluator every later step composes on; both-backend picture of walk/jog/sprint/dig |
+| **1316a — research and concept** | step 1, step 20's research document, the final-check record | measurement tools and the document the point owes; no gameplay change; gated by what it executes: Vitest (exporter, cache digests), the Python round-trip check, `build.mjs sheets`, the penetration gate, build and lint |
+| **1316b — rig, clips and the pose pipeline** | steps 2, 3, 5–11 with the step-4 decision after 9, 13 | the one topology change, its gate, the clip library and the evaluator every later step composes on; both-backend picture of walk/jog/sprint/dig |
 | **1316c — turning, actions and the tag poses** | steps 12, 14–19 | each reads natural only on the composed body; port-city and river-bank pictures on both backends |
 
 Sub-point b is the one most likely not to converge in one branch (a HIGH rig change plus
 a runtime rewrite); if it stalls, cut it again along steps 2–7 (pipeline, penetration gate)
-and steps 8–11 (runtime, contact tests). The split keeps the penetration gate on the
-pipeline half and the no-slide tests on the runtime half, so neither half can be merged
-green while the other is red.
+and steps 8–11 (runtime, contact tests). Separate halves do not by themselves keep
+each other green, so every independently mergeable sub-point — a, b, c and any re-cut
+of b — runs both the penetration gate and the full-ramp no-slide tests as merge
+requirements, whatever files it touches.
 
 ## 7. Open items for the final check
 
@@ -388,3 +410,14 @@ green while the other is red.
   never delays a valid catch.
 - `OPEN:` per-foot terrain height (backlog) if a slope defect is measured in a village
   picture during sub-point c.
+
+## 8. Answers to the first final check (GPT-6 Astra at 055dab0, do-not-merge)
+
+| # | Objection | Answer in this revision |
+|---|---|---|
+| 1 | Hands solved before the pelvis drop move off their contacts | Step 8 order: leg solve and pelvis height are the last body-moving pass, hand contacts after it; step 10 says the same and adds `hands land on the final body`. |
+| 2 | Exporter omits the group squash and morphs | Step 1 exports root transform with scale, bone translation/rotation/scale and morph weights, and a 1e-4 round-trip check precedes any use as evidence. |
+| 3 | Jog lands without the full-ramp no-slide check | Constraint 2 and step 5: the band exemption goes in step 5 and the full-ramp limit is its merge requirement; a needed contact fix lands with it. |
+| 4 | Step 4 depends on later steps | Step 4 moved after step 9 as an explicit decision on the sheets after steps 3, 7, 9; adding bones repeats step 2's whole acceptance. |
+| 5 | 35° steps cannot make 180° in 3–5 steps | A step is one foot's lift and plant, ≤ 90° foot and ≤ 45° heading per step; the spot turn takes 4–6 steps. |
+| 6 | Split misclassifies 1316a and separates the gates | 1316a is gated by what it executes; every mergeable sub-point runs both the penetration gate and the full-ramp no-slide tests. |
