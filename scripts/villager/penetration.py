@@ -573,6 +573,24 @@ def selftest():
     # only capes and cloaks are open; a closed outer garment keeps the bag alone
     assert [is_open(n) for n in ('g-cape-leftShoulder', 'g-cloak-bothShoulders', 'g-hood-overHead', 'g-toga-leftShoulder', 'g-shirt-chest')] == \
         [True, True, False, False, False]
+    # the comparison with main: a garment main has no row for is UNCHECKED and
+    # fails it, within tolerance or not; a known garment is judged as before
+    lim = {'garmentMaskCutTolerance': 0.01}
+
+    def row(v, clip):
+        x = _empty()
+        x['inner'].update(value=v)
+        x['clips'] = {f'inner {clip}': v}
+        return x
+    main = {'build': {'g-a': row(0.001, 'build')}, 'garments': {'g-a': row(0.001, 'walk')}}
+    now_b = {'g-a': row(0.001, 'build'), 'g-new': row(0.0, 'build')}
+    now_w = {'g-a': row(0.02, 'walk'), 'g-new': row(0.0, 'walk')}
+    _l, worse, unchecked = compare(now_b, now_w, main, lim, 0.003)
+    assert unchecked == ['g-new'], 'a garment absent from the baseline passed unchecked'
+    assert worse == ['- `g-a` inner walk: 0.0010 on main → 0.0200'], worse
+    assert any('UNCHECKED' in s and '`g-new`' in s for s in _l)
+    main['build']['g-new'], main['garments']['g-new'] = row(0.0, 'build'), row(0.0, 'walk')
+    assert compare(now_b, now_w, main, lim, 0.003)[2] == [], 'every garment has a row'
     print('penetration selftest: ok')
 
 
@@ -657,6 +675,40 @@ NAMES = {'cloth': 'cloth in the body', 'shown': 'skin through the cloth', 'hole'
          'cut': 'hidden skin past the cloth', 'inner': 'inner garment through the cloth', 'innerHole': 'hidden inner garment out by an opening'}
 
 
+def compare(build, worst, main, a, tol):
+    """The `## Against main` lines, the garment/column/clip cases worse than
+    main, and the garments main has no row for (in its build pose or every
+    pose): those are UNCHECKED — no comparison passes a garment it never saw."""
+    lines = ['## Against main', '',
+             'Main\'s garments measured by this same step (same poses, corners and rules), in the build pose and in every pose. A garment, column and '
+             'clip is WORSE when it is over tolerance and more than 0.0005 above main\'s value (clip `build`: the build pose). A garment main has no '
+             'row for is UNCHECKED and fails the comparison.', '']
+    unchecked = sorted({n for now, base in ((build, main['build']), (worst, main['garments'])) for n in now if n not in base})
+    worse = []
+    for now, base in ((build, main['build']), (worst, main['garments'])):
+        for n, r in sorted(now.items()):
+            if n not in base:
+                continue
+            for key, v in sorted(r['clips'].items()):
+                col = key.split(' ')[0]
+                b = base[n].get('clips', {}).get(key, 0.0)
+                if v > _limit(col, a, tol) and v > b + 0.0005:
+                    worse.append(f'- `{n}` {key}: {b:.4f} on main → {v:.4f}')
+
+    def within(w):
+        return sum(1 for r in w.values() if all(r[c]['value'] <= _limit(c, a, tol) for c in COLUMNS))
+    bad_build, bad = len(build) - within(build), len(worst) - within(worst)
+    lines += [f'Main: {within(main["build"])} of {len(main["build"])} garments within tolerance in the build pose, '
+              f'{within(main["garments"])} of {len(main["garments"])} in every frame and layering; now {len(build) - bad_build} and {len(worst) - bad}.', '']
+    lines += (worse or ['No garment, column and clip is worse than on main, in the build pose or any other.']) + ['']
+    if unchecked:
+        lines += [f'**UNCHECKED — {len(unchecked)} garment(s) without a baseline row, the comparison fails:** '
+                  + ', '.join(f'`{n}`' for n in unchecked) + '.', '']
+    else:
+        lines += [f'Every one of the {len(worst)} garments has a baseline row.', '']
+    return lines, worse, unchecked
+
+
 def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     """The report: the build pose, every pose, every remaining case named, and
     — with `baseline` (a penetration-report.json of main's garments measured by
@@ -713,27 +765,13 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
             f'{NAMES[col]} — {part} — {clip}{f" under `{o}`" if o else ""} — {e["value"]:.4f} ({e["at"]}), {e["over"]} frames'
             for (col, clip, part, o), e in cases))
     lines.append('')
-    worse = []
+    unchecked = []
     if baseline:
         main = json.load(open(baseline))
         if 'build' not in main:
             raise RuntimeError(f'penetration: the baseline {baseline} has no build-pose measurement (`build`)')
-        lines += ['## Against main', '',
-                  'Main\'s garments measured by this same step (same poses, corners and rules), in the build pose and in every pose. A garment, column and '
-                  'clip is WORSE when it is over tolerance and more than 0.0005 above main\'s value (clip `build`: the build pose).', '']
-        for now, base in ((build, main['build']), (worst, main['garments'])):
-            for n, r in sorted(now.items()):
-                for key, v in sorted(r['clips'].items()):
-                    col = key.split(' ')[0]
-                    b = base.get(n, {}).get('clips', {}).get(key, 0.0)
-                    if v > _limit(col, a, tol) and v > b + 0.0005:
-                        worse.append(f'- `{n}` {key}: {b:.4f} on main → {v:.4f}')
-
-        def within(w):
-            return sum(1 for r in w.values() if all(r[c]['value'] <= _limit(c, a, tol) for c in COLUMNS))
-        lines += [f'Main: {within(main["build"])} of {len(main["build"])} garments within tolerance in the build pose, '
-                  f'{within(main["garments"])} of {len(main["garments"])} in every frame and layering; now {len(build) - bad_build} and {len(worst) - bad}.', '']
-        lines += (worse or ['No garment, column and clip is worse than on main, in the build pose or any other.']) + ['']
+        t, _worse, unchecked = compare(build, worst, main, a, tol)
+        lines += t
     os.makedirs(out, exist_ok=True)
     open(os.path.join(out, 'penetration-report.md'), 'w').write('\n'.join(lines))
 
@@ -743,7 +781,7 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
               open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
     print('\n'.join(lines))
     # a garment failing only in the build pose fails the step too
-    return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS))
+    return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS)), unchecked
 
 
 def runtime_report(out, body, garments, cfg, rt):
