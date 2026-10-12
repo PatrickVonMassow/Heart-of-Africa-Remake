@@ -323,6 +323,20 @@ export const WATCHER_PID_TOLERANCE_MS = 2000
  *  name from this pure module rather than importing the watcher wrapper. */
 export const WATCHER_PID_FILE = 'chat-watcher.json'
 
+/** Does a process command line belong to a chat watcher? Only node EXECUTING
+ *  the watcher script counts — an editor or `tail` naming the file does not.
+ *  `command` is the argument vector, or a string split on whitespace. A miss
+ *  (say, a node option with an operand) costs one extra start, which exits at
+ *  once on the held address (`holdExclusiveAddress`); it cannot double a watcher. */
+export function isWatcherCommand(command) {
+  const argv = Array.isArray(command) ? command : typeof command === 'string' ? command.split(/\s+/) : null
+  if (!argv || argv.length < 2) return false
+  const base = (a) => String(a).replace(/^"|"$/g, '').split(/[\\/]/).pop()
+  if (!/^node(\.exe)?$/i.test(base(argv[0]))) return false
+  const script = argv.slice(1).find((a) => !String(a).startsWith('-'))
+  return script !== undefined && base(script) === 'chat-watcher.mjs'
+}
+
 /**
  * IS THE WATCHER ALIVE, AND WHAT SHOULD THE TICK DO? PURE — `probe` is injected.
  *
@@ -339,7 +353,12 @@ export function watcherSupervision({ paused = false, record = null, probe = null
   let alive = false
   if (Number.isInteger(pid) && pid > 0 && typeof probe === 'function') {
     const p = probe(pid)
-    if (p && p.exists === true) {
+    if (p && p.exists === true && (typeof p.command === 'string' || Array.isArray(p.command))) {
+      // The command line, where the OS gives one, is the identity: the probed
+      // start time drifts against the wall clock (WSL measured -1.2 s in 5 h),
+      // crossed the tolerance, and every tick then started one more watcher.
+      alive = isWatcherCommand(p.command)
+    } else if (p && p.exists === true) {
       // `stampOf`, not `Number` — see its note. A pidfile with no start time is
       // meant to fall through to the LENIENT branch (unknown identity, treat the
       // live pid as ours); `Number(null)` is 0, which is finite, so the old form
@@ -473,4 +492,14 @@ export function ackPlan({ handed = [], pending = [], spawnedAt = null, actedAt =
   if (!Number.isFinite(spawned) || !Number.isFinite(acted) || acted < spawned) return []
   const ids = new Set((Array.isArray(handed) ? handed : []).map((m) => m?.id).filter(Boolean))
   return (Array.isArray(pending) ? pending : []).filter((m) => m && ids.has(m.id) && typeof m.file === 'string')
+}
+
+/**
+ * HOW MANY HANDED MESSAGES ARE STILL ON THE SPOOL? PURE. Measured, not derived
+ * as handed - acked: a responder's own delivery hook consumes its message
+ * before the watcher acks, which logged an answered message as still pending.
+ */
+export function stillPendingCount(handed = [], pending = []) {
+  const ids = new Set((Array.isArray(pending) ? pending : []).map((m) => m?.id).filter(Boolean))
+  return (Array.isArray(handed) ? handed : []).filter((m) => m?.id && ids.has(m.id)).length
 }

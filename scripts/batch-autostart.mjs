@@ -39,6 +39,7 @@ import {
   readOwnerLock,
   assessOwner,
   probePid,
+  processCommand,
   bootTimeMs,
   detectParallel,
   raiseParallelAlert,
@@ -711,6 +712,12 @@ if (!batchParked && pause.state !== 'retry' && state.pauseJournalKey) {
   delete state.pauseJournalKey
 }
 
+/** A pid probe that also names the command, the watcher's drift-free identity. */
+const watcherProbe = (pid) => {
+  const p = probePid(pid)
+  return p.exists ? { ...p, command: processCommand(pid) } : p
+}
+
 // --- THE MESSAGE WATCHER: this tick is its supervisor (point 407) --------------
 // Stage 3 of the chat channel is a long-lived process subscribed to the inbox
 // topic, so a message arriving into an IDLE machine wakes a light responder
@@ -728,7 +735,7 @@ if (!batchParked && pause.state !== 'retry' && state.pauseJournalKey) {
 // work; its decision gate admits only verified mail to a bounded responder.
 try {
   const rec = readJson(C(WATCHER_PID_FILE))
-  const sup = watcherSupervision({ paused: batchParked, record: rec, probe: probePid })
+  const sup = watcherSupervision({ paused: batchParked, record: rec, probe: watcherProbe })
   // A WATCHER CANNOT RUN WITHOUT A READABLE SECRET, and one started anyway exits
   // before it writes its pidfile — so the supervision would read "not running"
   // and start another doomed process at every tick, for ever, with nothing

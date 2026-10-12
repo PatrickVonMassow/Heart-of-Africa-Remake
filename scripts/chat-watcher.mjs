@@ -49,7 +49,7 @@ import {
 import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { knownMessages, claimMessage, readPending, spoolMessage } from './chat-spool.mjs'
 import { readReplyReceipt } from './chat-reply.mjs'
-import { assessOwner, bootTimeMs, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { assessOwner, bootTimeMs, holdExclusiveAddress, probePid, readOwnerLock, watcherAddress } from './batch-singleton.mjs'
 import { clearClaim, maxAgeMs as claimMaxAgeMs, readClaim, writeClaim } from './batch-claim.mjs'
 import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
@@ -63,6 +63,7 @@ import {
   RESPONDER_MAX_MS,
   WATCHER_PID_FILE,
   ackPlan,
+  stillPendingCount,
   adoptDecision,
   buildResponderPrompt,
   claimIsOurs,
@@ -109,7 +110,9 @@ function appendLog(line) {
 
 const log = (o) => {
   const line = JSON.stringify({ at: new Date().toISOString(), ...o })
-  process.stdout.write(`${line}\n`)
+  // The launcher points stdout at the same log file, so a detached watcher
+  // writes the line once, not twice.
+  if (dryRun || process.stdout.isTTY) process.stdout.write(`${line}\n`)
   appendLog(line)
 }
 
@@ -258,8 +261,10 @@ function onResponderExit(code) {
   const acked = ackHanded()
   // A responder that sent NO reply leaves its messages PENDING, on purpose — and
   // says so here, because that is the one shape in which a message could
-  // otherwise pass unnoticed. The next session is handed it.
-  log({ event: 'responder-exit', code, handed, acked, stillPending: handed - acked })
+  // otherwise pass unnoticed. The next session is handed it. Counted on the
+  // spool: the responder's own delivery hook consumes what it was handed.
+  const stillPending = stillPendingCount(state.handed, readPending())
+  log({ event: 'responder-exit', code, handed, acked, stillPending })
   state.handed = []
   state.spawnedAt = null
   releaseClaim('responder-exit')
@@ -493,8 +498,8 @@ async function handleLine(secret, maxAgeMs, line) {
     ...gathered,
   })
   const record = { event: verdict.accept ? verdict.message.id : (verdict.ntfyId ?? null), ...decision }
-  say(dryRun ? { ...record, dryRun: true } : record)
-  appendLog(JSON.stringify({ at: new Date().toISOString(), ...record }))
+  if (dryRun) say({ ...record, dryRun: true })
+  else log(record)
   if (dryRun || !verdict.accept) return
 
   // SPOOL FIRST, whatever the decision. The spool is the shared record the
@@ -570,6 +575,17 @@ async function run() {
   }
   const secret = status.secret
   const maxAge = Number(process.env.HOA_CHAT_MAX_AGE_MS) > 0 ? Number(process.env.HOA_CHAT_MAX_AGE_MS) : DEFAULT_MAX_AGE_MS
+  if (!dryRun) {
+    // ONE WATCHER PER CHECKOUT, held by the OS: two watchers wake two
+    // responders for one message, and a pidfile cannot elect without races.
+    const hold = await holdExclusiveAddress(watcherAddress(REPO_ROOT))
+    if (!hold.held) {
+      if (hold.reason === 'in-use') log({ event: 'already-watching', pid: readJson(PID_PATH)?.pid ?? null })
+      else log({ event: 'singleton-failed', reason: hold.reason })
+      process.exit(hold.reason === 'in-use' ? 0 : 1)
+    }
+    if (hold.reason !== 'held') log({ event: 'singleton-unguarded', reason: hold.reason })
+  }
   state.identity = ownIdentity()
   installShutdownHandlers()
   const { inbox } = await deriveTopics(secret)

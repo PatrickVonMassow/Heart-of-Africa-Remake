@@ -8,6 +8,7 @@ import {
   WAKE_REASONS,
   WATCHER_PID_TOLERANCE_MS,
   ackPlan,
+  stillPendingCount,
   adoptDecision,
   buildResponderPrompt,
   claimIsOurs,
@@ -18,7 +19,9 @@ import {
   sweepPlan,
   wakeDecision,
   watcherSupervision,
+  isWatcherCommand,
 } from './chat-watcher-core.mjs'
+import { holdExclusiveAddress, watcherAddress } from './batch-singleton.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
 import { claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
@@ -384,6 +387,15 @@ describe('watcherSupervision — the launcher tick is the whole lifecycle', () =
     expect(r.pid).toBe(null)
   })
 
+  it('trusts the command line over a start time that drifted past the tolerance', () => {
+    const drifted = { exists: true, startedAt: record.pidStartedAt - 5000 }
+    const cmd = '/usr/local/bin/node /workspace/hoa/scripts/chat-watcher.mjs'
+    expect(watcherSupervision({ record, probe: probeOf({ 900: { ...drifted, command: cmd } }) }).action).toBe('none')
+    expect(
+      watcherSupervision({ record, probe: probeOf({ 900: { ...drifted, command: '/usr/bin/vim notes' } }) }).action,
+    ).toBe('start')
+  })
+
   it('keeps a live inbox listener through a pause, so the user can end it', () => {
     expect(
       watcherSupervision({
@@ -646,5 +658,59 @@ describe('openPointStatus — the format alarm both spawners read', () => {
 
   it('is total', () => {
     expect(openPointStatus()).toEqual({ open: 0, alarm: false })
+  })
+})
+
+describe('the watcher singleton', () => {
+  const cmd = 'node /workspace/hoa/scripts/chat-watcher.mjs'
+
+  it('recognises the watcher command and nothing else', () => {
+    expect(isWatcherCommand(cmd)).toBe(true)
+    expect(isWatcherCommand('C:\\node\\node.exe C:\\hoa\\scripts\\chat-watcher.mjs')).toBe(true)
+    expect(isWatcherCommand('/usr/bin/tail -f /repo/scripts/chat-watcher.mjs')).toBe(false)
+    expect(isWatcherCommand('/usr/bin/vim /repo/scripts/chat-watcher.mjs')).toBe(false)
+    expect(isWatcherCommand('node scripts/chat-watcher.mjs --dry-run')).toBe(true)
+    expect(isWatcherCommand('node scripts/chat-watcher-core.test.mjs')).toBe(false)
+    expect(isWatcherCommand(['node', '--no-warnings', '/repo/scripts/chat-watcher.mjs'])).toBe(true)
+    expect(isWatcherCommand(['C:\\Program Files\\nodejs\\node.exe', 'C:\\hoa\\scripts\\chat-watcher.mjs'])).toBe(true)
+    expect(isWatcherCommand(['/usr/bin/vim', '/repo/scripts/chat-watcher.mjs'])).toBe(false)
+    expect(isWatcherCommand(['node', '/repo/scripts/other.mjs', 'chat-watcher.mjs'])).toBe(false)
+    expect(isWatcherCommand(null)).toBe(false)
+  })
+})
+
+describe.runIf(process.platform === 'linux')('holdExclusiveAddress — the OS admits one watcher per checkout', () => {
+  it('holds the address once and refuses a second holder until the first lets go', async () => {
+    const address = watcherAddress(`/test/${process.pid}/${Date.now()}`)
+    const first = await holdExclusiveAddress(address)
+    expect(first).toMatchObject({ held: true, reason: 'held' })
+    expect(await holdExclusiveAddress(address)).toEqual({ held: false, reason: 'in-use' })
+    await new Promise((r) => first.server.close(r))
+    const again = await holdExclusiveAddress(address)
+    expect(again.held).toBe(true)
+    again.server.close()
+  })
+
+  it('fails CLOSED on a listen error other than in-use', async () => {
+    // A filesystem path in a directory that does not exist cannot be bound.
+    const r = await holdExclusiveAddress(`/nonexistent-${process.pid}/watcher.sock`)
+    expect(r.held).toBe(false)
+    expect(r.reason).toMatch(/^listen-error: /)
+  })
+
+  it('names one address per checkout and none where the platform has no exclusive one', () => {
+    expect(watcherAddress('/a', 'linux')).not.toBe(watcherAddress('/b', 'linux'))
+    expect(watcherAddress('/a', 'linux').startsWith('\0')).toBe(true)
+    expect(watcherAddress('/a', 'win32')).toMatch(/^\\\\\.\\pipe\\/)
+    expect(watcherAddress('/a', 'darwin')).toBe(null)
+  })
+})
+
+describe('stillPendingCount — measured on the spool, not handed minus acked', () => {
+  it('counts an answered message the responder consumed itself as no longer pending', () => {
+    expect(stillPendingCount([{ id: 'a' }], [])).toBe(0)
+  })
+  it('counts only handed messages that are still spooled', () => {
+    expect(stillPendingCount([{ id: 'a' }, { id: 'b' }], [{ id: 'b' }, { id: 'c' }])).toBe(1)
   })
 })
