@@ -235,4 +235,67 @@ Read with a plain GLB parser from `public/models/villager.glb` and from the code
 
 ## 6. Measured diagnosis — the runtime composition next to a reference
 
-DIAGNOSIS_PLACEHOLDER
+**Material.** The runtime-composition sheets `verification/villager-body/runtime-<subject>-<view>.png`
+(concept step 1), rendered by `node scripts/villager/build.mjs sheets` from the export of
+`src/render/villagerRuntimePose.test.tsx`: the game's own figure (`SkinnedFigure`, the
+caller's pose code as PlaceLife drives it), every bone's local transform per frame, round
+trip checked in Python (`gamepath.runtime_check`: worst joint 0.0, rest 2.1e-7 against a
+1e-4 tolerance, 8 subjects, 92 frames). The numbers below are read from the same export
+(world joint positions; a segment's tilt is its angle from vertical toward the facing,
+an arm's elevation the shoulder→hand angle above horizontal, the swing the upper arm's
+sagittal angle, forward positive). Reference: §1.
+
+**Cause classes.** R = rig too primitive; D = joints present but badly driven; O = the
+clip's motion overridden by code; S = missing secondary motion; X = a defect outside
+motion design (a bug).
+
+### 6.1 Per subject
+
+| Subject | Measured on the runtime composition | Reference (§1) | Deficit and cause |
+|---|---|---|---|
+| **Walk** (adult man, 1.0 u/s) | trunk segment tilts constant to the degree over the whole cycle: hips→chest −9°, chest→neck +7°, neck→head +18°; hips vertical excursion 0.039 figure units (5 % of hip height); upper-arm swing −6..+25° (forward-biased), elbow 32–41°; hand elevation −74..−43° | thorax counter-rotation ±3–7°, near-upright trunk, arm swing ±15–20° about the hang, head stabilised on the path | **O**: the clip's trunk (chest pitch 16–20° with motion, hips yaw ±2°, roll ±2.5°, §5) never reaches the body — the gait layer writes only `LEGS` and free arms (`gltfClipLayers.ts:102,151`), trunk, neck and head are code-written (`:14-15`), so the trunk is a rigid block riding on the hips. **S**: no thorax counter-rotation, no head stabilisation. **D**: the arm swing is offset forward (hands reach −43°), the "marionette" swing in front of the body. |
+| **Turn** (adult man, 90° on the spot) | root travel 0.000, yaw 0→90°; each foot sweeps 0.96 / 0.83 units of path for a net 0.13 / 0.19; knee up to 86°; trunk tilts constant as in the walk | 2–4 small reorienting steps, head leads by ~200 ms, feet do not glide with the root | **D**: `stepWalk` counts a turn as distance (`walked = ahead ± (aside + turned·turnStep)`, `turnStep` 0.4, §5), so a standing quarter turn plays a full walking stride — the sheet shows walking legs under a body that rotates as one block. **S**: no head or eye lead, no pivot on the ball (no toe joint written: `UNWRITTEN` resets `toe.*`, `gltfClipLayers.ts:105`). |
+| **Run** (adult man, 3.0 u/s) | whole-trunk tilt 23° constant; neck→head 40–41° (head thrust forward and down); upper-arm swing −40..−1° (always behind vertical), elbow 80–94°; knee 34–108° | trunk 5–10°, head up and eyes forward, arm swing both sides of the hang with ~90° elbows, thorax rotation ±10–15° | **O/D**: the sprint clip's ~50° dive (hips pitch 22.7° constant, chest 26–39°, §5) is played as the only fast gait and its trunk is again replaced by the code's constant lean; the arms swing only behind the body, so the forearms point forward permanently ("reaching"). **S**: no thorax rotation. No jog exists between walk and sprint (§5 clip speeds). |
+| **Dig** (adult man, one 2.4 s stroke) | hips→chest 22–30°, chest→neck 46–59°, neck→head 51–62°; hips 0.79–0.86 of standing height (knees 57–81°); shaft near horizontal across the thighs at 1.55–2.21 s and through the dress | trunk hinge distributed over hips and spine, gaze on the blade, near-vertical blade at set, hands apart on the shaft | **R/D**: the fold sits in the upper trunk (chest→neck is twice hips→chest) because the trunk has two pivots and `spine` is zero in every retargeted clip (§5); the extra-lean search folds it further onto the upper hand (concept §1). **D**: the shaft passes through the thigh and dress in the lever phase (no tool–body clearance in the stroke). Dig runs on two clocks (2.4 s clip, 1.5 s caller, §5). |
+| **Pick-up** (adult woman, jar fill) | hips down to 0.36 of standing height (crouch × the group's y-squash); left arm hangs plumb the whole time (elevation −84..−82°, swing −5..−2°); right upper arm swings 62° **backward** (−62°); knees to 140° | squat or hinge chosen by the object's height, the reaching hand forward to the object, the other bracing, gaze on the object | **D**: the fill pose drives the right arm backward, behind the body, and the left arm not at all (the jar's place is not part of the export; behind the body is wrong for any jar the figure faces). **X/D**: the whole figure is squashed in y (`PlaceLife.tsx:3189-3194`), which shortens trunk and head together — a scale, not a pose. **R**: no fingers for a grip (grip morphs die in the hang bake, §5). |
+| **Point** (adult man, bearing 0.6 rad, elevation 0.15) | for 0.58–1.73 s the pointing hand stays at −62..−45° (below horizontal) with the trunk stooped to 22–32° and the head down (neck→head to 49°); horizontal only at 1.92 s (+12°); at 2.11 s the hips drop to 0.50 of standing height for one frame (a full squat), standing again at 2.30 s | gaze first, arm near-straight on the target line, slight trunk turn toward it | **D**: the arm aims below its line. The stoop is inferred, not traced: the point gesture's own lean is 0.03 rad (`gesture.ts:441`), and the only other trunk writer in reach of 22–32° is the contact lean (≤ `CONTACT_LEAN_MAX` 0.5 rad = 29°), which applies because the raised arm counts as a contact arm. **X**: the release frame drops into `CROUCH_MAX` (see 6.2). **R**: no index finger. |
+| **Chaser** (child, port-city tag, 3.4 u/s) | hips 0.50–0.65 of standing height in every frame, knees 103–126°, **no stride** while the root travels 5.6 units; trunk 38–57°, neck→head 63–82° (face to the ground); the reaching forearm crosses the face at 1.25–2.15 s | still a run: propulsion and counter-swing kept, head up on the quarry, one arm reaching horizontally, lean from acceleration | **X**: a full squat sliding along the ground — see 6.2 (teleport threshold in figure units). Behind the bug, **D**: `lean = max(runLean, shown.lean)` with `TOUCH_LEAN` 0.5 and both `CHASER_ARMS` forward and counted as contacts (§5) give the bow and the double grab; the gaze turns the trunk, not the head. |
+| **Caught child** (river-bank round) | from 0.63 s: hips 0.52 of standing height (knees 126°), trunk to 54°, neck→head 67°, both arms plumb (−84..−67°), splayed outside the knees in the front view | nearly upright trunk, shoulders protracted and depressed, chest sunk, chin dropped, arms loose in front of the thighs; not a hip fold, not a crouch | **X**: the crouch is the same `CROUCH_MAX` fallback (6.2). **R/D**: `caughtSlumpPose` (`tagGame.ts:1495`) is one lean (0.48) plus an arm pitch; with two trunk pivots and the clavicles reset (`UNWRITTEN`), protraction, chest sink and a distributed slump cannot be expressed. |
+
+### 6.2 Defects found by the measurement (X)
+
+- **Teleport threshold in figure units.** `stepWalk` (`src/render/figureWalk.ts:441`)
+  treats a ground speed above `VILLAGER_MOTION.teleportSpeed` = 6 person units/s as a
+  placement; the speed is divided by the figure's world scale (`skinnedFigure.tsx:551`),
+  so a child (0.55) at the tag sprint speed 3.4 u/s measures 6.18: every frame is
+  "placed, not walked", the measured speed stays 0, no gait plays. Checked by
+  experiment: the same subject at 3.2 u/s (5.8) runs (hips 0.96–1.07 of standing, feet
+  alternating ±0.4). Filed as a request (findings carrier, 12.10.2026).
+- **`CROUCH_MAX` as the fallback of an unreachable contact.** `contactCrouch`
+  (`src/render/figureRig.ts:39`) returns the deepest squat when no knee flex brings a
+  hand to its target, and every arm a pose moves off rest counts as a contact
+  (`skinnedFigure.tsx` `contactArm`). A gesture that is no contact — the chaser's
+  forward arms while "standing" (above), the slump's pitched arms, a point's release
+  frame — therefore squats the whole figure. `contactLean` already gives up beyond
+  `CONTACT_LEAN_REACH`; the crouch has no such limit. Filed with the request above.
+
+### 6.3 Summary by cause
+
+- **Clip overridden (O):** the decisive one for walk and run. The gait layer applies
+  only legs and free arms; the clip's pelvis-trunk-head motion is replaced by a
+  constant code lean, so the trunk is rigid in every gait (tilts constant to the
+  degree). The leg IK re-solves the whole leg onto the stride (§5), so the clip's own
+  leg timing is also largely replaced. → final state 3 (clip preserved, IK corrective).
+- **Rig too primitive (R):** two trunk pivots (`hips`/`spine` share head and tail),
+  clavicles and toes never written, no fingers. A distributed lean, a protracted
+  shoulder, a roll over the ball and a grip or index cannot be expressed. → final
+  state 2 (three-segment spine, clavicles and toes driven, coarse finger groups).
+- **Joints present but badly driven (D):** the turn as distance, the forward-biased
+  walk swing and behind-only run swing, the pick-up arm going backward, the pointing
+  arm below its line, the shaft through the thigh, the tag lean stacking on the
+  sprint's dive. → final states 5–8.
+- **Missing secondary motion (S):** no thorax counter-rotation, no head stabilisation
+  or lead, no gaze target. → final states 5–6.
+- **Defects (X):** the two in 6.2 make the tag chaser and the caught child squat
+  regardless of any pose design; they are filed separately because they are bugs with
+  player impact, not motion design.
