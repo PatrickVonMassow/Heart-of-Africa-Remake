@@ -85,7 +85,15 @@ put it is the mistake this line exists to stop.
   Criticality: medium - the user's only live channel to the batch.
   Bundle: Dorfleben.
   Attempt 1 (12.10.2026 22:45-23:31): the user was notified of a 22:58-23:10 window; owner blocked 46 min on a subagent (6 green unit runs); no message arrived, so no case. The new watcher logged each line once ("watching" at 20:44:31Z), so the duplicate-line fix holds live. Next attempt needs a user-confirmed window.
-  Also (same session): the running watcher (pid 1584562, started 15:10) still ran pre-merge code at 22:44; the autostart supervision restarts only a dead watcher, never one whose code a merge changed, so a merged watcher fix runs only after a manual restart or reboot. Fix it here or record why not.
+  Also (same session): the running watcher (pid 1584562, started 15:10) still ran pre-merge code at 22:44; the autostart supervision restarts only a dead watcher, never one whose code a merge changed, so a merged watcher fix runs only after a manual restart or reboot. Split off as point 1353 (13.10.2026).
+
+- [ ] 1353. The autostart supervision restarts a chat watcher whose code a merge changed
+  Queue position: queue front, directly after point 1352 (communication first).
+  Source: split from point 1352 (13.10.2026): on 12.10.2026 the running watcher (pid 1584562, started 15:10) still ran pre-merge code at 22:44; `watcherSupervision` in `scripts/chat-watcher-core.mjs` restarts only a dead watcher, so a merged watcher fix runs only after a manual restart or reboot.
+  Final state: the watcher records a fingerprint of its own code (the content hash of `scripts/chat-watcher.mjs` and the modules it imports from `scripts/`) in its pidfile; the supervision in `scripts/batch-autostart.mjs` compares it with the current files and, on a mismatch, stops the live watcher and starts the new one in the same tick (logged with reason `code-changed`). A pidfile without a fingerprint counts as changed once. A paused batch still restarts a stale watcher. A watcher whose responder is still running is not restarted until the responder has exited.
+  Verifiable: unit tests in `scripts/chat-watcher-core.test.mjs` for match, mismatch, missing fingerprint, paused and responder-busy; one live tick on this machine logs `chat watcher: restarted pid … (code-changed)` and the new pidfile carries the current fingerprint.
+  Criticality: medium - a merged fix to the user's only live channel stays inert until a reboot.
+  Bundle: Dorfleben.
 
 - [ ] 1053. A session the user opened for something else silently becomes the batch owner
   (user 03.09.2026, on seeing this session announce "Batch übernommen": »Wieso hast du die
