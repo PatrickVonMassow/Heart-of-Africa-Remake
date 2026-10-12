@@ -324,9 +324,33 @@ export const WATCHER_PID_TOLERANCE_MS = 2000
 export const WATCHER_PID_FILE = 'chat-watcher.json'
 
 /** Does a process command line belong to a chat watcher? Only node EXECUTING
- *  the watcher script counts — an editor or `tail` naming the file does not. */
+ *  the watcher script counts — an editor or `tail` naming the file does not.
+ *  `command` is the argument vector, or a string split on whitespace. */
 export function isWatcherCommand(command) {
-  return typeof command === 'string' && /^(\S*[\\/])?node(\.exe)?\s+(\S*[\\/])?chat-watcher\.mjs(\s|$)/.test(command)
+  const argv = Array.isArray(command) ? command : typeof command === 'string' ? command.split(/\s+/) : null
+  if (!argv || argv.length < 2) return false
+  const base = (a) => String(a).replace(/^"|"$/g, '').split(/[\\/]/).pop()
+  if (!/^node(\.exe)?$/i.test(base(argv[0]))) return false
+  const script = argv.slice(1).find((a) => !String(a).startsWith('-'))
+  return script !== undefined && base(script) === 'chat-watcher.mjs'
+}
+
+/**
+ * WIN THE PIDFILE, ATOMICALLY. Exclusive create is the election: of two
+ * watchers starting together exactly one creates the file. A file left by a
+ * dead watcher is moved aside under a name only one remover can take, then the
+ * create is retried once. `fs` is injected: { create(path, json) → boolean
+ * (false when it exists), read(path) → record|null, takeAside(path, expected) → boolean, true only
+ * when the file it moved was `expected` }.
+ * Returns { won, reason }.
+ */
+export function electWatcher({ path, record, probe, fs }) {
+  const json = JSON.stringify(record)
+  if (fs.create(path, json)) return { won: true, reason: 'created' }
+  const held = fs.read(path)
+  if (watcherSupervision({ record: held, probe }).action === 'none') return { won: false, reason: 'incumbent-alive' }
+  if (!fs.takeAside(path, held)) return { won: false, reason: 'lost-takeover' }
+  return fs.create(path, json) ? { won: true, reason: 'replaced-dead' } : { won: false, reason: 'lost-create' }
 }
 
 /**
@@ -356,7 +380,7 @@ export function watcherSupervision({ paused = false, record = null, probe = null
   let alive = false
   if (Number.isInteger(pid) && pid > 0 && typeof probe === 'function') {
     const p = probe(pid)
-    if (p && p.exists === true && typeof p.command === 'string') {
+    if (p && p.exists === true && (typeof p.command === 'string' || Array.isArray(p.command))) {
       // The command line, where the OS gives one, is the identity: the probed
       // start time drifts against the wall clock (WSL measured -1.2 s in 5 h),
       // crossed the tolerance, and every tick then started one more watcher.

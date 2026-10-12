@@ -20,6 +20,7 @@ import {
   watcherSupervision,
   watcherSuperseded,
   isWatcherCommand,
+  electWatcher,
 } from './chat-watcher-core.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
@@ -684,6 +685,61 @@ describe('watcherSuperseded — a second watcher stands down', () => {
     expect(isWatcherCommand('/usr/bin/vim /repo/scripts/chat-watcher.mjs')).toBe(false)
     expect(isWatcherCommand('node scripts/chat-watcher.mjs --dry-run')).toBe(true)
     expect(isWatcherCommand('node scripts/chat-watcher-core.test.mjs')).toBe(false)
+    expect(isWatcherCommand(['node', '--no-warnings', '/repo/scripts/chat-watcher.mjs'])).toBe(true)
+    expect(isWatcherCommand(['C:\\Program Files\\nodejs\\node.exe', 'C:\\hoa\\scripts\\chat-watcher.mjs'])).toBe(true)
+    expect(isWatcherCommand(['/usr/bin/vim', '/repo/scripts/chat-watcher.mjs'])).toBe(false)
+    expect(isWatcherCommand(['node', '/repo/scripts/other.mjs', 'chat-watcher.mjs'])).toBe(false)
     expect(isWatcherCommand(null)).toBe(false)
+  })
+})
+
+describe('electWatcher — exactly one of two simultaneous starters wins the pidfile', () => {
+  const cmd = ['node', '/repo/scripts/chat-watcher.mjs']
+  // One shared in-memory file system; create is exclusive, takeAside is a rename.
+  const memFs = () => {
+    const files = new Map()
+    return {
+      files,
+      create: (p, json) => (files.has(p) ? false : (files.set(p, JSON.parse(json)), true)),
+      read: (p) => files.get(p) ?? null,
+      takeAside(p, expected) {
+        const taken = files.get(p)
+        if (!taken) return false
+        files.delete(p)
+        if (taken.pid !== expected?.pid) {
+          if (!files.has(p)) files.set(p, taken)
+          return false
+        }
+        return true
+      },
+    }
+  }
+  const live = (pids) => (pid) => (pids.includes(pid) ? { exists: true, startedAt: 1, command: cmd } : { exists: false })
+
+  it('lets the first create win and refuses the second while the first lives', () => {
+    const fs = memFs()
+    const probe = live([1, 2])
+    expect(electWatcher({ path: 'w', record: { pid: 1 }, probe, fs })).toEqual({ won: true, reason: 'created' })
+    expect(electWatcher({ path: 'w', record: { pid: 2 }, probe, fs })).toEqual({ won: false, reason: 'incumbent-alive' })
+  })
+
+  it('replaces a dead watcher once, even when two starters race the takeover', () => {
+    const fs = memFs()
+    fs.files.set('w', { pid: 9 })
+    const probe = live([1, 2])
+    // Both read the dead record before either moves it: interleave by hand.
+    const held = fs.read('w')
+    expect(fs.takeAside('w', held)).toBe(true)
+    expect(fs.create('w', JSON.stringify({ pid: 1 }))).toBe(true)
+    // The rival's takeover now finds a FRESH file and must put it back.
+    expect(fs.takeAside('w', held)).toBe(false)
+    expect(fs.read('w')).toEqual({ pid: 1 })
+    expect(electWatcher({ path: 'w', record: { pid: 2 }, probe, fs }).won).toBe(false)
+  })
+
+  it('takes over a dead pidfile when alone', () => {
+    const fs = memFs()
+    fs.files.set('w', { pid: 9 })
+    expect(electWatcher({ path: 'w', record: { pid: 1 }, probe: live([1]), fs })).toEqual({ won: true, reason: 'replaced-dead' })
   })
 })

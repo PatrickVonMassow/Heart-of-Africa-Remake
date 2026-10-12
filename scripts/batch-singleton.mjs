@@ -844,12 +844,12 @@ export function cheapProbePid(pid) {
   }
 }
 
-/** The process command line (arguments joined by spaces), or null where the OS
- *  gives none cheaply (no /proc). */
+/** The process argument vector, or null where the OS gives none cheaply
+ *  (no /proc). */
 export function processCommand(pid) {
   if (process.platform === 'win32') return null
   try {
-    return readFileSync(`/proc/${Number(pid)}/cmdline`, 'utf8').split('\0').filter(Boolean).join(' ')
+    return readFileSync(`/proc/${Number(pid)}/cmdline`, 'utf8').split('\0').filter(Boolean)
   } catch {
     return null
   }

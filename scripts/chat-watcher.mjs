@@ -26,7 +26,7 @@
 // rewrote a document as empty from one: loud and free, rather than silently
 // wrong. The dry run is exempt — it changes nothing, and being able to watch the
 // channel from a worktree is exactly what it is for.
-import { closeSync, existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, readdirSync, linkSync, renameSync, rmSync, statSync, writeSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
@@ -69,6 +69,7 @@ import {
   reconnectDelayMs,
   responderClaim,
   sweepPlan,
+  electWatcher,
   wakeDecision,
   watcherSuperseded,
 } from './chat-watcher-core.mjs'
@@ -421,6 +422,45 @@ function installShutdownHandlers() {
 function writePidFile() {
   writeJsonAtomic(PID_PATH, { ...state.identity, at: Date.now(), sessionId: state.sessionId })
 }
+const pidFileOps = {
+  create(path, json) {
+    try {
+      const fd = openSync(path, 'wx')
+      try {
+        writeSync(fd, json)
+      } finally {
+        closeSync(fd)
+      }
+      return true
+    } catch (e) {
+      if (e && e.code === 'EEXIST') return false
+      throw e
+    }
+  },
+  read: (path) => readJson(path),
+  // Rename is atomic, so one remover takes the file. A rename that took a
+  // FRESH file (a rival replaced the dead one meanwhile) links it back.
+  takeAside(path, expected) {
+    const aside = `${path}.dead-${process.pid}`
+    try {
+      renameSync(path, aside)
+    } catch {
+      return false
+    }
+    const taken = readJson(aside)
+    const ours = taken?.pid === expected?.pid && taken?.pidStartedAt === expected?.pidStartedAt
+    if (!ours) {
+      try {
+        linkSync(aside, path)
+      } catch {
+        /* a third watcher created it; that one stands */
+      }
+    }
+    rmSync(aside, { force: true })
+    return ours
+  },
+}
+
 function clearPidFile() {
   try {
     const rec = readJson(PID_PATH)
@@ -604,9 +644,17 @@ async function run() {
     { now: Date.now(), retentionMs: envelopeRetentionMs(maxAge) },
   )
 
-  if (!dryRun && superseded()) {
-    log({ event: 'superseded-at-start', pid: readJson(PID_PATH)?.pid })
-    process.exit(0)
+  if (!dryRun) {
+    const election = electWatcher({
+      path: PID_PATH,
+      record: { ...state.identity, at: Date.now(), sessionId: state.sessionId },
+      probe: watcherProbe,
+      fs: pidFileOps,
+    })
+    if (!election.won) {
+      log({ event: 'superseded-at-start', reason: election.reason, pid: readJson(PID_PATH)?.pid })
+      process.exit(0)
+    }
   }
   if (!dryRun) {
     // A responder orphaned by a crashed predecessor is ADOPTED rather than
