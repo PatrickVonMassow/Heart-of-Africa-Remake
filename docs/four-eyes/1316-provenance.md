@@ -22,3 +22,10 @@ Read on 12.10.2026 from the origin session transcript
   worktree was removed before filing, so those images are not preserved. The
   clip/dress sheets it also links are tracked and present; the merger may
   re-render the audit views with `scripts/villager/build.mjs`.
+- **Merge (12.10.2026).** Claude Fable 5.1, author of neither half, folded the two
+  halves into `1316-union.json` (24 A + 15 B → 20 union entries, every input
+  accounted for; commit b5c93bcb2, mechanism-review record against it) after
+  re-measuring every relied-on claim from `public/models/villager.glb` and the
+  runtime; the prose concept with the disagreement table is
+  `docs/natural-villager-motion-concept.md`. The seven lost `audit-B-*.png` sheets
+  were not needed: the tracked clip sheets and the GLB itself answered the claims.
