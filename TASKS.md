@@ -15926,3 +15926,10 @@ to land than a mechanism that needs a review.
   Verifiable: in the runtime-pose export (src/render/villagerRuntimePose.test.tsx) the chaser's hips stay near standing height (they are 0.50-0.65 of it now) and its feet alternate; a Vitest case at 3.4 u/s for a child figure.
   Criticality: high - every child chaser of the port-city tag game at full sprint.
   Bundle: Dorfleben.
+- [ ] 1346. The garment penetration gate compares against a stale main report
+  Queue position: Dorfleben, after point 1316; before the rig points 1342/1343 rely on the gate.
+  Source: findings carrier 12.10.2026 10:37, measured on feat/1316-natural-villager-motion (clip path unchanged against main): `node scripts/villager/build.mjs penetration` on the 31 garments main builds since 83d5e49fa is red in absolute terms: 29 of 31 within tolerance in the build pose (g-veil-face inner 0.0369 under g-shirt-chest, g-wrapLong-chest inner 0.0061 under g-breastCloth-chest), 5 of 31 in every pose. Main's committed verification/villager-body/penetration-report.md/json (43515f095, 11.10.2026) still lists the earlier 32-garment set (g-cape-bothShoulders, g-cloak-leftShoulder/rightShoulder, g-skirtKnee-chest, g-skirtShort-chest), so the `--baseline` "no worse than main" comparison of points 1312/1314 has no baseline row for g-cape-chest, g-cloak-chest, g-neckBeads-chest and g-babySling-bothShoulders and can pass a new garment unchecked (possible false approval).
+  Final state: main's penetration report is measured on the garment set the shipped villager.glb carries; the comparison names a garment absent from the baseline as unchecked instead of passing it; the two build-pose layering failures are fixed or each named as a residual with its missing information.
+  Verifiable: `build.mjs penetration --baseline <main json>` on main reports every shipped garment with a baseline row; a selftest case where a garment missing from the baseline fails the comparison.
+  Criticality: medium - the garment gate every villager rig point leans on.
+  Bundle: Dorfleben.
