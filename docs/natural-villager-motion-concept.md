@@ -399,8 +399,12 @@ Sub-point b is the one most likely not to converge in one branch (a HIGH rig cha
 a runtime rewrite); if it stalls, cut it again along steps 2–7 (pipeline, penetration gate)
 and steps 8–11 (runtime, contact tests). Separate halves do not by themselves keep
 each other green, so every independently mergeable sub-point — a, b, c and any re-cut
-of b — runs both the penetration gate and the full-ramp no-slide tests as merge
-requirements, whatever files it touches.
+of b — runs both the penetration gate and the no-slide tests as merge requirements,
+whatever files it touches. The no-slide test is the one current at that point of the
+order: before step 5 (sub-point a, and b's commits before step 5) it is today's test
+with its walk↔sprint band exemption, which must stay green; step 5 removes the
+exemption together with the contact correction it needs, and from then on — the rest of
+b, all of c, any re-cut after step 5 — the full-ramp test is the gate.
 
 ## 7. Open items for the final check
 
@@ -420,4 +424,4 @@ requirements, whatever files it touches.
 | 3 | Jog lands without the full-ramp no-slide check | Constraint 2 and step 5: the band exemption goes in step 5 and the full-ramp limit is its merge requirement; a needed contact fix lands with it. |
 | 4 | Step 4 depends on later steps | Step 4 moved after step 9 as an explicit decision on the sheets after steps 3, 7, 9; adding bones repeats step 2's whole acceptance. |
 | 5 | 35° steps cannot make 180° in 3–5 steps | A step is one foot's lift and plant, ≤ 90° foot and ≤ 45° heading per step; the spot turn takes 4–6 steps. |
-| 6 | Split misclassifies 1316a and separates the gates | 1316a is gated by what it executes; every mergeable sub-point runs both the penetration gate and the full-ramp no-slide tests. |
+| 6 | Split misclassifies 1316a and separates the gates | 1316a is gated by what it executes; every mergeable sub-point runs both the penetration gate and the no-slide tests current at its place in the order (today's test before step 5, the full-ramp test from step 5 on — second round, 4874993bac930fa6). |
