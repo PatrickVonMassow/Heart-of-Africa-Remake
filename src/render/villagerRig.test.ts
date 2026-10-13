@@ -39,6 +39,22 @@ describe('the glTF villager asset', () => {
     expect(asset.parents[asset.bones.indexOf('foot.L')]).toBe(asset.bones.indexOf('shin.L'))
   })
 
+  it('has a three-segment spine over a short pelvis: 22 bones, hips → spine → spine1 → chest → neck', () => {
+    expect(asset.bones).toHaveLength(22)
+    const parent = (b: string) => asset.bones[asset.parents[asset.bones.indexOf(b)]]
+    expect(asset.parents[asset.bones.indexOf('hips')]).toBe(-1)
+    expect(parent('spine')).toBe('hips')
+    expect(parent('spine1')).toBe('spine')
+    expect(parent('chest')).toBe('spine1')
+    expect(parent('neck')).toBe('chest')
+    // the trunk in chain order, root first (the pose code walks topoOrder)
+    expect(['hips', 'spine', 'spine1', 'chest'].map((b) => asset.bones.indexOf(b))).toEqual([0, 1, 2, 3])
+    // four distinct pivots up the trunk, each above the one below
+    const y = (b: string) => asset.rest[asset.bones.indexOf(b) * 3 + 1]
+    const trunk = ['hips', 'spine', 'spine1', 'chest', 'neck'].map(y)
+    for (let k = 1; k < trunk.length; k++) expect(trunk[k] - trunk[k - 1]).toBeGreaterThan(0.02)
+  })
+
   it('has the clips the figure plays', () => {
     for (const c of ['idle', 'walk', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle']) expect(asset.clips[c]).toBeDefined()
     expect(asset.clips.walk.speed).toBeGreaterThan(0)

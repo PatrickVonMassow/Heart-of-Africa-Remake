@@ -102,7 +102,7 @@ export function stepClipLayers(
 const LEGS = ['hips', 'thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
 const ARM = (s: 'L' | 'R') => [`shoulder.${s}`, `upperArm.${s}`, `forearm.${s}`, `hand.${s}`]
 /** Bones the code-built pose never writes: they return to rest before a blend. */
-const UNWRITTEN = ['toe.L', 'toe.R', 'shoulder.L', 'shoulder.R']
+const UNWRITTEN = ['toe.L', 'toe.R', 'shoulder.L', 'shoulder.R', 'spine1']
 
 function blendInto(asset: VillagerAsset, bones: Record<string, THREE.Bone>, names: readonly string[], local: THREE.Quaternion[], w: number) {
   if (w <= 0) return

@@ -305,7 +305,9 @@ def dig_clip(body, clips, cfg):
             hips[1] -= drop + 0.1 * extra
             hips[2] -= 0.06 * L
             q[SK.INDEX['hips']] = qaxis([1, 0, 0], 0.25 * L)
-            q[SK.INDEX['spine']] = qnorm(qmul(qaxis([0, 1, 0], turn * 0.4), qaxis([1, 0, 0], L * 0.5)))
+            # the spine's former half of the lean over its two segments
+            q[SK.INDEX['spine']] = qnorm(qmul(qaxis([0, 1, 0], turn * 0.2), qaxis([1, 0, 0], L * 0.25)))
+            q[SK.INDEX['spine1']] = qnorm(qmul(qaxis([0, 1, 0], turn * 0.2), qaxis([1, 0, 0], L * 0.25)))
             q[SK.INDEX['chest']] = qnorm(qmul(qaxis([0, 1, 0], turn * 0.6), qaxis([1, 0, 0], L * 0.25)))
             q[SK.INDEX['neck']] = qaxis([1, 0, 0], -L * 0.15)
             q[SK.INDEX['head']] = qaxis([1, 0, 0], 0.12)

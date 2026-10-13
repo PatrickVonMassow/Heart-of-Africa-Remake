@@ -228,6 +228,13 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   }
 }
 
+/** Hips → neck, in order: the glTF body's three-segment spine carries a
+ *  `spine1` between `spine` and `chest` the code-built body does not have. */
+function trunkChain(b: Record<BoneName, THREE.Bone>): THREE.Bone[] {
+  const mid = (b as Partial<Record<string, THREE.Bone>>).spine1
+  return mid ? [b.hips, b.spine, mid, b.chest, b.neck] : [b.hips, b.spine, b.chest, b.neck]
+}
+
 const _s = new THREE.Vector3()
 const _t = new THREE.Vector3()
 const _e = new THREE.Vector3()
@@ -510,7 +517,7 @@ export function SkinnedFigure({
       }
       // The head's squat correction depends on the chain just posed: renew it
       // here, so an owning caller's retarget never leaves a stale one.
-      unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
+      unsquashHead(b.head, trunkChain(b), squat?.current ?? 1)
       b.hips.updateWorldMatrix(false, true)
       // A carried prop hangs from the hand anchor and was posed for the
       // primitive's hand frame: on a contact the anchor takes the virtual
@@ -590,7 +597,7 @@ export function SkinnedFigure({
       retarget()
     }
     // A squat shortens a person; it does not flatten the skull (work-order 1085).
-    unsquashHead(rig.bones.head, [rig.bones.hips, rig.bones.spine, rig.bones.chest, rig.bones.neck], squat?.current ?? 1)
+    unsquashHead(rig.bones.head, trunkChain(rig.bones), squat?.current ?? 1)
   })
 
   return (
