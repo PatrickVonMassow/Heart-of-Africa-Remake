@@ -194,7 +194,11 @@ function standDownCall({ toolName, command, filePath }) {
   const call = classifyCall({ toolName, command, filePath })
   if (call.kind !== 'escape') return call
   if (!SHELL_TOOLS.has(String(toolName ?? ''))) return { kind: 'mutating', segment: '' }
-  for (const seg of parseSegments(command)) {
+  const segments = parseSegments(command)
+  // The keep is admitted only as a lone command with no redirection at all.
+  if (segments.some(isVdzkKeepSegment) && (segments.length !== 1 || (segments[0].redirects ?? []).length))
+    return { kind: 'mutating', segment: segments.find(isVdzkKeepSegment).raw }
+  for (const seg of segments) {
     if (!isEscapeSegment(seg)) continue
     if (!(segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS) || isVdzkKeepSegment(seg)) || checkWritesFile(seg))
       return { kind: 'mutating', segment: seg.raw }

@@ -304,6 +304,9 @@ describe('ownership mutation stand-down', () => {
     expect(moved({ command: 'node scripts/board.mjs vdzk-remove "Kartenschrift"' }).block).toBe(true)
     expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && node scripts/board.mjs now "x"' }).block).toBe(true)
     expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" > out.txt' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && git status --short' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && node scripts/board.mjs vdzk-keep "L"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" > /dev/null 2>&1' }).block).toBe(true)
   })
 
   it('does not constrain a session while no other live owner holds the lock', () => {
