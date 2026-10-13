@@ -33983,3 +33983,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   convertPendingSpawn), scripts/batch-autostart.mjs (~1637 the pending-spawn writer, ~988
   lockConverted), scripts/batch-lock.mjs
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1033. The free lock lands silently in the window the user is sitting at (measured
+  31.08.2026, this session).
+  Queue position: after point 1053 (user 12.10.2026 21:23: »Ziehe 1053 und 1033 vor«).
+  WHAT HAPPENED: `batch-progress-guard` runs at the END OF EVERY TURN and calls the atomic
+  acquire. When the owning session dies, the next Stop run of ANY live session takes the batch.
+  Measured: the previous owner claimed at 22:52:50 and died around 23:00; at 23:03:02 the lock
+  named the INTERACTIVE session the user was chatting in, which had never asked for it and whose
+  own SessionStart notice still said STAND DOWN. The session learned about it only from a
+  subordinate clause inside a guard's refusal text, and kept obeying the stale stand-down.
+  WHY IT BLOCKS: the acquire is correct in its intent — the batch must never be ownerless — but
+  it cannot tell an unattended worker from the window a person is talking to. The user's window
+  is then driven into merges, dashboard writes and TASKS edits it was never asked to do, and the
+  reservation path of point 395 does not help because it only fires for a claim the user made.
+  FINAL STATE: (1) a session that did not request the batch and is demonstrably interactive does
+  not silently acquire a freed lock; it either asks or takes it only after saying so in the
+  answer, and the launcher's fresh worker remains the normal successor; (2) when a session DOES
+  become the owner without asking, that fact is stated as its own visible line, never as a
+  subordinate clause in another guard's refusal; (3) an unattended session is unaffected — the
+  never-ownerless guarantee holds for every path where nobody is sitting.
+  VERIFIABLE: unit cases over the acquire decision proving an interactive non-claimant does not
+  take a freed lock while an unattended session does; a case proving the ownership change is
+  announced on its own; a drill that kills an owner beside a live interactive session and asserts
+  the launcher's worker, not that window, becomes the successor. Plus `npm run test:unit`, lint,
+  build.
+  Criticality: high — it is the batch singleton, and its failure direction hands a user's
+  interactive window a role it never accepted.
+  Bundle: Session- & Repo-Hygiene.

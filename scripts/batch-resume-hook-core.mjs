@@ -26,6 +26,7 @@
 // pure and tested here; the hook only gathers the state and prints the result.
 import { CLAIM_BY } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
+import { humanText } from './request-approval-guard-core.mjs'
 
 const OWNER_OWNERSHIP = new Set(['acquired-spawn', 'acquired', 'mine'])
 
@@ -349,6 +350,76 @@ export function uninvitedSessionMessage({ sessionId = '' } = {}) {
     'reservation was converted for it and it held no batch lock before. It does NOT own the batch. ' +
     `Orientation only: the open points above, \`node scripts/point-brief.mjs <N>\` for a spec, ${OWNER_RUNBOOK_DOC} ` +
     `for how the batch runs. Answer the user normally. The user starts the batch with the word "${BATCH_START_WORD}"; ` +
+    `only then take it with \`node scripts/batch-claim.mjs --take --session ${sessionId}\`.`
+  )
+}
+
+/**
+ * DOES THIS TRANSCRIPT PROVE A PERSON IS SITTING AT THE WINDOW? PURE.
+ *
+ * Measured over this repo's transcripts (13.10.2026): a launcher spawn carries
+ * one prompt entry (`promptSource`/`turnOrigin` "sdk", no `origin`), while a
+ * window the user types into carries entries with `origin.kind` "human" — the
+ * same reading `request-approval-guard` uses for "headless". Returns true on the
+ * first human entry, false when the text was read and holds none, and null when
+ * there is nothing to read (unproven, never "interactive").
+ */
+export function transcriptShowsPerson(text) {
+  if (typeof text !== 'string' || text.length === 0) return null
+  if (!text.includes('"human"')) return false
+  for (const line of text.split('\n')) {
+    if (!line.includes('"human"')) continue
+    try {
+      if (humanText(JSON.parse(line)) !== null) return true
+    } catch {
+      /* a torn line proves nothing */
+    }
+  }
+  return false
+}
+
+/**
+ * MAY THIS TURN END TAKE A FREED BATCH LOCK? PURE.
+ *
+ * The Stop guard's acquire keeps the batch from ever being ownerless, but it
+ * must not hand the batch to the window a person is talking to unasked (user
+ * 31.08.2026). The invitations of `sessionStartOwnership` apply here too: a lock
+ * this session already holds, or a claim it made itself. Without one, only a
+ * session NOT demonstrably interactive acquires — the launcher's worker and any
+ * other unattended session, exactly as before. `interactive` null (unreadable)
+ * is unproven and keeps the never-ownerless path.
+ */
+export function turnEndOwnership({ heldHere = false, claimMine = false, interactive = null } = {}) {
+  if (heldHere) return { mayAcquire: true, invitation: 'held' }
+  if (claimMine) return { mayAcquire: true, invitation: 'claim' }
+  if (interactive === true) return { mayAcquire: false, invitation: null }
+  return { mayAcquire: true, invitation: 'unattended' }
+}
+
+/**
+ * The OWN line a session gets when a turn end made it the batch owner. PURE.
+ * Never a clause inside another guard's text: it is printed first, alone.
+ */
+export function ownershipChangeLine({ sessionId = '', invitation = null } = {}) {
+  const how =
+    invitation === 'claim'
+      ? 'on the claim this window recorded'
+      : 'because the lock had no live owner and this session is unattended'
+  return (
+    `BATCH OWNERSHIP CHANGED: this session (${sessionId || 'unknown'}) took the batch lock at this turn end, ${how}. ` +
+    'It now OWNS the batch; any earlier STAND DOWN notice is void.'
+  )
+}
+
+/**
+ * What an interactive, uninvited window is told when it left a freed lock
+ * alone. PURE. It asks; it takes nothing.
+ */
+export function freeLockDeclinedLine({ sessionId = '' } = {}) {
+  return (
+    'BATCH FREE, NOT TAKEN: the batch lock has no live owner, but this window is interactive and never asked for ' +
+    "the batch, so it did NOT take it — the launcher's fresh worker is the normal successor. This session does NOT " +
+    `own the batch; answer the user normally. If the user wants the batch here, they say "${BATCH_START_WORD}"; ` +
     `only then take it with \`node scripts/batch-claim.mjs --take --session ${sessionId}\`.`
   )
 }
