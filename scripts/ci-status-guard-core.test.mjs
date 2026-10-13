@@ -15,6 +15,7 @@ import {
   GATE_STATUS_CONTEXT,
   readAllStatusPages,
   refBranch,
+  targetBranch,
   withGateStatuses,
   failedRuns,
   notifiedFromState,
@@ -194,6 +195,66 @@ describe('classifyRuns', () => {
     })
     expect((await sweep('origin/main')).cache[HEAD].state).toBe('success')
     expect((await sweep('origin/feat/x')).cache[HEAD].state).toBe('failed')
+  })
+
+  // Review round 2 (13.10.2026): three ways a branch identity got lost.
+  const sweepOnce = (target, runs, cache = {}) => {
+    const asked = []
+    return sweepTargets({
+      targets: [target],
+      cache, notified: {}, famine: {}, now: 10 * 60 * 1000,
+      fetchRuns: async (sha) => { asked.push(sha); return runs },
+      judgeRed: async ({ classification }) => ({ classification, standDown: false }),
+      notify: async () => {},
+    }).then((result) => ({ ...result, asked }))
+  }
+  const sharedSha = () => withGateStatuses(
+    [run({ databaseId: 1, headBranch: 'main' }), feat({ databaseId: 2, url: 'https://github.com/o/r/actions/runs/2' })],
+    [gate('failure', { target_url: 'https://github.com/o/r/actions/runs/2' })],
+  )
+
+  it('does not let a sha cached green under main skip the feature branch that later owns it', async () => {
+    const asMain = await sweepOnce({ ref: 'origin/main', sha: HEAD, at: 1 }, sharedSha())
+    expect(asMain.cache[HEAD]).toMatchObject({ state: 'success', branch: 'main' })
+    // Same branch again: still a free cache hit.
+    expect((await sweepOnce({ ref: 'origin/main', sha: HEAD, at: 1 }, sharedSha(), asMain.cache)).asked).toEqual([])
+    // main moved on, feat/x now owns the sha: asked again, and red.
+    const asFeat = await sweepOnce({ ref: 'origin/feat/x', sha: HEAD, at: 1 }, sharedSha(), asMain.cache)
+    expect(asFeat.asked).toEqual([HEAD])
+    expect(asFeat.cache[HEAD].state).toBe('failed')
+  })
+
+  it('does not let another branch\'s newer run supersede the target\'s red gate, in either order', () => {
+    const urls = (id) => `https://github.com/o/r/actions/runs/${id}`
+    const statuses = [gate('failure', { target_url: urls(1) }), gate('failure', { target_url: urls(2) })]
+    for (const [xId, yId] of [[1, 2], [2, 1]]) {
+      const runs = [
+        run({ databaseId: xId, headBranch: 'feat/x', url: urls(xId) }),
+        run({ databaseId: yId, headBranch: 'feat/y', url: urls(yId) }),
+      ]
+      expect(classifyRuns(runs, HEAD, { statuses, branch: 'feat/x' }).state).toBe('failed')
+      expect(classifyRuns(runs, HEAD, { statuses, branch: 'feat/y' }).state).toBe('failed')
+      expect(failedRuns(runs, HEAD, { statuses, branch: 'feat/x' })).toHaveLength(1)
+    }
+    // A green re-run of the target's OWN branch still supersedes its red.
+    const rerun = [feat({ databaseId: 1 }), feat({ databaseId: 3, url: urls(3) })]
+    expect(classifyRuns(rerun, HEAD, onFeat([gate('failure')])).state).toBe('success')
+  })
+
+  it('keeps the real branch of a HEAD pushed from another clone, through the sweep and the wait', async () => {
+    const [target] = refTargets({ headSha: HEAD, headPushed: true, headBranch: 'feat/x' })
+    expect(target).toEqual({ ref: 'HEAD', sha: HEAD, at: 0, branch: 'feat/x' })
+    expect(refTargets({ headSha: HEAD, headPushed: true })).toEqual([{ ref: 'HEAD', sha: HEAD, at: 0 }])
+    const soft = withGateStatuses([feat()], [gate('failure')])
+    expect((await sweepOnce(target, soft)).cache[HEAD].state).toBe('failed')
+    const wait = renewCiWait(null, {
+      target,
+      classification: { state: 'pending', workflowName: 'CI', runId: 1 },
+      firstSeenAt: 0,
+      observedAt: 0,
+    }, { now: 0, makeWakeToken: () => 'wake' })
+    expect(targetBranch(wait)).toBe('feat/x')
+    expect(classifyRuns(soft, HEAD, { branch: targetBranch(wait) }).state).toBe('failed')
   })
 
   // Review P2 (13.10.2026): a red gate on an unread page must not pass as green.

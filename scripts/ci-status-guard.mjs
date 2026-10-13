@@ -41,7 +41,7 @@ import {
   failedRuns,
   withGateStatuses,
   readAllStatusPages,
-  refBranch,
+  targetBranch,
   ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
@@ -191,6 +191,15 @@ function git(args) {
     timeout: 5000,
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim()
+}
+
+/** The checked-out branch name, '' when detached or unreadable. */
+function currentBranch() {
+  try {
+    return git(['symbolic-ref', '--quiet', '--short', 'HEAD'])
+  } catch {
+    return ''
+  }
 }
 
 /** HEAD counts as pushed once ANY remote-tracking ref contains it (local refs, no
@@ -693,6 +702,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
       existingRefs,
       headSha: head,
       headPushed: isPushed(head),
+      headBranch: currentBranch(),
     }),
     liveAuthorBranches,
   })
@@ -826,7 +836,7 @@ async function observeDurableWait(wakeToken) {
       await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
       continue
     }
-    let classification = classifyRuns(runs, wait.sha, { branch: refBranch(wait.ref) })
+    let classification = classifyRuns(runs, wait.sha, { branch: targetBranch(wait) })
     const observedAt = Date.now()
     if (classification.state === 'pending') {
       const observation = {
@@ -889,7 +899,7 @@ async function observeDurableWait(wakeToken) {
       try {
         const judged = await judgeRed(repo, {
           sha: wait.sha,
-          branch: refBranch(wait.ref),
+          branch: targetBranch(wait),
           runs,
           classification,
           famine,
@@ -926,6 +936,7 @@ async function observeDurableWait(wakeToken) {
             state: classification.state,
             firstSeenAt: wait.firstObservationAt,
             checkedAt: observedAt,
+            branch: targetBranch(wait),
             ...(reason ? { reason } : {}),
           },
         },

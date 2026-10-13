@@ -46,6 +46,11 @@ function runBranch(r) {
 export function refBranch(ref) {
   return String(ref ?? '').replace(/^refs\/heads\//, '').replace(/^(refs\/remotes\/)?origin\//, '')
 }
+/** The branch a target (or a wait) is judged as: the HEAD fallback carries its
+ *  real branch in `branch`, since its ref is the bare word HEAD. */
+export function targetBranch(target) {
+  return String(target?.branch || refBranch(target?.ref))
+}
 
 /**
  * Attach each run's `ci/gate (branch)` commit status to it as `gate`.
@@ -93,6 +98,19 @@ function foldGate(runs, branch) {
  *  target branch's red gates folded in. */
 function gatedRuns(runs, { statuses = null, branch = '' } = {}) {
   return foldGate(withGateStatuses(runs, statuses), branch)
+}
+
+/**
+ * After the cancellation reduction: a target whose OWN branch carries a red gate
+ * is judged by its own branch's runs only, so another branch's newer run of the
+ * same workflow on the same sha cannot supersede that red (review 13.10.2026).
+ * Without a red gate on the target branch nothing changes — main never posts
+ * one, so main reads exactly as before.
+ */
+function scopeToBranch(runs, branch) {
+  if (!branch) return runs
+  const own = runs.filter((r) => runBranch(r) === branch)
+  return own.some((r) => r?.gate && String(r.conclusion ?? '') === 'failure') ? own : runs
 }
 
 /**
@@ -172,7 +190,7 @@ function newestPerWorkflowFrom(runs) {
 export function classifyRuns(runs, headSha, gate = {}) {
   try {
     if (!Array.isArray(runs) || !headSha) return { state: 'none' }
-    const mine = verdictRuns(gatedRuns(runs, gate), headSha)
+    const mine = scopeToBranch(verdictRuns(gatedRuns(runs, gate), headSha), gate?.branch)
     if (mine.length === 0) return { state: 'none' }
 
     const newestPerWorkflow = newestPerWorkflowFrom(mine)
@@ -220,7 +238,7 @@ export function classifyRuns(runs, headSha, gate = {}) {
 export function failedRuns(runs, headSha, gate = {}) {
   try {
     if (!Array.isArray(runs) || !headSha) return []
-    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(gatedRuns(runs, gate), headSha))
+    const newestPerWorkflow = newestPerWorkflowFrom(scopeToBranch(verdictRuns(gatedRuns(runs, gate), headSha), gate?.branch))
     return [...newestPerWorkflow.values()]
       .filter((r) => String(r?.status ?? '') === 'completed' && FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
       .map((r) => ({
@@ -250,7 +268,7 @@ export function failedRuns(runs, headSha, gate = {}) {
 export function recoveredWorkflows(runs, headSha, gate = {}) {
   try {
     if (!Array.isArray(runs) || !headSha) return []
-    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(gatedRuns(runs, gate), headSha))
+    const newestPerWorkflow = newestPerWorkflowFrom(scopeToBranch(verdictRuns(gatedRuns(runs, gate), headSha), gate?.branch))
     return [...newestPerWorkflow.entries()]
       .filter(([, r]) => String(r?.status ?? '') === 'completed' && !FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
       .map(([name]) => name)
@@ -361,6 +379,7 @@ export function renewCiWait(previous, observation, {
       identity,
       state: 'pending',
       ref: observation.target.ref,
+      ...(observation.target.branch ? { branch: String(observation.target.branch) } : {}),
       sha: observation.target.sha,
       workflow: observation.classification.workflowName,
       runId: observation.classification.runId,
@@ -516,7 +535,7 @@ export function pushedRefsFromReflog(text, { now = Date.now(), windowMs = PUSH_W
  * HEAD is included when it is pushed but carries no push reflog entry of ours
  * (pushed from another clone), which keeps the guard's old guarantee intact.
  */
-export function refTargets({ pushed = [], existingRefs = [], headSha = '', headPushed = false } = {}) {
+export function refTargets({ pushed = [], existingRefs = [], headSha = '', headPushed = false, headBranch = '' } = {}) {
   try {
     const exists = new Set(existingRefs)
     const seenShas = new Map()
@@ -538,7 +557,11 @@ export function refTargets({ pushed = [], existingRefs = [], headSha = '', headP
     }
     // HEAD's own sha leads: it is what the session is standing on.
     live.sort((a, b) => (a.sha === headSha ? -1 : 0) - (b.sha === headSha ? -1 : 0))
-    if (headPushed && headSha && !seenShas.has(headSha)) live.push({ ref: 'HEAD', sha: headSha, at: 0 })
+    if (headPushed && headSha && !seenShas.has(headSha)) {
+      // The bare word HEAD names no branch a run carries, so the gate could not
+      // be folded in; the real branch travels beside it (review 13.10.2026).
+      live.push({ ref: 'HEAD', sha: headSha, at: 0, ...(headBranch ? { branch: String(headBranch) } : {}) })
+    }
     return live
   } catch {
     return []
@@ -715,7 +738,12 @@ export async function sweepTargets({
 
   for (const target of targets) {
     const gates = target?.disposition !== 'report'
-    const entry = nextCache[target.sha]
+    // A sha's green is a green FOR ONE BRANCH: the same sha judged under another
+    // branch (main moved on, so a feature ref now owns it) must be asked again,
+    // or the cached main green would skip that branch's red gate.
+    const entry = nextCache[target.sha]?.state === 'success' && nextCache[target.sha]?.branch !== targetBranch(target)
+      ? undefined
+      : nextCache[target.sha]
     const cached = cachedAnswer(entry, now)
     // A sha whose run CONCLUDED green (or that no workflow covers) is not asked
     // about again while cached — this is what keeps the repeat turn free.
@@ -757,7 +785,7 @@ export async function sweepTargets({
       failedOpen.push(`${target.ref} ${String(target.sha).slice(0, 7)}: GitHub Actions could not be read`)
       continue
     }
-    const gate = { branch: refBranch(target.ref) }
+    const gate = { branch: targetBranch(target) }
     const classification = classifyRuns(runs, target.sha, gate)
     const verdict = refVerdict({ state: classification.state, at, now })
     observations.push({ target, classification, firstSeenAt: at, observedAt: now, previousState: entry?.state ?? null, verdict })
@@ -768,7 +796,7 @@ export async function sweepTargets({
       // the NEXT famine for that workflow read as an already-expired waiver and
       // escalate on its first sighting.
       for (const name of recoveredWorkflows(runs, target.sha, gate)) delete nextFamine[name]
-      nextCache[target.sha] = { state: 'success', firstSeenAt: at, checkedAt: now }
+      nextCache[target.sha] = { state: 'success', firstSeenAt: at, checkedAt: now, branch: gate.branch }
       continue
     }
     if (verdict === 'gave-up') {
