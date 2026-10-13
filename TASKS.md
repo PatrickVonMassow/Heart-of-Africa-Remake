@@ -96,14 +96,6 @@ put it is the mistake this line exists to stop.
   Refs: scripts/batch-pause.mjs, scripts/batch-pause-core.mjs (namesUserUtterance), scripts/batch-progress-guard.mjs.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 1349. The CI status guard reports a red feature-branch run as green
-  Queue position: after point 1351.
-  Source: findings carrier 12.10.2026 17:07: run 38277768235 (feat/1346-penetration-baseline c96ee475a) failed unit shard fast (1) (villagerPenetrationReport.test.ts:174) and set commit status ci/gate (branch)=failure, but every job concludes success on feat/** because .github/workflows/ci.yml marks each step continue-on-error; scripts/ci-status-guard-core.mjs classifyRuns reads only run conclusions, and batch-autostart-core.mjs ciTerminalPrompt hands that success on.
-  Final state: ci-status-guard and the CI-terminal handoff judge a feature-branch ref by its ci/gate commit status (or an equivalent failing signal), so a red branch is never reported green; main behaviour unchanged.
-  Verifiable: a Vitest case with a success-concluded run and a failing ci/gate status that the guard classifies red.
-  Criticality: medium - possible false approval of a landing.
-  Bundle: Modell & Wächter.
-
 - [ ] 1350. The decision-card guard deadlocks a stand-down chat session
   Queue position: after point 1349.
   Source: findings carrier 12.10.2026 16:36: chat-only session 994859ad (STAND DOWN, batch owned by 4dc5437a) answered a board message; Stop hook decision-card-guard demanded `board.mjs vdzk-keep` for three cards, which the stand-down PreToolUse hook refuses.
