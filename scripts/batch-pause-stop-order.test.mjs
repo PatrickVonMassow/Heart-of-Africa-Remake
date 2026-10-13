@@ -28,6 +28,10 @@ describe('explicit stop order', () => {
     'Why did you stop the batch',
     'Stop asking questions about the work',
     'Bitte nicht\n die Batch anhalten.',
+    'Stop the batch from stopping automatically.',
+    'Halte die Batch an der Spitze der Prioritätenliste.',
+    'Stopp die Batch. Nein, mach doch weiter.',
+    'Stopp die Batch. Warum hängt der Build',
   ])('refuses %j', (text) => {
     expect(isExplicitStopOrder(text)).toBe(false)
   })
@@ -51,6 +55,7 @@ describe('explicit stop order', () => {
   it('judges the quoted words of a pause reason, not the session prose around them', () => {
     expect(quotesExplicitStopOrder('user asked to stop the batch: »Hast du die Batch bekommen?«')).toBe(false)
     expect(quotesExplicitStopOrder('user: „Halte die Batch an“')).toBe(true)
+    expect(quotesExplicitStopOrder('user: »Stopp die Batch. Nein, mach doch weiter.«')).toBe(false)
   })
 
   it('recovers a clockless user-stop record whose quote is no order', () => {

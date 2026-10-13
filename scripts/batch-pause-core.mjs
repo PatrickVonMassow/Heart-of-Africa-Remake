@@ -73,50 +73,54 @@ export function namesUserUtterance(reason) {
 /**
  * ONLY AN EXPLICIT ORDER STOPS THE BATCH (point 1351). Twice a session paused the
  * batch on a question or a discussion remark (24.09.2026 »Erstmal nur darüber
- * reden«, 12.10.2026 »Hast du die Batch bekommen?«). A sentence counts only in
- * COMMAND FORM: it opens with a stop imperative, or is "<the batch> <stop verb
- * infinitive>", or is the bare stop word — and never when it asks, negates or
- * hedges. Conservative on purpose: a refused real order costs one rephrasing, a
- * false stop idles the machine.
+ * reden«, 12.10.2026 »Hast du die Batch bekommen?«). Only a CLOSED COMMAND
+ * counts: "stop the batch", "Batch anhalten", the bare stop word, at most with a
+ * time phrase. Conservative on purpose: a refused real order costs one
+ * rephrasing, a false stop idles the machine.
  */
 const QUOTED = /"([^"\n]{3,})"|„([^“”\n]{3,})[“”]|“([^”\n]{3,})”|»([^«\n]{3,})«/g
 const L = '(?![\\p{L}])'
 const LEAD = '^(?:(?:bitte|please|claude)[,!]?\\s+)*'
-const TARGET = '(?:die\\s+|der\\s+|deiner\\s+|the\\s+|deine\\s+|your\\s+)?(?:batch|stapel|arbeit|work|alles|everything)' + L
-const IMPERATIVE = new RegExp(
+const TARGET = '(?:die\\s+|der\\s+|deine\\s+|deiner\\s+|the\\s+|your\\s+)?(?:batch|stapel|arbeit|work|alles|everything)' + L
+const NOW = '(?:\\s+(?:sofort|jetzt|now))?'
+// The only words a command may carry after its verb: when, and for how long.
+const TAIL =
+  '(?:\\s+(?:sofort|jetzt|now|bitte|please|bis\\s+morgen|bis\\s+auf\\s+weiteres|bis\\s+ich\\s+zurück\\s+bin|für\\s+heute|for\\s+now|for\\s+today|until\\s+i\\s+return|until\\s+tomorrow))*[\\s!.]*$'
+const COMMAND = new RegExp(
   LEAD +
-    '(?:(?:stopp|stoppe|stop|pausiere|pause|unterbrich|beende|suspend)' + L + '\\s+(?:sofort\\s+|jetzt\\s+|now\\s+)?' + TARGET +
-    '|halte?' + L + '\\s+' + TARGET + '.*(?<![\\p{L}])an' + L +
-    '|hör(?:e)?' + L + '\\s+mit\\s+' + TARGET + '.*(?<![\\p{L}])auf' + L + ')',
+    '(?:(?:stopp|stoppe|stop|pausiere|pause|unterbrich|beende|suspend)' + L + NOW + '\\s+' + TARGET +
+    '|halte?' + L + '\\s+' + TARGET + NOW + '\\s+an' + L +
+    '|hör(?:e)?' + L + '\\s+mit\\s+' + TARGET + '\\s+auf' + L +
+    '|' + TARGET + NOW + '\\s+(?:anhalten|stoppen|pausieren|unterbrechen|beenden)' + L +
+    '|(?:stopp|stop|halt|anhalten|pause)' + L + ')' +
+    TAIL,
   'iu',
 )
-const INFINITIVE = new RegExp(
-  LEAD + TARGET + '\\s+(?:sofort\\s+|jetzt\\s+)?(?:anhalten|stoppen|pausieren|unterbrechen|beenden)' + L + '[\\s!.]*$',
-  'iu',
-)
-const BARE_STOP = /^\s*(?:stopp|stop|halt|anhalten|pause)\s*[!.]*\s*$/i
-const NEGATION = /(?<![\p{L}'])(nicht|nie|niemals|kein\p{L}*|nein|not|never|no|don't|dont)(?![\p{L}'])/iu
-const HEDGE =
-  /(?<![\p{L}])(vielleicht|eventuell|erstmal|könnte\p{L}*|würde\p{L}*|sollte\p{L}*|soll|sollen|willst|überleg\p{L}*|falls|wenn|ob|reden|besprechen|maybe|perhaps|could|would|should|might|if|whether|discuss|talk)(?![\p{L}])/iu
+// Any of these ANYWHERE in the text voids it: a question, a negation, a hedge, or
+// a word that keeps or restarts the batch (a retraction inside the same message).
+const VOIDING =
+  /\?|(?<![\p{L}'])(nicht|nie|niemals|kein\p{L}*|nein|doch|not|never|no|don't|dont|vielleicht|eventuell|erstmal|könnte\p{L}*|würde\p{L}*|sollte\p{L}*|soll|sollen|willst|überleg\p{L}*|falls|wenn|ob|reden|besprechen|weiter\p{L}*|fortsetzen|starte\p{L}*|maybe|perhaps|could|would|should|might|if|whether|discuss|talk|continue|resume|restart|keep|go\s+on)(?![\p{L}'])/iu
 
-/** Sentences, with a wrapped line kept in its sentence so a negation keeps its scope. */
-function sentencesOf(text) {
-  const flat = String(text ?? '')
-    .replace(/[’‘ʼ`´]/g, "'")
-    .replace(/\s+/g, ' ')
+/** Sentences of one flattened text; a wrapped line stays in its sentence. */
+function sentencesOf(flat) {
   return flat.match(/[^.!?…;]+[.!?…;]*/g) ?? []
 }
 
-function isStopOrderSentence(sentence) {
-  const s = sentence.trim()
-  if (!s || s.includes('?')) return false
-  if (NEGATION.test(s) || HEDGE.test(s)) return false
-  return BARE_STOP.test(s) || IMPERATIVE.test(s) || INFINITIVE.test(s)
-}
-
-/** Does this user text contain an explicit order to stop or pause the batch? */
+/**
+ * Is this user text an explicit order to stop or pause the batch? Every sentence
+ * must be EXACTLY a closed command (verb, the batch, at most a time phrase), and
+ * nothing in the whole text may ask, negate, hedge or retract.
+ */
 export function isExplicitStopOrder(text) {
-  return sentencesOf(text).some(isStopOrderSentence)
+  const flat = String(text ?? '')
+    .replace(/[’‘ʼ`´]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!flat || VOIDING.test(flat)) return false
+  const sentences = sentencesOf(flat)
+    .map((x) => x.trim())
+    .filter(Boolean)
+  return sentences.length > 0 && sentences.every((x) => COMMAND.test(x))
 }
 
 /** Does a pause reason QUOTE an explicit stop order (not just any user words)? */
