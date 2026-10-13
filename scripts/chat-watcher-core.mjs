@@ -180,10 +180,13 @@ export function wakeDecision({
 
 /** How long a message may sit pending under "the live owner will get it" before
  *  the watcher takes it anyway. Calibratable — `HOA_CHAT_DEFER_MS` in the
- *  wrapper. Three minutes is short enough that a phone reader still reads it as
- *  an answer, and long enough that an ordinarily busy owner always wins the race
- *  (its heartbeat delivers within seconds). */
-export const DEFERRAL_MS = 3 * 60 * 1000
+ *  wrapper. 45 seconds (three minutes until 13.10.2026): a working owner's
+ *  heartbeat delivers within seconds, so it still always wins the race, while
+ *  an owner that is waiting cannot answer at all — every further minute of
+ *  deferral was pure wait for the phone reader, on top of a responder run of
+ *  up to RESPONDER_MAX_MS. With the sweep every 15 s a message is taken
+ *  within about a minute. */
+export const DEFERRAL_MS = 45 * 1000
 
 /**
  * HOW LONG HAS THIS MESSAGE BEEN WAITING? PURE. NaN when it cannot be told.
@@ -531,6 +534,21 @@ export function buildResponderPrompt(messages) {
     return `- [${when}] ${JSON.stringify(text)}`
   })
   return `${RESPONDER_PROMPT_HEAD} ${lines.join(' ')}`
+}
+
+/**
+ * THE RESPONDER KNOWS ITS OWN SESSION ID. PURE.
+ *
+ * The answered-card Stop review can owe a non-owner responder a
+ * `board.mjs vdzk-keep` or `vdzk-answer.mjs` call, and both pick the session
+ * from `CLAUDE_SESSION_ID` once the guard state holds more than one. The CLI
+ * does not export it, so the responder of 12.10.2026 19:44 UTC answered in
+ * seven seconds and then looped on Stop until the RESPONDER_MAX_MS kill. The id
+ * is therefore fixed BEFORE the spawn (`--session-id`) and exported with it.
+ * It is a fresh uuid, never the claim's synthetic `chat-responder-…` id.
+ */
+export function responderSpawn({ args = [], env = {}, sessionId } = {}) {
+  return { args: [...args, '--session-id', sessionId], env: { ...env, CLAUDE_SESSION_ID: sessionId } }
 }
 
 /**

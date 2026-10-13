@@ -72,6 +72,7 @@ import {
   claimIsOurs,
   reconnectDelayMs,
   responderClaim,
+  responderSpawn,
   selfRestartDecision,
   sweepPlan,
   wakeDecision,
@@ -309,7 +310,8 @@ function spawnResponder(messages) {
     // user's focus, and this process wakes while the user is elsewhere).
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
-    child = spawn(exe, buildSpawnArgs({ prompt, fableState }), buildSpawnOptions({ cwd: REPO_ROOT, stdio: ['ignore', out, out] }))
+    const plan = responderSpawn({ args: buildSpawnArgs({ prompt, fableState }), env: process.env, sessionId: randomUUID() })
+    child = spawn(exe, plan.args, buildSpawnOptions({ cwd: REPO_ROOT, stdio: ['ignore', out, out], env: plan.env }))
   } catch (e) {
     log({ event: 'spawn-failed', reason: (e && e.message) || String(e) })
     return false
