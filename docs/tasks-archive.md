@@ -34038,3 +34038,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Also (findings carrier 12.10.2026 19:46-19:47, responder 19043d77 on probe message 2eaa0509): reproduced with four cards; scripts/decision-card-guard.mjs:366 evaluateCardReviews blocks before the nonOwner exit at :382, so the responder looped on Stop.
   Bundle: Chat & Tafel.
   Decision (owner 13.10.2026, open to veto): the spec's blanket stand-down would silently drop the deliberate non-owner carry path (evaluateCardReviews' non-owner branch; vdzk-answer is already allowed in stand-down). Instead: (C) for a non-owner, block only on cards that share terms with the message, and let the rest pass; (B) admit `board.mjs vdzk-keep` through the stand-down allowlist, so a false term match is no deadlock. Verifiable becomes: Vitest cases where a non-owner with unrelated open cards passes, and the stand-down hook admits vdzk-keep.
+
+- [x] 1352. Chat responder: a known session id ends its zero-ack runs, and the deferral drops to 45 s
+  Queue position: queue front, after point 1348 (communication first).
+  Source: split from the live-measurement point (13.10.2026, owner decision under the standing split rule): the user-approved amendment steps 1 and 2 are built, unit-tested and cross-vendor reviewed (GPT-6 Astra "merge" at b6770afba), but the live case needs a user-confirmed window, and the watcher only runs merged code; the live case moves to point 1355.
+  Final state: amendment steps 1 and 2 (recorded under point 1355) on main: the responder runs with a fresh --session-id that is also exported as CLAUDE_SESSION_ID, so the answered-card Stop review can finish; DEFERRAL_MS is 45 s, still calibratable via HOA_CHAT_DEFER_MS.
+  Verifiable: scripts/chat-watcher-core.test.mjs green (session id in args and env, deferral default and override); CI green on the branch head.
+  Criticality: medium - the user's only live channel to the batch.
+  Bundle: Dorfleben.

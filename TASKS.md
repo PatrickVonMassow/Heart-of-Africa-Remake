@@ -77,13 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1352. Chat responder: a known session id ends its zero-ack runs, and the deferral drops to 45 s
-  Queue position: queue front, after point 1348 (communication first).
-  Source: split from the live-measurement point (13.10.2026, owner decision under the standing split rule): the user-approved amendment steps 1 and 2 are built, unit-tested and cross-vendor reviewed (GPT-6 Astra "merge" at b6770afba), but the live case needs a user-confirmed window, and the watcher only runs merged code; the live case moves to point 1355.
-  Final state: amendment steps 1 and 2 (recorded under point 1355) on main: the responder runs with a fresh --session-id that is also exported as CLAUDE_SESSION_ID, so the answered-card Stop review can finish; DEFERRAL_MS is 45 s, still calibratable via HOA_CHAT_DEFER_MS.
-  Verifiable: scripts/chat-watcher-core.test.mjs green (session id in args and env, deferral default and override); CI green on the branch head.
-  Criticality: medium - the user's only live channel to the batch.
-  Bundle: Dorfleben.
 - [ ] 1355. Live measurement: a board chat message sent during a blocking owner call is answered within 3 minutes
   Queue position: directly after point 1352 (it measures that point's merged fixes).
   Source: split from point 1352 (13.10.2026); carries the original live-measurement spec, its attempt history and the user-approved amendment step 3.
