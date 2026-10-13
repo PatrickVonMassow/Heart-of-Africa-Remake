@@ -51,6 +51,11 @@ export function refBranch(ref) {
 export function targetBranch(target) {
   return String(target?.branch || refBranch(target?.ref))
 }
+/** A wait's target for a renewal or alert: keeps the HEAD fallback's branch,
+ *  which a bare `{ ref, sha }` would drop (review P2, 13.10.2026). */
+export function waitTarget(wait) {
+  return { ref: wait?.ref, sha: wait?.sha, ...(wait?.branch ? { branch: String(wait.branch) } : {}) }
+}
 
 /**
  * Attach each run's `ci/gate (branch)` commit status to it as `gate`.

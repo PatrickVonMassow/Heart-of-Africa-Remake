@@ -16,6 +16,7 @@ import {
   readAllStatusPages,
   refBranch,
   targetBranch,
+  waitTarget,
   withGateStatuses,
   failedRuns,
   notifiedFromState,
@@ -255,6 +256,17 @@ describe('classifyRuns', () => {
     }, { now: 0, makeWakeToken: () => 'wake' })
     expect(targetBranch(wait)).toBe('feat/x')
     expect(classifyRuns(soft, HEAD, { branch: targetBranch(wait) }).state).toBe('failed')
+    // Review P2 (13.10.2026): a pending renewal from the wait keeps the branch.
+    for (const runId of [1, 2]) {
+      const renewed = renewCiWait(runId === 1 ? wait : null, {
+        target: waitTarget(wait),
+        classification: { state: 'pending', workflowName: 'CI', runId },
+        firstSeenAt: 0,
+        observedAt: 1,
+      }, { now: 1, makeWakeToken: () => 'wake' })
+      expect(targetBranch(renewed)).toBe('feat/x')
+      expect(classifyRuns(soft, HEAD, { branch: targetBranch(renewed) }).state).toBe('failed')
+    }
   })
 
   // Review P2 (13.10.2026): a red gate on an unread page must not pass as green.

@@ -42,6 +42,7 @@ import {
   withGateStatuses,
   readAllStatusPages,
   targetBranch,
+  waitTarget,
   ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
@@ -840,7 +841,7 @@ async function observeDurableWait(wakeToken) {
     const observedAt = Date.now()
     if (classification.state === 'pending') {
       const observation = {
-        target: { ref: wait.ref, sha: wait.sha },
+        target: waitTarget(wait),
         classification,
         firstSeenAt: wait.firstObservationAt,
         observedAt,
@@ -917,7 +918,7 @@ async function observeDurableWait(wakeToken) {
         await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
         continue
       }
-      await notifyCiRed(ciRedAlertMessage({ target: { ref: wait.ref, sha: wait.sha }, classification, standDown }))
+      await notifyCiRed(ciRedAlertMessage({ target: waitTarget(wait), classification, standDown }))
     }
 
     let finished = null
