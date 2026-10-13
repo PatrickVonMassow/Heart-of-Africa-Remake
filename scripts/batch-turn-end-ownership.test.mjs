@@ -12,7 +12,7 @@ import {
   transcriptShowsPerson,
   turnEndOwnership,
 } from './batch-resume-hook-core.mjs'
-import { composeHookText, turnEndInvitation } from './batch-progress-guard.mjs'
+import { composeHookText, gatherBatchProgressInputs, turnEndInvitation } from './batch-progress-guard.mjs'
 import { acquire, assessOwner, convertPendingSpawn, readOwnerLock, statePathsFor } from './batch-singleton.mjs'
 import { launcherStartDecision } from './batch-autostart-core.mjs'
 
@@ -146,5 +146,20 @@ describe('drill: an owner dies beside a live interactive window', () => {
     expect(plan).toEqual({ mayAcquire: true, invitation: 'unattended' })
     expect(acquire('worker-9', { ...base(), pid: WORKER_PID })).toBe('acquired')
     expect(readOwnerLock(lockPath).sessionId).toBe('worker-9')
+  })
+
+  it('the guard preflight predicts no ownership for the uninvited interactive window', () => {
+    const lock = deadOwner()
+    const inputs = (mayAcquire) =>
+      gatherBatchProgressInputs({
+        sessionId: 'window-2',
+        paused: false,
+        lockPath,
+        lock,
+        tasksText: '- [ ] 1. open point',
+        probes: { turnEndInvitation: () => ({ mayAcquire }) },
+      })
+    expect(inputs(false)).toMatchObject({ applicable: false, cause: 'uninvited-interactive' })
+    expect(inputs(true).cause).not.toBe('uninvited-interactive')
   })
 })

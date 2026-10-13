@@ -9,8 +9,9 @@
 // HARD SINGLETON (24.07.2026, after the e9407cae double-session incident):
 //   - It pushes ONLY the session that holds (or atomically acquires) the batch
 //     lock. A session with open work acquires a FREE, unreserved lock through the
-//     ATOMIC acquire in scripts/batch-singleton.mjs; the old check-then-claim
-//     conscription is gone. A session that does not own the lock — even one with
+//     ATOMIC acquire in scripts/batch-singleton.mjs — unless it is a window a
+//     person types into that holds no lock and made no claim (31.08.2026); the
+//     old check-then-claim conscription is gone. A session that does not own the lock — even one with
 //     no readable session id — STANDS DOWN, blocked only while a declared child of
 //     its own still needs a transfer (the stand-down boundary, point 716).
 //   - ACTIVE PARALLEL-SESSION DETECTOR: each turn-end, the owner checks for a
