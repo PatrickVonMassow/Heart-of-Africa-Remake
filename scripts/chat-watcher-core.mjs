@@ -180,10 +180,13 @@ export function wakeDecision({
 
 /** How long a message may sit pending under "the live owner will get it" before
  *  the watcher takes it anyway. Calibratable — `HOA_CHAT_DEFER_MS` in the
- *  wrapper. Three minutes is short enough that a phone reader still reads it as
- *  an answer, and long enough that an ordinarily busy owner always wins the race
- *  (its heartbeat delivers within seconds). */
-export const DEFERRAL_MS = 3 * 60 * 1000
+ *  wrapper. 45 seconds (three minutes until 13.10.2026): a working owner's
+ *  heartbeat delivers within seconds, so it still always wins the race, while
+ *  an owner that is waiting cannot answer at all — every further minute of
+ *  deferral was pure wait for the phone reader, on top of a responder run of
+ *  up to RESPONDER_MAX_MS. With the sweep every 15 s a message is taken
+ *  within about a minute. */
+export const DEFERRAL_MS = 45 * 1000
 
 /**
  * HOW LONG HAS THIS MESSAGE BEEN WAITING? PURE. NaN when it cannot be told.

@@ -133,7 +133,7 @@ describe('the deferral has a deadline — a live owner may not sit on a message 
   const NOW = 1_700_000_000_000
 
   it('still skips for a live owner while the message is YOUNG — unchanged behaviour', () => {
-    const plan = sweepPlan({ pending: [aged(0)], now: NOW + 60_000, windowMs: DEFERRAL_MS })
+    const plan = sweepPlan({ pending: [aged(0)], now: NOW + DEFERRAL_MS - 1, windowMs: DEFERRAL_MS })
     expect(plan.overdue).toEqual([])
     expect(wakeDecision({ ...ok, ownerAlive: true, deferralExpired: false })).toEqual({
       decision: 'skip',
