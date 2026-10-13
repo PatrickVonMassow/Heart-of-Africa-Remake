@@ -26,6 +26,8 @@
 // rewrote a document as empty from one: loud and free, rather than silently
 // wrong. The dry run is exempt — it changes nothing, and being able to watch the
 // channel from a worktree is exactly what it is for.
+// FIRST import: the code fingerprint is read before the rest evaluates.
+import { LOADED_FINGERPRINT, readWatcherFingerprint } from './chat-watcher-fingerprint.mjs'
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -61,6 +63,7 @@ import {
   DEFERRAL_MS,
   RESPONDER_MAX_MESSAGES,
   RESPONDER_MAX_MS,
+  SELF_RESTART_CHECK_MS,
   WATCHER_PID_FILE,
   ackPlan,
   stillPendingCount,
@@ -69,6 +72,7 @@ import {
   claimIsOurs,
   reconnectDelayMs,
   responderClaim,
+  selfRestartDecision,
   sweepPlan,
   wakeDecision,
 } from './chat-watcher-core.mjs'
@@ -199,9 +203,13 @@ function gatherState(sessionId, responderLive) {
 const state = {
   sessionId: `${CLAIM_SESSION_PREFIX}-${randomUUID()}`,
   identity: { pid: process.pid, pidStartedAt: null },
+  codeFingerprint: null,
   child: null,
   childTimer: null,
   sweepTimer: null,
+  selfRestartTimer: null,
+  /** Stream lines between arrival and their spool write (`handleLine` awaits). */
+  inFlight: 0,
   handed: [],
   /** Envelope ids this watcher already handed to a responder. The sweep skips
    *  them, so a responder that answered nothing leaves its messages pending
@@ -377,6 +385,7 @@ function shutdown(why, code = 0) {
   try {
     if (state.childTimer) clearTimeout(state.childTimer)
     if (state.sweepTimer) clearInterval(state.sweepTimer)
+    if (state.selfRestartTimer) clearInterval(state.selfRestartTimer)
     // A responder is OURS, so an orderly stop takes it with us. The launcher
     // keeps this process through a batch pause so user mail can end that pause;
     // any other shutdown still must not leave a headless session under a claim
@@ -418,7 +427,12 @@ function installShutdownHandlers() {
 }
 
 function writePidFile() {
-  writeJsonAtomic(PID_PATH, { ...state.identity, at: Date.now(), sessionId: state.sessionId })
+  writeJsonAtomic(PID_PATH, {
+    ...state.identity,
+    at: Date.now(),
+    sessionId: state.sessionId,
+    codeFingerprint: state.codeFingerprint,
+  })
 }
 function clearPidFile() {
   try {
@@ -453,6 +467,15 @@ async function consumeStream(url, onEvent, signal) {
 
 /** One arrived line → verified, decided, and (live only) acted on. */
 async function handleLine(secret, maxAgeMs, line) {
+  state.inFlight++
+  try {
+    await decideLine(secret, maxAgeMs, line)
+  } finally {
+    state.inFlight--
+  }
+}
+
+async function decideLine(secret, maxAgeMs, line) {
   const event = parseNtfyLine(line)
   if (!event) return
   if (event.event === 'message' && Number.isFinite(event.time)) {
@@ -550,6 +573,30 @@ function sweepDeferred() {
   }
 }
 
+// --- Self-restart on changed code -----------------------------------------------
+//
+// A merge into the watcher's code stays inert in a running watcher. So, when it
+// is idle, it compares its start fingerprint with the code on disk and exits on
+// a change; the launcher's next tick starts the new code (`selfRestartDecision`).
+
+/** One check. Total — it runs inside a timer. */
+function checkSelfRestart() {
+  try {
+    const verdict = selfRestartDecision({
+      startFingerprint: state.codeFingerprint,
+      currentFingerprint: readWatcherFingerprint(),
+      childAlive: state.child !== null,
+      adoptedResponderAlive: adoptDecision({ claim: readClaim(), probe: probePid }).adopt,
+      pending: state.handed.length + state.inFlight,
+    })
+    if (!verdict.exit) return
+    log({ event: 'code-changed-exit', message: 'chat watcher: exiting (code-changed)' })
+    shutdown('code-changed')
+  } catch (e) {
+    log({ event: 'self-restart-check-failed', reason: (e && e.message) || String(e) })
+  }
+}
+
 async function run() {
   // The worktree refusal comes FIRST, before the channel is even looked at: a
   // run from the wrong checkout must be loud whether or not a secret happens to
@@ -587,6 +634,7 @@ async function run() {
     if (hold.reason !== 'held') log({ event: 'singleton-unguarded', reason: hold.reason })
   }
   state.identity = ownIdentity()
+  state.codeFingerprint = LOADED_FINGERPRINT
   installShutdownHandlers()
   const { inbox } = await deriveTopics(secret)
   // The ledger the spool already holds: what is waiting AND what was consumed.
@@ -622,6 +670,8 @@ async function run() {
     // RUN gets no sweep — it decides and reports, and spawns nothing.
     state.sweepTimer = setInterval(sweepDeferred, sweepIntervalMs())
     if (typeof state.sweepTimer.unref === 'function') state.sweepTimer.unref()
+    state.selfRestartTimer = setInterval(checkSelfRestart, SELF_RESTART_CHECK_MS)
+    if (typeof state.selfRestartTimer.unref === 'function') state.selfRestartTimer.unref()
   }
   log({ event: 'watching', mode: dryRun ? 'dry-run' : 'live', sessionId: state.sessionId, deferralMs: deferralMs() })
 

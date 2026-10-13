@@ -50,6 +50,8 @@
 // by process), and would then acquire the owner lock — precisely the outcome
 // this module exists to prevent.
 
+import { createHash } from 'node:crypto'
+
 /**
  * Every reason a decision can carry, in one place so the live path, the dry run
  * and the tests all speak the same words. The verification drops (`malformed`,
@@ -335,6 +337,83 @@ export function isWatcherCommand(command) {
   if (!/^node(\.exe)?$/i.test(base(argv[0]))) return false
   const script = argv.slice(1).find((a) => !String(a).startsWith('-'))
   return script !== undefined && base(script) === 'chat-watcher.mjs'
+}
+
+/** Relative imports of one module source: static, side-effect and dynamic.
+ *  Not syntax-aware: an import inside a comment or string is followed too, which
+ *  only widens the hash; a nonexistent one is skipped by the caller. */
+function relativeImports(source) {
+  const out = []
+  // The path sits in a lookahead: a match consumes only its keyword, so a false
+  // match (say, in a comment) can never swallow the quote of a real import.
+  const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(?=['"](\.\/[^'"\r\n]+)['"])/g
+  for (let m; (m = re.exec(source)); ) out.push(m[1].slice(2))
+  return out
+}
+
+/**
+ * THE WATCHER'S CODE FINGERPRINT. PURE — `readText(name)` returns a `scripts/`
+ * file's content or null. Hashes the entry and every module it imports from
+ * `scripts/`, transitively (`./x.mjs` only; `../` and packages are outside), so
+ * any merge into code the watcher runs changes it. Null when any file is
+ * unreadable; an import whose file does not exist (`readText` gives undefined)
+ * is skipped — such a module could not load, so it is not code the watcher runs. Read at watcher start and at its idle self-restart check
+ * (`chat-watcher-fingerprint.mjs`, `selfRestartDecision`).
+ */
+export function watcherCodeFingerprint({ readText, entry = 'chat-watcher.mjs' } = {}) {
+  const seen = new Map()
+  const queue = [entry]
+  while (queue.length) {
+    const name = queue.shift()
+    if (seen.has(name)) continue
+    const text = typeof readText === 'function' ? readText(name) : null
+    if (text === undefined && name !== entry) continue
+    // An unreadable file makes the fingerprint incomplete: null, never a hash.
+    if (typeof text !== 'string') return null
+    seen.set(name, text)
+    queue.push(...relativeImports(text))
+  }
+  const hash = createHash('sha256')
+  for (const name of [...seen.keys()].sort()) hash.update(`${name}\0${seen.get(name)}\0`)
+  return hash.digest('hex').slice(0, 16)
+}
+
+/** The start fingerprint a watcher may vouch for. The ESM loader read its
+ *  sources before this fingerprint was taken, so a file modified in between
+ *  (mtime from `processStartMs` to `nowMs`) makes it `untrusted`, and the
+ *  first idle check restarts once. A future mtime (clock set back) is ignored. */
+export function startFingerprint({ fingerprint, mtimesMs = [], processStartMs, nowMs, untrusted }) {
+  if (fingerprint === null) return null
+  return mtimesMs.some((m) => m >= processStartMs && m <= nowMs) ? untrusted : fingerprint
+}
+
+/** How often an idle watcher recomputes its code fingerprint (calibratable). */
+export const SELF_RESTART_CHECK_MS = 30_000
+
+/**
+ * SHOULD AN IDLE WATCHER EXIT BECAUSE A MERGE CHANGED ITS CODE? PURE.
+ *
+ * Exit only on a readable current fingerprint that differs from the one taken
+ * at start, while no responder it spawned or adopted is alive and no message is
+ * in its hands. An unreadable fingerprint (null) never exits. After the exit the
+ * launcher's dead-watcher branch (`watcherSupervision`) starts the new code.
+ *
+ * Returns { exit, reason }.
+ */
+export function selfRestartDecision({
+  startFingerprint = null,
+  currentFingerprint = null,
+  childAlive = false,
+  adoptedResponderAlive = false,
+  pending = 0,
+} = {}) {
+  if (typeof currentFingerprint !== 'string' || currentFingerprint === '') {
+    return { exit: false, reason: 'fingerprint-unreadable' }
+  }
+  if (currentFingerprint === startFingerprint) return { exit: false, reason: 'code-unchanged' }
+  if (childAlive || adoptedResponderAlive) return { exit: false, reason: 'responder-live' }
+  if (pending > 0) return { exit: false, reason: 'message-in-hand' }
+  return { exit: true, reason: 'code-changed' }
 }
 
 /**

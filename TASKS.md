@@ -85,7 +85,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium - the user's only live channel to the batch.
   Bundle: Dorfleben.
   Attempt 1 (12.10.2026 22:45-23:31): the user was notified of a 22:58-23:10 window; owner blocked 46 min on a subagent (6 green unit runs); no message arrived, so no case. The new watcher logged each line once ("watching" at 20:44:31Z), so the duplicate-line fix holds live. Next attempt needs a user-confirmed window.
-  Also (same session): the running watcher (pid 1584562, started 15:10) still ran pre-merge code at 22:44; the autostart supervision restarts only a dead watcher, never one whose code a merge changed, so a merged watcher fix runs only after a manual restart or reboot. Fix it here or record why not.
+  Also (same session): the running watcher (pid 1584562, started 15:10) still ran pre-merge code at 22:44; the autostart supervision restarts only a dead watcher, never one whose code a merge changed, so a merged watcher fix runs only after a manual restart or reboot. Split off as point 1353 (13.10.2026).
 
 - [ ] 1053. A session the user opened for something else silently becomes the batch owner
   (user 03.09.2026, on seeing this session announce "Batch übernommen": »Wieso hast du die

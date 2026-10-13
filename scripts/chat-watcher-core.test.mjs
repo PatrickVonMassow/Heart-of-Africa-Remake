@@ -18,6 +18,9 @@ import {
   stampOf,
   sweepPlan,
   wakeDecision,
+  selfRestartDecision,
+  startFingerprint,
+  watcherCodeFingerprint,
   watcherSupervision,
   isWatcherCommand,
 } from './chat-watcher-core.mjs'
@@ -26,6 +29,8 @@ import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
 import { claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
+import { LOADED_FINGERPRINT, readWatcherFingerprint } from './chat-watcher-fingerprint.mjs'
+import { readFileSync } from 'node:fs'
 
 const ok = { accepted: true, paused: false, formatAlarm: false, ownerAlive: false, responderLive: false, claimHonoured: false }
 
@@ -712,5 +717,136 @@ describe('stillPendingCount — measured on the spool, not handed minus acked', 
   })
   it('counts only handed messages that are still spooled', () => {
     expect(stillPendingCount([{ id: 'a' }, { id: 'b' }], [{ id: 'b' }, { id: 'c' }])).toBe(1)
+  })
+})
+
+describe('watcherCodeFingerprint — the watcher and the modules it imports', () => {
+  const files = {
+    'chat-watcher.mjs': "import { a } from './a.mjs'\nimport x from 'node:fs'\nawait import('./b.mjs')",
+    'a.mjs': "import './c.mjs'\nimport { y } from '../src/y.ts'",
+    'b.mjs': 'export const b = 1',
+    'c.mjs': 'export const c = 1',
+    'unrelated.mjs': 'export const u = 1',
+  }
+  const fp = (over = {}) => {
+    const all = { ...files, ...over }
+    return watcherCodeFingerprint({ readText: (n) => all[n] ?? null })
+  }
+
+  it('skips an import whose file does not exist, commented out or not', () => {
+    const base = fp()
+    const gone = (n) => (n === 'gone.mjs' || n === 'gone2.mjs' ? undefined : null)
+    const commented = watcherCodeFingerprint({
+      readText: (n) => ({ ...files, 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\n// import './gone.mjs'\n/* import './gone2.mjs' */" })[n] ?? gone(n),
+    })
+    expect(commented).not.toBeNull()
+    const missing = watcherCodeFingerprint({
+      readText: (n) => (n === 'gone.mjs' ? undefined : { ...files, 'chat-watcher.mjs': files['chat-watcher.mjs'] + "\nimport './gone.mjs'" }[n] ?? null),
+    })
+    expect(missing).not.toBeNull()
+    expect(base).not.toBeNull()
+  })
+
+  it('does not let an unterminated quote in a comment swallow the next import', () => {
+    const src = "// import './unfinished\nimport './a.mjs'"
+    const withA = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': src, 'a.mjs': a })[n] })
+    expect(withA('export const a = 1')).not.toBe(withA('export const a = 2'))
+    const sameLine = "/* import './unfinished */ import './a.mjs'"
+    const withB = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': sameLine, 'a.mjs': a })[n] })
+    expect(withB('export const a = 1')).not.toBe(withB('export const a = 2'))
+  })
+
+  it('keeps an import that sits between comment-like markers in strings', () => {
+    const src = "const open = '/*'\nimport './a.mjs'\nconst close = '*/'"
+    const withA = (a) => watcherCodeFingerprint({ readText: (n) => ({ 'chat-watcher.mjs': src, 'a.mjs': a })[n] ?? null })
+    expect(withA('export const a = 1')).not.toBe(withA('export const a = 2'))
+  })
+
+  it('still yields null for an unreadable entry or an unreadable existing import', () => {
+    expect(watcherCodeFingerprint({ readText: (n) => (n === 'chat-watcher.mjs' ? undefined : files[n]) })).toBeNull()
+    expect(fp({ 'b.mjs': null })).toBeNull()
+  })
+
+  it('is stable for unchanged files', () => {
+    expect(fp()).toBe(fp())
+  })
+
+  it('changes with the entry and with a transitive import', () => {
+    expect(fp({ 'chat-watcher.mjs': files['chat-watcher.mjs'] + '\n' })).not.toBe(fp())
+    expect(fp({ 'c.mjs': 'export const c = 2' })).not.toBe(fp())
+    expect(fp({ 'b.mjs': 'export const b = 2' })).not.toBe(fp())
+  })
+
+  it('ignores files the watcher does not import', () => {
+    expect(fp({ 'unrelated.mjs': 'export const u = 2' })).toBe(fp())
+  })
+
+  it('is null when an imported file is unreadable', () => {
+    expect(fp({ 'c.mjs': null })).toBe(null)
+    expect(fp({ 'chat-watcher.mjs': null })).toBe(null)
+  })
+
+  it('is read at the watcher module\'s first import, and complete on this tree', () => {
+    const src = readFileSync(new URL('./chat-watcher.mjs', import.meta.url), 'utf8')
+    const firstImport = src.split('\n').find((l) => l.startsWith('import '))
+    expect(firstImport).toContain("from './chat-watcher-fingerprint.mjs'")
+    expect(LOADED_FINGERPRINT).toMatch(/^[0-9a-f]{16}$/)
+    expect(readWatcherFingerprint()).toBe(LOADED_FINGERPRINT)
+  })
+})
+
+describe('selfRestartDecision — an idle watcher whose code a merge changed exits', () => {
+  const idle = { startFingerprint: 'aaaa', currentFingerprint: 'bbbb', childAlive: false, adoptedResponderAlive: false, pending: 0 }
+
+  it('stays on a matching fingerprint', () => {
+    expect(selfRestartDecision({ ...idle, currentFingerprint: 'aaaa' })).toEqual({ exit: false, reason: 'code-unchanged' })
+  })
+
+  it('exits on a mismatch while idle', () => {
+    expect(selfRestartDecision(idle)).toEqual({ exit: true, reason: 'code-changed' })
+  })
+
+  it('never exits on an unreadable current fingerprint', () => {
+    expect(selfRestartDecision({ ...idle, currentFingerprint: null })).toEqual({ exit: false, reason: 'fingerprint-unreadable' })
+    expect(selfRestartDecision({ ...idle, currentFingerprint: '' }).exit).toBe(false)
+  })
+
+  it('waits for a live spawned responder', () => {
+    expect(selfRestartDecision({ ...idle, childAlive: true })).toEqual({ exit: false, reason: 'responder-live' })
+  })
+
+  it('waits for a live adopted responder', () => {
+    expect(selfRestartDecision({ ...idle, adoptedResponderAlive: true })).toEqual({ exit: false, reason: 'responder-live' })
+  })
+
+  it('waits while a message is in its hands', () => {
+    expect(selfRestartDecision({ ...idle, pending: 1 })).toEqual({ exit: false, reason: 'message-in-hand' })
+  })
+
+  it('a watcher started without a fingerprint exits on the first readable one', () => {
+    expect(selfRestartDecision({ ...idle, startFingerprint: null }).exit).toBe(true)
+  })
+
+  it('is wired: the watcher checks it on its own timer and logs the exit', () => {
+    const src = readFileSync(new URL('./chat-watcher.mjs', import.meta.url), 'utf8')
+    expect(src).toContain('setInterval(checkSelfRestart, SELF_RESTART_CHECK_MS)')
+    expect(src).toContain("'chat watcher: exiting (code-changed)'")
+    expect(src).toContain("shutdown('code-changed')")
+  })
+})
+
+describe('startFingerprint — a fingerprint read after the code changed is not vouched for', () => {
+  const base = { fingerprint: 'abcd', processStartMs: 1000, nowMs: 2000, untrusted: 'U' }
+  it('trusts files older than the process', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 999] })).toBe('abcd')
+  })
+  it('distrusts a file modified while the process started', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 1500] })).toBe('U')
+  })
+  it('ignores a future mtime, so a clock set back cannot distrust every start', () => {
+    expect(startFingerprint({ ...base, mtimesMs: [500, 9000] })).toBe('abcd')
+  })
+  it('keeps an unreadable fingerprint null', () => {
+    expect(startFingerprint({ ...base, fingerprint: null, mtimesMs: [1500] })).toBeNull()
   })
 })
