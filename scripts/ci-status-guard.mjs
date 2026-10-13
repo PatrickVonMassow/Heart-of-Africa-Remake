@@ -39,6 +39,10 @@ import {
   ciWaitIdentity,
   classifyRuns,
   failedRuns,
+  withGateStatuses,
+  readAllStatusPages,
+  targetBranch,
+  waitTarget,
   ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
@@ -190,6 +194,15 @@ function git(args) {
   }).trim()
 }
 
+/** The checked-out branch name, '' when detached or unreadable. */
+function currentBranch() {
+  try {
+    return git(['symbolic-ref', '--quiet', '--short', 'HEAD'])
+  } catch {
+    return ''
+  }
+}
+
 /** HEAD counts as pushed once ANY remote-tracking ref contains it (local refs, no
  *  network). Feature branches push to origin/feat/<point>-<slug>, so the old
  *  origin/main-only ancestor check silenced the guard for ALL branch work —
@@ -250,7 +263,10 @@ function httpsRequest(url, { method = 'GET', headers = {}, body = null, timeoutM
   })
 }
 
-/** Actions runs for the sha; null on any failure (the caller fails open). */
+/** Actions runs for the sha with its `ci/gate (branch)` commit statuses attached
+ * (a soft `feat/**` run concludes success even when its gate is red; the
+ * classifier folds the gate in for the target's own branch); null on any
+ * failure or incomplete read of either (the caller fails open and says so). */
 async function fetchRuns(repo, headSha) {
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -264,12 +280,29 @@ async function fetchRuns(repo, headSha) {
     { headers },
   )
   if (!res || res.status !== 200) return null
+  let runs
   try {
     const data = JSON.parse(res.body)
-    return Array.isArray(data?.workflow_runs) ? data.workflow_runs : null
+    runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : null
   } catch {
     return null
   }
+  if (!runs) return null
+  // Every page, or none: a red gate on an unread page must not pass as green.
+  const statuses = await readAllStatusPages(async (page) => {
+    const statusRes = await httpsRequest(
+      `https://api.github.com/repos/${repo}/commits/${headSha}/statuses?per_page=100&page=${page}`,
+      { headers },
+    )
+    if (!statusRes || statusRes.status !== 200) return null
+    try {
+      const list = JSON.parse(statusRes.body)
+      return Array.isArray(list) ? list : null
+    } catch {
+      return null
+    }
+  })
+  return statuses ? withGateStatuses(runs, statuses) : null
 }
 
 /** Dispatch the one failed-jobs re-run selected by the pure classifier. A 201
@@ -528,8 +561,8 @@ function pushReflog() {
  *  526/528). Returns the chosen classification, whether every red is
  *  unactionable, the famine clocks to keep, the judged workflows and the
  *  re-run wait a failed-jobs dispatch started (`rerunWait`). */
-async function judgeRed(repo, { sha, runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
-  const reds = failedRuns(runs, sha)
+async function judgeRed(repo, { sha, branch = '', runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
+  const reds = failedRuns(runs, sha, { branch })
   const judged = []
   const stillFamished = {}
   let dispatchedWait = null
@@ -670,6 +703,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
       existingRefs,
       headSha: head,
       headPushed: isPushed(head),
+      headBranch: currentBranch(),
     }),
     liveAuthorBranches,
   })
@@ -803,11 +837,11 @@ async function observeDurableWait(wakeToken) {
       await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
       continue
     }
-    let classification = classifyRuns(runs, wait.sha)
+    let classification = classifyRuns(runs, wait.sha, { branch: targetBranch(wait) })
     const observedAt = Date.now()
     if (classification.state === 'pending') {
       const observation = {
-        target: { ref: wait.ref, sha: wait.sha },
+        target: waitTarget(wait),
         classification,
         firstSeenAt: wait.firstObservationAt,
         observedAt,
@@ -866,6 +900,7 @@ async function observeDurableWait(wakeToken) {
       try {
         const judged = await judgeRed(repo, {
           sha: wait.sha,
+          branch: targetBranch(wait),
           runs,
           classification,
           famine,
@@ -883,7 +918,7 @@ async function observeDurableWait(wakeToken) {
         await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
         continue
       }
-      await notifyCiRed(ciRedAlertMessage({ target: { ref: wait.ref, sha: wait.sha }, classification, standDown }))
+      await notifyCiRed(ciRedAlertMessage({ target: waitTarget(wait), classification, standDown }))
     }
 
     let finished = null
@@ -902,6 +937,7 @@ async function observeDurableWait(wakeToken) {
             state: classification.state,
             firstSeenAt: wait.firstObservationAt,
             checkedAt: observedAt,
+            branch: targetBranch(wait),
             ...(reason ? { reason } : {}),
           },
         },
