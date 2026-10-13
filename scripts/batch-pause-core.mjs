@@ -34,6 +34,7 @@
 // scripts/batch-lock.mjs, the tick's decision in scripts/batch-autostart.mjs.
 
 import { createHash } from 'node:crypto'
+import { humanText } from './request-approval-guard-core.mjs'
 
 /** The metadata keys the record understands. Anything else is part of the reason,
  *  so a legacy line like `autostart watchdog: …` is never eaten as metadata. */
@@ -67,6 +68,48 @@ const USER_UTTERANCE = /"[^"\n]{3,}"|„[^“”\n]{3,}[“”]|“[^”\n]{3,}�
 
 export function namesUserUtterance(reason) {
   return USER_UTTERANCE.test(String(reason ?? ''))
+}
+
+/**
+ * ONLY AN EXPLICIT ORDER STOPS THE BATCH (point 1351). Twice a session paused the
+ * batch on a question or a discussion remark (24.09.2026 »Erstmal nur darüber
+ * reden«, 12.10.2026 »Hast du die Batch bekommen?«). A sentence counts only as an
+ * imperative to stop or pause that names the batch (or is the bare stop word),
+ * and never when it asks, negates or hedges. Conservative on purpose: a refused
+ * real order costs one rephrasing, a false stop idles the machine.
+ */
+const QUOTED = /"([^"\n]{3,})"|„([^“”\n]{3,})[“”]|“([^”\n]{3,})”|»([^«\n]{3,})«/g
+const STOP_VERB =
+  /(?<![\p{L}])(anhalten|halte?(?![\p{L}]).*(?<![\p{L}])an|stopp|stoppe|stoppen|stop|pausiere|pausieren|pause|unterbrich|unterbrechen|beende|beenden|aufhören|hör(?![\p{L}]).*(?<![\p{L}])auf|suspend)(?![\p{L}])/iu
+const BARE_STOP = /^\s*(stopp|stop|halt|anhalten|pause)\s*[!.]*\s*$/i
+const STOP_TARGET = /(?<![\p{L}])(batch|stapel|arbeit|alles|work|everything)(?![\p{L}])/iu
+const NEGATION = /(?<![\p{L}'])(nicht|nie|niemals|kein\p{L}*|nein|not|never|no|don't|dont)(?![\p{L}'])/iu
+const HEDGE =
+  /(?<![\p{L}])(vielleicht|eventuell|erstmal|könnte\p{L}*|würde\p{L}*|sollte\p{L}*|soll|sollen|willst|überleg\p{L}*|falls|wenn|ob|reden|besprechen|maybe|perhaps|could|would|should|might|if|whether|discuss|talk)(?![\p{L}])/iu
+
+function sentencesOf(text) {
+  return String(text ?? '').match(/[^.!?…;\n]+[.!?…;]*/g) ?? []
+}
+
+function isStopOrderSentence(sentence) {
+  const s = sentence.trim()
+  if (!s || s.includes('?')) return false
+  if (NEGATION.test(s) || HEDGE.test(s)) return false
+  if (BARE_STOP.test(s)) return true
+  return STOP_VERB.test(s) && STOP_TARGET.test(s)
+}
+
+/** Does this user text contain an explicit order to stop or pause the batch? */
+export function isExplicitStopOrder(text) {
+  return sentencesOf(text).some(isStopOrderSentence)
+}
+
+/** Does a pause reason QUOTE an explicit stop order (not just any user words)? */
+export function quotesExplicitStopOrder(reason) {
+  for (const m of String(reason ?? '').matchAll(QUOTED)) {
+    if (isExplicitStopOrder(m.slice(1).find(Boolean))) return true
+  }
+  return false
 }
 
 /**
@@ -188,11 +231,14 @@ export function classifyPause({ text, now = Date.now() } = {}) {
   const base = { reason: rec.reason, type: rec.type, cause: rec.cause, retryAfter: rec.retryAfter, attempt: rec.attempt, pausedAt: rec.pausedAt, waitMs: 0 }
   if (rec.retryAfter == null) {
     const typedUserStop = rec.type === PAUSE_TYPES.USER_STOP && rec.cause === 'user-stop' && rec.clocklessOnPurpose
-    if (typedUserStop && namesUserUtterance(rec.reason)) {
+    if (typedUserStop && quotesExplicitStopOrder(rec.reason)) {
       return { ...base, state: 'hold', why: 'typed user-stop: the user deliberately stopped the batch' }
     }
     if (typedUserStop) {
-      return { ...base, state: 'recover', misfiledUserStop: true, why: 'typed user-stop quotes no user utterance (a misfiled stop)' }
+      const why = namesUserUtterance(rec.reason)
+        ? 'typed user-stop quotes no explicit stop order (a misfiled stop)'
+        : 'typed user-stop quotes no user utterance (a misfiled stop)'
+      return { ...base, state: 'recover', misfiledUserStop: true, why }
     }
     const why = rec.clocklessOnPurpose
       ? `retry-after is never, but only a typed user-stop may be clockless${rec.type ? ` (type ${rec.type})` : ''}`
@@ -276,4 +322,32 @@ export function describePause(verdict) {
     default:
       return 'not paused'
   }
+}
+
+/**
+ * Did a REAL human message in this transcript order the batch stopped? The Stop
+ * guard offers the user-stop end only then (point 1351): naming it to every
+ * session invited reading a question as one. `text` is the JSONL transcript.
+ */
+export function transcriptOrdersStop(text) {
+  if (typeof text !== 'string' || !text.includes('"human"')) return false
+  for (const line of text.split('\n')) {
+    if (!line.includes('"human"')) continue
+    try {
+      const said = humanText(JSON.parse(line))
+      if (said !== null && isExplicitStopOrder(said)) return true
+    } catch {
+      /* a torn line proves nothing */
+    }
+  }
+  return false
+}
+
+/** The Stop guard's user-stop clause: offered only to a session whose user ordered a stop. */
+export function userStopEnd(userOrderedStop) {
+  return userOrderedStop
+    ? '(b) the user explicitly ORDERED the batch stopped or paused: ' +
+        '`node scripts/batch-pause.mjs --user-stop "<the user\'s order, quoted>"`, then stop; '
+    : '(b) no user stop: no human message in this session orders the batch stopped, and a question, ' +
+        'complaint or discussion remark is never one; '
 }
