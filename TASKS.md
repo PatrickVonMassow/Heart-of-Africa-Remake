@@ -87,16 +87,6 @@ put it is the mistake this line exists to stop.
   Attempt 1 (12.10.2026 22:45-23:31): the user was notified of a 22:58-23:10 window; owner blocked 46 min on a subagent (6 green unit runs); no message arrived, so no case. The new watcher logged each line once ("watching" at 20:44:31Z), so the duplicate-line fix holds live. Next attempt needs a user-confirmed window.
   Also (same session): the running watcher (pid 1584562, started 15:10) still ran pre-merge code at 22:44; the autostart supervision restarts only a dead watcher, never one whose code a merge changed, so a merged watcher fix runs only after a manual restart or reboot. Split off as point 1353 (13.10.2026).
 
-- [ ] 1350. The decision-card guard deadlocks a stand-down chat session
-  Queue position: after point 1349.
-  Source: findings carrier 12.10.2026 16:36: chat-only session 994859ad (STAND DOWN, batch owned by 4dc5437a) answered a board message; Stop hook decision-card-guard demanded `board.mjs vdzk-keep` for three cards, which the stand-down PreToolUse hook refuses.
-  Final state: decision-card-guard stands down for a session that does not own the batch lock (house rule for session guards), leaving the card review to the owner.
-  Verifiable: a Vitest case where a non-owner session with open cards passes the guard.
-  Criticality: medium - a real blockade of the chat answer path.
-  Also (findings carrier 12.10.2026 19:46-19:47, responder 19043d77 on probe message 2eaa0509): reproduced with four cards; scripts/decision-card-guard.mjs:366 evaluateCardReviews blocks before the nonOwner exit at :382, so the responder looped on Stop.
-  Bundle: Chat & Tafel.
-  Decision (owner 13.10.2026, open to veto): the spec's blanket stand-down would silently drop the deliberate non-owner carry path (evaluateCardReviews' non-owner branch; vdzk-answer is already allowed in stand-down). Instead: (C) for a non-owner, block only on cards that share terms with the message, and let the rest pass; (B) admit `board.mjs vdzk-keep` through the stand-down allowlist, so a false term match is no deadlock. Verifiable becomes: Vitest cases where a non-owner with unrelated open cards passes, and the stand-down hook admits vdzk-keep.
-
 - [ ] 1342. Natural villager motion b: three-segment spine, hand morphs, jog and clip style, dig action, one pose pipeline, distributed lean and gaze, corrective leg IK
   Queue position: directly after point 1316 (its sub-point a supplies the runtime sheets and pose exporter every step here is judged with).
   Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 2, 3, 5-11 with the step-4 forearm-twist decision after step 9, and step 13, in that order, as approved by the GPT-6 Astra final check at b231b21.

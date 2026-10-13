@@ -34028,3 +34028,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — a false stop idles the machine until the user notices.
   Refs: scripts/batch-pause.mjs, scripts/batch-pause-core.mjs (namesUserUtterance), scripts/batch-progress-guard.mjs.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1350. The decision-card guard deadlocks a stand-down chat session
+  Queue position: after point 1349.
+  Source: findings carrier 12.10.2026 16:36: chat-only session 994859ad (STAND DOWN, batch owned by 4dc5437a) answered a board message; Stop hook decision-card-guard demanded `board.mjs vdzk-keep` for three cards, which the stand-down PreToolUse hook refuses.
+  Final state: decision-card-guard stands down for a session that does not own the batch lock (house rule for session guards), leaving the card review to the owner.
+  Verifiable: a Vitest case where a non-owner session with open cards passes the guard.
+  Criticality: medium - a real blockade of the chat answer path.
+  Also (findings carrier 12.10.2026 19:46-19:47, responder 19043d77 on probe message 2eaa0509): reproduced with four cards; scripts/decision-card-guard.mjs:366 evaluateCardReviews blocks before the nonOwner exit at :382, so the responder looped on Stop.
+  Bundle: Chat & Tafel.
+  Decision (owner 13.10.2026, open to veto): the spec's blanket stand-down would silently drop the deliberate non-owner carry path (evaluateCardReviews' non-owner branch; vdzk-answer is already allowed in stand-down). Instead: (C) for a non-owner, block only on cards that share terms with the message, and let the rest pass; (B) admit `board.mjs vdzk-keep` through the stand-down allowlist, so a false term match is no deadlock. Verifiable becomes: Vitest cases where a non-owner with unrelated open cards passes, and the stand-down hook admits vdzk-keep.
