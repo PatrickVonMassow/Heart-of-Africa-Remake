@@ -77,11 +77,18 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1352. Live measurement: a board chat message sent during a >15 min blocking call is answered within 15 minutes
+- [ ] 1352. Chat responder: a known session id ends its zero-ack runs, and the deferral drops to 45 s
   Queue position: queue front, after point 1348 (communication first).
-  Source: split from point 1348 (12.10.2026): its fixes are unit-tested, but the user's acceptance needs a measured live case against the merged watcher.
-  Final state: one recorded case in which a genuine user board chat message arrived while the owner session sat in a blocking call over 15 minutes, and the reply receipt lies at most 15 minutes after its receivedAt; a miss is diagnosed and fixed here.
-  Verifiable: .claude/chat-watcher.log shows one defer-sweep spawn per message (no duplicate lines), a single responder, responder-exit with stillPending 0, and chat-reply-receipt minus receivedAt <= 15 min; the numbers go into the point's closing note. Procedure: blocking owner call >15 min with a busy subagent; the message must stay in .claude/chat-spool/ until the defer sweep (~3 min after receivedAt).
+  Source: split from the live-measurement point (13.10.2026, owner decision under the standing split rule): the user-approved amendment steps 1 and 2 are built, unit-tested and cross-vendor reviewed (GPT-6 Astra "merge" at b6770afba), but the live case needs a user-confirmed window, and the watcher only runs merged code; the live case moves to point 1355.
+  Final state: amendment steps 1 and 2 (recorded under point 1355) on main: the responder runs with a fresh --session-id that is also exported as CLAUDE_SESSION_ID, so the answered-card Stop review can finish; DEFERRAL_MS is 45 s, still calibratable via HOA_CHAT_DEFER_MS.
+  Verifiable: scripts/chat-watcher-core.test.mjs green (session id in args and env, deferral default and override); CI green on the branch head.
+  Criticality: medium - the user's only live channel to the batch.
+  Bundle: Dorfleben.
+- [ ] 1355. Live measurement: a board chat message sent during a blocking owner call is answered within 3 minutes
+  Queue position: directly after point 1352 (it measures that point's merged fixes).
+  Source: split from point 1352 (13.10.2026); carries the original live-measurement spec, its attempt history and the user-approved amendment step 3.
+  Final state: one recorded case in which a genuine user board chat message arrived while the owner session sat in a blocking call over 15 minutes, and the reply receipt lies at most 3 minutes (target ~2 min) after its receivedAt; a miss is diagnosed and fixed here. The responder's cold start is measured and recorded in the closing note.
+  Verifiable: .claude/chat-watcher.log shows one defer-sweep spawn per message (no duplicate lines), a single responder, responder-exit with stillPending 0, and chat-reply-receipt minus receivedAt <= 3 min; the numbers go into the point's closing note. Procedure: blocking owner call >15 min with a busy subagent, in a window the user has confirmed; the watcher must run point 1352's merged code (restart it after the merge); the message stays in .claude/chat-spool/ until the defer sweep (~45 s after receivedAt).
   Criticality: medium - the user's only live channel to the batch.
   Bundle: Dorfleben.
   Attempt 1 (12.10.2026 22:45-23:31): the user was notified of a 22:58-23:10 window; owner blocked 46 min on a subagent (6 green unit runs); no message arrived, so no case. The new watcher logged each line once ("watching" at 20:44:31Z), so the duplicate-line fix holds live. Next attempt needs a user-confirmed window.
@@ -98,6 +105,7 @@ put it is the mistake this line exists to stop.
   Final state: point 1316's final states 2 (rig upgraded where the diagnosis requires it) and 4 (clip sources widened, recorded in scripts/villager/sources.json), with the clip style normalisation and the event-driven dig action of steps 6 and 7, as the concept's steps specify them.
   Verifiable: each step's *Verified* list in the concept; every mergeable commit range keeps the penetration gate and the no-slide test current at its place in the order green (today's test before step 5, the full-ramp test from step 5 on); `hands land on the final body`; runtime sheets before/after; village-walk and digging pictures on both backends; cross-vendor code review record.
   Criticality: high - every villager, both backends; HIGH rig change.
+  Handover 13.10.2026 21:40 (third author, nothing committed; branch still d3362ad48): step 6 checkpoint measured vs 48f8a70e8 - sprint hips 0 deg, chest 11.2 deg, chest-vs-hips yaw within 12 deg, walk chest 6.1 deg, idle yaw removed (all met); jog chest 13.4 deg misses its 10.9 deg config; walk elbow 31.7-41 deg unchanged (spec 15-25: elbowMin 17 deg is already exceeded, walk has no armIn offset) - the open step-6 item, then rebuild, penetration, sheets, no-slide. CI fast(2) on d3362ad: villagerFigureBody.test.ts 'a garment follows the body's morphs, hang, ground and scale' flags 309 cases outside the body box (likely the restyled glb, unconfirmed). Step 5 lacks the per-clip contact-fraction and knee plots. Step 7 not started; plan: bound the dig extra-lean search (adds 0.46-0.74 rad) in balance.ts, one clock (task.dug) for both bodies with stroke period and strike instant from blade contact in the dig clip metadata, FigureWork.digT feeding the glTF body, pose frozen on hold/fade; knee poles out, hands wider on the shaft, head on the blade. One asset build takes >20 min. Delete the untracked src/render/zzmeasure.test.ts in the worktree.
   Bundle: Dorfleben.
 
 - [ ] 1354. Natural villager motion b2: one pose pipeline, distributed lean and gaze, corrective leg IK, posable clavicles, pelvic check
