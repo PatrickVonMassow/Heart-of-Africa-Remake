@@ -547,11 +547,8 @@ export function buildResponderPrompt(messages) {
  * is therefore fixed BEFORE the spawn (`--session-id`) and exported with it.
  * It is a fresh uuid, never the claim's synthetic `chat-responder-…` id.
  */
-export function responderSpawn({ args = [], options = {}, sessionId } = {}) {
-  return {
-    args: [...args, '--session-id', sessionId],
-    options: { ...options, env: { ...(options.env ?? {}), CLAUDE_SESSION_ID: sessionId } },
-  }
+export function responderSpawn({ args = [], env = {}, sessionId } = {}) {
+  return { args: [...args, '--session-id', sessionId], env: { ...env, CLAUDE_SESSION_ID: sessionId } }
 }
 
 /**

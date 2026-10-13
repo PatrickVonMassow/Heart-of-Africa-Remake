@@ -310,12 +310,8 @@ function spawnResponder(messages) {
     // user's focus, and this process wakes while the user is elsewhere).
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
-    const plan = responderSpawn({
-      args: buildSpawnArgs({ prompt, fableState }),
-      options: buildSpawnOptions({ cwd: REPO_ROOT, stdio: ['ignore', out, out] }),
-      sessionId: randomUUID(),
-    })
-    child = spawn(exe, plan.args, plan.options)
+    const plan = responderSpawn({ args: buildSpawnArgs({ prompt, fableState }), env: process.env, sessionId: randomUUID() })
+    child = spawn(exe, plan.args, buildSpawnOptions({ cwd: REPO_ROOT, stdio: ['ignore', out, out], env: plan.env }))
   } catch (e) {
     log({ event: 'spawn-failed', reason: (e && e.message) || String(e) })
     return false

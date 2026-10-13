@@ -885,14 +885,11 @@ describe('the responder spawn carries its own session id', () => {
   })
 
   it('fixes the id before the spawn and exports the same one', () => {
-    const plan = responderSpawn({
-      args: buildSpawnArgs({ prompt: 'x', fallbackModel: null }),
-      options: buildSpawnOptions({ cwd: process.cwd(), stdio: 'ignore', env: base }),
-      sessionId: responderId,
-    })
+    const plan = responderSpawn({ args: buildSpawnArgs({ prompt: 'x', fallbackModel: null }), env: base, sessionId: responderId })
     expect(plan.args.slice(-2)).toEqual(['--session-id', responderId])
-    expect(plan.options.env.CLAUDE_SESSION_ID).toBe(responderId)
-    const r = keep(plan.options.env)
+    const { env } = buildSpawnOptions({ cwd: process.cwd(), stdio: 'ignore', env: plan.env })
+    expect(env.CLAUDE_SESSION_ID).toBe(responderId)
+    const r = keep(env)
     expect(r.stderr).toBe('')
     expect(r.status).toBe(0)
     const kept = JSON.parse(readFileSync(statePath, 'utf8')).sessions[responderId].review.kept
