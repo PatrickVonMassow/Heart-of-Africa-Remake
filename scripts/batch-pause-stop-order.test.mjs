@@ -22,11 +22,26 @@ describe('explicit stop order', () => {
     'Die Batch läuft halt weiter',
     'Warum stoppt die Batch ständig',
     "Don't stop the batch",
+    'Don’t stop the batch.',
+    'Ich musste die Batch anhalten.',
+    'The batch has a pause button.',
+    'Why did you stop the batch',
+    'Stop asking questions about the work',
+    'Bitte nicht\n die Batch anhalten.',
   ])('refuses %j', (text) => {
     expect(isExplicitStopOrder(text)).toBe(false)
   })
 
-  it.each(['Halte die Batch an', 'Stopp die Batch', 'Stopp!', 'Pausiere die Batch.', 'Stop the batch', 'Hör mit der Arbeit auf'])(
+  it.each([
+    'Halte die Batch an',
+    'Stopp die Batch',
+    'Stopp!',
+    'Pausiere die Batch.',
+    'Stop the batch',
+    'Hör mit der Arbeit auf',
+    'Claude, stopp die Batch bis morgen.',
+    'Batch sofort anhalten!',
+  ])(
     'accepts %j',
     (text) => {
       expect(isExplicitStopOrder(text)).toBe(true)
@@ -57,6 +72,8 @@ describe('stop guard text', () => {
     expect(transcriptOrdersStop(injected)).toBe(false)
     expect(transcriptOrdersStop(null)).toBe(false)
     expect(transcriptOrdersStop(ordered)).toBe(true)
+    expect(transcriptOrdersStop([human('Stopp die Batch'), human('Starte die Batch wieder.')].join('\n'))).toBe(false)
+    expect(transcriptOrdersStop(human('Bitte nicht\n die Batch anhalten.'))).toBe(false)
     expect(userStopEnd(false)).not.toContain('--user-stop')
     expect(userStopEnd(false)).toContain('never one')
     expect(userStopEnd(true)).toContain('batch-pause.mjs --user-stop')

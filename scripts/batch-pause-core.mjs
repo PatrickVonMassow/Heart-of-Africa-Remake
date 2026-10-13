@@ -73,30 +73,45 @@ export function namesUserUtterance(reason) {
 /**
  * ONLY AN EXPLICIT ORDER STOPS THE BATCH (point 1351). Twice a session paused the
  * batch on a question or a discussion remark (24.09.2026 »Erstmal nur darüber
- * reden«, 12.10.2026 »Hast du die Batch bekommen?«). A sentence counts only as an
- * imperative to stop or pause that names the batch (or is the bare stop word),
- * and never when it asks, negates or hedges. Conservative on purpose: a refused
- * real order costs one rephrasing, a false stop idles the machine.
+ * reden«, 12.10.2026 »Hast du die Batch bekommen?«). A sentence counts only in
+ * COMMAND FORM: it opens with a stop imperative, or is "<the batch> <stop verb
+ * infinitive>", or is the bare stop word — and never when it asks, negates or
+ * hedges. Conservative on purpose: a refused real order costs one rephrasing, a
+ * false stop idles the machine.
  */
 const QUOTED = /"([^"\n]{3,})"|„([^“”\n]{3,})[“”]|“([^”\n]{3,})”|»([^«\n]{3,})«/g
-const STOP_VERB =
-  /(?<![\p{L}])(anhalten|halte?(?![\p{L}]).*(?<![\p{L}])an|stopp|stoppe|stoppen|stop|pausiere|pausieren|pause|unterbrich|unterbrechen|beende|beenden|aufhören|hör(?![\p{L}]).*(?<![\p{L}])auf|suspend)(?![\p{L}])/iu
-const BARE_STOP = /^\s*(stopp|stop|halt|anhalten|pause)\s*[!.]*\s*$/i
-const STOP_TARGET = /(?<![\p{L}])(batch|stapel|arbeit|alles|work|everything)(?![\p{L}])/iu
+const L = '(?![\\p{L}])'
+const LEAD = '^(?:(?:bitte|please|claude)[,!]?\\s+)*'
+const TARGET = '(?:die\\s+|der\\s+|deiner\\s+|the\\s+|deine\\s+|your\\s+)?(?:batch|stapel|arbeit|work|alles|everything)' + L
+const IMPERATIVE = new RegExp(
+  LEAD +
+    '(?:(?:stopp|stoppe|stop|pausiere|pause|unterbrich|beende|suspend)' + L + '\\s+(?:sofort\\s+|jetzt\\s+|now\\s+)?' + TARGET +
+    '|halte?' + L + '\\s+' + TARGET + '.*(?<![\\p{L}])an' + L +
+    '|hör(?:e)?' + L + '\\s+mit\\s+' + TARGET + '.*(?<![\\p{L}])auf' + L + ')',
+  'iu',
+)
+const INFINITIVE = new RegExp(
+  LEAD + TARGET + '\\s+(?:sofort\\s+|jetzt\\s+)?(?:anhalten|stoppen|pausieren|unterbrechen|beenden)' + L + '[\\s!.]*$',
+  'iu',
+)
+const BARE_STOP = /^\s*(?:stopp|stop|halt|anhalten|pause)\s*[!.]*\s*$/i
 const NEGATION = /(?<![\p{L}'])(nicht|nie|niemals|kein\p{L}*|nein|not|never|no|don't|dont)(?![\p{L}'])/iu
 const HEDGE =
   /(?<![\p{L}])(vielleicht|eventuell|erstmal|könnte\p{L}*|würde\p{L}*|sollte\p{L}*|soll|sollen|willst|überleg\p{L}*|falls|wenn|ob|reden|besprechen|maybe|perhaps|could|would|should|might|if|whether|discuss|talk)(?![\p{L}])/iu
 
+/** Sentences, with a wrapped line kept in its sentence so a negation keeps its scope. */
 function sentencesOf(text) {
-  return String(text ?? '').match(/[^.!?…;\n]+[.!?…;]*/g) ?? []
+  const flat = String(text ?? '')
+    .replace(/[’‘ʼ`´]/g, "'")
+    .replace(/\s+/g, ' ')
+  return flat.match(/[^.!?…;]+[.!?…;]*/g) ?? []
 }
 
 function isStopOrderSentence(sentence) {
   const s = sentence.trim()
   if (!s || s.includes('?')) return false
   if (NEGATION.test(s) || HEDGE.test(s)) return false
-  if (BARE_STOP.test(s)) return true
-  return STOP_VERB.test(s) && STOP_TARGET.test(s)
+  return BARE_STOP.test(s) || IMPERATIVE.test(s) || INFINITIVE.test(s)
 }
 
 /** Does this user text contain an explicit order to stop or pause the batch? */
@@ -325,22 +340,25 @@ export function describePause(verdict) {
 }
 
 /**
- * Did a REAL human message in this transcript order the batch stopped? The Stop
+ * Does the latest REAL human message in this transcript order the batch stopped? The Stop
  * guard offers the user-stop end only then (point 1351): naming it to every
  * session invited reading a question as one. `text` is the JSONL transcript.
  */
 export function transcriptOrdersStop(text) {
   if (typeof text !== 'string' || !text.includes('"human"')) return false
+  // Only the LATEST human message counts: an order the user has since followed
+  // with anything else (a resume, a new task) no longer authorises a stop.
+  let latest = null
   for (const line of text.split('\n')) {
     if (!line.includes('"human"')) continue
     try {
       const said = humanText(JSON.parse(line))
-      if (said !== null && isExplicitStopOrder(said)) return true
+      if (said !== null) latest = said
     } catch {
       /* a torn line proves nothing */
     }
   }
-  return false
+  return latest !== null && isExplicitStopOrder(latest)
 }
 
 /** The Stop guard's user-stop clause: offered only to a session whose user ordered a stop. */
@@ -348,6 +366,6 @@ export function userStopEnd(userOrderedStop) {
   return userOrderedStop
     ? '(b) the user explicitly ORDERED the batch stopped or paused: ' +
         '`node scripts/batch-pause.mjs --user-stop "<the user\'s order, quoted>"`, then stop; '
-    : '(b) no user stop: no human message in this session orders the batch stopped, and a question, ' +
+    : '(b) no user stop: the user\'s latest message orders no stop, and a question, ' +
         'complaint or discussion remark is never one; '
 }
