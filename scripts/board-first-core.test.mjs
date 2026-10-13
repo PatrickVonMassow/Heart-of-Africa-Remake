@@ -298,6 +298,17 @@ describe('ownership mutation stand-down', () => {
     expect(moved({ worktree: true })).toEqual({ block: false, reason: '', standDown: true })
   })
 
+  it('admits the decision-card keep and still refuses other board mutations', () => {
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "Kartenschrift" --why "x"' }).block).toBe(false)
+    expect(moved({ command: 'node scripts/board.mjs now "x"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-remove "Kartenschrift"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && node scripts/board.mjs now "x"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" > out.txt' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && git status --short' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" && node scripts/board.mjs vdzk-keep "L"' }).block).toBe(true)
+    expect(moved({ command: 'node scripts/board.mjs vdzk-keep "K" > /dev/null 2>&1' }).block).toBe(true)
+  })
+
   it('does not constrain a session while no other live owner holds the lock', () => {
     expect(moved({ heldByOtherLiveOwner: false })).toEqual({ block: false, reason: '', standDown: false })
   })

@@ -614,7 +614,8 @@ function validUserMessage(message) {
 
 /** Which turn-start cards still need an explicit remove/keep decision for this
  * user message. A card absent now was removed; a title absent at turn start was
- * added after the message and is not due until the next one. */
+ * added after the message and is not due until the next one. A non-owner owes
+ * only the cards its message shares terms with: the board review is the owner's. */
 export function pendingCardReviews({
   userMessage = null,
   cardsAtMessage = null,
@@ -643,7 +644,7 @@ export function pendingCardReviews({
     const keptWithRequiredReason = Boolean(
       record && (terms.length === 0 || (typeof record.why === 'string' && record.why.trim())),
     )
-    if (keptWithRequiredReason || (nonOwner && carried.has(title))) continue
+    if (keptWithRequiredReason || (nonOwner && (!terms.length || carried.has(title)))) continue
     pending.push({ title, terms })
   }
   return pending
@@ -663,9 +664,7 @@ export function evaluateCardReviews(input = {}) {
       return `- ${quoted(title)}: node scripts/board.mjs vdzk-remove ${fragment}\n  or: ${keep}`
     }
     const carry = `node scripts/vdzk-answer.mjs ${fragment} --answer "<was der Nutzer entschieden hat>"`
-    return terms.length
-      ? `- ${quoted(title)} (shared: ${terms.join(', ')}): ${carry}\n  or, if it was not answered: ${keep}`
-      : `- ${quoted(title)}: ${keep}`
+    return `- ${quoted(title)} (shared: ${terms.join(', ')}): ${carry}\n  or, if it was not answered: ${keep}`
   })
   return {
     block: true,

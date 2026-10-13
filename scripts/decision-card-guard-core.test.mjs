@@ -574,6 +574,18 @@ describe('a non-owner carries an answer and the owner applies it', () => {
     expect(evaluateCarriedAnswers({ entries: [entry], currentTitles: [title], owner: false }).block).toBe(false)
   })
 
+  it('a non-owner passes cards its message does not touch and still carries a suspected answer', () => {
+    const unrelated = ['Startskript des Launchers', 'Kartenschrift für die Tafel']
+    const chat = { id: 'chat-unrelated', text: 'Wie weit ist der Batch gerade?' }
+    expect(evaluateCardReviews({ userMessage: chat, cardsAtMessage: unrelated, currentTitles: unrelated, nonOwner: true }))
+      .toEqual({ block: false, reason: null })
+    expect(evaluateCardReviews({ userMessage: chat, cardsAtMessage: unrelated, currentTitles: unrelated }).block).toBe(true)
+    const v = evaluateCardReviews({ userMessage, cardsAtMessage: [title, ...unrelated], currentTitles: [title, ...unrelated], nonOwner: true })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('node scripts/vdzk-answer.mjs')
+    expect(v.reason).toContain('1 open card(s)')
+  })
+
   it('an entry naming a vanished card self-clears', () => {
     expect(reconcileCarriedAnswers([entry], [])).toEqual({ active: [], cleared: [entry] })
     expect(evaluateCarriedAnswers({ entries: [entry], currentTitles: [], owner: true }).block).toBe(false)
