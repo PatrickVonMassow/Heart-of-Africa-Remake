@@ -2653,6 +2653,21 @@ export const VILLAGER_ASSET = {
   /** Taubin smoothing rounds over the settled cloth between settle passes
    *  (the pushes leave it dented). Calibratable. */
   garmentSettleSmooth: 4,
+  /** The clip style (natural-villager-motion step 6; scripts/villager/clips.py
+   *  `restyle`), per retargeted clip, rad: the hips' and the chest's MEAN
+   *  forward tilt (each keeps its swing; the source walk leans its chest 18°,
+   *  the jog 43° with a ±54° twist, the sprint dives 23° at the hips and 52° at
+   *  the chest), the chest's twist
+   *  against the hips as a share of the source's, the elbow's least bend and
+   *  the upper arm brought toward the body; `square` takes a standing clip's
+   *  constant turns out and puts its feet side by side. The head keeps its
+   *  world turn. Calibratable, read off the clip sheets. */
+  clipStyle: {
+    walk: { chestTilt: 0.105, elbowMin: 0.3 },
+    jog: { chestTilt: 0.19, chestTwist: 0.25 },
+    sprint: { hipsTilt: 0.0, chestTilt: 0.19, chestTwist: 0.37 },
+    idle: { square: true, chestTilt: 0.105 },
+  },
   /** The widest loop seam the clip pipeline closes (rad, the worst bone's
    *  turn between a loop's last frame and its first once cut where they meet
    *  best): beyond it the loop is refused, never smeared over its cycle

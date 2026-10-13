@@ -229,3 +229,34 @@ describe('the tool is held in the hand bone', () => {
     }
   })
 })
+
+describe('the clip style (natural-villager-motion step 6)', () => {
+  /** A bone's mean forward tilt (deg) over a clip: its up axis off the vertical, seen from the side. */
+  const tilt = (clip: string, bone: string, yaw = false) => {
+    const c = asset.clips[clip]
+    const n = asset.bones.length
+    const pose = newPose(n)
+    const world = newWorld(n)
+    const i = asset.bones.indexOf(bone)
+    let sum = 0
+    const k = 24
+    for (let f = 0; f < k; f++) {
+      sampleClip(c, (f / k) * c.duration, pose)
+      forwardKinematics(asset, asset.rest, pose, world)
+      const v = new THREE.Vector3(0, yaw ? 0 : 1, yaw ? 1 : 0).applyQuaternion(world.q[i])
+      sum += yaw ? Math.atan2(v.x, v.z) : Math.atan2(v.z, v.y)
+    }
+    return ((sum / k) * 180) / Math.PI
+  }
+  it('the sprint no longer dives: hips upright, chest under 15°; the jog likewise', () => {
+    expect(Math.abs(tilt('sprint', 'hips'))).toBeLessThan(2)
+    expect(tilt('sprint', 'chest')).toBeLessThan(15)
+    expect(tilt('jog', 'chest')).toBeLessThan(15)
+  })
+  it('the walk and the idle stand up: chest under 10°; the idle faces ahead', () => {
+    expect(tilt('walk', 'chest')).toBeLessThan(10)
+    expect(tilt('idle', 'chest')).toBeLessThan(10)
+    expect(Math.abs(tilt('idle', 'hips', true))).toBeLessThan(1)
+    expect(Math.abs(tilt('idle', 'head', true))).toBeLessThan(2)
+  })
+})
