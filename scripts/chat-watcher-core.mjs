@@ -534,6 +534,24 @@ export function buildResponderPrompt(messages) {
 }
 
 /**
+ * THE RESPONDER KNOWS ITS OWN SESSION ID. PURE.
+ *
+ * The answered-card Stop review can owe a non-owner responder a
+ * `board.mjs vdzk-keep` or `vdzk-answer.mjs` call, and both pick the session
+ * from `CLAUDE_SESSION_ID` once the guard state holds more than one. The CLI
+ * does not export it, so the responder of 12.10.2026 19:44 UTC answered in
+ * seven seconds and then looped on Stop until the RESPONDER_MAX_MS kill. The id
+ * is therefore fixed BEFORE the spawn (`--session-id`) and exported with it.
+ * It is a fresh uuid, never the claim's synthetic `chat-responder-…` id.
+ */
+export function responderSpawn({ args = [], options = {}, sessionId } = {}) {
+  return {
+    args: [...args, '--session-id', sessionId],
+    options: { ...options, env: { ...(options.env ?? {}), CLAUDE_SESSION_ID: sessionId } },
+  }
+}
+
+/**
  * WHICH SPOOLED MESSAGES MAY BE MARKED CONSUMED AFTER THE RESPONDER EXITED? PURE.
  *
  * Delivery into the prompt is AT-LEAST-ONCE by the same reasoning the launcher

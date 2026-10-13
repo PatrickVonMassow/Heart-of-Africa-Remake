@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import {
   CLAIM_BY,
   CLAIM_SESSION_PREFIX,
@@ -15,6 +15,7 @@ import {
   pendingAgeMs,
   reconnectDelayMs,
   responderClaim,
+  responderSpawn,
   stampOf,
   sweepPlan,
   wakeDecision,
@@ -27,10 +28,14 @@ import {
 import { holdExclusiveAddress, watcherAddress } from './batch-singleton.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
-import { claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
+import { buildSpawnArgs, buildSpawnOptions, claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 import { LOADED_FINGERPRINT, readWatcherFingerprint } from './chat-watcher-fingerprint.mjs'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { boardHtml } from './dashboard-guard-fixtures.mjs'
 
 const ok = { accepted: true, paused: false, formatAlarm: false, ownerAlive: false, responderLive: false, claimHonoured: false }
 
@@ -848,5 +853,49 @@ describe('startFingerprint — a fingerprint read after the code changed is not 
   })
   it('keeps an unreadable fingerprint null', () => {
     expect(startFingerprint({ ...base, fingerprint: null, mtimesMs: [1500] })).toBeNull()
+  })
+})
+
+// 12.10.2026 19:44 UTC: the responder replied in seven seconds, then looped on
+// the answered-card Stop review until the RESPONDER_MAX_MS kill — its remedy
+// (`board.mjs vdzk-keep`) could not tell which of the guard state's sessions
+// was its own, because the spawned CLI exports no CLAUDE_SESSION_ID.
+describe('the responder spawn carries its own session id', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'responder-session-'))
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  const boardPath = join(dir, 'board.html')
+  const statePath = join(dir, 'guard-state.json')
+  const title = 'Batchelor: Batch-Infrastruktur als eigenes Projekt abspalten'
+  const responderId = '11111111-2222-4333-8444-555555555555'
+  writeFileSync(boardPath, boardHtml({ klaerungExtra: [title] }))
+  const entry = (id) => ({ titles: [title], userMessage: { id, text: 'Messprobe vom Batch.' }, review: { messageId: id, kept: {} } })
+  // More than one session, as on the live host (19 on 13.10.2026).
+  writeFileSync(statePath, JSON.stringify({ version: 2, sessions: { 'owner-session': entry('m-owner'), [responderId]: entry('m-responder') } }))
+
+  const { CLAUDE_SESSION_ID: _drop, ...hostEnv } = process.env
+  const base = { ...hostEnv, DECISION_CARD_DASHBOARD: boardPath, DECISION_CARD_GUARD_STATE: statePath }
+  const keep = (env) => spawnSync(process.execPath, [join(process.cwd(), 'scripts', 'board.mjs'), 'vdzk-keep', title, '--why', 'Messprobe'], {
+    cwd: process.cwd(), env, encoding: 'utf8', windowsHide: true,
+  })
+
+  it('reproduces the loop: without the id the keep cannot pick its session', () => {
+    const r = keep(buildSpawnOptions({ cwd: process.cwd(), stdio: 'ignore', env: base }).env)
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain('cannot identify this session')
+  })
+
+  it('fixes the id before the spawn and exports the same one', () => {
+    const plan = responderSpawn({
+      args: buildSpawnArgs({ prompt: 'x', fallbackModel: null }),
+      options: buildSpawnOptions({ cwd: process.cwd(), stdio: 'ignore', env: base }),
+      sessionId: responderId,
+    })
+    expect(plan.args.slice(-2)).toEqual(['--session-id', responderId])
+    expect(plan.options.env.CLAUDE_SESSION_ID).toBe(responderId)
+    const r = keep(plan.options.env)
+    expect(r.stderr).toBe('')
+    expect(r.status).toBe(0)
+    const kept = JSON.parse(readFileSync(statePath, 'utf8')).sessions[responderId].review.kept
+    expect(Object.keys(kept)).toEqual([title])
   })
 })
