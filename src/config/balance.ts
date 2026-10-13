@@ -2653,6 +2653,11 @@ export const VILLAGER_ASSET = {
   /** Taubin smoothing rounds over the settled cloth between settle passes
    *  (the pushes leave it dented). Calibratable. */
   garmentSettleSmooth: 4,
+  /** The widest loop seam the clip pipeline closes (rad, the worst bone's
+   *  turn between a loop's last frame and its first once cut where they meet
+   *  best): beyond it the loop is refused, never smeared over its cycle
+   *  (natural-villager-motion step 5). Calibratable. */
+  loopSeamMax: 0.35,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive
@@ -2690,14 +2695,26 @@ export const VILLAGER_ASSET = {
 export const VILLAGER_GLTF = {
   /** How much of the adult man's build morph a build of ±1 gets, by age. */
   buildByAge: { child: 0.5, youth: 0.8, adult: 1, elder: 0.9 },
-  /** The walk turns into the sprint around this ground speed, per unit of leg
+  /** The walk turns into the jog around this ground speed, per unit of leg
    *  (figure units per second at the basis body's leg length; a child's
    *  shorter leg reaches it at a lower speed). Set where the walk's stride
    *  reaches strideMax (its natural speed ≈ 0.83 × strideMax²): above it a walk
    *  could only over-reach. Calibratable. */
-  sprintThreshold: 1.8,
-  /** Half-width of the band the two gaits cross-fade over, same units. */
-  sprintBand: 0.35,
+  jogThreshold: 1.8,
+  /** Half-width of the band walk and jog cross-fade over, same units. */
+  jogBand: 0.35,
+  /** The jog turns into the sprint here, same units: above the tag game's top
+   *  pace (a child at `sprintSpeed` ≈ 6.9 per unit of leg), so every running
+   *  villager jogs and the sprint is the clip of a real dash only
+   *  (natural-villager-motion step 5). Calibratable. */
+  sprintThreshold: 7.6,
+  /** Half-width of the band jog and sprint cross-fade over, same units. */
+  sprintBand: 0.5,
+  /** How the jog's stride follows its pace (as strideExponent/Min/Max for the
+   *  walk and sprint): the jog clip covers a long stride at its natural speed
+   *  (≈ 4.5 per unit of leg), so slower jogs shorten it more and keep their
+   *  cadence. Calibratable. */
+  jogStride: { exponent: 0.8, min: 0.4, max: 1.08 },
   /** Body safety net (design.md clothing rule): no vertex of the chest front
    *  or of a child's pelvis midline may peak sharper than this — its offset above
    *  its neighbours' mean along the normal, over their mean edge length. The
@@ -2718,6 +2735,12 @@ export const VILLAGER_GLTF = {
    *  fades back onto the clip's own foot (a shoved or turned foot eases home
    *  in its swing, never jumps). Calibratable. */
   plantFadeCycle: 0.15,
+  /** The pelvis under a warped stride (natural-villager-motion steps 5 and 10):
+   *  it drops just as far as both legs need to reach their feet, each leg
+   *  reaching at most `legReach` of its full length, and at most
+   *  `pelvisDropMax` per unit of leg. Calibratable. */
+  legReach: 0.995,
+  pelvisDropMax: 0.08,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Ground speed (figure units / s) below which the figure stands. */

@@ -15,15 +15,18 @@ import {
   contactPoints,
   forwardKinematics,
   gaitAt,
+  gaitWeights,
   newPose,
   newWorld,
   sampleClip,
   sprintWeight,
   strideFactor,
   toolInHand,
+  type GaitClips,
 } from './villagerRig'
 
 let asset: VillagerAsset
+const clips = () => asset.clips as unknown as GaitClips
 
 beforeAll(async () => {
   const buf = readFileSync(resolve(__dirname, '../../public/models/villager.glb'))
@@ -56,7 +59,7 @@ describe('the glTF villager asset', () => {
   })
 
   it('has the clips the figure plays', () => {
-    for (const c of ['idle', 'walk', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle']) expect(asset.clips[c]).toBeDefined()
+    for (const c of ['idle', 'walk', 'jog', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle']) expect(asset.clips[c]).toBeDefined()
     expect(asset.clips.walk.speed).toBeGreaterThan(0)
     expect(asset.clips.sprint.speed).toBeGreaterThan(asset.clips.walk.speed)
   })
@@ -116,13 +119,33 @@ describe('speed → clip, stride and cadence', () => {
   })
 
   it('advances the phase by exactly the distance one cycle covers', () => {
-    const g = gaitAt(asset.clips.walk, asset.clips.sprint, 1.2, 1)
+    const g = gaitAt(clips(), 1.2, 1)
     expect(g.sprint).toBe(0)
+    expect(g.jog).toBe(0)
     expect(g.cycle).toBeCloseTo(asset.clips.walk.speed * asset.clips.walk.duration * g.strideWalk)
     expect(g.phasePerUnit * g.cycle).toBeCloseTo(1)
     // a child (shorter leg) needs more cycles for the same ground
-    const child = gaitAt(asset.clips.walk, asset.clips.sprint, 1.2, 0.85)
+    const child = gaitAt(clips(), 1.2, 0.85)
     expect(child.phasePerUnit).toBeGreaterThan(g.phasePerUnit)
+  })
+
+  it('walk → jog → sprint by speed: the weights sum to 1, each gait wins its own band, the phase rate is continuous', () => {
+    expect(VILLAGER_GLTF.jogThreshold + VILLAGER_GLTF.jogBand).toBeLessThan(VILLAGER_GLTF.sprintThreshold - VILLAGER_GLTF.sprintBand)
+    let last = gaitAt(clips(), 0.05, 1)
+    for (let v = 0.06; v < 10; v += 0.01) {
+      for (const legs of [1, 0.85]) {
+        const w = gaitWeights(v, legs)
+        expect(w.walk + w.jog + w.sprint).toBeCloseTo(1, 12)
+        for (const x of [w.walk, w.jog, w.sprint]) expect(x).toBeGreaterThanOrEqual(0)
+      }
+      const g = gaitAt(clips(), v, 1)
+      // continuous: no jump of the phase rate at a band's edge or inside it
+      expect(Math.abs(g.phasePerUnit - last.phasePerUnit) / last.phasePerUnit).toBeLessThan(0.02)
+      last = g
+    }
+    expect(gaitWeights(1.0, 1).walk).toBe(1)
+    expect(gaitWeights((VILLAGER_GLTF.jogThreshold + VILLAGER_GLTF.sprintThreshold) / 2, 1).jog).toBe(1)
+    expect(gaitWeights(VILLAGER_GLTF.sprintThreshold + VILLAGER_GLTF.sprintBand + 0.1, 1).sprint).toBe(1)
   })
 })
 

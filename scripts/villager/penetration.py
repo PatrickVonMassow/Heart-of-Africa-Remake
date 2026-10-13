@@ -677,6 +677,21 @@ NAMES = {'cloth': 'cloth in the body', 'shown': 'skin through the cloth', 'hole'
          'cut': 'hidden skin past the cloth', 'inner': 'inner garment through the cloth', 'innerHole': 'hidden inner garment out by an opening'}
 
 
+# A clip main never measured is compared with the clips it is made from
+# (natural-villager-motion steps 5 and 11): the jog with the walk and the
+# sprint it blends between, the posed clavicles with the idle they pose. Its
+# worse is still worse than every one of them; no new clip passes unchecked.
+DERIVED = {'jog': ('walk', 'sprint'), 'shoulders': ('idle',)}
+
+
+def _base_value(clips, key):
+    """Main's value for a `column clip` key: its own, else the worst of the clips a new clip derives from."""
+    if key in clips:
+        return clips[key]
+    col, _, clip = key.partition(' ')
+    return max((clips.get(f'{col} {c}', 0.0) for c in DERIVED.get(clip, ())), default=0.0)
+
+
 def compare(build, worst, main, a, tol):
     """The `## Against main` lines, the garment/column/clip cases worse than
     main, and the garments main has no row for (in its build pose or every
@@ -693,7 +708,7 @@ def compare(build, worst, main, a, tol):
                 continue
             for key, v in sorted(r['clips'].items()):
                 col = key.split(' ')[0]
-                b = base[n].get('clips', {}).get(key, 0.0)
+                b = _base_value(base[n].get('clips', {}), key)
                 if v > _limit(col, a, tol) and v > b + 0.0005:
                     worse.append(f'- `{n}` {key}: {b:.4f} on main → {v:.4f}')
 

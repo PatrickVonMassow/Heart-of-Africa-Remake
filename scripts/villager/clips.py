@@ -26,14 +26,15 @@ FPS = 30
 SOURCES = {
     'idle': ('UAL1', 'Idle_Loop', 'loop'),
     'walk': ('UAL1', 'Walk_Loop', 'gait'),
+    'jog': ('UAL1', 'Jog_Fwd_Loop', 'gait'),
     'sprint': ('UAL1', 'Sprint_Loop', 'gait'),
     'kneelWork': ('UAL1', 'Fixing_Kneeling', 'once'),
 }
 # The kneel transitions cut from Fixing_Kneeling (seconds): going down, the
 # held kneel (one frame), getting up.
 KNEEL_CUTS = {'kneelDown': (0.0, 0.75), 'kneel': (1.2, 1.2), 'kneelUp': (4.1, 4.85)}
-FILES = {'UAL1': 'quaternius/AnimationLibrary_Godot_Standard.gltf'}
-MAPS = {'UAL1': SK.UAL1}
+FILES = {'UAL1': 'quaternius/AnimationLibrary_Godot_Standard.gltf', 'UAL2': 'quaternius/UAL2_Standard.glb'}
+MAPS = {'UAL1': SK.UAL1, 'UAL2': SK.UAL2}
 
 
 class Source:
@@ -235,6 +236,52 @@ def analyse_gait(clip, joints, cp):
     return {'heights': H, 'speed': speed}
 
 
+def contact_intervals(an, nf, touch=0.02):
+    """Per foot and contact (heel, ball, tip) the phase intervals [a, b) of
+    the cycle (0 … 1 from the left landing) in which it carries — within
+    `touch` of the ground; b > 1 where an interval wraps past the seam."""
+    n = nf - 1  # the last frame repeats the first
+    out = {}
+    for s in ('L', 'R'):
+        out[s] = {}
+        for k in ('heel', 'ball', 'tip'):
+            down = an['heights'][s][k][:n] < touch
+            if down.all():
+                out[s][k] = [[0.0, 1.0]]
+                continue
+            spans = []
+            for i in range(n):
+                if down[i] and not down[i - 1]:
+                    j = 1
+                    while down[(i + j) % n]:
+                        j += 1
+                    spans.append([i / n, (i + j) / n])
+            out[s][k] = sorted(spans)
+    return out
+
+
+def best_loop_end(c, search=0.25):
+    """Cut a loop at the frame of its last quarter that best meets its first
+    (the worst bone's angle): a source loop whose ends do not meet (the
+    Quaternius sprint) is closed where it nearly does instead of having a
+    wide gap smeared over the whole cycle. Returns the seam left at that cut."""
+    Q = c['q']
+    n = len(Q)
+
+    def gap(k):
+        d = np.abs((Q[0] * Q[k]).sum(1)).clip(0, 1)
+        return float(2 * np.arccos(d).max())
+    first = max(2, int(n * (1 - search)))
+    best = min(range(first, n), key=gap)
+    if best < n - 1 and gap(best) < gap(n - 1):
+        dt = c['times'][1] - c['times'][0]
+        c['q'] = Q[:best + 1].copy()
+        c['hips'] = c['hips'][:best + 1].copy()
+        c['times'] = c['times'][:best + 1].copy()
+        c['duration'] = float(best * dt)
+    return gap(len(c['q']) - 1)
+
+
 def lowest(an, side):
     H = an['heights'][side]
     return np.minimum(np.minimum(H['heel'], H['ball']), H['tip'])
@@ -337,10 +384,18 @@ def build_clips(src_dir, body, cfg, only=None):
         c['source'] = f'{lib}:{clip_name}'
         c['kind'] = kind
         if kind in ('gait', 'loop'):
-            seam = close_loop(c)
+            seam = best_loop_end(c)
+            close_loop(c)
+            c['seam'] = seam
+            limit = cfg['VILLAGER_ASSET']['loopSeamMax']
+            if seam > limit:
+                # a seam this wide is a different pose at the loop's two ends:
+                # spread over the cycle it smears the whole clip — refused
+                raise RuntimeError(f'clip {name}: loop seam {seam:.2f} rad over VILLAGER_ASSET.loopSeamMax = {limit}')
             if seam > 0.05:
                 print(f'clip {name}: loop seam closed ({seam:.2f} rad at the worst bone)')
-        if name == 'sprint':
+        if name in ('sprint', 'jog'):
+            # the jog snaps its knee straight at the strike as the sprint does (~28 rad/s)
             soften(c, 2)
         if kind == 'gait':
             ground(c, joints, cp, per_frame=(name != 'sprint' and name != 'jog'))
@@ -349,6 +404,7 @@ def build_clips(src_dir, body, cfg, only=None):
             an = analyse_gait(c, joints, cp)
             c['speed'] = an['speed']
             c['heights'] = an['heights']
+            c['contacts'] = {'seam': float(c['seam']), 'support': contact_intervals(an, len(c['times']))}
         else:
             ground(c, joints, cp, per_frame=False)
         out['clips'][name] = c

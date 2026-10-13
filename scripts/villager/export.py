@@ -164,4 +164,4 @@ def tool_hold(body):
     return out
 
 
-EXPORT_CLIPS = ('idle', 'walk', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle')
+EXPORT_CLIPS = ('idle', 'walk', 'jog', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle')

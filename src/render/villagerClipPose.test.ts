@@ -7,6 +7,7 @@ import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
+import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { clipGaitPose, clipPoseAt, newClipGait, shovelOnHungHand, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
@@ -123,18 +124,27 @@ describe('the clip gait on the ground', () => {
     return { slide, lowest }
   }
 
-  it('with the hold, a planted foot does not slide at any pace or body size outside the walk/sprint cross-fade', () => {
-    for (const person of [adult, child]) {
+  it('with the hold, a planted foot does not slide across the whole speed ramp: every body, both cross-fades, 30/60/120 Hz', () => {
+    // natural-villager-motion step 5: the walk ↔ jog ↔ sprint bands are no
+    // longer exempt — 0.004 person units per frame everywhere
+    const bodies = [
+      ...SEXES.flatMap((sex) => AGE_GROUPS.map((age) => gltfPerson(asset, sex, age, 0))),
+      gltfPerson(asset, 'male', 'adult', -1),
+      gltfPerson(asset, 'male', 'adult', 1),
+    ]
+    const G = VILLAGER_GLTF
+    // per unit of leg: a stroll, the walk, both bands (edges and middle), the jog, a dash
+    const ramp = [0.4, 1.0, 1.45, 1.8, 2.15, 3.5, 5.5, G.sprintThreshold - G.sprintBand, G.sprintThreshold, G.sprintThreshold + G.sprintBand, 8.6]
+    for (const person of bodies) {
       const per = person.frame.legScale * person.frame.scale
-      const band = [VILLAGER_GLTF.sprintThreshold - VILLAGER_GLTF.sprintBand, VILLAGER_GLTF.sprintThreshold + VILLAGER_GLTF.sprintBand].map((x) => x * per)
-      for (const v of [0.4, 0.8, 1.2, 1.4, 2.6, 3.4]) {
-        if (v > band[0] && v < band[1]) continue
-        expect(walkStraight(person, v).slide).toBeLessThan(0.004)
+      for (const hz of [30, 60, 120]) {
+        for (const v of ramp) {
+          const r = walkStraight(person, v * per, true, 3, 1 / hz)
+          expect(r.slide, `${v} per leg at ${hz} Hz, leg ${person.frame.legScale.toFixed(2)}`).toBeLessThan(0.004)
+        }
       }
-      // inside the cross-fade the hold may give way, by a slip and never a jump
-      expect(walkStraight(person, VILLAGER_GLTF.sprintThreshold * per).slide).toBeLessThan(0.08)
     }
-  })
+  }, 240_000)
 
   it('a held foot shoved off its clip lets go by easing, never by a jump when its last contact lifts', () => {
     const n = asset.bones.length
@@ -193,7 +203,7 @@ describe('the clip gait on the ground', () => {
     for (const v of [0.6, 1.2, 3.4]) expect(walkStraight(adult, v).lowest).toBeGreaterThan(-0.01)
   })
 
-  it('walk → sprint is continuous: a small change of pace moves no joint by a jump', () => {
+  it('walk → jog → sprint is continuous: a small change of pace moves no joint by a jump', () => {
     const n = asset.bones.length
     const f = adult.frame
     const g = newClipGait()
@@ -202,13 +212,15 @@ describe('the clip gait on the ground', () => {
     const b = newPose(n)
     const wa = newWorld(n)
     const wb = newWorld(n)
-    const threshold = VILLAGER_GLTF.sprintThreshold * f.legScale * f.scale
-    for (let v = threshold - 0.8; v < threshold + 0.8; v += 0.02) {
-      clipGaitPose(g, asset, f, v, null, a)
-      clipGaitPose(g, asset, f, v + 0.02, null, b)
-      forwardKinematics(asset, f.rest0, a, wa)
-      forwardKinematics(asset, f.rest0, b, wb)
-      for (let i = 0; i < n; i++) expect(wa.p[i].distanceTo(wb.p[i])).toBeLessThan(0.03)
+    for (const t of [VILLAGER_GLTF.jogThreshold, VILLAGER_GLTF.sprintThreshold]) {
+      const threshold = t * f.legScale * f.scale
+      for (let v = threshold - 0.8; v < threshold + 0.8; v += 0.02) {
+        clipGaitPose(g, asset, f, v, null, a)
+        clipGaitPose(g, asset, f, v + 0.02, null, b)
+        forwardKinematics(asset, f.rest0, a, wa)
+        forwardKinematics(asset, f.rest0, b, wb)
+        for (let i = 0; i < n; i++) expect(wa.p[i].distanceTo(wb.p[i])).toBeLessThan(0.03)
+      }
     }
   })
 })
@@ -266,9 +278,9 @@ describe('the clips themselves', () => {
           const a = new THREE.Quaternion().fromArray(r, (k - 1) * 4)
           const b = new THREE.Quaternion().fromArray(r, k * 4)
           const step = c.times[k] - c.times[k - 1]
-          // 9 rad/s holds the dig's throw and the walk's swing; a sprinter's
-          // thigh swings at up to ~14 (its knee snapped at ~30 before the softening)
-          expect(a.angleTo(b) / step, `${name} ${asset.bones[i]} frame ${k}`).toBeLessThan(name === 'sprint' ? 16 : 9)
+          // 9 rad/s holds the dig's throw and the walk's swing; a runner's (jog, sprint)
+          // thigh swings at up to ~17 (the sprint's knee snapped at ~30 before the softening)
+          expect(a.angleTo(b) / step, `${name} ${asset.bones[i]} frame ${k}`).toBeLessThan(name === 'sprint' || name === 'jog' ? 18 : 9)
         }
       })
     }
