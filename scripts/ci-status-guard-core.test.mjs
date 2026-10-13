@@ -13,6 +13,9 @@ import {
   ciRedAlertMessage,
   classifyRuns,
   GATE_STATUS_CONTEXT,
+  readAllStatusPages,
+  refBranch,
+  withGateStatuses,
   failedRuns,
   notifiedFromState,
   pruneFamine,
@@ -120,35 +123,85 @@ describe('classifyRuns', () => {
   // demands attention, and it must never bury a genuine red standing behind it.
   // A soft feat/** run concludes success while its gate is red; only the
   // ci/gate (branch) commit status carries the verdict (run 38277768235).
+  const RUN_PAGE = 'https://github.com/o/r/actions/runs/1'
   const gate = (state, over = {}) => ({
     context: GATE_STATUS_CONTEXT,
     state,
-    target_url: 'https://github.com/o/r/actions/runs/1',
+    target_url: RUN_PAGE,
     description: `gate ${state}: unit`,
     ...over,
   })
+  const feat = (over = {}) => run({ headBranch: 'feat/x', ...over })
+  const onFeat = (statuses) => ({ statuses, branch: 'feat/x' })
 
   it('classifies a success-concluded run with a failing ci/gate status as red', () => {
-    const c = classifyRuns([run()], HEAD, [gate('failure')])
+    const c = classifyRuns([feat()], HEAD, onFeat([gate('failure')]))
     expect(c).toMatchObject({ state: 'failed', runId: 1, workflowName: 'CI', conclusion: 'failure' })
-    expect(classifyRuns([run()], HEAD, [gate('error')]).state).toBe('failed')
+    expect(classifyRuns([feat()], HEAD, onFeat([gate('error')])).state).toBe('failed')
+    expect(failedRuns([feat()], HEAD, onFeat([gate('failure')]))).toHaveLength(1)
+    expect(recoveredWorkflows([feat()], HEAD, onFeat([gate('failure')]))).toEqual([])
+  })
+
+  // Review P1 (13.10.2026): the REST shape carries BOTH `url` (the API endpoint)
+  // and `html_url`; the status names the html_url, so `url` must not win.
+  it('matches the REST shape by html_url, not by its API url', () => {
+    const rest = {
+      id: 1, head_sha: HEAD, head_branch: 'feat/x', status: 'completed', conclusion: 'success', name: 'CI',
+      url: 'https://api.github.com/repos/o/r/actions/runs/1', html_url: RUN_PAGE,
+    }
+    expect(classifyRuns([rest], HEAD, onFeat([gate('failure')])).state).toBe('failed')
   })
 
   it('judges the gate by the newest status of the same run, and only that run', () => {
     // GitHub lists statuses newest first: a re-run's green supersedes the old red.
-    expect(classifyRuns([run()], HEAD, [gate('success'), gate('failure')]).state).toBe('success')
-    expect(classifyRuns([run()], HEAD, [gate('failure'), gate('success')]).state).toBe('failed')
+    expect(classifyRuns([feat()], HEAD, onFeat([gate('success'), gate('failure')])).state).toBe('success')
+    expect(classifyRuns([feat()], HEAD, onFeat([gate('failure'), gate('success')])).state).toBe('failed')
     // A red status of an OLDER run cannot paint a newer green run red.
     const other = gate('failure', { target_url: 'https://github.com/o/r/actions/runs/0' })
-    expect(classifyRuns([run()], HEAD, [other]).state).toBe('success')
+    expect(classifyRuns([feat()], HEAD, onFeat([other])).state).toBe('success')
     // Other contexts are not the gate.
-    expect(classifyRuns([run()], HEAD, [gate('failure', { context: 'ci/other' })]).state).toBe('success')
+    expect(classifyRuns([feat()], HEAD, onFeat([gate('failure', { context: 'ci/other' })])).state).toBe('success')
+    expect(classifyRuns([feat({ status: 'in_progress', conclusion: null })], HEAD, onFeat([gate('failure')])).state).toBe('pending')
   })
 
-  it('leaves main unchanged: no gate status means the run conclusion decides', () => {
-    expect(classifyRuns([run()], HEAD, []).state).toBe('success')
-    expect(classifyRuns([run()], HEAD).state).toBe('success')
-    expect(classifyRuns([run({ status: 'in_progress', conclusion: null })], HEAD, [gate('failure')]).state).toBe('pending')
+  // Review P2 (13.10.2026): a feature branch created at main's tip shares main's
+  // sha, and refTargets gives that sha to main. A red feature gate must not
+  // paint main red; the feature target itself still reads red.
+  it('keeps main unchanged on a sha it shares with a red-gated feature run', () => {
+    const mainRun = run({ databaseId: 1, headBranch: 'main', url: 'https://github.com/o/r/actions/runs/1' })
+    const featRun = feat({ databaseId: 2, url: 'https://github.com/o/r/actions/runs/2' })
+    const statuses = [gate('failure', { target_url: 'https://github.com/o/r/actions/runs/2' })]
+    expect(classifyRuns([mainRun, featRun], HEAD, { statuses, branch: 'main' }).state).toBe('success')
+    expect(classifyRuns([mainRun, featRun], HEAD, { statuses, branch: 'feat/x' }).state).toBe('failed')
+    // No gate input at all: exactly the old conclusion-only reading.
+    expect(classifyRuns([mainRun, featRun], HEAD).state).toBe('success')
+    expect(refBranch('origin/feat/x')).toBe('feat/x')
+    expect(refBranch('origin/main')).toBe('main')
+  })
+
+  it('sweeps a shared sha under main green and under the feature ref red', async () => {
+    const featRun = feat({ databaseId: 2, url: 'https://github.com/o/r/actions/runs/2' })
+    const runs = withGateStatuses(
+      [run({ databaseId: 1, headBranch: 'main' }), featRun],
+      [gate('failure', { target_url: 'https://github.com/o/r/actions/runs/2' })],
+    )
+    const sweep = (ref) => sweepTargets({
+      targets: [{ ref, sha: HEAD, at: 1 }],
+      cache: {}, notified: {}, famine: {}, now: 10 * 60 * 1000,
+      fetchRuns: async () => runs,
+      judgeRed: async ({ classification }) => ({ classification, standDown: false }),
+      notify: async () => {},
+    })
+    expect((await sweep('origin/main')).cache[HEAD].state).toBe('success')
+    expect((await sweep('origin/feat/x')).cache[HEAD].state).toBe('failed')
+  })
+
+  // Review P2 (13.10.2026): a red gate on an unread page must not pass as green.
+  it('reads every status page, and an incomplete read is unreadable', async () => {
+    const pages = { 1: Array(100).fill(gate('success')), 2: [gate('failure')] }
+    expect(await readAllStatusPages(async (n) => pages[n] ?? [])).toHaveLength(101)
+    expect(await readAllStatusPages(async (n) => (n === 1 ? pages[1] : null))).toBeNull()
+    expect(await readAllStatusPages(async () => Array(100).fill(gate('success')), { maxPages: 3 })).toBeNull()
   })
 
   it('keeps a lone cancellation red, and never hides a real failure', () => {
@@ -599,9 +652,9 @@ describe('renewable durable CI wait', () => {
 
   it('hands a failing ci/gate status on as a RED CI-terminal handoff, never green', () => {
     const wait = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake-1' })
-    const soft = [run({ databaseId: 32462093487, headSha: BRANCH, url: 'https://github.com/o/r/actions/runs/32462093487' })]
+    const soft = [run({ databaseId: 32462093487, headSha: BRANCH, headBranch: 'feat/x', url: 'https://github.com/o/r/actions/runs/32462093487' })]
     const statuses = [{ context: GATE_STATUS_CONTEXT, state: 'failure', target_url: 'https://github.com/o/r/actions/runs/32462093487' }]
-    const terminal = observeCiWait(wait, classifyRuns(soft, BRANCH, statuses), { now: NOW + 1 })
+    const terminal = observeCiWait(wait, classifyRuns(soft, BRANCH, { statuses, branch: refBranch(wait.ref) }), { now: NOW + 1 })
     const prompt = ciTerminalPrompt(assessCiWait({ wait: terminal, now: NOW + 2 }))
     expect(terminal.terminal).toMatchObject({ state: 'failed', verdict: 'red' })
     expect(prompt).toMatch(/concluded RED/)

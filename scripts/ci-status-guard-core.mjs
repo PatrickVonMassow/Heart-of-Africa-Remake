@@ -33,16 +33,29 @@ function runAttempt(r) {
 /** The commit-status context ci-gate-verdict posts on a soft `feat/**` run. */
 export const GATE_STATUS_CONTEXT = 'ci/gate (branch)'
 
+/** The run's web page — what a commit status's `target_url` names. The REST
+ *  shape carries BOTH `url` (the API endpoint) and `html_url`; gh's `url` is
+ *  the web page. So html_url wins here, unlike `runUrl`. */
+function runHtmlUrl(r) {
+  return String((r && (r.html_url ?? r.url)) ?? '')
+}
+function runBranch(r) {
+  return String((r && (r.headBranch ?? r.head_branch)) ?? '')
+}
+/** `origin/feat/x` → `feat/x`: the branch a pushed ref target names. */
+export function refBranch(ref) {
+  return String(ref ?? '').replace(/^refs\/heads\//, '').replace(/^(refs\/remotes\/)?origin\//, '')
+}
+
 /**
- * Fold the `ci/gate (branch)` commit statuses into the runs they report on.
+ * Attach each run's `ci/gate (branch)` commit status to it as `gate`.
  *
  * WHY (12.10.2026, run 38277768235): a `feat/**` push runs every CI step with
  * `continue-on-error`, so a red gate CONCLUDES `success` and only the commit
  * status says `failure`. Reading conclusions alone reported that branch green.
  * A status is matched to its run by `target_url` (the run's html_url); `statuses`
- * is GitHub's newest-first list, so the first status per run is its verdict. A
- * matched completed run whose status is `failure`/`error` becomes `failure`.
- * `main` posts no such status, so its runs pass through unchanged.
+ * is GitHub's newest-first list, so the first status per run is its verdict.
+ * Attaching changes no verdict: `foldGate` does that, for the target's branch.
  */
 export function withGateStatuses(runs, statuses) {
   if (!Array.isArray(runs) || !Array.isArray(statuses) || statuses.length === 0) return runs
@@ -53,11 +66,49 @@ export function withGateStatuses(runs, statuses) {
     if (url && !verdict.has(url)) verdict.set(url, s)
   }
   return runs.map((r) => {
-    const s = verdict.get(runUrl(r))
-    if (!s || !['failure', 'error'].includes(String(s.state ?? ''))) return r
-    if (String(r?.status ?? '') !== 'completed' || !OK_CONCLUSIONS.has(String(r?.conclusion ?? ''))) return r
-    return { ...r, conclusion: 'failure', gateStatus: String(s.description ?? s.state) }
+    const s = verdict.get(runHtmlUrl(r))
+    return s ? { ...r, gate: { state: String(s.state ?? ''), description: String(s.description ?? '') } } : r
   })
+}
+
+/**
+ * A completed, ok-concluded run whose attached gate is `failure`/`error` becomes
+ * `failure` — but ONLY a run of the TARGET's own branch. One sha can carry runs
+ * of several refs (a feature branch created at main's tip), and `refTargets`
+ * gives that sha to main: a red feature gate must not paint main red. Without a
+ * branch nothing is folded, so main and every caller that names none read as
+ * before.
+ */
+function foldGate(runs, branch) {
+  if (!Array.isArray(runs) || !branch) return runs
+  return runs.map((r) => {
+    if (!['failure', 'error'].includes(String(r?.gate?.state ?? ''))) return r
+    if (runBranch(r) !== branch) return r
+    if (String(r?.status ?? '') !== 'completed' || !OK_CONCLUSIONS.has(String(r?.conclusion ?? ''))) return r
+    return { ...r, conclusion: 'failure' }
+  })
+}
+
+/** The runs as the TARGET sees them: statuses attached (when given) and the
+ *  target branch's red gates folded in. */
+function gatedRuns(runs, { statuses = null, branch = '' } = {}) {
+  return foldGate(withGateStatuses(runs, statuses), branch)
+}
+
+/**
+ * Read EVERY page of a commit's statuses (`fetchPage(n)` → array or null), or
+ * null when the read is incomplete: a red gate on an unread page must never
+ * let the run pass as green (four-eyes review 13.10.2026).
+ */
+export async function readAllStatusPages(fetchPage, { perPage = 100, maxPages = 10 } = {}) {
+  const all = []
+  for (let page = 1; page <= maxPages; page++) {
+    const batch = await fetchPage(page)
+    if (!Array.isArray(batch)) return null
+    all.push(...batch)
+    if (batch.length < perPage) return all
+  }
+  return null // more pages than the cap: incomplete, so unreadable
 }
 
 /**
@@ -114,14 +165,14 @@ function newestPerWorkflowFrom(runs) {
  * predecessor), after `verdictRuns` has dropped superseded cancellations — the
  * same reduction `failedRuns` and `recoveredWorkflows` use. Across workflows:
  * any red → 'failed'; else any unfinished → 'pending'; else any green →
- * 'success'; else 'none' (fail-open). `statuses` (optional) are the commit
- * statuses for `headSha`, folded in by `withGateStatuses`.
+ * 'success'; else 'none' (fail-open). `gate` (optional): `{ statuses, branch }`
+ * — the commit statuses for `headSha` and the TARGET's branch (`gatedRuns`).
  * @returns {{state:'failed'|'pending'|'success'|'none', runId?, workflowName?, conclusion?, runAttempt?, url?}}
  */
-export function classifyRuns(runs, headSha, statuses = null) {
+export function classifyRuns(runs, headSha, gate = {}) {
   try {
     if (!Array.isArray(runs) || !headSha) return { state: 'none' }
-    const mine = verdictRuns(withGateStatuses(runs, statuses), headSha)
+    const mine = verdictRuns(gatedRuns(runs, gate), headSha)
     if (mine.length === 0) return { state: 'none' }
 
     const newestPerWorkflow = newestPerWorkflowFrom(mine)
@@ -166,10 +217,10 @@ export function classifyRuns(runs, headSha, statuses = null) {
  * watchdog run created a second later would then excuse a genuinely red CI run
  * standing on the same commit. The waiver must be judged against ALL of them.
  */
-export function failedRuns(runs, headSha) {
+export function failedRuns(runs, headSha, gate = {}) {
   try {
     if (!Array.isArray(runs) || !headSha) return []
-    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(runs, headSha))
+    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(gatedRuns(runs, gate), headSha))
     return [...newestPerWorkflow.values()]
       .filter((r) => String(r?.status ?? '') === 'completed' && FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
       .map((r) => ({
@@ -196,10 +247,10 @@ export function failedRuns(runs, headSha) {
  * for that workflow would then read as an already-expired waiver and escalate at
  * once, with an absurd age, in the FALSE-ALARM direction.
  */
-export function recoveredWorkflows(runs, headSha) {
+export function recoveredWorkflows(runs, headSha, gate = {}) {
   try {
     if (!Array.isArray(runs) || !headSha) return []
-    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(runs, headSha))
+    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(gatedRuns(runs, gate), headSha))
     return [...newestPerWorkflow.entries()]
       .filter(([, r]) => String(r?.status ?? '') === 'completed' && !FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
       .map(([name]) => name)
@@ -706,7 +757,8 @@ export async function sweepTargets({
       failedOpen.push(`${target.ref} ${String(target.sha).slice(0, 7)}: GitHub Actions could not be read`)
       continue
     }
-    const classification = classifyRuns(runs, target.sha)
+    const gate = { branch: refBranch(target.ref) }
+    const classification = classifyRuns(runs, target.sha, gate)
     const verdict = refVerdict({ state: classification.state, at, now })
     observations.push({ target, classification, firstSeenAt: at, observedAt: now, previousState: entry?.state ?? null, verdict })
     dirty = true
@@ -715,7 +767,7 @@ export async function sweepTargets({
       // THE WAIVER CLOCK IS CLEARED ON THE WAY OUT: a stale timestamp would make
       // the NEXT famine for that workflow read as an already-expired waiver and
       // escalate on its first sighting.
-      for (const name of recoveredWorkflows(runs, target.sha)) delete nextFamine[name]
+      for (const name of recoveredWorkflows(runs, target.sha, gate)) delete nextFamine[name]
       nextCache[target.sha] = { state: 'success', firstSeenAt: at, checkedAt: now }
       continue
     }
@@ -761,6 +813,7 @@ export async function sweepTargets({
     const { classification: chosen, standDown, stillFamished, judgedWorkflows, rerunWait } = await judgeRed({
       sha: target.sha,
       runs,
+      branch: gate.branch,
       // What this sweep has learned so far included, so a second red target on
       // the same workflow still sees the EARLIEST famine timestamp.
       famine: { ...nextFamine, ...Object.fromEntries(famishedNames) },

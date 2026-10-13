@@ -40,6 +40,8 @@ import {
   classifyRuns,
   failedRuns,
   withGateStatuses,
+  readAllStatusPages,
+  refBranch,
   ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
@@ -251,9 +253,10 @@ function httpsRequest(url, { method = 'GET', headers = {}, body = null, timeoutM
   })
 }
 
-/** Actions runs for the sha with its `ci/gate (branch)` commit statuses folded
- * in (a soft `feat/**` run concludes success even when its gate is red); null
- * on any failure of either read (the caller fails open and says so). */
+/** Actions runs for the sha with its `ci/gate (branch)` commit statuses attached
+ * (a soft `feat/**` run concludes success even when its gate is red; the
+ * classifier folds the gate in for the target's own branch); null on any
+ * failure or incomplete read of either (the caller fails open and says so). */
 async function fetchRuns(repo, headSha) {
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -275,17 +278,21 @@ async function fetchRuns(repo, headSha) {
     return null
   }
   if (!runs) return null
-  const statusRes = await httpsRequest(
-    `https://api.github.com/repos/${repo}/commits/${headSha}/statuses?per_page=100`,
-    { headers },
-  )
-  if (!statusRes || statusRes.status !== 200) return null
-  try {
-    const statuses = JSON.parse(statusRes.body)
-    return Array.isArray(statuses) ? withGateStatuses(runs, statuses) : null
-  } catch {
-    return null
-  }
+  // Every page, or none: a red gate on an unread page must not pass as green.
+  const statuses = await readAllStatusPages(async (page) => {
+    const statusRes = await httpsRequest(
+      `https://api.github.com/repos/${repo}/commits/${headSha}/statuses?per_page=100&page=${page}`,
+      { headers },
+    )
+    if (!statusRes || statusRes.status !== 200) return null
+    try {
+      const list = JSON.parse(statusRes.body)
+      return Array.isArray(list) ? list : null
+    } catch {
+      return null
+    }
+  })
+  return statuses ? withGateStatuses(runs, statuses) : null
 }
 
 /** Dispatch the one failed-jobs re-run selected by the pure classifier. A 201
@@ -544,8 +551,8 @@ function pushReflog() {
  *  526/528). Returns the chosen classification, whether every red is
  *  unactionable, the famine clocks to keep, the judged workflows and the
  *  re-run wait a failed-jobs dispatch started (`rerunWait`). */
-async function judgeRed(repo, { sha, runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
-  const reds = failedRuns(runs, sha)
+async function judgeRed(repo, { sha, branch = '', runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
+  const reds = failedRuns(runs, sha, { branch })
   const judged = []
   const stillFamished = {}
   let dispatchedWait = null
@@ -819,7 +826,7 @@ async function observeDurableWait(wakeToken) {
       await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
       continue
     }
-    let classification = classifyRuns(runs, wait.sha)
+    let classification = classifyRuns(runs, wait.sha, { branch: refBranch(wait.ref) })
     const observedAt = Date.now()
     if (classification.state === 'pending') {
       const observation = {
@@ -882,6 +889,7 @@ async function observeDurableWait(wakeToken) {
       try {
         const judged = await judgeRed(repo, {
           sha: wait.sha,
+          branch: refBranch(wait.ref),
           runs,
           classification,
           famine,
