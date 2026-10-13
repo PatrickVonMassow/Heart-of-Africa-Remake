@@ -2481,7 +2481,7 @@ session is actually acting, and that had to be made true rather than assumed
 delegated agent works in a worktree whose own spool is empty, so a message left to
 it waited 34 minutes under a correctly logged `skip / owner-live`. The deferral
 therefore has a DEADLINE. The watcher re-reads the pending spool on its own clock
-and anything older than `DEFERRAL_MS` (3 minutes, calibratable via
+and anything older than `DEFERRAL_MS` (45 seconds, calibratable via
 `HOA_CHAT_DEFER_MS`) is decided again with the owner gate lifted — it wakes a
 responder as it would for an idle machine, under the same bounded claim. Age is
 the trigger and no declaration is read: a session that is genuinely working
