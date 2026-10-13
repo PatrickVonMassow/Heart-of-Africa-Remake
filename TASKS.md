@@ -87,15 +87,6 @@ put it is the mistake this line exists to stop.
   Attempt 1 (12.10.2026 22:45-23:31): the user was notified of a 22:58-23:10 window; owner blocked 46 min on a subagent (6 green unit runs); no message arrived, so no case. The new watcher logged each line once ("watching" at 20:44:31Z), so the duplicate-line fix holds live. Next attempt needs a user-confirmed window.
   Also (same session): the running watcher (pid 1584562, started 15:10) still ran pre-merge code at 22:44; the autostart supervision restarts only a dead watcher, never one whose code a merge changed, so a merged watcher fix runs only after a manual restart or reboot. Split off as point 1353 (13.10.2026).
 
-- [ ] 1351. The batch is paused only on the user's explicit stop order
-  Queue position: after point 1033.
-  Source: user 12.10.2026 21:23: »stelle außerdem sicher, dass die Batch nicht wieder ohne meine Ausdrückliche Freigabe angehalten wird.« Trigger 21:04: asked »Hast du die Batch bekommen? Dazu habe ich dich nicht aufgefordert.«, the session ran `batch-pause.mjs --user-stop` with that quote; user: »Nein, nicht anhalten … Niemals in irgendeine meiner Fragen oder Anweisungen hineininterpretieren, dass ich das vielleicht wollen könnte.« Same error 24.09.2026 (»Erstmal nur darüber reden«). The memory rule held neither time, and `batch-progress-guard` names `--user-stop` as a legitimate turn end, which invites it.
-  Final state: no session can pause the batch on a user utterance that is not an explicit order to stop or pause it; a question, a complaint or a discussion remark is refused as a stop reason. The stop guard's list of legitimate ends no longer offers the user stop to a session whose user did not order one.
-  Verifiable: unit cases — the two quoted utterances above are refused as stop reasons, an explicit order (»Halte die Batch an«, »Stopp die Batch«) is accepted; the guard text case.
-  Criticality: high — a false stop idles the machine until the user notices.
-  Refs: scripts/batch-pause.mjs, scripts/batch-pause-core.mjs (namesUserUtterance), scripts/batch-progress-guard.mjs.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1350. The decision-card guard deadlocks a stand-down chat session
   Queue position: after point 1349.
   Source: findings carrier 12.10.2026 16:36: chat-only session 994859ad (STAND DOWN, batch owned by 4dc5437a) answered a board message; Stop hook decision-card-guard demanded `board.mjs vdzk-keep` for three cards, which the stand-down PreToolUse hook refuses.

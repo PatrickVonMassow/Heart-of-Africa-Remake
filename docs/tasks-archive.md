@@ -34019,3 +34019,12 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: a Vitest case with a success-concluded run and a failing ci/gate status that the guard classifies red.
   Criticality: medium - possible false approval of a landing.
   Bundle: Modell & Wächter.
+
+- [x] 1351. The batch is paused only on the user's explicit stop order
+  Queue position: after point 1033.
+  Source: user 12.10.2026 21:23: »stelle außerdem sicher, dass die Batch nicht wieder ohne meine Ausdrückliche Freigabe angehalten wird.« Trigger 21:04: asked »Hast du die Batch bekommen? Dazu habe ich dich nicht aufgefordert.«, the session ran `batch-pause.mjs --user-stop` with that quote; user: »Nein, nicht anhalten … Niemals in irgendeine meiner Fragen oder Anweisungen hineininterpretieren, dass ich das vielleicht wollen könnte.« Same error 24.09.2026 (»Erstmal nur darüber reden«). The memory rule held neither time, and `batch-progress-guard` names `--user-stop` as a legitimate turn end, which invites it.
+  Final state: no session can pause the batch on a user utterance that is not an explicit order to stop or pause it; a question, a complaint or a discussion remark is refused as a stop reason. The stop guard's list of legitimate ends no longer offers the user stop to a session whose user did not order one.
+  Verifiable: unit cases — the two quoted utterances above are refused as stop reasons, an explicit order (»Halte die Batch an«, »Stopp die Batch«) is accepted; the guard text case.
+  Criticality: high — a false stop idles the machine until the user notices.
+  Refs: scripts/batch-pause.mjs, scripts/batch-pause-core.mjs (namesUserUtterance), scripts/batch-progress-guard.mjs.
+  Bundle: Session- & Repo-Hygiene.
