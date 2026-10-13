@@ -115,7 +115,9 @@ import {
   createAdultWork,
   digProgressOf,
   digBout,
+  digPhaseOf,
   isDigging,
+  PRIMITIVE_DIG_STROKE,
   goalOf,
   stepAdultWork,
   taskOf,
@@ -2725,7 +2727,15 @@ function ErrandVillagers({
   const works = useRef<Array<RefObject<FigureWork>>>([])
   /** The glTF body draws (and holds) its own shovel; the hand prop is for the
    *  primitive and the code-built bodies. */
-  const gltfBody = !!useContext(FigureLookContext)?.villager
+  const villagerAsset = useContext(FigureLookContext)?.villager ?? null
+  const gltfBody = !!villagerAsset
+  /** The stroke the dig progress counts strikes on: the drawn body's own —
+   *  the glTF dig clip's period and blade contact, the primitive's otherwise —
+   *  so each counted strike (the earth thrown) is a strike the player sees. */
+  const digStroke = useMemo(() => {
+    const dig = villagerAsset?.clips.dig
+    return dig ? { seconds: dig.duration, strikeAt: dig.strike ?? 0 } : PRIMITIVE_DIG_STROKE
+  }, [villagerAsset])
   /** A villager PINNED into the fill, by index and progress — the dev route the
    *  verification poses one by. The errand's own fill phase drives the live dip;
    *  this only overrides which man is held and how far along it is. Null
@@ -2921,7 +2931,7 @@ function ErrandVillagers({
   useFrame((_, rawDt) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
-    const cfg = balance.villageLife.adultErrands
+    const cfg = { ...balance.villageLife.adultErrands, digStroke }
     // The jars standing at the village water stand: as many as the errand
     // state says have been set down, capped at the stand's capacity.
     for (let k = 0; k < standJars.current.length; k++) {
@@ -3167,6 +3177,10 @@ function ErrandVillagers({
         // clock running on while it fades; it restarts from the top once gone.
         state.digK = easeDigWeight(state.digK, digging, dt)
         state.dug = digging || state.digK > 0 ? state.dug + dt : 0
+        // the drawn stroke on the work's clock: it advances only while the hole
+        // deepens, so it freezes through a hold or a fade, and the strike the
+        // progress counts is the one drawn
+        if (task && task.phase === 'dig') figureWork.digT = task.dug + digPhaseOf(i)
         if (digging) {
           figureWork.dig = true
           const siteIndex = task?.siteIndex

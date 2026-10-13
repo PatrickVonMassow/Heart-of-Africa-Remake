@@ -33,7 +33,7 @@ function frame(
   f: { bones: Record<string, THREE.Bone>; tool: THREE.Group; c: ClipLayers },
   z: number,
   speed: number,
-  work: { dig: boolean; tool: boolean },
+  work: { dig: boolean; tool: boolean; digT?: number },
   dt: number,
   free: readonly [boolean, boolean] = [true, true],
 ) {
@@ -49,6 +49,22 @@ const tipY = (tool: THREE.Object3D) => new THREE.Vector3(0, VILLAGER_ASSET.shove
 const handleY = (tool: THREE.Object3D) => new THREE.Vector3(0, VILLAGER_ASSET.shovel.top, 0).applyMatrix4(tool.matrixWorld).y
 
 describe('the clip layers on the glTF figure', () => {
+  it('the dig stroke runs on the work clock the caller keeps, and freezes while it stands', () => {
+    const f = figure()
+    const dt = 1 / 60
+    // the work clock advancing: the stroke is exactly it
+    for (let k = 1; k <= 30; k++) frame(f, 0, 0, { dig: true, tool: true, digT: 0.37 + k * dt }, dt)
+    expect(f.c.digT).toBeCloseTo(0.37 + 30 * dt)
+    // the bout holds and fades: the clock stands, the stroke with it
+    const held = f.c.digT
+    for (let k = 0; k < 30; k++) frame(f, 0, 0, { dig: false, tool: true, digT: held }, dt)
+    expect(f.c.digT).toBe(held)
+    // without a work clock the layers keep their own (it restarts once the dig is gone)
+    const g = figure()
+    for (let k = 0; k < 30; k++) frame(g, 0, 0, { dig: true, tool: true }, dt)
+    expect(g.c.digT).toBeCloseTo(30 * dt)
+  })
+
   it('carry walking and standing: the shovel is in the hand and its blade never below the ground', () => {
     const f = figure()
     const dt = 1 / 60

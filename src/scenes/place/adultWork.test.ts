@@ -12,6 +12,7 @@ import {
   createAdultWork,
   digProgressOf,
   digStrikeCrossed,
+  PRIMITIVE_DIG_STROKE,
   goalOf,
   isDigging,
   stepAdultWork,
@@ -841,6 +842,38 @@ describe('digging records work at the site', () => {
     const dt = 1 / 60
     for (let t = 0; t < DIG_CYCLE_SECONDS * 10; t += dt) if (digStrikeCrossed(t, t + dt)) strikes++
     expect(strikes).toBe(10)
+  })
+
+  it('counts one strike per drawn blade contact, whatever the frame steps, a pause or an interruption', () => {
+    // the glTF stroke shape: a longer period, the blade meeting the ground inside it
+    const stroke = { seconds: 2.4, strikeAt: 0.93 }
+    let seed = 7
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (const phase of [0, 0.37, 1.11, 2.39]) {
+      let dug = 0
+      let counted = 0
+      let drawn = 0
+      for (let k = 0; k < 4000; k++) {
+        // variable steps, frames with no time (a pause), stretches where the
+        // bout is interrupted and the work clock (and the drawn stroke) stands
+        const dt = k % 97 < 9 ? 0 : k % 211 < 30 ? 0 : rand() * 0.12
+        const before = dug
+        dug += dt
+        if (digStrikeCrossed(before, dug, phase, stroke)) counted++
+        // the drawn stroke is the clip at (dug + phase) mod its period: a
+        // contact is drawn where that passes the blade's instant
+        const a = (before + phase) % stroke.seconds
+        const b = (dug + phase) % stroke.seconds
+        const laps = Math.floor((dug + phase) / stroke.seconds) - Math.floor((before + phase) / stroke.seconds)
+        if (dt > 0) drawn += laps === 0 ? (a < stroke.strikeAt && b >= stroke.strikeAt ? 1 : 0) : (a < stroke.strikeAt ? 1 : 0) + (laps - 1) + (b >= stroke.strikeAt ? 1 : 0)
+      }
+      expect(counted, `phase ${phase}`).toBe(drawn)
+      expect(counted).toBeGreaterThan(50)
+    }
+  })
+
+  it('the primitive stroke still strikes at the turn of its cycle', () => {
+    expect(PRIMITIVE_DIG_STROKE).toEqual({ seconds: DIG_CYCLE_SECONDS, strikeAt: 0 })
   })
 
   it('adds worker-seconds and strike events only after the second utterance', () => {

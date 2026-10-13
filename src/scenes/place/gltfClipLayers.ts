@@ -94,8 +94,11 @@ export function stepClipLayers(
   c.dig = ease(c.dig, work?.dig ? 1 : 0, dt)
   // the carry stays under the dig while it eases in, and is there again after
   c.carry = ease(c.carry, work?.tool && (!work.dig || c.dig < 1) ? 1 : 0, dt)
-  // the stroke starts from its top when the dig begins, and runs on while it fades
-  c.digT = c.dig > 0 ? c.digT + dt : 0
+  // the stroke on the work's clock where the caller keeps one (it stops, and the
+  // pose freezes, while the bout holds or fades); else it starts from its top
+  // when the dig begins and runs on while it fades
+  if (work?.digT !== undefined) c.digT = work.digT
+  else c.digT = c.dig > 0 ? c.digT + dt : 0
   c.arms = [ease(c.arms[0], c.free[0] ? 1 : 0, dt), ease(c.arms[1], c.free[1] ? 1 : 0, dt)]
   c.idleT += dt
 }

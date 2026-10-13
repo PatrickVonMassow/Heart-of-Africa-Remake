@@ -42,6 +42,9 @@ export interface VillagerClip {
    *  the phase intervals [a, b) it carries in (b > 1 wraps past the seam), and
    *  the loop seam the pipeline closed (rad). */
   contacts?: ClipContacts
+  /** A work stroke's blade contact (s from the clip's start): where the dig
+   *  counts its strike (scenes/place/adultWork.ts digStrikeCrossed). */
+  strike?: number
 }
 
 export interface ClipContacts {
@@ -98,7 +101,7 @@ interface Meta {
   jointDeltas: Record<string, Record<string, number[]>>
   tails: Record<string, number[]>
   contactPoints: Record<'L' | 'R', Record<'heel' | 'ball' | 'tip' | 'knee', number[]>>
-  clips: Record<string, { duration: number; kind: VillagerClipKind; speed?: number; tool?: ToolGrip; grip?: { L?: number; R?: number }; contacts?: ClipContacts }>
+  clips: Record<string, { duration: number; kind: VillagerClipKind; speed?: number; tool?: ToolGrip; grip?: { L?: number; R?: number }; contacts?: ClipContacts; strike?: number }>
   toolHold: Record<'L' | 'R', { rotation: number[]; offset: number[] }>
   stature: number
   garmentMask?: { garments: string[] }
@@ -171,7 +174,7 @@ export function villagerFromGltf(gltf: { scene: THREE.Object3D; animations: THRE
       if (prop === 'quaternion') rot[i] = t.values as Float32Array
       else if (prop === 'position' && i === 0) hips = t.values as Float32Array
     }
-    clips[a.name] = { name: a.name, kind: m.kind, duration: m.duration, speed: m.speed ?? 0, times, rot, hips, tool: m.tool, grip: m.grip, contacts: m.contacts }
+    clips[a.name] = { name: a.name, kind: m.kind, duration: m.duration, speed: m.speed ?? 0, times, rot, hips, tool: m.tool, grip: m.grip, contacts: m.contacts, strike: m.strike }
   }
   const cp = (s: 'L' | 'R'): ContactPoints => ({
     heel: v3(meta.contactPoints[s].heel),

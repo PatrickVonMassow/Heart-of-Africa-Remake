@@ -92,6 +92,9 @@ export interface AdultWorkConfig {
   intervalSpread: number
   dwellSeconds: number
   digSeconds: number
+  /** The stroke a strike is counted on: the drawn body's (the glTF dig clip's
+   *  period and blade-contact instant) — the primitive figure's when absent. */
+  digStroke?: DigStroke
   errandSeconds: number
   stallSeconds: number
   pace: number
@@ -304,9 +307,28 @@ export function clearTask(state: AdultWorkState, index: number): void {
   if (index >= 0 && index < state.tasks.length) clearPair(state, index)
 }
 
-export function digStrikeCrossed(before: number, after: number, phase = 0): boolean {
-  return Math.floor((after + phase) / DIG_CYCLE_SECONDS) > Math.floor((before + phase) / DIG_CYCLE_SECONDS)
+/** One dig stroke: its period (s) and the instant in it the blade meets the
+ *  ground (s from the stroke's start) — where a strike is counted. */
+export interface DigStroke {
+  seconds: number
+  strikeAt: number
 }
+
+/** The primitive figure's stroke (render/gesture.ts digPose): it strikes at the
+ *  turn of its cycle. */
+export const PRIMITIVE_DIG_STROKE: DigStroke = { seconds: DIG_CYCLE_SECONDS, strikeAt: 0 }
+
+/** Whether the work clock passed a strike between `before` and `after`
+ *  (seconds of digging, `phase` the body's offset into its stroke): one per
+ *  stroke, at its blade contact, whatever the frame steps. */
+export function digStrikeCrossed(before: number, after: number, phase = 0, stroke: DigStroke = PRIMITIVE_DIG_STROKE): boolean {
+  const at = (t: number) => Math.floor((t + phase - stroke.strikeAt) / stroke.seconds)
+  return at(after) > at(before)
+}
+
+/** A body's offset into its dig stroke (s), so a pair does not dig in lockstep:
+ *  the work clock and the drawn stroke both add it. */
+export const digPhaseOf = (index: number): number => index * 0.37
 
 
 function anyFree(view: AdultWorkView, avoid: number): number {
@@ -656,7 +678,7 @@ export function stepAdultWork(
       t.dug += dt
       const progress = (state.siteProgress[t.siteIndex] ??= { dug: 0, strikes: 0 })
       progress.dug += dt
-      if (digStrikeCrossed(before, t.dug, i * 0.37)) progress.strikes++
+      if (digStrikeCrossed(before, t.dug, digPhaseOf(i), cfg.digStroke)) progress.strikes++
       if (t.dug >= cfg.digSeconds) {
         progress.completed = true
         clearPair(state, i)
