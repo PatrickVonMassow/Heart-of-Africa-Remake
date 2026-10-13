@@ -95,6 +95,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium - a real blockade of the chat answer path.
   Also (findings carrier 12.10.2026 19:46-19:47, responder 19043d77 on probe message 2eaa0509): reproduced with four cards; scripts/decision-card-guard.mjs:366 evaluateCardReviews blocks before the nonOwner exit at :382, so the responder looped on Stop.
   Bundle: Chat & Tafel.
+  Decision (owner 13.10.2026, open to veto): the spec's blanket stand-down would silently drop the deliberate non-owner carry path (evaluateCardReviews' non-owner branch; vdzk-answer is already allowed in stand-down). Instead: (C) for a non-owner, block only on cards that share terms with the message, and let the rest pass; (B) admit `board.mjs vdzk-keep` through the stand-down allowlist, so a false term match is no deadlock. Verifiable becomes: Vitest cases where a non-owner with unrelated open cards passes, and the stand-down hook admits vdzk-keep.
 
 - [ ] 1342. Natural villager motion b: three-segment spine, hand morphs, jog and clip style, dig action, one pose pipeline, distributed lean and gaze, corrective leg IK
   Queue position: directly after point 1316 (its sub-point a supplies the runtime sheets and pose exporter every step here is judged with).
