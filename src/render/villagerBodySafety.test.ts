@@ -11,7 +11,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { bakeMorphs, inPeakRegion, morphInfluences, peakSharpness, vertexRings } from './villagerBody'
+import { bakeMorphs, inPeakRegion, morphInfluences, peakSharpness, restBounds, vertexRings } from './villagerBody'
 import { bakePose, gltfPerson, hungHeads } from './villagerFigureBody'
 
 const glb = readFileSync(resolve(__dirname, '../../public/models/villager.glb'))
@@ -42,7 +42,7 @@ function sharpestPeak(g: THREE.BufferGeometry, child = false) {
   const pos = g.getAttribute('position') as THREE.BufferAttribute
   const nor = g.getAttribute('normal') as THREE.BufferAttribute
   const rings = vertexRings(g)
-  g.computeBoundingBox()
+  restBounds(g)
   const y0 = g.boundingBox!.min.y
   const h = g.boundingBox!.max.y - y0
   const P = (i: number) => new THREE.Vector3().fromBufferAttribute(pos, i)

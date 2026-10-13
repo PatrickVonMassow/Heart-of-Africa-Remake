@@ -17,6 +17,7 @@
 import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF as G } from '../../config/balance'
 import type { VillagerAsset } from '../../render/villagerAsset'
+import { LIVE_MORPHS, type LiveMorph } from '../../render/villagerBody'
 import { clipGaitPose, clipPoseAt, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
 import type { GltfPerson } from '../../render/villagerFigureBody'
 import { blendPoses, newPose, type VillagerPose } from '../../render/villagerRig'
@@ -177,6 +178,42 @@ export function applyClipLayers(
     toHung(asset, f, c.pose, c.local, c.hips)
     blendInto(asset, bones, asset.bones, c.local, c.dig)
     blendHips(bones, c.hips, c.dig)
+  }
+}
+
+/**
+ * The hands' shapes (the glTF body's live morphs, render/villagerBody.ts
+ * LIVE_MORPHS) from what the hands do: closed round the shovel by the dig's
+ * share (both hands) and the carry's (the right), the pointing shape where a
+ * gesture aims a hand (`point`, left and right), and relaxed — a hand at rest
+ * is softly curled, never a flat board — wherever neither holds. Per hand the
+ * three weights sum to 1, so no shape stacks on another.
+ */
+export function handShapes(c: Pick<ClipLayers, 'dig' | 'carry' | 'arms'>, point: readonly [number, number] = [0, 0]): Record<LiveMorph, number> {
+  const clamp = (x: number) => Math.min(1, Math.max(0, x))
+  const gripL = clamp(c.dig)
+  // the carry is the right arm's only while the clips own that arm
+  const gripR = clamp(Math.max(c.dig, c.carry * c.arms[1]))
+  const pointL = clamp(point[0]) * (1 - gripL)
+  const pointR = clamp(point[1]) * (1 - gripR)
+  return {
+    'grip.L': gripL,
+    'grip.R': gripR,
+    'point.L': pointL,
+    'point.R': pointR,
+    'relax.L': clamp(1 - gripL - pointL),
+    'relax.R': clamp(1 - gripR - pointR),
+  }
+}
+
+/** Write hand-shape weights onto a mesh's morph influences (the targets it carries). */
+export function applyHandShapes(mesh: THREE.Mesh, w: Record<LiveMorph, number>): void {
+  const dict = mesh.morphTargetDictionary
+  const inf = mesh.morphTargetInfluences
+  if (!dict || !inf) return
+  for (const n of LIVE_MORPHS) {
+    const i = dict[n]
+    if (i !== undefined) inf[i] = w[n]
   }
 }
 

@@ -3,7 +3,7 @@
 // pose object is COPIED, never aliased to a shared template such as the
 // head-carry pose other vignettes use too.
 
-import { armAim, type FigurePose } from '../../render/gesture'
+import { armAim, copyPoseExtras, type FigurePose } from '../../render/gesture'
 import { HEAD_CARRY_POSE } from './placeFigureContext'
 
 /** Both arms reaching toward a bearing and down, for lifting or setting down. */
@@ -22,6 +22,7 @@ export function copyPose(into: FigurePose, from: FigurePose): void {
   into.right = { ...from.right }
   into.lean = from.lean
   into.turn = from.turn
+  copyPoseExtras(into, from)
 }
 
 /** A pose object of a figure's own, starting as a copy of `from`. */

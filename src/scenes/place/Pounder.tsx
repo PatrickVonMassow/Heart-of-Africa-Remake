@@ -11,7 +11,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
-import { armAim, REST_POSE, type FigurePose } from '../../render/gesture'
+import { armAim, copyPoseExtras, REST_POSE, type FigurePose } from '../../render/gesture'
 import { gaitCadence, gaitPhase } from '../../render/fauna'
 import { buildFishGeometry, FISH_TONES } from '../../render/fishMesh'
 import { playPoundThud } from '../../systems/ambience'
@@ -235,6 +235,7 @@ export function Pounder({ x, z, yaw: yawIn, cloth, duo: duoIn }: {
           Object.assign(pose.right, next.right)
           pose.lean = next.lean
           pose.turn = next.turn
+          copyPoseExtras(pose, next)
         }
         if (pestle) {
           pestle.position.set(cfg.strikeOffset, impactFootY(cfg), cfg.standOff)

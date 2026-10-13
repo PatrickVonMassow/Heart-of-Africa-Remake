@@ -283,7 +283,8 @@ interface Recorded {
   chain: Array<ReturnType<typeof trs> & { name: string }>
   bones: Array<ReturnType<typeof trs>>
   world: number[][]
-  morph: { influences: Record<string, number>; mesh: number[] }
+  /** The person's baked morphs, and the live (hand) morphs the mesh draws, by name. */
+  morph: { influences: Record<string, number>; mesh: Record<string, number> }
   tool: { visible: boolean; matrix: number[] } | null
 }
 
@@ -352,7 +353,10 @@ async function play(s: Subject) {
       chain: chainNodes.map((o) => ({ name: o.name || o.type, ...trs(o) })),
       bones: bones.map(trs),
       world: bones.map((b) => b.matrixWorld.toArray()),
-      morph: { influences: { ...person.frame.influences }, mesh: [...(mesh.morphTargetInfluences ?? [])] },
+      morph: {
+        influences: { ...person.frame.influences },
+        mesh: Object.fromEntries(Object.entries(mesh.morphTargetDictionary ?? {}).map(([n, i]) => [n, mesh.morphTargetInfluences?.[i] ?? 0])),
+      },
       tool: tool ? { visible: tool.visible, matrix: tool.matrixWorld.toArray() } : null,
     })
   }

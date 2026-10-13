@@ -10,8 +10,28 @@ import { VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
 import type { VillagerAsset } from './villagerAsset'
 
-/** The morphs that stay live on a figure (the hands close round a tool). */
-export const LIVE_MORPHS = ['grip.L', 'grip.R'] as const
+/**
+ * A geometry's bounds from its positions alone. three's computeBoundingBox /
+ * computeBoundingSphere add every relative morph target's extent, one on top
+ * of the other — six hand shapes inflated the body's height by a third — and
+ * the hand shapes never move a body's extent that far.
+ */
+export function restBounds(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute
+  g.boundingBox = new THREE.Box3().setFromBufferAttribute(pos)
+  g.boundingSphere = g.boundingBox.getBoundingSphere(new THREE.Sphere())
+  let r2 = 0
+  const c = g.boundingSphere.center
+  const v = new THREE.Vector3()
+  for (let k = 0; k < pos.count; k++) r2 = Math.max(r2, c.distanceToSquared(v.fromBufferAttribute(pos, k)))
+  g.boundingSphere.radius = Math.sqrt(r2)
+  return g
+}
+
+/** The morphs that stay live on a figure: the hands' shapes (closed round a
+ *  tool, pointing, relaxed), per hand (natural-villager-motion concept step 3). */
+export const LIVE_MORPHS = ['grip.L', 'grip.R', 'point.L', 'point.R', 'relax.L', 'relax.R'] as const
+export type LiveMorph = (typeof LIVE_MORPHS)[number]
 
 /**
  * Morph influences for a person: the pipeline's morphs are bilinear over the
@@ -74,7 +94,10 @@ export function bakeMorphs(src: THREE.BufferGeometry, influences: Record<string,
   const liveNames: string[] = []
   names.forEach((name, k) => {
     if ((LIVE_MORPHS as readonly string[]).includes(name)) {
-      live.push(morphs[k] as THREE.BufferAttribute)
+      // a named copy: the mesh's morph dictionary is read off the names
+      const a = (morphs[k] as THREE.BufferAttribute).clone()
+      a.name = name
+      live.push(a)
       liveNames.push(name)
     }
   })
@@ -141,7 +164,7 @@ export function stylisePeaks(g: THREE.BufferGeometry, child: boolean, passes = 3
   const nor = g.getAttribute('normal') as THREE.BufferAttribute
   const cap = VILLAGER_GLTF.trunkPeakSharpnessMax
   const rings = vertexRings(g)
-  g.computeBoundingBox()
+  restBounds(g)
   const yMin = g.boundingBox!.min.y
   const height = g.boundingBox!.max.y - yMin
   const P = Array.from({ length: pos.count }, (_, i) => new THREE.Vector3().fromBufferAttribute(pos, i))

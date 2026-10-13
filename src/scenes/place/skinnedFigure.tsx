@@ -23,6 +23,7 @@ import {
   type BoneName,
 } from '../../render/figureBody'
 import type { VillagerAsset } from '../../render/villagerAsset'
+import { restBounds } from '../../render/villagerBody'
 import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
@@ -53,7 +54,7 @@ import { REST_POSE_ARMS, type FigureLook } from './placeFigureContext'
 import { figureIdentity, type FigureIdentity } from './figureIdentity'
 import type { FigureWork } from './placeFigureContext'
 import { Shovel } from './shovel'
-import { applyClipLayers, clipLayers, placeShovel, stepClipLayers } from './gltfClipLayers'
+import { applyClipLayers, applyHandShapes, clipLayers, handShapes, placeShovel, stepClipLayers } from './gltfClipLayers'
 
 // ---- geometry caches: one build per distinct body and layer -----------------
 
@@ -188,7 +189,7 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     asset && person
       ? cachedGltfFigure(asset, person, layers, key, skin, paint === skin ? null : paint, look.radial)
       : cachedFigure(p, layers, key, skin, paint === skin ? null : paint, look.radial)
-  if (!geo.boundingBox) geo.computeBoundingBox()
+  if (!geo.boundingBox) restBounds(geo)
   const body = mesh(geo, figureMaterial(!!(asset && person)), 'figure-body')
   body.add(bones.hips)
   body.bind(skeleton, new THREE.Matrix4())
@@ -328,6 +329,8 @@ export function SkinnedFigure({
   const owned = !!(pose && limbs)
   const dims = useMemo(() => legDims(rig.p), [rig])
   const motion = useRef<WalkMotion>(restingMotion(kneel))
+  // The pose this figure shows of its own gesture (no caller owns it): the hands read its shape.
+  const ownShown = useRef<FigurePose | null>(null)
   // THE glTF BODY'S CLIPS (work-order "villager glTF body: animation, dress
   // and tool"): the gait, the dig and the shovel carry, layered over the
   // code-built pose by weights that blend in and out — never a cut.
@@ -514,6 +517,8 @@ export function SkinnedFigure({
         }) as [boolean, boolean]
         applyClipLayers(rig.gltf.asset, rig.gltf.person, b as unknown as Record<string, THREE.Bone>, clips, m, free)
         placeShovel(rig.gltf.asset, rig.gltf.person, clips, shovel.current)
+        const ph = (pose?.current ?? ownShown.current)?.pointHand
+        applyHandShapes(rig.meshes[0], handShapes(clips, ph ? [ph.left, ph.right] : [0, 0]))
       }
       // The head's squat correction depends on the chain just posed: renew it
       // here, so an owning caller's retarget never leaves a stale one.
@@ -590,6 +595,7 @@ export function SkinnedFigure({
       gesture.current = advanceGesture(gesture.current, dt)
       shown = gesturePose(gesture.current)
     }
+    ownShown.current = owned ? null : shown
     if (shown && !owned) {
       selfLimbs.current.trunk = trunk.current
       applyFigurePose(selfLimbs.current, shown) // retargets

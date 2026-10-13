@@ -308,8 +308,11 @@ def runtime_check(body, rt, cfg, tol=RUNTIME_TOLERANCE, log=print):
                 raise RuntimeError(f'runtime check FAILED: {s["id"]} t {f["t"]} carries a nonfinite morph weight')
             names = set(exported) | {k for k, x in w.items() if x}
             worst['morph'] = max([worst['morph']] + [abs(exported.get(k, 0.0) - w.get(k, 0.0)) for k in names])
-            if f['morph']['mesh']:
-                raise RuntimeError(f'runtime check: {s["id"]} draws {len(f["morph"]["mesh"])} mesh morph weights; the round trip does not reproduce them')
+            # the live hand shapes the mesh draws: by name, each a body morph, in [0, 1]
+            from body import HAND_MORPHS
+            for k, x in f['morph']['mesh'].items():
+                if k not in HAND_MORPHS or not (isinstance(x, (int, float)) and math.isfinite(x) and -1e-6 <= x <= 1 + 1e-6):
+                    raise RuntimeError(f'runtime check FAILED: {s["id"]} t {f["t"]} draws mesh morph {k} = {x}, not a hand shape weight in [0, 1]')
     frames = sum(len(s['frames']) for s in rt['subjects'])
     log(f'runtime check: {len(rt["subjects"])} subjects, {frames} frames; worst joint {worst["joint"]:.2e}, matrix {worst["matrix"]:.2e}, '
         f'morph {worst["morph"]:.2e}, rest {worst["rest"]:.2e} (tolerance {tol:g})')
@@ -317,6 +320,25 @@ def runtime_check(body, rt, cfg, tol=RUNTIME_TOLERANCE, log=print):
     if bad:
         raise RuntimeError(f'runtime check FAILED: {bad} over {tol:g} — the runtime export is no evidence until the round trip matches')
     return worst
+
+
+def runtime_hand_deltas(person, pos, body, jidx, jw):
+    """Per hand shape (body.HAND_MORPHS) its delta on the person's BAKED body
+    (the game carries the live morphs through the hang bake, villagerFigureBody.ts
+    bakePose): bake(pos + d) − bake(pos), the bake being affine per vertex."""
+    from body import HAND_MORPHS
+    base = person.bake(pos, jidx, jw)
+    return {m: person.bake(pos + body['morph_pos'][m], jidx, jw) - base for m in HAND_MORPHS}
+
+
+def runtime_hands(frame, deltas):
+    """The hand shapes a frame draws, as one delta on the baked body (zero
+    when it draws none)."""
+    out = 0.0
+    for m, x in frame['morph']['mesh'].items():
+        if x and m in deltas:
+            out = out + x * deltas[m]
+    return out
 
 
 def runtime_skin(subject, frame, baked, jidx, jw, space='figure'):

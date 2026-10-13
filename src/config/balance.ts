@@ -2659,6 +2659,27 @@ export const VILLAGER_ASSET = {
    *  figure's hand). Shared by the game's tool (PlaceLife.tsx) and the clips
    *  the pipeline solves the hands onto. */
   shovel: { top: 0.16, shaftBottom: -0.5, tip: -0.76, shaftRadius: 0.022, bladeWidth: 0.2, bladeThickness: 0.02 },
+  /** The hands' shapes (natural-villager-motion step 3; scripts/villager/body.py
+   *  hand_shape): per finger the curl (rad) at each of its three joints,
+   *  knuckle first, and the thumb's fold across the palm. `grip` closes round
+   *  a shaft (the values the closed hand was built with, not a guess);
+   *  `point` keeps the index straight and closes the rest; `relax` is the soft
+   *  curl of a hand at rest, deeper toward the little finger. Calibratable, read
+   *  off verification/villager-body/hands-*.png. */
+  handShapes: {
+    grip: {
+      fingers: { index: [1.15, 1.35, 0.95], middle: [1.15, 1.35, 0.95], ring: [1.15, 1.35, 0.95], pinky: [1.15, 1.35, 0.95] },
+      thumb: [0.55, 0.6, 0.5],
+    },
+    point: {
+      fingers: { index: [0.05, 0.05, 0.0], middle: [1.2, 1.4, 0.95], ring: [1.25, 1.4, 0.95], pinky: [1.3, 1.4, 0.95] },
+      thumb: [0.5, 0.55, 0.45],
+    },
+    relax: {
+      fingers: { index: [0.18, 0.25, 0.15], middle: [0.26, 0.32, 0.2], ring: [0.32, 0.38, 0.24], pinky: [0.38, 0.44, 0.28] },
+      thumb: [0.15, 0.15, 0.1],
+    },
+  },
 } as const
 
 /**

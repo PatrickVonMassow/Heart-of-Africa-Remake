@@ -37,6 +37,7 @@ import {
   digPose,
   fillPose,
   fillSquat,
+  copyPoseExtras,
   gestureEnvelope,
   gesturePose,
   isGesturing,
@@ -375,6 +376,7 @@ function Loom({
       Object.assign(p.right, next.right)
       p.lean = next.lean
       p.turn = next.turn
+      copyPoseExtras(p, next)
       applyFigurePose(weaverLimbs.current, p)
     }
 
@@ -423,6 +425,7 @@ function Loom({
       Object.assign(hp.right, next.right)
       hp.lean = next.lean
       hp.turn = next.turn
+      copyPoseExtras(hp, next)
       applyFigurePose(helperLimbs.current, hp)
     }
     // The body he presents to the rest of the village follows him.
@@ -1168,12 +1171,14 @@ function Kids({
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
+        copyPoseExtras(pose, drawn)
         pose.lean = drawn.lean
       } else {
         const drawn = bankFigurePose(slumped, gesturePose(gesture.current), c.lean, tagCfg)
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
+        copyPoseExtras(pose, drawn)
         pose.lean = drawn.lean
       }
       applyFigurePose(limbs.current[i]?.current ?? null, pose)
@@ -2069,6 +2074,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     Object.assign(p.right, shown.right)
     p.lean = shown.lean
     p.turn = shown.turn
+    copyPoseExtras(p, shown)
     if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, frame.lowSwing)
     if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, frame.highSwing)
   })
@@ -3146,6 +3152,7 @@ function ErrandVillagers({
           pose.right = dip.right
           pose.lean = dip.lean
           pose.turn = dip.turn
+          copyPoseExtras(pose, dip)
         }
       } else {
         // THE STROKE HOLDS THROUGH A SHOVE (the dig flicker): a body pushed a
@@ -3175,6 +3182,7 @@ function ErrandVillagers({
           pose.right = shown.right
           pose.lean = shown.lean
           pose.turn = shown.turn
+          copyPoseExtras(pose, shown)
         }
       }
       if (pose) applyFigurePose(limbs.current[i]?.current ?? null, pose)

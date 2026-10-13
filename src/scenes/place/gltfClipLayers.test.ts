@@ -10,7 +10,7 @@ import { VILLAGER_ASSET, VILLAGER_GLTF } from '../../config/balance'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
 import { shovelOnHungHand } from '../../render/villagerClipPose'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
-import { applyClipLayers, clipLayers, placeShovel, stepClipLayers, type ClipLayers } from './gltfClipLayers'
+import { applyClipLayers, clipLayers, handShapes, placeShovel, stepClipLayers, type ClipLayers } from './gltfClipLayers'
 
 let asset: VillagerAsset
 let person: GltfPerson
@@ -180,5 +180,30 @@ describe('the clip layers on the glTF figure', () => {
     const left = f.bones['hand.L'].getWorldPosition(new THREE.Vector3())
     const onLine = new THREE.Line3(a, b).closestPointToPoint(left, true, new THREE.Vector3())
     expect(onLine.distanceTo(left)).toBeLessThan(0.15)
+  })
+})
+
+describe('the hands\' shapes from what the hands do (natural-villager-motion step 3)', () => {
+  const sum = (w: Record<string, number>, s: 'L' | 'R') => w[`grip.${s}`] + w[`point.${s}`] + w[`relax.${s}`]
+  it('idle hands are relaxed; the dig closes both, the carry the right; a point opens the aiming hand', () => {
+    const idle = handShapes({ dig: 0, carry: 0, arms: [1, 1] })
+    expect(idle['relax.L']).toBe(1)
+    expect(idle['relax.R']).toBe(1)
+    const dig = handShapes({ dig: 1, carry: 0, arms: [1, 1] })
+    expect([dig['grip.L'], dig['grip.R'], dig['relax.L'], dig['relax.R']]).toEqual([1, 1, 0, 0])
+    const carry = handShapes({ dig: 0, carry: 1, arms: [1, 1] })
+    expect([carry['grip.L'], carry['grip.R']]).toEqual([0, 1])
+    // a carry over an arm the code took (a gesture) leaves that hand to the code
+    expect(handShapes({ dig: 0, carry: 1, arms: [1, 0] })['grip.R']).toBe(0)
+    const point = handShapes({ dig: 0, carry: 0, arms: [1, 1] }, [0, 1])
+    expect([point['point.R'], point['relax.R'], point['relax.L']]).toEqual([1, 0, 1])
+  })
+
+  it('per hand the shapes always sum to 1, through every blend', () => {
+    for (const dig of [0, 0.3, 1]) for (const carry of [0, 0.6, 1]) for (const p of [0, 0.5, 1]) {
+      const w = handShapes({ dig, carry, arms: [1, 0.7] }, [p, 1 - p])
+      for (const s of ['L', 'R'] as const) expect(sum(w, s)).toBeCloseTo(1, 9)
+      for (const v of Object.values(w)) expect(v).toBeGreaterThanOrEqual(0)
+    }
   })
 })

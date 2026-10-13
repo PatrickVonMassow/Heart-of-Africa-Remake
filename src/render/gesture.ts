@@ -127,6 +127,15 @@ export interface FigurePose {
    *  pixel at all. Point 351's chase reads its posture through `lean` in the
    *  same way. */
   turn: number
+  /** How far each hand takes the pointing shape (0 … 1; absent: none) — the
+   *  glTF body's `point.L/R` hand morphs (natural-villager-motion step 3). */
+  pointHand?: { left: number; right: number }
+}
+
+/** Carry the pose's optional parts (the hand shapes) from `from` onto
+ *  `into`, for a caller that copies the arms, lean and turn field by field. */
+export function copyPoseExtras(into: FigurePose, from: FigurePose): void {
+  into.pointHand = from.pointHand
 }
 
 /** Which side an arm belongs to. */
@@ -461,6 +470,8 @@ export function gesturePose(s: GestureState): FigurePose {
     lean: lean * e,
     turn: turn * e,
   }
+  // the aiming hand of a point or an indication takes the pointing shape
+  if (s.kind === 'point' || s.kind === 'indicate') posed.pointHand = { left: side === 'left' ? e : 0, right: side === 'right' ? e : 0 }
   return posed
 }
 

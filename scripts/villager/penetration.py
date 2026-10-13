@@ -305,14 +305,14 @@ def _poses(S, c, person, cfg, ident):
     if rt is not None:
         s = rt[c]
         for f in s['frames']:
-            yield s['id'], f"{s['id']} t {f['t']:.2f} s ({sex} {age} build {build:+.1f})", (lambda v, i, w, f=f: GP.runtime_skin(s, f, v, i, w, 'pipeline')), GP.runtime_squash(s, f)
+            yield s['id'], f"{s['id']} t {f['t']:.2f} s ({sex} {age} build {build:+.1f})", (lambda v, i, w, f=f: GP.runtime_skin(s, f, v, i, w, 'pipeline')), GP.runtime_squash(s, f), f
         return
     for k, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
         if k % S['stride']:
             continue
         at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
         wr, wp = person.pose(q, hips, kst)
-        yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp)), None
+        yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp)), None, None
 
 
 def _corner(c):
@@ -334,6 +334,8 @@ def _corner(c):
     pos, j = morphed(body, w)
     person = GP.Person(j)
     bh = person.bake(pos, S['jidx'], S['jw'])
+    # a runtime frame's hand shapes (the live morphs it draws) on the baked body
+    hand = GP.runtime_hand_deltas(person, pos, body, S['jidx'], S['jw']) if rt is not None else {}
     gh = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in names}
     bm = {n: Masked(mk['body'], body['tris'], mk['garments'], n) for n in names}
     # every layering: (inner, outer) with the inner's mask under that outer
@@ -348,9 +350,9 @@ def _corner(c):
     worst = {n: _empty() for n in names}
     nv = len(body['pos'])
     bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
-    for cname, at, skin, post in _poses(S, c, person, cfg, (sex, age, build)):
+    for cname, at, skin, post, rframe in _poses(S, c, person, cfg, (sex, age, build)):
         # unpushed: before the root's squash (`post`), which follows the mask push
-        bvu = skin(bh, S['jidx'], S['jw'])
+        bvu = skin(bh if rframe is None else bh + GP.runtime_hands(rframe, hand), S['jidx'], S['jw'])
         gvu = {n: skin(gh[n], *gskin[n]) for n in names}
         bv = bvu if post is None else post(bvu)
         gv = gvu if post is None else {n: post(x) for n, x in gvu.items()}
