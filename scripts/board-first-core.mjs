@@ -176,6 +176,15 @@ export function sessionScratchpad({ tmp = '/tmp', uid, projectDir = '', sessionI
 /** Remedy scripts that only CHECK; a standing-down session may still run them. */
 const STAND_DOWN_CHECK_SCRIPTS = ['guard-preflight.mjs', 'dashboard-guard.mjs', 'board-first-guard.mjs']
 
+/** `board.mjs vdzk-keep` only records a keep in the decision-card guard state,
+ *  never the board, and is that guard's non-owner remedy for a false term match. */
+function isVdzkKeepSegment(seg) {
+  if (!segmentInvokesScript(seg, ['board.mjs'])) return false
+  const words = (seg.words ?? []).map((w) => String(w.text).replace(/\\/g, '/'))
+  const at = words.findIndex((w) => w === 'board.mjs' || w.endsWith('/board.mjs'))
+  return at >= 0 && words[at + 1] === 'vdzk-keep'
+}
+
 /**
  * classifyCall for a session that does NOT own the batch. The gate's 'escape'
  * (board writes, board.mjs, focus, publish) is the OWNER's remedy, so here it
@@ -187,7 +196,7 @@ function standDownCall({ toolName, command, filePath }) {
   if (!SHELL_TOOLS.has(String(toolName ?? ''))) return { kind: 'mutating', segment: '' }
   for (const seg of parseSegments(command)) {
     if (!isEscapeSegment(seg)) continue
-    if (!segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS) || checkWritesFile(seg))
+    if (!(segmentInvokesScript(seg, STAND_DOWN_CHECK_SCRIPTS) || isVdzkKeepSegment(seg)) || checkWritesFile(seg))
       return { kind: 'mutating', segment: seg.raw }
   }
   return { kind: 'read-only', segment: '' }
