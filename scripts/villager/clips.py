@@ -396,8 +396,10 @@ def restyle(c, name, joints, style):
     per frame: the hips' and the chest's MEAN forward tilt brought to
     `hipsTilt` and `chestTilt` by one offset each (each keeps its swing; the legs keeping their world turn so the feet stay
     put; the rest on the chest), the chest's twist against the hips scaled by
-    `chestTwist`; the head keeping its world turn through it all. `elbowMin`
-    softens a straight elbow, `armIn` brings the upper arm toward the body;
+    `chestTwist`; the head keeping its world turn through it all (the twist
+    moves the chest's tilt, so a second pass brings its mean back to
+    `chestTilt`). `elbowMean` shifts each elbow's bend by one offset to that
+    mean, kept in [`elbowMin`, `elbowMax`]; `armIn` brings the upper arm toward the body;
     `square` takes a standing clip's constant turns out (hips and head) and
     puts the feet side by side."""
     s = style.get(name)
@@ -414,6 +416,14 @@ def restyle(c, name, joints, style):
     # constant offsets to the means, so each bone keeps its own swing through the cycle
     hips_off = np.radians(0.0) + (s['hipsTilt'] - np.radians(before['hips']) if 'hipsTilt' in s else 0.0)
     chest_off = s['chestTilt'] - np.radians(before['chest']) - hips_off if 'chestTilt' in s else 0.0
+
+    def bend_of(wp, side):
+        iu, il, ih = SK.INDEX['upperArm.' + side], SK.INDEX['forearm.' + side], SK.INDEX['hand.' + side]
+        u, fa = wp[il] - wp[iu], wp[ih] - wp[il]
+        return u, fa, float(np.arccos(np.clip(np.dot(u, fa) / np.linalg.norm(u) / np.linalg.norm(fa), -1, 1)))
+
+    # the elbow's bend is the arm's own: the trunk offsets below leave it as it is
+    bend_mean = {side: float(np.mean([bend_of(fk(f)[1], side)[2] for f in range(n)])) for side in ('L', 'R')}
     for f in range(n):
         q, h = Q[f], P[f]
         wr0, _wp = rig.fk(joints, q, h)
@@ -437,6 +447,17 @@ def restyle(c, name, joints, style):
             from gltfio import qaxis
             head0 = qmul(qaxis(Y, heading(wr, 'hips') - heading(wr0, 'head')), head0)
         _set_world(joints, q, h, 'head', head0)
+    if 'chestTilt' in s:
+        # the twist turned the tilted chest about the vertical, which moves its
+        # tilt (the jog came out 13.4° for 10.9°): the mean brought back
+        res = s['chestTilt'] - float(np.mean([tilt(fk(f)[0], 'chest') for f in range(n)]))
+        for f in range(n):
+            q, h = Q[f], P[f]
+            head0 = rig.fk(joints, q, h)[0][SK.INDEX['head']].copy()
+            _turn(joints, q, h, 'chest', X, res)
+            _set_world(joints, q, h, 'head', head0)
+    for f in range(n):
+        q, h = Q[f], P[f]
         if 'elbowMin' in s:
             for side, sg in (('L', 1.0), ('R', -1.0)):
                 wr, wp = rig.fk(joints, q, h)
@@ -444,12 +465,13 @@ def restyle(c, name, joints, style):
                 if s.get('armIn'):
                     _turn(joints, q, h, 'upperArm.' + side, fwd, -sg * s['armIn'])
                     wr, wp = rig.fk(joints, q, h)
-                iu, il, ih = SK.INDEX['upperArm.' + side], SK.INDEX['forearm.' + side], SK.INDEX['hand.' + side]
-                u, fa = wp[il] - wp[iu], wp[ih] - wp[il]
-                bend = float(np.arccos(np.clip(np.dot(u, fa) / np.linalg.norm(u) / np.linalg.norm(fa), -1, 1)))
-                axis = np.cross(u, fwd)
-                if bend < s['elbowMin'] and np.linalg.norm(axis) > 1e-6:
-                    _turn(joints, q, h, 'forearm.' + side, axis / np.linalg.norm(axis), s['elbowMin'] - bend)
+                u, fa, bend = bend_of(wp, side)
+                want = bend + (s['elbowMean'] - bend_mean[side]) if 'elbowMean' in s else bend
+                want = min(max(want, s['elbowMin']), s.get('elbowMax', np.pi))
+                # in the elbow's own plane (a near-straight arm has none: bent forward)
+                axis = np.cross(u, fa) if bend > 0.05 else np.cross(u, fwd)
+                if abs(want - bend) > 1e-6 and np.linalg.norm(axis) > 1e-6:
+                    _turn(joints, q, h, 'forearm.' + side, axis / np.linalg.norm(axis), want - bend)
         if s.get('square'):
             wr, wp = rig.fk(joints, q, h)
             mid = 0.5 * (wp[SK.INDEX['foot.L']][2] + wp[SK.INDEX['foot.R']][2])
@@ -469,7 +491,10 @@ def restyle(c, name, joints, style):
         flip = (Q[f] * Q[f - 1]).sum(1) < 0
         Q[f, flip] *= -1
     after = {b: float(np.degrees(np.mean([tilt(fk(f)[0], b) for f in range(n)]))) for b in ('hips', 'chest', 'head')}
-    print(f'clip {name}: style — tilt (deg) before {before}, after {after}')
+    elbows = [np.degrees(bend_of(fk(f)[1], side)[2]) for f in range(n) for side in ('L', 'R')]
+    print(f'clip {name}: style — tilt (deg) before {before}, after {after}; elbow (deg) '
+          f'{np.degrees(min(bend_mean.values())):.1f}-{np.degrees(max(bend_mean.values())):.1f} mean before, '
+          f'{min(elbows):.1f}-{max(elbows):.1f} after')
     return after
 
 

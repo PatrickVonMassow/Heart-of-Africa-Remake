@@ -2658,12 +2658,14 @@ export const VILLAGER_ASSET = {
    *  forward tilt (each keeps its swing; the source walk leans its chest 18°,
    *  the jog 43° with a ±54° twist, the sprint dives 23° at the hips and 52° at
    *  the chest), the chest's twist
-   *  against the hips as a share of the source's, the elbow's least bend and
-   *  the upper arm brought toward the body; `square` takes a standing clip's
+   *  against the hips as a share of the source's, the elbow's mean bend (one
+   *  offset, so the forearm keeps its swing) held in [elbowMin, elbowMax] —
+   *  the source walk bends it 32–41°, the concept asks 15–25° — and the upper
+   *  arm brought toward the body; `square` takes a standing clip's
    *  constant turns out and puts its feet side by side. The head keeps its
    *  world turn. Calibratable, read off the clip sheets. */
   clipStyle: {
-    walk: { chestTilt: 0.105, elbowMin: 0.3 },
+    walk: { chestTilt: 0.105, elbowMean: 0.35, elbowMin: 0.26, elbowMax: 0.44, armIn: 0.05 },
     jog: { chestTilt: 0.19, chestTwist: 0.25 },
     sprint: { hipsTilt: 0.0, chestTilt: 0.19, chestTwist: 0.37 },
     idle: { square: true, chestTilt: 0.105 },
