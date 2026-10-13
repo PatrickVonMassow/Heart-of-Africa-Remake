@@ -307,6 +307,19 @@ export function sessionStartOwnership({ converted = false, heldHere = false, spa
   return { invitation: null, mayAcquire: false, unproven: !!auth }
 }
 
+/**
+ * MAY THIS SESSION START CONSUME THE LAUNCHER'S ONE-SHOT MARKER? PURE.
+ *
+ * Only the successor the marker invited consumes it: a converted reservation, or
+ * a proven spawn token that then owns. Any other window leaves it in place for
+ * that successor (four-eyes review: an uninvited window deleted it first); the
+ * marker expires on its own after ten minutes.
+ */
+export function consumesLaunchAuthorization({ ownership = 'none', invitation = null } = {}) {
+  if (ownership === 'acquired-spawn') return true
+  return invitation === 'spawn-token' && (ownership === 'acquired' || ownership === 'mine')
+}
+
 /** The word the user starts the batch with in a window the hook did not invite. */
 export const BATCH_START_WORD = 'continue'
 

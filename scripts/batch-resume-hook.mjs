@@ -48,6 +48,7 @@ import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
 import {
   allGatedMessage,
+  consumesLaunchAuthorization,
   openPointsHeadline,
   ownerRunbookContext,
   ownerStartText,
@@ -421,7 +422,7 @@ try {
           )
         }
       }
-      if (auth) clearAuthorized()
+      if (auth && consumesLaunchAuthorization({ ownership, invitation })) clearAuthorized()
       // The claim has done its job the moment its own window owns the batch.
       if (reservation.mine && (ownership === 'acquired' || ownership === 'mine')) clearClaim()
 

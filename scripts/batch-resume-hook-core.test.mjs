@@ -6,6 +6,7 @@ import {
   BATCH_START_WORD,
   STAND_DOWN_KINDS,
   allGatedMessage,
+  consumesLaunchAuthorization,
   openPointsHeadline,
   ownerRunbookContext,
   ownerStartText,
@@ -398,5 +399,22 @@ describe('SessionStart ownership needs an invitation (user 03.09.2026)', () => {
 
   it('a marker without a token proves nothing', () => {
     expect(spawnTokenProof({ auth: { ...auth, spawnToken: '' }, lastSpawn, ancestorPid: 4242 }).proven).toBe(false)
+  })
+
+  it.each([
+    ['a converted reservation', { ownership: 'acquired-spawn', invitation: 'pending-spawn' }, true],
+    ['a proven spawn token that owns', { ownership: 'acquired', invitation: 'spawn-token' }, true],
+    ['a proven spawn token that lost the acquire', { ownership: 'none', invitation: 'spawn-token' }, false],
+    ['a compaction of the owner', { ownership: 'mine', invitation: 'held' }, false],
+    ['an uninvited window', { ownership: 'none', invitation: null }, false],
+  ])('the launcher marker is consumed only by its successor (%s)', (_label, input, expected) => {
+    expect(consumesLaunchAuthorization(input)).toBe(expected)
+  })
+
+  it('an uninvited window leaves the marker, so the successor starting after it still proves its spawn', () => {
+    const first = sessionStartOwnership({ converted: false, heldHere: false, spawnProof: spawnTokenProof({ auth, lastSpawn, ancestorPid: 999 }), auth })
+    expect(consumesLaunchAuthorization({ ownership: 'none', invitation: first.invitation })).toBe(false)
+    const successor = sessionStartOwnership({ converted: false, heldHere: false, spawnProof: spawnTokenProof({ auth, lastSpawn, ancestorPid: 4242 }), auth })
+    expect(successor).toEqual({ invitation: 'spawn-token', mayAcquire: true, unproven: false })
   })
 })
