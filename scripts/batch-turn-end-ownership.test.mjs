@@ -3,9 +3,11 @@
 // ownership-change line, and a drill — an owner dies beside a live interactive
 // window and the launcher's worker, not that window, becomes the successor.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { REPO_ROOT } from './repo-paths.mjs'
 import {
   freeLockDeclinedLine,
   ownershipChangeLine,
@@ -13,7 +15,7 @@ import {
   turnEndOwnership,
 } from './batch-resume-hook-core.mjs'
 import { composeHookText, gatherBatchProgressInputs, turnEndInvitation } from './batch-progress-guard.mjs'
-import { acquire, assessOwner, convertPendingSpawn, readOwnerLock, statePathsFor } from './batch-singleton.mjs'
+import { acquire, assessOwner, convertPendingSpawn, probePid, readOwnerLock, statePathsFor } from './batch-singleton.mjs'
 import { launcherStartDecision } from './batch-autostart-core.mjs'
 
 // The two transcript shapes measured on 13.10.2026 in this repo's transcripts.
@@ -161,5 +163,70 @@ describe('drill: an owner dies beside a live interactive window', () => {
       })
     expect(inputs(false)).toMatchObject({ applicable: false, cause: 'uninvited-interactive' })
     expect(inputs(true).cause).not.toBe('uninvited-interactive')
+  })
+})
+
+// THE REAL HOOK, run as the harness runs it: stdin payload, a fixture repository
+// (HOA_REPO_ROOT) holding a dead owner's lock, one open and one closed point.
+describe('the Stop hook itself', () => {
+  const SID = 'bbbbbbbb-0000-4000-8000-000000000002'
+  let root
+  const state = (name) => join(root, '.claude', name)
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'hoa-turn-end-'))
+    mkdirSync(join(root, '.claude'))
+    mkdirSync(join(root, 'docs'))
+    writeFileSync(join(root, 'TASKS.md'), '# Work order\n\n- [ ] 2. Still open.\n')
+    writeFileSync(join(root, 'docs', 'tasks-archive.md'), '# Archive\n\n- [x] 1. Closed.\n')
+    const at = Date.now() - 3_600_000
+    writeFileSync(state('batch-lock.json'), JSON.stringify({
+      v: 2, sessionId: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'session', startedAt: at, claimedAt: at,
+      acquiredAt: at, leaseUntil: at + 60_000, fence: 1, pid: 424242, pidStartedAt: 1,
+    }))
+  })
+  afterEach(() => rmSync(root, { recursive: true, force: true }))
+
+  const runHook = (transcriptText) => {
+    const transcriptPath = join(root, 'transcript.jsonl')
+    writeFileSync(transcriptPath, transcriptText)
+    const r = spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts', 'batch-progress-guard.mjs')], {
+      cwd: root,
+      env: { ...process.env, HOA_REPO_ROOT: root },
+      input: JSON.stringify({ session_id: SID, transcript_path: transcriptPath }),
+      encoding: 'utf8',
+      timeout: 60_000,
+      windowsHide: true,
+    })
+    expect(r.status).toBe(0)
+    return { out: JSON.parse(r.stdout), lock: JSON.parse(readFileSync(state('batch-lock.json'), 'utf8')) }
+  }
+
+  it('an unattended session takes the dead lock and says so first, before the continue block', () => {
+    const { out, lock } = runHook(UNATTENDED)
+    expect(lock.sessionId).toBe(SID)
+    expect(out.decision).toBe('block')
+    const [lead, rest] = out.reason.split('\n\n')
+    expect(lead).toBe(ownershipChangeLine({ sessionId: SID, invitation: 'unattended' }))
+    expect(rest).toMatch(/^DO NOT STOP THE BATCH/)
+  })
+
+  it('an interactive window leaves the lock alone and asks', () => {
+    const { out, lock } = runHook(INTERACTIVE)
+    expect(lock.sessionId).toBe('aaaaaaaa-0000-4000-8000-000000000001')
+    expect(out).toEqual({ systemMessage: freeLockDeclinedLine({ sessionId: SID }) })
+  })
+
+  it('an acquisition that hands over at a valid boundary still announces itself', () => {
+    const now = Date.now()
+    writeFileSync(state('batch-boundary.json'), JSON.stringify({ point: 1, sessionId: SID, at: now, phase: 'committed' }))
+    // An armed launcher: a live daemon record naming this test process.
+    writeFileSync(state('batch-launcher.json'), JSON.stringify({
+      v: 1, pid: process.pid, pidStartedAt: probePid(process.pid)?.startedAt, startedAt: now, lastTickAt: now,
+    }))
+    const { out, lock } = runHook(UNATTENDED)
+    expect(lock).toMatchObject({ sessionId: SID, handedOver: true })
+    const [lead, rest] = out.systemMessage.split('\n\n')
+    expect(lead).toBe(ownershipChangeLine({ sessionId: SID, invitation: 'unattended' }))
+    expect(rest).toMatch(/HANDED THE BATCH OVER at its valid boundary \(point 1\)/)
   })
 })

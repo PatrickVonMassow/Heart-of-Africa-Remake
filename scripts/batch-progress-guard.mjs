@@ -757,6 +757,13 @@ try {
         `HANDOVER ${what} by ${sid} — lock marked handed-over; the launcher may spawn the ` +
           `successor.${handed.attempts > 1 ? ` (the write needed ${handed.attempts} attempts)` : ''}`,
       )
+      // An acquisition at this very turn end is still announced on its own line.
+      if (leadLine) {
+        warn(
+          `This session then HANDED THE BATCH OVER at its valid boundary (${what}): the lock is marked ` +
+            'handed-over and the launcher may spawn the successor. It does not keep the batch.',
+        )
+      }
       process.exit(0)
     }
     // The stop may proceed — a guard never traps a session — but it must NEVER
