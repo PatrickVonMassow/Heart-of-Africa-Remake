@@ -87,47 +87,6 @@ put it is the mistake this line exists to stop.
   Attempt 1 (12.10.2026 22:45-23:31): the user was notified of a 22:58-23:10 window; owner blocked 46 min on a subagent (6 green unit runs); no message arrived, so no case. The new watcher logged each line once ("watching" at 20:44:31Z), so the duplicate-line fix holds live. Next attempt needs a user-confirmed window.
   Also (same session): the running watcher (pid 1584562, started 15:10) still ran pre-merge code at 22:44; the autostart supervision restarts only a dead watcher, never one whose code a merge changed, so a merged watcher fix runs only after a manual restart or reboot. Split off as point 1353 (13.10.2026).
 
-- [ ] 1053. A session the user opened for something else silently becomes the batch owner
-  (user 03.09.2026, on seeing this session announce "Batch übernommen": »Wieso hast du die
-  Batch übernommen, ich habe dich nicht dazu aufgefordert. Manchmal fällt sie dir
-  anscheinend einfach irgendwie zu.«).
-  Queue position: after point 1348 (user 12.10.2026 21:23: »Ziehe 1053 und 1033 vor«).
-  MEASURED 03.09.2026 on this very session: the process had been running since 16:17:48; a
-  `/clear` gave it a new session id, `scripts/batch-resume-hook.mjs` ran on SessionStart
-  and won the ordinary atomic `acquire` at 21:00:46 — three and a half minutes before the
-  session's first tool call. The lock it wrote carries `"kind": "session"`, NOT the
-  launcher's `pending-spawn`. The same hook then injects the hard-coded sentence "Standing
-  user instruction: continue the batch autonomously"
-  (scripts/batch-resume-hook.mjs ~436), which the session reads as an order the user never
-  gave in that conversation.
-  WHY IT MATTERS: the batch is the machine's most expensive activity, and it starts without
-  anyone deciding that it should. Every window the user opens to ask a question becomes an
-  owner that dispatches agents, merges and pushes.
-  Final state:
-  - Ownership on SessionStart requires an INVITATION: the launcher's `pending-spawn`
-    reservation converted for THIS session (`acquired-spawn`), or a lock this same process
-    already held across a compaction (`mine`). A bare `acquire` in a session with no
-    reservation orients the session — repository state, open points, runbook — and says how
-    to take the batch, but does not take it.
-  - THE LAUNCHER'S AUTONOMY IS NOT WEAKENED. A spawned successor that reaches the hook with
-    its reservation lost must not leave the batch ownerless: the fallback is measured
-    against the spawn token the launcher already writes, and a successor that proves it,
-    acquires. Whatever cannot prove it raises the launcher's existing `lockConverted`
-    telemetry rather than silently taking or silently dropping the batch.
-  - The injected "Standing user instruction" sentence stops asserting a user order for a
-    session that was not invited; an uninvited session is told the batch is available and
-    by which word the user starts it.
-  Test: Vitest over the hook's ownership branch — a pending-spawn conversion still owns, a
-  compaction of the owning process still owns, a bare session start does NOT own and gets
-  the orientation text without the standing-instruction sentence, and a spawned successor
-  whose reservation is gone but whose spawn token holds still owns.
-  Criticality: high — it decides who may spend the machine, and getting the fallback wrong
-  stalls the batch instead.
-  Refs: scripts/batch-resume-hook.mjs (~372-440), scripts/batch-singleton.mjs (acquire,
-  convertPendingSpawn), scripts/batch-autostart.mjs (~1637 the pending-spawn writer, ~988
-  lockConverted), scripts/batch-lock.mjs
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1033. The free lock lands silently in the window the user is sitting at (measured
   31.08.2026, this session).
   Queue position: after point 1053 (user 12.10.2026 21:23: »Ziehe 1053 und 1033 vor«).
