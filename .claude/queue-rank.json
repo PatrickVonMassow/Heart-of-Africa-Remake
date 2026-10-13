@@ -1632,12 +1632,6 @@
       "why": "chat answer path blockade, beside the communication point",
       "origin": "machine",
       "place": "last"
-    },
-    "1351": {
-      "at": "2026-10-12T19:32:42.810Z",
-      "why": "user 12.10.2026 21:23 ordered the false-stop guard together with pulling 1053 and 1033 forward",
-      "origin": "machine",
-      "place": "last"
     }
   },
   "boundary": {
@@ -1667,7 +1661,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-13T04:49:45.690Z",
+    "at": "2026-10-13T05:42:26.926Z",
     "points": [
       184,
       200,
@@ -2118,7 +2112,6 @@
       1345,
       1347,
       1350,
-      1351,
       1352
     ]
   }
