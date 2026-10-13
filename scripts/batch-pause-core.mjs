@@ -116,19 +116,21 @@ export function isExplicitStopOrder(text) {
     .replace(/[’‘ʼ`´]/g, "'")
     .replace(/\s+/g, ' ')
     .trim()
-  if (!flat || VOIDING.test(flat)) return false
+  // »bis auf weiteres« is a duration the TAIL allows, not the continue word »weiter«.
+  if (!flat || VOIDING.test(flat.replace(/bis auf weiteres/giu, ' '))) return false
   const sentences = sentencesOf(flat)
     .map((x) => x.trim())
     .filter(Boolean)
   return sentences.length > 0 && sentences.every((x) => COMMAND.test(x))
 }
 
-/** Does a pause reason QUOTE an explicit stop order (not just any user words)? */
+/**
+ * Does a pause reason QUOTE an explicit stop order (not just any user words)? All
+ * quotes are judged as ONE utterance, so a separately quoted retraction voids it.
+ */
 export function quotesExplicitStopOrder(reason) {
-  for (const m of String(reason ?? '').matchAll(QUOTED)) {
-    if (isExplicitStopOrder(m.slice(1).find(Boolean))) return true
-  }
-  return false
+  const quotes = [...String(reason ?? '').matchAll(QUOTED)].map((m) => m.slice(1).find(Boolean))
+  return quotes.length > 0 && isExplicitStopOrder(quotes.join('. '))
 }
 
 /**
