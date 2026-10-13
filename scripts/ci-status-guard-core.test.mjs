@@ -3,7 +3,7 @@
 // input fails open, and a green re-run supersedes its red predecessor.
 import { describe, it, expect } from 'vitest'
 import { assessCiWait } from './batch-in-flight-core.mjs'
-import { successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
+import { ciTerminalPrompt, successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
 import {
   acknowledgeCiWaitState,
   blockReason,
@@ -12,6 +12,7 @@ import {
   ciWaitIdentity,
   ciRedAlertMessage,
   classifyRuns,
+  GATE_STATUS_CONTEXT,
   failedRuns,
   notifiedFromState,
   pruneFamine,
@@ -117,6 +118,39 @@ describe('classifyRuns', () => {
 
   // A cancellation is only noise when something else JUDGED. Alone it still
   // demands attention, and it must never bury a genuine red standing behind it.
+  // A soft feat/** run concludes success while its gate is red; only the
+  // ci/gate (branch) commit status carries the verdict (run 38277768235).
+  const gate = (state, over = {}) => ({
+    context: GATE_STATUS_CONTEXT,
+    state,
+    target_url: 'https://github.com/o/r/actions/runs/1',
+    description: `gate ${state}: unit`,
+    ...over,
+  })
+
+  it('classifies a success-concluded run with a failing ci/gate status as red', () => {
+    const c = classifyRuns([run()], HEAD, [gate('failure')])
+    expect(c).toMatchObject({ state: 'failed', runId: 1, workflowName: 'CI', conclusion: 'failure' })
+    expect(classifyRuns([run()], HEAD, [gate('error')]).state).toBe('failed')
+  })
+
+  it('judges the gate by the newest status of the same run, and only that run', () => {
+    // GitHub lists statuses newest first: a re-run's green supersedes the old red.
+    expect(classifyRuns([run()], HEAD, [gate('success'), gate('failure')]).state).toBe('success')
+    expect(classifyRuns([run()], HEAD, [gate('failure'), gate('success')]).state).toBe('failed')
+    // A red status of an OLDER run cannot paint a newer green run red.
+    const other = gate('failure', { target_url: 'https://github.com/o/r/actions/runs/0' })
+    expect(classifyRuns([run()], HEAD, [other]).state).toBe('success')
+    // Other contexts are not the gate.
+    expect(classifyRuns([run()], HEAD, [gate('failure', { context: 'ci/other' })]).state).toBe('success')
+  })
+
+  it('leaves main unchanged: no gate status means the run conclusion decides', () => {
+    expect(classifyRuns([run()], HEAD, []).state).toBe('success')
+    expect(classifyRuns([run()], HEAD).state).toBe('success')
+    expect(classifyRuns([run({ status: 'in_progress', conclusion: null })], HEAD, [gate('failure')]).state).toBe('pending')
+  })
+
   it('keeps a lone cancellation red, and never hides a real failure', () => {
     expect(classifyRuns([run({ conclusion: 'cancelled' })], HEAD).state).toBe('failed')
     const red = run({ databaseId: 10, conclusion: 'failure' })
@@ -561,6 +595,17 @@ describe('renewable durable CI wait', () => {
       observer: null,
       terminal: { state: 'success', verdict: 'green', observedAt: NOW + 2, conclusion: 'success', url: 'https://x' },
     })
+  })
+
+  it('hands a failing ci/gate status on as a RED CI-terminal handoff, never green', () => {
+    const wait = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake-1' })
+    const soft = [run({ databaseId: 32462093487, headSha: BRANCH, url: 'https://github.com/o/r/actions/runs/32462093487' })]
+    const statuses = [{ context: GATE_STATUS_CONTEXT, state: 'failure', target_url: 'https://github.com/o/r/actions/runs/32462093487' }]
+    const terminal = observeCiWait(wait, classifyRuns(soft, BRANCH, statuses), { now: NOW + 1 })
+    const prompt = ciTerminalPrompt(assessCiWait({ wait: terminal, now: NOW + 2 }))
+    expect(terminal.terminal).toMatchObject({ state: 'failed', verdict: 'red' })
+    expect(prompt).toMatch(/concluded RED/)
+    expect(prompt).not.toMatch(/GREEN/)
   })
 
   it('backs off exponentially but never reaches the 900-second scheduler interval', () => {

@@ -30,6 +30,36 @@ function runAttempt(r) {
   return Number.isSafeInteger(value) && value > 0 ? value : 1
 }
 
+/** The commit-status context ci-gate-verdict posts on a soft `feat/**` run. */
+export const GATE_STATUS_CONTEXT = 'ci/gate (branch)'
+
+/**
+ * Fold the `ci/gate (branch)` commit statuses into the runs they report on.
+ *
+ * WHY (12.10.2026, run 38277768235): a `feat/**` push runs every CI step with
+ * `continue-on-error`, so a red gate CONCLUDES `success` and only the commit
+ * status says `failure`. Reading conclusions alone reported that branch green.
+ * A status is matched to its run by `target_url` (the run's html_url); `statuses`
+ * is GitHub's newest-first list, so the first status per run is its verdict. A
+ * matched completed run whose status is `failure`/`error` becomes `failure`.
+ * `main` posts no such status, so its runs pass through unchanged.
+ */
+export function withGateStatuses(runs, statuses) {
+  if (!Array.isArray(runs) || !Array.isArray(statuses) || statuses.length === 0) return runs
+  const verdict = new Map()
+  for (const s of statuses) {
+    if (String(s?.context ?? '') !== GATE_STATUS_CONTEXT) continue
+    const url = String(s?.target_url ?? '')
+    if (url && !verdict.has(url)) verdict.set(url, s)
+  }
+  return runs.map((r) => {
+    const s = verdict.get(runUrl(r))
+    if (!s || !['failure', 'error'].includes(String(s.state ?? ''))) return r
+    if (String(r?.status ?? '') !== 'completed' || !OK_CONCLUSIONS.has(String(r?.conclusion ?? ''))) return r
+    return { ...r, conclusion: 'failure', gateStatus: String(s.description ?? s.state) }
+  })
+}
+
 /**
  * The runs for ONE workflow at ONE sha, reduced to the single run that carries
  * the verdict — with SUPERSEDED CANCELLATIONS DROPPED FIRST.
@@ -84,13 +114,14 @@ function newestPerWorkflowFrom(runs) {
  * predecessor), after `verdictRuns` has dropped superseded cancellations — the
  * same reduction `failedRuns` and `recoveredWorkflows` use. Across workflows:
  * any red → 'failed'; else any unfinished → 'pending'; else any green →
- * 'success'; else 'none' (fail-open).
+ * 'success'; else 'none' (fail-open). `statuses` (optional) are the commit
+ * statuses for `headSha`, folded in by `withGateStatuses`.
  * @returns {{state:'failed'|'pending'|'success'|'none', runId?, workflowName?, conclusion?, runAttempt?, url?}}
  */
-export function classifyRuns(runs, headSha) {
+export function classifyRuns(runs, headSha, statuses = null) {
   try {
     if (!Array.isArray(runs) || !headSha) return { state: 'none' }
-    const mine = verdictRuns(runs, headSha)
+    const mine = verdictRuns(withGateStatuses(runs, statuses), headSha)
     if (mine.length === 0) return { state: 'none' }
 
     const newestPerWorkflow = newestPerWorkflowFrom(mine)

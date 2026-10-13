@@ -39,6 +39,7 @@ import {
   ciWaitIdentity,
   classifyRuns,
   failedRuns,
+  withGateStatuses,
   ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
@@ -250,7 +251,9 @@ function httpsRequest(url, { method = 'GET', headers = {}, body = null, timeoutM
   })
 }
 
-/** Actions runs for the sha; null on any failure (the caller fails open). */
+/** Actions runs for the sha with its `ci/gate (branch)` commit statuses folded
+ * in (a soft `feat/**` run concludes success even when its gate is red); null
+ * on any failure of either read (the caller fails open and says so). */
 async function fetchRuns(repo, headSha) {
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -264,9 +267,22 @@ async function fetchRuns(repo, headSha) {
     { headers },
   )
   if (!res || res.status !== 200) return null
+  let runs
   try {
     const data = JSON.parse(res.body)
-    return Array.isArray(data?.workflow_runs) ? data.workflow_runs : null
+    runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : null
+  } catch {
+    return null
+  }
+  if (!runs) return null
+  const statusRes = await httpsRequest(
+    `https://api.github.com/repos/${repo}/commits/${headSha}/statuses?per_page=100`,
+    { headers },
+  )
+  if (!statusRes || statusRes.status !== 200) return null
+  try {
+    const statuses = JSON.parse(statusRes.body)
+    return Array.isArray(statuses) ? withGateStatuses(runs, statuses) : null
   } catch {
     return null
   }
