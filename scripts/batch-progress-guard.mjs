@@ -86,6 +86,7 @@ import { POOL_CAP, slotsRemedy, describeInFlight } from './batch-in-flight-core.
 import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
 import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
+import { transcriptOrdersStop, userStopEnd } from './batch-pause-core.mjs'
 import {
   freeLockDeclinedLine,
   ownershipChangeLine,
@@ -927,8 +928,9 @@ try {
       `never idling by ending the turn. Keep the dashboard current. Legitimate ends: (a) every point is done; ` +
       `(a2) WAITING on handed-out work you cannot poll further (agent still building, suite on the machine): declare ` +
       `it with \`node scripts/batch-in-flight.mjs --waiting-on "<what>" --branch <b> --worktree <w> --pid <p> --log <l>\` ` +
-      `— allowed while a probe finds it alive; one dead item ends it, so act when it lands; (b) the user asked to stop: ` +
-      `\`node scripts/batch-pause.mjs --user-stop "<the user's words, quoted>"\`, then stop; (c) you just MERGED AND ` +
+      `— allowed while a probe finds it alive; one dead item ends it, so act when it lands; ` +
+      userStopEnd(transcriptOrdersStop(readTranscriptText(transcriptPath))) +
+      `(c) you just MERGED AND ` +
       `TICKED a point — POINT BOUNDARY: \`node scripts/batch-boundary.mjs --prepare <point>\`, its bookkeeping, ` +
       `\`--commit <point>\` as the last action, then END THE SESSION (a delegated author with pushed checkpoints is ` +
       `handed over with the boundary; unpushed, non-transferable work drains first); (d) EVERY open item waits on ` +
