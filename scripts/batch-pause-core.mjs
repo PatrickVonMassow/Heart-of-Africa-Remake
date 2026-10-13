@@ -78,7 +78,8 @@ export function namesUserUtterance(reason) {
  * time phrase. Conservative on purpose: a refused real order costs one
  * rephrasing, a false stop idles the machine.
  */
-const QUOTED = /"([^"\n]{3,})"|„([^“”\n]{3,})[“”]|“([^”\n]{3,})”|»([^«\n]{3,})«/g
+// Any length: a one-word quote (»No«) can be the retraction that voids the order.
+const QUOTED = /"([^"\n]+)"|„([^“”\n]+)[“”]|“([^”\n]+)”|»([^«\n]+)«/g
 const L = '(?![\\p{L}])'
 const LEAD = '^(?:(?:bitte|please|claude)[,!]?\\s+)*'
 const TARGET = '(?:die\\s+|der\\s+|deine\\s+|deiner\\s+|the\\s+|your\\s+)?(?:batch|stapel|arbeit|work|alles|everything)' + L

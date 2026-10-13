@@ -60,6 +60,7 @@ describe('explicit stop order', () => {
     expect(quotesExplicitStopOrder('user: »Stopp die Batch. Nein, mach doch weiter.«')).toBe(false)
     expect(quotesExplicitStopOrder('user: »Stopp die Batch«; user correction: »Nein, mach weiter.«')).toBe(false)
     expect(quotesExplicitStopOrder('user: »Stopp die Batch«, then »Halte die Batch an«')).toBe(true)
+    expect(quotesExplicitStopOrder('user: »Stop the batch«; correction: »No«')).toBe(false)
   })
 
   it('recovers a clockless user-stop record whose quote is no order', () => {
