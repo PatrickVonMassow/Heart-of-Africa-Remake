@@ -463,17 +463,12 @@ def _settle_one(n):
                 r = np.array([gv[k][0] - axis[0], 0.0, gv[k][2] - axis[2]])
                 r /= max(np.linalg.norm(r), 1e-9)
                 out = way_out(tree, gv[k], r)
-                # the SHORTER of the two ways out, each taken whole: between the
-                # thighs the radial way crosses a whole thigh (10 cm against 4
-                # along the normal), and that push, spread and repeated every
-                # round, blew the trousers and the garments over them up; the
-                # normal push by the depth alone left the cloth inside the
-                # other part (forearm at the hip, thigh in the cloak: the
-                # build pose 20 of 31 for main's 29, measured 14.10.2026)
+                # only a SHORTER way out: between the thighs the radial way
+                # crosses a whole thigh (10 cm against 4 along the normal), and
+                # that push, spread and repeated every round, blew the
+                # trousers and the garments over them up (measured 14.10.2026)
                 if out < way:
                     need[k], dirs[k] = out + clear[n], r
-                elif way < np.inf:
-                    need[k] = way + clear[n]
         push = np.zeros_like(gv)
         push[bad] = need[bad, None] * dirs[bad]
         if len(fb):
@@ -501,7 +496,7 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
     short of it moves out along the body's normal at its nearest point — or,
     inside where that way leads into another body part (the armpit, where the
     arm meets the trunk), outward from the body's axis, over the limb, where
-    that way out is the shorter, else all the way out along the normal. The
+    that way out is the shorter. The
     move is taken back to the rest pose through the game's blend at that
     corner (gamepath.Person.undraw) and added to the corner's own morph
     (SETTLE_ORDER), spread a little onto the neighbours so no spike rises in
