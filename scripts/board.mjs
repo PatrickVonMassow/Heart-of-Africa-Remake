@@ -22,6 +22,7 @@
 //                                                     # (only when the requirement changes)
 //   node scripts/board.mjs migrate-descriptions       # one-time description/status split
 //   node scripts/board.mjs merge-done                 # fold duplicate Erledigt cards
+//   node scripts/board.mjs backfill-times [--dry-run] # record start/sessions of old cards
 //   node scripts/board.mjs vdzk-add "<title>" "<question>"
 //                                                     # ask the user a decision
 //                                                     # (--automated: accepted, ignored)
@@ -89,6 +90,14 @@ import {
   toNow,
   toQueue,
   mergeDoneDuplicates,
+  applyCardTimes,
+  backfillCardTimes,
+  queueEstimateHours,
+  recordPromotion,
+  resolveBerlinClock,
+  spanOf,
+  timedCards,
+  timesEndClock,
 } from './board-core.mjs'
 import { runBoardEdit } from './board-edit-core.mjs'
 import { withDerivedState } from './board-state.mjs'
@@ -104,8 +113,100 @@ import { readTasksAll } from './tasks-source.mjs'
 import { settledRulingVerdict } from './settled-ruling-core.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
+const ARCHIVE = resolve(REPO_ROOT, '.batch-dashboard-archive.html')
+// The recorded start, session count, expected end and end per point (user
+// 05.10.2026): the card header is rendered from it, so a successor session no
+// longer writes its takeover time over the start.
+const CARD_TIMES_PATH = resolve(REPO_ROOT, '.claude/board-card-times.json')
+const ACTIVITY_LOG = resolve(REPO_ROOT, '.claude/batch-activity.jsonl')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
 const run = (args) => execFileSync(process.execPath, args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
+const git = (args) => {
+  try {
+    return execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 << 20 })
+  } catch {
+    return ''
+  }
+}
+
+const readCardTimes = () => {
+  const store = readJson(CARD_TIMES_PATH)
+  return store && typeof store.points === 'object' ? store : { v: 1, points: {} }
+}
+/** The record an edit produced; written together with the board file (see applyEdit). */
+let pendingCardTimes = null
+const stageCardTimes = (store) => {
+  pendingCardTimes = store
+}
+const sessionId = () => readDeclaration()?.sessionId || process.env.CLAUDE_SESSION_ID || ''
+
+/**
+ * Per point: the first and last commit of its feat/ branch — merged into main
+ * (the merge's range; the merge itself is the last) or still a local/remote
+ * branch. The fallback start of a card and the retroactive pass's trace.
+ */
+function branchTraces(points) {
+  const want = new Set(points.map(String))
+  const traces = {}
+  const add = (point, first, last) => {
+    const t = (traces[point] ??= { firstCommit: null, lastCommit: null })
+    if (first && (!t.firstCommit || first < t.firstCommit)) t.firstCommit = first
+    if (last && (!t.lastCommit || last > t.lastCommit)) t.lastCommit = last
+  }
+  const toIso = (d) => new Date(d).toISOString()
+  for (const line of git(['log', '--merges', '--first-parent', '--format=%H%x09%cI%x09%s', 'main']).split('\n')) {
+    const [sha, at, subject] = line.split('\t')
+    const point = (String(subject ?? '').match(/Merge branch '(?:origin\/)?feat\/(\d+)-/) ?? [])[1]
+    if (!point || !want.has(point)) continue
+    const dates = git(['log', '--format=%aI', `${sha}^1..${sha}^2`]).split('\n').filter(Boolean).map(toIso).sort()
+    if (dates.length) add(point, dates[0], toIso(at))
+  }
+  const refs = git(['for-each-ref', '--format=%(refname)', 'refs/heads/feat', 'refs/remotes/origin/feat']).split('\n')
+  for (const ref of refs) {
+    const point = (ref.match(/\/feat\/(\d+)-/) ?? [])[1]
+    if (!point || !want.has(point)) continue
+    const dates = git(['log', '--format=%aI', `main..${ref}`]).split('\n').filter(Boolean).map(toIso).sort()
+    if (dates.length) add(point, dates[0], dates.at(-1))
+  }
+  return traces
+}
+
+/** Distinct sessions the activity log names per point — the session trace of old cards. */
+function sessionTraces(points) {
+  const want = new Set(points.map(String))
+  const seen = {}
+  let text = ''
+  try {
+    text = readFileSync(ACTIVITY_LOG, 'utf8')
+  } catch {
+    return {}
+  }
+  for (const line of text.split('\n')) {
+    const m = line.match(/"session":"([^"]+)","point":(\d+)/)
+    if (m && want.has(m[2])) (seen[m[2]] ??= new Set()).add(m[1])
+  }
+  return Object.fromEntries(Object.entries(seen).map(([p, s]) => [p, s.size]))
+}
+
+/** Record a promotion of `point` and return the span its header renders. */
+function promoteTimes(store, point, { now, eta }) {
+  const key = String(point)
+  const fallbackStart = store.points[key] ? null : branchTraces([key])[key]?.firstCommit
+  store.points[key] = recordPromotion(store.points[key], { now, session: sessionId(), fallbackStart, eta })
+  stageCardTimes(store)
+  return spanOf(store.points[key], { now })
+}
+
+/** Record the end of `point`; null (legacy header) when it was never recorded. */
+function finishTimes(store, point, { now }) {
+  const key = String(point)
+  if (!store.points[key]?.start) return null
+  store.points[key] = { ...store.points[key], end: now.toISOString() }
+  stageCardTimes(store)
+  return spanOf(store.points[key], { now })
+}
+
+const etaFromHours = (now, hours) => (hours == null ? null : new Date(now.getTime() + hours * 3600000))
 
 // STDIN IS READ ONCE, AND ONLY WHEN ASKED FOR (point 410): reading fd 0
 // unconditionally would block every call that has no pipe attached. Explicit
@@ -177,12 +278,16 @@ function applyEdit(fn, done, preparePublish = () => {}) {
   // beside it blocks the state writers — so the board would stay unpublishable.
   // It is said out loud, because an edit that silently swallowed a card's prose
   // would be its own defect.
+  pendingCardTimes = null
   const result = runBoardEdit({
     html: readFileSync(BOARD, 'utf8'),
     tasksText: readTasksAll(),
     transform: fn,
     done,
-    write: (html) => writeTextAtomic(BOARD, html),
+    write: (html) => {
+      writeTextAtomic(BOARD, html)
+      if (pendingCardTimes) writeTextAtomic(CARD_TIMES_PATH, `${JSON.stringify(pendingCardTimes, null, 2)}\n`)
+    },
     rotate: () => run(['scripts/board-archive-rotate.mjs']),
     preparePublish,
     publish: () => run([PUBLISH_SCRIPT, '--locked']),
@@ -274,7 +379,17 @@ try {
   } else if (cmd === 'eta') {
     const [point, when] = rest
     if (!point || !when) throw new Error('usage: board.mjs eta <point> "<HH:MM>"')
-    edit((html) => setCardTimes(html, point, when), `${point} is now expected to be done by ~${when}`)
+    edit((html) => {
+      const store = readCardTimes()
+      const entry = store.points[String(point)]
+      if (!entry?.start || entry.end) return setCardTimes(html, point, when)
+      const now = new Date()
+      const eta = resolveBerlinClock(String(when).replace(/^~\s*/, ''), now, { future: true })
+      if (!eta) return setCardTimes(html, point, when) // refuses the malformed time itself
+      store.points[String(point)] = { ...entry, eta: eta.toISOString() }
+      stageCardTimes(store)
+      return setCardTimes(html, point, when, { span: spanOf(store.points[String(point)], { now }) })
+    }, `${point} is now expected to be done by ~${when}`)
   } else if (cmd === 'paused') {
     // THERE IS NOTHING TO COMMAND HERE ANY MORE (point 749). A pause used to be
     // written — first as a user-decision card, then briefly onto the running
@@ -309,7 +424,11 @@ try {
     // start time and no expected end, which is the invisibility point 439 ends.
     const noEstimate = promotionEstimateWarning(readFileSync(BOARD, 'utf8'), point)
     editPrepared(
-      (html) => toNow(html, point, textOf(words), { stamp: at, tasksText: readTasksAll() }),
+      (html) => {
+        const now = new Date()
+        const span = promoteTimes(readCardTimes(), point, { now, eta: etaFromHours(now, queueEstimateHours(html, point)) })
+        return toNow(html, point, textOf(words), { stamp: at, tasksText: readTasksAll(), span })
+      },
       `${point} is current work since ${at} (title and estimate taken from its queue card)`,
       prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: current work` }),
     )
@@ -335,8 +454,15 @@ try {
     const at = berlinStamp()
     const noEstimate = next == null ? null : promotionEstimateWarning(readFileSync(BOARD, 'utf8'), next)
     editPrepared(
-      (html) =>
-        closeCard(html, point, {
+      (html) => {
+        const now = new Date()
+        const store = readCardTimes()
+        const span = finishTimes(store, point, { now })
+        const nextSpan =
+          next == null ? null : promoteTimes(store, next, { now, eta: etaFromHours(now, queueEstimateHours(html, next)) })
+        return closeCard(html, point, {
+          span,
+          nextSpan,
           text: textOf(words),
           end: at,
           next,
@@ -345,7 +471,8 @@ try {
           // one for a forgotten successor: the caller DID choose this way out.
           none: hasNone ? textOf(noneWords) || ' ' : '',
           tasksText: readTasksAll(),
-        }),
+        })
+      },
       next != null
         ? `${point} archived as done at ${at}; ${next} is current work in the same edit`
         : hasNone
@@ -460,7 +587,16 @@ try {
       throw new Error('usage: board.mjs promote <point> "<times>" "<title>" "<status>"|--text-stdin')
     }
     editPrepared(
-      (html) => promoteToNow(html, point, { title, times, status: textOf(words), tasksText: readTasksAll() }),
+      (html) => {
+        // The caller's "<times>" gives the expected end only; the start is the record's.
+        const now = new Date()
+        const clock = timesEndClock(times)
+        const span = promoteTimes(readCardTimes(), point, {
+          now,
+          eta: clock ? resolveBerlinClock(clock, now, { future: true }) : null,
+        })
+        return promoteToNow(html, point, { title, times, status: textOf(words), tasksText: readTasksAll(), span })
+      },
       `${point} promoted to current work`,
       prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: promoted to current work` }),
     )
@@ -512,6 +648,37 @@ try {
         ? `board: folded duplicate Erledigt cards for point(s) ${folded.join(', ')}`
         : 'board: no duplicate Erledigt cards',
     )
+  } else if (cmd === 'backfill-times') {
+    // RETROACTIVE (user 14.10.2026): every card without a record — Erledigt and
+    // the archive included — gets one from its traces; untraceable ones keep their value.
+    const dryRun = rest.includes('--dry-run')
+    const now = new Date()
+    const boardCards = timedCards(readFileSync(BOARD, 'utf8'))
+    const archiveCards = existsSync(ARCHIVE) ? timedCards(readFileSync(ARCHIVE, 'utf8'), { archive: true }) : []
+    const cards = [...boardCards, ...archiveCards]
+    const points = [...new Set(cards.map((c) => c.point))]
+    const traces = branchTraces(points)
+    const sessions = sessionTraces(points)
+    for (const [point, t] of Object.entries(traces)) t.sessions = sessions[point] ?? 1
+    const result = backfillCardTimes({ store: readCardTimes(), cards, traces, now })
+    console.log(
+      `board: ${cards.length} card(s) of ${points.length} point(s); records added for ${result.added.length} point(s); ` +
+        `${new Set(result.untraceable).size} point(s) untraceable, their cards keep their value` +
+        (dryRun ? ' (dry run, nothing written)' : ''),
+    )
+    if (!dryRun) {
+      edit((html) => {
+        stageCardTimes(result.store)
+        return applyCardTimes(html, result.store, { now }).html
+      }, 'card times rendered from the record')
+      if (existsSync(ARCHIVE)) {
+        withBoardEditLock(() => {
+          const page = applyCardTimes(readFileSync(ARCHIVE, 'utf8'), result.store, { now, archive: true })
+          writeTextAtomic(ARCHIVE, page.html)
+          console.log(`board: ${page.rendered} archive card(s) rendered from the record`)
+        })
+      }
+    }
   } else if (cmd === 'focus') {
     const [point, ...words] = rest
     const note = textOf(words)
@@ -552,7 +719,8 @@ try {
         'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'log-add "Entscheidungsprotokoll: <title>" "<record>" | log-remove "<title>" | ' +
         'vdzk-keep "<title>" [...] [--why "<reason>"] | ' +
-        'promote <point> "<times>" "<title>" "<status>" | merge-done | focus <point> "<note>" | attest\n' +
+        'promote <point> "<times>" "<title>" "<status>" | merge-done | backfill-times [--dry-run] | ' +
+        'focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,
     )
     process.exitCode = 2

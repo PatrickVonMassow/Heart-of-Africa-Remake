@@ -85,6 +85,19 @@ import {
   renderCardSections,
   setCardDescription,
 } from './board-core.mjs'
+import {
+  applyCardTimes,
+  backfillCardTimes,
+  cardSpanBand,
+  cardTimeLine,
+  formatCardSpan,
+  recordPromotion,
+  resolveBerlinClock,
+  spanOf,
+  timedCards,
+  timesEndClock,
+} from './board-core.mjs'
+import { etaMinutes } from './dashboard-guard-core.mjs'
 
 // A minimal document WITH the section heading: since the sixth cross-review
 // there is no fragment fallback — a writer on a document without the
@@ -2456,5 +2469,173 @@ describe('card description and status are separate sections', () => {
     expect(descriptionOf(queueCard(html, 704))).toBe('Warum das ansteht.')
     // Idempotent: a second run changes nothing.
     expect(migrateCardDescriptions(html, TASKS).html).toBe(html)
+  })
+})
+
+// User 05.10.2026: a successor session wrote its takeover time over the card's
+// start, and a span over 24 h showed no date. Berlin is UTC+2 in early October.
+describe('card times', () => {
+  const at = (iso) => new Date(iso)
+  const min = 60000
+
+  describe('time-span bands (Europe/Berlin)', () => {
+    it('shows times only up to 24 h, across midnight too', () => {
+      expect(formatCardSpan(at('2026-10-03T07:12:00Z'), at('2026-10-03T12:30:00Z'))).toBe('09:12 – 14:30')
+      expect(formatCardSpan(at('2026-10-03T21:10:00Z'), at('2026-10-03T23:40:00Z'))).toBe('23:10 – 01:40')
+    })
+
+    it('treats exactly 24 h as times only and one minute more as dated', () => {
+      const start = at('2026-10-03T07:12:00Z')
+      const day = new Date(start.getTime() + 24 * 60 * min)
+      expect(cardSpanBand(start, day)).toBe('time')
+      expect(formatCardSpan(start, day)).toBe('09:12 – 09:12')
+      const over = new Date(day.getTime() + min)
+      expect(cardSpanBand(start, over)).toBe('date')
+      expect(formatCardSpan(start, over)).toBe('03.10. 09:12 – 04.10. 09:13')
+      expect(formatCardSpan(start, at('2026-10-05T12:30:00Z'))).toBe('03.10. 09:12 – 05.10. 14:30')
+    })
+
+    it('treats exactly one year as DD.MM. and one minute more as DD.MM.YY', () => {
+      const start = at('2025-10-03T07:12:00Z')
+      const year = at('2026-10-03T07:12:00Z')
+      expect(cardSpanBand(start, year)).toBe('date')
+      expect(formatCardSpan(start, year)).toBe('03.10. 09:12 – 03.10. 09:12')
+      expect(cardSpanBand(start, new Date(year.getTime() + min))).toBe('year')
+      expect(formatCardSpan(start, at('2026-10-05T12:30:00Z'))).toBe('03.10.25 09:12 – 05.10.26 14:30')
+    })
+
+    it('puts the estimate tilde before the clock, where the eta audit reads it', () => {
+      const line = cardTimeLine({ start: '2026-10-03T07:12:00Z', end: '2026-10-05T12:30:00Z', projected: true, sessions: 2 })
+      expect(line).toBe('03.10. 09:12 – 05.10. ~14:30 · 2 Sitzungen')
+      expect(etaMinutes(line)).toEqual({ eta: 14 * 60 + 30, start: 9 * 60 + 12 })
+    })
+
+    it('dates a running card without an end by its distance to now', () => {
+      expect(cardTimeLine({ start: '2026-10-03T07:12:00Z', now: at('2026-10-03T12:00:00Z') })).toBe('09:12')
+      expect(cardTimeLine({ start: '2026-10-03T07:12:00Z', now: at('2026-10-05T12:00:00Z') })).toBe('03.10. 09:12')
+    })
+  })
+
+  describe('session count', () => {
+    it('appends the count only when more than one session worked the card', () => {
+      const span = { start: '2026-10-03T07:12:00Z', end: '2026-10-03T12:30:00Z' }
+      expect(cardTimeLine({ ...span, sessions: 1 })).toBe('09:12 – 14:30')
+      expect(cardTimeLine({ ...span, sessions: 3 })).toBe('09:12 – 14:30 · 3 Sitzungen')
+    })
+
+    it('counts a promotion by another session, not a repeat by the same one', () => {
+      const first = recordPromotion(undefined, { now: at('2026-10-03T07:12:00Z'), session: 'A' })
+      expect(first.sessions).toBe(1)
+      expect(recordPromotion(first, { now: at('2026-10-03T08:00:00Z'), session: 'A' }).sessions).toBe(1)
+      const second = recordPromotion(first, { now: at('2026-10-03T12:00:00Z'), session: 'B' })
+      expect(second.sessions).toBe(2)
+      expect(recordPromotion(second, { now: at('2026-10-03T13:00:00Z'), session: '' }).sessions).toBe(3)
+    })
+  })
+
+  describe('handover keeps the original start', () => {
+    const queued = () =>
+      fullBoard({ now: nowEntry(900, 'Anderes', '08:00 · ~18:00'), queue: queueEntry(1303, 'Kartenzeiten', '~2 h') })
+
+    it('renders the recorded start after a return to the queue and a successor promotion', () => {
+      const t1 = at('2026-10-03T07:12:00Z')
+      let entry = recordPromotion(undefined, { now: t1, session: 'A', eta: new Date(t1.getTime() + 120 * min) })
+      let html = toNow(queued(), 1303, 'Begonnen.', { stamp: '09:12', span: spanOf(entry, { now: t1 }) })
+      expect(html).toContain('<span class="meta">09:12 – ~11:12</span>')
+
+      html = toQueue(html, 1303)
+      expect(queueCard(html, 1303)).toContain('~2 h')
+
+      const t2 = at('2026-10-03T12:00:00Z')
+      entry = recordPromotion(entry, { now: t2, session: 'B', eta: new Date(t2.getTime() + 30 * min) })
+      html = toNow(html, 1303, 'Übernommen.', { stamp: '14:00', span: spanOf(entry, { now: t2 }) })
+      expect(nowCard(html, 1303)).toContain('<span class="meta">09:12 – ~14:30 · 2 Sitzungen</span>')
+      expect(entry.start).toBe(t1.toISOString())
+    })
+
+    it('ignores the start of a free "<times>" string once a record exists', () => {
+      const t1 = at('2026-10-03T07:12:00Z')
+      const t2 = at('2026-10-03T12:00:00Z')
+      const entry = recordPromotion(recordPromotion(undefined, { now: t1, session: 'A' }), {
+        now: t2,
+        session: 'B',
+        eta: resolveBerlinClock(timesEndClock('14:00 · ~14:30'), t2, { future: true }),
+      })
+      const html = promoteToNow(queued(), 1303, {
+        title: 'Kartenzeiten',
+        times: '14:00 · ~14:30',
+        status: 'Übernommen.',
+        stamp: '14:00',
+        span: spanOf(entry, { now: t2 }),
+      })
+      expect(nowCard(html, 1303)).toContain('<span class="meta">09:12 – ~14:30 · 2 Sitzungen</span>')
+    })
+
+    it('takes the first branch commit as the start when it is earlier than the promotion', () => {
+      const now = at('2026-10-05T12:00:00Z')
+      expect(recordPromotion(undefined, { now, fallbackStart: '2026-10-03T07:12:00Z' }).start).toBe('2026-10-03T07:12:00.000Z')
+      expect(recordPromotion(undefined, { now, fallbackStart: '2026-10-06T07:12:00Z' }).start).toBe(now.toISOString())
+    })
+
+    it('archives with the recorded start, a dated span and the session count', () => {
+      const start = at('2026-10-03T07:12:00Z')
+      const entry = { ...recordPromotion(undefined, { now: start }), sessions: 3, end: '2026-10-05T12:30:00Z' }
+      const html = fullBoard({ now: nowEntry(1303, 'Kartenzeiten', '14:00 · ~14:30') + nowEntry(900, 'Anderes', '08:00') })
+      const out = toDone(html, 1303, { end: '14:30', span: spanOf(entry) })
+      expect(doneCard(out, 1303)).toContain('<span class="meta">03.10. 09:12 – 05.10. 14:30 · 3 Sitzungen</span>')
+    })
+
+    it('keeps the legacy readers working on the new notation', () => {
+      const html = fullBoard({ now: nowEntry(1303, 'Kartenzeiten', '03.10. 09:12 – 05.10. ~11:12 · 2 Sitzungen') })
+      expect(queueCard(toQueue(html, 1303), 1303)).toContain('~2 h')
+      expect(() => setCardTimes(html, 1303, '15:00')).not.toThrow()
+      expect(doneStart('<span class="meta">09:12 – 14:30</span>')).toBe('09:12')
+    })
+  })
+
+  describe('resolveBerlinClock', () => {
+    it('finds the nearest moment or the next one for an estimate', () => {
+      const ref = at('2026-10-03T21:50:00Z') // 23:50 Berlin
+      expect(resolveBerlinClock('00:10', ref).toISOString()).toBe('2026-10-03T22:10:00.000Z')
+      expect(resolveBerlinClock('23:00', ref).toISOString()).toBe('2026-10-03T21:00:00.000Z')
+      // An hour of slack: 23:00 is still today's, 22:30 already tomorrow's.
+      expect(resolveBerlinClock('23:00', ref, { future: true }).toISOString()).toBe('2026-10-03T21:00:00.000Z')
+      expect(resolveBerlinClock('22:30', ref, { future: true }).toISOString()).toBe('2026-10-04T20:30:00.000Z')
+      expect(resolveBerlinClock('23:30', ref, { future: true }).toISOString()).toBe('2026-10-03T21:30:00.000Z')
+      expect(resolveBerlinClock('nope', ref)).toBeNull()
+    })
+  })
+
+  describe('retroactive pass', () => {
+    const done = (n, meta) =>
+      `<details>\n  <summary><span class="num">${n}</span><span class="t">Fertig ${n}</span>` +
+      `<span class="right"><span class="meta">${meta}</span></span></summary>\n  <div class="body">\n    <p>Erledigt.</p>\n  </div>\n</details>\n`
+    const html = () =>
+      fullBoard({ now: nowEntry(900, 'Anderes', '08:00 · ~18:00'), done: done(1302, '00:49 · 00:49') + done(11, '10:00 · 11:00') })
+
+    it('records traceable cards from their first branch commit and keeps the rest', () => {
+      const now = at('2026-10-15T08:00:00Z')
+      const cards = timedCards(html())
+      // The title-only legacy now-card is no numbered card; the board upgrades those on every edit.
+      expect(cards.map((c) => [c.point, c.finished])).toEqual([['1302', true], ['11', true]])
+      const traces = {
+        1302: { firstCommit: '2026-10-14T18:05:00Z', lastCommit: '2026-10-14T22:48:00Z', sessions: 2 },
+      }
+      const result = backfillCardTimes({ store: { v: 1, points: {} }, cards, traces, now })
+      expect(result.added).toEqual(['1302'])
+      expect(result.untraceable).toEqual(['11'])
+      expect(result.store.points['1302']).toMatchObject({ start: '2026-10-14T18:05:00.000Z', sessions: 2, end: '2026-10-14T22:49:00.000Z' })
+      const rendered = applyCardTimes(html(), result.store, { now })
+      expect(rendered.rendered).toBe(1)
+      expect(doneCard(rendered.html, 1302)).toContain('<span class="meta">20:05 – 00:49 · 2 Sitzungen</span>')
+      expect(doneCard(rendered.html, 11)).toContain('<span class="meta">10:00 · 11:00</span>')
+    })
+
+    it('leaves a recorded card alone and renders archive pages too', () => {
+      const store = { v: 1, points: { 11: { start: '2026-10-01T08:00:00Z', end: '2026-10-03T09:00:00Z', sessions: 1 } } }
+      expect(backfillCardTimes({ store, cards: timedCards(html()), traces: {} }).added).toEqual([])
+      const page = applyCardTimes(done(11, '10:00 · 11:00'), store, { archive: true })
+      expect(page.html).toContain('<span class="meta">01.10. 10:00 – 03.10. 11:00</span>')
+    })
   })
 })

@@ -593,11 +593,15 @@ function queueDescription(card) {
  * Move a point's card out of the queue and into the current-work section as a
  * `now` card with the given title, times and stamped status.
  *
+ * With a `span` (the card-times record, see `recordPromotion`) the header is
+ * rendered from the RECORDED start, never from the caller's `times`: a
+ * successor session must not overwrite when the work began (user 05.10.2026).
+ *
  * This exists because hand-rolling the regex per move kept failing on shell
  * escaping — three times in one day — and a board edit that silently matches
  * nothing is exactly the class of failure the guards were built for.
  */
-export function promoteToNow(html, point, { title, times, status, stamp = berlinStamp(), description = '', tasksText = '' }) {
+export function promoteToNow(html, point, { title, times, status, stamp = berlinStamp(), description = '', tasksText = '', span = null }) {
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   if (!title || !status) throw new Error('board: promote needs a title and a status')
@@ -614,7 +618,7 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
   }
   const now =
     `<details class="now">\n  <summary>${numberChip(point)}<span class="t">${escapeCardTitle(stripPointPrefix(title, point))}</span>` +
-    `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
+    `<span class="right"><span class="meta">${span ? cardTimeLine(span) : times ?? stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardSections({
       description: String(description ?? '').trim() || queueDescription(card) || pointDescription(tasksText, point),
       status,
@@ -1340,7 +1344,7 @@ export function addHours(stamp, hours) {
 
 /** The difference between the two stamps of a now-card header, in hours. */
 function spanHours(times) {
-  const m = String(times ?? '').match(/(\d{1,2}):(\d{2})\s*·\s*~?\s*(\d{1,2}):(\d{2})/)
+  const m = String(times ?? '').match(new RegExp(`(\\d{1,2}):(\\d{2})\\s*[·–]\\s*~?\\s*(?:${DATE_PREFIX})?~?\\s*(\\d{1,2}):(\\d{2})`))
   if (!m) return null
   const from = Number(m[1]) * 60 + Number(m[2])
   const to = Number(m[3]) * 60 + Number(m[4])
@@ -1368,7 +1372,7 @@ const statusOf = (card) => {
  * caller types a point number and a status, and the header the guard reads
  * cannot drift from the queue entry it came from.
  */
-export function toNow(html, point, status, { stamp = berlinStamp(), description = '', tasksText = '' } = {}) {
+export function toNow(html, point, status, { stamp = berlinStamp(), description = '', tasksText = '', span = null } = {}) {
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   const hours = estimateHours(metaOf(card))
@@ -1379,6 +1383,7 @@ export function toNow(html, point, status, { stamp = berlinStamp(), description 
     stamp,
     description,
     tasksText,
+    span,
   })
 }
 
@@ -1465,12 +1470,12 @@ export function toQueue(html, point, { text, estimate } = {}) {
  * shape the Erledigt section fixes. The body carries the card's status text,
  * every paragraph, over unless the caller writes a closing one.
  */
-export function toDone(html, point, { text, end = berlinStamp() } = {}) {
+export function toDone(html, point, { text, end = berlinStamp(), span = null } = {}) {
   const card = nowCard(html, point)
   if (!card) throw new Error(`board: no current-work card for point ${point}`)
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to archive a card with an empty body')
-  const start = (metaOf(card).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1] ?? end
+  const start = (metaOf(card).match(START_FIELD_RE) ?? [])[1] ?? end
   const title = stripPointPrefix(titleOf(card), point)
   const out = html.replace(card, '')
   // ONE POINT, ONE ERLEDIGT CARD (user 18.08.2026, measured on point 700, which
@@ -1486,17 +1491,18 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   const existing = doneCards(out, point)
   const earliest = earliestStart(existing) || start
   const description = descriptionOf(card) || existing.map(descriptionOf).find(Boolean) || ''
-  const entry = renderDoneEntry({ point, title, start: earliest, end, body, description })
+  const meta = span ? cardTimeLine(span) : `${earliest} · ${end}`
+  const entry = renderDoneEntry({ point, title, meta, body, description })
   const cleaned = dropDoneCards(out, point)
   const { from } = sectionBounds(cleaned, 'done')
   return `${cleaned.slice(0, from)}\n${entry}${cleaned.slice(from).replace(/^\n/, '')}`
 }
 
 /** One Erledigt entry, the single writer of that markup. */
-function renderDoneEntry({ point, title, start, end, body, description = '' }) {
+function renderDoneEntry({ point, title, meta, body, description = '' }) {
   return (
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
-    `<span class="right"><span class="meta">${start} · ${end}</span></span></summary>\n` +
+    `<span class="right"><span class="meta">${meta}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardSections({ description, status: body })}\n  </div>\n</details>\n`
   )
 }
@@ -1510,7 +1516,7 @@ function renderDoneEntry({ point, title, start, end, body, description = '' }) {
  */
 export function withStart(card, start) {
   return String(card ?? '').replace(/(class="meta">)([^<]*)/, (whole, lead, content) => {
-    const at = content.indexOf('·')
+    const at = content.search(/[·–]/)
     return at < 0 ? `${lead}${start}` : `${lead}${start} ${content.slice(at)}`
   })
 }
@@ -1579,7 +1585,7 @@ export function doneStart(card) {
   // a bare digit boundary still read `12:34:56` and `12:34x` as `12:34`, so a
   // damaged card could decide the merged start. What may follow is the range
   // separator or the closing tag, nothing else.
-  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|<\/span>))/)
+  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|–|<\/span>))/)
   if (!m) return ''
   const [, h, min] = m
   if (Number(h) > 23 || Number(min) > 59) return ''
@@ -2303,14 +2309,14 @@ function writeStateCard(html, { kind, point = null, title, text: reason, stamp, 
  * another card on its own. Anything else is REFUSED: leaving the section empty
  * is the defect, and forgetting must not be able to reach it.
  */
-export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp, tasksText = '' } = {}) {
+export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp, tasksText = '', span = null, nextSpan = null } = {}) {
   if (next != null && none) throw new Error('board: done takes EITHER --next or --none, never both')
   const at = stamp ?? end
-  const archived = toDone(html, point, { text, end })
+  const archived = toDone(html, point, { text, end, span })
   if (next != null) {
     const status = String(nextStatus ?? '').trim()
     if (!status) throw new Error(`board: --next ${next} needs the new card's status text`)
-    return toNow(archived, next, status, { stamp: at, tasksText })
+    return toNow(archived, next, status, { stamp: at, tasksText, span: nextSpan })
   }
   if (none) return toNoCurrentWork(archived, none, { stamp: at })
   if (!hasCurrentWork(archived)) {
@@ -2883,7 +2889,7 @@ export function migrateCardDescriptions(html, tasksText) {
  * 09.09.2026 the user hit the visible half of this: the board promised 11:46
  * for work still running at 13:40.
  */
-export function setCardTimes(html, point, end) {
+export function setCardTimes(html, point, end, { span = null } = {}) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
   html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
@@ -2900,9 +2906,12 @@ export function setCardTimes(html, point, end) {
   if (!m) throw new Error(`board: no current-work card for point ${point} — add the card first`)
   // The START is never rewritten: it is when the work actually began, and a
   // re-estimate that moved it would erase how long the point has been running.
-  const start = (String(m[2]).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1]
+  const start = (String(m[2]).match(START_FIELD_RE) ?? [])[1]
   if (!start) throw new Error(`board: the card for point ${point} carries no start time: "${m[2]}"`)
-  const rewritten = section.replace(re, (_all, head, _old, tail) => `${head}${start} · ~${wanted}${tail}`)
+  // With the card-times record the start comes from the record (and is the same
+  // moment); the line is rendered whole, session count included.
+  const line = span ? cardTimeLine(span) : `${start} · ~${wanted}`
+  const rewritten = section.replace(re, (_all, head, _old, tail) => `${head}${line}${tail}`)
   return html.slice(0, from) + rewritten + html.slice(to)
 }
 
@@ -3013,4 +3022,228 @@ export function promotionEstimateWarning(html, point) {
         `expected end. Give it one: node scripts/board.mjs eta ${point} "<HH:MM>" (a queue --estimate no ` +
         'longer reaches the promoted card)'
     : null
+}
+
+// ═══ Card times: the original start, the session count, dated spans ═══
+// User 05.10.2026: a successor session wrote its takeover time as the card's
+// start ("14:00 – 14:30" for many hours of work), and a span over 24 h was
+// indistinguishable from a short one. The start is now RECORDED once, at the
+// first promotion (`.claude/board-card-times.json`, written by board.mjs), and
+// every header is rendered from that record.
+
+/** An optional "DD.MM." / "DD.MM.YY" date in front of a clock, as source text. */
+const DATE_PREFIX = '\\d{1,2}\\.\\d{1,2}\\.(?:\\d{2})?\\s+'
+/** A header's start field: the clock, with the date a long span puts in front. */
+const START_FIELD_RE = new RegExp(`^\\s*((?:${DATE_PREFIX})?\\d{1,2}:\\d{2})`)
+
+/** The separator between start and end, and the session suffix's noun. */
+export const CARD_SPAN_SEPARATOR = ' – '
+export const SESSIONS_WORD = 'Sitzungen'
+
+const BERLIN_PARTS = new Intl.DateTimeFormat('de-DE', {
+  timeZone: 'Europe/Berlin',
+  year: '2-digit',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+function berlinParts(date) {
+  const p = Object.fromEntries(BERLIN_PARTS.formatToParts(date).map((x) => [x.type, x.value]))
+  return { day: p.day, month: p.month, year: p.year, clock: `${p.hour}:${p.minute}` }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Which notation a span needs: 'time' (≤ 24 h), 'date' (> 24 h), 'year' (> 1 calendar year). */
+export function cardSpanBand(start, end) {
+  const from = new Date(start)
+  const to = new Date(end)
+  const [a, b] = from <= to ? [from, to] : [to, from]
+  const yearOn = new Date(a)
+  yearOn.setUTCFullYear(yearOn.getUTCFullYear() + 1)
+  if (b > yearOn) return 'year'
+  if (b - a > DAY_MS) return 'date'
+  return 'time'
+}
+
+function bandStamp(date, band, { projected = false } = {}) {
+  const p = berlinParts(date)
+  const clock = `${projected ? '~' : ''}${p.clock}`
+  if (band === 'year') return `${p.day}.${p.month}.${p.year} ${clock}`
+  if (band === 'date') return `${p.day}.${p.month}. ${clock}`
+  return clock
+}
+
+/**
+ * "09:12 – 14:30", "03.10. 09:12 – 05.10. 14:30" or
+ * "03.10.25 09:12 – 05.10.26 14:30" (Europe/Berlin), by the distance between the
+ * two. A projected end carries "~" before its clock, after any date, so the
+ * estimate audit's `~HH:MM` still finds it.
+ */
+export function formatCardSpan(start, end, { projected = false } = {}) {
+  const band = cardSpanBand(start, end)
+  return `${bandStamp(new Date(start), band)}${CARD_SPAN_SEPARATOR}${bandStamp(new Date(end), band, { projected })}`
+}
+
+/**
+ * A card's whole time line: the span (or the start alone, dated by its distance
+ * to `now`, while a running card has no expected end) plus "· <n> Sitzungen"
+ * when more than one session worked it.
+ */
+export function cardTimeLine({ start, end = null, projected = false, sessions = 1, now = new Date() } = {}) {
+  const line = end
+    ? formatCardSpan(start, end, { projected })
+    : bandStamp(new Date(start), cardSpanBand(start, now))
+  return Number(sessions) > 1 ? `${line} · ${sessions} ${SESSIONS_WORD}` : line
+}
+
+/**
+ * The record after `point` is promoted. The START is set once — the first
+ * promotion, or the point's first branch commit when that is earlier (the
+ * fallback for work begun before a card was promoted) — and never moved again.
+ * A promotion by a session other than the last one counts one more session; an
+ * unknown session counts as a new one.
+ */
+export function recordPromotion(entry, { now = new Date(), session = '', fallbackStart = null, eta = null } = {}) {
+  const at = new Date(now)
+  const fallback = fallbackStart ? new Date(fallbackStart) : null
+  const start = entry?.start ?? (fallback && fallback < at ? fallback : at).toISOString()
+  const sameSession = Boolean(entry && session && entry.session === session)
+  const sessions = entry ? (Number(entry.sessions) || 1) + (sameSession ? 0 : 1) : 1
+  return { start, sessions, session: session || '', eta: eta ? new Date(eta).toISOString() : null, end: null }
+}
+
+/** The span a recorded card renders: running (projected end) or finished. */
+export function spanOf(entry, { now = new Date() } = {}) {
+  if (!entry?.start) return null
+  const finished = Boolean(entry.end)
+  return {
+    start: entry.start,
+    end: finished ? entry.end : entry.eta ?? null,
+    projected: !finished,
+    sessions: entry.sessions ?? 1,
+    now,
+  }
+}
+
+/**
+ * The moment whose Berlin clock reads `clock` ("HH:MM"), next to `reference`:
+ * the nearest one, or with `future` the first at or after the reference (an
+ * hour of slack, so an estimate typed at 14:31 for 14:30 stays today).
+ */
+export function resolveBerlinClock(clock, reference = new Date(), { future = false } = {}) {
+  const m = String(clock ?? '').match(/^\s*(\d{1,2}):(\d{2})\s*$/)
+  if (!m) return null
+  const ref = new Date(reference)
+  const [h, min] = berlinParts(ref).clock.split(':').map(Number)
+  const base = ref.getTime() - ref.getUTCSeconds() * 1000 - ref.getUTCMilliseconds() +
+    ((Number(m[1]) * 60 + Number(m[2])) - (h * 60 + min)) * 60000
+  const candidates = [base - DAY_MS, base, base + DAY_MS].map((t) => new Date(t))
+  if (future) return candidates.find((c) => c.getTime() >= ref.getTime() - 3600000) ?? candidates[2]
+  return candidates.reduce((best, c) => (Math.abs(c - ref) < Math.abs(best - ref) ? c : best))
+}
+
+/** The end clock a free "<times>" string names ("09:12 · ~14:30" → "14:30"), or null. */
+export function timesEndClock(times) {
+  const m = String(times ?? '').match(new RegExp(`[·–-]\\s*~?\\s*(?:${DATE_PREFIX})?~?\\s*(\\d{1,2}:\\d{2})`))
+  return m ? m[1] : null
+}
+
+/** The first card-head regex match's meta, rewritten — one card's text. */
+function withMeta(card, line) {
+  return card.replace(/(<span class="meta">)[^<]*(<\/span>)/, (_all, open, close) => `${open}${line}${close}`)
+}
+
+const NOW_CARD_RE = new RegExp(`<details class="now"[^>]*>\\s*<summary>\\s*${CARD_NUMBER_SOURCE('(\\d+)')}[\\s\\S]*?</details>`, 'g')
+
+/**
+ * Render every recorded card's header from the record: running cards in the
+ * current-work section, finished ones in Erledigt — or, with `archive`, every
+ * Erledigt-shaped card of an archive page. Cards without a record keep their
+ * value. Returns `{ html, rendered }`.
+ */
+export function applyCardTimes(html, store, { now = new Date(), archive = false } = {}) {
+  const source = String(html ?? '')
+  const points = store?.points ?? {}
+  let rendered = 0
+  const render = (text, re, finished) =>
+    text.replace(re, (card, point) => {
+      const entry = points[point]
+      if (!entry?.start || Boolean(entry.end) !== finished) return card
+      rendered++
+      return withMeta(card, cardTimeLine(spanOf(entry, { now })))
+    })
+  const doneRe = () => new RegExp(DONE_CARD_RE.source, 'g')
+  if (archive) return { html: render(source, doneRe(), true), rendered }
+  let out = source
+  for (const [key, re, finished] of [['now', NOW_CARD_RE, false], ['done', doneRe(), true]]) {
+    let b
+    try {
+      b = sectionBounds(out, key)
+    } catch {
+      continue
+    }
+    out = `${out.slice(0, b.from)}${render(out.slice(b.from, b.end), new RegExp(re.source, 'g'), finished)}${out.slice(b.end)}`
+  }
+  return { html: out, rendered }
+}
+
+/**
+ * The records the retroactive pass derives for cards that carry none: start =
+ * the point's first branch commit; end = the card's own end clock, placed next
+ * to the merge (or last branch commit), never before the start; sessions = the
+ * distinct sessions the traces name (at least one). A card without a trace is
+ * counted in `untraceable` and keeps its value.
+ */
+export function backfillCardTimes({ store = {}, cards = [], traces = {}, now = new Date() } = {}) {
+  const points = { ...(store.points ?? {}) }
+  const added = []
+  const untraceable = []
+  for (const { point, meta, finished } of cards) {
+    if (points[point]?.start) continue
+    const trace = traces[point]
+    if (!trace?.firstCommit) {
+      untraceable.push(point)
+      continue
+    }
+    const start = new Date(trace.firstCommit)
+    const endClock = finished ? (String(meta ?? '').match(/(\d{1,2}:\d{2})\s*$/) ?? [])[1] : null
+    let end = null
+    if (finished) {
+      const near = new Date(trace.lastCommit ?? trace.firstCommit)
+      end = (endClock && resolveBerlinClock(endClock, near)) || near
+      if (end < start) end = near < start ? start : near
+    }
+    const etaClock = finished ? null : timesEndClock(meta)
+    points[point] = {
+      start: start.toISOString(),
+      sessions: Math.max(1, Number(trace.sessions) || 1),
+      session: '',
+      eta: etaClock ? resolveBerlinClock(etaClock, now, { future: true }).toISOString() : null,
+      end: end ? end.toISOString() : null,
+    }
+    added.push(point)
+  }
+  return { store: { ...store, v: 1, points }, added, untraceable }
+}
+
+/** `{ point, meta, finished }` for every numbered now- and Erledigt card (or every archive card). */
+export function timedCards(html, { archive = false } = {}) {
+  const source = String(html ?? '')
+  const collect = (text, re, finished) =>
+    [...text.matchAll(re)].map((m) => ({ point: m[1], meta: metaOf(m[0]), finished }))
+  if (archive) return collect(source, new RegExp(DONE_CARD_RE.source, 'g'), true)
+  const out = []
+  for (const [key, re, finished] of [['now', NOW_CARD_RE, false], ['done', DONE_CARD_RE, true]]) {
+    try {
+      const b = sectionBounds(source, key)
+      out.push(...collect(source.slice(b.from, b.end), new RegExp(re.source, 'g'), finished))
+    } catch {
+      /* no such section */
+    }
+  }
+  return out
 }
