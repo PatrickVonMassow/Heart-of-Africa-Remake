@@ -1344,10 +1344,23 @@ export function addHours(stamp, hours) {
 
 /** The difference between the two stamps of a now-card header, in hours. */
 function spanHours(times) {
-  const m = String(times ?? '').match(new RegExp(`(\\d{1,2}):(\\d{2})\\s*[·–]\\s*~?\\s*(?:${DATE_PREFIX})?~?\\s*(\\d{1,2}):(\\d{2})`))
+  const stamp = '(?:(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2})?\\s+)?~?\\s*(\\d{1,2}):(\\d{2})'
+  const m = String(times ?? '').match(new RegExp(`${stamp}\\s*[·–]\\s*~?\\s*${stamp}`))
   if (!m) return null
-  const from = Number(m[1]) * 60 + Number(m[2])
-  const to = Number(m[3]) * 60 + Number(m[4])
+  const [, d1, mo1, y1, h1, mi1, d2, mo2, y2, h2, mi2] = m
+  // DATED on both sides (a span over 24 h): the full duration, not the clock
+  // difference modulo a day (cross-vendor review). The year is only written
+  // past one year; otherwise the end lies in the start's year or the next.
+  if (d1 && d2) {
+    const startYear = y1 ? 2000 + Number(y1) : 2001
+    const at = (year, d, mo, h, mi) => Date.UTC(year, Number(mo) - 1, Number(d), Number(h), Number(mi))
+    const from = at(startYear, d1, mo1, h1, mi1)
+    let to = at(y2 ? 2000 + Number(y2) : startYear, d2, mo2, h2, mi2)
+    if (!y2 && to < from) to = at(startYear + 1, d2, mo2, h2, mi2)
+    return (to - from) / 3600000
+  }
+  const from = Number(h1) * 60 + Number(mi1)
+  const to = Number(h2) * 60 + Number(mi2)
   return ((to - from + 1440) % 1440) / 60
 }
 
@@ -1585,11 +1598,16 @@ export function doneStart(card) {
   // a bare digit boundary still read `12:34:56` and `12:34x` as `12:34`, so a
   // damaged card could decide the merged start. What may follow is the range
   // separator or the closing tag, nothing else.
-  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|–|<\/span>))/)
+  // A long span's start carries its date ("03.10. 09:12", "03.10.25 09:12"),
+  // and the merge must keep it whole (cross-vendor review).
+  const m = String(card ?? '').match(
+    /class="meta">\s*((\d{1,2})\.(\d{1,2})\.(?:\d{2})?\s+)?(\d{1,2}):(\d{2})(?=\s*(?:·|–|<\/span>))/,
+  )
   if (!m) return ''
-  const [, h, min] = m
+  const [, date = '', day, month, h, min] = m
   if (Number(h) > 23 || Number(min) > 59) return ''
-  return `${h}:${min}`
+  if (date && (Number(day) < 1 || Number(day) > 31 || Number(month) < 1 || Number(month) > 12)) return ''
+  return `${date.trim() ? `${date.trim()} ` : ''}${h}:${min}`
 }
 
 /**
@@ -2889,7 +2907,7 @@ export function migrateCardDescriptions(html, tasksText) {
  * 09.09.2026 the user hit the visible half of this: the board promised 11:46
  * for work still running at 13:40.
  */
-export function setCardTimes(html, point, end, { span = null } = {}) {
+export function setCardTimes(html, point, end, { span = null, now = new Date() } = {}) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
   html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
@@ -2910,7 +2928,7 @@ export function setCardTimes(html, point, end, { span = null } = {}) {
   if (!start) throw new Error(`board: the card for point ${point} carries no start time: "${m[2]}"`)
   // With the card-times record the start comes from the record (and is the same
   // moment); the line is rendered whole, session count included.
-  const line = span ? cardTimeLine(span) : `${start} · ~${wanted}`
+  const line = span ? cardTimeLine(span) : legacyTimeLine(m[2], start, wanted, now)
   const rewritten = section.replace(re, (_all, head, _old, tail) => `${head}${line}${tail}`)
   return html.slice(0, from) + rewritten + html.slice(to)
 }
@@ -3111,9 +3129,13 @@ export function recordPromotion(entry, { now = new Date(), session = '', fallbac
   const at = new Date(now)
   const fallback = fallbackStart ? new Date(fallbackStart) : null
   const start = entry?.start ?? (fallback && fallback < at ? fallback : at).toISOString()
-  const sameSession = Boolean(entry && session && entry.session === session)
-  const sessions = entry ? (Number(entry.sessions) || 1) + (sameSession ? 0 : 1) : 1
-  return { start, sessions, session: session || '', eta: eta ? new Date(eta).toISOString() : null, end: null }
+  // DISTINCT sessions (cross-vendor review): A → B → A is two sessions, so the
+  // ids already counted are kept; an unknown session always counts.
+  const sessionIds = Array.isArray(entry?.sessionIds) ? [...entry.sessionIds] : entry?.session ? [entry.session] : []
+  const known = Boolean(session && sessionIds.includes(session))
+  if (session && !known) sessionIds.push(session)
+  const sessions = entry ? (Number(entry.sessions) || 1) + (known ? 0 : 1) : 1
+  return { start, sessions, session: session || '', sessionIds, eta: eta ? new Date(eta).toISOString() : null, end: null }
 }
 
 /** The span a recorded card renders: running (projected end) or finished. */
@@ -3195,7 +3217,8 @@ export function applyCardTimes(html, store, { now = new Date(), archive = false 
  * The records the retroactive pass derives for cards that carry none: start =
  * the point's first branch commit; end = the card's own end clock, placed next
  * to the merge (or last branch commit), never before the start; sessions = the
- * distinct sessions the traces name (at least one). A card without a trace is
+ * distinct sessions the traces name (at least one), kept as `sessionIds` so a
+ * later promotion by one of them is not counted again. A card without a trace is
  * counted in `untraceable` and keeps its value.
  */
 export function backfillCardTimes({ store = {}, cards = [], traces = {}, now = new Date() } = {}) {
@@ -3210,7 +3233,8 @@ export function backfillCardTimes({ store = {}, cards = [], traces = {}, now = n
       continue
     }
     const start = new Date(trace.firstCommit)
-    const endClock = finished ? (String(meta ?? '').match(/(\d{1,2}:\d{2})\s*$/) ?? [])[1] : null
+    const bare = String(meta ?? '').replace(new RegExp(`\\s*·\\s*\\d+\\s+${SESSIONS_WORD}\\s*$`), '')
+    const endClock = finished ? (bare.match(/(\d{1,2}:\d{2})\s*$/) ?? [])[1] : null
     let end = null
     if (finished) {
       const near = new Date(trace.lastCommit ?? trace.firstCommit)
@@ -3220,8 +3244,9 @@ export function backfillCardTimes({ store = {}, cards = [], traces = {}, now = n
     const etaClock = finished ? null : timesEndClock(meta)
     points[point] = {
       start: start.toISOString(),
-      sessions: Math.max(1, Number(trace.sessions) || 1),
+      sessions: Math.max(1, Number(trace.sessions) || 1, trace.sessionIds?.length ?? 0),
       session: '',
+      sessionIds: Array.isArray(trace.sessionIds) ? [...trace.sessionIds] : [],
       eta: etaClock ? resolveBerlinClock(etaClock, now, { future: true }).toISOString() : null,
       end: end ? end.toISOString() : null,
     }
@@ -3246,4 +3271,44 @@ export function timedCards(html, { archive = false } = {}) {
     }
   }
   return out
+}
+
+/**
+ * The whole retroactive pass as ONE transaction over the board, the archive
+ * page and the LATEST record (cross-vendor review): the caller runs it inside
+ * the board edit lock, so a promotion recorded meanwhile is merged, never
+ * overwritten, and both pages are written before anything is published.
+ * `traceOf(points)` supplies the branch/session traces.
+ */
+export function backfillTransaction({ html, archiveHtml = null, store = {}, traceOf = () => ({}), now = new Date() } = {}) {
+  const cards = [...timedCards(html), ...(archiveHtml == null ? [] : timedCards(archiveHtml, { archive: true }))]
+  const points = [...new Set(cards.map((c) => c.point))]
+  const result = backfillCardTimes({ store, cards, traces: traceOf(points), now })
+  const board = applyCardTimes(html, result.store, { now })
+  const archive = archiveHtml == null ? null : applyCardTimes(archiveHtml, result.store, { now, archive: true })
+  return {
+    html: board.html,
+    archiveHtml: archive?.html ?? null,
+    store: result.store,
+    cards: cards.length,
+    points: points.length,
+    added: result.added,
+    untraceable: [...new Set(result.untraceable)],
+    rendered: board.rendered + (archive?.rendered ?? 0),
+  }
+}
+
+/**
+ * A re-estimated header WITHOUT a record: the start field, its separator and
+ * the session suffix stay; a dated start gets a dated end in the same notation
+ * (cross-vendor review), an undated one the bare "~HH:MM" it always had.
+ */
+function legacyTimeLine(meta, start, wanted, now = new Date()) {
+  const sep = String(meta).includes('–') ? CARD_SPAN_SEPARATOR : ' · '
+  const suffix = (String(meta).match(new RegExp(`\\s*·\\s*\\d+\\s+${SESSIONS_WORD}\\s*$`)) ?? [''])[0]
+  const dated = start.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2})?\s/)
+  const end = dated
+    ? bandStamp(resolveBerlinClock(wanted, now, { future: true }), dated[3] ? 'year' : 'date', { projected: true })
+    : `~${wanted}`
+  return `${start}${sep}${end}${suffix}`
 }

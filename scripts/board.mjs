@@ -90,13 +90,11 @@ import {
   toNow,
   toQueue,
   mergeDoneDuplicates,
-  applyCardTimes,
-  backfillCardTimes,
+  backfillTransaction,
   queueEstimateHours,
   recordPromotion,
   resolveBerlinClock,
   spanOf,
-  timedCards,
   timesEndClock,
 } from './board-core.mjs'
 import { runBoardEdit } from './board-edit-core.mjs'
@@ -171,7 +169,7 @@ function branchTraces(points) {
   return traces
 }
 
-/** Distinct sessions the activity log names per point — the session trace of old cards. */
+/** Distinct session ids the activity log names per point — the session trace of old cards. */
 function sessionTraces(points) {
   const want = new Set(points.map(String))
   const seen = {}
@@ -185,7 +183,7 @@ function sessionTraces(points) {
     const m = line.match(/"session":"([^"]+)","point":(\d+)/)
     if (m && want.has(m[2])) (seen[m[2]] ??= new Set()).add(m[1])
   }
-  return Object.fromEntries(Object.entries(seen).map(([p, s]) => [p, s.size]))
+  return Object.fromEntries(Object.entries(seen).map(([p, s]) => [p, [...s]]))
 }
 
 /** Record a promotion of `point` and return the span its header renders. */
@@ -653,31 +651,51 @@ try {
     // the archive included — gets one from its traces; untraceable ones keep their value.
     const dryRun = rest.includes('--dry-run')
     const now = new Date()
-    const boardCards = timedCards(readFileSync(BOARD, 'utf8'))
-    const archiveCards = existsSync(ARCHIVE) ? timedCards(readFileSync(ARCHIVE, 'utf8'), { archive: true }) : []
-    const cards = [...boardCards, ...archiveCards]
-    const points = [...new Set(cards.map((c) => c.point))]
-    const traces = branchTraces(points)
-    const sessions = sessionTraces(points)
-    for (const [point, t] of Object.entries(traces)) t.sessions = sessions[point] ?? 1
-    const result = backfillCardTimes({ store: readCardTimes(), cards, traces, now })
-    console.log(
-      `board: ${cards.length} card(s) of ${points.length} point(s); records added for ${result.added.length} point(s); ` +
-        `${new Set(result.untraceable).size} point(s) untraceable, their cards keep their value` +
-        (dryRun ? ' (dry run, nothing written)' : ''),
-    )
-    if (!dryRun) {
-      edit((html) => {
-        stageCardTimes(result.store)
-        return applyCardTimes(html, result.store, { now }).html
-      }, 'card times rendered from the record')
-      if (existsSync(ARCHIVE)) {
-        withBoardEditLock(() => {
-          const page = applyCardTimes(readFileSync(ARCHIVE, 'utf8'), result.store, { now, archive: true })
-          writeTextAtomic(ARCHIVE, page.html)
-          console.log(`board: ${page.rendered} archive card(s) rendered from the record`)
-        })
+    const traceOf = (points) => {
+      const traces = branchTraces(points)
+      const sessions = sessionTraces(points)
+      for (const [point, t] of Object.entries(traces)) {
+        t.sessionIds = sessions[point] ?? []
+        t.sessions = Math.max(1, t.sessionIds.length)
       }
+      return traces
+    }
+    // Board, archive and the LATEST record are read inside the edit lock and
+    // written before the publish (cross-vendor review): a promotion recorded
+    // meanwhile is merged, never overwritten.
+    let tx = null
+    const run_ = (html) => {
+      tx = backfillTransaction({
+        html,
+        archiveHtml: existsSync(ARCHIVE) ? readFileSync(ARCHIVE, 'utf8') : null,
+        store: readCardTimes(),
+        traceOf,
+        now,
+      })
+      return tx
+    }
+    const report = () =>
+      console.log(
+        `board: ${tx.cards} card(s) of ${tx.points} point(s); records added for ${tx.added.length} point(s); ` +
+          `${tx.untraceable.length} point(s) untraceable, their cards keep their value; ` +
+          `${tx.rendered} card(s) rendered from the record` +
+          (dryRun ? ' (dry run, nothing written)' : ''),
+      )
+    if (dryRun) {
+      run_(readFileSync(BOARD, 'utf8'))
+      report()
+    } else {
+      editPrepared(
+        (html) => {
+          stageCardTimes(run_(html).store)
+          return tx.html
+        },
+        'card times rendered from the record',
+        () => {
+          if (tx?.archiveHtml != null) writeTextAtomic(ARCHIVE, tx.archiveHtml)
+        },
+      )
+      if (tx) report()
     }
   } else if (cmd === 'focus') {
     const [point, ...words] = rest

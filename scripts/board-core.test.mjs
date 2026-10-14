@@ -88,6 +88,7 @@ import {
 import {
   applyCardTimes,
   backfillCardTimes,
+  backfillTransaction,
   cardSpanBand,
   cardTimeLine,
   formatCardSpan,
@@ -2531,6 +2532,23 @@ describe('card times', () => {
       expect(second.sessions).toBe(2)
       expect(recordPromotion(second, { now: at('2026-10-03T13:00:00Z'), session: '' }).sessions).toBe(3)
     })
+
+    it('counts distinct sessions: A, then B, then A again is two', () => {
+      const a = recordPromotion(undefined, { now: at('2026-10-03T07:12:00Z'), session: 'A' })
+      const b = recordPromotion(a, { now: at('2026-10-03T08:00:00Z'), session: 'B' })
+      const back = recordPromotion(b, { now: at('2026-10-03T09:00:00Z'), session: 'A' })
+      expect(back.sessions).toBe(2)
+      expect(back.sessionIds).toEqual(['A', 'B'])
+    })
+
+    it('does not count again a session the retroactive trace already named', () => {
+      const traces = { 5: { firstCommit: '2026-10-03T07:00:00Z', sessionIds: ['A', 'B'], sessions: 2 } }
+      const cards = [{ point: '5', meta: '09:00 · ~11:00', finished: false }]
+      const entry = backfillCardTimes({ cards, traces, now: at('2026-10-03T08:00:00Z') }).store.points['5']
+      expect(entry.sessions).toBe(2)
+      expect(recordPromotion(entry, { now: at('2026-10-03T09:00:00Z'), session: 'B' }).sessions).toBe(2)
+      expect(recordPromotion(entry, { now: at('2026-10-03T09:00:00Z'), session: 'C' }).sessions).toBe(3)
+    })
   })
 
   describe('handover keeps the original start', () => {
@@ -2587,9 +2605,40 @@ describe('card times', () => {
 
     it('keeps the legacy readers working on the new notation', () => {
       const html = fullBoard({ now: nowEntry(1303, 'Kartenzeiten', '03.10. 09:12 – 05.10. ~11:12 · 2 Sitzungen') })
-      expect(queueCard(toQueue(html, 1303), 1303)).toContain('~2 h')
-      expect(() => setCardTimes(html, 1303, '15:00')).not.toThrow()
+      // The full dated duration, 03.10. 09:12 → 05.10. 11:12, not the clock difference.
+      expect(queueCard(toQueue(html, 1303), 1303)).toContain('<span class="meta">~50 h</span>')
       expect(doneStart('<span class="meta">09:12 – 14:30</span>')).toBe('09:12')
+    })
+
+    it('re-estimates a dated card without a record, keeping start, date notation and sessions', () => {
+      const html = fullBoard({ now: nowEntry(1303, 'Kartenzeiten', '03.10. 09:12 – 05.10. ~11:12 · 2 Sitzungen') })
+      const out = setCardTimes(html, 1303, '15:00', { now: at('2026-10-05T10:00:00Z') })
+      expect(nowCard(out, 1303)).toContain('<span class="meta">03.10. 09:12 – 05.10. ~15:00 · 2 Sitzungen</span>')
+      const year = fullBoard({ now: nowEntry(1303, 'K', '03.10.25 09:12 – 05.10.26 ~11:12') })
+      expect(nowCard(setCardTimes(year, 1303, '15:00', { now: at('2026-10-05T10:00:00Z') }), 1303)).toContain(
+        '<span class="meta">03.10.25 09:12 – 05.10.26 ~15:00</span>',
+      )
+    })
+
+    it('reads a dated span over a year boundary as its full duration', () => {
+      const html = fullBoard({ now: nowEntry(1303, 'K', '31.12. 22:00 – 02.01. ~00:00') })
+      expect(queueCard(toQueue(html, 1303), 1303)).toContain('<span class="meta">~26 h</span>')
+    })
+
+    it('keeps a dated original start when duplicate Erledigt cards are merged', () => {
+      const card = (meta, text) =>
+        `<details>\n  <summary><span class="num">700</span><span class="t">Punkt</span>` +
+        `<span class="right"><span class="meta">${meta}</span></span></summary>\n  <div class="body">\n    <p>${text}</p>\n  </div>\n</details>\n`
+      expect(doneStart(card('03.10. 09:12 – 05.10. 14:30', 'x'))).toBe('03.10. 09:12')
+      expect(doneStart(card('03.10.25 09:12 – 05.10.26 14:30', 'x'))).toBe('03.10.25 09:12')
+      expect(doneStart(card('33.10. 09:12 – 05.10. 14:30', 'x'))).toBe('')
+      const html = fullBoard({
+        now: nowEntry(900, 'Anderes', '08:00'),
+        done: card('06.10. 10:00 – 08.10. 12:00', 'neu') + card('03.10. 09:12 – 05.10. 14:30', 'alt'),
+      })
+      const merged = mergeDoneDuplicates(html)
+      expect(merged.merged).toEqual(['700'])
+      expect(doneCard(merged.html, 700)).toContain('<span class="meta">03.10. 09:12 – 08.10. 12:00</span>')
     })
   })
 
@@ -2631,11 +2680,43 @@ describe('card times', () => {
       expect(doneCard(rendered.html, 11)).toContain('<span class="meta">10:00 · 11:00</span>')
     })
 
-    it('leaves a recorded card alone and renders archive pages too', () => {
-      const store = { v: 1, points: { 11: { start: '2026-10-01T08:00:00Z', end: '2026-10-03T09:00:00Z', sessions: 1 } } }
-      expect(backfillCardTimes({ store, cards: timedCards(html()), traces: {} }).added).toEqual([])
+    it('leaves a recorded card alone even when a conflicting trace exists, and renders archive pages too', () => {
+      const record = { start: '2026-10-01T08:00:00Z', end: '2026-10-03T09:00:00Z', sessions: 1 }
+      const store = { v: 1, points: { 11: { ...record } } }
+      const traces = { 11: { firstCommit: '2026-09-20T08:00:00Z', lastCommit: '2026-09-21T08:00:00Z', sessions: 4 } }
+      const result = backfillCardTimes({ store, cards: timedCards(html()), traces })
+      expect(result.added).toEqual([])
+      expect(result.store.points['11']).toEqual(record)
       const page = applyCardTimes(done(11, '10:00 · 11:00'), store, { archive: true })
       expect(page.html).toContain('<span class="meta">01.10. 10:00 – 03.10. 11:00</span>')
+    })
+
+    it('reads the end clock of a done card that carries a session suffix', () => {
+      const traces = { 12: { firstCommit: '2026-10-03T07:00:00Z', lastCommit: '2026-10-03T09:05:00Z', sessions: 2 } }
+      const cards = [{ point: '12', meta: '09:00 – 11:00 · 2 Sitzungen', finished: true }]
+      const entry = backfillCardTimes({ cards, traces }).store.points['12']
+      expect(entry.end).toBe('2026-10-03T09:00:00.000Z')
+    })
+
+    it('runs as one transaction that merges a promotion recorded meanwhile and renders both pages', () => {
+      const now = at('2026-10-15T08:00:00Z')
+      // The LATEST record holds a promotion of 1302 made after the pass gathered
+      // its points; its trace says otherwise and must not win.
+      const latest = { v: 1, points: { 1302: { start: '2026-10-14T06:00:00.000Z', sessions: 3, sessionIds: [], eta: null, end: '2026-10-14T22:49:00.000Z' } } }
+      const traceOf = (points) => {
+        expect(points).toEqual(['1302', '11', '40'])
+        return {
+          1302: { firstCommit: '2026-10-14T18:05:00Z', lastCommit: '2026-10-14T22:48:00Z', sessions: 1 },
+          40: { firstCommit: '2026-10-02T08:00:00Z', lastCommit: '2026-10-04T09:30:00Z', sessions: 1 },
+        }
+      }
+      const tx = backfillTransaction({ html: html(), archiveHtml: done(40, '10:00 · 11:30'), store: latest, traceOf, now })
+      expect(tx.store.points['1302']).toEqual(latest.points['1302'])
+      expect(tx.added).toEqual(['40'])
+      expect(tx.untraceable).toEqual(['11'])
+      expect(doneCard(tx.html, 1302)).toContain('<span class="meta">08:00 – 00:49 · 3 Sitzungen</span>')
+      expect(tx.archiveHtml).toContain('<span class="meta">02.10. 10:00 – 04.10. 11:30</span>')
+      expect(tx.rendered).toBe(2)
     })
   })
 })
