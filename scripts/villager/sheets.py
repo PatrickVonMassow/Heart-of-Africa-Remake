@@ -111,6 +111,10 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
             for k, (sex, age, outfit) in enumerate(outfits(garments)):
                 clip_sheet(out, body, clips, name, frames=8, view=35, spacing=1.0, sex=sex, age=age,
                            fname=f'dress-{name}-{k}.png', garments=garments, outfit=outfit, cfg=cfg)
+    if clips and (not want or 'gait' in want):
+        # per gait clip its support intervals, contact fraction and knee bend
+        from gaitplots import gait_plots
+        gait_plots(out, body, clips)
     if clips:
         for name in clips['clips']:
             if not want or name in want or 'clips' in want:
