@@ -2681,6 +2681,20 @@ export const VILLAGER_ASSET = {
    *  figure's hand). Shared by the game's tool (PlaceLife.tsx) and the clips
    *  the pipeline solves the hands onto. */
   shovel: { top: 0.16, shaftBottom: -0.5, tip: -0.76, shaftRadius: 0.022, bladeWidth: 0.2, bladeThickness: 0.02 },
+  /** The authored dig (natural-villager-motion step 7; scripts/villager/
+   *  toolclips.py dig_clip). The extra trunk lean the hands may ask for to
+   *  reach the shaft is capped at `leanExtraMax` (rad; unbounded it folded
+   *  the trunk 0.46–0.74 rad past its keyed lean onto the hands); what they
+   *  need beyond it the hips give by sinking `dropPerExtra` figure units per
+   *  rad, the knees bending out — their poles `kneeOut` (rad) off straight
+   *  ahead. `grip`: where each hand holds the shaft (tool frame, figure
+   *  units; the right hand lower, the tool's carry hand) — measured: with the
+   *  keyed upper-hand path a lower right hand (−0.06 … −0.12) leaves it short
+   *  of the shaft and flips the left elbow, so the hands stay 0.16 apart until
+   *  the keys are re-authored. `headOnBlade`: the
+   *  share of the head's turn toward the blade. Calibratable, read off the
+   *  dig sheets. */
+  dig: { leanExtraMax: 0.4, dropPerExtra: 0.5, kneeOut: 0.35, grip: { R: -0.03, L: 0.13 }, headOnBlade: 0.6 },
   /** The hands' shapes (natural-villager-motion step 3; scripts/villager/body.py
    *  hand_shape): per finger the curl (rad) at each of its three joints,
    *  knuckle first, and the thumb's fold across the palm. `grip` closes round
