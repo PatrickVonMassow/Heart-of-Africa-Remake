@@ -34046,3 +34046,12 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: scripts/chat-watcher-core.test.mjs green (session id in args and env, deferral default and override); CI green on the branch head.
   Criticality: medium - the user's only live channel to the batch.
   Bundle: Dorfleben.
+
+- [x] 1357. Launcher takeover from a live owner crashes on a missing start reservation
+  Queue position: at the very front of the queue, ahead of point 1302 (user order 14.10.2026: "Lege für den Befund … einen Punkt an, an der Queue-Spitze.").
+  Problem: when the launcher takes the batch from a LIVE owner (ownerKeepsBatch past-absolute-deadline, handover.take) scripts/batch-autostart.mjs sets writerRecovered=true, but startDecision is still the refusal 'owner-live' from successorStartDecision and carries no .reservation. The atomic acquire then reads startDecision.reservation.requestedFence (batch-autostart.mjs:1796) and throws a TypeError. Measured 14.10.2026: 239 crashes in the launcher log; the defect stands since d4c8e3d00 (24.08.2026).
+  Final state:
+  1. The reservation build (spawnToken, sourceGeneration, sourceSpawnToken, wakeToken, trigger, requestedFence, requestedAt) moves out of successorStartDecision in scripts/batch-autostart-core.mjs into an exported pure function startReservation; successorStartDecision uses it.
+  2. The takeover branch attaches startReservation(...) to startDecision. When its requestedFence is null the tick aborts with a log line instead of crashing.
+  Tests: a core test for startReservation in batch-autostart-core.test.mjs; a source test in batch-autostart.test.mjs that the takeover branch attaches the reservation.
+  Bundle: Session- & Repo-Hygiene.
