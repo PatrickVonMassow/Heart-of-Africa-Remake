@@ -2394,6 +2394,21 @@ describe('card description and status are separate sections', () => {
     expect(described).toContain('<p>Alter Stand.</p>')
   })
 
+  it('a description-only carry-over keeps the standing status markup byte for byte', () => {
+    const promoted = toNow(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }), 701, 'Begonnen.', { stamp: '10:00' })
+    const status = '<p>Waiting.</p><ul><li>Required prerequisite</li></ul>'
+    const standing =
+      '<details>\n  <summary><span class="num">701</span><span class="t">Nächster Punkt</span>' +
+      '<span class="right"><span class="meta">~2 h</span></span></summary>\n  <div class="body">\n' +
+      `    <p class="desc-missing">Beschreibung fehlt</p>\n    <hr class="split">\n    <p class="status-head">Stand der Umsetzung</p>\n    ${status}` +
+      '\n  </div>\n</details>\n'
+    const drifted = promoted.replace('<summary><h2>Warteschlange</h2></summary>', (m) => `${m}\n${standing}`)
+    const card = queueCard(toQueue(drifted, 701), 701)
+    expect(descriptionOf(card)).toBe('Warum das ansteht.')
+    expect(card).toContain(status)
+    expect(card).toContain('~2 h')
+  })
+
   it('the migration leaves a queue card whose body is more than paragraphs untouched (review finding 2)', () => {
     const listCard = queueEntry(704, 'Liste', '~1 h').replace('<p>Warum das ansteht.</p>', '<p>Scope.</p><ul><li>eins</li></ul>')
     const source = fullBoard({ queue: listCard })

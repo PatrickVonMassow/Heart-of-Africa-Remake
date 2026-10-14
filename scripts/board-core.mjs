@@ -1424,7 +1424,10 @@ export function toQueue(html, point, { text, estimate } = {}) {
   const updateStanding = (doc) => {
     // A standing card without a description takes the now-card's along.
     const carried = card && !queueDescription(standing) ? descriptionOf(card) : ''
-    if (!text?.trim() && estimate == null && !carried) return doc
+    if (!text?.trim() && estimate == null) {
+      // Description-only carry-over: the status markup stays byte for byte.
+      return carried ? doc.replace(standing, () => withCardDescription(standing, carried)) : doc
+    }
     const body = text?.trim() || statusOf(standing)
     if (!body) throw new Error('board: refusing to queue a card with an empty body')
     const meta = estimate ?? (metaOf(standing).trim() || QUEUE_STUB_META)
