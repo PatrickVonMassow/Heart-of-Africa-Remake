@@ -77,8 +77,17 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1357. Launcher takeover from a live owner crashes on a missing start reservation
+  Queue position: at the very front of the queue, ahead of point 1302 (user order 14.10.2026: "Lege für den Befund … einen Punkt an, an der Queue-Spitze.").
+  Problem: when the launcher takes the batch from a LIVE owner (ownerKeepsBatch past-absolute-deadline, handover.take) scripts/batch-autostart.mjs sets writerRecovered=true, but startDecision is still the refusal 'owner-live' from successorStartDecision and carries no .reservation. The atomic acquire then reads startDecision.reservation.requestedFence (batch-autostart.mjs:1796) and throws a TypeError. Measured 14.10.2026: 239 crashes in the launcher log; the defect stands since d4c8e3d00 (24.08.2026).
+  Final state:
+  1. The reservation build (spawnToken, sourceGeneration, sourceSpawnToken, wakeToken, trigger, requestedFence, requestedAt) moves out of successorStartDecision in scripts/batch-autostart-core.mjs into an exported pure function startReservation; successorStartDecision uses it.
+  2. The takeover branch attaches startReservation(...) to startDecision. When its requestedFence is null the tick aborts with a log line instead of crashing.
+  Tests: a core test for startReservation in batch-autostart-core.test.mjs; a source test in batch-autostart.test.mjs that the takeover branch attaches the reservation.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1302. Board cards: separate description section from implementation status
-  Queue position: at the very front of the queue (user order 14.10.2026: "Ziehe 1302 ganz nach vorne in der Queue."); still ahead of point 1303.
+  Queue position: directly after point 1357, which stands at the very front (user order 14.10.2026: "Ziehe 1302 ganz nach vorne in der Queue."; 1357 placed ahead of it by user order 14.10.2026); still ahead of point 1303.
   Why: a card has one body field (board-core.mjs promoteToNow -> renderCardBody(status)); every status update overwrites the description, so texts like "Punkt erledigt, Abschlussarbeiten stehen noch aus" leave the user unable to see what the point is about.
   User (05.10.2026): "Der Beschreibungstext von Karten auf dem Dashboard wird aktuell als Status-Angabe missbraucht. [...] Mit so einem Text kann ich nicht erkennen, was im Rahmen des Tickets überhaupt gemacht wird." / "Wie wäre es, den beim Aufklappen einer Karte angezeigten Text in zwei Sektionen aufzuteilen: Einen Bereich, der die Beschreibung enthält. Dieser sollte im Normalfall bereits vor dem Ziehen der Karte geschrieben werden. Während der Bearbeitung wird er nur geändert, wenn sich wider erwarten etwas an den Anforderungen ändert. Einen weiteren, optisch (z. B. durch eine Trennlinie) abgegrenzten Bereich mit dem aktuellen Status der Umsetzung. Dieser soll immer aktuell gehalten werden."
   Final state: an expanded dashboard card (now/queue/done) shows two sections.
