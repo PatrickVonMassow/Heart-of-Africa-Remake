@@ -156,7 +156,7 @@ function branchTraces(points) {
   const toIso = (d) => new Date(d).toISOString()
   for (const line of git(['log', '--merges', '--first-parent', '--format=%H%x09%cI%x09%s', 'main']).split('\n')) {
     const [sha, at, subject] = line.split('\t')
-    const point = (String(subject ?? '').match(/Merge branch '(?:origin\/)?feat\/(\d+)-/) ?? [])[1]
+    const point = (String(subject ?? '').match(/Merge (?:remote-tracking )?(?:branch )?'?(?:origin\/)?feat\/(\d+)-/) ?? [])[1]
     if (!point || !want.has(point)) continue
     const dates = git(['log', '--format=%aI', `${sha}^1..${sha}^2`]).split('\n').filter(Boolean).map(toIso).sort()
     if (dates.length) add(point, dates[0], toIso(at))
