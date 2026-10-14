@@ -15872,3 +15872,10 @@ to land than a mechanism that needs a review.
   Verifiable: Vitest reproducing an answer-session start that leaves the lock with the batch session.
   Also (findings carrier 07.10.2026 23:20): session 9696d681 released its claim to 06667ad0 via the hand-back bound while .claude/batch-lock.json was absent, so heldByOtherLiveOwner() read false and dashboard-guard (focus reconcile) and retro-currency-guard kept blocking the released session's Stop, demanding batch mutations its hand-back forbids; and a session that took the batch only to edit the work order re-acquired the lock through its heartbeat after `batch-singleton.mjs release`, so it could not hand back without a ticked point or the context watermark. Stand-down honours a claim this session released, and a manual release stays released.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1358. CI guard: a red run charged to a parked point reports instead of blocking
+  Queue position: end of the bundle (owner finding 15.10.2026, real batch blockade under CLAUDE.md §2 finding intake).
+  Problem: ci-status-guard refuses every Stop of the batch session for any recently pushed red ref. On 15.10.2026 run 38591097319 on feat/1342-natural-motion-b (ac8a558) failed deterministically. Under the 14.10. decision that red is the parked point's own unfinished state, and it is charged in TASKS.md under point 1342. A green re-run is impossible, and a fix means doing the parked point. So every turn end of an unrelated point burns context answering the same refusal until the 24 h push window lapses.
+  Final state: a red ref whose owning open point records the charge (its TASKS.md entry names the run id) is reported once per session and does not block; an uncharged red still blocks as today. No new ledger: the TASKS.md note is the evidence.
+  Verifiable: ci-status-guard-core unit tests: a charged red run on a feature ref yields a report without a block; an uncharged one still blocks; main is never exempt.
+  Bundle: Session- & Repo-Hygiene.
