@@ -1749,7 +1749,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 14.10.2026, 08:57 · Quellen-Fingerprint: `0615315543a4…`
+Zuletzt aktualisiert: Mittwoch, 14.10.2026, 09:40 · Quellen-Fingerprint: `bf191b20dded…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1824,7 +1824,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | How to read Patrick's two usage dashboards (they count in OPPOSITE directions); the OpenAI-first emergency ended 17.08.2026 and the normal split of CLAUDE.md §6 applies | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
-| Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
+| Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 2 | mittel | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
@@ -1866,8 +1866,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 107 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 9 Revert-/Reapply-Commits · 153 Prozess-/Meta-TASKS-Punkte (davon 69 offen).
 
-<!-- RETRO-FINGERPRINT: 0615315543a4e2cb1e642aba890eec296829cd33421e3f7f0aa233c2868d14bc -->
-<!-- RETRO-LAST-REFRESHED: 2026-10-14T06:57:06.414Z -->
+<!-- RETRO-FINGERPRINT: bf191b20dded7cc32b023bd6fd9718e8edf71e14bd44e36320918f2f773e0796 -->
+<!-- RETRO-LAST-REFRESHED: 2026-10-14T07:40:04.560Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
