@@ -470,13 +470,16 @@ try {
     const [point, ...words] = rest
     if (!point || words.length === 0) throw new Error('usage: board.mjs describe <point> "<text>"|--text-stdin')
     const text = textOf(words)
-    const board = readFileSync(BOARD, 'utf8')
-    edit((html) => setCardDescription(html, point, text), `description of ${point} rewritten`)
-    // A queue card is a projection of the data file: the description lives there too.
-    if (describedSection(board, point) === 'queue') {
-      const dataFile = resolve(REPO_ROOT, QUEUE_DATA_PATH)
-      writeTextAtomic(dataFile, `${JSON.stringify(setQueueEntry(readJson(dataFile), point, { body: text }), null, 2)}\n`)
-    }
+    edit((html) => {
+      const out = setCardDescription(html, point, text)
+      // A queue card is a projection of the data file: the description lives
+      // there too, written inside the same locked transaction, before publish.
+      if (describedSection(html, point) === 'queue') {
+        const dataFile = resolve(REPO_ROOT, QUEUE_DATA_PATH)
+        writeTextAtomic(dataFile, `${JSON.stringify(setQueueEntry(readJson(dataFile), point, { body: text }), null, 2)}\n`)
+      }
+      return out
+    }, `description of ${point} rewritten`)
   } else if (cmd === 'migrate-descriptions') {
     // ONE-TIME (user 05.10.2026 / 14.10.2026): split every card into description
     // and status. Idempotent — an already split card is left alone.
@@ -487,11 +490,12 @@ try {
       return r.html
     }, 'cards split into description and status')
     if (report) {
-      const { counts, missing } = report
+      const { counts, missing, skipped } = report
       console.log(
         `board: split now ${counts.now}, queue ${counts.queue}, done ${counts.done} card(s); ` +
           `"${DESCRIPTION_MISSING_TEXT}" stays on now [${missing.now.join(', ')}], done [${missing.done.join(', ')}] ` +
-          `(${missing.now.length + missing.done.length} card(s)); queue stubs without prose: ${missing.queue.length}`,
+          `(${missing.now.length + missing.done.length} card(s)); queue stubs without prose: ${missing.queue.length}; ` +
+          `queue cards left unsplit (body is not plain paragraphs): [${skipped.join(', ')}]`,
       )
     }
   } else if (cmd === 'merge-done') {
