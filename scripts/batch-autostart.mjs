@@ -93,6 +93,7 @@ import {
   staleEtaLogLine,
   launcherStartRecord,
   successorStartDecision,
+  startReservation,
   supervisorRestartDecision,
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
@@ -1486,6 +1487,15 @@ if (!startDecision.start) {
         'shape that stood the batch still for 107 minutes on 03.09.2026. A successor is being started.',
       'high',
     )
+    // The refused decision carries no reservation; the takeover needs one for
+    // the atomic acquire below.
+    const reservation = startReservation({ trigger, spawnToken, lock, fenceState, now })
+    if (reservation.requestedFence === null) {
+      log('skip: takeover refused — the ownership fence has no safe successor generation; NOT spawning')
+      writeJsonAtomic(C('autostart-state.json'), state)
+      process.exit(0)
+    }
+    startDecision = { ...startDecision, reservation }
     delete state.wedgeVerdictKey
     delete state.wedgeVerdictRepeats
     delete state.writerVetoSince
