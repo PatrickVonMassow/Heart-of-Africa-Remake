@@ -2247,6 +2247,7 @@ describe('startReservation', () => {
 
   it('is the reservation a start decision returns', () => {
     const d = successorStartDecision({ trigger: { kind: 'watchdog' }, spawnToken: 't', now: 42 })
-    if (d.start) expect(d.reservation).toEqual(startReservation({ trigger: { kind: 'watchdog' }, spawnToken: 't', now: 42 }))
+    expect(d.start).toBe(true)
+    expect(d.reservation).toEqual(startReservation({ trigger: { kind: 'watchdog' }, spawnToken: 't', now: 42 }))
   })
 })
