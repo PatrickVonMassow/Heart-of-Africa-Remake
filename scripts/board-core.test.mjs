@@ -90,6 +90,8 @@ import {
   backfillCardTimes,
   backfillTransaction,
   cardSpanBand,
+  runCardTimesBackfill,
+  spanHours,
   cardTimeLine,
   formatCardSpan,
   recordPromotion,
@@ -2620,9 +2622,31 @@ describe('card times', () => {
       )
     })
 
+    it('places a yearless dated span by context: leap years and an exact calendar year', () => {
+      const leap = at('2028-03-02T08:00:00Z')
+      expect(spanHours('28.02. 09:00 – 01.03. ~09:00', { now: leap })).toBe(48)
+      expect(spanHours('28.02. 09:00 – 01.03. ~09:00', { now: at('2027-03-02T08:00:00Z') })).toBe(24)
+      // Same date and time in the DD.MM. notation is exactly one year (the band rule).
+      expect(spanHours('05.10. 09:00 – 05.10. ~09:00', { now: at('2026-10-05T08:00:00Z') })).toBe(8760)
+      // A start date later in the year than now lies in the previous year.
+      expect(spanHours('28.12. 09:00 – 02.01. ~09:00', { now: at('2027-01-02T08:00:00Z') })).toBe(120)
+      // DD.MM.YY names its years: a full year, and a leap year's full year.
+      expect(spanHours('05.10.25 09:00 – 05.10.26 ~09:00')).toBe(8760)
+      expect(spanHours('05.10.27 09:00 – 05.10.28 ~09:00')).toBe(8784)
+      const html = fullBoard({ now: nowEntry(1303, 'K', '05.10. 09:00 – 05.10. ~09:00') })
+      expect(queueCard(toQueue(html, 1303, { now: at('2026-10-05T08:00:00Z') }), 1303)).toContain('<span class="meta">~8760 h</span>')
+    })
+
+    it('takes the queue estimate from the record when there is one', () => {
+      const recorded = { start: '2028-02-28T08:00:00Z', eta: '2028-03-01T08:00:00Z', end: null }
+      expect(spanHours('28.02. 09:00 – 01.03. ~09:00', { now: at('2027-01-01T00:00:00Z'), recorded })).toBe(48)
+      const html = fullBoard({ now: nowEntry(1303, 'K', '09:00 – ~09:00') })
+      expect(queueCard(toQueue(html, 1303, { recorded }), 1303)).toContain('<span class="meta">~48 h</span>')
+    })
+
     it('reads a dated span over a year boundary as its full duration', () => {
       const html = fullBoard({ now: nowEntry(1303, 'K', '31.12. 22:00 – 02.01. ~00:00') })
-      expect(queueCard(toQueue(html, 1303), 1303)).toContain('<span class="meta">~26 h</span>')
+      expect(queueCard(toQueue(html, 1303, { now: at('2027-01-02T08:00:00Z') }), 1303)).toContain('<span class="meta">~26 h</span>')
     })
 
     it('keeps a dated original start when duplicate Erledigt cards are merged', () => {
@@ -2717,6 +2741,62 @@ describe('card times', () => {
       expect(doneCard(tx.html, 1302)).toContain('<span class="meta">08:00 – 00:49 · 3 Sitzungen</span>')
       expect(tx.archiveHtml).toContain('<span class="meta">02.10. 10:00 – 04.10. 11:30</span>')
       expect(tx.rendered).toBe(2)
+    })
+
+    it('keeps a promotion recorded between the start of the pass and the lock', () => {
+      const now = at('2026-10-15T08:00:00Z')
+      // The persisted record and the pages, as the files hold them.
+      let persisted = { v: 1, points: {} }
+      let board = html()
+      let archive = done(40, '10:00 · 11:30')
+      const promoted = { start: '2026-10-14T06:00:00.000Z', sessions: 2, sessionIds: ['A', 'B'], eta: null, end: '2026-10-14T22:49:00.000Z' }
+      const order = []
+      const tx = runCardTimesBackfill({
+        now,
+        readBoard: () => board,
+        readArchive: () => archive,
+        readStore: () => structuredClone(persisted),
+        traceOf: () => ({
+          1302: { firstCommit: '2026-10-14T18:05:00Z', lastCommit: '2026-10-14T22:48:00Z', sessions: 1 },
+          40: { firstCommit: '2026-10-02T08:00:00Z', lastCommit: '2026-10-04T09:30:00Z', sessions: 1 },
+        }),
+        editBoard: (transform, afterWrite) => {
+          // Another session records its promotion while this one waits for the lock.
+          persisted = { v: 1, points: { ...persisted.points, 1302: promoted } }
+          order.push('lock')
+          const out = transform(board)
+          board = out.html
+          persisted = out.store
+          order.push('write')
+          afterWrite()
+          order.push('publish')
+        },
+        writeArchive: (page) => {
+          order.push('archive')
+          archive = page
+        },
+      })
+      expect(persisted.points['1302']).toEqual(promoted)
+      expect(persisted.points['40']).toMatchObject({ start: '2026-10-02T08:00:00.000Z' })
+      expect(tx.added).toEqual(['40'])
+      expect(doneCard(board, 1302)).toContain('<span class="meta">08:00 – 00:49 · 2 Sitzungen</span>')
+      expect(archive).toContain('<span class="meta">02.10. 10:00 – 04.10. 11:30</span>')
+      expect(order).toEqual(['lock', 'write', 'archive', 'publish'])
+    })
+
+    it('writes nothing on a dry run', () => {
+      let wrote = false
+      const tx = runCardTimesBackfill({
+        dryRun: true,
+        readBoard: () => html(),
+        readStore: () => ({ v: 1, points: {} }),
+        traceOf: () => ({}),
+        editBoard: () => {
+          wrote = true
+        },
+      })
+      expect(wrote).toBe(false)
+      expect(tx.untraceable).toEqual(['1302', '11'])
     })
   })
 })

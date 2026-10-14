@@ -90,7 +90,7 @@ import {
   toNow,
   toQueue,
   mergeDoneDuplicates,
-  backfillTransaction,
+  runCardTimesBackfill,
   queueEstimateHours,
   recordPromotion,
   resolveBerlinClock,
@@ -435,7 +435,7 @@ try {
     const [point, ...words] = rest
     if (!point) throw new Error('usage: board.mjs queue <point> ["<text>"|--text-stdin]')
     editPrepared(
-      (html) => toQueue(html, point, { text: textOf(words) }),
+      (html) => toQueue(html, point, { text: textOf(words), recorded: readCardTimes().points[String(point)] ?? null }),
       `${point} returned to the queue`,
       prepareActiveTransition({ exitPoint: Number(point), note: `point ${point}: returned to queue` }),
     )
@@ -660,42 +660,32 @@ try {
       }
       return traces
     }
-    // Board, archive and the LATEST record are read inside the edit lock and
-    // written before the publish (cross-vendor review): a promotion recorded
-    // meanwhile is merged, never overwritten.
-    let tx = null
-    const run_ = (html) => {
-      tx = backfillTransaction({
-        html,
-        archiveHtml: existsSync(ARCHIVE) ? readFileSync(ARCHIVE, 'utf8') : null,
-        store: readCardTimes(),
-        traceOf,
-        now,
-      })
-      return tx
-    }
-    const report = () =>
+    const tx = runCardTimesBackfill({
+      dryRun,
+      now,
+      readBoard: () => readFileSync(BOARD, 'utf8'),
+      readArchive: () => (existsSync(ARCHIVE) ? readFileSync(ARCHIVE, 'utf8') : null),
+      readStore: readCardTimes,
+      traceOf,
+      editBoard: (transform, afterWrite) =>
+        editPrepared(
+          (html) => {
+            const out = transform(html)
+            stageCardTimes(out.store)
+            return out.html
+          },
+          'card times rendered from the record',
+          afterWrite,
+        ),
+      writeArchive: (html) => writeTextAtomic(ARCHIVE, html),
+    })
+    if (tx) {
       console.log(
         `board: ${tx.cards} card(s) of ${tx.points} point(s); records added for ${tx.added.length} point(s); ` +
           `${tx.untraceable.length} point(s) untraceable, their cards keep their value; ` +
           `${tx.rendered} card(s) rendered from the record` +
           (dryRun ? ' (dry run, nothing written)' : ''),
       )
-    if (dryRun) {
-      run_(readFileSync(BOARD, 'utf8'))
-      report()
-    } else {
-      editPrepared(
-        (html) => {
-          stageCardTimes(run_(html).store)
-          return tx.html
-        },
-        'card times rendered from the record',
-        () => {
-          if (tx?.archiveHtml != null) writeTextAtomic(ARCHIVE, tx.archiveHtml)
-        },
-      )
-      if (tx) report()
     }
   } else if (cmd === 'focus') {
     const [point, ...words] = rest

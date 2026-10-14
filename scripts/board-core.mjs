@@ -1343,20 +1343,28 @@ export function addHours(stamp, hours) {
 }
 
 /** The difference between the two stamps of a now-card header, in hours. */
-function spanHours(times) {
+export function spanHours(times, { now = new Date(), recorded = null } = {}) {
+  // THE RECORD FIRST (second cross-vendor round): its timestamps are exact,
+  // where a header without a year can only be placed by context.
+  if (recorded?.start && (recorded.end || recorded.eta)) {
+    return (new Date(recorded.end ?? recorded.eta) - new Date(recorded.start)) / 3600000
+  }
   const stamp = '(?:(\\d{1,2})\\.(\\d{1,2})\\.(\\d{2})?\\s+)?~?\\s*(\\d{1,2}):(\\d{2})'
   const m = String(times ?? '').match(new RegExp(`${stamp}\\s*[·–]\\s*~?\\s*${stamp}`))
   if (!m) return null
   const [, d1, mo1, y1, h1, mi1, d2, mo2, y2, h2, mi2] = m
   // DATED on both sides (a span over 24 h): the full duration, not the clock
-  // difference modulo a day (cross-vendor review). The year is only written
-  // past one year; otherwise the end lies in the start's year or the next.
+  // difference modulo a day (cross-vendor review). "DD.MM.YY" names its years;
+  // a "DD.MM." span is placed by context — its start is the latest such date
+  // not after `now` — and spans more than 24 h up to exactly one year, so an
+  // end that does not lie after the start lies a year later.
   if (d1 && d2) {
-    const startYear = y1 ? 2000 + Number(y1) : 2001
     const at = (year, d, mo, h, mi) => Date.UTC(year, Number(mo) - 1, Number(d), Number(h), Number(mi))
+    let startYear = y1 ? 2000 + Number(y1) : Number(berlinParts(new Date(now)).year) + 2000
+    if (!y1 && at(startYear, d1, mo1, h1, mi1) > new Date(now).getTime() + DAY_MS) startYear -= 1
     const from = at(startYear, d1, mo1, h1, mi1)
     let to = at(y2 ? 2000 + Number(y2) : startYear, d2, mo2, h2, mi2)
-    if (!y2 && to < from) to = at(startYear + 1, d2, mo2, h2, mi2)
+    if (!y2 && to <= from) to = at(startYear + 1, d2, mo2, h2, mi2)
     return (to - from) / 3600000
   }
   const from = Number(h1) * 60 + Number(mi1)
@@ -1413,7 +1421,7 @@ export function toNow(html, point, status, { stamp = berlinStamp(), description 
  * card has a start time and no end, so `spanHours` is null on the way back —
  * and it turned the whole unit layer red over a board move that looked routine.
  */
-export function toQueue(html, point, { text, estimate } = {}) {
+export function toQueue(html, point, { text, estimate, recorded = null, now = new Date() } = {}) {
   const card = nowCard(html, point)
   // Both sections travel: the description stays, the status is the text given
   // or the card's own.
@@ -1469,7 +1477,7 @@ export function toQueue(html, point, { text, estimate } = {}) {
   if (standing) return updateStanding(html.replace(card, ''))
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to queue a card with an empty body')
-  const hours = spanHours(metaOf(card))
+  const hours = spanHours(metaOf(card), { now, recorded })
   const meta = estimate ?? (hours == null ? QUEUE_STUB_META : hoursLabel(hours))
   const entry = renderEntry(stripPointPrefix(titleOf(card), point), meta, body, descriptionOf(card))
   const out = html.replace(card, '')
@@ -3311,4 +3319,40 @@ function legacyTimeLine(meta, start, wanted, now = new Date()) {
     ? bandStamp(resolveBerlinClock(wanted, now, { future: true }), dated[3] ? 'year' : 'date', { projected: true })
     : `~${wanted}`
   return `${start}${sep}${end}${suffix}`
+}
+
+/**
+ * The `backfill-times` command as one orchestration with its I/O injected, so
+ * the lost-update race is testable (second cross-vendor round). Outside the
+ * lock only the dry run reads anything; the real pass reads board, archive and
+ * the record INSIDE `editBoard`, whose transform returns `{ html, store }` and
+ * whose `afterWrite` writes the archive before the publish.
+ */
+export function runCardTimesBackfill({
+  dryRun = false,
+  now = new Date(),
+  readBoard,
+  readArchive = () => null,
+  readStore,
+  traceOf,
+  editBoard,
+  writeArchive = () => {},
+} = {}) {
+  let tx = null
+  const pass = (html) =>
+    (tx = backfillTransaction({ html, archiveHtml: readArchive(), store: readStore(), traceOf, now }))
+  if (dryRun) {
+    pass(readBoard())
+    return tx
+  }
+  editBoard(
+    (html) => {
+      pass(html)
+      return { html: tx.html, store: tx.store }
+    },
+    () => {
+      if (tx?.archiveHtml != null) writeArchive(tx.archiveHtml)
+    },
+  )
+  return tx
 }
