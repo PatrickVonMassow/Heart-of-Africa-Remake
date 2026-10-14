@@ -1422,7 +1422,9 @@ export function toQueue(html, point, { text, estimate } = {}) {
   // meta, and what was not given keeps the standing card's own value. The
   // bare handover call (`queue <n>`) leaves it untouched.
   const updateStanding = (doc) => {
-    if (!text?.trim() && estimate == null) return doc
+    // A standing card without a description takes the now-card's along.
+    const carried = card && !queueDescription(standing) ? descriptionOf(card) : ''
+    if (!text?.trim() && estimate == null && !carried) return doc
     const body = text?.trim() || statusOf(standing)
     if (!body) throw new Error('board: refusing to queue a card with an empty body')
     const meta = estimate ?? (metaOf(standing).trim() || QUEUE_STUB_META)
@@ -2719,7 +2721,10 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   // ONLY THE STATUS IS REPLACED: the description is read back from the card and
   // written unchanged (byte-identical; only `describe` changes it).
   const rewritten = section.replace(re, (whole, head, tail) => {
-    const kept = [...whole.matchAll(/\n[ \t]*<p class="desc(?:-missing)?">[\s\S]*?<\/p>/g)].map((m) => m[0]).join('')
+    // Cut at the divider ELEMENT, whatever the line breaks around it.
+    const inner = whole.slice(head.length, whole.length - tail.length)
+    const at = inner.indexOf('<hr class="split">')
+    const kept = at < 0 ? '' : inner.slice(0, at).trimEnd()
     return kept
       ? `${head}${kept}\n${renderStatusSection({ status: text, stamp })}\n  ${tail}`
       : `${head}\n${renderCardSections({ status: text, stamp })}\n  ${tail}`
@@ -2743,10 +2748,8 @@ const CARD_BODY_RE = /(<div class="body">)([\s\S]*?)(\s*<\/div>\s*<\/details>)/
 function withCardDescription(card, description, { status = null } = {}) {
   return String(card).replace(CARD_BODY_RE, (_m, open, inner, close) => {
     const desc = renderDescriptionSection(description)
-    if (hasCardSections(card)) {
-      const hr = inner.lastIndexOf('\n', inner.indexOf('<hr class="split">'))
-      return `${open}\n${desc}${inner.slice(hr)}${close}`
-    }
+    const at = inner.indexOf('<hr class="split">')
+    if (at >= 0) return `${open}\n${desc}\n    ${inner.slice(at)}${close}`
     const rest = status == null
       ? [`    <hr class="split">`, `    <p class="status-head">${STATUS_SECTION_TITLE}</p>`, ...(inner.trim() ? [`    ${inner.trim()}`] : [])].join('\n')
       : renderStatusSection({ status })
@@ -2833,6 +2836,7 @@ export function setCardDescription(html, point, text) {
 export function migrateCardDescriptions(html, tasksText) {
   const counts = { now: 0, queue: 0, done: 0 }
   const missing = { now: [], queue: [], done: [] }
+  const skipped = []
   let out = String(html ?? '')
   for (const key of ['now', 'queue', 'done']) {
     out = editSectionCards(out, key, (card) => {
@@ -2840,6 +2844,14 @@ export function migrateCardDescriptions(html, tasksText) {
       if (key === 'now' && card.state && card.state !== 'stub') return null
       counts[key]++
       if (key === 'queue') {
+        // Only a body of plain paragraphs is prose this can carry; anything
+        // else (a list, a table) stays untouched and is reported.
+        const inner = (card.html.match(CARD_BODY_RE) ?? [])[2] ?? ''
+        if (inner.replace(/<p>[\s\S]*?<\/p>/g, '').trim()) {
+          counts.queue--
+          skipped.push(card.point)
+          return null
+        }
         const prose = queueDescription(card.html)
         if (!prose) missing.queue.push(card.point)
         // The generated stub stays what the queue rebuild renders for "no prose yet".
@@ -2850,7 +2862,7 @@ export function migrateCardDescriptions(html, tasksText) {
       return withCardDescription(card.html, description)
     })
   }
-  return { html: out, counts, missing }
+  return { html: out, counts, missing, skipped }
 }
 
 /**

@@ -2378,6 +2378,43 @@ describe('card description and status are separate sections', () => {
     expect(pointDescription(TASKS, 999)).toBe('')
   })
 
+  it('status and describe cut at the divider element even on an inline body (review finding 1)', () => {
+    const inline = fullBoard({
+      now:
+        '<details class="now">\n  <summary><span class="num">701</span><span class="t">X</span>' +
+        '<span class="right"><span class="meta">10:00</span></span></summary>\n' +
+        '  <div class="body"><p class="desc">Inline-Beschreibung.</p><hr class="split"><p class="status-head">Stand der Umsetzung</p><p>Alter Stand.</p></div>\n</details>\n',
+    })
+    const updated = nowCard(setCardStatus(inline, 701, 'Neuer Stand.', '11:00'), 701)
+    expect(descriptionOf(updated)).toBe('Inline-Beschreibung.')
+    expect(updated).toContain('Neuer Stand.')
+    expect(updated).not.toContain('Alter Stand.')
+    const described = nowCard(setCardDescription(inline, 701, 'Neu.'), 701)
+    expect(descriptionOf(described)).toBe('Neu.')
+    expect(described).toContain('<p>Alter Stand.</p>')
+  })
+
+  it('the migration leaves a queue card whose body is more than paragraphs untouched (review finding 2)', () => {
+    const listCard = queueEntry(704, 'Liste', '~1 h').replace('<p>Warum das ansteht.</p>', '<p>Scope.</p><ul><li>eins</li></ul>')
+    const source = fullBoard({ queue: listCard })
+    const r = migrateCardDescriptions(source, '')
+    expect(r.html).toBe(source)
+    expect(r.skipped).toEqual(['704'])
+    expect(r.counts.queue).toBe(0)
+  })
+
+  it('an argument-free move to the queue carries the description onto a standing card that lacks one (review finding 3)', () => {
+    const promoted = toNow(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }), 701, 'Begonnen.', { stamp: '10:00' })
+    const standing =
+      '<details>\n  <summary><span class="num">701</span><span class="t">Nächster Punkt</span>' +
+      '<span class="right"><span class="meta">~2 h</span></span></summary>\n  <div class="body">\n' +
+      renderCardSections({ status: 'Noch nicht begonnen.' }) + '\n  </div>\n</details>\n'
+    const drifted = promoted.replace('<summary><h2>Warteschlange</h2></summary>', (m) => `${m}\n${standing}`)
+    const out = toQueue(drifted, 701)
+    expect(nowCard(out, 701)).toBeNull()
+    expect(descriptionOf(queueCard(out, 701))).toBe('Warum das ansteht.')
+  })
+
   it('the one-time migration keeps each body as the status and derives the description', () => {
     const legacyDone =
       '<details>\n  <summary><span class="num">702</span><span class="t">Alt</span>' +
