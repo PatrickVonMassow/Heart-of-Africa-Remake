@@ -18,6 +18,9 @@
 //   node scripts/board.mjs eta    <point> "<HH:MM>"    # a now-card's expected end
 //   node scripts/board.mjs promote <point> "<times>" "<title>" "<status>"
 //                                                     # write a now-card directly
+//   node scripts/board.mjs describe <point> "<text>"  # rewrite a card's description
+//                                                     # (only when the requirement changes)
+//   node scripts/board.mjs migrate-descriptions       # one-time description/status split
 //   node scripts/board.mjs merge-done                 # fold duplicate Erledigt cards
 //   node scripts/board.mjs vdzk-add "<title>" "<question>"
 //                                                     # ask the user a decision
@@ -66,6 +69,10 @@ import {
   isDecisionRecordTitle,
   berlinStamp,
   closeCard,
+  DESCRIPTION_MISSING_TEXT,
+  migrateCardDescriptions,
+  describedSection,
+  setCardDescription,
   parseClosingArgs,
   parseDoneArgs,
   pointSubject,
@@ -302,7 +309,7 @@ try {
     // start time and no expected end, which is the invisibility point 439 ends.
     const noEstimate = promotionEstimateWarning(readFileSync(BOARD, 'utf8'), point)
     editPrepared(
-      (html) => toNow(html, point, textOf(words), { stamp: at }),
+      (html) => toNow(html, point, textOf(words), { stamp: at, tasksText: readTasksAll() }),
       `${point} is current work since ${at} (title and estimate taken from its queue card)`,
       prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: current work` }),
     )
@@ -337,6 +344,7 @@ try {
           // A bare `--none` must reach the "needs a reason" refusal, not the
           // one for a forgotten successor: the caller DID choose this way out.
           none: hasNone ? textOf(noneWords) || ' ' : '',
+          tasksText: readTasksAll(),
         }),
       next != null
         ? `${point} archived as done at ${at}; ${next} is current work in the same edit`
@@ -452,10 +460,44 @@ try {
       throw new Error('usage: board.mjs promote <point> "<times>" "<title>" "<status>"|--text-stdin')
     }
     editPrepared(
-      (html) => promoteToNow(html, point, { title, times, status: textOf(words) }),
+      (html) => promoteToNow(html, point, { title, times, status: textOf(words), tasksText: readTasksAll() }),
       `${point} promoted to current work`,
       prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: promoted to current work` }),
     )
+  } else if (cmd === 'describe') {
+    // THE ONLY WRITER OF A CARD'S DESCRIPTION once the card exists (user
+    // 05.10.2026): used when the requirement itself changes, never for progress.
+    const [point, ...words] = rest
+    if (!point || words.length === 0) throw new Error('usage: board.mjs describe <point> "<text>"|--text-stdin')
+    const text = textOf(words)
+    edit((html) => {
+      const out = setCardDescription(html, point, text)
+      // A queue card is a projection of the data file: the description lives
+      // there too, written inside the same locked transaction, before publish.
+      if (describedSection(html, point) === 'queue') {
+        const dataFile = resolve(REPO_ROOT, QUEUE_DATA_PATH)
+        writeTextAtomic(dataFile, `${JSON.stringify(setQueueEntry(readJson(dataFile), point, { body: text }), null, 2)}\n`)
+      }
+      return out
+    }, `description of ${point} rewritten`)
+  } else if (cmd === 'migrate-descriptions') {
+    // ONE-TIME (user 05.10.2026 / 14.10.2026): split every card into description
+    // and status. Idempotent — an already split card is left alone.
+    let report = null
+    edit((html) => {
+      const r = migrateCardDescriptions(html, readTasksAll())
+      report = r
+      return r.html
+    }, 'cards split into description and status')
+    if (report) {
+      const { counts, missing, skipped } = report
+      console.log(
+        `board: split now ${counts.now}, queue ${counts.queue}, done ${counts.done} card(s); ` +
+          `"${DESCRIPTION_MISSING_TEXT}" stays on now [${missing.now.join(', ')}], done [${missing.done.join(', ')}] ` +
+          `(${missing.now.length + missing.done.length} card(s)); queue stubs without prose: ${missing.queue.length}; ` +
+          `queue cards left unsplit (body is not plain paragraphs): [${skipped.join(', ')}]`,
+      )
+    }
   } else if (cmd === 'merge-done') {
     // One point, one Erledigt card. `done` folds them at write time; this is for
     // a board that already carries duplicates (point 700 stood there four times).
