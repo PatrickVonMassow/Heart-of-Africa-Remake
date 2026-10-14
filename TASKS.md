@@ -77,19 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1302. Board cards: separate description section from implementation status
-  Queue position: directly after point 1357, which stands at the very front (user order 14.10.2026: "Ziehe 1302 ganz nach vorne in der Queue."; 1357 placed ahead of it by user order 14.10.2026); still ahead of point 1303.
-  Why: a card has one body field (board-core.mjs promoteToNow -> renderCardBody(status)); every status update overwrites the description, so texts like "Punkt erledigt, Abschlussarbeiten stehen noch aus" leave the user unable to see what the point is about.
-  User (05.10.2026): "Der Beschreibungstext von Karten auf dem Dashboard wird aktuell als Status-Angabe missbraucht. [...] Mit so einem Text kann ich nicht erkennen, was im Rahmen des Tickets überhaupt gemacht wird." / "Wie wäre es, den beim Aufklappen einer Karte angezeigten Text in zwei Sektionen aufzuteilen: Einen Bereich, der die Beschreibung enthält. Dieser sollte im Normalfall bereits vor dem Ziehen der Karte geschrieben werden. Während der Bearbeitung wird er nur geändert, wenn sich wider erwarten etwas an den Anforderungen ändert. Einen weiteren, optisch (z. B. durch eine Trennlinie) abgegrenzten Bereich mit dem aktuellen Status der Umsetzung. Dieser soll immer aktuell gehalten werden."
-  Final state: an expanded dashboard card (now/queue/done) shows two sections.
-  1. Description (top): 1-3 sentences on what the point delivers. Set when the card is created (promote/queue add), sourced from the point's TASKS.md text when not given. A status update can NOT touch it; only an explicit board.mjs command (e.g. `describe <point> --text-stdin`) changes it, used only when the requirement actually changes.
-  2. A visible divider (e.g. <hr> or bordered block), then "Stand der Umsetzung" with the "Stand <stamp>" lead. Every progress update replaces only this section.
-  A card without a description renders a visible "Beschreibung fehlt" placeholder instead of failing. No new guard (infrastructure freeze): the separation lives in the card format and in board-core.mjs (renderCardBody / promoteToNow / status-update paths) alone.
-  One-time migration: each existing card's current body becomes its status; its description is filled from the point's TASKS.md text.
-  Tests: node tests in board-core.test.mjs proving a status update leaves the description byte-identical and that both sections render with the divider.
-  Scope addition (user, 14.10.2026): "Soweit mit überschaubarem Aufwand nachvollziehbar sollen die Änderungen vom Ticket auch für alle bereits erledigten Karten nachgezogen werden." The one-time migration also backfills the cards already in the done column: for a done card the description comes from the point's text in docs/tasks-archive.md (scripts/tasks-source.mjs), its current body becomes its "Stand der Umsetzung" section. A done card whose point cannot be resolved gets the "Beschreibung fehlt" placeholder; the closing note states how many, rather than reconstructing them by hand.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1303. Board cards keep the original start time and show dates for long spans
   Queue position: directly after point 1302, which stands at the very queue front (user order 14.10.2026: "Reihe das 1303 nach 1302 ein.").
   Why: the card's times are a free string each session passes to `board.mjs promote <point> "<times>"` (board-core.mjs promoteToNow). A successor session writes its own takeover time, so a point worked for many hours shows e.g. "14:00 – 14:30". And a span over 24 h is indistinguishable from a short one without a date.
