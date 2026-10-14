@@ -844,4 +844,14 @@ describe('the launcher keys its skip on progress (union entry U4)', () => {
     expect(source).toMatch(/min ago is still inside its backoff/)
     expect(source).not.toMatch(/min ago is still claiming the lock/)
   })
+
+  it('attaches a start reservation when it takes the batch from a live owner', () => {
+    // The takeover runs on the refused 'owner-live' decision, which carries no
+    // reservation; the atomic acquire reads startDecision.reservation.requestedFence.
+    const take = source.slice(source.indexOf('if (!writerRecovered && handover.take)'))
+    const branch = take.slice(0, take.indexOf('writerRecovered = true'))
+    expect(branch).toMatch(/startReservation\(\{ trigger, spawnToken, lock, fenceState, now \}\)/)
+    expect(branch).toMatch(/reservation\.requestedFence === null/)
+    expect(branch).toMatch(/startDecision = \{ \.\.\.startDecision, reservation \}/)
+  })
 })
