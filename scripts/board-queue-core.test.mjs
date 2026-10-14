@@ -350,6 +350,18 @@ describe('renderQueueCard — the markup the guard parsers read, and no injectio
     expect(html.match(/<p class="desc">/g)).toHaveLength(1)
   })
 
+  it('imports no description from a split card that only shows the placeholder (review finding 4)', () => {
+    const card =
+      '<details>\n  <summary><span class="num">9</span><span class="t">Neun</span><span class="right"><span class="meta">~1 h</span></span></summary>\n' +
+      '  <div class="body">\n    <p class="desc-missing">Beschreibung fehlt</p>\n    <hr class="split">\n' +
+      '    <p class="status-head">Stand der Umsetzung</p>\n    <p>Noch nicht begonnen.</p>\n  </div>\n</details>\n'
+    const board = `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n${card}</details>\n<details class="sect">`
+    const imported = importQueueFromHtml(board).points[9]
+    expect(imported.body).toBeNull()
+    // Round trip: rendering the import back shows the stub, not the status as prose.
+    expect(renderQueueCard({ point: 9, title: imported.title, body: imported.body, meta: '~1 h' })).not.toMatch(/<p class="desc">[^<]*Stand der Umsetzung/)
+  })
+
   it('shows the description, the divider and a not-started status, and imports the description alone', () => {
     const html = renderQueueCard({ point: 9, title: 'Neun', body: ['Was der Punkt liefert.'], meta: '~1 h' })
     expect(html).toMatch(/<p class="desc">Was der Punkt liefert\.<\/p>\n\s*<hr class="split">\n\s*<p class="status-head">Stand der Umsetzung<\/p>\n\s*<p>Noch nicht begonnen\.<\/p>/)

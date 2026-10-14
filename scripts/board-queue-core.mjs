@@ -640,11 +640,13 @@ export function importQueueFromHtml(html) {
     const title = (summary.match(/class="t">([\s\S]*?)<\/span>/) ?? [])[1] ?? ''
     const metaRaw = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? ''
     const bodyHtml = (chunk.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? ''
-    // A split card stores its DESCRIPTION alone; the status is not queue prose.
-    const paraRe = bodyHtml.includes('<hr class="split">') ? /<p class="desc">([\s\S]*?)<\/p>/gi : /<p\b[^>]*>([\s\S]*?)<\/p>/gi
+    // A split card stores its DESCRIPTION alone; the status and the
+    // placeholder are not queue prose, so no description paragraph means none.
+    const split = bodyHtml.includes('<hr class="split">')
+    const paraRe = split ? /<p class="desc">([\s\S]*?)<\/p>/gi : /<p\b[^>]*>([\s\S]*?)<\/p>/gi
     const paras = [...bodyHtml.matchAll(paraRe)].map((m) => cardText(m[1])).filter(Boolean)
-    // A card with no <p> at all (a hand-written board) still yields its text.
-    const body = paras.length ? paras : [cardText(bodyHtml)].filter(Boolean)
+    // A legacy card with no <p> at all (a hand-written board) still yields its text.
+    const body = paras.length || split ? paras : [cardText(bodyHtml)].filter(Boolean)
     // THE CARD SEQUENCE IS NOT IMPORTED (point 608): the board's order is a
     // rendering of the work order, so reading it back would only re-create the
     // second home this point removed.
