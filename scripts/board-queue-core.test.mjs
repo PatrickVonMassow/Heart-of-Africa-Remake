@@ -335,19 +335,26 @@ describe('renderQueueCard — the markup the guard parsers read, and no injectio
   // The hand-kept board carried two or three paragraphs per card; the projection
   // that replaced it could emit only one, which turns a restored body into the
   // long unbroken paragraph the conciseness guard rejects.
-  it('renders one <p> per paragraph, and still accepts a bare string', () => {
+  it('renders one description <p> per paragraph, and still accepts a bare string', () => {
     const many = renderQueueCard({ point: 9, title: 'Neun', body: ['Erster.', 'Zweiter.'], meta: '~1 h' })
-    expect(many.match(/<p>/g)).toHaveLength(2)
-    expect(many).toContain('<p>Erster.</p>')
-    expect(many).toContain('<p>Zweiter.</p>')
+    expect(many.match(/<p class="desc">/g)).toHaveLength(2)
+    expect(many).toContain('<p class="desc">Erster.</p>')
+    expect(many).toContain('<p class="desc">Zweiter.</p>')
 
     const one = renderQueueCard({ point: 9, title: 'Neun', body: 'Nur einer.', meta: '~1 h' })
-    expect(one.match(/<p>/g)).toHaveLength(1)
+    expect(one.match(/<p class="desc">/g)).toHaveLength(1)
   })
 
   it('drops empty paragraphs rather than rendering a blank one', () => {
     const html = renderQueueCard({ point: 9, title: 'Neun', body: ['Da.', '   ', ''], meta: '~1 h' })
-    expect(html.match(/<p>/g)).toHaveLength(1)
+    expect(html.match(/<p class="desc">/g)).toHaveLength(1)
+  })
+
+  it('shows the description, the divider and a not-started status, and imports the description alone', () => {
+    const html = renderQueueCard({ point: 9, title: 'Neun', body: ['Was der Punkt liefert.'], meta: '~1 h' })
+    expect(html).toMatch(/<p class="desc">Was der Punkt liefert\.<\/p>\n\s*<hr class="split">\n\s*<p class="status-head">Stand der Umsetzung<\/p>\n\s*<p>Noch nicht begonnen\.<\/p>/)
+    const board = `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n${html}</details>\n<details class="sect">`
+    expect(importQueueFromHtml(board).points[9].body).toEqual(['Was der Punkt liefert.'])
   })
 })
 

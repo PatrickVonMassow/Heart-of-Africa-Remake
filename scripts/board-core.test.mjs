@@ -76,6 +76,15 @@ import {
   projectNowForPublish,
   renderCardCriticalities,
 } from './board-core.mjs'
+import {
+  DESCRIPTION_MISSING_TEXT,
+  doneCard,
+  descriptionOf,
+  migrateCardDescriptions,
+  pointDescription,
+  renderCardSections,
+  setCardDescription,
+} from './board-core.mjs'
 
 // A minimal document WITH the section heading: since the sixth cross-review
 // there is no fragment fallback — a writer on a document without the
@@ -99,7 +108,7 @@ describe('setCardStatus', () => {
   it('leaves the card structure the guard reads intact', () => {
     const out = setCardStatus(board(), 361, 'X', '09:00')
     expect(out).toMatch(/<details class="now">\s*<summary>/)
-    expect(out).toMatch(/<div class="body">\s*<p>/)
+    expect(out).toMatch(/<div class="body">\s*<p class="desc-missing">Beschreibung fehlt<\/p>\s*<hr class="split">\s*<p class="status-head">/)
     // The card plus its section wrapper — exactly what the fixture carries.
     expect(out.match(/<\/details>/g)).toHaveLength(2)
   })
@@ -898,7 +907,7 @@ describe('derived now-section membership', () => {
   // User 05.10.2026: a stub titled only "Text für diesen Punkt fehlt noch"
   // hid for hours what was being worked on, although the queue card the
   // projection removed had named the point.
-  it('names a new stub from its queue card and carries the queue prose into its body', () => {
+  it('names a new stub from its queue card and carries the queue prose into its description', () => {
     const before = fullBoard({ queue: queueEntry(1295, 'Laufende Dorfbewohner', '~3 h') })
     const out = reconcileNowProjection(before, [1295], {
       focusPoint: 1295,
@@ -908,7 +917,7 @@ describe('derived now-section membership', () => {
     })
     expect(out).toContain('<span class="num">1295</span><span class="t">Laufende Dorfbewohner</span>')
     expect(out).toContain('data-state="stub"')
-    expect(out).toContain('Aus der Warteschlange übernommen: Warum das ansteht.')
+    expect(out).toContain('<p class="desc">Warum das ansteht.</p>')
     expect(out).not.toContain('Text für diesen Punkt fehlt noch')
     expect(out).not.toContain('Anderer')
     expect(parseQueuePoints(out)).toEqual(new Set())
@@ -932,7 +941,7 @@ describe('derived now-section membership', () => {
     }
     const out = reconcileNowProjection(fullBoard(), [700, 697], { focusPoint: 700, stamp: '11:00', queueData })
     expect(out).toContain('<span class="num">700</span><span class="t">Titel aus der Datei</span>')
-    expect(out).toContain('Aus der Warteschlange übernommen: Erster Absatz.')
+    expect(out).toContain('<p class="desc">Erster Absatz.</p>')
     expect(out).toContain('Zweiter &lt;Absatz&gt;.')
     expect(out).toContain('<span class="num">697</span><span class="t">Nur ein Text, der als Titel dient.</span>')
     expect(out).not.toContain('Text für diesen Punkt fehlt noch')
@@ -1568,7 +1577,10 @@ describe('point 700 — the handover state cannot block the handover', () => {
     expect(card700).toContain('Zurückgestellt: Übergabe an den Nachfolger.')
     expect(card700).toContain('~3 h')
     expect(card700).not.toContain('~5 h')
-    expect(card700).not.toContain('Warum das ansteht.')
+    // The standing card's prose is its DESCRIPTION, which an update keeps;
+    // the text replaces its status.
+    expect(card700).toContain('<p class="desc">Warum das ansteht.</p>')
+    expect(card700.split('<hr class="split">')[1]).not.toContain('Warum das ansteht.')
     expect(queueCard(updated, 701)).toContain('Warum das ansteht.')
     // A partial update keeps the standing card's OTHER half.
     const textOnly = queueCard(toQueue(drifted, 700, { text: 'Nur neuer Text.' }), 700)
@@ -2279,5 +2291,116 @@ describe('doneStart / earliestStart', () => {
     expect(earliestStart([meta('01:04 · 01:10'), meta('99:99 · 00:44')])).toBe('01:04')
     expect(earliestStart([])).toBe('')
     expect(earliestStart()).toBe('')
+  })
+})
+
+// User 05.10.2026: the card text was a status that hid what the point is about.
+describe('card description and status are separate sections', () => {
+  const TASKS = [
+    '- [ ] 701. Nächster Punkt headline',
+    '  Why: something broke.',
+    '  Final state: the card shows two sections. It never loses the description. See point 700 for the rest.',
+    '- [x] 702. Archived headline that says what it delivered.',
+    '  Bundle: Hygiene.',
+    '',
+  ].join('\n')
+  const statusSection = (card) => card.slice(card.indexOf('<hr class="split">'))
+  const descSection = (card) => card.slice(card.indexOf('<div class="body">'), card.indexOf('<hr class="split">'))
+
+  it('renders the description, a visible divider, then the stamped status', () => {
+    const body = renderCardSections({ description: 'Was der Punkt liefert.', status: 'Erster Schritt.', stamp: '09:00' })
+    expect(body).toBe(
+      '    <p class="desc">Was der Punkt liefert.</p>\n' +
+        '    <hr class="split">\n' +
+        '    <p class="status-head">Stand der Umsetzung</p>\n' +
+        '    <p><span class="stamp">Stand 09:00</span> Erster Schritt.</p>',
+    )
+  })
+
+  it('renders the visible placeholder when the description is missing', () => {
+    expect(renderCardSections({ status: 'X' })).toContain(`<p class="desc-missing">${DESCRIPTION_MISSING_TEXT}</p>`)
+  })
+
+  it('promote takes the queue prose as the description and the given text as the status', () => {
+    const out = toNow(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }), 701, 'Begonnen.', { stamp: '10:00' })
+    const card = nowCard(out, 701)
+    expect(descSection(card)).toContain('<p class="desc">Warum das ansteht.</p>')
+    expect(statusSection(card)).toContain('<span class="stamp">Stand 10:00</span> Begonnen.')
+    expect(statusSection(card)).not.toContain('Warum das ansteht.')
+  })
+
+  it('promote of a stub queue card derives the description from the work-order text', () => {
+    const stub = queueEntry(701, 'Nächster Punkt', '~2 h').replace('Warum das ansteht.', QUEUE_STUB_BODY.replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+    const out = toNow(fullBoard({ queue: stub }), 701, 'Begonnen.', { stamp: '10:00', tasksText: TASKS })
+    expect(descriptionOf(nowCard(out, 701))).toBe('The card shows two sections. It never loses the description.')
+  })
+
+  it('a status update leaves the description byte-identical', () => {
+    const promoted = toNow(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }), 701, 'Begonnen.', { stamp: '10:00' })
+    const updated = setCardStatus(promoted, 701, 'Zweiter Stand.\n\nMit Absatz.', '11:00')
+    const before = nowCard(promoted, 701)
+    const after = nowCard(updated, 701)
+    expect(descSection(after)).toBe(descSection(before))
+    expect(statusSection(after)).toContain('<span class="stamp">Stand 11:00</span> Zweiter Stand.')
+    expect(statusSection(after)).toContain('<p>Mit Absatz.</p>')
+    expect(after).not.toContain('Begonnen.')
+    expect(setCardStatus(updated, 701, 'Dritter.', '12:00').split('<hr class="split">')).toHaveLength(2)
+  })
+
+  it('describe changes only the description; the status stays', () => {
+    const promoted = toNow(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }), 701, 'Begonnen.', { stamp: '10:00' })
+    const out = setCardDescription(promoted, 701, 'Neue Anforderung.')
+    expect(descriptionOf(nowCard(out, 701))).toBe('Neue Anforderung.')
+    expect(statusSection(nowCard(out, 701))).toBe(statusSection(nowCard(promoted, 701)))
+    expect(() => setCardDescription(promoted, 701, 'wort '.repeat(61))).toThrow(/1-3 sentences/)
+    expect(() => setCardDescription(promoted, 999, 'X.')).toThrow(/no card/)
+  })
+
+  it('moves to the queue and to Erledigt carry both sections', () => {
+    const promoted = toNow(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }), 701, 'Begonnen.', { stamp: '10:00' })
+    const queued = queueCard(toQueue(promoted, 701), 701)
+    expect(descriptionOf(queued)).toBe('Warum das ansteht.')
+    expect(statusSection(queued)).toContain('Begonnen.')
+    const done = doneCard(toDone(promoted, 701, { end: '12:00' }), 701)
+    expect(descriptionOf(done)).toBe('Warum das ansteht.')
+    expect(statusSection(done)).toContain('Begonnen.')
+  })
+
+  it('status readers read the status section, never the description', () => {
+    const promoted = toNow(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }), 701, 'Begonnen.', { stamp: '10:00' })
+    const done = doneCard(toDone(promoted, 701, { end: '12:00' }), 701)
+    expect(done.match(/Warum das ansteht\./g)).toHaveLength(1)
+  })
+
+  it('a derived description skips sentences naming another point', () => {
+    expect(pointDescription(TASKS, 701)).not.toMatch(/700/)
+    expect(pointDescription(TASKS, 702)).toBe('Archived headline that says what it delivered.')
+    expect(pointDescription(TASKS, 999)).toBe('')
+  })
+
+  it('the one-time migration keeps each body as the status and derives the description', () => {
+    const legacyDone =
+      '<details>\n  <summary><span class="num">702</span><span class="t">Alt</span>' +
+      '<span class="right"><span class="meta">09:00 · 10:00</span></span></summary>\n' +
+      '  <div class="body">\n    <p>Punkt erledigt, Abschlussarbeiten stehen noch aus.</p>\n  </div>\n</details>\n'
+    const unknownDone = legacyDone.replace(/702/g, '703')
+    const source = fullBoard({
+      now: nowEntry(701, 'Nächster Punkt', '10:00 · ~12:00'),
+      queue: queueEntry(704, 'Wartet', '~1 h'),
+      done: legacyDone + unknownDone,
+    })
+    const { html, counts, missing } = migrateCardDescriptions(source, TASKS)
+    expect(counts).toEqual({ now: 1, queue: 1, done: 2 })
+    expect(missing).toEqual({ now: [], queue: [], done: ['703'] })
+    const now = nowCard(html, 701)
+    expect(descriptionOf(now)).toBe('The card shows two sections. It never loses the description.')
+    expect(statusSection(now)).toContain('<p><span class="stamp">Stand 16:20</span> läuft</p>')
+    const done = doneCard(html, 702)
+    expect(descriptionOf(done)).toBe('Archived headline that says what it delivered.')
+    expect(statusSection(done)).toContain('<p>Punkt erledigt, Abschlussarbeiten stehen noch aus.</p>')
+    expect(doneCard(html, 703)).toContain(`<p class="desc-missing">${DESCRIPTION_MISSING_TEXT}</p>`)
+    expect(descriptionOf(queueCard(html, 704))).toBe('Warum das ansteht.')
+    // Idempotent: a second run changes nothing.
+    expect(migrateCardDescriptions(html, TASKS).html).toBe(html)
   })
 })
