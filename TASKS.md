@@ -77,6 +77,19 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1302. Board cards: separate description section from implementation status
+  Queue position: at the very front of the queue (user order 14.10.2026: "Ziehe 1302 ganz nach vorne in der Queue."); still ahead of point 1303.
+  Why: a card has one body field (board-core.mjs promoteToNow -> renderCardBody(status)); every status update overwrites the description, so texts like "Punkt erledigt, Abschlussarbeiten stehen noch aus" leave the user unable to see what the point is about.
+  User (05.10.2026): "Der Beschreibungstext von Karten auf dem Dashboard wird aktuell als Status-Angabe missbraucht. [...] Mit so einem Text kann ich nicht erkennen, was im Rahmen des Tickets überhaupt gemacht wird." / "Wie wäre es, den beim Aufklappen einer Karte angezeigten Text in zwei Sektionen aufzuteilen: Einen Bereich, der die Beschreibung enthält. Dieser sollte im Normalfall bereits vor dem Ziehen der Karte geschrieben werden. Während der Bearbeitung wird er nur geändert, wenn sich wider erwarten etwas an den Anforderungen ändert. Einen weiteren, optisch (z. B. durch eine Trennlinie) abgegrenzten Bereich mit dem aktuellen Status der Umsetzung. Dieser soll immer aktuell gehalten werden."
+  Final state: an expanded dashboard card (now/queue/done) shows two sections.
+  1. Description (top): 1-3 sentences on what the point delivers. Set when the card is created (promote/queue add), sourced from the point's TASKS.md text when not given. A status update can NOT touch it; only an explicit board.mjs command (e.g. `describe <point> --text-stdin`) changes it, used only when the requirement actually changes.
+  2. A visible divider (e.g. <hr> or bordered block), then "Stand der Umsetzung" with the "Stand <stamp>" lead. Every progress update replaces only this section.
+  A card without a description renders a visible "Beschreibung fehlt" placeholder instead of failing. No new guard (infrastructure freeze): the separation lives in the card format and in board-core.mjs (renderCardBody / promoteToNow / status-update paths) alone.
+  One-time migration: each existing card's current body becomes its status; its description is filled from the point's TASKS.md text.
+  Tests: node tests in board-core.test.mjs proving a status update leaves the description byte-identical and that both sections render with the divider.
+  Scope addition (user, 14.10.2026): "Soweit mit überschaubarem Aufwand nachvollziehbar sollen die Änderungen vom Ticket auch für alle bereits erledigten Karten nachgezogen werden." The one-time migration also backfills the cards already in the done column: for a done card the description comes from the point's text in docs/tasks-archive.md (scripts/tasks-source.mjs), its current body becomes its "Stand der Umsetzung" section. A done card whose point cannot be resolved gets the "Beschreibung fehlt" placeholder; the closing note states how many, rather than reconstructing them by hand.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1355. Live measurement: a board chat message sent during a blocking owner call is answered within 3 minutes
   Queue position: directly after point 1352 (it measures that point's merged fixes).
   Source: split from point 1352 (13.10.2026); carries the original live-measurement spec, its attempt history and the user-approved amendment step 3.
@@ -269,18 +282,6 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: medium — visible limb shrinking and ground clipping of every low-preset villager at work.
 
-- [ ] 1302. Board cards: separate description section from implementation status
-  Queue position: directly after point 1295 (landed; this slot follows its split-off 1301), ahead of point 1303 (user order 05.10.2026: "Ja, übernimm beide so. Reihe sie nach 1295 ein.").
-  Why: a card has one body field (board-core.mjs promoteToNow -> renderCardBody(status)); every status update overwrites the description, so texts like "Punkt erledigt, Abschlussarbeiten stehen noch aus" leave the user unable to see what the point is about.
-  User (05.10.2026): "Der Beschreibungstext von Karten auf dem Dashboard wird aktuell als Status-Angabe missbraucht. [...] Mit so einem Text kann ich nicht erkennen, was im Rahmen des Tickets überhaupt gemacht wird." / "Wie wäre es, den beim Aufklappen einer Karte angezeigten Text in zwei Sektionen aufzuteilen: Einen Bereich, der die Beschreibung enthält. Dieser sollte im Normalfall bereits vor dem Ziehen der Karte geschrieben werden. Während der Bearbeitung wird er nur geändert, wenn sich wider erwarten etwas an den Anforderungen ändert. Einen weiteren, optisch (z. B. durch eine Trennlinie) abgegrenzten Bereich mit dem aktuellen Status der Umsetzung. Dieser soll immer aktuell gehalten werden."
-  Final state: an expanded dashboard card (now/queue/done) shows two sections.
-  1. Description (top): 1-3 sentences on what the point delivers. Set when the card is created (promote/queue add), sourced from the point's TASKS.md text when not given. A status update can NOT touch it; only an explicit board.mjs command (e.g. `describe <point> --text-stdin`) changes it, used only when the requirement actually changes.
-  2. A visible divider (e.g. <hr> or bordered block), then "Stand der Umsetzung" with the "Stand <stamp>" lead. Every progress update replaces only this section.
-  A card without a description renders a visible "Beschreibung fehlt" placeholder instead of failing. No new guard (infrastructure freeze): the separation lives in the card format and in board-core.mjs (renderCardBody / promoteToNow / status-update paths) alone.
-  One-time migration: each existing card's current body becomes its status; its description is filled from the point's TASKS.md text.
-  Tests: node tests in board-core.test.mjs proving a status update leaves the description byte-identical and that both sections render with the divider.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1303. Board cards keep the original start time and show dates for long spans
   Queue position: directly after point 1302 (user order 05.10.2026: "Ja, übernimm beide so. Reihe sie nach 1295 ein.").
   Why: the card's times are a free string each session passes to `board.mjs promote <point> "<times>"` (board-core.mjs promoteToNow). A successor session writes its own takeover time, so a point worked for many hours shows e.g. "14:00 – 14:30". And a span over 24 h is indistinguishable from a short one without a date.
@@ -293,6 +294,13 @@ put it is the mistake this line exists to stop.
      - > 24 h: date added, "03.10. 09:12 – 05.10. 14:30"
      - > 1 year: date with two-digit year, "03.10.25 09:12 – 05.10.26 14:30"
   Tests: node tests in board-core.test.mjs for handover keeping the start, the session count, and all three format bands including the exact 24 h / 1 year boundaries.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1356. Bounded waits: owner polling loops on a build log need a timeout and a stall report
+  Queue position: directly after point 1303 (user order 14.10.2026: "Okay, das nach 1303 einreihen").
+  Problem: the batch owner waits on long builds with unbounded shell loops of the form `until grep -q "^exit " $LOG; do sleep 20; done`. Measured 14.10.2026 (point 1342 villager build, owner session d32316f0): the build log was silent from 02:06 to 05:42 while 10 Blender processes ran at 100 % CPU; the owner could not tell a slow run from a hung one, and a genuine hang would have stalled the batch forever with nobody notified. This run turned out slow, not hung (exit 1 at 05:42 with 30 garments over penetration tolerance).
+  Final state: an owner wait on a background build/log has a timeout, and log silence beyond a stall threshold is reported (board/chat) instead of waited out silently; a timeout or stall is diagnosed, not retried blindly. Use an existing mechanism where one fits (infrastructure freeze, CLAUDE.md §2: no new guard or framework; a documented wait helper or rule suffices).
+  Verifiable: a unit test showing a wait on a never-finishing log ends with a stall report within the configured bound.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
