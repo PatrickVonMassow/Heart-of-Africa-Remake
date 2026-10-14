@@ -2405,7 +2405,9 @@ describe('card description and status are separate sections', () => {
     const drifted = promoted.replace('<summary><h2>Warteschlange</h2></summary>', (m) => `${m}\n${standing}`)
     const card = queueCard(toQueue(drifted, 701), 701)
     expect(descriptionOf(card)).toBe('Warum das ansteht.')
-    expect(card).toContain(status)
+    const afterSplit = (html) => html.slice(html.indexOf('<hr class="split">'), html.indexOf('</details>'))
+    expect(afterSplit(card)).toBe(afterSplit(standing))
+    expect(card.split(status)).toHaveLength(2)
     expect(card).toContain('~2 h')
   })
 
