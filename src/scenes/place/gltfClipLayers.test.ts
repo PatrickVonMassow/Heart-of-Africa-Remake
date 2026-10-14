@@ -10,7 +10,8 @@ import { VILLAGER_ASSET, VILLAGER_GLTF } from '../../config/balance'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
 import { shovelOnHungHand } from '../../render/villagerClipPose'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
-import { applyClipLayers, clipLayers, handShapes, placeShovel, stepClipLayers, type ClipLayers } from './gltfClipLayers'
+import { AGE_GROUPS, SEXES } from '../../systems/appearance'
+import { applyClipLayers, clipLayers, gripShaft, handShapes, placeShovel, stepClipLayers, type ClipLayers } from './gltfClipLayers'
 
 let asset: VillagerAsset
 let person: GltfPerson
@@ -196,6 +197,59 @@ describe('the clip layers on the glTF figure', () => {
     const left = f.bones['hand.L'].getWorldPosition(new THREE.Vector3())
     const onLine = new THREE.Line3(a, b).closestPointToPoint(left, true, new THREE.Vector3())
     expect(onLine.distanceTo(left)).toBeLessThan(0.15)
+  })
+})
+
+describe('hands land on the final body (natural-villager-motion step 7)', () => {
+  it('on every person, the whole stroke through: the left fist on the shaft at the upper grip, the arm smooth', () => {
+    const dig = asset.clips.dig
+    const L = ['upperArm.L', 'forearm.L', 'hand.L']
+    for (const sex of SEXES)
+      for (const age of AGE_GROUPS)
+        for (const build of [-1, 0, 1]) {
+          const who = gltfPerson(asset, sex, age, build)
+          const { bones } = createGltfSkeleton(asset, who.rest)
+          const tool = new THREE.Group()
+          bones['hand.R'].add(tool)
+          const c = clipLayers(asset)
+          const pose = (digT: number) => {
+            for (const b of Object.values(bones)) b.quaternion.identity()
+            stepClipLayers(asset, who, c, 0, 0, { x: 0, z: 0, yaw: 0, unit: 1 }, { dig: true, tool: true, digT }, 1 / 60)
+            applyClipLayers(asset, who, bones, c, { speed: 0, weight: 0, kneel: 0 }, [true, true])
+            placeShovel(asset, who, c, tool)
+            bones.hips.updateMatrixWorld(true)
+          }
+          for (let k = 0; k < 120; k++) pose(0)
+          let prev: THREE.Quaternion[] | null = null
+          let prevClip: THREE.Quaternion[] | null = null
+          for (let f = 0; f <= Math.round(dig.duration * 60); f++) {
+            pose(f / 60)
+            const clipQ = L.map((n) => bones[n].getWorldQuaternion(new THREE.Quaternion()))
+            gripShaft(asset, who, bones, c, tool)
+            const q = L.map((n) => bones[n].getWorldQuaternion(new THREE.Quaternion()))
+            const at = `${sex} ${age} ${build} t=${(f / 60).toFixed(2)}`
+            // the fist (the hold's offset in the hung hand) on the shaft's upper grip;
+            // before the solve it missed by up to 0.055 of the stature (measured)
+            const hl = asset.bones.indexOf('hand.L')
+            const fist = asset.toolHold.L.offset.clone().applyQuaternion(who.frame.hang[hl]).multiplyScalar(who.frame.scale).applyMatrix4(bones['hand.L'].matrixWorld)
+            const grip = new THREE.Vector3(0, dig.tool!.other!, 0).applyMatrix4(tool.matrixWorld)
+            expect(fist.distanceTo(grip) / who.p.stature, at).toBeLessThan(0.002)
+            // a correction, not another pose: measured at most 0.34 rad
+            for (let i = 0; i < 3; i++) expect(q[i].angleTo(clipQ[i]), `${L[i]} ${at}`).toBeLessThan(0.45)
+            // no flip between frames: measured 0.124 rad against the clip's own 0.113
+            if (prev && prevClip) for (let i = 0; i < 3; i++) expect(prev[i].angleTo(q[i]), `${L[i]} ${at}`).toBeLessThan(prevClip[i].angleTo(clipQ[i]) + 0.05)
+            prev = q
+            prevClip = clipQ
+          }
+        }
+  })
+
+  it('leaves the arm to the layers below while nothing is dug', () => {
+    const f = figure()
+    for (let k = 0; k < 30; k++) frame(f, 0, 0, { dig: false, tool: true }, 1 / 60)
+    const before = f.bones['forearm.L'].quaternion.clone()
+    gripShaft(asset, person, f.bones, f.c, f.tool)
+    expect(f.bones['forearm.L'].quaternion.angleTo(before)).toBe(0)
   })
 })
 

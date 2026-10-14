@@ -54,7 +54,7 @@ import { REST_POSE_ARMS, type FigureLook } from './placeFigureContext'
 import { figureIdentity, type FigureIdentity } from './figureIdentity'
 import type { FigureWork } from './placeFigureContext'
 import { Shovel } from './shovel'
-import { applyClipLayers, applyHandShapes, clipLayers, handShapes, placeShovel, stepClipLayers } from './gltfClipLayers'
+import { applyClipLayers, applyHandShapes, clipLayers, gripShaft, handShapes, placeShovel, stepClipLayers } from './gltfClipLayers'
 
 // ---- geometry caches: one build per distinct body and layer -----------------
 
@@ -517,6 +517,7 @@ export function SkinnedFigure({
         }) as [boolean, boolean]
         applyClipLayers(rig.gltf.asset, rig.gltf.person, b as unknown as Record<string, THREE.Bone>, clips, m, free)
         placeShovel(rig.gltf.asset, rig.gltf.person, clips, shovel.current)
+        gripShaft(rig.gltf.asset, rig.gltf.person, b as unknown as Record<string, THREE.Bone>, clips, shovel.current)
         const ph = (pose?.current ?? ownShown.current)?.pointHand
         applyHandShapes(rig.meshes[0], handShapes(clips, ph ? [ph.left, ph.right] : [0, 0]))
       }

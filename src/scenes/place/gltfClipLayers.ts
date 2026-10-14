@@ -20,6 +20,7 @@ import type { VillagerAsset } from '../../render/villagerAsset'
 import { LIVE_MORPHS, type LiveMorph } from '../../render/villagerBody'
 import { clipGaitPose, clipPoseAt, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
 import type { GltfPerson } from '../../render/villagerFigureBody'
+import { solveTwoBone } from '../../render/figureRig'
 import { blendPoses, newPose, type VillagerPose } from '../../render/villagerRig'
 import type { FigureWork } from './placeFigureContext'
 
@@ -240,4 +241,72 @@ export function placeShovel(asset: VillagerAsset, person: GltfPerson, c: ClipLay
   tool.position.copy(at.position)
   tool.quaternion.copy(at.quaternion)
   tool.scale.setScalar(person.frame.scale)
+}
+
+const _base = new THREE.Matrix4()
+const _m = new THREE.Matrix4()
+const _p = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+const _q = new THREE.Quaternion()
+const _q2 = new THREE.Quaternion()
+const _s = new THREE.Vector3()
+const _held = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()]
+
+/** `o`'s position and turn in the body's frame (the hips' parent): free of a
+ *  squash the figure group may carry, so directions and turns stay rigid. */
+function inBody(o: THREE.Object3D, pos: THREE.Vector3, quat: THREE.Quaternion): void {
+  _m.multiplyMatrices(_base, o.matrixWorld).decompose(pos, quat, _s)
+}
+
+/** Turn bone `b` (body frame) by the shortest turn taking `from` to `to`. */
+function swing(b: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3): void {
+  inBody(b, _s, _q)
+  _q.premultiply(_q2.setFromUnitVectors(from.normalize(), to.clone().normalize()))
+  inBody(b.parent!, _s, _q2)
+  b.quaternion.copy(_q2.invert().multiply(_q))
+  b.updateMatrixWorld(true)
+}
+
+/**
+ * Both hands on the shaft on the FINAL body (natural-villager-motion step 7).
+ * The right hand holds the shovel by attachment (placeShovel); the dig clip
+ * puts the left on the shaft for the neutral body it was solved on only — on
+ * another person its fist missed the shaft by up to 0.055 of the stature
+ * (measured 14.10.2026). After the layers and the shovel: the left arm solved
+ * so the left hand holds the shaft at the dig's upper grip with the hold the
+ * pipeline authors (asset.toolHold.L), the elbow kept in the clip's own plane,
+ * by the dig's share of the body.
+ */
+export function gripShaft(asset: VillagerAsset, person: GltfPerson, bones: Record<string, THREE.Bone>, c: ClipLayers, tool: THREE.Object3D | null): void {
+  const other = asset.clips.dig.tool?.other
+  if (!tool || c.dig <= 0 || other === undefined) return
+  const chain = [bones['upperArm.L'], bones['forearm.L'], bones['hand.L']]
+  chain.forEach((b, i) => _held[i].copy(b.quaternion))
+  bones.hips.updateMatrixWorld(true)
+  if (bones.hips.parent) _base.copy(bones.hips.parent.matrixWorld).invert()
+  else _base.identity()
+  const [sh, el, wr, target] = _p
+  // the hand's turn and place that hold the tool where it is, at the upper grip
+  const hold = shovelOnHungHand(asset, person.frame, 'L', other)
+  inBody(tool, target, _q)
+  const want = _q.clone().multiply(hold.quaternion.clone().invert())
+  target.sub(hold.position.clone().applyQuaternion(want))
+  inBody(chain[0], sh, _q)
+  inBody(chain[1], el, _q)
+  inBody(chain[2], wr, _q)
+  const a = sh.distanceTo(el)
+  const b = el.distanceTo(wr)
+  // the clip's own bend: the elbow off the shoulder–wrist line
+  const line = wr.clone().sub(sh).normalize()
+  const pole = el.clone().sub(sh)
+  pole.addScaledVector(line, -pole.dot(line))
+  const sol = solveTwoBone(sh, target, a, b, pole)
+  swing(chain[0], el.clone().sub(sh), sol.upper)
+  inBody(chain[1], el, _q)
+  inBody(chain[2], wr, _q)
+  swing(chain[1], wr.clone().sub(el), sol.fore)
+  inBody(chain[1], _s, _q)
+  chain[2].quaternion.copy(_q.invert().multiply(want))
+  // eased in and out with the dig, from what the layers below left
+  if (c.dig < 1) chain.forEach((bn, i) => bn.quaternion.copy(_held[i].clone().slerp(bn.quaternion, c.dig)))
+  chain[0].updateMatrixWorld(true)
 }
