@@ -245,7 +245,7 @@ def _first_shown(ids, dist, keep):
 
 
 def _empty():
-    return {c: {'value': 0.0, 'at': None, 'over': 0, 'part': None} for c in COLUMNS} | {'checked': 0, 'cases': {}, 'clips': {}}
+    return {c: {'value': 0.0, 'at': None, 'over': 0, 'part': None} for c in COLUMNS} | {'checked': 0, 'checkedClips': {}, 'cases': {}, 'clips': {}}
 
 
 def _note(r, col, v, at, tol, part=None, clip=None, cases=()):
@@ -361,6 +361,7 @@ def _corner(c):
         for n in names:
             r = worst[n]
             r['checked'] += 1
+            r['checkedClips'][cname] = r['checkedClips'].get(cname, 0) + 1
             mb = bm[n]
             bp, smp, nrm = mb.drawn_at(bvu, depth, post)
             # the pushed body: every triangle (inside test), and the drawn ones
@@ -625,6 +626,9 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
             for n, r in part.items():
                 t = worst[n]
                 t['checked'] += r['checked']
+                # per clip, so a clip main never measured (DERIVED) is told apart
+                for key, v in r['checkedClips'].items():
+                    t['checkedClips'][key] = t['checkedClips'].get(key, 0) + v
                 for key, v in r['clips'].items():
                     t['clips'][key] = max(t['clips'].get(key, 0.0), v)
                 for key, e in r['cases'].items():
