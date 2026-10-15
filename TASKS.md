@@ -119,6 +119,7 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
 
   CI red charged here 15.10.2026: run 38728530503 (feat/1342-natural-motion-b 0c5be8f) fails villagerPenetrationReport.test.ts, g-breastCloth-chest innerHole under g-cape-rightShoulder - the committed report predates the cover-mask fix 0c5be8f83; it clears with the regenerated outputs of the running asset build.
+  Rebuild in flight 15.10.2026 (started ~13:37, export done, sheets done, penetration at male adult +1 by 14:40; previous build took ~4 h): bash pid 2445760 / node pid 2483392 in the 1342 worktree, log local/villager-build-1359-mask.log ends with "BUILD EXIT <code>"; the in-flight guard cannot carry it (no pushed checkpoint since 0c5be8f), so the next owner checks that log, commits the regenerated outputs and pushes.
 - [ ] 1354. Natural villager motion b2: one pose pipeline, distributed lean and gaze, corrective leg IK, posable clavicles, pelvic check
   Queue position: directly after point 1342 (judged on its rig and clips).
   Source: cut from point 1342 on 13.10.2026 along the line 1342 named for a stall (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 8, 9, the step-4 forearm-twist decision after step 9, 10, 11 and 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
