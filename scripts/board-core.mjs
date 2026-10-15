@@ -1360,8 +1360,13 @@ export function spanHours(times, { now = new Date(), recorded = null } = {}) {
   // end that does not lie after the start lies a year later.
   if (d1 && d2) {
     const at = (year, d, mo, h, mi) => Date.UTC(year, Number(mo) - 1, Number(d), Number(h), Number(mi))
-    let startYear = y1 ? 2000 + Number(y1) : Number(berlinParts(new Date(now)).year) + 2000
-    if (!y1 && at(startYear, d1, mo1, h1, mi1) > new Date(now).getTime() + DAY_MS) startYear -= 1
+    // Compared in Berlin wall time on both sides, so no slack is needed
+    // (third cross-vendor round: a day of slack put a start a day ahead in the
+    // current year).
+    const nowParts = berlinParts(new Date(now))
+    const nowWall = at(Number(nowParts.year) + 2000, nowParts.day, nowParts.month, ...nowParts.clock.split(':'))
+    let startYear = y1 ? 2000 + Number(y1) : Number(nowParts.year) + 2000
+    if (!y1 && at(startYear, d1, mo1, h1, mi1) > nowWall) startYear -= 1
     const from = at(startYear, d1, mo1, h1, mi1)
     let to = at(y2 ? 2000 + Number(y2) : startYear, d2, mo2, h2, mi2)
     if (!y2 && to <= from) to = at(startYear + 1, d2, mo2, h2, mi2)
