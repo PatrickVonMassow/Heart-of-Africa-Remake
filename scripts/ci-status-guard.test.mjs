@@ -56,4 +56,19 @@ describe('the CI guard wires the durable observer', () => {
     expect(code).toMatch(/allowRerun: !readOnly/)
     expect(code).toMatch(/standDown && judged\.rerunWait\?\.state === 'pending'/)
   })
+
+  it('keeps charged-red run ids in the observer entry and reports them once per session', () => {
+    const observer = code.slice(code.indexOf('async function observeDurableWait'))
+    expect(observer).toMatch(/\[wait\.sha\]: observedShaEntry\(\{[\s\S]*?runIds:/)
+    expect(code).toMatch(/chargedReportsDue\(current\.chargedReport, sessionId, swept\.charged\)/)
+    expect(code).toMatch(/chargedReport: report\.next/)
+  })
+
+  it('keeps observing a charged red while a sibling workflow is unfinished', () => {
+    const observer = code.slice(code.indexOf('async function observeDurableWait'))
+    // Behaviour is covered by observerClassification in the core tests; here only
+    // that the observer's pending branch (renewCiWait) consumes its answer.
+    expect(observer).toMatch(/let classification = observerClassification\(runs, wait\.sha, \{ branch: targetBranch\(wait\), chargedRuns: readChargedRuns \}\)\n[^\n]*\n\s*if \(classification\.state === 'pending'\) \{[\s\S]*?renewCiWait\(/)
+    expect(observer).not.toMatch(/classifyRuns\(/)
+  })
 })

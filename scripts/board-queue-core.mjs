@@ -50,7 +50,7 @@ import {
   QUEUE_STUB_META,
   TRANSLITERATION_STEMS,
 } from './dashboard-guard-core.mjs'
-import { normaliseLineEndings } from './board-core.mjs'
+import { normaliseLineEndings, QUEUE_STATUS_TEXT, renderStatusSection } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
@@ -541,14 +541,18 @@ export function renderRequestsCard(requests, { max = REQUEST_CARD_MAX } = {}) {
   )
 }
 
-/** One card, in exactly the markup the board guard's parsers read. */
+/**
+ * One card, in exactly the markup the board guard's parsers read. The stored
+ * prose is the point's DESCRIPTION (written before the card is taken up); the
+ * status below the divider says no work has started yet.
+ */
 export function renderQueueCard({ point, title, body, meta }) {
   return (
     `<details>\n  <summary><span class="num">${Number(point)}</span><span class="t">${esc(title)}</span>` +
     `<span class="right"><span class="meta">${esc(meta)}</span></span></summary>\n` +
     `  <div class="body">\n${(paragraphs(body) ?? [QUEUE_STUB_BODY])
-      .map((p) => `    <p>${esc(p)}</p>\n`)
-      .join('')}  </div>\n</details>\n`
+      .map((p) => `    <p class="desc">${esc(p)}</p>\n`)
+      .join('')}${renderStatusSection({ status: QUEUE_STATUS_TEXT })}\n  </div>\n</details>\n`
   )
 }
 
@@ -636,9 +640,13 @@ export function importQueueFromHtml(html) {
     const title = (summary.match(/class="t">([\s\S]*?)<\/span>/) ?? [])[1] ?? ''
     const metaRaw = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? ''
     const bodyHtml = (chunk.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? ''
-    const paras = [...bodyHtml.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => cardText(m[1])).filter(Boolean)
-    // A card with no <p> at all (a hand-written board) still yields its text.
-    const body = paras.length ? paras : [cardText(bodyHtml)].filter(Boolean)
+    // A split card stores its DESCRIPTION alone; the status and the
+    // placeholder are not queue prose, so no description paragraph means none.
+    const split = bodyHtml.includes('<hr class="split">')
+    const paraRe = split ? /<p class="desc">([\s\S]*?)<\/p>/gi : /<p\b[^>]*>([\s\S]*?)<\/p>/gi
+    const paras = [...bodyHtml.matchAll(paraRe)].map((m) => cardText(m[1])).filter(Boolean)
+    // A legacy card with no <p> at all (a hand-written board) still yields its text.
+    const body = paras.length || split ? paras : [cardText(bodyHtml)].filter(Boolean)
     // THE CARD SEQUENCE IS NOT IMPORTED (point 608): the board's order is a
     // rendering of the work order, so reading it back would only re-create the
     // second home this point removed.

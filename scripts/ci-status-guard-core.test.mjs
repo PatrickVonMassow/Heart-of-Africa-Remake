@@ -11,7 +11,12 @@ import {
   ciWaitBackoffMs,
   ciWaitIdentity,
   ciRedAlertMessage,
+  blockingRunIds,
+  chargedReportsDue,
+  chargedRunIds,
   classifyRuns,
+  observedShaEntry,
+  observerClassification,
   GATE_STATUS_CONTEXT,
   readAllStatusPages,
   refBranch,
@@ -1159,5 +1164,282 @@ describe('ciRedAlertMessage', () => {
     expect(message).toContain('nothing in the repository can clear it')
     expect(message).toContain('the Pages queue is empty')
     expect(message).toContain('2026-08-18T02:03:00.000Z')
+  })
+})
+
+// A parked point's red that its OPEN TASKS.md entry charges is reported, not
+// blocked (15.10.2026, run 38591097319); main is never exempt.
+describe('charged reds', () => {
+  const RUN = '38591097319'
+  const tasks = [
+    '- [ ] 1342. Natural villager motion b',
+    `  Charged: run ${RUN} on feat/1342-natural-motion-b is this point's own unfinished state.`,
+    '- [ ] 1343. Another point',
+    '  Mentions run 99999999999 only here.',
+    '- [x] 1344. Closed point',
+    '  run 77777777777',
+  ].join('\n')
+  const red = (sha) => [run({ headSha: sha, conclusion: 'failure', databaseId: Number(RUN) })]
+  const featTarget = { ref: 'origin/feat/1342-natural-motion-b', sha: BRANCH, at: t(120) }
+  const fromTasks = (text) => (branch) => chargedRunIds(text, branch)
+
+  it('chargedRunIds reads only the owning OPEN point block', () => {
+    expect([...chargedRunIds(tasks, 'feat/1342-natural-motion-b')]).toEqual([RUN])
+    expect([...chargedRunIds(tasks, 'feat/1343-x')]).toEqual(['99999999999'])
+    expect(chargedRunIds(tasks, 'feat/1344-x').size).toBe(0) // closed point
+    expect(chargedRunIds(tasks, 'feat/1345-x').size).toBe(0) // no such point
+    expect(chargedRunIds(tasks, 'main').size).toBe(0)
+    expect(chargedRunIds(tasks, 'HEAD').size).toBe(0)
+    expect(chargedRunIds(null, 'feat/1342-x').size).toBe(0)
+  })
+
+  it('a charged red on a feature ref reports without blocking', async () => {
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    expect(got.cache[BRANCH]).toMatchObject({ state: 'failed', runId: Number(RUN) })
+    expect(got.alerts).toHaveLength(1) // notification unchanged
+  })
+
+  it('the same red without the note still blocks', async () => {
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks('- [ ] 1342. x') })
+    expect(got.decision).toContain(featTarget.ref)
+    expect(got.charged).toEqual([])
+    const noSource = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(noSource.decision).toContain('RED')
+  })
+
+  it('a red run on another point charged elsewhere does not exempt this branch', async () => {
+    const other = { ...featTarget, ref: 'origin/feat/1343-x' }
+    const got = await sweep({ targets: [other], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toContain('RED')
+  })
+
+  it('main is never exempt, even when the source names the run', async () => {
+    const mainTarget = { ref: 'origin/main', sha: HEAD, at: t(120) }
+    const got = await sweep({ targets: [mainTarget], runsBySha: { [HEAD]: red(HEAD) }, chargedRuns: () => new Set([RUN]) })
+    expect(got.decision).toContain('origin/main')
+    expect(got.charged).toEqual([])
+  })
+
+  it('the cached failed path honours the charge, and blocks without it', async () => {
+    const first = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(first.decision).toContain('RED')
+    const again = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks(tasks) })
+    expect(again.asked).toEqual([])
+    expect(again.decision).toBe(null)
+    expect(again.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    const uncharged = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks('') })
+    expect(uncharged.decision).toContain('RED')
+  })
+
+  // Review 15.10.2026, P1: a charge on one red must not exempt another red on
+  // the same sha, whichever of the two the API lists first.
+  const OTHER = '38591097320'
+  const mixed = (order) => {
+    const a = run({ headSha: BRANCH, conclusion: 'failure', databaseId: Number(RUN), workflowName: 'CI' })
+    const b = run({ headSha: BRANCH, conclusion: 'failure', databaseId: Number(OTHER), workflowName: 'Pages' })
+    return order === 'charged-first' ? [a, b] : [b, a]
+  }
+  for (const order of ['charged-first', 'uncharged-first']) {
+    it(`a charged and an uncharged red on one sha still block (${order})`, async () => {
+      const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: mixed(order) }, chargedRuns: fromTasks(tasks) })
+      expect(got.decision).toContain('RED')
+      expect(got.charged).toEqual([])
+      expect([...got.cache[BRANCH].runIds].sort()).toEqual([RUN, OTHER])
+      const again = await sweep({ targets: [featTarget], cache: got.cache, chargedRuns: fromTasks(tasks) })
+      expect(again.decision).toContain('RED')
+    })
+  }
+
+  it('two reds on one sha exempt only when both are charged', async () => {
+    const both = `${tasks}\n- [ ] 1399. y`.replace(`run ${RUN} on`, `run ${RUN} and run ${OTHER} on`)
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: mixed('uncharged-first') }, chargedRuns: fromTasks(both) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toHaveLength(1)
+  })
+
+  it('a judge naming its blocking reds narrows the set to them', async () => {
+    const got = await sweepTargets({
+      targets: [featTarget], now: NOW,
+      fetchRuns: async () => mixed('uncharged-first'),
+      // The uncharged red is GitHub's side (unactionable), so only the charged one blocks.
+      judgeRed: async ({ classification }) => ({ classification: { ...classification, runId: Number(RUN) }, standDown: false, blockingRunIds: [RUN] }),
+      notify: async () => {},
+      chargedRuns: fromTasks(tasks),
+    })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+  })
+
+  // Review 15.10.2026, P3: the durable observer's terminal entry keeps its run
+  // ids, so a charged red it finished does not block until the cache expires.
+  it('an observer-written failed entry honours the charge', async () => {
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const classification = { state: 'failed', runId: Number(RUN), workflowName: 'CI', conclusion: 'failure' }
+    const entry = observedShaEntry({ wait, classification, reason: blockReason(classification, BRANCH, wait.ref), runIds: [RUN], runs: red(BRANCH), observedAt: t(10) })
+    expect(entry).toMatchObject({ state: 'failed', runId: Number(RUN), runIds: [RUN], branch: 'feat/1342-natural-motion-b', settled: true })
+    const got = await sweep({ targets: [featTarget], cache: { [BRANCH]: entry }, chargedRuns: fromTasks(tasks) })
+    expect(got.asked).toEqual([])
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    const uncharged = await sweep({ targets: [featTarget], cache: { [BRANCH]: entry }, chargedRuns: fromTasks('') })
+    expect(uncharged.decision).toContain('RED')
+    expect(observedShaEntry({ wait, classification: { state: 'success' }, observedAt: t(10) })).not.toHaveProperty('runIds')
+  })
+
+  // Second review 15.10.2026, P1: a cached failed entry exempts only for the
+  // branch that produced it; a sibling feat branch on the same sha does not.
+  it('a cached charge from another branch, or from no branch, does not exempt', async () => {
+    const sibling = { ...featTarget, ref: 'origin/feat/1343-x' }
+    const first = await sweep({ targets: [sibling], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(first.cache[BRANCH]).toMatchObject({ state: 'failed', branch: 'feat/1343-x', runIds: [RUN] })
+    const cross = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks(tasks) })
+    expect(cross.asked).toEqual([])
+    expect(cross.decision).toContain('RED')
+    const { branch: _dropped, ...noBranch } = first.cache[BRANCH]
+    const bare = await sweep({ targets: [featTarget], cache: { [BRANCH]: noBranch }, chargedRuns: fromTasks(tasks) })
+    expect(bare.decision).toContain('RED')
+    const own = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(own.cache[BRANCH].branch).toBe('feat/1342-natural-motion-b')
+    const cachedOwn = await sweep({ targets: [featTarget], cache: own.cache, chargedRuns: fromTasks(tasks) })
+    expect(cachedOwn.decision).toBe(null)
+  })
+
+  // Second review 15.10.2026, P2: an actionable red without a run id can never
+  // be charged, so it keeps the sha blocking next to a charged one.
+  it('an id-less blocking red prevents the exemption', async () => {
+    const got = await sweepTargets({
+      targets: [featTarget], now: NOW,
+      fetchRuns: async () => red(BRANCH),
+      judgeRed: async ({ classification }) => ({ classification, standDown: false, blockingRunIds: [RUN, null] }),
+      notify: async () => {},
+      chargedRuns: fromTasks(tasks),
+    })
+    expect(got.decision).toContain('RED')
+    expect(got.cache[BRANCH].runIds).toEqual([RUN, null])
+    const again = await sweep({ targets: [featTarget], cache: got.cache, chargedRuns: fromTasks(tasks) })
+    expect(again.decision).toContain('RED')
+    const idless = run({ headSha: BRANCH, conclusion: 'failure', databaseId: undefined, workflowName: 'Pages' })
+    const ids = blockingRunIds({ runs: [...red(BRANCH), idless], sha: BRANCH, branch: 'feat/1342-natural-motion-b' })
+    expect(ids).toContain(null)
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const observed = observedShaEntry({ wait, classification: { state: 'failed', runId: Number(RUN) }, reason: 'RED', runIds: ids, observedAt: t(10) })
+    expect(observed.runIds).toContain(null)
+    const fromObserver = await sweep({ targets: [featTarget], cache: { [BRANCH]: observed }, chargedRuns: fromTasks(tasks) })
+    expect(fromObserver.decision).toBe('RED')
+  })
+
+  // Third review 15.10.2026: a charged red does not release the turn while
+  // another workflow on the sha is still running.
+  for (const order of ['red-first', 'running-first']) {
+    it(`a charged red beside a running workflow waits instead of exempting (${order})`, async () => {
+      const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+      const runs = order === 'red-first' ? [...red(BRANCH), running] : [running, ...red(BRANCH)]
+      const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: runs }, chargedRuns: fromTasks(tasks) })
+      expect(got.decision).toContain('NOT yet concluded')
+      expect(got.charged).toEqual([])
+      expect(got.cache[BRANCH]).toMatchObject({ state: 'pending', runId: 5, workflowName: 'Pages' })
+      expect(got.observations.at(-1)).toMatchObject({ verdict: 'wait', classification: { state: 'pending', runId: 5 } })
+    })
+  }
+
+  // Review 15.10.2026, P2: past the budget the sibling wait still reaches the
+  // durable wait through reconciliation instead of reading as a red.
+  it('a charged red beside a running workflow past the budget keeps a durable pending wait', async () => {
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const stale = { ...featTarget, at: NOW - WAIT_BUDGET_MS - 1000 }
+    const got = await sweep({ targets: [stale], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.failedOpen).toHaveLength(1)
+    expect(got.cache[BRANCH]).toMatchObject({ state: 'pending' })
+    expect(got.observations.at(-1)).toMatchObject({ verdict: 'gave-up', classification: { state: 'pending', runId: 5 } })
+    const wait = reconcileCiWait(null, got.observations, { now: NOW, makeWakeToken: () => 'tok' })
+    expect(wait).toMatchObject({ state: 'pending', runId: 5, wakeToken: 'tok' })
+  })
+
+  it('a charged red whose sibling workflows all finished is exempt', async () => {
+    const done = run({ headSha: BRANCH, conclusion: 'success', databaseId: 5, workflowName: 'Pages' })
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), done] }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    expect(got.cache[BRANCH].state).toBe('failed')
+  })
+
+  it('an uncharged red beside a running workflow still blocks', async () => {
+    const running = run({ headSha: BRANCH, status: 'queued', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks('') })
+    expect(got.decision).toContain('RED')
+  })
+
+  // Fourth review 15.10.2026, P1: a red cached beside a running workflow keeps
+  // that fact; charged later, it is asked again instead of exempted from cache.
+  it('a red cached beside a running workflow is rechecked, not exempted, once charged', async () => {
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const first = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks('') })
+    expect(first.decision).toContain('RED')
+    expect(first.cache[BRANCH]).toMatchObject({ state: 'failed', settled: false })
+    const still = await sweep({ targets: [featTarget], cache: first.cache, runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks(tasks) })
+    expect(still.asked).toEqual([BRANCH])
+    expect(still.decision).toContain('NOT yet concluded')
+    expect(still.charged).toEqual([])
+    const done = { ...running, status: 'completed', conclusion: 'success' }
+    const finished = await sweep({ targets: [featTarget], cache: first.cache, runsBySha: { [BRANCH]: [...red(BRANCH), done] }, chargedRuns: fromTasks(tasks) })
+    expect(finished.decision).toBe(null)
+    expect(finished.cache[BRANCH]).toMatchObject({ state: 'failed', settled: true })
+  })
+
+  it('a report-only red cached beside a running workflow is rechecked once it gates', async () => {
+    const running = run({ headSha: BRANCH, status: 'queued', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const runsBySha = { [BRANCH]: [...red(BRANCH), running] }
+    const report = await sweep({ targets: [{ ...featTarget, disposition: 'report' }], runsBySha, chargedRuns: fromTasks(tasks) })
+    expect(report.decision).toBe(null)
+    expect(report.cache[BRANCH].settled).toBe(false)
+    const gating = await sweep({ targets: [featTarget], cache: report.cache, runsBySha, chargedRuns: fromTasks(tasks) })
+    expect(gating.asked).toEqual([BRANCH])
+    expect(gating.decision).toContain('NOT yet concluded')
+  })
+
+  it('an observer entry without runs, or with a running sibling, is not settled', () => {
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const classification = { state: 'failed', runId: Number(RUN) }
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    expect(observedShaEntry({ wait, classification, runIds: [RUN], observedAt: t(10) }).settled).toBe(false)
+    expect(observedShaEntry({ wait, classification, runIds: [RUN], runs: [...red(BRANCH), running], observedAt: t(10) }).settled).toBe(false)
+  })
+
+  // Fourth review 15.10.2026, P2: the observer renews its wait on the running
+  // sibling instead of finishing on the charged red or polling unrecorded.
+  it('the observer classifies a charged red beside a running workflow as that pending wait', () => {
+    const branch = 'feat/1342-natural-motion-b'
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const runs = [...red(BRANCH), running]
+    const got = observerClassification(runs, BRANCH, { branch, chargedRuns: fromTasks(tasks) })
+    expect(got).toMatchObject({ state: 'pending', runId: 5, workflowName: 'Pages' })
+    expect(observerClassification(runs, BRANCH, { branch, chargedRuns: fromTasks('') }).state).toBe('failed')
+    const done = [...red(BRANCH), { ...running, status: 'completed', conclusion: 'success' }]
+    expect(observerClassification(done, BRANCH, { branch, chargedRuns: fromTasks(tasks) })).toMatchObject({ state: 'failed', runId: Number(RUN) })
+    expect(observerClassification(runs, BRANCH, { branch: 'main', chargedRuns: () => new Set([RUN]) }).state).toBe('failed')
+
+    // The same pending classification goes through the ordinary renewal.
+    const target = { ref: featTarget.ref, sha: BRANCH }
+    const observe = (at) => ({ target, classification: got, firstSeenAt: t(300), observedAt: at })
+    const opened = renewCiWait(null, observe(t(60)), { now: t(60), makeWakeToken: () => 'tok' })
+    const renewed = renewCiWait(opened, observe(t(10)), { now: t(10), makeWakeToken: () => 'other' })
+    expect(renewed).toMatchObject({ state: 'pending', wakeToken: 'tok', lastObservationAt: t(10), runId: 5 })
+    expect(renewed.firstObservationAt).toBe(opened.firstObservationAt)
+  })
+
+  // Review 15.10.2026, P2: reported once per session, again in a new one.
+  it('a charged red is reported once per session and again in a new session', () => {
+    const c = [{ ref: featTarget.ref, sha: BRANCH, runId: RUN }]
+    const first = chargedReportsDue(undefined, 's1', c)
+    expect(first.due).toEqual(c)
+    const repeat = chargedReportsDue(first.next, 's1', c)
+    expect(repeat.due).toEqual([])
+    expect(chargedReportsDue(repeat.next, 's1', c).due).toEqual([])
+    const fresh = chargedReportsDue(repeat.next, 's2', c)
+    expect(fresh.due).toEqual(c)
+    expect(fresh.next).toEqual({ session: 's2', keys: [`${featTarget.ref}@${BRANCH}`] })
   })
 })

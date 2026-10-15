@@ -69,6 +69,7 @@ import {
   launcherStartDecision,
   launcherStartRecord,
   successorStartDecision,
+  startReservation,
   supervisorRestartDecision,
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
@@ -2211,5 +2212,42 @@ describe('U23 — a takeover is a handover, and needs somebody to hand to', () =
     // No verdict at all is not a licence to take the batch either.
     expect(takeoverHandsOver()).toMatchObject({ take: false, code: 'owner-keeps' })
     expect(() => takeoverHandsOver({ keeps: stalled, spawnBlocked: true })).not.toThrow()
+  })
+})
+
+describe('startReservation', () => {
+  it('builds the pending-spawn reservation from trigger, lock and fence', () => {
+    const r = startReservation({
+      trigger: { kind: 'boundary', generation: 7, predecessorToken: 'prev', wakeToken: 'wake' },
+      spawnToken: 'tok',
+      lock: { fence: 9 },
+      fenceState: { fence: 12 },
+      now: 1000,
+    })
+    expect(r).toEqual({
+      spawnToken: 'tok',
+      sourceGeneration: 7,
+      sourceSpawnToken: 'prev',
+      wakeToken: 'wake',
+      trigger: 'boundary',
+      requestedFence: 13,
+      requestedAt: 1000,
+    })
+  })
+
+  it('takes the lock fence when it is ahead of the durable mark, and nulls absent tokens', () => {
+    const r = startReservation({ trigger: { kind: 'watchdog' }, spawnToken: 't', lock: { fence: 20 }, fenceState: { fence: 3 }, now: 5 })
+    expect(r).toMatchObject({ requestedFence: 21, sourceGeneration: null, sourceSpawnToken: null, wakeToken: null })
+  })
+
+  it('has no requested fence when the fence is exhausted', () => {
+    const r = startReservation({ trigger: { kind: 'watchdog' }, spawnToken: 't', fenceState: { fence: Number.MAX_SAFE_INTEGER } })
+    expect(r.requestedFence).toBeNull()
+  })
+
+  it('is the reservation a start decision returns', () => {
+    const d = successorStartDecision({ trigger: { kind: 'watchdog' }, spawnToken: 't', now: 42 })
+    expect(d.start).toBe(true)
+    expect(d.reservation).toEqual(startReservation({ trigger: { kind: 'watchdog' }, spawnToken: 't', now: 42 }))
   })
 })

@@ -570,6 +570,31 @@ const CI_WAIT_VETO_TRIGGERS = new Set([
 ])
 
 /**
+ * The reservation a start places on the pending-spawn lock. PURE.
+ *
+ * Shared by the start decision and the launcher's takeover from a live owner,
+ * which starts on a refused decision and so has no reservation of its own.
+ * `requestedFence` is null when the fence has no safe successor generation.
+ */
+export function startReservation({ trigger = null, spawnToken = '', lock = null, fenceState = null, now = Date.now() } = {}) {
+  const durableFence = Number.isSafeInteger(fenceState?.fence) && fenceState.fence >= 0 ? fenceState.fence : 0
+  const lockFence = Number.isSafeInteger(lock?.fence) && lock.fence >= 0 ? lock.fence : 0
+  const observedFence = Math.max(durableFence, lockFence)
+  return {
+    spawnToken,
+    sourceGeneration: Number.isSafeInteger(trigger?.generation) ? trigger.generation : null,
+    sourceSpawnToken: typeof trigger?.predecessorToken === 'string' && trigger.predecessorToken ? trigger.predecessorToken : null,
+    wakeToken: typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null,
+    trigger: trigger && typeof trigger.kind === 'string' ? trigger.kind : '',
+    // This is a PROPOSAL, captured with the start decision rather than
+    // recomputed after the exclusive lock create. The serialized fence door
+    // refuses it if another grant advances the durable mark in between.
+    requestedFence: observedFence < Number.MAX_SAFE_INTEGER ? observedFence + 1 : null,
+    requestedAt: now,
+  }
+}
+
+/**
  * THE ONE SUCCESSOR-START DECISION. PURE.
  *
  * Callers gather policy state and process evidence, then every event comes
@@ -595,16 +620,8 @@ export function successorStartDecision({
   probePid = () => null,
   now = Date.now(),
 } = {}) {
-  const kind = trigger && typeof trigger.kind === 'string' ? trigger.kind : ''
-  const sourceGeneration = Number.isSafeInteger(trigger?.generation) ? trigger.generation : null
-  const sourceSpawnToken = typeof trigger?.predecessorToken === 'string' && trigger.predecessorToken
-    ? trigger.predecessorToken
-    : null
-  const wakeToken = typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null
-  const durableFence = Number.isSafeInteger(fenceState?.fence) && fenceState.fence >= 0 ? fenceState.fence : 0
-  const lockFence = Number.isSafeInteger(lock?.fence) && lock.fence >= 0 ? lock.fence : 0
-  const observedFence = Math.max(durableFence, lockFence)
-  const requestedFence = observedFence < Number.MAX_SAFE_INTEGER ? observedFence + 1 : null
+  const reservation = startReservation({ trigger, spawnToken, lock, fenceState, now })
+  const { trigger: kind, sourceGeneration, sourceSpawnToken, wakeToken, requestedFence } = reservation
   const ciWaitDeadline = Number.isFinite(ciWait?.deadline) ? ciWait.deadline : null
   const ciWaitDeadlineLabel = ciWaitDeadline !== null && Math.abs(ciWaitDeadline) <= 8.64e15
     ? new Date(ciWaitDeadline).toISOString()
@@ -735,18 +752,7 @@ export function successorStartDecision({
     code: 'start',
     reason: ownership.reason,
     evidence,
-    reservation: {
-      spawnToken,
-      sourceGeneration,
-      sourceSpawnToken,
-      wakeToken,
-      trigger: kind,
-      // This is a PROPOSAL, captured with the start decision rather than
-      // recomputed after the exclusive lock create. The serialized fence door
-      // refuses it if another grant advances the durable mark in between.
-      requestedFence,
-      requestedAt: now,
-    },
+    reservation,
   }
 }
 
