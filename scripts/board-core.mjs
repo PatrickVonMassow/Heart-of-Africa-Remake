@@ -1366,7 +1366,10 @@ export function spanHours(times, { now = new Date(), recorded = null } = {}) {
     const nowParts = berlinParts(new Date(now))
     const nowWall = at(Number(nowParts.year) + 2000, nowParts.day, nowParts.month, ...nowParts.clock.split(':'))
     // A 29.02. exists only in a leap year; Date.UTC would roll it to 01.03.
-    const exists = (year, d, mo) => new Date(Date.UTC(year, Number(mo) - 1, Number(d))).getUTCDate() === Number(d)
+    const exists = (year, d, mo) => {
+      const date = new Date(Date.UTC(year, Number(mo) - 1, Number(d)))
+      return date.getUTCDate() === Number(d) && date.getUTCMonth() === Number(mo) - 1
+    }
     let startYear = y1 ? 2000 + Number(y1) : Number(nowParts.year) + 2000
     if (!y1) {
       // Bounded: a date no year has (31.02.) is no span, not an endless search.

@@ -2637,6 +2637,7 @@ describe('card times', () => {
       // A date no year has is no span.
       expect(spanHours('31.02. 10:00 – 02.03. ~10:00', { now: at('2025-03-01T09:00:00Z') })).toBe(null)
       expect(spanHours('28.02.25 10:00 – 29.02.25 ~10:00')).toBe(null)
+      expect(spanHours('01.13. 10:00 – 02.13. ~10:00', { now: at('2026-10-15T12:00:00Z') })).toBe(null)
       // DD.MM.YY names its years: a full year, and a leap year's full year.
       expect(spanHours('05.10.25 09:00 – 05.10.26 ~09:00')).toBe(8760)
       expect(spanHours('05.10.27 09:00 – 05.10.28 ~09:00')).toBe(8784)
