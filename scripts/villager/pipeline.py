@@ -4,8 +4,8 @@
   body        MakeHuman base → decimated body, morphs, joints, weights (cached)
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
   garments    each dress form built round the body, weights transferred,
-              fitted to every frame of the clips without their style at every
-              body corner, then settled
+              fitted to every frame of the clips with only their trunk's
+              style at every body corner, then settled
               clear of the body and the inner layers in the build pose at
               every body corner (fit.py) (cached)
   (mask)      each garment's cover mask over the body and the garments of

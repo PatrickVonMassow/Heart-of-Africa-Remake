@@ -524,8 +524,9 @@ def slice_clip(c, t0, t1, name):
 
 
 def build_clips(src_dir, body, cfg, only=None, style=True):
-    """The retargeted clips; `style=False` leaves the clip style out (the
-    motion the garments are tailored to, pipeline.py)."""
+    """The retargeted clips; `style=False` leaves the clip style out, a dict
+    puts that style on instead of VILLAGER_ASSET.clipStyle (the motion the
+    garments are tailored to, fit.tailor)."""
     import os
     joints = body['joints']
     cp = contact_points(body)
@@ -557,7 +558,7 @@ def build_clips(src_dir, body, cfg, only=None, style=True):
             soften(c, 2)
         # the style offsets (natural-villager-motion step 6), before the grounding
         if style:
-            restyle(c, name, joints, cfg['VILLAGER_ASSET']['clipStyle'])
+            restyle(c, name, joints, cfg['VILLAGER_ASSET']['clipStyle'] if style is True else style)
         if kind == 'gait':
             ground(c, joints, cp, per_frame=(name != 'sprint' and name != 'jog'))
             an = analyse_gait(c, joints, cp)

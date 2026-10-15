@@ -269,14 +269,22 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
 
 def tailor(src_dir, mh, body, clips, cfg):
     """The garments step: built round the body, fitted (`fit`) to the clips
-    WITHOUT their style (VILLAGER_ASSET.clipStyle, clips.restyle), then
-    settled (`settle`). Fitted to the restyled walk, sprint and idle, the
-    rest-pose pushes drove the trousers into the legs in the build pose deeper
-    than the settle clears (build pose 20/31 garments within tolerance against
-    29/31 unstyled, measured 15.10.2026); the exported clips keep their style."""
+    with only the TRUNK's style (VILLAGER_ASSET.clipStyle chestTilt and
+    chestTwist, clips.restyle), then settled (`settle`). Fitted to the fully
+    restyled walk, sprint and idle (the sprint's hips straightened, the idle's
+    feet squared), the rest-pose pushes drove the trousers into the legs in
+    the build pose deeper than the settle clears (build pose 20/31 garments
+    within tolerance against 29/31 unstyled, measured 15.10.2026); fitted to
+    the source trunk instead (the source sprint leans the chest 52 degrees,
+    the head held up), they raised the robe's collar over the chin on every
+    body but the adult man's (up to 0.035 figure units on the women and
+    children, measured 15.10.2026). The exported clips keep their whole
+    style."""
     import clips as CL
     import garments as G
-    plain = CL.build_clips(src_dir, body, cfg, style=False) if cfg['VILLAGER_ASSET']['clipStyle'] else clips
+    style = cfg['VILLAGER_ASSET']['clipStyle']
+    trunk = {c: {k: v for k, v in s.items() if k in ('chestTilt', 'chestTwist')} for c, s in style.items()}
+    plain = CL.build_clips(src_dir, body, cfg, style=trunk) if style else clips
     return settle(body, fit(body, plain, G.build_garments(mh, body, plain, cfg), cfg), cfg)
 
 
