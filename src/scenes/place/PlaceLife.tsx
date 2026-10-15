@@ -116,6 +116,7 @@ import {
   digProgressOf,
   digBout,
   digPhaseOf,
+  drawnDigClock,
   isDigging,
   PRIMITIVE_DIG_STROKE,
   goalOf,
@@ -2928,10 +2929,17 @@ function ErrandVillagers({
     [colliders, standable],
   )
 
+  // Priority −1, as the walkers': the figures (subscribed first, as children)
+  // read this frame's work clock and step, not the last frame's.
   useFrame((_, rawDt) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const cfg = { ...balance.villageLife.adultErrands, digStroke }
+    // The errands step first: the strokes drawn below run on the work clock
+    // as this step leaves it, so the progress published with it never leads
+    // the strike shown.
+    stepAdultWork(work, view, dt, cfg, rand)
+    onDigProgress(digProgressOf(work, geography.digSites.length))
     // The jars standing at the village water stand: as many as the errand
     // state says have been set down, capped at the stand's capacity.
     for (let k = 0; k < standJars.current.length; k++) {
@@ -3176,11 +3184,11 @@ function ErrandVillagers({
         // trunk and the shovel's turn along the arm together, the stroke's
         // clock running on while it fades; it restarts from the top once gone.
         state.digK = easeDigWeight(state.digK, digging, dt)
-        state.dug = digging || state.digK > 0 ? state.dug + dt : 0
-        // the drawn stroke on the work's clock: it advances only while the hole
-        // deepens, so it freezes through a hold or a fade, and the strike the
-        // progress counts is the one drawn
-        if (task && task.phase === 'dig') figureWork.digT = task.dug + digPhaseOf(i)
+        // the drawn stroke on the work's clock, for both bodies: it advances
+        // only while the hole deepens, so it freezes through a hold or a fade,
+        // and the strike the progress counts is the one drawn
+        state.dug = drawnDigClock(state.dug, task, digging || state.digK > 0)
+        if (task && task.phase === 'dig') figureWork.digT = state.dug + digPhaseOf(i)
         if (digging) {
           figureWork.dig = true
           const siteIndex = task?.siteIndex
@@ -3190,7 +3198,7 @@ function ErrandVillagers({
         // the shaft along the digging arm: the stroke drives the blade into the pit
         if (digTool) digTool.rotation.x = primitiveToolTilt(state.digK)
         const base = carry === 'fullJar' && !isGesturing(gesture.current) ? HEAD_CARRY_POSE.current : gesturePose(gesture.current)
-        const shown = state.digK > 0 ? mixDigPose(base, digPose(state.dug, i * 0.37), state.digK) : base
+        const shown = state.digK > 0 ? mixDigPose(base, digPose(state.dug, digPhaseOf(i)), state.digK) : base
         if (pose) {
           pose.left = shown.left
           pose.right = shown.right
@@ -3239,9 +3247,6 @@ function ErrandVillagers({
       ;(mesh.material as THREE.MeshBasicMaterial).opacity = ring.opacity
     })
 
-    stepAdultWork(work, view, dt, cfg, rand)
-    const progress = digProgressOf(work, geography.digSites.length)
-    onDigProgress(progress)
     for (const said of work.emitted) {
       // The speaker turns to what he is talking about as he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all. The word and
@@ -3253,7 +3258,7 @@ function ErrandVillagers({
         speakWork(camera, said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
       }
     }
-  })
+  }, -1)
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): what the adults
   // have said this visit, and what each of them is doing about it.

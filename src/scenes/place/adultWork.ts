@@ -246,6 +246,19 @@ export function digBout(hold: { digHold: number }, onRim: boolean, inBout: boole
   return hold.digHold > 0
 }
 
+/**
+ * The clock a body's drawn stroke runs on (both the glTF clip and the
+ * primitive's digPose, each with `digPhaseOf`): its errand's work clock
+ * (`dug`, advanced by stepAdultWork only under a stroke really played) while
+ * it digs, so each counted strike is the one drawn in that frame; held where
+ * it stopped while the bout's pose is still `shown` (a hold or a fade);
+ * from the top once the pose is gone.
+ */
+export function drawnDigClock(prev: number, task: { phase: string; dug: number } | null | undefined, shown: boolean): number {
+  if (task && task.phase === 'dig') return task.dug
+  return shown ? prev : 0
+}
+
 export function carryOf(state: AdultWorkState, index: number): AdultCarry {
   return state.tasks[index]?.carry ?? 'none'
 }

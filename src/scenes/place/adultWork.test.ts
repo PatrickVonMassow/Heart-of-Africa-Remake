@@ -11,7 +11,9 @@ import {
   clearTask,
   createAdultWork,
   digProgressOf,
+  digPhaseOf,
   digStrikeCrossed,
+  drawnDigClock,
   PRIMITIVE_DIG_STROKE,
   goalOf,
   isDigging,
@@ -28,7 +30,7 @@ import { clearOfSpoil, DIG_RIM_DISTANCE } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { instructionDelay, utteranceSeconds } from '../../communication/speaking'
 import { balance } from '../../config/balance'
-import { DIG_CYCLE_SECONDS } from '../../render/gesture'
+import { DIG_CYCLE_SECONDS, digPose } from '../../render/gesture'
 import { resetDevAsserts } from '../../systems/devAssert'
 
 const CFG: AdultWorkConfig = {
@@ -870,6 +872,37 @@ describe('digging records work at the site', () => {
       expect(counted, `phase ${phase}`).toBe(drawn)
       expect(counted).toBeGreaterThan(50)
     }
+  })
+
+  it('the drawn stroke runs on the work clock as the step leaves it: each counted strike is drawn that frame, held through a hold and a fade', () => {
+    const i = 3
+    const phase = digPhaseOf(i)
+    const task = { phase: 'dig', dug: 0 }
+    let drawn = 0
+    let counted = 0
+    let atStrike = 0
+    for (let k = 0; k < 900; k++) {
+      // the step: the hole deepens only in some frames (a shove, a pause)
+      const before = task.dug
+      if (k % 50 >= 8) task.dug += 1 / 60
+      const strike = digStrikeCrossed(before, task.dug, phase, PRIMITIVE_DIG_STROKE)
+      // then the figure: the drawn clock is the work clock, never ahead or behind
+      drawn = drawnDigClock(drawn, task, true)
+      expect(drawn).toBe(task.dug)
+      if (!strike) continue
+      counted++
+      // the primitive's pose at the drawn clock is at its blow (the arms'
+      // lowest swing, raise ~0) in the very frame the strike is counted
+      if (digPose(drawn, phase).left.pitch > digPose(0, 0).left.pitch - 0.01) atStrike++
+    }
+    expect(counted).toBeGreaterThan(5)
+    expect(atStrike).toBe(counted)
+    // the errand moves on: the stroke holds where it stopped while the pose
+    // fades, and starts from the top once it is gone
+    const end = drawn
+    expect(drawnDigClock(drawn, { phase: 'fetch', dug: 0 }, true)).toBe(end)
+    expect(drawnDigClock(drawn, null, true)).toBe(end)
+    expect(drawnDigClock(drawn, null, false)).toBe(0)
   })
 
   it('the primitive stroke still strikes at the turn of its cycle', () => {
