@@ -2734,13 +2734,18 @@ export const VILLAGER_GLTF = {
   jogThreshold: 1.8,
   /** Half-width of the band walk and jog cross-fade over, same units. */
   jogBand: 0.35,
-  /** The jog turns into the sprint here, same units: above the tag game's top
-   *  pace (a child at `sprintSpeed` ≈ 6.9 per unit of leg), so every running
-   *  villager jogs and the sprint is the clip of a real dash only
-   *  (natural-villager-motion step 5). Calibratable. */
-  sprintThreshold: 7.6,
-  /** Half-width of the band jog and sprint cross-fade over, same units. */
-  sprintBand: 0.5,
+  /** The jog turns into the sprint here, same units: the band's lower edge
+   *  (threshold − band) sits above the tag game's top pace — a fresh runner at
+   *  `sprintSpeed × runnerBoost` on a child figure (`CHILD_FIGURE_SCALE`) runs
+   *  ≈ 7.2–7.5 per unit of leg — so every running villager jogs and the sprint
+   *  is the clip of a real dash only (natural-villager-motion step 5).
+   *  Calibratable. */
+  sprintThreshold: 7.9,
+  /** Half-width of the band jog and sprint cross-fade over, same units.
+   *  Narrow so the band's top stays below ≈ 8.2 per unit of leg, past which
+   *  the pure sprint's held toe slides beyond the no-slide limit at 120 Hz
+   *  (male youth, measured 15.10.2026; OPEN: the hold's contact onboarding). */
+  sprintBand: 0.25,
   /** How the jog's stride follows its pace (as strideExponent/Min/Max for the
    *  walk and sprint): the jog clip covers a long stride at its natural speed
    *  (≈ 4.5 per unit of leg), so slower jogs shorten it more and keep their

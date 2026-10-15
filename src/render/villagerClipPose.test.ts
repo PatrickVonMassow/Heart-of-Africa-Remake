@@ -6,12 +6,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
+import { balance, VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
+import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { clipGaitPose, clipPoseAt, newClipGait, shovelOnHungHand, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
-import { contactPoints, forwardKinematics, newPose, newWorld, toolInHand } from './villagerRig'
+import { contactPoints, forwardKinematics, newPose, newWorld, sprintWeight, toolInHand } from './villagerRig'
 
 let asset: VillagerAsset
 let adult: GltfPerson
@@ -134,7 +135,7 @@ describe('the clip gait on the ground', () => {
     ]
     const G = VILLAGER_GLTF
     // per unit of leg: a stroll, the walk, both bands (edges and middle), the jog, a dash
-    const ramp = [0.4, 1.0, 1.45, 1.8, 2.15, 3.5, 5.5, G.sprintThreshold - G.sprintBand, G.sprintThreshold, G.sprintThreshold + G.sprintBand, 8.6]
+    const ramp = [0.4, 1.0, G.jogThreshold - G.jogBand, G.jogThreshold, G.jogThreshold + G.jogBand, 3.5, 5.5, G.sprintThreshold - G.sprintBand, G.sprintThreshold, G.sprintThreshold + G.sprintBand, 8.6]
     for (const person of bodies) {
       const per = person.frame.legScale * person.frame.scale
       for (const hz of [30, 60, 120]) {
@@ -199,6 +200,19 @@ describe('the clip gait on the ground', () => {
     for (const i of foot) expect(a.p[i].distanceTo(b.p[i])).toBeLessThan(1e-9)
   })
 
+  it("the tag game's fastest child still jogs: the sprint blend starts above a fresh runner's top pace", () => {
+    const tag = balance.villageLife.tag
+    const top = tag.sprintSpeed * tag.runnerBoost
+    for (const sex of SEXES) {
+      const f = gltfPerson(asset, sex, 'child', 0).frame
+      // the figure's own speed (world / group scale), then as clipGaitPose reads it
+      const v = top / CHILD_FIGURE_SCALE / f.scale
+      expect(sprintWeight(v, f.legScale), sex).toBe(0)
+      // with a margin: two per cent more pace still stays out of the band
+      expect(sprintWeight(v * 1.02, f.legScale), sex).toBe(0)
+    }
+  })
+
   it('the feet never sink below the ground', () => {
     for (const v of [0.6, 1.2, 3.4]) expect(walkStraight(adult, v).lowest).toBeGreaterThan(-0.01)
   })
@@ -219,7 +233,7 @@ describe('the clip gait on the ground', () => {
         clipGaitPose(g, asset, f, v + 0.02, null, b)
         forwardKinematics(asset, f.rest0, a, wa)
         forwardKinematics(asset, f.rest0, b, wb)
-        for (let i = 0; i < n; i++) expect(wa.p[i].distanceTo(wb.p[i])).toBeLessThan(0.03)
+        for (let i = 0; i < n; i++) expect(wa.p[i].distanceTo(wb.p[i]), `${t} band at ${v.toFixed(2)}, bone ${asset.bones[i]}`).toBeLessThan(0.03)
       }
     }
   })
