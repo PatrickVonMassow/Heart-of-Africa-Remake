@@ -309,7 +309,9 @@ def dig_clip(body, clips, cfg):
         tool_pos = tip - tool_rot @ np.array([0, SHOVEL['tip'], 0])
         tips.append(tip.copy())
 
-        def solve(extra, tool_pos=tool_pos, tool_rot=tool_rot, lean=lean, drop=drop, turn=turn):
+        # every frame-dependent input bound now: the solvers run again after
+        # this loop, when a free `tip` would be the last frame's
+        def solve(extra, tool_pos=tool_pos, tool_rot=tool_rot, lean=lean, drop=drop, turn=turn, tip=tip):
             from gltfio import qaxis
             q = q_stand.copy()
             hips = hips_stand.copy()
