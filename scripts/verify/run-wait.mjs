@@ -382,17 +382,22 @@ function secondsFlag(args, flag, fallbackMs) {
 const LOG_TAIL_BYTES = 256 * 1024
 
 function readTail(path, size) {
-  const length = Math.min(size, LOG_TAIL_BYTES)
-  const buf = Buffer.alloc(length)
+  // One byte before the window says whether the window starts on a line boundary.
+  const cut = size > LOG_TAIL_BYTES
+  const start = cut ? size - LOG_TAIL_BYTES - 1 : 0
+  const buf = Buffer.alloc(size - start)
   const fd = openSync(path, 'r')
   try {
-    readSync(fd, buf, 0, length, size - length)
+    readSync(fd, buf, 0, buf.length, start)
   } finally {
     closeSync(fd)
   }
-  const text = buf.toString('utf8')
-  // A cut tail starts mid-line; that fragment must not pass for a whole done line.
-  return length < size ? text.slice(text.indexOf('\n') + 1) : text
+  if (!cut) return buf.toString('utf8')
+  // A window starting mid-line drops that fragment, so it never passes for a
+  // whole done line; with no newline at all the whole window is one fragment.
+  if (buf[0] === 0x0a) return buf.subarray(1).toString('utf8')
+  const nl = buf.indexOf(0x0a)
+  return nl < 0 ? '' : buf.subarray(nl + 1).toString('utf8')
 }
 
 /** `--await-log`: a bounded wait on an arbitrary log (point 1356). */

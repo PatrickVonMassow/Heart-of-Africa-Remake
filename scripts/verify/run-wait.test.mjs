@@ -373,10 +373,23 @@ describe('run-wait --await-log', () => {
     }
   })
 
+  // The tail window is the last 256 KiB; each case puts its start at `exit 0`.
+  const WINDOW = 256 * 1024
+  const wait = (text) => run(['--await-log', buildLog(text), '--stall', '60', '--timeout', '0.5', '--tick', '0.1'])
+
   it('a done marker inside a line cut by the tail window is not taken for a done line', () => {
-    const log = buildLog(`prefix exit 0\n${'x'.repeat(256 * 1024 - 7)}`)
-    const r = run(['--await-log', log, '--stall', '60', '--timeout', '0.5', '--tick', '0.1'])
+    const r = wait(`prefix exit 0\n${'x'.repeat(WINDOW - 7)}`)
     expect(r.status).toBe(3)
     expect(r.stdout).toMatch(/^TIMEOUT /m)
+  })
+
+  it('a cut window with no newline at all is one fragment, not a done line', () => {
+    expect(wait(`prefix exit 0${' '.repeat(WINDOW - 6)}`).status).toBe(3)
+  })
+
+  it('a window starting exactly on a line boundary keeps its whole done line', () => {
+    const r = wait(`prefix\nexit 0\n${'x'.repeat(WINDOW - 7)}`)
+    expect(r.status).toBe(0)
+    expect(r.stdout).toMatch(/^DONE /m)
   })
 })
