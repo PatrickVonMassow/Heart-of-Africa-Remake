@@ -366,6 +366,12 @@ def tilt(wr, b):
     return float(np.arctan2(y[2], y[1]))
 
 
+def tilt_after(turn, wr, b):
+    """`b`'s forward tilt once the whole figure is turned by the world `turn`."""
+    y = qrot(qmul(turn, wr[SK.INDEX[b]]), Y)
+    return float(np.arctan2(y[2], y[1]))
+
+
 def heading(wr, b):
     """A bone's facing about the vertical (rad, + to the figure's left)."""
     z = qrot(wr[SK.INDEX[b]], Z)
@@ -409,10 +415,15 @@ def restyle(c, name, joints, style):
     Q, P = c['q'], c['hips']
     n = len(Q)
     fk = lambda f: rig.fk(joints, Q[f], P[f])  # noqa: E731
+    hips_yaw = float(np.mean([heading(fk(f)[0], 'hips') for f in range(n)])) if s.get('square') else 0.0
+    # the tilts the offsets correct, read as the frame loop below meets them:
+    # after the square's yaw is out (a turn about the vertical changes what a
+    # tilt seen from the side measures)
+    from gltfio import qaxis
+    unyaw = qaxis(Y, -hips_yaw)
     before = {}
     for b in ('hips', 'chest', 'head'):
-        before[b] = float(np.degrees(np.mean([tilt(fk(f)[0], b) for f in range(n)])))
-    hips_yaw = float(np.mean([heading(fk(f)[0], 'hips') for f in range(n)])) if s.get('square') else 0.0
+        before[b] = float(np.degrees(np.mean([tilt_after(unyaw, fk(f)[0], b) for f in range(n)])))
     # constant offsets to the means, so each bone keeps its own swing through the cycle
     hips_off = np.radians(0.0) + (s['hipsTilt'] - np.radians(before['hips']) if 'hipsTilt' in s else 0.0)
     chest_off = s['chestTilt'] - np.radians(before['chest']) - hips_off if 'chestTilt' in s else 0.0
@@ -577,3 +588,24 @@ def build_clips(src_dir, body, cfg, only=None, style=True):
     import toolclips
     toolclips.build_tool_clips(body, out, cfg)
     return out
+
+
+def selftest():
+    """The square's yaw comes out before the hips' tilt is read (no Blender
+    needed): a bone turned 60° about the vertical and tilted 30° forward in its
+    own frame reads ≈ 13.9° seen from the side, 30° once the turn is out, and
+    the offset from that brings it exactly to its target."""
+    from gltfio import qaxis
+    w = {SK.INDEX['hips']: qmul(qaxis(Y, np.radians(60)), qaxis(X, np.radians(30)))}
+    wr = [w.get(i, np.array([0, 0, 0, 1.0])) for i in range(len(SK.BONES))]
+    unyaw = qaxis(Y, -np.radians(60))
+    assert abs(np.degrees(tilt(wr, 'hips')) - 30) > 10
+    assert abs(np.degrees(tilt_after(unyaw, wr, 'hips')) - 30) < 1e-6
+    target = np.radians(5)
+    off = target - tilt_after(unyaw, wr, 'hips')
+    turned = qmul(qaxis(X, off), qmul(unyaw, wr[SK.INDEX['hips']]))
+    wr2 = list(wr)
+    wr2[SK.INDEX['hips']] = turned
+    assert abs(tilt(wr2, 'hips') - target) < 1e-6
+    print('clips selftest: ok')
+
