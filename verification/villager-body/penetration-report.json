@@ -442,29 +442,23 @@
     "part": null
    },
    "innerHole": {
-    "value": 0.005382745526731014,
-    "at": "under g-cape-rightShoulder, build frame 0 (female elder build +0)",
-    "over": 1,
-    "part": "chest"
+    "value": 0.0,
+    "at": null,
+    "over": 0,
+    "part": null
    },
    "checked": 10,
    "checkedClips": {
     "build": 10
    },
-   "cases": {
-    "innerHole build chest g-cape-rightShoulder": {
-     "value": 0.005382745526731014,
-     "at": "under g-cape-rightShoulder, build frame 0 (female elder build +0)",
-     "over": 1
-    }
-   },
+   "cases": {},
    "clips": {
     "cloth build": 0.0,
     "shown build": 0.0,
     "hole build": 0.0,
     "cut build": 0.0,
     "inner build": 0.0,
-    "innerHole build": 0.005382745526731014
+    "innerHole build": 0.0
    }
   },
   "g-shirt-chest": {
@@ -9875,7 +9869,7 @@
    "innerHole": {
     "value": 0.07997097074985504,
     "at": "under g-cape-leftShoulder, dig frame 9 (female adult build +0)",
-    "over": 3812,
+    "over": 3742,
     "part": "chest"
    },
    "checked": 6690,
@@ -9901,6 +9895,11 @@
      "value": 0.00962141901254654,
      "at": "under g-cape-leftShoulder, idle frame 19 (male elder build +0)",
      "over": 577
+    },
+    "inner idle chest g-cape-rightShoulder": {
+     "value": 0.008401867002248764,
+     "at": "under g-cape-rightShoulder, idle frame 59 (male elder build +0)",
+     "over": 478
     },
     "inner idle chest g-hood-overHead": {
      "value": 0.014606485143303871,
@@ -9937,6 +9936,11 @@
      "at": "under g-cape-leftShoulder, walk frame 4 stride 0.75 (female adult build +0)",
      "over": 981
     },
+    "inner walk chest g-cape-rightShoulder": {
+     "value": 0.013071789406239986,
+     "at": "under g-cape-rightShoulder, walk frame 4 stride 0.75 (female adult build +0)",
+     "over": 1074
+    },
     "inner walk chest g-hood-overHead": {
      "value": 0.01978813111782074,
      "at": "under g-hood-overHead, walk frame 21 stride 0.75 (male youth build +0)",
@@ -9962,6 +9966,11 @@
      "at": "under g-cape-leftShoulder, jog frame 26 stride 0.75 (female adult build +0)",
      "over": 798
     },
+    "inner jog chest g-cape-rightShoulder": {
+     "value": 0.008459695614874363,
+     "at": "under g-cape-rightShoulder, jog frame 24 stride 0.75 (male child build +0)",
+     "over": 570
+    },
     "inner jog chest g-hood-overHead": {
      "value": 0.015095146372914314,
      "at": "under g-hood-overHead, jog frame 12 stride 0.75 (male elder build +0)",
@@ -9971,6 +9980,11 @@
      "value": 0.01084980834275484,
      "at": "under g-cape-leftShoulder, sprint frame 0 stride 0.75 (male child build +0)",
      "over": 588
+    },
+    "inner sprint chest g-cape-rightShoulder": {
+     "value": 0.009866886772215366,
+     "at": "under g-cape-rightShoulder, sprint frame 0 stride 0.75 (male child build +0)",
+     "over": 429
     },
     "inner sprint chest g-hood-overHead": {
      "value": 0.014240942895412445,
@@ -9986,6 +10000,11 @@
      "value": 0.05918411538004875,
      "at": "under g-cape-leftShoulder, kneelDown frame 22 (female elder build +0)",
      "over": 182
+    },
+    "inner kneelDown chest g-cape-rightShoulder": {
+     "value": 0.06046973168849945,
+     "at": "under g-cape-rightShoulder, kneelDown frame 22 (female elder build +0)",
+     "over": 168
     },
     "inner kneelDown chest g-hood-overHead": {
      "value": 0.025930751115083694,
@@ -10020,7 +10039,7 @@
     "innerHole kneelDown chest g-cape-chest": {
      "value": 0.05857188254594803,
      "at": "under g-cape-chest, kneelDown frame 22 (female elder build +0)",
-     "over": 119
+     "over": 117
     },
     "innerHole kneelDown chest g-cape-leftShoulder": {
      "value": 0.04843425750732422,
@@ -10035,7 +10054,7 @@
     "innerHole kneelDown chest g-cape-rightShoulder": {
      "value": 0.057972680777311325,
      "at": "under g-cape-rightShoulder, kneelDown frame 22 (female elder build +0)",
-     "over": 123
+     "over": 105
     },
     "cloth kneel chest None": {
      "value": 0.028049093984721225,
@@ -10083,9 +10102,9 @@
      "over": 16
     },
     "inner kneel chest g-cape-rightShoulder": {
-     "value": 0.06034160777926445,
+     "value": 0.069733165204525,
      "at": "under g-cape-rightShoulder, kneel frame 0 (female elder build +0)",
-     "over": 14
+     "over": 20
     },
     "inner kneel chest g-hood-overHead": {
      "value": 0.05125328525900841,
@@ -10170,12 +10189,17 @@
     "innerHole kneelUp chest g-cape-rightShoulder": {
      "value": 0.05750458315014839,
      "at": "under g-cape-rightShoulder, kneelUp frame 0 (female elder build +0)",
-     "over": 192
+     "over": 191
     },
     "innerHole kneelUp chest g-cloak-bothShoulders": {
      "value": 0.015365216881036758,
      "at": "under g-cloak-bothShoulders, kneelUp frame 14 (male child build +0)",
      "over": 95
+    },
+    "inner kneelUp chest g-cape-rightShoulder": {
+     "value": 0.06539209932088852,
+     "at": "under g-cape-rightShoulder, kneelUp frame 5 (male adult build +1)",
+     "over": 199
     },
     "inner kneelUp spine1 g-cape-rightShoulder": {
      "value": 0.06860966980457306,
@@ -10191,11 +10215,6 @@
      "value": 0.019459541887044907,
      "at": "under g-cloak-bothShoulders, kneelUp frame 17 (female adult build +0)",
      "over": 122
-    },
-    "inner kneelUp chest g-cape-rightShoulder": {
-     "value": 0.06539209932088852,
-     "at": "under g-cape-rightShoulder, kneelUp frame 5 (male adult build +1)",
-     "over": 78
     },
     "cloth kneelUp forearm.R None": {
      "value": 0.014127805265970437,
@@ -10240,7 +10259,7 @@
     "inner dig chest g-cape-rightShoulder": {
      "value": 0.08118075877428055,
      "at": "under g-cape-rightShoulder, dig frame 58 (female adult build +0)",
-     "over": 597
+     "over": 621
     },
     "inner dig chest g-hood-overHead": {
      "value": 0.04209394007921219,
@@ -10363,19 +10382,14 @@
      "over": 1230
     },
     "inner carry chest g-cape-rightShoulder": {
-     "value": 0.022658802568912506,
-     "at": "under g-cape-rightShoulder, carry frame 22 stride 0.75 (male child build +0)",
-     "over": 963
+     "value": 0.032879117876291275,
+     "at": "under g-cape-rightShoulder, carry frame 22 stride 0.75 (female adult build +0)",
+     "over": 1230
     },
     "innerHole carry chest g-cloak-bothShoulders": {
      "value": 0.029649801552295685,
      "at": "under g-cloak-bothShoulders, carry frame 22 stride 0.75 (female adult build +0)",
      "over": 1159
-    },
-    "innerHole carry chest g-cape-rightShoulder": {
-     "value": 0.03506387025117874,
-     "at": "under g-cape-rightShoulder, carry frame 27 stride 0.75 (female elder build +0)",
-     "over": 924
     },
     "inner carry chest g-hood-overHead": {
      "value": 0.03032185137271881,
@@ -10387,15 +10401,15 @@
      "at": "under g-cloak-chest, carry frame 22 stride 0.75 (female adult build +0)",
      "over": 422
     },
-    "innerHole carry chest g-cape-chest": {
-     "value": 0.03549456223845482,
-     "at": "under g-cape-chest, carry frame 24 stride 0.75 (female elder build +0)",
-     "over": 765
-    },
     "cloth carry forearm.L None": {
      "value": 0.014276329447567475,
      "at": "carry frame 30 stride 0.75 (male child build +0)",
      "over": 130
+    },
+    "innerHole carry chest g-cape-chest": {
+     "value": 0.03549456223845482,
+     "at": "under g-cape-chest, carry frame 24 stride 0.75 (female elder build +0)",
+     "over": 681
     },
     "inner carry chest g-cloak-bothShoulders": {
      "value": 0.009000143967568874,
@@ -10443,9 +10457,9 @@
      "over": 760
     },
     "inner carryIdle chest g-cape-rightShoulder": {
-     "value": 0.021666575223207474,
-     "at": "under g-cape-rightShoulder, carryIdle frame 18 (male child build +0)",
-     "over": 532
+     "value": 0.03151527792215347,
+     "at": "under g-cape-rightShoulder, carryIdle frame 39 (female adult build +0)",
+     "over": 760
     },
     "inner carryIdle chest g-hood-overHead": {
      "value": 0.026539186015725136,
@@ -10463,14 +10477,9 @@
      "over": 504
     },
     "innerHole carryIdle chest g-cape-chest": {
-     "value": 0.03133635222911835,
-     "at": "under g-cape-chest, carryIdle frame 0 (female elder build +0)",
-     "over": 525
-    },
-    "innerHole carryIdle chest g-cape-rightShoulder": {
-     "value": 0.032992392778396606,
-     "at": "under g-cape-rightShoulder, carryIdle frame 66 (female elder build +0)",
-     "over": 619
+     "value": 0.0265427827835083,
+     "at": "under g-cape-chest, carryIdle frame 10 (female adult build +0)",
+     "over": 449
     },
     "cloth kneel thigh.L None": {
      "value": 0.024302214910520852,
@@ -10500,7 +10509,7 @@
     "innerHole jog chest g-cape-chest": {
      "value": 0.0192912295460701,
      "at": "under g-cape-chest, jog frame 9 stride 0.75 (female elder build +0)",
-     "over": 150
+     "over": 132
     },
     "innerHole sprint chest g-cape-leftShoulder": {
      "value": 0.029635898768901825,
@@ -10526,6 +10535,16 @@
      "value": 0.02819384915445816,
      "at": "kneelUp frame 13 (female adult build +0)",
      "over": 36
+    },
+    "innerHole carry chest g-cape-rightShoulder": {
+     "value": 0.0219736211001873,
+     "at": "under g-cape-rightShoulder, carry frame 5 stride 0.75 (female elder build +0)",
+     "over": 462
+    },
+    "innerHole carryIdle chest g-cape-rightShoulder": {
+     "value": 0.019665617495775223,
+     "at": "under g-cape-rightShoulder, carryIdle frame 65 (female adult build +0)",
+     "over": 242
     },
     "inner kneel spine1 g-cape-rightShoulder": {
      "value": 0.03966154158115387,
@@ -10553,9 +10572,9 @@
      "over": 30
     },
     "innerHole idle chest g-cape-chest": {
-     "value": 0.007681603543460369,
-     "at": "under g-cape-chest, idle frame 65 (female elder build +0)",
-     "over": 93
+     "value": 0.005206828936934471,
+     "at": "under g-cape-chest, idle frame 59 (female elder build +0)",
+     "over": 66
     },
     "inner walk chest g-cape-chest": {
      "value": 0.010067419148981571,
@@ -10572,25 +10591,10 @@
      "at": "under g-cloak-bothShoulders, walk frame 3 stride 0.75 (female elder build +0)",
      "over": 57
     },
-    "inner walk chest g-cape-rightShoulder": {
-     "value": 0.0077139586210250854,
-     "at": "under g-cape-rightShoulder, walk frame 24 stride 0.75 (female adult build +0)",
-     "over": 147
-    },
     "innerHole walk chest g-cloak-chest": {
      "value": 0.009937766008079052,
      "at": "under g-cloak-chest, walk frame 36 stride 0.75 (female elder build +0)",
      "over": 120
-    },
-    "innerHole walk chest g-cape-rightShoulder": {
-     "value": 0.015665043145418167,
-     "at": "under g-cape-rightShoulder, walk frame 5 stride 0.75 (female elder build +0)",
-     "over": 228
-    },
-    "innerHole jog chest g-cape-rightShoulder": {
-     "value": 0.026712022721767426,
-     "at": "under g-cape-rightShoulder, jog frame 7 stride 0.75 (female elder build +0)",
-     "over": 102
     },
     "inner jog chest g-cape-chest": {
      "value": 0.003325176425278187,
@@ -10602,45 +10606,35 @@
      "at": "under g-cape-chest, sprint frame 3 stride 0.75 (female youth build +0)",
      "over": 6
     },
-    "innerHole sprint chest g-cape-rightShoulder": {
-     "value": 0.027749327942728996,
-     "at": "under g-cape-rightShoulder, sprint frame 4 stride 0.75 (female elder build +0)",
-     "over": 120
-    },
-    "innerHole sprint chest g-cape-chest": {
-     "value": 0.029197795316576958,
-     "at": "under g-cape-chest, sprint frame 10 stride 0.75 (female elder build +0)",
-     "over": 135
-    },
-    "inner kneelDown chest g-cape-rightShoulder": {
-     "value": 0.06046973168849945,
-     "at": "under g-cape-rightShoulder, kneelDown frame 22 (female elder build +0)",
-     "over": 17
-    },
     "innerHole kneel chest g-cloak-chest": {
      "value": 0.014961844310164452,
      "at": "under g-cloak-chest, kneel frame 0 (female adult build +0)",
      "over": 6
-    },
-    "innerHole idle chest g-cape-rightShoulder": {
-     "value": 0.01326722465455532,
-     "at": "under g-cape-rightShoulder, idle frame 65 (female elder build +0)",
-     "over": 106
     },
     "innerHole idle chest g-cloak-chest": {
      "value": 0.0069103301502764225,
      "at": "under g-cloak-chest, idle frame 30 (female elder build +0)",
      "over": 69
     },
+    "innerHole walk chest g-cape-rightShoulder": {
+     "value": 0.006604429334402084,
+     "at": "under g-cape-rightShoulder, walk frame 38 stride 0.75 (female adult build +0)",
+     "over": 36
+    },
     "innerHole walk chest g-cape-leftShoulder": {
      "value": 0.020654255524277687,
      "at": "under g-cape-leftShoulder, walk frame 24 stride 0.75 (female elder build +0)",
      "over": 135
     },
-    "inner jog chest g-cape-rightShoulder": {
-     "value": 0.0035574529320001602,
-     "at": "under g-cape-rightShoulder, jog frame 17 stride 0.75 (female adult build +0)",
-     "over": 9
+    "innerHole jog chest g-cape-rightShoulder": {
+     "value": 0.014397726394236088,
+     "at": "under g-cape-rightShoulder, jog frame 5 stride 0.75 (female elder build +0)",
+     "over": 63
+    },
+    "innerHole sprint chest g-cape-chest": {
+     "value": 0.029197795316576958,
+     "at": "under g-cape-chest, sprint frame 10 stride 0.75 (female elder build +0)",
+     "over": 126
     },
     "innerHole sprint chest g-cloak-chest": {
      "value": 0.006878601387143135,
@@ -10652,10 +10646,10 @@
      "at": "sprint frame 2 stride 0.75 (female adult build +0)",
      "over": 3
     },
-    "inner sprint chest g-cape-rightShoulder": {
-     "value": 0.004962666425853968,
-     "at": "under g-cape-rightShoulder, sprint frame 13 stride 0.75 (female adult build +0)",
-     "over": 12
+    "innerHole sprint chest g-cape-rightShoulder": {
+     "value": 0.014542102813720703,
+     "at": "under g-cape-rightShoulder, sprint frame 4 stride 0.75 (female elder build +0)",
+     "over": 81
     },
     "cloth kneelDown thigh.L None": {
      "value": 0.014336566501064806,
@@ -10714,7 +10708,7 @@
     "hole idle": 0.0,
     "cut idle": 0.0,
     "inner idle": 0.014606485143303871,
-    "innerHole idle": 0.01326722465455532,
+    "innerHole idle": 0.0069103301502764225,
     "cloth walk": 0.017642394853556315,
     "shown walk": 0.0,
     "hole walk": 0.0,
@@ -10726,7 +10720,7 @@
     "hole jog": 0.0,
     "cut jog": 0.0,
     "inner jog": 0.015095146372914314,
-    "innerHole jog": 0.026712022721767426,
+    "innerHole jog": 0.02669624052941799,
     "cloth sprint": 0.003548192299930137,
     "shown sprint": 0.0,
     "hole sprint": 0.0,
