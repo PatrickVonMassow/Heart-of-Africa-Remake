@@ -2771,6 +2771,13 @@ export const VILLAGER_GLTF = {
    *  fades back onto the clip's own foot (a shoved or turned foot eases home
    *  in its swing, never jumps). Calibratable. */
   plantFadeCycle: 0.15,
+  /** How high (multiples of the touch height) a held sole contact rises
+   *  before it lets go; its share of the foot's hold fades from 0.6 touch up
+   *  to here. A heel rolling off over a planted ball carries its own miss,
+   *  and dropped within one frame it shifted the held ball by a third of the
+   *  difference (0.0044 per 60 Hz frame mid walk↔jog band, measured
+   *  15.10.2026). Calibratable. */
+  plantLetGo: 2,
   /** The pelvis under a warped stride (natural-villager-motion steps 5 and 10):
    *  it drops just as far as both legs need to reach their feet, each leg
    *  reaching at most `legReach` of its full length, and at most

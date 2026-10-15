@@ -9,8 +9,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { balance, VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
-import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, newClipGait, shovelOnHungHand, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
+import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
+import { clipGaitPose, clipPoseAt, newClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, newPose, newWorld, sprintWeight, toolInHand } from './villagerRig'
 
@@ -85,6 +85,29 @@ describe('a clip pose on the hung skeleton', () => {
       const want = world.p[i].clone().setY(world.p[i].y - f.sole).multiplyScalar(f.scale)
       expect(drawn[i].distanceTo(want)).toBeLessThan(1e-4)
     }
+  })
+})
+
+describe('a gait clip\'s stance', () => {
+  const clip = (name: string, L: Record<'heel' | 'ball' | 'tip', [number, number][]>) =>
+    ({ name, contacts: { support: { L, R: { heel: [], ball: [], tip: [] } } } }) as unknown as VillagerClip
+
+  it('runs over every overlapping support span, not only those starting at the landing', () => {
+    const c = clip('walk', { heel: [[0, 0.3]], ball: [[0.2, 0.5]], tip: [[0.4, 0.65]] })
+    expect(stanceOf(c, 'L')).toEqual([0, 0.65])
+    // a span after a gap belongs to no stance of this landing
+    const gap = clip('walk', { heel: [[0, 0.3]], ball: [[0.4, 0.5]], tip: [] })
+    expect(stanceOf(gap, 'L')).toEqual([0, 0.3])
+    // the shipped walk carries the foot about two thirds of its cycle
+    const w = stanceOf(asset.clips.walk, 'L')
+    expect(w[1] - w[0]).toBeGreaterThan(0.6)
+  })
+
+  it('is read per clip object: two clips of one name keep their own stance', () => {
+    const a = clip('walk', { heel: [[0, 0.6]], ball: [], tip: [] })
+    const b = clip('walk', { heel: [[0, 0.2]], ball: [], tip: [] })
+    expect(stanceOf(a, 'L')).toEqual([0, 0.6])
+    expect(stanceOf(b, 'L')).toEqual([0, 0.2])
   })
 })
 
@@ -226,14 +249,21 @@ describe('the clip gait on the ground', () => {
     const b = newPose(n)
     const wa = newWorld(n)
     const wb = newWorld(n)
-    for (const t of [VILLAGER_GLTF.jogThreshold, VILLAGER_GLTF.sprintThreshold]) {
+    // per 0.02 of pace. The walk ↔ jog band syncs the stances of gaits of very
+    // different support (walk 0.675 of the cycle, jog 0.107): the swinging leg
+    // sweeps through part of its cycle across the band, 0.048 at this phase
+    // (measured 15.10.2026; 0.029 while the walk's stance was misread as 0.3)
+    for (const [t, limit] of [
+      [VILLAGER_GLTF.jogThreshold, 0.06],
+      [VILLAGER_GLTF.sprintThreshold, 0.03],
+    ]) {
       const threshold = t * f.legScale * f.scale
       for (let v = threshold - 0.8; v < threshold + 0.8; v += 0.02) {
         clipGaitPose(g, asset, f, v, null, a)
         clipGaitPose(g, asset, f, v + 0.02, null, b)
         forwardKinematics(asset, f.rest0, a, wa)
         forwardKinematics(asset, f.rest0, b, wb)
-        for (let i = 0; i < n; i++) expect(wa.p[i].distanceTo(wb.p[i]), `${t} band at ${v.toFixed(2)}, bone ${asset.bones[i]}`).toBeLessThan(0.03)
+        for (let i = 0; i < n; i++) expect(wa.p[i].distanceTo(wb.p[i]), `${t} band at ${v.toFixed(2)}, bone ${asset.bones[i]}`).toBeLessThan(limit)
       }
     }
   })

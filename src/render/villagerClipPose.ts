@@ -98,34 +98,40 @@ const LEG_BONES = (['L', 'R'] as const).map((s) => [`thigh.${s}`, `shin.${s}`, `
 
 /** A gait clip's stance of one foot (phase it lands, phase it lifts; the
  *  lift may lie past 1), from its support intervals: the earliest touch of
- *  that foot's contacts and the last lift of the stance that touch begins.
- *  [0, 0] without support metadata (no warp). */
+ *  that foot's contacts and the last lift of the continuous support that touch
+ *  begins (overlapping heel/ball/tip spans chain into one stance). Cached per
+ *  clip object, so a replaced clip of the same name is read afresh. [0, 0]
+ *  without support metadata (no warp). */
 export function stanceOf(clip: VillagerClip, side: 'L' | 'R'): [number, number] {
-  const key = clip.name + side
-  const hit = _stance.get(key)
-  if (hit) return hit
-  const sup = clip.contacts?.support?.[side]
-  let out: [number, number] = [0, 0]
-  if (sup) {
-    // the landing: the left foot at 0 (the clips start there), the right one's first touch after a quarter
-    const spans = [...sup.heel, ...sup.ball, ...sup.tip]
-    if (spans.length) {
-      const near = (a: number) => (side === 'L' ? Math.min(a, Math.abs(1 - a)) : Math.abs(a - 0.5))
-      const land = spans.reduce((m, sp) => (near(sp[0]) < near(m[0]) ? sp : m))[0]
-      const start = side === 'L' && land > 0.5 ? land - 1 : land
-      // the stance: every span beginning within a tenth of the landing
-      let lift = start
-      for (const [a, b] of spans) {
-        const a2 = side === 'L' && a > 0.5 ? a - 1 : a
-        if (Math.abs(a2 - start) < 0.1) lift = Math.max(lift, b - (a - a2))
-      }
-      out = [start, lift]
-    }
+  let hit = _stance.get(clip)
+  if (!hit) {
+    hit = { L: readStance(clip, 'L'), R: readStance(clip, 'R') }
+    _stance.set(clip, hit)
   }
-  _stance.set(key, out)
-  return out
+  return hit[side]
 }
-const _stance = new Map<string, [number, number]>()
+const _stance = new WeakMap<VillagerClip, Record<'L' | 'R', [number, number]>>()
+
+function readStance(clip: VillagerClip, side: 'L' | 'R'): [number, number] {
+  const sup = clip.contacts?.support?.[side]
+  if (!sup) return [0, 0]
+  // the left foot's spans late in the cycle belong to its landing at 0 (the clips start there)
+  const spans = [...sup.heel, ...sup.ball, ...sup.tip]
+    .map(([a, b]) => (side === 'L' && a > 0.5 ? [a - 1, b - 1] : [a, b]))
+    .sort((x, y) => x[0] - y[0])
+  if (!spans.length) return [0, 0]
+  // the landing: the left foot at 0, the right one's touch nearest half a cycle
+  const near = (a: number) => (side === 'L' ? Math.abs(a) : Math.abs(a - 0.5))
+  const start = spans.reduce((m, sp) => (near(sp[0]) < near(m[0]) ? sp : m))[0]
+  // the stance: every span beginning within a tenth of the landing, then every
+  // span that begins before the support so far has ended
+  let lift = start
+  for (const [a, b] of spans) {
+    if (a < start - 0.1) continue
+    if (a - start < 0.1 || a <= lift + 1e-6) lift = Math.max(lift, b)
+  }
+  return [start, lift]
+}
 
 /**
  * The phase at which a clip whose foot carries over `clip` (land, lift) shows
@@ -285,18 +291,20 @@ export function clipGaitPose(
     let down = 0
     let firm = 0
     const touch = PLANT_TOUCH * frame.legScale
+    const letGo = G.plantLetGo * touch
     for (const k of CONTACTS) {
       const p = c[k]
       p.z += shift
-      if (!body || p.y >= touch) {
+      if (!body || p.y >= letGo) {
         held[k] = null
         continue
       }
       if (!held[k]) continue
       // a contact rising off the ground lets go gradually, never in one frame
       // (fully held up to 60 % of the touch height: a short leg's toe still
-      // carries where the no-slide test counts it as down)
-      const w = smoothstep(Math.min(1, (touch - p.y) / (0.4 * touch)))
+      // carries where the no-slide test counts it as down), and over a band
+      // above the touch height, so its share of the hold fades over frames
+      const w = smoothstep(Math.min(1, (letGo - p.y) / (letGo - 0.6 * touch)))
       toPerson(frame, body, held[k]!, _h.set(0, 0, 0))
       _miss.x += w * (_h.x - p.x)
       _miss.z += w * (_h.z - p.z)
