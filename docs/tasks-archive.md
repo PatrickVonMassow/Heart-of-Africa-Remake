@@ -34083,3 +34083,10 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Tests: node tests in board-core.test.mjs for handover keeping the start, the session count, and all three format bands including the exact 24 h / 1 year boundaries.
   Scope addition (user, 14.10.2026): "sofern mit vertretbarem Aufwand leistbar - auch bei 1303 alle Karten, inkl. bereits erledigter, nachgezogen werden". The change is applied retroactively to ALL cards, done ones included: start time from the first commit on the point's feat/ branch (the fallback above), session count from available traces (e.g. distinct sessions/commits on the branch); the new time-span format applies to every card. A card without traceable data keeps its current value; the closing note states how many.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1356. Bounded waits: owner polling loops on a build log need a timeout and a stall report
+  Queue position: directly after point 1303 (user order 14.10.2026: "Okay, das nach 1303 einreihen").
+  Problem: the batch owner waits on long builds with unbounded shell loops of the form `until grep -q "^exit " $LOG; do sleep 20; done`. Measured 14.10.2026 (point 1342 villager build, owner session d32316f0): the build log was silent from 02:06 to 05:42 while 10 Blender processes ran at 100 % CPU; the owner could not tell a slow run from a hung one, and a genuine hang would have stalled the batch forever with nobody notified. This run turned out slow, not hung (exit 1 at 05:42 with 30 garments over penetration tolerance).
+  Final state: an owner wait on a background build/log has a timeout, and log silence beyond a stall threshold is reported (board/chat) instead of waited out silently; a timeout or stall is diagnosed, not retried blindly. Use an existing mechanism where one fits (infrastructure freeze, CLAUDE.md §2: no new guard or framework; a documented wait helper or rule suffices).
+  Verifiable: a unit test showing a wait on a never-finishing log ends with a stall report within the configured bound.
+  Bundle: Session- & Repo-Hygiene.

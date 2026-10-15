@@ -77,13 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1356. Bounded waits: owner polling loops on a build log need a timeout and a stall report
-  Queue position: directly after point 1303 (user order 14.10.2026: "Okay, das nach 1303 einreihen").
-  Problem: the batch owner waits on long builds with unbounded shell loops of the form `until grep -q "^exit " $LOG; do sleep 20; done`. Measured 14.10.2026 (point 1342 villager build, owner session d32316f0): the build log was silent from 02:06 to 05:42 while 10 Blender processes ran at 100 % CPU; the owner could not tell a slow run from a hung one, and a genuine hang would have stalled the batch forever with nobody notified. This run turned out slow, not hung (exit 1 at 05:42 with 30 garments over penetration tolerance).
-  Final state: an owner wait on a background build/log has a timeout, and log silence beyond a stall threshold is reported (board/chat) instead of waited out silently; a timeout or stall is diagnosed, not retried blindly. Use an existing mechanism where one fits (infrastructure freeze, CLAUDE.md §2: no new guard or framework; a documented wait helper or rule suffices).
-  Verifiable: a unit test showing a wait on a never-finishing log ends with a stall report within the configured bound.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1355. Live measurement: a board chat message sent during a blocking owner call is answered within 3 minutes
   Queue position: directly after point 1352 (it measures that point's merged fixes).
   Source: split from point 1352 (13.10.2026); carries the original live-measurement spec, its attempt history and the user-approved amendment step 3.
