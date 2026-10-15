@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { VILLAGER_GLTF } from '../config/balance'
+import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { legScale, morphInfluences, restHeads } from './villagerBody'
@@ -227,6 +227,34 @@ describe('the tool is held in the hand bone', () => {
       const leftFist = asset.toolHold.L.offset.clone().applyQuaternion(world.q[hL]).add(world.p[hL])
       expect(leftFist.distanceTo(otherGrip)).toBeLessThan(0.01)
     }
+  })
+
+  it('in the dig clip the head follows the blade tip frame by frame, not a fixed point', () => {
+    const dig = asset.clips.dig
+    const pose = newPose(asset.bones.length)
+    const world = newWorld(asset.bones.length)
+    const hR = asset.bones.indexOf('hand.R')
+    const ih = asset.bones.indexOf('head')
+    const frames = Array.from({ length: 24 }, (_, f) => {
+      sampleClip(dig, (dig.duration * f) / 24, pose)
+      forwardKinematics(asset, asset.rest, pose, world)
+      const tool = toolInHand(asset, 'R', dig.tool!.grip)
+      const q = world.q[hR].clone().multiply(tool.quaternion)
+      const origin = tool.position.clone().applyQuaternion(world.q[hR]).add(world.p[hR])
+      const tip = origin.add(new THREE.Vector3(0, VILLAGER_ASSET.shovel.tip, 0).applyQuaternion(q))
+      const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(world.q[ih])
+      return { tip, head: world.p[ih].clone(), fwd }
+    })
+    const off = (k: number, target: THREE.Vector3) => frames[k].fwd.angleTo(target.clone().sub(frames[k].head))
+    // where the blade has moved away from its first-frame place, the head
+    // looks nearer the moving tip than that fixed place (the bug aimed at it)
+    let judged = 0
+    for (let k = 1; k < frames.length; k++) {
+      if (frames[k].tip.distanceTo(frames[0].tip) < 0.15) continue
+      judged++
+      expect(off(k, frames[k].tip)).toBeLessThan(off(k, frames[0].tip))
+    }
+    expect(judged).toBeGreaterThan(4)
   })
 })
 
