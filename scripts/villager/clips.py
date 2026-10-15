@@ -426,15 +426,25 @@ def restyle(c, name, joints, style):
     bend_mean = {side: float(np.mean([bend_of(fk(f)[1], side)[2] for f in range(n)])) for side in ('L', 'R')}
     for f in range(n):
         q, h = Q[f], P[f]
-        wr0, _wp = rig.fk(joints, q, h)
+        wr0, wp0 = rig.fk(joints, q, h)
         head0 = wr0[SK.INDEX['head']].copy()
         if hips_yaw:
             _turn(joints, q, h, 'hips', Y, -hips_yaw)
-            wr0, _wp = rig.fk(joints, q, h)
+            wr0, wp0 = rig.fk(joints, q, h)
             head0 = wr0[SK.INDEX['head']].copy()
         if 'hipsTilt' in s:
             _turn(joints, q, h, 'hips', X, hips_off)
             _hold(joints, q, h, ['thigh.L', 'thigh.R'], wr0)
+            # the turned hips carry the thigh heads along, and the legs kept
+            # their world turn moved the feet with them, by a little more or
+            # less every frame: a planted sprint foot slid under the runtime
+            # hold (0.0041 per 120 Hz frame for the no-slide test's 0.004).
+            # Each leg is bent back onto its foot's own place and turn, its
+            # knee toward where it was.
+            for side in ('L', 'R'):
+                fi, si = SK.INDEX['foot.' + side], SK.INDEX['shin.' + side]
+                hip = rig.fk(joints, q, h)[1][SK.INDEX['thigh.' + side]]
+                two_bone(joints, q, h, 'thigh.' + side, 'shin.' + side, wp0[fi], wp0[si] - hip, wr0[fi], 'foot.' + side)
         if 'chestTilt' in s:
             _turn(joints, q, h, 'chest', X, chest_off)
         if 'chestTwist' in s:
