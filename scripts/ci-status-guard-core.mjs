@@ -1059,10 +1059,12 @@ export async function sweepTargets({
     const sibling = exempt ? unfinishedRun(runs, target.sha, gate) : null
     if (sibling) {
       const siblingVerdict = refVerdict({ state: 'pending', at, now })
+      // Past the budget too, the observation stays the sibling's pending one, so
+      // reconciliation still opens a durable wait (review 15.10.2026).
+      Object.assign(observations.at(-1), { classification: sibling, verdict: siblingVerdict })
       if (siblingVerdict === 'wait') {
         const wait = waitReason(target, sibling)
         waiting ??= wait
-        Object.assign(observations.at(-1), { classification: sibling, verdict: 'wait' })
         nextCache[target.sha] = {
           state: 'pending', firstSeenAt: at, checkedAt: now, reason: wait,
           runId: sibling.runId ?? null, workflowName: sibling.workflowName ?? null,

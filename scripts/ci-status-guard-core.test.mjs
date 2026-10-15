@@ -1344,6 +1344,20 @@ describe('charged reds', () => {
     })
   }
 
+  // Review 15.10.2026, P2: past the budget the sibling wait still reaches the
+  // durable wait through reconciliation instead of reading as a red.
+  it('a charged red beside a running workflow past the budget keeps a durable pending wait', async () => {
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const stale = { ...featTarget, at: NOW - WAIT_BUDGET_MS - 1000 }
+    const got = await sweep({ targets: [stale], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.failedOpen).toHaveLength(1)
+    expect(got.cache[BRANCH]).toMatchObject({ state: 'pending' })
+    expect(got.observations.at(-1)).toMatchObject({ verdict: 'gave-up', classification: { state: 'pending', runId: 5 } })
+    const wait = reconcileCiWait(null, got.observations, { now: NOW, makeWakeToken: () => 'tok' })
+    expect(wait).toMatchObject({ state: 'pending', runId: 5, wakeToken: 'tok' })
+  })
+
   it('a charged red whose sibling workflows all finished is exempt', async () => {
     const done = run({ headSha: BRANCH, conclusion: 'success', databaseId: 5, workflowName: 'Pages' })
     const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), done] }, chargedRuns: fromTasks(tasks) })
