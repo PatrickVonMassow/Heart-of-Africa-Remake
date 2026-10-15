@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -10,6 +10,8 @@ import {
 } from './decision-card-guard.mjs'
 import { boardHtml } from './dashboard-guard-fixtures.mjs'
 import { buildResponderPrompt } from './chat-watcher-core.mjs'
+import { projectSlug } from './context-watermark.mjs'
+import { REPO_ROOT } from './repo-paths.mjs'
 
 const dir = mkdtempSync(join(tmpdir(), 'vdzk-answer-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -82,6 +84,25 @@ describe('the transcript user-message boundary', () => {
       promptSource: 'typed',
       isSidechain: true,
     }))).toBeNull()
+  })
+
+  // Measured 03.10.2026 in the head session's transcript: this CLI writes a
+  // human prompt as promptSource "sdk" with origin.kind "human"; no entry says
+  // "typed". Peer messages and task notifications carry other origin kinds.
+  it('arms a human-origin prompt written with promptSource "sdk"', () => {
+    expect(extractLastUserMessage(entry({
+      promptSource: 'sdk',
+      origin: { kind: 'human' },
+      turnOrigin: 'human',
+      message: { content: [{ type: 'text', text: 'Verwerfen.' }] },
+    }))).toEqual({ id: 'message', text: 'Verwerfen.' })
+    for (const kind of ['peer', 'task-notification', 'coordinator']) {
+      expect(extractLastUserMessage(entry({
+        promptSource: 'sdk',
+        origin: { kind },
+        message: { content: [{ type: 'text', text: 'Maschinentext.' }] },
+      }))).toBeNull()
+    }
   })
 
   it('rejects a typed content array carrying a tool result', () => {
@@ -274,6 +295,50 @@ describe('vdzk-answer carries the decision with its deadline', () => {
     writeFileSync(answersPath, '{broken')
     expect(() => run('vdzk-answer.mjs', ['Kartenschrift', '--answer', 'Schrift bleibt.'])).toThrow(/unreadable/)
     expect(readFileSync(answersPath, 'utf8')).toBe('{broken')
+  })
+})
+
+describe('a standing-down head session carries its answer without a seeded entry', () => {
+  // The state shape measured 03.10.2026: every headless session's entry has a
+  // null userMessage and the head session has none at all; the harness exports
+  // CLAUDE_CODE_SESSION_ID, not CLAUDE_SESSION_ID.
+  it('records the answer from the head session\'s own transcript', () => {
+    const head = 'head-session-036dac43'
+    const home = join(dir, 'home')
+    const projectDir = join(home, '.claude', 'projects', projectSlug(REPO_ROOT))
+    mkdirSync(projectDir, { recursive: true })
+    writeFileSync(join(projectDir, `${head}.jsonl`), [
+      JSON.stringify({ type: 'user', uuid: 'clear', message: { content: '<command-name>/clear</command-name>' } }),
+      JSON.stringify({
+        type: 'user',
+        uuid: 'head-verwerfen',
+        promptSource: 'sdk',
+        origin: { kind: 'human' },
+        message: { content: [{ type: 'text', text: 'Ja, die Karte verwerfen.' }] },
+      }),
+      JSON.stringify({ type: 'user', uuid: 'notice', promptSource: 'system', message: { content: '[Cross-session delivery notice] held' } }),
+    ].join('\n'))
+    writeFileSync(boardPath, boardHtml({ klaerungExtra: titles }))
+    writeFileSync(statePath, JSON.stringify({
+      version: 2,
+      sessions: {
+        'headless-a': { titles, userMessage: null, review: null, at: Date.now(), seededAtTurnStart: true },
+        'headless-b': { titles, userMessage: null, review: null, at: Date.now(), seededAtTurnStart: true },
+      },
+    }))
+    rmSync(answersPath, { force: true })
+    const headEnv = { ...env, HOME: home, USERPROFILE: home, CLAUDE_CODE_SESSION_ID: head }
+    delete headEnv.CLAUDE_SESSION_ID
+    execFileSync(process.execPath, [join(process.cwd(), 'scripts', 'vdzk-answer.mjs'), 'Freigabe', '--answer', 'verwerfen'], {
+      cwd: process.cwd(), env: headEnv, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const [entry] = JSON.parse(readFileSync(answersPath, 'utf8'))
+    expect(entry).toMatchObject({
+      cardTitle: titles[1],
+      answer: 'verwerfen',
+      sourceSessionId: head,
+      sourceMessageId: 'head-verwerfen',
+    })
   })
 })
 
