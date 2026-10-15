@@ -338,11 +338,15 @@ def dig_clip(body, clips, cfg):
             # elbows out, down and back IN THE CHEST'S FRAME: a pole fixed in
             # the world swung through the shoulder→wrist line as the trunk
             # turned, and the hinge flipped (the left forearm jumped ~0.6 rad
-            # between two frames at the lever)
+            # between two frames at the lever). Both poles mirror each other:
+            # the left one further back ([0.6, -0.4, -0.4]) lay near the
+            # shoulder→wrist line of the capped lean as the upper hand dropped
+            # to the press, and the left upper arm swung 9.6 rad/s there (5.7
+            # mirrored, measured 15.10.2026)
             wr_, _wp = world_of(joints, q, hips)
             Wc = _quat_mat(wr_[SK.INDEX['chest']])
             mr = hand_on_tool(body, joints, q, hips, 'R', tool_pos, tool_rot, DIG_GRIP['R'], Wc @ np.array([-0.6, -0.5, -0.3]), thumb_up=True)
-            ml = hand_on_tool(body, joints, q, hips, 'L', tool_pos, tool_rot, DIG_GRIP['L'], Wc @ np.array([0.6, -0.4, -0.4]), thumb_up=True)
+            ml = hand_on_tool(body, joints, q, hips, 'L', tool_pos, tool_rot, DIG_GRIP['L'], Wc @ np.array([0.6, -0.5, -0.3]), thumb_up=True)
             solve.last = (mr, ml)
             return q, hips, max(mr, ml)
 
