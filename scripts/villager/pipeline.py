@@ -79,6 +79,8 @@ def main():
     steps = ['body', 'clips', 'garments', 'export', 'sheets', 'penetration'] if a.step == 'all' else a.step.split(',')
     import mask as MK
     MK.selftest()
+    import gaitplots as GPL
+    GPL.selftest()
     if 'garments' in steps or 'selftest' in steps:
         import fit as F
         F.selftest()

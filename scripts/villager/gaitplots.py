@@ -30,14 +30,30 @@ def knee_flexion(joints, clip):
     return out
 
 
-def contact_fraction(spans):
-    """The share of the cycle a foot carries on any of its contacts."""
-    grid = np.zeros(400, bool)
+def contact_fraction(spans, cells=400):
+    """The share of the cycle a foot carries on any of its contacts: the grid
+    cells whose centre lies in some interval (the intervals may run past 1)."""
+    centre = (np.arange(cells) + 0.5) / cells
+    grid = np.zeros(cells, bool)
     for k in ('heel', 'ball', 'tip'):
         for a, b in spans[k]:
-            for x in np.arange(a, b, 1 / 400):
-                grid[int(round(x * 400)) % 400] = True
+            grid |= ((centre - a) % 1.0) < (b - a)
     return float(grid.mean())
+
+
+def selftest():
+    """contact_fraction on known unions (no Blender needed)."""
+    one = lambda *iv: {'heel': list(iv), 'ball': [], 'tip': []}  # noqa: E731
+    near = lambda x, want: abs(x - want) <= 1 / 400  # noqa: E731
+    # a short span counts every cell it covers once (the rounded sampling
+    # mapped consecutive samples onto one cell and lost the next)
+    assert near(contact_fraction(one([15 / 32, 16 / 32])), 1 / 32)
+    assert near(contact_fraction(one([0.2, 0.2 + 0.6])), 0.6)
+    # overlapping spans count their union; a span past 1 wraps
+    assert near(contact_fraction(one([0, 0.3], [0.2, 0.5])), 0.5)
+    assert near(contact_fraction(one([0.9, 1.1])), 0.2)
+    assert near(contact_fraction({'heel': [[0, 0.25]], 'ball': [[0.5, 0.75]], 'tip': [[0.1, 0.2]]}), 0.5)
+    print('gaitplots selftest: ok')
 
 
 def _x(p):
