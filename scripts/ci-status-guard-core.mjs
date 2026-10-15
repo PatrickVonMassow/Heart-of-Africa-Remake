@@ -262,6 +262,25 @@ export function failedRuns(runs, headSha, gate = {}) {
 }
 
 /**
+ * The first workflow whose NEWEST run on this head has not completed, in the
+ * shape `classifyRuns` gives a pending one; null when every workflow finished.
+ * A charged red must not release the turn while a sibling is still running
+ * (review 15.10.2026): `classifyRuns` names the red and hides that wait.
+ */
+export function unfinishedRun(runs, headSha, gate = {}) {
+  try {
+    if (!Array.isArray(runs) || !headSha) return null
+    const newestPerWorkflow = newestPerWorkflowFrom(scopeToBranch(verdictRuns(gatedRuns(runs, gate), headSha), gate?.branch))
+    for (const r of newestPerWorkflow.values()) {
+      if (String(r?.status ?? '') !== 'completed') return { state: 'pending', runId: runId(r), workflowName: runName(r) }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
  * The workflows whose NEWEST run on this head completed with a conclusion that
  * is not a failure (an unknown conclusion counts too) — i.e. the ones whose
  * waiver clock no longer applies.
@@ -741,7 +760,7 @@ export function chargedRunIds(tasksText, branch) {
 /** True when EVERY blocking red run id on `branch` is charged to its owning
  *  open point; an empty list, or any red without an id, exempts nothing. main
  *  is never exempt, whatever the injected source says. */
-function isCharged(chargedRuns, branch, runIds) {
+export function isCharged(chargedRuns, branch, runIds) {
   const ids = Array.isArray(runIds) ? runIds : []
   if (!branch || branch === 'main' || ids.length === 0) return false
   if (ids.some((id) => id == null || String(id) === '')) return false
@@ -1009,14 +1028,33 @@ export async function sweepTargets({
     // The exemption needs EVERY blocking red on the sha charged, not just the
     // chosen one (review 15.10.2026): a charged A must not hide an uncharged B.
     const runIds = blockingRunIds({ judged, runs, sha: target.sha, branch: gate.branch, chosen })
+    const exempt = Boolean(gates && reason) && isCharged(chargedRuns, gate.branch, runIds)
+    // A charged red is no settled exemption while another workflow on the sha is
+    // still running: that one is waited for as usual and nothing is cached as
+    // failed, so the next sweep judges the sha again (review 15.10.2026).
+    const sibling = exempt ? unfinishedRun(runs, target.sha, gate) : null
+    if (sibling) {
+      const siblingVerdict = refVerdict({ state: 'pending', at, now })
+      if (siblingVerdict === 'wait') {
+        const wait = waitReason(target, sibling)
+        waiting ??= wait
+        Object.assign(observations.at(-1), { classification: sibling, verdict: 'wait' })
+        nextCache[target.sha] = {
+          state: 'pending', firstSeenAt: at, checkedAt: now, reason: wait,
+          runId: sibling.runId ?? null, workflowName: sibling.workflowName ?? null,
+          ...keepRerunBudget,
+        }
+      } else {
+        failedOpen.push(`${target.ref} ${String(target.sha).slice(0, 7)}: its run never concluded — waited past the budget`)
+        nextCache[target.sha] = { state: 'pending', firstSeenAt: at, checkedAt: now, ...keepRerunBudget }
+      }
+      continue
+    }
     nextCache[target.sha] = {
       state: 'failed', firstSeenAt: at, checkedAt: now, reason, runId: chosen.runId ?? null, runIds, branch: gate.branch,
     }
-    if (gates && reason) {
-      if (isCharged(chargedRuns, gate.branch, runIds)) {
-        charged.push({ ref: target.ref, sha: target.sha, runId: runIds.join(',') })
-      } else block ??= reason
-    }
+    if (exempt) charged.push({ ref: target.ref, sha: target.sha, runId: runIds.join(',') })
+    else if (gates && reason) block ??= reason
   }
 
   // A workflow still dying the famine way KEEPS its clock; one this sweep judged

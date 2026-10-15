@@ -1329,6 +1329,34 @@ describe('charged reds', () => {
     expect(fromObserver.decision).toBe('RED')
   })
 
+  // Third review 15.10.2026: a charged red does not release the turn while
+  // another workflow on the sha is still running.
+  for (const order of ['red-first', 'running-first']) {
+    it(`a charged red beside a running workflow waits instead of exempting (${order})`, async () => {
+      const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+      const runs = order === 'red-first' ? [...red(BRANCH), running] : [running, ...red(BRANCH)]
+      const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: runs }, chargedRuns: fromTasks(tasks) })
+      expect(got.decision).toContain('NOT yet concluded')
+      expect(got.charged).toEqual([])
+      expect(got.cache[BRANCH]).toMatchObject({ state: 'pending', runId: 5, workflowName: 'Pages' })
+      expect(got.observations.at(-1)).toMatchObject({ verdict: 'wait', classification: { state: 'pending', runId: 5 } })
+    })
+  }
+
+  it('a charged red whose sibling workflows all finished is exempt', async () => {
+    const done = run({ headSha: BRANCH, conclusion: 'success', databaseId: 5, workflowName: 'Pages' })
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), done] }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    expect(got.cache[BRANCH].state).toBe('failed')
+  })
+
+  it('an uncharged red beside a running workflow still blocks', async () => {
+    const running = run({ headSha: BRANCH, status: 'queued', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks('') })
+    expect(got.decision).toContain('RED')
+  })
+
   // Review 15.10.2026, P2: reported once per session, again in a new one.
   it('a charged red is reported once per session and again in a new session', () => {
     const c = [{ ref: featTarget.ref, sha: BRANCH, runId: RUN }]

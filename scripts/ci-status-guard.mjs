@@ -39,7 +39,9 @@ import {
   blockingRunIds,
   chargedReportsDue,
   chargedRunIds,
+  isCharged,
   observedShaEntry,
+  unfinishedRun,
   refBranch,
   ciWaitBackoffMs,
   ciWaitIdentity,
@@ -837,6 +839,18 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
   return { applicable: true, inputs: { decision: swept.decision, failedOpen: swept.failedOpen } }
 }
 
+/** Whether the red the observer judged is charged to its branch's open point. */
+function observerRedIsCharged(wait, judged, runs, chosen) {
+  try {
+    const branch = targetBranch(wait)
+    const tasksText = readFileSync(repoPath('TASKS.md'), 'utf8')
+    const runIds = blockingRunIds({ judged, runs, sha: wait.sha, branch, chosen })
+    return isCharged((b) => chargedRunIds(tasksText, b), branch, runIds)
+  } catch {
+    return false
+  }
+}
+
 /** Claim and run the renewable observer. Its ownership is stored on the wait,
  * not in process memory, so a duplicate spawn loses harmlessly and a launcher
  * restart can replace a dead observer without replacing the wake token. */
@@ -948,6 +962,11 @@ async function observeDurableWait(wakeToken) {
         }
       } catch { /* an undecidable red remains a repository repair path */ }
       if (classification.state === 'pending') {
+        await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
+        continue
+      }
+      // A charged red does not finish the wait while a sibling workflow runs.
+      if (!standDown && unfinishedRun(runs, wait.sha, { branch: targetBranch(wait) }) && observerRedIsCharged(wait, judgedRed, runs, classification)) {
         await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
         continue
       }

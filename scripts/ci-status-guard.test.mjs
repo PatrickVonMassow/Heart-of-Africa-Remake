@@ -63,4 +63,10 @@ describe('the CI guard wires the durable observer', () => {
     expect(code).toMatch(/chargedReportsDue\(current\.chargedReport, sessionId, swept\.charged\)/)
     expect(code).toMatch(/chargedReport: report\.next/)
   })
+
+  it('keeps observing a charged red while a sibling workflow is unfinished', () => {
+    const observer = code.slice(code.indexOf('async function observeDurableWait'))
+    expect(observer.indexOf('observerRedIsCharged(wait')).toBeLessThan(observer.indexOf('await notifyCiRed('))
+    expect(observer).toMatch(/unfinishedRun\(runs, wait\.sha/)
+  })
 })
