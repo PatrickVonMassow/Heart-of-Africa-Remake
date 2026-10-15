@@ -267,6 +267,19 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     return garments
 
 
+def tailor(src_dir, mh, body, clips, cfg):
+    """The garments step: built round the body, fitted (`fit`) to the clips
+    WITHOUT their style (VILLAGER_ASSET.clipStyle, clips.restyle), then
+    settled (`settle`). Fitted to the restyled walk, sprint and idle, the
+    rest-pose pushes drove the trousers into the legs in the build pose deeper
+    than the settle clears (build pose 20/31 garments within tolerance against
+    29/31 unstyled, measured 15.10.2026); the exported clips keep their style."""
+    import clips as CL
+    import garments as G
+    plain = CL.build_clips(src_dir, body, cfg, style=False) if cfg['VILLAGER_ASSET']['clipStyle'] else clips
+    return settle(body, fit(body, plain, G.build_garments(mh, body, plain, cfg), cfg), cfg)
+
+
 # The body corners in the order their morphs can be settled: each corner's
 # morph weights are those of a corner before it plus ONE morph of its own (None:
 # the neutral corner, the rest positions), so a corner settled later never

@@ -513,7 +513,9 @@ def slice_clip(c, t0, t1, name):
             'source': c['source'] + f' {t0:.2f}–{t1:.2f}s'}
 
 
-def build_clips(src_dir, body, cfg, only=None):
+def build_clips(src_dir, body, cfg, only=None, style=True):
+    """The retargeted clips; `style=False` leaves the clip style out (the
+    motion the garments are tailored to, pipeline.py)."""
     import os
     joints = body['joints']
     cp = contact_points(body)
@@ -544,7 +546,8 @@ def build_clips(src_dir, body, cfg, only=None):
             # the jog snaps its knee straight at the strike as the sprint does (~28 rad/s)
             soften(c, 2)
         # the style offsets (natural-villager-motion step 6), before the grounding
-        restyle(c, name, joints, cfg['VILLAGER_ASSET']['clipStyle'])
+        if style:
+            restyle(c, name, joints, cfg['VILLAGER_ASSET']['clipStyle'])
         if kind == 'gait':
             ground(c, joints, cp, per_frame=(name != 'sprint' and name != 'jog'))
             an = analyse_gait(c, joints, cp)

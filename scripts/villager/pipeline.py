@@ -4,7 +4,8 @@
   body        MakeHuman base → decimated body, morphs, joints, weights (cached)
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
   garments    each dress form built round the body, weights transferred,
-              fitted to every clip frame at every body corner, then settled
+              fitted to every frame of the clips without their style at every
+              body corner, then settled
               clear of the body and the inner layers in the build pose at
               every body corner (fit.py) (cached)
   (mask)      each garment's cover mask over the body and the garments of
@@ -105,10 +106,8 @@ def main():
         clips = cached(a.work, 'clips', lambda: CL.build_clips(a.src, body, cfg), force='clips' in steps, key=keys['clips'])
     garments = None
     if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
-        import garments as G
         import fit as F
-        garments = cached(a.work, 'garments', lambda: F.settle(body, F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg),
-                          force='garments' in steps, key=keys['garments'])
+        garments = cached(a.work, 'garments', lambda: F.tailor(a.src, mh, body, clips, cfg), force='garments' in steps, key=keys['garments'])
     if garments is not None and clips is not None:
         # the mask over every pose costs minutes: cached on its inputs, its own
         # code and what its motion evaluation reads (MK.motion_key)
