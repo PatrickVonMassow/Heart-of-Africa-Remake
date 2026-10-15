@@ -139,6 +139,15 @@ node scripts/verify/run-wait.mjs --receipt [<log>]                 # a finished 
 `--await` returns when the run is over and prints its receipt; neither counts as
 a poll, because nobody looked. With no `<log>` both resolve the newest run.
 
+**A build log with no verify record** (a Blender build ending in `exit <code>`)
+is awaited with `run-wait.mjs --await-log <log> [--done '<regex>'] [--timeout <s>]
+[--stall <s>]`, never `until grep … ; do sleep; done` (point 1356). It ends DONE
+(default marker `^exit `; exit 0, or 1 for a non-zero build code), STALLED (no
+log growth for 30 min; exit 5) or TIMEOUT (6 h; exit 3), both calibratable in
+`run-wait-core.mjs`. A stall or timeout prints the last write age, log size and
+last lines for a diagnosis; it is never retried blindly. Run it in the
+background when it may outlast the 10-minute shell cap.
+
 **3. Where a look is genuinely unavoidable, it is COUNTED.**
 
 ```

@@ -28,6 +28,9 @@ not need it and must not act on it.
   second author is building buys a slower run and a redder one. This is
   scheduling, not construction: no guard enforces it, and `--plan` printing the
   observed band is the whole of its machinery.
+- Await a background build log with `node scripts/verify/run-wait.mjs
+  --await-log <log>` (as a background call), never an `until grep` loop. A
+  STALLED or TIMEOUT result is diagnosed and reported, not re-awaited blindly.
 - User-facing aesthetic judgment is against deployed `main`. A test-green,
   independently picture-checked improvement lands before asking whether it is
   aesthetically good enough. Use a branch preview only when the user's eyes are
