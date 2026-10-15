@@ -13,7 +13,8 @@
 // no alert), so it does not own the supervisor's turn end. The exemption ends with that declaration. A ref that
 // no longer exists is dropped, and terminal answers are cached per sha so the
 // common turn costs no API call. The decision logic lives in
-// ci-status-guard-core.mjs (pure, Vitest-covered).
+// ci-status-guard-core.mjs (pure, Vitest-covered). A feature ref's red that its
+// open TASKS.md point charges by run id is reported on stderr, not blocked.
 //
 // Fail-OPEN above all: CI pending past the wait budget, no run yet, offline,
 // non-200, any internal error → allow, so the guard can never freeze a session
@@ -35,6 +36,8 @@ import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import {
   acknowledgeCiWaitState,
   blockReason,
+  chargedRunIds,
+  refBranch,
   ciWaitBackoffMs,
   ciWaitIdentity,
   classifyRuns,
@@ -720,7 +723,15 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
     return { applicable: true, inputs: { decision: null, failedOpen: [] } }
   }
 
+  // Unreadable TASKS.md → nothing charged, so every red still blocks.
+  let tasksText = ''
+  try {
+    tasksText = readFileSync(repoPath('TASKS.md'), 'utf8')
+  } catch {
+    /* fail-safe */
+  }
   const swept = await sweepTargets({
+    chargedRuns: (branch) => chargedRunIds(tasksText, branch),
     targets,
     cache,
     notified,
@@ -785,6 +796,14 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
       })
     }
     startWaitObserver(durableWait)
+  }
+
+  if (!readOnly && swept.charged?.length > 0) {
+    console.error(
+      `ci-status-guard reported, charged to point ${swept.charged
+        .map((c) => `${/^feat\/(\d+)-/.exec(refBranch(c.ref))?.[1] ?? '?'}: ${c.ref} ${String(c.sha).slice(0, 7)} run ${c.runId}`)
+        .join('; ')}`,
+    )
   }
 
   // A fail-open SAYS why (point 387): a silently swallowed API error is
