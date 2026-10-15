@@ -11,6 +11,7 @@ import {
   ciWaitBackoffMs,
   ciWaitIdentity,
   ciRedAlertMessage,
+  blockingRunIds,
   chargedReportsDue,
   chargedRunIds,
   classifyRuns,
@@ -1284,6 +1285,48 @@ describe('charged reds', () => {
     const uncharged = await sweep({ targets: [featTarget], cache: { [BRANCH]: entry }, chargedRuns: fromTasks('') })
     expect(uncharged.decision).toContain('RED')
     expect(observedShaEntry({ wait, classification: { state: 'success' }, observedAt: t(10) })).not.toHaveProperty('runIds')
+  })
+
+  // Second review 15.10.2026, P1: a cached failed entry exempts only for the
+  // branch that produced it; a sibling feat branch on the same sha does not.
+  it('a cached charge from another branch, or from no branch, does not exempt', async () => {
+    const sibling = { ...featTarget, ref: 'origin/feat/1343-x' }
+    const first = await sweep({ targets: [sibling], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(first.cache[BRANCH]).toMatchObject({ state: 'failed', branch: 'feat/1343-x', runIds: [RUN] })
+    const cross = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks(tasks) })
+    expect(cross.asked).toEqual([])
+    expect(cross.decision).toContain('RED')
+    const { branch: _dropped, ...noBranch } = first.cache[BRANCH]
+    const bare = await sweep({ targets: [featTarget], cache: { [BRANCH]: noBranch }, chargedRuns: fromTasks(tasks) })
+    expect(bare.decision).toContain('RED')
+    const own = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(own.cache[BRANCH].branch).toBe('feat/1342-natural-motion-b')
+    const cachedOwn = await sweep({ targets: [featTarget], cache: own.cache, chargedRuns: fromTasks(tasks) })
+    expect(cachedOwn.decision).toBe(null)
+  })
+
+  // Second review 15.10.2026, P2: an actionable red without a run id can never
+  // be charged, so it keeps the sha blocking next to a charged one.
+  it('an id-less blocking red prevents the exemption', async () => {
+    const got = await sweepTargets({
+      targets: [featTarget], now: NOW,
+      fetchRuns: async () => red(BRANCH),
+      judgeRed: async ({ classification }) => ({ classification, standDown: false, blockingRunIds: [RUN, null] }),
+      notify: async () => {},
+      chargedRuns: fromTasks(tasks),
+    })
+    expect(got.decision).toContain('RED')
+    expect(got.cache[BRANCH].runIds).toEqual([RUN, null])
+    const again = await sweep({ targets: [featTarget], cache: got.cache, chargedRuns: fromTasks(tasks) })
+    expect(again.decision).toContain('RED')
+    const idless = run({ headSha: BRANCH, conclusion: 'failure', databaseId: undefined, workflowName: 'Pages' })
+    const ids = blockingRunIds({ runs: [...red(BRANCH), idless], sha: BRANCH, branch: 'feat/1342-natural-motion-b' })
+    expect(ids).toContain(null)
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const observed = observedShaEntry({ wait, classification: { state: 'failed', runId: Number(RUN) }, reason: 'RED', runIds: ids, observedAt: t(10) })
+    expect(observed.runIds).toContain(null)
+    const fromObserver = await sweep({ targets: [featTarget], cache: { [BRANCH]: observed }, chargedRuns: fromTasks(tasks) })
+    expect(fromObserver.decision).toBe('RED')
   })
 
   // Review 15.10.2026, P2: reported once per session, again in a new one.

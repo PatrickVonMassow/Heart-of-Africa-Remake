@@ -739,11 +739,12 @@ export function chargedRunIds(tasksText, branch) {
 }
 
 /** True when EVERY blocking red run id on `branch` is charged to its owning
- *  open point; an empty list exempts nothing. main is never exempt, whatever
- *  the injected source says. */
+ *  open point; an empty list, or any red without an id, exempts nothing. main
+ *  is never exempt, whatever the injected source says. */
 function isCharged(chargedRuns, branch, runIds) {
-  const ids = (Array.isArray(runIds) ? runIds : []).filter((id) => id != null)
+  const ids = Array.isArray(runIds) ? runIds : []
   if (!branch || branch === 'main' || ids.length === 0) return false
+  if (ids.some((id) => id == null || String(id) === '')) return false
   try {
     const charged = chargedRuns(branch)
     return ids.every((id) => Boolean(charged?.has(String(id))))
@@ -754,22 +755,27 @@ function isCharged(chargedRuns, branch, runIds) {
 
 /** The run ids that make a red sha block: `judged.blockingRunIds` when the judge
  *  names them, else every failed run on the sha (`failedRuns`), else the chosen
- *  one. Over-inclusion only withholds an exemption, never grants one. */
+ *  one. A red without an id stays as `null`, which `isCharged` never exempts.
+ *  Over-inclusion only withholds an exemption, never grants one. */
 export function blockingRunIds({ judged, runs, sha, branch, chosen } = {}) {
+  const asId = (id) => (id == null ? null : String(id))
   try {
     if (Array.isArray(judged?.blockingRunIds) && judged.blockingRunIds.length > 0) {
-      return judged.blockingRunIds.map(String)
+      return judged.blockingRunIds.map(asId)
     }
-    const all = failedRuns(runs, sha, { branch }).map((r) => r.runId).filter((id) => id != null)
-    if (all.length > 0) return all.map(String)
-    return chosen?.runId != null ? [String(chosen.runId)] : []
+    const all = failedRuns(runs, sha, { branch }).map((r) => asId(r.runId))
+    if (all.length > 0) return all
+    return [asId(chosen?.runId)]
   } catch {
-    return chosen?.runId != null ? [String(chosen.runId)] : []
+    return [asId(chosen?.runId)]
   }
 }
 
-/** The run ids a cached failed entry blocks on (`runIds`, else its `runId`). */
-function entryRunIds(entry) {
+/** The run ids a cached failed entry blocks on (`runIds`, else its `runId`).
+ *  An entry judged under another branch, or under none, yields nothing: its
+ *  ids say nothing about this branch's reds (review 15.10.2026). */
+function entryRunIds(entry, branch) {
+  if (!entry?.branch || entry.branch !== branch) return []
   if (Array.isArray(entry?.runIds)) return entry.runIds
   return entry?.runId != null ? [entry.runId] : []
 }
@@ -785,7 +791,7 @@ export function observedShaEntry({ wait, classification, reason = null, runIds =
     checkedAt: observedAt,
     branch: targetBranch(wait),
     ...(reason ? { reason } : {}),
-    ...(failed ? { runId: classification.runId ?? null, runIds: (runIds ?? []).map(String) } : {}),
+    ...(failed ? { runId: classification.runId ?? null, runIds: (runIds ?? []).map((id) => (id == null ? null : String(id))) } : {}),
   }
 }
 
@@ -859,7 +865,7 @@ export async function sweepTargets({
     if (cached === 'success' || cached === 'nocheck') continue
     if (cached === 'failed') {
       if (gates && entry.reason) {
-        const ids = entryRunIds(entry)
+        const ids = entryRunIds(entry, targetBranch(target))
         if (isCharged(chargedRuns, targetBranch(target), ids)) {
           charged.push({ ref: target.ref, sha: target.sha, runId: ids.map(String).join(',') })
         } else block ??= entry.reason
@@ -1003,7 +1009,9 @@ export async function sweepTargets({
     // The exemption needs EVERY blocking red on the sha charged, not just the
     // chosen one (review 15.10.2026): a charged A must not hide an uncharged B.
     const runIds = blockingRunIds({ judged, runs, sha: target.sha, branch: gate.branch, chosen })
-    nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason, runId: chosen.runId ?? null, runIds }
+    nextCache[target.sha] = {
+      state: 'failed', firstSeenAt: at, checkedAt: now, reason, runId: chosen.runId ?? null, runIds, branch: gate.branch,
+    }
     if (gates && reason) {
       if (isCharged(chargedRuns, gate.branch, runIds)) {
         charged.push({ ref: target.ref, sha: target.sha, runId: runIds.join(',') })

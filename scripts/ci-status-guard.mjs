@@ -620,7 +620,8 @@ async function judgeRed(repo, { sha, branch = '', runs, classification, famine, 
     // waiver clock of one that is no longer dying the famine way.
     judgedWorkflows: judged.map((c) => c.workflowName),
     // The reds something can be done about; a charge must cover all of them.
-    blockingRunIds: judged.filter((c) => c.actionable !== false && c.runId != null).map((c) => String(c.runId)),
+    // An id-less one stays as null, so it can never be charged away.
+    blockingRunIds: judged.filter((c) => c.actionable !== false).map((c) => (c.runId == null ? null : String(c.runId))),
   }
 }
 
