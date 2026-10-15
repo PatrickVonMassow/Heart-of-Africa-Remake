@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="720" height="460" viewBox="0 0 720 460" font-family="sans-serif" font-size="12">
 <rect width="720" height="460" fill="#fcfcfb"/>
-<text x="120" y="22" font-size="15" fill="#0b0b0b">sprint: support and knee over the cycle (0.67 s, 5.99 units/s)</text>
+<text x="120" y="22" font-size="15" fill="#0b0b0b">sprint: support and knee over the cycle (0.67 s, 6.01 units/s)</text>
 <text x="120" y="40" fill="#52514e">contact fraction left 10%, right 10%; loop seam 0.011 rad</text>
 <text x="112" y="69" text-anchor="end" fill="#52514e">left heel</text>
 <rect x="120" y="58" width="576" height="14" fill="#e4e3df" rx="2"/>
@@ -29,10 +29,10 @@
 <line x1="120" x2="696" y1="204.0" y2="204.0" stroke="#e4e3df"/>
 <text x="112" y="208.0" text-anchor="end" fill="#52514e">120°</text>
 <text x="112" y="194" text-anchor="end" fill="#0b0b0b">knee bend</text>
-<polyline points="120.0,318.9 148.8,327.1 177.6,356.2 206.4,371.3 235.2,356.3 264.0,326.1 292.8,296.6 321.6,269.1 350.4,241.6 379.2,217.7 408.0,205.1 436.8,210.3 465.6,234.2 494.4,271.9 523.2,314.7 552.0,353.8 580.8,382.2 609.6,393.1 638.4,378.4 667.2,343.8 696.0,318.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
-<text x="696" y="312.9" text-anchor="end" fill="#0b0b0b">left</text>
-<polyline points="120.0,236.1 148.8,225.8 177.6,229.3 206.4,247.5 235.2,277.2 264.0,311.6 292.8,342.6 321.6,361.0 350.4,358.5 379.2,337.4 408.0,313.2 436.8,307.5 465.6,332.1 494.4,367.6 523.2,379.2 552.0,362.7 580.8,336.7 609.6,310.5 638.4,283.4 667.2,256.9 696.0,236.1" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
-<text x="696" y="230.1" text-anchor="end" fill="#0b0b0b">right</text>
+<polyline points="120.0,316.8 148.8,324.8 177.6,353.7 206.4,369.5 235.2,356.3 264.0,326.6 292.8,297.2 321.6,269.6 350.4,241.9 379.2,217.6 408.0,204.5 436.8,209.2 465.6,232.8 494.4,270.3 523.2,312.9 552.0,351.1 580.8,377.2 609.6,385.2 638.4,373.8 667.2,341.3 696.0,316.8" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+<text x="696" y="310.8" text-anchor="end" fill="#0b0b0b">left</text>
+<polyline points="120.0,235.6 148.8,224.8 177.6,228.0 206.4,246.2 235.2,275.9 264.0,310.2 292.8,340.9 321.6,358.4 350.4,355.8 379.2,335.0 408.0,311.1 436.8,305.4 465.6,329.8 494.4,364.6 523.2,377.2 552.0,362.5 580.8,337.1 609.6,310.9 638.4,283.6 667.2,256.8 696.0,235.6" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+<text x="696" y="229.6" text-anchor="end" fill="#0b0b0b">right</text>
 <text x="120.0" y="422" text-anchor="middle" fill="#52514e">0</text>
 <text x="264.0" y="422" text-anchor="middle" fill="#52514e">0.25</text>
 <text x="408.0" y="422" text-anchor="middle" fill="#52514e">0.5</text>
