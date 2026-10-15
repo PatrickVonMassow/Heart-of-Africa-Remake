@@ -11,6 +11,7 @@ import {
   ciWaitBackoffMs,
   ciWaitIdentity,
   ciRedAlertMessage,
+  chargedRunIds,
   classifyRuns,
   GATE_STATUS_CONTEXT,
   readAllStatusPages,
@@ -1159,5 +1160,72 @@ describe('ciRedAlertMessage', () => {
     expect(message).toContain('nothing in the repository can clear it')
     expect(message).toContain('the Pages queue is empty')
     expect(message).toContain('2026-08-18T02:03:00.000Z')
+  })
+})
+
+// A parked point's red that its OPEN TASKS.md entry charges is reported, not
+// blocked (15.10.2026, run 38591097319); main is never exempt.
+describe('charged reds', () => {
+  const RUN = '38591097319'
+  const tasks = [
+    '- [ ] 1342. Natural villager motion b',
+    `  Charged: run ${RUN} on feat/1342-natural-motion-b is this point's own unfinished state.`,
+    '- [ ] 1343. Another point',
+    '  Mentions run 99999999999 only here.',
+    '- [x] 1344. Closed point',
+    '  run 77777777777',
+  ].join('\n')
+  const red = (sha) => [run({ headSha: sha, conclusion: 'failure', databaseId: Number(RUN) })]
+  const featTarget = { ref: 'origin/feat/1342-natural-motion-b', sha: BRANCH, at: t(120) }
+  const fromTasks = (text) => (branch) => chargedRunIds(text, branch)
+
+  it('chargedRunIds reads only the owning OPEN point block', () => {
+    expect([...chargedRunIds(tasks, 'feat/1342-natural-motion-b')]).toEqual([RUN])
+    expect([...chargedRunIds(tasks, 'feat/1343-x')]).toEqual(['99999999999'])
+    expect(chargedRunIds(tasks, 'feat/1344-x').size).toBe(0) // closed point
+    expect(chargedRunIds(tasks, 'feat/1345-x').size).toBe(0) // no such point
+    expect(chargedRunIds(tasks, 'main').size).toBe(0)
+    expect(chargedRunIds(tasks, 'HEAD').size).toBe(0)
+    expect(chargedRunIds(null, 'feat/1342-x').size).toBe(0)
+  })
+
+  it('a charged red on a feature ref reports without blocking', async () => {
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    expect(got.cache[BRANCH]).toMatchObject({ state: 'failed', runId: Number(RUN) })
+    expect(got.alerts).toHaveLength(1) // notification unchanged
+  })
+
+  it('the same red without the note still blocks', async () => {
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks('- [ ] 1342. x') })
+    expect(got.decision).toContain(featTarget.ref)
+    expect(got.charged).toEqual([])
+    const noSource = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(noSource.decision).toContain('RED')
+  })
+
+  it('a red run on another point charged elsewhere does not exempt this branch', async () => {
+    const other = { ...featTarget, ref: 'origin/feat/1343-x' }
+    const got = await sweep({ targets: [other], runsBySha: { [BRANCH]: red(BRANCH) }, chargedRuns: fromTasks(tasks) })
+    expect(got.decision).toContain('RED')
+  })
+
+  it('main is never exempt, even when the source names the run', async () => {
+    const mainTarget = { ref: 'origin/main', sha: HEAD, at: t(120) }
+    const got = await sweep({ targets: [mainTarget], runsBySha: { [HEAD]: red(HEAD) }, chargedRuns: () => new Set([RUN]) })
+    expect(got.decision).toContain('origin/main')
+    expect(got.charged).toEqual([])
+  })
+
+  it('the cached failed path honours the charge, and blocks without it', async () => {
+    const first = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: red(BRANCH) } })
+    expect(first.decision).toContain('RED')
+    const again = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks(tasks) })
+    expect(again.asked).toEqual([])
+    expect(again.decision).toBe(null)
+    expect(again.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    const uncharged = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks('') })
+    expect(uncharged.decision).toContain('RED')
   })
 })

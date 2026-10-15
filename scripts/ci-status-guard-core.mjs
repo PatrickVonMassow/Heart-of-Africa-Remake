@@ -2,7 +2,9 @@
 // Classifies the GitHub Actions runs for every pushed ref (`refTargets`,
 // `sweepTargets`) and decides block/notify. WHERE a red's cause lies — this
 // repository or GitHub's side — is decided next door in ci-failure-cause-core.mjs
-// and shapes the message blockReason writes. No I/O; the synchronous helpers never
+// and shapes the message blockReason writes. A red on a feature ref whose OPEN
+// point in TASKS.md names its run id (`chargedRunIds`) is reported, not blocked;
+// main is never exempt. No I/O; the synchronous helpers never
 // throw, while `sweepTargets` rejects only when an injected callback does —
 // Vitest-covered in
 // ci-status-guard-core.test.mjs. Accepts both the `gh run list --json` field
@@ -709,6 +711,45 @@ export function notifiedFromState(state) {
 }
 
 /**
+ * The run ids charged to the OPEN point that owns `branch` (`feat/<N>-…`): every
+ * `run <8+ digits>` inside that point's `- [ ] N.` block of the TASKS.md text, up
+ * to the next column-0 `- [` line. main, HEAD and any non-feat branch → empty.
+ *
+ * WHY (15.10.2026, run 38591097319): a parked point's deterministic red cannot be
+ * re-run green and is fixed only by doing that point, so blocking on it burned
+ * every unrelated turn end for the whole push window. The TASKS.md charge note is
+ * the evidence; no ledger of its own.
+ */
+export function chargedRunIds(tasksText, branch) {
+  const ids = new Set()
+  try {
+    const m = /^feat\/(\d+)-/.exec(String(branch ?? ''))
+    if (!m) return ids
+    const lines = String(tasksText ?? '').split(/\r?\n/)
+    const start = lines.findIndex((line) => line.startsWith(`- [ ] ${m[1]}.`))
+    if (start < 0) return ids
+    for (let i = start; i < lines.length; i++) {
+      if (i > start && lines[i].startsWith('- [')) break
+      for (const hit of lines[i].matchAll(/\brun (\d{8,})\b/g)) ids.add(hit[1])
+    }
+  } catch {
+    /* fail-safe: nothing charged, so the red still blocks */
+  }
+  return ids
+}
+
+/** True when the red `runId` on `branch` is charged to its owning open point.
+ *  main is never exempt, whatever the injected source says. */
+function isCharged(chargedRuns, branch, runId) {
+  if (!branch || branch === 'main' || runId == null) return false
+  try {
+    return Boolean(chargedRuns(branch)?.has(String(runId)))
+  } catch {
+    return false
+  }
+}
+
+/**
  * THE SWEEP: judge every pushed target and return the turn-end decision.
  *
  * All I/O is INJECTED (`fetchRuns`, `judgeRed`, `notify`), so the whole
@@ -716,7 +757,10 @@ export function notifiedFromState(state) {
  * and what fails open — is decided here and covered by Vitest without a network
  * or a repository. The wrapper only supplies the GitHub API and ntfy.
  *
- * @returns {{decision: string|null, cache, notified, famine, failedOpen: string[], observations: object[], dirty: boolean}}
+ * `chargedRuns(branch) => Set<string>` names the run ids charged to the branch's
+ * open point (`chargedRunIds`); such a red lands in `charged` instead of blocking.
+ *
+ * @returns {{decision: string|null, cache, notified, famine, failedOpen: string[], charged: object[], observations: object[], dirty: boolean}}
  */
 export async function sweepTargets({
   targets = [],
@@ -727,11 +771,13 @@ export async function sweepTargets({
   fetchRuns,
   judgeRed,
   notify,
+  chargedRuns = () => new Set(),
 } = {}) {
   const nextCache = { ...cache }
   const nextNotified = { ...notified }
   const nextFamine = { ...famine }
   const failedOpen = []
+  const charged = []
   const observations = []
   // The waiver clocks this sweep touched, applied once at the end so the order
   // of the targets cannot decide them.
@@ -754,7 +800,11 @@ export async function sweepTargets({
     // about again while cached — this is what keeps the repeat turn free.
     if (cached === 'success' || cached === 'nocheck') continue
     if (cached === 'failed') {
-      if (gates && entry.reason) block ??= entry.reason
+      if (gates && entry.reason) {
+        if (isCharged(chargedRuns, targetBranch(target), entry.runId)) {
+          charged.push({ ref: target.ref, sha: target.sha, runId: String(entry.runId) })
+        } else block ??= entry.reason
+      }
       continue
     }
     if (cached === 'pending') {
@@ -890,8 +940,12 @@ export async function sweepTargets({
       }
       continue
     }
-    nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason }
-    if (gates && reason) block ??= reason
+    nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason, runId: chosen.runId ?? null }
+    if (gates && reason) {
+      if (isCharged(chargedRuns, gate.branch, chosen.runId)) {
+        charged.push({ ref: target.ref, sha: target.sha, runId: String(chosen.runId) })
+      } else block ??= reason
+    }
   }
 
   // A workflow still dying the famine way KEEPS its clock; one this sweep judged
@@ -905,6 +959,7 @@ export async function sweepTargets({
     notified: nextNotified,
     famine: nextFamine,
     failedOpen,
+    charged,
     observations,
     dirty,
   }
