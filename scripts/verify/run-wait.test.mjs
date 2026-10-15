@@ -325,3 +325,48 @@ describe('--receipt and the failure modes', () => {
     expect(res.stdout).toMatch(/usage:/)
   })
 })
+
+// `--await-log` (point 1356): a bounded wait on a build log with no verify record.
+describe('run-wait --await-log', () => {
+  function buildLog(text, ageMs = 0) {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-awaitlog-'))
+    const log = join(dir, 'build.log')
+    writeFileSync(log, text)
+    if (ageMs) {
+      const t = (Date.now() - ageMs) / 1000
+      utimesSync(log, t, t)
+    }
+    return log
+  }
+
+  it('a never-finishing silent log ends STALLED within the bound, exit 5, with a diagnosis report', () => {
+    const log = buildLog('blender: step 4/9\n')
+    const t0 = Date.now()
+    const r = run(['--await-log', log, '--stall', '1', '--timeout', '20', '--tick', '0.1'])
+    expect(Date.now() - t0).toBeLessThan(10_000)
+    expect(r.status).toBe(5)
+    expect(r.stdout).toMatch(/^STALLED /m)
+    expect(r.stdout).toContain('blender: step 4/9')
+    expect(r.stdout).toMatch(/DIAGNOSE/)
+  })
+
+  it('a done marker returns the build outcome: exit 0 stays 0, exit 1 becomes 1', () => {
+    const ok = run(['--await-log', buildLog('work\nexit 0\n'), '--tick', '0.1'])
+    expect(ok.status).toBe(0)
+    expect(ok.stdout).toMatch(/^DONE .* exit 0$/m)
+    const bad = run(['--await-log', buildLog('work\nexit 1\n'), '--tick', '0.1'])
+    expect(bad.status).toBe(1)
+    expect(bad.stdout).toMatch(/exit 1$/m)
+  })
+
+  it('a timeout ends the wait with exit 3', () => {
+    const r = run(['--await-log', buildLog('working\n'), '--stall', '60', '--timeout', '0.5', '--tick', '0.1'])
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/^TIMEOUT /m)
+  })
+
+  it('refuses a bad threshold and a missing log argument', () => {
+    expect(run(['--await-log', buildLog('x\n'), '--stall', 'abc']).status).toBe(1)
+    expect(run(['--await-log']).status).toBe(2)
+  })
+})
