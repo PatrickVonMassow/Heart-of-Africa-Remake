@@ -44,7 +44,8 @@ the cloth (work-order points 1337, 1334).
 
 The body gets one mask per vertex (hide and push bits over the garments);
 every garment the same over the garments of an OUTER layer (LAYER) that cover
-it (every outfit layering: a figure wears at most one garment per slot). The game reads
+it (every outfit layering: a figure wears at most one garment per slot), a hole
+any body corner shows in the build pose pushed instead (`inner_corners`). The game reads
 the body's mask from villager.glb — attribute _COVER, unsigned shorts (hide
 bits 0-15, hide bits 16-31, push bits 0-15, push bits 16-31); bit k is
 scene.extras.villager.garmentMask.garments[k] (src/render/villagerGarmentMask.ts).
@@ -436,6 +437,66 @@ def masks(body, garments, cfg, clips=None, log=print):
                 cls[b] = c
         inner[n] = to_bits(cls, len(gv[n]))
     return {'garments': names, 'body': to_bits(body_cls, len(bv)), 'inner': inner}
+
+
+def inner_corners(body, garments, cfg, mk, log=print):
+    """`mk` with every inner garment's mask over an outer one (`masks`, read
+    on the neutral body) checked in the build pose at every body corner of the
+    penetration report: a hidden point — or a corner of a hidden triangle
+    whose centre — that has left the outer garment by an opening farther than
+    the tolerance at some corner (a hole, penetration.py `innerHole`) is
+    pushed instead (stays drawn), unless it passes through that garment's
+    cloth past the tolerance at some corner; `exposed` keeps hidden what the
+    un-hiding would draw unclean. Read on the neutral body alone, breast-cloth
+    triangles hidden 0.075 from the right-shoulder cape's hem there hung
+    0.0054 out under it on the elder woman (build pose, measured
+    15.10.2026)."""
+    import gamepath as GP
+    from fit import garment_pos
+    from penetration import CORNERS
+    from sheets import corner_weights, morphed
+    a = cfg['VILLAGER_ASSET']
+    reach, tol = a['garmentMaskOpening'], a['garmentPenetrationTolerance']
+    names, Gm = mk['garments'], garments['meshes']
+    q = G.design_pose(body)
+    pose = build_pose(body)
+    vol = {n: Volume(pose(Gm[n]['pos'], Gm[n]['W']), Gm[n]['tris']) for n in names}
+    posed = []
+    for corner in CORNERS:
+        w = corner_weights(*corner)
+        _p, j = morphed(body, w)
+        person = GP.Person(j)
+        wr, wp = person.pose(q, None, 1)
+        posed.append({n: person.skin(person.bake(garment_pos(Gm[n], w), *top4(Gm[n]['W'])), *top4(Gm[n]['W']), wr, wp) for n in names})
+    inner = {}
+    for n in names:
+        m = mk['inner'][n]
+        cls = {}
+        for b, o in enumerate(names):
+            hide, push = decode(m, names, [o])
+            c = np.where(hide, 1, np.where(push, 2, 0)).astype(np.uint8)
+            if not c.any():
+                continue
+            t = np.asarray(Gm[n]['tris'])
+            ht = np.nonzero((c[t] == 1).all(1))[0]
+            ids = np.nonzero(c == 1)[0]
+            out = np.zeros(len(c), bool)
+            thr = np.zeros(len(c))
+            for gv in posed:
+                smp = np.concatenate([gv[n], gv[n][t[ht]].mean(1)])
+                place, dist = vol[o].where(gv[o], smp, reach, ids=np.concatenate([ids, len(c) + np.arange(len(ht))]))
+                np.maximum(thr, np.where(place[:len(c)] == THROUGH, dist[:len(c)], 0.0), out=thr)
+                hole = (place == OUT) & (dist > tol)
+                out |= hole[:len(c)]
+                out[t[ht[hole[len(c):]]].ravel()] = True
+            k = c.copy()
+            k[(c == 1) & out & (thr <= tol)] = 2
+            k = exposed(c, k, thr > tol, Gm[n]['tris'])
+            if (k != c).any():
+                log(f'mask: {n} under {o} at every body corner: {int(((c == 1) & (k == 2)).sum())} hidden points pushed instead')
+            cls[b] = k
+        inner[n] = to_bits(cls, len(m))
+    return {**mk, 'inner': inner}
 
 
 # ---- the mask over every pose ------------------------------------------------------

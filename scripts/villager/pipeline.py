@@ -113,7 +113,7 @@ def main():
         # code and what its motion evaluation reads (MK.motion_key)
         import hashlib
         key = keys['garments'] + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest() + MK.motion_key(body)
-        garments['mask'] = cached(a.work, 'mask', lambda: MK.masks(body, garments, cfg, clips), key=key)
+        garments['mask'] = cached(a.work, 'mask', lambda: MK.inner_corners(body, garments, cfg, MK.masks(body, garments, cfg, clips)), key=key)
     elif garments is not None:
         garments['mask'] = MK.masks(body, garments, cfg)
     if 'export' in steps:
