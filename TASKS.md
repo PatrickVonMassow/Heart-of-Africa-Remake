@@ -77,21 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1303. Board cards keep the original start time and show dates for long spans
-  Queue position: directly after point 1302, which stands at the very queue front (user order 14.10.2026: "Reihe das 1303 nach 1302 ein.").
-  Why: the card's times are a free string each session passes to `board.mjs promote <point> "<times>"` (board-core.mjs promoteToNow). A successor session writes its own takeover time, so a point worked for many hours shows e.g. "14:00 – 14:30". And a span over 24 h is indistinguishable from a short one without a date.
-  User (05.10.2026): "Wird eine Karte an eine Nachfolgesitzung übergeben, um den Kontext einer Sitzung nicht zu sehr wachsen zu lassen, schreibt die neue Sitzung ihre Übernahmezeit als Startzeit hinein. Dann kommt am Ende so etwas heraus wie dass in der Karte steht, der Task wäre von 14:00 bis 14:30 Uhr bearbeitet worden, obwohl die Bearbeitung eigentlich viele Stunden vor 14 Uhr begonnen hatte und nur die letzte Sitzung, die daran gearbeitet hat, um 14 Uhr begonnen hat." / "Wenn Start- und Endzeit mehr als 24 h auseinanderliegen, ist das nicht erkennbar. In diesem Fall soll auch das Datum mitangegeben werden - zunächst nur im Format DD.MM. Nur, wenn Start- und Endzeit mehr als ein Jahr auseinanderliegen, soll als Format DD.MM.YY verwendet werden."
-  Final state:
-  1. A card's start time is recorded once, at its first promotion to current work (fallback: the first commit on the point's feat/ branch). A session handover / re-promotion never overwrites it; the successor keeps the original start. board-core.mjs promoteToNow and the handover path read the existing start instead of taking the caller's free "<times>" string for it.
-  2. The number of sessions that worked the card is counted; when >1 the time line appends "· <n> Sitzungen".
-  3. Time-span format (Europe/Berlin), by distance between start and end (or now for running cards):
-     - <= 24 h: times only, "09:12 – 14:30" (also across midnight, "23:10 – 01:40")
-     - > 24 h: date added, "03.10. 09:12 – 05.10. 14:30"
-     - > 1 year: date with two-digit year, "03.10.25 09:12 – 05.10.26 14:30"
-  Tests: node tests in board-core.test.mjs for handover keeping the start, the session count, and all three format bands including the exact 24 h / 1 year boundaries.
-  Scope addition (user, 14.10.2026): "sofern mit vertretbarem Aufwand leistbar - auch bei 1303 alle Karten, inkl. bereits erledigter, nachgezogen werden". The change is applied retroactively to ALL cards, done ones included: start time from the first commit on the point's feat/ branch (the fallback above), session count from available traces (e.g. distinct sessions/commits on the branch); the new time-span format applies to every card. A card without traceable data keeps its current value; the closing note states how many.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1356. Bounded waits: owner polling loops on a build log need a timeout and a stall report
   Queue position: directly after point 1303 (user order 14.10.2026: "Okay, das nach 1303 einreihen").
   Problem: the batch owner waits on long builds with unbounded shell loops of the form `until grep -q "^exit " $LOG; do sleep 20; done`. Measured 14.10.2026 (point 1342 villager build, owner session d32316f0): the build log was silent from 02:06 to 05:42 while 10 Blender processes ran at 100 % CPU; the owner could not tell a slow run from a hung one, and a genuine hang would have stalled the batch forever with nobody notified. This run turned out slow, not hung (exit 1 at 05:42 with 30 garments over penetration tolerance).
