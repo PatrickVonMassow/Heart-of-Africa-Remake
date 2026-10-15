@@ -230,9 +230,9 @@ export function applyHandShapes(mesh: THREE.Mesh, w: Record<LiveMorph, number>):
  */
 export function placeShovel(asset: VillagerAsset, person: GltfPerson, c: ClipLayers, tool: THREE.Object3D | null): void {
   if (!tool) return
-  const held = Math.max(c.dig, c.carry)
-  tool.visible = held > 0.5
-  if (!tool.visible) return
+  tool.visible = Math.max(c.dig, c.carry) > 0.5
+  // placed even while hidden: gripShaft solves the left hand onto it from the
+  // dig's first frame, before the shovel shows
   const dig = asset.clips.dig.tool?.grip ?? 0
   const carry = asset.clips.carry.tool?.grip ?? dig
   // the dig layers over everything below it, so its share of the arm is c.dig;

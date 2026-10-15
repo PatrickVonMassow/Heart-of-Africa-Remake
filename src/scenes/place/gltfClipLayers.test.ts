@@ -244,6 +244,22 @@ describe('hands land on the final body (natural-villager-motion step 7)', () => 
         }
   })
 
+  it('fading the dig in, the left hand grips the shovel where the hand holds it, before the shovel shows', () => {
+    const f = figure()
+    // the tool's transform left stale from elsewhere
+    f.tool.position.set(1, 2, 3)
+    const dt = 1 / 60
+    frame(f, 0, 0, { dig: true, tool: true, digT: 0 }, dt)
+    expect(f.c.dig).toBeGreaterThan(0)
+    expect(f.c.dig).toBeLessThan(0.5)
+    expect(f.tool.visible).toBe(false)
+    const dig = asset.clips.dig.tool!.grip
+    const carry = asset.clips.carry.tool?.grip ?? dig
+    const at = shovelOnHungHand(asset, person.frame, 'R', carry + (dig - carry) * f.c.dig)
+    expect(f.tool.position.distanceTo(at.position)).toBeLessThan(1e-9)
+    expect(f.tool.quaternion.angleTo(at.quaternion)).toBeLessThan(1e-9)
+  })
+
   it('leaves the arm to the layers below while nothing is dug', () => {
     const f = figure()
     for (let k = 0; k < 30; k++) frame(f, 0, 0, { dig: false, tool: true }, 1 / 60)
