@@ -34090,3 +34090,10 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Final state: an owner wait on a background build/log has a timeout, and log silence beyond a stall threshold is reported (board/chat) instead of waited out silently; a timeout or stall is diagnosed, not retried blindly. Use an existing mechanism where one fits (infrastructure freeze, CLAUDE.md §2: no new guard or framework; a documented wait helper or rule suffices).
   Verifiable: a unit test showing a wait on a never-finishing log ends with a stall report within the configured bound.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1358. CI guard: a red run charged to a parked point reports instead of blocking
+  Queue position: end of the bundle (owner finding 15.10.2026, real batch blockade under CLAUDE.md §2 finding intake).
+  Problem: ci-status-guard refuses every Stop of the batch session for any recently pushed red ref. On 15.10.2026 run 38591097319 on feat/1342-natural-motion-b (ac8a558) failed deterministically. Under the 14.10. decision that red is the parked point's own unfinished state, and it is charged in TASKS.md under point 1342. A green re-run is impossible, and a fix means doing the parked point. So every turn end of an unrelated point burns context answering the same refusal until the 24 h push window lapses.
+  Final state: a red ref whose owning open point records the charge (its TASKS.md entry names the run id) is reported once per session and does not block; an uncharged red still blocks as today. No new ledger: the TASKS.md note is the evidence.
+  Verifiable: ci-status-guard-core unit tests: a charged red run on a feature ref yields a report without a block; an uncharged one still blocks; main is never exempt.
+  Bundle: Session- & Repo-Hygiene.
