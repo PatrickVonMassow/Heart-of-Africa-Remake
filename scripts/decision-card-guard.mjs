@@ -169,7 +169,8 @@ function typedUserText(content) {
 /** The last positively identified user message in Claude's JSONL transcript.
  *
  * There are exactly two accepted channels: a CLI entry marked
- * `promptSource: "typed"`, and the chat watcher's own responder envelope. All
+ * `promptSource: "typed"` or `origin.kind: "human"`, and the chat watcher's own
+ * responder envelope. All
  * other `type: "user"` entries are machine traffic and cannot arm a review.
  * Older CLI versions that omit `promptSource` therefore cannot arm the typed
  * channel; that conservative miss is preferable to assigning a duty from
@@ -189,7 +190,9 @@ export function extractLastUserMessage(jsonl) {
     const content = entry.message?.content
     const id = entry.uuid || entry.message?.id
     if (typeof id !== 'string' || !id.trim()) continue
-    if (entry.promptSource === 'typed') {
+    // This CLI writes a human prompt as promptSource "sdk" with origin.kind
+    // "human" (measured 03.10.2026); peers and notifications carry other kinds.
+    if (entry.promptSource === 'typed' || entry.origin?.kind === 'human') {
       const text = typedUserText(content)
       if (text) last = { id, text }
     }
