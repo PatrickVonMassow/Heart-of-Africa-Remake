@@ -368,5 +368,15 @@ describe('run-wait --await-log', () => {
   it('refuses a bad threshold and a missing log argument', () => {
     expect(run(['--await-log', buildLog('x\n'), '--stall', 'abc']).status).toBe(1)
     expect(run(['--await-log']).status).toBe(2)
+    for (const flag of ['--timeout', '--stall', '--done']) {
+      expect(run(['--await-log', buildLog('exit 0\n'), flag]).status).toBe(1)
+    }
+  })
+
+  it('a done marker inside a line cut by the tail window is not taken for a done line', () => {
+    const log = buildLog(`prefix exit 0\n${'x'.repeat(256 * 1024 - 7)}`)
+    const r = run(['--await-log', log, '--stall', '60', '--timeout', '0.5', '--tick', '0.1'])
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/^TIMEOUT /m)
   })
 })

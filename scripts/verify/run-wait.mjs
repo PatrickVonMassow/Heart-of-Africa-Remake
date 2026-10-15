@@ -359,10 +359,13 @@ function doReceipt(logArg) {
   return exitOf(record)
 }
 
-/** The value after `--flag`, or null. */
+/** The value after `--flag`, or null when the flag is absent; a flag without
+ *  its operand is refused rather than read as absent. */
 function flagValue(args, flag) {
   const i = args.indexOf(flag)
-  return i >= 0 && i + 1 < args.length ? args[i + 1] : null
+  if (i < 0) return null
+  if (i + 1 >= args.length || args[i + 1].startsWith('--')) throw new Error(`${flag} needs a value`)
+  return args[i + 1]
 }
 
 /** Seconds from a flag as ms, or the default; a bad value is refused, not guessed. */
@@ -387,7 +390,9 @@ function readTail(path, size) {
   } finally {
     closeSync(fd)
   }
-  return buf.toString('utf8')
+  const text = buf.toString('utf8')
+  // A cut tail starts mid-line; that fragment must not pass for a whole done line.
+  return length < size ? text.slice(text.indexOf('\n') + 1) : text
 }
 
 /** `--await-log`: a bounded wait on an arbitrary log (point 1356). */
