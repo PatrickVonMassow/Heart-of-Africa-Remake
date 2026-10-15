@@ -92,6 +92,7 @@ put it is the mistake this line exists to stop.
   1. Diagnose and fix first: every responder run in .claude/chat-watcher.log so far ends with acked 0 / stillPending 1 (e.g. 12.10.2026 16:36 and 16:37 UTC exit 0; 16:45 and 19:54 UTC killed with 143 after RESPONDER_MAX_MS). No responder has ever answered a message. A shorter deferral is worthless until a responder actually acks and replies.
   2. Then lower DEFERRAL_MS (scripts/chat-watcher-core.mjs:186) from 3 min to ~45 s (stays calibratable via HOA_CHAT_DEFER_MS; update the comment's rationale).
   3. Change 1352's acceptance bound from "reply receipt <= 15 min after receivedAt" to "<= 3 min" (target ~2 min). A hard 1 min bound is NOT the goal: the responder's cold start alone takes roughly a minute (estimate, not yet measured; measure it in the live case and record it in the closing note).
+  Attempt 3 (15.10.2026 14:50-15:10, window notified by ntfy at 14:27, not confirmed by the user): the owner blocked on the point-1358 author and the 1342 villager rebuild; the watcher (live since 00:35Z, deferral 45 s) logged no message and the spool stayed empty, so no case. A future attempt needs a window the user confirms.
 - [ ] 1359. Villager clip restyle regresses the build-pose garment fit: repair it on the 1342 branch or revert the restyle
   Queue position: directly before point 1342 (front of Dorfleben's actionable work; 1342 lands after it).
   Source: split from point 1342 on 15.10.2026 under its decision of 14.10.2026, after the four detached Blender isolation builds of session e0eb280d finished.
