@@ -2632,6 +2632,11 @@ describe('card times', () => {
       expect(spanHours('28.12. 09:00 – 02.01. ~09:00', { now: at('2027-01-02T08:00:00Z') })).toBe(120)
       // A start a day after now lies in the previous year, across its leap day.
       expect(spanHours('28.02. 09:00 – 01.03. ~10:00', { now: at('2025-02-27T12:00:00Z') })).toBe(49)
+      // A 29.02. start lies in the latest leap year, never rolled to 01.03.
+      expect(spanHours('29.02. 10:00 – 02.03. ~10:00', { now: at('2025-03-01T09:00:00Z') })).toBe(48)
+      // A date no year has is no span.
+      expect(spanHours('31.02. 10:00 – 02.03. ~10:00', { now: at('2025-03-01T09:00:00Z') })).toBe(null)
+      expect(spanHours('28.02.25 10:00 – 29.02.25 ~10:00')).toBe(null)
       // DD.MM.YY names its years: a full year, and a leap year's full year.
       expect(spanHours('05.10.25 09:00 – 05.10.26 ~09:00')).toBe(8760)
       expect(spanHours('05.10.27 09:00 – 05.10.28 ~09:00')).toBe(8784)

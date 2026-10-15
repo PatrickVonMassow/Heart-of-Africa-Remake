@@ -1365,11 +1365,25 @@ export function spanHours(times, { now = new Date(), recorded = null } = {}) {
     // current year).
     const nowParts = berlinParts(new Date(now))
     const nowWall = at(Number(nowParts.year) + 2000, nowParts.day, nowParts.month, ...nowParts.clock.split(':'))
+    // A 29.02. exists only in a leap year; Date.UTC would roll it to 01.03.
+    const exists = (year, d, mo) => new Date(Date.UTC(year, Number(mo) - 1, Number(d))).getUTCDate() === Number(d)
     let startYear = y1 ? 2000 + Number(y1) : Number(nowParts.year) + 2000
-    if (!y1 && at(startYear, d1, mo1, h1, mi1) > nowWall) startYear -= 1
+    if (!y1) {
+      // Bounded: a date no year has (31.02.) is no span, not an endless search.
+      for (let tries = 0; !exists(startYear, d1, mo1) || at(startYear, d1, mo1, h1, mi1) > nowWall; tries += 1) {
+        if (tries > 8) return null
+        startYear -= 1
+      }
+    } else if (!exists(startYear, d1, mo1)) return null
     const from = at(startYear, d1, mo1, h1, mi1)
-    let to = at(y2 ? 2000 + Number(y2) : startYear, d2, mo2, h2, mi2)
-    if (!y2 && to <= from) to = at(startYear + 1, d2, mo2, h2, mi2)
+    let endYear = y2 ? 2000 + Number(y2) : startYear
+    if (!y2) {
+      for (let tries = 0; !exists(endYear, d2, mo2) || at(endYear, d2, mo2, h2, mi2) <= from; tries += 1) {
+        if (tries > 8) return null
+        endYear += 1
+      }
+    } else if (!exists(endYear, d2, mo2)) return null
+    const to = at(endYear, d2, mo2, h2, mi2)
     return (to - from) / 3600000
   }
   const from = Number(h1) * 60 + Number(mi1)
