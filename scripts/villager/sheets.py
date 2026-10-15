@@ -73,6 +73,13 @@ def hand_sheet(out, body):
     on = body['W'][:, hand] > 0.4
     tris = body['tris'][on[body['tris']].all(1)]
     for view in ('front', 'side', 35):
+        cam = view if view != 'side' else 'other'
+        # the shapes side by side across the picture, along the camera's
+        # screen right (perpendicular to its view: +x from the front, +z for
+        # 'other' looking along +x); spaced along x, the side view stacked
+        # them into the screen
+        a = np.radians(hand_azimuth(cam))
+        across = np.array([np.cos(a), 0.0, -np.sin(a)])
         R.clear()
         x = 0.0
         for k, shape in enumerate(HAND_SHAPES):
@@ -81,13 +88,28 @@ def hand_sheet(out, body):
             wr, wp = rig.fk(j, rest_q())
             v = rig.skin(pos, jidx, jw, j, wr, wp)
             c = wp[hand]
-            v = v - c
-            v[:, 0] += x
+            v = v - c + x * across
             R.add_mesh(f'hand-{shape}', v, tris, SKIN)
-            R.label(shape, np.array([x, -0.13, 0.0]), 0.03, view if view != 'side' else 'other', LABEL)
+            R.label(shape, x * across + np.array([0, -0.13, 0.0]), 0.03, cam, LABEL)
             x += 0.2
         R.render(os.path.join(out, f"hands-{view if isinstance(view, str) else 'az' + str(view)}.png"),
-                 (x / 2 - 0.1, -0.05, 0), x + 0.05, view if view != 'side' else 'other', (1500, 600))
+                 tuple((x / 2 - 0.1) * across + np.array([0, -0.05, 0])), x + 0.05, cam, (1500, 600))
+
+
+def hand_azimuth(view):
+    """A view's camera azimuth (deg) as render.py reads it."""
+    return {'side': 90.0, 'front': 0.0, 'back': 180.0, 'other': -90.0}.get(view, view)
+
+
+def selftest_hand_layout():
+    """The hand sheet's spacing runs across every view's picture: it is
+    perpendicular to the camera's view direction (no Blender needed)."""
+    for view in ('front', 'other', 35):
+        a = np.radians(hand_azimuth(view))
+        across = np.array([np.cos(a), 0.0, -np.sin(a)])
+        look = np.array([np.sin(a), 0.0, np.cos(a)])
+        assert abs(float(across @ look)) < 1e-12 and abs(np.linalg.norm(across) - 1) < 1e-12, view
+    print('sheets hand layout selftest: ok')
 
 
 def sheets(out, mh, body, clips, garments, cfg, only=''):

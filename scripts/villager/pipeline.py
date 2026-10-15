@@ -83,6 +83,8 @@ def main():
     GPL.selftest()
     import clips as CL
     CL.selftest()
+    import sheets as SH
+    SH.selftest_hand_layout()
     if 'garments' in steps or 'selftest' in steps:
         import fit as F
         F.selftest()
