@@ -231,32 +231,49 @@ describe('the tool is held in the hand bone', () => {
 })
 
 describe('the clip style (natural-villager-motion step 6)', () => {
-  /** A bone's mean forward tilt (deg) over a clip: its up axis off the vertical, seen from the side. */
-  const tilt = (clip: string, bone: string, yaw = false) => {
+  /** A bone's forward tilt (deg) per sampled frame of a clip: its up axis off
+   *  the vertical, seen from the side (or, with `yaw`, its facing off ahead). */
+  const tilts = (clip: string, bone: string, yaw = false) => {
     const c = asset.clips[clip]
     const n = asset.bones.length
     const pose = newPose(n)
     const world = newWorld(n)
     const i = asset.bones.indexOf(bone)
-    let sum = 0
     const k = 24
-    for (let f = 0; f < k; f++) {
+    return Array.from({ length: k }, (_, f) => {
       sampleClip(c, (f / k) * c.duration, pose)
       forwardKinematics(asset, asset.rest, pose, world)
       const v = new THREE.Vector3(0, yaw ? 0 : 1, yaw ? 1 : 0).applyQuaternion(world.q[i])
-      sum += yaw ? Math.atan2(v.x, v.z) : Math.atan2(v.z, v.y)
-    }
-    return ((sum / k) * 180) / Math.PI
+      return ((yaw ? Math.atan2(v.x, v.z) : Math.atan2(v.z, v.y)) * 180) / Math.PI
+    })
   }
+  /** The tilt's size: its mean over the clip of each frame's absolute tilt
+   *  (a clip swinging ±30° or leaning back has no small mean), and the worst
+   *  single frame. */
+  const size = (clip: string, bone: string, yaw = false) => {
+    const t = tilts(clip, bone, yaw).map(Math.abs)
+    return { mean: t.reduce((s, x) => s + x, 0) / t.length, worst: Math.max(...t) }
+  }
+  // a single frame may swing past the mean's bound with the stride, never
+  // dive (the jog's chest peaks at 19.9°, measured 15.10.2026)
+  const DIVE = 25
   it('the sprint no longer dives: hips upright, chest under 15°; the jog likewise', () => {
-    expect(Math.abs(tilt('sprint', 'hips'))).toBeLessThan(2)
-    expect(tilt('sprint', 'chest')).toBeLessThan(15)
-    expect(tilt('jog', 'chest')).toBeLessThan(15)
+    expect(size('sprint', 'hips').worst).toBeLessThan(2)
+    for (const clip of ['sprint', 'jog']) {
+      const chest = size(clip, 'chest')
+      expect(chest.mean, clip).toBeLessThan(15)
+      expect(chest.worst, clip).toBeLessThan(DIVE)
+    }
+    // leaning forward, not back
+    expect(Math.min(...tilts('sprint', 'chest'), ...tilts('jog', 'chest'))).toBeGreaterThan(0)
   })
   it('the walk and the idle stand up: chest under 10°; the idle faces ahead', () => {
-    expect(tilt('walk', 'chest')).toBeLessThan(10)
-    expect(tilt('idle', 'chest')).toBeLessThan(10)
-    expect(Math.abs(tilt('idle', 'hips', true))).toBeLessThan(1)
-    expect(Math.abs(tilt('idle', 'head', true))).toBeLessThan(2)
+    for (const clip of ['walk', 'idle']) {
+      const chest = size(clip, 'chest')
+      expect(chest.mean, clip).toBeLessThan(10)
+      expect(chest.worst, clip).toBeLessThan(DIVE)
+    }
+    expect(size('idle', 'hips', true).worst).toBeLessThan(1)
+    expect(size('idle', 'head', true).worst).toBeLessThan(2)
   })
 })
