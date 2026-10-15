@@ -39,13 +39,11 @@ import {
   blockingRunIds,
   chargedReportsDue,
   chargedRunIds,
-  isCharged,
   observedShaEntry,
-  unfinishedRun,
+  observerClassification,
   refBranch,
   ciWaitBackoffMs,
   ciWaitIdentity,
-  classifyRuns,
   failedRuns,
   withGateStatuses,
   readAllStatusPages,
@@ -839,15 +837,12 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
   return { applicable: true, inputs: { decision: swept.decision, failedOpen: swept.failedOpen } }
 }
 
-/** Whether the red the observer judged is charged to its branch's open point. */
-function observerRedIsCharged(wait, judged, runs, chosen) {
+/** The run ids charged to `branch`'s open point; unreadable TASKS.md → none. */
+function readChargedRuns(branch) {
   try {
-    const branch = targetBranch(wait)
-    const tasksText = readFileSync(repoPath('TASKS.md'), 'utf8')
-    const runIds = blockingRunIds({ judged, runs, sha: wait.sha, branch, chosen })
-    return isCharged((b) => chargedRunIds(tasksText, b), branch, runIds)
+    return chargedRunIds(readFileSync(repoPath('TASKS.md'), 'utf8'), branch)
   } catch {
-    return false
+    return new Set()
   }
 }
 
@@ -882,7 +877,7 @@ async function observeDurableWait(wakeToken) {
       await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
       continue
     }
-    let classification = classifyRuns(runs, wait.sha, { branch: targetBranch(wait) })
+    let classification = observerClassification(runs, wait.sha, { branch: targetBranch(wait), chargedRuns: readChargedRuns })
     const observedAt = Date.now()
     if (classification.state === 'pending') {
       const observation = {
@@ -965,11 +960,6 @@ async function observeDurableWait(wakeToken) {
         await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
         continue
       }
-      // A charged red does not finish the wait while a sibling workflow runs.
-      if (!standDown && unfinishedRun(runs, wait.sha, { branch: targetBranch(wait) }) && observerRedIsCharged(wait, judgedRed, runs, classification)) {
-        await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
-        continue
-      }
       await notifyCiRed(ciRedAlertMessage({ target: waitTarget(wait), classification, standDown }))
     }
 
@@ -992,6 +982,7 @@ async function observeDurableWait(wakeToken) {
             runIds: classification.state === 'failed'
               ? blockingRunIds({ judged: judgedRed, runs, sha: wait.sha, branch: targetBranch(wait), chosen: classification })
               : [],
+            runs,
             observedAt,
           }),
         },

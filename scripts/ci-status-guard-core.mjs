@@ -802,7 +802,7 @@ function entryRunIds(entry, branch) {
 /** The sha-cache entry the durable observer writes once its wait concludes.
  *  A red keeps its run ids, so a charge applies at once and not only after
  *  the entry expires (review 15.10.2026). */
-export function observedShaEntry({ wait, classification, reason = null, runIds = [], observedAt }) {
+export function observedShaEntry({ wait, classification, reason = null, runIds = [], runs = null, observedAt }) {
   const failed = classification?.state === 'failed'
   return {
     state: classification?.state,
@@ -810,8 +810,28 @@ export function observedShaEntry({ wait, classification, reason = null, runIds =
     checkedAt: observedAt,
     branch: targetBranch(wait),
     ...(reason ? { reason } : {}),
-    ...(failed ? { runId: classification.runId ?? null, runIds: (runIds ?? []).map((id) => (id == null ? null : String(id))) } : {}),
+    ...(failed ? {
+      runId: classification.runId ?? null,
+      runIds: (runIds ?? []).map((id) => (id == null ? null : String(id))),
+      // Settled only with runs that show no other workflow still running.
+      settled: Array.isArray(runs) && !unfinishedRun(runs, wait?.sha, { branch: targetBranch(wait) }),
+    } : {}),
   }
+}
+
+/**
+ * The classification the durable observer acts on: `classifyRuns`, except that
+ * a red charged to the branch's open point (`chargedRuns`) beside a workflow
+ * still running yields that workflow as pending, so the wait is renewed as
+ * usual and not finished on the charged red (review 15.10.2026).
+ */
+export function observerClassification(runs, sha, { branch, chargedRuns = () => new Set() } = {}) {
+  const classification = classifyRuns(runs, sha, { branch })
+  if (classification.state !== 'failed') return classification
+  const sibling = unfinishedRun(runs, sha, { branch })
+  if (!sibling) return classification
+  const runIds = blockingRunIds({ runs, sha, branch, chosen: classification })
+  return isCharged(chargedRuns, branch, runIds) ? sibling : classification
 }
 
 /**
@@ -882,14 +902,18 @@ export async function sweepTargets({
     // A sha whose run CONCLUDED green (or that no workflow covers) is not asked
     // about again while cached — this is what keeps the repeat turn free.
     if (cached === 'success' || cached === 'nocheck') continue
+    // A cached red exempts only with the evidence that every other workflow on
+    // the sha had finished (`settled`); without it the sha is asked again, so a
+    // sibling still running then is waited for (review 15.10.2026).
+    let recheck = false
     if (cached === 'failed') {
       if (gates && entry.reason) {
         const ids = entryRunIds(entry, targetBranch(target))
-        if (isCharged(chargedRuns, targetBranch(target), ids)) {
-          charged.push({ ref: target.ref, sha: target.sha, runId: ids.map(String).join(',') })
-        } else block ??= entry.reason
+        if (!isCharged(chargedRuns, targetBranch(target), ids)) block ??= entry.reason
+        else if (entry.settled === true) charged.push({ ref: target.ref, sha: target.sha, runId: ids.map(String).join(',') })
+        else recheck = true
       }
-      continue
+      if (!recheck) continue
     }
     if (cached === 'pending') {
       // The BUDGET outranks the cache: a wait recorded a minute ago must not
@@ -1052,6 +1076,7 @@ export async function sweepTargets({
     }
     nextCache[target.sha] = {
       state: 'failed', firstSeenAt: at, checkedAt: now, reason, runId: chosen.runId ?? null, runIds, branch: gate.branch,
+      settled: !unfinishedRun(runs, target.sha, gate),
     }
     if (exempt) charged.push({ ref: target.ref, sha: target.sha, runId: runIds.join(',') })
     else if (gates && reason) block ??= reason

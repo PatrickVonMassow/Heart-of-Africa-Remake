@@ -16,6 +16,7 @@ import {
   chargedRunIds,
   classifyRuns,
   observedShaEntry,
+  observerClassification,
   GATE_STATUS_CONTEXT,
   readAllStatusPages,
   refBranch,
@@ -1276,8 +1277,8 @@ describe('charged reds', () => {
   it('an observer-written failed entry honours the charge', async () => {
     const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
     const classification = { state: 'failed', runId: Number(RUN), workflowName: 'CI', conclusion: 'failure' }
-    const entry = observedShaEntry({ wait, classification, reason: blockReason(classification, BRANCH, wait.ref), runIds: [RUN], observedAt: t(10) })
-    expect(entry).toMatchObject({ state: 'failed', runId: Number(RUN), runIds: [RUN], branch: 'feat/1342-natural-motion-b' })
+    const entry = observedShaEntry({ wait, classification, reason: blockReason(classification, BRANCH, wait.ref), runIds: [RUN], runs: red(BRANCH), observedAt: t(10) })
+    expect(entry).toMatchObject({ state: 'failed', runId: Number(RUN), runIds: [RUN], branch: 'feat/1342-natural-motion-b', settled: true })
     const got = await sweep({ targets: [featTarget], cache: { [BRANCH]: entry }, chargedRuns: fromTasks(tasks) })
     expect(got.asked).toEqual([])
     expect(got.decision).toBe(null)
@@ -1355,6 +1356,64 @@ describe('charged reds', () => {
     const running = run({ headSha: BRANCH, status: 'queued', conclusion: null, databaseId: 5, workflowName: 'Pages' })
     const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks('') })
     expect(got.decision).toContain('RED')
+  })
+
+  // Fourth review 15.10.2026, P1: a red cached beside a running workflow keeps
+  // that fact; charged later, it is asked again instead of exempted from cache.
+  it('a red cached beside a running workflow is rechecked, not exempted, once charged', async () => {
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const first = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks('') })
+    expect(first.decision).toContain('RED')
+    expect(first.cache[BRANCH]).toMatchObject({ state: 'failed', settled: false })
+    const still = await sweep({ targets: [featTarget], cache: first.cache, runsBySha: { [BRANCH]: [...red(BRANCH), running] }, chargedRuns: fromTasks(tasks) })
+    expect(still.asked).toEqual([BRANCH])
+    expect(still.decision).toContain('NOT yet concluded')
+    expect(still.charged).toEqual([])
+    const done = { ...running, status: 'completed', conclusion: 'success' }
+    const finished = await sweep({ targets: [featTarget], cache: first.cache, runsBySha: { [BRANCH]: [...red(BRANCH), done] }, chargedRuns: fromTasks(tasks) })
+    expect(finished.decision).toBe(null)
+    expect(finished.cache[BRANCH]).toMatchObject({ state: 'failed', settled: true })
+  })
+
+  it('a report-only red cached beside a running workflow is rechecked once it gates', async () => {
+    const running = run({ headSha: BRANCH, status: 'queued', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const runsBySha = { [BRANCH]: [...red(BRANCH), running] }
+    const report = await sweep({ targets: [{ ...featTarget, disposition: 'report' }], runsBySha, chargedRuns: fromTasks(tasks) })
+    expect(report.decision).toBe(null)
+    expect(report.cache[BRANCH].settled).toBe(false)
+    const gating = await sweep({ targets: [featTarget], cache: report.cache, runsBySha, chargedRuns: fromTasks(tasks) })
+    expect(gating.asked).toEqual([BRANCH])
+    expect(gating.decision).toContain('NOT yet concluded')
+  })
+
+  it('an observer entry without runs, or with a running sibling, is not settled', () => {
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const classification = { state: 'failed', runId: Number(RUN) }
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    expect(observedShaEntry({ wait, classification, runIds: [RUN], observedAt: t(10) }).settled).toBe(false)
+    expect(observedShaEntry({ wait, classification, runIds: [RUN], runs: [...red(BRANCH), running], observedAt: t(10) }).settled).toBe(false)
+  })
+
+  // Fourth review 15.10.2026, P2: the observer renews its wait on the running
+  // sibling instead of finishing on the charged red or polling unrecorded.
+  it('the observer classifies a charged red beside a running workflow as that pending wait', () => {
+    const branch = 'feat/1342-natural-motion-b'
+    const running = run({ headSha: BRANCH, status: 'in_progress', conclusion: null, databaseId: 5, workflowName: 'Pages' })
+    const runs = [...red(BRANCH), running]
+    const got = observerClassification(runs, BRANCH, { branch, chargedRuns: fromTasks(tasks) })
+    expect(got).toMatchObject({ state: 'pending', runId: 5, workflowName: 'Pages' })
+    expect(observerClassification(runs, BRANCH, { branch, chargedRuns: fromTasks('') }).state).toBe('failed')
+    const done = [...red(BRANCH), { ...running, status: 'completed', conclusion: 'success' }]
+    expect(observerClassification(done, BRANCH, { branch, chargedRuns: fromTasks(tasks) })).toMatchObject({ state: 'failed', runId: Number(RUN) })
+    expect(observerClassification(runs, BRANCH, { branch: 'main', chargedRuns: () => new Set([RUN]) }).state).toBe('failed')
+
+    // The same pending classification goes through the ordinary renewal.
+    const target = { ref: featTarget.ref, sha: BRANCH }
+    const observe = (at) => ({ target, classification: got, firstSeenAt: t(300), observedAt: at })
+    const opened = renewCiWait(null, observe(t(60)), { now: t(60), makeWakeToken: () => 'tok' })
+    const renewed = renewCiWait(opened, observe(t(10)), { now: t(10), makeWakeToken: () => 'other' })
+    expect(renewed).toMatchObject({ state: 'pending', wakeToken: 'tok', lastObservationAt: t(10), runId: 5 })
+    expect(renewed.firstObservationAt).toBe(opened.firstObservationAt)
   })
 
   // Review 15.10.2026, P2: reported once per session, again in a new one.
