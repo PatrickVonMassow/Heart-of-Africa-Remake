@@ -2778,6 +2778,12 @@ export const VILLAGER_GLTF = {
    *  difference (0.0044 per 60 Hz frame mid walk↔jog band, measured
    *  15.10.2026). Calibratable. */
   plantLetGo: 2,
+  /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
+   *  the blended gait's stance is read over `groundSamples` phases, at
+   *  `groundLevels` steps across each cross-fade band (interpolated between).
+   *  Calibratable. */
+  groundSamples: 24,
+  groundLevels: 8,
   /** The pelvis under a warped stride (natural-villager-motion steps 5 and 10):
    *  it drops just as far as both legs need to reach their feet, each leg
    *  reaching at most `legReach` of its full length, and at most

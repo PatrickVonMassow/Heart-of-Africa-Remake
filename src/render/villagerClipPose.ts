@@ -180,6 +180,7 @@ const smoothstep = (x: number) => x * x * (3 - 2 * x)
 const _h = new THREE.Vector3()
 const SIDES = ['L', 'R'] as const
 const _target = [new THREE.Vector3(), new THREE.Vector3()]
+const _lift = [0, 0]
 
 /** Hip joint → knee → ankle at rest: the leg's full reach (person units). */
 function legLength(rest: Float32Array, thigh: number, shin: number, foot: number): number {
@@ -206,6 +207,133 @@ function toPerson(frame: PersonFrame, body: GroundBody, h: { x: number; z: numbe
   return out.set((dx * c - dz * s) * k, out.y, (dx * s + dz * c) * k)
 }
 
+type GaitWeights = { walk: number; jog: number; sprint: number }
+
+/** The clips blended at `phase` by the gait weights into `out` (hips scaled
+ *  onto the person, stride not yet warped). Each leg in step across the gaits
+ *  (natural-villager-motion step 5): the clips land a foot at the same phase
+ *  but carry it for very different shares of the cycle (the walk ~2/3, the jog
+ *  under 1/5); blended at one phase a foot would be half planted, half
+ *  swinging and drag its hold. So each leg plays every clip at a phase warped
+ *  to the blended stance (`stanceSync`), left in `_blendStance`. */
+function blendGait(asset: VillagerAsset, frame: PersonFrame, phase: number, w: GaitWeights, walkClip: VillagerClip, out: VillagerPose): VillagerPose {
+  const n = asset.bones.length
+  const parts = [
+    { clip: walkClip, pose: ensure(_a, n), w: w.walk },
+    { clip: asset.clips.jog, pose: ensure(_j, n), w: w.jog },
+    { clip: asset.clips.sprint, pose: ensure(_b, n), w: w.sprint },
+  ]
+  const live = parts.filter((p) => p.w > 0)
+  const total = live.reduce((t, p) => t + p.w, 0) || 1
+  for (const [i, side] of SIDES.entries()) {
+    let on = 0
+    let off = 0
+    for (const p of live) {
+      const e = stanceOf(p.clip, side)
+      on += p.w * e[0]
+      off += p.w * e[1]
+    }
+    _blendStance[i] = [on / total, off / total]
+  }
+  for (const p of parts) {
+    samplePhase(p.clip, phase, frame, p.pose)
+    if (p.w <= 0) continue
+    for (const [i, side] of SIDES.entries()) {
+      const e = stanceOf(p.clip, side)
+      const b = _blendStance[i]
+      if (Math.abs(e[0] - b[0]) < 1e-6 && Math.abs(e[1] - b[1]) < 1e-6) continue
+      samplePhase(p.clip, stanceSync(phase, b, e), frame, ensure(_legPose, n))
+      for (const bone of LEG_BONES[i]) {
+        const k = asset.bones.indexOf(bone)
+        for (let c = 0; c < 4; c++) p.pose.rot[k * 4 + c] = _legPose.rot[k * 4 + c]
+      }
+    }
+  }
+  return blendPoses(
+    [
+      { pose: _a, w: w.walk },
+      { pose: _j, w: w.jog },
+      { pose: _b, w: w.sprint },
+    ],
+    ensure(out, n),
+  )
+}
+
+/**
+ * How high each foot's lowest sole contact stands over the ground through its
+ * stance in the gait blend `w` on this person (person units, [L, R]; 0
+ * without a stance). The clips are authored on the basis body and their hips
+ * scaled by the hip height alone, so a morphed body's feet land above or
+ * below the ground (a child's ankle sits otherwise than in proportion to its
+ * hips), the runs land their right foot higher than their left even on the
+ * basis body, and a blend of two clips carries its stance foot lower than
+ * either. Read at `groundLevels` steps across each cross-fade band and
+ * interpolated between, cached per person and walk clip: it changes with the
+ * pace, never within a stance, so it moves no planted foot.
+ */
+export function gaitFootGround(asset: VillagerAsset, frame: PersonFrame, walkClip: VillagerClip, w: GaitWeights): readonly [number, number] {
+  // the two band shares (gaitWeights): walk → runs a, jog → sprint b
+  const a = 1 - w.walk
+  const b = a > 1e-9 ? w.sprint / a : 0
+  const q = Math.max(1, G.groundLevels)
+  const fa = Math.min(q, Math.max(0, a * q))
+  const fb = Math.min(q, Math.max(0, b * q))
+  const a0 = Math.min(q - 1, Math.floor(fa))
+  const b0 = Math.min(q - 1, Math.floor(fb))
+  const ta = fa - a0
+  const tb = fb - b0
+  _groundOut[0] = 0
+  _groundOut[1] = 0
+  for (const [ia, wa] of [[a0, 1 - ta], [a0 + 1, ta]] as const) {
+    for (const [ib, wb] of [[b0, 1 - tb], [b0 + 1, tb]] as const) {
+      const k = wa * wb
+      if (k <= 0) continue
+      const h = groundLevel(asset, frame, walkClip, ia, ib, q)
+      _groundOut[0] += k * h[0]
+      _groundOut[1] += k * h[1]
+    }
+  }
+  return _groundOut
+}
+const _groundOut: [number, number] = [0, 0]
+const _ground = new WeakMap<PersonFrame, WeakMap<VillagerClip, Map<number, [number, number]>>>()
+const _gPose = newPose(0)
+const _gWorld = newWorld(0)
+
+/** gaitFootGround at the grid level (ia, ib) of q steps per band. */
+function groundLevel(asset: VillagerAsset, frame: PersonFrame, walkClip: VillagerClip, ia: number, ib: number, q: number): [number, number] {
+  let perFrame = _ground.get(frame)
+  if (!perFrame) _ground.set(frame, (perFrame = new WeakMap()))
+  let levels = perFrame.get(walkClip)
+  if (!levels) perFrame.set(walkClip, (levels = new Map()))
+  const key = ia * (q + 1) + ib
+  let hit = levels.get(key)
+  if (hit) return hit
+  const a = ia / q
+  const b = ib / q
+  const w = { walk: 1 - a, jog: a * (1 - b), sprint: a * b }
+  const n = asset.bones.length
+  const world = ensureWorld(_gWorld, n)
+  const steps = Math.max(1, G.groundSamples)
+  hit = [0, 0]
+  for (const [i, side] of SIDES.entries()) {
+    blendGait(asset, frame, 0, w, walkClip, _gPose)
+    const [land, lift] = _blendStance[i]
+    if (lift - land < 1e-6) continue
+    let low = Infinity
+    for (let k = 0; k <= steps; k++) {
+      const ph = land + ((lift - land) * k) / steps
+      blendGait(asset, frame, ((ph % 1) + 1) % 1, w, walkClip, _gPose)
+      forwardKinematics(asset, frame.rest0, _gPose, world)
+      const c = contactPoints(asset, world, frame.legScale)[side]
+      low = Math.min(low, c.heel.y, c.ball.y, c.tip.y)
+    }
+    hit[i] = low
+  }
+  levels.set(key, hit)
+  return hit
+}
+
 /**
  * The gait pose at the gait's phase and `speed` (figure units/s) on the
  * person's A-pose skeleton: walk and sprint blended by the sprint share, the
@@ -226,50 +354,15 @@ export function clipGaitPose(
   const world = ensureWorld(_w, n)
   const v = speed / frame.scale
   const gait = gaitAt(asset.clips as unknown as GaitClips, v, frame.legScale)
-  // each leg in step across the gaits (natural-villager-motion step 5): the
-  // clips land a foot at the same phase but carry it for very different shares
-  // of the cycle (the walk ~2/3, the jog under 1/5); blended at one phase a
-  // foot would be half planted, half swinging and drag its hold. So each leg
-  // plays every clip at a phase warped to the blended stance (`stanceSync`).
-  const parts = [
-    { clip: walkClip, pose: ensure(_a, n), w: gait.walk },
-    { clip: asset.clips.jog, pose: ensure(_j, n), w: gait.jog },
-    { clip: asset.clips.sprint, pose: ensure(_b, n), w: gait.sprint },
-  ]
-  const live = parts.filter((p) => p.w > 0)
-  for (const side of SIDES) {
-    let on = 0
-    let off = 0
-    for (const p of live) {
-      const e = stanceOf(p.clip, side)
-      on += p.w * e[0]
-      off += p.w * e[1]
-    }
-    const total = live.reduce((t, p) => t + p.w, 0) || 1
-    _blendStance[side === 'L' ? 0 : 1] = [on / total, off / total]
-  }
-  for (const p of parts) {
-    samplePhase(p.clip, g.phase, frame, p.pose)
-    if (p.w <= 0) continue
-    for (const [i, side] of SIDES.entries()) {
-      const e = stanceOf(p.clip, side)
-      const b = _blendStance[i]
-      if (Math.abs(e[0] - b[0]) < 1e-6 && Math.abs(e[1] - b[1]) < 1e-6) continue
-      samplePhase(p.clip, stanceSync(g.phase, b, e), frame, ensure(_legPose, n))
-      for (const bone of LEG_BONES[i]) {
-        const k = asset.bones.indexOf(bone)
-        for (let c = 0; c < 4; c++) p.pose.rot[k * 4 + c] = _legPose.rot[k * 4 + c]
-      }
-    }
-  }
-  blendPoses(
-    [
-      { pose: _a, w: gait.walk },
-      { pose: _j, w: gait.jog },
-      { pose: _b, w: gait.sprint },
-    ],
-    out,
-  )
+  // each foot's stance height over the ground in this blend: the hips drop by
+  // the higher one and the lower foot is lifted by the rest, so no leg is
+  // asked to reach further than its clips do
+  const ground = gaitFootGround(asset, frame, walkClip, gait)
+  const sink = Math.max(ground[0], ground[1])
+  _lift[0] = sink - ground[0]
+  _lift[1] = sink - ground[1]
+  blendGait(asset, frame, g.phase, gait, walkClip, out)
+  out.hips.y -= sink
   forwardKinematics(asset, frame.rest0, out, world)
   const hips = asset.bones.indexOf('hips')
   // how far a lifted foot's correction fades this call: by the cycle walked
@@ -286,6 +379,8 @@ export function clipGaitPose(
     // touched down; the ankle moves by their mean miss (a foot rolling from the
     // heel over the ball keeps each point still while it carries).
     const c = contactPoints(asset, world, frame.legScale)[s]
+    for (const k of CONTACTS) c[k].y += _lift[i]
+    _t.y += _lift[i]
     const held = g.held[i]
     _miss.set(0, 0, 0)
     let down = 0

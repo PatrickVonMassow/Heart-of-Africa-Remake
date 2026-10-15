@@ -121,6 +121,11 @@ describe('the clip gait on the ground', () => {
     const f = person.frame
     let slide = 0
     let lowest = Infinity
+    // per foot, frames with a contact down, and contacts measured down on two
+    // frames running (a floating foot has neither; a run's ~0.1-cycle stance
+    // lasts two 30 Hz frames, so it may land there without a pair)
+    const downs = { L: 0, R: 0 }
+    const pairs = { L: 0, R: 0 }
     let last: Record<string, THREE.Vector3> = {}
     let z = 0
     for (let t = 0; t < seconds; t += dt) {
@@ -137,15 +142,19 @@ describe('the clip gait on the ground', () => {
           const p = c[s][k]
           lowest = Math.min(lowest, p.y)
           if (p.y > 0.01) continue
+          if (t > 1) downs[s]++
           const w = new THREE.Vector3(p.x * f.scale, 0, p.z * f.scale + z)
           const key = s + k
-          if (last[key] && t > 1) slide = Math.max(slide, w.distanceTo(last[key]))
+          if (last[key] && t > 1) {
+            slide = Math.max(slide, w.distanceTo(last[key]))
+            pairs[s]++
+          }
           next[key] = w
         }
       }
       last = next
     }
-    return { slide, lowest }
+    return { slide, lowest, downs, pairs }
   }
 
   it('with the hold, a planted foot does not slide across the whole speed ramp: every body, both cross-fades, 30/60/120 Hz', () => {
@@ -164,7 +173,13 @@ describe('the clip gait on the ground', () => {
       for (const hz of [30, 60, 120]) {
         for (const v of ramp) {
           const r = walkStraight(person, v * per, true, 3, 1 / hz)
-          expect(r.slide, `${v} per leg at ${hz} Hz, leg ${person.frame.legScale.toFixed(2)}`).toBeLessThan(0.004)
+          const where = `${v} per leg at ${hz} Hz, leg ${person.frame.legScale.toFixed(2)}`
+          expect(r.slide, where).toBeLessThan(0.004)
+          // the slide was measured: each foot came down (and, from 60 Hz,
+          // was followed there), and no foot sank into the ground
+          expect(Math.min(r.downs.L, r.downs.R), where).toBeGreaterThan(0)
+          if (hz >= 60) expect(Math.min(r.pairs.L, r.pairs.R), where).toBeGreaterThan(0)
+          expect(r.lowest, where).toBeGreaterThan(-0.005)
         }
       }
     }
