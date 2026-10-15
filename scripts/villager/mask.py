@@ -447,7 +447,8 @@ def inner_corners(body, garments, cfg, mk, log=print):
     the tolerance at some corner (a hole, penetration.py `innerHole`) is
     pushed instead (stays drawn), unless it passes through that garment's
     cloth past the tolerance at some corner; `exposed` keeps hidden what the
-    un-hiding would draw unclean. Read on the neutral body alone, breast-cloth
+    un-hiding would draw unclean, and `keep_centres` every hidden triangle
+    whose centre passes through the cloth. Read on the neutral body alone, breast-cloth
     triangles hidden 0.075 from the right-shoulder cape's hem there hung
     0.0054 out under it on the elder woman (build pose, measured
     15.10.2026)."""
@@ -482,16 +483,19 @@ def inner_corners(body, garments, cfg, mk, log=print):
             ids = np.nonzero(c == 1)[0]
             out = np.zeros(len(c), bool)
             thr = np.zeros(len(c))
+            cthr = np.zeros(len(ht))
             for gv in posed:
                 smp = np.concatenate([gv[n], gv[n][t[ht]].mean(1)])
                 place, dist = vol[o].where(gv[o], smp, reach, ids=np.concatenate([ids, len(c) + np.arange(len(ht))]))
                 np.maximum(thr, np.where(place[:len(c)] == THROUGH, dist[:len(c)], 0.0), out=thr)
+                np.maximum(cthr, np.where(place[len(c):] == THROUGH, dist[len(c):], 0.0), out=cthr)
                 hole = (place == OUT) & (dist > tol)
                 out |= hole[:len(c)]
                 out[t[ht[hole[len(c):]]].ravel()] = True
             k = c.copy()
             k[(c == 1) & out & (thr <= tol)] = 2
             k = exposed(c, k, thr > tol, Gm[n]['tris'])
+            k = keep_centres(c, k, t[ht[cthr > tol]])
             if (k != c).any():
                 log(f'mask: {n} under {o} at every body corner: {int(((c == 1) & (k == 2)).sum())} hidden points pushed instead')
             cls[b] = k
@@ -562,6 +566,20 @@ def exposed(c, k, unclean, tris):
         if not back.any():
             return k
         k[back] = 1
+
+
+def keep_centres(c, k, through):
+    """`k` with every triangle of `through` (hidden whole in `c`, its centre
+    passing through the outer cloth past the tolerance at some body corner)
+    hidden whole again: a drawn triangle shows its centre, and `exposed` sees
+    only its corners."""
+    t = np.asarray(through, int).reshape(-1, 3)
+    k = k.copy()
+    drawn = ~(k[t] == 1).all(1)
+    back = np.zeros(len(k), bool)
+    back[t[drawn].ravel()] = True
+    k[back & (c == 1)] = 1
+    return k
 
 
 def _motion_corner(corner):
@@ -779,6 +797,13 @@ def selftest():
     st = (np.zeros(3), np.zeros(3), np.array([5, 5, 5]), np.ones(3), np.zeros(3))
     k = decide(np.array([1, 1, 1], np.uint8), st, tol, cut, [[0, 1, 2]])
     assert k.tolist() == [1, 1, 1], k.tolist()
+    # a hidden triangle whose centre passes through the cloth stays hidden
+    # whole, even with clean corners un-hidden to close a hole elsewhere
+    c = np.array([1, 1, 1, 1], np.uint8)
+    k = np.array([2, 1, 1, 2], np.uint8)
+    assert keep_centres(c, k, [[0, 1, 2]]).tolist() == [1, 1, 1, 2]
+    assert keep_centres(c, k, np.zeros((0, 3), int)).tolist() == [2, 1, 1, 2]
+    assert keep_centres(c, np.array([1, 1, 1, 2], np.uint8), [[0, 1, 2]]).tolist() == [1, 1, 1, 2]
     print('mask selftest: ok')
 
 
