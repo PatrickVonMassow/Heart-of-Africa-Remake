@@ -56,4 +56,11 @@ describe('the CI guard wires the durable observer', () => {
     expect(code).toMatch(/allowRerun: !readOnly/)
     expect(code).toMatch(/standDown && judged\.rerunWait\?\.state === 'pending'/)
   })
+
+  it('keeps charged-red run ids in the observer entry and reports them once per session', () => {
+    const observer = code.slice(code.indexOf('async function observeDurableWait'))
+    expect(observer).toMatch(/\[wait\.sha\]: observedShaEntry\(\{[\s\S]*?runIds:/)
+    expect(code).toMatch(/chargedReportsDue\(current\.chargedReport, sessionId, swept\.charged\)/)
+    expect(code).toMatch(/chargedReport: report\.next/)
+  })
 })

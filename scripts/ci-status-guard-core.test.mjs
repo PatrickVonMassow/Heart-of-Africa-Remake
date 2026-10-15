@@ -11,8 +11,10 @@ import {
   ciWaitBackoffMs,
   ciWaitIdentity,
   ciRedAlertMessage,
+  chargedReportsDue,
   chargedRunIds,
   classifyRuns,
+  observedShaEntry,
   GATE_STATUS_CONTEXT,
   readAllStatusPages,
   refBranch,
@@ -1227,5 +1229,73 @@ describe('charged reds', () => {
     expect(again.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
     const uncharged = await sweep({ targets: [featTarget], cache: first.cache, chargedRuns: fromTasks('') })
     expect(uncharged.decision).toContain('RED')
+  })
+
+  // Review 15.10.2026, P1: a charge on one red must not exempt another red on
+  // the same sha, whichever of the two the API lists first.
+  const OTHER = '38591097320'
+  const mixed = (order) => {
+    const a = run({ headSha: BRANCH, conclusion: 'failure', databaseId: Number(RUN), workflowName: 'CI' })
+    const b = run({ headSha: BRANCH, conclusion: 'failure', databaseId: Number(OTHER), workflowName: 'Pages' })
+    return order === 'charged-first' ? [a, b] : [b, a]
+  }
+  for (const order of ['charged-first', 'uncharged-first']) {
+    it(`a charged and an uncharged red on one sha still block (${order})`, async () => {
+      const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: mixed(order) }, chargedRuns: fromTasks(tasks) })
+      expect(got.decision).toContain('RED')
+      expect(got.charged).toEqual([])
+      expect([...got.cache[BRANCH].runIds].sort()).toEqual([RUN, OTHER])
+      const again = await sweep({ targets: [featTarget], cache: got.cache, chargedRuns: fromTasks(tasks) })
+      expect(again.decision).toContain('RED')
+    })
+  }
+
+  it('two reds on one sha exempt only when both are charged', async () => {
+    const both = `${tasks}\n- [ ] 1399. y`.replace(`run ${RUN} on`, `run ${RUN} and run ${OTHER} on`)
+    const got = await sweep({ targets: [featTarget], runsBySha: { [BRANCH]: mixed('uncharged-first') }, chargedRuns: fromTasks(both) })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toHaveLength(1)
+  })
+
+  it('a judge naming its blocking reds narrows the set to them', async () => {
+    const got = await sweepTargets({
+      targets: [featTarget], now: NOW,
+      fetchRuns: async () => mixed('uncharged-first'),
+      // The uncharged red is GitHub's side (unactionable), so only the charged one blocks.
+      judgeRed: async ({ classification }) => ({ classification: { ...classification, runId: Number(RUN) }, standDown: false, blockingRunIds: [RUN] }),
+      notify: async () => {},
+      chargedRuns: fromTasks(tasks),
+    })
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+  })
+
+  // Review 15.10.2026, P3: the durable observer's terminal entry keeps its run
+  // ids, so a charged red it finished does not block until the cache expires.
+  it('an observer-written failed entry honours the charge', async () => {
+    const wait = { ref: featTarget.ref, sha: BRANCH, firstObservationAt: t(300) }
+    const classification = { state: 'failed', runId: Number(RUN), workflowName: 'CI', conclusion: 'failure' }
+    const entry = observedShaEntry({ wait, classification, reason: blockReason(classification, BRANCH, wait.ref), runIds: [RUN], observedAt: t(10) })
+    expect(entry).toMatchObject({ state: 'failed', runId: Number(RUN), runIds: [RUN], branch: 'feat/1342-natural-motion-b' })
+    const got = await sweep({ targets: [featTarget], cache: { [BRANCH]: entry }, chargedRuns: fromTasks(tasks) })
+    expect(got.asked).toEqual([])
+    expect(got.decision).toBe(null)
+    expect(got.charged).toEqual([{ ref: featTarget.ref, sha: BRANCH, runId: RUN }])
+    const uncharged = await sweep({ targets: [featTarget], cache: { [BRANCH]: entry }, chargedRuns: fromTasks('') })
+    expect(uncharged.decision).toContain('RED')
+    expect(observedShaEntry({ wait, classification: { state: 'success' }, observedAt: t(10) })).not.toHaveProperty('runIds')
+  })
+
+  // Review 15.10.2026, P2: reported once per session, again in a new one.
+  it('a charged red is reported once per session and again in a new session', () => {
+    const c = [{ ref: featTarget.ref, sha: BRANCH, runId: RUN }]
+    const first = chargedReportsDue(undefined, 's1', c)
+    expect(first.due).toEqual(c)
+    const repeat = chargedReportsDue(first.next, 's1', c)
+    expect(repeat.due).toEqual([])
+    expect(chargedReportsDue(repeat.next, 's1', c).due).toEqual([])
+    const fresh = chargedReportsDue(repeat.next, 's2', c)
+    expect(fresh.due).toEqual(c)
+    expect(fresh.next).toEqual({ session: 's2', keys: [`${featTarget.ref}@${BRANCH}`] })
   })
 })

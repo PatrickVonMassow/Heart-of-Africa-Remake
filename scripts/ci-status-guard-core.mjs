@@ -738,15 +738,73 @@ export function chargedRunIds(tasksText, branch) {
   return ids
 }
 
-/** True when the red `runId` on `branch` is charged to its owning open point.
- *  main is never exempt, whatever the injected source says. */
-function isCharged(chargedRuns, branch, runId) {
-  if (!branch || branch === 'main' || runId == null) return false
+/** True when EVERY blocking red run id on `branch` is charged to its owning
+ *  open point; an empty list exempts nothing. main is never exempt, whatever
+ *  the injected source says. */
+function isCharged(chargedRuns, branch, runIds) {
+  const ids = (Array.isArray(runIds) ? runIds : []).filter((id) => id != null)
+  if (!branch || branch === 'main' || ids.length === 0) return false
   try {
-    return Boolean(chargedRuns(branch)?.has(String(runId)))
+    const charged = chargedRuns(branch)
+    return ids.every((id) => Boolean(charged?.has(String(id))))
   } catch {
     return false
   }
+}
+
+/** The run ids that make a red sha block: `judged.blockingRunIds` when the judge
+ *  names them, else every failed run on the sha (`failedRuns`), else the chosen
+ *  one. Over-inclusion only withholds an exemption, never grants one. */
+export function blockingRunIds({ judged, runs, sha, branch, chosen } = {}) {
+  try {
+    if (Array.isArray(judged?.blockingRunIds) && judged.blockingRunIds.length > 0) {
+      return judged.blockingRunIds.map(String)
+    }
+    const all = failedRuns(runs, sha, { branch }).map((r) => r.runId).filter((id) => id != null)
+    if (all.length > 0) return all.map(String)
+    return chosen?.runId != null ? [String(chosen.runId)] : []
+  } catch {
+    return chosen?.runId != null ? [String(chosen.runId)] : []
+  }
+}
+
+/** The run ids a cached failed entry blocks on (`runIds`, else its `runId`). */
+function entryRunIds(entry) {
+  if (Array.isArray(entry?.runIds)) return entry.runIds
+  return entry?.runId != null ? [entry.runId] : []
+}
+
+/** The sha-cache entry the durable observer writes once its wait concludes.
+ *  A red keeps its run ids, so a charge applies at once and not only after
+ *  the entry expires (review 15.10.2026). */
+export function observedShaEntry({ wait, classification, reason = null, runIds = [], observedAt }) {
+  const failed = classification?.state === 'failed'
+  return {
+    state: classification?.state,
+    firstSeenAt: wait?.firstObservationAt,
+    checkedAt: observedAt,
+    branch: targetBranch(wait),
+    ...(reason ? { reason } : {}),
+    ...(failed ? { runId: classification.runId ?? null, runIds: (runIds ?? []).map(String) } : {}),
+  }
+}
+
+/**
+ * The charged reds not yet reported in `sessionId`, and the report state to
+ * keep (`{ session, keys }` in the guard's state file). A new session starts
+ * empty, so each session hears about a charge once.
+ */
+export function chargedReportsDue(prior, sessionId, charged = []) {
+  const session = String(sessionId ?? '')
+  const seen = new Set(prior?.session === session && Array.isArray(prior?.keys) ? prior.keys : [])
+  const due = []
+  for (const c of charged ?? []) {
+    const key = `${c.ref}@${c.sha}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    due.push(c)
+  }
+  return { due, next: { session, keys: [...seen] } }
 }
 
 /**
@@ -801,8 +859,9 @@ export async function sweepTargets({
     if (cached === 'success' || cached === 'nocheck') continue
     if (cached === 'failed') {
       if (gates && entry.reason) {
-        if (isCharged(chargedRuns, targetBranch(target), entry.runId)) {
-          charged.push({ ref: target.ref, sha: target.sha, runId: String(entry.runId) })
+        const ids = entryRunIds(entry)
+        if (isCharged(chargedRuns, targetBranch(target), ids)) {
+          charged.push({ ref: target.ref, sha: target.sha, runId: ids.map(String).join(',') })
         } else block ??= entry.reason
       }
       continue
@@ -893,7 +952,7 @@ export async function sweepTargets({
     // RED. WHERE the fault lies decides the remedy: a red the repository cannot
     // fix must not demand a fixing push (point 526), and EVERY failed run on the
     // sha is judged, not just the one classifyRuns names (four-eyes 06.08.2026).
-    const { classification: chosen, standDown, stillFamished, judgedWorkflows, rerunWait } = await judgeRed({
+    const judged = await judgeRed({
       sha: target.sha,
       runs,
       branch: gate.branch,
@@ -903,6 +962,7 @@ export async function sweepTargets({
       classification,
       now,
     })
+    const { classification: chosen, standDown, stillFamished, judgedWorkflows, rerunWait } = judged
     // The waiver clock follows the verdict in BOTH directions: a workflow judged
     // unactionable keeps (or starts) its clock, one judged actionable loses it.
     // Only adding would leave a stale clock behind, so the next genuine famine
@@ -940,10 +1000,13 @@ export async function sweepTargets({
       }
       continue
     }
-    nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason, runId: chosen.runId ?? null }
+    // The exemption needs EVERY blocking red on the sha charged, not just the
+    // chosen one (review 15.10.2026): a charged A must not hide an uncharged B.
+    const runIds = blockingRunIds({ judged, runs, sha: target.sha, branch: gate.branch, chosen })
+    nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason, runId: chosen.runId ?? null, runIds }
     if (gates && reason) {
-      if (isCharged(chargedRuns, gate.branch, chosen.runId)) {
-        charged.push({ ref: target.ref, sha: target.sha, runId: String(chosen.runId) })
+      if (isCharged(chargedRuns, gate.branch, runIds)) {
+        charged.push({ ref: target.ref, sha: target.sha, runId: runIds.join(',') })
       } else block ??= reason
     }
   }

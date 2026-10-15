@@ -36,7 +36,10 @@ import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import {
   acknowledgeCiWaitState,
   blockReason,
+  blockingRunIds,
+  chargedReportsDue,
   chargedRunIds,
+  observedShaEntry,
   refBranch,
   ciWaitBackoffMs,
   ciWaitIdentity,
@@ -562,8 +565,9 @@ function pushReflog() {
 /** Judge ONE red sha: every failed run on it, each classified for WHERE its
  *  fault lies, so an outage cannot be mistaken for our own breakage (points
  *  526/528). Returns the chosen classification, whether every red is
- *  unactionable, the famine clocks to keep, the judged workflows and the
- *  re-run wait a failed-jobs dispatch started (`rerunWait`). */
+ *  unactionable, the famine clocks to keep, the judged workflows, the
+ *  re-run wait a failed-jobs dispatch started (`rerunWait`) and the actionable
+ *  reds' run ids (`blockingRunIds`). */
 async function judgeRed(repo, { sha, branch = '', runs, classification, famine, now, rerunWait = null, allowRerun = true }) {
   const reds = failedRuns(runs, sha, { branch })
   const judged = []
@@ -615,6 +619,8 @@ async function judgeRed(repo, { sha, branch = '', runs, classification, famine, 
     // Every workflow this call actually judged, so the sweep can CLEAR the
     // waiver clock of one that is no longer dying the famine way.
     judgedWorkflows: judged.map((c) => c.workflowName),
+    // The reds something can be done about; a charge must cover all of them.
+    blockingRunIds: judged.filter((c) => c.actionable !== false && c.runId != null).map((c) => String(c.runId)),
   }
 }
 
@@ -745,8 +751,12 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
           notifyCiRed(ciRedAlertMessage({ target, classification, standDown })),
   })
 
+  // Charged reds are reported once per session (`chargedReport` in the state).
+  let chargedDue = swept.charged ?? []
   if (!readOnly) {
     const persisted = mutateState((current) => {
+      const report = chargedReportsDue(current.chargedReport, sessionId, swept.charged)
+      chargedDue = report.due
       const observations = (swept.observations ?? []).filter((item) => item?.target?.disposition !== 'report')
       const prior = current.ciWait ?? null
       const nextWait = reconcileCiWait(prior, observations, { now, makeWakeToken: randomUUID })
@@ -759,6 +769,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
         notifiedRefs: swept.notified,
         notifiedAt: now,
         ciWait: nextWait,
+        chargedReport: report.next,
       }
     })
     const durableWait = persisted?.ciWait ?? null
@@ -798,9 +809,9 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
     startWaitObserver(durableWait)
   }
 
-  if (!readOnly && swept.charged?.length > 0) {
+  if (!readOnly && chargedDue.length > 0) {
     console.error(
-      `ci-status-guard reported, charged to point ${swept.charged
+      `ci-status-guard reported, charged to point ${chargedDue
         .map((c) => `${/^feat\/(\d+)-/.exec(refBranch(c.ref))?.[1] ?? '?'}: ${c.ref} ${String(c.sha).slice(0, 7)} run ${c.runId}`)
         .join('; ')}`,
     )
@@ -915,6 +926,7 @@ async function observeDurableWait(wakeToken) {
 
     let standDown = false
     let famine = snapshot.famine ?? {}
+    let judgedRed = null
     if (classification.state === 'failed') {
       try {
         const judged = await judgeRed(repo, {
@@ -926,6 +938,7 @@ async function observeDurableWait(wakeToken) {
           now: observedAt,
           rerunWait: wait,
         })
+        judgedRed = judged
         classification = judged.classification ?? classification
         standDown = judged.standDown === true
         famine = { ...famine, ...(judged.stillFamished ?? {}) }
@@ -952,13 +965,15 @@ async function observeDurableWait(wakeToken) {
         famine,
         shas: {
           ...(current.shas ?? {}),
-          [wait.sha]: {
-            state: classification.state,
-            firstSeenAt: wait.firstObservationAt,
-            checkedAt: observedAt,
-            branch: targetBranch(wait),
-            ...(reason ? { reason } : {}),
-          },
+          [wait.sha]: observedShaEntry({
+            wait,
+            classification,
+            reason,
+            runIds: classification.state === 'failed'
+              ? blockingRunIds({ judged: judgedRed, runs, sha: wait.sha, branch: targetBranch(wait), chosen: classification })
+              : [],
+            observedAt,
+          }),
         },
         notifiedRefs: classification.state === 'failed'
           ? { ...(current.notifiedRefs ?? {}), [wait.ref]: wait.sha }
