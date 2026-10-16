@@ -286,7 +286,10 @@ function joinContinuations(text) {
     } else if (c === '\\') {
       if (text.startsWith('\r\n', i + 1)) i += 2
       else if (text[i + 1] === '\n') i += 1
-      else out += text.slice(i, i + 2), i++
+      else {
+        out += text.slice(i, i + 2)
+        i++
+      }
     } else {
       if (c === '"') dq = !dq
       out += c
@@ -323,7 +326,12 @@ export function requestsOf(command, shell = 'bash') {
   if (joined === command) return found
   // union: a deposit seen in either reading is judged (fail closed)
   const seen = new Set(found.map((r) => JSON.stringify(r)))
-  for (const r of scan(joined)) if (!seen.has(JSON.stringify(r))) found.push(r), seen.add(JSON.stringify(r))
+  for (const r of scan(joined)) {
+    const key = JSON.stringify(r)
+    if (seen.has(key)) continue
+    seen.add(key)
+    found.push(r)
+  }
   return found
 }
 
