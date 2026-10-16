@@ -133,6 +133,7 @@ put it is the mistake this line exists to stop.
   Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.
   Final state: a carried head load rests on the drawn head within 2 cm for every villager build and age on every rig preset that draws loads.
   Verifiable: the crown-rests check added on feat/1342-natural-motion-b (4bd272643) green; Vitest over the crown anchor; 1295-village-head-carrier picture-checked on both backends.
+  User bug report 16.10.2026 09:06 (findings carrier, /backup/hoa/local/SchwebendeSchaubeUeberDenKoepfen.zip, "Schwebende Scheibe über dem Kopf"): build production cff9fdb (main), WebGPU, nvidia, medium quality, seed 3674687236, place bambara-village, x/z -59.45/-130.99, day 0: thin flat white discs hover clearly above the heads of at least five villagers (the elder in the centre, the two blue-tunic men, two figures by the left hut, the woman on the right), most of whom carry nothing visible. The red disc by the middle hut is the chief's hut marker, not a defect (user correction 09:09). Check whether an empty head pad/load is drawn on non-carriers; if the white disc is not this point's floating load, extend this point's final state to remove it. This seed/position is a picture case of this point.
   Bundle: Dorfleben.
 
 - [ ] 1354. Natural villager motion b2: one pose pipeline, distributed lean and gaze, corrective leg IK, posable clavicles, pelvic check
@@ -15874,4 +15875,11 @@ to land than a mechanism that needs a review.
   Final state: a session started by the chat watcher for a single answer never becomes batch-lock holder, and the lock-bound Stop guards stand down for it; reproduced and fixed at the lock acquisition, no new guard (infrastructure freeze 01.09.2026).
   Verifiable: Vitest reproducing an answer-session start that leaves the lock with the batch session.
   Also (findings carrier 07.10.2026 23:20): session 9696d681 released its claim to 06667ad0 via the hand-back bound while .claude/batch-lock.json was absent, so heldByOtherLiveOwner() read false and dashboard-guard (focus reconcile) and retro-currency-guard kept blocking the released session's Stop, demanding batch mutations its hand-back forbids; and a session that took the batch only to edit the work order re-acquired the lock through its heartbeat after `batch-singleton.mjs release`, so it could not hand back without a ticked point or the context watermark. Stand-down honours a claim this session released, and a manual release stays released.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1361. decision-card-guard deadlocks a non-owner session's Stop by demanding a vdzk-keep the ownership guard refuses
+  Queue position: end of Session- & Repo-Hygiene.
+  Source: findings carrier 16.10.2026 09:02: session 1624ee5d (not batch owner; owner 36861bc0): Stop hook decision-card-guard demanded 'board.mjs vdzk-keep "Batchelor: Batch-Infrastruktur als eigenes Projekt abspalten"' for user message 29bbe2bf (a board-chat test log, no decision); the PreToolUse batch-ownership stand-down refused that command, and the guard fired twice in a row. scripts/decision-card-guard.mjs computes heldByOtherLiveOwner but still demands the keep (the carry path of e65219245).
+  Final state: for a session not holding the batch lock, decision-card-guard never demands an action the ownership stand-down refuses (it stands down, or carries the answer to the owner without a keep demand); the card stays open.
+  Verifiable: Vitest reproducing a non-owner Stop with an open card and a non-decision user message: no blocking demand.
   Bundle: Session- & Repo-Hygiene.
