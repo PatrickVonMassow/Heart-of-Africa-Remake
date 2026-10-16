@@ -1983,6 +1983,34 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(manualRelease(lockPath)).toBeNull()
   })
 
+  it('the manual CLI release leaves a newer writer generation untouched', () => {
+    const path = join(dir, 'session-process.json')
+    acquire('writer-session', opts({ now: NOW, pid: 4242, pidStartedAt: NOW - 60_000 }))
+    const generation = readOwnerLock(lockPath).fence
+    writeFileSync(path, JSON.stringify({
+      'writer-session': { pid: 4242, generation: generation + 1, authorityState: 'active', batchWriterAt: NOW },
+    }))
+    expect(manualRelease(lockPath)).toBe('writer-session')
+    expect(readOwnerLock(lockPath)).toBeNull()
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: generation + 1,
+      authorityState: 'active',
+    })
+  })
+
+  it('the manual CLI release drops a lock whose holder has no writer record', () => {
+    acquire('writer-session', opts({ now: NOW, pid: 4242, pidStartedAt: NOW - 60_000 }))
+    expect(manualRelease(lockPath)).toBe('writer-session')
+    expect(readOwnerLock(lockPath)).toBeNull()
+  })
+
+  it('the CLI release command goes through manualRelease', () => {
+    const source = readFileSync(new URL('./batch-singleton.mjs', import.meta.url), 'utf8')
+    const branch = source.slice(source.indexOf("cmd === 'release'"), source.indexOf("} else if (cmd)"))
+    expect(branch).toContain('manualRelease()')
+    expect(branch).not.toContain('rmSync')
+  })
+
   it('revokes only the still-current writer fence and records the recovery', () => {
     const fencePath = join(dir, 'writer-recovery-fence.json')
     writeFileSync(fencePath, JSON.stringify({
