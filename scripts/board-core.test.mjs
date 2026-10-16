@@ -2808,3 +2808,38 @@ describe('card times', () => {
     })
   })
 })
+
+// Point 1363: the landing whose projection discards the now card must still
+// leave the done card with its description.
+describe('description survives a landing through the discarded now card', () => {
+  const tasksText = [
+    '- [x] 1342. Natural villager motion',
+    '  Final state: villagers walk, kneel and carry with a natural gait.',
+    '',
+  ].join('\n')
+
+  it('focus cleared -> projection -> closing --title -> done keeps the description', () => {
+    const queued = fullBoard({
+      queue: queueEntry(1342, 'Natürliche Bewegung', '~2 h'),
+      done: '<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n',
+    })
+    const running = toNow(queued, 1342, 'Läuft.', { stamp: '10:00', tasksText })
+    expect(descriptionOf(nowCard(running, 1342))).toBeTruthy()
+    const projected = reconcileNowProjection(running, [], { stamp: '12:00' })
+    expect(nowCard(projected, 1342)).toBeFalsy()
+    const closing = toClosingWork(projected, 1342, {
+      subject: 'Natürliche Bewegung',
+      reason: 'Das Vier-Augen-Protokoll fehlt noch.',
+      stamp: '12:05',
+    })
+    const out = closeCard(closing, 1342, {
+      text: 'Zusammengeführt.',
+      end: '12:30',
+      none: 'Übergabe — der Nachfolger nimmt Punkt 1364.',
+      tasksText,
+    })
+    const card = doneCard(out, 1342)
+    expect(descriptionOf(card)).toContain('natural gait')
+    expect(card).not.toContain(DESCRIPTION_MISSING_TEXT)
+  })
+})

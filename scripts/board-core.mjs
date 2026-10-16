@@ -1513,7 +1513,7 @@ export function toQueue(html, point, { text, estimate, recorded = null, now = ne
  * shape the Erledigt section fixes. The body carries the card's status text,
  * every paragraph, over unless the caller writes a closing one.
  */
-export function toDone(html, point, { text, end = berlinStamp(), span = null } = {}) {
+export function toDone(html, point, { text, end = berlinStamp(), span = null, tasksText = '' } = {}) {
   const card = nowCard(html, point)
   if (!card) throw new Error(`board: no current-work card for point ${point}`)
   const body = text?.trim() || statusOf(card)
@@ -1533,7 +1533,10 @@ export function toDone(html, point, { text, end = berlinStamp(), span = null } =
   // arithmetic says the opposite (measured on point 700's four cards).
   const existing = doneCards(out, point)
   const earliest = earliestStart(existing) || start
-  const description = descriptionOf(card) || existing.map(descriptionOf).find(Boolean) || ''
+  // The work order is the last fallback (point 1363): a landing whose projection
+  // discarded the now card leaves a closing state card without description.
+  const description =
+    descriptionOf(card) || existing.map(descriptionOf).find(Boolean) || pointDescription(tasksText, point) || ''
   const meta = span ? cardTimeLine(span) : `${earliest} · ${end}`
   const entry = renderDoneEntry({ point, title, meta, body, description })
   const cleaned = dropDoneCards(out, point)
@@ -2360,7 +2363,7 @@ function writeStateCard(html, { kind, point = null, title, text: reason, stamp, 
 export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp, tasksText = '', span = null, nextSpan = null } = {}) {
   if (next != null && none) throw new Error('board: done takes EITHER --next or --none, never both')
   const at = stamp ?? end
-  const archived = toDone(html, point, { text, end, span })
+  const archived = toDone(html, point, { text, end, span, tasksText })
   if (next != null) {
     const status = String(nextStatus ?? '').trim()
     if (!status) throw new Error(`board: --next ${next} needs the new card's status text`)
