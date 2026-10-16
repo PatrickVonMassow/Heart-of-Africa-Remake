@@ -4367,8 +4367,17 @@ if (section('village-walk')) {
     const ok = census.filter((c) => c.ok).sort((a, b) => a.cruise - b.cruise)
     return { pick: ok.length ? ok[0].i : null, census }
   }
-  const found = await stepUntil((arg) => new Function('arg', `return (${arg.fn})(arg)`)(arg).pick !== null, { fn: walkers.toString(), walkOnly: WALK_ONLY, walkLeft: WALK_LEFT }, 3600)
-  const chosen = await page.evaluate(walkers, { walkOnly: WALK_ONLY, walkLeft: WALK_LEFT })
+  // The pick is kept from the very frame that found it: life runs on between
+  // two evaluates, and a walker re-asked a frame later can have drifted out of
+  // the cruise band (measured 16.10.2026, full WebGPU run: found, then no pick).
+  const found = await stepUntil((arg) => {
+    const r = new Function('arg', `return (${arg.fn})(arg)`)(arg)
+    if (r.pick !== null) window.__verifyWalkPick = r
+    return r.pick !== null
+  }, { fn: walkers.toString(), walkOnly: WALK_ONLY, walkLeft: WALK_LEFT }, 3600)
+  const chosen = found
+    ? await page.evaluate(() => window.__verifyWalkPick)
+    : await page.evaluate(walkers, { walkOnly: WALK_ONLY, walkLeft: WALK_LEFT })
   check('village walk: a villager is out walking on the skinned body', found, found ? '' : `no walker out at cruise on the walk gait with ${WALK_LEFT} m to go: ${JSON.stringify(chosen.census)}`)
   const who = found ? chosen.pick : null
   // A walker out but none on the skinned body would skip every gait check
@@ -4640,6 +4649,8 @@ if (section('village-walk')) {
           z: g.position.z,
           onHeadBone: chain.includes('bone-head'),
           chain,
+          // What hangs under the crown, for a base that is not found.
+          underCrown: crown ? crown.children.map((o) => `${o.type}${o.visible ? '' : ' hidden'}`) : null,
           base: base ? { x: +base.x.toFixed(4), y: +base.y.toFixed(4), z: +base.z.toFixed(4) } : null,
           crownAboveHead: top && head ? top.y - head.getWorldPosition(new V()).y : null,
           // The crown over the drawn head top under it (figure units): 0 is a
@@ -4816,7 +4827,11 @@ if (section('village-walk')) {
     if (!hips) return false
     const bind = new hips.position.constructor().setFromMatrixPosition(mesh.skeleton.boneInverses[0].clone().invert()).y
     const f = hips.position.y / bind
-    return f > 0.55 && f < 0.9
+    // Half-way by the KNEEL itself, not by a low hip alone: a hip that low
+    // also comes from ducking through the hut doorway on the way out (measured
+    // 16.10.2026, WebGL 2: caught 0.5 m inside the own hut, no side-on spot).
+    const k = g.getObjectByName('inhabitant')?.userData.walk?.kneel
+    return typeof k === 'number' && k > 0.05 && k < 0.95 && f > 0.55 && f < 0.9
   }, null, 7200)
   check('kneel: the task walker was caught on its way down or up', halfway, '')
   if (halfway) {
