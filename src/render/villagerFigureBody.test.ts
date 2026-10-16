@@ -160,6 +160,29 @@ describe('the hands\' shapes (natural-villager-motion step 3)', () => {
     expect((fig.morphAttributes.position ?? []).map((m) => m.name)).toEqual([...LIVE_MORPHS])
     expect(fig.morphAttributes.position![0].count).toBe(fig.getAttribute('position').count)
   })
+
+  it('the dressed figure keeps its shapes RELATIVE: with both hands relaxed it still stands upright on the ground', () => {
+    // three's mergeGeometries checks morphTargetsRelative but leaves the merged
+    // geometry at the default false; the GPU then scales the base by
+    // 1 − Σ weights (−1 with both hands relaxed) and draws the body upside
+    // down below the ground.
+    const person = gltfPerson(asset, 'female', 'adult')
+    const layers = appearanceFor({ peopleId: 'zulu', sex: 'female', age: 'adult', drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, cloth: '#887766', palette: ['#887766'], pick: 0.3 })
+    const fig = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
+    expect(fig.morphTargetsRelative).toBe(true)
+    const { skeleton, bones } = createGltfSkeleton(asset, person.rest)
+    const mesh = new THREE.SkinnedMesh(fig, new THREE.MeshBasicMaterial())
+    mesh.add(bones.hips)
+    mesh.bind(skeleton, new THREE.Matrix4())
+    mesh.morphTargetInfluences![mesh.morphTargetDictionary!['relax.L']] = 1
+    mesh.morphTargetInfluences![mesh.morphTargetDictionary!['relax.R']] = 1
+    mesh.updateMatrixWorld(true)
+    const box = new THREE.Box3()
+    const v = new THREE.Vector3()
+    for (let k = 0; k < fig.getAttribute('position').count; k++) box.expandByPoint(mesh.getVertexPosition(k, v))
+    expect(box.min.y).toBeGreaterThan(-0.05)
+    expect(box.max.y).toBeGreaterThan(person.p.stature * 0.9)
+  })
 })
 
 describe('the skeleton the figure binds', () => {

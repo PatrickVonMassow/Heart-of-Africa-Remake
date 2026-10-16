@@ -599,6 +599,10 @@ export function gltfFigureGeometry(
   }
   const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
   if (!g) throw new Error('glTF villager: body and garments do not merge')
+  // three's merge checks the parts agree on relative targets but leaves the
+  // result at the default (absolute): the GPU would scale the base by 1 − Σ
+  // weights and turn the body inside out below the ground
+  g.morphTargetsRelative = parts[0].morphTargetsRelative
   // the merge drops the targets' names: the mesh's morph dictionary reads them
   const named = parts[0].morphAttributes.position ?? []
   ;(g.morphAttributes.position ?? []).forEach((m, k) => (m.name = named[k]?.name ?? m.name))
