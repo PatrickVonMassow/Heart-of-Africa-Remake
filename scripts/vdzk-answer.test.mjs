@@ -250,6 +250,23 @@ describe('board.mjs vdzk-keep records the current message, never the board', () 
     expect(kept[titles[0]].why).toBe('')
   })
 
+  it('records the keep for --session without CLAUDE_SESSION_ID, even beside another session', () => {
+    reset('Danke, ich habe den Bericht gesehen.')
+    const state = JSON.parse(readFileSync(statePath, 'utf8'))
+    state.sessions.other = { ...state.sessions[session], review: { messageId: 'user-message-1', kept: {} } }
+    writeFileSync(statePath, JSON.stringify(state))
+    const { CLAUDE_SESSION_ID: _drop, CLAUDE_CODE_SESSION_ID: _drop2, ...bare } = env
+    const keep = (args) => execFileSync(process.execPath, [join(process.cwd(), 'scripts', 'board.mjs'), 'vdzk-keep', ...args], {
+      cwd: process.cwd(), env: bare, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    expect(() => keep(['Freigabe'])).toThrow(/cannot identify this session/)
+    expect(keep(['Freigabe', '--why', 'unrelated', '--session', session])).toContain('message recorded as not answering')
+    const after = JSON.parse(readFileSync(statePath, 'utf8')).sessions
+    expect(after[session].review.kept[titles[1]].why).toBe('unrelated')
+    expect(after.other.review.kept).toEqual({})
+    expect(() => keep(['Freigabe', '--session'])).toThrow(/usage/)
+  })
+
   it('refuses ambiguous and unknown fragments', () => {
     reset('Danke.')
     expect(() => run('board.mjs', ['vdzk-keep', 'a'])).toThrow(/matches 2/)
@@ -270,6 +287,16 @@ describe('vdzk-answer carries the decision with its deadline', () => {
       sourceMessageId: 'user-message-1',
     })
     expect(entry.deadlineAt - entry.recordedAt).toBe(ANSWER_DEADLINE_MS)
+  })
+
+  it('takes the session from --session when no environment variable names it', () => {
+    reset()
+    const { CLAUDE_SESSION_ID: _drop, CLAUDE_CODE_SESSION_ID: _drop2, ...bare } = env
+    execFileSync(process.execPath, [join(process.cwd(), 'scripts', 'vdzk-answer.mjs'), 'Kartenschrift', '--answer', 'Bleibt.', '--session', session], {
+      cwd: process.cwd(), env: bare, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const [entry] = JSON.parse(readFileSync(answersPath, 'utf8'))
+    expect(entry).toMatchObject({ cardTitle: titles[0], sourceSessionId: session, sourceMessageId: 'user-message-1' })
   })
 
   it('updates the same card/message record instead of stacking duplicate duties', () => {
