@@ -162,48 +162,36 @@ const isRequestWord = (word) =>
  * occurrence that yields no deposit there becomes an untitled one.
  */
 function depositsIn(tokens, shell, depth) {
-  return scan(tokens, shell, depth).found
-}
-
-/** A `node …/finding.mjs` simple command starts at `start`. */
-const isFindingCall = (tokens, start) =>
-  typeof tokens[start] === 'string' &&
-  /(^|\/)node$/.test(tokens[start]) &&
-  typeof tokens[start + 1] === 'string' &&
-  /(^|\/)finding\.mjs$/.test(tokens[start + 1])
-
-/** `{ found, exempt }`: the deposits, and the flag occurrences inside exempted detail prose. */
-function scan(tokens, shell, depth) {
   const found = []
   const consumed = new Set()
-  let exempt = 0
   const isWord = (k) => k < tokens.length && typeof tokens[k] === 'string'
   const valueAt = (k) => (isWord(k) && !tokens[k].startsWith('--') ? (consumed.add(k), tokens[k]) : '')
   // A finding's --detail text is prose, not a command: the flag word inside it
-  // is no deposit. Only a direct `node …/finding.mjs` call earns this — another
-  // program (`bash -c 'eval "$1"' --detail …`) may run its argument — and a
-  // value with any expansion (`$`, backtick, braces, glob) can still produce one. The
-  // tokens carry no quoting, so only a value with whitespace — necessarily
-  // quoted — counts as prose; an exact `--request` value stays a deposit.
+  // is no deposit. Only a direct `node …/finding.mjs` call of the command line
+  // itself earns this — another program (`bash -c 'eval "$1"' --detail …`) or
+  // a re-parsed string may run its argument — and a value with any expansion
+  // (`$`, backtick, braces, glob) can still produce one. The tokens carry no
+  // quoting, so only a value with whitespace — necessarily quoted — counts as
+  // prose; an exact `--request` value stays a deposit.
   let start = 0
   tokens.forEach((word, k) => {
     if (typeof word !== 'string') {
       start = k + 1
       return
     }
-    if (word !== DETAIL_FLAG || !isWord(k + 1) || !isFindingCall(tokens, start)) return
+    if (depth > 0 || word !== DETAIL_FLAG || !isWord(k + 1) || !isFindingCall(tokens, start)) return
     const value = tokens[k + 1]
     if (/[$`{}*?[\]]/.test(value) || !/\s/.test(value)) return
     consumed.add(k + 1)
-    exempt += (value.match(REQUEST_FLAG_RE) ?? []).length
   })
   for (let k = 0; k < tokens.length; k++) {
     const word = tokens[k]
     if (isRequestWord(word)) {
       const title = word === REQUEST_FLAG ? valueAt(k + 1) : word.slice(REQUEST_FLAG.length + 1)
       let approved = ''
-      // The approval belongs to the same simple command: an operator ends the search.
-      for (let j = k + 1; j < tokens.length && typeof tokens[j] === 'string' && !isRequestWord(tokens[j]); j++) {
+      // The approval belongs to the same simple command: an operator or a
+      // possible comment (`# --approved …`) ends the search.
+      for (let j = k + 1; isWord(j) && !isRequestWord(tokens[j]) && !tokens[j].startsWith('#'); j++) {
         if (tokens[j] === APPROVED_FLAG) {
           approved = valueAt(j + 1)
           break
@@ -216,13 +204,19 @@ function scan(tokens, shell, depth) {
     if (typeof word !== 'string' || consumed.has(k) || isRequestWord(word)) return
     const occurrences = (word.match(REQUEST_FLAG_RE) ?? []).length
     if (occurrences === 0) return
-    const inner = depth < MAX_NESTING ? scan(tokenize(word, shell), shell, depth + 1) : { found: [], exempt: 0 }
-    found.push(...inner.found)
-    exempt += inner.exempt
-    for (let n = inner.found.length + inner.exempt; n < occurrences; n++) found.push({ title: '', approved: '' })
+    const inner = depth < MAX_NESTING ? depositsIn(tokenize(word, shell), shell, depth + 1) : []
+    found.push(...inner)
+    for (let n = inner.length; n < occurrences; n++) found.push({ title: '', approved: '' })
   })
-  return { found, exempt }
+  return found
 }
+
+/** A `node …/finding.mjs` simple command starts at `start`. */
+const isFindingCall = (tokens, start) =>
+  typeof tokens[start] === 'string' &&
+  /(^|\/)node$/.test(tokens[start]) &&
+  typeof tokens[start + 1] === 'string' &&
+  /(^|\/)finding\.mjs$/.test(tokens[start + 1])
 
 /**
  * Every finding.mjs request deposit in a command — a TEXTUAL, fail-closed rule.

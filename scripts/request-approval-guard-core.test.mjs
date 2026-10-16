@@ -427,10 +427,15 @@ describe('the flag word inside a finding detail', () => {
     expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
   })
 
-  it('detail prose inside a shell-wrapped finding call is no request', () => {
-    const command = `bash -lc 'node scripts/finding.mjs --record x --detail "mentions --request"'`
-    expect(requestsOf(command)).toEqual([])
-    expect(verdict(command, chat).block).toBe(false)
+  it('detail prose inside a re-parsed string is still judged (fail closed)', () => {
+    expect(requestsOf(`bash -lc 'node scripts/finding.mjs --record x --detail "mentions --request"'`)).toHaveLength(1)
+    const piped = `printf '%s' 'node scripts/finding.mjs --detail "x --request Unapproved"' | xargs -d ' ' sh -c 'exec "$@"' _`
+    expect(requestsOf(piped)).not.toEqual([])
+  })
+
+  it('an --approved word inside a comment is no approval', () => {
+    const command = `node scripts/finding.mjs --request "${TITLE}" --stdin # --approved "passt so"`
+    expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
   })
 
 })
