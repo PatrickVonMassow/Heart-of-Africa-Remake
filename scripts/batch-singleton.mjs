@@ -2006,6 +2006,23 @@ export function release(sessionId, lockPath = LOCK_PATH) {
   return false
 }
 
+/**
+ * The CLI's manual release: retire the holder's batch writer, then drop the lock.
+ * Deleting only the lock left an active writer whose idle process vetoed every
+ * launcher start until it exited (standstill of 16.10.2026).
+ */
+export function manualRelease(lockPath = LOCK_PATH) {
+  const lock = readOwnerLock(lockPath)
+  if (!lock) return null
+  retireBatchWriter(lock.sessionId, {
+    lockPath,
+    generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+    reason: 'manual-release',
+  })
+  rmSync(lockPath, { force: true })
+  return lock.sessionId
+}
+
 /** The head the boundary was committed from. Best effort: a seal without a ref
  *  is still a seal, and no bookkeeping read may fail a handover. */
 function currentHeadForSeal(lockPath) {
@@ -2555,10 +2572,9 @@ if (isMain) {
     const parallel = detectParallel(readOwnerLock()?.sessionId ?? '')
     console.log(`live parallel sessions: ${parallel.length ? JSON.stringify(parallel) : 'none'}`)
   } else if (cmd === 'release') {
-    const lock = readOwnerLock()
-    if (lock) {
-      rmSync(LOCK_PATH, { force: true })
-      console.log(`released lock held by ${lock.sessionId} (manual override)`)
+    const released = manualRelease()
+    if (released) {
+      console.log(`released lock held by ${released} (manual override, batch writer retired)`)
     } else {
       console.log('no lock to release')
     }
