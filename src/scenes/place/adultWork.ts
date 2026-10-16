@@ -172,6 +172,10 @@ export interface AdultWorkState {
    *  It is capped at `balance.waterStandCapacity`: a delivery past the cap
    *  replaces the oldest jar, which is what lets the stand need no consumer. */
   standJars: number
+  /** Per body whose dig bout completed in the latest step: the work clock
+   *  (`dug`) it completed at, so the drawn stroke ends on the step's last
+   *  advance although the task is gone. */
+  digEnded: Record<number, number>
 }
 
 export const WORK_ARRIVE_RADIUS = 1.1
@@ -190,6 +194,7 @@ export function createAdultWork(count: number, cfg: AdultWorkConfig, progress: r
     cursor: 0,
     siteProgress: Object.fromEntries(progress.map((p, i) => [i, { ...p }])),
     standJars: 0,
+    digEnded: {},
   }
 }
 
@@ -250,12 +255,15 @@ export function digBout(hold: { digHold: number }, onRim: boolean, inBout: boole
  * The clock a body's drawn stroke runs on (both the glTF clip and the
  * primitive's digPose, each with `digPhaseOf`): its errand's work clock
  * (`dug`, advanced by stepAdultWork only under a stroke really played) while
- * it digs, so each counted strike is the one drawn in that frame; held where
- * it stopped while the bout's pose is still `shown` (a hold or a fade);
- * from the top once the pose is gone.
+ * it digs, so each counted strike is the one drawn in that frame; on the
+ * step that completes the bout, the clock it completed at (`ended`, the
+ * state's `digEnded`), the task being gone; held where it stopped while the
+ * bout's pose is still `shown` (a hold or a fade); from the top once the pose
+ * is gone.
  */
-export function drawnDigClock(prev: number, task: { phase: string; dug: number } | null | undefined, shown: boolean): number {
+export function drawnDigClock(prev: number, task: { phase: string; dug: number } | null | undefined, shown: boolean, ended?: number): number {
   if (task && task.phase === 'dig') return task.dug
+  if (ended !== undefined) return ended
   return shown ? prev : 0
 }
 
@@ -574,6 +582,7 @@ export function stepAdultWork(
   if (dt <= 0) return null
   state.clock += dt
   state.emitted = []
+  state.digEnded = {}
   state.floor = view.floor ?? state.floor ?? new SpeechFloor(() => ({ x: 0, z: 0, active: false }), () => state.clock)
   if (state.last) state.last.age += dt
   let spoken: SpokenWord | null = null
@@ -694,6 +703,10 @@ export function stepAdultWork(
       if (digStrikeCrossed(before, t.dug, digPhaseOf(i), cfg.digStroke)) progress.strikes++
       if (t.dug >= cfg.digSeconds) {
         progress.completed = true
+        // both bodies' clocks as this step leaves them, for the drawn stroke
+        state.digEnded[i] = t.dug
+        const mate = t.partner === null ? null : state.tasks[t.partner]
+        if (mate && mate.phase === 'dig' && t.partner !== null) state.digEnded[t.partner] = mate.dug
         clearPair(state, i)
       }
     } else if (t.arrived && t.phase === 'fetch' && !t.via) {

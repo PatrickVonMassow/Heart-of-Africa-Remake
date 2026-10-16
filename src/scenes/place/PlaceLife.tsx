@@ -3187,8 +3187,9 @@ function ErrandVillagers({
         // the drawn stroke on the work's clock, for both bodies: it advances
         // only while the hole deepens, so it freezes through a hold or a fade,
         // and the strike the progress counts is the one drawn
-        state.dug = drawnDigClock(state.dug, task, digging || state.digK > 0)
-        if (task && task.phase === 'dig') figureWork.digT = state.dug + digPhaseOf(i)
+        const ended = work.digEnded[i]
+        state.dug = drawnDigClock(state.dug, task, digging || state.digK > 0, ended)
+        if ((task && task.phase === 'dig') || ended !== undefined) figureWork.digT = state.dug + digPhaseOf(i)
         if (digging) {
           figureWork.dig = true
           const siteIndex = task?.siteIndex

@@ -905,6 +905,46 @@ describe('digging records work at the site', () => {
     expect(drawnDigClock(drawn, null, false)).toBe(0)
   })
 
+  it('the stroke that completes the bout is drawn: the final advance survives the task\'s removal', () => {
+    const v = riverless(view(6))
+    v.geography.digSites = v.geography.digSites.slice(0, 1)
+    const state = stageDig(v)
+    const first = initiatorOf(state)
+    const partner = state.tasks[first]!.partner!
+    for (let clock = 0; clock < 5; clock += 0.1) {
+      v.villagers.forEach((me, i) => { me.free = !state.tasks[i] })
+      stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    }
+    // the body stepped first completes its bout in a step that crosses its strike
+    const lo = Math.min(first, partner)
+    const hi = Math.max(first, partner)
+    const dt = 1 / 60
+    const strike = 3 * DIG_CYCLE_SECONDS - digPhaseOf(lo)
+    const cfg = { ...CFG, digSeconds: strike + dt / 4 }
+    const start = { [lo]: strike - dt / 4, [hi]: strike - 1 }
+    for (const i of [lo, hi]) {
+      Object.assign(state.tasks[i]!, { phase: 'dig', arrived: true, owes: false, dug: start[i] })
+      putAtGoal(state, v, i)
+    }
+    const drawn = [lo, hi].map((i) => drawnDigClock(0, taskOf(state, i), true))
+    const strikes = state.siteProgress[0]?.strikes ?? 0
+    stepAdultWork(state, v, dt, cfg, () => 0.5)
+    expect(state.tasks[lo]).toBeNull()
+    expect(state.tasks[hi]).toBeNull()
+    // the excavation counted the strike in this step ...
+    expect(state.siteProgress[0].strikes).toBe(strikes + 1)
+    expect(state.siteProgress[0].completed).toBe(true)
+    // ... and the drawn stroke reaches it in the same frame, at its blow
+    const after = [lo, hi].map((i, k) => drawnDigClock(drawn[k], taskOf(state, i), true, state.digEnded[i]))
+    expect(after[0]).toBeCloseTo(start[lo] + dt, 9)
+    expect(digPose(after[0], digPhaseOf(lo)).left.pitch).toBeGreaterThan(digPose(0, 0).left.pitch - 0.01)
+    // the partner, released before its own step, holds its clock where it was
+    expect(after[1]).toBe(start[hi])
+    // the next step carries no completion: the stroke holds through the fade
+    stepAdultWork(state, v, dt, cfg, () => 0.5)
+    expect(drawnDigClock(after[0], taskOf(state, lo), true, state.digEnded[lo])).toBe(after[0])
+  })
+
   it('the primitive stroke still strikes at the turn of its cycle', () => {
     expect(PRIMITIVE_DIG_STROKE).toEqual({ seconds: DIG_CYCLE_SECONDS, strikeAt: 0 })
   })
