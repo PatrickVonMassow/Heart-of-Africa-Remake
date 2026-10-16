@@ -657,13 +657,15 @@ export function evaluateCardReviews(input = {}) {
   const pending = pendingCardReviews(input)
   if (!pending.length) return pass()
   const nonOwner = input.nonOwner === true
+  // The session id makes each command copyable without CLAUDE_SESSION_ID.
+  const session = /^[A-Za-z0-9._-]+$/.test(String(input.sessionId ?? '')) ? ` --session ${input.sessionId}` : ''
   const lines = pending.map(({ title, terms }) => {
     const fragment = quoted(title)
-    const keep = `node scripts/board.mjs vdzk-keep ${fragment}${terms.length ? ' --why "<warum diese Nachricht die Karte nicht beantwortet>"' : ''}`
+    const keep = `node scripts/board.mjs vdzk-keep ${fragment}${terms.length ? ' --why "<warum diese Nachricht die Karte nicht beantwortet>"' : ''}${session}`
     if (!nonOwner) {
       return `- ${quoted(title)}: node scripts/board.mjs vdzk-remove ${fragment}\n  or: ${keep}`
     }
-    const carry = `node scripts/vdzk-answer.mjs ${fragment} --answer "<was der Nutzer entschieden hat>"`
+    const carry = `node scripts/vdzk-answer.mjs ${fragment} --answer "<was der Nutzer entschieden hat>"${session}`
     return `- ${quoted(title)} (shared: ${terms.join(', ')}): ${carry}\n  or, if it was not answered: ${keep}`
   })
   return {
