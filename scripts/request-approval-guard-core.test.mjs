@@ -419,6 +419,12 @@ describe('the flag word inside a finding detail', () => {
 
   it('an expansion-bearing or unquoted detail value is still judged', () => {
     expect(requestsOf('node scripts/finding.mjs --record x --detail {--request,Unapproved} --stdin')).toHaveLength(1)
+    expect(requestsOf('node scripts/finding.mjs --detail [-\\ --request]* Unapproved --stdin')).toHaveLength(1)
+  })
+
+  it('an --approved word of a later command is no approval', () => {
+    const command = `node scripts/finding.mjs --request "${TITLE}" --stdin; printf '%s\\n' --approved "passt so"`
+    expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
   })
 
   it('detail prose inside a shell-wrapped finding call is no request', () => {

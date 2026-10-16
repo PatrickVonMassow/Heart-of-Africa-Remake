@@ -182,7 +182,7 @@ function scan(tokens, shell, depth) {
   // A finding's --detail text is prose, not a command: the flag word inside it
   // is no deposit. Only a direct `node …/finding.mjs` call earns this — another
   // program (`bash -c 'eval "$1"' --detail …`) may run its argument — and a
-  // value with any expansion (`$`, backtick, braces) can still produce one. The
+  // value with any expansion (`$`, backtick, braces, glob) can still produce one. The
   // tokens carry no quoting, so only a value with whitespace — necessarily
   // quoted — counts as prose; an exact `--request` value stays a deposit.
   let start = 0
@@ -193,7 +193,7 @@ function scan(tokens, shell, depth) {
     }
     if (word !== DETAIL_FLAG || !isWord(k + 1) || !isFindingCall(tokens, start)) return
     const value = tokens[k + 1]
-    if (/[$`{}]/.test(value) || !/\s/.test(value)) return
+    if (/[$`{}*?[\]]/.test(value) || !/\s/.test(value)) return
     consumed.add(k + 1)
     exempt += (value.match(REQUEST_FLAG_RE) ?? []).length
   })
@@ -202,7 +202,8 @@ function scan(tokens, shell, depth) {
     if (isRequestWord(word)) {
       const title = word === REQUEST_FLAG ? valueAt(k + 1) : word.slice(REQUEST_FLAG.length + 1)
       let approved = ''
-      for (let j = k + 1; j < tokens.length && !isRequestWord(tokens[j]); j++) {
+      // The approval belongs to the same simple command: an operator ends the search.
+      for (let j = k + 1; j < tokens.length && typeof tokens[j] === 'string' && !isRequestWord(tokens[j]); j++) {
         if (tokens[j] === APPROVED_FLAG) {
           approved = valueAt(j + 1)
           break
