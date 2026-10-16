@@ -108,6 +108,7 @@ import {
   type BankUtterance,
   type BankWorld,
 } from './bankGame'
+import { FrameFirst } from './frameFirst'
 import {
   ADULT_SITUATIONS,
   carryOf,
@@ -2929,9 +2930,10 @@ function ErrandVillagers({
     [colliders, standable],
   )
 
-  // Priority −1, as the walkers': the figures (subscribed first, as children)
-  // read this frame's work clock and step, not the last frame's.
-  useFrame((_, rawDt) => {
+  // Run as this component's first child (FrameFirst): after the children's
+  // frame, so the step's hearing guard reads where they stand this frame, and
+  // before the figures', so they draw this frame's work clock and step.
+  const errandFrame = (rawDt: number) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
     const cfg = { ...balance.villageLife.adultErrands, digStroke }
@@ -3259,7 +3261,7 @@ function ErrandVillagers({
         speakWork(camera, said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
       }
     }
-  }, -1)
+  }
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): what the adults
   // have said this visit, and what each of them is doing about it.
@@ -3379,6 +3381,7 @@ function ErrandVillagers({
 
   return (
     <>
+      <FrameFirst frame={errandFrame} />
       {people.map((p, i) => (
         <group
           key={i}
