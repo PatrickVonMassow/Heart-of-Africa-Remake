@@ -2446,6 +2446,9 @@ function Walkers({
       states: states.current,
       homes: defs.map((d) => d.home),
       carries: defs.map((d) => d.carries),
+      // Each walker's cruise pace (world units per second), so the walk probe
+      // can tell a walker at pace from one still easing up to it.
+      speeds: defs.map((d) => d.speed),
       // The drawn group, for the walk's foot and stride measurements.
       group: (who: number) => refs.current[who] ?? null,
       // Read the rendered body independently of the surface it should ride.
