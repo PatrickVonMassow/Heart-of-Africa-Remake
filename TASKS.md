@@ -85,6 +85,14 @@ put it is the mistake this line exists to stop.
   User bug report 16.10.2026 09:06 (findings carrier, /backup/hoa/local/SchwebendeSchaubeUeberDenKoepfen.zip, "Schwebende Scheibe über dem Kopf"): build production cff9fdb (main), WebGPU, nvidia, medium quality, seed 3674687236, place bambara-village, x/z -59.45/-130.99, day 0: thin flat white discs hover clearly above the heads of at least five villagers (the elder in the centre, the two blue-tunic men, two figures by the left hut, the woman on the right), most of whom carry nothing visible. The red disc by the middle hut is the chief's hut marker, not a defect (user correction 09:09). Check whether an empty head pad/load is drawn on non-carriers; if the white disc is not this point's floating load, extend this point's final state to remove it. This seed/position is a picture case of this point.
   Bundle: Dorfleben.
 
+- [ ] 1362. The low-preset village-walk probe gathers too few primitive-walker samples
+  Queue position: directly after point 1360 (Dorfleben); may land on its own.
+  Source: owner closing run 16.10.2026 12:20 on origin/main dfb0ed0 (1359+1342 landed), webgpu, polish-villagers --section=village-walk: new red "low preset: every walking primitive stands on the ground every frame" with {samples 27, walkers 1, skinned 0, worstGround 0}; the check needs >= 30 samples, so the red is a sample shortage, not a ground defect (green with 33/4 in the 1342 section runs the same morning). Same class as the walker search/read race fixed on the 1342 branch (ae987a4a3); the run was flagged UNDER LOAD.
+  Final state: the low-preset ground check in scripts/verify/polish-villagers.mjs always gathers its 30 samples (keeps sampling across walkers or waits for a walking primitive) and reports a real ground verdict; worstGround stays <= 0.040 m.
+  Verifiable: polish-villagers --section=village-walk on both backends shows the low-preset check with samples >= 30 and green on three consecutive quiet-host runs; then the full polish-villagers covering run on both backends that the 1342 landing still owes (render-verify-guard).
+  Criticality: low - probe only, no player-visible change; it blocks the covering picture run.
+  Bundle: Dorfleben.
+
 - [ ] 1354. Natural villager motion b2: one pose pipeline, distributed lean and gaze, corrective leg IK, posable clavicles, pelvic check
   Queue position: directly after point 1342 (judged on its rig and clips).
   Source: cut from point 1342 on 13.10.2026 along the line 1342 named for a stall (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 8, 9, the step-4 forearm-twist decision after step 9, 10, 11 and 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
