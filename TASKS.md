@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1366. Manual batch release leaves the writer active, so the launcher vetoes every successor
-  Queue position: front of the queue (user 16.10.2026: "continue und dazu die dauerhafte Lösung als Punkt").
-  Source: batch standstill 16.10.2026 17:37-18:03 (launcher "skip: authoritative batch-writer process measured for 768d0d06… (pid 1619) with no owner lock present"). Session 768d0d06 released via the CLI 'node scripts/batch-singleton.mjs release', whose branch (batch-singleton.mjs ~2557-2561) only deletes the lock file; the library release() retires the writer via retireBatchWriter, the CLI does not. The record in .claude/session-process.json stayed authorityState "active" at the current fence 2722 while the idle VS Code process lived on, so batch-autostart-core.mjs (~487-500) vetoed every start. The take message of batch-claim.mjs itself recommends this CLI release.
-  Final state: the CLI 'batch-singleton.mjs release' retires the lock holder's batch writer (reason 'manual-release', generation from the lock's fence) before removing the lock, exactly as release() does; no released lock leaves an active writer behind.
-  Verifiable: Vitest: lock + active writer record -> CLI release -> writer authorityState 'retired', lock gone, and the autostart decision over that state does not veto with "authoritative batch-writer process".
-  Criticality: high - reproducible batch standstill until the released session's process ends.
-  Bundle: Modell & Wächter.
-
 - [ ] 1363. Board: the description survives landing (the projection discards the now card)
   Queue position: front of the queue (user 16.10.2026: "ja, vorne in der Queue so einreihen").
   Source: user 16.10.2026 on point 1302: "Sinn der Sache war, dass die Beschreibungen von Anfang an da sind und nie wieder verlorengehen (z. B. durch Überschreiben mit dem Status). Für 1342 ist sie aber verlorengegangen." Measured: the done card 1342 shows "Beschreibung fehlt". Cause reproduced on a board copy: land-point settleActiveWork clears the focus, board-publish -> reconcileNowProjection(html, []) removes the numbered now card (board-core.mjs ~1240, return '') without archiving it to done; then 'board.mjs closing <N> --title ...' writes a state card without description (toClosingWork/writeStateCard), and 'done <N>' archives it via toDone, whose fallback to existing done cards stays empty -> placeholder. The path done -> closing -> done keeps the description.
