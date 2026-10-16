@@ -10,7 +10,7 @@ import { balance, VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, newClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
+import { clipGaitPose, clipPoseAt, newClipGait, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, newPose, newWorld, sprintWeight, toolInHand } from './villagerRig'
 
@@ -112,8 +112,12 @@ describe('a gait clip\'s stance', () => {
 })
 
 describe('the clip gait on the ground', () => {
-  /** Walk a person straight ahead at `speed` and record each planted foot's world slide. */
-  function walkStraight(person: GltfPerson, speed: number, hold = true, seconds = 4, dt = 1 / 60) {
+  /** Walk a person straight ahead at `speed` and record each planted foot's
+   *  world slide. `probes` > 1 also samples each frame interval that many
+   *  times from a copy of the frame's gait state (nothing drawn, the state
+   *  carried on unchanged) and measures every contact down at the frame
+   *  against itself at those sub-frame instants. */
+  function walkStraight(person: GltfPerson, speed: number, hold = true, seconds = 4, dt = 1 / 60, probes = 1) {
     const n = asset.bones.length
     const g = newClipGait()
     const pose = newPose(n)
@@ -121,40 +125,58 @@ describe('the clip gait on the ground', () => {
     const f = person.frame
     let slide = 0
     let lowest = Infinity
-    // per foot, frames with a contact down, and contacts measured down on two
-    // frames running (a floating foot has neither; a run's ~0.1-cycle stance
-    // lasts two 30 Hz frames, so it may land there without a pair)
+    // per foot, frames with a contact down, contacts measured down on two
+    // frames running, and contacts measured down at a frame and at one of its
+    // sub-frame probes (a floating foot has none; a run's stance at the bands
+    // can touch at most one 30 Hz frame running, so there it lands without a
+    // pair and only the probes measure it)
     const downs = { L: 0, R: 0 }
     const pairs = { L: 0, R: 0 }
+    const probed = { L: 0, R: 0 }
+    /** The contacts down after stepping `gait` by `walked` to the body at `z` (world x, z). */
+    const downAt = (gait: ClipGait, walked: number, z: number) => {
+      stepClipGait(gait, asset, f, walked, speed)
+      clipGaitPose(gait, asset, f, speed, hold ? { x: 0, z, yaw: 0, unit: 1 } : null, pose)
+      forwardKinematics(asset, f.rest0, pose, world)
+      const c = contactPoints(asset, world, f.legScale)
+      const down: Record<string, THREE.Vector3> = {}
+      for (const s of ['L', 'R'] as const) {
+        for (const k of ['heel', 'ball', 'tip'] as const) {
+          const p = c[s][k]
+          lowest = Math.min(lowest, p.y)
+          if (p.y <= 0.01) down[s + k] = new THREE.Vector3(p.x * f.scale, 0, p.z * f.scale + z)
+        }
+      }
+      return down
+    }
     let last: Record<string, THREE.Vector3> = {}
     let z = 0
     for (let t = 0; t < seconds; t += dt) {
       const walked = speed * dt
       z += walked
-      stepClipGait(g, asset, f, walked, speed)
-      const body: GroundBody = { x: 0, z, yaw: 0, unit: 1 }
-      clipGaitPose(g, asset, f, speed, hold ? body : null, pose)
-      forwardKinematics(asset, f.rest0, pose, world)
-      const c = contactPoints(asset, world, f.legScale)
-      const next: typeof last = {}
-      for (const s of ['L', 'R'] as const) {
-        for (const k of ['heel', 'ball', 'tip'] as const) {
-          const p = c[s][k]
-          lowest = Math.min(lowest, p.y)
-          if (p.y > 0.01) continue
-          if (t > 1) downs[s]++
-          const w = new THREE.Vector3(p.x * f.scale, 0, p.z * f.scale + z)
-          const key = s + k
-          if (last[key] && t > 1) {
-            slide = Math.max(slide, w.distanceTo(last[key]))
-            pairs[s]++
+      const now = downAt(g, walked, z)
+      const keys = Object.keys(now)
+      if (t > 1) {
+        for (const key of keys) {
+          const s = key[0] as 'L' | 'R'
+          downs[s]++
+          if (!last[key]) continue
+          slide = Math.max(slide, now[key].distanceTo(last[key]))
+          pairs[s]++
+        }
+        for (let j = 1; j < probes && keys.length; j++) {
+          const part = (walked * j) / probes
+          const sub = downAt(structuredClone(g), part, z + part)
+          for (const key of keys) {
+            if (!sub[key]) continue
+            slide = Math.max(slide, sub[key].distanceTo(now[key]))
+            probed[key[0] as 'L' | 'R']++
           }
-          next[key] = w
         }
       }
-      last = next
+      last = now
     }
-    return { slide, lowest, downs, pairs }
+    return { slide, lowest, downs, pairs, probed }
   }
 
   it('with the hold, a planted foot does not slide across the whole speed ramp: every body, both cross-fades, 30/60/120 Hz', () => {
@@ -172,13 +194,17 @@ describe('the clip gait on the ground', () => {
       const per = person.frame.legScale * person.frame.scale
       for (const hz of [30, 60, 120]) {
         for (const v of ramp) {
-          const r = walkStraight(person, v * per, true, 3, 1 / hz)
+          // 30 Hz probes each frame at its half: the slide is measured there
+          // even where no contact stays down two frames running
+          const r = walkStraight(person, v * per, true, 3, 1 / hz, hz === 30 ? 2 : 1)
           const where = `${v} per leg at ${hz} Hz, leg ${person.frame.legScale.toFixed(2)}`
           expect(r.slide, where).toBeLessThan(0.004)
-          // the slide was measured: each foot came down (and, from 60 Hz,
-          // was followed there), and no foot sank into the ground
+          // the slide was measured: each foot came down and was followed
+          // there (from 60 Hz frame to frame, at 30 Hz to the half frame),
+          // and no foot sank into the ground
           expect(Math.min(r.downs.L, r.downs.R), where).toBeGreaterThan(0)
-          if (hz >= 60) expect(Math.min(r.pairs.L, r.pairs.R), where).toBeGreaterThan(0)
+          const followed = hz >= 60 ? r.pairs : r.probed
+          expect(Math.min(followed.L, followed.R), where).toBeGreaterThan(0)
           expect(r.lowest, where).toBeGreaterThan(-0.005)
         }
       }
