@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1365. The approval guard ignores user approvals that arrive during a running turn
-  Queue position: directly after point 1364 (same endless loop, user 16.10.2026).
-  Source: findings carrier 16.10.2026 16:34, session 0eea1689: the user wrote mid-turn "Batch hierherholen, einreihen und direkt an nächste Session weitergeben" (approving the title shown verbatim before); finding.mjs --request with that wording as approval was refused by request-approval-guard (no-approval-after-proposal) — mid-turn messages are apparently not read as genuine user messages. Side finding: the guard reads the request flag word inside a finding's detail text as a request.
-  Final state: a user message delivered mid-turn (the harness's "The user sent a new message while you were working" form) counts as a genuine user message for request-approval-guard, while a quote of it inside a tool result or system notification still does not; the flag word inside a finding's --detail text is not read as a request.
-  Verifiable: Vitest over a transcript fixture with a mid-turn user message after the proposal -> approval accepted; the same text inside a tool result -> refused; a --record whose detail contains the flag word -> not treated as a request.
-  Criticality: high - with 1364 it caused the endless loop.
-  Bundle: Modell & Wächter.
-
 - [ ] 1360. A villager's head load floats 5-7 cm above the drawn head
   Queue position: directly after point 1342 (Dorfleben); may land on its own.
   Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.

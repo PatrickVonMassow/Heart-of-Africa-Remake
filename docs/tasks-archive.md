@@ -34201,3 +34201,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: Vitest: the stand-down classifier allows 'node scripts/board.mjs vdzk-keep "x" --why y --session <id>' for a non-owner and still refuses other board.mjs writes; vdzk-keep with --session records the keep; a test pairing every remediation command decision-card-guard prints with the stand-down verdict for a non-owner (none refused).
   Criticality: high - reproducible endless Stop-hook loop in a non-owner session.
   Bundle: Modell & Wächter.
+
+- [x] 1365. The approval guard ignores user approvals that arrive during a running turn
+  Queue position: directly after point 1364 (same endless loop, user 16.10.2026).
+  Source: findings carrier 16.10.2026 16:34, session 0eea1689: the user wrote mid-turn "Batch hierherholen, einreihen und direkt an nächste Session weitergeben" (approving the title shown verbatim before); finding.mjs --request with that wording as approval was refused by request-approval-guard (no-approval-after-proposal) — mid-turn messages are apparently not read as genuine user messages. Side finding: the guard reads the request flag word inside a finding's detail text as a request.
+  Final state: a user message delivered mid-turn (the harness's "The user sent a new message while you were working" form) counts as a genuine user message for request-approval-guard, while a quote of it inside a tool result or system notification still does not; the flag word inside a finding's --detail text is not read as a request.
+  Verifiable: Vitest over a transcript fixture with a mid-turn user message after the proposal -> approval accepted; the same text inside a tool result -> refused; a --record whose detail contains the flag word -> not treated as a request.
+  Criticality: high - with 1364 it caused the endless loop.
+  Bundle: Modell & Wächter.
