@@ -1869,4 +1869,14 @@ export const RED_CHARGES = [
       + 'the glTF body; measured again 11.10.2026 on feat/1336 49f836d8f, webgpu (worstGround 0.198 m, '
       + 'stances 1). The charge dies with point 1330.',
   },
+  {
+    point: 1360,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^head carrier: the crown rests on the drawn head under it\b/i,
+    why:
+      'FILED AS 1360 ON 16.10.2026: red on feat/1342-natural-motion-b 9279dd9d9, webgpu '
+      + '(crownOverDrawnHead 0.073 m); Vitest over the bind pose shows the same 5-7 cm float of the '
+      + 'crown anchor on main. The charge dies with point 1360.',
+  },
 ]
