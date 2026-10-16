@@ -33,8 +33,8 @@ const OPERATORS = ['&&', '||', ';', '|', '&', '(', ')', '`']
  * heredoc (`<<WORD`, `<<-WORD`) is skipped to its terminator line; a quoted
  * delimiter keeps its body literal, but an UNQUOTED body with a command
  * substitution (`$(…)`, backtick) — which bash runs — comes back as one word
- * (then a line break), so the substitution is scanned. A here-string `<<<` is
- * an ordinary redirect. PowerShell: backslash is a plain path character, the backtick
+ * (then a line break), so the substitution is scanned. The `<<` / `<<<`
+ * operator itself is kept as a word, so its operand is never read as a title. PowerShell: backslash is a plain path character, the backtick
  * escapes, and a here-string `@'…'@` / `@"…"@` is one word. Parentheses and
  * (in bash) backticks separate commands, so `$(node …)` is seen.
  * Returns an array of strings; operators come back as `{ op }` objects.
@@ -69,7 +69,9 @@ export function tokenize(text, shell = 'bash') {
           if ((strip ? line.replace(/^\t+/, '') : line).replace(/\r$/, '') === delim) break
           body += `${line}\n`
         }
-        if (!quoted && /\$\(|`/.test(body)) out.push(body, { op: '\n' })
+        // bash joins backslash-newline continuations in an unquoted body first
+        const joined = quoted ? '' : body.replace(/\\\r?\n/g, '')
+        if (/\$\(|`/.test(joined)) out.push(joined, { op: '\n' })
       }
       continue
     }
@@ -116,13 +118,16 @@ export function tokenize(text, shell = 'bash') {
       }
       continue
     }
-    if (!ps && src.startsWith('<<<', i)) {
-      flush()
-      i += 3
-      continue
-    }
     if (!ps && src.startsWith('<<', i)) {
+      // The operator stays a word (with a leading fd number) so that a
+      // redirection operand can never be read as a title or approval.
+      const marker = src.startsWith('<<<', i) ? '<<<' : '<<'
+      word = /^\d+$/.test(word ?? '') ? word + marker : (flush(), marker)
       flush()
+      if (marker === '<<<') {
+        i += 3
+        continue
+      }
       let j = i + 2
       const strip = src[j] === '-'
       if (strip) j++
@@ -155,8 +160,8 @@ export function tokenize(text, shell = 'bash') {
 /** The exact `--request` flag inside any text (`--requests` and `--request-x` excluded). */
 const REQUEST_FLAG_RE = /(^|[^\w-])--request(?![\w-])/g
 const MAX_NESTING = 3
-/** A bash redirection word (`>`, `2>`, `>>f`, `<f`, `>|`): never a title or approval. */
-const REDIRECT_RE = /^\d*[<>]/
+/** A bash redirection word (`>`, `2>`, `>>f`, `<f`, `<<<`, `{fd}>`): never a title or approval. */
+const REDIRECT_RE = /^(\d*|\{\w+\})[<>]/
 
 /** The ONE request predicate: detection and approval boundaries both use it. */
 const isRequestWord = (word) =>

@@ -173,8 +173,8 @@ describe('command parsing', () => {
     expect(requestOf(command)).toEqual({ title: TITLE, approved: '' })
   })
 
-  it('treats a here-string as an ordinary redirect', () => {
-    expect(tokenize('cat <<< "x" && ls')).toEqual(['cat', 'x', { op: '&&' }, 'ls'])
+  it('keeps the here-string operator as a word', () => {
+    expect(tokenize('cat <<< "x" && ls')).toEqual(['cat', '<<<', 'x', { op: '&&' }, 'ls'])
   })
 
   it('reads --approved from the command and decodes double-quote escapes', () => {
@@ -484,5 +484,31 @@ describe('deposit shapes the tokenizer missed (GPT-6 Astra review, round 6)', ()
     }
     const plain = ['cat > /tmp/s.md <<EOF', 'spec text mentioning scripts/finding.mjs --request', 'EOF'].join('\n')
     expect(requestsOf(plain)).toEqual([])
+  })
+  it('a backslash-newline continuation in an unquoted heredoc body cannot hide a substitution', () => {
+    const command = ['cat <<EOF', '$\\', '(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n')
+    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
+    blocked(command)
+    const tabbed = ['cat <<-EOF', '\t`node scripts/finding.mjs \\', '\t--request Hidden`', '\tEOF'].join('\n')
+    expect(requestsOf(tabbed).map((r) => r.title)).toContain('Hidden')
+  })
+
+  it('a here-string or heredoc operand is never a title or approval', () => {
+    const shapes = [
+      'node scripts/finding.mjs --request <<< Outer Hidden --stdin --approved "passt so"',
+      'node scripts/finding.mjs --request <<<"Outer" Hidden --stdin --approved "passt so"',
+      "node scripts/finding.mjs --request 0<<< 'Outer' Hidden --stdin --approved \"passt so\"",
+      'node scripts/finding.mjs --request {fd}<Outer Hidden --stdin --approved "passt so"',
+      'node scripts/finding.mjs --request < Outer Hidden --stdin --approved "passt so"',
+      'node scripts/finding.mjs --request >> Outer Hidden --stdin --approved "passt so"',
+      ['node scripts/finding.mjs --request <<-Outer Hidden --approved "passt so"', 'x', 'Outer'].join('\n'),
+    ]
+    for (const command of shapes) {
+      expect(requestsOf(command).map((r) => r.title), command).not.toContain('Outer')
+      blocked(command)
+    }
+    const approval = 'node scripts/finding.mjs --request Outer --stdin --approved <<< "passt so"'
+    expect(requestsOf(approval)[0].approved).toBe('')
+    blocked(approval)
   })
 })
