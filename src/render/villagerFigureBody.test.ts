@@ -252,6 +252,7 @@ function drawnHeadTop(asset: VillagerAsset, g: THREE.BufferGeometry, rest: Float
   return top
 }
 
+const HEAD_FORMS = new Set(['cap', 'turban', 'headband', 'headRing', 'topknot', 'hairBag'])
 const dressOf = (l: DressLayer): DressLayer => ({ ...l, colour: l.colour === 'cloth' ? '#b08850' : l.colour, colour2: l.colour2 === 'cloth' ? '#b08850' : l.colour2 })
 
 describe('a head load rests on the drawn head', () => {
@@ -268,6 +269,24 @@ describe('a head load rests on the drawn head', () => {
           const top = drawnHeadTop(asset, g, person.rest)
           expect(Math.abs(crown - top), `${id} ${sex} ${age} build ${build}: crown ${crown.toFixed(3)} over drawn head ${top.toFixed(3)}`).toBeLessThanOrEqual(0.02)
         }
+      }
+    }
+  })
+
+  it('no head piece floats: every one reaches down onto the head of every person who could wear it', () => {
+    const worn = new Map<string, DressLayer>()
+    for (const t of Object.values(PEOPLE_DRESS))
+      for (const sex of SEXES) for (const age of AGE_GROUPS) for (const l of t[sex][age]) if (HEAD_FORMS.has(l.form)) worn.set(garmentMeshName(l), dressOf(l))
+    expect(worn.size).toBeGreaterThan(0)
+    for (const { sex, age } of people()) {
+      const person = gltfPerson(asset, sex, age)
+      for (const [name, l] of worn) {
+        const g = gltfGarment(asset, person, l)
+        expect(g, name).not.toBeNull()
+        g!.computeBoundingBox()
+        // its lowest edge below the bare head's top: a piece wholly above the
+        // scalp is a disc hovering over the head (the user's report of 16.10.)
+        expect(g!.boundingBox!.min.y, `${name} on ${sex} ${age} (head top ${person.p.crownY.toFixed(3)})`).toBeLessThan(person.p.crownY)
       }
     }
   })

@@ -478,9 +478,9 @@
    "worn": [
     "g-hood-overHead"
    ],
-   "hidden": 184,
-   "covered": 1775,
-   "drawnTriangles": 5734,
+   "hidden": 186,
+   "covered": 1788,
+   "drawnTriangles": 5729,
    "coveredIds": [
     2,
     5,
@@ -491,13 +491,13 @@
     11,
     12,
     14,
+    16,
     17,
     18,
     19,
     20,
     21,
-    22,
-    23
+    22
    ]
   },
   {
@@ -523,9 +523,26 @@
     "g-headband-aroundHead"
    ],
    "hidden": 0,
-   "covered": 0,
+   "covered": 99,
    "drawnTriangles": 5998,
-   "coveredIds": []
+   "coveredIds": [
+    63,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    391,
+    392
+   ]
   },
   {
    "worn": [
@@ -667,25 +684,25 @@
     "g-headband-aroundHead"
    ],
    "hidden": 109,
-   "covered": 248,
+   "covered": 347,
    "drawnTriangles": 5818,
    "coveredIds": [
-    589,
-    623,
-    624,
-    625,
-    626,
-    628,
-    631,
-    632,
-    633,
-    634,
-    635,
-    643,
-    644,
-    645,
-    646,
-    647
+    63,
+    75,
+    76,
+    77,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    391,
+    392
    ]
   },
   {
