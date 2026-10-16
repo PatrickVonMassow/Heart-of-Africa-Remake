@@ -445,3 +445,44 @@ describe('the flag word inside a finding detail', () => {
   })
 
 })
+
+describe('deposit shapes the tokenizer missed (GPT-6 Astra review, round 6)', () => {
+  // the transcript approves only the outer, visible title
+  const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
+  const blocked = (command) => expect(evaluate({ command, entries: chat }).block, command).toBe(true)
+
+  it('a substitution inside a --request=<value> word is a deposit', () => {
+    const command = 'node scripts/finding.mjs --request="Outer $(node scripts/finding.mjs --request Hidden --stdin)" --approved "passt so"'
+    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
+    blocked(command)
+  })
+
+  it('a redirection operator or its target is never a title', () => {
+    const command = 'node scripts/finding.mjs --request > /tmp/out Hidden --stdin --approved "passt so"'
+    const titles = requestsOf(command).map((r) => r.title)
+    expect(titles).not.toContain('>')
+    expect(titles).not.toContain('/tmp/out')
+    blocked(command)
+    expect(requestsOf('node scripts/finding.mjs --request 2>/dev/null Hidden')[0].title).toBe('')
+    expect(requestsOf('node scripts/finding.mjs --request=>x Hidden')[0].title).toBe('')
+    // even a matching proposal and approval cannot attach to a redirection
+    expect(evaluate({ command, entries: [human('start'), said('> /tmp/out Hidden'), human('passt so')] }).block).toBe(true)
+  })
+
+  it('an unquoted heredoc body is scanned for substitutions', () => {
+    const command = ['cat > /tmp/s.md <<EOF', 'Notes: $(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n')
+    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
+    blocked(command)
+    const backtick = ['cat <<-EOF', '\t`node scripts/finding.mjs --request Hidden`', '\tEOF'].join('\n')
+    expect(requestsOf(backtick).map((r) => r.title)).toContain('Hidden')
+  })
+
+  it('a quoted heredoc body stays literal', () => {
+    for (const open of ["<<'EOF'", '<<"EOF"', '<<\\EOF']) {
+      const command = [`cat > /tmp/s.md ${open}`, 'Notes: $(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n')
+      expect(requestsOf(command), open).toEqual([])
+    }
+    const plain = ['cat > /tmp/s.md <<EOF', 'spec text mentioning scripts/finding.mjs --request', 'EOF'].join('\n')
+    expect(requestsOf(plain)).toEqual([])
+  })
+})

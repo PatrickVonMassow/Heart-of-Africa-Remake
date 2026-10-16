@@ -30,9 +30,11 @@ const OPERATORS = ['&&', '||', ';', '|', '&', '(', ')', '`']
  * Split shell text into words and operator separators, quote-aware.
  *
  * `shell` is 'bash' (default) or 'powershell'. Bash: backslash escapes, and a
- * heredoc (`<<WORD`, `<<-WORD`, quoted or not) is skipped to its terminator
- * line, so its body never yields a word; a here-string `<<<` is an ordinary
- * redirect. PowerShell: backslash is a plain path character, the backtick
+ * heredoc (`<<WORD`, `<<-WORD`) is skipped to its terminator line; a quoted
+ * delimiter keeps its body literal, but an UNQUOTED body with a command
+ * substitution (`$(…)`, backtick) — which bash runs — comes back as one word
+ * (then a line break), so the substitution is scanned. A here-string `<<<` is
+ * an ordinary redirect. PowerShell: backslash is a plain path character, the backtick
  * escapes, and a here-string `@'…'@` / `@"…"@` is one word. Parentheses and
  * (in bash) backticks separate commands, so `$(node …)` is seen.
  * Returns an array of strings; operators come back as `{ op }` objects.
@@ -56,15 +58,18 @@ export function tokenize(text, shell = 'bash') {
       out.push({ op: '\n' })
       i++
       while (pending.length) {
-        const { delim, strip } = pending.shift()
+        const { delim, strip, quoted } = pending.shift()
         // skip body lines until the terminator line
+        let body = ''
         for (;;) {
           if (i >= src.length) break
           const end = src.indexOf('\n', i)
           const line = end < 0 ? src.slice(i) : src.slice(i, end)
           i = end < 0 ? src.length : end + 1
           if ((strip ? line.replace(/^\t+/, '') : line).replace(/\r$/, '') === delim) break
+          body += `${line}\n`
         }
+        if (!quoted && /\$\(|`/.test(body)) out.push(body, { op: '\n' })
       }
       continue
     }
@@ -123,11 +128,13 @@ export function tokenize(text, shell = 'bash') {
       if (strip) j++
       while (src[j] === ' ' || src[j] === '\t') j++
       let delim = ''
+      let quoted = false
       while (j < src.length && !/[\s;&|<>]/.test(src[j])) {
         if (src[j] !== "'" && src[j] !== '"' && src[j] !== '\\') delim += src[j]
+        else quoted = true
         j++
       }
-      if (delim) pending.push({ delim, strip })
+      if (delim) pending.push({ delim, strip, quoted })
       i = j
       continue
     }
@@ -148,6 +155,8 @@ export function tokenize(text, shell = 'bash') {
 /** The exact `--request` flag inside any text (`--requests` and `--request-x` excluded). */
 const REQUEST_FLAG_RE = /(^|[^\w-])--request(?![\w-])/g
 const MAX_NESTING = 3
+/** A bash redirection word (`>`, `2>`, `>>f`, `<f`, `>|`): never a title or approval. */
+const REDIRECT_RE = /^\d*[<>]/
 
 /** The ONE request predicate: detection and approval boundaries both use it. */
 const isRequestWord = (word) =>
@@ -168,7 +177,7 @@ function depositsIn(tokens, shell, depth) {
   // A value with command substitution stays open to the recursive scan below:
   // the substitution runs whatever its title or approval role.
   const valueAt = (k) => {
-    if (!isWord(k) || tokens[k].startsWith('--')) return ''
+    if (!isWord(k) || tokens[k].startsWith('--') || (shell !== 'powershell' && REDIRECT_RE.test(tokens[k]))) return ''
     if (!/\$\(|`/.test(tokens[k])) consumed.add(k)
     return tokens[k]
   }
@@ -193,7 +202,8 @@ function depositsIn(tokens, shell, depth) {
   for (let k = 0; k < tokens.length; k++) {
     const word = tokens[k]
     if (isRequestWord(word)) {
-      const title = word === REQUEST_FLAG ? valueAt(k + 1) : word.slice(REQUEST_FLAG.length + 1)
+      const inline = word.slice(REQUEST_FLAG.length + 1)
+      const title = word === REQUEST_FLAG ? valueAt(k + 1) : shell !== 'powershell' && REDIRECT_RE.test(inline) ? '' : inline
       let approved = ''
       // The approval belongs to the same simple command: an operator or a
       // possible comment (`# --approved …`) ends the search.
@@ -207,10 +217,13 @@ function depositsIn(tokens, shell, depth) {
     }
   }
   tokens.forEach((word, k) => {
-    if (typeof word !== 'string' || consumed.has(k) || isRequestWord(word)) return
-    const occurrences = (word.match(REQUEST_FLAG_RE) ?? []).length
+    if (typeof word !== 'string' || consumed.has(k)) return
+    // a `--request=<value>` word is re-scanned only for a substitution in its value
+    const text = isRequestWord(word) ? word.slice(REQUEST_FLAG.length + 1) : word
+    if (isRequestWord(word) && !/\$\(|`/.test(text)) return
+    const occurrences = (text.match(REQUEST_FLAG_RE) ?? []).length
     if (occurrences === 0) return
-    const inner = depth < MAX_NESTING ? depositsIn(tokenize(word, shell), shell, depth + 1) : []
+    const inner = depth < MAX_NESTING ? depositsIn(tokenize(text, shell), shell, depth + 1) : []
     found.push(...inner)
     for (let n = inner.length; n < occurrences; n++) found.push({ title: '', approved: '' })
   })
@@ -226,8 +239,8 @@ const isFindingCall = (tokens, start) =>
 
 /**
  * Every finding.mjs request deposit in a command — a TEXTUAL, fail-closed rule.
- * A command is judged when its words (heredoc bodies and PowerShell
- * here-strings excluded) mention `finding.mjs` and the exact `--request` flag;
+ * A command is judged when its words (quoted or substitution-free heredoc
+ * bodies and PowerShell here-strings excluded) mention `finding.mjs` and the exact `--request` flag;
  * each `--request` occurrence is then a deposit `{ title, approved }`, with ''
  * where no value could be extracted. No attempt is made to decide whether the
  * text would really execute: `echo …/finding.mjs --request x` is judged too.
