@@ -14,6 +14,8 @@
 /** The exact flag that makes a finding.mjs call a deposit. */
 export const REQUEST_FLAG = '--request'
 export const APPROVED_FLAG = '--approved'
+/** finding.mjs's free-text flag whose value is never read as a command. */
+export const DETAIL_FLAG = '--detail'
 /** Shortest acceptable quote, in non-space characters. */
 export const MIN_QUOTE_CHARS = 2
 
@@ -164,6 +166,11 @@ function depositsIn(tokens, shell, depth) {
   const consumed = new Set()
   const isWord = (k) => k < tokens.length && typeof tokens[k] === 'string'
   const valueAt = (k) => (isWord(k) && !tokens[k].startsWith('--') ? (consumed.add(k), tokens[k]) : '')
+  // A finding's --detail text is prose, not a command: the flag word inside it
+  // is no deposit. A value with command substitution can still run one.
+  tokens.forEach((word, k) => {
+    if (word === DETAIL_FLAG && isWord(k + 1) && !/\$\(|`/.test(tokens[k + 1])) consumed.add(k + 1)
+  })
   for (let k = 0; k < tokens.length; k++) {
     const word = tokens[k]
     if (isRequestWord(word)) {
@@ -235,8 +242,24 @@ export function parseTranscript(text) {
   return { entries, malformed }
 }
 
-/** The text of a REAL human message, or null for anything else. */
+/**
+ * The text of a REAL human message, or null for anything else. A message the
+ * user sends during a running turn is stored as an `attachment` entry of type
+ * `queued_command` with `origin.kind === 'human'` (the harness renders it as
+ * "The user sent a new message while you were working"); it counts like a
+ * turn-opening one. Task notifications (no origin) and peer messages do not.
+ */
 export function humanText(entry) {
+  if (entry && entry.type === 'attachment' && !entry.isMeta) {
+    const a = entry.attachment
+    if (!a || a.type !== 'queued_command' || !a.origin || a.origin.kind !== 'human') return null
+    if (typeof a.prompt === 'string') return a.prompt
+    if (!Array.isArray(a.prompt)) return null
+    return a.prompt
+      .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
+      .map((b) => b.text)
+      .join('\n')
+  }
   if (!entry || entry.type !== 'user' || entry.isMeta) return null
   if (!entry.origin || entry.origin.kind !== 'human') return null
   const content = entry.message && entry.message.content
