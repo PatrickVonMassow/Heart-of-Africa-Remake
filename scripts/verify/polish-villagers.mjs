@@ -4242,8 +4242,14 @@ if (section('village-walk')) {
   // first surface on the sight line to its hips and its head is its own body:
   // a hut wall or another villager in front is the next spot, and no spot at
   // all is no frame.
+  let sideOnMisses = []
   const sideOn = async (walker, near, pitch) => {
-    const spots = [0, 0.4, -0.4].flatMap((turn) => [1, -1].flatMap((f) => [near, near * 0.7, near * 1.35].map((d) => [f, d, turn])))
+    sideOnMisses = []
+    // Square first, then ever more oblique (at most 26 degrees off square): a
+    // post in one sight line (measured: an unnamed cylinder blocked every one
+    // of the former 18 spots at the kneeling task walker) leaves the next a
+    // few degrees on clear. Each refused spot's reason is kept for the red.
+    const spots = [0, 0.15, -0.15, 0.3, -0.3, 0.45, -0.45].flatMap((turn) => [1, -1].flatMap((f) => [near, near * 0.85, near * 1.2, near * 0.7, near * 1.35].map((d) => [f, d, turn])))
     for (const [flank, dist, turn] of spots) {
       const want = await page.evaluate(({ walker, dist, pitch, flank, turn }) => {
         const g = walker === null ? window.__placeScene.getObjectByName('village-task-walker') : window.__placeWalkers.group(walker)
@@ -4257,11 +4263,14 @@ if (section('village-walk')) {
       }, { walker, dist, pitch, flank, turn })
       await nextFrames(4)
       const at = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-      if (Math.hypot(at.x - want.x, at.z - want.z) >= 0.05) continue
+      if (Math.hypot(at.x - want.x, at.z - want.z) >= 0.05) {
+        sideOnMisses.push({ flank, dist, turn, why: 'moved', by: +Math.hypot(at.x - want.x, at.z - want.z).toFixed(2) })
+        continue
+      }
       const seen = await page.evaluate((walker) => {
         const g = walker === null ? window.__placeScene.getObjectByName('village-task-walker') : window.__placeWalkers.group(walker)
         const cam = window.__placeCamera
-        if (!g?.visible || !cam || !window.__placeRayHit) return false
+        if (!g?.visible || !cam || !window.__placeRayHit) return 'no subject'
         const V = g.position.constructor
         const own = new Set()
         g.traverse((o) => own.add(o.uuid))
@@ -4269,7 +4278,7 @@ if (section('village-walk')) {
         g.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
         const hips = mesh?.skeleton.bones.find((b) => b.name === 'bone-hips')
         const head = g.getObjectByName('figure-head')
-        if (!hips || !head) return false
+        if (!hips || !head) return 'no hips or head'
         g.updateWorldMatrix(true, true)
         cam.updateMatrixWorld()
         // Inside the body the sight line meets the subject's own surface
@@ -4280,19 +4289,30 @@ if (section('village-walk')) {
             const hit = window.__placeRayHit(p.x, p.y, p.z, [from.x, from.y, from.z])
             if (hit.hitDistance === null || own.has(hit.hitUuid) || hit.hitDistance >= hit.targetDistance - 0.25) return true
             const by = window.__placeScene.getObjectByProperty('uuid', hit.hitUuid)
-            if (![by?.material].flat().some((m) => m?.transparent)) return false
+            if (![by?.material].flat().some((m) => m?.transparent)) {
+              const chain = []
+              for (let o = by; o && chain.length < 5; o = o.parent) if (o.name) chain.push(o.name)
+              const at = from.clone().add(p.clone().sub(from).normalize().multiplyScalar(hit.hitDistance))
+              const mat = [by?.material].flat()[0]
+              const gp = by?.geometry?.parameters
+              const wp = by ? by.getWorldPosition(p.clone()) : null
+              const what = `${by?.isInstancedMesh ? 'instanced ' : ''}${gp ? JSON.stringify(gp).slice(0, 90) : ''} at ${wp ? `${wp.x.toFixed(2)} ${wp.y.toFixed(2)} ${wp.z.toFixed(2)}` : '?'} parent ${by?.parent?.type ?? ''} ${by?.parent?.parent?.type ?? ''}`
+              return `blocked by ${by?.type ?? hit.hitUuid} ${by?.geometry?.type ?? ''} ${mat?.type ?? ''} ${mat?.name ?? ''} [${chain.join(' < ')}] at ${hit.hitDistance.toFixed(2)} of ${hit.targetDistance.toFixed(2)}, point ${at.x.toFixed(2)} ${at.y.toFixed(2)} ${at.z.toFixed(2)}, target y ${p.y.toFixed(2)}, eye y ${cam.position.y.toFixed(2)}; ${what}`
+            }
             from = from.clone().add(p.clone().sub(from).normalize().multiplyScalar(hit.hitDistance + 0.01))
           }
-          return false
+          return 'too many see-through surfaces'
         }
-        for (const p of [hips.getWorldPosition(new V()), head.getWorldPosition(new V())]) {
+        for (const [name, p] of [['hips', hips.getWorldPosition(new V())], ['head', head.getWorldPosition(new V())]]) {
           const n = p.clone().project(cam)
-          if (!(Math.abs(n.x) < 0.9 && Math.abs(n.y) < 0.9 && n.z < 1)) return false
-          if (!clearTo(p)) return false
+          if (!(Math.abs(n.x) < 0.9 && Math.abs(n.y) < 0.9 && n.z < 1)) return `${name} out of the picture`
+          const clear = clearTo(p)
+          if (clear !== true) return `${name}: ${clear}`
         }
         return true
       }, walker)
-      if (seen) return { x: want.gx, z: want.gz }
+      if (seen === true) return { x: want.gx, z: want.gz }
+      sideOnMisses.push({ flank, dist, turn, why: seen })
     }
     return null
   }
@@ -4305,38 +4325,52 @@ if (section('village-walk')) {
   const tol = await page.evaluate(() => ({ ...(window.__villagerMotion ?? {}) }))
   const FOOT_TOL = (tol.footGroundTolerance ?? 0.02) + 0.02 // + the slope under a stride
   const SLIP_TOL = (tol.stanceSlipTolerance ?? 0.03) + 0.01 // + one frame's sampling
-  // A walker that is out, walking (on the walk gait), not lingering, skinned and drawn.
-  const pick = () =>
-    page.evaluate((walkOnly) => {
-      const w = window.__placeWalkers
-      if (!w) return null
-      for (let i = 0; i < w.states.length; i++) {
-        const s = w.states[i]
-        const g = w.group(i)
-        if (!g || !g.visible || s.mode !== 'walk' || s.pause > 0) continue
-        if (s.seg === 0 || s.seg >= s.route.length - 2) continue // not on a door leg
-        let skinned = false
-        let gait = null
-        g.traverse((o) => {
-          if (o.isSkinnedMesh) skinned = true
-          if (o.userData.gait && !gait) gait = o.userData.gait
-        })
-        if (skinned && gait && gait.walk >= walkOnly) return i
-      }
-      return null
-    }, WALK_ONLY)
-  const found = await stepUntil((walkOnly) => {
+  // A walker that is out, walking (on the walk gait), not lingering, skinned
+  // and drawn — AT ITS CRUISE PACE (the walk's smoothed speed within 10 % of
+  // its route pace: one just through its door is still easing up, reads as a
+  // walk for a frame and jogs the next), heading straight at its waypoint
+  // with at least WALK_LEFT metres of that straight leg to go (a turn adds
+  // its step to the walk's speed and tips a brisk walker into the jog band),
+  // and of those the slowest cruiser. The census names every walker out
+  // when none qualifies.
+  const WALK_LEFT = 3
+  const walkers = (arg) => {
     const w = window.__placeWalkers
-    if (!w) return false
-    return w.states.some((s, i) => {
-      if (s.mode !== 'walk' || s.pause > 0 || s.seg === 0 || s.seg >= s.route.length - 2 || !w.group(i)?.visible) return false
+    if (!w) return { pick: null, census: [] }
+    const census = []
+    for (let i = 0; i < w.states.length; i++) {
+      const s = w.states[i]
+      const g = w.group(i)
+      if (!g || !g.visible || s.mode !== 'walk' || s.pause > 0) continue
+      if (s.seg === 0 || s.seg >= s.route.length - 2) continue // not on a door leg
+      let skinned = false
       let gait = null
-      w.group(i).traverse((o) => { if (o.userData.gait && !gait) gait = o.userData.gait })
-      return !!gait && gait.walk >= walkOnly
-    })
-  }, WALK_ONLY, 3600)
-  check('village walk: a villager is out walking on the skinned body', found, found ? '' : 'no walker out on the walk gait')
-  const who = found ? await pick() : null
+      let walk = null
+      g.traverse((o) => {
+        if (o.isSkinnedMesh) skinned = true
+        if (o.userData.gait && !gait) gait = o.userData.gait
+        if (o.userData.walk && !walk) walk = o.userData.walk
+      })
+      const unit = g.getWorldScale(g.position.clone()).x || 1
+      const pace = walk ? walk.speed * unit : 0
+      // Ground left before the next stop: the errand (seg 3 lingers) or the door leg.
+      const len = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
+      const r = s.route
+      const left = len([s.x, s.z], r[s.seg + 1])
+      const bearing = Math.atan2(r[s.seg + 1][0] - s.x, r[s.seg + 1][1] - s.z)
+      const off = Math.abs(Math.atan2(Math.sin(bearing - s.yaw), Math.cos(bearing - s.yaw)))
+      const row = { i, skinned, walk: gait ? +gait.walk.toFixed(3) : null, pace: +pace.toFixed(2), cruise: w.speeds[i], left: +left.toFixed(1), off: +off.toFixed(2) }
+      census.push(row)
+      row.ok = skinned && !!gait && gait.walk >= arg.walkOnly && Math.abs(pace - w.speeds[i]) <= 0.1 * w.speeds[i] && left >= arg.walkLeft && off <= 0.15
+    }
+    // The slowest qualifying walker: furthest from the jog band.
+    const ok = census.filter((c) => c.ok).sort((a, b) => a.cruise - b.cruise)
+    return { pick: ok.length ? ok[0].i : null, census }
+  }
+  const found = await stepUntil((arg) => new Function('arg', `return (${arg.fn})(arg)`)(arg).pick !== null, { fn: walkers.toString(), walkOnly: WALK_ONLY, walkLeft: WALK_LEFT }, 3600)
+  const chosen = await page.evaluate(walkers, { walkOnly: WALK_ONLY, walkLeft: WALK_LEFT })
+  check('village walk: a villager is out walking on the skinned body', found, found ? '' : `no walker out at cruise on the walk gait with ${WALK_LEFT} m to go: ${JSON.stringify(chosen.census)}`)
+  const who = found ? chosen.pick : null
   // A walker out but none on the skinned body would skip every gait check
   // below: that is a red, never a quiet pass.
   check('village walk: the walker measured is drawn on the skinned body', who !== null, found ? 'walkers out, none skinned' : 'no walker out')
@@ -4408,13 +4442,31 @@ if (section('village-walk')) {
           body: { x: g.position.x, z: g.position.z },
         }
       }, i)
+    // Sampled in RUNS of consecutive walk-gait frames: a turn adds its step
+    // to the walk's speed and can tip a brisk walker into the jog band for a
+    // few frames, and a walker reaching its errand or door stops — either
+    // ends the run, the probe waits out the dip (or takes the next walker that
+    // qualifies) and samples on. Stances and slips are measured within a run
+    // only; a gap never joins two runs.
     const samples = []
-    for (let f = 0; f < 120; f++) {
-      const r = await readFeet(who)
-      if (!r || r.mode !== 'walk' || r.pause > 0 || !(r.gaitWalk >= WALK_ONLY)) break
-      samples.push(r)
+    const gaps = []
+    let walker = who
+    let runId = 0
+    for (let f = 0; f < 600 && samples.length < 120; f++) {
+      const r = walker === null ? null : await readFeet(walker)
+      if (r && r.mode === 'walk' && r.pause === 0 && r.gaitWalk >= WALK_ONLY) {
+        samples.push({ ...r, who: walker, run: runId })
+      } else {
+        if (samples.length && samples[samples.length - 1].run === runId) {
+          gaps.push({ at: samples.length, who: walker, mode: r?.mode, gaitWalk: r?.gaitWalk == null ? null : +r.gaitWalk.toFixed(3), speed: r?.walk ? +r.walk.speed.toFixed(2) : null, seg: r?.seg })
+          runId++
+        }
+        // Out of the walk altogether (lingering, at a door, indoors): the next walker.
+        if (!r || r.mode !== 'walk' || r.pause > 0 || r.seg === 0 || r.seg >= 5) walker = (await page.evaluate(walkers, { walkOnly: WALK_ONLY, walkLeft: WALK_LEFT })).pick
+      }
       await nextFrames(1)
     }
+    const runs = new Set(samples.map((r) => r.run)).size
     if (process.env.VILLAGE_WALK_DUMP) (await import('node:fs')).writeFileSync(process.env.VILLAGE_WALK_DUMP, JSON.stringify(samples))
     // The lowest DRAWN sole point each frame (the transformed foot geometry).
     const footVerts = samples.length ? Math.min(...samples.flatMap((r) => r.feet.map((f) => f.verts))) : 0
@@ -4433,7 +4485,7 @@ if (section('village-walk')) {
     let worstSlip = 0
     let worstStance = null
     const stances = []
-    const walking = (j) => j > 0 && Math.hypot(samples[j].body.x - samples[j - 1].body.x, samples[j].body.z - samples[j - 1].body.z) > 0.01
+    const walking = (j) => j > 0 && samples[j].run === samples[j - 1].run && Math.hypot(samples[j].body.x - samples[j - 1].body.x, samples[j].body.z - samples[j - 1].body.z) > 0.01
     for (const k of [0, 1]) {
       let start = null
       let run = 0
@@ -4486,7 +4538,7 @@ if (section('village-walk')) {
     const armVsLeg = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', i)).toFixed(3)) : [0, 0]
     const armVsOther = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', 1 - i)).toFixed(3)) : [0, 0]
     const gaitWalk = samples.length ? +Math.min(...samples.map((r) => r.gaitWalk)).toFixed(3) : null
-    const detail = JSON.stringify({ frames: samples.length, gaitWalk, footVerts, worstGround: +worstGround.toFixed(4), worstPlantedSole: +worstPlantedSole.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
+    const detail = JSON.stringify({ frames: samples.length, runs, walkers: [...new Set(samples.map((r) => r.who))], gaps: gaps.slice(0, 4), gaitWalk, footVerts, worstGround: +worstGround.toFixed(4), worstPlantedSole: +worstPlantedSole.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
     report(`  village-walk ${detail}`)
     check('village walk: measured over at least 30 walking frames', samples.length >= 30, detail)
     check(`village walk: the lowest drawn sole sits on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m, transformed foot geometry)`, samples.length > 0 && footVerts > 0 && worstGround <= FOOT_TOL, detail)
@@ -4789,7 +4841,7 @@ if (section('village-walk')) {
       })
       check('kneel: one figure folds down — no second body swapped in, no squash, the head keeps its shape', k.figures === 1 && k.uniform && k.headRound, JSON.stringify(k))
       const seen = await sideOn(null, 2.6, -0.16)
-      check('kneel: the camera found a free spot side-on to the task walker', !!seen, '')
+      check('kneel: the camera found a free spot side-on to the task walker', !!seen, seen ? '' : JSON.stringify(sideOnMisses))
       if (seen) await frame(shot('1295-village-kneel-transition'), {
         local: { x: k.x, y: 0.5, z: k.z },
         label: 'the Zulu task walker half-way through kneeling down at its work, side-on: legs folding, head round, one figure',
