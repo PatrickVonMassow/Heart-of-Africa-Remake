@@ -142,6 +142,29 @@ function cachedGltfFigure(asset: VillagerAsset, person: GltfPerson, layers: Dres
   return g
 }
 
+// ---- GPU release of the shared geometries ------------------------------------
+// The caches above keep the CPU geometry for the session; its GPU side (vertex
+// buffers and, for the glTF body's live hand morphs, three's per-geometry morph
+// DataArrayTexture) is freed when the last mounted figure drawing it goes, so
+// leaving a settlement releases what its villagers held instead of keeping every
+// distinct figure ever drawn resident. A geometry drawn again re-uploads.
+
+const geometryUsers = new Map<THREE.BufferGeometry, number>()
+
+function holdGeometry(g: THREE.BufferGeometry): void {
+  geometryUsers.set(g, (geometryUsers.get(g) ?? 0) + 1)
+}
+
+function releaseGeometry(g: THREE.BufferGeometry): void {
+  const n = (geometryUsers.get(g) ?? 1) - 1
+  if (n > 0) {
+    geometryUsers.set(g, n)
+    return
+  }
+  geometryUsers.delete(g)
+  g.dispose()
+}
+
 /** The figure's whole scene graph, built once per identity and look. */
 interface Rig {
   p: BodyProportions
@@ -305,8 +328,15 @@ export function SkinnedFigure({
   const id = useMemo(() => figureIdentity(key, scale, sex, age), [key, scale, sex, age])
   const rig = useMemo(() => buildRig(id, look, cloth, skin), [id, look, cloth, skin])
   // The skeleton (and its bone texture) is this figure's own; the geometry is
-  // shared through the caches and stays.
-  useEffect(() => () => rig.skeleton.dispose(), [rig])
+  // shared through the caches, its GPU side held while any figure draws it.
+  useEffect(() => {
+    const geos = rig.meshes.map((m) => m.geometry)
+    geos.forEach(holdGeometry)
+    return () => {
+      geos.forEach(releaseGeometry)
+      rig.skeleton.dispose()
+    }
+  }, [rig])
   const L = FIGURE_LIMBS
   // THE VIRTUAL PRIMITIVE RIG the poses are written onto — the primitive
   // figure's pivots exactly (placeFigure.tsx), drawing nothing.
