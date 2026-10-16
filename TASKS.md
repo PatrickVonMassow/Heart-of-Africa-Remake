@@ -77,6 +77,30 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1363. Board: the description survives landing (the projection discards the now card)
+  Queue position: front of the queue (user 16.10.2026: "ja, vorne in der Queue so einreihen").
+  Source: user 16.10.2026 on point 1302: "Sinn der Sache war, dass die Beschreibungen von Anfang an da sind und nie wieder verlorengehen (z. B. durch Überschreiben mit dem Status). Für 1342 ist sie aber verlorengegangen." Measured: the done card 1342 shows "Beschreibung fehlt". Cause reproduced on a board copy: land-point settleActiveWork clears the focus, board-publish -> reconcileNowProjection(html, []) removes the numbered now card (board-core.mjs ~1240, return '') without archiving it to done; then 'board.mjs closing <N> --title ...' writes a state card without description (toClosingWork/writeStateCard), and 'done <N>' archives it via toDone, whose fallback to existing done cards stays empty -> placeholder. The path done -> closing -> done keeps the description.
+  Final state: a numbered card's description survives every landing path, the projection discarding the now card included: the projection hands a discarded numbered card with its description to done (toDone) instead of deleting it, or toClosingWork takes the description from the discarded/done card or tasks-source pointDescription. One-off: 1342's done card gets its description back via 'board.mjs describe 1342' from the archive text.
+  Verifiable: a Vitest over exactly the sequence focus cleared -> board-publish projection -> closing <N> --title -> done <N> asserts the description on the done card; the done card 1342 on the published board shows its description.
+  Criticality: medium - the user's board loses information on every landing of this kind.
+  Bundle: Chat & Tafel.
+
+- [ ] 1364. Guard deadlock: decision-card-guard demands vdzk-keep, the batch stand-down refuses it to a non-owner session
+  Queue position: directly after point 1363 (user 16.10.2026: "Und behebe das Problem, dass du eben in einer Endlosschleife gelandet bist").
+  Source: findings carrier 16.10.2026 16:31, session 0eea1689 (non-owner, owner 4b0a3d9b). The Stop hook decision-card-guard demanded 'node scripts/board.mjs vdzk-keep "<card>" --why ...'. Without a prefix the call fails with 'cannot identify this session — CLAUDE_SESSION_ID is missing and the guard state is ambiguous' (selectedSession, decision-card-guard.mjs:215); with CLAUDE_SESSION_ID the PreToolUse stand-down (board-first-core.mjs) refuses the command as state-changing, although recordDecisionCardKeep only writes guard state and is meant for non-owners (decision-card-guard.mjs:270-272). Together with 1365 this held the session in about 40 Stop-hook rounds (user: "Du hängst in einer Endlosschleife.").
+  Final state: a non-owner session can satisfy every Stop-hook demand addressed to it: the stand-down lets 'board.mjs vdzk-keep' through (it writes guard state only), and vdzk-keep accepts --session <id> so it needs no environment variable; no Stop hook demands an action the stand-down refuses.
+  Verifiable: Vitest: the stand-down classifier allows 'node scripts/board.mjs vdzk-keep "x" --why y --session <id>' for a non-owner and still refuses other board.mjs writes; vdzk-keep with --session records the keep; a test pairing every remediation command decision-card-guard prints with the stand-down verdict for a non-owner (none refused).
+  Criticality: high - reproducible endless Stop-hook loop in a non-owner session.
+  Bundle: Modell & Wächter.
+
+- [ ] 1365. The approval guard ignores user approvals that arrive during a running turn
+  Queue position: directly after point 1364 (same endless loop, user 16.10.2026).
+  Source: findings carrier 16.10.2026 16:34, session 0eea1689: the user wrote mid-turn "Batch hierherholen, einreihen und direkt an nächste Session weitergeben" (approving the title shown verbatim before); finding.mjs --request with that wording as approval was refused by request-approval-guard (no-approval-after-proposal) — mid-turn messages are apparently not read as genuine user messages. Side finding: the guard reads the request flag word inside a finding's detail text as a request.
+  Final state: a user message delivered mid-turn (the harness's "The user sent a new message while you were working" form) counts as a genuine user message for request-approval-guard, while a quote of it inside a tool result or system notification still does not; the flag word inside a finding's --detail text is not read as a request.
+  Verifiable: Vitest over a transcript fixture with a mid-turn user message after the proposal -> approval accepted; the same text inside a tool result -> refused; a --record whose detail contains the flag word -> not treated as a request.
+  Criticality: high - with 1364 it caused the endless loop.
+  Bundle: Modell & Wächter.
+
 - [ ] 1360. A villager's head load floats 5-7 cm above the drawn head
   Queue position: directly after point 1342 (Dorfleben); may land on its own.
   Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.
