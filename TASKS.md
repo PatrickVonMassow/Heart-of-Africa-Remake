@@ -77,6 +77,14 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1367. The request-approval guard's tokenizer still misses three deposit shapes
+  Queue position: directly after point 1365 (split from its review, which did not converge on pre-existing tokenizer limits).
+  Source: GPT-6 Astra review of point 1365, round 6 (receipt 3bd9990b5d8e14d3, 16.10.2026): all three exist on main before 1365. (1) `--request="Outer $(node scripts/finding.mjs --request Hidden …)"` — the `--request=` word is never re-scanned, so the substituted request is hidden; (2) `--request > /tmp/out Hidden … --approved "passt so"` — a redirection becomes the title `>`, so an approval can attach to a title never proposed; (3) an unquoted heredoc body with `$(node scripts/finding.mjs --request Hidden …)` is discarded by the tokenizer although bash executes it.
+  Final state: scripts/request-approval-guard-core.mjs judges each of the three shapes fail closed (the hidden request is a deposit, a redirection operator is never a title, an unquoted heredoc body is scanned for substitutions).
+  Verifiable: Vitest with the three commands above: each yields a deposit that the guard blocks without a matching human approval.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
+
 - [ ] 1360. A villager's head load floats 5-7 cm above the drawn head
   Queue position: directly after point 1342 (Dorfleben); may land on its own.
   Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.
@@ -15839,11 +15847,5 @@ to land than a mechanism that needs a review.
   Source: findings carrier 16.10.2026 09:02: session 1624ee5d (not batch owner; owner 36861bc0): Stop hook decision-card-guard demanded 'board.mjs vdzk-keep "Batchelor: Batch-Infrastruktur als eigenes Projekt abspalten"' for user message 29bbe2bf (a board-chat test log, no decision); the PreToolUse batch-ownership stand-down refused that command, and the guard fired twice in a row. scripts/decision-card-guard.mjs computes heldByOtherLiveOwner but still demands the keep (the carry path of e65219245).
   Final state: for a session not holding the batch lock, decision-card-guard never demands an action the ownership stand-down refuses (it stands down, or carries the answer to the owner without a keep demand); the card stays open.
   Verifiable: Vitest reproducing a non-owner Stop with an open card and a non-decision user message: no blocking demand.
+  Also (findings carrier 16.10.2026 22:14, session 7850716a): the bare `node scripts/board.mjs vdzk-keep …` passes the stand-down (isVdzkKeepSegment); only a wrapped call (`cd … && … 2>&1 | tail`) is refused, so the deadlock is avoidable in practice.
   Bundle: Session- & Repo-Hygiene.
-- [ ] 1367. The request-approval guard's tokenizer still misses three deposit shapes
-  Queue position: directly after point 1365 (split from its review, which did not converge on pre-existing tokenizer limits).
-  Source: GPT-6 Astra review of point 1365, round 6 (receipt 3bd9990b5d8e14d3, 16.10.2026): all three exist on main before 1365. (1) `--request="Outer $(node scripts/finding.mjs --request Hidden …)"` — the `--request=` word is never re-scanned, so the substituted request is hidden; (2) `--request > /tmp/out Hidden … --approved "passt so"` — a redirection becomes the title `>`, so an approval can attach to a title never proposed; (3) an unquoted heredoc body with `$(node scripts/finding.mjs --request Hidden …)` is discarded by the tokenizer although bash executes it.
-  Final state: scripts/request-approval-guard-core.mjs judges each of the three shapes fail closed (the hidden request is a deposit, a redirection operator is never a title, an unquoted heredoc body is scanned for substitutions).
-  Verifiable: Vitest with the three commands above: each yields a deposit that the guard blocks without a matching human approval.
-  Criticality: high - possible false approval.
-  Bundle: Modell & Wächter.
