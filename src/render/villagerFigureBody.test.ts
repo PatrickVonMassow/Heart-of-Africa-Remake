@@ -12,7 +12,7 @@ import { VILLAGER_MOTION as M } from '../config/balance'
 import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
 import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
-import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
+import { ankleAt, figureCrownOffset, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { buildLayerGeometry, INFANT_SKIN } from './figureDress'
 import { axisClearance } from '../test/axisClearance'
@@ -232,6 +232,46 @@ function skinned(g: THREE.BufferGeometry, sk: THREE.Skeleton): Float32Array {
   }
   return out
 }
+
+/** The drawn head top over the head bone's axis: the highest vertex skinned
+ *  wholly to the head (scalp or headwear) within 6 cm of the bone's vertical,
+ *  as the head-carrier check in scripts/verify/polish-villagers.mjs reads it. */
+function drawnHeadTop(asset: VillagerAsset, g: THREE.BufferGeometry, rest: Float32Array): number {
+  const hi = asset.bones.indexOf('head')
+  const hx = rest[hi * 3]
+  const hz = rest[hi * 3 + 2]
+  const pos = g.getAttribute('position')
+  const si = g.getAttribute('skinIndex')
+  const sw = g.getAttribute('skinWeight')
+  let top = -Infinity
+  for (let v = 0; v < pos.count; v++) {
+    let whole = false
+    for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === hi && sw.getComponent(v, k) > 0.99) whole = true
+    if (whole && Math.hypot(pos.getX(v) - hx, pos.getZ(v) - hz) <= 0.06) top = Math.max(top, pos.getY(v))
+  }
+  return top
+}
+
+const dressOf = (l: DressLayer): DressLayer => ({ ...l, colour: l.colour === 'cloth' ? '#b08850' : l.colour, colour2: l.colour2 === 'cloth' ? '#b08850' : l.colour2 })
+
+describe('a head load rests on the drawn head', () => {
+  it('the crown anchor on the head bone is the drawn head top (within 2 cm) for every build, age and dress', () => {
+    for (const { sex, age } of people()) {
+      for (const build of [-1, 0, 1]) {
+        const person = gltfPerson(asset, sex, age, build)
+        const { skeleton, bones } = createGltfSkeleton(asset, person.rest)
+        const headAt = bones.head.getWorldPosition(new THREE.Vector3())
+        const dresses = build === 0 ? Object.entries(PEOPLE_DRESS).map(([id, t]) => [id, t[sex][age].map(dressOf)] as const) : [['bare', []] as const]
+        for (const [id, layers] of dresses) {
+          const g = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
+          const crown = headAt.y + figureCrownOffset(person.p, g, skeleton.bones.indexOf(bones.head), headAt)
+          const top = drawnHeadTop(asset, g, person.rest)
+          expect(Math.abs(crown - top), `${id} ${sex} ${age} build ${build}: crown ${crown.toFixed(3)} over drawn head ${top.toFixed(3)}`).toBeLessThanOrEqual(0.02)
+        }
+      }
+    }
+  })
+})
 
 describe('the dressed figure', () => {
   it('every people’s dress of every sex and age merges with the glTF body into one geometry', () => {
