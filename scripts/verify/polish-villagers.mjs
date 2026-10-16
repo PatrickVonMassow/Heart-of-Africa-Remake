@@ -4237,33 +4237,77 @@ if (section('village-walk')) {
   // The camera side-on to a walker (index; null: the task walker), about
   // `near` off its flank: the left flank first, then the right, nearer or
   // farther where the player cannot stand (a hut wall pushes it off, and the
-  // figure leaves the picture).
+  // figure leaves the picture), a little fore or aft of square where neither
+  // sees it. A spot counts only when the subject is in the picture and the
+  // first surface on the sight line to its hips and its head is its own body:
+  // a hut wall or another villager in front is the next spot, and no spot at
+  // all is no frame.
   const sideOn = async (walker, near, pitch) => {
-    for (const [flank, dist] of [1, -1].flatMap((f) => [near, near * 0.7, near * 1.35].map((d) => [f, d]))) {
-      const want = await page.evaluate(({ walker, dist, pitch, flank }) => {
+    const spots = [0, 0.4, -0.4].flatMap((turn) => [1, -1].flatMap((f) => [near, near * 0.7, near * 1.35].map((d) => [f, d, turn])))
+    for (const [flank, dist, turn] of spots) {
+      const want = await page.evaluate(({ walker, dist, pitch, flank, turn }) => {
         const g = walker === null ? window.__placeScene.getObjectByName('village-task-walker') : window.__placeWalkers.group(walker)
-        const side = g.rotation.y + (flank * Math.PI) / 2
+        const side = g.rotation.y + (flank * Math.PI) / 2 + turn
         const p = window.__placePlayer
         p.x = g.position.x + Math.sin(side) * dist
         p.z = g.position.z + Math.cos(side) * dist
         p.yaw = side
         p.pitch = pitch
         return { x: p.x, z: p.z, gx: g.position.x, gz: g.position.z }
-      }, { walker, dist, pitch, flank })
+      }, { walker, dist, pitch, flank, turn })
       await nextFrames(4)
       const at = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-      if (Math.hypot(at.x - want.x, at.z - want.z) < 0.05) return { x: want.gx, z: want.gz }
+      if (Math.hypot(at.x - want.x, at.z - want.z) >= 0.05) continue
+      const seen = await page.evaluate((walker) => {
+        const g = walker === null ? window.__placeScene.getObjectByName('village-task-walker') : window.__placeWalkers.group(walker)
+        const cam = window.__placeCamera
+        if (!g?.visible || !cam || !window.__placeRayHit) return false
+        const V = g.position.constructor
+        const own = new Set()
+        g.traverse((o) => own.add(o.uuid))
+        let mesh = null
+        g.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
+        const hips = mesh?.skeleton.bones.find((b) => b.name === 'bone-hips')
+        const head = g.getObjectByName('figure-head')
+        if (!hips || !head) return false
+        g.updateWorldMatrix(true, true)
+        cam.updateMatrixWorld()
+        // Inside the body the sight line meets the subject's own surface
+        // first; a see-through surface (the rain's streaks) is looked past.
+        const clearTo = (p) => {
+          let from = cam.position.clone()
+          for (let k = 0; k < 6; k++) {
+            const hit = window.__placeRayHit(p.x, p.y, p.z, [from.x, from.y, from.z])
+            if (hit.hitDistance === null || own.has(hit.hitUuid) || hit.hitDistance >= hit.targetDistance - 0.25) return true
+            const by = window.__placeScene.getObjectByProperty('uuid', hit.hitUuid)
+            if (![by?.material].flat().some((m) => m?.transparent)) return false
+            from = from.clone().add(p.clone().sub(from).normalize().multiplyScalar(hit.hitDistance + 0.01))
+          }
+          return false
+        }
+        for (const p of [hips.getWorldPosition(new V()), head.getWorldPosition(new V())]) {
+          const n = p.clone().project(cam)
+          if (!(Math.abs(n.x) < 0.9 && Math.abs(n.y) < 0.9 && n.z < 1)) return false
+          if (!clearTo(p)) return false
+        }
+        return true
+      }, walker)
+      if (seen) return { x: want.gx, z: want.gz }
     }
     return null
   }
+  // The walk gait proper: the glTF body's walk share at its own ground speed
+  // (`userData.gait`, skinnedFigure.tsx), so a walker brisk enough to blend
+  // into the jog — no planted stance through its flight — is never the subject.
+  const WALK_ONLY = 0.98
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
   await goToPlace('zulu-village')
   const tol = await page.evaluate(() => ({ ...(window.__villagerMotion ?? {}) }))
   const FOOT_TOL = (tol.footGroundTolerance ?? 0.02) + 0.02 // + the slope under a stride
   const SLIP_TOL = (tol.stanceSlipTolerance ?? 0.03) + 0.01 // + one frame's sampling
-  // A walker that is out, walking, not lingering, skinned and drawn.
+  // A walker that is out, walking (on the walk gait), not lingering, skinned and drawn.
   const pick = () =>
-    page.evaluate(() => {
+    page.evaluate((walkOnly) => {
       const w = window.__placeWalkers
       if (!w) return null
       for (let i = 0; i < w.states.length; i++) {
@@ -4272,17 +4316,26 @@ if (section('village-walk')) {
         if (!g || !g.visible || s.mode !== 'walk' || s.pause > 0) continue
         if (s.seg === 0 || s.seg >= s.route.length - 2) continue // not on a door leg
         let skinned = false
-        g.traverse((o) => { if (o.isSkinnedMesh) skinned = true })
-        if (skinned) return i
+        let gait = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh) skinned = true
+          if (o.userData.gait && !gait) gait = o.userData.gait
+        })
+        if (skinned && gait && gait.walk >= walkOnly) return i
       }
       return null
-    })
-  const found = await stepUntil(async () => {
+    }, WALK_ONLY)
+  const found = await stepUntil((walkOnly) => {
     const w = window.__placeWalkers
     if (!w) return false
-    return w.states.some((s, i) => s.mode === 'walk' && s.pause <= 0 && s.seg > 0 && s.seg < s.route.length - 2 && w.group(i)?.visible)
-  }, null, 3600)
-  check('village walk: a villager is out walking on the skinned body', found, found ? '' : 'no walker left its dwelling')
+    return w.states.some((s, i) => {
+      if (s.mode !== 'walk' || s.pause > 0 || s.seg === 0 || s.seg >= s.route.length - 2 || !w.group(i)?.visible) return false
+      let gait = null
+      w.group(i).traverse((o) => { if (o.userData.gait && !gait) gait = o.userData.gait })
+      return !!gait && gait.walk >= walkOnly
+    })
+  }, WALK_ONLY, 3600)
+  check('village walk: a villager is out walking on the skinned body', found, found ? '' : 'no walker out on the walk gait')
   const who = found ? await pick() : null
   // A walker out but none on the skinned body would skip every gait check
   // below: that is a red, never a quiet pass.
@@ -4341,6 +4394,11 @@ if (section('village-walk')) {
             g.traverse((o) => { if (o.userData.walk && !w) w = o.userData.walk })
             return w && { phase: w.phase, weight: w.weight, speed: w.speed, reach: w.reach, held: w.plants.map((p) => !!p.contact), off: w.plants.map((p) => [p.offset.x, p.offset.z]) }
           })(),
+          gaitWalk: (() => {
+            let q = null
+            g.traverse((o) => { if (o.userData.gait && !q) q = o.userData.gait })
+            return q ? q.walk : null
+          })(),
           handZ: [ahead('hand.L'), ahead('hand.R')],
           footZ: [ahead('foot.L'), ahead('foot.R')],
           mode: s.mode,
@@ -4353,7 +4411,7 @@ if (section('village-walk')) {
     const samples = []
     for (let f = 0; f < 120; f++) {
       const r = await readFeet(who)
-      if (!r || r.mode !== 'walk' || r.pause > 0) break
+      if (!r || r.mode !== 'walk' || r.pause > 0 || !(r.gaitWalk >= WALK_ONLY)) break
       samples.push(r)
       await nextFrames(1)
     }
@@ -4427,7 +4485,8 @@ if (section('village-walk')) {
     const col = (key, i) => samples.map((r) => r[key][i])
     const armVsLeg = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', i)).toFixed(3)) : [0, 0]
     const armVsOther = samples.length > 2 ? [0, 1].map((i) => +corr(col('handZ', i), col('footZ', 1 - i)).toFixed(3)) : [0, 0]
-    const detail = JSON.stringify({ frames: samples.length, footVerts, worstGround: +worstGround.toFixed(4), worstPlantedSole: +worstPlantedSole.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
+    const gaitWalk = samples.length ? +Math.min(...samples.map((r) => r.gaitWalk)).toFixed(3) : null
+    const detail = JSON.stringify({ frames: samples.length, gaitWalk, footVerts, worstGround: +worstGround.toFixed(4), worstPlantedSole: +worstPlantedSole.toFixed(4), worstSlip: +worstSlip.toFixed(4), stances: stances.length, fullStances, thighSwing: +thighSwing.toFixed(3), armSwing: +armSwing.toFixed(3), counter, armVsLeg, armVsOther, worstStance })
     report(`  village-walk ${detail}`)
     check('village walk: measured over at least 30 walking frames', samples.length >= 30, detail)
     check(`village walk: the lowest drawn sole sits on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m, transformed foot geometry)`, samples.length > 0 && footVerts > 0 && worstGround <= FOOT_TOL, detail)
@@ -4438,13 +4497,17 @@ if (section('village-walk')) {
     check('village walk: each arm swings against its own side’s leg (hand forward while that foot is back)', armVsLeg.every((r) => r < -0.5) && armVsOther.every((r) => r > 0.5), detail)
 
     // MID-STRIDE, side-on: the camera stands three metres off his flank.
-    const stride = await stepUntil((i) => {
+    const stride = await stepUntil(({ i, walkOnly }) => {
       const g = window.__placeWalkers.group(i)
       let mesh = null
-      g?.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o })
+      let gait = null
+      g?.traverse((o) => {
+        if (o.isSkinnedMesh && !mesh) mesh = o
+        if (o.userData.gait && !gait) gait = o.userData.gait
+      })
       const t = mesh?.skeleton.bones.find((b) => b.name === 'bone-thigh.L')
-      return !!t && Math.abs(t.rotation.x) > 0.22 && window.__placeWalkers.states[i].mode === 'walk'
-    }, who, 240)
+      return !!t && Math.abs(t.rotation.x) > 0.22 && window.__placeWalkers.states[i].mode === 'walk' && !!gait && gait.walk >= walkOnly
+    }, { i: who, walkOnly: WALK_ONLY }, 240)
     if (stride) {
       await freezeLife(true)
       try {
@@ -4461,18 +4524,28 @@ if (section('village-walk')) {
     check('village walk: a mid-stride moment was caught for the picture', stride, '')
   }
 
-  // A HEAD CARRIER: the load sits on the crown, no hand above the load.
-  const carrierFound = await stepUntil(() => {
+  // A HEAD CARRIER: the load sits on the crown, no hand above the load. The
+  // carrier is one out on the walk gait (as the walker above), and the one
+  // found is the one measured and photographed.
+  const carrierOut = (walkOnly) => {
     const w = window.__placeWalkers
-    return !!w && w.states.some((s, i) => w.carries[i] && s.mode === 'walk' && s.seg > 0 && s.seg < s.route.length - 2 && w.group(i)?.visible)
-  }, null, 3600)
+    if (!w) return null
+    const i = w.states.findIndex((s, k) => {
+      if (!w.carries[k] || s.mode !== 'walk' || s.pause > 0 || s.seg === 0 || s.seg >= s.route.length - 2 || !w.group(k)?.visible) return false
+      let gait = null
+      w.group(k).traverse((o) => { if (o.userData.gait && !gait) gait = o.userData.gait })
+      return !!gait && gait.walk >= walkOnly
+    })
+    return i < 0 ? null : { i }
+  }
+  const carrierFound = await stepUntil(carrierOut, WALK_ONLY, 3600)
   check('village walk: a villager carries a load on the head', carrierFound, '')
   if (carrierFound) {
     await freezeLife(true)
     try {
-      const c = await page.evaluate(() => {
+      const out = await page.evaluate(carrierOut, WALK_ONLY)
+      const c = !out ? null : await page.evaluate((i) => {
         const w = window.__placeWalkers
-        const i = w.states.findIndex((s, k) => w.carries[k] && s.mode === 'walk' && w.group(k)?.visible)
         const g = w.group(i)
         const V = g.position.constructor
         const crown = g.getObjectByName('figure-crown')
@@ -4491,6 +4564,24 @@ if (section('village-walk')) {
           const b = o.geometry.boundingBox
           base = crown.worldToLocal(o.localToWorld(new V((b.min.x + b.max.x) / 2, b.min.y, (b.min.z + b.max.z) / 2)))
         })
+        // The DRAWN head under the crown: the vertices skinned wholly to the
+        // head bone (scalp and headwear), carried through the bones as the GPU
+        // does, in the crown's frame; the highest of them within 6 cm of its
+        // axis is where the load must rest. Above it the load floats.
+        let headTop = null
+        g.traverse((m) => {
+          if (!m.isSkinnedMesh || !crown) return
+          const b = m.skeleton.bones.findIndex((q) => q.name === 'bone-head')
+          const si = m.geometry.attributes.skinIndex
+          const sw = m.geometry.attributes.skinWeight
+          for (let v = 0; si && sw && v < si.count; v++) {
+            let whole = false
+            for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === b && sw.getComponent(v, k) > 0.99) whole = true
+            if (!whole) continue
+            const q = crown.worldToLocal(m.localToWorld(m.getVertexPosition(v, new V())))
+            if (Math.hypot(q.x, q.z) <= 0.06 && (headTop === null || q.y > headTop)) headTop = q.y
+          }
+        })
         return {
           i,
           x: g.position.x,
@@ -4499,18 +4590,26 @@ if (section('village-walk')) {
           chain,
           base: base ? { x: +base.x.toFixed(4), y: +base.y.toFixed(4), z: +base.z.toFixed(4) } : null,
           crownAboveHead: top && head ? top.y - head.getWorldPosition(new V()).y : null,
+          // The crown over the drawn head top under it (figure units): 0 is a
+          // load resting on the head.
+          crownOverDrawnHead: headTop === null ? null : +(-headTop).toFixed(4),
           handsBelowCrown: top ? hands.every((h) => h < top.y + 0.05) : false,
         }
-      })
-      check('head carrier: the load’s crown hangs from the head bone (it rides the head, never a fixed height)', c.onHeadBone && c.crownAboveHead > 0, JSON.stringify(c))
-      check('head carrier: the load’s base sits on the crown (within 1 cm)', !!c.base && Math.hypot(c.base.x, c.base.y, c.base.z) <= 0.01, JSON.stringify(c))
-      check('head carrier: no hand is raised above the head — the balanced carrier keeps both arms free', c.handsBelowCrown, JSON.stringify(c))
-      const seen = await sideOn(c.i, 3.2, -0.04)
-      check('head carrier: the camera found a free spot side-on to the carrier', !!seen, '')
-      if (seen) await frame(shot('1295-village-head-carrier'), {
-        local: { x: c.x, y: 1.2, z: c.z },
-        label: 'a Zulu villager walking with a basket on the head: the basket sits on the crown, both arms swing free',
-      })
+      }, out.i)
+      check('head carrier: the carrier found is still out on the walk once life is held', !!c, '')
+      if (c) {
+        const d = JSON.stringify(c)
+        check('head carrier: the load’s crown hangs from the head bone (it rides the head, never a fixed height)', c.onHeadBone && c.crownAboveHead > 0, d)
+        check('head carrier: the load’s base sits on the crown (within 1 cm)', !!c.base && Math.hypot(c.base.x, c.base.y, c.base.z) <= 0.01, d)
+        check('head carrier: the crown rests on the drawn head under it (within 2 cm) — the load neither floats nor sinks', c.crownOverDrawnHead !== null && Math.abs(c.crownOverDrawnHead) <= 0.02, d)
+        check('head carrier: no hand is raised above the head — the balanced carrier keeps both arms free', c.handsBelowCrown, d)
+        const seen = await sideOn(c.i, 3.2, -0.04)
+        check('head carrier: the camera found a free spot side-on to the carrier', !!seen, '')
+        if (seen) await frame(shot('1295-village-head-carrier'), {
+          local: { x: c.x, y: 1.2, z: c.z },
+          label: 'a Zulu villager walking with a basket on the head: the basket sits on the crown, both arms swing free',
+        })
+      }
     } finally {
       await freezeLife(false)
     }

@@ -25,6 +25,7 @@ import {
 import type { VillagerAsset } from '../../render/villagerAsset'
 import { restBounds } from '../../render/villagerBody'
 import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
+import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
 import { contactCrouch, contactLean, gestureArmEuler, hangToward, solveTwoBone, unsquashHead } from '../../render/figureRig'
@@ -605,8 +606,14 @@ export function SkinnedFigure({
       const body = { x: _here.x, z: _here.z, yaw: Math.atan2(_facing.x, _facing.z), unit }
       const walked = stepWalk(m, body, dt, dims, id.age, kneel || !!kneeling?.current, joints)
       if (rig.gltf && clips) stepClipLayers(rig.gltf.asset, rig.gltf.person, clips, walked, m.speed, body, work?.current ?? null, dt)
-      // Dev: the walk the village-walk verification reads beside the bones.
-      if (import.meta.env.DEV) g.userData.walk = m
+      // Dev: the walk the village-walk verification reads beside the bones,
+      // and the glTF body's gait shares at that speed (walk/jog/sprint), so
+      // it can pick a figure that really walks.
+      if (import.meta.env.DEV) {
+        g.userData.walk = m
+        const f = rig.gltf?.person.frame
+        g.userData.gait = f ? gaitWeights(m.speed / f.scale, f.legScale) : null
+      }
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
       const actor = g.userData.actor as { height: number } | undefined
       if (actor) actor.height = 1.45 - 0.45 * m.kneel // the label over the drawn crown
