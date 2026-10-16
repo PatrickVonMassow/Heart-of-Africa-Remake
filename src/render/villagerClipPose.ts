@@ -270,7 +270,7 @@ function blendGait(asset: VillagerAsset, frame: PersonFrame, phase: number, w: G
  * hips), the runs land their right foot higher than their left even on the
  * basis body, and a blend of two clips carries its stance foot lower than
  * either. Read at `groundLevels` steps across each cross-fade band and
- * interpolated between, cached per person and walk clip: it changes with the
+ * interpolated between, cached per person and gait clips: it changes with the
  * pace, never within a stance, so it moves no planted foot.
  */
 export function gaitFootGround(asset: VillagerAsset, frame: PersonFrame, walkClip: VillagerClip, w: GaitWeights): readonly [number, number] {
@@ -298,7 +298,8 @@ export function gaitFootGround(asset: VillagerAsset, frame: PersonFrame, walkCli
   return _groundOut
 }
 const _groundOut: [number, number] = [0, 0]
-const _ground = new WeakMap<PersonFrame, WeakMap<VillagerClip, Map<number, [number, number]>>>()
+/** Per person and walk clip: the grid levels read with these jog and sprint clips. */
+const _ground = new WeakMap<PersonFrame, WeakMap<VillagerClip, { jog: VillagerClip; sprint: VillagerClip; levels: Map<number, [number, number]> }>>()
 const _gPose = newPose(0)
 const _gWorld = newWorld(0)
 
@@ -306,8 +307,12 @@ const _gWorld = newWorld(0)
 function groundLevel(asset: VillagerAsset, frame: PersonFrame, walkClip: VillagerClip, ia: number, ib: number, q: number): [number, number] {
   let perFrame = _ground.get(frame)
   if (!perFrame) _ground.set(frame, (perFrame = new WeakMap()))
-  let levels = perFrame.get(walkClip)
-  if (!levels) perFrame.set(walkClip, (levels = new Map()))
+  // every clip of the blend shapes the heights: a replaced jog or sprint reads them afresh
+  let cached = perFrame.get(walkClip)
+  if (!cached || cached.jog !== asset.clips.jog || cached.sprint !== asset.clips.sprint) {
+    perFrame.set(walkClip, (cached = { jog: asset.clips.jog, sprint: asset.clips.sprint, levels: new Map() }))
+  }
+  const levels = cached.levels
   const key = ia * (q + 1) + ib
   let hit = levels.get(key)
   if (hit) return hit

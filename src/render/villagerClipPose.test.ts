@@ -10,7 +10,7 @@ import { balance, VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, newClipGait, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitFootGround, newClipGait, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, newPose, newWorld, sprintWeight, toolInHand } from './villagerRig'
 
@@ -117,6 +117,21 @@ describe('a gait clip\'s stance', () => {
     const b = clip('walk', { heel: [[0, 0.2]], ball: [], tip: [] })
     expect(stanceOf(a, 'L')).toEqual([0, 0.6])
     expect(stanceOf(b, 'L')).toEqual([0, 0.2])
+  })
+})
+
+describe('the gait feet\'s ground height', () => {
+  it('is read afresh when the jog or sprint clip is replaced on the same person and walk', () => {
+    const f = gltfPerson(asset, 'male', 'adult', 0).frame
+    for (const [name, w] of [['jog', { walk: 0, jog: 1, sprint: 0 }], ['sprint', { walk: 0, jog: 0, sprint: 1 }]] as const) {
+      const before = [...gaitFootGround(asset, f, asset.clips.walk, w)]
+      // the other run in its place: a clip of other heights, the person and walk kept
+      const swapped = { ...asset, clips: { ...asset.clips, [name]: name === 'jog' ? asset.clips.sprint : asset.clips.jog } }
+      const fresh = [...gaitFootGround(swapped, gltfPerson(asset, 'male', 'adult', 0).frame, asset.clips.walk, w)]
+      expect(Math.max(...fresh.map((h, i) => Math.abs(h - before[i]))), name).toBeGreaterThan(1e-4)
+      const read = [...gaitFootGround(swapped, f, asset.clips.walk, w)]
+      read.forEach((h, i) => expect(h, `${name} ${i}`).toBeCloseTo(fresh[i], 9))
+    }
   })
 })
 
