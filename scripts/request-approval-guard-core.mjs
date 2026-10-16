@@ -162,14 +162,39 @@ const isRequestWord = (word) =>
  * occurrence that yields no deposit there becomes an untitled one.
  */
 function depositsIn(tokens, shell, depth) {
+  return scan(tokens, shell, depth).found
+}
+
+/** A `node …/finding.mjs` simple command starts at `start`. */
+const isFindingCall = (tokens, start) =>
+  typeof tokens[start] === 'string' &&
+  /(^|\/)node$/.test(tokens[start]) &&
+  typeof tokens[start + 1] === 'string' &&
+  /(^|\/)finding\.mjs$/.test(tokens[start + 1])
+
+/** `{ found, exempt }`: the deposits, and the flag occurrences inside exempted detail prose. */
+function scan(tokens, shell, depth) {
   const found = []
   const consumed = new Set()
+  let exempt = 0
   const isWord = (k) => k < tokens.length && typeof tokens[k] === 'string'
   const valueAt = (k) => (isWord(k) && !tokens[k].startsWith('--') ? (consumed.add(k), tokens[k]) : '')
   // A finding's --detail text is prose, not a command: the flag word inside it
-  // is no deposit. A value with command substitution can still run one.
+  // is no deposit. Only a direct `node …/finding.mjs` call earns this — another
+  // program (`bash -c 'eval "$1"' --detail …`) may run its argument — and a
+  // value with command substitution can still run one. An exact `--request`
+  // value stays a deposit: finding.mjs reads any such argv word as the flag.
+  let start = 0
   tokens.forEach((word, k) => {
-    if (word === DETAIL_FLAG && isWord(k + 1) && !/\$\(|`/.test(tokens[k + 1])) consumed.add(k + 1)
+    if (typeof word !== 'string') {
+      start = k + 1
+      return
+    }
+    if (word !== DETAIL_FLAG || !isWord(k + 1) || !isFindingCall(tokens, start)) return
+    const value = tokens[k + 1]
+    if (/\$\(|`/.test(value) || isRequestWord(value)) return
+    consumed.add(k + 1)
+    exempt += (value.match(REQUEST_FLAG_RE) ?? []).length
   })
   for (let k = 0; k < tokens.length; k++) {
     const word = tokens[k]
@@ -189,11 +214,12 @@ function depositsIn(tokens, shell, depth) {
     if (typeof word !== 'string' || consumed.has(k) || isRequestWord(word)) return
     const occurrences = (word.match(REQUEST_FLAG_RE) ?? []).length
     if (occurrences === 0) return
-    const inner = depth < MAX_NESTING ? depositsIn(tokenize(word, shell), shell, depth + 1) : []
-    found.push(...inner)
-    for (let n = inner.length; n < occurrences; n++) found.push({ title: '', approved: '' })
+    const inner = depth < MAX_NESTING ? scan(tokenize(word, shell), shell, depth + 1) : { found: [], exempt: 0 }
+    found.push(...inner.found)
+    exempt += inner.exempt
+    for (let n = inner.found.length + inner.exempt; n < occurrences; n++) found.push({ title: '', approved: '' })
   })
-  return found
+  return { found, exempt }
 }
 
 /**

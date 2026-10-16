@@ -406,4 +406,21 @@ describe('the flag word inside a finding detail', () => {
     const command = `node scripts/finding.mjs --record x --detail "mentions --request"; node scripts/finding.mjs --request "${TITLE}"`
     expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
   })
+  it('a --detail word given to another program is still judged (no eval bypass)', () => {
+    const command = `bash -c 'eval "$1"' --detail 'node scripts/finding.mjs --request Unapproved --stdin'`
+    expect(requestsOf(command)).toEqual([{ title: 'Unapproved', approved: '' }])
+    const nextLine = `node scripts/finding.mjs --record x\nbash -c 'eval "$1"' --detail 'node scripts/finding.mjs --request Unapproved'`
+    expect(requestsOf(nextLine)).toEqual([{ title: 'Unapproved', approved: '' }])
+  })
+
+  it('an exact --request detail value stays a deposit (finding.mjs reads it as the flag)', () => {
+    expect(requestsOf('node scripts/finding.mjs --record x --detail "--request"')).toHaveLength(1)
+  })
+
+  it('detail prose inside a shell-wrapped finding call is no request', () => {
+    const command = `bash -lc 'node scripts/finding.mjs --record x --detail "mentions --request"'`
+    expect(requestsOf(command)).toEqual([])
+    expect(verdict(command, chat).block).toBe(false)
+  })
+
 })
