@@ -70,6 +70,7 @@ import {
   noteTopLevelSession,
   noteSessionStandDown,
   retireBatchWriter,
+  manualRelease,
   revokeWriterFence,
   readSessionProcesses,
   PARALLEL_ALERT_PATH,
@@ -1960,6 +1961,26 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       authorityState: 'retired',
       retiredReason: 'owner-release',
     })
+  })
+
+  it('the manual CLI release retires the holder writer before dropping the lock', () => {
+    const path = join(dir, 'session-process.json')
+    acquire('writer-session', opts({ now: NOW, pid: 4242, pidStartedAt: NOW - 60_000 }))
+    const generation = readOwnerLock(lockPath).fence
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 1_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(manualRelease(lockPath)).toBe('writer-session')
+    expect(readOwnerLock(lockPath)).toBeNull()
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation,
+      authorityState: 'retired',
+      retiredReason: 'manual-release',
+    })
+    expect(manualRelease(lockPath)).toBeNull()
   })
 
   it('revokes only the still-current writer fence and records the recovery', () => {
