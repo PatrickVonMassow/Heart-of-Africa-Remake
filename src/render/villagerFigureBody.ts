@@ -19,7 +19,7 @@ import { INFANT_SKIN, surfaceOf } from './figureDress'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
-import { bakeMorphs, legScale, morphInfluences, restHeads, stylisePeaks } from './villagerBody'
+import { bakeMorphs, legScale, morphInfluences, restBounds, restHeads, stylisePeaks } from './villagerBody'
 import { topoOrder } from './villagerAsset'
 import { applyGarmentMask, COVER_ATTRIBUTE } from './villagerGarmentMask'
 
@@ -109,11 +109,47 @@ export function bakePose(geo: THREE.BufferGeometry, rest: Float32Array, heads: F
   }
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4))
   g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wts, 4))
-  g.morphAttributes = {}
-  g.morphTargetsRelative = false
+  // The live morphs (the hands' shapes, villagerBody.ts LIVE_MORPHS) ride the
+  // same linear skin map: a relative delta turns with the bones it hangs on
+  // (Σ w·R_b·d), so a closed hand closes on the hung body as on the file's.
+  const live = (geo.morphAttributes.position ?? []).map((m) => {
+    const d = new Float32Array(pos.count * 3)
+    for (let k = 0; k < pos.count; k++) {
+      t.set(m.getX(k), m.getY(k), m.getZ(k))
+      if (t.lengthSq() === 0) continue
+      acc.set(0, 0, 0)
+      let total = 0
+      for (let c = 0; c < 4; c++) {
+        const w = sw.getComponent(k, c)
+        if (w <= 0) continue
+        v.copy(t).applyQuaternion(world[si.getComponent(k, c)])
+        acc.addScaledVector(v, w)
+        total += w
+      }
+      if (total > 0) acc.multiplyScalar(1 / total)
+      else acc.copy(t)
+      d[k * 3] = acc.x
+      d[k * 3 + 1] = acc.y
+      d[k * 3 + 2] = acc.z
+    }
+    const a = new THREE.BufferAttribute(d, 3)
+    a.name = m.name
+    return a
+  })
+  g.morphAttributes = live.length ? { position: live } : {}
+  g.morphTargetsRelative = true
   g.deleteAttribute('normal')
   g.computeVertexNormals()
   return g
+}
+
+/** Scale a geometry's relative morph deltas (the body's grounding and sizing
+ *  scale positions about the soles; a delta only scales). */
+function scaleMorphs(g: THREE.BufferGeometry, s: number): void {
+  for (const m of g.morphAttributes.position ?? []) {
+    const a = m.array as Float32Array
+    for (let i = 0; i < a.length; i++) a[i] *= s
+  }
 }
 
 /** The bone each vertex hangs on most (its largest skin weight). */
@@ -206,6 +242,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
     arr[k * 3 + 2] *= s
   }
   pos.needsUpdate = true
+  scaleMorphs(g, s)
   stylisePeaks(g, age === 'child')
   const rest = new Float32Array(heads.length)
   for (let i = 0; i < heads.length / 3; i++) {
@@ -213,8 +250,7 @@ export function gltfPerson(asset: VillagerAsset, sex: Sex, age: AgeGroup, build 
     rest[i * 3 + 1] = (heads[i * 3 + 1] - sole) * s
     rest[i * 3 + 2] = heads[i * 3 + 2] * s
   }
-  g.computeBoundingBox()
-  g.computeBoundingSphere()
+  restBounds(g)
   const p = measureProportions(asset, g, dom, rest, p0)
   const cov = asset.geometries.body.getAttribute(COVER_ATTRIBUTE) as THREE.BufferAttribute | undefined
   return {
@@ -470,6 +506,13 @@ export function gltfGarment(asset: VillagerAsset, person: GltfPerson, l: DressLa
   if (!src || asset.parts[name] !== 'garment') return null
   const { rest0, hang, sole, scale, influences } = person.frame
   const g = bakePose(bakeMorphs(src, influences), rest0, hungHeads(asset, rest0, hang), hang)
+  // The hands' shapes move the body's hands only: a garment carries zero
+  // deltas for them (merged with the body, every part needs the same targets).
+  g.morphAttributes.position = (g.morphAttributes.position ?? []).map((m) => {
+    const z = new THREE.BufferAttribute(new Float32Array(m.count * 3), 3)
+    z.name = m.name
+    return z
+  })
   const pos = g.getAttribute('position') as THREE.BufferAttribute
   const arr = pos.array as Float32Array
   let bottom = Infinity
@@ -556,6 +599,13 @@ export function gltfFigureGeometry(
   }
   const g = parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
   if (!g) throw new Error('glTF villager: body and garments do not merge')
-  g.computeBoundingSphere()
+  // three's merge checks the parts agree on relative targets but leaves the
+  // result at the default (absolute): the GPU would scale the base by 1 − Σ
+  // weights and turn the body inside out below the ground
+  g.morphTargetsRelative = parts[0].morphTargetsRelative
+  // the merge drops the targets' names: the mesh's morph dictionary reads them
+  const named = parts[0].morphAttributes.position ?? []
+  ;(g.morphAttributes.position ?? []).forEach((m, k) => (m.name = named[k]?.name ?? m.name))
+  restBounds(g)
   return g
 }

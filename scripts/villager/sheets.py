@@ -60,10 +60,64 @@ def body_sheet(out, body):
     R.render(os.path.join(out, 'body-morphs-quarter.png'), (x / 2 - 0.4, 0.7, 0), x + 0.3, 30, (2000, 560))
 
 
+def hand_sheet(out, body):
+    """The hand shapes close up (natural-villager-motion step 3): the adult
+    man's right hand, left to right relaxed, closed round a shaft and pointing,
+    as the morph deltas put them on the rest body. verification/villager-body/
+    hands-<view>.png"""
+    from body import HAND_SHAPES
+    jidx, jw = top4(body['W'])
+    base = corner_weights('male', 'adult')
+    hand = SK.INDEX['hand.R']
+    # the hand alone: the triangles skinned mostly to it
+    on = body['W'][:, hand] > 0.4
+    tris = body['tris'][on[body['tris']].all(1)]
+    for view in ('front', 'side', 35):
+        cam = view if view != 'side' else 'other'
+        # the shapes side by side across the picture, along the camera's
+        # screen right (perpendicular to its view: +x from the front, +z for
+        # 'other' looking along +x); spaced along x, the side view stacked
+        # them into the screen
+        a = np.radians(hand_azimuth(cam))
+        across = np.array([np.cos(a), 0.0, -np.sin(a)])
+        R.clear()
+        x = 0.0
+        for k, shape in enumerate(HAND_SHAPES):
+            w = dict(base, **{f'{shape}.R': 1.0})
+            pos, j = morphed(body, w)
+            wr, wp = rig.fk(j, rest_q())
+            v = rig.skin(pos, jidx, jw, j, wr, wp)
+            c = wp[hand]
+            v = v - c + x * across
+            R.add_mesh(f'hand-{shape}', v, tris, SKIN)
+            R.label(shape, x * across + np.array([0, -0.13, 0.0]), 0.03, cam, LABEL)
+            x += 0.2
+        R.render(os.path.join(out, f"hands-{view if isinstance(view, str) else 'az' + str(view)}.png"),
+                 tuple((x / 2 - 0.1) * across + np.array([0, -0.05, 0])), x + 0.05, cam, (1500, 600))
+
+
+def hand_azimuth(view):
+    """A view's camera azimuth (deg) as render.py reads it."""
+    return {'side': 90.0, 'front': 0.0, 'back': 180.0, 'other': -90.0}.get(view, view)
+
+
+def selftest_hand_layout():
+    """The hand sheet's spacing runs across every view's picture: it is
+    perpendicular to the camera's view direction (no Blender needed)."""
+    for view in ('front', 'other', 35):
+        a = np.radians(hand_azimuth(view))
+        across = np.array([np.cos(a), 0.0, -np.sin(a)])
+        look = np.array([np.sin(a), 0.0, np.cos(a)])
+        assert abs(float(across @ look)) < 1e-12 and abs(np.linalg.norm(across) - 1) < 1e-12, view
+    print('sheets hand layout selftest: ok')
+
+
 def sheets(out, mh, body, clips, garments, cfg, only=''):
     want = set(only.split(',')) if only else None
     if not want or 'body' in want:
         body_sheet(out, body)
+    if not want or 'hands' in want:
+        hand_sheet(out, body)
     if garments and (not want or 'garments' in want):
         garment_sheet(out, body, clips, garments, cfg, 'walk', 0.3, view='front')
         garment_sheet(out, body, clips, garments, cfg, 'walk', 0.3, view='side')
@@ -79,6 +133,10 @@ def sheets(out, mh, body, clips, garments, cfg, only=''):
             for k, (sex, age, outfit) in enumerate(outfits(garments)):
                 clip_sheet(out, body, clips, name, frames=8, view=35, spacing=1.0, sex=sex, age=age,
                            fname=f'dress-{name}-{k}.png', garments=garments, outfit=outfit, cfg=cfg)
+    if clips and (not want or 'gait' in want):
+        # per gait clip its support intervals, contact fraction and knee bend
+        from gaitplots import gait_plots
+        gait_plots(out, body, clips)
     if clips:
         for name in clips['clips']:
             if not want or name in want or 'clips' in want:
@@ -297,6 +355,7 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
     for s in rt['subjects']:
         person, pos, w = GP.runtime_person(body, s, cfg)
         baked = person.bake(pos, jidx, jw)
+        hand = GP.runtime_hand_deltas(person, pos, body, jidx, jw)
         missing = [n for n in s['garments'] if not garments or n not in garments['meshes']]
         if missing:
             raise RuntimeError(f"runtime sheets: {s['id']} wears {missing}, absent from the built garments — rebuild them (--step garments)")
@@ -332,7 +391,7 @@ def runtime_sheets(out, body, clips, garments, cfg, rt):
                 off = right * (k * spacing - span / 2)
                 at = np.array([f['root']['p'][0], 0.0, f['root']['p'][2]])
                 move = off - at
-                bv = drawn(f, baked, jidx, jw, body['tris'], bpush)
+                bv = drawn(f, baked + GP.runtime_hands(f, hand), jidx, jw, body['tris'], bpush)
                 R.add_mesh(f'f{k}', bv + move, btris, SKIN)
                 top = max(top, float(bv[:, 1].max()))
                 for c, g in enumerate(worn):

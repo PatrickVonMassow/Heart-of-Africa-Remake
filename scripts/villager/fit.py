@@ -267,6 +267,27 @@ def fit(body, clips, garments, cfg, passes=6, stride=2, log=lambda *x: print(*x,
     return garments
 
 
+def tailor(src_dir, mh, body, clips, cfg):
+    """The garments step: built round the body, fitted (`fit`) to the clips
+    with only the TRUNK's style (VILLAGER_ASSET.clipStyle chestTilt and
+    chestTwist, clips.restyle), then settled (`settle`). Fitted to the fully
+    restyled walk, sprint and idle (the sprint's hips straightened, the idle's
+    feet squared), the rest-pose pushes drove the trousers into the legs in
+    the build pose deeper than the settle clears (build pose 20/31 garments
+    within tolerance against 29/31 unstyled, measured 15.10.2026); fitted to
+    the source trunk instead (the source sprint leans the chest 52 degrees,
+    the head held up), they raised the robe's collar over the chin on every
+    body but the adult man's (up to 0.035 figure units on the women and
+    children, measured 15.10.2026). The exported clips keep their whole
+    style."""
+    import clips as CL
+    import garments as G
+    style = cfg['VILLAGER_ASSET']['clipStyle']
+    trunk = {c: {k: v for k, v in s.items() if k in ('chestTilt', 'chestTwist')} for c, s in style.items()}
+    plain = CL.build_clips(src_dir, body, cfg, style=trunk) if style else clips
+    return settle(body, fit(body, plain, G.build_garments(mh, body, plain, cfg), cfg), cfg)
+
+
 # The body corners in the order their morphs can be settled: each corner's
 # morph weights are those of a corner before it plus ONE morph of its own (None:
 # the neutral corner, the rest positions), so a corner settled later never
@@ -458,11 +479,16 @@ def _settle_one(n):
             break
         dirs = nrm.copy()
         for k in bad[d[bad] > 0]:
-            if way_out(tree, gv[k], nrm[k]) > 1.5 * d[k] + 0.005:
+            way = way_out(tree, gv[k], nrm[k])
+            if way > 1.5 * d[k] + 0.005:
                 r = np.array([gv[k][0] - axis[0], 0.0, gv[k][2] - axis[2]])
                 r /= max(np.linalg.norm(r), 1e-9)
                 out = way_out(tree, gv[k], r)
-                if out < np.inf:
+                # only a SHORTER way out: between the thighs the radial way
+                # crosses a whole thigh (10 cm against 4 along the normal), and
+                # that push, spread and repeated every round, blew the
+                # trousers and the garments over them up (measured 14.10.2026)
+                if out < way:
                     need[k], dirs[k] = out + clear[n], r
         push = np.zeros_like(gv)
         push[bad] = need[bad, None] * dirs[bad]
@@ -490,7 +516,8 @@ def settle_once(body, garments, cfg, rounds=8, log=lambda *x: print(*x, flush=Tr
     (garments.refine) the cloth between the vertices clears it too. A vertex
     short of it moves out along the body's normal at its nearest point — or,
     inside where that way leads into another body part (the armpit, where the
-    arm meets the trunk), outward from the body's axis, over the limb. The
+    arm meets the trunk), outward from the body's axis, over the limb, where
+    that way out is the shorter. The
     move is taken back to the rest pose through the game's blend at that
     corner (gamepath.Person.undraw) and added to the corner's own morph
     (SETTLE_ORDER), spread a little onto the neighbours so no spike rises in

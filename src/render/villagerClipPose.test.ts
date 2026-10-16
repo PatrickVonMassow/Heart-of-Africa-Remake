@@ -6,11 +6,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
-import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, newClipGait, shovelOnHungHand, stepClipGait, toHung, type GroundBody } from './villagerClipPose'
+import { balance, VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
+import { CHILD_FIGURE_SCALE } from './figures'
+import { AGE_GROUPS, SEXES } from '../systems/appearance'
+import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
+import { clipGaitPose, clipPoseAt, gaitFootGround, newClipGait, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
-import { contactPoints, forwardKinematics, newPose, newWorld, toolInHand } from './villagerRig'
+import { contactPoints, forwardKinematics, newPose, newWorld, sprintWeight, toolInHand } from './villagerRig'
 
 let asset: VillagerAsset
 let adult: GltfPerson
@@ -86,9 +88,60 @@ describe('a clip pose on the hung skeleton', () => {
   })
 })
 
+describe('a gait clip\'s stance', () => {
+  const clip = (name: string, L: Record<'heel' | 'ball' | 'tip', [number, number][]>) =>
+    ({ name, contacts: { support: { L, R: { heel: [], ball: [], tip: [] } } } }) as unknown as VillagerClip
+
+  it('runs over every overlapping support span, not only those starting at the landing', () => {
+    const c = clip('walk', { heel: [[0, 0.3]], ball: [[0.2, 0.5]], tip: [[0.4, 0.65]] })
+    expect(stanceOf(c, 'L')).toEqual([0, 0.65])
+    // a span after a gap belongs to no stance of this landing
+    const gap = clip('walk', { heel: [[0, 0.3]], ball: [[0.4, 0.5]], tip: [] })
+    expect(stanceOf(gap, 'L')).toEqual([0, 0.3])
+    // the shipped walk carries the foot about two thirds of its cycle
+    const w = stanceOf(asset.clips.walk, 'L')
+    expect(w[1] - w[0]).toBeGreaterThan(0.6)
+  })
+
+  it('lands at the earliest touch of the support, not at the span starting nearest the landing phase', () => {
+    // the right foot's heel lands at 0.35; its ball (0.5) only rolls on from there
+    const c = {
+      name: 'run',
+      contacts: { support: { L: { heel: [], ball: [], tip: [] }, R: { heel: [[0.35, 0.55]], ball: [[0.5, 0.65]], tip: [[0.6, 0.7]] } } },
+    } as unknown as VillagerClip
+    expect(stanceOf(c, 'R')).toEqual([0.35, 0.7])
+  })
+
+  it('is read per clip object: two clips of one name keep their own stance', () => {
+    const a = clip('walk', { heel: [[0, 0.6]], ball: [], tip: [] })
+    const b = clip('walk', { heel: [[0, 0.2]], ball: [], tip: [] })
+    expect(stanceOf(a, 'L')).toEqual([0, 0.6])
+    expect(stanceOf(b, 'L')).toEqual([0, 0.2])
+  })
+})
+
+describe('the gait feet\'s ground height', () => {
+  it('is read afresh when the jog or sprint clip is replaced on the same person and walk', () => {
+    const f = gltfPerson(asset, 'male', 'adult', 0).frame
+    for (const [name, w] of [['jog', { walk: 0, jog: 1, sprint: 0 }], ['sprint', { walk: 0, jog: 0, sprint: 1 }]] as const) {
+      const before = [...gaitFootGround(asset, f, asset.clips.walk, w)]
+      // the other run in its place: a clip of other heights, the person and walk kept
+      const swapped = { ...asset, clips: { ...asset.clips, [name]: name === 'jog' ? asset.clips.sprint : asset.clips.jog } }
+      const fresh = [...gaitFootGround(swapped, gltfPerson(asset, 'male', 'adult', 0).frame, asset.clips.walk, w)]
+      expect(Math.max(...fresh.map((h, i) => Math.abs(h - before[i]))), name).toBeGreaterThan(1e-4)
+      const read = [...gaitFootGround(swapped, f, asset.clips.walk, w)]
+      read.forEach((h, i) => expect(h, `${name} ${i}`).toBeCloseTo(fresh[i], 9))
+    }
+  })
+})
+
 describe('the clip gait on the ground', () => {
-  /** Walk a person straight ahead at `speed` and record each planted foot's world slide. */
-  function walkStraight(person: GltfPerson, speed: number, hold = true, seconds = 4, dt = 1 / 60) {
+  /** Walk a person straight ahead at `speed` and record each planted foot's
+   *  world slide. `probes` > 1 also samples each frame interval that many
+   *  times from a copy of the frame's gait state (nothing drawn, the state
+   *  carried on unchanged) and measures every contact down at the frame
+   *  against itself at those sub-frame instants. */
+  function walkStraight(person: GltfPerson, speed: number, hold = true, seconds = 4, dt = 1 / 60, probes = 1) {
     const n = asset.bones.length
     const g = newClipGait()
     const pose = newPose(n)
@@ -96,45 +149,91 @@ describe('the clip gait on the ground', () => {
     const f = person.frame
     let slide = 0
     let lowest = Infinity
+    // per foot, frames with a contact down, contacts measured down on two
+    // frames running, and contacts measured down at a frame and at one of its
+    // sub-frame probes (a floating foot has none; a run's stance at the bands
+    // can touch at most one 30 Hz frame running, so there it lands without a
+    // pair and only the probes measure it)
+    const downs = { L: 0, R: 0 }
+    const pairs = { L: 0, R: 0 }
+    const probed = { L: 0, R: 0 }
+    /** The contacts down after stepping `gait` by `walked` to the body at `z` (world x, z). */
+    const downAt = (gait: ClipGait, walked: number, z: number) => {
+      stepClipGait(gait, asset, f, walked, speed)
+      clipGaitPose(gait, asset, f, speed, hold ? { x: 0, z, yaw: 0, unit: 1 } : null, pose)
+      forwardKinematics(asset, f.rest0, pose, world)
+      const c = contactPoints(asset, world, f.legScale)
+      const down: Record<string, THREE.Vector3> = {}
+      for (const s of ['L', 'R'] as const) {
+        for (const k of ['heel', 'ball', 'tip'] as const) {
+          const p = c[s][k]
+          lowest = Math.min(lowest, p.y)
+          if (p.y <= 0.01) down[s + k] = new THREE.Vector3(p.x * f.scale, 0, p.z * f.scale + z)
+        }
+      }
+      return down
+    }
     let last: Record<string, THREE.Vector3> = {}
     let z = 0
     for (let t = 0; t < seconds; t += dt) {
       const walked = speed * dt
       z += walked
-      stepClipGait(g, asset, f, walked, speed)
-      const body: GroundBody = { x: 0, z, yaw: 0, unit: 1 }
-      clipGaitPose(g, asset, f, speed, hold ? body : null, pose)
-      forwardKinematics(asset, f.rest0, pose, world)
-      const c = contactPoints(asset, world, f.legScale)
-      const next: typeof last = {}
-      for (const s of ['L', 'R'] as const) {
-        for (const k of ['heel', 'ball', 'tip'] as const) {
-          const p = c[s][k]
-          lowest = Math.min(lowest, p.y)
-          if (p.y > 0.01) continue
-          const w = new THREE.Vector3(p.x * f.scale, 0, p.z * f.scale + z)
-          const key = s + k
-          if (last[key] && t > 1) slide = Math.max(slide, w.distanceTo(last[key]))
-          next[key] = w
+      const now = downAt(g, walked, z)
+      const keys = Object.keys(now)
+      if (t > 1) {
+        for (const key of keys) {
+          const s = key[0] as 'L' | 'R'
+          downs[s]++
+          if (!last[key]) continue
+          slide = Math.max(slide, now[key].distanceTo(last[key]))
+          pairs[s]++
+        }
+        for (let j = 1; j < probes && keys.length; j++) {
+          const part = (walked * j) / probes
+          const sub = downAt(structuredClone(g), part, z + part)
+          for (const key of keys) {
+            if (!sub[key]) continue
+            slide = Math.max(slide, sub[key].distanceTo(now[key]))
+            probed[key[0] as 'L' | 'R']++
+          }
         }
       }
-      last = next
+      last = now
     }
-    return { slide, lowest }
+    return { slide, lowest, downs, pairs, probed }
   }
 
-  it('with the hold, a planted foot does not slide at any pace or body size outside the walk/sprint cross-fade', () => {
-    for (const person of [adult, child]) {
+  it('with the hold, a planted foot does not slide across the whole speed ramp: every body, both cross-fades, 30/60/120 Hz', () => {
+    // natural-villager-motion step 5: the walk ↔ jog ↔ sprint bands are no
+    // longer exempt — 0.004 person units per frame everywhere
+    const bodies = [
+      ...SEXES.flatMap((sex) => AGE_GROUPS.map((age) => gltfPerson(asset, sex, age, 0))),
+      gltfPerson(asset, 'male', 'adult', -1),
+      gltfPerson(asset, 'male', 'adult', 1),
+    ]
+    const G = VILLAGER_GLTF
+    // per unit of leg: a stroll, the walk, both bands (edges and middle), the jog, a dash
+    const ramp = [0.4, 1.0, G.jogThreshold - G.jogBand, G.jogThreshold, G.jogThreshold + G.jogBand, 3.5, 5.5, G.sprintThreshold - G.sprintBand, G.sprintThreshold, G.sprintThreshold + G.sprintBand, 8.6]
+    for (const person of bodies) {
       const per = person.frame.legScale * person.frame.scale
-      const band = [VILLAGER_GLTF.sprintThreshold - VILLAGER_GLTF.sprintBand, VILLAGER_GLTF.sprintThreshold + VILLAGER_GLTF.sprintBand].map((x) => x * per)
-      for (const v of [0.4, 0.8, 1.2, 1.4, 2.6, 3.4]) {
-        if (v > band[0] && v < band[1]) continue
-        expect(walkStraight(person, v).slide).toBeLessThan(0.004)
+      for (const hz of [30, 60, 120]) {
+        for (const v of ramp) {
+          // 30 Hz probes each frame at its half: the slide is measured there
+          // even where no contact stays down two frames running
+          const r = walkStraight(person, v * per, true, 3, 1 / hz, hz === 30 ? 2 : 1)
+          const where = `${v} per leg at ${hz} Hz, leg ${person.frame.legScale.toFixed(2)}`
+          expect(r.slide, where).toBeLessThan(0.004)
+          // the slide was measured: each foot came down and was followed
+          // there (from 60 Hz frame to frame, at 30 Hz to the half frame),
+          // and no foot sank into the ground
+          expect(Math.min(r.downs.L, r.downs.R), where).toBeGreaterThan(0)
+          const followed = hz >= 60 ? r.pairs : r.probed
+          expect(Math.min(followed.L, followed.R), where).toBeGreaterThan(0)
+          expect(r.lowest, where).toBeGreaterThan(-0.005)
+        }
       }
-      // inside the cross-fade the hold may give way, by a slip and never a jump
-      expect(walkStraight(person, VILLAGER_GLTF.sprintThreshold * per).slide).toBeLessThan(0.08)
     }
-  })
+  }, 240_000)
 
   it('a held foot shoved off its clip lets go by easing, never by a jump when its last contact lifts', () => {
     const n = asset.bones.length
@@ -189,11 +288,24 @@ describe('the clip gait on the ground', () => {
     for (const i of foot) expect(a.p[i].distanceTo(b.p[i])).toBeLessThan(1e-9)
   })
 
+  it("the tag game's fastest child still jogs: the sprint blend starts above a fresh runner's top pace", () => {
+    const tag = balance.villageLife.tag
+    const top = tag.sprintSpeed * tag.runnerBoost
+    for (const sex of SEXES) {
+      const f = gltfPerson(asset, sex, 'child', 0).frame
+      // the figure's own speed (world / group scale), then as clipGaitPose reads it
+      const v = top / CHILD_FIGURE_SCALE / f.scale
+      expect(sprintWeight(v, f.legScale), sex).toBe(0)
+      // with a margin: two per cent more pace still stays out of the band
+      expect(sprintWeight(v * 1.02, f.legScale), sex).toBe(0)
+    }
+  })
+
   it('the feet never sink below the ground', () => {
     for (const v of [0.6, 1.2, 3.4]) expect(walkStraight(adult, v).lowest).toBeGreaterThan(-0.01)
   })
 
-  it('walk → sprint is continuous: a small change of pace moves no joint by a jump', () => {
+  it('walk → jog → sprint is continuous: a small change of pace moves no joint by a jump', () => {
     const n = asset.bones.length
     const f = adult.frame
     const g = newClipGait()
@@ -202,13 +314,22 @@ describe('the clip gait on the ground', () => {
     const b = newPose(n)
     const wa = newWorld(n)
     const wb = newWorld(n)
-    const threshold = VILLAGER_GLTF.sprintThreshold * f.legScale * f.scale
-    for (let v = threshold - 0.8; v < threshold + 0.8; v += 0.02) {
-      clipGaitPose(g, asset, f, v, null, a)
-      clipGaitPose(g, asset, f, v + 0.02, null, b)
-      forwardKinematics(asset, f.rest0, a, wa)
-      forwardKinematics(asset, f.rest0, b, wb)
-      for (let i = 0; i < n; i++) expect(wa.p[i].distanceTo(wb.p[i])).toBeLessThan(0.03)
+    // per 0.02 of pace. The walk ↔ jog band syncs the stances of gaits of very
+    // different support (walk 0.675 of the cycle, jog 0.107): the swinging leg
+    // sweeps through part of its cycle across the band, 0.048 at this phase
+    // (measured 15.10.2026; 0.029 while the walk's stance was misread as 0.3)
+    for (const [t, limit] of [
+      [VILLAGER_GLTF.jogThreshold, 0.06],
+      [VILLAGER_GLTF.sprintThreshold, 0.03],
+    ]) {
+      const threshold = t * f.legScale * f.scale
+      for (let v = threshold - 0.8; v < threshold + 0.8; v += 0.02) {
+        clipGaitPose(g, asset, f, v, null, a)
+        clipGaitPose(g, asset, f, v + 0.02, null, b)
+        forwardKinematics(asset, f.rest0, a, wa)
+        forwardKinematics(asset, f.rest0, b, wb)
+        for (let i = 0; i < n; i++) expect(wa.p[i].distanceTo(wb.p[i]), `${t} band at ${v.toFixed(2)}, bone ${asset.bones[i]}`).toBeLessThan(limit)
+      }
     }
   })
 })
@@ -266,9 +387,9 @@ describe('the clips themselves', () => {
           const a = new THREE.Quaternion().fromArray(r, (k - 1) * 4)
           const b = new THREE.Quaternion().fromArray(r, k * 4)
           const step = c.times[k] - c.times[k - 1]
-          // 9 rad/s holds the dig's throw and the walk's swing; a sprinter's
-          // thigh swings at up to ~14 (its knee snapped at ~30 before the softening)
-          expect(a.angleTo(b) / step, `${name} ${asset.bones[i]} frame ${k}`).toBeLessThan(name === 'sprint' ? 16 : 9)
+          // 9 rad/s holds the dig's throw and the walk's swing; a runner's (jog, sprint)
+          // thigh swings at up to ~17 (the sprint's knee snapped at ~30 before the softening)
+          expect(a.angleTo(b) / step, `${name} ${asset.bones[i]} frame ${k}`).toBeLessThan(name === 'sprint' || name === 'jog' ? 18 : 9)
         }
       })
     }

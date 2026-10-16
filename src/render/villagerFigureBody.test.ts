@@ -16,7 +16,9 @@ import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { buildLayerGeometry, INFANT_SKIN } from './figureDress'
 import { axisClearance } from '../test/axisClearance'
+import { LIVE_MORPHS, restBounds } from './villagerBody'
 import {
+  bakePose,
   createGltfSkeleton,
   garmentMeshName,
   gltfFigureGeometry,
@@ -55,15 +57,16 @@ describe('the glTF body hung into the code-built rest', () => {
     }
   })
 
-  it('stands on y = 0 at the code-built stature of its sex and age, with no morph left on the GPU', () => {
+  it('stands on y = 0 at the code-built stature of its sex and age, only the hands\' shapes left live on the GPU', () => {
     for (const { sex, age } of people()) {
       const { geometry, p } = gltfPerson(asset, sex, age)
-      geometry.computeBoundingBox()
+      restBounds(geometry)
       expect(geometry.boundingBox!.min.y).toBeGreaterThan(-0.01)
       expect(geometry.boundingBox!.min.y).toBeLessThan(0.01)
       expect(geometry.boundingBox!.max.y).toBeCloseTo(bodyProportions(sex, age).stature, 4)
       expect(p.stature).toBeCloseTo(bodyProportions(sex, age).stature, 6)
-      expect(Object.keys(geometry.morphAttributes)).toHaveLength(0)
+      expect((geometry.morphAttributes.position ?? []).map((m) => m.name)).toEqual([...LIVE_MORPHS])
+      expect(geometry.morphTargetsRelative).toBe(true)
       expect(geometry.getAttribute('skinIndex')).toBeInstanceOf(THREE.Uint16BufferAttribute)
       expect(geometry.getAttribute('skinWeight').normalized).toBe(false)
     }
@@ -109,6 +112,76 @@ describe('the glTF body hung into the code-built rest', () => {
         })
       }
     }
+  })
+})
+
+describe('the hands\' shapes (natural-villager-motion step 3)', () => {
+  it('a morph delta turns with the bones its vertex hangs on through the hang bake', () => {
+    // two bones, one vertex on each half and half; bone 1 turned a quarter about z
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 1, 0, 0, 2, 0], 3))
+    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute([0, 0, 0, 0, 0, 1, 0, 0], 4))
+    g.setAttribute('skinWeight', new THREE.Float32BufferAttribute([1, 0, 0, 0, 0.5, 0.5, 0, 0], 4))
+    const d = new THREE.Float32BufferAttribute([1, 0, 0, 1, 0, 0], 3)
+    d.name = 'grip.L'
+    g.morphAttributes.position = [d]
+    g.morphTargetsRelative = true
+    const rest = new Float32Array([0, 0, 0, 0, 1, 0])
+    const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2)
+    const out = bakePose(g, rest, rest, [new THREE.Quaternion(), turn])
+    const m = out.morphAttributes.position![0]
+    expect(m.name).toBe('grip.L')
+    expect(out.morphTargetsRelative).toBe(true)
+    // on bone 0 alone: unturned
+    expect([m.getX(0), m.getY(0), m.getZ(0)]).toEqual([1, 0, 0])
+    // half on the quarter-turned bone: (1, 0, 0)/2 + (0, 1, 0)/2
+    expect(m.getX(1)).toBeCloseTo(0.5, 6)
+    expect(m.getY(1)).toBeCloseTo(0.5, 6)
+  })
+
+  it('every person carries the six hand shapes, scaled with the body; a garment carries zero deltas and still merges', () => {
+    const person = gltfPerson(asset, 'female', 'adult')
+    const names = (person.geometry.morphAttributes.position ?? []).map((m) => m.name)
+    expect(names).toEqual([...LIVE_MORPHS])
+    // a closed hand moves the hand and nothing far from it
+    const grip = person.geometry.morphAttributes.position![names.indexOf('grip.L')]
+    let moved = 0
+    for (let k = 0; k < grip.count; k++) moved = Math.max(moved, Math.hypot(grip.getX(k), grip.getY(k), grip.getZ(k)))
+    expect(moved).toBeGreaterThan(0.005)
+    expect(moved).toBeLessThan(0.15)
+    const layers = appearanceFor({ peopleId: 'swahili', sex: 'female', age: 'adult', drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, cloth: '#887766', palette: ['#887766'], pick: 0.3 })
+    const worn = layers.map((l) => gltfGarment(asset, person, l)).filter((g): g is THREE.BufferGeometry => !!g)
+    expect(worn.length).toBeGreaterThan(0)
+    for (const g of worn) {
+      expect((g.morphAttributes.position ?? []).map((m) => m.name)).toEqual([...LIVE_MORPHS])
+      for (const m of g.morphAttributes.position!) expect(Math.max(...(m.array as Float32Array).map(Math.abs))).toBe(0)
+    }
+    const fig = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
+    expect((fig.morphAttributes.position ?? []).map((m) => m.name)).toEqual([...LIVE_MORPHS])
+    expect(fig.morphAttributes.position![0].count).toBe(fig.getAttribute('position').count)
+  })
+
+  it('the dressed figure keeps its shapes RELATIVE: with both hands relaxed it still stands upright on the ground', () => {
+    // three's mergeGeometries checks morphTargetsRelative but leaves the merged
+    // geometry at the default false; the GPU then scales the base by
+    // 1 − Σ weights (−1 with both hands relaxed) and draws the body upside
+    // down below the ground.
+    const person = gltfPerson(asset, 'female', 'adult')
+    const layers = appearanceFor({ peopleId: 'zulu', sex: 'female', age: 'adult', drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, cloth: '#887766', palette: ['#887766'], pick: 0.3 })
+    const fig = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
+    expect(fig.morphTargetsRelative).toBe(true)
+    const { skeleton, bones } = createGltfSkeleton(asset, person.rest)
+    const mesh = new THREE.SkinnedMesh(fig, new THREE.MeshBasicMaterial())
+    mesh.add(bones.hips)
+    mesh.bind(skeleton, new THREE.Matrix4())
+    mesh.morphTargetInfluences![mesh.morphTargetDictionary!['relax.L']] = 1
+    mesh.morphTargetInfluences![mesh.morphTargetDictionary!['relax.R']] = 1
+    mesh.updateMatrixWorld(true)
+    const box = new THREE.Box3()
+    const v = new THREE.Vector3()
+    for (let k = 0; k < fig.getAttribute('position').count; k++) box.expandByPoint(mesh.getVertexPosition(k, v))
+    expect(box.min.y).toBeGreaterThan(-0.05)
+    expect(box.max.y).toBeGreaterThan(person.p.stature * 0.9)
   })
 })
 
@@ -339,7 +412,7 @@ describe('the pipeline garments on the glTF body', () => {
       for (const build of [-1, 0, 1]) {
         const person = gltfPerson(asset, sex, age, build)
         const H = person.p.stature
-        person.geometry.computeBoundingBox()
+        restBounds(person.geometry)
         for (const n of asset.garmentMask) {
           const [, form, wear] = n.split('-')
           // a mantle's flare and a sling on the back stand further off the body

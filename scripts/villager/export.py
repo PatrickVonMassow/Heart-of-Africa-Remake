@@ -126,10 +126,10 @@ def export(path, mh, body, clips, garments, cfg, mask=None):
             continue
         write_clip(w, name, c, bone_nodes)
         clip_meta[name] = {k: c[k] for k in ('duration', 'kind', 'source') if k in c}
-        for k in ('speed', 'phase0'):
+        for k in ('speed', 'phase0', 'strike'):
             if k in c:
                 clip_meta[name][k] = float(c[k])
-        for k in ('tool', 'grip', 'contacts'):
+        for k in ('tool', 'grip', 'contacts', 'phases'):
             if k in c:
                 clip_meta[name][k] = c[k]
     meta = {
@@ -164,4 +164,4 @@ def tool_hold(body):
     return out
 
 
-EXPORT_CLIPS = ('idle', 'walk', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle')
+EXPORT_CLIPS = ('idle', 'walk', 'jog', 'sprint', 'kneelDown', 'kneel', 'kneelUp', 'dig', 'carry', 'carryIdle')

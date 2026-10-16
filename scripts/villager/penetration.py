@@ -245,7 +245,7 @@ def _first_shown(ids, dist, keep):
 
 
 def _empty():
-    return {c: {'value': 0.0, 'at': None, 'over': 0, 'part': None} for c in COLUMNS} | {'checked': 0, 'cases': {}, 'clips': {}}
+    return {c: {'value': 0.0, 'at': None, 'over': 0, 'part': None} for c in COLUMNS} | {'checked': 0, 'checkedClips': {}, 'cases': {}, 'clips': {}}
 
 
 def _note(r, col, v, at, tol, part=None, clip=None, cases=()):
@@ -305,14 +305,14 @@ def _poses(S, c, person, cfg, ident):
     if rt is not None:
         s = rt[c]
         for f in s['frames']:
-            yield s['id'], f"{s['id']} t {f['t']:.2f} s ({sex} {age} build {build:+.1f})", (lambda v, i, w, f=f: GP.runtime_skin(s, f, v, i, w, 'pipeline')), GP.runtime_squash(s, f)
+            yield s['id'], f"{s['id']} t {f['t']:.2f} s ({sex} {age} build {build:+.1f})", (lambda v, i, w, f=f: GP.runtime_skin(s, f, v, i, w, 'pipeline')), GP.runtime_squash(s, f), f
         return
     for k, (cname, f, kst, q, hips) in enumerate(GP.poses(S['clips'], S['clip_names'], cfg)):
         if k % S['stride']:
             continue
         at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
         wr, wp = person.pose(q, hips, kst)
-        yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp)), None
+        yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp)), None, None
 
 
 def _corner(c):
@@ -334,6 +334,8 @@ def _corner(c):
     pos, j = morphed(body, w)
     person = GP.Person(j)
     bh = person.bake(pos, S['jidx'], S['jw'])
+    # a runtime frame's hand shapes (the live morphs it draws) on the baked body
+    hand = GP.runtime_hand_deltas(person, pos, body, S['jidx'], S['jw']) if rt is not None else {}
     gh = {n: person.bake(garment_pos(garments['meshes'][n], w), *gskin[n]) for n in names}
     bm = {n: Masked(mk['body'], body['tris'], mk['garments'], n) for n in names}
     # every layering: (inner, outer) with the inner's mask under that outer
@@ -348,9 +350,9 @@ def _corner(c):
     worst = {n: _empty() for n in names}
     nv = len(body['pos'])
     bone = lambda k: S['bones'][S['dom'][k if k < nv else body['tris'][k - nv][0]]]  # noqa: E731
-    for cname, at, skin, post in _poses(S, c, person, cfg, (sex, age, build)):
+    for cname, at, skin, post, rframe in _poses(S, c, person, cfg, (sex, age, build)):
         # unpushed: before the root's squash (`post`), which follows the mask push
-        bvu = skin(bh, S['jidx'], S['jw'])
+        bvu = skin(bh if rframe is None else bh + GP.runtime_hands(rframe, hand), S['jidx'], S['jw'])
         gvu = {n: skin(gh[n], *gskin[n]) for n in names}
         bv = bvu if post is None else post(bvu)
         gv = gvu if post is None else {n: post(x) for n, x in gvu.items()}
@@ -359,6 +361,7 @@ def _corner(c):
         for n in names:
             r = worst[n]
             r['checked'] += 1
+            r['checkedClips'][cname] = r['checkedClips'].get(cname, 0) + 1
             mb = bm[n]
             bp, smp, nrm = mb.drawn_at(bvu, depth, post)
             # the pushed body: every triangle (inside test), and the drawn ones
@@ -623,6 +626,9 @@ def measure(body, clips, garments, cfg, stride=1, names=None, clip_names=None, c
             for n, r in part.items():
                 t = worst[n]
                 t['checked'] += r['checked']
+                # per clip, so a clip main never measured (DERIVED) is told apart
+                for key, v in r['checkedClips'].items():
+                    t['checkedClips'][key] = t['checkedClips'].get(key, 0) + v
                 for key, v in r['clips'].items():
                     t['clips'][key] = max(t['clips'].get(key, 0.0), v)
                 for key, e in r['cases'].items():
@@ -675,6 +681,21 @@ NAMES = {'cloth': 'cloth in the body', 'shown': 'skin through the cloth', 'hole'
          'cut': 'hidden skin past the cloth', 'inner': 'inner garment through the cloth', 'innerHole': 'hidden inner garment out by an opening'}
 
 
+# A clip main never measured is compared with the clips it is made from
+# (natural-villager-motion steps 5 and 11): the jog with the walk and the
+# sprint it blends between, the posed clavicles with the idle they pose. Its
+# worse is still worse than every one of them; no new clip passes unchecked.
+DERIVED = {'jog': ('walk', 'sprint'), 'shoulders': ('idle',)}
+
+
+def _base_value(clips, key):
+    """Main's value for a `column clip` key: its own, else the worst of the clips a new clip derives from."""
+    if key in clips:
+        return clips[key]
+    col, _, clip = key.partition(' ')
+    return max((clips.get(f'{col} {c}', 0.0) for c in DERIVED.get(clip, ())), default=0.0)
+
+
 def compare(build, worst, main, a, tol):
     """The `## Against main` lines, the garment/column/clip cases worse than
     main, and the garments main has no row for (in its build pose or every
@@ -691,7 +712,7 @@ def compare(build, worst, main, a, tol):
                 continue
             for key, v in sorted(r['clips'].items()):
                 col = key.split(' ')[0]
-                b = base[n].get('clips', {}).get(key, 0.0)
+                b = _base_value(base[n].get('clips', {}), key)
                 if v > _limit(col, a, tol) and v > b + 0.0005:
                     worse.append(f'- `{n}` {key}: {b:.4f} on main → {v:.4f}')
 

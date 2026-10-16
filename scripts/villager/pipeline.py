@@ -4,7 +4,8 @@
   body        MakeHuman base → decimated body, morphs, joints, weights (cached)
   clips       Quaternius clips retargeted onto the villager skeleton (cached)
   garments    each dress form built round the body, weights transferred,
-              fitted to every clip frame at every body corner, then settled
+              fitted to every frame of the clips with only their trunk's
+              style at every body corner, then settled
               clear of the body and the inner layers in the build pose at
               every body corner (fit.py) (cached)
   (mask)      each garment's cover mask over the body and the garments of
@@ -78,6 +79,12 @@ def main():
     steps = ['body', 'clips', 'garments', 'export', 'sheets', 'penetration'] if a.step == 'all' else a.step.split(',')
     import mask as MK
     MK.selftest()
+    import gaitplots as GPL
+    GPL.selftest()
+    import clips as CL
+    CL.selftest()
+    import sheets as SH
+    SH.selftest_hand_layout()
     if 'garments' in steps or 'selftest' in steps:
         import fit as F
         F.selftest()
@@ -105,16 +112,14 @@ def main():
         clips = cached(a.work, 'clips', lambda: CL.build_clips(a.src, body, cfg), force='clips' in steps, key=keys['clips'])
     garments = None
     if have('garments') and any(s in steps for s in ('garments', 'export', 'sheets', 'penetration')):
-        import garments as G
         import fit as F
-        garments = cached(a.work, 'garments', lambda: F.settle(body, F.fit(body, clips, G.build_garments(mh, body, clips, cfg), cfg), cfg),
-                          force='garments' in steps, key=keys['garments'])
+        garments = cached(a.work, 'garments', lambda: F.tailor(a.src, mh, body, clips, cfg), force='garments' in steps, key=keys['garments'])
     if garments is not None and clips is not None:
         # the mask over every pose costs minutes: cached on its inputs, its own
         # code and what its motion evaluation reads (MK.motion_key)
         import hashlib
         key = keys['garments'] + hashlib.sha256(open(MK.__file__, 'rb').read()).hexdigest() + MK.motion_key(body)
-        garments['mask'] = cached(a.work, 'mask', lambda: MK.masks(body, garments, cfg, clips), key=key)
+        garments['mask'] = cached(a.work, 'mask', lambda: MK.inner_corners(body, garments, cfg, MK.masks(body, garments, cfg, clips)), key=key)
     elif garments is not None:
         garments['mask'] = MK.masks(body, garments, cfg)
     if 'export' in steps:

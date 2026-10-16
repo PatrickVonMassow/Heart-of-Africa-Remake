@@ -37,6 +37,7 @@ import {
   digPose,
   fillPose,
   fillSquat,
+  copyPoseExtras,
   gestureEnvelope,
   gesturePose,
   isGesturing,
@@ -107,6 +108,7 @@ import {
   type BankUtterance,
   type BankWorld,
 } from './bankGame'
+import { FrameFirst } from './frameFirst'
 import {
   ADULT_SITUATIONS,
   carryOf,
@@ -114,7 +116,10 @@ import {
   createAdultWork,
   digProgressOf,
   digBout,
+  digPhaseOf,
+  drawnDigClock,
   isDigging,
+  PRIMITIVE_DIG_STROKE,
   goalOf,
   stepAdultWork,
   taskOf,
@@ -375,6 +380,7 @@ function Loom({
       Object.assign(p.right, next.right)
       p.lean = next.lean
       p.turn = next.turn
+      copyPoseExtras(p, next)
       applyFigurePose(weaverLimbs.current, p)
     }
 
@@ -423,6 +429,7 @@ function Loom({
       Object.assign(hp.right, next.right)
       hp.lean = next.lean
       hp.turn = next.turn
+      copyPoseExtras(hp, next)
       applyFigurePose(helperLimbs.current, hp)
     }
     // The body he presents to the rest of the village follows him.
@@ -1168,12 +1175,14 @@ function Kids({
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
+        copyPoseExtras(pose, drawn)
         pose.lean = drawn.lean
       } else {
         const drawn = bankFigurePose(slumped, gesturePose(gesture.current), c.lean, tagCfg)
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
+        copyPoseExtras(pose, drawn)
         pose.lean = drawn.lean
       }
       applyFigurePose(limbs.current[i]?.current ?? null, pose)
@@ -2069,6 +2078,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     Object.assign(p.right, shown.right)
     p.lean = shown.lean
     p.turn = shown.turn
+    copyPoseExtras(p, shown)
     if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, frame.lowSwing)
     if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, frame.highSwing)
   })
@@ -2436,6 +2446,9 @@ function Walkers({
       states: states.current,
       homes: defs.map((d) => d.home),
       carries: defs.map((d) => d.carries),
+      // Each walker's cruise pace (world units per second), so the walk probe
+      // can tell a walker at pace from one still easing up to it.
+      speeds: defs.map((d) => d.speed),
       // The drawn group, for the walk's foot and stride measurements.
       group: (who: number) => refs.current[who] ?? null,
       // Read the rendered body independently of the surface it should ride.
@@ -2719,7 +2732,15 @@ function ErrandVillagers({
   const works = useRef<Array<RefObject<FigureWork>>>([])
   /** The glTF body draws (and holds) its own shovel; the hand prop is for the
    *  primitive and the code-built bodies. */
-  const gltfBody = !!useContext(FigureLookContext)?.villager
+  const villagerAsset = useContext(FigureLookContext)?.villager ?? null
+  const gltfBody = !!villagerAsset
+  /** The stroke the dig progress counts strikes on: the drawn body's own —
+   *  the glTF dig clip's period and blade contact, the primitive's otherwise —
+   *  so each counted strike (the earth thrown) is a strike the player sees. */
+  const digStroke = useMemo(() => {
+    const dig = villagerAsset?.clips.dig
+    return dig ? { seconds: dig.duration, strikeAt: dig.strike ?? 0 } : PRIMITIVE_DIG_STROKE
+  }, [villagerAsset])
   /** A villager PINNED into the fill, by index and progress — the dev route the
    *  verification poses one by. The errand's own fill phase drives the live dip;
    *  this only overrides which man is held and how far along it is. Null
@@ -2912,10 +2933,18 @@ function ErrandVillagers({
     [colliders, standable],
   )
 
-  useFrame((_, rawDt) => {
+  // Run as this component's first child (FrameFirst): after the children's
+  // frame, so the step's hearing guard reads where they stand this frame, and
+  // before the figures', so they draw this frame's work clock and step.
+  const errandFrame = (rawDt: number) => {
     if (isLifeFrozen()) return
     const dt = Math.min(rawDt, 0.1)
-    const cfg = balance.villageLife.adultErrands
+    const cfg = { ...balance.villageLife.adultErrands, digStroke }
+    // The errands step first: the strokes drawn below run on the work clock
+    // as this step leaves it, so the progress published with it never leads
+    // the strike shown.
+    stepAdultWork(work, view, dt, cfg, rand)
+    onDigProgress(digProgressOf(work, geography.digSites.length))
     // The jars standing at the village water stand: as many as the errand
     // state says have been set down, capped at the stand's capacity.
     for (let k = 0; k < standJars.current.length; k++) {
@@ -3146,6 +3175,7 @@ function ErrandVillagers({
           pose.right = dip.right
           pose.lean = dip.lean
           pose.turn = dip.turn
+          copyPoseExtras(pose, dip)
         }
       } else {
         // THE STROKE HOLDS THROUGH A SHOVE (the dig flicker): a body pushed a
@@ -3159,7 +3189,12 @@ function ErrandVillagers({
         // trunk and the shovel's turn along the arm together, the stroke's
         // clock running on while it fades; it restarts from the top once gone.
         state.digK = easeDigWeight(state.digK, digging, dt)
-        state.dug = digging || state.digK > 0 ? state.dug + dt : 0
+        // the drawn stroke on the work's clock, for both bodies: it advances
+        // only while the hole deepens, so it freezes through a hold or a fade,
+        // and the strike the progress counts is the one drawn
+        const ended = work.digEnded[i]
+        state.dug = drawnDigClock(state.dug, task, digging || state.digK > 0, ended)
+        if ((task && task.phase === 'dig') || ended !== undefined) figureWork.digT = state.dug + digPhaseOf(i)
         if (digging) {
           figureWork.dig = true
           const siteIndex = task?.siteIndex
@@ -3169,12 +3204,13 @@ function ErrandVillagers({
         // the shaft along the digging arm: the stroke drives the blade into the pit
         if (digTool) digTool.rotation.x = primitiveToolTilt(state.digK)
         const base = carry === 'fullJar' && !isGesturing(gesture.current) ? HEAD_CARRY_POSE.current : gesturePose(gesture.current)
-        const shown = state.digK > 0 ? mixDigPose(base, digPose(state.dug, i * 0.37), state.digK) : base
+        const shown = state.digK > 0 ? mixDigPose(base, digPose(state.dug, digPhaseOf(i)), state.digK) : base
         if (pose) {
           pose.left = shown.left
           pose.right = shown.right
           pose.lean = shown.lean
           pose.turn = shown.turn
+          copyPoseExtras(pose, shown)
         }
       }
       if (pose) applyFigurePose(limbs.current[i]?.current ?? null, pose)
@@ -3217,9 +3253,6 @@ function ErrandVillagers({
       ;(mesh.material as THREE.MeshBasicMaterial).opacity = ring.opacity
     })
 
-    stepAdultWork(work, view, dt, cfg, rand)
-    const progress = digProgressOf(work, geography.digSites.length)
-    onDigProgress(progress)
     for (const said of work.emitted) {
       // The speaker turns to what he is talking about as he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all. The word and
@@ -3231,7 +3264,7 @@ function ErrandVillagers({
         speakWork(camera, said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
       }
     }
-  })
+  }
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): what the adults
   // have said this visit, and what each of them is doing about it.
@@ -3351,6 +3384,7 @@ function ErrandVillagers({
 
   return (
     <>
+      <FrameFirst frame={errandFrame} />
       {people.map((p, i) => (
         <group
           key={i}

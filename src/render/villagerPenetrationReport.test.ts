@@ -5,12 +5,15 @@
 // visible-only count (penetration-report-main.json).
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET } from '../config/balance'
+import { parseVillager } from './villagerAsset'
 
 type Column = 'cloth' | 'shown' | 'hole' | 'cut' | 'inner' | 'innerHole'
 interface Garment {
   checked: number
+  /** the frames measured per clip (pose × corner) */
+  checkedClips: Record<string, number>
   clips: Record<string, number>
   cases: Record<string, { value: number; at: string; over: number }>
 }
@@ -31,6 +34,9 @@ const BUILD_RESIDUALS: Record<string, string[]> = {
   'g-wrapLong-chest': ['g-breastCloth-chest'],
   'g-veil-face': ['g-shirt-chest', 'g-robe-chest', 'g-cape-leftShoulder', 'g-cloak-chest', 'g-cape-chest', 'g-cloak-bothShoulders'],
 }
+
+// penetration.py DERIVED: a clip main never measured → the clips it is made from
+const DERIVED: Record<string, string[]> = { jog: ['walk', 'sprint'], shoulders: ['idle'] }
 
 // mask.py LAYER by slot (src/systems/appearance.ts LayerSlot), innermost first
 const LAYER: Record<string, number> = {
@@ -75,10 +81,40 @@ function worseThanMain(r: Report, base: Report, buildOnly = false): string[] {
 }
 
 describe('the visible-only penetration report', () => {
+  let exported: string[] = []
+  beforeAll(async () => {
+    const buf = readFileSync(resolve(__dirname, '../../public/models/villager.glb'))
+    exported = Object.keys((await parseVillager(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))).clips)
+  })
+
+  it('measures every clip the asset exports that main never measured, with the columns of the clips it derives from', () => {
+    const derived = exported.filter((c) => c in DERIVED)
+    // the jog is exported; a derived clip the asset drops is no coverage gap
+    expect(derived).toContain('jog')
+    const cols = (g: Garment, clip: string) => Object.keys(g.clips).filter((k) => k.split(' ')[1] === clip).map((k) => k.split(' ')[0])
+    for (const [n, g] of Object.entries(now.garments)) {
+      for (const c of derived) {
+        expect(g.checkedClips[c] ?? 0, `${n} ${c}`).toBeGreaterThan(0)
+        const want = new Set(DERIVED[c].flatMap((src) => cols(g, src)))
+        expect([...want].filter((col) => !cols(g, c).includes(col)), `${n} ${c}`).toEqual([])
+        expect(want.size, `${n} ${c}`).toBeGreaterThan(0)
+      }
+    }
+  })
+
   it('measures every garment main measured, per column and clip', () => {
     expect(Object.keys(now.garments).sort()).toEqual(Object.keys(main.garments).sort())
     for (const [n, g] of Object.entries(now.garments)) {
-      expect(g.checked, n).toBe(main.garments[n].checked)
+      // main counts its frames over its own clips only; a clip main never
+      // measured is one penetration.py compares with the clips it derives
+      // from (DERIVED), and its frames come on top of main's, never instead
+      const sum = (clips: string[]) => clips.reduce((t, c) => t + g.checkedClips[c], 0)
+      const ofMain = new Set(Object.keys(main.garments[n].clips).map((k) => k.split(' ')[1]))
+      const clips = Object.keys(g.checkedClips)
+      expect(sum(clips), n).toBe(g.checked)
+      expect(sum(clips.filter((c) => ofMain.has(c))), n).toBe(main.garments[n].checked)
+      expect([...ofMain].filter((c) => !g.checkedClips[c]), n).toEqual([])
+      expect(clips.filter((c) => !ofMain.has(c) && !(c in DERIVED)), n).toEqual([])
       expect(Object.keys(g.clips).length, n).toBeGreaterThan(0)
     }
   })

@@ -17,8 +17,10 @@
 import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF as G } from '../../config/balance'
 import type { VillagerAsset } from '../../render/villagerAsset'
+import { LIVE_MORPHS, type LiveMorph } from '../../render/villagerBody'
 import { clipGaitPose, clipPoseAt, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
 import type { GltfPerson } from '../../render/villagerFigureBody'
+import { solveTwoBone } from '../../render/figureRig'
 import { blendPoses, newPose, type VillagerPose } from '../../render/villagerRig'
 import type { FigureWork } from './placeFigureContext'
 
@@ -93,8 +95,11 @@ export function stepClipLayers(
   c.dig = ease(c.dig, work?.dig ? 1 : 0, dt)
   // the carry stays under the dig while it eases in, and is there again after
   c.carry = ease(c.carry, work?.tool && (!work.dig || c.dig < 1) ? 1 : 0, dt)
-  // the stroke starts from its top when the dig begins, and runs on while it fades
-  c.digT = c.dig > 0 ? c.digT + dt : 0
+  // the stroke on the work's clock where the caller keeps one (it stops, and the
+  // pose freezes, while the bout holds or fades); else it starts from its top
+  // when the dig begins and runs on while it fades
+  if (work?.digT !== undefined) c.digT = work.digT
+  else c.digT = c.dig > 0 ? c.digT + dt : 0
   c.arms = [ease(c.arms[0], c.free[0] ? 1 : 0, dt), ease(c.arms[1], c.free[1] ? 1 : 0, dt)]
   c.idleT += dt
 }
@@ -102,7 +107,7 @@ export function stepClipLayers(
 const LEGS = ['hips', 'thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
 const ARM = (s: 'L' | 'R') => [`shoulder.${s}`, `upperArm.${s}`, `forearm.${s}`, `hand.${s}`]
 /** Bones the code-built pose never writes: they return to rest before a blend. */
-const UNWRITTEN = ['toe.L', 'toe.R', 'shoulder.L', 'shoulder.R']
+const UNWRITTEN = ['toe.L', 'toe.R', 'shoulder.L', 'shoulder.R', 'spine1']
 
 function blendInto(asset: VillagerAsset, bones: Record<string, THREE.Bone>, names: readonly string[], local: THREE.Quaternion[], w: number) {
   if (w <= 0) return
@@ -181,6 +186,42 @@ export function applyClipLayers(
 }
 
 /**
+ * The hands' shapes (the glTF body's live morphs, render/villagerBody.ts
+ * LIVE_MORPHS) from what the hands do: closed round the shovel by the dig's
+ * share (both hands) and the carry's (the right), the pointing shape where a
+ * gesture aims a hand (`point`, left and right), and relaxed — a hand at rest
+ * is softly curled, never a flat board — wherever neither holds. Per hand the
+ * three weights sum to 1, so no shape stacks on another.
+ */
+export function handShapes(c: Pick<ClipLayers, 'dig' | 'carry' | 'arms'>, point: readonly [number, number] = [0, 0]): Record<LiveMorph, number> {
+  const clamp = (x: number) => Math.min(1, Math.max(0, x))
+  const gripL = clamp(c.dig)
+  // the carry is the right arm's only while the clips own that arm
+  const gripR = clamp(Math.max(c.dig, c.carry * c.arms[1]))
+  const pointL = clamp(point[0]) * (1 - gripL)
+  const pointR = clamp(point[1]) * (1 - gripR)
+  return {
+    'grip.L': gripL,
+    'grip.R': gripR,
+    'point.L': pointL,
+    'point.R': pointR,
+    'relax.L': clamp(1 - gripL - pointL),
+    'relax.R': clamp(1 - gripR - pointR),
+  }
+}
+
+/** Write hand-shape weights onto a mesh's morph influences (the targets it carries). */
+export function applyHandShapes(mesh: THREE.Mesh, w: Record<LiveMorph, number>): void {
+  const dict = mesh.morphTargetDictionary
+  const inf = mesh.morphTargetInfluences
+  if (!dict || !inf) return
+  for (const n of LIVE_MORPHS) {
+    const i = dict[n]
+    if (i !== undefined) inf[i] = w[n]
+  }
+}
+
+/**
  * The shovel on the right hand bone: shown while the hands hold it, gripped
  * where the dig's or the carry's clip grips it, by each clip's share of the
  * arm's pose as applyClipLayers layers it (the dig over the carry over the
@@ -189,9 +230,9 @@ export function applyClipLayers(
  */
 export function placeShovel(asset: VillagerAsset, person: GltfPerson, c: ClipLayers, tool: THREE.Object3D | null): void {
   if (!tool) return
-  const held = Math.max(c.dig, c.carry)
-  tool.visible = held > 0.5
-  if (!tool.visible) return
+  tool.visible = Math.max(c.dig, c.carry) > 0.5
+  // placed even while hidden: gripShaft solves the left hand onto it from the
+  // dig's first frame, before the shovel shows
   const dig = asset.clips.dig.tool?.grip ?? 0
   const carry = asset.clips.carry.tool?.grip ?? dig
   // the dig layers over everything below it, so its share of the arm is c.dig;
@@ -200,4 +241,72 @@ export function placeShovel(asset: VillagerAsset, person: GltfPerson, c: ClipLay
   tool.position.copy(at.position)
   tool.quaternion.copy(at.quaternion)
   tool.scale.setScalar(person.frame.scale)
+}
+
+const _base = new THREE.Matrix4()
+const _m = new THREE.Matrix4()
+const _p = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+const _q = new THREE.Quaternion()
+const _q2 = new THREE.Quaternion()
+const _s = new THREE.Vector3()
+const _held = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()]
+
+/** `o`'s position and turn in the body's frame (the hips' parent): free of a
+ *  squash the figure group may carry, so directions and turns stay rigid. */
+function inBody(o: THREE.Object3D, pos: THREE.Vector3, quat: THREE.Quaternion): void {
+  _m.multiplyMatrices(_base, o.matrixWorld).decompose(pos, quat, _s)
+}
+
+/** Turn bone `b` (body frame) by the shortest turn taking `from` to `to`. */
+function swing(b: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3): void {
+  inBody(b, _s, _q)
+  _q.premultiply(_q2.setFromUnitVectors(from.normalize(), to.clone().normalize()))
+  inBody(b.parent!, _s, _q2)
+  b.quaternion.copy(_q2.invert().multiply(_q))
+  b.updateMatrixWorld(true)
+}
+
+/**
+ * Both hands on the shaft on the FINAL body (natural-villager-motion step 7).
+ * The right hand holds the shovel by attachment (placeShovel); the dig clip
+ * puts the left on the shaft for the neutral body it was solved on only — on
+ * another person its fist missed the shaft by up to 0.055 of the stature
+ * (measured 14.10.2026). After the layers and the shovel: the left arm solved
+ * so the left hand holds the shaft at the dig's upper grip with the hold the
+ * pipeline authors (asset.toolHold.L), the elbow kept in the clip's own plane,
+ * by the dig's share of the body.
+ */
+export function gripShaft(asset: VillagerAsset, person: GltfPerson, bones: Record<string, THREE.Bone>, c: ClipLayers, tool: THREE.Object3D | null): void {
+  const other = asset.clips.dig.tool?.other
+  if (!tool || c.dig <= 0 || other === undefined) return
+  const chain = [bones['upperArm.L'], bones['forearm.L'], bones['hand.L']]
+  chain.forEach((b, i) => _held[i].copy(b.quaternion))
+  bones.hips.updateMatrixWorld(true)
+  if (bones.hips.parent) _base.copy(bones.hips.parent.matrixWorld).invert()
+  else _base.identity()
+  const [sh, el, wr, target] = _p
+  // the hand's turn and place that hold the tool where it is, at the upper grip
+  const hold = shovelOnHungHand(asset, person.frame, 'L', other)
+  inBody(tool, target, _q)
+  const want = _q.clone().multiply(hold.quaternion.clone().invert())
+  target.sub(hold.position.clone().applyQuaternion(want))
+  inBody(chain[0], sh, _q)
+  inBody(chain[1], el, _q)
+  inBody(chain[2], wr, _q)
+  const a = sh.distanceTo(el)
+  const b = el.distanceTo(wr)
+  // the clip's own bend: the elbow off the shoulder–wrist line
+  const line = wr.clone().sub(sh).normalize()
+  const pole = el.clone().sub(sh)
+  pole.addScaledVector(line, -pole.dot(line))
+  const sol = solveTwoBone(sh, target, a, b, pole)
+  swing(chain[0], el.clone().sub(sh), sol.upper)
+  inBody(chain[1], el, _q)
+  inBody(chain[2], wr, _q)
+  swing(chain[1], wr.clone().sub(el), sol.fore)
+  inBody(chain[1], _s, _q)
+  chain[2].quaternion.copy(_q.invert().multiply(want))
+  // eased in and out with the dig, from what the layers below left
+  if (c.dig < 1) chain.forEach((bn, i) => bn.quaternion.copy(_held[i].clone().slerp(bn.quaternion, c.dig)))
+  chain[0].updateMatrixWorld(true)
 }

@@ -207,7 +207,8 @@ DIG_KEYS = [
     (1.70, (-0.08, 0.76, 0.26), (-0.62, -0.28, 0.73), 0.05, 0.30, -0.40),
     (2.00, (-0.04, 0.80, 0.28), (-0.20, -0.66, 0.72), 0.05, 0.30, -0.20),
 ]
-DIG_GRIP = {'R': -0.03, 'L': 0.13}
+# where each hand holds the shaft: VILLAGER_ASSET.dig.grip, set by build_tool_clips
+DIG_GRIP = None
 
 
 def _transport(a0, a1, v):
@@ -264,7 +265,16 @@ def max_turn_per_frame(Q):
     return out
 
 
+def dig_phases():
+    """The stroke's named phases (s from its start), from DIG_KEYS: set the
+    blade, press it in, lever the soil, lift and throw it, recover."""
+    names = ('set', 'press', 'lever', 'lift', 'throw', 'recover')
+    return {n: float(k[0]) for n, k in zip(names, DIG_KEYS)}
+
+
 def dig_clip(body, clips, cfg):
+    from gltfio import qfrom_to, qslerp
+    dc = cfg['VILLAGER_ASSET']['dig']
     joints = body['joints']
     idle = clips['clips']['idle']
     from sheets import sample
@@ -279,6 +289,7 @@ def dig_clip(body, clips, cfg):
     Q = np.zeros((n, len(SK.NAMES), 4))
     P = np.zeros((n, 3))
     misses = []
+    tips = []
     solvers, needs = [], []
     keyed = [catmull([(kk[0], np.concatenate([kk[1], kk[2], kk[3:]])) for kk in DIG_KEYS], t, DIG_PERIOD) for t in times]
     faces, hol = dig_faces([-unit(k[3:6]) for k in keyed])
@@ -296,30 +307,48 @@ def dig_clip(body, clips, cfg):
         z_ax = rot[:, 1]
         tool_rot = np.stack([np.cross(y_ax, z_ax), y_ax, z_ax], 1)
         tool_pos = tip - tool_rot @ np.array([0, SHOVEL['tip'], 0])
+        tips.append(tip.copy())
 
-        def solve(extra, tool_pos=tool_pos, tool_rot=tool_rot, lean=lean, drop=drop, turn=turn):
+        # every frame-dependent input bound now: the solvers run again after
+        # this loop, when a free `tip` would be the last frame's
+        def solve(extra, tool_pos=tool_pos, tool_rot=tool_rot, lean=lean, drop=drop, turn=turn, tip=tip):
             from gltfio import qaxis
             q = q_stand.copy()
             hips = hips_stand.copy()
-            L = lean + extra
-            hips[1] -= drop + 0.1 * extra
+            # the trunk takes the extra lean only up to its cap; the hips sink for the rest
+            L = lean + min(extra, dc['leanExtraMax'])
+            hips[1] -= drop + 0.1 * extra + dc['dropPerExtra'] * max(0.0, extra - dc['leanExtraMax'])
             hips[2] -= 0.06 * L
             q[SK.INDEX['hips']] = qaxis([1, 0, 0], 0.25 * L)
-            q[SK.INDEX['spine']] = qnorm(qmul(qaxis([0, 1, 0], turn * 0.4), qaxis([1, 0, 0], L * 0.5)))
+            # the spine's former half of the lean over its two segments
+            q[SK.INDEX['spine']] = qnorm(qmul(qaxis([0, 1, 0], turn * 0.2), qaxis([1, 0, 0], L * 0.25)))
+            q[SK.INDEX['spine1']] = qnorm(qmul(qaxis([0, 1, 0], turn * 0.2), qaxis([1, 0, 0], L * 0.25)))
             q[SK.INDEX['chest']] = qnorm(qmul(qaxis([0, 1, 0], turn * 0.6), qaxis([1, 0, 0], L * 0.25)))
             q[SK.INDEX['neck']] = qaxis([1, 0, 0], -L * 0.15)
             q[SK.INDEX['head']] = qaxis([1, 0, 0], 0.12)
-            # legs back onto their planted ankles, knees ahead
-            for s_ in 'LR':
-                two_bone(joints, q, hips, 'thigh.' + s_, 'shin.' + s_, ankles[s_], np.array([0, 0, 1.0]), foot_rot[s_], 'foot.' + s_)
+            # the head turned toward the blade by its share (the neck keeps its own)
+            wr_, wp_ = world_of(joints, q, hips)
+            ih = SK.INDEX['head']
+            look = unit(tip - wp_[ih])
+            fwd = qrot(wr_[ih], np.array([0, 0, 1.0]))
+            aim = qslerp(np.array([0, 0, 0, 1.0]), qfrom_to(fwd, look), dc['headOnBlade'])
+            set_world_rot(q, wr_, 'head', qnorm(qmul(aim, wr_[ih])))
+            # legs back onto their planted ankles, the knees ahead and out
+            for s_, sg in (('L', 1.0), ('R', -1.0)):
+                pole = unit(np.array([sg * np.sin(dc['kneeOut']), 0, np.cos(dc['kneeOut'])]))
+                two_bone(joints, q, hips, 'thigh.' + s_, 'shin.' + s_, ankles[s_], pole, foot_rot[s_], 'foot.' + s_)
             # elbows out, down and back IN THE CHEST'S FRAME: a pole fixed in
             # the world swung through the shoulder→wrist line as the trunk
             # turned, and the hinge flipped (the left forearm jumped ~0.6 rad
-            # between two frames at the lever)
+            # between two frames at the lever). Both poles mirror each other:
+            # the left one further back ([0.6, -0.4, -0.4]) lay near the
+            # shoulder→wrist line of the capped lean as the upper hand dropped
+            # to the press, and the left upper arm swung 9.6 rad/s there (5.7
+            # mirrored, measured 15.10.2026)
             wr_, _wp = world_of(joints, q, hips)
             Wc = _quat_mat(wr_[SK.INDEX['chest']])
             mr = hand_on_tool(body, joints, q, hips, 'R', tool_pos, tool_rot, DIG_GRIP['R'], Wc @ np.array([-0.6, -0.5, -0.3]), thumb_up=True)
-            ml = hand_on_tool(body, joints, q, hips, 'L', tool_pos, tool_rot, DIG_GRIP['L'], Wc @ np.array([0.6, -0.4, -0.4]), thumb_up=True)
+            ml = hand_on_tool(body, joints, q, hips, 'L', tool_pos, tool_rot, DIG_GRIP['L'], Wc @ np.array([0.6, -0.5, -0.3]), thumb_up=True)
             solve.last = (mr, ml)
             return q, hips, max(mr, ml)
 
@@ -356,9 +385,33 @@ def dig_clip(body, clips, cfg):
     print('dig shaft clearance (min over frames, by key):', round(float(clear.min()), 3), 'at t=%.2f' % times[int(np.argmin(clear))], [round(float(clear[int(round(k[0] * FPS))]), 3) for k in DIG_KEYS])
     print('dig needs', np.round(needs[::6], 2), 'last R/L', np.round(solvers[0].last if hasattr(solvers[0], 'last') else (0, 0), 3))
     print(f'dig: worst hand miss {max(misses):.4f} at t={times[int(np.argmax(misses))]:.2f}; misses at keys', [round(misses[int(round(k[0] * FPS))], 3) for k in DIG_KEYS])
+    trunk = [float(DIG_KEYS_LEAN(t) + min(smooth[f], dc['leanExtraMax'])) for f, t in enumerate(times)]
+    print(f'dig: trunk lean {min(trunk):.2f}-{max(trunk):.2f} rad (extra capped at {dc["leanExtraMax"]}), hip sink beyond the cap up to '
+          f'{dc["dropPerExtra"] * max(0.0, float(smooth.max()) - dc["leanExtraMax"]):.3f}')
+    strike = dig_strike(times, np.array(tips))
+    print(f'dig: phases {dig_phases()}, blade contact (strike) at {strike:.2f} s')
     return {'times': times, 'q': Q, 'hips': P, 'duration': DIG_PERIOD, 'kind': 'loop', 'source': 'authored (scripts/villager/toolclips.py)',
             'tool': {'hand': 'R', 'grip': DIG_GRIP['R'], 'other': DIG_GRIP['L'], 'thumbUp': True},
-            'grip': {'L': 1, 'R': 1}, 'misses': misses}
+            'grip': {'L': 1, 'R': 1}, 'misses': misses, 'strike': strike, 'phases': dig_phases()}
+
+
+def DIG_KEYS_LEAN(t):
+    """The keyed trunk lean at time t (rad)."""
+    return float(catmull([(k[0], np.array([k[4]])) for k in DIG_KEYS], t, DIG_PERIOD)[0])
+
+
+def dig_strike(times, tips):
+    """The blade's contact with the ground (s): the first frame after the
+    blade's highest point at which it is down within 1 cm of its lowest — the
+    instant the dig counts its strike (scenes/place/adultWork.ts)."""
+    y = tips[:-1, 1]  # the last frame repeats the first
+    top = int(np.argmax(y))
+    n = len(y)
+    for k in range(1, n + 1):
+        f = (top + k) % n
+        if y[f] <= y.min() + 0.01:
+            return float(times[f])
+    return 0.0
 
 
 # Carried over the right shoulder: in the CHEST's frame, the shaft runs from the
@@ -401,6 +454,8 @@ def carry_clip(body, clips, base, name):
 def build_tool_clips(body, clips, cfg):
     global SHOVEL
     SHOVEL = cfg['VILLAGER_ASSET']['shovel']
+    global DIG_GRIP
+    DIG_GRIP = cfg['VILLAGER_ASSET']['dig']['grip']
     clips['clips']['dig'] = dig_clip(body, clips, cfg)
     clips['clips']['carry'] = carry_clip(body, clips, 'walk', 'carry')
     clips['clips']['carryIdle'] = carry_clip(body, clips, 'idle', 'carryIdle')

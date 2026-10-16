@@ -62,6 +62,11 @@ export const FigureLookContext = createContext<FigureLook | null>(null)
 export interface FigureWork {
   dig: boolean
   tool: boolean
+  /** Seconds into the dig stroke on the work's own clock (adultWork's
+   *  `task.dug` plus the body's phase), so the drawn strike and the counted
+   *  one are the same instant; left as it was while the bout holds or fades,
+   *  which freezes the stroke. Absent: the clip layers keep their own clock. */
+  digT?: number
 }
 
 /**

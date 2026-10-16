@@ -2653,12 +2653,69 @@ export const VILLAGER_ASSET = {
   /** Taubin smoothing rounds over the settled cloth between settle passes
    *  (the pushes leave it dented). Calibratable. */
   garmentSettleSmooth: 4,
+  /** The clip style (natural-villager-motion step 6; scripts/villager/clips.py
+   *  `restyle`), per retargeted clip, rad: the hips' and the chest's MEAN
+   *  forward tilt (each keeps its swing; the source walk leans its chest 18°,
+   *  the jog 43° with a ±54° twist, the sprint dives 23° at the hips and 52° at
+   *  the chest), the chest's twist
+   *  against the hips as a share of the source's, the elbow's mean bend (one
+   *  offset, so the forearm keeps its swing) held in [elbowMin, elbowMax] —
+   *  the source walk bends it 32–41°, the concept asks 15–25° — and the upper
+   *  arm brought toward the body; `square` takes a standing clip's
+   *  constant turns out and puts its feet side by side. The head keeps its
+   *  world turn. Calibratable, read off the clip sheets. */
+  clipStyle: {
+    walk: { chestTilt: 0.105, elbowMean: 0.35, elbowMin: 0.26, elbowMax: 0.44, armIn: 0.05 },
+    jog: { chestTilt: 0.19, chestTwist: 0.25 },
+    sprint: { hipsTilt: 0.0, chestTilt: 0.19, chestTwist: 0.37 },
+    idle: { square: true, chestTilt: 0.105 },
+  },
+  /** The widest loop seam the clip pipeline closes (rad, the worst bone's
+   *  turn between a loop's last frame and its first once cut where they meet
+   *  best): beyond it the loop is refused, never smeared over its cycle
+   *  (natural-villager-motion step 5). Calibratable. */
+  loopSeamMax: 0.35,
   /** The villagers' digging shovel in its own frame (figure units): +y along
    *  the shaft to the handle, the blade at −y with its face toward +z; the
    *  origin is where a one-handed carrier's hand holds it (the primitive
    *  figure's hand). Shared by the game's tool (PlaceLife.tsx) and the clips
    *  the pipeline solves the hands onto. */
   shovel: { top: 0.16, shaftBottom: -0.5, tip: -0.76, shaftRadius: 0.022, bladeWidth: 0.2, bladeThickness: 0.02 },
+  /** The authored dig (natural-villager-motion step 7; scripts/villager/
+   *  toolclips.py dig_clip). The extra trunk lean the hands may ask for to
+   *  reach the shaft is capped at `leanExtraMax` (rad; unbounded it folded
+   *  the trunk 0.46–0.74 rad past its keyed lean onto the hands); what they
+   *  need beyond it the hips give by sinking `dropPerExtra` figure units per
+   *  rad, the knees bending out — their poles `kneeOut` (rad) off straight
+   *  ahead. `grip`: where each hand holds the shaft (tool frame, figure
+   *  units; the right hand lower, the tool's carry hand) — measured: with the
+   *  keyed upper-hand path a lower right hand (−0.06 … −0.12) leaves it short
+   *  of the shaft and flips the left elbow, so the hands stay 0.16 apart until
+   *  the keys are re-authored. `headOnBlade`: the
+   *  share of the head's turn toward the blade. Calibratable, read off the
+   *  dig sheets. */
+  dig: { leanExtraMax: 0.4, dropPerExtra: 0.5, kneeOut: 0.35, grip: { R: -0.03, L: 0.13 }, headOnBlade: 0.6 },
+  /** The hands' shapes (natural-villager-motion step 3; scripts/villager/body.py
+   *  hand_shape): per finger the curl (rad) at each of its three joints,
+   *  knuckle first, and the thumb's fold across the palm. `grip` closes round
+   *  a shaft (the values the closed hand was built with, not a guess);
+   *  `point` keeps the index straight and closes the rest; `relax` is the soft
+   *  curl of a hand at rest, deeper toward the little finger. Calibratable, read
+   *  off verification/villager-body/hands-*.png. */
+  handShapes: {
+    grip: {
+      fingers: { index: [1.15, 1.35, 0.95], middle: [1.15, 1.35, 0.95], ring: [1.15, 1.35, 0.95], pinky: [1.15, 1.35, 0.95] },
+      thumb: [0.55, 0.6, 0.5],
+    },
+    point: {
+      fingers: { index: [0.05, 0.05, 0.0], middle: [1.2, 1.4, 0.95], ring: [1.25, 1.4, 0.95], pinky: [1.3, 1.4, 0.95] },
+      thumb: [0.5, 0.55, 0.45],
+    },
+    relax: {
+      fingers: { index: [0.18, 0.25, 0.15], middle: [0.26, 0.32, 0.2], ring: [0.32, 0.38, 0.24], pinky: [0.38, 0.44, 0.28] },
+      thumb: [0.15, 0.15, 0.1],
+    },
+  },
 } as const
 
 /**
@@ -2669,14 +2726,31 @@ export const VILLAGER_ASSET = {
 export const VILLAGER_GLTF = {
   /** How much of the adult man's build morph a build of ±1 gets, by age. */
   buildByAge: { child: 0.5, youth: 0.8, adult: 1, elder: 0.9 },
-  /** The walk turns into the sprint around this ground speed, per unit of leg
+  /** The walk turns into the jog around this ground speed, per unit of leg
    *  (figure units per second at the basis body's leg length; a child's
    *  shorter leg reaches it at a lower speed). Set where the walk's stride
    *  reaches strideMax (its natural speed ≈ 0.83 × strideMax²): above it a walk
    *  could only over-reach. Calibratable. */
-  sprintThreshold: 1.8,
-  /** Half-width of the band the two gaits cross-fade over, same units. */
-  sprintBand: 0.35,
+  jogThreshold: 1.8,
+  /** Half-width of the band walk and jog cross-fade over, same units. */
+  jogBand: 0.35,
+  /** The jog turns into the sprint here, same units: the band's lower edge
+   *  (threshold − band) sits above the tag game's top pace — a fresh runner at
+   *  `sprintSpeed × runnerBoost` on a child figure (`CHILD_FIGURE_SCALE`) runs
+   *  ≈ 7.2–7.5 per unit of leg — so every running villager jogs and the sprint
+   *  is the clip of a real dash only (natural-villager-motion step 5).
+   *  Calibratable. */
+  sprintThreshold: 7.9,
+  /** Half-width of the band jog and sprint cross-fade over, same units.
+   *  Narrow so the band's top stays below ≈ 8.2 per unit of leg, past which
+   *  the pure sprint's held toe slides beyond the no-slide limit at 120 Hz
+   *  (male youth, measured 15.10.2026; OPEN: the hold's contact onboarding). */
+  sprintBand: 0.25,
+  /** How the jog's stride follows its pace (as strideExponent/Min/Max for the
+   *  walk and sprint): the jog clip covers a long stride at its natural speed
+   *  (≈ 4.5 per unit of leg), so slower jogs shorten it more and keep their
+   *  cadence. Calibratable. */
+  jogStride: { exponent: 0.8, min: 0.4, max: 1.08 },
   /** Body safety net (design.md clothing rule): no vertex of the chest front
    *  or of a child's pelvis midline may peak sharper than this — its offset above
    *  its neighbours' mean along the normal, over their mean edge length. The
@@ -2697,6 +2771,25 @@ export const VILLAGER_GLTF = {
    *  fades back onto the clip's own foot (a shoved or turned foot eases home
    *  in its swing, never jumps). Calibratable. */
   plantFadeCycle: 0.15,
+  /** How high (multiples of the touch height) a held sole contact rises
+   *  before it lets go; its share of the foot's hold fades from 0.6 touch up
+   *  to here. A heel rolling off over a planted ball carries its own miss,
+   *  and dropped within one frame it shifted the held ball by a third of the
+   *  difference (0.0044 per 60 Hz frame mid walk↔jog band, measured
+   *  15.10.2026). Calibratable. */
+  plantLetGo: 2,
+  /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
+   *  the blended gait's stance is read over `groundSamples` phases, at
+   *  `groundLevels` steps across each cross-fade band (interpolated between).
+   *  Calibratable. */
+  groundSamples: 24,
+  groundLevels: 8,
+  /** The pelvis under a warped stride (natural-villager-motion steps 5 and 10):
+   *  it drops just as far as both legs need to reach their feet, each leg
+   *  reaching at most `legReach` of its full length, and at most
+   *  `pelvisDropMax` per unit of leg. Calibratable. */
+  legReach: 0.995,
+  pelvisDropMax: 0.08,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Ground speed (figure units / s) below which the figure stands. */

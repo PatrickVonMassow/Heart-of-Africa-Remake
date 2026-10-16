@@ -23,7 +23,9 @@ import {
   type BoneName,
 } from '../../render/figureBody'
 import type { VillagerAsset } from '../../render/villagerAsset'
+import { restBounds } from '../../render/villagerBody'
 import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
+import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
 import { contactCrouch, contactLean, gestureArmEuler, hangToward, solveTwoBone, unsquashHead } from '../../render/figureRig'
@@ -53,7 +55,7 @@ import { REST_POSE_ARMS, type FigureLook } from './placeFigureContext'
 import { figureIdentity, type FigureIdentity } from './figureIdentity'
 import type { FigureWork } from './placeFigureContext'
 import { Shovel } from './shovel'
-import { applyClipLayers, clipLayers, placeShovel, stepClipLayers } from './gltfClipLayers'
+import { applyClipLayers, applyHandShapes, clipLayers, gripShaft, handShapes, placeShovel, stepClipLayers } from './gltfClipLayers'
 
 // ---- geometry caches: one build per distinct body and layer -----------------
 
@@ -141,6 +143,29 @@ function cachedGltfFigure(asset: VillagerAsset, person: GltfPerson, layers: Dres
   return g
 }
 
+// ---- GPU release of the shared geometries ------------------------------------
+// The caches above keep the CPU geometry for the session; its GPU side (vertex
+// buffers and, for the glTF body's live hand morphs, three's per-geometry morph
+// DataArrayTexture) is freed when the last mounted figure drawing it goes, so
+// leaving a settlement releases what its villagers held instead of keeping every
+// distinct figure ever drawn resident. A geometry drawn again re-uploads.
+
+const geometryUsers = new Map<THREE.BufferGeometry, number>()
+
+function holdGeometry(g: THREE.BufferGeometry): void {
+  geometryUsers.set(g, (geometryUsers.get(g) ?? 0) + 1)
+}
+
+function releaseGeometry(g: THREE.BufferGeometry): void {
+  const n = (geometryUsers.get(g) ?? 1) - 1
+  if (n > 0) {
+    geometryUsers.set(g, n)
+    return
+  }
+  geometryUsers.delete(g)
+  g.dispose()
+}
+
 /** The figure's whole scene graph, built once per identity and look. */
 interface Rig {
   p: BodyProportions
@@ -188,7 +213,7 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     asset && person
       ? cachedGltfFigure(asset, person, layers, key, skin, paint === skin ? null : paint, look.radial)
       : cachedFigure(p, layers, key, skin, paint === skin ? null : paint, look.radial)
-  if (!geo.boundingBox) geo.computeBoundingBox()
+  if (!geo.boundingBox) restBounds(geo)
   const body = mesh(geo, figureMaterial(!!(asset && person)), 'figure-body')
   body.add(bones.hips)
   body.bind(skeleton, new THREE.Matrix4())
@@ -226,6 +251,13 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     hands: [hand('L', 'hand-left'), hand('R', 'hand-right')],
     gltf: asset && person ? { asset, person } : null,
   }
+}
+
+/** Hips → neck, in order: the glTF body's three-segment spine carries a
+ *  `spine1` between `spine` and `chest` the code-built body does not have. */
+function trunkChain(b: Record<BoneName, THREE.Bone>): THREE.Bone[] {
+  const mid = (b as Partial<Record<string, THREE.Bone>>).spine1
+  return mid ? [b.hips, b.spine, mid, b.chest, b.neck] : [b.hips, b.spine, b.chest, b.neck]
 }
 
 const _s = new THREE.Vector3()
@@ -297,8 +329,15 @@ export function SkinnedFigure({
   const id = useMemo(() => figureIdentity(key, scale, sex, age), [key, scale, sex, age])
   const rig = useMemo(() => buildRig(id, look, cloth, skin), [id, look, cloth, skin])
   // The skeleton (and its bone texture) is this figure's own; the geometry is
-  // shared through the caches and stays.
-  useEffect(() => () => rig.skeleton.dispose(), [rig])
+  // shared through the caches, its GPU side held while any figure draws it.
+  useEffect(() => {
+    const geos = rig.meshes.map((m) => m.geometry)
+    geos.forEach(holdGeometry)
+    return () => {
+      geos.forEach(releaseGeometry)
+      rig.skeleton.dispose()
+    }
+  }, [rig])
   const L = FIGURE_LIMBS
   // THE VIRTUAL PRIMITIVE RIG the poses are written onto — the primitive
   // figure's pivots exactly (placeFigure.tsx), drawing nothing.
@@ -321,6 +360,8 @@ export function SkinnedFigure({
   const owned = !!(pose && limbs)
   const dims = useMemo(() => legDims(rig.p), [rig])
   const motion = useRef<WalkMotion>(restingMotion(kneel))
+  // The pose this figure shows of its own gesture (no caller owns it): the hands read its shape.
+  const ownShown = useRef<FigurePose | null>(null)
   // THE glTF BODY'S CLIPS (work-order "villager glTF body: animation, dress
   // and tool"): the gait, the dig and the shovel carry, layered over the
   // code-built pose by weights that blend in and out — never a cut.
@@ -507,10 +548,13 @@ export function SkinnedFigure({
         }) as [boolean, boolean]
         applyClipLayers(rig.gltf.asset, rig.gltf.person, b as unknown as Record<string, THREE.Bone>, clips, m, free)
         placeShovel(rig.gltf.asset, rig.gltf.person, clips, shovel.current)
+        gripShaft(rig.gltf.asset, rig.gltf.person, b as unknown as Record<string, THREE.Bone>, clips, shovel.current)
+        const ph = (pose?.current ?? ownShown.current)?.pointHand
+        applyHandShapes(rig.meshes[0], handShapes(clips, ph ? [ph.left, ph.right] : [0, 0]))
       }
       // The head's squat correction depends on the chain just posed: renew it
       // here, so an owning caller's retarget never leaves a stale one.
-      unsquashHead(b.head, [b.hips, b.spine, b.chest, b.neck], squat?.current ?? 1)
+      unsquashHead(b.head, trunkChain(b), squat?.current ?? 1)
       b.hips.updateWorldMatrix(false, true)
       // A carried prop hangs from the hand anchor and was posed for the
       // primitive's hand frame: on a contact the anchor takes the virtual
@@ -562,8 +606,14 @@ export function SkinnedFigure({
       const body = { x: _here.x, z: _here.z, yaw: Math.atan2(_facing.x, _facing.z), unit }
       const walked = stepWalk(m, body, dt, dims, id.age, kneel || !!kneeling?.current, joints)
       if (rig.gltf && clips) stepClipLayers(rig.gltf.asset, rig.gltf.person, clips, walked, m.speed, body, work?.current ?? null, dt)
-      // Dev: the walk the village-walk verification reads beside the bones.
-      if (import.meta.env.DEV) g.userData.walk = m
+      // Dev: the walk the village-walk verification reads beside the bones,
+      // and the glTF body's gait shares at that speed (walk/jog/sprint), so
+      // it can pick a figure that really walks.
+      if (import.meta.env.DEV) {
+        g.userData.walk = m
+        const f = rig.gltf?.person.frame
+        g.userData.gait = f ? gaitWeights(m.speed / f.scale, f.legScale) : null
+      }
       m.crouch = approach(m.crouch, m.crouchTarget, VILLAGER_MOTION.crouchRate, dt)
       const actor = g.userData.actor as { height: number } | undefined
       if (actor) actor.height = 1.45 - 0.45 * m.kneel // the label over the drawn crown
@@ -583,6 +633,7 @@ export function SkinnedFigure({
       gesture.current = advanceGesture(gesture.current, dt)
       shown = gesturePose(gesture.current)
     }
+    ownShown.current = owned ? null : shown
     if (shown && !owned) {
       selfLimbs.current.trunk = trunk.current
       applyFigurePose(selfLimbs.current, shown) // retargets
@@ -590,7 +641,7 @@ export function SkinnedFigure({
       retarget()
     }
     // A squat shortens a person; it does not flatten the skull (work-order 1085).
-    unsquashHead(rig.bones.head, [rig.bones.hips, rig.bones.spine, rig.bones.chest, rig.bones.neck], squat?.current ?? 1)
+    unsquashHead(rig.bones.head, trunkChain(rig.bones), squat?.current ?? 1)
   })
 
   return (

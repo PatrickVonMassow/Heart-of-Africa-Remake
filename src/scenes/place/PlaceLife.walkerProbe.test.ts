@@ -17,11 +17,13 @@ it('reports the real body transform separately from live ground and holds only t
   const held = { current: null as number | null }
   const w = {} as { __placeWalkers: {
     states: unknown
+    speeds: number[]
     sample: (who: number) => unknown
     hold: (who: number | null) => void
   } }
-  install(w, states, [{ home: { x: 0, z: 0 } }], { current: [body] }, height, held)
+  install(w, states, [{ home: { x: 0, z: 0 }, speed: 1.3 }], { current: [body] }, height, held)
   expect(w.__placeWalkers.states).toBe(states.current)
+  expect(w.__placeWalkers.speeds).toEqual([1.3])
   expect(w.__placeWalkers.sample(0)).toEqual({ x: 4, z: 6, mode: 'walk', pause: 0,
     groundHeight: 0.4, drawn: { x: 4, y: 0.43, z: 6, visible: true }, held: false })
   expect(height).toHaveBeenCalledWith(4, 6)
