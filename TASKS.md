@@ -15848,3 +15848,10 @@ to land than a mechanism that needs a review.
   Final state: for a session not holding the batch lock, decision-card-guard never demands an action the ownership stand-down refuses (it stands down, or carries the answer to the owner without a keep demand); the card stays open.
   Verifiable: Vitest reproducing a non-owner Stop with an open card and a non-decision user message: no blocking demand.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 1367. The request-approval guard's tokenizer still misses three deposit shapes
+  Queue position: directly after point 1365 (split from its review, which did not converge on pre-existing tokenizer limits).
+  Source: GPT-6 Astra review of point 1365, round 6 (receipt 3bd9990b5d8e14d3, 16.10.2026): all three exist on main before 1365. (1) `--request="Outer $(node scripts/finding.mjs --request Hidden …)"` — the `--request=` word is never re-scanned, so the substituted request is hidden; (2) `--request > /tmp/out Hidden … --approved "passt so"` — a redirection becomes the title `>`, so an approval can attach to a title never proposed; (3) an unquoted heredoc body with `$(node scripts/finding.mjs --request Hidden …)` is discarded by the tokenizer although bash executes it.
+  Final state: scripts/request-approval-guard-core.mjs judges each of the three shapes fail closed (the hidden request is a deposit, a redirection operator is never a title, an unquoted heredoc body is scanned for substitutions).
+  Verifiable: Vitest with the three commands above: each yields a deposit that the guard blocks without a matching human approval.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
