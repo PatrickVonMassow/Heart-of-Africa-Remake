@@ -85,6 +85,14 @@ put it is the mistake this line exists to stop.
   Criticality: high - possible false approval.
   Bundle: Modell & Wächter.
 
+- [ ] 1368. A quoted heredoc fed to a shell still hides a request deposit from the approval guard
+  Queue position: directly after point 1367 (same guard core, possible false approval).
+  Source: findings carrier 17.10.2026 01:10 (author of point 1367): `bash <<'EOF'` with `node scripts/finding.mjs --request X` in the body runs that body as commands, but scripts/request-approval-guard-core.mjs treats every quoted heredoc body as literal. Pre-existing on main.
+  Final state: a heredoc body (quoted or not) that is the stdin of a shell interpreter (bash, sh, zsh, dash) is scanned as commands; other quoted heredoc bodies stay literal.
+  Verifiable: Vitest: `bash <<'EOF'` with a request in the body yields a deposit the guard blocks without a matching human approval; `cat <<'EOF'` with the same body yields none.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
+
 - [ ] 1360. A villager's head load floats 5-7 cm above the drawn head
   Queue position: directly after point 1342 (Dorfleben); may land on its own.
   Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.
@@ -15849,14 +15857,6 @@ to land than a mechanism that needs a review.
   Verifiable: Vitest reproducing a non-owner Stop with an open card and a non-decision user message: no blocking demand.
   Also (findings carrier 16.10.2026 22:14, session 7850716a): the bare `node scripts/board.mjs vdzk-keep …` passes the stand-down (isVdzkKeepSegment); only a wrapped call (`cd … && … 2>&1 | tail`) is refused, so the deadlock is avoidable in practice.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1368. A quoted heredoc fed to a shell still hides a request deposit from the approval guard
-  Queue position: end of Modell & Wächter.
-  Source: findings carrier 17.10.2026 01:10 (author of point 1367): `bash <<'EOF'` with `node scripts/finding.mjs --request X` in the body runs that body as commands, but scripts/request-approval-guard-core.mjs treats every quoted heredoc body as literal. Pre-existing on main.
-  Final state: a heredoc body (quoted or not) that is the stdin of a shell interpreter (bash, sh, zsh, dash) is scanned as commands; other quoted heredoc bodies stay literal.
-  Verifiable: Vitest: `bash <<'EOF'` with a request in the body yields a deposit the guard blocks without a matching human approval; `cat <<'EOF'` with the same body yields none.
-  Criticality: high - possible false approval.
-  Bundle: Modell & Wächter.
 
 - [ ] 1369. Astra routing sends a point the share switch then refuses to commission
   Queue position: end of Modell & Wächter.
