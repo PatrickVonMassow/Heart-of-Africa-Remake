@@ -417,6 +417,10 @@ describe('the flag word inside a finding detail', () => {
     expect(requestsOf('node scripts/finding.mjs --record x --detail "--request"')).toHaveLength(1)
   })
 
+  it('an expansion-bearing or unquoted detail value is still judged', () => {
+    expect(requestsOf('node scripts/finding.mjs --record x --detail {--request,Unapproved} --stdin')).toHaveLength(1)
+  })
+
   it('detail prose inside a shell-wrapped finding call is no request', () => {
     const command = `bash -lc 'node scripts/finding.mjs --record x --detail "mentions --request"'`
     expect(requestsOf(command)).toEqual([])
