@@ -436,6 +436,12 @@ describe('the flag word inside a finding detail', () => {
   it('an --approved word inside a comment is no approval', () => {
     const command = `node scripts/finding.mjs --request "${TITLE}" --stdin # --approved "passt so"`
     expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
+    expect(requestsOf(`node scripts/finding.mjs --request A --stdin --approved #ok`)).toEqual([{ title: 'A', approved: '' }])
+  })
+
+  it('a substitution inside a title or approval is still scanned', () => {
+    const command = `node scripts/finding.mjs --request "Outer $(node scripts/finding.mjs --request Hidden --stdin)" --approved "passt so"`
+    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
   })
 
 })

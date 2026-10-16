@@ -165,7 +165,13 @@ function depositsIn(tokens, shell, depth) {
   const found = []
   const consumed = new Set()
   const isWord = (k) => k < tokens.length && typeof tokens[k] === 'string'
-  const valueAt = (k) => (isWord(k) && !tokens[k].startsWith('--') ? (consumed.add(k), tokens[k]) : '')
+  // A value with command substitution stays open to the recursive scan below:
+  // the substitution runs whatever its title or approval role.
+  const valueAt = (k) => {
+    if (!isWord(k) || tokens[k].startsWith('--')) return ''
+    if (!/\$\(|`/.test(tokens[k])) consumed.add(k)
+    return tokens[k]
+  }
   // A finding's --detail text is prose, not a command: the flag word inside it
   // is no deposit. Only a direct `node …/finding.mjs` call of the command line
   // itself earns this — another program (`bash -c 'eval "$1"' --detail …`) or
@@ -193,7 +199,7 @@ function depositsIn(tokens, shell, depth) {
       // possible comment (`# --approved …`) ends the search.
       for (let j = k + 1; isWord(j) && !isRequestWord(tokens[j]) && !tokens[j].startsWith('#'); j++) {
         if (tokens[j] === APPROVED_FLAG) {
-          approved = valueAt(j + 1)
+          approved = isWord(j + 1) && tokens[j + 1].startsWith('#') ? '' : valueAt(j + 1)
           break
         }
       }
