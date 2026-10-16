@@ -34193,3 +34193,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: a Vitest over exactly the sequence focus cleared -> board-publish projection -> closing <N> --title -> done <N> asserts the description on the done card; no done card on the published board shows "Beschreibung fehlt".
   Criticality: medium - the user's board loses information on every landing of this kind.
   Bundle: Chat & Tafel.
+
+- [x] 1364. Guard deadlock: decision-card-guard demands vdzk-keep, the batch stand-down refuses it to a non-owner session
+  Queue position: directly after point 1363 (user 16.10.2026: "Und behebe das Problem, dass du eben in einer Endlosschleife gelandet bist").
+  Source: findings carrier 16.10.2026 16:31, session 0eea1689 (non-owner, owner 4b0a3d9b). The Stop hook decision-card-guard demanded 'node scripts/board.mjs vdzk-keep "<card>" --why ...'. Without a prefix the call fails with 'cannot identify this session — CLAUDE_SESSION_ID is missing and the guard state is ambiguous' (selectedSession, decision-card-guard.mjs:215); with CLAUDE_SESSION_ID the PreToolUse stand-down (board-first-core.mjs) refuses the command as state-changing, although recordDecisionCardKeep only writes guard state and is meant for non-owners (decision-card-guard.mjs:270-272). Together with 1365 this held the session in about 40 Stop-hook rounds (user: "Du hängst in einer Endlosschleife.").
+  Final state: a non-owner session can satisfy every Stop-hook demand addressed to it: the stand-down lets 'board.mjs vdzk-keep' through (it writes guard state only), and vdzk-keep accepts --session <id> so it needs no environment variable; no Stop hook demands an action the stand-down refuses.
+  Verifiable: Vitest: the stand-down classifier allows 'node scripts/board.mjs vdzk-keep "x" --why y --session <id>' for a non-owner and still refuses other board.mjs writes; vdzk-keep with --session records the keep; a test pairing every remediation command decision-card-guard prints with the stand-down verdict for a non-owner (none refused).
+  Criticality: high - reproducible endless Stop-hook loop in a non-owner session.
+  Bundle: Modell & Wächter.
