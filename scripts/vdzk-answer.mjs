@@ -195,10 +195,11 @@ if (isMainModule(import.meta.url)) {
     } else {
       const answer = flagValue(args, '--answer')
       const fragment = args[0]
-      if (!fragment || answer == null) {
-        throw new Error('usage: vdzk-answer.mjs "<fragment>" --answer "<what the user decided>"')
+      const sessionId = flagValue(args, '--session')
+      if (!fragment || answer == null || sessionId === undefined || sessionId === '') {
+        throw new Error('usage: vdzk-answer.mjs "<fragment>" --answer "<what the user decided>" [--session <id>]')
       }
-      const entry = recordVdzkAnswer(fragment, answer)
+      const entry = recordVdzkAnswer(fragment, answer, sessionId ? { sessionId } : {})
       console.log(`answer carried for ${entry.cardTitle}; deadline ${new Date(entry.deadlineAt).toISOString()}`)
     }
   } catch (error) {

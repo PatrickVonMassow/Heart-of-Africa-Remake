@@ -30,7 +30,7 @@
 //   node scripts/board.mjs log-add "Entscheidungsprotokoll: <title>" "<record>"
 //                                                     # a decision taken, for veto
 //   node scripts/board.mjs log-remove "<title>"       # drop a vetoed record
-//   node scripts/board.mjs vdzk-keep "<title>" [...] # message did not answer it
+//   node scripts/board.mjs vdzk-keep "<title>" [...] [--session <id>] # message did not answer it
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
 //   node scripts/board.mjs attest                     # rotate, audit (--synced), confirm prep
 //
@@ -571,13 +571,18 @@ try {
     if (!fragment) throw new Error('usage: board.mjs log-remove "<title>"|--text-stdin')
     edit((html) => removeDecisionRecord(html, fragment), `decision record removed: ${fragment}`)
   } else if (cmd === 'vdzk-keep') {
-    const whyAt = rest.indexOf('--why')
-    const fragments = whyAt < 0 ? rest : rest.slice(0, whyAt)
-    const whyWords = whyAt < 0 ? [] : rest.slice(whyAt + 1)
-    if (!fragments.length || (whyAt >= 0 && whyWords.length !== 1)) {
-      throw new Error('usage: board.mjs vdzk-keep "<title>" [...] [--why "<reason>"]')
+    // --session <id> names the session without an environment variable, so a
+    // standing-down non-owner can run the guard's printed command as is.
+    const sessionAt = rest.indexOf('--session')
+    const sessionId = sessionAt < 0 ? '' : rest[sessionAt + 1] ?? ''
+    const args = sessionAt < 0 ? rest : [...rest.slice(0, sessionAt), ...rest.slice(sessionAt + 2)]
+    const whyAt = args.indexOf('--why')
+    const fragments = whyAt < 0 ? args : args.slice(0, whyAt)
+    const whyWords = whyAt < 0 ? [] : args.slice(whyAt + 1)
+    if (!fragments.length || (whyAt >= 0 && whyWords.length !== 1) || (sessionAt >= 0 && !sessionId)) {
+      throw new Error('usage: board.mjs vdzk-keep "<title>" [...] [--why "<reason>"] [--session <id>]')
     }
-    const kept = recordDecisionCardKeep(fragments, whyWords[0] ?? '')
+    const kept = recordDecisionCardKeep(fragments, whyWords[0] ?? '', sessionId ? { sessionId } : {})
     console.log(`message recorded as not answering: ${kept.join(' | ')}`)
   } else if (cmd === 'promote') {
     const [point, times, title, ...words] = rest
@@ -726,7 +731,7 @@ try {
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
         'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'log-add "Entscheidungsprotokoll: <title>" "<record>" | log-remove "<title>" | ' +
-        'vdzk-keep "<title>" [...] [--why "<reason>"] | ' +
+        'vdzk-keep "<title>" [...] [--why "<reason>"] [--session <id>] | ' +
         'promote <point> "<times>" "<title>" "<status>" | merge-done | backfill-times [--dry-run] | ' +
         'focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,
