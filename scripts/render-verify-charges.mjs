@@ -1879,4 +1879,14 @@ export const RED_CHARGES = [
       + '(crownOverDrawnHead 0.073 m); Vitest over the bind pose shows the same 5-7 cm float of the '
       + 'crown anchor on main. The charge dies with point 1360.',
   },
+  {
+    point: 1360,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^head carrier: the load.s base sits on the crown \(within 1 cm\)/i,
+    why:
+      'MEASURED 16.10.2026 on feat/1342-natural-motion-b 5751f7419, webgpu, full run: base null '
+      + '(no visible load mesh found under the crown) with crownOverDrawnHead 0.0512 m on carrier i=2; '
+      + 'the same head load is point 1360\'s. The charge dies with point 1360.',
+  },
 ]
