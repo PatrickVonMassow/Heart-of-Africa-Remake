@@ -512,3 +512,43 @@ describe('deposit shapes the tokenizer missed (GPT-6 Astra review, round 6)', ()
     blocked(approval)
   })
 })
+
+describe('structural fail-closed rule (GPT-6 Astra review, round 2 on the shape fixes)', () => {
+  const chat = [human('start'), said('Vorschlag: Outer Hidden'), human('passt so')]
+  const untitledAndBlocked = (command) => {
+    expect(requestsOf(command), command).toContainEqual({ title: '', approved: '' })
+    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true })
+  }
+
+  it('a continuation inside a heredoc delimiter cannot turn the body quoted', () => {
+    const command = ['cat <<EO\\', 'F', '$(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n')
+    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
+    expect(evaluate({ command, entries: chat }).block).toBe(true)
+  })
+
+  it('a continuation before a quoted heredoc terminator cannot swallow a later deposit', () => {
+    const command = ["cat <<'X'", 'foo\\', 'X', 'node scripts/finding.mjs --request Hidden --stdin'].join('\n')
+    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
+  })
+
+  it('over-blocks: any redirection in the request command makes it untitled (redirect operand as approval)', () => {
+    untitledAndBlocked('node scripts/finding.mjs --request Outer --stdin > --approved "passt so"')
+  })
+
+  it('over-blocks: any here-string in the request command makes it untitled ({fd} prefix split off)', () => {
+    untitledAndBlocked('node scripts/finding.mjs --request {fd}<<<Outer Hidden --stdin --approved "passt so"')
+  })
+
+  it('over-blocks: redirections of every form make the request untitled', () => {
+    for (const r of ['2>/dev/null', '>&2', '<&0', '&> /tmp/x', '>> /tmp/x', '< /tmp/x', "<<< 'x'"]) {
+      untitledAndBlocked(`node scripts/finding.mjs --request Outer --stdin ${r} --approved "passt so"`)
+    }
+  })
+
+  it('keeps the documented stdin route: a heredoc that ends the request command', () => {
+    const command = ['node scripts/finding.mjs --request Outer --stdin --approved "passt so" <<\'EOF\'', '--- spec ---', 'x', 'EOF'].join('\n')
+    expect(requestsOf(command)).toEqual([{ title: 'Outer', approved: 'passt so' }])
+    expect(evaluate({ command, entries: chat }).block).toBe(false)
+  })
+})
+

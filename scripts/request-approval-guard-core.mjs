@@ -143,6 +143,19 @@ export function tokenize(text, shell = 'bash') {
       i = j
       continue
     }
+    if (!ps && src.startsWith('&>', i)) {
+      // `&>` / `&>>` redirect both streams of the SAME command: one redirection word
+      flush()
+      word = '&>'
+      i += 2
+      continue
+    }
+    if (!ps && c === '&' && /[<>]$/.test(word ?? '')) {
+      // `>&2` / `<&0` duplicate a descriptor: the `&` belongs to the redirection word
+      word += c
+      i++
+      continue
+    }
     const op = OPERATORS.find((o) => src.startsWith(o, i) && !(ps && o === '`'))
     if (op) {
       flush()
@@ -160,8 +173,8 @@ export function tokenize(text, shell = 'bash') {
 /** The exact `--request` flag inside any text (`--requests` and `--request-x` excluded). */
 const REQUEST_FLAG_RE = /(^|[^\w-])--request(?![\w-])/g
 const MAX_NESTING = 3
-/** A bash redirection word (`>`, `2>`, `>>f`, `<f`, `<<<`, `{fd}>`): never a title or approval. */
-const REDIRECT_RE = /^(\d*|\{\w+\})[<>]/
+/** A bash redirection word (`>`, `2>`, `>>f`, `<f`, `<<<`, `{fd}>`, `&>`, `>&2`): never a title or approval. */
+const REDIRECT_RE = /^(\d*|\{\w+\})[<>]|^&>/
 
 /** The ONE request predicate: detection and approval boundaries both use it. */
 const isRequestWord = (word) =>
@@ -218,7 +231,7 @@ function depositsIn(tokens, shell, depth) {
           break
         }
       }
-      found.push({ title, approved })
+      found.push(hasRedirect(tokens, k) ? { title: '', approved: '' } : { title, approved })
     }
   }
   tokens.forEach((word, k) => {
@@ -235,6 +248,53 @@ function depositsIn(tokens, shell, depth) {
   return found
 }
 
+/**
+ * Does the simple command around token `k` carry a redirection, here-string or
+ * heredoc word? Then its deposit is untitled (always denied): the operand of a
+ * redirection is not an argument, so no title or approval read there is
+ * trustworthy. One exemption keeps finding.mjs's documented stdin route: a
+ * heredoc operator that ENDS the command (`… --stdin <<'EOF'`) — the tokenizer
+ * already consumed its delimiter, so nothing after it can be read as a value.
+ */
+function hasRedirect(tokens, k) {
+  let s = k
+  while (s > 0 && typeof tokens[s - 1] === 'string') s--
+  let e = k
+  while (e < tokens.length && typeof tokens[e] === 'string') e++
+  for (let j = s; j < e; j++) {
+    if (j === e - 1 && /^\d*<<$/.test(tokens[j])) continue
+    if (REDIRECT_RE.test(tokens[j])) return true
+  }
+  return false
+}
+
+/**
+ * Bash joins a backslash-newline continuation everywhere but inside single
+ * quotes (and quoted heredoc bodies — so this joined text is scanned IN
+ * ADDITION to the original, never instead of it).
+ */
+function joinContinuations(text) {
+  let out = ''
+  let dq = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (c === "'" && !dq) {
+      const end = text.indexOf("'", i + 1)
+      const stop = end < 0 ? text.length : end + 1
+      out += text.slice(i, stop)
+      i = stop - 1
+    } else if (c === '\\') {
+      if (text.startsWith('\r\n', i + 1)) i += 2
+      else if (text[i + 1] === '\n') i += 1
+      else out += text.slice(i, i + 2), i++
+    } else {
+      if (c === '"') dq = !dq
+      out += c
+    }
+  }
+  return out
+}
+
 /** A `node …/finding.mjs` simple command starts at `start`. */
 const isFindingCall = (tokens, start) =>
   typeof tokens[start] === 'string' &&
@@ -247,13 +307,24 @@ const isFindingCall = (tokens, start) =>
  * A command is judged when its words (quoted or substitution-free heredoc
  * bodies and PowerShell here-strings excluded) mention `finding.mjs` and the exact `--request` flag;
  * each `--request` occurrence is then a deposit `{ title, approved }`, with ''
- * where no value could be extracted. No attempt is made to decide whether the
+ * where no value could be extracted or its simple command carries a
+ * redirection. Bash text is read twice — as written and with backslash-newline
+ * continuations joined — and the deposits of both readings are judged. No attempt is made to decide whether the
  * text would really execute: `echo …/finding.mjs --request x` is judged too.
  */
 export function requestsOf(command, shell = 'bash') {
-  const tokens = tokenize(command, shell)
-  if (!tokens.some((t) => typeof t === 'string' && t.includes('finding.mjs'))) return []
-  return depositsIn(tokens, shell, 0)
+  const scan = (text) => {
+    const tokens = tokenize(text, shell)
+    if (!tokens.some((t) => typeof t === 'string' && t.includes('finding.mjs'))) return []
+    return depositsIn(tokens, shell, 0)
+  }
+  const found = scan(command)
+  const joined = shell === 'powershell' ? command : joinContinuations(String(command ?? ''))
+  if (joined === command) return found
+  // union: a deposit seen in either reading is judged (fail closed)
+  const seen = new Set(found.map((r) => JSON.stringify(r)))
+  for (const r of scan(joined)) if (!seen.has(JSON.stringify(r))) found.push(r), seen.add(JSON.stringify(r))
+  return found
 }
 
 /** The first request deposit in a command, or null (convenience for callers and tests). */
