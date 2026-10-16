@@ -103,6 +103,15 @@ describe('a gait clip\'s stance', () => {
     expect(w[1] - w[0]).toBeGreaterThan(0.6)
   })
 
+  it('lands at the earliest touch of the support, not at the span starting nearest the landing phase', () => {
+    // the right foot's heel lands at 0.35; its ball (0.5) only rolls on from there
+    const c = {
+      name: 'run',
+      contacts: { support: { L: { heel: [], ball: [], tip: [] }, R: { heel: [[0.35, 0.55]], ball: [[0.5, 0.65]], tip: [[0.6, 0.7]] } } },
+    } as unknown as VillagerClip
+    expect(stanceOf(c, 'R')).toEqual([0.35, 0.7])
+  })
+
   it('is read per clip object: two clips of one name keep their own stance', () => {
     const a = clip('walk', { heel: [[0, 0.6]], ball: [], tip: [] })
     const b = clip('walk', { heel: [[0, 0.2]], ball: [], tip: [] })

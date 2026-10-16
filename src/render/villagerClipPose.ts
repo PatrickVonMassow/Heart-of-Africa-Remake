@@ -120,16 +120,18 @@ function readStance(clip: VillagerClip, side: 'L' | 'R'): [number, number] {
     .map(([a, b]) => (side === 'L' && a > 0.5 ? [a - 1, b - 1] : [a, b]))
     .sort((x, y) => x[0] - y[0])
   if (!spans.length) return [0, 0]
-  // the landing: the left foot at 0, the right one's touch nearest half a cycle
-  const near = (a: number) => (side === 'L' ? Math.abs(a) : Math.abs(a - 0.5))
-  const start = spans.reduce((m, sp) => (near(sp[0]) < near(m[0]) ? sp : m))[0]
-  // the stance: every span beginning within a tenth of the landing, then every
-  // span that begins before the support so far has ended
-  let lift = start
+  // the connected supports: a span joins the one before it when it begins
+  // before that support has ended or within a tenth of its first touch
+  const supports: [number, number][] = []
   for (const [a, b] of spans) {
-    if (a < start - 0.1) continue
-    if (a - start < 0.1 || a <= lift + 1e-6) lift = Math.max(lift, b)
+    const last = supports[supports.length - 1]
+    if (last && (a <= last[1] + 1e-6 || a - last[0] < 0.1)) last[1] = Math.max(last[1], b)
+    else supports.push([a, b])
   }
+  // the stance: the support whose earliest touch lies nearest the landing
+  // (the left foot at 0, the right one at half a cycle), from that touch on
+  const near = (a: number) => (side === 'L' ? Math.abs(a) : Math.abs(a - 0.5))
+  const [start, lift] = supports.reduce((m, sp) => (near(sp[0]) < near(m[0]) ? sp : m))
   return [start, lift]
 }
 
