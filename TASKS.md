@@ -15848,3 +15848,10 @@ to land than a mechanism that needs a review.
   Final state: the routing verdict printed by --routing and by the SessionStart hook already accounts for the share switch, so a point routed to Astra is one author-astra accepts without --anyway.
   Verifiable: Vitest on author-routing-core: switch `default` + HIGH point -> the reported lane matches what the commission accepts.
   Bundle: Modell & Wächter.
+
+- [ ] 1373. The approval guard refuses ordinary commands that merely contain quotes or operators
+  Queue position: end of Modell & Wächter.
+  Source: findings carrier 17.10.2026 14:25 (non-owner session): scripts/request-approval-guard refused three commands unrelated to finding.mjs or --request: an && chain with `batch-claim --status`, the `node -e` timestamp measurement that timestamp-guard prescribes, and the `board.mjs vdzk-keep "<title>" --why "<…>"` line that decision-card-guard prints verbatim. One guard thus blocks the commands other guards demand; worked around with unquoted arguments; reproducible.
+  Final state: the approval guard decides only on commands that can reach a request deposit (finding.mjs with --request, in any of the obfuscations points 1370-1372 cover); a command naming neither still runs unchanged in owner and non-owner sessions.
+  Verifiable: Vitest on request-approval-guard-core with the three quoted commands above: allowed; the 1370-1372 obfuscation cases stay refused.
+  Bundle: Modell & Wächter.
