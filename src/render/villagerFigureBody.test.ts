@@ -8,7 +8,7 @@ import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
-import { VILLAGER_MOTION as M } from '../config/balance'
+import { VILLAGER_ASSET, VILLAGER_MOTION as M } from '../config/balance'
 import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
 import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
@@ -384,9 +384,12 @@ describe('a head load rests on the drawn head', () => {
           const v = Array.from({ length: pos.count }, (_, k) => new THREE.Vector3().fromBufferAttribute(pos, k))
           const at = `${name} on ${sex} ${age} build ${build}`
           if (l.form === 'hairBag') {
-            // touches the back of the head, its middle outside the skull
+            // touches the back of the head, its middle outside the skull: no
+            // farther off than the pipeline settles a head garment (its layer's
+            // clearance), with 3 mm for the morph carrying it to this person
             const gap = Math.min(...v.map((a) => surfaceGap(skin, a)))
-            expect(gap, `${at}: gap to the head`).toBeLessThanOrEqual(0.01)
+            const settled = VILLAGER_ASSET.garmentSettleClearance + VILLAGER_ASSET.garmentLayerGap
+            expect(gap, `${at}: gap to the head`).toBeLessThanOrEqual(settled + 0.003)
             const mid = v.reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(v.length)
             const back = Math.min(...headSection(skin, mid.y).flat().map((p) => p.y))
             expect(mid.z, `${at}: middle behind the skull`).toBeLessThan(back)
