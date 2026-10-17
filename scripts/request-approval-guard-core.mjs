@@ -230,105 +230,106 @@ export function looseView(command) {
   return String(command ?? '').replace(LOOSE_STRIP, '')
 }
 
-/** Stand-in for text a glob, brace or extglob may splice into one word. */
+/** Stand-in for text an expansion may splice in. */
 const WILD = '\u0000'
-/** Stand-in for a `$`/backtick expansion: its unquoted result may split into whole words. */
-const SPLIT = '\u0001'
 const CONTINUATION = /\\\r?\n/g
 const ANSI_C = /\$'((?:[^'\\]|\\[\s\S])*)'/g
 const ANSI_C_ESCAPE = /\\(?:x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{1,4})|U([0-9a-fA-F]{1,8})|([0-7]{1,3}))/g
-/** Expansions whose result is unknown here, each with its stand-in; innermost first per pass. */
-const EXPANSIONS = [
-  [/\$\{[^{}]*\}|\$\([^()]*\)|`[^`]*`|\$\w+|\$[@*#?$!-]/g, SPLIT],
-  [/\{[^{}]*\}/g, WILD],
-  [/[?*+@!]\([^()]*\)/g, WILD],
-  [/\[[^\]]*\]/g, WILD],
-  [/[*?]/g, WILD],
-]
+/** Expansions whose result is unknown here; each pass collapses the innermost level. */
+const EXPANSIONS = [/\$\{[^{}]*\}|\$\([^()]*\)|`[^`]*`|\$\w+|\$[@*#?$!-]/g, /\{[^{}]*\}/g, /[?*+@!]\([^()]*\)/g, /\[[^\]]*\]/g, /[*?]/g]
+/** Any character that makes bash expand: `$`, backtick, backslash, braces, globs, extglobs. */
+const EXPANDING = /[$`\\{}*?[\]]|[+@!]\(/
+/** Simple commands that never run an argument as a script or flag. */
+const INERT = new Set(['echo', 'printf', 'cd', 'ls', 'cat', 'git', 'grep', 'head', 'tail', 'wc', 'pwd', 'test', '[', 'date'])
+/** Words and operators: redirection operands and operator-attached words stand alone. */
+const WORD_SPLIT = /[\s<>|&;()]+/
 
-/** The command with each ANSI-C `$'…'` string decoded the way bash decodes it. */
-function decodeAnsiC(command) {
-  return command.replace(ANSI_C, (_, body) =>
-    body.replace(ANSI_C_ESCAPE, (m, x, u, U, oct) => {
-      const code = parseInt(x ?? u ?? U ?? oct, oct ? 8 : 16)
-      return code <= 0x10ffff ? String.fromCodePoint(code) : m
-    }),
-  )
+/** The command with continuations joined (bash does this first) and each ANSI-C `$'…'` decoded. */
+function decoded(command) {
+  return String(command ?? '')
+    .replace(CONTINUATION, '')
+    .replace(ANSI_C, (_, body) =>
+      body.replace(ANSI_C_ESCAPE, (m, x, u, U, oct) => {
+        const code = parseInt(x ?? u ?? U ?? oct, oct ? 8 : 16)
+        return code <= 0x10ffff ? String.fromCodePoint(code) : m
+      }),
+    )
 }
 
-/** The loose view after expansion: continuations joined first (as bash does), ANSI-C decoded, every other expansion a stand-in. */
+/** The decoded loose view with every expansion collapsed to one WILD. */
 function expansionView(command) {
-  let view = decodeAnsiC(String(command ?? '').replace(CONTINUATION, ''))
-  for (const [pattern, stand] of EXPANSIONS) {
-    for (let prev = null; prev !== view; ) [prev, view] = [view, view.replace(pattern, stand)]
+  let view = decoded(command)
+  for (const pattern of EXPANSIONS) {
+    for (let prev = null; prev !== view; ) [prev, view] = [view, view.replace(pattern, WILD)]
   }
   return looseView(view)
 }
 
-/** `parts` as an anchored regex: each stand-in matches any text, every other character itself. */
-const wordRegex = (parts) =>
-  new RegExp(`^${parts.map((c) => (c === WILD ? '[\\s\\S]*' : c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).join('')}$`)
-
-/**
- * Could some expansion of `word` be a marker word? The script word must END in
- * `finding.mjs` (any path before it), the flag word must BE `--request` or
- * start `--request=`.
- */
-function couldBeMarker(word) {
-  const parts = [...word].map((c) => (c === SPLIT ? WILD : c))
-  for (let s = 0; s < parts.length; s++) if (wordRegex(parts.slice(s)).test('finding.mjs')) return true
-  for (let e = 1; e <= parts.length; e++) {
-    if ((e === parts.length || parts[e] === '=') && wordRegex(parts.slice(0, e)).test(REQUEST_FLAG)) return true
-  }
-  return false
-}
-
-/** Could `word` assemble `target` around its literal text? A window with a stand-in and a literal must match. */
+/** Could `word` assemble `target` around its literal text? A window with a WILD and a literal must match. */
 function couldAssemble(word, target) {
-  const parts = [...word].map((c) => (c === SPLIT ? WILD : c))
+  const parts = [...word]
   for (let s = 0; s < parts.length; s++) {
+    let pattern = ''
     let literals = 0
     let wild = false
     for (let e = s; e < parts.length && literals <= target.length; e++) {
       if (parts[e] === WILD) wild = true
       else literals++
-      if (wild && literals > 0 && wordRegex(parts.slice(s, e + 1)).test(target)) return true
+      pattern += parts[e] === WILD ? '[\\s\\S]*' : parts[e].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (wild && literals > 0 && new RegExp(`^${pattern}$`).test(target)) return true
     }
   }
   return false
 }
 
-/** Words that run a following word as a script or flag. */
-const EXEC_WORDS = new Set(['node', 'npx', 'bash', 'sh', 'zsh', 'eval', 'source', 'exec', 'xargs', 'env'])
-/** A `.` or an expansion as the first word of a simple command. */
-const COMMAND_POSITION = new RegExp(`(?:^|[;&|(\\n]|\\b(?:then|do|else)\\s)\\s*(?:\\.\\s|${SPLIT})`)
+/**
+ * The simple commands of a decoded command, `$(…)` and backtick bodies
+ * included. An unquoted heredoc body contributes only its substitutions, a
+ * quoted one nothing.
+ */
+function simpleCommands(text) {
+  const lines = text.replace(/`([^`]*)`/g, '$($1)').split('\n')
+  const out = []
+  for (let k = 0; k < lines.length; k++) {
+    const line = lines[k]
+    out.push(...line.split(/\$\(|[;&|()]/))
+    const doc = /<<-?\s*(['"]?)([\w.-]+)\1/.exec(line)
+    if (!doc) continue
+    for (k++; k < lines.length && lines[k].trim() !== doc[2]; k++) {
+      if (!doc[1]) out.push(...lines[k].split('$(').slice(1).map((piece) => piece.split(')')[0]))
+    }
+  }
+  return out
+}
 
-/** Can the command run an expanded word as a script or flag? */
-function hasExecutionVector(command) {
-  const view = looseView(decodeAnsiC(String(command ?? '').replace(CONTINUATION, '')))
-  if (view.split(/[\s;&|()<>{}]+/).some((w) => EXEC_WORDS.has(w.split('/').pop()))) return true
-  return COMMAND_POSITION.test(expansionView(command))
+/** Does this simple command start, past `NAME=value` prefixes, with a literal inert command word? */
+function isInert(command) {
+  const src = command.trim()
+  if (!src) return true
+  if (/^[<>]/.test(src)) return false
+  const words = src.split(/[\s<>]+/).filter((w) => w.replace(/['"]/g, ''))
+  const first = words.find((w) => !/^[A-Za-z_]\w*=/.test(w))
+  return first === undefined || INERT.has(first)
 }
 
 const MARKERS = ['finding.mjs', REQUEST_FLAG]
 
 /**
  * Could this command deposit a request? True when its loose view mentions
- * `finding.mjs` or `--request`, or when an expansion could supply or assemble
- * either one. A glob, brace or extglob may supply a whole marker word; a `$`
- * or backtick expansion may word-split, so with an execution vector any word
- * holding one counts, without one only an assembly around literal text does.
+ * `finding.mjs` or `--request`. A command that expands anything also counts
+ * when an expansion could assemble a marker around literal text, or when any
+ * of its simple commands is not a literal inert one — the expansion could
+ * then supply a whole marker word, or the command run it.
  */
 export function isPossibleDeposit(command) {
   const loose = looseView(command)
   if (MARKERS.some((m) => loose.includes(m))) return true
-  const expanded = expansionView(command)
-  if (MARKERS.some((m) => expanded.includes(m))) return true
-  const words = expanded.split(/\s+/).filter((word) => word.includes(WILD) || word.includes(SPLIT))
-  if (words.some((word) => word.includes(SPLIT)) && hasExecutionVector(command)) return true
-  return words.some((word) =>
-    word.includes(SPLIT) ? MARKERS.some((m) => couldAssemble(word, m)) : couldBeMarker(word),
-  )
+  const text = decoded(command)
+  if (MARKERS.some((m) => looseView(text).includes(m))) return true
+  if (!EXPANDING.test(String(command ?? ''))) return false
+  const words = expansionView(command).split(WORD_SPLIT).filter((word) => word.includes(WILD))
+  if (words.some((word) => MARKERS.some((m) => couldAssemble(word, m)))) return true
+  return !simpleCommands(text).every(isInert)
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')

@@ -609,7 +609,12 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     'cd "$(git rev-parse --show-toplevel)"',
     'git commit --author=$AUTHOR -m x',
     'cat /tmp/$NAME.log | wc -l',
-  ])('a $ expansion without an execution vector is left alone: %s', (command) => {
+    'cat /tmp/$NAME.log',
+    'ls *.md',
+    'git status',
+    'A=1 echo $HOME',
+    ['cat > /tmp/notes.md <<EOF', "it's $(date) and `pwd`", 'EOF'].join('\n'),
+  ])('an expanding command of literal inert commands is left alone: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(false)
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
@@ -625,7 +630,16 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     'exec $F',
     '$N scripts/x.mjs $R Hidden',
     'cd /tmp && $N $F',
-  ])('a $ expansion with an execution vector is a possible deposit: %s', (command) => {
+    // Astra round 2 on 23e1c913f: attached redirections, assignment prefix, expanded executor
+    `node scripts/fin*.mjs</dev/null --request>/dev/null${tail}`,
+    `node $F --re{q..q}uest>/dev/null${tail}`,
+    `A=1 $N $F $R${tail}`,
+    `n{o..o}de $F $R${tail}`,
+    `echo ok; $N $F`,
+    `echo "$($N $F $R)"`,
+    'echo `$N $F $R`',
+    `>echo $N $F $R`,
+  ])('an expanding command with a non-inert simple command is a possible deposit: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
