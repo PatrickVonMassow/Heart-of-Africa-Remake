@@ -253,18 +253,25 @@ const globHitsMarker = (word) =>
 
 /**
  * Could a shell that re-reads this text assemble a marker? True when it spells
- * one loosely, holds a substitution, variable, ANSI-C quote, backtick, brace
- * or extglob expansion, or a glob word that could match a marker. A lone `$`
- * stays literal (`grep '$'`). Accepted over-block: `find -name '*.mjs'`.
+ * one loosely, holds a substitution, variable, positional or special
+ * parameter, ANSI-C quote, backtick, brace or extglob expansion, or a glob
+ * word that could match a marker. A lone `$` stays literal (`grep '$'`).
+ * Accepted over-block: `find -name '*.mjs'`.
  */
 function couldExpandToMarker(text) {
   return mentionsMarker(text) || expandsToMarker(text)
 }
 
-/** The expansion half of couldExpandToMarker: a marker no plain spelling shows. */
+/**
+ * The expansion half of couldExpandToMarker: a marker no plain spelling shows.
+ * A word with whitespace is a command string a nested shell may re-read, so it
+ * is judged like a non-canonical command: any character outside PLAIN or any
+ * glob counts (`bash -c 'eval cd*.md'`).
+ */
 function expandsToMarker(text) {
   const src = String(text ?? '')
-  if (/\$[({'"A-Za-z_]|`/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src) || /[@+!*?]\(/.test(src)) return true
+  if (/\s/.test(src) && (!PLAIN.test(src) || /[*?]/.test(src))) return true
+  if (/\$\S|`/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src) || /[@+!*?]\(/.test(src)) return true
   return looseView(src).split(/\s+/).some(globHitsMarker)
 }
 
