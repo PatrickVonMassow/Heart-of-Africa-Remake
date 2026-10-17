@@ -3700,18 +3700,28 @@ if (section('water-jar-carried')) {
             ` feet ${p.feet ? `(${p.feet.x.toFixed(2)}, ${p.feet.y.toFixed(2)}, ${p.feet.z.toFixed(2)})` : '?'}, ${got.tried} placements` : ''),
       )
       if (phase === 'walk-back') {
-        // The set-down: the stand gains a jar only now.
+        // The set-down: the stand, emptied first so the cap cannot hide it,
+        // gains exactly his jar, and only once he has reached it.
+        await page.evaluate(() => window.__placeClearStand())
+        await nextFrames(2)
+        const before = (await standReading()).count
         await freezeLife(false)
-        const before = stand.count
-        const delivered = await page.waitForFunction((w) => window.__placeErrands().villagers[w].carry !== 'fullJar', who, { timeout: 120000 })
-          .then(() => true).catch(() => false)
+        const flip = await page.waitForFunction((w) => {
+          const e = window.__placeErrands()
+          const v = e.villagers[w]
+          if (v.carry === 'fullJar') return null
+          const st = e.geography.waterStand
+          return { carry: v.carry, gap: Math.hypot(v.x - st.x, v.z - st.z), reach: e.standArrivalRadius }
+        }, who, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null)
         await nextFrames(2)
         const after = await standReading()
-        // +1, unless the stand was already full (the errand caps it).
-        const want = Math.min(before + 1, after.capacity)
+        // His stand spot is JOIN_STAND_OFF (2.4 m) from the stand's centre; half a
+        // metre over that plus his arrival reach still means "at the stand".
+        const atStand = !!flip && flip.carry === 'none' && flip.gap <= 2.4 + flip.reach + 0.5
         check(`water jar (${body} body): the stand gains his jar only when he sets it down`,
-          delivered && after.shown === after.count && after.count === want,
-          `${before} → ${after.count} set down (want ${want}, capacity ${after.capacity}), ${after.shown} shown`)
+          before === 0 && atStand && after.shown === after.count && after.count === 1,
+          `${before} → ${after.count} set down, ${after.shown} shown; ` +
+            (flip ? `jar ${flip.carry} at ${flip.gap.toFixed(2)} m from the stand (reach ${flip.reach})` : 'jar never left his head'))
       }
       await freezeLife(false)
     }

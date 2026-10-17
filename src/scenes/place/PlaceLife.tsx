@@ -3276,6 +3276,7 @@ function ErrandVillagers({
       last: work.last ? { ...work.last } : null,
       standJars: work.standJars,
       standCapacity: balance.waterStandCapacity,
+      standArrivalRadius: balance.waterStandArrivalRadius,
       /** The fill ring as drawn (work-order 1117): up, and where the water is. */
       fillRing: {
         shown: fillRingShown.current,
@@ -3376,10 +3377,16 @@ function ErrandVillagers({
           ? null
           : { who, progress, facing, anchors: people.map((p) => ({ x: p.x, z: p.z })) }
     }
+    // Empties the water stand, so a browser check can watch one set-down add
+    // exactly one jar instead of meeting a stand already at its cap (work-order 1376).
+    w.__placeClearStand = () => {
+      work.standJars = 0
+    }
     return () => {
       delete w.__placeErrands
       delete w.__placeCastErrand
       delete w.__placeForceFill
+      delete w.__placeClearStand
     }
   }, [work, people, geography, view, groundHeight])
 
