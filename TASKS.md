@@ -93,6 +93,14 @@ put it is the mistake this line exists to stop.
   Criticality: low - probe only, no player-visible change; it blocks the covering picture run.
   Bundle: Dorfleben.
 
+- [ ] 1374. The head-carrier probe sometimes measures a carrier with nothing under its crown
+  Queue position: directly after point 1362 (Dorfleben); may land on its own.
+  Source: owner finding 17.10.2026 18:35, polish-villagers full run on feat/1360-head-load-rests 91e1ccbb9 (webgpu, log local/verify-logs/2026-10-17T16-00-47-668-polish-villagers.log): red "head carrier: the load's base sits on the crown (within 1 cm)" with {"i":2,"onHeadBone":true,"underCrown":[],"base":null}; the same red with i=2 on main 5751f7419 (webgpu, local/verify-logs/2026-10-16T07-03-38-686-polish-villagers.log), so it predates 1360; section-only village-walk runs on 1360 were green. The carrier flagged by `__placeWalkers.carries[k]` has an empty `figure-crown` (no portalled basket at all, not a hidden one): either the probe's index k does not match the group it reads, or the headProp portal is missing on that rig.
+  Final state: every villager flagged as a carrier draws its basket under its own crown at all times, and the probe measures exactly that villager; "the load's base sits on the crown" is green.
+  Verifiable: Vitest or probe assertion that carries[k] and group(k) name the same walker; polish-villagers --section=village-walk green on both backends and in a full run.
+  Criticality: medium - a carrier may walk without its basket (player-visible if real) or the probe measures the wrong walker.
+  Bundle: Dorfleben.
+
 - [ ] 1354. Natural villager motion b2: one pose pipeline, distributed lean and gaze, corrective leg IK, posable clavicles, pelvic check
   Queue position: directly after point 1342 (judged on its rig and clips).
   Source: cut from point 1342 on 13.10.2026 along the line 1342 named for a stall (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 8, 9, the step-4 forearm-twist decision after step 9, 10, 11 and 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
