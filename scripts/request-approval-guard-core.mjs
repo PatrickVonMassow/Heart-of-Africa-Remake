@@ -113,9 +113,7 @@ function depositsIn(tokens, shell, depth) {
     found.push({ title, approved })
   })
   tokens.forEach((word, k) => {
-    // A direct finding.mjs call hands its words to no shell: only a spelled marker is rescanned there.
-    const possible = depth === 0 && isFindingCall(tokens) ? mentionsMarker(word) : isPossibleDeposit(word)
-    if (consumed.has(k) || isRequestWord(word) || !possible) return
+    if (consumed.has(k) || isRequestWord(word) || !mentionsMarker(word)) return
     if (!isCanonical(word, shell) || depth >= MAX_NESTING) {
       found.push(UNTITLED())
       return
@@ -140,7 +138,7 @@ function depositsIn(tokens, shell, depth) {
  * --request x` is judged too.
  */
 export function requestsOf(command, shell = 'bash') {
-  if (!isPossibleDeposit(command)) return []
+  if (!isPossibleDeposit(command, shell)) return []
   if (!isCanonical(command, shell)) return [UNTITLED()]
   const tokens = tokenize(command, shell)
   if (!tokens.some((t) => t.includes('finding.mjs'))) return []
@@ -239,23 +237,20 @@ const MARKERS = ['finding.mjs', REQUEST_FLAG]
 /** Does the command spell a marker once quotes, escapes and `$` are ignored? */
 const mentionsMarker = (command) => MARKERS.some((m) => looseView(command).includes(m))
 
-/** A `*`/`?` glob as an anchored regex. */
-const globRegex = (glob) => new RegExp(`^${glob.replace(/[.+^$()|[\]\\{}]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`)
-
 /**
  * Could this command deposit a request? True when its loose view spells
- * `finding.mjs` or `--request`, when it holds any character outside PLAIN
+ * `finding.mjs` or `--request`. A canonical command is judged by that alone.
+ * A non-canonical one also counts when it holds any character outside PLAIN
  * (sound by construction; accepted over-block for quotes, pipes and the like
- * in a chat session), or when a glob word could match the script's basename
- * or the flag.
+ * in a chat session), or a `*`/`?` glob anywhere but in one plain `ls` line —
+ * a matched filename may carry a whole command for eval, bash and the like.
  */
-export function isPossibleDeposit(command) {
+export function isPossibleDeposit(command, shell = 'bash') {
   const src = String(command ?? '')
-  if (mentionsMarker(src) || !PLAIN.test(src)) return true
-  return src
-    .split(/\s+/)
-    .filter((word) => /[*?]/.test(word))
-    .some((word) => globRegex(word.split('/').pop()).test('finding.mjs') || globRegex(word.split('=')[0]).test(REQUEST_FLAG))
+  if (mentionsMarker(src)) return true
+  if (isCanonical(src, shell)) return false
+  if (!PLAIN.test(src)) return true
+  return /[*?]/.test(src) && (src.trim().split(/ +/)[0] !== 'ls' || src.includes('\n'))
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')
@@ -338,7 +333,7 @@ const DIRECT_CALL = /^node (\.[\\/])?scripts[\\/]finding\.mjs[ \t]/
  * the first that fails denies the whole call.
  */
 export function evaluate({ command, entries, malformed = 0, shell = 'bash' }) {
-  if (!isPossibleDeposit(command)) return ALLOW
+  if (!isPossibleDeposit(command, shell)) return ALLOW
   const canonical = isCanonical(command, shell)
   const requests = canonical ? requestsOf(command, shell) : null
   if (requests && requests.length === 0) return ALLOW

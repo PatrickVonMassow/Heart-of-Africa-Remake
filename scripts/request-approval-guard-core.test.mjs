@@ -409,8 +409,7 @@ describe('the flag word inside a finding detail', () => {
   })
   it('a --detail word given to another program is still judged (no eval bypass)', () => {
     const command = `bash -c 'eval "$1"' --detail 'node scripts/finding.mjs --request Unapproved --stdin'`
-    // `eval "$1"` itself is an untitled possible deposit too: its expansion may supply the marker words
-    expect(requestsOf(command)).toEqual([{ title: '', approved: '' }, { title: 'Unapproved', approved: '' }])
+    expect(requestsOf(command)).toEqual([{ title: 'Unapproved', approved: '' }])
     const nextLine = `node scripts/finding.mjs --record x\nbash -c 'eval "$1"' --detail 'node scripts/finding.mjs --request Unapproved'`
     nonCanonical(nextLine)
   })
@@ -600,7 +599,7 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
-  it.each(['git status', 'ls *.md', 'ls README.md', 'cat scripts/*.json', 'npm run lint'])('leaves alone: %s', (command) => {
+  it.each(['git status', 'ls *.md', 'ls -la scripts/*.mjs', 'ls README.md', 'npm run lint'])('leaves alone: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(false)
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
@@ -612,6 +611,8 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     "echo 'a $b' | wc -l",
     'ls {src,docs}/*.ts',
     'git log | head',
+    'cat scripts/*.json',
+    ['ls *.md', 'ls'].join('\n'),
     ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'),
   ])('a non-plain character counts (accepted over-block): %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
@@ -646,6 +647,9 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     `cat <<<$F; node $F $R${tail}`,
     ["cat <<'EOF'", 'x\\', 'EOF', `node $F $R${tail}`].join('\n'),
     `node scripts/fin[[:alpha:]]ing.mjs --re[[:alpha:]]uest${tail}`,
+    // Astra round 5 on 2694444a0: a matched filename may hold a whole command
+    'eval cd*.md',
+    'bash x*',
   ])('a possible deposit: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
@@ -654,6 +658,12 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
   it('a single-quoted $ in a canonical deposit stays literal: one titled request (Astra round 3, P2)', () => {
     const command = "node scripts/finding.mjs --request Outer --spec-file '/tmp/$SPEC.md' --why-file /tmp/w.md --approved \"passt so\""
     expect(requestsOf(command)).toEqual([{ title: 'Outer', approved: 'passt so' }])
+    expect(evaluate({ command, entries: chat }).block).toBe(false)
+  })
+
+  it('a canonical read command behaves as before: no request (Astra round 5, P2)', () => {
+    const command = "grep '$' scripts/finding.mjs"
+    expect(requestsOf(command)).toEqual([])
     expect(evaluate({ command, entries: chat }).block).toBe(false)
   })
 
