@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1362. The low-preset village-walk probe gathers too few primitive-walker samples
-  Queue position: directly after point 1360 (Dorfleben); may land on its own.
-  Source: owner closing run 16.10.2026 12:20 on origin/main dfb0ed0 (1359+1342 landed), webgpu, polish-villagers --section=village-walk: new red "low preset: every walking primitive stands on the ground every frame" with {samples 27, walkers 1, skinned 0, worstGround 0}; the check needs >= 30 samples, so the red is a sample shortage, not a ground defect (green with 33/4 in the 1342 section runs the same morning). Same class as the walker search/read race fixed on the 1342 branch (ae987a4a3); the run was flagged UNDER LOAD.
-  Final state: the low-preset ground check in scripts/verify/polish-villagers.mjs always gathers its 30 samples (keeps sampling across walkers or waits for a walking primitive) and reports a real ground verdict; worstGround stays <= 0.040 m.
-  Verifiable: polish-villagers --section=village-walk on both backends shows the low-preset check with samples >= 30 and green on three consecutive quiet-host runs; then the full polish-villagers covering run on both backends that the 1342 landing still owes (render-verify-guard).
-  Criticality: low - probe only, no player-visible change; it blocks the covering picture run.
-  Bundle: Dorfleben.
-
 - [ ] 1374. The head-carrier probe sometimes measures a carrier with nothing under its crown
   Queue position: directly after point 1362 (Dorfleben); may land on its own.
   Source: owner finding 17.10.2026 18:35, polish-villagers full run on feat/1360-head-load-rests 91e1ccbb9 (webgpu, log local/verify-logs/2026-10-17T16-00-47-668-polish-villagers.log): red "head carrier: the load's base sits on the crown (within 1 cm)" with {"i":2,"onHeadBone":true,"underCrown":[],"base":null}; the same red with i=2 on main 5751f7419 (webgpu, local/verify-logs/2026-10-16T07-03-38-686-polish-villagers.log), so it predates 1360; section-only village-walk runs on 1360 were green. The carrier flagged by `__placeWalkers.carries[k]` has an empty `figure-crown` (no portalled basket at all, not a hidden one): either the probe's index k does not match the group it reads, or the headProp portal is missing on that rig.
