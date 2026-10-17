@@ -407,6 +407,78 @@ export function assistantText(entry) {
   return texts.length ? texts.join('\n') : null
 }
 
+// ── Coarse fail-closed pre-gate ──────────────────────────────────────────
+// Three review rounds each found a new bash spelling that the precise parse
+// below missed. Instead of extending it, a POSSIBLE deposit must be written in
+// one simple canonical form before the precise parse is trusted at all.
+
+/** Characters bash/PowerShell can splice out of a word: quotes, escapes, `$`. */
+const LOOSE_STRIP = /\\\r?\n|['"\\`$\u2018\u2019\u201A\u201B\u201C\u201D\u201E\u201F]/g
+
+/** The command with every quote, backslash, backslash-newline, backtick and `$` removed. */
+export function looseView(command) {
+  return String(command ?? '').replace(LOOSE_STRIP, '')
+}
+
+/** Could this command deposit a request? True when its loose view mentions `finding.mjs` or `--request`. */
+export function isPossibleDeposit(command) {
+  const loose = looseView(command)
+  return loose.includes('finding.mjs') || loose.includes(REQUEST_FLAG)
+}
+
+const BASH_META = new Set('$`\\<>|;&(){}*?[]#')
+const PS_META = new Set('$`<>|;&(){}@#')
+const SMART_QUOTES = /[\u2018\u2019\u201A\u201B\u201C\u201D\u201E\u201F]/
+
+/**
+ * Is the command ONE plain simple command the precise parse can be trusted
+ * on? No newline, no unquoted shell metacharacter, and every quoted string a
+ * whole word (or the value of an unquoted `--flag=`) — a single-quoted one
+ * literal, a double-quoted one without `$` or backtick.
+ */
+export function isCanonical(command, shell = 'bash') {
+  const ps = shell === 'powershell'
+  const meta = ps ? PS_META : BASH_META
+  const src = String(command ?? '')
+  if (/[\r\n]/.test(src) || SMART_QUOTES.test(src)) return false
+  let word = ''
+  for (let i = 0; i < src.length; ) {
+    const c = src[i]
+    if (c === ' ' || c === '\t') {
+      word = ''
+      i++
+      continue
+    }
+    if (c === "'" || c === '"') {
+      if (word !== '' && !/^--[\w-]+=$/.test(word)) return false
+      let j = i + 1
+      while (j < src.length && src[j] !== c) {
+        if (c === '"' && (src[j] === '$' || src[j] === '`')) return false
+        j += c === '"' && !ps && src[j] === '\\' ? 2 : 1
+      }
+      if (j >= src.length) return false
+      i = j + 1
+      if (i < src.length && src[i] !== ' ' && src[i] !== '\t') return false
+      continue
+    }
+    if (meta.has(c)) return false
+    word += c
+    i++
+  }
+  return true
+}
+
+const NON_CANONICAL =
+  'this command may deposit a request (it mentions finding.mjs or --request once quotes, backslashes and $ are ignored) ' +
+  'but is not one plain line, so its deposit cannot be read reliably. Issue the deposit as ONE plain line: ' +
+  'node scripts/finding.mjs --request "<title>" --spec-file <path> --why-file <path> --approved "<user words>" ' +
+  '- no newline, heredoc, redirection, pipe, chaining, substitution, variable or quote-split word - and write the ' +
+  'spec and why files with the Write tool first. A command that merely mentions finding.mjs or --request must ' +
+  'leave those words out or move its text into a file.'
+
+/** No real human message and no unreadable line: a headless/launcher session. */
+const isHeadless = (entries, malformed) => malformed === 0 && !entries.some((e) => humanText(e) !== null)
+
 const HOW_TO_PASS =
   'To pass: show the request title in a reply to the user, let the user approve it in a LATER message, ' +
   'then deposit with --approved "<the user\'s approving words, verbatim>".'
@@ -430,11 +502,14 @@ const ALLOW = { block: false }
  * the first that fails denies the whole call.
  */
 export function evaluate({ command, entries, malformed = 0, shell = 'bash' }) {
-  const requests = requestsOf(command, shell)
-  if (requests.length === 0) return ALLOW
+  if (!isPossibleDeposit(command)) return ALLOW
+  const canonical = isCanonical(command, shell)
+  const requests = canonical ? requestsOf(command, shell) : null
+  if (requests && requests.length === 0) return ALLOW
   if (entries === null || entries === undefined) {
     return deny('transcript-unreadable', 'the session transcript could not be read, so no approval can be shown.')
   }
+  if (!canonical) return isHeadless(entries, malformed) ? ALLOW : deny('non-canonical', NON_CANONICAL)
   for (const request of requests) {
     const verdict = judge(request, entries, malformed)
     if (verdict.block) return verdict

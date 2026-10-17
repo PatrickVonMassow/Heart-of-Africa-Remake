@@ -15,6 +15,9 @@ import {
   requestsOf,
   tokenize,
   humanText,
+  isCanonical,
+  isPossibleDeposit,
+  looseView,
 } from './request-approval-guard-core.mjs'
 import { commandFrom, hookDecision, readTranscript } from './request-approval-guard.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -165,7 +168,7 @@ describe('command parsing', () => {
       'EOF',
     ].join('\n')
     expect(requestOf(command)).toEqual({ title: TITLE, approved: '' })
-    expect(verdict(command, [human('start'), said(TITLE), human('passt so')])).toMatchObject({ block: true, id: 'no-approved' })
+    expect(verdict(command, [human('start'), said(TITLE), human('passt so')])).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
   it('still sees a request that follows a heredoc', () => {
@@ -203,8 +206,7 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
     const command = `${deposit('passt so')} ; node scripts/finding.mjs --request "Unapproved" --stdin`
     expect(requestsOf(command).map((r) => r.title)).toEqual([TITLE, 'Unapproved'])
     expect(verdict(deposit('passt so'), approvedChat).block).toBe(false)
-    expect(verdict(command, approvedChat)).toMatchObject({ block: true, id: 'no-approved' })
-    expect(verdict(command, approvedChat).reason).toContain('Unapproved')
+    expect(verdict(command, approvedChat)).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
   it('2: sees the deposit behind value-taking node options', () => {
@@ -319,10 +321,10 @@ describe('confirming review findings (GPT-6 Astra, b9d21dd) — all caught by th
       { title: 'B', approved: 'passt so' },
     ])
     const chat = [human('start'), said('A and B'), human('passt so')]
-    expect(evaluate({ command, entries: chat })).toMatchObject({ block: true, id: 'no-approved' })
+    expect(evaluate({ command, entries: chat })).toMatchObject({ block: true, id: 'non-canonical' })
   })
   it('denies a matched command whose --request has no readable title (fail closed)', () => {
-    for (const command of ['node scripts/finding.mjs --request', 'node scripts/finding.mjs --request --stdin', 'node scripts/finding.mjs --request ; ls']) {
+    for (const command of ['node scripts/finding.mjs --request', 'node scripts/finding.mjs --request --stdin']) {
       expect(evaluate({ command, entries: approvedChat }), command).toMatchObject({ block: true, id: 'no-title' })
     }
     // a nested string whose flag yields no title is an untitled deposit
@@ -545,10 +547,78 @@ describe('structural fail-closed rule (GPT-6 Astra review, round 2 on the shape 
     }
   })
 
-  it('keeps the documented stdin route: a heredoc that ends the request command', () => {
+  it('denies the stdin route in a chat session: a heredoc is never canonical', () => {
     const command = ['node scripts/finding.mjs --request Outer --stdin --approved "passt so" <<\'EOF\'', '--- spec ---', 'x', 'EOF'].join('\n')
     expect(requestsOf(command)).toEqual([{ title: 'Outer', approved: 'passt so' }])
-    expect(evaluate({ command, entries: chat }).block).toBe(false)
+    expect(evaluate({ command, entries: chat })).toMatchObject({ block: true, id: 'non-canonical' })
   })
 })
 
+
+describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape fixes)', () => {
+  // the transcript approves only some OTHER, visible title
+  const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
+  const denied = (command) => {
+    expect(isPossibleDeposit(command), command).toBe(true)
+    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
+  }
+  const shapes = {
+    'substitution inside --request=': 'node scripts/finding.mjs --request="Outer $(node scripts/finding.mjs --request Hidden --stdin)" --approved "passt so"',
+    'redirection before the title': 'node scripts/finding.mjs --request > /tmp/out Hidden --stdin --approved "passt so"',
+    'unquoted heredoc body with a substitution': ['cat > /tmp/s.md <<EOF', 'Notes: $(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n'),
+    'quote-split flag inside a substitution': 'echo "$(node scripts/finding.mjs --reque""st Hidden --stdin)"',
+    'quote-split flag inside a heredoc': ['cat <<EOF', '$(node scripts/finding.mjs --reque""st Hidden --stdin)', 'EOF'].join('\n'),
+    'continued heredoc terminator hiding a later deposit': [
+      'cat <<EOF',
+      "it's a note",
+      'EO\\',
+      'F',
+      'node scripts/finding.mjs --request Hidden --stdin --approved "passt so"',
+    ].join('\n'),
+    'attached redirection': 'node scripts/finding.mjs --request Outer --stdin>/tmp/out --approved "passt so"',
+    'quote-split script name': 'node scripts/fin""ding.mjs --request Outer --approved "passt so"',
+    'backslash-split flag': 'node scripts/finding.mjs --req\\uest Outer --approved "passt so"',
+    'empty ANSI-C string inside the name': "node scripts/fin$''ding.mjs --request Outer --approved \"passt so\"",
+    'backslash-newline inside the flag': 'node scripts/finding.mjs --req\\\nuest Outer --approved "passt so"',
+    'chained second deposit': 'node scripts/finding.mjs --request Outer --approved "passt so"; node scripts/finding.mjs --request Hidden',
+  }
+  for (const [name, command] of Object.entries(shapes)) it(`denies: ${name}`, () => denied(command))
+
+  it('the reason tells the author how to deposit instead', () => {
+    const { reason } = evaluate({ command: shapes['attached redirection'], entries: chat })
+    expect(reason).toContain('ONE plain line')
+    expect(reason).toContain('--spec-file')
+    expect(reason).toContain('Write tool')
+  })
+
+  it('the loose view drops quotes, escapes, continuations and $', () => {
+    expect(looseView('fin""ding.mjs --req\\uest a\\\nb $x')).toBe('finding.mjs --request ab x')
+  })
+
+  it('a plain canonical approved deposit is still allowed, an unapproved one blocked', () => {
+    const plain = 'node scripts/finding.mjs --request "Outer" --spec-file /tmp/s.md --why-file /tmp/w.md --approved "passt so"'
+    expect(isCanonical(plain)).toBe(true)
+    expect(evaluate({ command: plain, entries: chat }).block).toBe(false)
+    expect(evaluate({ command: plain.replace('Outer', 'Hidden'), entries: chat })).toMatchObject({ block: true, id: 'no-proposal' })
+    expect(evaluate({ command: 'node scripts/finding.mjs --request="Outer" --approved "passt so"', entries: chat }).block).toBe(false)
+  })
+
+  it('unrelated commands are untouched', () => {
+    for (const command of ['git status', ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
+      expect(isPossibleDeposit(command), command).toBe(false)
+      expect(evaluate({ command, entries: chat }).block, command).toBe(false)
+    }
+  })
+
+  it('a headless session is not gated (it may deposit anyway)', () => {
+    expect(evaluate({ command: shapes['attached redirection'], entries: [said('working')] }).block).toBe(false)
+    expect(evaluate({ command: shapes['attached redirection'], entries: null })).toMatchObject({ block: true, id: 'transcript-unreadable' })
+    expect(evaluate({ command: shapes['attached redirection'], entries: [], malformed: 1 })).toMatchObject({ block: true, id: 'non-canonical' })
+  })
+
+  it('the hook wrapper judges a possible deposit the precise parse does not see', () => {
+    const command = shapes['quote-split flag inside a substitution']
+    expect(hookDecision({ tool_name: 'Bash', tool_input: { command }, transcript_path: '/nonexistent' })).not.toBe(null)
+    expect(hookDecision({ tool_name: 'Bash', tool_input: { command: 'git status' }, transcript_path: '/nonexistent' })).toBe(null)
+  })
+})
