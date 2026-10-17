@@ -1879,13 +1879,4 @@ export const RED_CHARGES = [
       + '(i=2, underCrown [], base null) and on main 5751f7419; the flagged carrier has an empty crown. '
       + 'The charge dies with point 1374.',
   },
-  {
-    point: 1362,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^low preset: every walking primitive stands on the ground every frame\b/i,
-    why:
-      'FILED AS 1362 ON 16.10.2026: red on origin/main dfb0ed0, webgpu (samples 27 < 30, walkers 1, '
-      + 'worstGround 0) - a probe sample shortage, not a ground defect. The charge dies with point 1362.',
-  },
 ]
