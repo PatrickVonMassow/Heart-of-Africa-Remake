@@ -605,6 +605,11 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
 
+  it.each(['git status', 'ls *.md', 'ls README.md'])('leaves alone in PowerShell: %s (Astra round 9, P2)', (command) => {
+    expect(isPossibleDeposit(command, 'powershell'), command).toBe(false)
+    expect(evaluate({ command, entries: chat, shell: 'powershell' }).block, command).toBe(false)
+  })
+
   // Accepted over-block: a non-canonical chat command with any character outside the plain set counts.
   it.each([
     'echo $HOME',
@@ -673,6 +678,8 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     `eval node 'scripts/fin""ding.mjs' '--reque""st'${tail}`,
     "eval bash 'x*'",
     `eval node 'scripts/f@(i)nding.mjs' X`,
+    // Astra round 9 on 4acdd52f0: a quoted tilde expands to $HOME under eval
+    `eval node '~' --request${tail}`,
   ])('a possible deposit: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })

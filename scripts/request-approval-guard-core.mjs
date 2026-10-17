@@ -254,7 +254,7 @@ const globHitsMarker = (word) =>
 /**
  * Could a shell that re-reads this text assemble a marker? True when it spells
  * one loosely, holds a substitution, variable, positional or special
- * parameter, ANSI-C quote, backtick, brace, extglob or any glob. A lone `$`
+ * parameter, ANSI-C quote, backtick, brace, extglob, tilde or any glob. A lone `$`
  * stays literal (`grep '$'`). Accepted over-block: `find -name '*.ts'`.
  */
 function couldExpandToMarker(text) {
@@ -271,7 +271,7 @@ function expandsToMarker(text) {
   const src = String(text ?? '')
   if (/\s/.test(src) && (!PLAIN.test(src) || /[*?]/.test(src))) return true
   // any glob: an evaluator re-joins words, so `eval bash 'x*'` runs whatever the match names
-  return /\$\S|`|[*?[]|[@+!]\(/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src)
+  return /\$\S|`|[*?[~]|[@+!]\(/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src)
 }
 
 /**
@@ -287,10 +287,11 @@ function expandsToMarker(text) {
 export function isPossibleDeposit(command, shell = 'bash') {
   const src = String(command ?? '')
   if (mentionsMarker(src)) return true
+  const plain = PLAIN.test(src) && !src.includes('\n')
+  // one plain ls line in either shell: its globs only list, unless they could match a marker
+  if (plain && src.trim().split(/ +/)[0] === 'ls') return src.split(/ +/).some(globHitsMarker)
   if (isCanonical(src, shell)) return tokenize(src, shell).some(couldExpandToMarker)
-  if (!PLAIN.test(src)) return true
-  if (!/[*?]/.test(src)) return false
-  return src.trim().split(/ +/)[0] !== 'ls' || src.includes('\n') || src.split(/ +/).some(globHitsMarker)
+  return !PLAIN.test(src) || /[*?]/.test(src)
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')
