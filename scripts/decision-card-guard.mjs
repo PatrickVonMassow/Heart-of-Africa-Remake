@@ -373,6 +373,7 @@ if (isMainModule(import.meta.url)) {
       review: activeSnapshot?.review,
       carriedAnswers: reconciled.active,
       nonOwner,
+      sessionId,
       stateReadable: Boolean(activeSnapshot),
     })
     if (reviewVerdict.block) {

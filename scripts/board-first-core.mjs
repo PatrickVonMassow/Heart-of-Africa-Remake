@@ -289,9 +289,10 @@ export function ownershipStandDownDecision({
         'reads remain available so you can inspect and report the state. The current owner continues the batch.\n' +
         `ONE WRITE PATH STAYS OPEN: your session scratchpad ${pad} — the Write tool with an absolute path there, ` +
         "or one `cd <scratchpad> && cat > <file> <<'EOF'` call; the repository stays refused.\n" +
-        'To hand the user\'s request or a finding to the owner, use the carrier, which needs no file: ' +
-        '`node scripts/finding.mjs --request "<title>" --stdin --session <this session id>` with the parts ' +
-        '`--- spec ---`, `--- why ---`, `--- quotes ---` … on stdin (or `--record "<title>" --detail "<…>"` for a finding).\n' +
+        'To hand the user\'s request or a finding to the owner, use the carrier: write the spec and why into ' +
+        'scratchpad files with the Write tool, then run ONE plain line ' +
+        '`node scripts/finding.mjs --request "<title>" --spec-file <spec path> --why-file <why path> --session <this session id> --approved "<user words>"` ' +
+        '(or `--record "<title>" --detail "<…>"` for a finding).\n' +
         'To request ownership through the sanctioned handoff, run `node scripts/batch-claim.mjs --session <this session id>`.',
     }
   } catch {

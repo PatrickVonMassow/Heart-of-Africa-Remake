@@ -15839,4 +15839,12 @@ to land than a mechanism that needs a review.
   Source: findings carrier 16.10.2026 09:02: session 1624ee5d (not batch owner; owner 36861bc0): Stop hook decision-card-guard demanded 'board.mjs vdzk-keep "Batchelor: Batch-Infrastruktur als eigenes Projekt abspalten"' for user message 29bbe2bf (a board-chat test log, no decision); the PreToolUse batch-ownership stand-down refused that command, and the guard fired twice in a row. scripts/decision-card-guard.mjs computes heldByOtherLiveOwner but still demands the keep (the carry path of e65219245).
   Final state: for a session not holding the batch lock, decision-card-guard never demands an action the ownership stand-down refuses (it stands down, or carries the answer to the owner without a keep demand); the card stays open.
   Verifiable: Vitest reproducing a non-owner Stop with an open card and a non-decision user message: no blocking demand.
+  Also (findings carrier 16.10.2026 22:14, session 7850716a): the bare `node scripts/board.mjs vdzk-keep …` passes the stand-down (isVdzkKeepSegment); only a wrapped call (`cd … && … 2>&1 | tail`) is refused, so the deadlock is avoidable in practice.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1369. Astra routing sends a point the share switch then refuses to commission
+  Queue position: end of Modell & Wächter.
+  Source: findings carrier 17.10.2026 00:59: `node scripts/author-astra.mjs --routing --point 1367` answered astra (HIGH criticality), the SessionStart hook said hard and critical work goes straight to Astra, yet `author-astra.mjs --point 1367` exited 3 because astra-share at `default` keeps authoring with Claude. Every session pays one futile commission before falling back to Opus.
+  Final state: the routing verdict printed by --routing and by the SessionStart hook already accounts for the share switch, so a point routed to Astra is one author-astra accepts without --anyway.
+  Verifiable: Vitest on author-routing-core: switch `default` + HIGH point -> the reported lane matches what the commission accepts.
+  Bundle: Modell & Wächter.
