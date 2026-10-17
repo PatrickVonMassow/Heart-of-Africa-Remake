@@ -3709,19 +3709,24 @@ if (section('water-jar-carried')) {
         const flip = await page.waitForFunction((w) => {
           const e = window.__placeErrands()
           const v = e.villagers[w]
-          if (v.carry === 'fullJar') return null
           const st = e.geography.waterStand
-          return { carry: v.carry, gap: Math.hypot(v.x - st.x, v.z - st.z), reach: e.standArrivalRadius }
+          // A jar on the stand while his is still on his head was credited early.
+          if (v.carry === 'fullJar') {
+            if (e.standJars > 0) return { carry: v.carry, early: e.standJars, gap: Math.hypot(v.x - st.x, v.z - st.z), reach: e.standArrivalRadius }
+            return null
+          }
+          return { carry: v.carry, count: e.standJars, gap: Math.hypot(v.x - st.x, v.z - st.z), reach: e.standArrivalRadius }
         }, who, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null)
         await nextFrames(2)
         const after = await standReading()
         // His stand spot is JOIN_STAND_OFF (2.4 m) from the stand's centre; half a
         // metre over that plus his arrival reach still means "at the stand".
-        const atStand = !!flip && flip.carry === 'none' && flip.gap <= 2.4 + flip.reach + 0.5
+        const atStand = !!flip && !flip.early && flip.carry === 'none' && flip.count === 1 && flip.gap <= 2.4 + flip.reach + 0.5
         check(`water jar (${body} body): the stand gains his jar only when he sets it down`,
           before === 0 && atStand && after.shown === after.count && after.count === 1,
           `${before} → ${after.count} set down, ${after.shown} shown; ` +
-            (flip ? `jar ${flip.carry} at ${flip.gap.toFixed(2)} m from the stand (reach ${flip.reach})` : 'jar never left his head'))
+            (flip ? (flip.early ? `${flip.early} on the stand while his jar was still on his head, ${flip.gap.toFixed(2)} m out` :
+              `jar ${flip.carry} at ${flip.gap.toFixed(2)} m from the stand (reach ${flip.reach}), ${flip.count} on the stand at that instant`) : 'jar never left his head'))
       }
       await freezeLife(false)
     }
