@@ -572,7 +572,10 @@ describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-pa
     nonCanonical(command, 'powershell')
     const chat = [human('start'), said('%USERNAME%'), human('ok')]
     expect(evaluate({ command, entries: chat, shell: 'powershell' }).block).toBe(true)
-    // a quoted --% is a literal argument, and bash knows no stop-parsing token
+    // a quoted --% is a literal argument in both shells, and bash knows no stop-parsing token
     expect(isCanonical(`node scripts/finding.mjs --request "a --% b" --approved "ok"`, 'bash')).toBe(true)
+    expect(isCanonical(`node scripts/finding.mjs --request "a --% b" --approved "ok"`, 'powershell')).toBe(true)
+    expect(isCanonical(`node scripts/finding.mjs --request 'a --% b' --approved "ok"`, 'powershell')).toBe(true)
+    nonCanonical('node scripts/finding.mjs --request "x" --approved "ok" --%', 'powershell')
   })
 })

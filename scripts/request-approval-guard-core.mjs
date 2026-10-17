@@ -251,12 +251,13 @@ export function isCanonical(command, shell = 'bash') {
   const meta = ps ? PS_META : BASH_META
   const src = String(command ?? '')
   if (/[\r\n]/.test(src) || SMART_QUOTES.test(src)) return false
-  // PowerShell's stop-parsing token hands the rest to the callee with %VAR% expanded.
-  if (ps && /(^|[ \t])--%([ \t]|$)/.test(src)) return false
+  // PowerShell's unquoted stop-parsing token hands the rest to the callee with %VAR% expanded.
+  const stopsParsing = (w) => ps && w === '--%'
   let word = ''
   for (let i = 0; i < src.length; ) {
     const c = src[i]
     if (c === ' ' || c === '\t') {
+      if (stopsParsing(word)) return false
       word = ''
       i++
       continue
@@ -277,7 +278,7 @@ export function isCanonical(command, shell = 'bash') {
     word += c
     i++
   }
-  return true
+  return !stopsParsing(word)
 }
 
 const NON_CANONICAL =
