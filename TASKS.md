@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1372. The approval guard treats a bash -c wrapper around a deposit as canonical
-  Queue position: directly after point 1371 (same guard, possible false approval; pre-existing on main, filed from 1370's authoring).
-  Source: findings carrier 17.10.2026 02:37 (author of point 1370): the canonical path in scripts/request-approval-guard-core.mjs accepts `bash -c 'node $F $R X'` and `bash -c 'node scripts/fin""ding.mjs --request X'` in chat sessions without approval.
-  Final state: a shell wrapper (`bash -c`, `sh -c`, `zsh -c`, `eval`) whose argument could hold a deposit is never canonical; it counts as a possible deposit and is denied without a matching human approval.
-  Verifiable: Vitest: both commands above block in a chat session without approval; a canonical direct deposit with approval still passes.
-  Criticality: high - possible false approval.
-  Bundle: Modell & Wächter.
-
 - [ ] 1360. A villager's head load floats 5-7 cm above the drawn head
   Queue position: directly after point 1342 (Dorfleben); may land on its own.
   Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.

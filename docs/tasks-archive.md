@@ -34242,3 +34242,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: Vitest (spawned): garbled JSON on stdin and a forced evaluation error each yield a deny decision; an empty manual run prints nothing and exits 0.
   Criticality: high - possible false approval.
   Bundle: Modell & Wächter.
+
+- [x] 1372. The approval guard treats a bash -c wrapper around a deposit as canonical
+  Queue position: directly after point 1371 (same guard, possible false approval; pre-existing on main, filed from 1370's authoring).
+  Source: findings carrier 17.10.2026 02:37 (author of point 1370): the canonical path in scripts/request-approval-guard-core.mjs accepts `bash -c 'node $F $R X'` and `bash -c 'node scripts/fin""ding.mjs --request X'` in chat sessions without approval.
+  Final state: a shell wrapper (`bash -c`, `sh -c`, `zsh -c`, `eval`) whose argument could hold a deposit is never canonical; it counts as a possible deposit and is denied without a matching human approval.
+  Verifiable: Vitest: both commands above block in a chat session without approval; a canonical direct deposit with approval still passes.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
