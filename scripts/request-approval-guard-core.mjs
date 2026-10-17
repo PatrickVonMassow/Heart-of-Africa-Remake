@@ -282,7 +282,7 @@ const NON_CANONICAL =
   'this command may deposit a request (it mentions finding.mjs or --request once quotes, backslashes and $ are ignored) ' +
   'but is not one plain line, so its deposit cannot be read reliably. Issue the deposit as ONE plain line: ' +
   'node scripts/finding.mjs --request "<title>" --spec-file <path> --why-file <path> --approved "<user words>" ' +
-  '- no newline, heredoc, redirection, pipe, chaining, substitution, variable or quote-split word - and write the ' +
+  '- started by node itself (no eval, bash -c, env or xargs), no newline, heredoc, redirection, pipe, chaining, substitution, variable or quote-split word - and write the ' +
   'spec and why files with the Write tool first. A command that merely mentions finding.mjs or --request must ' +
   'leave those words out or move its text into a file.'
 
@@ -304,6 +304,7 @@ export function formatReason(id, detail) {
 
 const deny = (id, detail) => ({ block: true, id, reason: formatReason(id, detail) })
 const ALLOW = { block: false }
+const DIRECT_CALL = /^node (\.[\\/])?scripts[\\/]finding\.mjs[ \t]/
 
 /**
  * The verdict for one command. `entries` are the parsed transcript JSONL lines;
@@ -316,10 +317,12 @@ export function evaluate({ command, entries, malformed = 0, shell = 'bash' }) {
   const canonical = isCanonical(command, shell)
   const requests = canonical ? requestsOf(command, shell) : null
   if (requests && requests.length === 0) return ALLOW
+  // A deposit not issued by `node` itself (eval, bash -c, env, xargs …) can be reparsed after this check.
+  const direct = canonical && DIRECT_CALL.test(String(command).trim())
   if (entries === null || entries === undefined) {
     return deny('transcript-unreadable', 'the session transcript could not be read, so no approval can be shown.')
   }
-  if (!canonical) return isHeadless(entries, malformed) ? ALLOW : deny('non-canonical', NON_CANONICAL)
+  if (!direct) return isHeadless(entries, malformed) ? ALLOW : deny('non-canonical', NON_CANONICAL)
   for (const request of requests) {
     const verdict = judge(request, entries, malformed)
     if (verdict.block) return verdict

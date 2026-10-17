@@ -536,6 +536,16 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
     expect(isCanonical('node scripts/finding.mjs --request "~+" --approved "passt so"')).toBe(true)
   })
 
+  it('a deposit not started by node itself is not canonical: eval and friends reparse the title', () => {
+    const approved = [human('start'), said('Vorschlag: ~+'), human('ok')]
+    const tail = "scripts/finding.mjs --request '~+' --spec-file /tmp/s.md --why-file /tmp/w.md --approved ok"
+    for (const prefix of ['eval node', 'env node', 'bash -c node', 'xargs node', 'sudo node']) {
+      const command = `${prefix} ${tail}`
+      expect(evaluate({ command, entries: approved }), command).toMatchObject({ block: true, id: 'non-canonical' })
+    }
+    expect(evaluate({ command: `node ${tail}`, entries: approved }).block).toBe(false)
+  })
+
   it('unrelated commands are untouched', () => {
     for (const command of ['git status', ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
       expect(isPossibleDeposit(command), command).toBe(false)
