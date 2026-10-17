@@ -612,9 +612,17 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     ["bash -c 'eval node scripts/finding.mjs?*'", 'powershell'],
     ["bash -c 'eval node scripts/finding.mjs?*'", 'bash'],
     ["bash -c 'node @a'", 'powershell'],
+    // Astra round 11 on 3cceeac5f: the ls exception checks splatting too
+    ['ls @depositArgs', 'powershell'],
   ])('a possible deposit: %s (%s)', (command, shell) => {
     expect(isPossibleDeposit(command, shell), command).toBe(true)
     expect(evaluate({ command, entries: chat, shell }), command).toMatchObject({ block: true, id: 'non-canonical' })
+  })
+
+  it('a quoted literal path in a direct PowerShell call stays literal (Astra round 11, P2)', () => {
+    const command = "node scripts\\finding.mjs --request Outer --spec-file 'C:\\tmp\\finding.mjs[old].md' --why-file C:\\tmp\\w.md --approved \"passt so\""
+    expect(requestsOf(command, 'powershell')).toEqual([{ title: 'Outer', approved: 'passt so' }])
+    expect(evaluate({ command, entries: chat, shell: 'powershell' }).block).toBe(false)
   })
 
   it.each(['git status', 'ls *.md', 'ls README.md'])('leaves alone in PowerShell: %s (Astra round 9, P2)', (command) => {

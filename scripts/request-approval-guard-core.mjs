@@ -123,7 +123,7 @@ function depositsIn(tokens, shell, depth) {
     const words = tokenize(word, shell)
     if (words.length === 1 && words[0] === word) {
       // a plain word, read as it is — unless a shell that re-reads it could still assemble a marker
-      if (expandsToMarker(word)) found.push(UNTITLED())
+      if (expandsToMarker(word) && !(depth === 0 && isFindingCall(tokens))) found.push(UNTITLED())
       return
     }
     const inner = depositsIn(words, shell, depth + 1)
@@ -239,6 +239,8 @@ export function looseView(command) {
 /** A command of only these characters expands nothing but `*`/`?` globs: no quote, `$`, escape, operator or brace. */
 const PLAIN = /^[A-Za-z0-9 _./:=,@%+\-*?\n]*$/
 const MARKERS = ['finding.mjs', REQUEST_FLAG]
+/** A whole-word PowerShell splat (`@args`), which may supply any argument list. */
+const SPLAT = /(^|\s)@\w/
 
 /** Does the command spell a marker once quotes, escapes and `$` are ignored? */
 const mentionsMarker = (command) => MARKERS.some((m) => looseView(command).includes(m))
@@ -272,7 +274,7 @@ function expandsToMarker(text) {
   const src = String(text ?? '')
   if (/\s/.test(src) && (!PLAIN.test(src) || /[*?]/.test(src))) return true
   // any glob: an evaluator re-joins words, so `eval bash 'x*'` runs whatever the match names
-  return /\$\S|`|[*?[~]|[@+!]\(|(^|\s)@\w/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src)
+  return /\$\S|`|[*?[~]|[@+!]\(/.test(src) || SPLAT.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src)
 }
 
 /**
@@ -290,9 +292,9 @@ export function isPossibleDeposit(command, shell = 'bash') {
   if (mentionsMarker(src)) return true
   const plain = PLAIN.test(src) && !src.includes('\n')
   // one plain ls line in either shell: its globs only list, unless they could match a marker
-  if (plain && src.trim().split(/ +/)[0] === 'ls') return src.split(/ +/).some(globHitsMarker)
+  if (plain && src.trim().split(/ +/)[0] === 'ls') return src.split(/ +/).some(globHitsMarker) || SPLAT.test(src)
   if (isCanonical(src, shell)) return tokenize(src, shell).some(couldExpandToMarker)
-  return !PLAIN.test(src) || /[*?]/.test(src) || /(^|\s)@\w/.test(src)
+  return !PLAIN.test(src) || /[*?]/.test(src) || SPLAT.test(src)
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')
