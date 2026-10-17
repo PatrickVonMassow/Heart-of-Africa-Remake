@@ -123,7 +123,7 @@ function depositsIn(tokens, shell, depth) {
     const words = tokenize(word, shell)
     if (words.length === 1 && words[0] === word) {
       // a plain word, read as it is — unless a shell that re-reads it could still assemble a marker
-      if (!mentionsMarker(word)) found.push(UNTITLED())
+      if (expandsToMarker(word)) found.push(UNTITLED())
       return
     }
     const inner = depositsIn(words, shell, depth + 1)
@@ -254,7 +254,8 @@ const globHitsMarker = (word) =>
 /**
  * Could a shell that re-reads this text assemble a marker? True when it spells
  * one loosely, holds a substitution, variable, positional or special
- * parameter, ANSI-C quote, backtick, brace, extglob, tilde or any glob. A lone `$`
+ * parameter, ANSI-C quote, backtick, brace, extglob, tilde, PowerShell
+ * splatting (`@args`) or any glob. A lone `$`
  * stays literal (`grep '$'`). Accepted over-block: `find -name '*.ts'`.
  */
 function couldExpandToMarker(text) {
@@ -271,7 +272,7 @@ function expandsToMarker(text) {
   const src = String(text ?? '')
   if (/\s/.test(src) && (!PLAIN.test(src) || /[*?]/.test(src))) return true
   // any glob: an evaluator re-joins words, so `eval bash 'x*'` runs whatever the match names
-  return /\$\S|`|[*?[~]|[@+!]\(/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src)
+  return /\$\S|`|[*?[~]|[@+!]\(|(^|\s)@\w/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src)
 }
 
 /**
@@ -291,7 +292,7 @@ export function isPossibleDeposit(command, shell = 'bash') {
   // one plain ls line in either shell: its globs only list, unless they could match a marker
   if (plain && src.trim().split(/ +/)[0] === 'ls') return src.split(/ +/).some(globHitsMarker)
   if (isCanonical(src, shell)) return tokenize(src, shell).some(couldExpandToMarker)
-  return !PLAIN.test(src) || /[*?]/.test(src)
+  return !PLAIN.test(src) || /[*?]/.test(src) || /(^|\s)@\w/.test(src)
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')

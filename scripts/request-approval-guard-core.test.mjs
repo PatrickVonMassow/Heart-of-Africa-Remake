@@ -605,6 +605,18 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
 
+  // Astra round 10 on 70c46b122: splatting; a word that spells a marker and expands too
+  it.each([
+    ['node @depositArgs', 'powershell'],
+    ['node @depositArgs', 'bash'],
+    ["bash -c 'eval node scripts/finding.mjs?*'", 'powershell'],
+    ["bash -c 'eval node scripts/finding.mjs?*'", 'bash'],
+    ["bash -c 'node @a'", 'powershell'],
+  ])('a possible deposit: %s (%s)', (command, shell) => {
+    expect(isPossibleDeposit(command, shell), command).toBe(true)
+    expect(evaluate({ command, entries: chat, shell }), command).toMatchObject({ block: true, id: 'non-canonical' })
+  })
+
   it.each(['git status', 'ls *.md', 'ls README.md'])('leaves alone in PowerShell: %s (Astra round 9, P2)', (command) => {
     expect(isPossibleDeposit(command, 'powershell'), command).toBe(false)
     expect(evaluate({ command, entries: chat, shell: 'powershell' }).block, command).toBe(false)
