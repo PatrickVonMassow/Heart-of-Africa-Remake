@@ -373,16 +373,26 @@ export const HEAD_TOP_AXIS = 0.06
 /**
  * The top of the drawn head over the head bone's vertical in the bind pose:
  * the highest vertex skinned wholly to `head` (scalp or headwear) within
- * HEAD_TOP_AXIS of (`x`, `z`). Null when no such vertex is drawn. The global
- * top would put the load on whatever pokes highest anywhere on the figure.
+ * HEAD_TOP_AXIS of (`x`, `z`). Only vertices of drawn triangles count: the
+ * garment mask drops triangles from the index but keeps their vertices
+ * (non-indexed geometry draws every vertex). Null when no such vertex is
+ * drawn. The global top would put the load on whatever pokes highest
+ * anywhere on the figure.
  */
 export function drawnHeadTop(g: BufferGeometry, head: number, x: number, z: number): number | null {
   const pos = g.getAttribute('position')
   const si = g.getAttribute('skinIndex')
   const sw = g.getAttribute('skinWeight')
   if (!pos || !si || !sw) return null
+  const index = g.getIndex()
+  let drawn: Uint8Array | null = null
+  if (index) {
+    drawn = new Uint8Array(pos.count)
+    for (let i = 0; i < index.count; i++) drawn[index.getX(i)] = 1
+  }
   let top: number | null = null
   for (let v = 0; v < pos.count; v++) {
+    if (drawn && !drawn[v]) continue
     let whole = false
     for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === head && sw.getComponent(v, k) > 0.99) whole = true
     if (whole && Math.hypot(pos.getX(v) - x, pos.getZ(v) - z) <= HEAD_TOP_AXIS && (top === null || pos.getY(v) > top)) top = pos.getY(v)
