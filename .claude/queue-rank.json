@@ -1632,6 +1632,12 @@
       "why": "routing/share mismatch costs one futile commission per session; no false approval, end of bundle is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1373": {
+      "at": "2026-10-17T14:27:20.120Z",
+      "why": "same guard core as 1370-1372; end of Modell & Wächter is its place",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1661,7 +1667,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-17T05:40:27.143Z",
+    "at": "2026-10-17T14:27:20.129Z",
     "points": [
       184,
       200,
@@ -2111,7 +2117,8 @@
       1360,
       1361,
       1362,
-      1369
+      1369,
+      1373
     ]
   }
 }
