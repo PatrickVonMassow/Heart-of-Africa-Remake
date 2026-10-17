@@ -34234,3 +34234,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: Vitest: the brace command above, `node scripts/fin*.mjs --request Hidden …` and an ANSI-C-quoted `$'--re\x71uest'` each block without a matching human approval; `git status` and `ls *.md` stay untouched.
   Criticality: high - possible false approval.
   Bundle: Modell & Wächter.
+
+- [x] 1371. The approval guard's hook wrapper allows a call when the payload is unreadable or evaluation throws
+  Queue position: directly after point 1370 (same guard, possible false approval; pre-existing on main, filed from 1367's review because it lies outside the tokenizer scope).
+  Source: GPT-6 Astra review of point 1367, round 6 pass 2/2 (receipt 7a43ffdefe370f31, 17.10.2026): in `scripts/request-approval-guard.mjs` a hook-payload JSON parse failure exits 0 without a decision, and the outer catch logs "allowing the call" and exits 0, so a deposit reaching either path runs without the canonical-line verdict.
+  Final state: when invoked as a hook, a garbled payload or an exception during evaluation denies the call (fail closed) with a reason naming the error; a manual run without stdin stays a no-op.
+  Verifiable: Vitest (spawned): garbled JSON on stdin and a forced evaluation error each yield a deny decision; an empty manual run prints nothing and exits 0.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
