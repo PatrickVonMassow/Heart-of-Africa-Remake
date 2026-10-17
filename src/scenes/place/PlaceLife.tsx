@@ -3409,6 +3409,8 @@ function ErrandVillagers({
                 ref={(el) => {
                   headJars.current[i] = el
                 }}
+                name="carried-jar-full"
+                userData={{ villager: i }}
                 visible={false}
                 position={[0, JAR_HEIGHT / 2, 0]}
                 // A carried jar is not a plumb cylinder: a small lean turns the
@@ -3425,6 +3427,8 @@ function ErrandVillagers({
                   ref={(el) => {
                     handJars.current[i] = el
                   }}
+                  name="carried-jar-empty"
+                  userData={{ villager: i }}
                   visible={false}
                   position={[0, -0.12, 0.04]}
                   rotation={[0, 0, 0.12]}
@@ -3608,6 +3612,7 @@ function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObjec
             ref={(el) => {
               if (jarRefs.current) jarRefs.current[i] = el
             }}
+            name="stand-jar"
             visible={false}
             position={[offset, 0.385 + JAR_HEIGHT / 2, i % 2 === 0 ? 0.04 : -0.06]}
           >
