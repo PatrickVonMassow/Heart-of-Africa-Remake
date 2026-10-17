@@ -230,10 +230,70 @@ export function looseView(command) {
   return String(command ?? '').replace(LOOSE_STRIP, '')
 }
 
-/** Could this command deposit a request? True when its loose view mentions `finding.mjs` or `--request`. */
+/** Stand-in for any text bash may splice in by expansion. */
+const WILD = '\u0000'
+const ANSI_C = /\$'((?:[^'\\]|\\[\s\S])*)'/g
+const ANSI_C_ESCAPE = /\\(?:x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{1,4})|U([0-9a-fA-F]{1,8})|([0-7]{1,3}))/g
+/** Expansions whose result is unknown here: `${…}`, `$(…)`, backticks, `$name`, braces, extglobs, `[…]`, `*`, `?`. */
+const EXPANSIONS = [/\$\{[^{}]*\}|\$\([^()]*\)|`[^`]*`|\$\w+/g, /\{[^{}]*\}/g, /[?*+@!]\([^()]*\)/g, /\[[^\]]*\]/g, /[*?]/g]
+
+/** The command with each ANSI-C `$'…'` string decoded the way bash decodes it. */
+function decodeAnsiC(command) {
+  return command.replace(ANSI_C, (_, body) =>
+    body.replace(ANSI_C_ESCAPE, (m, x, u, U, oct) => {
+      const code = parseInt(x ?? u ?? U ?? oct, oct ? 8 : 16)
+      return code <= 0x10ffff ? String.fromCodePoint(code) : m
+    }),
+  )
+}
+
+/** The loose view of the command after expansion: ANSI-C decoded, every other expansion one WILD. */
+function expansionView(command) {
+  let view = decodeAnsiC(String(command ?? ''))
+  for (const pattern of EXPANSIONS) {
+    // Innermost first: a nested brace or substitution collapses one level per pass.
+    for (let prev = null; prev !== view; ) [prev, view] = [view, view.replace(pattern, WILD)]
+  }
+  return looseView(view)
+}
+
+/** Could some expansion of `word` contain `target`? A window of it with a WILD and a literal must match. */
+function couldExpandTo(word, target) {
+  const parts = [...word]
+  for (let s = 0; s < parts.length; s++) {
+    let pattern = ''
+    let literals = 0
+    let wild = false
+    for (let e = s; e < parts.length && literals <= target.length; e++) {
+      if (parts[e] === WILD) {
+        pattern += '[\\s\\S]*'
+        wild = true
+      } else {
+        pattern += parts[e].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        literals++
+      }
+      if (wild && literals > 0 && new RegExp(`^${pattern}$`).test(target)) return true
+    }
+  }
+  return false
+}
+
+const MARKERS = ['finding.mjs', REQUEST_FLAG]
+
+/**
+ * Could this command deposit a request? True when its loose view mentions
+ * `finding.mjs` or `--request`, or when brace, glob, ANSI-C or parameter
+ * expansion could assemble either one.
+ */
 export function isPossibleDeposit(command) {
   const loose = looseView(command)
-  return loose.includes('finding.mjs') || loose.includes(REQUEST_FLAG)
+  if (MARKERS.some((m) => loose.includes(m))) return true
+  const expanded = expansionView(command)
+  if (MARKERS.some((m) => expanded.includes(m))) return true
+  return expanded
+    .split(/\s+/)
+    .filter((word) => word.includes(WILD))
+    .some((word) => MARKERS.some((m) => couldExpandTo(word, m)))
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')

@@ -574,6 +574,28 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
   })
 })
 
+describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra review of 1367, round 5)', () => {
+  const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
+  const tail = ' Hidden --spec-file /tmp/s.md --why-file /tmp/w.md'
+  it.each([
+    `node scripts/fin{d..d}ing.mjs --re{q..q}uest${tail}`,
+    `node scripts/fin*.mjs --request${tail}`,
+    `node scripts/fin*.mjs --re?uest${tail}`,
+    `node scripts/finding.mjs $'--re\\x71uest'${tail}`,
+    `node $'scripts/fin\\x64ing.mjs' $'\\x2d\\x2d\\x72\\x65\\x71\\x75\\x65\\x73\\x74'${tail}`,
+    `node $'scripts/fin\\144ing.mjs' --re[q]uest${tail}`,
+    `node scripts/f@(i)nding.mjs --re\${Q:-q}uest${tail}`,
+  ])('denies: %s', (command) => {
+    expect(isPossibleDeposit(command), command).toBe(true)
+    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
+  })
+
+  it.each(['git status', 'ls *.md', 'ls {src,docs}/*.ts', "echo $'a\\tb'", 'cat scripts/*.json'])('leaves alone: %s', (command) => {
+    expect(isPossibleDeposit(command), command).toBe(false)
+    expect(evaluate({ command, entries: chat }).block, command).toBe(false)
+  })
+})
+
 describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-parsing', () => {
   it('denies an approved title behind --%, which PowerShell expands as %VAR%', () => {
     const command = 'node scripts/finding.mjs --% --request "%USERNAME%" --spec-file C:/tmp/s.md --why-file C:/tmp/w.md --approved "ok"'
