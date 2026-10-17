@@ -3501,7 +3501,8 @@ if (section('adult-errands')) {
 // walking back — the jar group of THAT carrier is projected through the live
 // camera, and the pixels inside that projection must change when only its own
 // meshes are hidden (scripts/verify/carriedJar.mjs). Both figure bodies: the
-// default preset's skinned body and the low preset's primitive one.
+// skinned body (as mounted, and after its rig is rebuilt in place) and the low
+// preset's primitive one.
 if (section('water-jar-carried')) {
   const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
   const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
@@ -3628,11 +3629,20 @@ if (section('water-jar-carried')) {
     return null
   }, [phase, who], { timeout: 240000 }).then((h) => h.jsonValue()).catch(() => null)
 
-  for (const body of live ? ['default', 'low'] : []) {
-    if (body === 'low') {
-      await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
+  // Three bodies: the skinned one as the village mounted it; the same figures
+  // after a preset switch REBUILDS their rig in place (medium → high changes the
+  // body's radial segments) — the path on which the jars stayed on the old,
+  // undrawn skeleton; and the low preset's primitive figure.
+  const BODIES = [
+    { body: 'skinned', level: null },
+    { body: 'skinned-rebuilt', level: 'high' },
+    { body: 'primitive', level: 'low' },
+  ]
+  for (const { body, level } of live ? BODIES : []) {
+    if (level) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
       await nextFrames(8)
-      await awaitPlaceDrawn('water jar: low preset')
+      await awaitPlaceDrawn(`water jar: ${level} preset`)
     }
     let who = null
     for (const { phase, name, label } of PHASES) {

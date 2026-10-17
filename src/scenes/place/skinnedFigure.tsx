@@ -9,7 +9,7 @@
 // verification reads — `figure-head`, `hand-left`, `hand-right` — sit on the
 // bones, so they report where the drawn body really is.
 
-import { useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { Fragment, useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal, useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { FIGURE_LIMBS } from '../../render/figures'
@@ -666,15 +666,18 @@ export function SkinnedFigure({
           ))}
         </group>
       </group>
-      {handProp && createPortal(<>{handProp}</>, rig.hands[0])}
-      {rig.gltf &&
-        createPortal(
-          <group ref={shovel} visible={false} name="digging-tool">
-            <Shovel />
-          </group>,
-          rig.bones['hand.R'],
-        )}
-      {headProp && createPortal(<>{headProp}</>, rig.crown)}
+      {/* Keyed by skeleton: a rebuilt rig remounts the props on its new bones. */}
+      <Fragment key={rig.skeleton.uuid}>
+        {handProp && createPortal(<>{handProp}</>, rig.hands[0])}
+        {rig.gltf &&
+          createPortal(
+            <group ref={shovel} visible={false} name="digging-tool">
+              <Shovel />
+            </group>,
+            rig.bones['hand.R'],
+          )}
+        {headProp && createPortal(<>{headProp}</>, rig.crown)}
+      </Fragment>
     </group>
   )
 }
