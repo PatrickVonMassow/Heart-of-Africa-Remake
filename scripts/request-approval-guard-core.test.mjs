@@ -599,7 +599,7 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
-  it.each(['git status', 'ls *.md', 'ls -la scripts/*.mjs', 'ls README.md', 'npm run lint'])('leaves alone: %s', (command) => {
+  it.each(['git status', 'ls *.md', 'ls README.md', 'npm run lint', "find . -name '*.ts'", "git commit -m 'Fix (x)'"])('leaves alone: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(false)
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
@@ -650,6 +650,16 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     // Astra round 5 on 2694444a0: a matched filename may hold a whole command
     'eval cd*.md',
     'bash x*',
+    // Astra round 6 on 9a0d7bd: the ls exception holds only for globs that cannot match a marker
+    'ls scripts/fin*.mjs',
+    'ls -la scripts/*.mjs',
+    'ls --re?uest',
+    // a quoted expansion that a nested shell re-reads
+    `bash -c 'node scripts/fin*.mjs --re* Hidden'`,
+    `bash -c 'node scripts/fin{d..d}ing.mjs --re{q..q}uest Hidden'`,
+    `eval 'node scripts/fin?ing.mjs --re?uest Hidden'`,
+    `bash -c 'node $(printf scripts/fin%sing.mjs d) X'`,
+    `bash -c 'node scripts/fin[d]ing.mjs X'`,
   ])('a possible deposit: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })

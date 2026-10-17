@@ -113,13 +113,19 @@ function depositsIn(tokens, shell, depth) {
     found.push({ title, approved })
   })
   tokens.forEach((word, k) => {
-    if (consumed.has(k) || isRequestWord(word) || !mentionsMarker(word)) return
+    // A direct finding.mjs call hands its words to no shell: only a spelled marker is rescanned there.
+    const possible = depth === 0 && isFindingCall(tokens) ? mentionsMarker(word) : couldExpandToMarker(word)
+    if (consumed.has(k) || isRequestWord(word) || !possible) return
     if (!isCanonical(word, shell) || depth >= MAX_NESTING) {
       found.push(UNTITLED())
       return
     }
     const words = tokenize(word, shell)
-    if (words.length === 1 && words[0] === word) return // a plain word, read as it is
+    if (words.length === 1 && words[0] === word) {
+      // a plain word, read as it is — unless a shell that re-reads it could still assemble a marker
+      if (!mentionsMarker(word)) found.push(UNTITLED())
+      return
+    }
     const inner = depositsIn(words, shell, depth + 1)
     found.push(...inner)
     const occurrences = (word.match(REQUEST_FLAG_RE) ?? []).length
@@ -141,7 +147,7 @@ export function requestsOf(command, shell = 'bash') {
   if (!isPossibleDeposit(command, shell)) return []
   if (!isCanonical(command, shell)) return [UNTITLED()]
   const tokens = tokenize(command, shell)
-  if (!tokens.some((t) => t.includes('finding.mjs'))) return []
+  if (!tokens.some((t) => t.includes('finding.mjs') || expandsToMarker(t))) return []
   return depositsIn(tokens, shell, 0)
 }
 
@@ -237,20 +243,48 @@ const MARKERS = ['finding.mjs', REQUEST_FLAG]
 /** Does the command spell a marker once quotes, escapes and `$` are ignored? */
 const mentionsMarker = (command) => MARKERS.some((m) => looseView(command).includes(m))
 
+/** A `*`/`?`/`[…]` glob as an anchored regex (a bracket class reads as one character). */
+const globRegex = (glob) =>
+  new RegExp(`^${glob.replace(/\[[^\]]*\]?\]/g, '?').replace(/[.+^$()|[\]\\{}]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`)
+
+/** Could this glob word match the script's basename or the flag? */
+const globHitsMarker = (word) =>
+  /[*?[]/.test(word) && (globRegex(word.split('/').pop()).test('finding.mjs') || globRegex(word.split('=')[0]).test(REQUEST_FLAG))
+
+/**
+ * Could a shell that re-reads this text assemble a marker? True when it spells
+ * one loosely, holds a substitution, variable, ANSI-C quote, backtick, brace
+ * or extglob expansion, or a glob word that could match a marker. A lone `$`
+ * stays literal (`grep '$'`). Accepted over-block: `find -name '*.mjs'`.
+ */
+function couldExpandToMarker(text) {
+  return mentionsMarker(text) || expandsToMarker(text)
+}
+
+/** The expansion half of couldExpandToMarker: a marker no plain spelling shows. */
+function expandsToMarker(text) {
+  const src = String(text ?? '')
+  if (/\$[({'"A-Za-z_]|`/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src) || /[@+!*?]\(/.test(src)) return true
+  return looseView(src).split(/\s+/).some(globHitsMarker)
+}
+
 /**
  * Could this command deposit a request? True when its loose view spells
- * `finding.mjs` or `--request`. A canonical command is judged by that alone.
- * A non-canonical one also counts when it holds any character outside PLAIN
- * (sound by construction; accepted over-block for quotes, pipes and the like
- * in a chat session), or a `*`/`?` glob anywhere but in one plain `ls` line —
- * a matched filename may carry a whole command for eval, bash and the like.
+ * `finding.mjs` or `--request`. A canonical command also counts when one of
+ * its words could expand to a marker once a shell re-reads it (`bash -c
+ * 'node scripts/fin*.mjs …'`). A non-canonical one counts when it holds any
+ * character outside PLAIN (sound by construction; accepted over-block for
+ * quotes, pipes and the like in a chat session), or a `*`/`?` glob anywhere
+ * but in one plain `ls` line whose globs cannot match a marker — a matched
+ * filename may carry a whole command for eval, bash and the like.
  */
 export function isPossibleDeposit(command, shell = 'bash') {
   const src = String(command ?? '')
   if (mentionsMarker(src)) return true
-  if (isCanonical(src, shell)) return false
+  if (isCanonical(src, shell)) return tokenize(src, shell).some(couldExpandToMarker)
   if (!PLAIN.test(src)) return true
-  return /[*?]/.test(src) && (src.trim().split(/ +/)[0] !== 'ls' || src.includes('\n'))
+  if (!/[*?]/.test(src)) return false
+  return src.trim().split(/ +/)[0] !== 'ls' || src.includes('\n') || src.split(/ +/).some(globHitsMarker)
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')
