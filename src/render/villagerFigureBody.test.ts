@@ -8,11 +8,11 @@ import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
-import { VILLAGER_MOTION as M } from '../config/balance'
+import { VILLAGER_ASSET, VILLAGER_MOTION as M } from '../config/balance'
 import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
 import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
-import { ankleAt, legDims, legExtent, strideReach, walkPose } from './figureWalk'
+import { ankleAt, figureCrownOffset, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
 import { buildLayerGeometry, INFANT_SKIN } from './figureDress'
 import { axisClearance } from '../test/axisClearance'
@@ -232,6 +232,241 @@ function skinned(g: THREE.BufferGeometry, sk: THREE.Skeleton): Float32Array {
   }
   return out
 }
+
+/** The drawn head top over the head bone's axis: the highest vertex skinned
+ *  wholly to the head (scalp or headwear) within 6 cm of the bone's vertical,
+ *  as the head-carrier check in scripts/verify/polish-villagers.mjs reads it. */
+function drawnHeadTop(asset: VillagerAsset, g: THREE.BufferGeometry, rest: Float32Array): number {
+  const hi = asset.bones.indexOf('head')
+  const hx = rest[hi * 3]
+  const hz = rest[hi * 3 + 2]
+  const pos = g.getAttribute('position')
+  const si = g.getAttribute('skinIndex')
+  const sw = g.getAttribute('skinWeight')
+  // only vertices of drawn triangles: the garment mask drops triangles, not vertices
+  const index = g.getIndex()
+  const drawn = index ? new Set(Array.from({ length: index.count }, (_, i) => index.getX(i))) : null
+  let top = -Infinity
+  for (let v = 0; v < pos.count; v++) {
+    if (drawn && !drawn.has(v)) continue
+    let whole = false
+    for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === hi && sw.getComponent(v, k) > 0.99) whole = true
+    if (whole && Math.hypot(pos.getX(v) - hx, pos.getZ(v) - hz) <= 0.06) top = Math.max(top, pos.getY(v))
+  }
+  return top
+}
+
+const SEATED_FORMS = new Set(['cap', 'headband', 'hairBag'])
+
+/** The bare body's head surface: its triangles whose corners are all skinned
+ *  mostly to the head (scalp, face). The scalp is coarse — edges up to 11 cm —
+ *  so the seating checks measure against these triangles, never against the
+ *  vertices: a slab of vertices misses the back of the skull, and their
+ *  centroid leans into the dense face. */
+function headSkin(asset: VillagerAsset, g: THREE.BufferGeometry): THREE.Triangle[] {
+  const hi = asset.bones.indexOf('head')
+  const pos = g.getAttribute('position')
+  const si = g.getAttribute('skinIndex')
+  const sw = g.getAttribute('skinWeight')
+  const onHead = (v: number) => [0, 1, 2, 3].some((k) => si.getComponent(v, k) === hi && sw.getComponent(v, k) > 0.5)
+  const at = (v: number) => new THREE.Vector3().fromBufferAttribute(pos, v)
+  const index = g.getIndex()!
+  const out: THREE.Triangle[] = []
+  for (let t = 0; t < index.count; t += 3) {
+    const [a, b, c] = [index.getX(t), index.getX(t + 1), index.getX(t + 2)]
+    if (onHead(a) && onHead(b) && onHead(c)) out.push(new THREE.Triangle(at(a), at(b), at(c)))
+  }
+  return out
+}
+/** The head surface's outline at height y: its section points in (x, z) segments. */
+function headSection(skin: THREE.Triangle[], y: number): [THREE.Vector2, THREE.Vector2][] {
+  const segs: [THREE.Vector2, THREE.Vector2][] = []
+  for (const t of skin) {
+    const cut: THREE.Vector2[] = []
+    for (const [p, q] of [[t.a, t.b], [t.b, t.c], [t.c, t.a]]) {
+      if ((p.y - y) * (q.y - y) > 0 || p.y === q.y) continue
+      const f = (y - p.y) / (q.y - p.y)
+      cut.push(new THREE.Vector2(p.x + (q.x - p.x) * f, p.z + (q.z - p.z) * f))
+    }
+    if (cut.length >= 2) segs.push([cut[0], cut[1]])
+  }
+  return segs
+}
+/** The section's centre: the middle of its extent in x and z. */
+function sectionCentre(segs: [THREE.Vector2, THREE.Vector2][]): THREE.Vector2 {
+  const b = new THREE.Box2()
+  for (const [p, q] of segs) b.expandByPoint(p).expandByPoint(q)
+  return b.getCenter(new THREE.Vector2())
+}
+/** The section's farthest reach from `c` along `dir` (unit): the head's radius there. */
+function sectionReach(segs: [THREE.Vector2, THREE.Vector2][], c: THREE.Vector2, dir: THREE.Vector2): number {
+  let best = -Infinity
+  for (const [p, q] of segs) {
+    const e = q.clone().sub(p)
+    const den = dir.x * e.y - dir.y * e.x
+    if (Math.abs(den) < 1e-12) continue
+    const w = p.clone().sub(c)
+    const t = (w.x * e.y - w.y * e.x) / den
+    const u = (w.x * dir.y - w.y * dir.x) / den
+    if (t > 0 && u >= -1e-6 && u <= 1 + 1e-6) best = Math.max(best, t)
+  }
+  return best
+}
+/** A head piece's lower edge: its lowest vertex in each of 24 directions round its own axis. */
+function brimOf(v: THREE.Vector3[]): THREE.Vector3[] {
+  const b = new THREE.Box3().setFromPoints(v)
+  const c = b.getCenter(new THREE.Vector3())
+  const low = new Map<number, THREE.Vector3>()
+  for (const a of v) {
+    if (Math.hypot(a.x - c.x, a.z - c.z) < 0.01) continue
+    const k = Math.round(((Math.atan2(a.z - c.z, a.x - c.x) + Math.PI) / (2 * Math.PI)) * 24) % 24
+    if (!low.has(k) || a.y < low.get(k)!.y) low.set(k, a)
+  }
+  return [...low.values()]
+}
+const surfaceGap = (skin: THREE.Triangle[], a: THREE.Vector3) => {
+  const q = new THREE.Vector3()
+  return Math.min(...skin.map((t) => t.closestPointToPoint(a, q).distanceTo(a)))
+}
+
+const HEAD_FORMS = new Set(['cap', 'turban', 'headband', 'headRing', 'topknot', 'hairBag'])
+const dressOf = (l: DressLayer): DressLayer => ({ ...l, colour: l.colour === 'cloth' ? '#b08850' : l.colour, colour2: l.colour2 === 'cloth' ? '#b08850' : l.colour2 })
+
+describe('a head load rests on the drawn head', () => {
+  it('the crown anchor on the head bone is the drawn head top (within 2 cm) for every build, age and dress', { timeout: 120_000 }, () => {
+    for (const { sex, age } of people()) {
+      for (const build of [-1, 0, 1]) {
+        const person = gltfPerson(asset, sex, age, build)
+        const { skeleton, bones } = createGltfSkeleton(asset, person.rest)
+        const headAt = bones.head.getWorldPosition(new THREE.Vector3())
+        const dresses = [['bare', []] as const, ...Object.entries(PEOPLE_DRESS).map(([id, t]) => [id, t[sex][age].map(dressOf)] as const)]
+        for (const [id, layers] of dresses) {
+          const g = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
+          const crown = headAt.y + figureCrownOffset(person.p, g, skeleton.bones.indexOf(bones.head), headAt)
+          const top = drawnHeadTop(asset, g, person.rest)
+          expect(Math.abs(crown - top), `${id} ${sex} ${age} build ${build}: crown ${crown.toFixed(3)} over drawn head ${top.toFixed(3)}`).toBeLessThanOrEqual(0.02)
+        }
+      }
+    }
+  })
+
+  it('no head piece floats: every one reaches down onto the head of every person who could wear it', () => {
+    const worn = new Map<string, DressLayer>()
+    for (const t of Object.values(PEOPLE_DRESS))
+      for (const sex of SEXES) for (const age of AGE_GROUPS) for (const l of t[sex][age]) if (HEAD_FORMS.has(l.form)) worn.set(garmentMeshName(l), dressOf(l))
+    expect(worn.size).toBeGreaterThan(0)
+    for (const { sex, age } of people()) {
+      const person = gltfPerson(asset, sex, age)
+      for (const [name, l] of worn) {
+        const g = gltfGarment(asset, person, l)
+        expect(g, name).not.toBeNull()
+        g!.computeBoundingBox()
+        // its lowest edge below the bare head's top: a piece wholly above the
+        // scalp is a disc hovering over the head (the user's report of 16.10.)
+        expect(g!.boundingBox!.min.y, `${name} on ${sex} ${age} (head top ${person.p.crownY.toFixed(3)})`).toBeLessThan(person.p.crownY)
+      }
+    }
+  })
+
+  it('a cap, a headband and a hair bag sit on the head skin: centred, neither sunk nor lifted', { timeout: 120_000 }, () => {
+    const worn = new Map<string, DressLayer>()
+    for (const t of Object.values(PEOPLE_DRESS))
+      for (const sex of SEXES) for (const age of AGE_GROUPS) for (const l of t[sex][age]) if (SEATED_FORMS.has(l.form)) worn.set(garmentMeshName(l), dressOf(l))
+    expect([...worn.values()].map((l) => l.form).sort()).toEqual(['cap', 'hairBag', 'headband'])
+    for (const { sex, age } of people()) {
+      for (const build of [-1, 0, 1]) {
+        const person = gltfPerson(asset, sex, age, build)
+        const skin = headSkin(asset, person.geometry)
+        const crown = drawnHeadTop(asset, person.geometry, person.rest)
+        for (const [name, l] of worn) {
+          const g = gltfGarment(asset, person, l)!
+          const pos = g.getAttribute('position')
+          const v = Array.from({ length: pos.count }, (_, k) => new THREE.Vector3().fromBufferAttribute(pos, k))
+          const at = `${name} on ${sex} ${age} build ${build}`
+          if (l.form === 'hairBag') {
+            // touches the back of the head, its middle outside the skull: no
+            // farther off than the pipeline settles a head garment (its layer's
+            // clearance), with 3 mm for the morph carrying it to this person
+            const gap = Math.min(...v.map((a) => surfaceGap(skin, a)))
+            const settled = VILLAGER_ASSET.garmentSettleClearance + VILLAGER_ASSET.garmentLayerGap
+            expect(gap, `${at}: gap to the head`).toBeLessThanOrEqual(settled + 0.003)
+            // and nowhere through it: every vertex outside the head's section at its height
+            for (const a of v) {
+              const sec = headSection(skin, a.y)
+              if (!sec.length) continue
+              const hc = sectionCentre(sec)
+              const off = new THREE.Vector2(a.x - hc.x, a.z - hc.y)
+              const sr = sectionReach(sec, hc, off.clone().normalize())
+              if (sr > 0) expect(off.length() - sr, `${at}: bag inside the skull at y ${a.y.toFixed(3)}`).toBeGreaterThanOrEqual(-0.006)
+            }
+            const mid = v.reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(v.length)
+            const back = Math.min(...headSection(skin, mid.y).flat().map((p) => p.y))
+            expect(mid.z, `${at}: middle behind the skull`).toBeLessThan(back)
+            continue
+          }
+          // the lower edge against the head's section at its height
+          const brim = brimOf(v)
+          expect(brim.length, `${at}: brim`).toBeGreaterThan(16)
+          const y0 = brim.reduce((s, a) => s + a.y, 0) / brim.length
+          const hc = sectionCentre(headSection(skin, y0))
+          const c = new THREE.Box2().setFromPoints(brim.map((a) => new THREE.Vector2(a.x, a.z))).getCenter(new THREE.Vector2())
+          expect(c.distanceTo(hc), `${at}: brim off the head's centre`).toBeLessThanOrEqual(0.012)
+          // every brim point just outside the skin: not sunk into the skull, not lifted off it
+          for (const a of brim) {
+            const off = new THREE.Vector2(a.x - hc.x, a.z - hc.y)
+            const sr = sectionReach(headSection(skin, a.y), hc, off.clone().normalize())
+            expect(sr, `${at}: head skin under the brim`).toBeGreaterThan(0)
+            expect(off.length() - sr, `${at}: brim against the skin`).toBeGreaterThanOrEqual(-0.006)
+            expect(off.length() - sr, `${at}: brim against the skin`).toBeLessThanOrEqual(0.03)
+          }
+          if (l.form === 'cap') {
+            const top = Math.max(...v.map((a) => a.y))
+            expect(top, `${at}: cap over the crown`).toBeGreaterThan(crown)
+            expect(top - crown, `${at}: cap over the crown`).toBeLessThanOrEqual(0.02)
+          }
+        }
+      }
+    }
+  })
+})
+
+describe('a head piece faces outward', () => {
+  it('every triangle of a cap, a turban and a headband turns its front away from the head', () => {
+    const worn = new Map<string, DressLayer>()
+    for (const t of Object.values(PEOPLE_DRESS))
+      for (const sex of SEXES) for (const age of AGE_GROUPS) for (const l of t[sex][age]) if (['cap', 'turban', 'headband'].includes(l.form)) worn.set(garmentMeshName(l), dressOf(l))
+    expect(worn.size).toBeGreaterThan(0)
+    const person = gltfPerson(asset, 'male', 'adult')
+    for (const [name, l] of worn) {
+      const g = gltfGarment(asset, person, l)!
+      const pos = g.getAttribute('position')
+      const index = g.getIndex()!
+      g.computeBoundingBox()
+      const top = g.boundingBox!.max.y
+      // the head's axis inside the piece: its middle in x and z
+      const c = g.boundingBox!.getCenter(new THREE.Vector3())
+      const [a, b, d] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+      let out = 0
+      let crown = 0
+      for (let t = 0; t < index.count; t += 3) {
+        a.fromBufferAttribute(pos, index.getX(t))
+        b.fromBufferAttribute(pos, index.getX(t + 1))
+        d.fromBufferAttribute(pos, index.getX(t + 2))
+        const n = new THREE.Triangle(a, b, d).getNormal(new THREE.Vector3())
+        const m = a.clone().add(b).add(d).divideScalar(3)
+        const away = m.clone().sub(new THREE.Vector3(c.x, Math.min(m.y, c.y), c.z))
+        if (n.dot(away) > 0) out++
+        // the crown's closing fan: its triangles face up
+        if (l.form !== 'headband' && Math.hypot(m.x - c.x, m.z - c.z) < 0.015 && m.y > top - 0.02) {
+          crown++
+          expect(n.y, `${name}: crown triangle faces up`).toBeGreaterThan(0)
+        }
+      }
+      expect(out / (index.count / 3), `${name}: share of triangles facing outward`).toBeGreaterThan(0.95)
+      if (l.form !== 'headband') expect(crown, `${name}: a closed crown`).toBeGreaterThan(0)
+    }
+  })
+})
 
 describe('the dressed figure', () => {
   it('every people’s dress of every sex and age merges with the glTF body into one geometry', () => {

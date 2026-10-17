@@ -589,7 +589,12 @@ def build_form(B, form, wear, L):
         # closed end (a cap on the first ring is a disc through the chest)
         return sweep(rings, closed_bottom=True, keep=lambda k, i: not (abs(ang(i)) < 0.7 and face_lo < rings[k][0] < face_hi)), 2
     if form in ('turban', 'cap', 'headband'):
-        hc = L['chin'] + 0.07 * H
+        # a cap and a headband from the drawn chin, not the head joint
+        # (`chin`), which stands some centimetres above it: measured from the
+        # joint they began above the crown and hovered over the head as flat
+        # discs. OPEN: the turban keeps the joint — measured from the chin it
+        # swelled under the hood and the garment settle diverged
+        hc = (L['chin'] if form == 'turban' else L['jaw']) + 0.07 * H
         lo = hc + (0.02 if form == 'headband' else 0.01 if form == 'turban' else 0.03) * H
         hi = lo + 0.025 * H if form == 'headband' else L['crown'] + (0.045 if form == 'turban' else 0.006) * H
         ease = (0.03 if form == 'turban' else 0.007) * H
@@ -602,7 +607,11 @@ def build_form(B, form, wear, L):
             if form != 'headband' and k == steps - 1:
                 r = r * 0.35
             rings.append((y, c, r))
-        return sweep(rings, closed_top=form != 'headband'), 0
+        # built from the brim up; sweep takes its rings top to bottom (its
+        # winding faces outward only so), so they are reversed and the crown,
+        # now the first ring, is the closed end (closing the brim left a disc
+        # across the brow and the crown open)
+        return sweep(rings[::-1], closed_top=form != 'headband'), 0
     if form == 'veil':
         rings = []
         # rings close enough that the chin, the lips and the nose between
@@ -620,7 +629,15 @@ def build_form(B, form, wear, L):
     if form == 'topknot':
         return blob((0, L['crown'] + 0.005 * H, -0.01 * H), 0.04 * H, (1, 0.8, 0.95)), 0
     if form == 'hairBag':
-        return blob((0, L['chin'] + 0.09 * H, -0.075 * H), 0.045 * H, (1, 0.8, 0.9)), 0
+        # against the back of the skull, measured at the bag's height: a fixed
+        # depth left it 1-1.6 cm behind the head. Its front starts 4 cm inside
+        # the skull so the settle's push (fit.settle_once) lays it onto the
+        # scalp at its clearance at EVERY body corner: from 1.5 cm the child's
+        # smaller head left the morphed bag 1.4 cm off, never pushed
+        y, r = L['jaw'] + 0.09 * H, 0.045 * H
+        near = B.mask_body & (B.head > 0.5) & (np.abs(B.v[:, 1] - y) < 0.03)
+        back = float(B.v[near][:, 2].min())
+        return blob((0, y, back - 0.9 * r + 0.04), r, (1, 0.8, 0.9)), 0
     if form == 'neckBeads' and wear == 'chest':
         # layered strings built into a wide, deep collar over the breast
         # (figureDress.ts neckBeads 'chest'): close on the body, so a cloak
@@ -1014,6 +1031,9 @@ def build_garments(mh, body, clips, cfg):
     q = design_pose(body)
     B = Body(mh, body, q)
     L = landmarks(body['joints'], H)
+    # the drawn chin: the lowest point of the head's own skin (as the game
+    # measures `chinY`, render/villagerFigureBody.ts measureProportions)
+    L['jaw'] = float(B.v[B.mask_body & (B.head > 0.5)][:, 1].min())
     meshes = {}
     meta = {}
     for form, wear in GARMENTS:

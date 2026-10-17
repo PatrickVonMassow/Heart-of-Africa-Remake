@@ -33,7 +33,7 @@ import {
   approach,
   armAtRest,
   crouchTarget,
-  crownOffset,
+  figureCrownOffset,
   headLoadGrip,
   kneelBlend,
   legDims,
@@ -227,7 +227,9 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
   bones.head.add(head)
   const crown = new THREE.Object3D()
   crown.name = 'figure-crown'
-  crown.position.set(0, crownOffset(p, geo.boundingBox?.max.y), 0)
+  // Both skeletons rest unrotated: the bone's bind place is its world place.
+  const headAt = bones.head.getWorldPosition(new THREE.Vector3())
+  crown.position.set(0, figureCrownOffset(p, geo, skeleton.bones.indexOf(bones.head), headAt), 0)
   bones.head.add(crown)
   // The thighs turn against the pelvis's walking yaw before they swing, so the
   // stride stays in the line of travel.
