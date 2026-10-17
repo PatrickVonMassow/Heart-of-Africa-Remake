@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1370. The approval guard misses a deposit whose script name or flag bash assembles by expansion
-  Queue position: directly after point 1368 (same guard core, possible false approval; split from 1367, whose review did not converge on this class).
-  Source: GPT-6 Astra review of point 1367, round 5 (receipt c9969dab7e268bd3, 17.10.2026): `node scripts/fin{d..d}ing.mjs --re{q..q}uest Hidden --spec-file /tmp/s.md --why-file /tmp/w.md` — brace expansion assembles both markers, so the loose view in scripts/request-approval-guard-core.mjs never sees `finding.mjs` or `--request` and the guard allows without approval. Same class, named by the 1367 author: globs (`scripts/fin*.mjs`) and ANSI-C quoting (`$'\x66'…`).
-  Final state: a command whose loose view could expand to `finding.mjs` or `--request` through brace, glob or ANSI-C expansion counts as a possible deposit and, being non-canonical, is denied.
-  Verifiable: Vitest: the brace command above, `node scripts/fin*.mjs --request Hidden …` and an ANSI-C-quoted `$'--re\x71uest'` each block without a matching human approval; `git status` and `ls *.md` stay untouched.
-  Criticality: high - possible false approval.
-  Bundle: Modell & Wächter.
-
 - [ ] 1371. The approval guard's hook wrapper allows a call when the payload is unreadable or evaluation throws
   Queue position: directly after point 1370 (same guard, possible false approval; pre-existing on main, filed from 1367's review because it lies outside the tokenizer scope).
   Source: GPT-6 Astra review of point 1367, round 6 pass 2/2 (receipt 7a43ffdefe370f31, 17.10.2026): in `scripts/request-approval-guard.mjs` a hook-payload JSON parse failure exits 0 without a decision, and the outer catch logs "allowing the call" and exits 0, so a deposit reaching either path runs without the canonical-line verdict.

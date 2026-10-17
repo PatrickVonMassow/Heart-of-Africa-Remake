@@ -34226,3 +34226,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: Vitest: for each of bash, sh, zsh, dash and each of `<<'EOF'`, `<<"EOF"`, `<<EOF`, a body `node scripts/finding.mjs --request X …` is a possible deposit that `evaluate` blocks without a matching human approval.
   Criticality: high - possible false approval.
   Bundle: Modell & Wächter.
+
+- [x] 1370. The approval guard misses a deposit whose script name or flag bash assembles by expansion
+  Queue position: directly after point 1368 (same guard core, possible false approval; split from 1367, whose review did not converge on this class).
+  Source: GPT-6 Astra review of point 1367, round 5 (receipt c9969dab7e268bd3, 17.10.2026): `node scripts/fin{d..d}ing.mjs --re{q..q}uest Hidden --spec-file /tmp/s.md --why-file /tmp/w.md` — brace expansion assembles both markers, so the loose view in scripts/request-approval-guard-core.mjs never sees `finding.mjs` or `--request` and the guard allows without approval. Same class, named by the 1367 author: globs (`scripts/fin*.mjs`) and ANSI-C quoting (`$'\x66'…`).
+  Final state: a command whose loose view could expand to `finding.mjs` or `--request` through brace, glob or ANSI-C expansion counts as a possible deposit and, being non-canonical, is denied.
+  Verifiable: Vitest: the brace command above, `node scripts/fin*.mjs --request Hidden …` and an ANSI-C-quoted `$'--re\x71uest'` each block without a matching human approval; `git status` and `ls *.md` stay untouched.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
