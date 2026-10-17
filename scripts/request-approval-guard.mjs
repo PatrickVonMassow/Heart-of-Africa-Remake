@@ -17,10 +17,11 @@
 // `transcript_path` (JSONL). A request deposit whose transcript cannot be read
 // is DENIED (loud); any other guard error ALLOWS with a stderr note.
 //
-// WHAT IS JUDGED is decided TEXTUALLY and fail-closed: any command whose words
-// (heredoc bodies and PowerShell here-strings excluded) mention `finding.mjs`
-// and the exact `--request` flag; every `--request` in it is a deposit needing
-// its own approval, and one without a readable title is denied. The guard keeps
+// WHAT IS JUDGED is decided TEXTUALLY and fail-closed: a command whose loose
+// view (quotes, backslashes, `$` removed) mentions `finding.mjs` or `--request`
+// is a possible deposit. Unless it is one plain canonical line it is denied in
+// a chat session; a canonical one has every `--request` judged as a deposit
+// needing its own approval, one without a readable title denied. The guard keeps
 // a cooperative session from forgetting the rule; it is no shell parser and
 // does not try to win against an adversary.
 // ACCEPTED FALSE POSITIVE: a command that merely MENTIONS
@@ -39,7 +40,7 @@
 // NOT REGISTERED with guard-preflight.mjs, for the reason firewall-guard.mjs
 // gives: it judges a command that does not exist until the tool call is made.
 import { readFileSync } from 'node:fs'
-import { evaluate, parseTranscript, requestsOf, shellOf } from './request-approval-guard-core.mjs'
+import { evaluate, isPossibleDeposit, parseTranscript, shellOf } from './request-approval-guard-core.mjs'
 import { isMainModule } from './is-main.mjs'
 
 export const GUARDED_TOOLS = new Set(['Bash', 'PowerShell'])
@@ -69,7 +70,7 @@ export function readTranscript(path) {
 export function hookDecision(payload) {
   const command = commandFrom(payload)
   const shell = shellOf(payload && payload.tool_name)
-  if (!command || requestsOf(command, shell).length === 0) return null
+  if (!command || !isPossibleDeposit(command)) return null
   const transcript = readTranscript(payload.transcript_path)
   const verdict = evaluate({ command, shell, entries: transcript && transcript.entries, malformed: transcript ? transcript.malformed : 0 })
   if (!verdict.block) return null
@@ -89,10 +90,10 @@ if (isMainModule(import.meta.url)) {
       const command = process.argv[checkAt + 1] ?? ''
       const tAt = process.argv.indexOf('--transcript')
       const shell = process.argv.includes('--powershell') ? 'powershell' : 'bash'
-      if (requestsOf(command, shell).length === 0) {
+      if (!isPossibleDeposit(command)) {
         console.log('request-approval-guard: OK (not a request deposit)')
       } else if (tAt < 0) {
-        console.log('request-approval-guard: a request deposit — pass --transcript <path.jsonl> to judge its approval')
+        console.log('request-approval-guard: a possible request deposit — pass --transcript <path.jsonl> to judge its approval')
       } else {
         const transcript = readTranscript(process.argv[tAt + 1])
         const verdict = evaluate({ command, shell, entries: transcript && transcript.entries, malformed: transcript ? transcript.malformed : 0 })
