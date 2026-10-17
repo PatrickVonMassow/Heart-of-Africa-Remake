@@ -478,14 +478,12 @@
    "worn": [
     "g-hood-overHead"
    ],
-   "hidden": 184,
-   "covered": 1753,
-   "drawnTriangles": 5731,
+   "hidden": 182,
+   "covered": 1733,
+   "drawnTriangles": 5732,
    "coveredIds": [
     5,
     7,
-    8,
-    10,
     11,
     12,
     16,
@@ -497,7 +495,9 @@
     22,
     23,
     24,
-    25
+    25,
+    26,
+    27
    ]
   },
   {
