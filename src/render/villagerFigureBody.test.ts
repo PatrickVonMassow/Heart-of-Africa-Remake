@@ -258,20 +258,76 @@ function drawnHeadTop(asset: VillagerAsset, g: THREE.BufferGeometry, rest: Float
 
 const SEATED_FORMS = new Set(['cap', 'headband', 'hairBag'])
 
-/** The bare body's vertices skinned wholly to the head: the scalp, face and neck top. */
-function headSkin(asset: VillagerAsset, g: THREE.BufferGeometry): THREE.Vector3[] {
+/** The bare body's head surface: its triangles whose corners are all skinned
+ *  mostly to the head (scalp, face). The scalp is coarse — edges up to 11 cm —
+ *  so the seating checks measure against these triangles, never against the
+ *  vertices: a slab of vertices misses the back of the skull, and their
+ *  centroid leans into the dense face. */
+function headSkin(asset: VillagerAsset, g: THREE.BufferGeometry): THREE.Triangle[] {
   const hi = asset.bones.indexOf('head')
   const pos = g.getAttribute('position')
   const si = g.getAttribute('skinIndex')
   const sw = g.getAttribute('skinWeight')
-  const out: THREE.Vector3[] = []
-  for (let v = 0; v < pos.count; v++) {
-    for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === hi && sw.getComponent(v, k) > 0.99) out.push(new THREE.Vector3().fromBufferAttribute(pos, v))
+  const onHead = (v: number) => [0, 1, 2, 3].some((k) => si.getComponent(v, k) === hi && sw.getComponent(v, k) > 0.5)
+  const at = (v: number) => new THREE.Vector3().fromBufferAttribute(pos, v)
+  const index = g.getIndex()!
+  const out: THREE.Triangle[] = []
+  for (let t = 0; t < index.count; t += 3) {
+    const [a, b, c] = [index.getX(t), index.getX(t + 1), index.getX(t + 2)]
+    if (onHead(a) && onHead(b) && onHead(c)) out.push(new THREE.Triangle(at(a), at(b), at(c)))
   }
   return out
 }
-const nearest = (pts: THREE.Vector3[], a: THREE.Vector3) => Math.min(...pts.map((b) => b.distanceTo(a)))
-const centre = (pts: THREE.Vector3[]) => pts.reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(pts.length)
+/** The head surface's outline at height y: its section points in (x, z) segments. */
+function headSection(skin: THREE.Triangle[], y: number): [THREE.Vector2, THREE.Vector2][] {
+  const segs: [THREE.Vector2, THREE.Vector2][] = []
+  for (const t of skin) {
+    const cut: THREE.Vector2[] = []
+    for (const [p, q] of [[t.a, t.b], [t.b, t.c], [t.c, t.a]]) {
+      if ((p.y - y) * (q.y - y) > 0 || p.y === q.y) continue
+      const f = (y - p.y) / (q.y - p.y)
+      cut.push(new THREE.Vector2(p.x + (q.x - p.x) * f, p.z + (q.z - p.z) * f))
+    }
+    if (cut.length >= 2) segs.push([cut[0], cut[1]])
+  }
+  return segs
+}
+/** The section's centre: the middle of its extent in x and z. */
+function sectionCentre(segs: [THREE.Vector2, THREE.Vector2][]): THREE.Vector2 {
+  const b = new THREE.Box2()
+  for (const [p, q] of segs) b.expandByPoint(p).expandByPoint(q)
+  return b.getCenter(new THREE.Vector2())
+}
+/** The section's farthest reach from `c` along `dir` (unit): the head's radius there. */
+function sectionReach(segs: [THREE.Vector2, THREE.Vector2][], c: THREE.Vector2, dir: THREE.Vector2): number {
+  let best = -Infinity
+  for (const [p, q] of segs) {
+    const e = q.clone().sub(p)
+    const den = dir.x * e.y - dir.y * e.x
+    if (Math.abs(den) < 1e-12) continue
+    const w = p.clone().sub(c)
+    const t = (w.x * e.y - w.y * e.x) / den
+    const u = (w.x * dir.y - w.y * dir.x) / den
+    if (t > 0 && u >= -1e-6 && u <= 1 + 1e-6) best = Math.max(best, t)
+  }
+  return best
+}
+/** A head piece's lower edge: its lowest vertex in each of 24 directions round its own axis. */
+function brimOf(v: THREE.Vector3[]): THREE.Vector3[] {
+  const b = new THREE.Box3().setFromPoints(v)
+  const c = b.getCenter(new THREE.Vector3())
+  const low = new Map<number, THREE.Vector3>()
+  for (const a of v) {
+    if (Math.hypot(a.x - c.x, a.z - c.z) < 0.01) continue
+    const k = Math.round(((Math.atan2(a.z - c.z, a.x - c.x) + Math.PI) / (2 * Math.PI)) * 24) % 24
+    if (!low.has(k) || a.y < low.get(k)!.y) low.set(k, a)
+  }
+  return [...low.values()]
+}
+const surfaceGap = (skin: THREE.Triangle[], a: THREE.Vector3) => {
+  const q = new THREE.Vector3()
+  return Math.min(...skin.map((t) => t.closestPointToPoint(a, q).distanceTo(a)))
+}
 
 const HEAD_FORMS = new Set(['cap', 'turban', 'headband', 'headRing', 'topknot', 'hairBag'])
 const dressOf = (l: DressLayer): DressLayer => ({ ...l, colour: l.colour === 'cloth' ? '#b08850' : l.colour, colour2: l.colour2 === 'cloth' ? '#b08850' : l.colour2 })
@@ -329,32 +385,27 @@ describe('a head load rests on the drawn head', () => {
           const at = `${name} on ${sex} ${age} build ${build}`
           if (l.form === 'hairBag') {
             // touches the back of the head, its middle outside the skull
-            const gap = Math.min(...v.map((a) => nearest(skin, a)))
+            const gap = Math.min(...v.map((a) => surfaceGap(skin, a)))
             expect(gap, `${at}: gap to the head`).toBeLessThanOrEqual(0.01)
             const mid = v.reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(v.length)
-            const band = skin.filter((a) => Math.abs(a.y - mid.y) < 0.01)
-            expect(mid.z, `${at}: middle behind the skull`).toBeLessThan(Math.min(...band.map((a) => a.z)))
+            const back = Math.min(...headSection(skin, mid.y).flat().map((p) => p.y))
+            expect(mid.z, `${at}: middle behind the skull`).toBeLessThan(back)
             continue
           }
-          // the lowest ring against the head skin at its height
-          const lo = Math.min(...v.map((a) => a.y))
-          const ring = v.filter((a) => a.y < lo + 0.002)
-          const band = skin.filter((a) => Math.abs(a.y - lo) < 0.008)
-          expect(band.length, `${at}: head skin at the brim`).toBeGreaterThan(8)
-          const c = centre(ring)
-          const hc = centre(band)
-          expect(Math.hypot(c.x - hc.x, c.z - hc.z), `${at}: brim off the head's centre`).toBeLessThanOrEqual(0.012)
+          // the lower edge against the head's section at its height
+          const brim = brimOf(v)
+          expect(brim.length, `${at}: brim`).toBeGreaterThan(16)
+          const y0 = brim.reduce((s, a) => s + a.y, 0) / brim.length
+          const hc = sectionCentre(headSection(skin, y0))
+          const c = new THREE.Box2().setFromPoints(brim.map((a) => new THREE.Vector2(a.x, a.z))).getCenter(new THREE.Vector2())
+          expect(c.distanceTo(hc), `${at}: brim off the head's centre`).toBeLessThanOrEqual(0.012)
           // every brim point just outside the skin: not sunk into the skull, not lifted off it
-          for (const a of ring) {
-            const r = Math.hypot(a.x - hc.x, a.z - hc.z)
-            const dir = Math.atan2(a.z - hc.z, a.x - hc.x)
-            const s0 = band.reduce((best, b) => {
-              const d = Math.abs(Math.atan2(b.z - hc.z, b.x - hc.x) - dir)
-              return Math.min(d, 2 * Math.PI - d) < best.d ? { d: Math.min(d, 2 * Math.PI - d), b } : best
-            }, { d: Infinity, b: band[0] }).b
-            const sr = Math.hypot(s0.x - hc.x, s0.z - hc.z)
-            expect(r - sr, `${at}: brim against the skin`).toBeGreaterThanOrEqual(-0.006)
-            expect(r - sr, `${at}: brim against the skin`).toBeLessThanOrEqual(0.03)
+          for (const a of brim) {
+            const off = new THREE.Vector2(a.x - hc.x, a.z - hc.y)
+            const sr = sectionReach(headSection(skin, a.y), hc, off.clone().normalize())
+            expect(sr, `${at}: head skin under the brim`).toBeGreaterThan(0)
+            expect(off.length() - sr, `${at}: brim against the skin`).toBeGreaterThanOrEqual(-0.006)
+            expect(off.length() - sr, `${at}: brim against the skin`).toBeLessThanOrEqual(0.03)
           }
           if (l.form === 'cap') {
             const top = Math.max(...v.map((a) => a.y))
