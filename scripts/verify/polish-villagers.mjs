@@ -3548,7 +3548,8 @@ if (section('water-jar-carried')) {
   const standReading = () => page.evaluate(() => {
     let shown = 0
     window.__placeScene.traverse((o) => { if (o.name === 'stand-jar' && o.visible) shown++ })
-    return { shown, count: window.__placeErrands().standJars }
+    const e = window.__placeErrands()
+    return { shown, count: e.standJars, capacity: e.standCapacity }
   })
   // A lens beside the jar, on the first bearing the ground accepts and from
   // which the jar's pixels are really there.
@@ -3641,10 +3642,33 @@ if (section('water-jar-carried')) {
     { body: 'primitive', level: 'low' },
   ]
   for (const { body, level } of live ? BODIES : []) {
+    // The rebuilt pass must really rebuild: medium first, its skeletons noted,
+    // then the switch, and every skinned inhabitant must stand on a new one.
+    const skeletonIds = () => page.evaluate(() => {
+      const ids = []
+      window.__placeScene.traverse((o) => {
+        if (o.name !== 'inhabitant') return
+        o.traverse((q) => { if (q.isSkinnedMesh && q.skeleton) ids.push(q.skeleton.uuid) })
+      })
+      return ids
+    })
+    let rigsBefore = null
+    if (body === 'skinned-rebuilt') {
+      await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+      await nextFrames(8)
+      await awaitPlaceDrawn('water jar: medium preset')
+      rigsBefore = new Set(await skeletonIds())
+    }
     if (level) {
       await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
       await nextFrames(8)
       await awaitPlaceDrawn(`water jar: ${level} preset`)
+    }
+    if (rigsBefore) {
+      const after = await skeletonIds()
+      check('water jar (skinned-rebuilt body): the preset switch rebuilt every figure rig',
+        rigsBefore.size > 0 && after.length > 0 && after.every((id) => !rigsBefore.has(id)),
+        `${rigsBefore.size} skeletons before, ${after.length} after, ${after.filter((id) => rigsBefore.has(id)).length} kept`)
     }
     let who = null
     for (const { phase, name, label } of PHASES) {
@@ -3659,6 +3683,9 @@ if (section('water-jar-carried')) {
         } })
         return s
       }, who)
+      const wantSkinned = body !== 'primitive'
+      check(`water jar (${body} body, ${phase}): the carrier wears the ${wantSkinned ? 'skinned' : 'primitive'} body`,
+        skinned === wantSkinned, `villager ${who}: ${skinned ? 'skinned' : 'primitive'} body`)
       const stand = await standReading()
       check(`water jar (${body} body, ${phase}): the stand shows exactly the jars set down on it`,
         stand.shown === stand.count, `${stand.shown} shown, ${stand.count} set down`)
@@ -3680,9 +3707,11 @@ if (section('water-jar-carried')) {
           .then(() => true).catch(() => false)
         await nextFrames(2)
         const after = await standReading()
+        // +1, unless the stand was already full (the errand caps it).
+        const want = Math.min(before + 1, after.capacity)
         check(`water jar (${body} body): the stand gains his jar only when he sets it down`,
-          delivered && after.shown === after.count && (after.count === before + 1 || after.count === before),
-          `${before} → ${after.count} set down, ${after.shown} shown`)
+          delivered && after.shown === after.count && after.count === want,
+          `${before} → ${after.count} set down (want ${want}, capacity ${after.capacity}), ${after.shown} shown`)
       }
       await freezeLife(false)
     }

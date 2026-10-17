@@ -3275,6 +3275,7 @@ function ErrandVillagers({
       staged: { ...work.staged },
       last: work.last ? { ...work.last } : null,
       standJars: work.standJars,
+      standCapacity: balance.waterStandCapacity,
       /** The fill ring as drawn (work-order 1117): up, and where the water is. */
       fillRing: {
         shown: fillRingShown.current,
