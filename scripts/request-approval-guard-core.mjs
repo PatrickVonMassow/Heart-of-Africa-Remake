@@ -251,6 +251,8 @@ export function isCanonical(command, shell = 'bash') {
   const meta = ps ? PS_META : BASH_META
   const src = String(command ?? '')
   if (/[\r\n]/.test(src) || SMART_QUOTES.test(src)) return false
+  // PowerShell's stop-parsing token hands the rest to the callee with %VAR% expanded.
+  if (ps && /(^|[ \t])--%([ \t]|$)/.test(src)) return false
   let word = ''
   for (let i = 0; i < src.length; ) {
     const c = src[i]

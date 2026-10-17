@@ -565,3 +565,14 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
     expect(hookDecision({ tool_name: 'Bash', tool_input: { command: 'git status' }, transcript_path: '/nonexistent' })).toBe(null)
   })
 })
+
+describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-parsing', () => {
+  it('denies an approved title behind --%, which PowerShell expands as %VAR%', () => {
+    const command = 'node scripts/finding.mjs --% --request "%USERNAME%" --spec-file C:/tmp/s.md --why-file C:/tmp/w.md --approved "ok"'
+    nonCanonical(command, 'powershell')
+    const chat = [human('start'), said('%USERNAME%'), human('ok')]
+    expect(evaluate({ command, entries: chat, shell: 'powershell' }).block).toBe(true)
+    // a quoted --% is a literal argument, and bash knows no stop-parsing token
+    expect(isCanonical(`node scripts/finding.mjs --request "a --% b" --approved "ok"`, 'bash')).toBe(true)
+  })
+})
