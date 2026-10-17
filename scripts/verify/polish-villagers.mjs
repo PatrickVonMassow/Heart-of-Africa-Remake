@@ -4896,9 +4896,12 @@ if (section('village-walk')) {
   check('low preset: every villager drawn is the primitive figure (no skinned body)', census.figures > 0 && census.skinnedFigures === 0, JSON.stringify(census))
   check('low preset: every kneeling primitive figure keeps a uniform scale', census.kneeling > 0 && census.bad.length === 0, JSON.stringify(census))
   // Grounding of the walking primitives, every frame for a while: the lowest
-  // drawn point of each walker's body over the ground under it.
+  // drawn point of each walker's body over the ground under it. Sampling runs
+  // on past 60 frames until 30 walking samples exist (a single walker can
+  // stop to idle mid-window), capped so an empty village still ends.
   const lowGround = []
-  for (let f = 0; f < 60; f++) {
+  let lowFrames = 0
+  for (let f = 0; f < 600 && (f < 60 || lowGround.length < 30); f++) {
     lowGround.push(...(await page.evaluate(() => {
       const w = window.__placeWalkers
       const V = window.__placeScene.position.constructor
@@ -4926,9 +4929,10 @@ if (section('village-walk')) {
       return rows
     })))
     await nextFrames(1)
+    lowFrames = f + 1
   }
   const lowWorst = lowGround.reduce((m, r) => Math.max(m, Math.abs(r.off)), 0)
-  const lowDetail = JSON.stringify({ samples: lowGround.length, walkers: new Set(lowGround.map((r) => r.i)).size, skinned: lowGround.filter((r) => r.skinned).length, worstGround: +lowWorst.toFixed(4) })
+  const lowDetail = JSON.stringify({ samples: lowGround.length, frames: lowFrames, walkers: new Set(lowGround.map((r) => r.i)).size, skinned: lowGround.filter((r) => r.skinned).length, worstGround: +lowWorst.toFixed(4) })
   report(`  low-preset walkers ${lowDetail}`)
   check(`low preset: every walking primitive stands on the ground every frame (≤ ${FOOT_TOL.toFixed(3)} m)`, lowGround.length >= 30 && lowGround.every((r) => !r.skinned) && lowWorst <= FOOT_TOL, lowDetail)
   // The task walker's whole kneel, on the primitive.
