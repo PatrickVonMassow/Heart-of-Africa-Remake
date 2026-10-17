@@ -528,6 +528,14 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
     expect(evaluate({ command: 'node scripts/finding.mjs --request="Outer" --approved "passt so"', entries: chat }).block).toBe(false)
   })
 
+  it('an unquoted tilde is not canonical: bash expands the title past its approval', () => {
+    const command = 'node scripts/finding.mjs --request ~+ --spec-file /tmp/s.md --why-file /tmp/w.md --approved "passt so"'
+    expect(isCanonical(command)).toBe(false)
+    const approved = [human('start'), said('Vorschlag: ~+'), human('passt so')]
+    expect(evaluate({ command, entries: approved })).toMatchObject({ block: true, id: 'non-canonical' })
+    expect(isCanonical('node scripts/finding.mjs --request "~+" --approved "passt so"')).toBe(true)
+  })
+
   it('unrelated commands are untouched', () => {
     for (const command of ['git status', ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
       expect(isPossibleDeposit(command), command).toBe(false)

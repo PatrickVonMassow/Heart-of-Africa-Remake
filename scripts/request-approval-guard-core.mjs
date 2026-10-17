@@ -236,7 +236,7 @@ export function isPossibleDeposit(command) {
   return loose.includes('finding.mjs') || loose.includes(REQUEST_FLAG)
 }
 
-const BASH_META = new Set('$`\\<>|;&(){}*?[]#')
+const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')
 const PS_META = new Set('$`<>|;&(){}@#')
 const SMART_QUOTES = /[\u2018\u2019\u201A\u201B\u201C\u201D\u201E\u201F]/
 
