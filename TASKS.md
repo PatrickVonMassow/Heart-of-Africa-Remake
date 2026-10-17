@@ -93,6 +93,14 @@ put it is the mistake this line exists to stop.
   Criticality: medium - a carrier may walk without its basket (player-visible if real) or the probe measures the wrong walker.
   Bundle: Dorfleben.
 
+- [ ] 1375. The village-loom shutter bracket finds the helper no longer walking out
+  Queue position: directly after point 1374 (Dorfleben); may land on its own.
+  Source: owner covering run 17.10.2026 20:32 for point 1362 on feat/1362-low-walk-samples 5e2d25128, webgpu full polish-villagers (log local/verify-logs/2026-10-17T18-32-30-952-polish-villagers.log, machine state unknown): red "he was still walking out under her reading when the shutter closed" {along 2.4, partWay true, outward false, reading true}; the pre-shutter check was green, so the helper turned between the two reads while the frame was taken.
+  Final state: the teaching picture is taken early enough on the walk out (or the shutter is fast enough) that the bracket read after it still finds him walking out under her reading; the check stays as strict as it is.
+  Verifiable: polish-villagers --section=village-loom green on both backends three times in a row, then in a full run.
+  Criticality: low - probe timing only, no player-visible change; it blocks a clean covering polish-villagers run.
+  Bundle: Dorfleben.
+
 - [ ] 1354. Natural villager motion b2: one pose pipeline, distributed lean and gaze, corrective leg IK, posable clavicles, pelvic check
   Queue position: directly after point 1342 (judged on its rig and clips).
   Source: cut from point 1342 on 13.10.2026 along the line 1342 named for a stall (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 8, 9, the step-4 forearm-twist decision after step 9, 10, 11 and 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
