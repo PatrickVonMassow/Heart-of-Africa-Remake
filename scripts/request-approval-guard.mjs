@@ -97,12 +97,12 @@ function denyFor(why) {
 
 /**
  * The hook's stdout for raw stdin text: '' to allow, else the deny JSON. Empty
- * stdin (a manual run) allows; a garbled payload or an evaluation error denies.
+ * stdin (a manual run) allows, whitespace does not; a garbled payload or an evaluation error denies.
  * REQUEST_APPROVAL_GUARD_TEST_THROW forces the error path for the spawned test
  * — it can only deny, never allow.
  */
 export function hookOutput(stdinText, decide = hookDecision) {
-  if (!stdinText.trim()) return ''
+  if (stdinText === '') return ''
   let payload
   try {
     payload = JSON.parse(stdinText)

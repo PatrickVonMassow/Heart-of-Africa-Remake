@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 import {
   evaluate,
   normalize,
@@ -739,7 +740,7 @@ describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-pa
 })
 
 describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', () => {
-  const GUARD = new URL('./request-approval-guard.mjs', import.meta.url).pathname
+  const GUARD = fileURLToPath(new URL('./request-approval-guard.mjs', import.meta.url))
   const spawnGuard = (input, env = {}) =>
     spawnSync(process.execPath, [GUARD], { input, encoding: 'utf8', env: { ...process.env, ...env }, windowsHide: true })
   const denyReason = (stdout) => {
@@ -760,6 +761,12 @@ describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', 
     expect(run.status).toBe(0)
     expect(denyReason(run.stdout)).toContain('evaluation error: forced test error')
     expect(denyReason(hookOutput(payload, () => { throw new Error('boom') }))).toContain('evaluation error: boom')
+  })
+
+  it('denies a whitespace-only payload rather than reading it as a manual run', () => {
+    const run = spawnGuard(' \n')
+    expect(run.status).toBe(0)
+    expect(denyReason(run.stdout)).toContain('garbled hook payload')
   })
 
   it('stays a silent no-op on an empty manual run', () => {
