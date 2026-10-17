@@ -77,15 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1368. A quoted heredoc fed to a shell still hides a request deposit from the approval guard
-  Queue position: directly after point 1367 (same guard core, possible false approval).
-  Source: findings carrier 17.10.2026 01:10 (author of point 1367): `bash <<'EOF'` with `node scripts/finding.mjs --request X` in the body runs that body as commands, but scripts/request-approval-guard-core.mjs treats every quoted heredoc body as literal. Pre-existing on main.
-  Re-measured 17.10.2026 after point 1367 landed: its canonical-line gate already denies every heredoc that may deposit (`bash <<'EOF'` → `non-canonical`). Keeping `cat <<'EOF'` bodies literal would undo 1367's accepted over-block, so that half is dropped (veto: restore it as its own point).
-  Final state: a heredoc fed to a shell interpreter (bash, sh, zsh, dash), quoted delimiter or not, with a request in its body is denied in a chat session; a regression test pins it.
-  Verifiable: Vitest: for each of bash, sh, zsh, dash and each of `<<'EOF'`, `<<"EOF"`, `<<EOF`, a body `node scripts/finding.mjs --request X …` is a possible deposit that `evaluate` blocks without a matching human approval.
-  Criticality: high - possible false approval.
-  Bundle: Modell & Wächter.
-
 - [ ] 1370. The approval guard misses a deposit whose script name or flag bash assembles by expansion
   Queue position: directly after point 1368 (same guard core, possible false approval; split from 1367, whose review did not converge on this class).
   Source: GPT-6 Astra review of point 1367, round 5 (receipt c9969dab7e268bd3, 17.10.2026): `node scripts/fin{d..d}ing.mjs --re{q..q}uest Hidden --spec-file /tmp/s.md --why-file /tmp/w.md` — brace expansion assembles both markers, so the loose view in scripts/request-approval-guard-core.mjs never sees `finding.mjs` or `--request` and the guard allows without approval. Same class, named by the 1367 author: globs (`scripts/fin*.mjs`) and ANSI-C quoting (`$'\x66'…`).

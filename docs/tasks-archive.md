@@ -34217,3 +34217,12 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: Vitest with the three commands above: each yields a deposit that the guard blocks without a matching human approval.
   Criticality: high - possible false approval.
   Bundle: Modell & Wächter.
+
+- [x] 1368. A quoted heredoc fed to a shell still hides a request deposit from the approval guard
+  Queue position: directly after point 1367 (same guard core, possible false approval).
+  Source: findings carrier 17.10.2026 01:10 (author of point 1367): `bash <<'EOF'` with `node scripts/finding.mjs --request X` in the body runs that body as commands, but scripts/request-approval-guard-core.mjs treats every quoted heredoc body as literal. Pre-existing on main.
+  Re-measured 17.10.2026 after point 1367 landed: its canonical-line gate already denies every heredoc that may deposit (`bash <<'EOF'` → `non-canonical`). Keeping `cat <<'EOF'` bodies literal would undo 1367's accepted over-block, so that half is dropped (veto: restore it as its own point).
+  Final state: a heredoc fed to a shell interpreter (bash, sh, zsh, dash), quoted delimiter or not, with a request in its body is denied in a chat session; a regression test pins it.
+  Verifiable: Vitest: for each of bash, sh, zsh, dash and each of `<<'EOF'`, `<<"EOF"`, `<<EOF`, a body `node scripts/finding.mjs --request X …` is a possible deposit that `evaluate` blocks without a matching human approval.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
