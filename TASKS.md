@@ -93,6 +93,14 @@ put it is the mistake this line exists to stop.
   Criticality: high - possible false approval.
   Bundle: Modell & Wächter.
 
+- [ ] 1370. The approval guard misses a deposit whose script name or flag bash assembles by expansion
+  Queue position: directly after point 1368 (same guard core, possible false approval; split from 1367, whose review did not converge on this class).
+  Source: GPT-6 Astra review of point 1367, round 5 (receipt c9969dab7e268bd3, 17.10.2026): `node scripts/fin{d..d}ing.mjs --re{q..q}uest Hidden --spec-file /tmp/s.md --why-file /tmp/w.md` — brace expansion assembles both markers, so the loose view in scripts/request-approval-guard-core.mjs never sees `finding.mjs` or `--request` and the guard allows without approval. Same class, named by the 1367 author: globs (`scripts/fin*.mjs`) and ANSI-C quoting (`$'\x66'…`).
+  Final state: a command whose loose view could expand to `finding.mjs` or `--request` through brace, glob or ANSI-C expansion counts as a possible deposit and, being non-canonical, is denied.
+  Verifiable: Vitest: the brace command above, `node scripts/fin*.mjs --request Hidden …` and an ANSI-C-quoted `$'--re\x71uest'` each block without a matching human approval; `git status` and `ls *.md` stay untouched.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
+
 - [ ] 1360. A villager's head load floats 5-7 cm above the drawn head
   Queue position: directly after point 1342 (Dorfleben); may land on its own.
   Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.
