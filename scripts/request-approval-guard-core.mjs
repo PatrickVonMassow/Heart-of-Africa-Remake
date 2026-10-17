@@ -272,12 +272,10 @@ const wordRegex = (parts) =>
 /**
  * Could some expansion of `word` be a marker word? The script word must END in
  * `finding.mjs` (any path before it), the flag word must BE `--request` or
- * start `--request=`. A `$`/backtick stand-in may split off whole words, so
- * any word holding one could.
+ * start `--request=`.
  */
-function couldExpandTo(word) {
-  if (word.includes(SPLIT)) return true
-  const parts = [...word]
+function couldBeMarker(word) {
+  const parts = [...word].map((c) => (c === SPLIT ? WILD : c))
   for (let s = 0; s < parts.length; s++) if (wordRegex(parts.slice(s)).test('finding.mjs')) return true
   for (let e = 1; e <= parts.length; e++) {
     if ((e === parts.length || parts[e] === '=') && wordRegex(parts.slice(0, e)).test(REQUEST_FLAG)) return true
@@ -285,22 +283,52 @@ function couldExpandTo(word) {
   return false
 }
 
+/** Could `word` assemble `target` around its literal text? A window with a stand-in and a literal must match. */
+function couldAssemble(word, target) {
+  const parts = [...word].map((c) => (c === SPLIT ? WILD : c))
+  for (let s = 0; s < parts.length; s++) {
+    let literals = 0
+    let wild = false
+    for (let e = s; e < parts.length && literals <= target.length; e++) {
+      if (parts[e] === WILD) wild = true
+      else literals++
+      if (wild && literals > 0 && wordRegex(parts.slice(s, e + 1)).test(target)) return true
+    }
+  }
+  return false
+}
+
+/** Words that run a following word as a script or flag. */
+const EXEC_WORDS = new Set(['node', 'npx', 'bash', 'sh', 'zsh', 'eval', 'source', 'exec', 'xargs', 'env'])
+/** A `.` or an expansion as the first word of a simple command. */
+const COMMAND_POSITION = new RegExp(`(?:^|[;&|(\\n]|\\b(?:then|do|else)\\s)\\s*(?:\\.\\s|${SPLIT})`)
+
+/** Can the command run an expanded word as a script or flag? */
+function hasExecutionVector(command) {
+  const view = looseView(decodeAnsiC(String(command ?? '').replace(CONTINUATION, '')))
+  if (view.split(/[\s;&|()<>{}]+/).some((w) => EXEC_WORDS.has(w.split('/').pop()))) return true
+  return COMMAND_POSITION.test(expansionView(command))
+}
+
 const MARKERS = ['finding.mjs', REQUEST_FLAG]
 
 /**
  * Could this command deposit a request? True when its loose view mentions
- * `finding.mjs` or `--request`, or when an expansion — brace, glob, ANSI-C,
- * parameter or command substitution — could supply or assemble either one.
+ * `finding.mjs` or `--request`, or when an expansion could supply or assemble
+ * either one. A glob, brace or extglob may supply a whole marker word; a `$`
+ * or backtick expansion may word-split, so with an execution vector any word
+ * holding one counts, without one only an assembly around literal text does.
  */
 export function isPossibleDeposit(command) {
   const loose = looseView(command)
   if (MARKERS.some((m) => loose.includes(m))) return true
   const expanded = expansionView(command)
   if (MARKERS.some((m) => expanded.includes(m))) return true
-  return expanded
-    .split(/\s+/)
-    .filter((word) => word.includes(WILD) || word.includes(SPLIT))
-    .some(couldExpandTo)
+  const words = expanded.split(/\s+/).filter((word) => word.includes(WILD) || word.includes(SPLIT))
+  if (words.some((word) => word.includes(SPLIT)) && hasExecutionVector(command)) return true
+  return words.some((word) =>
+    word.includes(SPLIT) ? MARKERS.some((m) => couldAssemble(word, m)) : couldBeMarker(word),
+  )
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')

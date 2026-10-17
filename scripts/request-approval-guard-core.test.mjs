@@ -556,7 +556,7 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
   })
 
   it('unrelated commands are untouched', () => {
-    for (const command of ['git status', ['cat > /tmp/notes.md <<EOF', "it's a note", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
+    for (const command of ['git status', ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
       expect(isPossibleDeposit(command), command).toBe(false)
       expect(evaluate({ command, entries: chat }).block, command).toBe(false)
     }
@@ -604,11 +604,30 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
 
-  it('accepted over-block: any $ or backtick expansion may supply a whole marker word', () => {
-    for (const command of ['echo $HOME', 'cd "$(git rev-parse --show-toplevel)"', 'ls -*']) {
-      expect(isPossibleDeposit(command), command).toBe(true)
-      expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
-    }
+  it.each([
+    'echo $HOME',
+    'cd "$(git rev-parse --show-toplevel)"',
+    'git commit --author=$AUTHOR -m x',
+    'cat /tmp/$NAME.log | wc -l',
+  ])('a $ expansion without an execution vector is left alone: %s', (command) => {
+    expect(isPossibleDeposit(command), command).toBe(false)
+    expect(evaluate({ command, entries: chat }).block, command).toBe(false)
+  })
+
+  it.each([
+    'npx $F $R Hidden',
+    'bash -c "$CMD"',
+    'eval $CMD',
+    'source $FILE',
+    '. $FILE',
+    'xargs < /tmp/args $F',
+    'env $F',
+    'exec $F',
+    '$N scripts/x.mjs $R Hidden',
+    'cd /tmp && $N $F',
+  ])('a $ expansion with an execution vector is a possible deposit: %s', (command) => {
+    expect(isPossibleDeposit(command), command).toBe(true)
+    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
 })
 
