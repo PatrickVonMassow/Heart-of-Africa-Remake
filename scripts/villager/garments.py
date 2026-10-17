@@ -607,10 +607,11 @@ def build_form(B, form, wear, L):
             if form != 'headband' and k == steps - 1:
                 r = r * 0.35
             rings.append((y, c, r))
-        # the rings run from the brim up: the crown, the LAST ring, is the
-        # closed end (closing the first ring left a disc across the brow and
-        # the crown open)
-        return sweep(rings, closed_bottom=form != 'headband'), 0
+        # built from the brim up; sweep takes its rings top to bottom (its
+        # winding faces outward only so), so they are reversed and the crown,
+        # now the first ring, is the closed end (closing the brim left a disc
+        # across the brow and the crown open)
+        return sweep(rings[::-1], closed_top=form != 'headband'), 0
     if form == 'veil':
         rings = []
         # rings close enough that the chin, the lips and the nose between
