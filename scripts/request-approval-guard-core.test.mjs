@@ -478,6 +478,14 @@ describe('shapes of earlier review rounds are denied by the pre-gate (GPT-6 Astr
       nonCanonical([`cat > /tmp/s.md ${open}`, 'Notes: $(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n'))
     }
   })
+
+  it('a heredoc fed to a shell runs its body, so a deposit there is denied whatever the delimiter quoting', () => {
+    for (const sh of ['bash', 'sh', 'zsh', 'dash', '/bin/bash']) {
+      for (const open of ["<<'EOF'", '<<"EOF"', '<<EOF', '<<-EOF']) {
+        nonCanonical([`${sh} ${open}`, `node scripts/finding.mjs --request Hidden --spec-file /tmp/s.md --approved "passt so"`, 'EOF'].join('\n'))
+      }
+    }
+  })
 })
 
 describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape fixes)', () => {
