@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 import {
   evaluate,
   normalize,
@@ -19,7 +20,7 @@ import {
   isPossibleDeposit,
   looseView,
 } from './request-approval-guard-core.mjs'
-import { commandFrom, hookDecision, readTranscript } from './request-approval-guard.mjs'
+import { commandFrom, hookDecision, hookOutput, readTranscript } from './request-approval-guard.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 
 const TITLE = 'Guard the request deposit'
@@ -735,5 +736,48 @@ describe('cross-vendor review finding (GPT-6 Astra, 7589d5b): PowerShell stop-pa
     expect(isCanonical(`node scripts/finding.mjs --request "a --% b" --approved "ok"`, 'powershell')).toBe(true)
     expect(isCanonical(`node scripts/finding.mjs --request 'a --% b' --approved "ok"`, 'powershell')).toBe(true)
     nonCanonical('node scripts/finding.mjs --request "x" --approved "ok" --%', 'powershell')
+  })
+})
+
+describe('the hook wrapper fails closed (GPT-6 Astra review of 1367, round 6)', () => {
+  const GUARD = fileURLToPath(new URL('./request-approval-guard.mjs', import.meta.url))
+  const spawnGuard = (input, env = {}) =>
+    spawnSync(process.execPath, [GUARD], { input, encoding: 'utf8', env: { ...process.env, ...env }, windowsHide: true })
+  const denyReason = (stdout) => {
+    const out = JSON.parse(stdout).hookSpecificOutput
+    expect(out.permissionDecision).toBe('deny')
+    return out.permissionDecisionReason
+  }
+
+  it('denies a garbled payload, naming the parse error', () => {
+    const run = spawnGuard('{"tool_name": "Bash", "tool_input": ')
+    expect(run.status).toBe(0)
+    expect(denyReason(run.stdout)).toContain('garbled hook payload')
+  })
+
+  it('denies when evaluation throws, naming the error', () => {
+    const payload = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } })
+    const run = spawnGuard(payload, { REQUEST_APPROVAL_GUARD_TEST_THROW: '1' })
+    expect(run.status).toBe(0)
+    expect(denyReason(run.stdout)).toContain('evaluation error: forced test error')
+    expect(denyReason(hookOutput(payload, () => { throw new Error('boom') }))).toContain('evaluation error: boom')
+  })
+
+  it('denies a whitespace-only payload rather than reading it as a manual run', () => {
+    const run = spawnGuard(' \n')
+    expect(run.status).toBe(0)
+    expect(denyReason(run.stdout)).toContain('garbled hook payload')
+  })
+
+  it('stays a silent no-op on an empty manual run', () => {
+    const run = spawnGuard('')
+    expect(run.status).toBe(0)
+    expect(run.stdout).toBe('')
+  })
+
+  it('still allows an ordinary non-deposit command', () => {
+    const run = spawnGuard(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status' } }))
+    expect(run.status).toBe(0)
+    expect(run.stdout).toBe('')
   })
 })

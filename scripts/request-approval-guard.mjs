@@ -15,7 +15,8 @@
 // the quote. A transcript with no real human message (headless/launcher
 // session) passes. This wrapper reads the hook payload and its
 // `transcript_path` (JSONL). A request deposit whose transcript cannot be read
-// is DENIED (loud); any other guard error ALLOWS with a stderr note.
+// is DENIED (loud), and so is a garbled payload or any guard error during
+// evaluation (fail closed, 17.10.2026); an empty stdin (manual run) is a no-op.
 //
 // WHAT IS JUDGED is decided TEXTUALLY and fail-closed: a command whose loose
 // view (quotes, backslashes, `$` removed) mentions `finding.mjs` or `--request`
@@ -83,6 +84,40 @@ export function hookDecision(payload) {
   }
 }
 
+/** A deny output object naming why the guard could not judge the call. */
+function denyFor(why) {
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `request-approval-guard could not judge this call (${why}), so it is denied (fail closed). Repeat the call; if it keeps failing, report the guard error.`,
+    },
+  }
+}
+
+/**
+ * The hook's stdout for raw stdin text: '' to allow, else the deny JSON. Empty
+ * stdin (a manual run) allows, whitespace does not; a garbled payload or an evaluation error denies.
+ * REQUEST_APPROVAL_GUARD_TEST_THROW forces the error path for the spawned test
+ * — it can only deny, never allow.
+ */
+export function hookOutput(stdinText, decide = hookDecision) {
+  if (stdinText === '') return ''
+  let payload
+  try {
+    payload = JSON.parse(stdinText)
+  } catch (e) {
+    return JSON.stringify(denyFor(`garbled hook payload: ${e && e.message}`))
+  }
+  try {
+    if (process.env.REQUEST_APPROVAL_GUARD_TEST_THROW) throw new Error('forced test error')
+    const decision = decide(payload)
+    return decision ? JSON.stringify(decision) : ''
+  } catch (e) {
+    return JSON.stringify(denyFor(`evaluation error: ${e && e.message}`))
+  }
+}
+
 if (isMainModule(import.meta.url)) {
   try {
     const checkAt = process.argv.indexOf('--check')
@@ -102,18 +137,12 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
-    let payload = null
-    try {
-      payload = JSON.parse(readFileSync(0, 'utf8'))
-    } catch {
-      process.exit(0) // no/garbled stdin (manual run) — nothing to judge
-    }
-
-    const decision = hookDecision(payload)
-    if (decision) process.stdout.write(JSON.stringify(decision))
+    process.stdout.write(hookOutput(process.stdin.isTTY ? '' : readFileSync(0, 'utf8')))
     process.exit(0)
   } catch (e) {
-    console.error(`request-approval-guard error (allowing the call): ${e && e.message}`)
+    // A --check run only reports; a hook run that cannot read stdin denies.
+    console.error(`request-approval-guard error: ${e && e.message}`)
+    if (!process.argv.includes('--check')) process.stdout.write(JSON.stringify(denyFor(`stdin unreadable: ${e && e.message}`)))
     process.exit(0)
   }
 }
