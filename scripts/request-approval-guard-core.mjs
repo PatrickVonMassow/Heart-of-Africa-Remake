@@ -230,12 +230,21 @@ export function looseView(command) {
   return String(command ?? '').replace(LOOSE_STRIP, '')
 }
 
-/** Stand-in for any text bash may splice in by expansion. */
+/** Stand-in for text a glob, brace or extglob may splice into one word. */
 const WILD = '\u0000'
+/** Stand-in for a `$`/backtick expansion: its unquoted result may split into whole words. */
+const SPLIT = '\u0001'
+const CONTINUATION = /\\\r?\n/g
 const ANSI_C = /\$'((?:[^'\\]|\\[\s\S])*)'/g
 const ANSI_C_ESCAPE = /\\(?:x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{1,4})|U([0-9a-fA-F]{1,8})|([0-7]{1,3}))/g
-/** Expansions whose result is unknown here: `${…}`, `$(…)`, backticks, `$name`, braces, extglobs, `[…]`, `*`, `?`. */
-const EXPANSIONS = [/\$\{[^{}]*\}|\$\([^()]*\)|`[^`]*`|\$\w+/g, /\{[^{}]*\}/g, /[?*+@!]\([^()]*\)/g, /\[[^\]]*\]/g, /[*?]/g]
+/** Expansions whose result is unknown here, each with its stand-in; innermost first per pass. */
+const EXPANSIONS = [
+  [/\$\{[^{}]*\}|\$\([^()]*\)|`[^`]*`|\$\w+|\$[@*#?$!-]/g, SPLIT],
+  [/\{[^{}]*\}/g, WILD],
+  [/[?*+@!]\([^()]*\)/g, WILD],
+  [/\[[^\]]*\]/g, WILD],
+  [/[*?]/g, WILD],
+]
 
 /** The command with each ANSI-C `$'…'` string decoded the way bash decodes it. */
 function decodeAnsiC(command) {
@@ -247,33 +256,31 @@ function decodeAnsiC(command) {
   )
 }
 
-/** The loose view of the command after expansion: ANSI-C decoded, every other expansion one WILD. */
+/** The loose view after expansion: continuations joined first (as bash does), ANSI-C decoded, every other expansion a stand-in. */
 function expansionView(command) {
-  let view = decodeAnsiC(String(command ?? ''))
-  for (const pattern of EXPANSIONS) {
-    // Innermost first: a nested brace or substitution collapses one level per pass.
-    for (let prev = null; prev !== view; ) [prev, view] = [view, view.replace(pattern, WILD)]
+  let view = decodeAnsiC(String(command ?? '').replace(CONTINUATION, ''))
+  for (const [pattern, stand] of EXPANSIONS) {
+    for (let prev = null; prev !== view; ) [prev, view] = [view, view.replace(pattern, stand)]
   }
   return looseView(view)
 }
 
-/** Could some expansion of `word` contain `target`? A window of it with a WILD and a literal must match. */
-function couldExpandTo(word, target) {
+/** `parts` as an anchored regex: each stand-in matches any text, every other character itself. */
+const wordRegex = (parts) =>
+  new RegExp(`^${parts.map((c) => (c === WILD ? '[\\s\\S]*' : c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).join('')}$`)
+
+/**
+ * Could some expansion of `word` be a marker word? The script word must END in
+ * `finding.mjs` (any path before it), the flag word must BE `--request` or
+ * start `--request=`. A `$`/backtick stand-in may split off whole words, so
+ * any word holding one could.
+ */
+function couldExpandTo(word) {
+  if (word.includes(SPLIT)) return true
   const parts = [...word]
-  for (let s = 0; s < parts.length; s++) {
-    let pattern = ''
-    let literals = 0
-    let wild = false
-    for (let e = s; e < parts.length && literals <= target.length; e++) {
-      if (parts[e] === WILD) {
-        pattern += '[\\s\\S]*'
-        wild = true
-      } else {
-        pattern += parts[e].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        literals++
-      }
-      if (wild && literals > 0 && new RegExp(`^${pattern}$`).test(target)) return true
-    }
+  for (let s = 0; s < parts.length; s++) if (wordRegex(parts.slice(s)).test('finding.mjs')) return true
+  for (let e = 1; e <= parts.length; e++) {
+    if ((e === parts.length || parts[e] === '=') && wordRegex(parts.slice(0, e)).test(REQUEST_FLAG)) return true
   }
   return false
 }
@@ -282,8 +289,8 @@ const MARKERS = ['finding.mjs', REQUEST_FLAG]
 
 /**
  * Could this command deposit a request? True when its loose view mentions
- * `finding.mjs` or `--request`, or when brace, glob, ANSI-C or parameter
- * expansion could assemble either one.
+ * `finding.mjs` or `--request`, or when an expansion — brace, glob, ANSI-C,
+ * parameter or command substitution — could supply or assemble either one.
  */
 export function isPossibleDeposit(command) {
   const loose = looseView(command)
@@ -292,8 +299,8 @@ export function isPossibleDeposit(command) {
   if (MARKERS.some((m) => expanded.includes(m))) return true
   return expanded
     .split(/\s+/)
-    .filter((word) => word.includes(WILD))
-    .some((word) => MARKERS.some((m) => couldExpandTo(word, m)))
+    .filter((word) => word.includes(WILD) || word.includes(SPLIT))
+    .some(couldExpandTo)
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')
@@ -342,7 +349,7 @@ export function isCanonical(command, shell = 'bash') {
 }
 
 const NON_CANONICAL =
-  'this command may deposit a request (it mentions finding.mjs or --request once quotes, backslashes and $ are ignored) ' +
+  'this command may deposit a request (it mentions finding.mjs or --request once quotes, backslashes and $ are ignored, or an expansion could supply them) ' +
   'but is not one plain line, so its deposit cannot be read reliably. Issue the deposit as ONE plain line: ' +
   'node scripts/finding.mjs --request "<title>" --spec-file <path> --why-file <path> --approved "<user words>" ' +
   '- started by node itself (no eval, bash -c, env or xargs), no newline, heredoc, redirection, pipe, chaining, substitution, variable or quote-split word - and write the ' +

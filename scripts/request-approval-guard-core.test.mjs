@@ -409,7 +409,8 @@ describe('the flag word inside a finding detail', () => {
   })
   it('a --detail word given to another program is still judged (no eval bypass)', () => {
     const command = `bash -c 'eval "$1"' --detail 'node scripts/finding.mjs --request Unapproved --stdin'`
-    expect(requestsOf(command)).toEqual([{ title: 'Unapproved', approved: '' }])
+    // `eval "$1"` itself is an untitled possible deposit too: its expansion may supply the marker words
+    expect(requestsOf(command)).toEqual([{ title: '', approved: '' }, { title: 'Unapproved', approved: '' }])
     const nextLine = `node scripts/finding.mjs --record x\nbash -c 'eval "$1"' --detail 'node scripts/finding.mjs --request Unapproved'`
     nonCanonical(nextLine)
   })
@@ -555,7 +556,7 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
   })
 
   it('unrelated commands are untouched', () => {
-    for (const command of ['git status', ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
+    for (const command of ['git status', ['cat > /tmp/notes.md <<EOF', "it's a note", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
       expect(isPossibleDeposit(command), command).toBe(false)
       expect(evaluate({ command, entries: chat }).block, command).toBe(false)
     }
@@ -585,6 +586,14 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     `node $'scripts/fin\\x64ing.mjs' $'\\x2d\\x2d\\x72\\x65\\x71\\x75\\x65\\x73\\x74'${tail}`,
     `node $'scripts/fin\\144ing.mjs' --re[q]uest${tail}`,
     `node scripts/f@(i)nding.mjs --re\${Q:-q}uest${tail}`,
+    // the expansion supplies the whole marker word (Astra review of 0c4051d18)
+    `node $(printf 'scripts/fin%sing.mjs' d) $(printf -- '--re%suest' q)${tail}`,
+    `node $F $R${tail}`,
+    `node scripts/$F --request${tail}`,
+    `node {scripts/fin,x}{ding.mjs,y} {--re,x}{quest,y}${tail}`,
+    `node scripts/finding.mjs --re{q..q}uest=Hidden --spec-file /tmp/s.md`,
+    // bash joins continuations before it reads $'…'
+    `node $\\\n'scripts/fin\\x64ing.mjs' $\\\n'--re\\x71uest'${tail}`,
   ])('denies: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
@@ -593,6 +602,13 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
   it.each(['git status', 'ls *.md', 'ls {src,docs}/*.ts', "echo $'a\\tb'", 'cat scripts/*.json'])('leaves alone: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(false)
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
+  })
+
+  it('accepted over-block: any $ or backtick expansion may supply a whole marker word', () => {
+    for (const command of ['echo $HOME', 'cd "$(git rev-parse --show-toplevel)"', 'ls -*']) {
+      expect(isPossibleDeposit(command), command).toBe(true)
+      expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
+    }
   })
 })
 
