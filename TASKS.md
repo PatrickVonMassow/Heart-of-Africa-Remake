@@ -101,6 +101,14 @@ put it is the mistake this line exists to stop.
   Criticality: high - possible false approval.
   Bundle: Modell & Wächter.
 
+- [ ] 1371. The approval guard's hook wrapper allows a call when the payload is unreadable or evaluation throws
+  Queue position: directly after point 1370 (same guard, possible false approval; pre-existing on main, filed from 1367's review because it lies outside the tokenizer scope).
+  Source: GPT-6 Astra review of point 1367, round 6 pass 2/2 (receipt 7a43ffdefe370f31, 17.10.2026): in `scripts/request-approval-guard.mjs` a hook-payload JSON parse failure exits 0 without a decision, and the outer catch logs "allowing the call" and exits 0, so a deposit reaching either path runs without the canonical-line verdict.
+  Final state: when invoked as a hook, a garbled payload or an exception during evaluation denies the call (fail closed) with a reason naming the error; a manual run without stdin stays a no-op.
+  Verifiable: Vitest (spawned): garbled JSON on stdin and a forced evaluation error each yield a deny decision; an empty manual run prints nothing and exits 0.
+  Criticality: high - possible false approval.
+  Bundle: Modell & Wächter.
+
 - [ ] 1360. A villager's head load floats 5-7 cm above the drawn head
   Queue position: directly after point 1342 (Dorfleben); may land on its own.
   Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.
