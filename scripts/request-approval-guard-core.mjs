@@ -147,7 +147,7 @@ export function requestsOf(command, shell = 'bash') {
   if (!isPossibleDeposit(command, shell)) return []
   if (!isCanonical(command, shell)) return [UNTITLED()]
   const tokens = tokenize(command, shell)
-  if (!tokens.some((t) => t.includes('finding.mjs') || expandsToMarker(t))) return []
+  if (!tokens.some((t) => looseView(t).includes('finding.mjs') || expandsToMarker(t))) return []
   return depositsIn(tokens, shell, 0)
 }
 
@@ -254,9 +254,8 @@ const globHitsMarker = (word) =>
 /**
  * Could a shell that re-reads this text assemble a marker? True when it spells
  * one loosely, holds a substitution, variable, positional or special
- * parameter, ANSI-C quote, backtick, brace or extglob expansion, or a glob
- * word that could match a marker. A lone `$` stays literal (`grep '$'`).
- * Accepted over-block: `find -name '*.mjs'`.
+ * parameter, ANSI-C quote, backtick, brace, extglob or any glob. A lone `$`
+ * stays literal (`grep '$'`). Accepted over-block: `find -name '*.ts'`.
  */
 function couldExpandToMarker(text) {
   return mentionsMarker(text) || expandsToMarker(text)
@@ -271,8 +270,8 @@ function couldExpandToMarker(text) {
 function expandsToMarker(text) {
   const src = String(text ?? '')
   if (/\s/.test(src) && (!PLAIN.test(src) || /[*?]/.test(src))) return true
-  if (/\$\S|`/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src) || /[@+!*?]\(/.test(src)) return true
-  return looseView(src).split(/\s+/).some(globHitsMarker)
+  // any glob: an evaluator re-joins words, so `eval bash 'x*'` runs whatever the match names
+  return /\$\S|`|[*?[]|[@+!]\(/.test(src) || /\{[^{}]*(,|\.\.)[^{}]*\}/.test(src)
 }
 
 /**

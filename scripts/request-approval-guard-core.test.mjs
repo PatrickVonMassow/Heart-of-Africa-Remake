@@ -600,7 +600,7 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
-  it.each(['git status', 'ls *.md', 'ls README.md', 'npm run lint', "find . -name '*.ts'", "git commit -m 'Fix x'"])('leaves alone: %s', (command) => {
+  it.each(['git status', 'ls *.md', 'ls README.md', 'npm run lint', "git commit -m 'Fix x'"])('leaves alone: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(false)
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
@@ -617,6 +617,7 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'),
     // a quoted command string is judged like a non-canonical command (round 7 on 5fc0e782c)
     "git commit -m 'Fix (x)'",
+    "find . -name '*.ts'",
   ])('a non-plain character counts (accepted over-block): %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
@@ -668,6 +669,10 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     `bash -c 'node scripts/fin$@ding.mjs X'`,
     `bash -c 'eval cd*.md'`,
     `bash -c 'echo hi; $N'`,
+    // Astra round 8 on 9561e5879: eval re-joins separately quoted words
+    `eval node 'scripts/fin""ding.mjs' '--reque""st'${tail}`,
+    "eval bash 'x*'",
+    `eval node 'scripts/f@(i)nding.mjs' X`,
   ])('a possible deposit: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
