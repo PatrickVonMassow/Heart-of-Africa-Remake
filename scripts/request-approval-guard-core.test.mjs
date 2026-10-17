@@ -556,7 +556,8 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
   })
 
   it('unrelated commands are untouched', () => {
-    for (const command of ['git status', ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
+    // the heredoc delimiter is quoted: an unquoted body's $(date) is an opaque expansion (accepted over-block)
+    for (const command of ['git status', ["cat > /tmp/notes.md <<'EOF'", "it's $(date)", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
       expect(isPossibleDeposit(command), command).toBe(false)
       expect(evaluate({ command, entries: chat }).block, command).toBe(false)
     }
@@ -599,35 +600,38 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
-  it.each(['git status', 'ls *.md', 'ls {src,docs}/*.ts', "echo $'a\\tb'", 'cat scripts/*.json'])('leaves alone: %s', (command) => {
+  it.each([
+    'git status',
+    'ls README.md',
+    "echo 'a $b'",
+    'ls *.md',
+    'ls {src,docs}/*.ts',
+    "echo $'a\\tb'",
+    'cat scripts/*.json',
+    ['cat > /tmp/notes.md <<"EOF"', "it's $(date)", 'EOF'].join('\n'),
+  ])('leaves alone: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(false)
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
 
+  // Accepted over-block: an opaque $ or backtick expansion could supply any word, so a chat session issues it canonically or not at all.
   it.each([
     'echo $HOME',
     'cd "$(git rev-parse --show-toplevel)"',
-    'git commit --author=$AUTHOR -m x',
-    'cat /tmp/$NAME.log | wc -l',
     'cat /tmp/$NAME.log',
-    'ls *.md',
-    'git status',
-    'A=1 echo $HOME',
-    ['cat > /tmp/notes.md <<EOF', "it's $(date) and `pwd`", 'EOF'].join('\n'),
-  ])('an expanding command of literal inert commands is left alone: %s', (command) => {
-    expect(isPossibleDeposit(command), command).toBe(false)
-    expect(evaluate({ command, entries: chat }).block, command).toBe(false)
+    'echo `date`',
+    ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'),
+  ])('an opaque expansion counts (accepted over-block): %s', (command) => {
+    expect(isPossibleDeposit(command), command).toBe(true)
+    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
   it.each([
     'npx $F $R Hidden',
     'bash -c "$CMD"',
     'eval $CMD',
-    'source $FILE',
     '. $FILE',
     'xargs < /tmp/args $F',
-    'env $F',
-    'exec $F',
     '$N scripts/x.mjs $R Hidden',
     'cd /tmp && $N $F',
     // Astra round 2 on 23e1c913f: attached redirections, assignment prefix, expanded executor
@@ -635,13 +639,23 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     `node $F --re{q..q}uest>/dev/null${tail}`,
     `A=1 $N $F $R${tail}`,
     `n{o..o}de $F $R${tail}`,
-    `echo ok; $N $F`,
     `echo "$($N $F $R)"`,
     'echo `$N $F $R`',
     `>echo $N $F $R`,
-  ])('an expanding command with a non-inert simple command is a possible deposit: %s', (command) => {
+    // Astra round 3 on 243b02ae3: git runs an argument, heredoc substitution after a separator, quoted fake heredoc
+    `git -c alias.d='!node' d $F $R${tail}`,
+    ['cat <<EOF', '$(echo; $N $F $R)', 'EOF'].join('\n'),
+    ["echo '<<EOF'", `$N $F $R${tail}`, 'EOF'].join('\n'),
+    ["cat <<'EOF'", '$x', 'EOF', `node $F $R${tail}`].join('\n'),
+  ])('an opaque expansion is a possible deposit: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
+  })
+
+  it('a single-quoted $ in a canonical deposit stays literal: one titled request (Astra round 3, P2)', () => {
+    const command = "node scripts/finding.mjs --request Outer --spec-file '/tmp/$SPEC.md' --why-file /tmp/w.md --approved \"passt so\""
+    expect(requestsOf(command)).toEqual([{ title: 'Outer', approved: 'passt so' }])
+    expect(evaluate({ command, entries: chat }).block).toBe(false)
   })
 })
 
