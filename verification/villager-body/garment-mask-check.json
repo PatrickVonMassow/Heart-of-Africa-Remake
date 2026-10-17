@@ -478,26 +478,26 @@
    "worn": [
     "g-hood-overHead"
    ],
-   "hidden": 186,
-   "covered": 1788,
-   "drawnTriangles": 5729,
+   "hidden": 182,
+   "covered": 1729,
+   "drawnTriangles": 5732,
    "coveredIds": [
-    2,
     5,
     7,
-    8,
-    9,
-    10,
     11,
     12,
-    14,
     16,
     17,
     18,
     19,
     20,
     21,
-    22
+    22,
+    23,
+    24,
+    25,
+    26,
+    27
    ]
   },
   {
@@ -505,18 +505,42 @@
     "g-turban-aroundHead"
    ],
    "hidden": 0,
-   "covered": 0,
+   "covered": 6,
    "drawnTriangles": 5998,
-   "coveredIds": []
+   "coveredIds": [
+    349,
+    350,
+    430,
+    439,
+    1916,
+    1925
+   ]
   },
   {
    "worn": [
     "g-cap-crown"
    ],
    "hidden": 0,
-   "covered": 0,
+   "covered": 76,
    "drawnTriangles": 5998,
-   "coveredIds": []
+   "coveredIds": [
+    63,
+    82,
+    83,
+    348,
+    349,
+    350,
+    351,
+    387,
+    388,
+    389,
+    390,
+    392,
+    393,
+    394,
+    397,
+    398
+   ]
   },
   {
    "worn": [
@@ -656,13 +680,17 @@
     "g-turban-aroundHead"
    ],
    "hidden": 450,
-   "covered": 511,
+   "covered": 517,
    "drawnTriangles": 5209,
    "coveredIds": [
     318,
     335,
     336,
+    349,
+    350,
     383,
+    430,
+    439,
     509,
     510,
     511,
@@ -670,11 +698,7 @@
     513,
     516,
     517,
-    518,
-    519,
-    520,
-    521,
-    522
+    518
    ]
   },
   {
