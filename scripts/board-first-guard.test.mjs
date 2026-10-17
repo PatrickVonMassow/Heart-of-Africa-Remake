@@ -281,7 +281,7 @@ describe('board-first-guard (spawned)', () => {
       const reason = refused.decision?.hookSpecificOutput?.permissionDecisionReason ?? ''
       expect(reason).toContain('BATCH OWNERSHIP STAND-DOWN')
       expect(reason).toContain(`your session scratchpad \`${pad}\``)
-      expect(reason).toContain('node scripts/finding.mjs --request "<title>" --stdin')
+      expect(reason).toContain('node scripts/finding.mjs --request "<title>" --spec-file <spec path> --why-file <why path>')
 
       // The board stays the owner's: a real board Write and a real publish command are refused.
       expect(allowed('Write', { file_path: resolve(repo, '.batch-dashboard.html') })).toBe(false)
