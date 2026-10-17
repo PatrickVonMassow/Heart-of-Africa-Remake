@@ -556,6 +556,23 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
     expect(evaluate({ command: `node ${tail}`, entries: approved }).block).toBe(false)
   })
 
+  it('a quoted shell wrapper around a deposit is never canonical: bash/sh/zsh -c and eval are denied', () => {
+    const unapproved = [human('hallo')]
+    const approved = [human('start'), said('Vorschlag: X'), human('passt so')]
+    const wrapped = [
+      `bash -c 'node $F $R X'`,
+      `bash -c 'node scripts/fin""ding.mjs --request X'`,
+      `sh -c 'node scripts/finding.mjs --request X --approved "passt so"'`,
+      `zsh -c 'node scripts/finding.mjs --request X --approved "passt so"'`,
+      `eval 'node scripts/finding.mjs --request X --approved "passt so"'`,
+    ]
+    for (const command of wrapped) {
+      expect(evaluate({ command, entries: unapproved }), command).toMatchObject({ block: true, id: 'non-canonical' })
+      expect(evaluate({ command, entries: approved }), command).toMatchObject({ block: true, id: 'non-canonical' })
+    }
+    expect(evaluate({ command: 'node scripts/finding.mjs --request X --approved "passt so"', entries: approved }).block).toBe(false)
+  })
+
   it('unrelated commands are untouched', () => {
     // a heredoc or pipe now counts as a possible deposit (accepted over-block); see the expansion block below
     for (const command of ['git status', 'ls -la scripts', 'npm run build']) {
