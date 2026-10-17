@@ -110,6 +110,14 @@ put it is the mistake this line exists to stop.
   Criticality: low - probe timing only, no player-visible change; it blocks a clean covering polish-villagers run.
   Bundle: Dorfleben.
 
+- [ ] 1377. The village chief is still built from primitive shapes instead of the clothed skinned body
+  Queue position: directly after point 1375 (Dorfleben); the user may move it forward.
+  Source: user report 17.10.2026 21:23: the chief still consists of simple geometric shapes. Confirmed in code: the chief in src/scenes/place/PlaceScene.tsx 602-745 builds its own cone body, cylinder, sphere head, sphere cap and sphere hands instead of using PlaceFigure/SkinnedFigure from src/scenes/place/placeFigure.tsx, which shows every other villager as a clothed skinned body on Medium/High. Equally primitive: RobedFigure (PlaceScene.tsx 2296) for the Giza ambient figures.
+  Final state: on Medium/High the chief (and the Giza robed ambient figures) are drawn through the same figure path as the other villagers, as a clothed skinned body with their role's dress and pose; Low keeps the primitive figure as for every villager.
+  Verifiable: browser assertion that the chief's group holds a skinned mesh on Medium/High and the primitive figure on Low; chief and Giza figure pictures on both backends, picture-checked.
+  Criticality: medium - player-visible on every village visit, both backends.
+  Bundle: Dorfleben.
+
 - [ ] 1354. Natural villager motion b2: one pose pipeline, distributed lean and gaze, corrective leg IK, posable clavicles, pelvic check
   Queue position: directly after point 1342 (judged on its rig and clips).
   Source: cut from point 1342 on 13.10.2026 along the line 1342 named for a stall (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 8, 9, the step-4 forearm-twist decision after step 9, 10, 11 and 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
