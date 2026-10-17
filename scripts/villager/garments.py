@@ -628,7 +628,13 @@ def build_form(B, form, wear, L):
     if form == 'topknot':
         return blob((0, L['crown'] + 0.005 * H, -0.01 * H), 0.04 * H, (1, 0.8, 0.95)), 0
     if form == 'hairBag':
-        return blob((0, L['jaw'] + 0.09 * H, -0.075 * H), 0.045 * H, (1, 0.8, 0.9)), 0
+        # against the back of the skull, measured at the bag's height: a fixed
+        # depth left it 1-1.6 cm behind the head. Its front starts 1.5 cm
+        # inside the skull; the garment push lays it onto the scalp
+        y, r = L['jaw'] + 0.09 * H, 0.045 * H
+        near = B.mask_body & (B.head > 0.5) & (np.abs(B.v[:, 1] - y) < 0.03)
+        back = float(B.v[near][:, 2].min())
+        return blob((0, y, back - 0.9 * r + 0.015), r, (1, 0.8, 0.9)), 0
     if form == 'neckBeads' and wear == 'chest':
         # layered strings built into a wide, deep collar over the breast
         # (figureDress.ts neckBeads 'chest'): close on the body, so a cloak
