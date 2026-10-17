@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1367. The request-approval guard's tokenizer still misses three deposit shapes
-  Queue position: directly after point 1365 (split from its review, which did not converge on pre-existing tokenizer limits).
-  Source: GPT-6 Astra review of point 1365, round 6 (receipt 3bd9990b5d8e14d3, 16.10.2026): all three exist on main before 1365. (1) `--request="Outer $(node scripts/finding.mjs --request Hidden …)"` — the `--request=` word is never re-scanned, so the substituted request is hidden; (2) `--request > /tmp/out Hidden … --approved "passt so"` — a redirection becomes the title `>`, so an approval can attach to a title never proposed; (3) an unquoted heredoc body with `$(node scripts/finding.mjs --request Hidden …)` is discarded by the tokenizer although bash executes it.
-  Final state: scripts/request-approval-guard-core.mjs judges each of the three shapes fail closed (the hidden request is a deposit, a redirection operator is never a title, an unquoted heredoc body is scanned for substitutions).
-  Verifiable: Vitest with the three commands above: each yields a deposit that the guard blocks without a matching human approval.
-  Criticality: high - possible false approval.
-  Bundle: Modell & Wächter.
-
 - [ ] 1368. A quoted heredoc fed to a shell still hides a request deposit from the approval guard
   Queue position: directly after point 1367 (same guard core, possible false approval).
   Source: findings carrier 17.10.2026 01:10 (author of point 1367): `bash <<'EOF'` with `node scripts/finding.mjs --request X` in the body runs that body as commands, but scripts/request-approval-guard-core.mjs treats every quoted heredoc body as literal. Pre-existing on main.
