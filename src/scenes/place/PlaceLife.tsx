@@ -3275,6 +3275,8 @@ function ErrandVillagers({
       staged: { ...work.staged },
       last: work.last ? { ...work.last } : null,
       standJars: work.standJars,
+      standCapacity: balance.waterStandCapacity,
+      standArrivalRadius: balance.waterStandArrivalRadius,
       /** The fill ring as drawn (work-order 1117): up, and where the water is. */
       fillRing: {
         shown: fillRingShown.current,
@@ -3375,10 +3377,16 @@ function ErrandVillagers({
           ? null
           : { who, progress, facing, anchors: people.map((p) => ({ x: p.x, z: p.z })) }
     }
+    // Empties the water stand, so a browser check can watch one set-down add
+    // exactly one jar instead of meeting a stand already at its cap (work-order 1376).
+    w.__placeClearStand = () => {
+      work.standJars = 0
+    }
     return () => {
       delete w.__placeErrands
       delete w.__placeCastErrand
       delete w.__placeForceFill
+      delete w.__placeClearStand
     }
   }, [work, people, geography, view, groundHeight])
 
@@ -3409,6 +3417,8 @@ function ErrandVillagers({
                 ref={(el) => {
                   headJars.current[i] = el
                 }}
+                name="carried-jar-full"
+                userData={{ villager: i }}
                 visible={false}
                 position={[0, JAR_HEIGHT / 2, 0]}
                 // A carried jar is not a plumb cylinder: a small lean turns the
@@ -3425,6 +3435,8 @@ function ErrandVillagers({
                   ref={(el) => {
                     handJars.current[i] = el
                   }}
+                  name="carried-jar-empty"
+                  userData={{ villager: i }}
                   visible={false}
                   position={[0, -0.12, 0.04]}
                   rotation={[0, 0, 0.12]}
@@ -3608,6 +3620,7 @@ function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObjec
             ref={(el) => {
               if (jarRefs.current) jarRefs.current[i] = el
             }}
+            name="stand-jar"
             visible={false}
             position={[offset, 0.385 + JAR_HEIGHT / 2, i % 2 === 0 ? 0.04 : -0.06]}
           >

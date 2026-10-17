@@ -12,6 +12,7 @@ import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
+import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
@@ -3490,6 +3491,250 @@ if (section('adult-errands')) {
   }
   }
 
+}
+
+// THE WATER CARRIER'S JAR, AS DRAWN, FOR THE WHOLE ERRAND. The user watched a
+// Bambara carrier walk to the river with empty hands, bend into the water,
+// walk back with nothing on his head, and a full jar appear on the stand. Every
+// check above read the errand's `carry` field or probed an assumed point over
+// his head. This block asks the picture: in each phase — walking out, filling,
+// walking back — the jar group of THAT carrier is projected through the live
+// camera, and the pixels inside that projection must change when only its own
+// meshes are hidden (scripts/verify/carriedJar.mjs). Both figure bodies: the
+// skinned body (as mounted, and after its rig is rebuilt in place) and the low
+// preset's primitive one.
+if (section('water-jar-carried')) {
+  const freezeLife = (on) => page.evaluate((v) => window.__placeFreezeLife?.(v), on)
+  const shotName = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.dwellSeconds = 1
+    e.digSeconds = 3
+    e.pace = 6
+    e.villagerCount = 10
+  })
+  await goToPlace('bambara-village')
+  const live = await page.evaluate(() => !!window.__placeErrands)
+  check('water jar: the Bambara village publishes its errands', live)
+
+  // Rawness of a clip: decoded once per exposure, RGBA.
+  const rawOf = async (buf) => {
+    const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+    return { data, channels: info.channels }
+  }
+  // The jar's own pixels: the projected rectangle exposed with and without its
+  // meshes, life frozen so nothing else moves between the two.
+  const jarPixels = async (who, name, rect) => {
+    const clip = { x: rect.x, y: rect.y, width: Math.max(1, rect.width), height: Math.max(1, rect.height) }
+    await page.evaluate(castCarriedJarShadow, { who, name, on: false })
+    await nextFrames(8)
+    const shown = await rawOf(await capturePixels(page, `${name} shown`, { clip }))
+    await page.evaluate(showCarriedJarMeshes, { who, name, on: false })
+    await nextFrames(8)
+    const hidden = await rawOf(await capturePixels(page, `${name} hidden`, { clip }))
+    await page.evaluate(showCarriedJarMeshes, { who, name, on: true })
+    await page.evaluate(castCarriedJarShadow, { who, name, on: true })
+    await nextFrames(4)
+    return countChangedPixels(shown.data, hidden.data, shown.channels)
+  }
+  // Every stand jar shown against the errand's own count: none appears unless
+  // one was set down.
+  const standReading = () => page.evaluate(() => {
+    let shown = 0
+    window.__placeScene.traverse((o) => { if (o.name === 'stand-jar' && o.visible) shown++ })
+    const e = window.__placeErrands()
+    return { shown, count: e.standJars, capacity: e.standCapacity }
+  })
+  // A lens beside the jar, on the first bearing the ground accepts and from
+  // which the jar's pixels are really there.
+  const photographJar = async (who, name, phase, body, label) => {
+    const first = await page.evaluate(probeCarriedJar, { who, name })
+    if (!first.found) return { verdict: judgeCarriedJar(first, 0), probe: first, tried: 0 }
+    let best = { verdict: judgeCarriedJar(first, 0), probe: first, tried: 0 }
+    let tried = 0
+    for (const dist of [3, 4.5]) for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2
+      const placed = await page.evaluate(([c, a, dist, margin]) => {
+        const cx = c.x + Math.sin(a) * dist
+        const cz = c.z + Math.cos(a) * dist
+        const inward = Math.hypot(cx, cz) <= Math.hypot(c.x, c.z)
+        const edge = window.__placeBoundaryRadius(Math.atan2(cz, cx))
+        if (!inward && (edge == null || Math.hypot(cx, cz) > edge - margin)) return null
+        const p = window.__placePlayer
+        p.x = cx
+        p.z = cz
+        p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
+        p.pitch = Math.atan2(c.y - 1.6, dist)
+        return { x: cx, z: cz }
+      }, [first.center, a, dist, 8])
+      if (!placed) continue
+      tried++
+      await nextFrames(3)
+      const drift = await page.evaluate((w) => Math.hypot(window.__placePlayer.x - w.x, window.__placePlayer.z - w.z), placed)
+      if (drift > 0.4) continue
+      await awaitPlaceDrawn(`water jar ${phase}`)
+      const probe = await page.evaluate(probeCarriedJar, { who, name })
+      if (!probe.rect) continue
+      const changed = await jarPixels(who, name, probe.rect)
+      const verdict = judgeCarriedJar(probe, changed)
+      best = { verdict, probe, tried, changed }
+      if (verdict.ok) {
+        await frame(shotName(`1376-water-carrier-${phase}-${body}`), {
+          local: probe.center,
+          label: label,
+        })
+        return best
+      }
+    }
+    return best
+  }
+  const PHASES = [
+    { phase: 'walk-out', name: 'carried-jar-empty', label: 'the water carrier walking to the river with the EMPTY jar in his hand' },
+    { phase: 'fill', name: 'carried-jar-empty', label: 'the water carrier at the bank dipping the same jar into the river' },
+    { phase: 'walk-back', name: 'carried-jar-full', label: 'the water carrier walking back with the FULL jar on his head' },
+  ]
+  // Waits for the named phase of one carrier (or, for the walk-out, of any),
+  // casting the water errand while none runs, and FREEZES life in the same
+  // frame the phase is seen, so the exposure shows that instant.
+  const awaitPhase = (phase, who) => page.waitForFunction(([phase, who]) => {
+    const e = window.__placeErrands()
+    const stand = e.geography.waterStand
+    const vs = e.villagers
+    const hit = (i) => {
+      const v = vs[i]
+      if (!v?.work) return false
+      if (phase === 'walk-out') {
+        return v.work.situation === 'water-out' && v.carry === 'emptyJar' && v.filling == null &&
+          !v.work.arrived && stand && Math.hypot(v.x - stand.x, v.z - stand.z) > 2.5
+      }
+      if (phase === 'fill') return v.carry === 'emptyJar' && v.filling != null && v.filling > 0.3
+      return v.work.situation === 'water-back' && v.carry === 'fullJar' && !v.work.arrived &&
+        stand && Math.hypot(v.x - stand.x, v.z - stand.z) > 4
+    }
+    const found = who == null ? vs.findIndex((_, i) => hit(i)) : hit(who) ? who : -1
+    if (found >= 0) {
+      window.__placeFreezeLife(true)
+      return { who: found }
+    }
+    if (phase === 'walk-out' && !vs.some((v) => v.work?.situation?.startsWith('water'))) {
+      const now = performance.now()
+      if (!(window.__jarCastAt > now - 2000)) {
+        window.__jarCastAt = now
+        window.__placeCastErrand('water-out')
+      }
+    }
+    return null
+  }, [phase, who], { timeout: 240000 }).then((h) => h.jsonValue()).catch(() => null)
+
+  // Three bodies: the skinned one as the village mounted it; the same figures
+  // after a preset switch REBUILDS their rig in place (medium → high changes the
+  // body's radial segments) — the path on which the jars stayed on the old,
+  // undrawn skeleton; and the low preset's primitive figure.
+  const BODIES = [
+    { body: 'skinned', level: null },
+    { body: 'skinned-rebuilt', level: 'high' },
+    { body: 'primitive', level: 'low' },
+  ]
+  for (const { body, level } of live ? BODIES : []) {
+    // The rebuilt pass must really rebuild: medium first, its skeletons noted,
+    // then the switch, and every skinned inhabitant must stand on a new one.
+    const skeletonIds = () => page.evaluate(() => {
+      const ids = []
+      window.__placeScene.traverse((o) => {
+        if (o.name !== 'inhabitant') return
+        o.traverse((q) => { if (q.isSkinnedMesh && q.skeleton) ids.push(q.skeleton.uuid) })
+      })
+      return ids
+    })
+    let rigsBefore = null
+    if (body === 'skinned-rebuilt') {
+      await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+      await nextFrames(8)
+      await awaitPlaceDrawn('water jar: medium preset')
+      rigsBefore = new Set(await skeletonIds())
+    }
+    if (level) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+      await nextFrames(8)
+      await awaitPlaceDrawn(`water jar: ${level} preset`)
+    }
+    if (rigsBefore) {
+      const after = await skeletonIds()
+      check('water jar (skinned-rebuilt body): the preset switch rebuilt every figure rig',
+        rigsBefore.size > 0 && after.length > 0 && after.every((id) => !rigsBefore.has(id)),
+        `${rigsBefore.size} skeletons before, ${after.length} after, ${after.filter((id) => rigsBefore.has(id)).length} kept`)
+    }
+    let who = null
+    for (const { phase, name, label } of PHASES) {
+      const at = await awaitPhase(phase, who)
+      check(`water jar (${body} body): the ${phase} phase is reached`, !!at, at ? `villager ${at.who}` : 'not within 240 s')
+      if (!at) break
+      who = at.who
+      const skinned = await page.evaluate((w) => {
+        let s = false
+        window.__placeScene.traverse((o) => { if (o.name === 'carried-jar-empty' && o.userData.villager === w) {
+          for (let p = o; p; p = p.parent) if (p.name === 'inhabitant') p.traverse((q) => { if (q.isSkinnedMesh) s = true })
+        } })
+        return s
+      }, who)
+      const wantSkinned = body !== 'primitive'
+      check(`water jar (${body} body, ${phase}): the carrier wears the ${wantSkinned ? 'skinned' : 'primitive'} body`,
+        skinned === wantSkinned, `villager ${who}: ${skinned ? 'skinned' : 'primitive'} body`)
+      const stand = await standReading()
+      check(`water jar (${body} body, ${phase}): the stand shows exactly the jars set down on it`,
+        stand.shown === stand.count, `${stand.shown} shown, ${stand.count} set down`)
+      const got = await photographJar(who, name, phase, body, label)
+      const p = got.probe
+      check(
+        `water jar (${body} body): in the ${phase} phase his jar is drawn where the lens sees it`,
+        got.verdict.ok,
+        `${skinned ? 'skinned' : 'primitive'} body, villager ${who}: ${got.verdict.why}` +
+          (p?.found ? ` — jar centre (${p.center.x.toFixed(2)}, ${p.center.y.toFixed(2)}, ${p.center.z.toFixed(2)}),` +
+            ` size ${p.size.x.toFixed(2)}×${p.size.y.toFixed(2)}×${p.size.z.toFixed(2)}, world scale ${p.worldScale.toFixed(3)},` +
+            ` feet ${p.feet ? `(${p.feet.x.toFixed(2)}, ${p.feet.y.toFixed(2)}, ${p.feet.z.toFixed(2)})` : '?'}, ${got.tried} placements` : ''),
+      )
+      if (phase === 'walk-back') {
+        // The set-down: the stand, emptied first so the cap cannot hide it,
+        // gains exactly his jar, and only once he has reached it.
+        await page.evaluate(() => window.__placeClearStand())
+        await nextFrames(2)
+        const before = (await standReading()).count
+        await freezeLife(false)
+        const flip = await page.waitForFunction((w) => {
+          const e = window.__placeErrands()
+          const v = e.villagers[w]
+          const st = e.geography.waterStand
+          // A jar on the stand while his is still on his head was credited early.
+          if (v.carry === 'fullJar') {
+            if (e.standJars > 0) return { carry: v.carry, early: e.standJars, gap: Math.hypot(v.x - st.x, v.z - st.z), reach: e.standArrivalRadius }
+            return null
+          }
+          return { carry: v.carry, count: e.standJars, gap: Math.hypot(v.x - st.x, v.z - st.z), reach: e.standArrivalRadius }
+        }, who, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null)
+        await nextFrames(2)
+        const after = await standReading()
+        // His stand spot is JOIN_STAND_OFF (2.4 m) from the stand's centre; half a
+        // metre over that plus his arrival reach still means "at the stand".
+        const atStand = !!flip && !flip.early && flip.carry === 'none' && flip.count === 1 && flip.gap <= 2.4 + flip.reach + 0.5
+        check(`water jar (${body} body): the stand gains his jar only when he sets it down`,
+          before === 0 && atStand && after.shown === after.count && after.count === 1,
+          `${before} → ${after.count} set down, ${after.shown} shown; ` +
+            (flip ? (flip.early ? `${flip.early} on the stand while his jar was still on his head, ${flip.gap.toFixed(2)} m out` :
+              `jar ${flip.carry} at ${flip.gap.toFixed(2)} m from the stand (reach ${flip.reach}), ${flip.count} on the stand at that instant`) : 'jar never left his head'))
+      }
+      await freezeLife(false)
+    }
+  }
+  if (live) {
+    await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    await freezeLife(false)
+  }
 }
 
 // GRAIN POUNDING READS AS GRAIN POUNDING (work-order 1274). The stroke itself —
