@@ -34250,3 +34250,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: Vitest: both commands above block in a chat session without approval; a canonical direct deposit with approval still passes.
   Criticality: high - possible false approval.
   Bundle: Modell & Wächter.
+
+- [x] 1360. A villager's head load floats 5-7 cm above the drawn head
+  Queue position: directly after point 1342 (Dorfleben); may land on its own.
+  Source: Opus 5.5 author on the 1342 branch, 16.10.2026: the crown anchor is placed at "drawn top minus chin height" measured up from the head bone, which sits 5-7 cm above the chin, so the load rests 5.1-7.3 cm above the drawn head top (Vitest, bind pose, Zulu adults, elders, youths); main's 1295-village-head-carrier frame shows the same float.
+  Final state: a carried head load rests on the drawn head within 2 cm for every villager build and age on every rig preset that draws loads.
+  Verifiable: the crown-rests check added on feat/1342-natural-motion-b (4bd272643) green; Vitest over the crown anchor; 1295-village-head-carrier picture-checked on both backends.
+  User bug report 16.10.2026 09:06 (findings carrier, /backup/hoa/local/SchwebendeSchaubeUeberDenKoepfen.zip, "Schwebende Scheibe über dem Kopf"): build production cff9fdb (main), WebGPU, nvidia, medium quality, seed 3674687236, place bambara-village, x/z -59.45/-130.99, day 0: thin flat white discs hover clearly above the heads of at least five villagers (the elder in the centre, the two blue-tunic men, two figures by the left hut, the woman on the right), most of whom carry nothing visible. The red disc by the middle hut is the chief's hut marker, not a defect (user correction 09:09). Check whether an empty head pad/load is drawn on non-carriers; if the white disc is not this point's floating load, extend this point's final state to remove it. This seed/position is a picture case of this point.
+  Bundle: Dorfleben.
