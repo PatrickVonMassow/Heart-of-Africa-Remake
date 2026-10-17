@@ -42,6 +42,12 @@ const deposit = (approved, title = TITLE) =>
   `node scripts/finding.mjs --request "${title}" --spec-file /tmp/s.md --why-file /tmp/w.md` +
   (approved === undefined ? '' : ` --approved "${approved}"`)
 const verdict = (command, entries) => evaluate({ command, entries })
+/** A shape the pre-gate denies: one untitled deposit, refused even against an approved title. */
+const nonCanonical = (command, shell = 'bash') => {
+  expect(requestsOf(command, shell), command).toEqual([{ title: '', approved: '' }])
+  const entries = [human('start'), said(`${TITLE} Outer Hidden`), human('passt so')]
+  expect(evaluate({ command, entries, shell }), command).toMatchObject({ block: true, id: 'non-canonical' })
+}
 
 describe('non-request commands pass untouched', () => {
   const chat = [human('hallo')]
@@ -151,8 +157,7 @@ describe('headless sessions', () => {
 describe('command parsing', () => {
   it('detects a chained command', () => {
     const command = `cd /workspace/hoa && node scripts/finding.mjs --request "${TITLE}" --stdin --session abc`
-    expect(requestOf(command)).toEqual({ title: TITLE, approved: '' })
-    expect(verdict(command, [human('hi')]).block).toBe(true)
+    nonCanonical(command)
   })
 
   it('detects node with options and an absolute script path', () => {
@@ -167,17 +172,15 @@ describe('command parsing', () => {
       '--approved "passt so"',
       'EOF',
     ].join('\n')
-    expect(requestOf(command)).toEqual({ title: TITLE, approved: '' })
-    expect(verdict(command, [human('start'), said(TITLE), human('passt so')])).toMatchObject({ block: true, id: 'non-canonical' })
+    nonCanonical(command)
   })
 
   it('still sees a request that follows a heredoc', () => {
-    const command = ['cat > /tmp/s.md <<EOF', 'spec text', 'EOF', `node scripts/finding.mjs --request "${TITLE}" --spec-file /tmp/s.md`].join('\n')
-    expect(requestOf(command)).toEqual({ title: TITLE, approved: '' })
+    nonCanonical(['cat > /tmp/s.md <<EOF', 'spec text', 'EOF', `node scripts/finding.mjs --request "${TITLE}" --spec-file /tmp/s.md`].join('\n'))
   })
 
-  it('keeps the here-string operator as a word', () => {
-    expect(tokenize('cat <<< "x" && ls')).toEqual(['cat', '<<<', 'x', { op: '&&' }, 'ls'])
+  it('splits a canonical command into its words', () => {
+    expect(tokenize(`node x "a b" 'c d' --request="e f" "sag \\"ja\\""`)).toEqual(['node', 'x', 'a b', 'c d', '--request=e f', 'sag "ja"'])
   })
 
   it('reads --approved from the command and decodes double-quote escapes', () => {
@@ -202,11 +205,13 @@ describe('the wrapper payload reader', () => {
 describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
   const approvedChat = [human('start'), said(TITLE), human('passt so')]
 
-  it('1: judges EVERY deposit in a chained command, not only the first', () => {
-    const command = `${deposit('passt so')} ; node scripts/finding.mjs --request "Unapproved" --stdin`
+  it('1: judges EVERY deposit in a command, not only the first', () => {
+    const command = `${deposit('passt so')} --request "Unapproved"`
     expect(requestsOf(command).map((r) => r.title)).toEqual([TITLE, 'Unapproved'])
     expect(verdict(deposit('passt so'), approvedChat).block).toBe(false)
-    expect(verdict(command, approvedChat)).toMatchObject({ block: true, id: 'non-canonical' })
+    expect(verdict(command, approvedChat)).toMatchObject({ block: true, id: 'no-approved' })
+    expect(verdict(command, approvedChat).reason).toContain('Unapproved')
+    nonCanonical(`${deposit('passt so')} ; node scripts/finding.mjs --request "Unapproved" --stdin`)
   })
 
   it('2: sees the deposit behind value-taking node options', () => {
@@ -223,13 +228,9 @@ describe('cross-vendor review findings (GPT-6 Astra, 86cbc8f)', () => {
     expect(command).toContain('.\\scripts\\finding.mjs')
     expect(evaluate({ command, entries: approvedChat, shell: 'powershell' }).block).toBe(true)
     expect(hookDecision({ tool_name: 'PowerShell', tool_input: { command }, transcript_path: '/nonexistent' })).not.toBe(null)
-    // the PowerShell escape is the backtick, and a here-string body is one word
-    expect(requestOf('& node C:\\hoa\\scripts\\finding.mjs --request "a `"b`"" --approved "ok"', 'powershell')).toEqual({
-      title: 'a "b"',
-      approved: 'ok',
-    })
-    const here = `node .\\scripts\\finding.mjs --request "${TITLE}" --stdin @'\n--approved "passt so"\n'@`
-    expect(requestOf(here, 'powershell')).toEqual({ title: TITLE, approved: '' })
+    // a PowerShell call operator, backtick escape or here-string is not canonical
+    nonCanonical('& node C:\\hoa\\scripts\\finding.mjs --request "a `"b`"" --approved "ok"', 'powershell')
+    nonCanonical(`node .\\scripts\\finding.mjs --request "${TITLE}" --stdin @'\n--approved "passt so"\n'@`, 'powershell')
   })
 
   describe('4: a malformed transcript is unreadable, not headless', () => {
@@ -294,34 +295,34 @@ describe('confirming review findings (GPT-6 Astra, b9d21dd) — all caught by th
     expect(requestOf(command, shell), command).toEqual({ title: TITLE, approved: '' })
     expect(evaluate({ command, entries: approvedChat, shell }).block, command).toBe(true)
   }
-  it('if/then', () => caught(`if true; then node scripts/finding.mjs --request "${TITLE}" --stdin; fi`))
+  it('if/then', () => nonCanonical(`if true; then node scripts/finding.mjs --request "${TITLE}" --stdin; fi`))
   it('env -u', () => caught(`env -u HOME node scripts/finding.mjs --request "${TITLE}" --stdin`))
   it('bash -lc', () => caught(`bash -lc 'node scripts/finding.mjs --request "${TITLE}" --stdin'`))
   it('multi-argument pwsh -Command', () =>
     caught(`pwsh -NoProfile -Command node .\\scripts\\finding.mjs --request "${TITLE}" --stdin`, 'powershell'))
   it('PowerShell backtick + CRLF continuation', () =>
-    caught(`node .\\scripts\\finding.mjs --request \`\r\n  "${TITLE}" --stdin`, 'powershell'))
+    nonCanonical(`node .\\scripts\\finding.mjs --request \`\r\n  "${TITLE}" --stdin`, 'powershell'))
   it('node -e … -- finding.mjs --request is judged (fail closed, no longer a false positive to argue)', () =>
     caught(`node -e "1" -- scripts/finding.mjs --request "${TITLE}"`))
   it('chain and node -r stay caught', () => {
     caught(`node -r fs scripts/finding.mjs --request "${TITLE}"`)
-    expect(requestsOf(`${deposit('passt so')} && node scripts/finding.mjs --request "Unapproved"`)).toHaveLength(2)
+    nonCanonical(`${deposit('passt so')} && node scripts/finding.mjs --request "Unapproved"`)
   })
   it('pairs each --approved with its own --request', () => {
-    const command = `node scripts/finding.mjs --request "${TITLE}" --approved "passt so"; node scripts/finding.mjs --request "Other"`
+    const command = `node scripts/finding.mjs --request "${TITLE}" --approved "passt so" --request "Other"`
     expect(requestsOf(command)).toEqual([
       { title: TITLE, approved: 'passt so' },
       { title: 'Other', approved: '' },
     ])
   })
   it('stops the approval lookup at a --request=<value> deposit too (round-3 review)', () => {
-    const command = 'node scripts/finding.mjs --request "A"; node scripts/finding.mjs --request="B" --approved "passt so"'
+    const command = 'node scripts/finding.mjs --request "A" --request="B" --approved "passt so"'
     expect(requestsOf(command)).toEqual([
       { title: 'A', approved: '' },
       { title: 'B', approved: 'passt so' },
     ])
     const chat = [human('start'), said('A and B'), human('passt so')]
-    expect(evaluate({ command, entries: chat })).toMatchObject({ block: true, id: 'non-canonical' })
+    expect(evaluate({ command, entries: chat })).toMatchObject({ block: true, id: 'no-approved' })
   })
   it('denies a matched command whose --request has no readable title (fail closed)', () => {
     for (const command of ['node scripts/finding.mjs --request', 'node scripts/finding.mjs --request --stdin']) {
@@ -400,19 +401,17 @@ describe('the flag word inside a finding detail', () => {
   })
 
   it('a --detail value with command substitution is still judged (fail closed)', () => {
-    const command = `node scripts/finding.mjs --record x --detail "$(node scripts/finding.mjs --request '${TITLE}')"`
-    expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
+    nonCanonical(`node scripts/finding.mjs --record x --detail "$(node scripts/finding.mjs --request '${TITLE}')"`)
   })
 
   it('a real request next to a --record detail is still judged', () => {
-    const command = `node scripts/finding.mjs --record x --detail "mentions --request"; node scripts/finding.mjs --request "${TITLE}"`
-    expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
+    nonCanonical(`node scripts/finding.mjs --record x --detail "mentions --request"; node scripts/finding.mjs --request "${TITLE}"`)
   })
   it('a --detail word given to another program is still judged (no eval bypass)', () => {
     const command = `bash -c 'eval "$1"' --detail 'node scripts/finding.mjs --request Unapproved --stdin'`
     expect(requestsOf(command)).toEqual([{ title: 'Unapproved', approved: '' }])
     const nextLine = `node scripts/finding.mjs --record x\nbash -c 'eval "$1"' --detail 'node scripts/finding.mjs --request Unapproved'`
-    expect(requestsOf(nextLine)).toEqual([{ title: 'Unapproved', approved: '' }])
+    nonCanonical(nextLine)
   })
 
   it('an exact --request detail value stays a deposit (finding.mjs reads it as the flag)', () => {
@@ -425,8 +424,7 @@ describe('the flag word inside a finding detail', () => {
   })
 
   it('an --approved word of a later command is no approval', () => {
-    const command = `node scripts/finding.mjs --request "${TITLE}" --stdin; printf '%s\\n' --approved "passt so"`
-    expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
+    nonCanonical(`node scripts/finding.mjs --request "${TITLE}" --stdin; printf '%s\\n' --approved "passt so"`)
   })
 
   it('detail prose inside a re-parsed string is still judged (fail closed)', () => {
@@ -436,124 +434,51 @@ describe('the flag word inside a finding detail', () => {
   })
 
   it('an --approved word inside a comment is no approval', () => {
-    const command = `node scripts/finding.mjs --request "${TITLE}" --stdin # --approved "passt so"`
-    expect(requestsOf(command)).toEqual([{ title: TITLE, approved: '' }])
-    expect(requestsOf(`node scripts/finding.mjs --request A --stdin --approved #ok`)).toEqual([{ title: 'A', approved: '' }])
+    nonCanonical(`node scripts/finding.mjs --request "${TITLE}" --stdin # --approved "passt so"`)
+    nonCanonical(`node scripts/finding.mjs --request A --stdin --approved #ok`)
   })
 
   it('a substitution inside a title or approval is still scanned', () => {
-    const command = `node scripts/finding.mjs --request "Outer $(node scripts/finding.mjs --request Hidden --stdin)" --approved "passt so"`
-    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
+    nonCanonical(`node scripts/finding.mjs --request "Outer $(node scripts/finding.mjs --request Hidden --stdin)" --approved "passt so"`)
+    // a single-quoted title is literal: no substitution runs, the title is judged as written
+    expect(requestsOf(`node scripts/finding.mjs --request 'Outer $(x)'`)).toEqual([{ title: 'Outer $(x)', approved: '' }])
   })
 
 })
 
-describe('deposit shapes the tokenizer missed (GPT-6 Astra review, round 6)', () => {
-  // the transcript approves only the outer, visible title
-  const chat = [human('start'), said('Vorschlag: Outer'), human('passt so')]
-  const blocked = (command) => expect(evaluate({ command, entries: chat }).block, command).toBe(true)
+describe('shapes of earlier review rounds are denied by the pre-gate (GPT-6 Astra, rounds 6 and 2)', () => {
+  const shapes = [
+    'node scripts/finding.mjs --request > /tmp/out Hidden --stdin --approved "passt so"',
+    'node scripts/finding.mjs --request 2>/dev/null Hidden',
+    'node scripts/finding.mjs --request=>x Hidden',
+    ['cat <<-EOF', '\t`node scripts/finding.mjs --request Hidden`', '\tEOF'].join('\n'),
+    ['cat <<EOF', '$\\', '(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n'),
+    ['cat <<-EOF', '\t`node scripts/finding.mjs \\', '\t--request Hidden`', '\tEOF'].join('\n'),
+    ['cat <<EO\\', 'F', '$(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n'),
+    ["cat <<'X'", 'foo\\', 'X', 'node scripts/finding.mjs --request Hidden --stdin'].join('\n'),
+    'node scripts/finding.mjs --request <<< Outer Hidden --stdin --approved "passt so"',
+    'node scripts/finding.mjs --request <<<"Outer" Hidden --stdin --approved "passt so"',
+    "node scripts/finding.mjs --request 0<<< 'Outer' Hidden --stdin --approved \"passt so\"",
+    'node scripts/finding.mjs --request {fd}<Outer Hidden --stdin --approved "passt so"',
+    'node scripts/finding.mjs --request < Outer Hidden --stdin --approved "passt so"',
+    'node scripts/finding.mjs --request >> Outer Hidden --stdin --approved "passt so"',
+    ['node scripts/finding.mjs --request <<-Outer Hidden --approved "passt so"', 'x', 'Outer'].join('\n'),
+    'node scripts/finding.mjs --request Outer --stdin --approved <<< "passt so"',
+    'node scripts/finding.mjs --request Outer --stdin > --approved "passt so"',
+    'node scripts/finding.mjs --request {fd}<<<Outer Hidden --stdin --approved "passt so"',
+    ...['2>/dev/null', '>&2', '<&0', '&> /tmp/x', '>> /tmp/x', '< /tmp/x', "<<< 'x'"].map(
+      (r) => `node scripts/finding.mjs --request Outer --stdin ${r} --approved "passt so"`,
+    ),
+    ['node scripts/finding.mjs --request Outer --stdin --approved "passt so" <<\'EOF\'', '--- spec ---', 'x', 'EOF'].join('\n'),
+  ]
+  it.each(shapes)('%s', (command) => nonCanonical(command))
 
-  it('a substitution inside a --request=<value> word is a deposit', () => {
-    const command = 'node scripts/finding.mjs --request="Outer $(node scripts/finding.mjs --request Hidden --stdin)" --approved "passt so"'
-    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
-    blocked(command)
-  })
-
-  it('a redirection operator or its target is never a title', () => {
-    const command = 'node scripts/finding.mjs --request > /tmp/out Hidden --stdin --approved "passt so"'
-    const titles = requestsOf(command).map((r) => r.title)
-    expect(titles).not.toContain('>')
-    expect(titles).not.toContain('/tmp/out')
-    blocked(command)
-    expect(requestsOf('node scripts/finding.mjs --request 2>/dev/null Hidden')[0].title).toBe('')
-    expect(requestsOf('node scripts/finding.mjs --request=>x Hidden')[0].title).toBe('')
-    // even a matching proposal and approval cannot attach to a redirection
-    expect(evaluate({ command, entries: [human('start'), said('> /tmp/out Hidden'), human('passt so')] }).block).toBe(true)
-  })
-
-  it('an unquoted heredoc body is scanned for substitutions', () => {
-    const command = ['cat > /tmp/s.md <<EOF', 'Notes: $(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n')
-    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
-    blocked(command)
-    const backtick = ['cat <<-EOF', '\t`node scripts/finding.mjs --request Hidden`', '\tEOF'].join('\n')
-    expect(requestsOf(backtick).map((r) => r.title)).toContain('Hidden')
-  })
-
-  it('a quoted heredoc body stays literal', () => {
+  it('a quoted heredoc body that mentions a deposit is denied too (accepted over-block)', () => {
     for (const open of ["<<'EOF'", '<<"EOF"', '<<\\EOF']) {
-      const command = [`cat > /tmp/s.md ${open}`, 'Notes: $(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n')
-      expect(requestsOf(command), open).toEqual([])
+      nonCanonical([`cat > /tmp/s.md ${open}`, 'Notes: $(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n'))
     }
-    const plain = ['cat > /tmp/s.md <<EOF', 'spec text mentioning scripts/finding.mjs --request', 'EOF'].join('\n')
-    expect(requestsOf(plain)).toEqual([])
-  })
-  it('a backslash-newline continuation in an unquoted heredoc body cannot hide a substitution', () => {
-    const command = ['cat <<EOF', '$\\', '(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n')
-    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
-    blocked(command)
-    const tabbed = ['cat <<-EOF', '\t`node scripts/finding.mjs \\', '\t--request Hidden`', '\tEOF'].join('\n')
-    expect(requestsOf(tabbed).map((r) => r.title)).toContain('Hidden')
-  })
-
-  it('a here-string or heredoc operand is never a title or approval', () => {
-    const shapes = [
-      'node scripts/finding.mjs --request <<< Outer Hidden --stdin --approved "passt so"',
-      'node scripts/finding.mjs --request <<<"Outer" Hidden --stdin --approved "passt so"',
-      "node scripts/finding.mjs --request 0<<< 'Outer' Hidden --stdin --approved \"passt so\"",
-      'node scripts/finding.mjs --request {fd}<Outer Hidden --stdin --approved "passt so"',
-      'node scripts/finding.mjs --request < Outer Hidden --stdin --approved "passt so"',
-      'node scripts/finding.mjs --request >> Outer Hidden --stdin --approved "passt so"',
-      ['node scripts/finding.mjs --request <<-Outer Hidden --approved "passt so"', 'x', 'Outer'].join('\n'),
-    ]
-    for (const command of shapes) {
-      expect(requestsOf(command).map((r) => r.title), command).not.toContain('Outer')
-      blocked(command)
-    }
-    const approval = 'node scripts/finding.mjs --request Outer --stdin --approved <<< "passt so"'
-    expect(requestsOf(approval)[0].approved).toBe('')
-    blocked(approval)
   })
 })
-
-describe('structural fail-closed rule (GPT-6 Astra review, round 2 on the shape fixes)', () => {
-  const chat = [human('start'), said('Vorschlag: Outer Hidden'), human('passt so')]
-  const untitledAndBlocked = (command) => {
-    expect(requestsOf(command), command).toContainEqual({ title: '', approved: '' })
-    expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true })
-  }
-
-  it('a continuation inside a heredoc delimiter cannot turn the body quoted', () => {
-    const command = ['cat <<EO\\', 'F', '$(node scripts/finding.mjs --request Hidden --stdin)', 'EOF'].join('\n')
-    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
-    expect(evaluate({ command, entries: chat }).block).toBe(true)
-  })
-
-  it('a continuation before a quoted heredoc terminator cannot swallow a later deposit', () => {
-    const command = ["cat <<'X'", 'foo\\', 'X', 'node scripts/finding.mjs --request Hidden --stdin'].join('\n')
-    expect(requestsOf(command).map((r) => r.title)).toContain('Hidden')
-  })
-
-  it('over-blocks: any redirection in the request command makes it untitled (redirect operand as approval)', () => {
-    untitledAndBlocked('node scripts/finding.mjs --request Outer --stdin > --approved "passt so"')
-  })
-
-  it('over-blocks: any here-string in the request command makes it untitled ({fd} prefix split off)', () => {
-    untitledAndBlocked('node scripts/finding.mjs --request {fd}<<<Outer Hidden --stdin --approved "passt so"')
-  })
-
-  it('over-blocks: redirections of every form make the request untitled', () => {
-    for (const r of ['2>/dev/null', '>&2', '<&0', '&> /tmp/x', '>> /tmp/x', '< /tmp/x', "<<< 'x'"]) {
-      untitledAndBlocked(`node scripts/finding.mjs --request Outer --stdin ${r} --approved "passt so"`)
-    }
-  })
-
-  it('denies the stdin route in a chat session: a heredoc is never canonical', () => {
-    const command = ['node scripts/finding.mjs --request Outer --stdin --approved "passt so" <<\'EOF\'', '--- spec ---', 'x', 'EOF'].join('\n')
-    expect(requestsOf(command)).toEqual([{ title: 'Outer', approved: 'passt so' }])
-    expect(evaluate({ command, entries: chat })).toMatchObject({ block: true, id: 'non-canonical' })
-  })
-})
-
 
 describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape fixes)', () => {
   // the transcript approves only some OTHER, visible title
