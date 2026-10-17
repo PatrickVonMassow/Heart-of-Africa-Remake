@@ -120,6 +120,14 @@ put it is the mistake this line exists to stop.
   Criticality: medium - player-visible on every village visit, both backends.
   Bundle: Dorfleben.
 
+- [ ] 1378. The traveller in the bird's-eye view is still built from boxes and cylinders instead of the new figure look
+  Queue position: directly after point 1377 (Dorfleben); the user may move it forward.
+  Source: user order 17.10.2026 21:34: "Alle Figuren sollen den neuen Look haben, auch die bei den Pyramiden." Owner search the same evening: apart from the chief and the Giza robed figures (both point 1377), the bird's-eye traveller in src/scenes/travel/TravelScene.tsx (about 2712-2760) is the last hand-built figure: boxes and cylinders with khaki jacket, sun helmet and backpack (TRAVELLER_PACK, src/render/figures.ts), with wound marks over helmet and shoulders. Village, port, fishery, pounders and dig sites already draw through PlaceFigure.
+  Final state: on Medium/High the bird's-eye traveller is drawn in the same clothed figure look as the place figures (khaki jacket, sun helmet, backpack recognisable at bird's-eye distance), keeping the wound marks, the canoe-drag carry and his current footprint and collision; Low may keep the primitive figure as the villagers do.
+  Verifiable: browser assertion that the traveller's group holds the new figure mesh on Medium/High; bird's-eye pictures on both backends, picture-checked for a recognisable traveller at play distance.
+  Criticality: medium - player-visible in the whole travel view, both backends.
+  Bundle: Dorfleben.
+
 - [ ] 1354. Natural villager motion b2: one pose pipeline, distributed lean and gaze, corrective leg IK, posable clavicles, pelvic check
   Queue position: directly after point 1342 (judged on its rig and clips).
   Source: cut from point 1342 on 13.10.2026 along the line 1342 named for a stall (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 8, 9, the step-4 forearm-twist decision after step 9, 10, 11 and 13, in that order, as approved by the GPT-6 Astra final check at b231b21.
