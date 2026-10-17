@@ -69,7 +69,7 @@ const UNTITLED = () => ({ title: '', approved: '' })
 const isRequestWord = (word) => word === REQUEST_FLAG || word.startsWith(`${REQUEST_FLAG}=`)
 
 /** A `node …/finding.mjs` call: the command's first two words. */
-const isFindingCall = (tokens) => /(^|\/)node$/.test(tokens[0] ?? '') && /(^|\/)finding\.mjs$/.test(tokens[1] ?? '')
+const isFindingCall = (tokens) => /(^|[\\/])node$/.test(tokens[0] ?? '') && /(^|[\\/])finding\.mjs$/.test(tokens[1] ?? '')
 
 /**
  * The deposits in one canonical simple command's words: every exact
@@ -232,118 +232,30 @@ export function looseView(command) {
   return String(command ?? '').replace(LOOSE_STRIP, '')
 }
 
-/** Stand-in for text a brace, glob or extglob may splice into one word. */
-const WILD = '\u0000'
-const CONTINUATION = /\\\r?\n/g
-const ANSI_C = /\$'((?:[^'\\]|\\[\s\S])*)'/g
-const ANSI_C_ESCAPE = /\\(?:x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{1,4})|U([0-9a-fA-F]{1,8})|([0-7]{1,3}))/g
-/** Pattern expansions; each pass collapses the innermost level. */
-const PATTERNS = [/\{[^{}]*\}/g, /[?*+@!]\([^()]*\)/g, /\[[^\]]*\]/g, /[*?]/g]
-/** Words and operators: redirection operands and operator-attached words stand alone. */
-const WORD_SPLIT = /[\s<>|&;()]+/
-const HEREDOC = /^<<-?[ \t]*([^\s;&|<>()]+)/
-
-/** The command with continuations joined (bash does this first) and each ANSI-C `$'…'` decoded. */
-function decoded(command) {
-  return String(command ?? '')
-    .replace(CONTINUATION, '')
-    .replace(ANSI_C, (_, body) =>
-      body.replace(ANSI_C_ESCAPE, (m, x, u, U, oct) => {
-        const code = parseInt(x ?? u ?? U ?? oct, oct ? 8 : 16)
-        return code <= 0x10ffff ? String.fromCodePoint(code) : m
-      }),
-    )
-}
-
-/**
- * Does bash perform an OPAQUE expansion here — a `$` or backtick whose result
- * this check cannot see? Single-quoted text, ANSI-C `$'…'` and a quoted
- * heredoc body are literal; an unterminated quote counts (fail closed).
- */
-function hasOpaqueExpansion(command) {
-  const src = String(command ?? '').replace(CONTINUATION, '')
-  const docs = []
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i]
-    if (c === '\\') i++
-    else if (c === "'" || (c === '$' && src[i + 1] === "'")) {
-      if (c === '$') i++
-      for (i++; i < src.length && src[i] !== "'"; i++) if (c === '$' && src[i] === '\\') i++
-      if (i >= src.length) return true
-    } else if (c === '"') {
-      for (i++; i < src.length && src[i] !== '"'; i++) {
-        if (src[i] === '\\') i++
-        else if (src[i] === '$' || src[i] === '`') return true
-      }
-      if (i >= src.length) return true
-    } else if (c === '$' || c === '`') return true
-    else if (c === '<' && src[i + 1] === '<' && src[i + 2] !== '<') {
-      const m = HEREDOC.exec(src.slice(i))
-      if (!m) continue
-      const quotes = m[1].match(/['"]/g) ?? []
-      if (quotes.length % 2) return true
-      docs.push({ word: m[1].replace(/['"\\]/g, ''), quoted: /['"\\]/.test(m[1]), dash: m[0].startsWith('<<-') })
-      i += m[0].length - 1
-    } else if (c === '\n') {
-      for (const doc of docs.splice(0)) {
-        while (i < src.length) {
-          const end = src.indexOf('\n', i + 1) < 0 ? src.length : src.indexOf('\n', i + 1)
-          const line = src.slice(i + 1, end)
-          i = end
-          if ((doc.dash ? line.replace(/^\t+/, '') : line) === doc.word) break
-          if (!doc.quoted && /[$`]/.test(line)) return true
-        }
-      }
-    }
-  }
-  return false
-}
-
-/** The decoded loose view with every brace, glob and extglob collapsed to one WILD. */
-function patternView(command) {
-  let view = decoded(command)
-  for (const pattern of PATTERNS) {
-    for (let prev = null; prev !== view; ) [prev, view] = [view, view.replace(pattern, WILD)]
-  }
-  return looseView(view)
-}
-
-/** `parts` as an anchored regex: a WILD matches any text, every other character itself. */
-const wordRegex = (parts) =>
-  new RegExp(`^${parts.map((c) => (c === WILD ? '[\\s\\S]*' : c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).join('')}$`)
-
-/**
- * Could some expansion of `word` be a marker word? The script word must END in
- * `finding.mjs` (any path before it), the flag word must BE `--request` or
- * start `--request=`.
- */
-function couldBeMarker(word) {
-  const parts = [...word]
-  for (let s = 0; s < parts.length; s++) if (wordRegex(parts.slice(s)).test('finding.mjs')) return true
-  for (let e = 1; e <= parts.length; e++) {
-    if ((e === parts.length || parts[e] === '=') && wordRegex(parts.slice(0, e)).test(REQUEST_FLAG)) return true
-  }
-  return false
-}
-
+/** A command of only these characters expands nothing but `*`/`?` globs: no quote, `$`, escape, operator or brace. */
+const PLAIN = /^[A-Za-z0-9 _./:=,@%+\-*?\n]*$/
 const MARKERS = ['finding.mjs', REQUEST_FLAG]
 
-/** Does the command spell a marker, once quotes, escapes and ANSI-C strings are resolved? */
-function mentionsMarker(command) {
-  return [looseView(command), looseView(decoded(command))].some((view) => MARKERS.some((m) => view.includes(m)))
-}
+/** Does the command spell a marker once quotes, escapes and `$` are ignored? */
+const mentionsMarker = (command) => MARKERS.some((m) => looseView(command).includes(m))
+
+/** A `*`/`?` glob as an anchored regex. */
+const globRegex = (glob) => new RegExp(`^${glob.replace(/[.+^$()|[\]\\{}]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`)
 
 /**
- * Could this command deposit a request? True when it spells `finding.mjs` or
- * `--request` once quotes, escapes and ANSI-C strings are resolved, when a
- * brace, glob or extglob word could expand to one, or when it holds an opaque
- * `$`/backtick expansion that could supply anything (accepted over-block).
+ * Could this command deposit a request? True when its loose view spells
+ * `finding.mjs` or `--request`, when it holds any character outside PLAIN
+ * (sound by construction; accepted over-block for quotes, pipes and the like
+ * in a chat session), or when a glob word could match the script's basename
+ * or the flag.
  */
 export function isPossibleDeposit(command) {
-  if (mentionsMarker(command) || hasOpaqueExpansion(command)) return true
-  return patternView(command)
-    .split(WORD_SPLIT)
-    .some((word) => word.includes(WILD) && couldBeMarker(word))
+  const src = String(command ?? '')
+  if (mentionsMarker(src) || !PLAIN.test(src)) return true
+  return src
+    .split(/\s+/)
+    .filter((word) => /[*?]/.test(word))
+    .some((word) => globRegex(word.split('/').pop()).test('finding.mjs') || globRegex(word.split('=')[0]).test(REQUEST_FLAG))
 }
 
 const BASH_META = new Set('$`\\<>|;&(){}*?[]#~')
@@ -392,7 +304,7 @@ export function isCanonical(command, shell = 'bash') {
 }
 
 const NON_CANONICAL =
-  'this command may deposit a request (it mentions finding.mjs or --request once quotes, backslashes and $ are ignored, or an expansion could supply them, as any $ or backtick expansion could) ' +
+  'this command may deposit a request (it mentions finding.mjs or --request once quotes, backslashes and $ are ignored, or holds a quote, $, escape, operator or other character an expansion could use) ' +
   'but is not one plain line, so its deposit cannot be read reliably. Issue the deposit as ONE plain line: ' +
   'node scripts/finding.mjs --request "<title>" --spec-file <path> --why-file <path> --approved "<user words>" ' +
   '- started by node itself (no eval, bash -c, env or xargs), no newline, heredoc, redirection, pipe, chaining, substitution, variable or quote-split word - and write the ' +

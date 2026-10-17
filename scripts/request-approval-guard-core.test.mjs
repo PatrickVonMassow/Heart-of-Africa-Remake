@@ -556,8 +556,8 @@ describe('coarse fail-closed pre-gate (GPT-6 Astra review, round 3 on the shape 
   })
 
   it('unrelated commands are untouched', () => {
-    // the heredoc delimiter is quoted: an unquoted body's $(date) is an opaque expansion (accepted over-block)
-    for (const command of ['git status', ["cat > /tmp/notes.md <<'EOF'", "it's $(date)", 'EOF'].join('\n'), 'ls | wc -l > /tmp/n']) {
+    // a heredoc or pipe now counts as a possible deposit (accepted over-block); see the expansion block below
+    for (const command of ['git status', 'ls -la scripts', 'npm run build']) {
       expect(isPossibleDeposit(command), command).toBe(false)
       expect(evaluate({ command, entries: chat }).block, command).toBe(false)
     }
@@ -600,33 +600,28 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
-  it.each([
-    'git status',
-    'ls README.md',
-    "echo 'a $b'",
-    'ls *.md',
-    'ls {src,docs}/*.ts',
-    "echo $'a\\tb'",
-    'cat scripts/*.json',
-    ['cat > /tmp/notes.md <<"EOF"', "it's $(date)", 'EOF'].join('\n'),
-  ])('leaves alone: %s', (command) => {
+  it.each(['git status', 'ls *.md', 'ls README.md', 'cat scripts/*.json', 'npm run lint'])('leaves alone: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(false)
     expect(evaluate({ command, entries: chat }).block, command).toBe(false)
   })
 
-  // Accepted over-block: an opaque $ or backtick expansion could supply any word, so a chat session issues it canonically or not at all.
+  // Accepted over-block: a non-canonical chat command with any character outside the plain set counts.
   it.each([
     'echo $HOME',
     'cd "$(git rev-parse --show-toplevel)"',
-    'cat /tmp/$NAME.log',
-    'echo `date`',
+    "echo 'a $b' | wc -l",
+    'ls {src,docs}/*.ts',
+    'git log | head',
     ['cat > /tmp/notes.md <<EOF', "it's $(date)", 'EOF'].join('\n'),
-  ])('an opaque expansion counts (accepted over-block): %s', (command) => {
+  ])('a non-plain character counts (accepted over-block): %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
 
   it.each([
+    `node scripts/fin*.mjs X${tail}`,
+    `node scripts/x.mjs --re?uest${tail}`,
+    `node scripts/x.mjs --re?uest=Hidden`,
     'npx $F $R Hidden',
     'bash -c "$CMD"',
     'eval $CMD',
@@ -647,7 +642,11 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     ['cat <<EOF', '$(echo; $N $F $R)', 'EOF'].join('\n'),
     ["echo '<<EOF'", `$N $F $R${tail}`, 'EOF'].join('\n'),
     ["cat <<'EOF'", '$x', 'EOF', `node $F $R${tail}`].join('\n'),
-  ])('an opaque expansion is a possible deposit: %s', (command) => {
+    // Astra round 4 on 59f33aa53: here-string, continuation in a quoted heredoc, POSIX bracket class
+    `cat <<<$F; node $F $R${tail}`,
+    ["cat <<'EOF'", 'x\\', 'EOF', `node $F $R${tail}`].join('\n'),
+    `node scripts/fin[[:alpha:]]ing.mjs --re[[:alpha:]]uest${tail}`,
+  ])('a possible deposit: %s', (command) => {
     expect(isPossibleDeposit(command), command).toBe(true)
     expect(evaluate({ command, entries: chat }), command).toMatchObject({ block: true, id: 'non-canonical' })
   })
@@ -656,6 +655,12 @@ describe('a deposit assembled by expansion is a possible deposit (GPT-6 Astra re
     const command = "node scripts/finding.mjs --request Outer --spec-file '/tmp/$SPEC.md' --why-file /tmp/w.md --approved \"passt so\""
     expect(requestsOf(command)).toEqual([{ title: 'Outer', approved: 'passt so' }])
     expect(evaluate({ command, entries: chat }).block).toBe(false)
+  })
+
+  it('a PowerShell backslash path is a direct finding.mjs call: one titled request (Astra round 4, P2)', () => {
+    const command = "node scripts\\finding.mjs --request Outer --spec-file 'C:\\tmp\\$SPEC.md' --why-file C:\\tmp\\w.md --approved \"passt so\""
+    expect(requestsOf(command, 'powershell')).toEqual([{ title: 'Outer', approved: 'passt so' }])
+    expect(evaluate({ command, entries: chat, shell: 'powershell' }).block).toBe(false)
   })
 })
 
