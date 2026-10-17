@@ -390,6 +390,15 @@ describe('a head load rests on the drawn head', () => {
             const gap = Math.min(...v.map((a) => surfaceGap(skin, a)))
             const settled = VILLAGER_ASSET.garmentSettleClearance + VILLAGER_ASSET.garmentLayerGap
             expect(gap, `${at}: gap to the head`).toBeLessThanOrEqual(settled + 0.003)
+            // and nowhere through it: every vertex outside the head's section at its height
+            for (const a of v) {
+              const sec = headSection(skin, a.y)
+              if (!sec.length) continue
+              const hc = sectionCentre(sec)
+              const off = new THREE.Vector2(a.x - hc.x, a.z - hc.y)
+              const sr = sectionReach(sec, hc, off.clone().normalize())
+              if (sr > 0) expect(off.length() - sr, `${at}: bag inside the skull at y ${a.y.toFixed(3)}`).toBeGreaterThanOrEqual(-0.006)
+            }
             const mid = v.reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(v.length)
             const back = Math.min(...headSection(skin, mid.y).flat().map((p) => p.y))
             expect(mid.z, `${at}: middle behind the skull`).toBeLessThan(back)
@@ -417,6 +426,44 @@ describe('a head load rests on the drawn head', () => {
           }
         }
       }
+    }
+  })
+})
+
+describe('a head piece faces outward', () => {
+  it('every triangle of a cap, a turban and a headband turns its front away from the head', () => {
+    const worn = new Map<string, DressLayer>()
+    for (const t of Object.values(PEOPLE_DRESS))
+      for (const sex of SEXES) for (const age of AGE_GROUPS) for (const l of t[sex][age]) if (['cap', 'turban', 'headband'].includes(l.form)) worn.set(garmentMeshName(l), dressOf(l))
+    expect(worn.size).toBeGreaterThan(0)
+    const person = gltfPerson(asset, 'male', 'adult')
+    for (const [name, l] of worn) {
+      const g = gltfGarment(asset, person, l)!
+      const pos = g.getAttribute('position')
+      const index = g.getIndex()!
+      g.computeBoundingBox()
+      const top = g.boundingBox!.max.y
+      // the head's axis inside the piece: its middle in x and z
+      const c = g.boundingBox!.getCenter(new THREE.Vector3())
+      const [a, b, d] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+      let out = 0
+      let crown = 0
+      for (let t = 0; t < index.count; t += 3) {
+        a.fromBufferAttribute(pos, index.getX(t))
+        b.fromBufferAttribute(pos, index.getX(t + 1))
+        d.fromBufferAttribute(pos, index.getX(t + 2))
+        const n = new THREE.Triangle(a, b, d).getNormal(new THREE.Vector3())
+        const m = a.clone().add(b).add(d).divideScalar(3)
+        const away = m.clone().sub(new THREE.Vector3(c.x, Math.min(m.y, c.y), c.z))
+        if (n.dot(away) > 0) out++
+        // the crown's closing fan: its triangles face up
+        if (l.form !== 'headband' && Math.hypot(m.x - c.x, m.z - c.z) < 0.015 && m.y > top - 0.02) {
+          crown++
+          expect(n.y, `${name}: crown triangle faces up`).toBeGreaterThan(0)
+        }
+      }
+      expect(out / (index.count / 3), `${name}: share of triangles facing outward`).toBeGreaterThan(0.95)
+      if (l.form !== 'headband') expect(crown, `${name}: a closed crown`).toBeGreaterThan(0)
     }
   })
 })
