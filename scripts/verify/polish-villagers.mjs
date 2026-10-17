@@ -12,7 +12,7 @@ import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
-import { probeCarriedJar, showCarriedJarMeshes, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
+import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
@@ -3532,12 +3532,14 @@ if (section('water-jar-carried')) {
   // meshes, life frozen so nothing else moves between the two.
   const jarPixels = async (who, name, rect) => {
     const clip = { x: rect.x, y: rect.y, width: Math.max(1, rect.width), height: Math.max(1, rect.height) }
+    await page.evaluate(castCarriedJarShadow, { who, name, on: false })
     await nextFrames(8)
     const shown = await rawOf(await capturePixels(page, `${name} shown`, { clip }))
     await page.evaluate(showCarriedJarMeshes, { who, name, on: false })
     await nextFrames(8)
     const hidden = await rawOf(await capturePixels(page, `${name} hidden`, { clip }))
     await page.evaluate(showCarriedJarMeshes, { who, name, on: true })
+    await page.evaluate(castCarriedJarShadow, { who, name, on: true })
     await nextFrames(4)
     return countChangedPixels(shown.data, hidden.data, shown.channels)
   }

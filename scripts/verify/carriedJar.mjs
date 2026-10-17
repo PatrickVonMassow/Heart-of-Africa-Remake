@@ -110,6 +110,19 @@ export function showCarriedJarMeshes({ who, name, on }) {
   return n
 }
 
+/**
+ * Runs INSIDE the page: switches the jar's shadow casting. The pixel diff runs
+ * with it off, so a jar hidden behind a body cannot pass on its shadow alone.
+ */
+export function castCarriedJarShadow({ who, name, on }) {
+  window.__placeScene.traverse((o) => {
+    if (o.name !== name || !o.userData || o.userData.villager !== who) return
+    o.traverse((m) => {
+      if (m.isMesh) m.castShadow = on
+    })
+  })
+}
+
 /** A pixel counts as changed when its summed RGB difference reaches this. */
 export const PIXEL_CHANGE_THRESHOLD = 36
 /** The fewest changed pixels that count as a jar drawn on the screen: a jar at
