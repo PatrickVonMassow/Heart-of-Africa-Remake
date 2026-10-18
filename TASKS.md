@@ -77,22 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1374. The head-carrier probe sometimes measures a carrier with nothing under its crown
-  Queue position: directly after point 1362 (Dorfleben); may land on its own.
-  Source: owner finding 17.10.2026 18:35, polish-villagers full run on feat/1360-head-load-rests 91e1ccbb9 (webgpu, log local/verify-logs/2026-10-17T16-00-47-668-polish-villagers.log): red "head carrier: the load's base sits on the crown (within 1 cm)" with {"i":2,"onHeadBone":true,"underCrown":[],"base":null}; the same red with i=2 on main 5751f7419 (webgpu, local/verify-logs/2026-10-16T07-03-38-686-polish-villagers.log), so it predates 1360; section-only village-walk runs on 1360 were green. The carrier flagged by `__placeWalkers.carries[k]` has an empty `figure-crown` (no portalled basket at all, not a hidden one): either the probe's index k does not match the group it reads, or the headProp portal is missing on that rig.
-  Final state: every villager flagged as a carrier draws its basket under its own crown at all times, and the probe measures exactly that villager; "the load's base sits on the crown" is green.
-  Verifiable: Vitest or probe assertion that carries[k] and group(k) name the same walker; polish-villagers --section=village-walk green on both backends and in a full run.
-  Criticality: medium - a carrier may walk without its basket (player-visible if real) or the probe measures the wrong walker.
-  Bundle: Dorfleben.
-
-- [ ] 1375. The village-loom shutter bracket finds the helper no longer walking out
-  Queue position: directly after point 1374 (Dorfleben); may land on its own.
-  Source: owner covering run 17.10.2026 20:32 for point 1362 on feat/1362-low-walk-samples 5e2d25128, webgpu full polish-villagers (log local/verify-logs/2026-10-17T18-32-30-952-polish-villagers.log, machine state unknown): red "he was still walking out under her reading when the shutter closed" {along 2.4, partWay true, outward false, reading true}; the pre-shutter check was green, so the helper turned between the two reads while the frame was taken.
-  Final state: the teaching picture is taken early enough on the walk out (or the shutter is fast enough) that the bracket read after it still finds him walking out under her reading; the check stays as strict as it is.
-  Verifiable: polish-villagers --section=village-loom green on both backends three times in a row, then in a full run.
-  Criticality: low - probe timing only, no player-visible change; it blocks a clean covering polish-villagers run.
-  Bundle: Dorfleben.
-
 - [ ] 1377. The village chief is still built from primitive shapes instead of the clothed skinned body
   Queue position: directly after point 1375 (Dorfleben); the user may move it forward.
   Source: user report 17.10.2026 21:23: the chief still consists of simple geometric shapes. Confirmed in code: the chief in src/scenes/place/PlaceScene.tsx 602-745 builds its own cone body, cylinder, sphere head, sphere cap and sphere hands instead of using PlaceFigure/SkinnedFigure from src/scenes/place/placeFigure.tsx, which shows every other villager as a clothed skinned body on Medium/High. Equally primitive: RobedFigure (PlaceScene.tsx 2296) for the Giza ambient figures.
@@ -15812,6 +15796,9 @@ to land than a mechanism that needs a review.
   able to fail on a strike that is truly silent.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side race, no player impact measured.
+  Also on WebGPU (18.10.2026): full polish-villagers on feat/1375 35d84fe reds the same
+  `{heardThree:true, struck:2, heard:3, thuds:3}` (log local/verify-logs/2026-10-18T02-30-03-836-polish-villagers.log);
+  the next `--section=village-pounding` run was green, so the race is not WebGL-2-specific.
 - [ ] 1296. The full world suite crashes on WebGPU at the rock-relief click behind an open dialog
   Measured 05.10.2026, 08:40-08:45, on main 69221cd36: `VERIFY_GL=webgpu` world (full suite) exits 1 twice in a row with
   "7 pass, 0 fail" and an uncaught TimeoutError — `page.locator('[data-form="rock-relief"]').click()`

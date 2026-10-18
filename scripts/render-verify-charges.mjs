@@ -202,7 +202,6 @@ export const RED_CHARGES = [
   {
     point: 1292,
     suite: 'polish-villagers',
-    backend: 'webgl',
     kind: 'check',
     match: /both women strike the mortar and every strike is heard/i,
     why:
@@ -211,7 +210,9 @@ export const RED_CHARGES = [
       + 'counted strikes, while the same section ran green on WebGPU minutes earlier and 1121 only '
       + 'changed the river-bank aim block. A counting race in the check, not a silent strike. '
       + 'It is charged, not excused: 1292 owns reading strikes and thuds from one moment, and the '
-      + 'charge dies with that point.',
+      + 'charge dies with that point.'
+      + ' Both backends since 18.10.2026: the full WebGPU run on feat/1375 35d84fe red the same '
+      + '{struck:2, heard:3, thuds:3}.',
   },
   {
     point: 939,
@@ -1868,26 +1869,6 @@ export const RED_CHARGES = [
       'FILED AS 1330 ON 08.10.2026: red on origin/main d22f82796 (worstGround 0.108 m, stances 0) since '
       + 'the glTF body; measured again 11.10.2026 on feat/1336 49f836d8f, webgpu (worstGround 0.198 m, '
       + 'stances 1). The charge dies with point 1330.',
-  },
-  {
-    point: 1374,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^head carrier: the load[’']s base sits on the crown\b/i,
-    why:
-      'FILED AS 1374 ON 17.10.2026: red on feat/1360-head-load-rests 91e1ccbb9, webgpu full run '
-      + '(i=2, underCrown [], base null) and on main 5751f7419; the flagged carrier has an empty crown. '
-      + 'The charge dies with point 1374.',
-  },
-  {
-    point: 1375,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^he was still walking out under her reading when the shutter closed\b/i,
-    why:
-      'FILED AS 1375 ON 17.10.2026: red on feat/1362-low-walk-samples 5e2d25128, webgpu full run '
-      + '(along 2.4, outward false, reading true) - the helper turned while the frame was taken. '
-      + 'The charge dies with point 1375.',
   },
   {
     point: 642,
