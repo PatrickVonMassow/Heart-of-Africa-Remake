@@ -2680,7 +2680,10 @@ the body as skin; fur, beads, metal, leaves and the scalp hair stay smooth.
 The projection runs in the body's bind pose (the vertex position before
 skinning), and each plane's tangent frame is rebuilt per pixel from the
 deformed surface, so the weave rides a walking leg instead of sliding across
-it. Tile sizes, relief and albedo strength per kind are calibratable guesses in
+it. A fragment samples only its own kind's maps (the kinds sit in exclusive
+branches on the fibre code, sampled with explicit gradients so mips and
+anisotropy stay correct): 12 samples at most, none for the smooth parts.
+Tile sizes, relief and albedo strength per kind are calibratable guesses in
 `FIGURE_MICRO` (`src/config/balance.ts`). The low preset keeps the primitive
 figure without them; far away (the bird's-eye traveller) the mip chain averages
 the structure out. Picture evidence: `polish-villagers --section=figure-micro`
