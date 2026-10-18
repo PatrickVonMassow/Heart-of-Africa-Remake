@@ -135,7 +135,8 @@ export function kneelLegs(thighLen: number, calfR: number): { thigh: number; shi
  * on the head alone shears it. The head's world linear part is
  * `diag(1,s,1) · Q · R · S` (Q the chain's rotation); with `R = Q⁻¹` and
  * `S = diag(1,1/s,1)` it is the identity — a counter-rotation and a stretch.
- * Writes `head`'s quaternion and scale; `chain` is hips → neck, in order.
+ * Reads and writes `head`'s quaternion (its own turn composed in: left as it
+ * is at no squash) and writes its scale; `chain` is hips → neck, in order.
  */
 export function unsquashHead(head: THREE.Object3D, chain: readonly THREE.Object3D[], s: number): void {
   const k = s > 0.01 ? s : 1
@@ -148,10 +149,13 @@ export function unsquashHead(head: THREE.Object3D, chain: readonly THREE.Object3
   // Keep the chain's TURN (its twist about y): a rotation about y commutes
   // with the y-squash, so only the rest — lean and stoop — must be undone.
   // With R = Q⁻¹·T the head's world part is diag(1,s,1)·T·diag(1,1/s,1) = T.
-  const twist = new THREE.Quaternion(0, q.y, 0, q.w)
+  // The head's own turn (the clip's, the gaze's) is composed in: its world
+  // twist is kept, and at no squash its local turn is left exactly as it is.
+  const world = q.clone().multiply(head.quaternion)
+  const twist = new THREE.Quaternion(0, world.y, 0, world.w)
   if (twist.lengthSq() < 1e-12) twist.identity()
   else twist.normalize()
-  head.quaternion.identity().slerp(q.invert().multiply(twist), f)
+  head.quaternion.slerp(q.invert().multiply(twist), f)
   head.scale.set(1, 1 / k, 1)
 }
 /** The squash over which the head's counter-rotation fades in. */
@@ -164,4 +168,108 @@ const DOWN = new THREE.Vector3(0, -1, 0)
 export function hangToward(dir: THREE.Vector3, parentWorld: THREE.Quaternion, out = new THREE.Quaternion()): THREE.Quaternion {
   const local = dir.clone().applyQuaternion(parentWorld.clone().invert()).normalize()
   return out.setFromUnitVectors(DOWN, local)
+}
+
+// ---- the distributed lean and the gaze (natural-villager-motion step 9) ------
+
+/** The three spine segments a trunk lean is shared over, pelvis up. */
+export const LEAN_BONES = ['spine', 'spine1', 'chest'] as const
+export type LeanBone = (typeof LEAN_BONES)[number]
+
+/**
+ * A trunk lean `pitch` (rad, + leaning in) and turn `yaw` (rad) shared over
+ * the spine segments by `shares` (VILLAGER_POSE.leanShares): per bone the
+ * local delta (pitch about its x, then yaw about its y) that sums to the whole.
+ */
+export function distributeLean(
+  pitch: number,
+  yaw: number,
+  shares: Readonly<Record<LeanBone, number>>,
+): Record<LeanBone, { pitch: number; yaw: number }> {
+  const out = {} as Record<LeanBone, { pitch: number; yaw: number }>
+  for (const b of LEAN_BONES) out[b] = { pitch: pitch * shares[b], yaw: yaw * shares[b] }
+  return out
+}
+
+/** A gaze held on a direction: its yaw and pitch (rad) relative to the
+ *  heading (+z, +y up), damped toward what it wants. */
+export interface Gaze {
+  yaw: number
+  pitch: number
+  wantYaw: number
+  wantPitch: number
+}
+export const newGaze = (): Gaze => ({ yaw: 0, pitch: 0, wantYaw: 0, wantPitch: 0 })
+
+export interface GazeLimits {
+  yawMax: number
+  pitchUp: number
+  pitchDown: number
+  seconds: number
+}
+
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
+
+/**
+ * One step of the gaze toward what it wants, frame-rate independent
+ * (1 − e^(−dt/τ)), within its limits scaled by `tight` (1, or less under a
+ * head load). The wanted yaw is taken the short way round from where the gaze
+ * is, then clamped, so a target behind never flips the head from one side to
+ * the other.
+ */
+export function stepGaze(g: Gaze, dt: number, lim: GazeLimits, tight = 1): void {
+  const yawMax = lim.yawMax * tight
+  const want = Math.min(yawMax, Math.max(-yawMax, g.yaw + wrap(g.wantYaw - g.yaw)))
+  const pitch = Math.min(lim.pitchUp * tight, Math.max(-lim.pitchDown * tight, g.wantPitch))
+  const k = 1 - Math.exp(-Math.max(0, dt) / Math.max(1e-6, lim.seconds))
+  g.yaw += (want - g.yaw) * k
+  g.pitch += (pitch - g.pitch) * k
+  g.yaw = Math.min(yawMax, Math.max(-yawMax, g.yaw))
+}
+
+/** The unit direction of a gaze's yaw and pitch (+z ahead, +y up). */
+export function gazeDirection(yaw: number, pitch: number, out = new THREE.Vector3()): THREE.Vector3 {
+  return out.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch))
+}
+
+/** A direction's gaze angles (yaw about +y from +z, pitch up). */
+export function gazeAngles(d: THREE.Vector3): { yaw: number; pitch: number } {
+  const len = d.length() || 1
+  return { yaw: Math.atan2(d.x, d.z), pitch: Math.asin(Math.min(1, Math.max(-1, d.y / len))) }
+}
+
+const _aw = new THREE.Quaternion()
+const _ad = new THREE.Quaternion()
+const _af = new THREE.Vector3()
+const _ap = new THREE.Quaternion()
+const _id = new THREE.Quaternion()
+
+/**
+ * Aim the head (+z its face) along `dir` (unit, body frame) over neck and
+ * head: the neck takes `neckShare` of the turn, the head the rest, so the face
+ * points along `dir` whatever the trunk below does (a lean, a gait's bob), by
+ * `weight` (0 leaves both as they are). `chestWorld` is the chest's turn in
+ * the body frame; `neck` and `head` are their local turns, written in place.
+ */
+export function aimHead(chestWorld: THREE.Quaternion, neck: THREE.Quaternion, head: THREE.Quaternion, dir: THREE.Vector3, neckShare: number, weight = 1): void {
+  if (weight <= 0) return
+  // the head's world turn and face, the shortest turn onto the wanted one
+  _aw.copy(chestWorld).multiply(neck).multiply(head)
+  _af.set(0, 0, 1).applyQuaternion(_aw)
+  _ad.setFromUnitVectors(_af, dir)
+  // the neck's share, as a world turn of the neck: local' = P⁻¹ · r · P · local
+  const r = _id.identity().slerp(_ad, Math.min(1, neckShare * weight))
+  _ap.copy(chestWorld)
+  neck.premultiply(_ap).premultiply(r).premultiply(_ap.invert())
+  // the head takes the rest
+  _aw.copy(chestWorld).multiply(neck).multiply(head)
+  _af.set(0, 0, 1).applyQuaternion(_aw)
+  const rest = _ad.setFromUnitVectors(_af, dir)
+  const total = Math.min(1, weight)
+  const neckW = Math.min(1, neckShare * weight)
+  // of what is left, the share that brings the whole turn to `weight`
+  const k = neckW >= 1 ? 1 : Math.max(0, (total - neckW) / (1 - neckW))
+  const r2 = new THREE.Quaternion().slerp(rest, k)
+  _ap.copy(chestWorld).multiply(neck)
+  head.premultiply(_ap).premultiply(r2).premultiply(_ap.invert())
 }
