@@ -798,6 +798,18 @@ if (section('chief-figure')) {
     await page.waitForFunction(() => window.__chief?.phase === 'walking-out' && window.__chief.progress === 0,
       null, { timeout: 30000 })
     for (const level of ['medium', 'high', 'low']) {
+      // Medium and High both draw a skinned mesh, so a skinned level first
+      // passes through Low: the mesh the census then finds can only come from
+      // the requested level's commit, never from the previous one.
+      if (level !== 'low') {
+        await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
+        await page.waitForFunction(() => {
+          const g = window.__placeScene?.getObjectByName('chief')
+          let skinned = 0
+          g?.traverse((o) => { if (o.isSkinnedMesh) skinned++ })
+          return !!g && skinned === 0
+        }, null, { timeout: 20000 }).catch(() => {})
+      }
       await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
       // The body is swapped by React on the next commit: wait for the census
       // the level asks for rather than a fixed delay.
@@ -842,12 +854,14 @@ if (section('chief-figure')) {
       })
       // A preset switch recompiles the scene's pipelines: wait until none is
       // pending for a few frames, or the frame shows an unlit scene.
-      await page.waitForFunction(() => {
+      await page.evaluate(() => { window.__chiefIdleRun = 0 })
+      const settled = await page.waitForFunction(() => {
         const s = window.__shaderPipelines?.()
         const idle = !s || (s.pending === 0 && s.queued === 0)
-        window.__chiefIdleRun = idle ? (window.__chiefIdleRun ?? 0) + 1 : 0
+        window.__chiefIdleRun = idle ? window.__chiefIdleRun + 1 : 0
         return window.__chiefIdleRun >= 3
-      }, null, { timeout: 60000, polling: 'raf' }).catch(() => {})
+      }, null, { timeout: 60000, polling: 'raf' }).then(() => true, () => false)
+      check(`Chief (${level}): the scene's pipelines settle before his picture`, settled)
       await shot(backend(`1377-chief-figure-${level}`), {
         local: { x: at.x, y: at.y + 0.8, z: at.z },
         label: level === 'low'
