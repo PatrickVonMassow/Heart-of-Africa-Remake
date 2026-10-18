@@ -10,7 +10,7 @@ import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { BASE, OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
@@ -5209,6 +5209,260 @@ if (section('village-walk')) {
   kneelChecks('low preset kneel', lowKneel)
   check(`low preset kneel: the primitive stays on the ground through the kneel (≤ ${FOOT_TOL.toFixed(3)} m)`, lowKneel.worstLowest !== null && lowKneel.worstLowest <= FOOT_TOL, JSON.stringify(lowKneel))
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+}
+
+// --- Figure micro-structure (design.md line 64) -------------------------------
+// The villagers and the traveller carry baked cloth / leather / skin structure,
+// projected in the body's BIND-POSE space (render/materials.ts figureMicro*).
+// Three pictures, judged by looking: a close first-person view of a villager
+// (cloth weave, hide grain, skin), the same walker at two phases of its stride
+// (the structure must stay on the limb, not swim across it), and the bird's-eye
+// traveller — plus the traveller's temporal stability measured under TRAA.
+if (section('figure-micro')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  // One villager `d` ahead of the player with a clear sight line to its hips
+  // and chest, on the first of 16 bearings that has one.
+  const stageOne = (village, who, d) =>
+    page.evaluate(
+      ({ who, d }) => {
+        const p = window.__placePlayer
+        window.__dressLineup(null)
+        for (let k = 0; k < 16; k++) {
+          const yaw = p.yaw + (k * Math.PI) / 8
+          const cx = p.x - Math.sin(yaw) * d
+          const cz = p.z - Math.cos(yaw) * d
+          const clear = [0.5, 0.9, 1.2].every((y) => {
+            const hit = window.__placeRayHit?.(cx, y, cz)
+            return !hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.15
+          })
+          if (!clear) continue
+          p.yaw = yaw
+          p.pitch = -0.12
+          window.__dressLineup({ x: cx, z: cz, yaw, only: [who] })
+          return { cx, cz, yaw }
+        }
+        return null
+      },
+      { who, d },
+    )
+  for (const [village, who, label] of [
+    ['zulu-village', 'female-adult', 'a Zulu married woman: bare skin, hide skirt, beadwork'],
+    ['hausa-village', 'male-adult', 'a Hausa married man in his cotton robe'],
+  ]) {
+    await goToPlace(village)
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
+    const at = await stageOne(village, who, 1.25)
+    check(`figure micro-structure: ${village} ${who} staged close with a clear view`, !!at, 'no clear bearing at 1.25 m')
+    if (!at) continue
+    await nextFrames(4)
+    const drawn = await page.evaluate(() => {
+      const row = window.__placeScene.getObjectByName('dress-lineup')
+      let skinned = null
+      row?.traverse((o) => {
+        if (o.isSkinnedMesh && !skinned) skinned = o
+      })
+      const fib = skinned?.geometry.getAttribute('figureFibre')
+      const kinds = fib ? [...new Set(Array.from(fib.array))].sort() : []
+      return { skinned: !!skinned, material: skinned?.material.name ?? null, normalNode: !!skinned?.material.normalNode, kinds }
+    })
+    check(
+      `figure micro-structure: the ${village} ${who} is the skinned body with the micro-relief material and its skin plus garment kinds`,
+      drawn.skinned && drawn.normalNode && drawn.kinds.includes(1) && drawn.kinds.some((k) => k === 2 || k === 3),
+      JSON.stringify(drawn),
+    )
+    await frame(shot(`1380-figure-micro-${village.replace('-village', '')}-close`), {
+      local: { x: at.cx, y: 0.8, z: at.cz },
+      label: `${label}, 1.25 m from the eye: the cloth/leather/skin micro-structure at first-person height`,
+    })
+    await page.evaluate(() => window.__dressLineup(null))
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
+  }
+
+  // THE WALK-CYCLE PAIR: one walker, frozen at two phases of its stride with
+  // the camera at the same offset from it, so the weave can be compared on the
+  // limb from frame to frame.
+  await goToPlace('hausa-village')
+  const walkerAt = () =>
+    page.evaluate(() => {
+      const w = window.__placeWalkers
+      if (!w) return null
+      for (let i = 0; i < w.states.length; i++) {
+        const s = w.states[i]
+        const g = w.group(i)
+        if (!g?.visible || s.mode !== 'walk' || s.pause > 0) continue
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        if (!mesh || !mesh.skeleton.bones.some((b) => b.name === 'bone-toe.L')) continue
+        return i
+      }
+      return null
+    })
+  let who = null
+  for (let f = 0; f < 600 && who === null; f += 10) {
+    who = await walkerAt()
+    if (who === null) await nextFrames(10)
+  }
+  check('figure micro-structure: a villager is out walking on the glTF body', who !== null, 'no skinned walker out in 600 frames')
+  if (who !== null) {
+    // The camera at the walker's flank, `dist` off, looking at it; returns the
+    // thigh swing and whether the hips and head project into the picture.
+    const flankView = (i, flank, dist) =>
+      page.evaluate(
+        ({ i, flank, dist }) => {
+          const g = window.__placeWalkers.group(i)
+          const side = g.rotation.y + (flank * Math.PI) / 2
+          const p = window.__placePlayer
+          p.x = g.position.x + Math.sin(side) * dist
+          p.z = g.position.z + Math.cos(side) * dist
+          p.yaw = side
+          p.pitch = -0.3
+          return { x: p.x, z: p.z, gx: g.position.x, gz: g.position.z }
+        },
+        { i, flank, dist },
+      )
+    const pose = (i) =>
+      page.evaluate((i) => {
+        const g = window.__placeWalkers.group(i)
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        const bone = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`)
+        const cam = window.__placeCamera
+        cam.updateMatrixWorld()
+        const V = g.position.constructor
+        const inView = ['hips', 'shin.L', 'shin.R'].every((n) => {
+          const v = bone(n).getWorldPosition(new V()).project(cam)
+          return Math.abs(v.x) < 0.95 && Math.abs(v.y) < 0.95 && v.z < 1
+        })
+        return { thighL: bone('thigh.L').rotation.x, thighR: bone('thigh.R').rotation.x, inView, at: { x: g.position.x, z: g.position.z } }
+      }, i)
+    // Stand at a flank that holds the legs in the picture and is not pushed off.
+    const standAt = async () => {
+      for (const flank of [1, -1]) {
+        for (const dist of [1.6, 1.9, 1.3, 2.3]) {
+          const want = await flankView(who, flank, dist)
+          await nextFrames(3)
+          const got = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+          if (Math.hypot(got.x - want.x, got.z - want.z) > 0.05) continue
+          const p = await pose(who)
+          if (p.inView) return { flank, dist, ...p }
+        }
+      }
+      return null
+    }
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
+    const a = await standAt()
+    check('figure micro-structure: walk frame A has the walker’s legs in view', !!a, 'no flank spot at 1.3–2.3 m held the walker')
+    if (a) {
+      await frame(shot('1380-figure-micro-walk-a'), {
+        local: { x: a.at.x, y: 0.6, z: a.at.z },
+        label: `walk-cycle frame A: the Hausa walker side-on (thighs ${a.thighL.toFixed(2)} / ${a.thighR.toFixed(2)} rad); the cloth weave on the moving leg`,
+      })
+      // On to a clearly different phase of the stride: the leading thigh swapped.
+      await page.evaluate(() => window.__placeFreezeLife?.(false))
+      const swapped = await stepUntil(
+        ({ i, a }) => {
+          const g = window.__placeWalkers.group(i)
+          let mesh = null
+          g.traverse((o) => {
+            if (o.isSkinnedMesh && !mesh) mesh = o
+          })
+          const t = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`).rotation.x
+          const d = t('thigh.L') - t('thigh.R')
+          return Math.sign(d) !== Math.sign(a.thighL - a.thighR) && Math.abs(d) > 0.6 * Math.abs(a.thighL - a.thighR)
+        },
+        { i: who, a },
+        240,
+      )
+      await page.evaluate(() => window.__placeFreezeLife?.(true))
+      const b = await standAt()
+      check(
+        'figure micro-structure: walk frame B shows the same walker at the opposite stride phase, legs in view',
+        swapped && !!b && b.flank === a.flank,
+        JSON.stringify({ swapped, a: a && { thighL: a.thighL, thighR: a.thighR, flank: a.flank }, b: b && { thighL: b.thighL, thighR: b.thighR, flank: b.flank } }),
+      )
+      if (b) {
+        await frame(shot('1380-figure-micro-walk-b'), {
+          local: { x: b.at.x, y: 0.6, z: b.at.z },
+          label: `walk-cycle frame B: the same walker half a stride on (thighs ${b.thighL.toFixed(2)} / ${b.thighR.toFixed(2)} rad); the weave must sit on the leg as in frame A`,
+        })
+      }
+    }
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
+  }
+
+  // THE BIRD'S-EYE TRAVELLER: out of the place into the travel view; the
+  // skinned traveller (medium) must stay still under TRAA — the baked maps'
+  // mip chain, not a distance fade, is what keeps the far structure calm.
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  const out = await page
+    .waitForFunction(() => !window.__game.getState().placeId && !!window.__travellerRoot && window.__camera?.settled?.(), null, { timeout: 60000 })
+    .then(() => true)
+    .catch(() => false)
+  check('figure micro-structure: the travel view holds the traveller', out, 'no settled travel camera with the traveller in 60 s')
+  if (out) {
+    const skinned = await page.evaluate(() => {
+      let m = null
+      window.__travellerRoot.traverse((o) => {
+        if (o.isSkinnedMesh && o.visible && !m) m = o
+      })
+      return m ? { material: m.material.name, normalNode: !!m.material.normalNode } : null
+    })
+    check('figure micro-structure: the traveller is the skinned body with the micro-relief material', !!skinned?.normalNode, JSON.stringify(skinned))
+    const pos = await page.evaluate(() => window.__game.getState().pos)
+    await frame(shot('1380-figure-micro-traveller'), {
+      world: { x: pos.x, z: pos.z },
+      label: 'the traveller from the bird’s-eye travel camera, standing still under TRAA',
+    })
+    // The traveller's screen box from the projection of his feet and crown.
+    const box = await page.evaluate(() => {
+      const r = window.__travellerRoot
+      r.updateWorldMatrix(true, true)
+      const V = r.position.constructor
+      const pts = []
+      r.traverse((o) => {
+        if (o.name === 'figure-crown' || o.name === 'bone-foot.L' || o.name === 'bone-foot.R' || o.name === 'bone-hand.L' || o.name === 'bone-hand.R') {
+          const v = o.getWorldPosition(new V())
+          pts.push(window.__camera.ndc(v.x, v.z, v.y))
+        }
+      })
+      const W = window.innerWidth
+      const H = window.innerHeight
+      const xs = pts.map((p) => ((p.x + 1) / 2) * W)
+      const ys = pts.map((p) => ((1 - p.y) / 2) * H)
+      const pad = 12
+      const left = Math.max(0, Math.floor(Math.min(...xs) - pad))
+      const top = Math.max(0, Math.floor(Math.min(...ys) - pad))
+      return { left, top, width: Math.min(W - left, Math.ceil(Math.max(...xs) - Math.min(...xs) + 2 * pad)), height: Math.min(H - top, Math.ceil(Math.max(...ys) - Math.min(...ys) + 2 * pad)), points: pts.length }
+    })
+    const frames = []
+    for (let i = 0; i < 4; i++) {
+      frames.push(await capturePixels(page, 'traveller shimmer frame diff', { clip: { x: box.left, y: box.top, width: box.width, height: box.height } }))
+      await nextFrames(6)
+    }
+    let maxFrac = 0
+    let prev = null
+    for (const f of frames) {
+      const raw = await sharp(f).greyscale().raw().toBuffer()
+      if (prev && prev.length === raw.length) {
+        let changed = 0
+        for (let i = 0; i < raw.length; i++) if (Math.abs(raw[i] - prev[i]) > 6) changed++
+        maxFrac = Math.max(maxFrac, changed / raw.length)
+      }
+      prev = raw
+    }
+    // The crop, enlarged 4× for the eye (nearest neighbour: no smoothing).
+    await sharp(frames[0]).resize({ width: box.width * 4, kernel: 'nearest' }).toFile(`${OUT}${shot('1380-figure-micro-traveller-crop')}.png`)
+    check(
+      'figure micro-structure: the standing traveller is temporally stable under TRAA (no shimmer)',
+      box.points >= 5 && box.width > 8 && box.height > 8 && maxFrac < 0.05,
+      JSON.stringify({ box, maxChangedFraction: +(maxFrac * 100).toFixed(2) + ' %' }),
+    )
+  }
 }
 
 await finishPolishSuite()
