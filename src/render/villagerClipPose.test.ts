@@ -468,6 +468,33 @@ describe('the corrective leg solve (natural-villager-motion step 10)', () => {
     expect(at(mid + 1e-7).distanceTo(at(mid - 1e-7))).toBeLessThan(1e-5)
   })
 
+  it('the knee turns continuously on a tilted leg too: the pole never lies along the hip–ankle line', () => {
+    // the leg tilted 53° off vertical, its knee swept across the line from
+    // 0.012 ahead to 0.012 behind (the review's case: behind at 0.004454683
+    // the pole once lay along the line and the ankle jumped 0.785)
+    const hip = new THREE.Vector3(0, 0.6, 0.8)
+    const ankle = new THREE.Vector3(0, 0, 0)
+    const across = new THREE.Vector3(0, 0.8, -0.6) // behind the line
+    const want = 0.9
+    const axis = new THREE.Vector3()
+    const at = (d: number) => {
+      const knee = hip.clone().multiplyScalar(0.5).addScaledVector(across, d)
+      const turn = kneeTurn(hip, knee, ankle, want, VILLAGER_POSE.kneePoleMin, axis)
+      const moved = ankle.clone().sub(knee).applyAxisAngle(axis, turn).add(knee)
+      expect(moved.distanceTo(hip)).toBeCloseTo(want, 6)
+      return moved
+    }
+    let last = at(-0.012)
+    let jump = 0
+    for (let k = 1; k <= 48000; k++) {
+      const moved = at(-0.012 + k * 0.0000005)
+      jump = Math.max(jump, moved.distanceTo(last))
+      last = moved
+    }
+    expect(jump).toBeLessThan(1e-3)
+    expect(at(0.004454583089).distanceTo(at(0.004454783089))).toBeLessThan(1e-5)
+  })
+
   it('held foot still holds', () => {
     // the foot's sole contacts (heel and ball), from the frame each touches
     // down while it stays down, drift on the ground by less than a
