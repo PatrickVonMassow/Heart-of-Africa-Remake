@@ -1638,6 +1638,12 @@
       "why": "same guard core as 1370-1372; end of Modell & Wächter is its place",
       "origin": "machine",
       "place": "last"
+    },
+    "1381": {
+      "at": "2026-10-18T22:50:01.865Z",
+      "why": "low-criticality test-side WebGL 2 red with no player impact; its own entry says end of Testinfrastruktur, behind the game points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1667,7 +1673,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-18T20:36:26.442Z",
+    "at": "2026-10-18T22:50:01.874Z",
     "points": [
       184,
       200,
@@ -2117,7 +2123,8 @@
       1369,
       1373,
       1379,
-      1380
+      1380,
+      1381
     ]
   }
 }
