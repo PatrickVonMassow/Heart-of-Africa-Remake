@@ -1870,16 +1870,6 @@ export const RED_CHARGES = [
       + 'stances 1). The charge dies with point 1330.',
   },
   {
-    point: 1375,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^he was still walking out under her reading when the shutter closed\b/i,
-    why:
-      'FILED AS 1375 ON 17.10.2026: red on feat/1362-low-walk-samples 5e2d25128, webgpu full run '
-      + '(along 2.4, outward false, reading true) - the helper turned while the frame was taken. '
-      + 'The charge dies with point 1375.',
-  },
-  {
     point: 642,
     suite: 'polish-villagers',
     kind: 'check',

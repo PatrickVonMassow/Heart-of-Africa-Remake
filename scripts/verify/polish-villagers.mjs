@@ -1671,93 +1671,104 @@ if (section('village-loom')) {
         const reading = (window.__speech?.labels() ?? []).some(l => l.speakerId === 'village-weaver')
         return { along, partWay: Math.abs(along) > 0.4 && Math.abs(along) < limit, outward, reading }
       }
-      const called = await page.waitForFunction(({ src, limit }) => {
-        const s = new Function('limit', 'return (' + src + ')(limit)')(limit)
-        return !!s && s.partWay && s.outward && s.reading
-      }, { src: helperState.toString(), limit: tendStand - 0.4 }, { timeout: 60000 }).then(() => true).catch(() => false)
-      check('the weaver’s call sends her helper part-way along the warp, and he is walking it OUT under her reading', called)
-      if (called) {
-        const view = page.viewportSize()
-        const teaching = await page.evaluate(({ width, height, limit, src }) => {
-          const layout = window.__placeLayout
-          const station = layout.loom
-          const state = new Function('limit', 'return (' + src + ')(limit)')(limit)
-          const along = state.along
-          const screen = window.__speech?.anchorScreen('village-weaver') ?? null
-          // Nine points ON THE WATER: three depths beyond the waterline (below)
-          // straight out from her seat, each also a stride either way along
-          // the warp. Each is projected through the live camera; the frame is
-          // then read at the ones inside it.
-          const cam = window.__placeCamera
-          const V = Object.getPrototypeOf(cam.position).constructor
-          // AT THREE DEPTHS, NOT ONE (work-order 1191): from a seat ~29 m back
-          // the point 3 m past the modelled waterline projected onto the drawn
-          // beach a few pixels under the water band, with the river plainly in
-          // the frame. 8 and 15 m out lie on the water from any seat the
-          // placement allows; one blue point still answers the question.
-          const toLine = layout.bank
-            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz)
-            : 0
-          const water = layout.bank
-            ? [3, 8, 15].flatMap((beyond) => [-2.5, 0, 2.5].map((d) => {
-                const out = toLine + beyond
-                const x = station.seat.x + layout.bank.nx * out + station.fx * d
-                const z = station.seat.z + layout.bank.nz * out + station.fz * d
-                const v = new V(x, 0, z).project(cam)
-                const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
-                return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
-              }))
-            : []
-          return {
-            ...state,
-            toward: along > 0 ? 'DOWNSTREAM' : 'UPSTREAM',
-            screen,
-            labelOnScreen: !!screen && screen.x >= 0 && screen.x <= width && screen.y >= 0 && screen.y <= height,
-            water,
+      // His walk out lasts barely a second at the errand pace, shorter than a
+      // shutter (point 1375: he arrived and turned between the two reads), so
+      // the life freeze is set IN the predicate, the same frame the state
+      // holds, and lifted only after the bracket read below.
+      try {
+        const called = await page.waitForFunction(({ src, limit }) => {
+          const s = new Function('limit', 'return (' + src + ')(limit)')(limit)
+          const held = !!s && s.partWay && s.outward && s.reading
+          if (held) window.__placeFreezeLife?.(true)
+          return held
+        }, { src: helperState.toString(), limit: tendStand - 0.4 }, { timeout: 60000 }).then(() => true).catch(() => false)
+        check('the weaver’s call sends her helper part-way along the warp, and he is walking it OUT under her reading', called)
+        if (called) {
+          const view = page.viewportSize()
+          const teaching = await page.evaluate(({ width, height, limit, src }) => {
+            const layout = window.__placeLayout
+            const station = layout.loom
+            const state = new Function('limit', 'return (' + src + ')(limit)')(limit)
+            const along = state.along
+            const screen = window.__speech?.anchorScreen('village-weaver') ?? null
+            // Nine points ON THE WATER: three depths beyond the waterline (below)
+            // straight out from her seat, each also a stride either way along
+            // the warp. Each is projected through the live camera; the frame is
+            // then read at the ones inside it.
+            const cam = window.__placeCamera
+            const V = Object.getPrototypeOf(cam.position).constructor
+            // AT THREE DEPTHS, NOT ONE (work-order 1191): from a seat ~29 m back
+            // the point 3 m past the modelled waterline projected onto the drawn
+            // beach a few pixels under the water band, with the river plainly in
+            // the frame. 8 and 15 m out lie on the water from any seat the
+            // placement allows; one blue point still answers the question.
+            const toLine = layout.bank
+              ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz)
+              : 0
+            const water = layout.bank
+              ? [3, 8, 15].flatMap((beyond) => [-2.5, 0, 2.5].map((d) => {
+                  const out = toLine + beyond
+                  const x = station.seat.x + layout.bank.nx * out + station.fx * d
+                  const z = station.seat.z + layout.bank.nz * out + station.fz * d
+                  const v = new V(x, 0, z).project(cam)
+                  const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
+                  return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
+                }))
+              : []
+            return {
+              ...state,
+              toward: along > 0 ? 'DOWNSTREAM' : 'UPSTREAM',
+              screen,
+              labelOnScreen: !!screen && screen.x >= 0 && screen.x <= width && screen.y >= 0 && screen.y <= height,
+              water,
+            }
+          }, { width: view.width, height: view.height, limit: tendStand, src: helperState.toString() })
+          check('her reading stands over her own head while he walks — and ON the screen',
+            teaching.reading && teaching.labelOnScreen, JSON.stringify(teaching))
+          check('he is part-way along the warp and still walking out before the picture is taken',
+            teaching.partWay && teaching.outward, JSON.stringify({ along: teaching.along, outward: teaching.outward }))
+          // The frame declares the HELPER as its subject: he is what the word
+          // means, and a picture that lost him would prove nothing.
+          const helperWorld = await page.evaluate(() => {
+            const helper = window.__placeScene.getObjectByName('village-loom-helper')
+            helper.updateWorldMatrix(true, false)
+            const e = helper.matrixWorld.elements
+            return { x: e[12], y: e[13], z: e[14] }
+          })
+          const third = await frame('1157-village-loom-named-tending', {
+            local: { x: helperWorld.x, y: helperWorld.y + 0.6, z: helperWorld.z },
+            label: `the helper ${teaching.toward.toLowerCase()} along the warp after the weaver named it, her reading over her head and the river beyond`,
+          })
+          // THE SHUTTER IS BRACKETED: the same state read again AFTER the frame.
+          // His walk out is monotone and her reading only ever ends, so a state
+          // that held before the shutter and still holds after it held at the
+          // shutter too — a helper who arrived, or a reading that faded, while
+          // the photograph was being taken is caught here.
+          const after = await page.evaluate(({ src, limit }) => new Function('limit', 'return (' + src + ')(limit)')(limit),
+            { src: helperState.toString(), limit: tendStand })
+          check('he was still walking out under her reading when the shutter closed',
+            !!after && after.partWay && after.outward && after.reading, JSON.stringify(after))
+          // THE WATER IS IN THE PICTURE (item 10): read off the captured frame at
+          // the projected water points, not assumed from the stand. Water is the
+          // one blue-dominant ground in this village; sand, cloth and a body in
+          // the way are not.
+          // A refused frame is its own red and leaves nothing to read (point 1145).
+          if (third) {
+            const { data, info } = await sharp(third).raw().toBuffer({ resolveWithObject: true })
+            const blueAt = (px, py) => {
+              if (px < 0 || py < 0 || px >= info.width || py >= info.height) return false
+              const i = (py * info.width + px) * info.channels
+              const r = data[i], g = data[i + 1], b = data[i + 2]
+              return b > r + 15 && b >= g - 10
+            }
+            const waterSeen = teaching.water.filter(w => w.inFrame && blueAt(w.px, w.py))
+            check('the river is in the captured frame, read at the projected water points',
+              waterSeen.length > 0, JSON.stringify(teaching.water))
           }
-        }, { width: view.width, height: view.height, limit: tendStand, src: helperState.toString() })
-        check('her reading stands over her own head while he walks — and ON the screen',
-          teaching.reading && teaching.labelOnScreen, JSON.stringify(teaching))
-        check('he is part-way along the warp and still walking out before the picture is taken',
-          teaching.partWay && teaching.outward, JSON.stringify({ along: teaching.along, outward: teaching.outward }))
-        // The frame declares the HELPER as its subject: he is what the word
-        // means, and a picture that lost him would prove nothing.
-        const helperWorld = await page.evaluate(() => {
-          const helper = window.__placeScene.getObjectByName('village-loom-helper')
-          helper.updateWorldMatrix(true, false)
-          const e = helper.matrixWorld.elements
-          return { x: e[12], y: e[13], z: e[14] }
-        })
-        const third = await frame('1157-village-loom-named-tending', {
-          local: { x: helperWorld.x, y: helperWorld.y + 0.6, z: helperWorld.z },
-          label: `the helper ${teaching.toward.toLowerCase()} along the warp after the weaver named it, her reading over her head and the river beyond`,
-        })
-        // THE SHUTTER IS BRACKETED: the same state read again AFTER the frame.
-        // His walk out is monotone and her reading only ever ends, so a state
-        // that held before the shutter and still holds after it held at the
-        // shutter too — a helper who arrived, or a reading that faded, while
-        // the photograph was being taken is caught here.
-        const after = await page.evaluate(({ src, limit }) => new Function('limit', 'return (' + src + ')(limit)')(limit),
-          { src: helperState.toString(), limit: tendStand })
-        check('he was still walking out under her reading when the shutter closed',
-          !!after && after.partWay && after.outward && after.reading, JSON.stringify(after))
-        // THE WATER IS IN THE PICTURE (item 10): read off the captured frame at
-        // the projected water points, not assumed from the stand. Water is the
-        // one blue-dominant ground in this village; sand, cloth and a body in
-        // the way are not.
-        // A refused frame is its own red and leaves nothing to read (point 1145).
-        if (third) {
-          const { data, info } = await sharp(third).raw().toBuffer({ resolveWithObject: true })
-          const blueAt = (px, py) => {
-            if (px < 0 || py < 0 || px >= info.width || py >= info.height) return false
-            const i = (py * info.width + px) * info.channels
-            const r = data[i], g = data[i + 1], b = data[i + 2]
-            return b > r + 15 && b >= g - 10
-          }
-          const waterSeen = teaching.water.filter(w => w.inFrame && blueAt(w.px, w.py))
-          check('the river is in the captured frame, read at the projected water points',
-            waterSeen.length > 0, JSON.stringify(teaching.water))
         }
+      } finally {
+        // Lifted on every path, so no later block inherits a frozen village.
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
       }
 
       // FROM THE PLAZA (point 1183): the user's criterion is that the station
