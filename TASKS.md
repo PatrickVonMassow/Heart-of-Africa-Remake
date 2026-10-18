@@ -138,6 +138,14 @@ put it is the mistake this line exists to stop.
   Charged 16.10.2026 from point 1342: runtime g-robe-chest Shown at thigh.R (run 0.0129, walk 0.0084 vs main 0.0006/0.0034; v1077 drawn via v1081 below the hem) - cause: fit.py stops at the first pass worsening the global max depth, so the knee skirt under the robe stays tight (2 passes, main 4). The rebuilt construction must clear it; numbers in the 1342 entry.
   Bundle: Dorfleben.
 
+- [ ] 1379. Giza tourists and the traveller wear 1890 Western dress: shoes, long sleeves, long trousers or skirts, a seated hat
+  Queue position: directly after point 1347 (it needs the rebuilt garment construction); split from point 1378 on 18.10.2026.
+  Source: picture check of point 1378 (18.10.2026): the Giza ambient figures and the bird's-eye traveller now use the shared skinned figure path, but the current garment set has no shoes, long sleeves, long trousers or hats, so the pith-helmeted tourists and the traveller show bare feet, bare forearms and calf-length trousers, and the hat sits as a head prop on the crown. Point 1378 was queued after 1347 for exactly this reason and was landed first as the body-path change only.
+  Final state: Western tourists at Giza (men: jacket, long trousers, shoes, pith helmet; women: long skirt, long sleeves, shoes, hat) and the bird's-eye traveller (khaki jacket and trousers, boots, pith helmet, backpack) are dressed period-correct for 1890 per docs/giza-1890.md with garments from the rebuilt construction of point 1347; the dragoman's tarboosh is drawn; wound marks, swim, canoe and drag stay readable from above.
+  Verifiable: Vitest on the Giza cast and traveller look (garment ids present per role); per backend one picture of the Giza tourists close up and one of the traveller from above, picture-checked.
+  Criticality: medium - player-visible at Giza and in the whole travel view, both backends.
+  Bundle: Dorfleben.
+
 - [ ] 1333. Water-carrying adult dips the jar's mouth under the water surface while filling
   Queue position: after point 1330, in the same village-errands block.
   Source: findings carrier 08.10.2026 20:23Z: `polish-villagers --section=adult-errands` fails "the jar's mouth is tipped under the water surface" on feat/1331 aceda635f (WebGPU mouth -0.197 m, WebGL 2 -0.221 m, surface -0.25 m) and identically on origin/main 6bd36687f at 20:45Z (mouth -0.200 m); runtime-identical to main, so pre-existing and not charged to 1331. Logs local/verify-logs/2026-10-08T20-40-46-090- and 2026-10-08T20-45-25-112-polish-villagers.log. The two water checks in the same runs belong to points 1242 and 568.
