@@ -2529,8 +2529,12 @@ function Player() {
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
+    // The drawn traveller, for the figure census of the verification.
+    const w = window as unknown as Record<string, unknown>
+    w.__travellerRoot = ref.current
     return () => {
-      delete (window as unknown as Record<string, unknown>).__player
+      delete w.__player
+      delete w.__travellerRoot
     }
   }, [])
 

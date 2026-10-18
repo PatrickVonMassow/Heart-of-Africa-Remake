@@ -14,7 +14,7 @@
 // the drei <Html> map/region labels, real layout geometry (getBoundingClientRect
 // hit-tests), a real WheelEvent zoom, the screenshots and the console-error
 // gate. Dev server only (dev hooks).
-import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
 import { FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { frameShutter, captureFrame, capturePixels, waitForSceneReady, jumpBeside } from './frameSubject.mjs'
@@ -965,6 +965,87 @@ if (section('canoe-depiction')) {
     check('Injured figure: healed explorer shows no wound', healed?.wounds === 0, JSON.stringify(healed))
   } else {
     check('Canoe: a water tile and a land tile were found', false, `water=${JSON.stringify(waterSpot)} land=${JSON.stringify(landSpot)}`)
+  }
+}
+
+// --- Point 1378: the traveller on the villagers' figure body -----------------
+// He is drawn through the villagers' Figure (skinned and dressed on medium,
+// primitive on low) at their stature, in khaki with sun helmet and pack. From
+// the steep bird's-eye he must read, and so must his wounds on crown and
+// shoulders: one frame per backend unhurt and one severely wounded.
+if (section('traveller-figure')) {
+  const backend = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  const land = await page.evaluate(() => {
+    const seed = window.__game.getState().seed
+    for (let lat = 24; lat >= 14; lat -= 0.3)
+      for (let lon = -6; lon <= 26; lon += 0.3) if (window.__terrainType(lat, lon, seed) === 'desert') return { lat, lon }
+    return null
+  })
+  check('Traveller: a desert tile to stand him on was found', !!land, JSON.stringify(land))
+  const level = await page.evaluate(() => window.__ui.getState().detailLevel)
+  if (land) try {
+    await page.evaluate((s) => {
+      const g = window.__game.getState()
+      window.__game.setState({ equipment: { ...g.equipment, canoe: 0 }, afflictions: { ...g.afflictions, wounds: 0 } })
+      g.debugJumpTo(s.lat, s.lon)
+    }, land)
+    const census = (skinnedWanted) =>
+      page
+        .waitForFunction((skinnedWanted) => {
+          const root = window.__travellerRoot
+          if (!root) return null
+          root.updateWorldMatrix(true, true)
+          let skinned = 0
+          let inhabitants = 0
+          let owned = 0
+          let helmet = 0
+          let head = null
+          root.traverse((o) => {
+            if (o.isSkinnedMesh) skinned++
+            if (o.name === 'inhabitant') {
+              inhabitants++
+              if (o.userData.actor?.ownedByPlayer) owned++
+            }
+            if (o.name === 'figure-head' && !head) head = o
+            if (o.name === 'sun-helmet') helmet++
+          })
+          if ((skinned > 0) !== skinnedWanted || !head) return null
+          return { skinned, inhabitants, owned, helmet, headRise: +(head.matrixWorld.elements[13] - root.matrixWorld.elements[13]).toFixed(3) }
+        }, skinnedWanted, { timeout: 30000 })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+    for (const lvl of ['low', 'medium']) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), lvl)
+      const c = await census(lvl !== 'low')
+      check(`Traveller (${lvl}): one villager Figure, ${lvl === 'low' ? 'primitive' : 'skinned'}, his own and never named, under the sun helmet`,
+        !!c && c.inhabitants === 1 && c.owned === 1 && c.helmet === 1, JSON.stringify(c))
+      check(`Traveller (${lvl}): his head stands at villager height`, !!c && c.headRise > 0.95 && c.headRise < 1.35, JSON.stringify(c))
+    }
+    await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
+    await page.waitForTimeout(1800)
+    const at = await page.evaluate(() => window.__game.getState().pos)
+    await shot(backend('1378-traveller-above'), { world: { x: at.x, z: at.z }, label: 'the traveller from above on the villagers’ body', settle: false })
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      window.__game.setState({ afflictions: { ...g.afflictions, wounds: 2 } })
+    })
+    await page.waitForFunction(() => window.__player?.wounds === 2, null, { timeout: 6000 }).catch(() => {})
+    await page.waitForTimeout(400)
+    const marks = await page.evaluate(() => {
+      const helmet = window.__travellerRoot?.getObjectByName('sun-helmet')
+      // the light and the severe strap groups ride the helmet: both shown when severe
+      const shown = helmet ? helmet.children.filter((c) => c.type === 'Group' && c.visible).length : -1
+      return { wounds: window.__player?.wounds, shownOnHelmet: shown }
+    })
+    check('Traveller: the severe wound shows its strap marks on the helmet', marks.wounds === 2 && marks.shownOnHelmet === 2, JSON.stringify(marks))
+    await shot(backend('1378-traveller-wounded'), { world: { x: at.x, z: at.z }, label: 'the severely wounded traveller from above', settle: false })
+  } finally {
+    await page.evaluate((l) => {
+      const g = window.__game.getState()
+      window.__game.setState({ afflictions: { ...g.afflictions, wounds: 0 } })
+      window.__ui.getState().setTravelZoom(1)
+      window.__ui.getState().setDetailLevel(l)
+    }, level)
   }
 }
 
