@@ -2664,6 +2664,28 @@ stylised in the asset (a Blender re-bake under `scripts/villager/`).
 
 ---
 
+### 8.7 Cloth, hide and skin micro-structure on the figures (design.md line 64)
+
+At first-person eye height the figures carry the same kind of baked surface
+structure as the huts: tileable 512² albedo and normal maps for `cloth` (a plain
+weave of slubbed threads with soft drape creases), `leather` (pebbled hide grain
+with wrinkles) and `skin` (faint pores and fine lines), generated
+reproducibly by `scripts/generate-surface-textures.mjs` into `public/tex/`. The
+albedo is neutral mid-gray and multiplied onto each figure's own colours, so
+the per-figure dress and skin tones and the dress patterns are unchanged; the
+normal map carries the relief the light reacts to. Which map a part gets
+follows the dress layer's material (`fibreOf` in `src/render/figureDress.ts`):
+cotton, wool, blankets, bark cloth and raffia read as cloth, hide as leather,
+the body as skin; fur, beads, metal, leaves and the scalp hair stay smooth.
+The projection runs in the body's bind pose (the vertex position before
+skinning), and each plane's tangent frame is rebuilt per pixel from the
+deformed surface, so the weave rides a walking leg instead of sliding across
+it. Tile sizes, relief and albedo strength per kind are calibratable guesses in
+`FIGURE_MICRO` (`src/config/balance.ts`). The low preset keeps the primitive
+figure without them; far away (the bird's-eye traveller) the mip chain averages
+the structure out. Picture evidence: `polish-villagers --section=figure-micro`
+(`verification/1380-figure-micro-*.png`).
+
 ## 9. Keeping the cook-fire alight in the rains (TASKS point 256)
 
 When this was written the game's §19.10 village fire burned unprotected
