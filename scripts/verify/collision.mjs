@@ -803,12 +803,15 @@ if (section('chief-figure')) {
       // the requested level's commit, never from the previous one.
       if (level !== 'low') {
         await page.evaluate(() => window.__ui.getState().setDetailLevel('low'))
-        await page.waitForFunction(() => {
+        const reset = await page.waitForFunction(() => {
           const g = window.__placeScene?.getObjectByName('chief')
           let skinned = 0
           g?.traverse((o) => { if (o.isSkinnedMesh) skinned++ })
           return !!g && skinned === 0
-        }, null, { timeout: 20000 }).catch(() => {})
+        }, null, { timeout: 20000 }).then(() => true, () => false)
+        check(`Chief (${level}): he passes through the primitive figure before the switch`, reset)
+        // Without that reset the census below could read the previous body.
+        if (!reset) continue
       }
       await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
       // The body is swapped by React on the next commit: wait for the census
