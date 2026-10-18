@@ -421,8 +421,9 @@ export function SkinnedFigure({
   // ONE POSE PIPELINE on the glTF body (natural-villager-motion step 8), in a
   // fixed order: the code's legs (stance, crouch, kneel) and the arms it
   // gestures with → the clips as the base (idle, gait, carry, dig: trunk, neck,
-  // head, clavicles and the arms they own) → the additive deltas (the pose's
-  // lean and turn, the elder's stoop) → the hand contacts and the steadying
+  // head, clavicles and the arms they own) and the posed clavicles → the
+  // contact's crouch target, tried on that body → the additive deltas (the
+  // pose's lean and turn, the elder's stoop) → the hand contacts and the steadying
   // hand, solved on that final body → the shovel, the hand shapes, the head's
   // squat correction last. The gait's leg solve and pelvis drop run inside the
   // gait layer; nothing after it moves the pelvis or a leg (the trunk deltas
@@ -537,28 +538,6 @@ export function SkinnedFigure({
           b.spine.updateWorldMatrix(false, true)
         }
       }
-      if (contact && !kneelNow && Math.abs(m.speed) <= VILLAGER_MOTION.moveSpeed) {
-        // Every pose is solved from STANDING height: a contact's crouch is
-        // found afresh each time, never inherited, so a held contact cannot
-        // alternate between crouched and standing. Each crouch is tried WITH
-        // its own lean (a low contact takes both: bent knees and a bent back).
-        const shortOf = () =>
-          Math.max(
-            ...(['L', 'R'] as const).map((s, i) => {
-              const vh = virtualHands.current[i]
-              return vh && contactArm[i] ? loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) - reachOf(s) * 0.995 : -1
-            }),
-          )
-        const tryAt = (cc: number) => {
-          b.hips.position.y = standHip(cc)
-          leanIn()
-          return shortOf()
-        }
-        m.crouchTarget = crouchTarget(m.speed, contactCrouch(tryAt))
-      } else {
-        // Never a crouch on the move: released before the walk, resumed after.
-        m.crouchTarget = 0
-      }
       const walk = poseLegs()
       // the code walk's counter-turn of the trunk is the code-built body's:
       // the glTF body's gait clip carries its own (and its stray −hipYaw goes)
@@ -602,6 +581,35 @@ export function SkinnedFigure({
         })
       }
       b.hips.updateWorldMatrix(false, true)
+      // THE CONTACT'S CROUCH, chosen on the established body (the clips, the
+      // dig's share and the posed clavicles already on).
+      if (contact && !kneelNow && Math.abs(m.speed) <= VILLAGER_MOTION.moveSpeed) {
+        // Every pose is solved from STANDING height: a contact's crouch is
+        // found afresh each time, never inherited, so a held contact cannot
+        // alternate between crouched and standing. Each crouch is tried WITH
+        // its own lean (a low contact takes both: bent knees and a bent back).
+        const shortOf = () =>
+          Math.max(
+            ...(['L', 'R'] as const).map((s, i) => {
+              const vh = virtualHands.current[i]
+              return vh && contactArm[i] ? loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) - reachOf(s) * 0.995 : -1
+            }),
+          )
+        const hipY = b.hips.position.y
+        const tryAt = (cc: number) => {
+          b.hips.position.y = standHip(cc)
+          leanIn()
+          return shortOf()
+        }
+        m.crouchTarget = crouchTarget(m.speed, contactCrouch(tryAt))
+        // the tries leave the body as it was
+        b.hips.position.y = hipY
+        writeTrunk(0, hipYaw, chestYaw)
+        b.hips.updateWorldMatrix(false, true)
+      } else {
+        // Never a crouch on the move: released before the walk, resumed after.
+        m.crouchTarget = 0
+      }
       if (contact) leanIn()
       // THE GAZE on the final trunk (step 9): the head held on what the figure
       // looks at — a hand in a contact, else the horizon along the heading
