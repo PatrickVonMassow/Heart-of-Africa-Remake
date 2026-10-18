@@ -1889,4 +1889,14 @@ export const RED_CHARGES = [
       + '(along 2.4, outward false, reading true) - the helper turned while the frame was taken. '
       + 'The charge dies with point 1375.',
   },
+  {
+    point: 642,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^the order at the stand can be photographed: a sender still there and a carrier already going — no order in 180 s/i,
+    why:
+      'MEASURED 18.10.2026 on main f698cd920, webgpu full polish-villagers: the moment-catcher point 642 '
+      + 'names as its fourth case found no order inside its 180 s window (charged before on 24.09.2026, '
+      + 'struck after one green pass). The charge dies with point 642.',
+  },
 ]
