@@ -1671,9 +1671,15 @@ if (section('village-loom')) {
         const reading = (window.__speech?.labels() ?? []).some(l => l.speakerId === 'village-weaver')
         return { along, partWay: Math.abs(along) > 0.4 && Math.abs(along) < limit, outward, reading }
       }
+      // His walk out lasts barely a second at the errand pace, shorter than a
+      // shutter (point 1375: he arrived and turned between the two reads), so
+      // the life freeze is set IN the predicate, the same frame the state
+      // holds, and lifted only after the bracket read below.
       const called = await page.waitForFunction(({ src, limit }) => {
         const s = new Function('limit', 'return (' + src + ')(limit)')(limit)
-        return !!s && s.partWay && s.outward && s.reading
+        const held = !!s && s.partWay && s.outward && s.reading
+        if (held) window.__placeFreezeLife?.(true)
+        return held
       }, { src: helperState.toString(), limit: tendStand - 0.4 }, { timeout: 60000 }).then(() => true).catch(() => false)
       check('the weaver’s call sends her helper part-way along the warp, and he is walking it OUT under her reading', called)
       if (called) {
@@ -1741,6 +1747,7 @@ if (section('village-loom')) {
           { src: helperState.toString(), limit: tendStand })
         check('he was still walking out under her reading when the shutter closed',
           !!after && after.partWay && after.outward && after.reading, JSON.stringify(after))
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
         // THE WATER IS IN THE PICTURE (item 10): read off the captured frame at
         // the projected water points, not assumed from the stand. Water is the
         // one blue-dominant ground in this village; sand, cloth and a body in
