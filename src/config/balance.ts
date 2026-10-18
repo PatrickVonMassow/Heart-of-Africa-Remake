@@ -2829,6 +2829,47 @@ export const VILLAGER_GLTF = {
   hair: { brow: 0.62, nape: 0.3, back: 0.38 },
 } as const
 
+/**
+ * The glTF villager's runtime pose on top of its clips (natural-villager-motion
+ * steps 9–11). Calibratable, read off the runtime sheets.
+ */
+export const VILLAGER_POSE = {
+  /** How a trunk lean or turn (rad) is shared over the three spine segments,
+   *  pelvis up; the hips take none (no leg is re-solved under them). Sum 1, no
+   *  bone above 0.35 (step 9). */
+  leanShares: { spine: 0.35, spine1: 0.33, chest: 0.32 },
+  /** The gaze (step 9): the head held on a target (by default the horizon
+   *  along the heading). `chestYaw`: the chest's share of a turn toward the
+   *  target; of the rest the neck takes `neck`, the head the remainder.
+   *  Limits relative to the heading (rad): yaw ±`yawMax`, pitch `pitchDown`
+   *  below … `pitchUp` above. `seconds`: the damping's time constant.
+   *  `headLoad`: the limits' share kept under a head load. */
+  gaze: { chestYaw: 0.25, neck: 0.4, yawMax: 1.22, pitchUp: 0.52, pitchDown: 0.7, seconds: 0.18, headLoad: 0.5 },
+  /** The corrective leg solve (step 10): it runs only where the leg's target
+   *  misses the clip's own ankle by more than this (person units per unit of
+   *  leg). The concept's ~2 mm would leave a held foot up to 2 mm off its hold
+   *  against the 1 mm the held-foot test allows; the solve keeps the clip's
+   *  own hinge and twist, so it needs no dead zone to keep the clip's leg and
+   *  this is 0.5 mm. The knee bends toward the clip's own knee until the leg
+   *  is this straight (the knee's offset off the hip–ankle line, person units
+   *  per unit of leg), toward straight ahead below it. */
+  legCorrectMin: 0.0005,
+  /** The posable clavicles (step 11): a pose's protraction (rad, the
+   *  shoulder forward) and elevation (rad, up; negative drops it) per side,
+   *  added after the clip, clamped to these ranges — the ones the garment
+   *  penetration gate measures (scripts/villager/penetration.py, clip
+   *  `shoulders`). Calibratable. */
+  shoulders: { protractionMax: 0.3, elevationMax: 0.2, dropMax: 0.12 },
+  /** The most the distributed trunk may lean (rad, the whole over its three
+   *  segments, each its share) to bring a contact into reach. A bend shared
+   *  over three pivots carries the shoulder less far than the same angle at
+   *  the lowest one: the runtime point subject's hand needed 0.55–0.6 rad
+   *  distributed where one joint needed 0.5 (measured 18.10.2026), so the
+   *  one-joint CONTACT_LEAN_MAX (0.5) is too short here. Calibratable. */
+  contactLeanMax: 1.2,
+  kneePoleMin: 0.01,
+} as const
+
 // Dev hook for the headless verification (the village-walk tolerances).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__villagerMotion = VILLAGER_MOTION

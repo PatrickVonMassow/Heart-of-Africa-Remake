@@ -232,9 +232,9 @@ describe('the visible-only penetration report', () => {
 
   // the markdown names each garment's MD_CASES (penetration.py) worst cases and
   // counts the rest; the json keeps every case
-  it('the report hands each garment\'s worst cases to point 1334 by name and counts the rest', () => {
+  it('the report hands each garment\'s worst cases to point 1347 by name and counts the rest', () => {
     const shown = 3
-    const section = md.split('## Remaining visible cases (handed to work-order point 1334)')[1]?.split('\n## ')[0]
+    const section = md.split('## Remaining visible cases (handed to work-order point 1347)')[1]?.split('\n## ')[0]
     expect(section).toBeDefined()
     const lines = section!.split('\n')
     let checked = 0

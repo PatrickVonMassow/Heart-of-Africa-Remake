@@ -53,6 +53,8 @@ import gamepath as GP
 import mask as M
 from body import top4, vertex_normals
 from export import EXPORT_CLIPS
+import skeleton as SK
+from gltfio import qinv, qmul, qnorm
 from fit import depths, garment_pos
 from sheets import corner_weights, morphed
 
@@ -311,8 +313,42 @@ def _poses(S, c, person, cfg, ident):
         if k % S['stride']:
             continue
         at = f'{cname} frame {f}{"" if kst == 1 else f" stride {kst:g}"} ({sex} {age} build {build:+.0f})'
+        if cname == 'shoulders':
+            q = shoulders_q(person, q, S['clips']['clips']['shoulders']['shoulders'][f])
         wr, wp = person.pose(q, hips, kst)
         yield cname, at, (lambda v, i, w, wr=wr, wp=wp: person.skin(v, i, w, wr, wp)), None, None
+
+
+def with_shoulders(clips, cfg):
+    """`clips` with the posable clavicles' measured range as a clip named
+    'shoulders' (natural-villager-motion step 11): the idle's first frame with
+    both clavicles at each extreme of VILLAGER_POSE.shoulders (forward, up,
+    dropped, forward and up, forward and dropped) — the range the game clamps
+    a pose's shoulders to (gltfClipLayers.ts poseShoulders)."""
+    s = cfg['VILLAGER_POSE']['shoulders']
+    pro, up, drop = s['protractionMax'], s['elevationMax'], s['dropMax']
+    variants = [(pro, 0.0), (0.0, up), (0.0, -drop), (pro, up), (pro, -drop)]
+    idle = clips['clips']['idle']
+    c = dict(clips)
+    c['clips'] = dict(clips['clips'])
+    c['clips']['shoulders'] = {'kind': 'shoulders', 'times': [0.0] * len(variants), 'q': [idle['q'][0]] * len(variants),
+                               'hips': [idle['hips'][0]] * len(variants), 'shoulders': variants}
+    return c
+
+
+def shoulders_q(person, q, pose):
+    """A frame's A-pose locals with both clavicles turned as poseShoulders
+    turns the hung ones: the hung local times Δ (forward about y, up about z,
+    three's Euler YZX) is the A-pose local times hang⁻¹ · Δ · hang."""
+    from gltfio import qaxis
+    pro, up = pose
+    q = np.array(q, float).copy()
+    for s, side in (('L', 1.0), ('R', -1.0)):
+        i = SK.NAMES.index(f'shoulder.{s}')
+        d = qmul(qaxis((0, 1, 0), -side * pro), qaxis((0, 0, 1), side * up))
+        h = person.hang[i]
+        q[i] = qnorm(qmul(q[i], qmul(qmul(qinv(h), d), h)))
+    return q
 
 
 def _corner(c):
@@ -594,6 +630,13 @@ def selftest():
     assert any('UNCHECKED' in s and '`g-new`' in s for s in _l)
     main['build']['g-new'], main['garments']['g-new'] = row(0.0, 'build'), row(0.0, 'walk')
     assert compare(now_b, now_w, main, lim, 0.003)[2] == [], 'every garment has a row'
+    # the shoulders clip samples every corner of the clamped range, the
+    # forward-and-up one included
+    sh = {'VILLAGER_POSE': {'shoulders': {'protractionMax': 0.3, 'elevationMax': 0.2, 'dropMax': 0.12}}}
+    idle = {'clips': {'idle': {'q': ['q0', 'q1'], 'hips': ['h0', 'h1']}}}
+    got = with_shoulders(idle, sh)['clips']['shoulders']
+    assert sorted(got['shoulders']) == sorted([(0.3, 0.0), (0.0, 0.2), (0.0, -0.12), (0.3, 0.2), (0.3, -0.12)]), got['shoulders']
+    assert got['q'] == ['q0'] * 5 and got['hips'] == ['h0'] * 5 and 'shoulders' not in idle['clips']
     print('penetration selftest: ok')
 
 
@@ -730,22 +773,38 @@ def compare(build, worst, main, a, tol):
     return lines, worse, unchecked
 
 
-# The markdown names at most this many worst cases per garment; the json keeps every one.
-MD_CASES = 3
-
-
 def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     """The report: the build pose, every pose, every remaining case named, and
     — with `baseline` (a penetration-report.json of main's garments measured by
     this same step) — every garment, column and clip worse than there."""
     a = cfg['VILLAGER_ASSET']
     build, tol = measure(body, build_pose_clips(body, clips), garments, cfg, clip_names=['build'])
-    worst, tol = measure(body, clips, garments, cfg, stride)
-    frames = sum(1 for _ in GP.poses(clips, EXPORT_CLIPS, cfg))
+    clips = with_shoulders(clips, cfg)
+    names = EXPORT_CLIPS + ('shoulders',)
+    worst, tol = measure(body, clips, garments, cfg, stride, clip_names=names)
+    frames = sum(1 for _ in GP.poses(clips, names, cfg))
+    lines, unchecked = markdown(out, build, worst, cfg, tol, names, frames, stride, baseline)
+
+    def plain(w):
+        return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
+    json.dump({'tolerance': tol, 'stride': stride, 'build': plain(build), 'garments': plain(worst)},
+              open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
+    print('\n'.join(lines))
+    # a garment failing only in the build pose fails the step too
+    return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS)), unchecked
+
+
+# The markdown names at most this many worst cases per garment; the json keeps every one.
+MD_CASES = 3
+
+
+def markdown(out, build, worst, cfg, tol, names, frames, stride=1, baseline=None):
+    """Write penetration-report.md from the measured `build` and `worst`; returns its lines and the unchecked garments."""
+    a = cfg['VILLAGER_ASSET']
     lines = [
         '# Garment penetration report',
         '',
-        f'Generated by `node scripts/villager/build.mjs` (step `penetration`). Every frame of the clips {", ".join(EXPORT_CLIPS)} '
+        f'Generated by `node scripts/villager/build.mjs` (step `penetration`). Every frame of the clips {", ".join(names)} '
         f'({frames} poses: every frame, a gait\'s at strides {", ".join(f"{k:g}" for k in GP.strides(cfg))}{"" if stride == 1 else f"; every {stride}th"}), '
         f'at {len(CORNERS)} body corners (both sexes × four age groups, and the adult man at build −1 and +1), skinned along the game\'s own path '
         f'(scripts/villager/gamepath.py), on WHAT THE GAME DRAWS: each garment\'s cover mask (scripts/villager/mask.py) applied — the body\'s triangles '
@@ -779,9 +838,9 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     t, bad = _table(worst, a, tol, worst[next(iter(worst))]['checked'])
     lines += t + ['', f'**{len(worst) - bad} of {len(worst)} garments within tolerance in every frame and layering** '
                   f'({worst[next(iter(worst))]["checked"]} poses × corners each).', '',
-                  '## Remaining visible cases (handed to work-order point 1334)', '',
+                  '## Remaining visible cases (handed to work-order point 1347)', '',
                   f'Every case over its tolerance, by garment (here its {MD_CASES} worst, every one in penetration-report.json): what is seen, the body part (of the inner garment for a layering), the clip, the outer garment of a '
-                  'layering, its worst value with where, and in how many frames it is over (clip `build`: the build pose). Each is handed to work-order point 1334 (garment motion cases).', '']
+                  'layering, its worst value with where, and in how many frames it is over (clip `build`: the build pose). Each is handed to work-order point 1347 (garment construction rebuild).', '']
     for n, r in sorted(worst.items()):
         cases = sorted((build[n]['cases'] | r['cases']).items(), key=lambda kv: -kv[1]['value'])
         if not cases:
@@ -800,14 +859,7 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
         lines += t
     os.makedirs(out, exist_ok=True)
     open(os.path.join(out, 'penetration-report.md'), 'w').write('\n'.join(lines))
-
-    def plain(w):
-        return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
-    json.dump({'tolerance': tol, 'stride': stride, 'build': plain(build), 'garments': plain(worst)},
-              open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
-    print('\n'.join(lines))
-    # a garment failing only in the build pose fails the step too
-    return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS)), unchecked
+    return lines, unchecked
 
 
 def runtime_report(out, body, garments, cfg, rt):

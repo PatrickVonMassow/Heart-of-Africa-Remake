@@ -11,18 +11,22 @@
 //          the gait; standing: `carryIdle`)
 //   dig    the authored dig on the whole body
 //
-// What stays the code's: the kneel, the work crouch, every contact and
-// steadying hand, the head's correction, the trunk's lean and stoop.
+// Under them all the idle is the standing base of the trunk, neck, head and
+// the free arms with their clavicles (natural-villager-motion step 8: one pose pipeline).
+// What stays the code's: the standing legs, the kneel, the work crouch, and —
+// added after the layers (skinnedFigure.tsx) — the trunk's lean and stoop, the
+// gaze, every contact and steadying hand, the head's squat correction.
 
 import * as THREE from 'three/webgpu'
-import { VILLAGER_GLTF as G } from '../../config/balance'
+import { VILLAGER_GLTF as G, VILLAGER_POSE } from '../../config/balance'
 import type { VillagerAsset } from '../../render/villagerAsset'
 import { LIVE_MORPHS, type LiveMorph } from '../../render/villagerBody'
 import { clipGaitPose, clipPoseAt, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
 import type { GltfPerson } from '../../render/villagerFigureBody'
-import { solveTwoBone } from '../../render/figureRig'
+import { aimHead, distributeLean, gazeDirection, LEAN_BONES, solveTwoBone, type LeanBone } from '../../render/figureRig'
 import { blendPoses, newPose, type VillagerPose } from '../../render/villagerRig'
 import type { FigureWork } from './placeFigureContext'
+import type { ShoulderPose } from '../../render/gesture'
 
 /** The motion a figure's clip layers read from its code-built walk. */
 export interface LayerMotion {
@@ -106,8 +110,16 @@ export function stepClipLayers(
 
 const LEGS = ['hips', 'thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
 const ARM = (s: 'L' | 'R') => [`shoulder.${s}`, `upperArm.${s}`, `forearm.${s}`, `hand.${s}`]
-/** Bones the code-built pose never writes: they return to rest before a blend. */
-const UNWRITTEN = ['toe.L', 'toe.R', 'shoulder.L', 'shoulder.R', 'spine1']
+/** The trunk, neck and head: the clips' own on the glTF body
+ *  (natural-villager-motion step 8), the code's lean and gaze added after.
+ *  The clavicles go with the arms (`ARM`): an arm the code takes for a
+ *  contact reaches from the clavicle at rest, as its solve assumes (the
+ *  idle's lowered clavicle left a pointing hand out of reach and the body
+ *  sank into a full crouch for it). */
+export const TRUNK = ['spine', 'spine1', 'chest', 'neck', 'head']
+/** Bones the code-built pose never writes and no base layer writes in full:
+ *  they return to rest before a blend. */
+const UNWRITTEN = ['toe.L', 'toe.R', 'shoulder.L', 'shoulder.R']
 
 function blendInto(asset: VillagerAsset, bones: Record<string, THREE.Bone>, names: readonly string[], local: THREE.Quaternion[], w: number) {
   if (w <= 0) return
@@ -148,6 +160,17 @@ export function applyClipLayers(
   // Each layer blends from what the one below left, so the dig eases in from
   // the carry (or the walk) and out to it again — never from the rest pose.
   const under = c.dig < 1
+  // THE STANDING BASE (step 8): the idle on the trunk, neck and head in
+  // full, and on each arm (clavicle included) the clips own; the legs stay the
+  // code's (its stance, work crouch and kneel), the walk layers over it
+  const idle = asset.clips.idle
+  if (idle) {
+    clipPoseAt(asset, f, idle, c.idleT % idle.duration, c.pose)
+    toHung(asset, f, c.pose, c.local, c.hips)
+    blendInto(asset, bones, TRUNK, c.local, 1)
+    blendInto(asset, bones, ARM('L'), c.local, c.arms[0])
+    blendInto(asset, bones, ARM('R'), c.local, c.arms[1])
+  }
   // THE GAIT
   if (walking > 1e-3 && under) {
     clipGaitPose(c.gait, asset, f, m.speed, c.ground, c.pose)
@@ -155,6 +178,7 @@ export function applyClipLayers(
     const w = walking
     blendInto(asset, bones, LEGS, c.local, w)
     blendHips(bones, c.hips, w)
+    blendInto(asset, bones, TRUNK, c.local, w)
     blendInto(asset, bones, ARM('L'), c.local, w * c.arms[0])
     // under a carry too, so a carry partly overriding the arm stays continuous
     blendInto(asset, bones, ARM('R'), c.local, w * c.arms[1])
@@ -309,4 +333,71 @@ export function gripShaft(asset: VillagerAsset, person: GltfPerson, bones: Recor
   // eased in and out with the dig, from what the layers below left
   if (c.dig < 1) chain.forEach((bn, i) => bn.quaternion.copy(_held[i].clone().slerp(bn.quaternion, c.dig)))
   chain[0].updateMatrixWorld(true)
+}
+
+/** The spine segments' turns the clips left, before the additive lean. */
+export type TrunkBase = Record<LeanBone, THREE.Quaternion>
+export const newTrunkBase = (): TrunkBase => ({ spine: new THREE.Quaternion(), spine1: new THREE.Quaternion(), chest: new THREE.Quaternion() })
+
+/** Take the spine segments' current turns as the base the lean adds to. */
+export function takeTrunkBase(bones: Record<string, THREE.Bone>, base: TrunkBase): void {
+  for (const n of LEAN_BONES) base[n].copy(bones[n]?.quaternion ?? base[n].identity())
+}
+
+const _le = new THREE.Euler()
+const _lq = new THREE.Quaternion()
+
+/**
+ * The trunk's additive lean on the glTF body (natural-villager-motion step 9):
+ * `pitch` (rad, + leaning in) and `turn` (rad) distributed over spine, spine1
+ * and chest (VILLAGER_POSE.leanShares), each on top of its clip turn `base`.
+ * Every lean of the game goes through here: the pose's (gesture, tag, caught
+ * slump), the elder's stoop and the contact lean.
+ */
+export function leanTrunk(bones: Record<string, THREE.Bone>, base: TrunkBase, pitch: number, turn: number): void {
+  const d = distributeLean(pitch, turn, VILLAGER_POSE.leanShares)
+  for (const n of LEAN_BONES) {
+    const b = bones[n]
+    if (b) b.quaternion.copy(base[n]).multiply(_lq.setFromEuler(_le.set(d[n].pitch, d[n].yaw, 0, 'XYZ')))
+  }
+}
+
+const _cw = new THREE.Quaternion()
+const _gd = new THREE.Vector3()
+
+/**
+ * Hold the head on a gaze (yaw, pitch relative to the heading, body frame)
+ * over neck 0.4 → head 0.6 (VILLAGER_POSE.gaze), by `weight`: after every
+ * trunk layer, so the face stays on its target through the lean and the gait.
+ */
+export function gazeHead(bones: Record<string, THREE.Bone>, yaw: number, pitch: number, weight: number): void {
+  _cw.identity()
+  for (const n of ['hips', 'spine', 'spine1', 'chest']) if (bones[n]) _cw.multiply(bones[n].quaternion)
+  aimHead(_cw, bones.neck.quaternion, bones.head.quaternion, gazeDirection(yaw, pitch, _gd), VILLAGER_POSE.gaze.neck, weight)
+}
+
+const _sq = new THREE.Quaternion()
+const _se = new THREE.Euler()
+
+/**
+ * The posable clavicles (natural-villager-motion step 11): each shoulder's
+ * protraction (forward) and elevation (up) added on top of what the clips
+ * left, clamped to VILLAGER_POSE.shoulders; none (absent or 0) leaves the
+ * clip's clavicle exactly as it is. The bones' frames are the body's at rest
+ * (the hung skeleton's locals are identity there): forward is +z, up +y, the
+ * left shoulder at +x.
+ */
+export function poseShoulders(bones: Record<string, THREE.Bone>, shoulders: { left: ShoulderPose; right: ShoulderPose } | undefined): void {
+  if (!shoulders) return
+  const lim = VILLAGER_POSE.shoulders
+  ;(['L', 'R'] as const).forEach((s) => {
+    const p = s === 'L' ? shoulders.left : shoulders.right
+    const b = bones[`shoulder.${s}`]
+    if (!b || (!p.protraction && !p.elevation)) return
+    const pro = Math.min(lim.protractionMax, Math.max(0, p.protraction))
+    const up = Math.min(lim.elevationMax, Math.max(-lim.dropMax, p.elevation))
+    const side = s === 'L' ? 1 : -1
+    // forward: a turn about y carrying the outer end (±x) toward +z; up: about z toward +y
+    b.quaternion.multiply(_sq.setFromEuler(_se.set(0, -side * pro, side * up, 'YZX')))
+  })
 }

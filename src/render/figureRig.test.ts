@@ -134,13 +134,33 @@ describe('the head stays round through a squat', () => {
     expect(ax[1].dot(ax[2])).toBeCloseTo(0, 6)
     // no snap at the threshold: a barely squashed head is oriented like an
     // unsquashed one
+    head.quaternion.identity()
     unsquashHead(head, chain, 0.999)
     const nearly = head.quaternion.clone()
+    head.quaternion.identity()
     unsquashHead(head, chain, 1)
     expect(nearly.angleTo(head.quaternion)).toBeLessThan(0.02)
     // and no squat leaves it untouched
     expect(head.scale.y).toBe(1)
     expect(head.quaternion.equals(new THREE.Quaternion())).toBe(true)
+  })
+
+  it('composes with the head\'s own turn: none at no squash, its world twist kept under one', () => {
+    const chain = [new THREE.Bone(), new THREE.Bone()]
+    chain[1].rotation.set(0.3, 0, 0)
+    chain[0].add(chain[1])
+    const head = new THREE.Bone()
+    chain[1].add(head)
+    const own = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, 0.5, 0))
+    head.quaternion.copy(own)
+    unsquashHead(head, chain, 1)
+    expect(head.quaternion.angleTo(own)).toBeLessThan(1e-6)
+    unsquashHead(head, chain, 0.7)
+    chain[0].updateMatrixWorld(true)
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(head.getWorldQuaternion(new THREE.Quaternion()))
+    // the world turn about y survives (the gaze's yaw), the pitch is undone
+    expect(Math.atan2(fwd.x, fwd.z)).toBeGreaterThan(0.3)
+    expect(Math.abs(fwd.y)).toBeLessThan(1e-6)
   })
 })
 

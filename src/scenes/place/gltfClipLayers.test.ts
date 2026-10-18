@@ -6,12 +6,14 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { VILLAGER_ASSET, VILLAGER_GLTF } from '../../config/balance'
+import { VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../../config/balance'
+import { distributeLean, gazeDirection, LEAN_BONES, newGaze, stepGaze } from '../../render/figureRig'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
-import { shovelOnHungHand } from '../../render/villagerClipPose'
+import { clipGaitPose, clipPoseAt, shovelOnHungHand, toHung } from '../../render/villagerClipPose'
+import { newPose } from '../../render/villagerRig'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { AGE_GROUPS, SEXES } from '../../systems/appearance'
-import { applyClipLayers, clipLayers, gripShaft, handShapes, placeShovel, stepClipLayers, type ClipLayers } from './gltfClipLayers'
+import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
 
 let asset: VillagerAsset
 let person: GltfPerson
@@ -50,6 +52,29 @@ const tipY = (tool: THREE.Object3D) => new THREE.Vector3(0, VILLAGER_ASSET.shove
 const handleY = (tool: THREE.Object3D) => new THREE.Vector3(0, VILLAGER_ASSET.shovel.top, 0).applyMatrix4(tool.matrixWorld).y
 
 describe('the clip layers on the glTF figure', () => {
+  it('with zero code lean the trunk bones equal the clip\'s: the idle standing, the gait walking (one pose pipeline)', () => {
+    const n = asset.bones.length
+    const local = Array.from({ length: n }, () => new THREE.Quaternion())
+    const hips = new THREE.Vector3()
+    // per component (q and −q the same turn): an angle read through acos
+    // near 1 is only good to ~1e-3 in float
+    const diff = (a: THREE.Quaternion, b: THREE.Quaternion) => {
+      const s = a.dot(b) < 0 ? -1 : 1
+      return Math.max(Math.abs(a.x - s * b.x), Math.abs(a.y - s * b.y), Math.abs(a.z - s * b.z), Math.abs(a.w - s * b.w))
+    }
+    const worst = (f: ReturnType<typeof figure>) => Math.max(...TRUNK.map((b) => diff(f.bones[b].quaternion, local[asset.bones.indexOf(b)])))
+    const dt = 1 / 60
+    const stand = figure()
+    for (let k = 0; k < 50; k++) frame(stand, 0, 0, { dig: false, tool: false }, dt)
+    toHung(asset, person.frame, clipPoseAt(asset, person.frame, asset.clips.idle, stand.c.idleT % asset.clips.idle.duration, newPose(n)), local, hips)
+    expect(worst(stand)).toBeLessThan(1e-4)
+    const walk = figure()
+    let z = 0
+    for (let k = 0; k < 50; k++) frame(walk, (z += 1.1 * dt), 1.1, { dig: false, tool: false }, dt)
+    toHung(asset, person.frame, clipGaitPose(structuredClone(walk.c.gait), asset, person.frame, 1.1, walk.c.ground, newPose(n)), local, hips)
+    expect(worst(walk)).toBeLessThan(1e-4)
+  })
+
   it('the dig stroke runs on the work clock the caller keeps, and freezes while it stands', () => {
     const f = figure()
     const dt = 1 / 60
@@ -291,5 +316,115 @@ describe('the hands\' shapes from what the hands do (natural-villager-motion ste
       for (const s of ['L', 'R'] as const) expect(sum(w, s)).toBeCloseTo(1, 9)
       for (const v of Object.values(w)) expect(v).toBeGreaterThanOrEqual(0)
     }
+  })
+})
+
+describe('the distributed lean and the gaze (natural-villager-motion step 9)', () => {
+  const forward = (b: THREE.Object3D) => new THREE.Vector3(0, 0, 1).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion()))
+
+  it('lean is distributed', () => {
+    const sh = VILLAGER_POSE.leanShares
+    const d = distributeLean(0.4, -0.2, sh)
+    let pitch = 0
+    let yaw = 0
+    for (const n of LEAN_BONES) {
+      // no bone carries more than 35 % of the whole
+      expect(Math.abs(d[n].pitch)).toBeLessThanOrEqual(0.35 * 0.4 + 1e-12)
+      expect(Math.abs(d[n].yaw)).toBeLessThanOrEqual(0.35 * 0.2 + 1e-12)
+      pitch += d[n].pitch
+      yaw += d[n].yaw
+    }
+    expect(pitch).toBeCloseTo(0.4, 12)
+    expect(yaw).toBeCloseTo(-0.2, 12)
+    // on the body: the chest leans by the whole, over the three segments, on
+    // top of the clip's own turn; the hips are untouched
+    const f = figure()
+    let z = 0
+    for (let k = 0; k < 30; k++) frame(f, (z += 1.1 / 60), 1.1, { dig: false, tool: false }, 1 / 60)
+    const hips = f.bones.hips.quaternion.clone()
+    const before = forward(f.bones.chest)
+    const base = newTrunkBase()
+    takeTrunkBase(f.bones, base)
+    leanTrunk(f.bones, base, 0.3, 0)
+    f.bones.hips.updateMatrixWorld(true)
+    expect(f.bones.hips.quaternion.equals(hips)).toBe(true)
+    for (const n of LEAN_BONES) expect(f.bones[n].quaternion.angleTo(base[n])).toBeLessThan(0.35 * 0.3 + 1e-3)
+    const after = forward(f.bones.chest)
+    expect(before.angleTo(after)).toBeCloseTo(0.3, 2)
+  })
+
+  it('a gaze stays inside limits that tighten under it, up and down', () => {
+    const lim = VILLAGER_POSE.gaze
+    for (const sign of [1, -1]) {
+      const g = newGaze()
+      g.pitch = g.wantPitch = sign > 0 ? lim.pitchUp : -lim.pitchDown
+      stepGaze(g, 1 / 60, lim, lim.headLoad)
+      const max = (sign > 0 ? lim.pitchUp : lim.pitchDown) * lim.headLoad
+      expect(Math.abs(g.pitch), `sign ${sign}`).toBeLessThanOrEqual(max + 1e-12)
+    }
+  })
+
+  it('gaze hold', () => {
+    const f = figure()
+    const base = newTrunkBase()
+    const g = newGaze()
+    const dt = 1 / 60
+    const lim = VILLAGER_POSE.gaze
+    let z = 0
+    /** One walking frame under a 0.3 rad lean, the head on the gaze. */
+    const step = (yaw: number, pitch: number) => {
+      frame(f, (z += 1.1 * dt), 1.1, { dig: false, tool: false }, dt)
+      takeTrunkBase(f.bones, base)
+      leanTrunk(f.bones, base, 0.3, 0)
+      g.wantYaw = yaw
+      g.wantPitch = pitch
+      stepGaze(g, dt, lim)
+      gazeHead(f.bones, g.yaw, g.pitch, 1)
+      f.bones.hips.updateMatrixWorld(true)
+      return forward(f.bones.head)
+    }
+    // settled on a target, then held through more than a whole gait cycle
+    for (let k = 0; k < 90; k++) step(0.5, -0.2)
+    const want = gazeDirection(0.5, -0.2)
+    let worst = 0
+    for (let k = 0; k < 120; k++) worst = Math.max(worst, step(0.5, -0.2).angleTo(want))
+    expect(worst).toBeLessThan((3 * Math.PI) / 180)
+    // the limits: a target far to the side and high above is followed only so far
+    for (let k = 0; k < 120; k++) step(2.0, 1.2)
+    const far = step(2.0, 1.2)
+    expect(Math.atan2(far.x, far.z)).toBeLessThan(lim.yawMax + 0.05)
+    expect(Math.asin(far.y)).toBeLessThan(lim.pitchUp + 0.05)
+    // a target straight behind, jittering across the back: the head stays on
+    // the side it was turned to, never flips over
+    for (let k = 0; k < 120; k++) {
+      const h = step(k % 2 ? Math.PI - 0.01 : -Math.PI + 0.01, 0)
+      expect(Math.atan2(h.x, h.z)).toBeGreaterThan(0.5)
+      expect(h.y).toBeLessThan(Math.sin(lim.pitchUp) + 0.05)
+    }
+  })
+})
+
+describe('the posable clavicles (natural-villager-motion step 11)', () => {
+  it("default 0 leaves the clip's clavicle; a protraction brings the shoulder forward, an elevation up", () => {
+    const f = figure()
+    let z = 0
+    for (let k = 0; k < 20; k++) frame(f, (z += 1.1 / 60), 1.1, { dig: false, tool: false }, 1 / 60)
+    const clip = ['L', 'R'].map((s) => f.bones[`shoulder.${s}`].quaternion.clone())
+    const joint = (s: string) => f.bones[`upperArm.${s}`].getWorldPosition(new THREE.Vector3())
+    f.bones.hips.updateMatrixWorld(true)
+    const at = ['L', 'R'].map(joint)
+    poseShoulders(f.bones, undefined)
+    poseShoulders(f.bones, { left: { protraction: 0, elevation: 0 }, right: { protraction: 0, elevation: 0 } })
+    ;['L', 'R'].forEach((s, i) => expect(f.bones[`shoulder.${s}`].quaternion.equals(clip[i])).toBe(true))
+    poseShoulders(f.bones, { left: { protraction: 0.25, elevation: 0 }, right: { protraction: 0, elevation: 0.15 } })
+    f.bones.hips.updateMatrixWorld(true)
+    expect(joint('L').z - at[0].z).toBeGreaterThan(0.01)
+    expect(joint('R').y - at[1].y).toBeGreaterThan(0.005)
+    // clamped to the range the penetration gate measures
+    const g = figure()
+    poseShoulders(g.bones, { left: { protraction: 5, elevation: -5 }, right: { protraction: 0, elevation: 0 } })
+    expect(g.bones['shoulder.L'].quaternion.angleTo(new THREE.Quaternion())).toBeLessThan(
+      VILLAGER_POSE.shoulders.protractionMax + VILLAGER_POSE.shoulders.dropMax + 1e-6,
+    )
   })
 })
