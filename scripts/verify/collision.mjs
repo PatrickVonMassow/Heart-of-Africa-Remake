@@ -682,8 +682,11 @@ if (section('chief-body')) {
     return speed
   })
   try {
+    // The first frames after entering the village are slow on a loaded host:
+    // the chief publishes his state from his first frame (measured 18.10.2026,
+    // state reached just past an 8 s budget).
     await page.waitForFunction(() => window.__chief?.phase === 'walking-out' && window.__chief.progress === 0,
-      null, { timeout: 8000 })
+      null, { timeout: 30000 })
     // WHERE the traveller starts matters, and the outward normal is not free
     // ground everywhere: at bambara-village a scattered 0.77 m prop sits 0.51 m
     // behind his stand, so a player planted there is inside it, is pushed out
@@ -754,8 +757,11 @@ if (section('chief-body')) {
       stopped.distance <= contact.r + 0.35 + 0.05 && stopped.side > 0
     check('Chief: walking forward stops at his body in front of the hut', touching, JSON.stringify(stopped))
     if (!touching) throw new Error('The declared blocked-player frame requires contact with the chief')
+    // At contact a villager-sized chief stands below the level gaze: look
+    // down at him (design.md §17.5: + looks up).
+    await page.evaluate(() => { window.__placePlayer.pitch = -0.5 })
     await shot('53-collision-chief-body', {
-      local: { x: contact.x, y: 0.9, z: contact.z },
+      local: { x: contact.x, y: 1.0, z: contact.z },
       label: 'the player blocked at the chief’s body in front of his hut',
     })
   } finally {
@@ -763,6 +769,7 @@ if (section('chief-body')) {
       window.__balance.communication.chiefWalkSpeed = speed
       window.__game.getState().bumpBalance()
       window.__chiefHome()
+      if (window.__placePlayer) window.__placePlayer.pitch = 0
     }, speed)
   }
 }
@@ -785,8 +792,11 @@ if (section('chief-figure')) {
   })
   const backend = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   try {
+    // The first frames after entering the village are slow on a loaded host:
+    // the chief publishes his state from his first frame (measured 18.10.2026,
+    // state reached just past an 8 s budget).
     await page.waitForFunction(() => window.__chief?.phase === 'walking-out' && window.__chief.progress === 0,
-      null, { timeout: 8000 })
+      null, { timeout: 30000 })
     for (const level of ['medium', 'high', 'low']) {
       await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
       // The body is swapped by React on the next commit: wait for the census
@@ -825,11 +835,19 @@ if (section('chief-figure')) {
         const e = g.matrixWorld.elements
         const f = g.rotation.y
         const p = window.__placePlayer
-        p.x = e[12] + Math.sin(f) * 2.4
-        p.z = e[14] + Math.cos(f) * 2.4
+        p.x = e[12] + Math.sin(f) * 3.4
+        p.z = e[14] + Math.cos(f) * 3.4
         p.yaw = Math.atan2(e[12] - p.x, e[14] - p.z) + Math.PI
         return { x: e[12], y: e[13], z: e[14] }
       })
+      // A preset switch recompiles the scene's pipelines: wait until none is
+      // pending for a few frames, or the frame shows an unlit scene.
+      await page.waitForFunction(() => {
+        const s = window.__shaderPipelines?.()
+        const idle = !s || (s.pending === 0 && s.queued === 0)
+        window.__chiefIdleRun = idle ? (window.__chiefIdleRun ?? 0) + 1 : 0
+        return window.__chiefIdleRun >= 3
+      }, null, { timeout: 60000, polling: 'raf' }).catch(() => {})
       await shot(backend(`1377-chief-figure-${level}`), {
         local: { x: at.x, y: at.y + 0.8, z: at.z },
         label: level === 'low'
