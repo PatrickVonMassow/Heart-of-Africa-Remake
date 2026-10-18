@@ -1031,8 +1031,8 @@ if (section('traveller-figure')) {
         !!c && c.inhabitants === 1 && c.owned === 1 && c.helmet === 1, JSON.stringify(c))
       check(`Traveller (${lvl}): his head stands at villager height`, !!c && c.headRise > 0.95 && c.headRise < 1.35, JSON.stringify(c))
     }
+    // the shutter waits for the zoomed scene to finish drawing
     await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
-    await page.waitForTimeout(1800)
     const at = await page.evaluate(() => window.__game.getState().pos)
     await shot(backend('1378-traveller-above'), { world: { x: at.x, z: at.z }, label: 'the traveller from above on the villagers’ body' })
     await page.evaluate(() => {
@@ -1040,7 +1040,6 @@ if (section('traveller-figure')) {
       window.__game.setState({ afflictions: { ...g.afflictions, wounds: 2 } })
     })
     await page.waitForFunction(() => window.__player?.wounds === 2, null, { timeout: 6000 }).catch(() => {})
-    await page.waitForTimeout(400)
     const marks = await page.evaluate(() => {
       const helmet = window.__travellerRoot?.getObjectByName('sun-helmet')
       // the light and the severe strap groups ride the helmet: both shown when severe
