@@ -677,6 +677,65 @@ const NO_PEOPLE: PeopleDress = people({
   },
 })
 
+/**
+ * The non-villager cast drawn on the same body (work-order "Giza figures and
+ * traveller"): the plateau's people and the expedition leader. Keyed like a
+ * people and passed as the figure look's `peopleId`; the hats are props on the
+ * head (the garment set holds no brimmed hat). Sources: docs/giza-1890.md §4.1;
+ * every colour is a calibratable guess, 'cloth' the figure's own colour.
+ */
+const GIZA = (why: string) => S(`giza-1890 §4.1: ${why}`)
+const CAST_GUESS = (why: string) => G(`giza-1890 §4.1 records no ${why}`)
+const galabiya = layer('torso', 'robe', 'cotton', 'cloth', 'chest', GIZA('the galabiya'))
+const suitCoat = layer('torso', 'shirt', 'wool', 'cloth', 'chest', GIZA('the suit coat, drawn knee-long'))
+const suitTrousers = layer('hip', 'trousers', 'wool', 'cloth', 'waist', GIZA('the suit'))
+const longGown = layer('torso', 'robe', 'wool', 'cloth', 'chest', GIZA('the long skirt and bodice as one gown'))
+export const CAST_DRESS: Record<'egyptian' | 'bedouin' | 'european', PeopleDress> = {
+  egyptian: people({
+    male: {
+      child: [{ ...galabiya }],
+      youth: [{ ...galabiya }, layer('head', 'cap', 'cotton', C.cotton, 'crown', GIZA("the boy's skullcap"))],
+      adult: [{ ...galabiya }, layer('head', 'turban', 'cotton', C.cotton, 'aroundHead', GIZA('the turban'))],
+    },
+    female: {
+      child: [{ ...galabiya }],
+      youth: [layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('local women at the plateau'))],
+      adult: [
+        layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('local women at the plateau')),
+        layer('shoulder', 'hood', 'cotton', C.black, 'overHead', CAST_GUESS('local women at the plateau')),
+      ],
+    },
+  }),
+  bedouin: people({
+    male: {
+      child: [{ ...galabiya }],
+      youth: [{ ...galabiya }, layer('shoulder', 'hood', 'cotton', C.cotton, 'overHead', GIZA('the head cloth'))],
+      adult: [{ ...galabiya }, layer('shoulder', 'hood', 'cotton', C.cotton, 'overHead', GIZA('the head cloth'))],
+    },
+    female: {
+      child: [{ ...galabiya }],
+      youth: [layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('Bedouin women at the plateau'))],
+      adult: [
+        layer('torso', 'robe', 'cotton', C.black, 'chest', CAST_GUESS('Bedouin women at the plateau')),
+        layer('shoulder', 'hood', 'cotton', C.black, 'overHead', CAST_GUESS('Bedouin women at the plateau')),
+      ],
+    },
+  }),
+  european: people({
+    male: {
+      child: [{ ...suitCoat }, { ...suitTrousers }],
+      youth: [{ ...suitCoat }, { ...suitTrousers }],
+      adult: [{ ...suitCoat }, { ...suitTrousers }],
+    },
+    female: {
+      child: [{ ...longGown }],
+      youth: [{ ...longGown }],
+      adult: [{ ...longGown }],
+    },
+  }),
+}
+export type CastId = keyof typeof CAST_DRESS
+
 // ---- the query --------------------------------------------------------------
 
 export interface AppearanceQuery {
@@ -747,7 +806,7 @@ export function withOpenOuterRule(layers: DressLayer[]): DressLayer[] {
  * The 'cloth' colour token is resolved to the figure's own cloth.
  */
 export function appearanceFor(q: AppearanceQuery): DressLayer[] {
-  const table = (q.peopleId && PEOPLE_DRESS[q.peopleId]) || NO_PEOPLE
+  const table = (q.peopleId && (PEOPLE_DRESS[q.peopleId] ?? CAST_DRESS[q.peopleId as CastId])) || NO_PEOPLE
   let layers = table[q.sex][q.age].map((l) => ({ ...l }))
 
   // OFFICE: the chief's boubou replaces the everyday torso garment.

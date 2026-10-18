@@ -2467,6 +2467,35 @@ export const VILLAGER_DRESS = {
 } as const
 
 /**
+ * The colours of the Giza plateau's people and of the expedition leader, drawn
+ * on the villagers' body (docs/giza-1890.md §4.1). Every value is a
+ * CALIBRATABLE guess: the record names the garments, not their colours. The
+ * gowns and the old robed figures' tones are kept; the hats are props.
+ */
+export const GIZA_CAST = {
+  guideGown: '#d8cba8',
+  cameleerGown: '#b89a63',
+  donkeyboyGown: '#9a7b4e',
+  touristSuit: '#c9bfa2',
+  touristGown: '#3e3a4a', // the dark colours of the Victorian dress
+  localSkin: '#7a5232',
+  bedouinSkin: '#6e4a2c',
+  touristSkin: '#d9b48e',
+  sunHelmet: '#e9e1c6',
+  ladyHat: '#5a4a3a',
+  ladyHatBand: '#8a2a2a',
+} as const
+
+/** The expedition leader of the bird's-eye view: khaki drill, sun helmet and
+ *  pack, on the same body (calibratable colours). */
+export const TRAVELLER_LOOK = {
+  khaki: '#c4ac72',
+  skin: '#e8c39a',
+  sunHelmet: '#ddd0a8',
+  pack: '#7c5a34',
+} as const
+
+/**
  * How a villager walks, kneels and carries on the head (work-order "walking
  * villagers"). Units are the figure's own (an adult man is FIGURE_STATURE
  * tall), seconds and radians. Every value is a CALIBRATABLE educated guess,
