@@ -230,22 +230,32 @@ describe('the visible-only penetration report', () => {
     for (const n of Object.keys(BUILD_RESIDUALS)) expect(backlog, n).toContain(`\`${n}\``)
   })
 
-  it('the report hands every remaining case to point 1334 by name', () => {
+  // the markdown names each garment's MD_CASES (penetration.py) worst cases and
+  // counts the rest; the json keeps every case
+  it('the report hands each garment\'s worst cases to point 1334 by name and counts the rest', () => {
+    const shown = 3
     const section = md.split('## Remaining visible cases (handed to work-order point 1334)')[1]?.split('\n## ')[0]
     expect(section).toBeDefined()
     const lines = section!.split('\n')
     let checked = 0
     for (const [n, g] of Object.entries(now.garments)) {
+      const cases = Object.entries({ ...now.build[n].cases, ...g.cases }).sort((a, b) => b[1].value - a[1].value)
+      if (!cases.length) continue
       const line = lines.find((l) => l.startsWith('- `' + n + '`: '))
-      for (const [key, e] of [...Object.entries(now.build[n].cases), ...Object.entries(g.cases)]) {
+      expect(line, n).toBeDefined()
+      cases.forEach(([key, e], i) => {
         // the case's garment, column, clip, body part and outer garment, together
         const [col, clip, part, outer] = key.split(' ')
         const under = outer && outer !== 'None' ? ` under \`${outer}\`` : ''
         const text = `${NAMES[col as Column]} — ${part} — ${clip}${under} — ${e.value.toFixed(4)} (${e.at}), ${e.over} frames`
-        expect(line, `${n} ${key}`).toBeDefined()
-        expect(line!.includes(text), `${n} ${key}: ${text}`).toBe(true)
+        // a case tied in value with the last one shown may stand either side of the cut
+        if (i < shown || e.value === cases[shown - 1][1].value) {
+          if (i < shown) expect(line!.includes(text), `${n} ${key}: ${text}`).toBe(true)
+        } else expect(line!.includes(text), `${n} ${key} is past the cut`).toBe(false)
         checked++
-      }
+      })
+      const more = cases.length - shown
+      expect(line!.endsWith(`; … and ${more} more (penetration-report.json)`), n).toBe(more > 0)
     }
     expect(checked).toBeGreaterThan(0)
   })
