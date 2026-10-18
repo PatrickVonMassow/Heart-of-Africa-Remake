@@ -11,8 +11,8 @@
 //          the gait; standing: `carryIdle`)
 //   dig    the authored dig on the whole body
 //
-// Under them all the idle is the standing base of the trunk, neck, head,
-// clavicles and free arms (natural-villager-motion step 8: one pose pipeline).
+// Under them all the idle is the standing base of the trunk, neck, head and
+// the free arms with their clavicles (natural-villager-motion step 8: one pose pipeline).
 // What stays the code's: the standing legs, the kneel, the work crouch, and —
 // added after the layers (skinnedFigure.tsx) — the trunk's lean and stoop, the
 // gaze, every contact and steadying hand, the head's squat correction.
@@ -110,13 +110,16 @@ export function stepClipLayers(
 
 const LEGS = ['hips', 'thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
 const ARM = (s: 'L' | 'R') => [`shoulder.${s}`, `upperArm.${s}`, `forearm.${s}`, `hand.${s}`]
-const LIMB = (s: 'L' | 'R') => [`upperArm.${s}`, `forearm.${s}`, `hand.${s}`]
-/** The trunk, neck, head and clavicles: the clips' own on the glTF body
- *  (natural-villager-motion step 8), the code's lean and gaze added after. */
-export const TRUNK = ['spine', 'spine1', 'chest', 'neck', 'head', 'shoulder.L', 'shoulder.R']
+/** The trunk, neck and head: the clips' own on the glTF body
+ *  (natural-villager-motion step 8), the code's lean and gaze added after.
+ *  The clavicles go with the arms (`ARM`): an arm the code takes for a
+ *  contact reaches from the clavicle at rest, as its solve assumes (the
+ *  idle's lowered clavicle left a pointing hand out of reach and the body
+ *  sank into a full crouch for it). */
+export const TRUNK = ['spine', 'spine1', 'chest', 'neck', 'head']
 /** Bones the code-built pose never writes and no base layer writes in full:
  *  they return to rest before a blend. */
-const UNWRITTEN = ['toe.L', 'toe.R']
+const UNWRITTEN = ['toe.L', 'toe.R', 'shoulder.L', 'shoulder.R']
 
 function blendInto(asset: VillagerAsset, bones: Record<string, THREE.Bone>, names: readonly string[], local: THREE.Quaternion[], w: number) {
   if (w <= 0) return
@@ -157,16 +160,16 @@ export function applyClipLayers(
   // Each layer blends from what the one below left, so the dig eases in from
   // the carry (or the walk) and out to it again — never from the rest pose.
   const under = c.dig < 1
-  // THE STANDING BASE (step 8): the idle on the trunk, neck, head and
-  // clavicles in full, and on each arm the clips own; the legs stay the
+  // THE STANDING BASE (step 8): the idle on the trunk, neck and head in
+  // full, and on each arm (clavicle included) the clips own; the legs stay the
   // code's (its stance, work crouch and kneel), the walk layers over it
   const idle = asset.clips.idle
   if (idle) {
     clipPoseAt(asset, f, idle, c.idleT % idle.duration, c.pose)
     toHung(asset, f, c.pose, c.local, c.hips)
     blendInto(asset, bones, TRUNK, c.local, 1)
-    blendInto(asset, bones, LIMB('L'), c.local, c.arms[0])
-    blendInto(asset, bones, LIMB('R'), c.local, c.arms[1])
+    blendInto(asset, bones, ARM('L'), c.local, c.arms[0])
+    blendInto(asset, bones, ARM('R'), c.local, c.arms[1])
   }
   // THE GAIT
   if (walking > 1e-3 && under) {
@@ -176,9 +179,9 @@ export function applyClipLayers(
     blendInto(asset, bones, LEGS, c.local, w)
     blendHips(bones, c.hips, w)
     blendInto(asset, bones, TRUNK, c.local, w)
-    blendInto(asset, bones, LIMB('L'), c.local, w * c.arms[0])
+    blendInto(asset, bones, ARM('L'), c.local, w * c.arms[0])
     // under a carry too, so a carry partly overriding the arm stays continuous
-    blendInto(asset, bones, LIMB('R'), c.local, w * c.arms[1])
+    blendInto(asset, bones, ARM('R'), c.local, w * c.arms[1])
   } else {
     // standing: the feet are where they stand, nothing held for the next walk
     releaseClipGait(c.gait)

@@ -2861,11 +2861,12 @@ export const VILLAGER_POSE = {
    *  `shoulders`). Calibratable. */
   shoulders: { protractionMax: 0.3, elevationMax: 0.2, dropMax: 0.12 },
   /** The most the distributed trunk may lean (rad, the whole over its three
-   *  segments) to bring a contact into reach. A bend shared over three pivots
-   *  carries the shoulder less far than the same angle at the lowest one, so
-   *  this is CONTACT_LEAN_MAX (0.5, one joint) over an estimated ~0.65 of the
-   *  lever. Calibratable. */
-  contactLeanMax: 0.8,
+   *  segments, each its share) to bring a contact into reach. A bend shared
+   *  over three pivots carries the shoulder less far than the same angle at
+   *  the lowest one: the runtime point subject's hand needed 0.55–0.6 rad
+   *  distributed where one joint needed 0.5 (measured 18.10.2026), so the
+   *  one-joint CONTACT_LEAN_MAX (0.5) is too short here. Calibratable. */
+  contactLeanMax: 1.2,
   kneePoleMin: 0.01,
 } as const
 
