@@ -5532,7 +5532,9 @@ if (section('figure-micro')) {
     // where he would be, not that he is drawn — an occluded or absent
     // traveller changes nothing and passed. So the same crop is rendered once
     // with the traveller hidden; the pixels that differ are HIS visible
-    // pixels (figure and own shadow), and the shimmer is measured on them.
+    // pixels, and the shimmer is measured on them. His cast shadow is
+    // switched off while the mask is taken (review finding): shadow pixels
+    // are ground, carry no micro-structure and diluted the interior.
     await page.evaluate(() => {
       window.__travellerRoot.visible = false
     })
@@ -5540,6 +5542,19 @@ if (section('figure-micro')) {
     const without = await grey(await capturePixels(page, 'traveller mask (hidden)', { clip }))
     await page.evaluate(() => {
       window.__travellerRoot.visible = true
+      window.__travellerShadow = []
+      window.__travellerRoot.traverse((o) => {
+        if (o.isMesh && o.castShadow) {
+          o.castShadow = false
+          window.__travellerShadow.push(o)
+        }
+      })
+    })
+    await nextFrames(30)
+    const shownNoShadow = await grey(await capturePixels(page, 'traveller mask (shown, no cast shadow)', { clip }))
+    await page.evaluate(() => {
+      for (const o of window.__travellerShadow) o.castShadow = true
+      delete window.__travellerShadow
     })
     await nextFrames(30)
     const frames = []
@@ -5550,9 +5565,9 @@ if (section('figure-micro')) {
     const raws = await Promise.all(frames.map(grey))
     const mask = new Uint8Array(without.length)
     let visible = 0
-    if (raws[0].length === without.length) {
+    if (shownNoShadow.length === without.length) {
       for (let i = 0; i < without.length; i++) {
-        if (Math.abs(raws[0][i] - without[i]) > 16) {
+        if (Math.abs(shownNoShadow[i] - without[i]) > 16) {
           mask[i] = 1
           visible++
         }
