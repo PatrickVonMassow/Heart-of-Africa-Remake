@@ -6,11 +6,11 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { balance, VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
+import { balance, VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../config/balance'
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, gaitFootGround, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitFootGround, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, gaitAt, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
 
@@ -432,6 +432,30 @@ describe('the corrective leg solve (natural-villager-motion step 10)', () => {
     }
     // the locals are the clip's
     expect(worst).toBeLessThan(1e-4)
+  })
+
+  it('the knee turns continuously as the knee crosses the hip–ankle line: no flip of its bend', () => {
+    // a unit leg, nearly straight, its knee from just in front of the line to
+    // just behind it — across the band where the hinge once flipped (knee z
+    // −0.0009999 vs −0.0010001 turned the shin +0.216 vs −0.218 rad)
+    const hip = new THREE.Vector3(0, 1, 0)
+    const ankle = new THREE.Vector3(0, 0, 0)
+    const want = 0.9
+    const axis = new THREE.Vector3()
+    let last: THREE.Vector3 | null = null
+    let jump = 0
+    for (let k = 0; k <= 400; k++) {
+      const knee = new THREE.Vector3(0, 0.5, 0.001 - k * 0.00001)
+      const turn = kneeTurn(hip, knee, ankle, want, VILLAGER_POSE.kneePoleMin, axis)
+      const moved = ankle.clone().sub(knee).applyAxisAngle(axis, turn).add(knee)
+      // the target length reached, the knee bent forward (the ankle behind it)
+      expect(moved.distanceTo(hip)).toBeCloseTo(want, 6)
+      expect(moved.z).toBeLessThan(0)
+      if (last) jump = Math.max(jump, moved.distanceTo(last))
+      last = moved
+    }
+    // 1e-5 of knee per step moves the ankle by about as little
+    expect(jump).toBeLessThan(1e-3)
   })
 
   it('held foot still holds', () => {

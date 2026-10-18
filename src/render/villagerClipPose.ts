@@ -513,8 +513,46 @@ export function kneePole(hip: THREE.Vector3, knee: THREE.Vector3, ankle: THREE.V
   return out.add(_kl.set(0, 0, 1 - k)).normalize()
 }
 const _kl = new THREE.Vector3()
+
+/**
+ * The knee's turn for a leg solve: the hinge axis (into `outAxis`, unit) and
+ * the angle (rad, about it) that turns the shin about the knee `knee` so the
+ * hip–ankle distance becomes `want`. The hinge stands across the hip–ankle
+ * line and the knee's pole (kneePole), and the knee is measured as a signed
+ * bend toward that pole, so a knee crossing the line (a straight or slightly
+ * overstretched clip leg) turns continuously: it opens through straight and
+ * bends toward the pole, never flipping to the other side.
+ */
+export function kneeTurn(
+  hip: THREE.Vector3,
+  knee: THREE.Vector3,
+  ankle: THREE.Vector3,
+  want: number,
+  straight: number,
+  outAxis: THREE.Vector3,
+): number {
+  kneePole(hip, knee, ankle, straight, _kp)
+  outAxis.copy(ankle).sub(hip).cross(_kp)
+  if (outAxis.lengthSq() < 1e-14) outAxis.set(1, 0, 0)
+  outAxis.normalize()
+  const h = _hk.copy(hip).sub(knee)
+  const u = _ak.copy(ankle).sub(knee)
+  const hn = h.dot(outAxis)
+  const un = u.dot(outAxis)
+  const hh = h.lengthSq()
+  const uu = u.lengthSq()
+  h.addScaledVector(outAxis, -hn)
+  u.addScaledVector(outAxis, -un)
+  // the angle from the thigh to the shin about the hinge, in (0, 2π): below
+  // π the knee bends toward the pole, π is straight, above π it bends away
+  let now = Math.atan2(_kx.crossVectors(h, u).dot(outAxis), h.dot(u))
+  if (now < 0) now += 2 * Math.PI
+  const cos = (hh + uu - want * want - 2 * hn * un) / Math.max(1e-12, 2 * h.length() * u.length())
+  return Math.acos(Math.min(1, Math.max(-1, cos))) - now
+}
 const _hk = new THREE.Vector3()
 const _ak = new THREE.Vector3()
+const _kx = new THREE.Vector3()
 const _n = new THREE.Vector3()
 const _kp = new THREE.Vector3()
 const _r1 = new THREE.Quaternion()
@@ -547,21 +585,9 @@ export function correctLeg(
   const a = H.distanceTo(K)
   const b = K.distanceTo(A)
   const want = Math.min(a + b - 1e-5, Math.max(Math.abs(a - b) + 1e-5, H.distanceTo(target)))
-  // the hinge: through the pose's knee, nudged along its pole so a straight
-  // leg still has one (bending forward)
-  kneePole(H, K, A, straight, _n)
-  _kp.copy(K).addScaledVector(_n, 1e-3 * (a + b))
-  _hk.copy(H).sub(_kp)
-  _ak.copy(A).sub(_kp)
-  _n.crossVectors(_hk, _ak)
-  if (_n.lengthSq() < 1e-14) _n.set(1, 0, 0)
-  _n.normalize()
-  _hk.copy(H).sub(K)
-  _ak.copy(A).sub(K)
-  const now = _hk.angleTo(_ak)
-  const cos = (a * a + b * b - want * want) / (2 * a * b)
-  const next = Math.acos(Math.min(1, Math.max(-1, cos)))
-  _r1.setFromAxisAngle(_n, next - now)
+  // the hinge: across the hip–ankle line and the knee's pole, the bend
+  // signed toward the pole (continuous as the knee crosses the line)
+  _r1.setFromAxisAngle(_n, kneeTurn(H, K, A, want, straight, _n))
   // the knee: the shin turned about the hinge
   setWorldRotation(asset, pose, world, lower, _qw.copy(world.q[lower]).premultiply(_r1))
   forwardKinematics(asset, rest, pose, world)
