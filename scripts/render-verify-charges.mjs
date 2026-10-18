@@ -1870,16 +1870,6 @@ export const RED_CHARGES = [
       + 'stances 1). The charge dies with point 1330.',
   },
   {
-    point: 1374,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^head carrier: the load[’']s base sits on the crown\b/i,
-    why:
-      'FILED AS 1374 ON 17.10.2026: red on feat/1360-head-load-rests 91e1ccbb9, webgpu full run '
-      + '(i=2, underCrown [], base null) and on main 5751f7419; the flagged carrier has an empty crown. '
-      + 'The charge dies with point 1374.',
-  },
-  {
     point: 1375,
     suite: 'polish-villagers',
     kind: 'check',

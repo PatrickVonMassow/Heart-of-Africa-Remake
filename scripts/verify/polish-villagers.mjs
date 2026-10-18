@@ -4905,6 +4905,17 @@ if (section('village-walk')) {
         }
       }, out.i)
       check('head carrier: the carrier found is still out on the walk once life is held', !!c, '')
+      // Every walker flagged as a carrier draws its basket under ITS crown, and
+      // no other does: carries[k] and group(k) name the same walker.
+      const crowns = await page.evaluate(() => {
+        const w = window.__placeWalkers
+        return w.carries.map((carries, k) => {
+          const crown = w.group(k)?.getObjectByName('figure-crown')
+          return { k, carries, load: !!crown?.children.some((o) => o.visible) }
+        })
+      })
+      check('head carrier: each walker carries a basket exactly when it is flagged a carrier',
+        crowns.every((o) => o.carries === o.load), JSON.stringify(crowns))
       if (c) {
         const d = JSON.stringify(c)
         check('head carrier: the load’s crown hangs from the head bone (it rides the head, never a fixed height)', c.onHeadBone && c.crownAboveHead > 0, d)
