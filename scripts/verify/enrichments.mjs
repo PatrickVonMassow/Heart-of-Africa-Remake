@@ -954,6 +954,10 @@ if (section('canoe-depiction')) {
       window.__game.setState({ afflictions: { ...g.afflictions, wounds: 2 } })
       window.__ui.getState().setTravelZoom(0.3)
     })
+    // Wait for the figure's own frame to show it (point 200's rule): after the
+    // jump of the passage above a WebGL 2 frame can take longer than a fixed
+    // wait, and the snapshot read then was the swim's.
+    await page.waitForFunction(() => window.__player?.wounds === 2, null, { timeout: 15000 }).catch(() => {})
     await page.waitForTimeout(500)
     const hurt = await page.evaluate(() => window.__player)
     check('Injured figure: a severe wound shows on the explorer', hurt?.wounds === 2, JSON.stringify(hurt))
@@ -1030,7 +1034,7 @@ if (section('traveller-figure')) {
     await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
     await page.waitForTimeout(1800)
     const at = await page.evaluate(() => window.__game.getState().pos)
-    await shot(backend('1378-traveller-above'), { world: { x: at.x, z: at.z }, label: 'the traveller from above on the villagers’ body', settle: false })
+    await shot(backend('1378-traveller-above'), { world: { x: at.x, z: at.z }, label: 'the traveller from above on the villagers’ body' })
     await page.evaluate(() => {
       const g = window.__game.getState()
       window.__game.setState({ afflictions: { ...g.afflictions, wounds: 2 } })
@@ -1044,7 +1048,7 @@ if (section('traveller-figure')) {
       return { wounds: window.__player?.wounds, shownOnHelmet: shown }
     })
     check('Traveller: the severe wound shows its strap marks on the helmet', marks.wounds === 2 && marks.shownOnHelmet === 2, JSON.stringify(marks))
-    await shot(backend('1378-traveller-wounded'), { world: { x: at.x, z: at.z }, label: 'the severely wounded traveller from above', settle: false })
+    await shot(backend('1378-traveller-wounded'), { world: { x: at.x, z: at.z }, label: 'the severely wounded traveller from above' })
 
     // In the canoe he kneels on the hull floor: his head drops well below a
     // standing villager's, and the legs fold into the hull.
@@ -1079,7 +1083,7 @@ if (section('traveller-figure')) {
       check('Traveller: in the canoe he kneels, his head low over the hull',
         seated.canoeing === true && seated.headOverBoat > 0.5 && seated.headOverBoat < 1.0, JSON.stringify(seated))
       const on = await page.evaluate(() => window.__game.getState().pos)
-      await shot(backend('1378-traveller-canoe'), { world: { x: on.x, z: on.z }, label: 'the wounded traveller kneeling in his canoe', settle: false })
+      await shot(backend('1378-traveller-canoe'), { world: { x: on.x, z: on.z }, label: 'the wounded traveller kneeling in his canoe' })
     }
   } finally {
     await page.evaluate((l) => {
