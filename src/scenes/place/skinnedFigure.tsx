@@ -301,6 +301,7 @@ export function SkinnedFigure({
   work,
   office,
   permanentLabel,
+  ownedByPlayer,
 }: {
   look: FigureLook
   cloth: string
@@ -332,6 +333,8 @@ export function SkinnedFigure({
   office?: 'chief'
   /** Carries a standing label of its own: the Ctrl layer does not name it twice. */
   permanentLabel?: boolean
+  /** The player's own figure (the bird's-eye traveller): never named by the Ctrl layer. */
+  ownedByPlayer?: boolean
 }) {
   const ownKey = useId()
   const key = identityKey ?? ownKey
@@ -654,7 +657,7 @@ export function SkinnedFigure({
   })
 
   return (
-    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: bodyH + 0.45, permanentLabel })}>
+    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: bodyH + 0.45, permanentLabel, ownedByPlayer })}>
       {rig.meshes.map((m) => (
         <primitive key={m.uuid} object={m} />
       ))}

@@ -100,11 +100,13 @@ export const FIGURE_LIMBS = {
  *  `rotation.y = Math.atan2(dx, dz)`, which maps the group's LOCAL +Z axis
  *  onto the travel direction — local +Z is the figure's FRONT, local -Z its
  *  BACK. The pack therefore carries a NEGATIVE z offset so it rides behind
- *  the torso (the torso box spans z -0.14..+0.14), never on the chest facing
+ *  the torso (the dressed chest's back lies near z -0.1), never on the chest facing
  *  the camera when the traveller walks toward the viewer. */
 export const TRAVELLER_PACK = {
   /** Box size [width, height, depth]. */
   size: [0.32, 0.38, 0.16],
-  /** Local offset in the yawing figure group; z < 0 = on the BACK. */
-  offset: [0, 0.72, -0.2],
+  /** Local offset in the yawing figure group; z < 0 = on the BACK. At the
+   *  villager-stature body's chest (chest line 0.72 × FIGURE_STATURE), clear of
+   *  the khaki coat's back. */
+  offset: [0, 0.86, -0.19],
 } as const

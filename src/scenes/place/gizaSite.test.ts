@@ -3,8 +3,15 @@
 // site-scale geometry's ~1890 casing cues, plus the Giza-vs-Meroë contrast.
 
 import { beforeAll, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { appearanceFor, CAST_DRESS } from '../../systems/appearance'
 import {
+  GIZA_AMBIENT,
   GIZA_PYRAMIDS,
+  gizaFigure,
+  isGizaPerson,
+  type GizaPersonRole,
   GIZA_SITE_RADIUS,
   GIZA_SLOPE,
   GIZA_SPAWN_Z,
@@ -301,5 +308,59 @@ describe('Giza site — the site-scale monument geometry', () => {
       ).toBeLessThan(menkaure.base * 1.2)
     }
     expect(granite, 'a red-granite skirt exists').toBeGreaterThan(0)
+  })
+})
+
+describe("Giza's people on the villagers' figure body (docs/giza-1890.md §4.1)", () => {
+  const persons = GIZA_AMBIENT.filter((a) => isGizaPerson(a.role))
+  const scene = readFileSync(resolve(process.cwd(), 'src/scenes/place/PlaceScene.tsx'), 'utf8')
+  const ambient = scene.slice(scene.indexOf('function GizaAmbient('), scene.indexOf('// --- Scene ---'))
+
+  it('draws every person through the shared Figure, at villager stature, and no hand-built body', () => {
+    expect(ambient).toContain('<Figure ')
+    // No scale prop: the stature is the villagers' (FIGURE_STATURE), the
+    // donkey-boy smaller only by his age group.
+    expect(/<Figure [^>]*scale=/.test(ambient)).toBe(false)
+    expect(scene).not.toContain('RobedFigure')
+    expect(ambient).toMatch(/useFigureLook\(placeId, GIZA_PALETTE, 'egyptian'\)/)
+  })
+
+  it('gives each role its cast, sex and age group', () => {
+    const spec = persons.map((a) => ({ role: a.role, ...gizaFigure(a.role as GizaPersonRole, a.sex) }))
+    for (const s of spec) {
+      if (s.role === 'donkeyboy') expect(s.age).toBe('youth')
+      else expect(s.age).toBe('adult')
+      expect(s.cast).toBe(s.role === 'tourist' ? 'european' : s.role === 'cameleer' ? 'bedouin' : 'egyptian')
+    }
+    // The tourists are a man in the sun helmet and a woman in her hat.
+    const tourists = spec.filter((s) => s.role === 'tourist')
+    expect(tourists.map((t) => [t.sex, t.hat]).sort()).toEqual([['female', 'ladyHat'], ['male', 'sunHelmet']])
+  })
+
+  it('dresses the locals in the galabiya and the tourists in Western dress', () => {
+    const dress = (role: GizaPersonRole, sex?: 'female' | 'male') => {
+      const s = gizaFigure(role, sex)
+      return appearanceFor({ peopleId: s.cast, sex: s.sex, age: s.age, drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, cloth: s.cloth, palette: [s.cloth], pick: 0.5 })
+    }
+    const forms = (role: GizaPersonRole, sex?: 'female' | 'male') => dress(role, sex).map((l) => l.form).sort()
+    expect(forms('guide')).toEqual(['robe', 'turban'])
+    expect(forms('cameleer')).toEqual(['hood', 'robe'])
+    expect(forms('donkeyboy')).toEqual(['cap', 'robe'])
+    expect(forms('tourist', 'male')).toEqual(['shirt', 'trousers'])
+    expect(forms('tourist', 'female')).toEqual(['robe'])
+    // The figure's own cloth colours the gown.
+    expect(dress('guide').find((l) => l.form === 'robe')?.colour).toBe(gizaFigure('guide').cloth)
+  })
+
+  it('cites the Giza dress section that exists', () => {
+    const doc = readFileSync(resolve(process.cwd(), 'docs/giza-1890.md'), 'utf8')
+    expect(doc).toMatch(/^### 4\.1 The cast's dress/m)
+    for (const table of Object.values(CAST_DRESS))
+      for (const sex of ['male', 'female'] as const)
+        for (const cell of Object.values(table[sex]))
+          for (const l of cell) {
+            const why = 'section' in l.source ? l.source.section : l.source.guess
+            expect(why).toMatch(/giza-1890 §4\.1/)
+          }
   })
 })

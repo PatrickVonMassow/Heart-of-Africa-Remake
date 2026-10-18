@@ -14,7 +14,7 @@
 // the drei <Html> map/region labels, real layout geometry (getBoundingClientRect
 // hit-tests), a real WheelEvent zoom, the screenshots and the console-error
 // gate. Dev server only (dev hooks).
-import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
 import { FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { frameShutter, captureFrame, capturePixels, waitForSceneReady, jumpBeside } from './frameSubject.mjs'
@@ -839,6 +839,12 @@ if (section('canoe-depiction')) {
     // shot catches a mid-transition view instead of the close-up.
     await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
     await page.waitForTimeout(1800)
+    // He kneels in the hull (point 1378): on the skinned body's own frame
+    // clock, which a slow headless frame rate stretches past the wait above.
+    await page.waitForFunction(() => {
+      const body = window.__travellerRoot?.getObjectByName('inhabitant')
+      return !body?.userData.walk || body.userData.walk.kneel >= 0.99
+    }, null, { timeout: 20000 }).catch(() => {})
     await shot('88-canoe-ride', { world: { lat: waterSpot.lat, lon: waterSpot.lon }, label: 'the canoe ride on the water', settle: false })
 
     // On land with the canoe still in the pack: it is dragged behind, not ridden.
@@ -891,17 +897,41 @@ if (section('canoe-depiction')) {
       // Poll on the SIM clock (point 249): the swim flag is set by the travel
       // frame loop, so a wall-clock window starves when frames run long.
       await window.__pollSim(5, () => window.__player?.swimming === true)
-      return { found: true, spot, player: window.__player }
+      // Measured, not reported: the water's float height from the surface
+      // construction the sheet is drawn from, and the drawn body's own joints.
+      const ws = await import('/src/scenes/travel/waterSurface.ts')
+      const terrain = await import('/src/world/terrain.ts')
+      const st = window.__game.getState()
+      const ll = { lat: -st.pos.z / 10, lon: st.pos.x / 10 }
+      const bedH = terrain.sampleTerrain(ll.lat, ll.lon, st.seed).height
+      const surface = ws.waterSurfaceY(ll.lat, ll.lon, st.seed, bedH)
+      const root = window.__travellerRoot
+      root.updateWorldMatrix(true, true)
+      const y = (name) => {
+        const o = root.getObjectByName(name)
+        return o ? o.matrixWorld.elements[13] : null
+      }
+      const feet = Math.min(y('bone-foot.L') ?? Infinity, y('bone-foot.R') ?? Infinity)
+      return {
+        found: true, spot, swimming: window.__player?.swimming === true,
+        surface, bed: Math.max(0, bedH), hips: y('bone-hips'), head: y('figure-head'), feet: Number.isFinite(feet) ? feet : null,
+      }
     })
-    const swimGap = swim.found
-      ? swim.player.surfaceY - (swim.player.refY + swim.player.figureLocalY)
-      : NaN
+    // The body's hip joint stands at 0.52 of FIGURE_STATURE (1.34) over its
+    // soles (render/figureBody.ts): hip-deep means that joint at the surface.
+    const ok = (v) => typeof v === 'number' && Number.isFinite(v)
+    const swimDepth = swim.found && ok(swim.surface) && ok(swim.hips) && ok(swim.head) && ok(swim.feet)
+      ? { hipsOverSurface: +(swim.hips - swim.surface).toFixed(3), headOverSurface: +(swim.head - swim.surface).toFixed(3), surfaceOverFeet: +(swim.surface - swim.feet).toFixed(3), feetOverBed: +(swim.feet - swim.bed).toFixed(3), surfOverBed: +(swim.surface - swim.bed).toFixed(3) }
+      : null
     check(
-      'a swimmer floats chest-deep ON the lake sheet — never on the carved bed (point 152)',
-      swim.found && swim.player.swimming === true &&
-        swim.player.surfaceY - swim.player.refY > 0.2 && // the bed genuinely lies below the sheet here
-        Math.abs(swimGap - 0.35) < 0.12, // immersion, within the swim bob
-      JSON.stringify({ spot: swim.spot, swimming: swim.player?.swimming, swimGap, surfOverBed: swim.found ? swim.player.surfaceY - swim.player.refY : null }),
+      'a swimmer floats hip-deep ON the lake sheet — never on the carved bed (point 152)',
+      swim.swimming === true && !!swimDepth &&
+        swimDepth.surfOverBed > 0.2 && // the bed genuinely lies below the sheet here
+        Math.abs(swimDepth.hipsOverSurface) < 0.2 && // the drawn hips at the water line, within the swim bob
+        swimDepth.surfaceOverFeet > 0.4 && // legs under the water
+        swimDepth.headOverSurface > 0.3 && // head clear
+        (swimDepth.surfOverBed < 1.0 || swimDepth.feetOverBed > 0.1), // where the sheet is deep, off the bed
+      JSON.stringify({ spot: swim.spot, swimming: swim.swimming, ...swimDepth, raw: swimDepth ? undefined : swim }),
     )
     await shot(
       '125-swim-lake-edward',
@@ -948,6 +978,10 @@ if (section('canoe-depiction')) {
       window.__game.setState({ afflictions: { ...g.afflictions, wounds: 2 } })
       window.__ui.getState().setTravelZoom(0.3)
     })
+    // Wait for the figure's own frame to show it (point 200's rule): after the
+    // jump of the passage above a WebGL 2 frame can take longer than a fixed
+    // wait, and the snapshot read then was the swim's.
+    await page.waitForFunction(() => window.__player?.wounds === 2, null, { timeout: 15000 }).catch(() => {})
     await page.waitForTimeout(500)
     const hurt = await page.evaluate(() => window.__player)
     check('Injured figure: a severe wound shows on the explorer', hurt?.wounds === 2, JSON.stringify(hurt))
@@ -965,6 +999,136 @@ if (section('canoe-depiction')) {
     check('Injured figure: healed explorer shows no wound', healed?.wounds === 0, JSON.stringify(healed))
   } else {
     check('Canoe: a water tile and a land tile were found', false, `water=${JSON.stringify(waterSpot)} land=${JSON.stringify(landSpot)}`)
+  }
+}
+
+// --- Point 1378: the traveller on the villagers' figure body -----------------
+// He is drawn through the villagers' Figure (skinned and dressed on medium,
+// primitive on low) at their stature, in khaki with sun helmet and pack. From
+// the steep bird's-eye he must read, and so must his wounds on crown and
+// shoulders: one frame per backend unhurt and one severely wounded.
+if (section('traveller-figure')) {
+  const backend = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  const land = await page.evaluate(() => {
+    const seed = window.__game.getState().seed
+    for (let lat = 24; lat >= 14; lat -= 0.3)
+      for (let lon = -6; lon <= 26; lon += 0.3) if (window.__terrainType(lat, lon, seed) === 'desert') return { lat, lon }
+    return null
+  })
+  check('Traveller: a desert tile to stand him on was found', !!land, JSON.stringify(land))
+  const level = await page.evaluate(() => window.__ui.getState().detailLevel)
+  if (land) try {
+    await page.evaluate((s) => {
+      const g = window.__game.getState()
+      window.__game.setState({ equipment: { ...g.equipment, canoe: 0 }, afflictions: { ...g.afflictions, wounds: 0 } })
+      g.debugJumpTo(s.lat, s.lon)
+    }, land)
+    const census = (skinnedWanted) =>
+      page
+        .waitForFunction((skinnedWanted) => {
+          const root = window.__travellerRoot
+          if (!root) return null
+          root.updateWorldMatrix(true, true)
+          let skinned = 0
+          let inhabitants = 0
+          let owned = 0
+          let helmet = 0
+          let head = null
+          root.traverse((o) => {
+            if (o.isSkinnedMesh) skinned++
+            if (o.name === 'inhabitant') {
+              inhabitants++
+              if (o.userData.actor?.ownedByPlayer) owned++
+            }
+            if (o.name === 'figure-head' && !head) head = o
+            if (o.name === 'sun-helmet') helmet++
+          })
+          if ((skinned > 0) !== skinnedWanted || !head) return null
+          return { skinned, inhabitants, owned, helmet, headRise: +(head.matrixWorld.elements[13] - root.matrixWorld.elements[13]).toFixed(3) }
+        }, skinnedWanted, { timeout: 30000 })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+    for (const lvl of ['low', 'medium']) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), lvl)
+      const c = await census(lvl !== 'low')
+      check(`Traveller (${lvl}): one villager Figure, ${lvl === 'low' ? 'primitive' : 'skinned'}, his own and never named, under the sun helmet`,
+        !!c && c.inhabitants === 1 && c.owned === 1 && c.helmet === 1, JSON.stringify(c))
+      check(`Traveller (${lvl}): his head stands at villager height`, !!c && c.headRise > 0.95 && c.headRise < 1.35, JSON.stringify(c))
+    }
+    // the shutter waits for the zoomed scene to finish drawing
+    await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
+    const at = await page.evaluate(() => window.__game.getState().pos)
+    await shot(backend('1378-traveller-above'), { world: { x: at.x, z: at.z }, label: 'the traveller from above on the villagers’ body' })
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      window.__game.setState({ afflictions: { ...g.afflictions, wounds: 2 } })
+    })
+    await page.waitForFunction(() => window.__player?.wounds === 2, null, { timeout: 6000 }).catch(() => {})
+    const marks = await page.evaluate(() => {
+      const helmet = window.__travellerRoot?.getObjectByName('sun-helmet')
+      // the light and the severe strap groups ride the helmet: both shown when severe
+      const shown = helmet ? helmet.children.filter((c) => c.type === 'Group' && c.visible).length : -1
+      return { wounds: window.__player?.wounds, shownOnHelmet: shown }
+    })
+    check('Traveller: the severe wound shows its strap marks on the helmet', marks.wounds === 2 && marks.shownOnHelmet === 2, JSON.stringify(marks))
+    await shot(backend('1378-traveller-wounded'), { world: { x: at.x, z: at.z }, label: 'the severely wounded traveller from above' })
+
+    // In the canoe he kneels on the hull floor: his head drops well below a
+    // standing villager's, and the legs fold into the hull.
+    const water = await page.evaluate(() => {
+      const seed = window.__game.getState().seed
+      for (let lat = 27; lat >= 25.5; lat -= 0.3)
+        for (let lon = 31.4; lon <= 33.2; lon += 0.3) if (window.__terrainType(lat, lon, seed) === 'water') return { lat, lon }
+      return null
+    })
+    check('Traveller: a water tile for the canoe was found', !!water, JSON.stringify(water))
+    if (water) {
+      await page.evaluate((s) => {
+        const g = window.__game.getState()
+        window.__game.setState({ equipment: { ...g.equipment, canoe: 1 } })
+        g.debugJumpTo(s.lat, s.lon)
+      }, water)
+      const boarded = await page.waitForFunction(() => window.__player?.canoeing === true, null, { timeout: 6000 }).then(() => true, () => false)
+      // The kneel is a 0.6 s transition (VILLAGER_MOTION.kneelSeconds) on the
+      // body's own clamped frame time: on a slow headless frame rate that is
+      // many frames, so wait for the body's own kneel, not the wall clock. A
+      // timeout is a failure of this check, never skipped.
+      const knelt = await page.waitForFunction(() => (window.__travellerRoot?.getObjectByName('inhabitant')?.userData.walk?.kneel ?? 0) >= 0.99,
+        null, { timeout: 20000 }).then(() => true, () => false)
+      const seated = await page.evaluate(() => {
+        const root = window.__travellerRoot
+        root.updateWorldMatrix(true, true)
+        const head = root.getObjectByName('figure-head')
+        const boat = root.children.find((c) => c.userData.actor?.kind === 'canoe')
+        const e = head.matrixWorld.elements
+        const body = root.getObjectByName('inhabitant')
+        // The legs in the hull: knees (shin bone roots) and ankles in the
+        // boat's frame — under the gunwale rim (CanoeHull: y 0.05), above its
+        // keel (~-0.25), inside its 0.72 × 2.15 plan.
+        const legs = ['shin.L', 'shin.R', 'foot.L', 'foot.R'].map((n) => {
+          const b = root.getObjectByName(`bone-${n}`)
+          if (!b) return { n, missing: true }
+          const p = boat.worldToLocal(b.getWorldPosition(b.position.clone()))
+          return { n, x: +p.x.toFixed(3), y: +p.y.toFixed(3), z: +p.z.toFixed(3) }
+        })
+        return { canoeing: window.__player?.canoeing, headOverBoat: +(e[13] - boat.matrixWorld.elements[13]).toFixed(3), kneel: body?.userData.walk?.kneel ?? null, speed: body?.userData.walk?.speed ?? null, legs }
+      })
+      check('Traveller: in the canoe he kneels, his head low over the hull',
+        boarded && knelt && seated.canoeing === true && typeof seated.kneel === 'number' && seated.kneel >= 0.99 &&
+          seated.headOverBoat > 0.5 && seated.headOverBoat < 1.0, JSON.stringify({ boarded, knelt, ...seated, legs: undefined }))
+      check('Traveller: kneeling, his legs are hidden inside the hull',
+        seated.legs.length === 4 && seated.legs.every((l) => !l.missing && l.y < 0.05 && l.y > -0.25 && Math.abs(l.x) < 0.36 && Math.abs(l.z) < 1.07),
+        JSON.stringify(seated.legs))
+      const on = await page.evaluate(() => window.__game.getState().pos)
+      await shot(backend('1378-traveller-canoe'), { world: { x: on.x, z: on.z }, label: 'the wounded traveller kneeling in his canoe' })
+    }
+  } finally {
+    await page.evaluate((l) => {
+      const g = window.__game.getState()
+      window.__game.setState({ afflictions: { ...g.afflictions, wounds: 0 }, equipment: { ...g.equipment, canoe: 0 } })
+      window.__ui.getState().setTravelZoom(1)
+      window.__ui.getState().setDetailLevel(l)
+    }, level)
   }
 }
 

@@ -9,7 +9,10 @@ import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
 import { VILLAGER_ASSET, VILLAGER_MOTION as M } from '../config/balance'
-import { AGE_GROUPS, appearanceFor, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
+import { AGE_GROUPS, appearanceFor, CAST_DRESS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
+
+/** Every dress table the body is drawn in: the peoples' and the non-villager cast's. */
+const DRESS_TABLES = { ...PEOPLE_DRESS, ...CAST_DRESS }
 import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
 import { ankleAt, figureCrownOffset, legDims, legExtent, strideReach, walkPose } from './figureWalk'
@@ -339,7 +342,7 @@ describe('a head load rests on the drawn head', () => {
         const person = gltfPerson(asset, sex, age, build)
         const { skeleton, bones } = createGltfSkeleton(asset, person.rest)
         const headAt = bones.head.getWorldPosition(new THREE.Vector3())
-        const dresses = [['bare', []] as const, ...Object.entries(PEOPLE_DRESS).map(([id, t]) => [id, t[sex][age].map(dressOf)] as const)]
+        const dresses = [['bare', []] as const, ...Object.entries(DRESS_TABLES).map(([id, t]) => [id, t[sex][age].map(dressOf)] as const)]
         for (const [id, layers] of dresses) {
           const g = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
           const crown = headAt.y + figureCrownOffset(person.p, g, skeleton.bones.indexOf(bones.head), headAt)
@@ -352,7 +355,7 @@ describe('a head load rests on the drawn head', () => {
 
   it('no head piece floats: every one reaches down onto the head of every person who could wear it', () => {
     const worn = new Map<string, DressLayer>()
-    for (const t of Object.values(PEOPLE_DRESS))
+    for (const t of Object.values(DRESS_TABLES))
       for (const sex of SEXES) for (const age of AGE_GROUPS) for (const l of t[sex][age]) if (HEAD_FORMS.has(l.form)) worn.set(garmentMeshName(l), dressOf(l))
     expect(worn.size).toBeGreaterThan(0)
     for (const { sex, age } of people()) {
@@ -370,7 +373,7 @@ describe('a head load rests on the drawn head', () => {
 
   it('a cap, a headband and a hair bag sit on the head skin: centred, neither sunk nor lifted', { timeout: 120_000 }, () => {
     const worn = new Map<string, DressLayer>()
-    for (const t of Object.values(PEOPLE_DRESS))
+    for (const t of Object.values(DRESS_TABLES))
       for (const sex of SEXES) for (const age of AGE_GROUPS) for (const l of t[sex][age]) if (SEATED_FORMS.has(l.form)) worn.set(garmentMeshName(l), dressOf(l))
     expect([...worn.values()].map((l) => l.form).sort()).toEqual(['cap', 'hairBag', 'headband'])
     for (const { sex, age } of people()) {
@@ -433,7 +436,7 @@ describe('a head load rests on the drawn head', () => {
 describe('a head piece faces outward', () => {
   it('every triangle of a cap, a turban and a headband turns its front away from the head', () => {
     const worn = new Map<string, DressLayer>()
-    for (const t of Object.values(PEOPLE_DRESS))
+    for (const t of Object.values(DRESS_TABLES))
       for (const sex of SEXES) for (const age of AGE_GROUPS) for (const l of t[sex][age]) if (['cap', 'turban', 'headband'].includes(l.form)) worn.set(garmentMeshName(l), dressOf(l))
     expect(worn.size).toBeGreaterThan(0)
     const person = gltfPerson(asset, 'male', 'adult')
@@ -473,7 +476,7 @@ describe('the dressed figure', () => {
     for (const { sex, age } of people()) {
       const person = gltfPerson(asset, sex, age)
       const bodyCount = person.geometry.getAttribute('position').count
-      for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
+      for (const [id, table] of Object.entries(DRESS_TABLES)) {
         // the table's 'cloth' colour is the figure's own cloth (appearanceFor resolves it)
         const cloth = <T extends string | null>(c: T): T | string => (c === 'cloth' ? '#b08850' : c)
         const layers = table[sex][age].map((l) => ({ ...l, colour: cloth(l.colour), colour2: cloth(l.colour2) }))
@@ -607,7 +610,7 @@ describe('the pipeline garments on the glTF body', () => {
   /** Every dress layer the outfit generator puts on a figure, one per form and wear. */
   const generated = () => {
     const out = new Map<string, DressLayer>()
-    for (const peopleId of [...Object.keys(PEOPLE_DRESS), null])
+    for (const peopleId of [...Object.keys(DRESS_TABLES), null])
       for (const sex of SEXES)
         for (const age of AGE_GROUPS)
           for (const drivers of DRIVERS)
@@ -631,7 +634,7 @@ describe('the pipeline garments on the glTF body', () => {
   it('no code-built layer reaches the glTF body: the figure is the body and exactly the pipeline garments', () => {
     for (const { sex, age } of people()) {
       const person = gltfPerson(asset, sex, age)
-      for (const [id, table] of Object.entries(PEOPLE_DRESS)) {
+      for (const [id, table] of Object.entries(DRESS_TABLES)) {
         const layers = table[sex][age].map((l) => ({ ...l, colour: l.colour === 'cloth' ? '#b08850' : l.colour, colour2: l.colour2 === 'cloth' ? '#b08850' : l.colour2 }))
         const g = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
         const garments = layers.filter((l) => l.form !== 'bodyPaint')

@@ -1164,6 +1164,89 @@ if (section('giza-site')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- The plateau's people on the villagers' body (work-order 1378) ------------
+// The guides, the cameleer, the donkey-boy and the two tourists are drawn
+// through the villagers' Figure: skinned and dressed on medium (and high), the
+// primitive on low, at villager stature. One frame of the ambient life per
+// backend, and one closer of the tourist man beside a guide.
+if (section('giza-figures')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await goToPlace('giza')
+  await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeScene,
+    null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  const level = await page.evaluate(() => window.__ui.getState().detailLevel)
+  try {
+    const census = (skinnedWanted) =>
+      page
+        .waitForFunction((skinnedWanted) => {
+          const out = []
+          window.__placeScene.traverse((o) => {
+            if (o.name !== 'inhabitant') return
+            let skinned = 0
+            let head = null
+            o.traverse((c) => {
+              if (c.isSkinnedMesh) skinned++
+              if (c.name === 'figure-head' && !head) head = c
+            })
+            o.updateWorldMatrix(true, true)
+            const base = o.matrixWorld.elements[13]
+            out.push({ kind: o.userData.actor?.kind, skinned, headRise: head ? +(head.matrixWorld.elements[13] - base).toFixed(3) : null })
+          })
+          if (out.length === 0 || out.some((f) => (f.skinned > 0) !== skinnedWanted || f.headRise === null)) return null
+          return out
+        }, skinnedWanted, { timeout: 30000 })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+    for (const lvl of ['low', 'medium']) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), lvl)
+      const people = await census(lvl !== 'low')
+      const kinds = (people ?? []).map((f) => f.kind).sort()
+      check(`Giza figures (${lvl}): every person is one villager Figure, ${lvl === 'low' ? 'primitive' : 'skinned'}`,
+        JSON.stringify(kinds) === JSON.stringify(['cameleer', 'donkeyboy', 'guide', 'guide', 'tourist', 'tourist']),
+        JSON.stringify(people))
+      // Villager stature: the head stands where a villager's does (FIGURE_STATURE
+      // 1.34), the donkey-boy a youth a little lower — not the old 1.32 m cone
+      // shrunk to 0.82 for him.
+      check(`Giza figures (${lvl}): every head stands at villager height`,
+        !!people && people.every((f) => f.headRise > 0.95 && f.headRise < 1.35), JSON.stringify(people))
+    }
+    // The wide frame: from the south over the approach, the woman tourist in
+    // front, the donkey-boy, the cameleer and his camel, the guides beyond.
+    await page.evaluate(() => {
+      const p = window.__placePlayer
+      p.x = 3
+      p.z = 40
+      p.yaw = 0.08
+      p.pitch = -0.06
+    })
+    await waitForStable(page)
+    await frame(shot('1378-giza-ambient'), { place: 'giza', label: "the plateau's ambient life on the villagers' dressed body" })
+    // Closer: the tourist man in his sun helmet beside a guide in galabiya and turban.
+    const near = await page.evaluate(() => {
+      const [gx, gz] = window.__placeLayout.errands[0]
+      const [tx, tz] = window.__placeLayout.errands[1]
+      const cx = (gx + tx) / 2
+      const cz = (gz + tz) / 2
+      const p = window.__placePlayer
+      p.x = cx - 1.5
+      p.z = cz + 5.5
+      p.yaw = Math.atan2(cx - p.x, cz - p.z) + Math.PI
+      p.pitch = -0.12
+      return { x: cx, z: cz }
+    })
+    await waitForStable(page)
+    await frame(shot('1378-giza-tourist-guide'), {
+      local: { x: near.x, y: 1.0, z: near.z },
+      label: 'the tourist in suit and sun helmet beside a guide in galabiya and turban',
+    })
+  } finally {
+    await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 // --- Detailed animal models (work-order 1284) ----------------------------------
 // The zebra, the antelope and the settlement goat are shaped models with face,
 // horns/mane and jointed legs; the zebra and the gazelle carry their pelt

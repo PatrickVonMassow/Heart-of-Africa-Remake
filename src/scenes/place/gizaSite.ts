@@ -16,7 +16,8 @@
 // cluster of small, steep ~70° cones — the slope ratio here is far flatter than
 // MEROE_PYRAMIDS' (~2.6·base) so the two can never be mistaken.
 
-import { balance } from '../../config/balance'
+import { balance, GIZA_CAST } from '../../config/balance'
+import type { AgeGroup, CastId, Sex } from '../../systems/appearance'
 import { openPlainWalkRadius } from './backdrop'
 import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import type { PlaceLayout } from './layout'
@@ -131,12 +132,58 @@ export interface GizaAmbientAnchor {
   role: GizaAmbientRole
   x: number
   z: number
+  /** A person's sex where the role has both (the tourists); male otherwise. */
+  sex?: Sex
+}
+
+/** The plateau's people: every role but the mounts. */
+export type GizaPersonRole = Exclude<GizaAmbientRole, 'camel' | 'donkey'>
+
+/** How a person of the plateau is drawn on the villagers' figure body. */
+export interface GizaFigureSpec {
+  /** The dress table they wear (`CAST_DRESS`, docs/giza-1890.md §4.1). */
+  cast: CastId
+  sex: Sex
+  age: AgeGroup
+  /** The figure's own cloth: the gown's or the suit's colour. */
+  cloth: string
+  skin: string
+  /** The hat worn as a prop on the head, where the garment set has none. */
+  hat: 'sunHelmet' | 'ladyHat' | null
+}
+
+export function isGizaPerson(role: GizaAmbientRole): role is GizaPersonRole {
+  return role !== 'camel' && role !== 'donkey'
+}
+
+/**
+ * Who stands at an anchor (docs/giza-1890.md §4.1): guides in the galabiya and
+ * turban, the Bedouin cameleer under his head cloth, the donkey-boy a youth in
+ * a skullcap, the tourists in 1890s Western dress. No scale: all of them stand
+ * at villager stature, the donkey-boy by his age group. Colours calibratable
+ * (`GIZA_CAST`).
+ */
+export function gizaFigure(role: GizaPersonRole, sex: Sex = 'male'): GizaFigureSpec {
+  const c = GIZA_CAST
+  switch (role) {
+    case 'guide':
+      return { cast: 'egyptian', sex: 'male', age: 'adult', cloth: c.guideGown, skin: c.localSkin, hat: null }
+    case 'cameleer':
+      return { cast: 'bedouin', sex: 'male', age: 'adult', cloth: c.cameleerGown, skin: c.bedouinSkin, hat: null }
+    case 'donkeyboy':
+      return { cast: 'egyptian', sex: 'male', age: 'youth', cloth: c.donkeyboyGown, skin: c.localSkin, hat: null }
+    case 'tourist':
+      return sex === 'female'
+        ? { cast: 'european', sex, age: 'adult', cloth: c.touristGown, skin: c.touristSkin, hat: 'ladyHat' }
+        : { cast: 'european', sex, age: 'adult', cloth: c.touristSuit, skin: c.touristSkin, hat: 'sunHelmet' }
+  }
 }
 
 // A handful of figures, no throng (docs/giza-1890.md §4): robed guides and a
 // Bedouin cameleer with his camel on the approach, a lone camel by the Sphinx,
-// a donkey-boy with his donkey, and a few 1890s tourists between the spawn and
-// the monuments so they read in front of the pyramids on approach.
+// a donkey-boy with his donkey, and a few 1890s tourists — a man and a woman —
+// between the spawn and the monuments so they read in front of the pyramids on
+// approach.
 export const GIZA_AMBIENT: readonly GizaAmbientAnchor[] = [
   { role: 'guide', x: 12, z: 8 },
   { role: 'tourist', x: 9, z: 12 },
@@ -145,7 +192,7 @@ export const GIZA_AMBIENT: readonly GizaAmbientAnchor[] = [
   { role: 'camel', x: 8, z: 26 },
   { role: 'donkeyboy', x: -7, z: 22 },
   { role: 'donkey', x: -4, z: 24 },
-  { role: 'tourist', x: -2, z: 30 },
+  { role: 'tourist', x: -2, z: 30, sex: 'female' },
   { role: 'guide', x: 16, z: 17 },
 ]
 
