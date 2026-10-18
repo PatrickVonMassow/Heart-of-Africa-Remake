@@ -897,17 +897,41 @@ if (section('canoe-depiction')) {
       // Poll on the SIM clock (point 249): the swim flag is set by the travel
       // frame loop, so a wall-clock window starves when frames run long.
       await window.__pollSim(5, () => window.__player?.swimming === true)
-      return { found: true, spot, player: window.__player }
+      // Measured, not reported: the water's float height from the surface
+      // construction the sheet is drawn from, and the drawn body's own joints.
+      const ws = await import('/src/scenes/travel/waterSurface.ts')
+      const terrain = await import('/src/world/terrain.ts')
+      const st = window.__game.getState()
+      const ll = { lat: -st.pos.z / 10, lon: st.pos.x / 10 }
+      const bedH = terrain.sampleTerrain(ll.lat, ll.lon, st.seed).height
+      const surface = ws.waterSurfaceY(ll.lat, ll.lon, st.seed, bedH)
+      const root = window.__travellerRoot
+      root.updateWorldMatrix(true, true)
+      const y = (name) => {
+        const o = root.getObjectByName(name)
+        return o ? o.matrixWorld.elements[13] : null
+      }
+      const feet = Math.min(y('bone-foot.L') ?? Infinity, y('bone-foot.R') ?? Infinity)
+      return {
+        found: true, spot, swimming: window.__player?.swimming === true,
+        surface, bed: Math.max(0, bedH), hips: y('bone-hips'), head: y('figure-head'), feet: Number.isFinite(feet) ? feet : null,
+      }
     })
-    const swimGap = swim.found
-      ? swim.player.surfaceY - (swim.player.refY + swim.player.figureLocalY)
-      : NaN
+    // The body's hip joint stands at 0.52 of FIGURE_STATURE (1.34) over its
+    // soles (render/figureBody.ts): hip-deep means that joint at the surface.
+    const ok = (v) => typeof v === 'number' && Number.isFinite(v)
+    const swimDepth = swim.found && ok(swim.surface) && ok(swim.hips) && ok(swim.head) && ok(swim.feet)
+      ? { hipsOverSurface: +(swim.hips - swim.surface).toFixed(3), headOverSurface: +(swim.head - swim.surface).toFixed(3), surfaceOverFeet: +(swim.surface - swim.feet).toFixed(3), feetOverBed: +(swim.feet - swim.bed).toFixed(3), surfOverBed: +(swim.surface - swim.bed).toFixed(3) }
+      : null
     check(
       'a swimmer floats hip-deep ON the lake sheet — never on the carved bed (point 152)',
-      swim.found && swim.player.swimming === true &&
-        swim.player.surfaceY - swim.player.refY > 0.2 && // the bed genuinely lies below the sheet here
-        Math.abs(swimGap - swim.player.swimImmersion) < 0.12, // immersion, within the swim bob
-      JSON.stringify({ spot: swim.spot, swimming: swim.player?.swimming, swimGap, immersion: swim.player?.swimImmersion, surfOverBed: swim.found ? swim.player.surfaceY - swim.player.refY : null }),
+      swim.swimming === true && !!swimDepth &&
+        swimDepth.surfOverBed > 0.2 && // the bed genuinely lies below the sheet here
+        Math.abs(swimDepth.hipsOverSurface) < 0.2 && // the drawn hips at the water line, within the swim bob
+        swimDepth.surfaceOverFeet > 0.4 && // legs under the water
+        swimDepth.headOverSurface > 0.3 && // head clear
+        (swimDepth.surfOverBed < 1.0 || swimDepth.feetOverBed > 0.1), // where the sheet is deep, off the bed
+      JSON.stringify({ spot: swim.spot, swimming: swim.swimming, ...swimDepth, raw: swimDepth ? undefined : swim }),
     )
     await shot(
       '125-swim-lake-edward',
@@ -1064,12 +1088,13 @@ if (section('traveller-figure')) {
         window.__game.setState({ equipment: { ...g.equipment, canoe: 1 } })
         g.debugJumpTo(s.lat, s.lon)
       }, water)
-      await page.waitForFunction(() => window.__player?.canoeing === true, null, { timeout: 6000 }).catch(() => {})
+      const boarded = await page.waitForFunction(() => window.__player?.canoeing === true, null, { timeout: 6000 }).then(() => true, () => false)
       // The kneel is a 0.6 s transition (VILLAGER_MOTION.kneelSeconds) on the
       // body's own clamped frame time: on a slow headless frame rate that is
-      // many frames, so wait for the body's own kneel, not the wall clock.
-      await page.waitForFunction(() => (window.__travellerRoot?.getObjectByName('inhabitant')?.userData.walk?.kneel ?? 0) >= 0.99,
-        null, { timeout: 20000 }).catch(() => {})
+      // many frames, so wait for the body's own kneel, not the wall clock. A
+      // timeout is a failure of this check, never skipped.
+      const knelt = await page.waitForFunction(() => (window.__travellerRoot?.getObjectByName('inhabitant')?.userData.walk?.kneel ?? 0) >= 0.99,
+        null, { timeout: 20000 }).then(() => true, () => false)
       const seated = await page.evaluate(() => {
         const root = window.__travellerRoot
         root.updateWorldMatrix(true, true)
@@ -1077,10 +1102,23 @@ if (section('traveller-figure')) {
         const boat = root.children.find((c) => c.userData.actor?.kind === 'canoe')
         const e = head.matrixWorld.elements
         const body = root.getObjectByName('inhabitant')
-        return { canoeing: window.__player?.canoeing, headOverBoat: +(e[13] - boat.matrixWorld.elements[13]).toFixed(3), kneel: body?.userData.walk?.kneel ?? null, speed: body?.userData.walk?.speed ?? null }
+        // The legs in the hull: knees (shin bone roots) and ankles in the
+        // boat's frame — under the gunwale rim (CanoeHull: y 0.05), above its
+        // keel (~-0.25), inside its 0.72 × 2.15 plan.
+        const legs = ['shin.L', 'shin.R', 'foot.L', 'foot.R'].map((n) => {
+          const b = root.getObjectByName(`bone-${n}`)
+          if (!b) return { n, missing: true }
+          const p = boat.worldToLocal(b.getWorldPosition(b.position.clone()))
+          return { n, x: +p.x.toFixed(3), y: +p.y.toFixed(3), z: +p.z.toFixed(3) }
+        })
+        return { canoeing: window.__player?.canoeing, headOverBoat: +(e[13] - boat.matrixWorld.elements[13]).toFixed(3), kneel: body?.userData.walk?.kneel ?? null, speed: body?.userData.walk?.speed ?? null, legs }
       })
       check('Traveller: in the canoe he kneels, his head low over the hull',
-        seated.canoeing === true && seated.headOverBoat > 0.5 && seated.headOverBoat < 1.0, JSON.stringify(seated))
+        boarded && knelt && seated.canoeing === true && typeof seated.kneel === 'number' && seated.kneel >= 0.99 &&
+          seated.headOverBoat > 0.5 && seated.headOverBoat < 1.0, JSON.stringify({ boarded, knelt, ...seated, legs: undefined }))
+      check('Traveller: kneeling, his legs are hidden inside the hull',
+        seated.legs.length === 4 && seated.legs.every((l) => !l.missing && l.y < 0.05 && l.y > -0.25 && Math.abs(l.x) < 0.36 && Math.abs(l.z) < 1.07),
+        JSON.stringify(seated.legs))
       const on = await page.evaluate(() => window.__game.getState().pos)
       await shot(backend('1378-traveller-canoe'), { world: { x: on.x, z: on.z }, label: 'the wounded traveller kneeling in his canoe' })
     }
