@@ -5284,10 +5284,12 @@ if (section('figure-micro')) {
   // the camera at the same offset from it, so the weave can be compared on the
   // limb from frame to frame.
   await goToPlace('hausa-village')
+  // Every walker out on the walk, on the glTF body.
   const walkerAt = () =>
     page.evaluate(() => {
       const w = window.__placeWalkers
-      if (!w) return null
+      const out = []
+      if (!w) return out
       for (let i = 0; i < w.states.length; i++) {
         const s = w.states[i]
         const g = w.group(i)
@@ -5297,13 +5299,13 @@ if (section('figure-micro')) {
           if (o.isSkinnedMesh && !mesh) mesh = o
         })
         if (!mesh || !mesh.skeleton.bones.some((b) => b.name === 'bone-toe.L')) continue
-        return i
+        out.push(i)
       }
-      return null
+      return out
     })
   let who = null
   for (let f = 0; f < 600 && who === null; f += 10) {
-    who = await walkerAt()
+    who = (await walkerAt())[0] ?? null
     if (who === null) await nextFrames(10)
   }
   check('figure micro-structure: a villager is out walking on the glTF body', who !== null, 'no skinned walker out in 600 frames')
@@ -5324,6 +5326,9 @@ if (section('figure-micro')) {
         },
         { i, flank, dist },
       )
+    // The pose, and whether the hips, both shins and the head project into the
+    // picture with the first surface on each sight line the walker's own body
+    // (a hut wall or a fence in front is no frame).
     const pose = (i) =>
       page.evaluate((i) => {
         const g = window.__placeWalkers.group(i)
@@ -5331,33 +5336,62 @@ if (section('figure-micro')) {
         g.traverse((o) => {
           if (o.isSkinnedMesh && !mesh) mesh = o
         })
+        const own = new Set()
+        g.traverse((o) => own.add(o.uuid))
         const bone = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`)
         const cam = window.__placeCamera
+        g.updateWorldMatrix(true, true)
         cam.updateMatrixWorld()
         const V = g.position.constructor
-        const inView = ['hips', 'shin.L', 'shin.R'].every((n) => {
-          const v = bone(n).getWorldPosition(new V()).project(cam)
-          return Math.abs(v.x) < 0.95 && Math.abs(v.y) < 0.95 && v.z < 1
-        })
-        return { thighL: bone('thigh.L').rotation.x, thighR: bone('thigh.R').rotation.x, inView, at: { x: g.position.x, z: g.position.z } }
+        let why = null
+        for (const n of ['hips', 'shin.L', 'shin.R', 'head']) {
+          const p = bone(n).getWorldPosition(new V())
+          const v = p.clone().project(cam)
+          if (!(Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.9 && v.z < 1)) {
+            why = `${n} out of the picture`
+            break
+          }
+          const hit = window.__placeRayHit?.(p.x, p.y, p.z)
+          if (hit && hit.hitDistance !== null && !own.has(hit.hitUuid) && hit.hitDistance < hit.targetDistance - 0.25) {
+            why = `${n} hidden at ${hit.hitDistance.toFixed(2)} of ${hit.targetDistance.toFixed(2)}`
+            break
+          }
+        }
+        return { thighL: bone('thigh.L').rotation.x, thighR: bone('thigh.R').rotation.x, inView: why === null, why, at: { x: g.position.x, z: g.position.z } }
       }, i)
     // Stand at a flank that holds the legs in the picture and is not pushed off.
-    const standAt = async () => {
-      for (const flank of [1, -1]) {
-        for (const dist of [1.6, 1.9, 1.3, 2.3]) {
+    const misses = []
+    const standAt = async (flanks = [1, -1]) => {
+      for (const flank of flanks) {
+        for (const dist of [1.6, 1.9, 1.3, 2.3, 2.8]) {
           const want = await flankView(who, flank, dist)
           await nextFrames(3)
           const got = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-          if (Math.hypot(got.x - want.x, got.z - want.z) > 0.05) continue
+          if (Math.hypot(got.x - want.x, got.z - want.z) > 0.05) {
+            misses.push({ flank, dist, why: 'moved' })
+            continue
+          }
           const p = await pose(who)
           if (p.inView) return { flank, dist, ...p }
+          misses.push({ flank, dist, why: p.why })
         }
       }
       return null
     }
-    await page.evaluate(() => window.__placeFreezeLife?.(true))
-    const a = await standAt()
-    check('figure micro-structure: walk frame A has the walker’s legs in view', !!a, 'no flank spot at 1.3–2.3 m held the walker')
+    // Frame A: the first walker out that a clear flank spot holds; life runs
+    // on a little between tries, so a walker behind a hut comes out again.
+    let a = null
+    for (let tries = 0; tries < 8 && !a; tries++) {
+      for (const i of await walkerAt()) {
+        who = i
+        await page.evaluate(() => window.__placeFreezeLife?.(true))
+        a = await standAt()
+        if (a) break
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+      }
+      if (!a) await nextFrames(60)
+    }
+    check('figure micro-structure: walk frame A has the walker’s legs in clear view', !!a, `no flank spot at 1.3–2.8 m held any walker: ${JSON.stringify(misses.slice(-12))}`)
     if (a) {
       await frame(shot('1380-figure-micro-walk-a'), {
         local: { x: a.at.x, y: 0.6, z: a.at.z },
@@ -5380,11 +5414,12 @@ if (section('figure-micro')) {
         240,
       )
       await page.evaluate(() => window.__placeFreezeLife?.(true))
-      const b = await standAt()
+      misses.length = 0
+      const b = await standAt([a.flank])
       check(
         'figure micro-structure: walk frame B shows the same walker at the opposite stride phase, legs in view',
         swapped && !!b && b.flank === a.flank,
-        JSON.stringify({ swapped, a: a && { thighL: a.thighL, thighR: a.thighR, flank: a.flank }, b: b && { thighL: b.thighL, thighR: b.thighR, flank: b.flank } }),
+        JSON.stringify({ swapped, a: a && { thighL: a.thighL, thighR: a.thighR, flank: a.flank }, b: b && { thighL: b.thighL, thighR: b.thighR, flank: b.flank }, misses }),
       )
       if (b) {
         await frame(shot('1380-figure-micro-walk-b'), {

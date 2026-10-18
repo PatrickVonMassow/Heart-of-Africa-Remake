@@ -2476,14 +2476,14 @@ export const VILLAGER_DRESS = {
  * CALIBRATABLE educated guess read off the eye-height pictures.
  */
 export const FIGURE_MICRO = {
-  /** Tile edge per kind (512 px per tile): cloth ≈ 0.21 m (a thread ≈ 3 mm),
-   *  leather ≈ 0.26 m, skin ≈ 0.1 m. */
-  tile: { cloth: 0.16, leather: 0.2, skin: 0.08 },
+  /** Tile edge per kind (512 px per tile): cloth ≈ 0.21 m (a thread ≈ 1.6 mm),
+   *  leather ≈ 0.26 m, skin ≈ 0.16 m. */
+  tile: { cloth: 0.16, leather: 0.2, skin: 0.12 },
   /** Normal-map tangent deflection per kind (1 = as baked). */
-  bump: { cloth: 1.0, leather: 1.0, skin: 0.6 },
+  bump: { cloth: 1.0, leather: 1.0, skin: 1.0 },
   /** How much of the baked albedo structure reaches the tint (0 = flat tint,
    *  1 = as baked); skin is kept faint so a face never reads dirty. */
-  albedo: { cloth: 1.0, leather: 0.9, skin: 0.6 },
+  albedo: { cloth: 1.0, leather: 0.9, skin: 0.8 },
   /** Frequency (per figure unit) of the low noise that switches between the
    *  two texture scales against visible tiling. */
   breakFreq: 2.2,

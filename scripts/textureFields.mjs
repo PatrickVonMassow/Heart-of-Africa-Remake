@@ -247,7 +247,7 @@ export const SURFACE_MATERIALS = {
   },
   // --- Figure kinds (villagers and the traveller, materials.ts figureMicro*) ---
   // Neutral gray (r = g = b): the per-figure dress/skin tint carries all hue.
-  // Handwoven cloth: plain weave (64 threads per tile, over/under alternating),
+  // Handwoven cloth: plain weave (128 threads per tile, over/under alternating),
   // slubbed threads of uneven thickness and soft vertical drape creases.
   cloth: {
     height(u, v) {
@@ -255,7 +255,7 @@ export const SURFACE_MATERIALS = {
     },
     colorize(h, u, v) {
       const slub = pnoise2(u, v, CLOTH_THREADS, 5, 153)
-      const g = 128 + (h - 0.41) * 70 + (slub - 0.5) * 18
+      const g = 128 + (h - 0.4) * 50 + (slub - 0.5) * 26
       return [g, g, g]
     },
     normalStrength: 2.6,
@@ -283,19 +283,19 @@ export const SURFACE_MATERIALS = {
       const base = fbm(u, v, 12, 3, 171)
       const pores = Math.pow(1 - worley(u, v, 72, 172), 7)
       const lines = Math.min(fbm2(u, v, 40, 6, 2, 173), fbm2(u, v, 6, 40, 2, 174))
-      return clamp01(0.45 + base * 0.3 - pores * 0.35 + lines * 0.2)
+      return clamp01(0.3 + base * 0.5 - pores * 0.35 + lines * 0.2)
     },
     colorize(h, u, v) {
       const mottle = fbm(u, v, 5, 3, 175)
-      const g = 128 + (h - 0.62) * 26 + (mottle - 0.5) * 16
+      const g = 128 + (h - 0.55) * 34 + (mottle - 0.5) * 22
       return [g, g, g]
     },
-    normalStrength: 2.6,
+    normalStrength: 4.0,
   },
 }
 
 /** Threads per cloth tile (an integer, so the weave tiles). */
-const CLOTH_THREADS = 64
+const CLOTH_THREADS = 128
 
 /** Plain weave: in each cell the warp (along v) or the weft (along u) lies on
  *  top, alternating chequerwise; each thread bulges across its width and dips
@@ -312,7 +312,7 @@ function clothHeight(u, v) {
   const weave = warpOver ? across(fx) * (0.55 + 0.45 * Math.sin(Math.PI * fy)) : across(fy) * (0.55 + 0.45 * Math.sin(Math.PI * fx))
   const slub = warpOver ? pnoise2(u, v, CLOTH_THREADS, 5, 151) : pnoise2(u, v, 5, CLOTH_THREADS, 152)
   const crease = fbm2(u, v, 4, 1, 3, 154)
-  return clamp01(weave * (0.7 + slub * 0.3) * 0.6 + crease * 0.4)
+  return clamp01(weave * (0.6 + slub * 0.4) * 0.4 + slub * 0.2 + crease * 0.4)
 }
 
 // --- Bake loop -------------------------------------------------------------------
