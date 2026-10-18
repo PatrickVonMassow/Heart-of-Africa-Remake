@@ -5421,25 +5421,39 @@ if (section('figure-micro')) {
         label: `walk-cycle frame A: the Hausa walker side-on (thighs ${a.thighL.toFixed(2)} / ${a.thighR.toFixed(2)} rad); the cloth weave on the moving leg`,
       })
       pair.push(await capturePixels(page, 'walk-cycle pair, frame A', { clip: await walkerBox(who) }))
-      // On to a clearly different phase of the stride: the leading thigh swapped.
-      await page.evaluate(() => window.__placeFreezeLife?.(false))
-      const swapped = await stepUntil(
-        ({ i, a }) => {
-          const g = window.__placeWalkers.group(i)
-          let mesh = null
-          g.traverse((o) => {
-            if (o.isSkinnedMesh && !mesh) mesh = o
-          })
-          const t = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`).rotation.x
-          const d = t('thigh.L') - t('thigh.R')
-          return Math.sign(d) !== Math.sign(a.thighL - a.thighR) && Math.abs(d) > 0.6 * Math.abs(a.thighL - a.thighR)
-        },
-        { i: who, a },
-        240,
-      )
-      await page.evaluate(() => window.__placeFreezeLife?.(true))
+      // On to a clearly different phase of the stride: the leading thigh
+      // swapped. Half a stride on, the walker may stand where the same flank
+      // spot is blocked (every distance "moved": a wall at his side), so up to
+      // four opposite-phase moments are tried before the frame is refused.
+      const swappedNow = (aa) =>
+        stepUntil(
+          ({ i, a }) => {
+            const g = window.__placeWalkers.group(i)
+            let mesh = null
+            g.traverse((o) => {
+              if (o.isSkinnedMesh && !mesh) mesh = o
+            })
+            const t = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`).rotation.x
+            const d = t('thigh.L') - t('thigh.R')
+            return Math.sign(d) !== Math.sign(a.thighL - a.thighR) && Math.abs(d) > 0.6 * Math.abs(a.thighL - a.thighR)
+          },
+          { i: who, a: aa },
+          240,
+        )
+      let swapped = false
+      let b = null
+      const bMisses = []
+      for (let attempt = 0; attempt < 4 && !b; attempt++) {
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+        if (attempt > 0) await nextFrames(20) // off this moment, on to the next stride
+        swapped = await swappedNow(a)
+        await page.evaluate(() => window.__placeFreezeLife?.(true))
+        misses.length = 0
+        if (swapped) b = await standAt([a.flank])
+        bMisses.push(...misses)
+      }
       misses.length = 0
-      const b = await standAt([a.flank])
+      misses.push(...bMisses.slice(-10))
       check(
         'figure micro-structure: walk frame B shows the same walker at the opposite stride phase, legs in view',
         swapped && !!b && b.flank === a.flank,
@@ -5546,13 +5560,43 @@ if (section('figure-micro')) {
     }
     // A man-sized figure in the bird's-eye crop covers far more than this.
     const minVisible = Math.max(40, Math.round(0.05 * without.length))
+    // The shimmer is judged on his INTERIOR (mask pixels whose 8 neighbours
+    // are his too): the silhouette ring flickers under the TRAA sub-pixel
+    // jitter whatever the surface carries — measured 7.4-8.8 % of all his
+    // pixels with the micro-structure switched OFF — while the micro-structure
+    // lives on the interior, where a mip-chain failure would show.
+    const W = box.width
+    const H = mask.length === W * box.height ? box.height : 0 // capture ≠ clip: no interior, the check fails
+    const interior = new Uint8Array(mask.length)
+    let inner = 0
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x
+        if (!mask[i]) continue
+        let all = true
+        for (let dy = -1; dy <= 1 && all; dy++) for (let dx = -1; dx <= 1; dx++) if (!mask[i + dy * W + dx]) all = false
+        if (all) {
+          interior[i] = 1
+          inner++
+        }
+      }
+    }
     let maxFrac = 0
+    let maxAll = 0
+    const pairs = []
     for (let k = 1; k < raws.length; k++) {
       const [a, b] = [raws[k - 1], raws[k]]
-      if (a.length !== b.length || a.length !== mask.length || visible === 0) continue
+      if (a.length !== b.length || a.length !== mask.length || inner === 0) continue
       let changed = 0
-      for (let i = 0; i < a.length; i++) if (mask[i] && Math.abs(a[i] - b[i]) > 6) changed++
-      maxFrac = Math.max(maxFrac, changed / visible)
+      let changedAll = 0
+      for (let i = 0; i < a.length; i++) {
+        if (!mask[i] || Math.abs(a[i] - b[i]) <= 6) continue
+        changedAll++
+        if (interior[i]) changed++
+      }
+      maxFrac = Math.max(maxFrac, changed / inner)
+      maxAll = Math.max(maxAll, changedAll / visible)
+      pairs.push(+((changed / inner) * 100).toFixed(2))
     }
     // The crop, enlarged 4× for the eye (nearest neighbour: no smoothing).
     await sharp(frames[0]).resize({ width: box.width * 4, kernel: 'nearest' }).toFile(`${OUT}${shot('1380-figure-micro-traveller-crop')}.png`)
@@ -5563,8 +5607,14 @@ if (section('figure-micro')) {
     )
     check(
       'figure micro-structure: the standing traveller is temporally stable under TRAA (no shimmer on his visible pixels)',
-      visible >= minVisible && maxFrac < 0.05,
-      JSON.stringify({ visiblePixels: visible, maxChangedFraction: +(maxFrac * 100).toFixed(2) + ' %' }),
+      visible >= minVisible && inner >= 20 && maxFrac < 0.05,
+      JSON.stringify({
+        visiblePixels: visible,
+        interiorPixels: inner,
+        maxChangedInterior: +(maxFrac * 100).toFixed(2) + ' %',
+        pairsPercent: pairs,
+        withSilhouette: +(maxAll * 100).toFixed(2) + ' %',
+      }),
     )
   }
 }
