@@ -839,6 +839,12 @@ if (section('canoe-depiction')) {
     // shot catches a mid-transition view instead of the close-up.
     await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
     await page.waitForTimeout(1800)
+    // He kneels in the hull (point 1378): on the skinned body's own frame
+    // clock, which a slow headless frame rate stretches past the wait above.
+    await page.waitForFunction(() => {
+      const body = window.__travellerRoot?.getObjectByName('inhabitant')
+      return !body?.userData.walk || body.userData.walk.kneel >= 0.99
+    }, null, { timeout: 20000 }).catch(() => {})
     await shot('88-canoe-ride', { world: { lat: waterSpot.lat, lon: waterSpot.lon }, label: 'the canoe ride on the water', settle: false })
 
     // On land with the canoe still in the pack: it is dragged behind, not ridden.
@@ -1039,10 +1045,46 @@ if (section('traveller-figure')) {
     })
     check('Traveller: the severe wound shows its strap marks on the helmet', marks.wounds === 2 && marks.shownOnHelmet === 2, JSON.stringify(marks))
     await shot(backend('1378-traveller-wounded'), { world: { x: at.x, z: at.z }, label: 'the severely wounded traveller from above', settle: false })
+
+    // In the canoe he kneels on the hull floor: his head drops well below a
+    // standing villager's, and the legs fold into the hull.
+    const water = await page.evaluate(() => {
+      const seed = window.__game.getState().seed
+      for (let lat = 27; lat >= 25.5; lat -= 0.3)
+        for (let lon = 31.4; lon <= 33.2; lon += 0.3) if (window.__terrainType(lat, lon, seed) === 'water') return { lat, lon }
+      return null
+    })
+    check('Traveller: a water tile for the canoe was found', !!water, JSON.stringify(water))
+    if (water) {
+      await page.evaluate((s) => {
+        const g = window.__game.getState()
+        window.__game.setState({ equipment: { ...g.equipment, canoe: 1 } })
+        g.debugJumpTo(s.lat, s.lon)
+      }, water)
+      await page.waitForFunction(() => window.__player?.canoeing === true, null, { timeout: 6000 }).catch(() => {})
+      // The kneel is a 0.6 s transition (VILLAGER_MOTION.kneelSeconds) on the
+      // body's own clamped frame time: on a slow headless frame rate that is
+      // many frames, so wait for the body's own kneel, not the wall clock.
+      await page.waitForFunction(() => (window.__travellerRoot?.getObjectByName('inhabitant')?.userData.walk?.kneel ?? 0) >= 0.99,
+        null, { timeout: 20000 }).catch(() => {})
+      const seated = await page.evaluate(() => {
+        const root = window.__travellerRoot
+        root.updateWorldMatrix(true, true)
+        const head = root.getObjectByName('figure-head')
+        const boat = root.children.find((c) => c.userData.actor?.kind === 'canoe')
+        const e = head.matrixWorld.elements
+        const body = root.getObjectByName('inhabitant')
+        return { canoeing: window.__player?.canoeing, headOverBoat: +(e[13] - boat.matrixWorld.elements[13]).toFixed(3), kneel: body?.userData.walk?.kneel ?? null, speed: body?.userData.walk?.speed ?? null }
+      })
+      check('Traveller: in the canoe he kneels, his head low over the hull',
+        seated.canoeing === true && seated.headOverBoat > 0.5 && seated.headOverBoat < 1.0, JSON.stringify(seated))
+      const on = await page.evaluate(() => window.__game.getState().pos)
+      await shot(backend('1378-traveller-canoe'), { world: { x: on.x, z: on.z }, label: 'the wounded traveller kneeling in his canoe', settle: false })
+    }
   } finally {
     await page.evaluate((l) => {
       const g = window.__game.getState()
-      window.__game.setState({ afflictions: { ...g.afflictions, wounds: 0 } })
+      window.__game.setState({ afflictions: { ...g.afflictions, wounds: 0 }, equipment: { ...g.equipment, canoe: 0 } })
       window.__ui.getState().setTravelZoom(1)
       window.__ui.getState().setDetailLevel(l)
     }, level)
