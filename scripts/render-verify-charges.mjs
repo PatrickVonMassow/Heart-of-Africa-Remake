@@ -233,6 +233,27 @@ export const RED_CHARGES = [
       + '{struck:2, heard:3, thuds:3}.',
   },
   {
+    point: 1292,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /back at the mortar both strike again, half a stroke apart/i,
+    why:
+      'WebGL 2 full polish-villagers on main 7690109ce after point 1354 (18.10.2026): before '
+      + '[195,194] after [196,194], every gap 0.50 — the 80-frame window missed the second strike. '
+      + 'The same counting race 1292 owns; 1354 only touched villager poses.',
+  },
+  {
+    point: 1381,
+    suite: 'polish-villagers',
+    backend: 'webgl',
+    kind: 'check',
+    match: /at least three unhidden fish are in the frame/i,
+    why:
+      'FILED AS 1381 ON 19.10.2026 from the WebGL 2 full polish-villagers on main 7690109ce after '
+      + 'point 1354: third fish {px:64, seen:false, hit:BoxGeometry}; green on WebGPU at the same '
+      + 'head, and 1354 only touched villager poses.',
+  },
+  {
     point: 939,
     suite: 'flow',
     backend: 'webgpu',

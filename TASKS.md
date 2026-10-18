@@ -15795,6 +15795,10 @@ to land than a mechanism that needs a review.
   Also on WebGPU (18.10.2026): full polish-villagers on feat/1375 35d84fe reds the same
   `{heardThree:true, struck:2, heard:3, thuds:3}` (log local/verify-logs/2026-10-18T02-30-03-836-polish-villagers.log);
   the next `--section=village-pounding` run was green, so the race is not WebGL-2-specific.
+  Second wording (18.10.2026, main 7690109ce, WebGL 2 full polish-villagers after point 1354): FAIL
+  "back at the mortar both strike again, half a stroke apart" — before [195,194] after [196,194], every
+  gap 0.50: the 80-frame window missed the second woman's strike. Same counting race; 1354 only touched
+  villager poses. Done-when covers this check too.
 - [ ] 1296. The full world suite crashes on WebGPU at the rock-relief click behind an open dialog
   Measured 05.10.2026, 08:40-08:45, on main 69221cd36: `VERIFY_GL=webgpu` world (full suite) exits 1 twice in a row with
   "7 pass, 0 fail" and an uncaught TimeoutError — `page.locator('[data-form="rock-relief"]').click()`
@@ -15859,3 +15863,16 @@ to land than a mechanism that needs a review.
   Final state: the approval guard decides only on commands that can reach a request deposit (finding.mjs with --request, in any of the obfuscations points 1370-1372 cover); a command naming neither still runs unchanged in owner and non-owner sessions.
   Verifiable: Vitest on request-approval-guard-core with the three quoted commands above: allowed; the 1370-1372 obfuscation cases stay refused.
   Bundle: Modell & Wächter.
+- [ ] 1381. The canoe-fish check sees its third fish hidden by an unnamed BoxGeometry on WebGL 2
+  Queue position: end of Testinfrastruktur.
+  Source: findings carrier 18.10.2026 21:55 (WebGL 2 covering run after point 1354). main 7690109ce,
+  `VERIFY_GL=webgl` full polish-villagers, section villager-canoe: fish samples
+  `[{px:84,seen},{px:72,seen},{px:64,seen:false,hit:BoxGeometry}]` — the check wants at least three
+  unhidden fish of 25 px or more; green on WebGPU at the same head. 1354 only touched villager poses.
+  Final state: the occluding BoxGeometry is named (which scene object it is) and either the check
+  aims past it or the occlusion is fixed as a scene defect; the check stays able to fail when fish
+  are truly hidden.
+  Verifiable: `VERIFY_GL=webgl npm test -- polish-villagers --section=villager-canoe` green on two
+  consecutive runs; WebGPU section stays green.
+  Bundle: Testinfrastruktur.
+  Criticality: low — a test-side occlusion, no player impact measured.
