@@ -28,7 +28,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { CONTACT_LEAN_MAX, contactCrouch, contactLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, newGaze, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, newGaze, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -518,7 +518,7 @@ export function SkinnedFigure({
           // the lean is searched again through the distributed chain, the
           // least (in the same steps) that brings every contact within reach
           lean = 0
-          for (let l = 0.05; l <= CONTACT_LEAN_MAX + 1e-9; l += 0.05) {
+          for (let l = 0.05; l <= VILLAGER_POSE.contactLeanMax + 1e-9; l += 0.05) {
             writeTrunk(l, hipYaw, chestYaw)
             b.hips.updateWorldMatrix(false, true)
             const short = (['L', 'R'] as const).some((s, i) => {

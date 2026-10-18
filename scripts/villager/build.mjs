@@ -92,7 +92,9 @@ export async function pipelineConfig() {
   })
   const code = out.outputFiles[0].text
   const mod = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
-  return { VILLAGER_ASSET: mod.VILLAGER_ASSET, VILLAGER_GLTF: mod.VILLAGER_GLTF, VILLAGER_POSE: mod.VILLAGER_POSE, FIGURE_STATURE: mod.VILLAGER_ASSET.stature }
+  // VILLAGER_POSE: only the clavicle range the penetration step measures — the
+  // runtime's other pose values must not key (and refit) the pipeline's caches
+  return { VILLAGER_ASSET: mod.VILLAGER_ASSET, VILLAGER_GLTF: mod.VILLAGER_GLTF, VILLAGER_POSE: { shoulders: mod.VILLAGER_POSE.shoulders }, FIGURE_STATURE: mod.VILLAGER_ASSET.stature }
 }
 
 /** The game's composed poses for the eight subjects, as JSON at `path` (Vitest). */

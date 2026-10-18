@@ -2860,6 +2860,12 @@ export const VILLAGER_POSE = {
    *  penetration gate measures (scripts/villager/penetration.py, clip
    *  `shoulders`). Calibratable. */
   shoulders: { protractionMax: 0.3, elevationMax: 0.2, dropMax: 0.12 },
+  /** The most the distributed trunk may lean (rad, the whole over its three
+   *  segments) to bring a contact into reach. A bend shared over three pivots
+   *  carries the shoulder less far than the same angle at the lowest one, so
+   *  this is CONTACT_LEAN_MAX (0.5, one joint) over an estimated ~0.65 of the
+   *  lever. Calibratable. */
+  contactLeanMax: 0.8,
   kneePoleMin: 0.01,
 } as const
 
