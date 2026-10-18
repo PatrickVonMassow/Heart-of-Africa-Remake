@@ -15796,6 +15796,9 @@ to land than a mechanism that needs a review.
   able to fail on a strike that is truly silent.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side race, no player impact measured.
+  Also on WebGPU (18.10.2026): full polish-villagers on feat/1375 35d84fe reds the same
+  `{heardThree:true, struck:2, heard:3, thuds:3}` (log local/verify-logs/2026-10-18T02-30-03-836-polish-villagers.log);
+  the next `--section=village-pounding` run was green, so the race is not WebGL-2-specific.
 - [ ] 1296. The full world suite crashes on WebGPU at the rock-relief click behind an open dialog
   Measured 05.10.2026, 08:40-08:45, on main 69221cd36: `VERIFY_GL=webgpu` world (full suite) exits 1 twice in a row with
   "7 pass, 0 fail" and an uncaught TimeoutError — `page.locator('[data-form="rock-relief"]').click()`
