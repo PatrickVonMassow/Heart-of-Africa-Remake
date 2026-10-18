@@ -1888,6 +1888,10 @@ read "no usable lease; ownership is uncertain…" instead of /not the lease that
 The same commit was green in the local pre-push gate and the rerun of the failed job
 was green. Non-blocking: infrastructure timing under the 01.09 freeze, no player impact;
 queue it only if it reproduces.
+- 2026-10-18 feat/1354 92fc1ef1b, local full `npm run test:unit` (602 files, host busy with the same
+  tree's build) — the whole "the daemon lifecycle in the sandbox" group red at once (12 cases, "the
+  probed process is not the one the lock names"); the file alone 25/25 green and the next full run
+  17,778 green on the same tree. Load-only, branch touches no daemon path; still not queued.
 - 2026-09-26 main 62a6642d0, webgpu/communication `--section=continuous-route` — red once under
   load (a concurrent Astra vitest run): `[ASSERT] adult-atom-lost — bambara-village: water-back pair
   1/0/walk: forced after 224.77s; overrun situation water-out pair 0/1 (speaker blocked)`. The same
