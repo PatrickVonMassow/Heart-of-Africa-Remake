@@ -5360,6 +5360,29 @@ if (section('figure-micro')) {
         return { thighL: bone('thigh.L').rotation.x, thighR: bone('thigh.R').rotation.x, inView: why === null, why, at: { x: g.position.x, z: g.position.z } }
       }, i)
     // Stand at a flank that holds the legs in the picture and is not pushed off.
+    // The walker's screen box (CSS px) from its projected joints, padded.
+    const walkerBox = (i) =>
+      page.evaluate((i) => {
+        const g = window.__placeWalkers.group(i)
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        const cam = window.__placeCamera
+        const V = g.position.constructor
+        const W = window.innerWidth
+        const H = window.innerHeight
+        const pts = ['head', 'foot.L', 'foot.R', 'hand.L', 'hand.R', 'hips']
+          .map((n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`).getWorldPosition(new V()).project(cam))
+          .map((v) => [((v.x + 1) / 2) * W, ((1 - v.y) / 2) * H])
+        const xs = pts.map((q) => q[0])
+        const ys = pts.map((q) => q[1])
+        const pad = 60
+        const x = Math.max(0, Math.floor(Math.min(...xs) - pad))
+        const y = Math.max(0, Math.floor(Math.min(...ys) - pad))
+        return { x, y, width: Math.min(W - x, Math.ceil(Math.max(...xs) + pad) - x), height: Math.min(H - y, Math.ceil(Math.max(...ys) + pad) - y) }
+      }, i)
+    const pair = []
     const misses = []
     const standAt = async (flanks = [1, -1]) => {
       for (const flank of flanks) {
@@ -5397,6 +5420,7 @@ if (section('figure-micro')) {
         local: { x: a.at.x, y: 0.6, z: a.at.z },
         label: `walk-cycle frame A: the Hausa walker side-on (thighs ${a.thighL.toFixed(2)} / ${a.thighR.toFixed(2)} rad); the cloth weave on the moving leg`,
       })
+      pair.push(await capturePixels(page, 'walk-cycle pair, frame A', { clip: await walkerBox(who) }))
       // On to a clearly different phase of the stride: the leading thigh swapped.
       await page.evaluate(() => window.__placeFreezeLife?.(false))
       const swapped = await stepUntil(
@@ -5426,6 +5450,19 @@ if (section('figure-micro')) {
           local: { x: b.at.x, y: 0.6, z: b.at.z },
           label: `walk-cycle frame B: the same walker half a stride on (thighs ${b.thighL.toFixed(2)} / ${b.thighR.toFixed(2)} rad); the weave must sit on the leg as in frame A`,
         })
+        pair.push(await capturePixels(page, 'walk-cycle pair, frame B', { clip: await walkerBox(who) }))
+        // Both crops side by side at one height, brightened ×2 for the eye (the
+        // walker is often in a hut's shade): the comparison picture.
+        const h = 640
+        const crops = await Promise.all(pair.map((c) => sharp(c).resize({ height: h }).modulate({ brightness: 2 }).toBuffer({ resolveWithObject: true })))
+        const w = crops.reduce((n, c) => n + c.info.width, 0) + 10
+        let left = 0
+        const layers = crops.map((c) => {
+          const l = { input: c.data, left, top: 0 }
+          left += c.info.width + 10
+          return l
+        })
+        await sharp({ create: { width: w, height: h, channels: 3, background: '#ffffff' } }).composite(layers).png().toFile(`${OUT}${shot('1380-figure-micro-walk-pair')}.png`)
       }
     }
     await page.evaluate(() => window.__placeFreezeLife?.(false))
