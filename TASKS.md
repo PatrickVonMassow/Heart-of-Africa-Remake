@@ -77,14 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1375. The village-loom shutter bracket finds the helper no longer walking out
-  Queue position: directly after point 1374 (Dorfleben); may land on its own.
-  Source: owner covering run 17.10.2026 20:32 for point 1362 on feat/1362-low-walk-samples 5e2d25128, webgpu full polish-villagers (log local/verify-logs/2026-10-17T18-32-30-952-polish-villagers.log, machine state unknown): red "he was still walking out under her reading when the shutter closed" {along 2.4, partWay true, outward false, reading true}; the pre-shutter check was green, so the helper turned between the two reads while the frame was taken.
-  Final state: the teaching picture is taken early enough on the walk out (or the shutter is fast enough) that the bracket read after it still finds him walking out under her reading; the check stays as strict as it is.
-  Verifiable: polish-villagers --section=village-loom green on both backends three times in a row, then in a full run.
-  Criticality: low - probe timing only, no player-visible change; it blocks a clean covering polish-villagers run.
-  Bundle: Dorfleben.
-
 - [ ] 1377. The village chief is still built from primitive shapes instead of the clothed skinned body
   Queue position: directly after point 1375 (Dorfleben); the user may move it forward.
   Source: user report 17.10.2026 21:23: the chief still consists of simple geometric shapes. Confirmed in code: the chief in src/scenes/place/PlaceScene.tsx 602-745 builds its own cone body, cylinder, sphere head, sphere cap and sphere hands instead of using PlaceFigure/SkinnedFigure from src/scenes/place/placeFigure.tsx, which shows every other villager as a clothed skinned body on Medium/High. Equally primitive: RobedFigure (PlaceScene.tsx 2296) for the Giza ambient figures.
