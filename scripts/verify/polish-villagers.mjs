@@ -5512,28 +5512,59 @@ if (section('figure-micro')) {
       const top = Math.max(0, Math.floor(Math.min(...ys) - pad))
       return { left, top, width: Math.min(W - left, Math.ceil(Math.max(...xs) - Math.min(...xs) + 2 * pad)), height: Math.min(H - top, Math.ceil(Math.max(...ys) - Math.min(...ys) + 2 * pad)), points: pts.length }
     })
+    const clip = { x: box.left, y: box.top, width: box.width, height: box.height }
+    const grey = async (png) => sharp(png).greyscale().raw().toBuffer()
+    // VISIBILITY FIRST (review finding): the joints' projection proves only
+    // where he would be, not that he is drawn — an occluded or absent
+    // traveller changes nothing and passed. So the same crop is rendered once
+    // with the traveller hidden; the pixels that differ are HIS visible
+    // pixels (figure and own shadow), and the shimmer is measured on them.
+    await page.evaluate(() => {
+      window.__travellerRoot.visible = false
+    })
+    await nextFrames(30) // let the TRAA history settle on the empty ground
+    const without = await grey(await capturePixels(page, 'traveller mask (hidden)', { clip }))
+    await page.evaluate(() => {
+      window.__travellerRoot.visible = true
+    })
+    await nextFrames(30)
     const frames = []
     for (let i = 0; i < 4; i++) {
-      frames.push(await capturePixels(page, 'traveller shimmer frame diff', { clip: { x: box.left, y: box.top, width: box.width, height: box.height } }))
+      frames.push(await capturePixels(page, 'traveller shimmer frame diff', { clip }))
       await nextFrames(6)
     }
-    let maxFrac = 0
-    let prev = null
-    for (const f of frames) {
-      const raw = await sharp(f).greyscale().raw().toBuffer()
-      if (prev && prev.length === raw.length) {
-        let changed = 0
-        for (let i = 0; i < raw.length; i++) if (Math.abs(raw[i] - prev[i]) > 6) changed++
-        maxFrac = Math.max(maxFrac, changed / raw.length)
+    const raws = await Promise.all(frames.map(grey))
+    const mask = new Uint8Array(without.length)
+    let visible = 0
+    if (raws[0].length === without.length) {
+      for (let i = 0; i < without.length; i++) {
+        if (Math.abs(raws[0][i] - without[i]) > 16) {
+          mask[i] = 1
+          visible++
+        }
       }
-      prev = raw
+    }
+    // A man-sized figure in the bird's-eye crop covers far more than this.
+    const minVisible = Math.max(40, Math.round(0.05 * without.length))
+    let maxFrac = 0
+    for (let k = 1; k < raws.length; k++) {
+      const [a, b] = [raws[k - 1], raws[k]]
+      if (a.length !== b.length || a.length !== mask.length || visible === 0) continue
+      let changed = 0
+      for (let i = 0; i < a.length; i++) if (mask[i] && Math.abs(a[i] - b[i]) > 6) changed++
+      maxFrac = Math.max(maxFrac, changed / visible)
     }
     // The crop, enlarged 4× for the eye (nearest neighbour: no smoothing).
     await sharp(frames[0]).resize({ width: box.width * 4, kernel: 'nearest' }).toFile(`${OUT}${shot('1380-figure-micro-traveller-crop')}.png`)
     check(
-      'figure micro-structure: the standing traveller is temporally stable under TRAA (no shimmer)',
-      box.points >= 5 && box.width > 8 && box.height > 8 && maxFrac < 0.05,
-      JSON.stringify({ box, maxChangedFraction: +(maxFrac * 100).toFixed(2) + ' %' }),
+      'figure micro-structure: the traveller is visibly drawn in his crop (hidden-vs-shown mask)',
+      box.points >= 5 && box.width > 8 && box.height > 8 && visible >= minVisible,
+      JSON.stringify({ box, visiblePixels: visible, minVisible, cropPixels: without.length }),
+    )
+    check(
+      'figure micro-structure: the standing traveller is temporally stable under TRAA (no shimmer on his visible pixels)',
+      visible >= minVisible && maxFrac < 0.05,
+      JSON.stringify({ visiblePixels: visible, maxChangedFraction: +(maxFrac * 100).toFixed(2) + ' %' }),
     )
   }
 }
