@@ -10,6 +10,8 @@ import { appearanceFor } from '../../systems/appearance'
 import { markActor, pushMarkedActors, type LabelledActor } from '../actorLabelSource'
 import { qualifiesAsActor } from '../../systems/actorLabels'
 import { TRAVELLER_LOOK } from '../../config/balance'
+import { FIGURE_STATURE } from '../../render/figureBody'
+import { CANOE_HULL_CLEARANCE, CANOE_SEAT_DROP, travellerPose } from './travellerPose'
 
 const scene = readFileSync(resolve(process.cwd(), 'src/scenes/travel/TravelScene.tsx'), 'utf8')
 const player = scene.slice(scene.indexOf('function Player()'), scene.indexOf('export function TravelScene()'))
@@ -41,10 +43,51 @@ describe("the traveller on the villagers' figure body", () => {
     expect(qualifiesAsActor(out[0])).toBe(false)
   })
 
-  it('kneels in the canoe and keeps the wound marks on crown and shoulders', () => {
-    expect(player).toContain('kneeling.current = canoeing')
-    // the light strap and the severe strap on the helmet, the severe soak on the shoulders
+  it('kneels in the canoe on water, stands again on land, and drags it there', () => {
+    const at = { wounds: 0, surfaceY: 1.4, refY: 0.6, bobTime: 0 }
+    const riding = travellerPose({ ...at, hasCanoe: true, onWater: true })
+    expect(riding).toMatchObject({ canoeing: true, carrying: false, swimming: false, kneeling: true })
+    // seated on the hull floor: the boat rides the surface, the body just under it
+    expect(riding.boatY).toBeCloseTo(at.surfaceY - at.refY + CANOE_HULL_CLEARANCE, 6)
+    expect(riding.figureY).toBeCloseTo(riding.boatY - CANOE_SEAT_DROP, 6)
+    const ashore = travellerPose({ ...at, surfaceY: 0, hasCanoe: true, onWater: false })
+    expect(ashore).toMatchObject({ canoeing: false, carrying: true, swimming: false, kneeling: false, figureY: 0 })
+    const walking = travellerPose({ ...at, surfaceY: 0, hasCanoe: false, onWater: false })
+    expect(walking).toMatchObject({ canoeing: false, carrying: false, kneeling: false, figureY: 0 })
+  })
+
+  it('swims without a canoe: hip-deep under the surface, never on the bed, never kneeling', () => {
+    const surfaceY = 2.0
+    const refY = 0.4 // the bed far below the sheet, as on Lake Edward
+    // the hip joint of the villager-stature body (render/figureBody.ts)
+    const hipOverFeet = FIGURE_STATURE * 0.52
+    for (const bobTime of [0, 0.37, 0.75, 1.5, 3.1]) {
+      const p = travellerPose({ hasCanoe: false, onWater: true, wounds: 0, surfaceY, refY, bobTime })
+      expect(p).toMatchObject({ swimming: true, canoeing: false, kneeling: false })
+      const feet = refY + p.figureY
+      expect(surfaceY - feet).toBeGreaterThan(0.5) // legs under the water
+      expect(Math.abs(feet + hipOverFeet - surfaceY)).toBeLessThan(0.15) // the hips at the surface
+      expect(feet + FIGURE_STATURE - surfaceY).toBeGreaterThan(0.5) // head and shoulders clear
+      expect(feet - refY).toBeGreaterThan(0.5) // floating, not walking the bed
+    }
+  })
+
+  it('shows the wound marks by severity: none, light on the crown, severe on crown and shoulders', () => {
+    const at = { hasCanoe: false, onWater: false, surfaceY: 0, refY: 0, bobTime: 0 }
+    const marks = (wounds: number) => {
+      const p = travellerPose({ ...at, wounds })
+      return [p.woundLight, p.woundSevere, p.woundShoulders]
+    }
+    expect(marks(0)).toEqual([false, false, false])
+    expect(marks(1)).toEqual([true, false, false])
+    expect(marks(2)).toEqual([true, true, true])
+    // the marks ride the kneeling body in the canoe just the same
+    expect(travellerPose({ ...at, onWater: true, hasCanoe: true, wounds: 2 })).toMatchObject({ kneeling: true, woundSevere: true })
+  })
+
+  it('the drawn traveller takes his pose from travellerPose', () => {
+    expect(player).toContain('travellerPose({')
+    expect(player).toContain('kneeling.current = pose.kneeling')
     expect(player).toMatch(/<SunHelmet[\s\S]*ref=\{woundLight\}[\s\S]*ref=\{woundSevere\}[\s\S]*<\/SunHelmet>/)
-    expect(player).toContain('woundShoulders.current.visible = wounds >= 2')
   })
 })

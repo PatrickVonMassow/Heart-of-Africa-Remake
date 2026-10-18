@@ -82,6 +82,7 @@ import {
   CANOE_DRAG_LEN,
   type TrailPoint,
 } from './canoeDrag'
+import { SWIM_IMMERSION, travellerPose } from './travellerPose'
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
 import { chunkOffsetsByDistance, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraFogFar, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
@@ -2440,18 +2441,6 @@ function GraveMarker() {
   )
 }
 
-// The explorer kneels this far below the boat origin: on the hull's floor
-// (CanoeHull), his folded legs inside the hull, torso and head over the gunwale.
-const CANOE_SEAT_DROP = 0.08
-// The hull's lowest point sits below the boat origin by ~0.25 (its draft); this
-// constant places that point just above the water surface, so the surface never
-// shows up through the open hull and floods the canoe (design.md §7).
-const CANOE_HULL_CLEARANCE = 0.29
-// How far the swimming figure hangs under the rendered water surface
-// (point 152, design.md §11.3): legs submerged to the hips of the villager-
-// stature body (hip joint at 0.52 of FIGURE_STATURE), torso and head clear.
-const SWIM_IMMERSION = 0.65
-
 /** The shoulder line of the standing adult man (render/figureBody.ts). */
 const FIGURE_SHOULDER_Y = FIGURE_STATURE * 0.815
 /** The traveller's cloth palette: one cloth, no rank. */
@@ -2550,8 +2539,6 @@ function Player() {
     // (design.md §7/§11).
     const hasCanoe = (s.equipment.canoe ?? 0) > 0
     const onWater = t.type === 'water' || t.type === 'ocean'
-    const canoeing = hasCanoe && onWater
-    const carrying = hasCanoe && !onWater
     bobTime.current += dt
 
     // Face the movement direction; bob gently while walking.
@@ -2587,27 +2574,17 @@ function Player() {
     // its sheet spans the lake-wide bedMax high above the carved rift bed,
     // so the figure walked the bottom, readable through the water.
     const surfaceY = onWater ? (waterSurfaceY(ll.lat, ll.lon, s.seed, t.height) ?? 0) : 0
-    const boatBaseY = surfaceY - refY + CANOE_HULL_CLEARANCE
-    // The swimming figure hangs this far under the surface, legs under.
-    const swimBaseY = surfaceY - refY - SWIM_IMMERSION
+    const wounds = s.afflictions.wounds
+    const pose = travellerPose({ hasCanoe, onWater, wounds, surfaceY, refY, bobTime: bobTime.current })
+    const { canoeing, carrying } = pose
 
     if (inner.current) {
       inner.current.rotation.y = heading.current
-      if (canoeing) {
-        // Sit into the hull, lifted to the water surface; a slow rock replaces the bob.
-        inner.current.position.y = boatBaseY - CANOE_SEAT_DROP + Math.sin(bobTime.current * 1.7) * 0.03
-      } else if (onWater) {
-        // Swimming (design.md §11.3): on the surface, a slow swim bob —
-        // never the walk bounce, and never the bed underneath.
-        inner.current.position.y = swimBaseY + Math.sin(bobTime.current * 2.1) * 0.05
-      } else {
-        // On foot the body walks by itself: no bounce of the whole figure.
-        inner.current.position.y = 0
-      }
+      inner.current.position.y = pose.figureY
     }
     if (boat.current) {
       boat.current.rotation.y = heading.current
-      boat.current.position.y = boatBaseY + Math.sin(bobTime.current * 1.7) * 0.03
+      boat.current.position.y = pose.boatY
     }
     // A gentle, one-sided paddle stroke while riding.
     if (paddle.current) paddle.current.rotation.x = 0.35 + Math.sin(bobTime.current * 3.2) * 0.4
@@ -2642,10 +2619,10 @@ function Player() {
       const gT = groundAt(trail.x, trail.z)
       const gL = groundAt(trail.x + pdx * 0.7, trail.z + pdz * 0.7)
       const gR = groundAt(trail.x - pdx * 0.7, trail.z - pdz * 0.7)
-      const pose = canoeDragPose(s.pos.x, s.pos.z, refY, trail, gT, gL, gR)
+      const drag = canoeDragPose(s.pos.x, s.pos.z, refY, trail, gT, gL, gR)
       carry.current.rotation.order = 'YXZ'
-      carry.current.position.set(pose.centreX, pose.centreY, pose.centreZ)
-      carry.current.rotation.set(pose.pitch, pose.yaw, pose.roll)
+      carry.current.position.set(drag.centreX, drag.centreY, drag.centreZ)
+      carry.current.rotation.set(drag.pitch, drag.yaw, drag.roll)
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, Record<string, unknown>>
         if (w.__player) {
@@ -2653,9 +2630,9 @@ function Player() {
             x: trail.x,
             z: trail.z,
             ground: gT,
-            farY: refY + pose.centreY + (CANOE_DRAG_LEN / 2) * Math.tan(pose.pitch),
-            pitch: pose.pitch,
-            roll: pose.roll,
+            farY: refY + drag.centreY + (CANOE_DRAG_LEN / 2) * Math.tan(drag.pitch),
+            pitch: drag.pitch,
+            roll: drag.roll,
           }
         }
       }
@@ -2664,7 +2641,6 @@ function Player() {
     }
 
     // Wounds show on the figure, scaling with severity (design.md §6/§16).
-    const wounds = s.afflictions.wounds
     if (wasCanoeing.current !== canoeing || wasCarrying.current !== carrying || wasWounds.current !== wounds) {
       wasCanoeing.current = canoeing
       wasCarrying.current = carrying
@@ -2672,13 +2648,13 @@ function Player() {
       if (boat.current) boat.current.visible = canoeing
       if (carry.current) carry.current.visible = carrying
     }
-    kneeling.current = canoeing
+    kneeling.current = pose.kneeling
     gait.current = gaitPhase(walked.current, cadence)
     // Every frame, not on the flip: the helmet's marks remount with the body
     // when the glTF asset arrives or the detail level changes.
-    if (woundLight.current) woundLight.current.visible = wounds >= 1
-    if (woundSevere.current) woundSevere.current.visible = wounds >= 2
-    if (woundShoulders.current) woundShoulders.current.visible = wounds >= 2
+    if (woundLight.current) woundLight.current.visible = pose.woundLight
+    if (woundSevere.current) woundSevere.current.visible = pose.woundSevere
+    if (woundShoulders.current) woundShoulders.current.visible = pose.woundShoulders
     // Pack and shoulder marks follow the drawn crown down into the kneel.
     const crown = inner.current?.getObjectByName('figure-crown')
     if (crown && inner.current && follow.current) {
@@ -2701,7 +2677,7 @@ function Player() {
         wounds,
         // Point 152: the swim float, checkable — the figure's local lift
         // and the surface/ground samples it derives from.
-        swimming: onWater && !canoeing,
+        swimming: pose.swimming,
         swimImmersion: SWIM_IMMERSION,
         figureLocalY: inner.current?.position.y ?? 0,
         surfaceY,
