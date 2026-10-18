@@ -225,6 +225,7 @@ export function stepGaze(g: Gaze, dt: number, lim: GazeLimits, tight = 1): void 
   g.yaw += (want - g.yaw) * k
   g.pitch += (pitch - g.pitch) * k
   g.yaw = Math.min(yawMax, Math.max(-yawMax, g.yaw))
+  g.pitch = Math.min(lim.pitchUp * tight, Math.max(-lim.pitchDown * tight, g.pitch))
 }
 
 /** The unit direction of a gaze's yaw and pitch (+z ahead, +y up). */

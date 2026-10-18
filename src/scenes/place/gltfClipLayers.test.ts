@@ -353,6 +353,17 @@ describe('the distributed lean and the gaze (natural-villager-motion step 9)', (
     expect(before.angleTo(after)).toBeCloseTo(0.3, 2)
   })
 
+  it('a gaze stays inside limits that tighten under it, up and down', () => {
+    const lim = VILLAGER_POSE.gaze
+    for (const sign of [1, -1]) {
+      const g = newGaze()
+      g.pitch = g.wantPitch = sign > 0 ? lim.pitchUp : -lim.pitchDown
+      stepGaze(g, 1 / 60, lim, lim.headLoad)
+      const max = (sign > 0 ? lim.pitchUp : lim.pitchDown) * lim.headLoad
+      expect(Math.abs(g.pitch), `sign ${sign}`).toBeLessThanOrEqual(max + 1e-12)
+    }
+  })
+
   it('gaze hold', () => {
     const f = figure()
     const base = newTrunkBase()
