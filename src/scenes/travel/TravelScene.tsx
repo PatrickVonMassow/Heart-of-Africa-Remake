@@ -30,8 +30,9 @@ import {
   effectiveTerrainRefine,
   effectiveFloraFogFactor,
   effectiveFloraCastShadow,
+  effectiveFigureLimbSegments,
 } from '../../state/ui'
-import { balance, START_YEAR } from '../../config/balance'
+import { balance, START_YEAR, TRAVELLER_LOOK } from '../../config/balance'
 import {
   PLACES,
   landmarkLabelHiddenByMapPoint,
@@ -84,7 +85,13 @@ import {
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
 import { chunkOffsetsByDistance, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraFogFar, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
-import { TRAVELLER_PACK } from '../../render/figures'
+import { FIGURE_LIMBS, TRAVELLER_PACK } from '../../render/figures'
+import { FIGURE_STATURE } from '../../render/figureBody'
+import { gaitCadence, gaitPhase } from '../../render/fauna'
+import { Figure } from '../place/placeFigure'
+import { FigureLookContext, LimbDetailContext } from '../place/placeFigureContext'
+import { useFigureLook } from '../place/useFigureLook'
+import { SunHelmet } from '../place/castHats'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
 import { TRAVEL_SKY } from '../../render/skyPresets'
@@ -2433,16 +2440,23 @@ function GraveMarker() {
   )
 }
 
-// The explorer sits this much lower when seated in the canoe, so torso and
-// head clear the gunwale while the (hidden) legs would fold into the hull.
-const CANOE_SEAT_DROP = 0.28
+// The explorer kneels this far below the boat origin: on the hull's floor
+// (CanoeHull), his folded legs inside the hull, torso and head over the gunwale.
+const CANOE_SEAT_DROP = 0.08
 // The hull's lowest point sits below the boat origin by ~0.25 (its draft); this
 // constant places that point just above the water surface, so the surface never
 // shows up through the open hull and floods the canoe (design.md §7).
 const CANOE_HULL_CLEARANCE = 0.29
 // How far the swimming figure hangs under the rendered water surface
-// (point 152, design.md §11.3): legs submerged, torso and head clear.
-const SWIM_IMMERSION = 0.35
+// (point 152, design.md §11.3): legs submerged to the hips of the villager-
+// stature body (hip joint at 0.52 of FIGURE_STATURE), torso and head clear.
+const SWIM_IMMERSION = 0.65
+
+/** The shoulder line of the standing adult man (render/figureBody.ts). */
+const FIGURE_SHOULDER_Y = FIGURE_STATURE * 0.815
+/** The traveller's cloth palette: one cloth, no rank. */
+const TRAVELLER_PALETTE: readonly string[] = [TRAVELLER_LOOK.khaki]
+const _crownAt = new THREE.Vector3()
 
 /** The dugout hull + gunwale rim, reused by the ridden and the dragged canoe. */
 function CanoeHull() {
@@ -2492,13 +2506,21 @@ function Player() {
   const inner = useRef<THREE.Group>(null)
   const boat = useRef<THREE.Group>(null)
   const carry = useRef<THREE.Group>(null)
-  const legs = useRef<THREE.Group>(null)
   const paddle = useRef<THREE.Group>(null)
   const woundLight = useRef<THREE.Group>(null)
   const woundSevere = useRef<THREE.Group>(null)
+  const woundShoulders = useRef<THREE.Group>(null)
+  const follow = useRef<THREE.Group>(null)
+  /** The primitive body's distance-driven stride; the skinned one measures its own. */
+  const gait = useRef(0)
+  const walked = useRef(0)
+  /** Kneels in the canoe: the legs fold into the hull. */
+  const kneeling = useRef(false)
+  const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
+  const look = useFigureLook(null, TRAVELLER_PALETTE, 'european')
+  const limbSegments = useUi(effectiveFigureLimbSegments)
   const heading = useRef(0)
   const last = useRef<{ x: number; z: number } | null>(null)
-  const walkTime = useRef(0)
   const bobTime = useRef(0)
   const wasCanoeing = useRef<boolean | null>(null)
   const wasCarrying = useRef<boolean | null>(null)
@@ -2541,7 +2563,7 @@ function Player() {
         while (diff > Math.PI) diff -= Math.PI * 2
         while (diff < -Math.PI) diff += Math.PI * 2
         heading.current += diff * Math.min(1, dt * 10)
-        walkTime.current += dt
+        walked.current += Math.hypot(dx, dz)
       }
     }
 
@@ -2575,7 +2597,8 @@ function Player() {
         // never the walk bounce, and never the bed underneath.
         inner.current.position.y = swimBaseY + Math.sin(bobTime.current * 2.1) * 0.05
       } else {
-        inner.current.position.y = moving ? Math.abs(Math.sin(walkTime.current * 9)) * 0.08 : 0
+        // On foot the body walks by itself: no bounce of the whole figure.
+        inner.current.position.y = 0
       }
     }
     if (boat.current) {
@@ -2644,9 +2667,21 @@ function Player() {
       wasWounds.current = wounds
       if (boat.current) boat.current.visible = canoeing
       if (carry.current) carry.current.visible = carrying
-      if (legs.current) legs.current.visible = !canoeing
-      if (woundLight.current) woundLight.current.visible = wounds >= 1
-      if (woundSevere.current) woundSevere.current.visible = wounds >= 2
+    }
+    kneeling.current = canoeing
+    gait.current = gaitPhase(walked.current, cadence)
+    // Every frame, not on the flip: the helmet's marks remount with the body
+    // when the glTF asset arrives or the detail level changes.
+    if (woundLight.current) woundLight.current.visible = wounds >= 1
+    if (woundSevere.current) woundSevere.current.visible = wounds >= 2
+    if (woundShoulders.current) woundShoulders.current.visible = wounds >= 2
+    // Pack and shoulder marks follow the drawn crown down into the kneel.
+    const crown = inner.current?.getObjectByName('figure-crown')
+    if (crown && inner.current && follow.current) {
+      inner.current.updateWorldMatrix(true, true)
+      crown.getWorldPosition(_crownAt)
+      inner.current.worldToLocal(_crownAt)
+      follow.current.position.y = _crownAt.y - FIGURE_STATURE
     }
     if (import.meta.env.DEV) {
       // Merged EVERY frame, not inside the change gate above: the gate only
@@ -2663,6 +2698,7 @@ function Player() {
         // Point 152: the swim float, checkable — the figure's local lift
         // and the surface/ground samples it derives from.
         swimming: onWater && !canoeing,
+        swimImmersion: SWIM_IMMERSION,
         figureLocalY: inner.current?.position.y ?? 0,
         surfaceY,
         refY,
@@ -2710,86 +2746,68 @@ function Player() {
         </group>
       </group>
       <group ref={inner}>
-        {/* Legs (hidden inside the hull while canoeing). */}
-        <group ref={legs}>
-          <mesh position={[-0.11, 0.22, 0]} castShadow>
-            <cylinderGeometry args={[0.08, 0.09, 0.44, 6]} />
-            <meshStandardMaterial color="#6e5a3a" roughness={0.9} />
-          </mesh>
-          <mesh position={[0.11, 0.22, 0]} castShadow>
-            <cylinderGeometry args={[0.08, 0.09, 0.44, 6]} />
-            <meshStandardMaterial color="#6e5a3a" roughness={0.9} />
-          </mesh>
-        </group>
-        {/* Torso (khaki jacket) */}
-        <mesh position={[0, 0.66, 0]} castShadow>
-          <boxGeometry args={[0.44, 0.52, 0.28]} />
-          <meshStandardMaterial color="#c4ac72" roughness={0.9} />
-        </mesh>
-        {/* Belt */}
-        <mesh position={[0, 0.45, 0]} castShadow>
-          <boxGeometry args={[0.46, 0.07, 0.3]} />
-          <meshStandardMaterial color="#4e3a20" roughness={0.8} />
-        </mesh>
-        {/* Arms */}
-        <mesh position={[-0.28, 0.68, 0]} rotation={[0, 0, 0.15]} castShadow>
-          <cylinderGeometry args={[0.06, 0.07, 0.46, 6]} />
-          <meshStandardMaterial color="#c4ac72" roughness={0.9} />
-        </mesh>
-        <mesh position={[0.28, 0.68, 0]} rotation={[0, 0, -0.15]} castShadow>
-          <cylinderGeometry args={[0.06, 0.07, 0.46, 6]} />
-          <meshStandardMaterial color="#c4ac72" roughness={0.9} />
-        </mesh>
-        {/* Head */}
-        <mesh position={[0, 1.06, 0]} castShadow>
-          <sphereGeometry args={[0.17, 12, 10]} />
-          <meshStandardMaterial color="#e8c39a" roughness={0.8} />
-        </mesh>
-        {/* Pith helmet: crown + brim */}
-        <mesh position={[0, 1.19, 0]} castShadow>
-          <sphereGeometry args={[0.19, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshStandardMaterial color="#ddd0a8" roughness={0.85} />
-        </mesh>
-        <mesh position={[0, 1.17, 0]} castShadow>
-          <cylinderGeometry args={[0.29, 0.29, 0.035, 14]} />
-          <meshStandardMaterial color="#d0c298" roughness={0.85} />
-        </mesh>
-        {/* Backpack — on the BACK (local -z; +z is the heading, see TRAVELLER_PACK). */}
-        <mesh position={[...TRAVELLER_PACK.offset]} castShadow>
-          <boxGeometry args={[...TRAVELLER_PACK.size]} />
-          <meshStandardMaterial color="#7c5a34" roughness={0.95} />
-        </mesh>
-        {/* Wounds show on the figure (design.md §6), toggled in useFrame. From
-            the steep bird's-eye the crown and shoulders are what read, so the
-            marks sit there. Light: a bandage strap over the helmet with a blood
-            spot. Severe: the strap runs red and blood soaks both shoulders. */}
-        <group ref={woundLight} visible={false}>
-          {/* Bandage strap over the crown of the helmet (visible from above). */}
-          <mesh position={[0, 1.26, 0]} castShadow>
-            <boxGeometry args={[0.13, 0.05, 0.46]} />
-            <meshStandardMaterial color="#ece6d6" roughness={1} />
-          </mesh>
-          {/* Blood soaking through the strap. */}
-          <mesh position={[0, 1.30, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.06, 12]} />
-            <meshStandardMaterial color="#a01c1c" roughness={0.8} side={THREE.DoubleSide} />
-          </mesh>
-        </group>
-        <group ref={woundSevere} visible={false}>
-          {/* The head strap runs red when the wound is severe. */}
-          <mesh position={[0, 1.27, 0]}>
-            <boxGeometry args={[0.14, 0.055, 0.48]} />
-            <meshStandardMaterial color="#8a1717" roughness={0.85} />
+        {/* The expedition leader on the villagers' figure body (skinned and
+            dressed on medium/high, primitive on low) at their stature, in
+            khaki drill with the sun helmet (docs/giza-1890.md §4.1). He walks
+            by his own measured ground speed and kneels in the canoe, his legs
+            folded into the hull. Never named by the Ctrl layer: he is the
+            player. From the steep bird's-eye the crown and shoulders are what
+            read, so the wound marks sit there: light, a bandage strap over the
+            helmet with a blood spot; severe, the strap runs red and blood soaks
+            both shoulders (design.md §6), toggled in useFrame. */}
+        <LimbDetailContext.Provider value={limbSegments}>
+          <FigureLookContext.Provider value={look}>
+            <Figure
+              cloth={TRAVELLER_LOOK.khaki}
+              skin={TRAVELLER_LOOK.skin}
+              sex="male"
+              age="adult"
+              legs
+              gait={gait}
+              kneeling={kneeling}
+              ownedByPlayer
+              headProp={
+                <SunHelmet colour={TRAVELLER_LOOK.sunHelmet}>
+                  <group ref={woundLight} visible={false}>
+                    <mesh position={[0, 0.03, 0]} castShadow>
+                      <boxGeometry args={[0.065, 0.026, 0.23]} />
+                      <meshStandardMaterial color="#ece6d6" roughness={1} />
+                    </mesh>
+                    <mesh position={[0, 0.045, 0.05]} rotation={[-Math.PI / 2, 0, 0]}>
+                      <circleGeometry args={[0.032, 12]} />
+                      <meshStandardMaterial color="#a01c1c" roughness={0.8} side={THREE.DoubleSide} />
+                    </mesh>
+                  </group>
+                  <group ref={woundSevere} visible={false}>
+                    <mesh position={[0, 0.032, 0]}>
+                      <boxGeometry args={[0.07, 0.03, 0.24]} />
+                      <meshStandardMaterial color="#8a1717" roughness={0.85} />
+                    </mesh>
+                  </group>
+                </SunHelmet>
+              }
+            />
+          </FigureLookContext.Provider>
+        </LimbDetailContext.Provider>
+        {/* Authored at the standing figure's heights; lowered each frame with
+            the drawn crown, so pack and shoulders follow the kneel. */}
+        <group ref={follow}>
+          {/* Backpack — on the BACK (local -z; +z is the heading, see TRAVELLER_PACK). */}
+          <mesh position={[...TRAVELLER_PACK.offset]} castShadow>
+            <boxGeometry args={[...TRAVELLER_PACK.size]} />
+            <meshStandardMaterial color={TRAVELLER_LOOK.pack} roughness={0.95} />
           </mesh>
           {/* Blood soaking both shoulders (top-facing, reads from above). */}
-          <mesh position={[-0.2, 0.9, 0.02]}>
-            <sphereGeometry args={[0.13, 12, 8]} />
-            <meshStandardMaterial color="#8a1717" roughness={0.85} />
-          </mesh>
-          <mesh position={[0.2, 0.9, 0.02]}>
-            <sphereGeometry args={[0.11, 12, 8]} />
-            <meshStandardMaterial color="#7a1414" roughness={0.85} />
-          </mesh>
+          <group ref={woundShoulders} visible={false}>
+            <mesh position={[-0.15, FIGURE_SHOULDER_Y, 0]}>
+              <sphereGeometry args={[0.07, 12, 8]} />
+              <meshStandardMaterial color="#8a1717" roughness={0.85} />
+            </mesh>
+            <mesh position={[0.15, FIGURE_SHOULDER_Y, 0]}>
+              <sphereGeometry args={[0.06, 12, 8]} />
+              <meshStandardMaterial color="#7a1414" roughness={0.85} />
+            </mesh>
+          </group>
         </group>
       </group>
     </group>

@@ -84,6 +84,7 @@ function PrimitiveFigure({
   headProp,
   kneeling,
   permanentLabel,
+  ownedByPlayer,
 }: {
   cloth: string
   skin?: string
@@ -130,6 +131,8 @@ function PrimitiveFigure({
   kneeling?: RefObject<boolean>
   /** Carries a standing label of its own: the Ctrl layer does not name it twice. */
   permanentLabel?: boolean
+  /** The player's own figure (the bird's-eye traveller): never named by the Ctrl layer. */
+  ownedByPlayer?: boolean
 }) {
   const cold = useContext(ColdCloaksContext)
   const segments = useContext(LimbDetailContext)
@@ -286,7 +289,7 @@ function PrimitiveFigure({
   return (
     // Named so a speaking figure can be found in the scene graph — the overhead
     // speech label rides on this object (design.md §13.4).
-    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: lay.labelHeight, permanentLabel })}>
+    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: lay.labelHeight, permanentLabel, ownedByPlayer })}>
       <group ref={lifted}>
         {/* The trunk pivots at the hip so a lean or a shake carries the arms and
             the head with it, and the legs (below) stay planted. The cone is a

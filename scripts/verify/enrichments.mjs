@@ -897,11 +897,11 @@ if (section('canoe-depiction')) {
       ? swim.player.surfaceY - (swim.player.refY + swim.player.figureLocalY)
       : NaN
     check(
-      'a swimmer floats chest-deep ON the lake sheet — never on the carved bed (point 152)',
+      'a swimmer floats hip-deep ON the lake sheet — never on the carved bed (point 152)',
       swim.found && swim.player.swimming === true &&
         swim.player.surfaceY - swim.player.refY > 0.2 && // the bed genuinely lies below the sheet here
-        Math.abs(swimGap - 0.35) < 0.12, // immersion, within the swim bob
-      JSON.stringify({ spot: swim.spot, swimming: swim.player?.swimming, swimGap, surfOverBed: swim.found ? swim.player.surfaceY - swim.player.refY : null }),
+        Math.abs(swimGap - swim.player.swimImmersion) < 0.12, // immersion, within the swim bob
+      JSON.stringify({ spot: swim.spot, swimming: swim.player?.swimming, swimGap, immersion: swim.player?.swimImmersion, surfOverBed: swim.found ? swim.player.surfaceY - swim.player.refY : null }),
     )
     await shot(
       '125-swim-lake-edward',
