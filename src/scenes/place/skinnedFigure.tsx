@@ -181,7 +181,7 @@ interface Rig {
   gltf: { asset: VillagerAsset; person: GltfPerson } | null
 }
 
-function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string): Rig {
+function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: string, office?: 'chief'): Rig {
   const asset = look.villager
   const person = asset ? cachedPerson(asset, id) : null
   const p = person ? person.p : bodyProportions(id.sex, id.age, id.build)
@@ -194,6 +194,7 @@ function buildRig(id: FigureIdentity, look: FigureLook, cloth: string, skin: str
     cloth,
     palette: look.palette,
     pick: id.pick,
+    office,
   })
   const key = `${id.sex}|${id.age}|${id.build}`
   const paint = skinTone(layers, skin)
@@ -298,6 +299,8 @@ export function SkinnedFigure({
   age,
   identityKey,
   work,
+  office,
+  permanentLabel,
 }: {
   look: FigureLook
   cloth: string
@@ -325,11 +328,15 @@ export function SkinnedFigure({
   identityKey?: string
   /** The hands' work: the glTF body digs and carries its shovel by its clips. */
   work?: RefObject<FigureWork>
+  /** An office whose dress this body wears (`appearanceFor`). */
+  office?: 'chief'
+  /** Carries a standing label of its own: the Ctrl layer does not name it twice. */
+  permanentLabel?: boolean
 }) {
   const ownKey = useId()
   const key = identityKey ?? ownKey
   const id = useMemo(() => figureIdentity(key, scale, sex, age), [key, scale, sex, age])
-  const rig = useMemo(() => buildRig(id, look, cloth, skin), [id, look, cloth, skin])
+  const rig = useMemo(() => buildRig(id, look, cloth, skin, office), [id, look, cloth, skin, office])
   // The skeleton (and its bone texture) is this figure's own; the geometry is
   // shared through the caches, its GPU side held while any figure draws it.
   useEffect(() => {
@@ -647,7 +654,7 @@ export function SkinnedFigure({
   })
 
   return (
-    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: bodyH + 0.45 })}>
+    <group ref={outer} name="inhabitant" scale={scale} userData={markActor({ kind: role, height: bodyH + 0.45, permanentLabel })}>
       {rig.meshes.map((m) => (
         <primitive key={m.uuid} object={m} />
       ))}

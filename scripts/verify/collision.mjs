@@ -8,7 +8,7 @@
 // buffers, the play rocks, the river bank, the wedge escape, inhabitant
 // placement across every settlement and a stranded-in-water rescue. Dev server
 // only (dev hooks).
-import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
@@ -755,7 +755,7 @@ if (section('chief-body')) {
     check('Chief: walking forward stops at his body in front of the hut', touching, JSON.stringify(stopped))
     if (!touching) throw new Error('The declared blocked-player frame requires contact with the chief')
     await shot('53-collision-chief-body', {
-      local: { x: contact.x, y: 1.4, z: contact.z },
+      local: { x: contact.x, y: 0.9, z: contact.z },
       label: 'the player blocked at the chief’s body in front of his hut',
     })
   } finally {
@@ -764,6 +764,86 @@ if (section('chief-body')) {
       window.__game.getState().bumpBalance()
       window.__chiefHome()
     }, speed)
+  }
+}
+
+if (section('chief-figure')) {
+  // === THE CHIEF ON THE VILLAGERS' BODY ==========================================
+  // He is drawn through the villagers' own Figure: the skinned, dressed body on
+  // medium and high, the primitive on low — at their game scale, not in metres.
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  await page.waitForFunction(() => window.__game.getState().placeId === 'bambara-village' && window.__placeLayout,
+    null, { timeout: 30000 })
+  const before = await page.evaluate(() => {
+    const speed = window.__balance.communication.chiefWalkSpeed
+    window.__balance.communication.chiefWalkSpeed = 0
+    window.__game.getState().bumpBalance()
+    window.__chiefHome()
+    window.__game.getState().callChiefOut()
+    window.__game.getState().setJournalOpen(false)
+    return { speed, level: window.__ui.getState().detailLevel }
+  })
+  const backend = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  try {
+    await page.waitForFunction(() => window.__chief?.phase === 'walking-out' && window.__chief.progress === 0,
+      null, { timeout: 8000 })
+    for (const level of ['medium', 'high', 'low']) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+      // The body is swapped by React on the next commit: wait for the census
+      // the level asks for rather than a fixed delay.
+      const census = await page
+        .waitForFunction((skinnedWanted) => {
+          const g = window.__placeScene?.getObjectByName('chief')
+          if (!g) return null
+          g.updateWorldMatrix(true, true)
+          let skinned = 0
+          let inhabitants = 0
+          let head = null
+          g.traverse((o) => {
+            if (o.isSkinnedMesh) skinned++
+            if (o.name === 'inhabitant') inhabitants++
+            if (o.name === 'figure-head' && !head) head = o
+          })
+          if ((skinned > 0) !== skinnedWanted || !head) return null
+          const e = head.matrixWorld.elements
+          return { skinned, inhabitants, headRise: +(e[13] - g.matrixWorld.elements[13]).toFixed(3) }
+        }, level !== 'low', { timeout: 20000 })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      const want = level === 'low' ? 'the primitive figure (no skinned mesh)' : 'a skinned mesh'
+      check(`Chief (${level}): his group holds ${want}, drawn as one villager`,
+        !!census && census.inhabitants === 1 && (level === 'low' ? census.skinned === 0 : census.skinned > 0),
+        JSON.stringify(census))
+      // Villager scale: his head stands where a villager's does (FIGURE_STATURE
+      // 1.34), no longer at the 1.68 m of the old metre-built figure.
+      check(`Chief (${level}): his head stands at villager height`,
+        !!census && census.headRise > 0.9 && census.headRise < 1.35, JSON.stringify(census))
+      if (level === 'high') continue
+      // Before him, facing him, at a conversation distance.
+      const at = await page.evaluate(() => {
+        const g = window.__placeScene.getObjectByName('chief')
+        const e = g.matrixWorld.elements
+        const f = g.rotation.y
+        const p = window.__placePlayer
+        p.x = e[12] + Math.sin(f) * 2.4
+        p.z = e[14] + Math.cos(f) * 2.4
+        p.yaw = Math.atan2(e[12] - p.x, e[14] - p.z) + Math.PI
+        return { x: e[12], y: e[13], z: e[14] }
+      })
+      await shot(backend(`1377-chief-figure-${level}`), {
+        local: { x: at.x, y: at.y + 0.8, z: at.z },
+        label: level === 'low'
+          ? 'the village chief on the low preset: the primitive villager figure at villager scale'
+          : 'the village chief on the skinned villager body in his white boubou, at villager scale',
+      })
+    }
+  } finally {
+    await page.evaluate(({ speed, level }) => {
+      window.__balance.communication.chiefWalkSpeed = speed
+      window.__game.getState().bumpBalance()
+      window.__ui.getState().setDetailLevel(level)
+      window.__chiefHome()
+    }, before)
   }
 }
 

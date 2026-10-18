@@ -31,11 +31,11 @@ import {
   effectiveFaunaBodySegments,
   effectivePlaceRiverSegments,
   effectiveWaterDetailOctaves,
+  effectiveFigureLimbSegments,
 } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { marketPlentyAt } from '../../systems/seasonalLife'
-import { cloakForCloth } from '../../systems/dress'
 import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor } from '../../systems/cookShelter'
 import { withFisheryMovers } from './fisheryColliders'
 import { CookShelter } from './CookShelter'
@@ -75,6 +75,10 @@ import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
+import { FIGURE_STATURE } from '../../render/figureBody'
+import { Figure } from './placeFigure'
+import { ColdCloaksContext, FigureLookContext, LimbDetailContext } from './placeFigureContext'
+import { useFigureLook } from './useFigureLook'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildPlayRock, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments } from '../../render/landmarks'
 import { GIZA_AMBIENT, GIZA_PYRAMIDS, type GizaAmbientRole } from './gizaSite'
@@ -637,12 +641,11 @@ function Chief({
   // faces the open ground rather than his wall.
   const standingFacing = drummerFacing()
   const [x, z] = door
+  // The rank cloth: the first of the palette is the notable's (`wearsByRank`),
+  // which also gives him the season's wrap where only rank wears one.
   const robe = style.cloth[0]
-  // The season's wrap over the shoulders, always — he is the notable
-  // (design.md §19.13, the reasoning that dressed the elder before him).
-  const shoulder = dress
-    ? cloakForCloth(dress.cloaks, dress.palette, style.cloth[1 % style.cloth.length])
-    : style.cloth[1 % style.cloth.length]
+  const look = useFigureLook(useGame((s) => s.placeId), style.cloth)
+  const limbSegments = useUi(effectiveFigureLimbSegments)
   useEffect(() => {
     setChiefAnchor(group.current)
     setChiefStanding(x, z)
@@ -709,36 +712,17 @@ function Chief({
     // Named, so a check can read where the picture really puts him — and so the
     // §13.4 speech dev hook finds his anchor by the speaker id he speaks under.
     <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, groundHeight(x, z), z]} rotation={[0, standingFacing, 0]}>
-      {/* Robe */}
-      <mesh position={[0, 0.62, 0]} castShadow>
-        <coneGeometry args={[CHIEF_BODY_RADIUS, 1.25, TESSELLATION.figureBody]} />
-        <meshStandardMaterial color={robe} roughness={0.95} />
-      </mesh>
-      {/* Torso and shoulder cloth */}
-      <mesh position={[0, 1.28, 0]} castShadow>
-        <cylinderGeometry args={[0.22, 0.28, 0.5, TESSELLATION.figureBody]} />
-        <meshStandardMaterial color={shoulder} roughness={0.95} />
-      </mesh>
-      {/* Head */}
-      <mesh position={[0, 1.68, 0]} castShadow>
-        <sphereGeometry args={[0.2, ...TESSELLATION.figureHead]} />
-        <meshStandardMaterial color="#5c3317" roughness={0.85} />
-      </mesh>
-      {/* Cap of office */}
-      <mesh position={[0, 1.8, 0]}>
-        <sphereGeometry args={[0.19, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 2.6]} />
-        <meshStandardMaterial color="#cfc8bd" roughness={1} />
-      </mesh>
-      {/* Staff of office */}
-      <mesh position={[0.38, 0.95, 0.05]} rotation={[0, 0, -0.08]} castShadow>
-        <cylinderGeometry args={[0.03, 0.04, 1.9, 6]} />
-        <meshStandardMaterial color="#5f4526" roughness={0.9} />
-      </mesh>
-      <mesh position={[0.4, 1.92, 0.05]}>
-        <sphereGeometry args={[0.06, ...TESSELLATION.figureHand]} />
-        <meshStandardMaterial color="#4a3018" roughness={0.9} />
-      </mesh>
-      <Html center position={[0, 2.3, 0]} distanceFactor={14}>
+      {/* The same body every villager is drawn with, at their game scale
+          (skinned on medium/high, primitive on low): an elder, set apart by
+          his dress of office, not by size. */}
+      <LimbDetailContext.Provider value={limbSegments}>
+        <ColdCloaksContext.Provider value={dress}>
+          <FigureLookContext.Provider value={look}>
+            <Figure cloth={robe} sex="male" age="elder" office="chief" permanentLabel />
+          </FigureLookContext.Provider>
+        </ColdCloaksContext.Provider>
+      </LimbDetailContext.Provider>
+      <Html center position={[0, FIGURE_STATURE + 0.5, 0]} distanceFactor={14}>
         <div className="map-label">{t.labels.chief}</div>
       </Html>
     </group>
