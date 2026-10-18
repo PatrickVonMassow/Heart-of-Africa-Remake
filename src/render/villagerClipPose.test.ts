@@ -10,9 +10,9 @@ import { balance, VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, gaitFootGround, newClipGait, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitFootGround, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
-import { contactPoints, forwardKinematics, newPose, newWorld, sprintWeight, toolInHand } from './villagerRig'
+import { contactPoints, forwardKinematics, gaitAt, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
 
 let asset: VillagerAsset
 let adult: GltfPerson
@@ -392,6 +392,97 @@ describe('the clips themselves', () => {
           expect(a.angleTo(b) / step, `${name} ${asset.bones[i]} frame ${k}`).toBeLessThan(name === 'sprint' || name === 'jog' ? 18 : 9)
         }
       })
+    }
+  })
+})
+
+describe('the corrective leg solve (natural-villager-motion step 10)', () => {
+  /** The figure speed (figure units/s) at which the person's walk strides `k` of its clip. */
+  function speedForStride(person: GltfPerson, k: number): number {
+    const f = person.frame
+    let lo = 0.05
+    let hi = VILLAGER_GLTF.jogThreshold - VILLAGER_GLTF.jogBand - 0.01
+    for (let it = 0; it < 60; it++) {
+      const mid = (lo + hi) / 2
+      if (gaitAt(asset.clips as unknown as GaitClips, mid * f.legScale, f.legScale).stride <= k) lo = mid
+      else hi = mid
+    }
+    return ((lo + hi) / 2) * f.legScale * f.scale
+  }
+
+  it("corrective leg IK keeps the clip's leg when nothing is held", () => {
+    const n = asset.bones.length
+    const f = adult.frame
+    const v = speedForStride(adult, 1)
+    expect(gaitAt(asset.clips as unknown as GaitClips, v / f.scale, f.legScale).stride).toBeCloseTo(1, 6)
+    const g = newClipGait()
+    const out = newPose(n)
+    const clip = newPose(n)
+    const legs = ['thigh', 'shin', 'foot', 'toe'].flatMap((b) => [`${b}.L`, `${b}.R`]).map((b) => asset.bones.indexOf(b))
+    let worst = 0
+    for (let k = 0; k < 48; k++) {
+      g.phase = k / 48
+      // nothing held (no ground), the clip's own stride
+      clipGaitPose(g, asset, f, v, null, out)
+      samplePhase(asset.clips.walk, g.phase, f, clip)
+      for (const b of legs) {
+        const s = out.rot[b * 4] * clip.rot[b * 4] + out.rot[b * 4 + 1] * clip.rot[b * 4 + 1] + out.rot[b * 4 + 2] * clip.rot[b * 4 + 2] + out.rot[b * 4 + 3] * clip.rot[b * 4 + 3] < 0 ? -1 : 1
+        for (let c = 0; c < 4; c++) worst = Math.max(worst, Math.abs(out.rot[b * 4 + c] - s * clip.rot[b * 4 + c]))
+      }
+    }
+    // the locals are the clip's
+    expect(worst).toBeLessThan(1e-4)
+  })
+
+  it('held foot still holds', () => {
+    // the foot's sole contacts (heel and ball), from the frame each touches
+    // down while it stays down, drift on the ground by less than a
+    // millimetre, at a short, the clip's and a long stride. OPEN: the toe tip
+    // (on the toe bone) drifts up to 1.9 mm while the clip's toe flexes under
+    // a held ball (measured 18.10.2026, the same on main); bending the toe
+    // onto the tip's hold broke the full-ramp no-slide test at the jog
+    const n = asset.bones.length
+    const f = adult.frame
+    for (const k of [0.75, 1.0, 1.35]) {
+      const v = speedForStride(adult, k)
+      const g = newClipGait()
+      const pose = newPose(n)
+      const world = newWorld(n)
+      const at = new Map<string, THREE.Vector3>()
+      const dt = 1 / 60
+      let z = 0
+      let drift = 0
+      let runs = 0
+      for (let t = 0; t < 7; t += dt) {
+        z += v * dt
+        stepClipGait(g, asset, f, v * dt, v)
+        clipGaitPose(g, asset, f, v, { x: 0, z, yaw: 0, unit: 1 }, pose)
+        forwardKinematics(asset, f.rest0, pose, world)
+        const c = contactPoints(asset, world, f.legScale)
+        for (const s of ['L', 'R'] as const) {
+          for (const key of ['heel', 'ball'] as const) {
+            const p = c[s][key]
+            const id = s + key
+            // on the ground: within a quarter of the touch height (5 mm); a
+            // contact rising past it is rolling off (the ball over the toe)
+            if (p.y > 0.25 * PLANT_TOUCH * f.legScale) {
+              at.delete(id)
+              continue
+            }
+            const here = new THREE.Vector3(p.x * f.scale, 0, p.z * f.scale + z)
+            const first = at.get(id)
+            if (!first) {
+              if (t > 1) runs++
+              at.set(id, here)
+            } else if (t > 1) {
+              const d = here.distanceTo(first)
+              drift = Math.max(drift, d)
+            }
+          }
+        }
+      }
+      expect(runs, `stride ${k}`).toBeGreaterThan(4)
+      expect(drift, `stride ${k}`).toBeLessThan(0.001)
     }
   })
 })

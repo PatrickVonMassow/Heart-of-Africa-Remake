@@ -12,7 +12,7 @@
 // Pure: arrays and three's math types, no scene graph; the tests read it directly.
 
 import * as THREE from 'three/webgpu'
-import { VILLAGER_GLTF as G } from '../config/balance'
+import { VILLAGER_GLTF as G, VILLAGER_POSE as P } from '../config/balance'
 import type { VillagerAsset, VillagerClip } from './villagerAsset'
 import type { PersonFrame } from './villagerFigureBody'
 import {
@@ -24,7 +24,6 @@ import {
   newWorld,
   sampleClip,
   setWorldRotation,
-  solveLimb,
   toolInHand,
   type GaitClips,
   type VillagerPose,
@@ -176,7 +175,6 @@ const ensureWorld = (w: WorldPose, bones: number) => {
 }
 const _keep = new THREE.Quaternion()
 const _t = new THREE.Vector3()
-const _pole = new THREE.Vector3()
 const _miss = new THREE.Vector3()
 const smoothstep = (x: number) => x * x * (3 - 2 * x)
 const _h = new THREE.Vector3()
@@ -438,6 +436,11 @@ export function clipGaitPose(
       for (const k of CONTACTS) if (held[k]) held[k] = toWorld(frame, body, _h.copy(c[k]).add(_miss))
     }
     if (body) {
+      // a contact takes hold where it touches down, by its height: the clips'
+      // support intervals (step 5) already pace each leg's stance in a blend
+      // (`stanceSync`); gating a hold by them left a contact touching just
+      // outside its blended stance unheld, sliding 0.008 at the walk ↔ jog band
+      // (measured 18.10.2026, natural-villager-motion step 10)
       for (const k of CONTACTS) {
         const p = c[k]
         if (p.y < touch && !held[k]) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
@@ -471,17 +474,103 @@ export function clipGaitPose(
     out.hips.y -= drop
     forwardKinematics(asset, frame.rest0, out, world)
   }
+  // THE CORRECTIVE LEG SOLVE (natural-villager-motion step 10): the clip's
+  // own leg, corrected only by what the target asks — the knee opened or
+  // closed about the clip's own hinge, then the thigh swung by the shortest
+  // turn onto the target — so a leg whose ankle already lies on its target
+  // keeps the clip's locals exactly, and the correction grows continuously
+  // with the miss (no thigh twist of an IK's own). Below `legCorrectMin` the
+  // leg is left alone. The last pass that moves the pelvis or a leg: every
+  // trunk layer and hand contact follows it (skinnedFigure.tsx).
+  const min = P.legCorrectMin * frame.legScale
   SIDES.forEach((s, i) => {
     const thigh = asset.bones.indexOf(`thigh.${s}`)
     const shin = asset.bones.indexOf(`shin.${s}`)
     const foot = asset.bones.indexOf(`foot.${s}`)
+    if (world.p[foot].distanceTo(_target[i]) <= min) return
     _keep.copy(world.q[foot])
-    _pole.set(0, 0, 1)
-    solveLimb(asset, frame.rest0, out, world, thigh, shin, foot, _target[i], _pole)
+    correctLeg(asset, frame.rest0, out, world, thigh, shin, foot, _target[i], P.kneePoleMin * frame.legScale)
     setWorldRotation(asset, out, world, foot, _keep)
     forwardKinematics(asset, frame.rest0, out, world)
   })
   return out
+}
+
+/**
+ * The knee's pole for a leg solve: the clip's own knee off the hip–ankle line
+ * (`hip`, `knee`, `ankle`), blended to straight ahead (+z) as the leg
+ * straightens below `straight` of offset. Unit length or less.
+ */
+export function kneePole(hip: THREE.Vector3, knee: THREE.Vector3, ankle: THREE.Vector3, straight: number, out: THREE.Vector3): THREE.Vector3 {
+  const line = _kl.copy(ankle).sub(hip)
+  const len = line.length()
+  out.copy(knee).sub(hip)
+  if (len > 1e-9) out.addScaledVector(line.divideScalar(len), -out.dot(line))
+  const off = out.length()
+  const k = smoothstep(Math.min(1, off / Math.max(1e-9, straight)))
+  if (off > 1e-9) out.divideScalar(off).multiplyScalar(k)
+  else out.set(0, 0, 0)
+  return out.add(_kl.set(0, 0, 1 - k)).normalize()
+}
+const _kl = new THREE.Vector3()
+const _hk = new THREE.Vector3()
+const _ak = new THREE.Vector3()
+const _n = new THREE.Vector3()
+const _kp = new THREE.Vector3()
+const _r1 = new THREE.Quaternion()
+const _r2 = new THREE.Quaternion()
+const _qw = new THREE.Quaternion()
+
+/**
+ * Correct a posed leg (`upper` → `lower` → `end`, the hip, knee and ankle
+ * joints) so its ankle reaches `target`, keeping the pose's own leg: the knee
+ * turned about the pose's own hinge to the length the target needs (bent
+ * toward the pose's knee, or straight ahead once the leg is straighter than
+ * `straight`), then the whole leg swung about the hip by the shortest turn.
+ * An ankle on its target leaves every local as it was. Mutates `pose` and
+ * recomputes `world`.
+ */
+export function correctLeg(
+  asset: VillagerAsset,
+  rest: Float32Array,
+  pose: VillagerPose,
+  world: WorldPose,
+  upper: number,
+  lower: number,
+  end: number,
+  target: THREE.Vector3,
+  straight: number,
+): void {
+  const H = world.p[upper]
+  const K = world.p[lower]
+  const A = world.p[end]
+  const a = H.distanceTo(K)
+  const b = K.distanceTo(A)
+  const want = Math.min(a + b - 1e-5, Math.max(Math.abs(a - b) + 1e-5, H.distanceTo(target)))
+  // the hinge: through the pose's knee, nudged along its pole so a straight
+  // leg still has one (bending forward)
+  kneePole(H, K, A, straight, _n)
+  _kp.copy(K).addScaledVector(_n, 1e-3 * (a + b))
+  _hk.copy(H).sub(_kp)
+  _ak.copy(A).sub(_kp)
+  _n.crossVectors(_hk, _ak)
+  if (_n.lengthSq() < 1e-14) _n.set(1, 0, 0)
+  _n.normalize()
+  _hk.copy(H).sub(K)
+  _ak.copy(A).sub(K)
+  const now = _hk.angleTo(_ak)
+  const cos = (a * a + b * b - want * want) / (2 * a * b)
+  const next = Math.acos(Math.min(1, Math.max(-1, cos)))
+  _r1.setFromAxisAngle(_n, next - now)
+  // the knee: the shin turned about the hinge
+  setWorldRotation(asset, pose, world, lower, _qw.copy(world.q[lower]).premultiply(_r1))
+  forwardKinematics(asset, rest, pose, world)
+  // the swing: the hip–ankle line onto the hip–target line
+  _hk.copy(world.p[end]).sub(world.p[upper]).normalize()
+  _ak.copy(target).sub(world.p[upper]).normalize()
+  _r2.setFromUnitVectors(_hk, _ak)
+  setWorldRotation(asset, pose, world, upper, _qw.copy(world.q[upper]).premultiply(_r2))
+  forwardKinematics(asset, rest, pose, world)
 }
 
 /** A once/loop clip at `t` seconds (looping a loop) on the person. */
