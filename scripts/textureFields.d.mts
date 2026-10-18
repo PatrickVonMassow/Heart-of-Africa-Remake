@@ -23,7 +23,7 @@ export declare function worley(u: number, v: number, p: number, seed: number): n
 
 export declare const TERRAIN_MATERIALS: Record<'sand' | 'grass' | 'rock' | 'forest', TextureMaterialDef>
 export declare const SURFACE_MATERIALS: Record<
-  'plaster' | 'mud' | 'thatch' | 'wood' | 'ground',
+  'plaster' | 'mud' | 'thatch' | 'wood' | 'ground' | 'cloth' | 'leather' | 'skin',
   TextureMaterialDef
 >
 
