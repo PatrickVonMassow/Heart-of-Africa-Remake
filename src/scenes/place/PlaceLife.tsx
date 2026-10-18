@@ -50,9 +50,9 @@ import {
   type GestureKind,
   type GestureState,
 } from '../../render/gesture'
-import { effectiveFaunaBodySegments, effectiveFigureBodySegments, effectiveFigureGltfBody, effectiveFigureLimbSegments, useUi } from '../../state/ui'
-import { useVillagerAsset } from './useVillagerAsset'
-import { placeDressDrivers, useColdCloaks } from './useColdCloaks'
+import { effectiveFaunaBodySegments, effectiveFigureLimbSegments, useUi } from '../../state/ui'
+import { useFigureLook } from './useFigureLook'
+import { useColdCloaks } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
 import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
@@ -191,7 +191,6 @@ import {
   useInhabitantBodies,
   useStandingBodies,
   useStandingBody,
-  type FigureLook,
 } from './placeFigureContext'
 
 /** Collision radius of inhabitants (WALKER_RADIUS; the player's own is PLAYER_RADIUS). */
@@ -3874,20 +3873,9 @@ export function PlaceLife({
   // here, not per figure: a settlement mounts a couple of dozen of them.
   const limbSegments = useUi(effectiveFigureLimbSegments)
 
-  // The skinned, dressed villagers' look (work-order "villager dress"): this
-  // settlement's people, the visit's season and year, its cloth palette. Null
-  // on the low preset, which keeps the primitive figure. Read once per visit,
-  // like the cloaks: time does not advance inside a settlement.
-  const bodySegments = useUi(effectiveFigureBodySegments)
-  // The glTF body where the level draws it (work-order "glTF villager body"):
-  // loaded on the first such visit; the code-built body stands in until then.
-  const villager = useVillagerAsset(useUi(effectiveFigureGltfBody) && bodySegments > 0)
-  const figureLook = useMemo<FigureLook | null>(() => {
-    const place = placeId ? placeById(placeId) : null
-    if (!bodySegments || !place) return null
-    const { drivers, year } = placeDressDrivers(place.id, useGame.getState().day)
-    return { peopleId: place.peopleId ?? null, drivers, year, palette: style.cloth, radial: bodySegments, villager }
-  }, [bodySegments, placeId, style.cloth, villager])
+  // The skinned, dressed villagers' look (work-order "villager dress"); null
+  // on the low preset, which keeps the primitive figure.
+  const figureLook = useFigureLook(placeId, style.cloth)
 
   // Whether this village has a well at all (point 1092) — the same answer the
   // layout's colliders and keep-clear spots are built from, so the drawn prop

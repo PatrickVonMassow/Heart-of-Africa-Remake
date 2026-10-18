@@ -112,6 +112,7 @@ const C = {
   barkPale: '#a88a62',
   barkRed: '#8a3a26', // camwood- or paint-reddened bark
   cotton: '#e6e1d3',
+  muslin: '#f3f0e8', // the finer white cloth a Mande king is set apart by (Park 1799)
   indigo: '#26355c',
   darkBlue: '#2b3550',
   black: '#211d1a',
@@ -693,6 +694,19 @@ export interface AppearanceQuery {
   palette: readonly string[]
   /** A stable per-figure number in [0, 1) for the choices a share decides. */
   pick: number
+  /** An office the figure holds: the village chief wears its dress. */
+  office?: 'chief'
+}
+
+/**
+ * The chief's dress of office, by people: the torso garment that replaces the
+ * everyday one. Only the Mande peoples carry a record — the boubou of finer
+ * cloth (Park 1799: blue Timbuktu cotton or white muslin; the Bamana boubou of
+ * Segou, Soleillet). Every other chief wears his people's dress at the rank cloth.
+ */
+const CHIEF_ROBE: Record<string, DressLayer> = {
+  bambara: layer('torso', 'robe', 'cotton', C.muslin, 'chest', G('dress research 17.10.2026, summaries only: Park 1799 finer cloth, the Bamana boubou of Segou (Soleillet)')),
+  mandinka: layer('torso', 'robe', 'cotton', C.muslin, 'chest', G('the Mande record of the Bambara chief (Park 1799)')),
 }
 
 /** The Zulu blanket share for a year (VILLAGER_DRESS, calibratable). */
@@ -735,6 +749,11 @@ export function withOpenOuterRule(layers: DressLayer[]): DressLayer[] {
 export function appearanceFor(q: AppearanceQuery): DressLayer[] {
   const table = (q.peopleId && PEOPLE_DRESS[q.peopleId]) || NO_PEOPLE
   let layers = table[q.sex][q.age].map((l) => ({ ...l }))
+
+  // OFFICE: the chief's boubou replaces the everyday torso garment.
+  // OPEN: no record of a chief's dress of office for the non-Mande peoples.
+  const robe = q.office === 'chief' && q.peopleId ? CHIEF_ROBE[q.peopleId] : undefined
+  if (robe) layers = [...layers.filter((l) => l.slot !== 'torso'), { ...robe }]
 
   // YEAR: a Baganda man of rank takes the white cotton kanzu (VILLAGER_DRESS).
   const rank = wearsByRank(q.cloth, q.palette)

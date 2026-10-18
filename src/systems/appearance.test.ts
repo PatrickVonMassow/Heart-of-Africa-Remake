@@ -286,3 +286,27 @@ describe('the open outer garment rule (design.md §19.15)', () => {
     expect(withOpenOuterRule([hip, top]).map((x) => x.form)).toEqual(['skirtKnee', 'breastCloth'])
   })
 })
+
+describe("the chief's dress of office", () => {
+  const chief = (peopleId: string) => appearanceFor(query({ peopleId, age: 'elder', cloth: SOUTH[0], office: 'chief' }))
+
+  it('dresses the Bambara chief in a white boubou over the everyday trousers and cap', () => {
+    const layers = chief('bambara')
+    const torso = layers.filter((l) => l.slot === 'torso')
+    expect(torso).toHaveLength(1)
+    expect(torso[0]).toMatchObject({ form: 'robe', material: 'cotton', colour: '#f3f0e8' })
+    expect(layers.map((l) => l.form)).toEqual(expect.arrayContaining(['trousers', 'cap']))
+    // An ordinary Bambara man keeps his indigo shirt.
+    const everyday = appearanceFor(query({ peopleId: 'bambara', age: 'elder', cloth: SOUTH[0] }))
+    expect(everyday.find((l) => l.slot === 'torso')?.form).toBe('shirt')
+  })
+
+  it('leaves a people without a recorded dress of office in its own dress', () => {
+    const zulu = query({ peopleId: 'zulu', age: 'elder', cloth: SOUTH[0] })
+    expect(appearanceFor({ ...zulu, office: 'chief' })).toEqual(appearanceFor(zulu))
+  })
+
+  it('wears no turban or metal decoration', () => {
+    expect(chief('bambara').some((l) => l.form === 'turban' || l.material === 'metal')).toBe(false)
+  })
+})
