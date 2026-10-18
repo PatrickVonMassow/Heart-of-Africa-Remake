@@ -775,6 +775,24 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     names = EXPORT_CLIPS + ('shoulders',)
     worst, tol = measure(body, clips, garments, cfg, stride, clip_names=names)
     frames = sum(1 for _ in GP.poses(clips, names, cfg))
+    lines, unchecked = markdown(out, build, worst, cfg, tol, names, frames, stride, baseline)
+
+    def plain(w):
+        return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
+    json.dump({'tolerance': tol, 'stride': stride, 'build': plain(build), 'garments': plain(worst)},
+              open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
+    print('\n'.join(lines))
+    # a garment failing only in the build pose fails the step too
+    return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS)), unchecked
+
+
+# The markdown names at most this many worst cases per garment; the json keeps every one.
+MD_CASES = 3
+
+
+def markdown(out, build, worst, cfg, tol, names, frames, stride=1, baseline=None):
+    """Write penetration-report.md from the measured `build` and `worst`; returns its lines and the unchecked garments."""
+    a = cfg['VILLAGER_ASSET']
     lines = [
         '# Garment penetration report',
         '',
@@ -812,16 +830,17 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     t, bad = _table(worst, a, tol, worst[next(iter(worst))]['checked'])
     lines += t + ['', f'**{len(worst) - bad} of {len(worst)} garments within tolerance in every frame and layering** '
                   f'({worst[next(iter(worst))]["checked"]} poses × corners each).', '',
-                  '## Remaining visible cases (handed to work-order point 1334)', '',
-                  'Every case over its tolerance, by garment: what is seen, the body part (of the inner garment for a layering), the clip, the outer garment of a '
-                  'layering, its worst value with where, and in how many frames it is over (clip `build`: the build pose). Each is handed to work-order point 1334 (garment motion cases).', '']
+                  '## Remaining visible cases (handed to work-order point 1347)', '',
+                  f'Every case over its tolerance, by garment (here its {MD_CASES} worst, every one in penetration-report.json): what is seen, the body part (of the inner garment for a layering), the clip, the outer garment of a '
+                  'layering, its worst value with where, and in how many frames it is over (clip `build`: the build pose). Each is handed to work-order point 1347 (garment construction rebuild).', '']
     for n, r in sorted(worst.items()):
         cases = sorted((build[n]['cases'] | r['cases']).items(), key=lambda kv: -kv[1]['value'])
         if not cases:
             continue
+        more = len(cases) - MD_CASES
         lines.append(f'- `{n}`: ' + '; '.join(
             f'{NAMES[col]} — {part} — {clip}{f" under `{o}`" if o else ""} — {e["value"]:.4f} ({e["at"]}), {e["over"]} frames'
-            for (col, clip, part, o), e in cases))
+            for (col, clip, part, o), e in cases[:MD_CASES]) + (f'; … and {more} more (penetration-report.json)' if more > 0 else ''))
     lines.append('')
     unchecked = []
     if baseline:
@@ -832,14 +851,7 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
         lines += t
     os.makedirs(out, exist_ok=True)
     open(os.path.join(out, 'penetration-report.md'), 'w').write('\n'.join(lines))
-
-    def plain(w):
-        return {n: {k: ({' '.join(str(x) for x in kk): vv for kk, vv in v.items()} if k == 'cases' else v) for k, v in r.items()} for n, r in w.items()}
-    json.dump({'tolerance': tol, 'stride': stride, 'build': plain(build), 'garments': plain(worst)},
-              open(os.path.join(out, 'penetration-report.json'), 'w'), indent=1)
-    print('\n'.join(lines))
-    # a garment failing only in the build pose fails the step too
-    return sum(1 for n in worst if any(r[n][c]['value'] > _limit(c, a, tol) for r in (build, worst) for c in COLUMNS)), unchecked
+    return lines, unchecked
 
 
 def runtime_report(out, body, garments, cfg, rt):
