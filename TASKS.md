@@ -77,16 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1377. The village chief is still built from primitive shapes instead of the clothed skinned body
-  Queue position: directly after point 1375 (Dorfleben); the user may move it forward.
-  Source: user report 17.10.2026 21:23: the chief still consists of simple geometric shapes. Confirmed in code: the chief in src/scenes/place/PlaceScene.tsx 602-745 builds its own cone body, cylinder, sphere head, sphere cap and sphere hands instead of using PlaceFigure/SkinnedFigure from src/scenes/place/placeFigure.tsx, which shows every other villager as a clothed skinned body on Medium/High. Equally primitive: RobedFigure (PlaceScene.tsx 2296) for the Giza ambient figures.
-  Final state: on Medium/High the chief is drawn through the same figure path as the other villagers, as a clothed skinned body with their role's dress and pose; Low keeps the primitive figure as for every villager. He stands on the villagers' game scale, distinguished by a finer (blue or white) boubou, not by size.
-  Size (owner finding 17.10.2026 21:29): the chief stands 1.45x the villagers because PlaceScene.tsx 711-740 builds him in real metres (head centre 1.68 m, cap ~1.9 m, staff ~1.98 m, cone robe radius CHIEF_BODY_RADIUS 0.42) while villagers use FIGURE_STATURE 1.34 (figureBody.ts:17); radius 0.42 is also his collision radius (collision.ts:241) and changes with him.
-  Dress research (17.10.2026, search summaries only, period but dated): Park 1799 - a king is set apart by finer cloth (blue Timbuktu cotton or white Moroccan muslin); ordinary men wear loose shirt, trousers, white cotton cap (as appearance.ts bambara already does); the boubou is elite prestige dress (Soninke chief's robe late 19th c.; Bamana boubou from Ségou before 1879, Soleillet, quai Branly); a horned hunter's hat with amulet packets (Met Gwantigi) is only weakly tied to office. Gap: no eyewitness account of a Bambara village chief in 1890; Gallieni 1885 and Binger 1892 still to read (Gallica, Gutenberg 74720). Avoid French decorations, uniform parts and the Tukulor conqueror's turban.
-  Verifiable: browser assertion that the chief's group holds a skinned mesh on Medium/High and the primitive figure on Low; chief pictures on both backends (the Giza figures moved to point 1378), picture-checked.
-  Criticality: medium - player-visible on every village visit, both backends.
-  Bundle: Dorfleben.
-
 - [ ] 1378. The Giza figures and the bird's-eye traveller get the clothed figure body
   Queue position: directly after point 1347 (user 17.10.2026 21:36: "Reihe das so ein, aber erst nach 1347."), so the new garment construction exists before these figures are dressed.
   Source: user 17.10.2026 21:34: "Alle Figuren sollen den neuen Look haben - auch die bei den Pyramiden." A search for hand-built human figures outside PlaceFigure/SkinnedFigure found three groups: the chief (point 1377), the Giza ambient RobedFigure, and the bird's-eye traveller. This point covers the last two.
