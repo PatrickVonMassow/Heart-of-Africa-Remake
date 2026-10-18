@@ -323,10 +323,11 @@ def with_shoulders(clips, cfg):
     """`clips` with the posable clavicles' measured range as a clip named
     'shoulders' (natural-villager-motion step 11): the idle's first frame with
     both clavicles at each extreme of VILLAGER_POSE.shoulders (forward, up,
-    dropped, forward and dropped) — the range the game clamps a pose's
-    shoulders to (gltfClipLayers.ts poseShoulders)."""
+    dropped, forward and up, forward and dropped) — the range the game clamps
+    a pose's shoulders to (gltfClipLayers.ts poseShoulders)."""
     s = cfg['VILLAGER_POSE']['shoulders']
-    variants = [(s['protractionMax'], 0.0), (0.0, s['elevationMax']), (0.0, -s['dropMax']), (s['protractionMax'], -s['dropMax'])]
+    pro, up, drop = s['protractionMax'], s['elevationMax'], s['dropMax']
+    variants = [(pro, 0.0), (0.0, up), (0.0, -drop), (pro, up), (pro, -drop)]
     idle = clips['clips']['idle']
     c = dict(clips)
     c['clips'] = dict(clips['clips'])
@@ -629,6 +630,13 @@ def selftest():
     assert any('UNCHECKED' in s and '`g-new`' in s for s in _l)
     main['build']['g-new'], main['garments']['g-new'] = row(0.0, 'build'), row(0.0, 'walk')
     assert compare(now_b, now_w, main, lim, 0.003)[2] == [], 'every garment has a row'
+    # the shoulders clip samples every corner of the clamped range, the
+    # forward-and-up one included
+    sh = {'VILLAGER_POSE': {'shoulders': {'protractionMax': 0.3, 'elevationMax': 0.2, 'dropMax': 0.12}}}
+    idle = {'clips': {'idle': {'q': ['q0', 'q1'], 'hips': ['h0', 'h1']}}}
+    got = with_shoulders(idle, sh)['clips']['shoulders']
+    assert sorted(got['shoulders']) == sorted([(0.3, 0.0), (0.0, 0.2), (0.0, -0.12), (0.3, 0.2), (0.3, -0.12)]), got['shoulders']
+    assert got['q'] == ['q0'] * 5 and got['hips'] == ['h0'] * 5 and 'shoulders' not in idle['clips']
     print('penetration selftest: ok')
 
 
