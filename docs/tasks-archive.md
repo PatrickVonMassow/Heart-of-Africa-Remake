@@ -34303,3 +34303,14 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: browser assertion that the chief's group holds a skinned mesh on Medium/High and the primitive figure on Low; chief pictures on both backends (the Giza figures moved to point 1378), picture-checked.
   Criticality: medium - player-visible on every village visit, both backends.
   Bundle: Dorfleben.
+
+- [x] 1378. The Giza figures and the bird's-eye traveller get the clothed figure body
+  Queue position: directly after point 1347 (user 17.10.2026 21:36: "Reihe das so ein, aber erst nach 1347."), so the new garment construction exists before these figures are dressed.
+  Source: user 17.10.2026 21:34: "Alle Figuren sollen den neuen Look haben - auch die bei den Pyramiden." A search for hand-built human figures outside PlaceFigure/SkinnedFigure found three groups: the chief (point 1377), the Giza ambient RobedFigure, and the bird's-eye traveller. This point covers the last two.
+  Final state: no human figure in the game is hand-built from primitives any more.
+  1. Giza ambient figures (src/scenes/place/PlaceScene.tsx `RobedFigure`, used by `GizaAmbient` for the roles tourist, guide/dragoman, cameleer, donkeyboy) are drawn through the same figure path as the villagers (PlaceFigure: skinned dressed body on medium/high, primitive body on low), at villager stature (FIGURE_STATURE, the donkey-boy as a youth). Their dress is period-correct for 1890 and sourced in docs/giza-1890.md (gaps recorded, marked calibratable guesses otherwise): Western tourists in 1890s dress with pith helmet (men) / long skirts (women); local guides, dragomen, cameleer and donkey-boy in galabiya and head cloth/turban. Camels and donkeys are animals and out of scope.
+  2. The bird's-eye traveller (src/scenes/travel/TravelScene.tsx, box/cylinder body around line 2712 with khaki jacket, pith helmet, TRAVELLER_PACK backpack) gets the same skinned body, dressed in khaki with pith helmet and backpack. Wound marks (light/severe, readable from the steep bird's-eye on crown and shoulders), swimming float, canoe paddling/legs hidden in the hull, and canoe dragging keep working and stay readable from above.
+  Both backends.
+  Verifiable: Vitest that the Giza roles and the traveller use the shared figure path at villager stature; existing traveller/wound/swim/canoe suites green; per backend one picture of the Giza ambient life and one of the traveller from above, also wounded, picture-checked.
+  Criticality: medium - player-visible at Giza and in the whole travel view, both backends.
+  Bundle: Dorfleben.
