@@ -730,6 +730,10 @@ def compare(build, worst, main, a, tol):
     return lines, worse, unchecked
 
 
+# The markdown names at most this many worst cases per garment; the json keeps every one.
+MD_CASES = 3
+
+
 def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     """The report: the build pose, every pose, every remaining case named, and
     — with `baseline` (a penetration-report.json of main's garments measured by
@@ -776,15 +780,16 @@ def report(out, body, clips, garments, cfg, stride=1, baseline=None):
     lines += t + ['', f'**{len(worst) - bad} of {len(worst)} garments within tolerance in every frame and layering** '
                   f'({worst[next(iter(worst))]["checked"]} poses × corners each).', '',
                   '## Remaining visible cases (handed to work-order point 1334)', '',
-                  'Every case over its tolerance, by garment: what is seen, the body part (of the inner garment for a layering), the clip, the outer garment of a '
+                  f'Every case over its tolerance, by garment (here its {MD_CASES} worst, every one in penetration-report.json): what is seen, the body part (of the inner garment for a layering), the clip, the outer garment of a '
                   'layering, its worst value with where, and in how many frames it is over (clip `build`: the build pose). Each is handed to work-order point 1334 (garment motion cases).', '']
     for n, r in sorted(worst.items()):
         cases = sorted((build[n]['cases'] | r['cases']).items(), key=lambda kv: -kv[1]['value'])
         if not cases:
             continue
+        more = len(cases) - MD_CASES
         lines.append(f'- `{n}`: ' + '; '.join(
             f'{NAMES[col]} — {part} — {clip}{f" under `{o}`" if o else ""} — {e["value"]:.4f} ({e["at"]}), {e["over"]} frames'
-            for (col, clip, part, o), e in cases))
+            for (col, clip, part, o), e in cases[:MD_CASES]) + (f'; … and {more} more (penetration-report.json)' if more > 0 else ''))
     lines.append('')
     unchecked = []
     if baseline:
