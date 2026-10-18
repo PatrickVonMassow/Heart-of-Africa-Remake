@@ -5262,8 +5262,9 @@ if (section('figure-micro')) {
       row?.traverse((o) => {
         if (o.isSkinnedMesh && !skinned) skinned = o
       })
-      const fib = skinned?.geometry.getAttribute('figureFibre')
-      const kinds = fib ? [...new Set(Array.from(fib.array))].sort() : []
+      // the micro-structure kind rides in w of the second colour (figureBody.ts)
+      const fib = skinned?.geometry.getAttribute('figureColour2')
+      const kinds = fib?.itemSize === 4 ? [...new Set(Array.from({ length: fib.count }, (_, k) => fib.getW(k)))].sort() : []
       return { skinned: !!skinned, material: skinned?.material.name ?? null, normalNode: !!skinned?.material.normalNode, kinds }
     })
     check(

@@ -198,7 +198,8 @@ function surfaceNormal(kind: SurfaceKind, strength: unknown) {
 // the bind-space plane coordinates (Schüler's cotangent frame, as three does
 // for a normal map without tangents), so the relief turns with the posed limb.
 
-/** Per-vertex micro-structure kind of a figure part (FIBRE_ATTRIBUTE). */
+/** Per-vertex micro-structure kind of a figure part (w of figureBody.ts
+ *  SECOND_COLOUR_ATTRIBUTE). */
 export const FIGURE_FIBRE = { none: 0, skin: 1, cloth: 2, leather: 3 } as const
 export type FigureFibreKind = Exclude<keyof typeof FIGURE_FIBRE, 'none'>
 const FIGURE_FIBRE_KINDS: readonly FigureFibreKind[] = ['skin', 'cloth', 'leather']

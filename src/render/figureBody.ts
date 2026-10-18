@@ -321,11 +321,11 @@ export function skinGeometry(
 
 /** Name of the per-vertex surface attribute: [pattern kind, a, b, roughness]. */
 export const SURFACE_ATTRIBUTE = 'figureSurface'
-/** Name of the per-vertex second colour a pattern mixes towards. */
+/** Name of the per-vertex second colour a pattern mixes towards (rgb), with
+ *  the part's micro-structure kind (materials.ts FIGURE_FIBRE) in w — packed,
+ *  because a masked glTF figure already binds WebGPU's limit of 8 vertex
+ *  buffers and a ninth attribute fails the pipeline. */
 export const SECOND_COLOUR_ATTRIBUTE = 'figureColour2'
-
-/** Name of the per-vertex micro-structure kind (materials.ts FIGURE_FIBRE). */
-export const FIBRE_ATTRIBUTE = 'figureFibre'
 
 /** The surface paint() gives skin and any part without a garment pattern. */
 export const PLAIN_SURFACE: [number, number, number, number] = [0, 0, 0, 0.85]
@@ -343,18 +343,16 @@ export function paint(
   const a = new THREE.Color(hex)
   const b = new THREE.Color(hex2)
   const col = new Float32Array(n * 3)
-  const col2 = new Float32Array(n * 3)
+  const col2 = new Float32Array(n * 4)
   const surf = new Float32Array(n * 4)
-  const fib = new Float32Array(n).fill(fibre)
   for (let i = 0; i < n; i++) {
     col.set([a.r, a.g, a.b], i * 3)
-    col2.set([b.r, b.g, b.b], i * 3)
+    col2.set([b.r, b.g, b.b, fibre], i * 4)
     surf.set(surface, i * 4)
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
-  geo.setAttribute(SECOND_COLOUR_ATTRIBUTE, new THREE.BufferAttribute(col2, 3))
+  geo.setAttribute(SECOND_COLOUR_ATTRIBUTE, new THREE.BufferAttribute(col2, 4))
   geo.setAttribute(SURFACE_ATTRIBUTE, new THREE.BufferAttribute(surf, 4))
-  geo.setAttribute(FIBRE_ATTRIBUTE, new THREE.BufferAttribute(fib, 1))
   return geo
 }
 
@@ -362,7 +360,7 @@ export function paint(
 export function tidy(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   const g = geo.index ? geo : geo
   for (const name of Object.keys(g.attributes)) {
-    if (!['position', 'normal', 'uv', 'color', 'skinIndex', 'skinWeight', SURFACE_ATTRIBUTE, SECOND_COLOUR_ATTRIBUTE, FIBRE_ATTRIBUTE].includes(name)) {
+    if (!['position', 'normal', 'uv', 'color', 'skinIndex', 'skinWeight', SURFACE_ATTRIBUTE, SECOND_COLOUR_ATTRIBUTE].includes(name)) {
       g.deleteAttribute(name)
     }
   }

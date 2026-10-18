@@ -32,7 +32,6 @@ import {
   boneIndex,
   boneSegments,
   cutTriangles,
-  FIBRE_ATTRIBUTE,
   mixHex,
   paint,
   SECOND_COLOUR_ATTRIBUTE,
@@ -641,7 +640,7 @@ function patternMix() {
  */
 function figureColorNode() {
   return Fn(() => {
-    const second = attribute<'vec3'>(SECOND_COLOUR_ATTRIBUTE, 'vec3')
+    const second = attribute<'vec4'>(SECOND_COLOUR_ATTRIBUTE, 'vec4').rgb
     return mix(vertexColor().rgb, second, patternMix())
   })()
 }
@@ -665,7 +664,7 @@ export function figureMaterial(masked = false): THREE.MeshStandardNodeMaterial {
     // The baked cloth/leather/skin micro-structure in bind-pose space
     // (materials.ts): a mean-1 factor on the figure's own colours, and the
     // relief as the normal.
-    const fibre = attribute<'float'>(FIBRE_ATTRIBUTE, 'float')
+    const fibre = attribute<'vec4'>(SECOND_COLOUR_ATTRIBUTE, 'vec4').w
     mat.colorNode = figureColorNode().mul(figureMicroColor(fibre))
     mat.normalNode = figureMicroNormal(fibre)
     mat.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w

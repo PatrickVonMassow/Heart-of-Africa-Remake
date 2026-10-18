@@ -74,7 +74,7 @@ describe('loadSurfaceTexture', () => {
 
 describe('figure micro-structure (bind-pose triplanar)', () => {
   it('builds a colour factor and a relief normal for the figure kinds', () => {
-    const fibre = attribute<'float'>('figureFibre', 'float')
+    const fibre = attribute<'vec4'>('figureColour2', 'vec4').w
     const m = new THREE.MeshStandardNodeMaterial()
     m.colorNode = vec3(0.5, 0.4, 0.3).mul(figureMicroColor(fibre))
     m.normalNode = figureMicroNormal(fibre)

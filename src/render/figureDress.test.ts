@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
-import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, FIBRE_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
+import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
 import { buildLayerGeometry, fibreOf, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
 import { FIGURE_FIBRE } from './materials'
@@ -267,7 +267,10 @@ describe('the shared material', () => {
 })
 
 describe('the micro-structure kind of every part', () => {
-  const fibres = (g: THREE.BufferGeometry) => new Set(Array.from((g.getAttribute(FIBRE_ATTRIBUTE) as THREE.BufferAttribute).array))
+  const fibres = (g: THREE.BufferGeometry) => {
+    const a = g.getAttribute(SECOND_COLOUR_ATTRIBUTE) as THREE.BufferAttribute
+    return new Set(Array.from({ length: a.count }, (_, k) => a.getW(k)))
+  }
 
   it('woven fibres are cloth, hide is leather, beads and metal stay smooth', () => {
     expect(fibreOf({ material: 'cotton' })).toBe(FIGURE_FIBRE.cloth)

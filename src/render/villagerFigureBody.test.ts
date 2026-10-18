@@ -13,7 +13,7 @@ import { AGE_GROUPS, appearanceFor, CAST_DRESS, PEOPLE_DRESS, SEXES, type DressL
 
 /** Every dress table the body is drawn in: the peoples' and the non-villager cast's. */
 const DRESS_TABLES = { ...PEOPLE_DRESS, ...CAST_DRESS }
-import { bodyProportions, FIBRE_ATTRIBUTE, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
+import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { FIGURE_FIBRE } from './materials'
 import { kneelLegs } from './figureRig'
 import { ankleAt, figureCrownOffset, legDims, legExtent, strideReach, walkPose } from './figureWalk'
@@ -729,11 +729,13 @@ describe('the micro-structure kinds on the glTF figure', () => {
     for (const l of layers) {
       const g = gltfGarment(asset, person, l)
       if (!g) continue
-      const fib = g.getAttribute(FIBRE_ATTRIBUTE) as THREE.BufferAttribute
-      expect(new Set(Array.from(fib.array)), garmentMeshName(l)).toEqual(new Set([fibreOf(l)]))
+      const fib = g.getAttribute(SECOND_COLOUR_ATTRIBUTE) as THREE.BufferAttribute
+      const kinds = new Set(Array.from({ length: fib.count }, (_, k) => fib.getW(k)))
+      expect(kinds, garmentMeshName(l)).toEqual(new Set([fibreOf(l)]))
     }
     const fig = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
-    const fib = fig.getAttribute(FIBRE_ATTRIBUTE) as THREE.BufferAttribute
+    const fib = fig.getAttribute(SECOND_COLOUR_ATTRIBUTE) as THREE.BufferAttribute
+    expect(fib.itemSize).toBe(4)
     expect(fib.count).toBe(fig.getAttribute('position').count)
     const bodyCount = person.geometry.getAttribute('position').count
     const hairCount = person.hair.reduce((n, h) => n + (h ? 1 : 0), 0)
@@ -743,10 +745,23 @@ describe('the micro-structure kinds on the glTF figure', () => {
     let none = 0
     let skin = 0
     for (let k = 0; k < bodyCount; k++) {
-      if (fib.getX(k) === FIGURE_FIBRE.none) none++
-      else if (fib.getX(k) === FIGURE_FIBRE.skin) skin++
+      if (fib.getW(k) === FIGURE_FIBRE.none) none++
+      else if (fib.getW(k) === FIGURE_FIBRE.skin) skin++
     }
     expect(none).toBe(hairCount)
     expect(skin).toBe(bodyCount - hairCount)
+  })
+
+  it('the masked figure binds at most WebGPU’s 8 vertex buffers (the kind adds none)', () => {
+    // A ninth attribute the material reads fails the pipeline on WebGPU
+    // ("Vertex buffer count (9) exceeds the maximum"): the micro-structure
+    // kind rides in w of the second colour for exactly that reason. The figure
+    // material reads no `uv`; morph targets go through a texture.
+    const person = gltfPerson(asset, 'male', 'adult')
+    const layers = appearanceFor({ peopleId: 'hausa', sex: 'male', age: 'adult', drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, cloth: '#887766', palette: ['#887766'], pick: 0.3 })
+    const fig = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
+    const read = Object.keys(fig.attributes).filter((n) => n !== 'uv')
+    expect(read).toContain(GARMENT_PUSH_ATTRIBUTE)
+    expect(read.length).toBeLessThanOrEqual(8)
   })
 })
