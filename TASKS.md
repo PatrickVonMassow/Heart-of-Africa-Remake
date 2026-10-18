@@ -13123,6 +13123,7 @@ to land than a mechanism that needs a review.
   VERIFIABLE: a logged sample of hunts crossing a region boundary showing both regions per hunt;
   the `enrichments` section green over the seeds that produced the mismatch; and a Vitest case
   pinning which region the check asks and why.
+  Recurred 18.10.2026: WebGPU full `enrichments` on feat/1378 335c9552e, same cheetah/central mismatch (local/verify-logs/2026-10-18T07-07-21-927-enrichments.log); the section alone was green on rerun.
   Criticality: low - a single mis-scored hunt in sixteen, invisible to the player, but it makes an
   ecology check report a fault it may not have found.
   Bundle: Tierverhalten.
