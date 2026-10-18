@@ -26,11 +26,13 @@ import {
 } from 'three/tsl'
 import type { DressLayer, DressPattern } from '../systems/appearance'
 import { merge, sweepTube, type SweepStation } from './faunaGeometry'
+import { FIGURE_FIBRE, figureMicroColor, figureMicroNormal } from './materials'
 import { garmentPushPosition } from './villagerGarmentMask'
 import {
   boneIndex,
   boneSegments,
   cutTriangles,
+  FIBRE_ATTRIBUTE,
   mixHex,
   paint,
   SECOND_COLOUR_ATTRIBUTE,
@@ -69,6 +71,27 @@ const ROUGHNESS: Record<DressLayer['material'], number> = {
   hair: 0.95,
   pigment: 0.85,
 }
+
+/** Micro-structure kind by material (materials.ts figureMicro*): woven and
+ *  felted fibres read as cloth, hide as leather; fur keeps its own mottle and
+ *  beads, metal, leaves and hair stay smooth. Body paint lies on the skin. */
+const FIBRE: Record<DressLayer['material'], number> = {
+  hide: FIGURE_FIBRE.leather,
+  fur: FIGURE_FIBRE.none,
+  barkCloth: FIGURE_FIBRE.cloth,
+  cotton: FIGURE_FIBRE.cloth,
+  wool: FIGURE_FIBRE.cloth,
+  blanket: FIGURE_FIBRE.cloth,
+  raffia: FIGURE_FIBRE.cloth,
+  leaves: FIGURE_FIBRE.none,
+  beads: FIGURE_FIBRE.none,
+  metal: FIGURE_FIBRE.none,
+  hair: FIGURE_FIBRE.none,
+  pigment: FIGURE_FIBRE.skin,
+}
+
+/** The micro-structure kind a layer is drawn with (FIGURE_FIBRE code). */
+export const fibreOf = (l: Pick<DressLayer, 'material'>): number => FIBRE[l.material]
 
 /** The surface a layer is drawn with: [kind, a, b, roughness]. */
 export function surfaceOf(l: DressLayer, p: BodyProportions, bottomY: number): [number, number, number, number] {
@@ -554,7 +577,12 @@ export function buildLayerGeometry(l: DressLayer, p: BodyProportions, radial = 1
   const second = l.colour2 ?? mixHex(l.colour, '#000000', 0.35)
   const surface = surfaceOf(l, p, bottom)
   const built = parts.map(({ geo, weigh, colour }) =>
-    tidy(skinGeometry(colour ? paint(geo, colour) : paint(geo, l.colour, surface, second), weigh)),
+    tidy(
+      skinGeometry(
+        colour ? paint(geo, colour) : paint(geo, l.colour, surface, second, fibreOf(l)),
+        weigh,
+      ),
+    ),
   )
   const geo = built.length === 1 ? built[0] : merge(built)
   geo.computeBoundingSphere()
@@ -634,7 +662,12 @@ export function figureMaterial(masked = false): THREE.MeshStandardNodeMaterial {
   let mat = figureMats[key]
   if (!mat) {
     mat = new THREE.MeshStandardNodeMaterial({ vertexColors: false, side: THREE.DoubleSide })
-    mat.colorNode = figureColorNode()
+    // The baked cloth/leather/skin micro-structure in bind-pose space
+    // (materials.ts): a mean-1 factor on the figure's own colours, and the
+    // relief as the normal.
+    const fibre = attribute<'float'>(FIBRE_ATTRIBUTE, 'float')
+    mat.colorNode = figureColorNode().mul(figureMicroColor(fibre))
+    mat.normalNode = figureMicroNormal(fibre)
     mat.roughnessNode = attribute<'vec4'>(SURFACE_ATTRIBUTE, 'vec4').w
     if (masked) mat.positionNode = garmentPushPosition()
     mat.name = masked ? 'figure-masked' : 'figure'

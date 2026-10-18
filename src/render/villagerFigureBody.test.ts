@@ -13,11 +13,12 @@ import { AGE_GROUPS, appearanceFor, CAST_DRESS, PEOPLE_DRESS, SEXES, type DressL
 
 /** Every dress table the body is drawn in: the peoples' and the non-villager cast's. */
 const DRESS_TABLES = { ...PEOPLE_DRESS, ...CAST_DRESS }
-import { bodyProportions, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
+import { bodyProportions, FIBRE_ATTRIBUTE, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
+import { FIGURE_FIBRE } from './materials'
 import { kneelLegs } from './figureRig'
 import { ankleAt, figureCrownOffset, legDims, legExtent, strideReach, walkPose } from './figureWalk'
 import { parseVillager, type VillagerAsset } from './villagerAsset'
-import { buildLayerGeometry, INFANT_SKIN } from './figureDress'
+import { buildLayerGeometry, fibreOf, INFANT_SKIN } from './figureDress'
 import { axisClearance } from '../test/axisClearance'
 import { LIVE_MORPHS, restBounds } from './villagerBody'
 import {
@@ -718,5 +719,34 @@ describe('which level draws the glTF body', () => {
     expect(QUALITY_PRESETS.high.figureGltfBody).toBe(true)
     // never on a level that draws the primitive figure
     for (const l of DETAIL_LEVELS) if (!QUALITY_PRESETS[l].figureBodySegments) expect(QUALITY_PRESETS[l].figureGltfBody).toBe(false)
+  })
+})
+
+describe('the micro-structure kinds on the glTF figure', () => {
+  it('the body is skin, its scalp hair none, and each pipeline garment carries its layer’s kind', () => {
+    const person = gltfPerson(asset, 'female', 'adult')
+    const layers = appearanceFor({ peopleId: 'swahili', sex: 'female', age: 'adult', drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, cloth: '#887766', palette: ['#887766'], pick: 0.3 })
+    for (const l of layers) {
+      const g = gltfGarment(asset, person, l)
+      if (!g) continue
+      const fib = g.getAttribute(FIBRE_ATTRIBUTE) as THREE.BufferAttribute
+      expect(new Set(Array.from(fib.array)), garmentMeshName(l)).toEqual(new Set([fibreOf(l)]))
+    }
+    const fig = gltfFigureGeometry(asset, person, layers, '#5c3317', null, 16)
+    const fib = fig.getAttribute(FIBRE_ATTRIBUTE) as THREE.BufferAttribute
+    expect(fib.count).toBe(fig.getAttribute('position').count)
+    const bodyCount = person.geometry.getAttribute('position').count
+    const hairCount = person.hair.reduce((n, h) => n + (h ? 1 : 0), 0)
+    expect(hairCount).toBeGreaterThan(0)
+    // the merged figure starts with the (masked) body; count its kinds over the
+    // body's own vertices, where the mask keeps the vertex order
+    let none = 0
+    let skin = 0
+    for (let k = 0; k < bodyCount; k++) {
+      if (fib.getX(k) === FIGURE_FIBRE.none) none++
+      else if (fib.getX(k) === FIGURE_FIBRE.skin) skin++
+    }
+    expect(none).toBe(hairCount)
+    expect(skin).toBe(bodyCount - hairCount)
   })
 })

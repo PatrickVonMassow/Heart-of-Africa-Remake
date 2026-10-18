@@ -1,9 +1,10 @@
 import * as THREE from 'three/webgpu'
 import { describe, expect, it } from 'vitest'
 import { AGE_GROUPS, PEOPLE_DRESS, SEXES, type DressLayer } from '../systems/appearance'
-import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, SURFACE_ATTRIBUTE } from './figureBody'
+import { BONE_NAMES, bodyProportions, boneIndex, buildBodyGeometry, createSkeleton, FIBRE_ATTRIBUTE, SURFACE_ATTRIBUTE } from './figureBody'
 import { kneelLegs } from './figureRig'
-import { buildLayerGeometry, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
+import { buildLayerGeometry, fibreOf, figureMaterial, PATTERN_KIND, trunkAt } from './figureDress'
+import { FIGURE_FIBRE } from './materials'
 import { axisClearance } from '../test/axisClearance'
 
 const adultMan = bodyProportions('male', 'adult')
@@ -256,6 +257,36 @@ describe('the shared material', () => {
     expect(figureMaterial().vertexColors).toBe(false)
     expect(figureMaterial().colorNode).toBeTruthy()
     expect(figureMaterial().roughnessNode).toBeTruthy()
+  })
+
+  it('carries the baked micro-structure relief on both variants (plain and masked glTF body)', () => {
+    expect(figureMaterial().normalNode).toBeTruthy()
+    expect(figureMaterial(true).normalNode).toBeTruthy()
+    expect(figureMaterial(true).positionNode).toBeTruthy()
+  })
+})
+
+describe('the micro-structure kind of every part', () => {
+  const fibres = (g: THREE.BufferGeometry) => new Set(Array.from((g.getAttribute(FIBRE_ATTRIBUTE) as THREE.BufferAttribute).array))
+
+  it('woven fibres are cloth, hide is leather, beads and metal stay smooth', () => {
+    expect(fibreOf({ material: 'cotton' })).toBe(FIGURE_FIBRE.cloth)
+    expect(fibreOf({ material: 'barkCloth' })).toBe(FIGURE_FIBRE.cloth)
+    expect(fibreOf({ material: 'hide' })).toBe(FIGURE_FIBRE.leather)
+    expect(fibreOf({ material: 'beads' })).toBe(FIGURE_FIBRE.none)
+    expect(fibreOf({ material: 'metal' })).toBe(FIGURE_FIBRE.none)
+  })
+
+  it('a dress layer is painted with its kind on every vertex', () => {
+    const cotton = buildLayerGeometry(layer({ material: 'cotton' }), adultMan)!
+    const hide = buildLayerGeometry(layer({ material: 'hide' }), adultMan)!
+    expect(fibres(cotton)).toEqual(new Set([FIGURE_FIBRE.cloth]))
+    expect(fibres(hide)).toEqual(new Set([FIGURE_FIBRE.leather]))
+  })
+
+  it('the code-built body is skin except its hair', () => {
+    const body = buildBodyGeometry(adultMan, { skin: '#5c3317', paint: null })
+    expect(fibres(body)).toEqual(new Set([FIGURE_FIBRE.skin, FIGURE_FIBRE.none]))
   })
 })
 

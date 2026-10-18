@@ -14,8 +14,9 @@
 import * as THREE from 'three/webgpu'
 import { VILLAGER_ASSET, VILLAGER_GLTF } from '../config/balance'
 import type { AgeGroup, Sex } from '../systems/appearance'
-import { bodyProportions, mixHex, paint as paintSurface, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE, tidy, type BodyProportions } from './figureBody'
-import { INFANT_SKIN, surfaceOf } from './figureDress'
+import { bodyProportions, FIBRE_ATTRIBUTE, mixHex, paint as paintSurface, PLAIN_SURFACE, SECOND_COLOUR_ATTRIBUTE, SURFACE_ATTRIBUTE, tidy, type BodyProportions } from './figureBody'
+import { fibreOf, INFANT_SKIN, surfaceOf } from './figureDress'
+import { FIGURE_FIBRE } from './materials'
 import type { DressLayer } from '../systems/appearance'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { VillagerAsset } from './villagerAsset'
@@ -524,19 +525,21 @@ export function gltfGarment(asset: VillagerAsset, person: GltfPerson, l: DressLa
   }
   pos.needsUpdate = true
   const second = l.colour2 ?? mixHex(l.colour, '#000000', 0.35)
-  const out = paintSurface(g, l.colour, surfaceOf(l, person.p, bottom), second)
+  const out = paintSurface(g, l.colour, surfaceOf(l, person.p, bottom), second, fibreOf(l))
   const infant = src.getAttribute(INFANT_ATTRIBUTE) as THREE.BufferAttribute | undefined
   if (infant) {
     // the infant is skin, not cloth: no garment pattern, second colour or sheen
     const col = out.getAttribute('color') as THREE.BufferAttribute
     const col2 = out.getAttribute(SECOND_COLOUR_ATTRIBUTE) as THREE.BufferAttribute
     const surf = out.getAttribute(SURFACE_ATTRIBUTE) as THREE.BufferAttribute
+    const fib = out.getAttribute(FIBRE_ATTRIBUTE) as THREE.BufferAttribute
     const c = new THREE.Color(INFANT_SKIN)
     for (let k = 0; k < infant.count; k++) {
       if (infant.getX(k) <= 0.5) continue
       col.setXYZ(k, c.r, c.g, c.b)
       col2.setXYZ(k, c.r, c.g, c.b)
       surf.setXYZW(k, ...PLAIN_SURFACE)
+      fib.setX(k, FIGURE_FIBRE.skin)
     }
   }
   return tidy(out)
@@ -581,9 +584,12 @@ export function gltfFigureGeometry(
 ): THREE.BufferGeometry {
   const body = paintSurface(person.geometry.clone(), paint ? mixHex(skin, paint, 0.55) : skin)
   const col = body.getAttribute('color') as THREE.BufferAttribute
+  const fib = body.getAttribute(FIBRE_ATTRIBUTE) as THREE.BufferAttribute
   const hair = new THREE.Color(person.p.hair)
   person.hair.forEach((h, i) => {
-    if (h) col.setXYZ(i, hair.r, hair.g, hair.b)
+    if (!h) return
+    col.setXYZ(i, hair.r, hair.g, hair.b)
+    fib.setX(i, FIGURE_FIBRE.none) // the scalp's hair: no skin pores
   })
   const depth = VILLAGER_ASSET.garmentMaskPush * person.frame.scale
   const drawn = layers.flatMap((l) => {

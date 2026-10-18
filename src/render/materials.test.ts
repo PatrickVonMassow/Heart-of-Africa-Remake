@@ -11,10 +11,14 @@ import {
   createNoisyMaterial,
   createSurfaceMaterial,
   detailFade,
+  FIGURE_FIBRE,
+  figureMicroColor,
+  figureMicroNormal,
   loadSurfaceTexture,
   proceduralBump,
 } from './materials'
-import { float, mx_fractal_noise_float, positionWorld } from 'three/tsl'
+import { attribute, float, mx_fractal_noise_float, positionWorld, vec3 } from 'three/tsl'
+import { FIGURE_MICRO } from '../config/balance'
 
 describe('createSurfaceMaterial', () => {
   it('wires a color node AND a baked micro-relief normal node', () => {
@@ -51,6 +55,47 @@ describe('loadSurfaceTexture', () => {
 
   it('caches by name (one texture per map)', () => {
     expect(loadSurfaceTexture('ground_n')).toBe(loadSurfaceTexture('ground_n'))
+  })
+
+  it('the figure kinds (cloth, leather, skin) get the same sampler state', () => {
+    for (const kind of ['cloth', 'leather', 'skin'] as const) {
+      for (const map of ['a', 'n'] as const) {
+        const t = loadSurfaceTexture(`${kind}_${map}`)
+        expect(t.wrapS).toBe(THREE.RepeatWrapping)
+        expect(t.wrapT).toBe(THREE.RepeatWrapping)
+        expect(t.generateMipmaps).toBe(true)
+        expect(t.anisotropy).toBeGreaterThan(1)
+        expect(t.colorSpace).toBe(THREE.NoColorSpace)
+        expect(loadSurfaceTexture(`${kind}_${map}`)).toBe(t)
+      }
+    }
+  })
+})
+
+describe('figure micro-structure (bind-pose triplanar)', () => {
+  it('builds a colour factor and a relief normal for the figure kinds', () => {
+    const fibre = attribute<'float'>('figureFibre', 'float')
+    const m = new THREE.MeshStandardNodeMaterial()
+    m.colorNode = vec3(0.5, 0.4, 0.3).mul(figureMicroColor(fibre))
+    m.normalNode = figureMicroNormal(fibre)
+    expect(m.colorNode).toBeTruthy()
+    expect(m.normalNode).toBeTruthy()
+  })
+
+  it('distinct, integer kind codes, none = 0', () => {
+    expect(FIGURE_FIBRE.none).toBe(0)
+    const codes = Object.values(FIGURE_FIBRE)
+    expect(new Set(codes).size).toBe(codes.length)
+    for (const c of codes) expect(Number.isInteger(c)).toBe(true)
+  })
+
+  it('every figure kind has a positive tile, bump and albedo amount', () => {
+    for (const kind of ['cloth', 'leather', 'skin'] as const) {
+      expect(FIGURE_MICRO.tile[kind]).toBeGreaterThan(0)
+      expect(FIGURE_MICRO.bump[kind]).toBeGreaterThan(0)
+      expect(FIGURE_MICRO.albedo[kind]).toBeGreaterThan(0)
+      expect(FIGURE_MICRO.albedo[kind]).toBeLessThanOrEqual(1)
+    }
   })
 })
 
