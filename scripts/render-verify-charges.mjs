@@ -86,6 +86,24 @@ export const RED_CHARGES = [
     why: 'Filed 12.10.2026 from the findings carrier: full WebGPU polish-children run on main 06c727d21 red, not in the baseline, machine quietness unverified. Point 1344 owns the cause; the charge dies with it.',
   },
   {
+    point: 1013,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^every predator fits the region and period/i,
+    why: 'Recurred 18.10.2026 on full WebGPU enrichments (feat/1378 335c9552e): the cheetah/central '
+      + 'food-web mismatch point 1013 describes; the section alone was green on rerun. Point 1013 '
+      + 'owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1330,
+    suite: 'polish-villagers',
+    kind: 'check',
+    match: /^village walk: the camera found a free spot side-on to the walker/i,
+    why: 'Seen 18.10.2026 on webgpu polish-villagers (log 2026-10-18T04-14-01-658, machine under '
+      + 'load): no side-on camera spot for the village walker, so the walk frame was not taken. '
+      + 'Point 1330 owns the village-walk frame; the charge dies with it.',
+  },
+  {
     point: 1236,
     suite: 'enrichments',
     kind: 'check',
