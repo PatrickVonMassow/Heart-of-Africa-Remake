@@ -499,7 +499,9 @@ export function clipGaitPose(
 /**
  * The knee's pole for a leg solve: the clip's own knee off the hip–ankle line
  * (`hip`, `knee`, `ankle`), blended to straight ahead (+z) as the leg
- * straightens below `straight` of offset. Unit length or less.
+ * straightens below `straight` of offset. A knee off the line backward
+ * (overstretched) gives way to straight ahead as well, so the blend never
+ * passes through zero: continuous in the knee everywhere. Unit length.
  */
 export function kneePole(hip: THREE.Vector3, knee: THREE.Vector3, ankle: THREE.Vector3, straight: number, out: THREE.Vector3): THREE.Vector3 {
   const line = _kl.copy(ankle).sub(hip)
@@ -507,9 +509,13 @@ export function kneePole(hip: THREE.Vector3, knee: THREE.Vector3, ankle: THREE.V
   out.copy(knee).sub(hip)
   if (len > 1e-9) out.addScaledVector(line.divideScalar(len), -out.dot(line))
   const off = out.length()
-  const k = smoothstep(Math.min(1, off / Math.max(1e-9, straight)))
-  if (off > 1e-9) out.divideScalar(off).multiplyScalar(k)
-  else out.set(0, 0, 0)
+  let k = smoothstep(Math.min(1, off / Math.max(1e-9, straight)))
+  if (off > 1e-9) {
+    out.divideScalar(off)
+    // backward (z ≤ −0.5) fades to ahead, reaching it straight behind
+    k *= smoothstep(Math.min(1, Math.max(0, 2 * (out.z + 1))))
+    out.multiplyScalar(k)
+  } else out.set(0, 0, 0)
   return out.add(_kl.set(0, 0, 1 - k)).normalize()
 }
 const _kl = new THREE.Vector3()

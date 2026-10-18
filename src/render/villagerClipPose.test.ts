@@ -436,16 +436,18 @@ describe('the corrective leg solve (natural-villager-motion step 10)', () => {
 
   it('the knee turns continuously as the knee crosses the hip–ankle line: no flip of its bend', () => {
     // a unit leg, nearly straight, its knee from just in front of the line to
-    // just behind it — across the band where the hinge once flipped (knee z
-    // −0.0009999 vs −0.0010001 turned the shin +0.216 vs −0.218 rad)
+    // well behind it — across the band where the hinge once flipped (knee z
+    // −0.0009999 vs −0.0010001 turned the shin +0.216 vs −0.218 rad), the
+    // pole blend's midpoint at −straight/2 (where it once passed through zero
+    // and moved the ankle 0.785 for a 2e-7 knee move) and past `straight`
     const hip = new THREE.Vector3(0, 1, 0)
     const ankle = new THREE.Vector3(0, 0, 0)
     const want = 0.9
     const axis = new THREE.Vector3()
     let last: THREE.Vector3 | null = null
     let jump = 0
-    for (let k = 0; k <= 400; k++) {
-      const knee = new THREE.Vector3(0, 0.5, 0.001 - k * 0.00001)
+    for (let k = 0; k <= 30000; k++) {
+      const knee = new THREE.Vector3(0, 0.5, 0.001 - k * 0.0000005)
       const turn = kneeTurn(hip, knee, ankle, want, VILLAGER_POSE.kneePoleMin, axis)
       const moved = ankle.clone().sub(knee).applyAxisAngle(axis, turn).add(knee)
       // the target length reached, the knee bent forward (the ankle behind it)
@@ -454,8 +456,16 @@ describe('the corrective leg solve (natural-villager-motion step 10)', () => {
       if (last) jump = Math.max(jump, moved.distanceTo(last))
       last = moved
     }
-    // 1e-5 of knee per step moves the ankle by about as little
+    // 5e-7 of knee per step moves the ankle by about as little
     expect(jump).toBeLessThan(1e-3)
+    // and right at the blend's midpoint, a 2e-7 knee move
+    const mid = -VILLAGER_POSE.kneePoleMin / 2
+    const at = (z: number) => {
+      const knee = new THREE.Vector3(0, 0.5, z)
+      const turn = kneeTurn(hip, knee, ankle, want, VILLAGER_POSE.kneePoleMin, axis)
+      return ankle.clone().sub(knee).applyAxisAngle(axis, turn).add(knee)
+    }
+    expect(at(mid + 1e-7).distanceTo(at(mid - 1e-7))).toBeLessThan(1e-5)
   })
 
   it('held foot still holds', () => {
