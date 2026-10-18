@@ -130,12 +130,23 @@ export interface FigurePose {
   /** How far each hand takes the pointing shape (0 … 1; absent: none) — the
    *  glTF body's `point.L/R` hand morphs (natural-villager-motion step 3). */
   pointHand?: { left: number; right: number }
+  /** Each clavicle's protraction and elevation (rad; absent: none) — the glTF
+   *  body's posable shoulders, added after its clips (natural-villager-motion
+   *  step 11). */
+  shoulders?: { left: ShoulderPose; right: ShoulderPose }
+}
+
+/** A clavicle's turn off the clip: forward (protraction) and up (elevation, rad). */
+export interface ShoulderPose {
+  protraction: number
+  elevation: number
 }
 
 /** Carry the pose's optional parts (the hand shapes) from `from` onto
  *  `into`, for a caller that copies the arms, lean and turn field by field. */
 export function copyPoseExtras(into: FigurePose, from: FigurePose): void {
   into.pointHand = from.pointHand
+  into.shoulders = from.shoulders
 }
 
 /** Which side an arm belongs to. */

@@ -13,7 +13,7 @@ import { clipGaitPose, clipPoseAt, shovelOnHungHand, toHung } from '../../render
 import { newPose } from '../../render/villagerRig'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { AGE_GROUPS, SEXES } from '../../systems/appearance'
-import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
+import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
 
 let asset: VillagerAsset
 let person: GltfPerson
@@ -390,5 +390,30 @@ describe('the distributed lean and the gaze (natural-villager-motion step 9)', (
       expect(Math.atan2(h.x, h.z)).toBeGreaterThan(0.5)
       expect(h.y).toBeLessThan(Math.sin(lim.pitchUp) + 0.05)
     }
+  })
+})
+
+describe('the posable clavicles (natural-villager-motion step 11)', () => {
+  it("default 0 leaves the clip's clavicle; a protraction brings the shoulder forward, an elevation up", () => {
+    const f = figure()
+    let z = 0
+    for (let k = 0; k < 20; k++) frame(f, (z += 1.1 / 60), 1.1, { dig: false, tool: false }, 1 / 60)
+    const clip = ['L', 'R'].map((s) => f.bones[`shoulder.${s}`].quaternion.clone())
+    const joint = (s: string) => f.bones[`upperArm.${s}`].getWorldPosition(new THREE.Vector3())
+    f.bones.hips.updateMatrixWorld(true)
+    const at = ['L', 'R'].map(joint)
+    poseShoulders(f.bones, undefined)
+    poseShoulders(f.bones, { left: { protraction: 0, elevation: 0 }, right: { protraction: 0, elevation: 0 } })
+    ;['L', 'R'].forEach((s, i) => expect(f.bones[`shoulder.${s}`].quaternion.equals(clip[i])).toBe(true))
+    poseShoulders(f.bones, { left: { protraction: 0.25, elevation: 0 }, right: { protraction: 0, elevation: 0.15 } })
+    f.bones.hips.updateMatrixWorld(true)
+    expect(joint('L').z - at[0].z).toBeGreaterThan(0.01)
+    expect(joint('R').y - at[1].y).toBeGreaterThan(0.005)
+    // clamped to the range the penetration gate measures
+    const g = figure()
+    poseShoulders(g.bones, { left: { protraction: 5, elevation: -5 }, right: { protraction: 0, elevation: 0 } })
+    expect(g.bones['shoulder.L'].quaternion.angleTo(new THREE.Quaternion())).toBeLessThan(
+      VILLAGER_POSE.shoulders.protractionMax + VILLAGER_POSE.shoulders.dropMax + 1e-6,
+    )
   })
 })

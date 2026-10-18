@@ -55,7 +55,7 @@ import { REST_POSE_ARMS, type FigureLook } from './placeFigureContext'
 import { figureIdentity, type FigureIdentity } from './figureIdentity'
 import type { FigureWork } from './placeFigureContext'
 import { Shovel } from './shovel'
-import { applyClipLayers, applyHandShapes, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, stepClipLayers, takeTrunkBase } from './gltfClipLayers'
+import { applyClipLayers, applyHandShapes, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, stepClipLayers, takeTrunkBase } from './gltfClipLayers'
 
 // ---- geometry caches: one build per distinct body and layer -----------------
 
@@ -593,6 +593,7 @@ export function SkinnedFigure({
         applyClipLayers(gltf.asset, gltf.person, gb, clips, m, free)
         takeTrunkBase(gb, trunkBase)
         digShare = clips.dig
+        poseShoulders(gb, (pose?.current ?? ownShown.current)?.shoulders)
         writeTrunk(0, 0, 0)
         ;(['L', 'R'] as const).forEach((s, i) => {
           armBase[i][0].copy(b[`upperArm.${s}`].quaternion)

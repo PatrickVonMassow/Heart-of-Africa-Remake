@@ -2854,6 +2854,12 @@ export const VILLAGER_POSE = {
    *  is this straight (the knee's offset off the hip–ankle line, person units
    *  per unit of leg), toward straight ahead below it. */
   legCorrectMin: 0.0005,
+  /** The posable clavicles (step 11): a pose's protraction (rad, the
+   *  shoulder forward) and elevation (rad, up; negative drops it) per side,
+   *  added after the clip, clamped to these ranges — the ones the garment
+   *  penetration gate measures (scripts/villager/penetration.py, clip
+   *  `shoulders`). Calibratable. */
+  shoulders: { protractionMax: 0.3, elevationMax: 0.2, dropMax: 0.12 },
   kneePoleMin: 0.01,
 } as const
 

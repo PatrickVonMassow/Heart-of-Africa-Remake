@@ -26,6 +26,7 @@ import type { GltfPerson } from '../../render/villagerFigureBody'
 import { aimHead, distributeLean, gazeDirection, LEAN_BONES, solveTwoBone, type LeanBone } from '../../render/figureRig'
 import { blendPoses, newPose, type VillagerPose } from '../../render/villagerRig'
 import type { FigureWork } from './placeFigureContext'
+import type { ShoulderPose } from '../../render/gesture'
 
 /** The motion a figure's clip layers read from its code-built walk. */
 export interface LayerMotion {
@@ -370,4 +371,30 @@ export function gazeHead(bones: Record<string, THREE.Bone>, yaw: number, pitch: 
   _cw.identity()
   for (const n of ['hips', 'spine', 'spine1', 'chest']) if (bones[n]) _cw.multiply(bones[n].quaternion)
   aimHead(_cw, bones.neck.quaternion, bones.head.quaternion, gazeDirection(yaw, pitch, _gd), VILLAGER_POSE.gaze.neck, weight)
+}
+
+const _sq = new THREE.Quaternion()
+const _se = new THREE.Euler()
+
+/**
+ * The posable clavicles (natural-villager-motion step 11): each shoulder's
+ * protraction (forward) and elevation (up) added on top of what the clips
+ * left, clamped to VILLAGER_POSE.shoulders; none (absent or 0) leaves the
+ * clip's clavicle exactly as it is. The bones' frames are the body's at rest
+ * (the hung skeleton's locals are identity there): forward is +z, up +y, the
+ * left shoulder at +x.
+ */
+export function poseShoulders(bones: Record<string, THREE.Bone>, shoulders: { left: ShoulderPose; right: ShoulderPose } | undefined): void {
+  if (!shoulders) return
+  const lim = VILLAGER_POSE.shoulders
+  ;(['L', 'R'] as const).forEach((s) => {
+    const p = s === 'L' ? shoulders.left : shoulders.right
+    const b = bones[`shoulder.${s}`]
+    if (!b || (!p.protraction && !p.elevation)) return
+    const pro = Math.min(lim.protractionMax, Math.max(0, p.protraction))
+    const up = Math.min(lim.elevationMax, Math.max(-lim.dropMax, p.elevation))
+    const side = s === 'L' ? 1 : -1
+    // forward: a turn about y carrying the outer end (±x) toward +z; up: about z toward +y
+    b.quaternion.multiply(_sq.setFromEuler(_se.set(0, -side * pro, side * up, 'YZX')))
+  })
 }
