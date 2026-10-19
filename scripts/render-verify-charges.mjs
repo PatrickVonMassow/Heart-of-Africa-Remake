@@ -81,13 +81,6 @@ export const RED_CHARGES = [
     why: 'Filed 19.10.2026 from the covering WebGPU run on main after point 1343 landed: no caught child inside the acquisition window. Point 1386 owns it; the charge dies with it.',
   },
   {
-    point: 1384,
-    suite: 'polish-children',
-    kind: 'check',
-    match: /inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging/i,
-    why: 'Filed 19.10.2026 by point 1343\'s author: fails on a continuous chase on both backends, the pre-1343 game code alike. Point 1384 owns the cause; the charge dies with it.',
-  },
-  {
     point: 1344,
     suite: 'polish-children',
     kind: 'check',
