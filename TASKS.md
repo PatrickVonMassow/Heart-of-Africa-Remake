@@ -15903,3 +15903,9 @@ to land than a mechanism that needs a review.
   Verifiable: each step's *Verified* list in the concept; penetration gate and full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point and carry; picture check in a port city and a village on both backends, judged by looking; cross-vendor code review record.
   Bundle: Dorfleben.
   Criticality: high - every villager, both backends.
+- [ ] 1387. Fishery net man changes into a different person when stepping ashore
+  Source: finding carrier, 19.10.2026 14:24: RiverFishery.tsx draws the net man as two Figure instances (village-canoe-netman kneeling in the boat, village-canoe-netman-ashore squatting) toggled by nm.inBoat; placeFigure.tsx keys identity per instance via useId, so the boat body and the shore body differ in sex and dress. The canoe carrier already uses one body with its own kneel transition.
+  Final state: the net man keeps one identity (sex, dress, face) in the boat and ashore, through the step between them.
+  Verifiable: a Vitest asserting boat and shore share one figure identity; the river-fishery frame before and after stepping ashore judged by looking on both backends.
+  Bundle: Dorfleben.
+  Criticality: medium - a visible person swap in every river village with a fishery.
