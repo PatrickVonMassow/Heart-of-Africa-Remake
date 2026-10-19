@@ -7,6 +7,8 @@ import {
   PREPARE_ARMS,
   describeReading,
   judgePrepareArms,
+  recordArmFrame,
+  ARM_ACQUISITION,
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 
@@ -233,5 +235,59 @@ describe('the chaser\'s arms inside the prepare window', () => {
     // and alone it is no evidence at all
     expect(judgePrepareArms([window(0.15, 0.02, 0.2)]).ok).toBe(false)
     expect(PREPARE_ARMS.measureSpan).toBeLessThan(PREPARE_ARMS.longSpan)
+  })
+})
+
+describe('the prepare window is recorded to its end', () => {
+  // a 0.9 s window whose readied left hand snaps back 0.2 m at 0.7 s; the free
+  // hand swings throughout. The probe ends the window after 0.9 s.
+  const frames = Array.from({ length: Math.round(1.2 * 60) + 1 }, (_, i) => {
+    const t = i / 60
+    if (t > 0.9) return null
+    const phase = Math.sin((2 * Math.PI * t) / 0.8)
+    return {
+      clock: 10 + t,
+      gap: 2.5,
+      side: 'left',
+      chaser: [
+        { hand: 'hand-left', local: { x: 0.2, y: 0.7, z: t >= 0.7 ? 0.1 : 0.3 } },
+        { hand: 'hand-right', local: { x: -0.2, y: 0.6, z: 0.1 + 0.1 * phase } },
+      ],
+    }
+  })
+  const acquire = (cfg) => {
+    const acq = { first: frames[0], all: [frames[0]], frames: 0 }
+    for (const r of frames.slice(1)) {
+      const got = recordArmFrame(acq, r, cfg)
+      if (got) return got
+    }
+    return null
+  }
+
+  it('keeps recording past the minimum span, so a late snap is judged', () => {
+    const got = acquire(ARM_ACQUISITION.near)
+    expect(got.complete).toBe(true)
+    expect(got.all.at(-1).clock - got.all[0].clock).toBeCloseTo(0.9, 6)
+    const verdict = judgePrepareArms([got.all])
+    expect(verdict.ok).toBe(false)
+    expect(verdict.detail).toMatch(/NOT HELD/)
+  })
+
+  it('calls a window that ends before the minimum span incomplete', () => {
+    const acq = { first: frames[0], all: [frames[0]], frames: 0 }
+    const got = recordArmFrame(acq, null, ARM_ACQUISITION.near)
+    expect(got.complete).toBe(false)
+  })
+
+  it('reads the far swing over its span alone', () => {
+    const got = acquire(ARM_ACQUISITION.far)
+    expect(got.complete).toBe(true)
+    expect(got.all.at(-1).clock - got.all[0].clock).toBeLessThan(ARM_ACQUISITION.far.span + 0.02)
+  })
+
+  it('a window cut off by the frame bound is not complete', () => {
+    const acq = { first: frames[0], all: [frames[0]], frames: 0 }
+    const got = frames.slice(1, 50).reduce((r, f) => r ?? recordArmFrame(acq, f, { ...ARM_ACQUISITION.near, maxFrames: 40 }), null)
+    expect(got.complete).toBe(false)
   })
 })

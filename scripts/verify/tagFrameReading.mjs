@@ -234,3 +234,31 @@ export function judgePrepareArms(windows) {
       : '')
   return { ok: !bad && !still, detail }
 }
+
+/**
+ * How each window of the chaser's arms is acquired. `far` is read over its
+ * span; a PREPARE window (`near`) is recorded to its actual end, so reaching
+ * the span it needs to judge a swing never ends the observation, and a snap
+ * late in the window is seen. `maxFrames` bounds a stalled loop: a window cut
+ * off there was not observed to its end and is never complete.
+ */
+export const ARM_ACQUISITION = {
+  far: { span: 0.5, untilEnd: false, maxFrames: 600 },
+  near: { span: PREPARE_ARMS.longSpan, untilEnd: true, maxFrames: 600 },
+}
+
+/**
+ * One frame of a window's acquisition: `acq` is `{ first, all, frames }`, `r`
+ * this frame's probe (null once out of the window). Returns null to keep
+ * recording, else the finished `{ all, complete }` — complete when the window
+ * ran its `span` and, `untilEnd`, was followed to its end. Self-contained: the
+ * page runs it by its source.
+ */
+export function recordArmFrame(acq, r, { span, untilEnd, maxFrames }) {
+  const ran = () => acq.all.at(-1).clock - acq.first.clock >= span
+  if (!r || r.side !== acq.first.side) return { all: acq.all, complete: ran() }
+  if (r.clock !== acq.all.at(-1).clock) acq.all.push(r)
+  if (!untilEnd && ran()) return { all: acq.all, complete: true }
+  if (++acq.frames > maxFrames) return { all: acq.all, complete: false }
+  return null
+}

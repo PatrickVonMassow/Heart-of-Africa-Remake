@@ -5,7 +5,7 @@
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { assertBackend } from './_browser.mjs'
 import { waitForSceneReady } from './frameSubject.mjs'
-import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeTagStandpoint, PREPARE_ARMS } from './tagFrameReading.mjs'
+import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
 import { CHILD_MOTION, holdsAGame, judgedEnough, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
 import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite } from './_polish.mjs'
 
@@ -519,8 +519,9 @@ if (section('tag-catch')) {
     // dwells ~0.25 s at its forward end (rising there, not advancing in z), so
     // 0.35 s centred on that dwell read a correctly swinging hand as 0.09 m.
     // Only some prepare windows last 0.6 s (11 of 26 measured), hence the
-    // retries below; a shorter window still has its readied hand judged.
-    const SPAN = { far: 0.5, near: PREPARE_ARMS.longSpan }
+    // retries below; a shorter window still has its readied hand judged. A
+    // prepare window is recorded to its END (ARM_ACQUISITION, recordArmFrame):
+    // reaching the span never ends the observation, so a late snap is seen.
     // ONE page-side RAF loop waits for the first frame in the window and then
     // records every following frame, so no frame falls into a handoff between
     // separate page calls. The acquisition keeps its own bound outside the page
@@ -533,30 +534,26 @@ if (section('tag-catch')) {
     const readSeriesInPage = (want) =>
       page
         .evaluate(
-          ({ want, span, src }) =>
+          ({ want, cfg, src, stepSrc }) =>
             new Promise((done) => {
               const probe = new Function(`return (${src})`)()
+              const step = new Function(`return (${stepSrc})`)()
               const deadline = performance.now() + 60000
-              let first = null
-              let all = null
-              let frames = 0
+              let acq = null
               const tick = () => {
-                if (!first) {
-                  first = probe({ want, lock: null })
-                  if (first) all = [first]
+                if (!acq) {
+                  const first = probe({ want, lock: null })
+                  if (first) acq = { first, all: [first], frames: 0 }
                   else if (performance.now() > deadline) return done({})
                   return requestAnimationFrame(tick)
                 }
-                const r = probe({ want, lock: first })
-                if (!r || r.side !== first.side) return done({ all, complete: false })
-                if (r.clock !== all.at(-1).clock) all.push(r)
-                if (r.clock - first.clock >= span) return done({ all, complete: true })
-                if (++frames > 600) return done({ all, complete: false })
+                const got = step(acq, probe({ want, lock: acq.first }), cfg)
+                if (got) return done(got)
                 requestAnimationFrame(tick)
               }
               requestAnimationFrame(tick)
             }),
-          { want, span: SPAN[want], src: probeArms.toString() },
+          { want, cfg: ARM_ACQUISITION[want], src: probeArms.toString(), stepSrc: recordArmFrame.toString() },
         )
         .then((got) => (got.all ? got : null))
         .catch(() => null)
