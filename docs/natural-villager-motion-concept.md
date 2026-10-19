@@ -304,6 +304,17 @@ reaching hand within 10° of horizontal; approach→catch and approach→miss tr
 with run support and free-arm swing continuing; port-city picture on both backends,
 judged by looking.
 *Keeps:* 2, 4; catch semantics unchanged.
+*As built (point 1343):* the glTF body draws its own pose (`FigurePose.body`,
+taken by a skinned figure's pivots); the primitive keeps its chaser arms and
+touch lean (constraint 7). The numbers are `VILLAGER_POSE.tagChaser`. The
+readied hand stands `prepareReach` of the DRAWN arm along the pose's arm
+direction (the virtual rig's proportions are not the drawn child's); the
+grab names the world point on the quarry's surface. A pose with a reach
+takes no contact lean, save the catch's last stride (`reach.lunge`), where
+the hand may still fall short of the quarry at the 0.45 m catch ring — that
+check stays point 1340's. Found on the way: a child's sprint (6.2–6.9 person
+units/s) exceeded the walk's teleport speed (6), freezing its legs at full
+run; raised to 10.
 
 **Step 16 (U16) — River-bank caught child.** One definition for tag and bank: a short
 brake-and-settle into a planted hold — trunk ~0.12 rad over spine/spine1/chest only
@@ -318,6 +329,13 @@ and closes that `// OPEN`.
 drift and no whole-body squash through catch→settle→hold→resume; river-bank picture on
 both backends at play distance.
 *Keeps:* 2, 4.
+*As built (point 1343):* `caughtBodyPose` with `VILLAGER_POSE.caughtSlump`,
+eased in and out over `settleSeconds` per child (tag beat and bank round
+alike); the arms are left at rest, so the clip hangs them and the protracted
+clavicles carry them forward. `caughtSlumpLean`/`caughtSlumpArmRoll` remain
+as the primitive's slump (its 0.20 roll is infeasible there; the `// OPEN`
+is closed). `// OPEN:` one knee softened and the weight shifted needs a
+per-leg pose on the standing legs; not built.
 
 **Step 17 (U17) — Pick-up and the jar fill.** Retarget `PickUp_Table` (table height) and
 `Farm_Harvest` (ground), cut down/hold/up; a `pickUp` work layer beside the dig (eased
@@ -433,8 +451,10 @@ b, all of c, any re-cut after step 5 — the full-ramp test is the gate.
 
 - `OPEN:` whether the kneel clips replace `kneelBlend` on the glTF body in step 8 or
   stay procedural until step 17 needs the pick-up kneel (either keeps the order).
-- `OPEN:` the chaser's prepare distance against the existing `grabWindow` so the pre-aim
-  never delays a valid catch.
+- *Decided (point 1343):* the prepare distance (3.2 m) lies beyond the commit
+  distance (2 m, the window the grab is due in — there is no `grabWindow`); the
+  pre-aim is drawn only and `grabDue` is unchanged, so it never delays a catch
+  (`tagBodyPose.test.ts`).
 - `OPEN:` per-foot terrain height (backlog) if a slope defect is measured in a village
   picture during sub-point c.
 
