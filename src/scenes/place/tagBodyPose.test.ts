@@ -205,6 +205,9 @@ describe('the port-city tag chaser on the glTF body (natural-villager-motion ste
     expect(shoulder[1] / SCALE).toBeGreaterThan(FIGURE_LIMBS.shoulderY - 0.03)
     expect(handGapToBody(hand, f.quarry, SCALE)).toBeLessThanOrEqual(FIGURE_LIMBS.handRadius * SCALE)
     expect(f.body.shoulders![side].protraction).toBeCloseTo(CH.reachProtraction, 9)
+    // the last stride may lunge onto the quarry; the approach never does
+    expect(f.body.reach!.lunge).toBe(true)
+    for (const g of caught.filter((x) => x.gap > 1)) expect(g.body.reach?.lunge ?? false).toBe(false)
   })
 
   it('after a miss the arm recovers into the swing and the run goes on', () => {

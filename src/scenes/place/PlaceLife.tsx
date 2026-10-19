@@ -1436,6 +1436,9 @@ function Kids({
         body: game ? tagBody(game, i) : null,
         facing: c.facing,
         turn: poses.current[i]?.current?.turn ?? 0,
+        // The glTF body's eased tag weights (natural-villager-motion steps
+        // 15/16): how far the readied arm, the reach and the caught hold are in.
+        bodyWeights: bodyWeights.current[i] ? { ...bodyWeights.current[i] } : null,
       })),
       /** The stone the off-game ROCK is climbed and spoken at, with the size the
        *  climb is played against (work-order 1080). Published rather than

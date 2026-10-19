@@ -479,46 +479,69 @@ if (section('tag-catch')) {
     // window, short of the commit distance, ONE arm is readied forward while
     // the other keeps swinging. Each frame is waited for and read in the same
     // page call as the round, so both describe one frame.
-    const readArms = (window_) =>
+    const readArms = (want, chaser = -1) =>
       page
         .waitForFunction(
-          (want) => {
+          ({ want, chaser }) => {
             const t = window.__placeTag()
-            if (!t.playing || t.chaser < 0 || t.target < 0) return null
+            if (!t.playing || t.chaser < 0 || t.target < 0 || (chaser >= 0 && t.chaser !== chaser)) return null
             const c = t.children[t.chaser]
             const q = t.children[t.target]
             if (c.body !== 'chaser' || (c.gesture && c.gesture.kind)) return null
             const gap = Math.hypot(q.x - c.x, q.z - c.z)
-            const inWindow = want === 'far' ? gap > t.prepareDistance + 0.5 : gap < t.prepareDistance - 0.6 && gap > t.commitDistance + 0.2
+            const w = c.bodyWeights
+            const inWindow =
+              want === 'far'
+                ? gap > t.prepareDistance + 0.5
+                : gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side
             if (!inWindow) return null
             const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
             if (runner < 0) return null
-            return { gap, chaser: window.__placeTagHands(t.chaser), runner: window.__placeTagHands(runner) }
+            return { gap, index: t.chaser, side: w ? w.side : null, chaser: window.__placeTagHands(t.chaser), runner: window.__placeTagHands(runner) }
           },
-          window_,
+          { want, chaser },
           { timeout: 60000, polling: 'raf' },
         )
         .then((h) => h.jsonValue())
         .catch(() => null)
-    // Body heights, in the child's own frame: +z forward, +y up. A hanging or
-    // swinging arm ends near z 0; a readied hand stands out in front.
-    const hanging = (h) => h.local.z < 0.15
-    const far = await readArms('far')
+    // Body heights, in the child's own frame: +z forward, +y up. Each window is
+    // read twice, a third of a sprint stride apart (8 frames), on the same
+    // chaser: a SWINGING hand moves in the body's frame, a HELD one barely does.
+    const hand = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right'))
+    const readPair = async (want) => {
+      const a = await readArms(want)
+      if (!a) return null
+      await nextFrames(8)
+      const b = await readArms(want, a.index)
+      return b ? { a, b } : null
+    }
+    const moved = (p, side) => {
+      const u = hand(p.a, side).local
+      const v = hand(p.b, side).local
+      return Math.hypot(u.x - v.x, u.y - v.y, u.z - v.z)
+    }
+    const fmt = (p, side) => `${side} ${JSON.stringify(hand(p.a, side).local)} moved ${moved(p, side).toFixed(3)}`
+    const far = await readPair('far')
     check(
-      "far from its quarry the catcher's two hands swing at its sides like a runner's, read off the drawn pivots",
-      !!far && far.chaser?.length === 2 && far.chaser.every(hanging),
-      far ? `${JSON.stringify(far.chaser?.map((h) => h.local))} at ${far.gap.toFixed(2)} m` : 'no far chasing frame without a grab',
+      "far from its quarry the catcher swings both hands with its run (neither is held out), read off the drawn pivots",
+      !!far && ['left', 'right'].every((side) => moved(far, side) > 0.03),
+      far ? `${fmt(far, 'left')}; ${fmt(far, 'right')} at ${far.a.gap.toFixed(2)} m` : 'no pair of far chasing frames without a grab',
     )
     check(
       "while a runner's hands hang at its sides",
-      !!far && far.runner?.length === 2 && far.runner.every(hanging),
-      far ? JSON.stringify(far.runner?.map((h) => h.local)) : 'no runner frame',
+      !!far && far.a.runner?.length === 2 && far.a.runner.every((h) => h.local.z < 0.15),
+      far ? JSON.stringify(far.a.runner?.map((h) => h.local)) : 'no runner frame',
     )
-    const near = await readArms('near')
+    // Inside the prepare window the readied hand is HELD out in front (it rides
+    // the run's bob, well under the free hand's swing) while the free hand
+    // keeps swinging.
+    const near = await readPair('near')
+    const side = near && near.a.side
+    const other = side === 'left' ? 'right' : 'left'
     check(
-      "inside the prepare window one of the catcher's hands is readied forward, the other still swinging",
-      !!near && near.chaser?.length === 2 && near.chaser.filter((h) => h.local.z > 0.15).length === 1 && near.chaser.filter(hanging).length === 1,
-      near ? `${JSON.stringify(near.chaser?.map((h) => h.local))} at ${near.gap.toFixed(2)} m` : 'no chasing frame inside the prepare window',
+      "inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging",
+      !!near && near.a.side === near.b.side && hand(near.a, side).local.z > 0.2 && hand(near.b, side).local.z > 0.2 && moved(near, side) < 0.6 * moved(near, other),
+      near ? `readied ${fmt(near, side)}; free ${fmt(near, other)} at ${near.a.gap.toFixed(2)}/${near.b.gap.toFixed(2)} m` : 'no pair of chasing frames inside the prepare window',
     )
 
     // Side-on to the pair, a few metres off, on a line the rendered scene

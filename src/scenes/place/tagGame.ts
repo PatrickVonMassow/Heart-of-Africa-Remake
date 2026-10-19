@@ -1714,7 +1714,8 @@ export function reachBodyPose(
       left: { protraction: side === 'left' ? protraction : 0, elevation: 0 },
       right: { protraction: side === 'right' ? protraction : 0, elevation: 0 },
     },
-    reach: { left: side === 'left' ? reach : 1, right: side === 'right' ? reach : 1 },
+    // the lunge only once the reach is fully out and the quarry inside it
+    reach: { left: side === 'left' ? reach : 1, right: side === 'right' ? reach : 1, lunge: !!aim && g >= 1 && aim.reach < c.reachMax },
     gaze: { yaw: bearing, pitch: 0, turn: bearing * (1 - g) },
   }
   return pose

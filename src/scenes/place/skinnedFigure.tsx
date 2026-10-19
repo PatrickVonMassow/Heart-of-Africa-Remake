@@ -278,6 +278,9 @@ const _facing = new THREE.Vector3()
 const _grip = new THREE.Vector3()
 const _gazeAt = new THREE.Vector3()
 const _rs = new THREE.Vector3()
+const _rv = new THREE.Vector3()
+const _rn = new THREE.Vector3()
+const _rf = new THREE.Vector3()
 
 /** What the figure measured of its own walk, and its transitions in progress. */
 
@@ -505,15 +508,31 @@ export function SkinnedFigure({
         loc(b[`forearm.${s}`], _e).distanceTo(loc(b[`upperArm.${s}`], _s)) +
         loc(b[`hand.${s}`], _w).distanceTo(_e) +
         loc(rig.hands[s === 'L' ? 0 : 1], _t).distanceTo(_w)
-      // Where a contact hand is solved to: the virtual hand, moved along the
-      // line from the drawn shoulder by the pose's reach (natural-villager-motion
-      // step 15: a bent prepared arm, or a reach for a target past the
-      // primitive's straight arm).
+      // Where a contact hand is solved to (natural-villager-motion step 15).
+      // Without a pose reach: the virtual hand. With one, `k`: up to 1 the hand
+      // stands k of the DRAWN arm out from the drawn shoulder along the pose's
+      // arm direction (a bent, readied arm — the virtual rig's proportions are
+      // not the drawn child's); past 1 it is the world point the pose names,
+      // k of the primitive arm out from its shoulder (the quarry's surface),
+      // blended over k 1 … 1.15 so the reach never jumps.
       const handTarget = (s: 'L' | 'R', i: number, vh: THREE.Object3D, out: THREE.Vector3) => {
-        loc(vh, out)
         const k = extras?.reach ? (i === 0 ? extras.reach.left : extras.reach.right) : 1
-        if (k !== 1) out.sub(loc(b[`upperArm.${s}`], _rs)).multiplyScalar(k).add(_rs)
-        return out
+        const pivot = arms.current[i]
+        if (k === 1 || !pivot) return loc(vh, out)
+        loc(pivot, _rv)
+        loc(vh, _rf)
+        const far = _rf.clone().sub(_rv).multiplyScalar(k).add(_rv)
+        _rf.sub(_rv).normalize()
+        // the drawn arm's reach, measured with this function's own scratch
+        // vectors (the callers hold theirs across this call)
+        const sh = loc(b[`upperArm.${s}`], new THREE.Vector3())
+        const el = loc(b[`forearm.${s}`], new THREE.Vector3())
+        const wr = loc(b[`hand.${s}`], new THREE.Vector3())
+        const len = sh.distanceTo(el) + el.distanceTo(wr) + wr.distanceTo(loc(rig.hands[s === 'L' ? 0 : 1], new THREE.Vector3()))
+        _rs.copy(sh)
+        _rn.copy(_rs).addScaledVector(_rf, len * Math.min(1, k))
+        const t = Math.max(0, Math.min(1, (k - 1) / 0.15))
+        return out.copy(_rn).lerp(far, t * t * (3 - 2 * t))
       }
       let hipYaw = 0
       let chestYaw = 0
@@ -531,7 +550,12 @@ export function SkinnedFigure({
           handTarget(s, i, vh, _t)
           lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
         })
-        if (lean > 0 && gltf) {
+        // a pose's reach that may lunge (the tag catch's last stride) leans in
+        // as far as it takes when a lean reaches its target; any other pose
+        // with its own reach leans by its own lean alone (the run's, step 15)
+        const grab = !!extras?.reach?.lunge
+        if (extras?.reach && !grab) lean = 0
+        if ((lean > 0 || grab) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
           // the lean is searched again through the distributed chain, the
           // least (in the same steps) that brings every contact within reach
@@ -548,7 +572,7 @@ export function SkinnedFigure({
               break
             }
           }
-          if (!lean) writeTrunk(0, hipYaw, chestYaw)
+          writeTrunk(lean, hipYaw, chestYaw)
           b.hips.updateWorldMatrix(false, true)
         } else if (lean > 0) {
           writeTrunk(lean, hipYaw, chestYaw)

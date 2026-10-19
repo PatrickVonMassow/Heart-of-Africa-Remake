@@ -144,8 +144,10 @@ export interface FigurePose {
   /** How far out each posed hand is solved (glTF body), as a share of the
    *  line from its shoulder to where the pose's arm points the hand (absent:
    *  1): below 1 the elbow bends, above 1 the hand reaches for a target beyond
-   *  the primitive's straight arm. */
-  reach?: { left: number; right: number }
+   *  the primitive's straight arm. `lunge`: the trunk may lean in, as far as
+   *  it takes, to bring such a hand onto its target (the catch's last stride);
+   *  without it a pose with a reach leans by its own lean alone. */
+  reach?: { left: number; right: number; lunge?: boolean }
   /** The glTF body's own pose where it differs from this one, which the
    *  primitive figure keeps (the low preset untouched, natural-villager-motion
    *  constraint 7): applyFigurePose writes it onto a skinned figure's pivots. */
