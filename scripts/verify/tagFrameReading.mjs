@@ -183,3 +183,36 @@ export function describeReading(reading) {
     `gap=${Number(reading.gap ?? 0).toFixed(1)}m wall=${Number(reading.nearestWall ?? 0).toFixed(1)}m`
   )
 }
+
+// --- The chaser's arms inside the prepare window ------------------------------
+// Each window is a series of frames of one chase, read off the drawn hand
+// pivots in the chaser's own frame (+z forward). EVERY observed window judges
+// the readied hand (ahead, held: only the run's bob); the free hand's swing
+// needs most of a stride, so only a window of `longSpan` judges it.
+/** Body-frame metres and seconds; calibratable. */
+export const PREPARE_ARMS = { readiedAhead: 0.15, heldSweep: 0.06, freeSweep: 0.12, longSpan: 0.6 }
+const handZ = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right')).local.z
+export const armSweep = (series, side) => {
+  const z = series.map((r) => handZ(r, side))
+  return Math.max(...z) - Math.min(...z)
+}
+export const armMinZ = (series, side) => Math.min(...series.map((r) => handZ(r, side)))
+const fmtArm = (series, side) => `${side} sweep ${armSweep(series, side).toFixed(3)} min z ${armMinZ(series, side).toFixed(3)}`
+const otherSide = (side) => (side === 'left' ? 'right' : 'left')
+
+/** The verdict over every prepare window observed, in order: `{ ok, detail }`. */
+export function judgePrepareArms(windows) {
+  const seen = windows.filter((w) => w && w.length > 0)
+  const long = seen.find((w) => w.at(-1).clock - w[0].clock >= PREPARE_ARMS.longSpan)
+  if (!long) return { ok: false, detail: `no chasing stride inside the prepare window (${seen.length} short windows)` }
+  const heldIn = (w) => armMinZ(w, w[0].side) > PREPARE_ARMS.readiedAhead && armSweep(w, w[0].side) < PREPARE_ARMS.heldSweep
+  const bad = seen.find((w) => !heldIn(w))
+  const side = long[0].side
+  const other = otherSide(side)
+  const swings = armSweep(long, other) > PREPARE_ARMS.freeSweep && armSweep(long, side) < 0.5 * armSweep(long, other)
+  const detail =
+    `readied ${fmtArm(long, side)}; free ${fmtArm(long, other)} from ${long[0].gap.toFixed(2)} m; ` +
+    `${seen.length} windows judged` +
+    (bad ? `; NOT HELD in a window from ${bad[0].gap.toFixed(2)} m: ${fmtArm(bad, bad[0].side)}` : '')
+  return { ok: !bad && swings, detail }
+}

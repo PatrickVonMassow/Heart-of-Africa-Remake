@@ -4,7 +4,9 @@ import {
   KID_HEIGHT,
   MIN_CHILD_PIXELS,
   VILLAGE_BEHIND,
+  PREPARE_ARMS,
   describeReading,
+  judgePrepareArms,
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 
@@ -168,5 +170,43 @@ describe('the reading is reported with its numbers', () => {
   it('probes the child from shin to head', () => {
     expect(AXIS_SAMPLES[0]).toBeLessThan(0.2)
     expect(AXIS_SAMPLES.at(-1)).toBeGreaterThan(0.7)
+  })
+})
+
+describe('the chaser\'s arms inside the prepare window', () => {
+  // a window of frames at 60 Hz: the readied left hand at z ahead plus its own
+  // sweep, the free right hand swinging by `free` over a 0.8 s stride
+  const window = (seconds, readiedSweep, free = 0.2) =>
+    Array.from({ length: Math.round(seconds * 60) + 1 }, (_, i) => {
+      const t = i / 60
+      const phase = Math.sin((2 * Math.PI * t) / 0.8)
+      return {
+        clock: 10 + t,
+        gap: 2.5,
+        side: 'left',
+        chaser: [
+          { hand: 'hand-left', local: { x: 0.2, y: 0.7, z: 0.3 + (readiedSweep / 2) * phase } },
+          { hand: 'hand-right', local: { x: -0.2, y: 0.6, z: 0.1 + (free / 2) * phase } },
+        ],
+      }
+    })
+
+  it('passes a held readied hand beside a swinging free hand', () => {
+    expect(judgePrepareArms([window(0.7, 0.02)]).ok).toBe(true)
+  })
+
+  it('fails a defective short window even when a healthy long one follows', () => {
+    const verdict = judgePrepareArms([window(0.45, 0.2), window(0.7, 0.02)])
+    expect(verdict.ok).toBe(false)
+    expect(verdict.detail).toMatch(/NOT HELD/)
+  })
+
+  it('needs one window long enough to judge the free arm', () => {
+    expect(judgePrepareArms([window(0.45, 0.02)]).ok).toBe(false)
+    expect(PREPARE_ARMS.longSpan).toBeGreaterThanOrEqual(0.6)
+  })
+
+  it('fails a free hand that does not swing', () => {
+    expect(judgePrepareArms([window(0.7, 0.02, 0.05)]).ok).toBe(false)
   })
 })
