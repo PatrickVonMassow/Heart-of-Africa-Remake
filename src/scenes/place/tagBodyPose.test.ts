@@ -29,6 +29,7 @@ import {
   grabHandWorld,
   handGapToBody,
   handOverArm,
+  holdBearing,
   mixPose,
   newTagBodyWeights,
   prepareDue,
@@ -122,6 +123,7 @@ function chase(quarryAt: (t: number) => { x: number; z: number }, seconds: numbe
     w.reach = easeWeight(w.reach, !!bodyAim, CH.prepareSeconds, dt)
     easeHandover(w, dt)
     const bearing = quarryBearing(s, 0)
+    holdBearing(w, bearing)
     if (w.prepare <= 0 && w.reach <= 0 && !bodyAim) w.side = null
     else w.side ??= bearing >= 0 ? 'left' : 'right'
     const pose = tagFigurePose(tagBody(s, 0), gesturePose(gesture), gestureEnvelope(gesture), lean, 0, CFG, { weights: w, aim: bodyAim, bearing })
@@ -218,6 +220,42 @@ describe('the port-city tag chaser on the glTF body (natural-villager-motion ste
       if (last) expect(armStep(last, arm), `bearing ${bearing.toFixed(3)}`).toBeLessThan(0.02)
       last = arm
     }
+  })
+
+  it('a half-readied arm stays continuous on consecutive frames across the actual ±π wrap of the bearing', () => {
+    // the quarry passes straight behind the chaser: its wrapped bearing goes
+    // from −π + 0.3 through −π to +π − 0.3, one small step per frame
+    for (const prepare of [0.25, 0.5, 0.75]) {
+      const w = { ...newTagBodyWeights(), prepare, side: 'left' as const }
+      let last: ArmPose | null = null
+      let crossed = false
+      for (let a = -Math.PI + 0.3; a > -Math.PI - 0.3; a -= 0.005) {
+        const bearing = wrap(a)
+        if (bearing > 0) crossed = true
+        holdBearing(w, bearing)
+        const pose = tagFigurePose('chaser', REST_POSE, 0, CFG.leanAtSprint, 0, CFG, { weights: w, aim: null, bearing })
+        const arm = pose.body!.left
+        if (last) expect(armStep(last, arm), `prepare ${prepare} bearing ${bearing.toFixed(3)}`).toBeLessThan(0.02)
+        last = arm
+      }
+      expect(crossed).toBe(true)
+    }
+  })
+
+  it('the held bearing re-centres whenever its whole turns are invisible, so it never winds up', () => {
+    const w = newTagBodyWeights()
+    w.prepare = 0.5
+    holdBearing(w, 3.0)
+    holdBearing(w, -3.0)
+    expect(w.heldBearing).toBeCloseTo(3.0 + (2 * Math.PI - 6.0), 9)
+    // fully readied with no reach out: the arm is held ahead whatever the turn
+    w.prepare = 1
+    holdBearing(w, -3.0)
+    expect(w.heldBearing).toBe(-3.0)
+    // not readied at all: the clip has the arm
+    w.prepare = 0
+    holdBearing(w, 2.0)
+    expect(w.heldBearing).toBe(2.0)
   })
 
   it('the readied arm is taken from the clip on its first frame and is fully up only once the clip has let go', () => {

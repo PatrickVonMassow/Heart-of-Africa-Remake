@@ -1574,8 +1574,25 @@ export interface TagBodyWeights {
    *  and the body drawn the frame before (`handFrom`) blends into the new. */
   handover: number
   handFrom: FigurePose | null
+  /** The quarry's bearing UNWRAPPED across frames (`holdBearing`), for the
+   *  readied arm's blend only; null until the first frame. */
+  heldBearing: number | null
 }
-export const newTagBodyWeights = (): TagBodyWeights => ({ slump: 0, prepare: 0, reach: 0, side: null, handover: 0, handFrom: null })
+export const newTagBodyWeights = (): TagBodyWeights => ({ slump: 0, prepare: 0, reach: 0, side: null, handover: 0, handFrom: null, heldBearing: null })
+
+/**
+ * Carry the quarry's bearing on from the frame before without its ±π wrap.
+ * A part-readied arm blends from the clip's yaw toward a target that turns
+ * with the bearing; as the quarry passes behind, the wrapped bearing jumps by
+ * 2π and the blend by `prepare`·2π, which no pure function of the wrapped
+ * bearing can avoid. The unwrapped one keeps it continuous. It re-centres on
+ * the wrapped bearing whenever a whole turn is invisible in the drawn arm:
+ * not readied (the clip has the arm) or fully readied with no reach out.
+ */
+export function holdBearing(w: TagBodyWeights, bearing: number): void {
+  const invisible = w.prepare <= 0 || (w.prepare >= 1 && w.reach <= 0)
+  w.heldBearing = invisible || w.heldBearing === null ? bearing : w.heldBearing + angleTo(w.heldBearing, bearing)
+}
 
 /**
  * Take the reaching arm's side from a fresh grab aim. When the reach passes to
@@ -1729,6 +1746,7 @@ export function reachBodyPose(
   bearing: number,
   prepare: number,
   c: ChaserBodyConfig = VILLAGER_POSE.tagChaser,
+  held: number = bearing,
 ): FigurePose {
   const p = smooth01(prepare)
   const g = aim ? clamp01(grab) : 0
@@ -1742,10 +1760,12 @@ export function reachBodyPose(
   const turn = (aim?.turn ?? 0) * g + bearing * (1 - g)
   // the reaching side starts from rest (the clip's swing), not from the
   // primitive's grab, which is aimed for another chain. The held yaw is left
-  // UNWRAPPED (turn is already in (−π, π]): a wrapped target flips from +π to
-  // −π as the turn crosses ±π ∓ 0.1, and the partial blend from the clip's
-  // yaw would snap the arm across the body.
-  const ready = lerpArm(restOf(side), armAim(sign * 0.1 - turn, c.prepareElevation), p)
+  // UNWRAPPED, and taken from the bearing unwrapped across frames (`held`,
+  // `holdBearing`): a wrapped target flips by 2π as the quarry passes behind,
+  // and the partial blend from the clip's yaw would snap the arm across the
+  // body. Against the drawn `turn` it differs only by whole turns once readied.
+  const armTurn = (aim?.turn ?? 0) * g + held * (1 - g)
+  const ready = lerpArm(restOf(side), armAim(sign * 0.1 - armTurn, c.prepareElevation), p)
   const arm = aim ? lerpArm(ready, armAim(aim.bearing, aim.elevation), g) : ready
   const reach = lerp(lerp(1, c.prepareReach, p), aim?.reach ?? 1, g)
   const protraction = lerp(c.prepareProtraction * p, c.reachProtraction, g)
@@ -1800,7 +1820,7 @@ export function tagFigurePose(
   const side: ArmSide = drawn.aim?.side ?? w.side ?? (drawn.bearing >= 0 ? 'left' : 'right')
   const grab = Math.min(envelope, smooth01(w.reach))
   let under = reaching
-    ? reachBodyPose(shown, grab, drawn.aim, side, runLean, drawn.bearing, w.prepare)
+    ? reachBodyPose(shown, grab, drawn.aim, side, runLean, drawn.bearing, w.prepare, VILLAGER_POSE.tagChaser, w.heldBearing ?? drawn.bearing)
     : { left: shown.left, right: shown.right, lean: Math.max(runLean, shown.lean), turn }
   // the reach handed to the other arm: out of the body drawn before the switch
   if (reaching && w.handFrom && w.handover > 0) under = mixPose(w.handFrom, under, smooth01(1 - w.handover))

@@ -84,6 +84,7 @@ import {
   grabDue,
   handGapToBody,
   handOverArm,
+  holdBearing,
   newTagBodyWeights,
   prepareDue,
   readySeconds,
@@ -1208,6 +1209,7 @@ function Kids({
         const bearing = quarry
           ? Math.atan2(Math.sin(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing), Math.cos(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing))
           : quarryBearing(game, i)
+        holdBearing(weights, bearing)
         if (weights.prepare <= 0 && weights.reach <= 0 && !bodyAims.current[i]) weights.side = null
         else weights.side ??= bearing >= 0 ? 'left' : 'right'
         const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn, tagCfg, {
