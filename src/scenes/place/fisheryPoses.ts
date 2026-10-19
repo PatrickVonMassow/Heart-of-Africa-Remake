@@ -3,8 +3,10 @@
 // pose object is COPIED, never aliased to a shared template such as the
 // head-carry pose other vignettes use too.
 
+import type * as THREE from 'three/webgpu'
 import { armAim, copyPoseExtras, type FigurePose } from '../../render/gesture'
 import { HEAD_CARRY_POSE } from './placeFigureContext'
+import type { CanoeNetMan } from './villagerCanoe'
 
 /** Both arms reaching toward a bearing and down, for lifting or setting down. */
 export function reachPose(bearing: number, down: number): FigurePose {
@@ -53,4 +55,28 @@ export function blendPose(into: FigurePose, a: FigurePose, b: FigurePose, t: num
   into.right = { pitch: mix(a.right.pitch, b.right.pitch), yaw: mix(a.right.yaw, b.right.yaw), roll: mix(a.right.roll, b.right.roll) }
   into.lean = mix(a.lean, b.lean)
   into.turn = mix(a.turn, b.turn)
+}
+
+/** How far down he goes as he lifts or sets the basket ashore (fraction of his height). */
+const SHORE_SQUAT = 0.28
+
+/** Places the net man (point 1387) for this frame: on the seat and kneeling
+ *  while in the hull, on the ground and standing (squatting to the basket) ashore. The kneel
+ *  itself is the figure's own down-and-up transition. */
+export function placeNetMan(
+  group: THREE.Object3D,
+  nm: CanoeNetMan,
+  /** World height of his seat in the hull. */
+  seatY: number,
+  ground: (x: number, z: number) => number,
+  kneels: { current: boolean },
+  squat: { current: number },
+): void {
+  kneels.current = nm.inBoat
+  const y = nm.inBoat ? seatY : ground(nm.x, nm.z)
+  group.position.set(nm.x, y, nm.z)
+  group.rotation.y = nm.yaw
+  const squash = nm.inBoat ? 1 : 1 - SHORE_SQUAT * nm.reach
+  group.scale.set(1, squash, 1)
+  squat.current = squash
 }
