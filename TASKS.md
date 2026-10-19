@@ -128,7 +128,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium - every walking villager on medium/high presets; a standing red in the village suite.
   Bundle: Dorfleben.
 
-- [ ] 1393. Make model lanes generic: one model-lanes data file, role-named scripts and constants, role-only wording in CLAUDE.md; switch the cross-vendor lane to GPT-6.1
+- [ ] 1393. Generic model lanes; the cross-vendor lane switches to GPT-6.1
   Queue position: directly BEFORE point 1347 in work-order order (user order 19.10.2026).
   Source: user order 19.10.2026 21:44: for OpenAI, GPT-6.1 (gpt-6.1-sol) replaces Astra from now on; the CLAUDE.md note that Astra authors the difficult HIGH points is outdated and must be removed. Live routing (astra-share default since 26.09.) already sends authoring to Claude, so the policy text contradicts practice.
   Execution: four eyes (CLAUDE.md 6): divergent design work blind-parallel from identical inputs, merged by a third model via scripts/blind-merge.mjs; the code is then reviewed cross-vendor, never by its author.
@@ -150,7 +150,7 @@ put it is the mistake this line exists to stop.
   - CLAUDE.md 6 speaks only of roles (main chain, cross-vendor reviewer, scarce lane); the outdated sentence "GPT-6 Astra authors difficult/complex/error-prone/HIGH points" is deleted. Commit trailers keep real model names, taken from model-lanes.mjs.
   - Unit suite green; build and lint green.
   Verifiable: unit suite, build and lint green; no consumer file outside scripts/model-lanes.mjs names a concrete model.
-  Bundle: infrastructure (user order).
+  Bundle: Modell & Wächter.
   Criticality: medium — policy text contradicts live routing.
 
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
