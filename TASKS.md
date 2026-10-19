@@ -77,6 +77,26 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1391. The F6 bug report releases the pointer lock when it opens
+  Queue position: front of the work order (user order 19.10.2026: "Dieser Bug und der mit dem Debug-Report sollen am Anfang der Queue stehen.").
+  Source: findings carrier 19.10.2026 19:10 (non-owner session), reproducible from code: StateDump.tsx does not call releasePointerLock on open, unlike the place dialogs (PlaceScene.tsx:2882). In the place view with the lock held, the browser swallows Esc and the report stays open; without the lock (after a native Esc, or on the world map) Esc reaches the text field (StateDump.tsx:162), closes the report and discards the typed text. The request-approval-guard remark in the same finding is point 1373.
+  Final state: opening the F6 report releases the pointer lock; Esc inside its text field never discards typed text without the player's intent (the close behaviour itself follows the existing place dialogs).
+  Verifiable: Vitest (jsdom) on StateDump: opening calls releasePointerLock; Esc in the text field keeps the typed text.
+  Bundle: Steuerung & Performance.
+  Criticality: medium — player-visible loss of a typed bug report.
+
+- [ ] 1392. Steadying hand holds a head load with the palm
+  Queue position: front of the work order, directly after point 1391 (user order 19.10.2026: "Dieser Bug und der mit dem Debug-Report sollen am Anfang der Queue stehen.").
+  Source: user report 19.10.2026 (findings carrier request "Stützhand hält die Kopflast mit der Handfläche"): villagers carrying a jar on the head hold it with the back of the hand instead of the palm, which looks unnatural.
+  Final state (verbatim from the approved request): Steadying hand on a head load (src/scenes/place/skinnedFigure.tsx, steadyArm branch around the headLoadGrip solve):
+  1. After the arm is solved to the grip, roll the wrist (hand.L / hand.R) so the palm normal faces the load's axis (inward toward the jar/bundle), instead of leaving the hand quaternion at identity, which shows the back of the hand to the load.
+  2. The blend with clip-owned arm shares stays continuous (no snap).
+  3. Vitest (jsdom, browserless pose math): for both sides, the palm normal of the steadying hand points toward the load axis (positive dot product with the hand-to-axis direction).
+  4. Picture check in a village with a head-load carrier, both sides visible: palm on the jar, back of the hand outward.
+  Verifiable: items 3 and 4 above, both backends.
+  Bundle: Dorfleben.
+  Criticality: medium — player-visible on every head-load carrier.
+
 - [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
   Queue position: directly after point 1343.
   Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.
@@ -107,6 +127,31 @@ put it is the mistake this line exists to stop.
   Verifiable: `polish-villagers --section=village-walk` green on both backends; Vitest for any gait/IK change in src/render/villagerClipPose.ts; walking frame picture-checked.
   Criticality: medium - every walking villager on medium/high presets; a standing red in the village suite.
   Bundle: Dorfleben.
+
+- [ ] 1393. Make model lanes generic: one model-lanes data file, role-named scripts and constants, role-only wording in CLAUDE.md; switch the cross-vendor lane to GPT-6.1
+  Queue position: directly BEFORE point 1347 in work-order order (user order 19.10.2026).
+  Source: user order 19.10.2026 21:44: for OpenAI, GPT-6.1 (gpt-6.1-sol) replaces Astra from now on; the CLAUDE.md note that Astra authors the difficult HIGH points is outdated and must be removed. Live routing (astra-share default since 26.09.) already sends authoring to Claude, so the policy text contradicts practice.
+  Execution: four eyes (CLAUDE.md 6): divergent design work blind-parallel from identical inputs, merged by a third model via scripts/blind-merge.mjs; the code is then reviewed cross-vendor, never by its author.
+  Goal: switching a model is a one-line data change. No file name, script name or constant name carries a vendor or model name; only data does.
+  Final state:
+  - scripts/model-lanes.mjs is the ONLY place naming concrete models. Each lane is a record: role, vendor, display name, model id, retired names, runtime (claude/codex), scarce flag. Guards, trailer checks, review chain, routing and tests read lanes only from it.
+  - The cross-vendor rule compares the vendor field of two lane records; no script knows a vendor name.
+  - Constants named by role (no ASTRA_MODEL, OPENAI_*, FABLE_* etc. in consumer code).
+  - Role-named scripts (proposal, author may refine names but keep them role-only):
+    fable-switch-core.mjs model identities -> model-lanes.mjs
+    fable-switch.mjs -> lane-switch.mjs (on/off per lane, scarce lanes included)
+    astra-share.mjs -> lane-routing.mjs (which task goes to which lane)
+    review-astra.mjs -> cross-review.mjs (review by a lane of another vendor than the author)
+    ask-astra.mjs -> ask-lane.mjs
+    author-astra.mjs / author-fable.mjs -> author-delegate.mjs --lane <role>
+    Matching core/test files follow. Hooks in .claude/settings.json (protected path: attended edit), docs (astra-routing.md, batch-owner-runbook.md, verify README) and memory entries naming old scripts follow.
+  - Tests import lane data instead of hard-coding names (today 114 literal occurrences in 28 test files).
+  - The OpenAI lane switches to GPT-6.1, model id gpt-6.1-sol, display name "GPT-6.1 Sol" (assumed; user may correct). "GPT-6 Astra" and "GPT-5.6 Sol" go into retired names so landed trailers keep verifying and the self-review ban treats all three as one lane. The new id is proven honoured on this machine (probe) before the lane counts as reachable.
+  - CLAUDE.md 6 speaks only of roles (main chain, cross-vendor reviewer, scarce lane); the outdated sentence "GPT-6 Astra authors difficult/complex/error-prone/HIGH points" is deleted. Commit trailers keep real model names, taken from model-lanes.mjs.
+  - Unit suite green; build and lint green.
+  Verifiable: unit suite, build and lint green; no consumer file outside scripts/model-lanes.mjs names a concrete model.
+  Bundle: infrastructure (user order).
+  Criticality: medium — policy text contradicts live routing.
 
 - [ ] 1347. Villager garments: rebuild the garment construction so cloth follows the body by construction (six eyes with final check)
   Queue position: directly after point 1330 (user order 12.10.2026).
@@ -15912,10 +15957,3 @@ to land than a mechanism that needs a review.
   Verifiable: each step's *Verified* list in the concept; penetration gate and full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point and carry; picture check in a port city and a village on both backends, judged by looking; cross-vendor code review record.
   Bundle: Dorfleben.
   Criticality: high - every villager, both backends.
-- [ ] 1391. The F6 bug report releases the pointer lock when it opens
-  Queue position: end of Steuerung & Performance.
-  Source: findings carrier 19.10.2026 19:10 (non-owner session), reproducible from code: StateDump.tsx does not call releasePointerLock on open, unlike the place dialogs (PlaceScene.tsx:2882). In the place view with the lock held, the browser swallows Esc and the report stays open; without the lock (after a native Esc, or on the world map) Esc reaches the text field (StateDump.tsx:162), closes the report and discards the typed text. The request-approval-guard remark in the same finding is point 1373.
-  Final state: opening the F6 report releases the pointer lock; Esc inside its text field never discards typed text without the player's intent (the close behaviour itself follows the existing place dialogs).
-  Verifiable: Vitest (jsdom) on StateDump: opening calls releasePointerLock; Esc in the text field keeps the typed text.
-  Bundle: Steuerung & Performance.
-  Criticality: medium — player-visible loss of a typed bug report.
