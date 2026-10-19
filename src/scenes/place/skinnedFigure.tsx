@@ -554,7 +554,9 @@ export function SkinnedFigure({
         // a pose's reach that may lunge (the tag catch's last stride) leans in
         // as far as it takes when a lean reaches its target; any other pose
         // with its own reach leans by its own lean alone (the run's, step 15)
-        const grab = !!extras?.reach?.lunge
+        // (a share of it while a blend eases the lunge in or out)
+        const lunge = Math.min(1, Math.max(0, Number(extras?.reach?.lunge ?? 0)))
+        const grab = lunge > 0
         if (extras?.reach && !grab) lean = 0
         if ((lean > 0 || grab) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
@@ -573,9 +575,11 @@ export function SkinnedFigure({
               break
             }
           }
+          if (extras?.reach) lean *= lunge
           writeTrunk(lean, hipYaw, chestYaw)
           b.hips.updateWorldMatrix(false, true)
         } else if (lean > 0) {
+          if (extras?.reach) lean *= lunge
           writeTrunk(lean, hipYaw, chestYaw)
           b.spine.updateWorldMatrix(false, true)
         }

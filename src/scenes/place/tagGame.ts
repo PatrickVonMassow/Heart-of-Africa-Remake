@@ -1618,8 +1618,8 @@ const lerpArm = (a: ArmPose, b: ArmPose, w: number): ArmPose => ({
 
 /**
  * Two poses blended by `w` (0: `a` exactly, 1: `b` exactly), the optional parts
- * included: an absent clavicle is at 0, a reach absent on one side 1, an absent gaze the
- * horizon along the pose's own turn.
+ * included: an absent clavicle is at 0, a reach absent on one side 1, an absent lunge 0
+ * (blended as a share), an absent gaze the horizon along the pose's own turn.
  */
 export function mixPose(a: FigurePose, b: FigurePose, w: number): FigurePose {
   if (w <= 0) return a
@@ -1627,6 +1627,7 @@ export function mixPose(a: FigurePose, b: FigurePose, w: number): FigurePose {
   const sh = (p: FigurePose, s: 'left' | 'right') => p.shoulders?.[s] ?? { protraction: 0, elevation: 0 }
   const re = (p: FigurePose, s: 'left' | 'right') => p.reach?.[s] ?? 1
   const gz = (p: FigurePose) => p.gaze ?? { yaw: p.turn, pitch: 0, turn: 0 }
+  const lu = (p: FigurePose) => Number(p.reach?.lunge ?? 0)
   const out: FigurePose = {
     left: lerpArm(a.left, b.left, w),
     right: lerpArm(a.right, b.right, w),
@@ -1643,7 +1644,9 @@ export function mixPose(a: FigurePose, b: FigurePose, w: number): FigurePose {
   if (a.reach || b.reach) {
     // a side neither pose names stays absent (the primitive's own hand)
     const one = (s: 'left' | 'right') => (a.reach?.[s] === undefined && b.reach?.[s] === undefined ? undefined : lerp(re(a, s), re(b, s), w))
-    out.reach = { left: one('left'), right: one('right') }
+    // the lunge's lean-in eased as a share, never switched off mid-blend
+    const lunge = lerp(lu(a), lu(b), w)
+    out.reach = { left: one('left'), right: one('right'), ...(lunge > 0 ? { lunge } : {}) }
   }
   if (a.gaze || b.gaze) {
     const ga = gz(a)

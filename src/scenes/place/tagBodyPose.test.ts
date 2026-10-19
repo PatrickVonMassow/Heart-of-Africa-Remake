@@ -235,6 +235,39 @@ describe('the port-city tag chaser on the glTF body (natural-villager-motion ste
     }
   })
 
+  it('a crossing during a lunging reach eases the lunge, trunk and hands through the handover', () => {
+    // half a metre ahead: the left hand is out and lunging when the quarry
+    // crosses, the right takes over short of a lunge
+    const crossed = chase((t) => ({ x: 1 - 2 * Math.min(1, t / 1.2), z: CFG.sprintSpeed * t + 0.5 }), 1.6)
+    const lunge = (f: Frame) => Number(f.body.reach?.lunge ?? 0)
+    const switchAt = crossed.findIndex((f, k) => k > 0 && f.aim?.side === 'right' && crossed[k - 1].aim?.side === 'left')
+    expect(switchAt).toBeGreaterThan(0)
+    expect(lunge(crossed[switchAt - 1])).toBe(1)
+    const hand = (f: Frame, s: 'left' | 'right') => grabHandWorld(f.me, f.body[s], s, f.body.lean, f.body.turn, SCALE, 0, f.body.reach?.[s] ?? 1)
+    // the handover's frames and the one on either side of it
+    const end = switchAt + Math.ceil(CH.prepareSeconds * 60) + 1
+    let eased = false
+    for (let k = switchAt; k <= end; k++) {
+      const a = crossed[k - 1]
+      const b = crossed[k]
+      const at = `t=${b.t.toFixed(2)}`
+      // the lean-in is a share that steps, never a switch
+      expect(Math.abs(lunge(a) - lunge(b)), `${at} lunge`).toBeLessThan(0.2)
+      if (lunge(b) > 0 && lunge(b) < 1) eased = true
+      expect(Math.abs(trunkPitch(a.body.lean) - trunkPitch(b.body.lean)), `${at} trunk`).toBeLessThan(0.05)
+      for (const s of ['left', 'right'] as const) {
+        expect(armStep(a.body[s], b.body[s]), `${at} ${s}`).toBeLessThan(0.2)
+        const ha = hand(a, s)
+        const hb = hand(b, s)
+        // the chaser's own run taken out of the step: no faster than the
+        // reach itself moves out (~0.1 body heights a frame)
+        const moved = Math.hypot(hb[0] - ha[0] - (b.me.x - a.me.x), hb[1] - ha[1], hb[2] - ha[2] - (b.me.z - a.me.z))
+        expect(moved / SCALE, `${at} ${s} hand`).toBeLessThan(0.12)
+      }
+    }
+    expect(eased).toBe(true)
+  })
+
   it('after a miss the arm recovers into the swing and the run goes on', () => {
     // closes to just inside the commit distance, then the quarry pulls away
     const missed = chase((t) => ({ x: -0.3, z: t < 1.6 ? 5 + 1.2 * t : 5 + 1.2 * 1.6 + 6 * (t - 1.6) }), 4)
