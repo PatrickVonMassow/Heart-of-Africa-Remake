@@ -1741,8 +1741,11 @@ export function reachBodyPose(
   // swept round with the head as the quarry's bearing changes.
   const turn = (aim?.turn ?? 0) * g + bearing * (1 - g)
   // the reaching side starts from rest (the clip's swing), not from the
-  // primitive's grab, which is aimed for another chain
-  const ready = lerpArm(restOf(side), armAim(angleTo(turn, sign * 0.1), c.prepareElevation), p)
+  // primitive's grab, which is aimed for another chain. The held yaw is left
+  // UNWRAPPED (turn is already in (−π, π]): a wrapped target flips from +π to
+  // −π as the turn crosses ±π ∓ 0.1, and the partial blend from the clip's
+  // yaw would snap the arm across the body.
+  const ready = lerpArm(restOf(side), armAim(sign * 0.1 - turn, c.prepareElevation), p)
   const arm = aim ? lerpArm(ready, armAim(aim.bearing, aim.elevation), g) : ready
   const reach = lerp(lerp(1, c.prepareReach, p), aim?.reach ?? 1, g)
   const protraction = lerp(c.prepareProtraction * p, c.reachProtraction, g)

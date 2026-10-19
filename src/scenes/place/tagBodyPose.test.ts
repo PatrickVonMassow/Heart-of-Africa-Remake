@@ -207,6 +207,19 @@ describe('the port-city tag chaser on the glTF body (natural-villager-motion ste
     }
   })
 
+  it('a half-readied arm eases smoothly while the quarry crosses behind the chaser (no ±π snap)', () => {
+    // the readied left arm at prepare 0.5, the quarry's bearing sweeping past
+    // −π + 0.1, where a wrapped target yaw would flip from +π to −π
+    const w = { ...newTagBodyWeights(), prepare: 0.5, side: 'left' as const }
+    let last: ArmPose | null = null
+    for (let bearing = -2.9; bearing > -Math.PI; bearing -= 0.005) {
+      const pose = tagFigurePose('chaser', REST_POSE, 0, CFG.leanAtSprint, 0, CFG, { weights: w, aim: null, bearing })
+      const arm = pose.body!.left
+      if (last) expect(armStep(last, arm), `bearing ${bearing.toFixed(3)}`).toBeLessThan(0.02)
+      last = arm
+    }
+  })
+
   it('the readied arm is taken from the clip on its first frame and is fully up only once the clip has let go', () => {
     // a skinned body takes an arm whose pose names a reach; the clip hands it
     // over in VILLAGER_GLTF.transitionSeconds, which the readied ease never beats
