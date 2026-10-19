@@ -72,5 +72,8 @@ it('stays one figure identity from the hull to the landing and back', async () =
 it('the fishery draws the net man through that one figure, never a shore double', () => {
   const source = readFileSync('src/scenes/place/RiverFishery.tsx', 'utf8')
   expect(source.match(/<FisheryNetMan\b/g)).toHaveLength(1)
-  expect(source).not.toContain('village-canoe-netman-ashore')
+  expect(readFileSync('src/scenes/place/FisheryNetMan.tsx', 'utf8').match(/<Figure\b/g)).toHaveLength(1)
+  // Its other people, one Figure each: the paddler, the carrier, the griller.
+  // A second net man under any name would be a fourth (GPT-6 Astra review).
+  expect(source.match(/<Figure\b/g)).toHaveLength(3)
 })
