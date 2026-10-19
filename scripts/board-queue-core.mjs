@@ -190,12 +190,25 @@ export function gatedEntryPoints(entries) {
   return (Array.isArray(entries) ? entries : []).filter((e) => e?.gated).map((e) => e.point)
 }
 
-/** Undo the escaping `renderQueueCard` applied, so a title read back compares. */
+/** The named entities a board title can carry, beyond the three `esc` writes. */
+const NAMED_ENTITIES = Object.freeze({
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', shy: '\u00ad',
+  hellip: '…', ndash: '–', mdash: '—', middot: '·', times: '×',
+  laquo: '«', raquo: '»', bdquo: '„', ldquo: '“', rdquo: '”', sbquo: '‚', lsquo: '‘', rsquo: '’',
+  auml: 'ä', ouml: 'ö', uuml: 'ü', Auml: 'Ä', Ouml: 'Ö', Uuml: 'Ü', szlig: 'ß', eacute: 'é',
+})
+
+/**
+ * Undo the escaping a board title carries, so a title read back compares and is
+ * measured as the reader sees it. ONE pass, so `&amp;quot;` stays `&quot;`; an
+ * entity outside the table stays literal.
+ */
 const unesc = (text) =>
-  String(text ?? '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
+  String(text ?? '').replace(/&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z][a-zA-Z0-9]*));/g, (whole, hex, dec, name) => {
+    const code = hex ? parseInt(hex, 16) : dec ? Number(dec) : null
+    if (code !== null) return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole
+    return Object.hasOwn(NAMED_ENTITIES, name) ? NAMED_ENTITIES[name] : whole
+  })
 
 /**
  * The same two reports, taken from a BOARD rather than from the data — what the
@@ -218,6 +231,46 @@ export function boardTitleReport(html, titles = {}) {
   }
   const asc = (a, b) => a - b
   return { untranslated: untranslated.sort(asc), unestimated: unestimated.sort(asc) }
+}
+
+/**
+ * The longest board card title, in characters (calibratable). A headline that
+ * runs on — the whole translated work-order title plus its queue position — is
+ * how cards came to carry their description in the title and none in the body.
+ */
+export const BOARD_CARD_TITLE_MAX = 80
+
+/** A title over the limit is refused at the store boundary, naming the remedy. */
+export function assertCardTitleLength(title) {
+  const t = typeof title === 'string' ? title.trim() : ''
+  const length = [...t].length
+  if (length > BOARD_CARD_TITLE_MAX) {
+    throw new Error(
+      `board-queue: refusing a card title of ${length} characters (limit ${BOARD_CARD_TITLE_MAX}) — ` +
+        'keep the title short and move the rest into the body: node scripts/board-queue.mjs set <N> --text-stdin',
+    )
+  }
+  return title
+}
+
+/**
+ * What BLOCKS a publish among the queue cards the board renders for OPEN points:
+ * a card with no body (only the generator's stub) and a card whose title is over
+ * `BOARD_CARD_TITLE_MAX`. A card for a point outside `open` is not counted.
+ */
+export function boardCardBlockers(html, open = []) {
+  const openSet = new Set([...open].map(Number))
+  const { points } = importQueueFromHtml(html)
+  const bodyless = []
+  const overlong = []
+  for (const [key, entry] of Object.entries(points)) {
+    const n = Number(key)
+    if (!openSet.has(n)) continue
+    if (!entry.body) bodyless.push(n)
+    if ([...String(entry.title ?? '')].length > BOARD_CARD_TITLE_MAX) overlong.push(n)
+  }
+  const asc = (a, b) => a - b
+  return { bodyless: bodyless.sort(asc), overlong: overlong.sort(asc) }
 }
 
 /**
@@ -643,7 +696,11 @@ export function importQueueFromHtml(html) {
     // A split card stores its DESCRIPTION alone; the status and the
     // placeholder are not queue prose, so no description paragraph means none.
     const split = bodyHtml.includes('<hr class="split">')
-    const paraRe = split ? /<p class="desc">([\s\S]*?)<\/p>/gi : /<p\b[^>]*>([\s\S]*?)<\/p>/gi
+    // Any attribute order and further class tokens count (`<p class="desc" lang="de">`);
+    // `\s` before `class` keeps `data-class` out.
+    const paraRe = split
+      ? /<p\b[^>]*?\sclass\s*=\s*["'](?:[^"']*\s)?desc(?:\s[^"']*)?["'][^>]*>([\s\S]*?)<\/p>/gi
+      : /<p\b[^>]*>([\s\S]*?)<\/p>/gi
     const paras = [...bodyHtml.matchAll(paraRe)].map((m) => cardText(m[1])).filter(Boolean)
     // A legacy card with no <p> at all (a hand-written board) still yields its text.
     const body = paras.length || split ? paras : [cardText(bodyHtml)].filter(Boolean)
@@ -779,6 +836,7 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
   const n = Number(point)
   if (!Number.isInteger(n) || n <= 0) throw new Error(`board: not a point number: ${point}`)
   assertNotFlagValue(title, 'title')
+  assertCardTitleLength(title)
   assertNotFlagValue(Array.isArray(body) ? body[0] : body, 'body')
   assertNotFlagValue(estimate, 'estimate')
   const { points } = normaliseQueueData(data)

@@ -35,6 +35,7 @@ import { REPO_ROOT, STATE_PATH, readJson } from './dashboard-state.mjs'
 import { parseKlaerungPoints, parseNowCardPoints } from './dashboard-guard-core.mjs'
 import { normaliseLineEndings, renderCardCriticalities } from './board-core.mjs'
 import {
+  BOARD_CARD_TITLE_MAX,
   ESTIMATE_CMD,
   QUEUE_DATA_PATH,
   SET_STDIN_FLAG,
@@ -110,7 +111,16 @@ function reportEntries(entries, tasksText = '') {
   if (gated.length) {
     console.log('  give each one a "Von dir zu klären" card, and clear it with: node scripts/defer-for-user.mjs --clear <N>')
   }
-  say(entries.filter((e) => e.stub).map((e) => e.point), 'no prose yet', 'node scripts/board-queue.mjs set <N> "<text>"')
+  say(
+    entries.filter((e) => e.stub).map((e) => e.point),
+    'no prose yet (blocks the publish)',
+    'node scripts/board-queue.mjs set <N> "<text>"',
+  )
+  say(
+    entries.filter((e) => [...String(e.title ?? '')].length > BOARD_CARD_TITLE_MAX).map((e) => e.point),
+    `title over ${BOARD_CARD_TITLE_MAX} characters (blocks the publish)`,
+    TITLE_CMD,
+  )
   // THE FALLBACK IS REPORTED (point 439): these cards carry the ENGLISH,
   // upper-case work-order headline (or the bare number) into a German board.
   say(untranslatedTitlePoints(entries), 'title still the work order’s (English)', TITLE_CMD)

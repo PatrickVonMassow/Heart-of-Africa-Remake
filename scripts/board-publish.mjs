@@ -62,7 +62,9 @@ import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
 import {
   ESTIMATE_CMD,
   QUEUE_DATA_PATH,
+  BOARD_CARD_TITLE_MAX,
   TITLE_CMD,
+  boardCardBlockers,
   boardTitleReport,
   parseQueueDataFile,
   parseTaskTitles,
@@ -405,8 +407,27 @@ if (uncovered.length) {
   // case that lands here is exactly a freshly appended point with no card
   // anywhere. The generator is what serves it.
   console.error('Give each of them a card: node scripts/board-queue.mjs   (rebuilds the queue')
-  console.error('from the work order; a point with no prose yet gets a stub, which is enough to')
-  console.error('publish). Write the prose with: node scripts/board-queue.mjs set <N> "<text>".')
+  console.error('from the work order; a point with no prose yet gets a stub, which the check')
+  console.error('below still refuses). Write the prose with: node scripts/board-queue.mjs set <N> "<text>".')
+  process.exit(1)
+}
+
+// A QUEUE CARD NEEDS A SHORT TITLE AND A BODY (user 19.10.2026): a card whose
+// description landed in its title shows a run-on headline over the generator's
+// stub. Only cards rendered for open points count.
+const blockers = boardCardBlockers(repoBytes, open)
+if (blockers.bodyless.length || blockers.overlong.length) {
+  console.error('board-publish REFUSED — queue card(s) for open points lack a short title or a body:')
+  if (blockers.bodyless.length) {
+    console.error(`  no body (only the stub): ${blockers.bodyless.join(', ')} — node scripts/board-queue.mjs set <N> --text-stdin`)
+  }
+  if (blockers.overlong.length) {
+    console.error(
+      `  title over ${BOARD_CARD_TITLE_MAX} characters: ${blockers.overlong.join(', ')} — ` +
+        `shorten it (${TITLE_CMD}) and move the rest into the body`,
+    )
+  }
+  console.error('Then rebuild the queue (node scripts/board-queue.mjs) and publish again.')
   process.exit(1)
 }
 

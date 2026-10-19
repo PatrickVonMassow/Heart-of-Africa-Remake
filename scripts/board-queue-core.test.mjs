@@ -16,10 +16,12 @@ import { queueCard, toNow } from './board-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { evaluate as evaluateTopic } from './dashboard-card-topic-guard-core.mjs'
 import {
+  BOARD_CARD_TITLE_MAX,
   FINDER_POINTS,
   RELEASE_TAG_POINT,
   QUEUE_STUB_BODY,
   assertNotFlagValue,
+  boardCardBlockers,
   boardTitleReport,
   buildQueueSection,
   importQueueFromHtml,
@@ -707,6 +709,64 @@ describe('the generator SAYS which cards are still unnamed and unestimated', () 
 
   it('survives a board with no queue at all rather than throwing inside a publish', () => {
     expect(boardTitleReport('<main></main>', titles)).toEqual({ untranslated: [], unestimated: [] })
+  })
+})
+
+describe('a board card has a short title and a body', () => {
+  const long = 'T'.repeat(BOARD_CARD_TITLE_MAX + 1)
+  it('refuses an over-long title at the store, naming the limit and the body as the remedy', () => {
+    expect(() => setQueueEntry(null, 7, { title: long })).toThrow(
+      new RegExp(`limit ${BOARD_CARD_TITLE_MAX}\\).*move the rest into the body`),
+    )
+    // Counted in characters, not UTF-16 units or bytes: exactly the limit passes.
+    const atLimit = 'Ü'.repeat(BOARD_CARD_TITLE_MAX)
+    expect(setQueueEntry(null, 7, { title: atLimit }).points[7].title).toBe(atLimit)
+    // A body-only write does not re-judge a title it does not touch.
+    expect(setQueueEntry({ points: { 7: { title: long } } }, 7, { body: 'Text.' }).points[7].body).toBe('Text.')
+  })
+  it('blocks a body-less or over-long card for an open point, and passes a short title with a body', () => {
+    const html = board(
+      renderQueueCard({ point: 1, title: 'Kurz', body: 'Text.', meta: '~1 h' }) +
+        renderQueueCard({ point: 2, title: 'Ohne Text', body: QUEUE_STUB_BODY, meta: QUEUE_STUB_META }) +
+        renderQueueCard({ point: 3, title: long, body: 'Text.', meta: '~1 h' }),
+    )
+    expect(boardCardBlockers(html, [1, 2, 3])).toEqual({ bodyless: [2], overlong: [3] })
+    expect(boardCardBlockers(html, [1])).toEqual({ bodyless: [], overlong: [] })
+  })
+  it('measures the title as the reader sees it, every entity decoded once', () => {
+    const shown = `${'A'.repeat(BOARD_CARD_TITLE_MAX - 5)}&quot;`
+    const html = board(
+      renderQueueCard({ point: 4, title: 'x', body: 'Text.', meta: '~1 h' }).replace(
+        '<span class="t">x</span>',
+        `<span class="t">${shown}</span>`,
+      ) +
+        renderQueueCard({ point: 5, title: 'x', body: 'Text.', meta: '~1 h' }).replace(
+          '<span class="t">x</span>',
+          `<span class="t">${'&#228;&#xFC;&hellip;'.repeat(BOARD_CARD_TITLE_MAX / 2)}</span>`,
+        ),
+    )
+    expect(importQueueFromHtml(html).points[4].title).toBe(`${'A'.repeat(BOARD_CARD_TITLE_MAX - 5)}"`)
+    expect(boardCardBlockers(html, [4, 5])).toEqual({ bodyless: [], overlong: [5] })
+  })
+  it('reads a hand-written description paragraph with further attributes and class tokens', () => {
+    // Written by hand, NOT by renderQueueCard: the importer must not depend on its exact tag.
+    const card = (point, p) =>
+      `<details>\n  <summary><span class="num">${point}</span><span class="t">Kurz</span>` +
+      `<span class="right"><span class="meta">~1 h</span></span></summary>\n` +
+      `  <div class="body">\n    ${p}\n    <hr class="split">\n    <p class="status">Status.</p>\n  </div>\n</details>\n`
+    const html = board(
+      card(11, '<p class="desc" lang="de">Text.</p>') +
+        card(12, '<p lang="de" class="lead desc">Text.</p>') +
+        card(13, '<p data-class="desc">Kein Text.</p>'),
+    )
+    expect(importQueueFromHtml(html).points[11].body).toEqual(['Text.'])
+    expect(importQueueFromHtml(html).points[12].body).toEqual(['Text.'])
+    expect(boardCardBlockers(html, [11, 12, 13])).toEqual({ bodyless: [13], overlong: [] })
+  })
+  it('ignores the cards of points that are no longer open', () => {
+    const html = board(renderQueueCard({ point: 9, title: long, body: QUEUE_STUB_BODY, meta: QUEUE_STUB_META }))
+    expect(boardCardBlockers(html, [])).toEqual({ bodyless: [], overlong: [] })
+    expect(boardCardBlockers('<main></main>', [9])).toEqual({ bodyless: [], overlong: [] })
   })
 })
 
