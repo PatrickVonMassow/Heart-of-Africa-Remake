@@ -425,6 +425,36 @@ if (section('villager-canoe')) {
           label: 'the two fishermen hauling the drift net into their dugout at the downstream end, silvery fish in the hull, seen from the boat’s standing place on the waterline; no child and no play rock in the picture',
         })
       }
+      // The net man ashore at the landing, squatting to the basket (point
+      // 1387): the SAME man who knelt in the hull — one drawn body, no double.
+      const ashore = await page
+        .waitForFunction(() => {
+          const c = window.__placeCanoe?.()
+          return !!c && c.phase === 'unload' && !c.netMan.inBoat && c.netMan.reach > 0.3
+        }, null, { timeout: 120000, polling: 100 })
+        .then(() => true)
+        .catch(() => false)
+      check('at the landing the net man steps ashore to unload', ashore)
+      if (ashore && atBoat) {
+        const nm = await page.evaluate(() => { const c = window.__placeCanoe(); return { x: c.netMan.x, z: c.netMan.z } })
+        await standAt(boat.stand, nm)
+        const one = await page.evaluate(() => {
+          const c = window.__placeCanoe()
+          let named = 0
+          let visible = 0
+          window.__placeScene.traverse((o) => {
+            if (!o.name.startsWith('village-canoe-netman')) return
+            named++
+            if (o.visible) visible++
+          })
+          return { named, visible, inFrame: window.__canoeSeen(c.netMan.x, 0.4, c.netMan.z, 0.8), phase: c.phase, inBoat: c.netMan.inBoat }
+        })
+        check('ashore he is the one net man figure the hull carried, in the frame', one.named === 1 && one.visible === 1 && one.inFrame && !one.inBoat, JSON.stringify(one))
+        await frame('1387-netman-ashore-unloading', {
+          local: { x: nm.x, y: 0.5, z: nm.z },
+          label: 'at the landing the net man squats ashore over the basket while unloading — the same man, same body and dress, who knelt in the dugout in the haul picture; no child and no play rock in the picture',
+        })
+      }
       // The net man's word to the paddler once the basket is set down, and the
       // paddler's hard strokes that answer it.
       const word = await page
