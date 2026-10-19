@@ -479,10 +479,10 @@ if (section('tag-catch')) {
     // window, short of the commit distance, ONE arm is readied forward while
     // the other keeps swinging. Each frame is read in the same page call as
     // the round, so both describe one frame. Only the FIRST frame of a series
-    // is waited for; the rest are read where they fall, and a frame from a
-    // different chase (chaser, quarry, tag count) or outside the window ends
-    // the series instead of being waited for — a wait could stitch strides
-    // of separate chases into one fake sweep.
+    // is waited for; the rest are recorded in the page on every following
+    // frame of the SAME chase (chaser, quarry, tag count, readied side) and
+    // window, and any break ends the series — a wait could stitch strides of
+    // separate chases into one fake sweep.
     const probeArms = ({ want, lock }) => {
       const t = window.__placeTag()
       if (!t.playing || t.chaser < 0 || t.target < 0) return null
@@ -495,12 +495,14 @@ if (section('tag-catch')) {
       const inWindow =
         want === 'far'
           ? gap > t.prepareDistance + 0.5
-          : gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side
+          : // readied and still: no grab out or easing back after a miss, no arm handover
+            gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side && w.reach <= 0 && !(w.handover > 0)
       if (!inWindow) return null
       const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
       if (runner < 0) return null
       return {
         gap,
+        clock: t.clock,
         index: t.chaser,
         target: t.target,
         tags: t.tags,
@@ -514,23 +516,37 @@ if (section('tag-catch')) {
         .waitForFunction(probeArms, { want, lock: null }, { timeout: 60000, polling: 'raf' })
         .then((h) => h.jsonValue())
         .catch(() => null)
-    const readArmsNow = (want, lock) => page.evaluate(probeArms, { want, lock }).catch(() => null)
     // Body heights, in the child's own frame: +z forward, +y up. Each window is
-    // read over most of a sprint stride (7 readings, 3 frames apart) on the same
-    // chaser: a SWINGING hand sweeps forward and back, a HELD one keeps its
-    // place ahead and only rides the run's bob.
+    // read over a span of the game's own clock (far: a whole arm swing; near:
+    // more than half of one, as long as the prepare window reliably holds),
+    // so a SWINGING hand shows its sweep, forward and back, while a HELD one
+    // keeps its place ahead and only rides the run's bob.
+    const SPAN = { far: 0.5, near: 0.35 }
     const hand = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right'))
     const readSeries = async (want) => {
       const first = await readArms(want)
       if (!first) return null
-      const all = [first]
-      for (let k = 1; k < 7; k++) {
-        await nextFrames(3)
-        const r = await readArmsNow(want, first)
-        if (!r || r.side !== first.side) return null
-        all.push(r)
-      }
-      return all
+      const got = await page
+        .evaluate(
+          ({ want, first, span, src }) =>
+            new Promise((done) => {
+              const probe = new Function(`return (${src})`)()
+              const all = [first]
+              let frames = 0
+              const tick = () => {
+                const r = probe({ want, lock: first })
+                if (!r || r.side !== first.side) return done({})
+                if (r.clock !== all.at(-1).clock) all.push(r)
+                if (r.clock - first.clock >= span) return done({ all })
+                if (++frames > 600) return done({})
+                requestAnimationFrame(tick)
+              }
+              requestAnimationFrame(tick)
+            }),
+          { want, first, span: SPAN[want], src: probeArms.toString() },
+        )
+        .catch(() => ({}))
+      return got.all ?? null
     }
     const sweep = (series, side) => {
       const z = series.map((r) => hand(r, side).local.z)
