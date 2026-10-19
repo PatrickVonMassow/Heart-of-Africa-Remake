@@ -2860,6 +2860,7 @@ describe('board cards keep the German description and drop the title from the st
   const POINT = 1390
   const SUBJECT = 'Board-Karten: kurzer Titel plus Beschreibung'
   const GERMAN = 'Kartentitel kurz halten (Längengrenze); die Beschreibung sagt, was der Punkt liefert.'
+  const CARD_TEXT = 'Auf der Karte selbst nachgeschärft: kurzer Titel, Beschreibung darunter.'
   const TASKS_TEXT = `- [x] ${POINT}. Board card titles stay short\n  Final state: Scripts/board-queue.mjs refuses a board card title longer than 80.\n`
   const queueData = { points: { [POINT]: { title: SUBJECT, body: [GERMAN] } } }
   const describedQueueCard = (description) =>
@@ -2879,13 +2880,27 @@ describe('board cards keep the German description and drop the title from the st
     return { queued, now, done, closing }
   }
 
-  it('shows the same German description on the queue, now, Erledigt and closing card', () => {
-    const { queued, now, done, closing } = walk(describedQueueCard(GERMAN), { queueData, tasksText: TASKS_TEXT })
-    expect(descriptionOf(queueCard(queued, POINT))).toBe(GERMAN)
-    expect(descriptionOf(nowCard(now, POINT))).toBe(GERMAN)
-    expect(descriptionOf(doneCard(done, POINT))).toBe(GERMAN)
+  it('keeps the card description on the queue, now, Erledigt and closing card, ahead of the queue data', () => {
+    const { queued, now, done, closing } = walk(describedQueueCard(CARD_TEXT), { queueData, tasksText: TASKS_TEXT })
+    expect(descriptionOf(queueCard(queued, POINT))).toBe(CARD_TEXT)
+    expect(descriptionOf(nowCard(now, POINT))).toBe(CARD_TEXT)
+    expect(descriptionOf(doneCard(done, POINT))).toBe(CARD_TEXT)
+    expect(descriptionOf(closingCard(closing))).toBe(CARD_TEXT)
+    const rearchived = closeCard(closing, POINT, { text: 'Abgeschlossen.', end: '11:30', none: 'Übergabe — der Nachfolger nimmt Punkt 1391.', queueData })
+    expect(descriptionOf(doneCard(rearchived, POINT))).toBe(CARD_TEXT)
+    for (const html of [now, done, closing, rearchived]) {
+      expect(html).not.toContain(GERMAN)
+      expect(html).not.toContain('refuses a board card title')
+    }
+  })
+
+  it('never takes an archived card\'s status as the closing description', () => {
+    const legacyDone =
+      `<details>\n  <summary><span class="num">${POINT}</span><span class="t">${SUBJECT}</span>` +
+      '<span class="right"><span class="meta">09:00 · 10:00</span></span></summary>\n' +
+      '  <div class="body">\n    <p>Alter Abschlussstand im Archiv.</p>\n  </div>\n</details>\n'
+    const closing = toClosingWork(fullBoard({ done: legacyDone }), POINT, { reason: 'Retrospektive fehlt.', stamp: '11:05', queueData })
     expect(descriptionOf(closingCard(closing))).toBe(GERMAN)
-    expect(closing).not.toContain('refuses a board card title')
   })
 
   it('takes the German queue data when the card itself has none', () => {
@@ -2950,6 +2965,17 @@ describe('board cards keep the German description and drop the title from the st
       expect(doneCard(html, POINT)).not.toContain(CLOSING_STAGE)
     }
     expect(descriptionOf(doneCard(rearchived, POINT))).toBe(GERMAN)
+  })
+
+  it('strips every closing-stage variant the publish gate recognises', () => {
+    for (const variant of [`${SUBJECT} — ${CLOSING_STAGE}`, `${SUBJECT}: abschlussarbeiten`, `${SUBJECT} – ABSCHLUSSARBEITEN`]) {
+      expect(closingCardTitle(variant)).toBe(`${SUBJECT}: ${CLOSING_STAGE}`)
+      const leaked = fullBoard({ done: describedQueueCard(GERMAN).replace(`<span class="t">${SUBJECT}</span>`, `<span class="t">${variant}</span>`) })
+      expect(titleIn(doneCard(cleanDoneTitles(leaked), POINT))).toBe(SUBJECT)
+      const closing = toClosingWork(fullBoard({}), POINT, { subject: variant, reason: 'Retrospektive fehlt.', stamp: '11:05' })
+      const archived = toDone(closing, POINT, { text: 'Fertig.', end: '11:30' })
+      expect(titleIn(doneCard(archived, POINT))).toBe(SUBJECT)
+    }
   })
 
   it('cleans an Erledigt title that already carries the stage label on the next edit', () => {

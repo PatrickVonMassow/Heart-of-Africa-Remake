@@ -1736,11 +1736,15 @@ export const CLOSING_STAGE = 'Abschlussarbeiten'
 /** The pre-655 closing title, still recognised so an older board stays readable. */
 export const CLOSING_WORK_TITLE = 'Abschlussarbeiten zum gerade beendeten Punkt'
 
-/** A subject with a `: Abschlussarbeiten` tail removed — composing twice must not stack. */
-const stripClosingStage = (text) =>
-  String(text ?? '')
-    .replace(new RegExp(`\\s*:\\s*${CLOSING_STAGE}\\s*$`), '')
-    .trim()
+/**
+ * The closing-stage tail ("<Betreff>: Abschlussarbeiten", "— abschlussarbeiten"):
+ * ONE grammar for detecting and removing it, so nothing the publish gate reads
+ * as a closing title survives the strip.
+ */
+const closingSuffixRe = () => new RegExp(`\\s*[:—–]\\s*${CLOSING_STAGE}\\s*$`, 'i')
+
+/** A subject with its closing-stage tail removed — composing twice must not stack. */
+const stripClosingStage = (text) => String(text ?? '').trim().replace(closingSuffixRe(), '').trim()
 
 /**
  * Is this title the shape the CLOSING card composes — "<Betreff>: <Stage>"?
@@ -1751,7 +1755,7 @@ const stripClosingStage = (text) =>
  * Vorbereitung" is an ordinary title with a real subject.
  */
 export function looksLikeClosingTitle(title) {
-  return new RegExp(`[:—–]\\s*${CLOSING_STAGE}\\s*$`, 'i').test(String(title ?? '').trim())
+  return closingSuffixRe().test(String(title ?? '').trim())
 }
 
 /** "<Betreff>: Abschlussarbeiten" — what `board.mjs closing <N>` composes. */
@@ -2321,7 +2325,15 @@ function closingDescription(html, point, queueData) {
   } catch {
     /* no current-work section — nothing to carry from it */
   }
-  const queued = queueCard(html, point)
+  // Scoped to the Warteschlange: the whole-document match would also find an
+  // Erledigt card and hand its status on as a description.
+  let queued = null
+  try {
+    const { from, end } = sectionBounds(html, 'queue')
+    queued = queueCard(html.slice(from, end), point)
+  } catch {
+    /* no queue section — nothing to carry from it */
+  }
   return (
     [...doneCards(html, point), now].map(descriptionOf).find(Boolean) ||
     (queued ? queueDescription(queued) : '') ||
