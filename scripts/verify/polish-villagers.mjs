@@ -5555,12 +5555,47 @@ if (section('figure-micro')) {
     await page.evaluate(() => {
       for (const o of window.__travellerShadow) o.castShadow = true
       delete window.__travellerShadow
+      // THE POSE IS FROZEN for the shimmer frames: standing, he still plays
+      // his idle clip, which moved his joints ~1 px between captures
+      // (measured 0.89-1.15 px) — motion, not shimmer, and on a textured
+      // surface it read as a rising 3-10 % "shimmer". A frozen page clock
+      // makes every frame's dt 0, so nothing animates, while the TRAA jitter
+      // still runs per rendered frame (the ground keeps changing 0.2-0.3 %).
+      const realNow = performance.now.bind(performance)
+      const t0 = realNow()
+      window.__realNow1380 = realNow
+      performance.now = () => t0
     })
-    await nextFrames(30)
     const frames = []
-    for (let i = 0; i < 4; i++) {
-      frames.push(await capturePixels(page, 'traveller shimmer frame diff', { clip }))
-      await nextFrames(6)
+    let boneMovePx = []
+    try {
+      await nextFrames(30) // TRAA history converges on the frozen pose, shadow back on
+      const joints = () =>
+        page.evaluate(() => {
+          const r = window.__travellerRoot
+          r.updateWorldMatrix(true, true)
+          const V = r.position.constructor
+          const pts = []
+          r.traverse((o) => {
+            if (!o.isBone) return
+            const v = o.getWorldPosition(new V())
+            const n = window.__camera.ndc(v.x, v.z, v.y)
+            pts.push([((n.x + 1) / 2) * window.innerWidth, ((1 - n.y) / 2) * window.innerHeight])
+          })
+          return pts
+        })
+      const at = []
+      for (let i = 0; i < 4; i++) {
+        at.push(await joints())
+        frames.push(await capturePixels(page, 'traveller shimmer frame diff', { clip }))
+        await nextFrames(6)
+      }
+      boneMovePx = at.slice(1).map((p, k) => +Math.max(0, ...p.map((q, j) => Math.hypot(q[0] - at[k][j][0], q[1] - at[k][j][1]))).toFixed(3))
+    } finally {
+      await page.evaluate(() => {
+        performance.now = window.__realNow1380
+        delete window.__realNow1380
+      })
     }
     const raws = await Promise.all(frames.map(grey))
     const mask = new Uint8Array(without.length)
@@ -5637,8 +5672,15 @@ if (section('figure-micro')) {
     )
     check(
       'figure micro-structure: the standing traveller is temporally stable under TRAA (no shimmer on his visible pixels)',
-      visible >= minVisible && inner >= 20 && maxFrac < 0.05,
+      // Measured with the pose frozen (19.10.2026, ~200 interior pixels, so
+      // one pixel ≈ 0.5 %): WebGPU micro ON [0, 0.51, 0.51] / [1.01, 1.01,
+      // 0.51] %, the micro-OFF control (FIGURE_MICRO bump and albedo 0)
+      // [0.5, 1.51, 1.01] % — the baked maps add no shimmer; WebGL 2 micro ON
+      // [1.97, 2.46, 1.48] % (no WebGL 2 control). The 5 % bar stays. A joint
+      // that still moves means the frames measure motion: the check fails.
+      visible >= minVisible && inner >= 20 && boneMovePx.length === 3 && boneMovePx.every((d) => d < 0.05) && maxFrac < 0.05,
       JSON.stringify({
+        boneMovePx,
         visiblePixels: visible,
         interiorPixels: inner,
         maxChangedInterior: +(maxFrac * 100).toFixed(2) + ' %',
