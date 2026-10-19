@@ -41,6 +41,7 @@ import {
   type TagWorld,
 } from './tagGame'
 import { mulberry32 } from '../../world/noise'
+import { VILLAGER_MOTION } from '../../config/balance'
 
 const CFG: TagConfig = balance.villageLife.tag
 const CH = VILLAGER_POSE.tagChaser
@@ -219,6 +220,12 @@ describe('the port-city tag chaser on the glTF body (natural-villager-motion ste
     for (let k = 1; k < missed.length; k++) {
       for (const s of ['left', 'right'] as const) expect(armStep(missed[k - 1].body[s], missed[k].body[s])).toBeLessThan(0.2)
     }
+  })
+
+  it('a child at the full run strides: its sprint is no placement to the walk', () => {
+    // the drawn walk measures speed in person units; above teleportSpeed it
+    // reads a jump and freezes the legs
+    expect((CFG.sprintSpeed * CFG.runnerBoost) / SCALE).toBeLessThan(VILLAGER_MOTION.teleportSpeed)
   })
 
   it('the primitive figure keeps its own chaser pose (the low preset untouched)', () => {

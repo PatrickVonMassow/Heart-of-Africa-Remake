@@ -445,6 +445,9 @@ describe('the runtime-pose exporter', () => {
     }
     const before = by('caught').frames.find((f) => f.t < 0.4)!
     expect(face(before.world[bone('head')]).y).toBeGreaterThan(-Math.sin(0.15))
+    // the chaser strides at its sprint (its legs froze above the old teleport speed)
+    const feet = by('chaser').frames.map((fr) => at(fr.world[bone('foot.L')]).z - fr.root.p[2])
+    expect(Math.max(...feet) - Math.min(...feet)).toBeGreaterThan(0.05)
     // (where the bearing turns slowly: the gaze is damped, 0.18 s)
     for (const fr of by('chaser').frames.filter((x) => x.t >= 1 && x.t <= 1.8)) {
       const head = at(fr.world[bone('head')])

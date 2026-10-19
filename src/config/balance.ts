@@ -2548,8 +2548,12 @@ export const VILLAGER_MOTION = {
   moveSpeed: 0.08,
   /** Time constant (s) of the measured ground speed's smoothing. */
   speedSmoothing: 0.12,
-  /** A ground speed above this is a placement, not a walk (no stride). */
-  teleportSpeed: 6,
+  /** A ground speed above this is a placement, not a walk (no stride), in
+   *  person units per second: a tag child's sprint (3.4 m/s, a runner's
+   *  boosted 3.8, at child scale 0.55) is 6.2–6.9 and must stride — at 6 its
+   *  legs froze at full run. A placement is a jump of a body width or more in
+   *  one frame (18+ at 60 Hz). Calibratable. */
+  teleportSpeed: 10,
   /** How fast the walk fades in and out (weight per second, 0 ↔ 1). */
   walkFadeRate: 5,
   /** Swing foot's lift at mid-swing, as a fraction of the leg length. */
