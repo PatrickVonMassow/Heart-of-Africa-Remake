@@ -5678,9 +5678,19 @@ if (section('figure-micro')) {
       // [0.5, 1.51, 1.01] % — the baked maps add no shimmer; WebGL 2 micro ON
       // [1.97, 2.46, 1.48] % (no WebGL 2 control). The 5 % bar stays. A joint
       // that still moves means the frames measure motion: the check fails.
-      visible >= minVisible && inner >= 20 && boneMovePx.length === 3 && boneMovePx.every((d) => d < 0.05) && maxFrac < 0.05,
+      // A capture that does not match the mask is skipped above, so every
+      // pair must have been compared or nothing was measured.
+      visible >= minVisible &&
+        inner >= 20 &&
+        boneMovePx.length === 3 &&
+        boneMovePx.every((d) => d < 0.05) &&
+        pairs.length === 3 &&
+        pairs.length === raws.length - 1 &&
+        maxFrac < 0.05,
       JSON.stringify({
         boneMovePx,
+        comparedPairs: pairs.length,
+        captures: raws.map((r) => r.length),
         visiblePixels: visible,
         interiorPixels: inner,
         maxChangedInterior: +(maxFrac * 100).toFixed(2) + ' %',
