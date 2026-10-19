@@ -455,6 +455,13 @@ b, all of c, any re-cut after step 5 — the full-ramp test is the gate.
   distance (2 m, the window the grab is due in — there is no `grabWindow`); the
   pre-aim is drawn only and `grabDue` is unchanged, so it never delays a catch
   (`tagBodyPose.test.ts`).
+- *Decided (point 1343):* step 15's catch alignment is split. Point 1343 aims the
+  reach at the actual target at the catch frame (the grab names the world point on
+  the quarry's surface; hand readback kept); the drawn hand actually touching the
+  quarry at the 0.45 m catch ring is point 1340's acceptance, not 1343's.
+- *Carried (point 1343):* step 16's softened knee and weight shift is not built
+  (it needs a per-leg pose on the standing legs); it moves to point 1383 with the
+  `caughtSlump` calibration, and §4's asymmetry decision stands until then.
 - `OPEN:` per-foot terrain height (backlog) if a slope defect is measured in a village
   picture during sub-point c.
 
