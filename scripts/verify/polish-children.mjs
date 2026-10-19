@@ -526,7 +526,7 @@ if (section('tag-catch')) {
       const all = [first]
       for (let k = 1; k < 7; k++) {
         await nextFrames(3)
-        const r = await readArms(want, first.index)
+        const r = await readArmsNow(want, first)
         if (!r || r.side !== first.side) return null
         all.push(r)
       }
@@ -558,7 +558,7 @@ if (section('tag-catch')) {
     const other = side === 'left' ? 'right' : 'left'
     check(
       "inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging",
-      !!near && minZ(near, side) > 0.15 && sweep(near, side) < 0.5 * sweep(near, other),
+      !!near && minZ(near, side) > 0.15 && sweep(near, other) > 0.12 && sweep(near, side) < 0.5 * sweep(near, other),
       near ? `readied ${fmt(near, side)}; free ${fmt(near, other)} from ${near[0].gap.toFixed(2)} m` : 'no chasing stride inside the prepare window',
     )
 
