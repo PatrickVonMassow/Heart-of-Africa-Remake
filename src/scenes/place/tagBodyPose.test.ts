@@ -264,10 +264,18 @@ describe('the caught child on the glTF body (natural-villager-motion step 16)', 
     const s = pair(CFG.catchDistance * 0.5)
     const w = newTagBodyWeights()
     const dt = 1 / 60
+    // the quarry at the sprint's lean (above the chaser's cap): the frame
+    // BEFORE the catch is the first compared, so the boundary is covered
+    const caught = s.target
+    s.children[caught].lean = CFG.leanAtSprint
+    expect(CFG.leanAtSprint).toBeGreaterThan(CH.leanMax + 0.05)
+    const runner = tagFigurePose(tagBody(s, caught), { ...REST_POSE }, 0, s.children[caught].lean, 0, CFG, { weights: w, aim: null, bearing: quarryBearing(s, caught) })
+    expect(tagBody(s, caught)).toBe('runner')
     stepTagGame(s, 1e-6, CFG, OPEN)
-    const caught = s.chaser
+    expect(s.chaser).toBe(caught)
     expect(tagBody(s, caught)).toBe('caught')
-    let prev: FigurePose | null = null
+    // what the glTF body draws: the pose's own body, else the pose itself
+    let prev: FigurePose | null = runner.body ?? runner
     let held = false
     let resumed = false
     for (let t = 0; t < CFG.caughtPauseSeconds + 1.5; t += dt) {
@@ -276,10 +284,15 @@ describe('the caught child on the glTF body (natural-villager-motion step 16)', 
       w.slump = easeWeight(w.slump, body === 'caught', SL.settleSeconds, dt)
       const pose = tagFigurePose(body, { ...REST_POSE }, 0, s.children[caught].lean, 0, CFG, { weights: w, aim: null, bearing: quarryBearing(s, caught) })
       const b = pose.body!
-      expect(trunkPitch(b.lean)).toBeLessThanOrEqual(0.15)
+      // eased out of the run's own lean, never past it; the hold itself stays
+      // over the spine alone
+      expect(b.lean).toBeLessThanOrEqual(CFG.leanAtSprint + 1e-9)
+      if (w.slump === 1) expect(trunkPitch(b.lean)).toBeLessThanOrEqual(0.15)
       expect(Object.keys(b)).not.toContain('squash')
       if (prev) {
-        expect(Math.abs(b.lean - prev.lean)).toBeLessThan(0.02)
+        // the brake's own ease out of the sprint lean (0.28) under the slump:
+        // ~0.02 rad a frame at most; the old snap to the chaser's cap was 0.16
+        expect(Math.abs(b.lean - prev.lean)).toBeLessThan(0.025)
         expect(Math.abs((b.gaze?.pitch ?? 0) - (prev.gaze?.pitch ?? 0))).toBeLessThan(0.06)
         expect(Math.abs((b.shoulders?.left.protraction ?? 0) - (prev.shoulders?.left.protraction ?? 0))).toBeLessThan(0.05)
       }

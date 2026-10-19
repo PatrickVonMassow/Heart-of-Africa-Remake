@@ -1747,9 +1747,10 @@ export function tagFigurePose(
   if (!drawn) return pose
   // THE glTF BODY'S OWN (steps 15/16): a reaching child (the chaser, or the
   // catcher on its catch frame) through `reachBodyPose`, eased into and out of
-  // the caught hold by the slump weight.
+  // the caught hold by the slump weight. The freshly caught child blends from
+  // the runner it was a frame ago, its run lean uncapped, never from a reach.
   const w = drawn.weights
-  const reaching = body !== 'runner' || !!drawn.aim || w.prepare > 0
+  const reaching = body === 'chaser' || !!drawn.aim || w.prepare > 0
   const side: ArmSide = drawn.aim?.side ?? w.side ?? (drawn.bearing >= 0 ? 'left' : 'right')
   const grab = Math.min(envelope, smooth01(w.reach))
   const under = reaching
