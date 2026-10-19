@@ -520,8 +520,14 @@ if (section('tag-catch')) {
     const hand = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right'))
     // ONE page-side RAF loop waits for the first frame in the window and then
     // records every following frame, so no frame falls into a handoff between
-    // separate page calls.
+    // separate page calls. The acquisition keeps its own bound outside the page
+    // too: a page whose frames stall never reaches the in-page deadline.
     const readSeries = (want) =>
+      Promise.race([
+        readSeriesInPage(want),
+        new Promise((done) => setTimeout(() => done(null), 75000).unref()),
+      ])
+    const readSeriesInPage = (want) =>
       page
         .evaluate(
           ({ want, span, src }) =>
