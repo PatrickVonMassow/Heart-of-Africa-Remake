@@ -92,6 +92,13 @@ put it is the mistake this line exists to stop.
   Verifiable: polish-children --section=tag-catch green on both backends on 3 consecutive runs for that check; port-city picture judged by looking.
   Bundle: Dorfleben.
   Criticality: medium - the port-city chaser's arms, both backends.
+- [ ] 1385. Cairo children frame aimed before the walking child moves out on WebGL 2
+  Queue position: directly after point 1384.
+  Source: docs/backlog.md (picture check of 1129, 02.10.2026), recurred 19.10.2026 on the full WebGL 2 polish-children run at feat/1343 4b9870e65 (local/verify-logs/2026-10-19T08-17-42-344-polish-children.log): "frame 690-cairo-children — its subject is not in the rendered picture: off the bottom edge of the frame". The aim is taken before the shot while the child keeps walking; test-frame aim only, no player impact, but it holds every covering polish-children run red.
+  Final state: the 690-cairo-children frame holds its child inside the picture at the shutter on both backends.
+  Verifiable: polish-children --section=children-motion green for that frame on both backends; frame judged by looking.
+  Bundle: Dorfleben.
+  Criticality: low - a test frame's aim; blocks the suite's covering run.
 - [ ] 1345. Child tag chaser at sprint speed squats without a stride (teleport threshold in figure units)
   Queue position: with the tag poses of point 1343 (Dorfleben); may land before it on its own.
   Source: findings carrier 12.10.2026 05:58, measured on feat/1316-natural-villager-motion (runtime sheets runtime-chaser-*.png, hips height per frame from the export): at 3.4 u/s the child chaser's hips sit at 0.50 of standing height in every frame with no stride; the same subject at 3.2 u/s (5.8 < 6) runs normally (hips 0.96-1.07, feet alternating +-0.4). Player impact: every child chaser of the port-city tag game at full sprint is drawn squatting and sliding. Related: the river-bank caught child (hips 0.52) and the point gesture's release frame (hips 0.50 at 2.11 s) reach the same CROUCH_MAX fallback.

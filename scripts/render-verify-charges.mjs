@@ -65,6 +65,27 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1384,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging/i,
+    why: 'Filed 19.10.2026 by point 1343\'s author: fails on a continuous chase on both backends, the pre-1343 game code alike. Point 1384 owns the cause; the charge dies with it.',
+  },
+  {
+    point: 1344,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /and the hand is on the stone in the very frame the word falls/i,
+    why: 'Recurred 19.10.2026 on full polish-children runs at feat/1343 4b9870e65, both backends, beside the whole-hold tap check of the same bank tap that point 1344 owns. The charge dies with it.',
+  },
+  {
+    point: 1385,
+    suite: 'polish-children',
+    kind: 'check',
+    match: /^frame 690-cairo-children/i,
+    why: 'Backlog since 02.10.2026, recurred 19.10.2026 on the full WebGL 2 run at feat/1343 4b9870e65: the aim precedes the walking child. Point 1385 owns it; the charge dies with it.',
+  },
+  {
     point: 1344,
     suite: 'polish-children',
     kind: 'check',
