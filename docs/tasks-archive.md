@@ -34343,3 +34343,12 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   - Playwright picture (both backends, isBackendSensitivePath applies): close first-person view of a villager in a village showing visible cloth and skin structure; a two-frame walk-cycle comparison showing the structure moves WITH the body (no swimming); the top-down travel view of the traveller without shimmer.
   Rendering change: update docs/peoples-1890.md §8 implementation section as well.
   Bundle: Dorfleben.
+
+- [x] 1343. Natural villager motion c: port-city tag chaser, river-bank caught child
+  Amended 19.10.2026 at the split into point 1383: this point now delivers concept steps 15 and 16 only (final states 7 and 8, and final state 5 for the chaser and caught child); steps 12, 14, 17-19 and step 20's remaining evidence are point 1383's.
+  Queue position: directly after point 1354 (every step here is judged on its composed body).
+  Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 12, 14-19 and step 20's remaining evidence, as approved by the GPT-6 Astra final check at b231b21.
+  Final state: point 1316's final states 5 (walk, turn on the spot and in motion, run, dig, pick up, point, carry, reach read natural; blended transitions, no snaps, no foot sliding), 7 (port-city tag chaser) and 8 (river-bank tag caught child), as the concept's steps specify them; the concept's §7 open items decided or filed.
+  Verifiable: each step's *Verified* list in the concept; penetration gate and the full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point, chaser and caught child; Playwright picture check in a port city and at a river bank on both backends, judged by looking; cross-vendor code review record.
+  Criticality: high - every villager, both backends.
+  Bundle: Dorfleben.
