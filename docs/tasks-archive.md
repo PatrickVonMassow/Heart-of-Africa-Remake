@@ -34376,3 +34376,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: unit tests for board-queue: an over-long title is refused, a body-less card blocks publishing, a short title with a body passes; no card in .claude/board-queue.json violates either rule after the change.
   Bundle: Chat & Tafel.
   Criticality: low — board readability for the user; changes an existing check, no new mechanism (CLAUDE.md §2 freeze: simplification of an existing rule).
+
+- [x] 1391. The F6 bug report releases the pointer lock when it opens
+  Queue position: front of the work order (user order 19.10.2026: "Dieser Bug und der mit dem Debug-Report sollen am Anfang der Queue stehen.").
+  Source: findings carrier 19.10.2026 19:10 (non-owner session), reproducible from code: StateDump.tsx does not call releasePointerLock on open, unlike the place dialogs (PlaceScene.tsx:2882). In the place view with the lock held, the browser swallows Esc and the report stays open; without the lock (after a native Esc, or on the world map) Esc reaches the text field (StateDump.tsx:162), closes the report and discards the typed text. The request-approval-guard remark in the same finding is point 1373.
+  Final state: opening the F6 report releases the pointer lock; Esc inside its text field never discards typed text without the player's intent (the close behaviour itself follows the existing place dialogs).
+  Verifiable: Vitest (jsdom) on StateDump: opening calls releasePointerLock; Esc in the text field keeps the typed text.
+  Bundle: Steuerung & Performance.
+  Criticality: medium — player-visible loss of a typed bug report.
