@@ -77,6 +77,29 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1394. Board cards keep the German description and drop the title from the status
+  Queue position: FRONT of the open work order (user order 19.10.2026 22:52, verbatim: "okay, das als erstes in der Queue einreihen"). Record it with queue-rank --ahead <N> --origin user.
+  Source: findings carrier request (user report 19.10.2026 22:47/22:49, approved "okay, das als erstes in der Queue einreihen"); with the addendum of 19.10.2026 22:59 (approved "ja") folded in.
+  SUPERSEDES the pending request "Closing-work board card keeps the point's description instead of showing only a status" (deposited 19.10.2026 20:19). That request's final state is folded in below, with its English fallback replaced. Do not append it separately.
+  Observed problem (measured 19.10.2026 22:50 on .batch-dashboard.html:4711-4717, card 1390):
+  - The description section is the English TASKS.md "Final state" sentence ("Scripts/board-queue.mjs refuses a board card title longer than ..."), although the German card body ("Kartentitel kurz halten (Längengrenze) ...") stands in .claude/board-queue.json since 17:25. Source: the pointDescription fallback (scripts/board-core.mjs:156) used by promoteToNow (~623) and toDone (~1539).
+  - The closing card shows only a status, no description section: toClosingWork writes through writeStateCard (scripts/board-core.mjs:2333-2353), which renders renderCardBody instead of renderCardSections.
+  - The status repeats the card title: toClosingWork composes "<subject> — dieser Punkt ist zusammengeführt ..." (scripts/board-core.mjs:2313), and batch sessions write now/status texts that begin with the card title.
+  - (Addendum, measured 19.10.2026 22:58 on .batch-dashboard.html:4711) the Erledigt card of 1390 is titled "Board-Karten: kurzer Titel plus Beschreibung: Abschlussarbeiten" — the closing card's stage label leaked into the archived card's title, so the Erledigt card and the closing card under "Woran ich gerade arbeite" look like one card listed twice.
+  Final state:
+  1. A card's description comes, in this order, from the card itself (queue, now or Erledigt card), then from the point's German queue text in .claude/board-queue.json, else the visible placeholder "Beschreibung fehlt". The English work-order text (pointDescription) is no longer used as a card description anywhere (promoteToNow, toDone, toClosingWork, migrateCardDescriptions).
+  2. The closing card is rendered with renderCardSections: description section on top, status below.
+  3. The closing status no longer starts with the subject: "Zusammengeführt und abgehakt; die Abschlussarbeiten stehen noch aus." followed by the owed duties.
+  4. board.mjs now/status strips a leading repetition of the card title (followed by a dash, colon or similar separator) from the status text when writing it. Nothing is refused (no new guard).
+  5. The idle card ("nichts läuft gerade", no point) keeps its current shape.
+  6. Vitest: a card with a German queue description goes queue -> now -> done -> closing and shows that same description on every step; a card with no German text shows "Beschreibung fehlt", never the TASKS.md text; the closing status does not begin with the subject; a status starting with the card title is stored without it.
+  - An Erledigt card's title is the point's subject alone; the closing stage label ("Abschlussarbeiten") appears only on the closing card. The path that writes or rewrites the Erledigt title strips it (stripClosingStage), and an Erledigt title that already carries it is cleaned on the next board edit.
+  - Vitest: queue -> now -> done -> closing -> point boundary; the Erledigt title never carries the stage label at any step.
+  7. Build, lint and unit suite green.
+  Verifiable: items 6, the addendum's Vitest and 7.
+  Bundle: Modell & Wächter.
+  Criticality: medium — the board the user reads loses or misstates every point's description.
+
 - [ ] 1392. Steadying hand holds a head load with the palm
   Queue position: front of the work order, directly after point 1391 (user order 19.10.2026: "Dieser Bug und der mit dem Debug-Report sollen am Anfang der Queue stehen.").
   Source: user report 19.10.2026 (findings carrier request "Stützhand hält die Kopflast mit der Handfläche"): villagers carrying a jar on the head hold it with the back of the hand instead of the palm, which looks unnatural.
@@ -124,6 +147,11 @@ put it is the mistake this line exists to stop.
   Queue position: directly BEFORE point 1347 in work-order order (user order 19.10.2026).
   Source: user order 19.10.2026 21:44: for OpenAI, GPT-6.1 (gpt-6.1-sol) replaces Astra from now on; the CLAUDE.md note that Astra authors the difficult HIGH points is outdated and must be removed. Live routing (astra-share default since 26.09.) already sends authoring to Claude, so the policy text contradicts practice.
   Execution: four eyes (CLAUDE.md 6): divergent design work blind-parallel from identical inputs, merged by a third model via scripts/blind-merge.mjs; the code is then reviewed cross-vendor, never by its author.
+  Amendment (user order 19.10.2026, approved "ok. freigegeben"; folded in from the findings carrier, supersedes the carrier finding "Global Codex CLI must go from 0.153.0 to 0.163.0 before gpt-6.1-sol works") — order of work:
+  1. FIRST STEP: update the global Codex CLI installation from 0.153.0 to 0.163.0 or newer (npm install -g). Only the batch owner can run this; the main write guard refuses npm install -g for non-owner sessions.
+  2. THEN prove that gpt-6.1-sol answers with the GLOBAL installation (a minimal probe prompt answered OK). If it does not answer, stop and report; do not start the rebuild.
+  3. ONLY THEN the rebuild of 1393 with four-eyes review across two vendors (CLAUDE.md 6), as the spec of 1393 describes.
+  Background measured 19.10.2026 22:07: codex 0.163.0 via npx with ChatGPT login: gpt-6.1-sol answered OK. codex 0.153.0 (the global install): 400 "not supported".
   Goal: switching a model is a one-line data change. No file name, script name or constant name carries a vendor or model name; only data does.
   Final state:
   - scripts/model-lanes.mjs is the ONLY place naming concrete models. Each lane is a record: role, vendor, display name, model id, retired names, runtime (claude/codex), scarce flag. Guards, trailer checks, review chain, routing and tests read lanes only from it.
