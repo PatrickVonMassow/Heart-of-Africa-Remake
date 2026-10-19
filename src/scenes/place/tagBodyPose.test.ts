@@ -33,6 +33,7 @@ import {
   newTagBodyWeights,
   prepareDue,
   quarryBearing,
+  readySeconds,
   stepTagGame,
   steerGrab,
   tagBody,
@@ -43,7 +44,7 @@ import {
   type TagWorld,
 } from './tagGame'
 import { mulberry32 } from '../../world/noise'
-import { VILLAGER_MOTION } from '../../config/balance'
+import { VILLAGER_GLTF, VILLAGER_MOTION } from '../../config/balance'
 
 const CFG: TagConfig = balance.villageLife.tag
 const CH = VILLAGER_POSE.tagChaser
@@ -117,7 +118,7 @@ function chase(quarryAt: (t: number) => { x: number; z: number }, seconds: numbe
       side = null
       bodyAim = null
     }
-    w.prepare = easeWeight(w.prepare, prepareDue(s, CFG), CH.prepareSeconds, dt)
+    w.prepare = easeWeight(w.prepare, prepareDue(s, CFG), readySeconds(), dt)
     w.reach = easeWeight(w.reach, !!bodyAim, CH.prepareSeconds, dt)
     easeHandover(w, dt)
     const bearing = quarryBearing(s, 0)
@@ -183,6 +184,38 @@ describe('the port-city tag chaser on the glTF body (natural-villager-motion ste
     expect(grabDue(s, CFG)).toBe(false)
     const t = pair(CFG.commitDistance - 0.1)
     expect(grabDue(t, CFG)).toBe(true)
+  })
+
+  it('the readied arm is held ahead of the body while the quarry circles it, never swept round with the gaze', () => {
+    // the quarry runs half round the chaser at 2.7 m — inside the prepare
+    // distance, outside the commit distance — from its left to its right
+    const R = 2.7
+    const circled = chase((t) => {
+      const a = 1.4 - 2.8 * Math.min(1, t / 1.5)
+      return { x: R * Math.sin(a), z: CFG.sprintSpeed * (t + 1 / 60) + R * Math.cos(a) }
+    }, 1.6)
+    const held = circled.filter((f) => !f.aim && f.side && f.gap > CFG.commitDistance && f.gap < CH.prepareDistance && f.t > 2 * CH.prepareSeconds)
+    expect(held.length).toBeGreaterThan(30)
+    // the bearing really swings (the head follows it), so a turned arm would show
+    expect(Math.max(...held.map((f) => f.bearing)) - Math.min(...held.map((f) => f.bearing))).toBeGreaterThan(1.5)
+    for (const f of held) {
+      const sign = f.side === 'left' ? 1 : -1
+      // the arm's yaw in the body's own frame: the pivot's plus the pose turn it hangs under
+      const yaw = wrap(f.body[f.side!].yaw + f.body.turn)
+      expect(yaw, `t=${f.t.toFixed(2)}`).toBeCloseTo(sign * 0.1, 6)
+      expect(f.body[f.side!].pitch).toBeCloseTo(-(Math.PI / 2 + CH.prepareElevation), 6)
+    }
+  })
+
+  it('the readied arm is taken from the clip on its first frame and is fully up only once the clip has let go', () => {
+    // a skinned body takes an arm whose pose names a reach; the clip hands it
+    // over in VILLAGER_GLTF.transitionSeconds, which the readied ease never beats
+    expect(readySeconds()).toBeGreaterThanOrEqual(VILLAGER_GLTF.transitionSeconds)
+    expect(readySeconds()).toBeGreaterThanOrEqual(CH.prepareSeconds)
+    const first = caught.find((f) => f.side && !f.aim)!
+    expect(first.body.reach?.[first.side!]).toBeDefined()
+    const free = caught.find((f) => !f.side)!
+    expect(free.body.reach).toBeUndefined()
   })
 
   it('blends, never snaps: the reaching arm moves a bounded amount per frame', () => {

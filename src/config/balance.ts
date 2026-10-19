@@ -2908,7 +2908,9 @@ export const VILLAGER_POSE = {
   // distance, so the pre-aim never delays a grab) one arm blends into a
   // bent-elbow preparation — aimed `prepareElevation` (rad, below the
   // horizontal), its hand at `prepareReach` of the straight arm, the
-  // clavicle forward `prepareProtraction` — over `prepareSeconds`; the grab
+  // clavicle forward `prepareProtraction` — over `prepareSeconds` (never
+  // faster than `VILLAGER_GLTF.transitionSeconds`, the clip's arm hand-over:
+  // `readySeconds` in tagGame.ts); the grab
   // then reaches `reachElevation` off the horizontal at shoulder height
   // with the clavicle forward `reachProtraction` (rad), the hand solved onto
   // the quarry's surface up to `reachMax` of the straight arm.
