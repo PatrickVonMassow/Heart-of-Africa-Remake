@@ -78,10 +78,12 @@ import {
   absorbSeparation,
   chaserGaze,
   createTagGame,
+  easeHandover,
   easeWeight,
   grabAim,
   grabDue,
   handGapToBody,
+  handOverArm,
   newTagBodyWeights,
   prepareDue,
   quarryBearing,
@@ -1184,7 +1186,7 @@ function Kids({
             { elevation: VILLAGER_POSE.tagChaser.reachElevation, reachMax: VILLAGER_POSE.tagChaser.reachMax },
           )
           bodyAims.current[i] = level
-          weights.side = level.side
+          handOverArm(weights, level.side, pose.body)
           gesture.current = steerGrab(gesture.current, aim)
           if (i !== game.chaser) gesture.current = steerGrab(gesture.current, null)
         } else {
@@ -1201,6 +1203,7 @@ function Kids({
         weights.prepare = easeWeight(weights.prepare, i === game.chaser && prepareDue(game, tagCfg), VILLAGER_POSE.tagChaser.prepareSeconds, dt)
         weights.reach = easeWeight(weights.reach, !!bodyAims.current[i], VILLAGER_POSE.tagChaser.prepareSeconds, dt)
         weights.slump = easeWeight(weights.slump, tagBody(game, i) === 'caught', VILLAGER_POSE.caughtSlump.settleSeconds, dt)
+        easeHandover(weights, dt)
         const bearing = quarry
           ? Math.atan2(Math.sin(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing), Math.cos(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing))
           : quarryBearing(game, i)

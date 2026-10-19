@@ -22,11 +22,13 @@ import {
   bankFigurePose,
   caughtBodyPose,
   createTagGame,
+  easeHandover,
   easeWeight,
   grabAim,
   grabDue,
   grabHandWorld,
   handGapToBody,
+  handOverArm,
   mixPose,
   newTagBodyWeights,
   prepareDue,
@@ -108,7 +110,7 @@ function chase(quarryAt: (t: number) => { x: number; z: number }, seconds: numbe
       const aim = grabAim({ x: c.x, z: c.z, facing: c.facing }, quarry, Math.max(lean, TOUCH_LEAN), SCALE, CFG.gazeTurnMax, side)
       side = aim.side
       bodyAim = grabAim({ x: c.x, z: c.z, facing: c.facing }, quarry, Math.min(lean, CH.leanMax), SCALE, CFG.gazeTurnMax, w.side, { elevation: CH.reachElevation, reachMax: CH.reachMax })
-      w.side = bodyAim.side
+      handOverArm(w, bodyAim.side, out.at(-1)?.body)
       gesture = steerGrab(gesture, aim)
     } else gesture = steerGrab(gesture, null)
     if (gesture.kind !== 'touch') {
@@ -117,6 +119,7 @@ function chase(quarryAt: (t: number) => { x: number; z: number }, seconds: numbe
     }
     w.prepare = easeWeight(w.prepare, prepareDue(s, CFG), CH.prepareSeconds, dt)
     w.reach = easeWeight(w.reach, !!bodyAim, CH.prepareSeconds, dt)
+    easeHandover(w, dt)
     const bearing = quarryBearing(s, 0)
     if (w.prepare <= 0 && w.reach <= 0 && !bodyAim) w.side = null
     else w.side ??= bearing >= 0 ? 'left' : 'right'
@@ -208,6 +211,23 @@ describe('the port-city tag chaser on the glTF body (natural-villager-motion ste
     // the last stride may lunge onto the quarry; the approach never does
     expect(f.body.reach!.lunge).toBe(true)
     for (const g of caught.filter((x) => x.gap > 1)) expect(g.body.reach?.lunge ?? false).toBe(false)
+  })
+
+  it('a quarry crossing to the other side hands the reach over between the arms, blended', () => {
+    // a metre ahead and sweeping from the left to the right, past the gaze
+    // limit: the reaching arm can no longer aim without crossing the chest
+    const crossed = chase((t) => ({ x: 1.4 - 2.8 * Math.min(1, t / 1.2), z: CFG.sprintSpeed * t + 1.2 }), 1.6)
+    const sides = crossed.flatMap((f) => (f.aim ? [f.aim.side] : []))
+    expect(sides[0]).toBe('left')
+    expect(sides.at(-1)).toBe('right')
+    for (let k = 1; k < crossed.length; k++) {
+      const a = crossed[k - 1]
+      const b = crossed[k]
+      for (const s of ['left', 'right'] as const) {
+        expect(armStep(a.body[s], b.body[s]), `t=${b.t.toFixed(2)} ${s}`).toBeLessThan(0.2)
+        expect(Math.abs((a.body.reach?.[s] ?? 1) - (b.body.reach?.[s] ?? 1)), `t=${b.t.toFixed(2)} ${s} reach`).toBeLessThan(0.2)
+      }
+    }
   })
 
   it('after a miss the arm recovers into the swing and the run goes on', () => {

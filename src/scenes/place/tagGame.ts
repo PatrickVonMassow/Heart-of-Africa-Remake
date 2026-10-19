@@ -1570,8 +1570,32 @@ export interface TagBodyWeights {
   reach: number
   /** The side the prepared or reaching arm is on, held while it is up. */
   side: ArmSide | null
+  /** 1 … 0 out of an arm handover: the reach changed sides (`handOverArm`)
+   *  and the body drawn the frame before (`handFrom`) blends into the new. */
+  handover: number
+  handFrom: FigurePose | null
 }
-export const newTagBodyWeights = (): TagBodyWeights => ({ slump: 0, prepare: 0, reach: 0, side: null })
+export const newTagBodyWeights = (): TagBodyWeights => ({ slump: 0, prepare: 0, reach: 0, side: null, handover: 0, handFrom: null })
+
+/**
+ * Take the reaching arm's side from a fresh grab aim. When the reach passes to
+ * the other arm (the quarry crossed past the gaze limit), the body drawn the
+ * frame before is kept, to blend out of over `prepareSeconds` (eased by
+ * `easeHandover`), so neither arm snaps.
+ */
+export function handOverArm(w: TagBodyWeights, side: ArmSide, last: FigurePose | null | undefined): void {
+  if (w.side && side !== w.side && last) {
+    w.handFrom = last
+    w.handover = 1
+  }
+  w.side = side
+}
+
+/** Ease an arm handover out (`handOverArm`). */
+export function easeHandover(w: TagBodyWeights, dt: number, c: ChaserBodyConfig = VILLAGER_POSE.tagChaser): void {
+  w.handover = easeWeight(w.handover, false, c.prepareSeconds, dt)
+  if (w.handover <= 0) w.handFrom = null
+}
 
 /** Ease a 0 … 1 weight toward `on` (1) or off (0) over `seconds`. */
 export function easeWeight(w: number, on: boolean, seconds: number, dt: number): number {
@@ -1753,9 +1777,11 @@ export function tagFigurePose(
   const reaching = body === 'chaser' || !!drawn.aim || w.prepare > 0
   const side: ArmSide = drawn.aim?.side ?? w.side ?? (drawn.bearing >= 0 ? 'left' : 'right')
   const grab = Math.min(envelope, smooth01(w.reach))
-  const under = reaching
+  let under = reaching
     ? reachBodyPose(shown, grab, drawn.aim, side, runLean, drawn.bearing, w.prepare)
     : { left: shown.left, right: shown.right, lean: Math.max(runLean, shown.lean), turn }
+  // the reach handed to the other arm: out of the body drawn before the switch
+  if (reaching && w.handFrom && w.handover > 0) under = mixPose(w.handFrom, under, smooth01(1 - w.handover))
   if (!reaching && w.slump <= 0) return pose
   return { ...pose, body: mixPose(under, caughtBodyPose(), smooth01(w.slump)) }
 }
