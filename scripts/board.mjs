@@ -238,6 +238,11 @@ function fallbackSubject(point) {
   return typeof title === 'string' && title.trim() ? title.trim() : null
 }
 
+/** `.claude/board-queue.json`, where each point's German card description is kept; null when unreadable. */
+function readQueueData() {
+  return readJson(resolve(REPO_ROOT, QUEUE_DATA_PATH))
+}
+
 /**
  * Serialize the ENTIRE board transaction, not merely its atomic replacement.
  * The launcher can redeem an answered card while an owner is working; without
@@ -425,7 +430,7 @@ try {
       (html) => {
         const now = new Date()
         const span = promoteTimes(readCardTimes(), point, { now, eta: etaFromHours(now, queueEstimateHours(html, point)) })
-        return toNow(html, point, textOf(words), { stamp: at, tasksText: readTasksAll(), span })
+        return toNow(html, point, textOf(words), { stamp: at, queueData: readQueueData(), span })
       },
       `${point} is current work since ${at} (title and estimate taken from its queue card)`,
       prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: current work` }),
@@ -468,7 +473,7 @@ try {
           // A bare `--none` must reach the "needs a reason" refusal, not the
           // one for a forgotten successor: the caller DID choose this way out.
           none: hasNone ? textOf(noneWords) || ' ' : '',
-          tasksText: readTasksAll(),
+          queueData: readQueueData(),
         })
       },
       next != null
@@ -528,7 +533,7 @@ try {
     const at = berlinStamp()
     const known = subject || fallbackSubject(point)
     edit(
-      (html) => toClosingWork(html, point, { subject: known, reason, stamp: at }),
+      (html) => toClosingWork(html, point, { subject: known, reason, stamp: at, queueData: readQueueData() }),
       `the board now names point ${point} and the closing duties still owed (Stand ${at}) — this is ` +
         'NOT a claim to stop: the board gate lets those duties through. End with ' +
         'node scripts/board.mjs none "<Grund, der den nächsten Punkt nennt>".',
@@ -598,7 +603,7 @@ try {
           now,
           eta: clock ? resolveBerlinClock(clock, now, { future: true }) : null,
         })
-        return promoteToNow(html, point, { title, times, status: textOf(words), tasksText: readTasksAll(), span })
+        return promoteToNow(html, point, { title, times, status: textOf(words), queueData: readQueueData(), span })
       },
       `${point} promoted to current work`,
       prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: promoted to current work` }),
@@ -624,7 +629,7 @@ try {
     // and status. Idempotent — an already split card is left alone.
     let report = null
     edit((html) => {
-      const r = migrateCardDescriptions(html, readTasksAll())
+      const r = migrateCardDescriptions(html, readQueueData())
       report = r
       return r.html
     }, 'cards split into description and status')

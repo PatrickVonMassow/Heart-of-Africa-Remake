@@ -143,54 +143,44 @@ export function renderStatusSection({ status = '', stamp = null, indent = '    '
 
 const escapeHtmlText = (text) => String(text ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-/** Matches a reference to another point, the forms the card-topic guard reads. */
-const POINT_REF_RE = /\b(?:punkt|point)s?\s+\d+|\(\d{2,}\)/i
+/**
+ * The German description `.claude/board-queue.json` keeps for `point` (its
+ * `body` paragraphs, HTML-escaped and joined by a blank line); '' when none.
+ * The second source of a card's description after the card itself — the
+ * English work-order text is never one (user 19.10.2026: the board is German).
+ */
+export function queuedDescription(queueData, point) {
+  const entry = queueData?.points?.[String(Number(point))]
+  if (!entry || typeof entry !== 'object') return ''
+  return (Array.isArray(entry.body) ? entry.body : [entry.body])
+    .filter((p) => typeof p === 'string' && p.trim())
+    .map((p) => escapeHtmlText(p.trim()))
+    .join('\n\n')
+}
+
+const unescapeHtmlText = (text) =>
+  String(text ?? '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
 
 /**
- * 1-3 sentences on what `point` delivers, from its work-order text
- * (TASKS.md + archive). Prefers the "Final state:" paragraph, else the
- * headline and the prose under it. Sentences naming another point are skipped,
- * so a derived description cannot trip the card-topic guard. HTML-escaped;
- * '' when the point is not found.
+ * A status text without a leading repetition of the card title ("<Titel> — …",
+ * "<Titel>: …"). The title stands in the card head already; repeating it at the
+ * start of the status pushed the actual state out of the first line (user
+ * 19.10.2026). Strips, never refuses: a status that is nothing but the title
+ * is kept as it is.
  */
-export function pointDescription(tasksText, point) {
-  const lines = normaliseLineEndings(tasksText).split('\n')
-  const at = lines.findIndex((l) => new RegExp(`^- \\[[ x]\\] ${Number(point)}\\.\\s`).test(l))
-  if (at < 0) return ''
-  const block = [lines[at].replace(/^- \[[ x]\] \d+\.\s*/, '')]
-  for (let i = at + 1; i < lines.length && !/^(?:- \[|#)/.test(lines[i]) && lines[i].trim(); i++) block.push(lines[i])
-  const isLabel = (l) => /^\s{2}[A-Z][A-Za-z ]{1,30}:/.test(l)
-  const paragraph = (from) => {
-    const out = [block[from]]
-    for (let i = from + 1; i < block.length && !isLabel(block[i]); i++) out.push(block[i])
-    return out.join(' ')
+export function stripLeadingTitle(status, title) {
+  const text = String(status ?? '')
+  const subject = unescapeHtmlText(title).trim()
+  if (!subject) return text
+  const body = text.trimStart()
+  for (const form of new Set([subject, escapeHtmlText(subject)])) {
+    if (body.slice(0, form.length).toLowerCase() !== form.toLowerCase()) continue
+    const sep = body.slice(form.length).match(/^\s*[—–\-:;,.|]+\s*/)
+    if (!sep) continue
+    const rest = body.slice(form.length + sep[0].length)
+    if (rest.trim()) return rest.replace(/^\p{Ll}/u, (c) => c.toUpperCase())
   }
-  const finalAt = block.findIndex((l) => /^\s{2}Final state:/.test(l))
-  const usable = (raw) =>
-    raw.replace(/`/g, '').replace(/\s+/g, ' ').trim()
-      .split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ»"(])/)
-      .filter((s) => s && !POINT_REF_RE.test(s))
-  // The final state says best what the point delivers; when every sentence of
-  // it names another point, the headline and its prose stand in.
-  const sentences = [
-    // Only its lead: an enumeration ("1. …", "(a) …") or a ";" starts the detail.
-    ...(finalAt >= 0
-      ? [usable(paragraph(finalAt).replace(/^\s*Final state:\s*/, '').split(/(?:^|\s)(?:\d+\.|\([a-z0-9]\))\s|;\s/)[0])]
-      : []),
-    usable(paragraph(0)),
-  ].find((list) => list.length) ?? []
-  const picked = []
-  let words = 0
-  for (const s of sentences) {
-    const n = s.split(/\s+/).length
-    if (picked.length === 3 || (picked.length && words + n > DESCRIPTION_WORD_LIMIT)) break
-    picked.push(s)
-    words += n
-  }
-  let out = picked.join(' ').replace(/^[a-z]/, (c) => c.toUpperCase())
-  const all = out.split(/\s+/)
-  if (all.length > DESCRIPTION_WORD_LIMIT) out = `${all.slice(0, DESCRIPTION_WORD_LIMIT).join(' ')} …`
-  return escapeHtmlText(out)
+  return text
 }
 
 /**
@@ -601,7 +591,7 @@ function queueDescription(card) {
  * escaping — three times in one day — and a board edit that silently matches
  * nothing is exactly the class of failure the guards were built for.
  */
-export function promoteToNow(html, point, { title, times, status, stamp = berlinStamp(), description = '', tasksText = '', span = null }) {
+export function promoteToNow(html, point, { title, times, status, stamp = berlinStamp(), description = '', queueData = null, span = null }) {
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   if (!title || !status) throw new Error('board: promote needs a title and a status')
@@ -620,8 +610,8 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
     `<details class="now">\n  <summary>${numberChip(point)}<span class="t">${escapeCardTitle(stripPointPrefix(title, point))}</span>` +
     `<span class="right"><span class="meta">${span ? cardTimeLine(span) : times ?? stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardSections({
-      description: String(description ?? '').trim() || queueDescription(card) || pointDescription(tasksText, point),
-      status,
+      description: String(description ?? '').trim() || queueDescription(card) || queuedDescription(queueData, point),
+      status: stripLeadingTitle(status, subject),
       stamp,
     })}\n  </div>\n</details>\n`
   // Both state cards go with it (points 470/544): the moment a point is current
@@ -1415,7 +1405,7 @@ const statusOf = (card) => {
  * caller types a point number and a status, and the header the guard reads
  * cannot drift from the queue entry it came from.
  */
-export function toNow(html, point, status, { stamp = berlinStamp(), description = '', tasksText = '', span = null } = {}) {
+export function toNow(html, point, status, { stamp = berlinStamp(), description = '', queueData = null, span = null } = {}) {
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   const hours = estimateHours(metaOf(card))
@@ -1425,7 +1415,7 @@ export function toNow(html, point, status, { stamp = berlinStamp(), description 
     status,
     stamp,
     description,
-    tasksText,
+    queueData,
     span,
   })
 }
@@ -1513,13 +1503,15 @@ export function toQueue(html, point, { text, estimate, recorded = null, now = ne
  * shape the Erledigt section fixes. The body carries the card's status text,
  * every paragraph, over unless the caller writes a closing one.
  */
-export function toDone(html, point, { text, end = berlinStamp(), span = null, tasksText = '' } = {}) {
+export function toDone(html, point, { text, end = berlinStamp(), span = null, queueData = null } = {}) {
   const card = nowCard(html, point)
   if (!card) throw new Error(`board: no current-work card for point ${point}`)
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to archive a card with an empty body')
   const start = (metaOf(card).match(START_FIELD_RE) ?? [])[1] ?? end
-  const title = stripPointPrefix(titleOf(card), point)
+  // The Erledigt title is the subject alone (user 19.10.2026): archiving the
+  // closing card must not carry its stage label into the archive.
+  const title = stripClosingStage(stripPointPrefix(titleOf(card), point))
   const out = html.replace(card, '')
   // ONE POINT, ONE ERLEDIGT CARD (user 18.08.2026, measured on point 700, which
   // stood there FOUR times). A point comes back into current work whenever a
@@ -1533,10 +1525,10 @@ export function toDone(html, point, { text, end = berlinStamp(), span = null, ta
   // arithmetic says the opposite (measured on point 700's four cards).
   const existing = doneCards(out, point)
   const earliest = earliestStart(existing) || start
-  // The work order is the last fallback (point 1363): a landing whose projection
-  // discarded the now card leaves a closing state card without description.
+  // The German queue text is the last source (point 1363): a landing whose
+  // projection discarded the now card leaves nothing else to carry over.
   const description =
-    descriptionOf(card) || existing.map(descriptionOf).find(Boolean) || pointDescription(tasksText, point) || ''
+    descriptionOf(card) || existing.map(descriptionOf).find(Boolean) || queuedDescription(queueData, point)
   const meta = span ? cardTimeLine(span) : `${earliest} · ${end}`
   const entry = renderDoneEntry({ point, title, meta, body, description })
   const cleaned = dropDoneCards(out, point)
@@ -2275,7 +2267,7 @@ export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
  * IT IS NOT A CLAIM TO STOP. That is the whole point of it — `board-first-guard`
  * denies under the idle card and lets the work through under this one.
  */
-export function toClosingWork(html, point, { subject, reason, stamp = berlinStamp() } = {}) {
+export function toClosingWork(html, point, { subject, reason, stamp = berlinStamp(), queueData = null } = {}) {
   if (!/^\d+$/.test(String(point ?? ''))) {
     throw new Error(
       `board: closing takes the POINT it closes, got "${point}" — node scripts/board.mjs closing <N> "<Grund>"`,
@@ -2307,13 +2299,49 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
     kind: 'closing',
     point,
     title: closingCardTitle(subject_),
-    // THE BODY SAYS WHAT THE POINT IS ABOUT BEFORE IT SAYS WHAT STAGE IT IS IN
-    // (user 11.08.2026). The subject leads, the owed duties follow as their own
-    // paragraph — composed here, so no caller can leave the subject out.
-    text: `${subject_} — dieser Punkt ist zusammengeführt und abgehakt; die ${CLOSING_STAGE} stehen noch aus.\n\n${duties}`,
+    // THE CARD SAYS WHAT THE POINT IS ABOUT BEFORE WHAT STAGE IT IS IN (user
+    // 11.08.2026, 19.10.2026): the point's description on top, the status below
+    // the divider. The subject stands in the title; the status does not repeat it.
+    description: closingDescription(html, point, queueData),
+    text: `Zusammengeführt und abgehakt; die ${CLOSING_STAGE} stehen noch aus.\n\n${stripLeadingTitle(duties, subject_)}`,
     stamp,
     claim: 'that only closing duties are left',
   })
+}
+
+/**
+ * The description the closing card shows: the point's own card (Erledigt,
+ * current work, queue or a standing closing card), else its German text in
+ * `.claude/board-queue.json`; '' leaves the visible placeholder.
+ */
+function closingDescription(html, point, queueData) {
+  let now = null
+  try {
+    now = nowCard(html, point)
+  } catch {
+    /* no current-work section — nothing to carry from it */
+  }
+  const queued = queueCard(html, point)
+  return (
+    [...doneCards(html, point), now].map(descriptionOf).find(Boolean) ||
+    (queued ? queueDescription(queued) : '') ||
+    queuedDescription(queueData, point)
+  )
+}
+
+/**
+ * Every Erledigt title without the closing stage label (user 19.10.2026): an
+ * archived card titled "<Betreff>: Abschlussarbeiten" read as the closing card
+ * listed twice. Runs on every board edit, so a board written before the fix
+ * heals on the next command.
+ */
+export function cleanDoneTitles(html) {
+  return editSectionCards(String(html ?? ''), 'done', (card) =>
+    card.html.replace(
+      new RegExp(`(<span class="t">)${TITLE_TEXT}(</span>)`),
+      (whole, open, title, close) => (looksLikeClosingTitle(title) ? `${open}${stripClosingStage(title)}${close}` : whole),
+    ),
+  )
 }
 
 /**
@@ -2330,7 +2358,7 @@ export function pointSubject(html, point) {
 }
 
 /** Write one state card, replacing whichever one stands. */
-function writeStateCard(html, { kind, point = null, title, text: reason, stamp, emptyReason, claim, precondition }) {
+function writeStateCard(html, { kind, point = null, title, text: reason, description = null, stamp, emptyReason, claim, precondition }) {
   const text = String(reason ?? '').trim()
   if (!text) throw new Error(emptyReason)
   const standing = standingPointCards(html)
@@ -2349,7 +2377,9 @@ function writeStateCard(html, { kind, point = null, title, text: reason, stamp, 
     `<details class="now"${STATE_ATTR(kind)}>\n  <summary>${point == null ? '' : numberChip(point)}` +
     `<span class="t">${escapeCardTitle(title)}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardBody(text, { stamp })}\n  </div>\n</details>\n`
+    `  <div class="body">\n${
+      description == null ? renderCardBody(text, { stamp }) : renderCardSections({ description, status: text, stamp })
+    }\n  </div>\n</details>\n`
   return insertAsFirstNowCard(stripStateCards(html), card)
 }
 
@@ -2360,14 +2390,14 @@ function writeStateCard(html, { kind, point = null, title, text: reason, stamp, 
  * another card on its own. Anything else is REFUSED: leaving the section empty
  * is the defect, and forgetting must not be able to reach it.
  */
-export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp, tasksText = '', span = null, nextSpan = null } = {}) {
+export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp, queueData = null, span = null, nextSpan = null } = {}) {
   if (next != null && none) throw new Error('board: done takes EITHER --next or --none, never both')
   const at = stamp ?? end
-  const archived = toDone(html, point, { text, end, span, tasksText })
+  const archived = toDone(html, point, { text, end, span, queueData })
   if (next != null) {
     const status = String(nextStatus ?? '').trim()
     if (!status) throw new Error(`board: --next ${next} needs the new card's status text`)
-    return toNow(archived, next, status, { stamp: at, tasksText, span: nextSpan })
+    return toNow(archived, next, status, { stamp: at, queueData, span: nextSpan })
   }
   if (none) return toNoCurrentWork(archived, none, { stamp: at })
   if (!hasCurrentWork(archived)) {
@@ -2778,6 +2808,8 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   const re = new RegExp(`(${NOW_HEAD(point)}${WITHIN_CARD}<div class="body">)${WITHIN_CARD}(</div>\\s*</details>)`)
   const { from, end, text: section } = nowSectionSlice(html)
   if (!re.test(section)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
+  const card = nowCard(html, point)
+  const status = card ? stripLeadingTitle(text, stripClosingStage(stripPointPrefix(titleOf(card), point))) : text
   // ONLY THE STATUS IS REPLACED: the description is read back from the card and
   // written unchanged (byte-identical; only `describe` changes it).
   const rewritten = section.replace(re, (whole, head, tail) => {
@@ -2786,8 +2818,8 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
     const at = inner.indexOf('<hr class="split">')
     const kept = at < 0 ? '' : inner.slice(0, at).trimEnd()
     return kept
-      ? `${head}${kept}\n${renderStatusSection({ status: text, stamp })}\n  ${tail}`
-      : `${head}\n${renderCardSections({ status: text, stamp })}\n  ${tail}`
+      ? `${head}${kept}\n${renderStatusSection({ status, stamp })}\n  ${tail}`
+      : `${head}\n${renderCardSections({ status, stamp })}\n  ${tail}`
   })
   return html.slice(0, from) + rewritten + html.slice(end)
 }
@@ -2887,13 +2919,13 @@ export function setCardDescription(html, point, text) {
 /**
  * ONE-TIME MIGRATION to the description/status split. A current-work or
  * Erledigt card keeps its whole body as its status and gets the description
- * derived from the point's work-order text (`tasksText`: TASKS.md + archive);
+ * taken from the point's German text in `.claude/board-queue.json` (`queueData`);
  * a queue card's prose IS its description (the queue rebuild renders it so)
  * and its status says no work has started. Cards already split are left alone;
  * state cards are not point cards. Returns the board and what it did,
  * including the points whose description stays the visible placeholder.
  */
-export function migrateCardDescriptions(html, tasksText) {
+export function migrateCardDescriptions(html, queueData = null) {
   const counts = { now: 0, queue: 0, done: 0 }
   const missing = { now: [], queue: [], done: [] }
   const skipped = []
@@ -2917,7 +2949,7 @@ export function migrateCardDescriptions(html, tasksText) {
         // The generated stub stays what the queue rebuild renders for "no prose yet".
         return withCardDescription(card.html, prose || escapePlain(QUEUE_STUB_BODY), { status: QUEUE_STATUS_TEXT })
       }
-      const description = pointDescription(tasksText, card.point)
+      const description = queuedDescription(queueData, card.point)
       if (!description) missing[key].push(card.point)
       return withCardDescription(card.html, description)
     })
