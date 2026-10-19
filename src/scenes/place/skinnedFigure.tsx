@@ -509,16 +509,17 @@ export function SkinnedFigure({
         loc(b[`hand.${s}`], _w).distanceTo(_e) +
         loc(rig.hands[s === 'L' ? 0 : 1], _t).distanceTo(_w)
       // Where a contact hand is solved to (natural-villager-motion step 15).
-      // Without a pose reach: the virtual hand. With one, `k`: up to 1 the hand
+      // Without a pose reach for the side: the virtual hand. With one, `k`
+      // (1 included — the curve is continuous through it): up to 1 the hand
       // stands k of the DRAWN arm out from the drawn shoulder along the pose's
       // arm direction (a bent, readied arm — the virtual rig's proportions are
       // not the drawn child's); past 1 it is the world point the pose names,
       // k of the primitive arm out from its shoulder (the quarry's surface),
       // blended over k 1 … 1.15 so the reach never jumps.
       const handTarget = (s: 'L' | 'R', i: number, vh: THREE.Object3D, out: THREE.Vector3) => {
-        const k = extras?.reach ? (i === 0 ? extras.reach.left : extras.reach.right) : 1
+        const k = i === 0 ? extras?.reach?.left : extras?.reach?.right
         const pivot = arms.current[i]
-        if (k === 1 || !pivot) return loc(vh, out)
+        if (k === undefined || !pivot) return loc(vh, out)
         loc(pivot, _rv)
         loc(vh, _rf)
         const far = _rf.clone().sub(_rv).multiplyScalar(k).add(_rv)
@@ -710,7 +711,17 @@ export function SkinnedFigure({
           _pole.set(i === 0 ? 1 : -1, -0.3, 0.2).applyQuaternion(chestQ())
           done = solveTo(_grip, _pole)
         } else if (contactArm[i] && vh) {
+          // (reachOf uses _t as scratch: measured before the target is)
+          const r = reachOf(s) * 0.999
           handTarget(s, i, vh, _t)
+          // a pose's own reach past the arm (a grab easing out before its
+          // lunge) holds the arm straight toward it rather than dropping to the
+          // unsolved fallback, so the hand runs on through k = 1 (the lean
+          // search above still sees the full target)
+          if ((i === 0 ? extras?.reach?.left : extras?.reach?.right) !== undefined) {
+            loc(up, _s)
+            if (_t.distanceTo(_s) > r) _t.sub(_s).setLength(r).add(_s)
+          }
           _pole.set(s === 'L' ? 0.5 : -0.5, -0.4, -1).applyQuaternion(chestQ())
           done = solveTo(_t.clone(), _pole)
         }

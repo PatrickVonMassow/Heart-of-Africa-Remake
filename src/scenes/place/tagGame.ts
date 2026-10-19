@@ -1594,7 +1594,7 @@ const lerpArm = (a: ArmPose, b: ArmPose, w: number): ArmPose => ({
 
 /**
  * Two poses blended by `w` (0: `a` exactly, 1: `b` exactly), the optional parts
- * included: an absent clavicle is at 0, an absent reach 1, an absent gaze the
+ * included: an absent clavicle is at 0, a reach absent on one side 1, an absent gaze the
  * horizon along the pose's own turn.
  */
 export function mixPose(a: FigurePose, b: FigurePose, w: number): FigurePose {
@@ -1616,7 +1616,11 @@ export function mixPose(a: FigurePose, b: FigurePose, w: number): FigurePose {
     })
     out.shoulders = { left: one('left'), right: one('right') }
   }
-  if (a.reach || b.reach) out.reach = { left: lerp(re(a, 'left'), re(b, 'left'), w), right: lerp(re(a, 'right'), re(b, 'right'), w) }
+  if (a.reach || b.reach) {
+    // a side neither pose names stays absent (the primitive's own hand)
+    const one = (s: 'left' | 'right') => (a.reach?.[s] === undefined && b.reach?.[s] === undefined ? undefined : lerp(re(a, s), re(b, s), w))
+    out.reach = { left: one('left'), right: one('right') }
+  }
   if (a.gaze || b.gaze) {
     const ga = gz(a)
     const gb = gz(b)
@@ -1715,7 +1719,7 @@ export function reachBodyPose(
       right: { protraction: side === 'right' ? protraction : 0, elevation: 0 },
     },
     // the lunge only once the reach is fully out and the quarry inside it
-    reach: { left: side === 'left' ? reach : 1, right: side === 'right' ? reach : 1, lunge: !!aim && g >= 1 && aim.reach < c.reachMax },
+    reach: { [side]: reach, lunge: !!aim && g >= 1 && aim.reach < c.reachMax },
     gaze: { yaw: bearing, pitch: 0, turn: bearing * (1 - g) },
   }
   return pose
