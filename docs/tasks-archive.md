@@ -34360,3 +34360,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: a Vitest proves boat state and shore state render the same figure identity; the fishery picture shows the same man (same dress, same body) in the canoe and at the landing during unloading, judged by looking on both backends.
   Bundle: Dorfleben.
   Criticality: medium — a player-visible identity swap of a villager, both backends.
+- [x] 1389. Tag main as poc and publish it at /Heart-of-Africa-Remake/poc/
+  Queue position: directly after point 1387 (user order 19.10.2026).
+  Source: user order 19.10.2026: "Noch ein Punkt direkt nach 1387: Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/". Confirmed with "ja" that main at execution time (after 1387, so the net-man fix is included) is meant.
+  Final state: the release tag `poc` points at the `main` commit current when this point is worked (i.e. including point 1387), and that build is live at https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ via the Pages workflow. Procedure: the poc part of docs/batch-owner-runbook.md (the authoritative release steps; memory version-release-process). This point IS the user's explicit tag approval for exactly this one re-tag of `poc` (memory tags-only-on-request); no other tag (`vX.Y`) is touched.
+  Verifiable: `git rev-parse poc` equals the tagged main commit, pushed to origin; the Pages deployment for that commit concluded green; the poc URL loads and serves that build (verified in a browser, the game starts).
+  Bundle: Dokumentation.
+  Criticality: medium — the user's public PoC build.
+  DONE 19.10.2026, 20:15. `poc` moved from 7290a1800 to f154baa67 (main HEAD including point 1387; CI run 39294905434 green) through the GitHub refs API, because github.com:443 refused git connections at that moment while api.github.com answered; local tag synced. Pages deployed by manual dispatch, run 39299262698, green. Verified in the browser: /poc/ serves chunk App-CvmX7Hnv.js carrying build commit f154baa, and the game starts in Cairo with HUD and no console errors on WebGPU and on the WebGL 2 lane (fallback notice shown).

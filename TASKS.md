@@ -77,13 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1389. Tag main as poc and publish it at /Heart-of-Africa-Remake/poc/
-  Queue position: directly after point 1387 (user order 19.10.2026).
-  Source: user order 19.10.2026: "Noch ein Punkt direkt nach 1387: Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/". Confirmed with "ja" that main at execution time (after 1387, so the net-man fix is included) is meant.
-  Final state: the release tag `poc` points at the `main` commit current when this point is worked (i.e. including point 1387), and that build is live at https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ via the Pages workflow. Procedure: the poc part of docs/batch-owner-runbook.md (the authoritative release steps; memory version-release-process). This point IS the user's explicit tag approval for exactly this one re-tag of `poc` (memory tags-only-on-request); no other tag (`vX.Y`) is touched.
-  Verifiable: `git rev-parse poc` equals the tagged main commit, pushed to origin; the Pages deployment for that commit concluded green; the poc URL loads and serves that build (verified in a browser, the game starts).
-  Bundle: Dokumentation.
-  Criticality: medium — the user's public PoC build.
 - [ ] 1390. Board cards need a short title and a body
   Queue position: directly after the point "Fishery net man stays the same person when stepping ashore" (user order 19.10.2026), i.e. second from the front; the later user order put 1389 directly after 1387, so this follows 1389.
   Source: user approval 19.10.2026: "Ja, reihe das nach dem neuen Punkt für die wechselnde Person mit dem Fischer ein." User observed 19.10.2026: cards sometimes carry a far too long title and no description, the description text having landed in the title (example: point 1379 "Giza-Touristen und Reisender in westlicher Kleidung von 1890 (Schuhe, lange Ärmel, lange Hosen/Röcke, sitzender Hut) — nach dem Kleidungs-Neubau 1347").
