@@ -15862,3 +15862,18 @@ to land than a mechanism that needs a review.
   consecutive runs; WebGPU section stays green.
   Bundle: Testinfrastruktur.
   Criticality: low — a test-side occlusion, no player impact measured.
+- [ ] 1382. The WebGPU polish-villagers suite finishes inside its wall timeout.
+  Queue position: front of Testinfrastruktur — the covering run of point 1380 is owed on both backends.
+  Source: findings carrier 19.10.2026 04:01 (covering run after point 1380). main dd8bde59c,
+  `VERIFY_GL=webgpu` full polish-villagers: KILLED after the 45-min wall timeout with 51 frames
+  written (23 expected floor), last sign of life 16 s-3 min before the kill, so slow rather than
+  hung. Log local/verify-logs/2026-10-19T03-15-30-181-polish-villagers.log. Section figure-micro
+  was green on both backends at 949aa441a; the WebGL 2 covering run is still owed. Sibling of 1223
+  (same symptom on `polish`).
+  Final state: measured whether 1380's added sections pushed the suite past
+  VERIFY_SUITE_TIMEOUT_MS; the suite is split or given a measured, justified timeout; the covering
+  pass then runs on both backends.
+  Verifiable: `VERIFY_GL=webgpu npm test -- polish-villagers` ends with its PASS/FAIL line inside
+  the timeout; the WebGL 2 pass likewise.
+  Bundle: Testinfrastruktur.
+  Criticality: high — the villager picture suite yields no full WebGPU evidence.
