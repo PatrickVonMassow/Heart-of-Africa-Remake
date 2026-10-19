@@ -187,10 +187,11 @@ export function describeReading(reading) {
 // --- The chaser's arms inside the prepare window ------------------------------
 // Each window is a series of frames of one chase, read off the drawn hand
 // pivots in the chaser's own frame (+z forward). EVERY observed window judges
-// the readied hand (ahead, held: only the run's bob); the free hand's swing
-// needs most of a stride, so only a window of `longSpan` judges it.
+// the readied hand (ahead, and held: swept by under half the free hand's
+// swing); that swing needs most of a stride, so only a window of `longSpan`
+// measures it, and it is the reference every window's readied hand is held to.
 /** Body-frame metres and seconds; calibratable. */
-export const PREPARE_ARMS = { readiedAhead: 0.15, heldSweep: 0.06, freeSweep: 0.12, longSpan: 0.6 }
+export const PREPARE_ARMS = { readiedAhead: 0.15, freeSweep: 0.12, longSpan: 0.6 }
 const handZ = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right')).local.z
 export const armSweep = (series, side) => {
   const z = series.map((r) => handZ(r, side))
@@ -205,11 +206,12 @@ export function judgePrepareArms(windows) {
   const seen = windows.filter((w) => w && w.length > 0)
   const long = seen.find((w) => w.at(-1).clock - w[0].clock >= PREPARE_ARMS.longSpan)
   if (!long) return { ok: false, detail: `no chasing stride inside the prepare window (${seen.length} short windows)` }
-  const heldIn = (w) => armMinZ(w, w[0].side) > PREPARE_ARMS.readiedAhead && armSweep(w, w[0].side) < PREPARE_ARMS.heldSweep
-  const bad = seen.find((w) => !heldIn(w))
   const side = long[0].side
   const other = otherSide(side)
-  const swings = armSweep(long, other) > PREPARE_ARMS.freeSweep && armSweep(long, side) < 0.5 * armSweep(long, other)
+  const free = armSweep(long, other)
+  const heldIn = (w) => armMinZ(w, w[0].side) > PREPARE_ARMS.readiedAhead && armSweep(w, w[0].side) < 0.5 * free
+  const bad = seen.find((w) => !heldIn(w))
+  const swings = free > PREPARE_ARMS.freeSweep
   const detail =
     `readied ${fmtArm(long, side)}; free ${fmtArm(long, other)} from ${long[0].gap.toFixed(2)} m; ` +
     `${seen.length} windows judged` +
