@@ -15893,6 +15893,7 @@ to land than a mechanism that needs a review.
   the timeout; the WebGL 2 pass likewise.
   Bundle: Testinfrastruktur.
   Criticality: high — the villager picture suite yields no full WebGPU evidence.
+  Recurred 19.10.2026 on BOTH backends at feat/1343 (WebGPU 3f4d620d9, log local/verify-logs/2026-10-19T09-37-31-282-polish-children-polish-villagers.log; WebGL 2 e5fbb1179, log local/verify-logs/2026-10-19T11-17-49-518-polish-children-polish-villagers.log): KILLED at 45 min each, so the fix covers both backends.
 - [ ] 1383. Natural villager motion d: turning, point and reach, pick-up, carry, calibration sweep
   Queue position: directly after point 1343.
   Source: split from point 1343 on 19.10.2026 (owner decision under the standing split rule): its author delivered concept steps 15 and 16 only.
