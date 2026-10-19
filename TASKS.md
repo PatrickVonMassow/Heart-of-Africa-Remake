@@ -77,13 +77,21 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1343. Natural villager motion c: turning, point and reach, port-city tag chaser, river-bank caught child, pick-up, carry, calibration sweep
+- [ ] 1343. Natural villager motion c: port-city tag chaser, river-bank caught child
+  Amended 19.10.2026 at the split into point 1383: this point now delivers concept steps 15 and 16 only (final states 7 and 8, and final state 5 for the chaser and caught child); steps 12, 14, 17-19 and step 20's remaining evidence are point 1383's.
   Queue position: directly after point 1354 (every step here is judged on its composed body).
   Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 12, 14-19 and step 20's remaining evidence, as approved by the GPT-6 Astra final check at b231b21.
   Final state: point 1316's final states 5 (walk, turn on the spot and in motion, run, dig, pick up, point, carry, reach read natural; blended transitions, no snaps, no foot sliding), 7 (port-city tag chaser) and 8 (river-bank tag caught child), as the concept's steps specify them; the concept's §7 open items decided or filed.
   Verifiable: each step's *Verified* list in the concept; penetration gate and the full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point, chaser and caught child; Playwright picture check in a port city and at a river bank on both backends, judged by looking; cross-vendor code review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
+- [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
+  Queue position: directly after point 1343.
+  Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.
+  Final state: in the port-city tag game the glTF chaser's readied arm stays held and its free arm keeps swinging through every prepare window, and the check passes on both backends.
+  Verifiable: polish-children --section=tag-catch green on both backends on 3 consecutive runs for that check; port-city picture judged by looking.
+  Bundle: Dorfleben.
+  Criticality: medium - the port-city chaser's arms, both backends.
 - [ ] 1345. Child tag chaser at sprint speed squats without a stride (teleport threshold in figure units)
   Queue position: with the tag poses of point 1343 (Dorfleben); may land before it on its own.
   Source: findings carrier 12.10.2026 05:58, measured on feat/1316-natural-villager-motion (runtime sheets runtime-chaser-*.png, hips height per frame from the export): at 3.4 u/s the child chaser's hips sit at 0.50 of standing height in every frame with no stride; the same subject at 3.2 u/s (5.8 < 6) runs normally (hips 0.96-1.07, feet alternating +-0.4). Player impact: every child chaser of the port-city tag game at full sprint is drawn squatting and sliding. Related: the river-bank caught child (hips 0.52) and the point gesture's release frame (hips 0.50 at 2.11 s) reach the same CROUCH_MAX fallback.
@@ -138,6 +146,7 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
 
 - [ ] 1340. Tag catcher's hands at chest height and on the caught child at the catch frame
+  Amended 19.10.2026 from point 1343's author: concept step 15 removes the catcher's forward chest-height hands, so that half of this final state is obsolete; the catch-frame hand on the caught child stays here (flaky: red on 3 WebGPU runs, 0.45 m catch distance at lean cap 0.12 rad).
   Queue position: after point 1333; point 1343 reworks the port-city chaser pose (point 1316's item 7) — if 1343 lands with `polish-children --section=tag-catch` green on both backends, this point closes with that run as evidence.
   Source: findings carrier 12.10.2026 02:47Z: polish-children --section=tag-catch (Cairo) is red on main 8a477d931 and on feat/1315 alike. WebGPU: "the catcher's two hands are held forward at chest height, read off the drawn pivots" fails (hand y 0.889/0.895); WebGL 2 on feat/1315: "at the catch frame the catcher's drawn hand is ON the caught child" fails. Not in the classified baseline. Logs: local/1315-main-port-webgpu.log, local/1315-port-webgl.log.
   Final state: in the port-city tag game the catcher's drawn hands are held forward at chest height while chasing and one drawn hand is on the caught child at the catch frame, on both backends.
@@ -15877,3 +15886,12 @@ to land than a mechanism that needs a review.
   the timeout; the WebGL 2 pass likewise.
   Bundle: Testinfrastruktur.
   Criticality: high — the villager picture suite yields no full WebGPU evidence.
+- [ ] 1383. Natural villager motion d: turning, point and reach, pick-up, carry, calibration sweep
+  Queue position: directly after point 1343.
+  Source: split from point 1343 on 19.10.2026 (owner decision under the standing split rule): its author delivered concept steps 15 and 16 only.
+  Spec: docs/natural-villager-motion-concept.md steps 12, 14, 17, 18, 19 and step 20's remaining evidence; the concept's §7 kneel-clip item belongs with step 17. Calibration input: the caught-child hold (`VILLAGER_POSE.caughtSlump`) reads only faintly at the river bank's 10-14 m spectator distance.
+  Carried from point 1343: concept step 16's softened knee and weight shift on the caught child (a per-leg pose on the standing legs) is built here.
+  Final state: point 1316's final state 5 for walk, turn on the spot and in motion, run, dig, pick up, point, carry and reach, as the concept's steps specify them.
+  Verifiable: each step's *Verified* list in the concept; penetration gate and full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point and carry; picture check in a port city and a village on both backends, judged by looking; cross-vendor code review record.
+  Bundle: Dorfleben.
+  Criticality: high - every villager, both backends.
