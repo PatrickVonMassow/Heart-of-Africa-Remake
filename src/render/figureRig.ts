@@ -170,6 +170,57 @@ export function hangToward(dir: THREE.Vector3, parentWorld: THREE.Quaternion, ou
   return out.setFromUnitVectors(DOWN, local)
 }
 
+/**
+ * The palm's normal in the LEFT hand bone's own frame on the hanging rest
+ * (+x the hand's outside, +z forward); the right hand mirrors x. The glTF
+ * hand's is measured off public/models/villager.glb — its flattest axis,
+ * signed by the way its `grip` morph curls the fingers (pinned by
+ * scenes/place/steadyingPalm.test.tsx) — and faces the thigh and a little
+ * back; the code-built hand is a paddle flat across z, taken as facing back
+ * to match.
+ */
+export const PALM_NORMAL = {
+  gltf: [-0.85, 0.19, -0.49],
+  code: [0, 0, -1],
+} as const satisfies Record<string, readonly [number, number, number]>
+
+/** The palm normal of one hand (`side` +1 left, −1 right) in its bone's frame. */
+export function palmNormal(body: keyof typeof PALM_NORMAL, side: 1 | -1, out = new THREE.Vector3()): THREE.Vector3 {
+  const [x, y, z] = PALM_NORMAL[body]
+  return out.set(side * x, y, z).normalize()
+}
+
+const _palmD = new THREE.Vector3()
+const _palmQ = new THREE.Quaternion()
+
+/**
+ * The roll (rad, in (−π, π]) that turns a hand's palm toward `toward`: a turn
+ * about the hand bone's own axis (local +y; the bone hangs along −y), so the
+ * hand stays where the arm solve put it and only rolls. `parentWorld` is the
+ * orientation of the hand's parent (the forearm) and `toward` a direction,
+ * both in one common frame; `palm` is the palm normal in the hand's frame
+ * (`palmNormal`). 0 when `toward` runs along the hand's axis.
+ */
+export function palmRollAngle(parentWorld: THREE.Quaternion, palm: THREE.Vector3, toward: THREE.Vector3): number {
+  const d = _palmD.copy(toward).applyQuaternion(_palmQ.copy(parentWorld).invert())
+  if (Math.hypot(d.x, d.z) < 1e-9 || Math.hypot(palm.x, palm.z) < 1e-9) return 0
+  // a turn about +y by θ carries the azimuth atan2(x, z) to atan2(x, z) + θ
+  const a = Math.atan2(d.x, d.z) - Math.atan2(palm.x, palm.z)
+  return a > Math.PI ? a - 2 * Math.PI : a <= -Math.PI ? a + 2 * Math.PI : a
+}
+
+/** `palmRollAngle` as the hand's local quaternion. */
+export function palmRoll(parentWorld: THREE.Quaternion, palm: THREE.Vector3, toward: THREE.Vector3, out = new THREE.Quaternion()): THREE.Quaternion {
+  return out.setFromAxisAngle(UP, palmRollAngle(parentWorld, palm, toward))
+}
+const UP = new THREE.Vector3(0, 1, 0)
+
+/** The share of a palm roll the forearm takes about its own axis, the wrist
+ *  the rest: the turn spread along the forearm as a real one pronates, so
+ *  neither the elbow's nor the wrist's skin wrings (the bodies have no twist
+ *  bones). A pose constant, calibratable. */
+export const FOREARM_ROLL_SHARE = 0.5
+
 // ---- the distributed lean and the gaze (natural-villager-motion step 9) ------
 
 /** The three spine segments a trunk lean is shared over, pelvis up. */
