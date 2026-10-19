@@ -512,11 +512,15 @@ if (section('tag-catch')) {
       }
     }
     // Body heights, in the child's own frame: +z forward, +y up. Each window is
-    // read over a span of the game's own clock (far: a whole arm swing; near:
-    // more than half of one, as long as the prepare window reliably holds),
-    // so a SWINGING hand shows its sweep, forward and back, while a HELD one
-    // keeps its place ahead and only rides the run's bob.
-    const SPAN = { far: 0.5, near: 0.35 }
+    // read over a span of the game's own clock, so a SWINGING hand shows its
+    // sweep, forward and back, while a HELD one keeps its place ahead and only
+    // rides the run's bob. The near span must cover most of a stride: measured
+    // 19.10.2026 on WebGPU the chaser's arm swings with a 0.7-1.05 s period and
+    // dwells ~0.25 s at its forward end (rising there, not advancing in z), so
+    // 0.35 s centred on that dwell read a correctly swinging hand as 0.09 m.
+    // Only some prepare windows last 0.6 s (11 of 26 measured), hence the
+    // retries below.
+    const SPAN = { far: 0.5, near: 0.6 }
     const hand = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right'))
     // ONE page-side RAF loop waits for the first frame in the window and then
     // records every following frame, so no frame falls into a handoff between
@@ -578,7 +582,7 @@ if (section('tag-catch')) {
     // Inside the prepare window the readied hand is HELD out in front while
     // the free hand keeps swinging.
     let near = null
-    for (let tries = 0; tries < 8 && !near; tries++) near = await readSeries('near')
+    for (let tries = 0; tries < 16 && !near; tries++) near = await readSeries('near')
     const side = near && near[0].side
     const other = side === 'left' ? 'right' : 'left'
     check(
