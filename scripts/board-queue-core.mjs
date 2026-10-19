@@ -221,6 +221,46 @@ export function boardTitleReport(html, titles = {}) {
 }
 
 /**
+ * The longest board card title, in characters (calibratable). A headline that
+ * runs on — the whole translated work-order title plus its queue position — is
+ * how cards came to carry their description in the title and none in the body.
+ */
+export const BOARD_CARD_TITLE_MAX = 80
+
+/** A title over the limit is refused at the store boundary, naming the remedy. */
+export function assertCardTitleLength(title) {
+  const t = typeof title === 'string' ? title.trim() : ''
+  const length = [...t].length
+  if (length > BOARD_CARD_TITLE_MAX) {
+    throw new Error(
+      `board-queue: refusing a card title of ${length} characters (limit ${BOARD_CARD_TITLE_MAX}) — ` +
+        'keep the title short and move the rest into the body: node scripts/board-queue.mjs set <N> --text-stdin',
+    )
+  }
+  return title
+}
+
+/**
+ * What BLOCKS a publish among the queue cards the board renders for OPEN points:
+ * a card with no body (only the generator's stub) and a card whose title is over
+ * `BOARD_CARD_TITLE_MAX`. A card for a point outside `open` is not counted.
+ */
+export function boardCardBlockers(html, open = []) {
+  const openSet = new Set([...open].map(Number))
+  const { points } = importQueueFromHtml(html)
+  const bodyless = []
+  const overlong = []
+  for (const [key, entry] of Object.entries(points)) {
+    const n = Number(key)
+    if (!openSet.has(n)) continue
+    if (!entry.body) bodyless.push(n)
+    if ([...String(entry.title ?? '')].length > BOARD_CARD_TITLE_MAX) overlong.push(n)
+  }
+  const asc = (a, b) => a - b
+  return { bodyless: bodyless.sort(asc), overlong: overlong.sort(asc) }
+}
+
+/**
  * A card-writing command may never STORE a command-line flag as prose (point
  * 439) — the defect that put a literal `--text-stdin` on six live cards. The
  * check sits at the store boundary, so no CLI can route around it; a text that
@@ -779,6 +819,7 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
   const n = Number(point)
   if (!Number.isInteger(n) || n <= 0) throw new Error(`board: not a point number: ${point}`)
   assertNotFlagValue(title, 'title')
+  assertCardTitleLength(title)
   assertNotFlagValue(Array.isArray(body) ? body[0] : body, 'body')
   assertNotFlagValue(estimate, 'estimate')
   const { points } = normaliseQueueData(data)
