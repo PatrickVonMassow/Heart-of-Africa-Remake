@@ -85,6 +85,13 @@ put it is the mistake this line exists to stop.
   Verifiable: each step's *Verified* list in the concept; penetration gate and the full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point, chaser and caught child; Playwright picture check in a port city and at a river bank on both backends, judged by looking; cross-vendor code review record.
   Criticality: high - every villager, both backends.
   Bundle: Dorfleben.
+- [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
+  Queue position: directly after point 1343.
+  Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.
+  Final state: in the port-city tag game the glTF chaser's readied arm stays held and its free arm keeps swinging through every prepare window, and the check passes on both backends.
+  Verifiable: polish-children --section=tag-catch green on both backends on 3 consecutive runs for that check; port-city picture judged by looking.
+  Bundle: Dorfleben.
+  Criticality: medium - the port-city chaser's arms, both backends.
 - [ ] 1345. Child tag chaser at sprint speed squats without a stride (teleport threshold in figure units)
   Queue position: with the tag poses of point 1343 (Dorfleben); may land before it on its own.
   Source: findings carrier 12.10.2026 05:58, measured on feat/1316-natural-villager-motion (runtime sheets runtime-chaser-*.png, hips height per frame from the export): at 3.4 u/s the child chaser's hips sit at 0.50 of standing height in every frame with no stride; the same subject at 3.2 u/s (5.8 < 6) runs normally (hips 0.96-1.07, feet alternating +-0.4). Player impact: every child chaser of the port-city tag game at full sprint is drawn squatting and sliding. Related: the river-bank caught child (hips 0.52) and the point gesture's release frame (hips 0.50 at 2.11 s) reach the same CROUCH_MAX fallback.
@@ -15888,10 +15895,3 @@ to land than a mechanism that needs a review.
   Verifiable: each step's *Verified* list in the concept; penetration gate and full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point and carry; picture check in a port city and a village on both backends, judged by looking; cross-vendor code review record.
   Bundle: Dorfleben.
   Criticality: high - every villager, both backends.
-- [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
-  Queue position: directly after point 1343.
-  Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.
-  Final state: in the port-city tag game the glTF chaser's readied arm stays held and its free arm keeps swinging through every prepare window, and the check passes on both backends.
-  Verifiable: polish-children --section=tag-catch green on both backends on 3 consecutive runs for that check; port-city picture judged by looking.
-  Bundle: Dorfleben.
-  Criticality: medium - the port-city chaser's arms, both backends.
