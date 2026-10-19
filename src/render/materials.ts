@@ -10,6 +10,7 @@
 // repetition.
 
 import * as THREE from 'three/webgpu'
+import { FIGURE_MICRO } from '../config/balance'
 import { SWEPT_PATCH_MEAN, edgeBandUniforms, sweptNode } from './edgeBand'
 import { seasonTintNode, wetGroundColor, wetGroundRoughness } from './seasonTint'
 import {
@@ -19,11 +20,15 @@ import {
   dFdy,
   faceDirection,
   float,
+  Fn,
+  If,
   mix,
   mx_fractal_noise_float,
   mx_worley_noise_float,
+  normalGeometry,
   normalView,
   normalWorld,
+  positionGeometry,
   positionView,
   positionWorld,
   smoothstep,
@@ -183,6 +188,169 @@ function surfaceNormal(kind: SurfaceKind, strength: unknown) {
   // and would apply each mesh's model rotation a second time — rotated
   // buildings and the tilted ground disc rendered with broken lighting.)
   return cameraViewMatrix.mul(vec4(blended, 0)).xyz.normalize()
+}
+
+// --- Figure micro-structure (villagers and the traveller) ---------------------
+// The same baked-map technique on the skinned figures, with one difference
+// that decides everything: the projection runs in the body's BIND-POSE space
+// (positionGeometry / normalGeometry, the attributes before skinning), never in
+// world space — world-space triplanar on a deforming body makes the weave swim
+// across a walking leg. The tangent frame of each projection plane is rebuilt
+// per pixel from the screen derivatives of the DEFORMED view position against
+// the bind-space plane coordinates (Schüler's cotangent frame, as three does
+// for a normal map without tangents), so the relief turns with the posed limb.
+
+/** Per-vertex micro-structure kind of a figure part (w of figureBody.ts
+ *  SECOND_COLOUR_ATTRIBUTE). */
+export const FIGURE_FIBRE = { none: 0, skin: 1, cloth: 2, leather: 3 } as const
+export type FigureFibreKind = Exclude<keyof typeof FIGURE_FIBRE, 'none'>
+const FIGURE_FIBRE_KINDS: readonly FigureFibreKind[] = ['skin', 'cloth', 'leather']
+
+type FloatNode = THREE.Node<'float'>
+type Vec2Node = THREE.Node<'vec2'>
+type Vec3Node = THREE.Node<'vec3'>
+
+// COST: a fragment pays for ONE kind only. The kinds sit in mutually
+// exclusive branches on the fibre code, so a fragment samples its own kind's
+// three planes × two scales (6 per map) and fibre `none` samples nothing —
+// against 3 kinds × 6 = 18 per map when every kind was sampled and weighted.
+// Implicit-derivative sampling is undefined in a non-uniform branch (WGSL
+// rejects it), so every sample takes EXPLICIT gradients of the continuous
+// plane coordinate, taken before the branch: mips and anisotropy select as
+// before, with the same per-kind textures and sampler state.
+
+/** True for the fragments of fibre `code` (codes are integers; the 0.5
+ *  window absorbs interpolation error of the flat per-part attribute). */
+const isFibre = (fibre: FloatNode, code: number) => fibre.sub(code).abs().lessThan(0.5)
+
+/** Evaluates `node` HERE, in the current (uniform) flow: a bare toVar() is
+ *  emitted at its first use, which would be inside the branch. */
+function hoist<T extends Vec2Node | Vec3Node>(node: T, zero: T): T {
+  const v = zero.toVar()
+  v.assign(node)
+  return v as unknown as T
+}
+
+interface BindPlane {
+  uv: Vec2Node
+  w: FloatNode
+  /** Screen derivatives of `uv`, taken in uniform control flow. */
+  dx: Vec2Node
+  dy: Vec2Node
+}
+
+/** The three bind-space projection planes, weighted by the bind-space normal,
+ *  with their screen gradients. Must run inside an Fn, before any branch. */
+function bindPlanes(): BindPlane[] {
+  const p = positionGeometry
+  const bw = normalGeometry.abs().pow(3)
+  const w = bw.div(bw.x.add(bw.y).add(bw.z)).toVar()
+  return ([
+    [p.zy, w.x],
+    [p.xz, w.y],
+    [p.xy, w.z],
+  ] as Array<[Vec2Node, FloatNode]>).map(([uv, pw]) => ({
+    uv,
+    w: pw,
+    dx: hoist(uv.dFdx(), vec2(0, 0)),
+    dy: hoist(uv.dFdy(), vec2(0, 0)),
+  }))
+}
+
+/** Low-frequency 0..1 switch between the two texture scales, in bind space
+ *  (so it, too, rides the body). */
+function bindTileBreakMask() {
+  return smoothstep(
+    float(0.3),
+    float(0.7),
+    mx_fractal_noise_float(positionGeometry.mul(FIGURE_MICRO.breakFreq), 2).mul(0.5).add(0.5),
+  )
+}
+
+/** One map of a kind at both scales, mask-blended, on one plane — sampled with
+ *  the plane's explicit gradients (scaled with the coordinate). */
+function twoScaleSample(tex: THREE.Texture, plane: BindPlane, kind: FigureFibreKind, mask: FloatNode) {
+  const f1 = 1 / FIGURE_MICRO.tile[kind]
+  const f2 = f1 * FIGURE_MICRO.secondScale
+  const at = (f: number) => texture(tex, plane.uv.mul(f)).grad(plane.dx.mul(f), plane.dy.mul(f))
+  return mix(at(f1), at(f2), mask)
+}
+
+/** Runs `body` for the one kind of this fragment (if / else-if chain on the
+ *  fibre code; fibre `none` runs none of them). */
+function perKind(fibre: FloatNode, body: (kind: FigureFibreKind) => void) {
+  let chain: ReturnType<typeof If> | null = null
+  for (const kind of FIGURE_FIBRE_KINDS) {
+    const cond = isFibre(fibre, FIGURE_FIBRE[kind])
+    chain = chain === null ? If(cond, () => body(kind)) : chain.ElseIf(cond, () => body(kind))
+  }
+}
+
+/**
+ * Albedo structure factor (mean ≈ 1) for a figure fragment of fibre `fibre`:
+ * the kind's mid-gray baked albedo, doubled, faded toward 1 by the kind's
+ * calibratable amount — multiplied onto the per-figure tint by the caller, so
+ * every figure keeps its own colours. Fibre `none` (hair, beads, metal) stays 1.
+ */
+export function figureMicroColor(fibre: FloatNode): FloatNode {
+  return Fn(() => {
+    const planes = bindPlanes()
+    const factor = float(1).toVar()
+    perKind(fibre, (kind) => {
+      const tex = loadSurfaceTexture(`${kind}_a`)
+      const mask = bindTileBreakMask()
+      let s: FloatNode = float(0)
+      for (const plane of planes) s = s.add(twoScaleSample(tex, plane, kind, mask).r.mul(plane.w))
+      factor.assign(s.mul(2).sub(1).mul(FIGURE_MICRO.albedo[kind]).add(1))
+    })
+    return factor
+  })() as unknown as FloatNode
+}
+
+/** View-space tangent and bitangent of a bind-space plane coordinate at this
+ *  pixel (cotangent frame from screen derivatives; three's TangentUtils).
+ *  On a back face normalView is negated, which negates t and b with it: the
+ *  whole perturbed normal mirrors, as the far side of a relief should. */
+function planeFrame(plane: BindPlane) {
+  const q0 = positionView.dFdx()
+  const q1 = positionView.dFdy()
+  const st0 = plane.dx
+  const st1 = plane.dy
+  const q1perp = q1.cross(normalView)
+  const q0perp = normalView.cross(q0)
+  const t = q1perp.mul(st0.x).add(q0perp.mul(st1.x))
+  const b = q1perp.mul(st0.y).add(q0perp.mul(st1.y))
+  const det = t.dot(t).max(b.dot(b))
+  const scale = det.equal(0).select(float(0), det.inverseSqrt())
+  return { t: hoist(t.mul(scale), vec3(0, 0, 0)), b: hoist(b.mul(scale), vec3(0, 0, 0)) }
+}
+
+/**
+ * View-space normal with the figure's baked micro-relief: per plane, the
+ * tangent-space normal of the fragment's kind (two scales, kind bump) applied
+ * in that plane's per-pixel frame, then the planes blended by the bind-space
+ * weights. Fibre `none` keeps the interpolated normal.
+ */
+export function figureMicroNormal(fibre: FloatNode): Vec3Node {
+  return Fn(() => {
+    const planes = bindPlanes()
+    // The frames use screen derivatives too: built before the branch.
+    const frames = planes.map(planeFrame)
+    const out = vec3(normalView).toVar()
+    perKind(fibre, (kind) => {
+      const tex = loadSurfaceTexture(`${kind}_n`)
+      const bump = FIGURE_MICRO.bump[kind]
+      const mask = bindTileBreakMask()
+      let acc: Vec3Node = vec3(0, 0, 0)
+      planes.forEach((plane, i) => {
+        const n = twoScaleSample(tex, plane, kind, mask).xyz.mul(2).sub(1)
+        const { t, b } = frames[i]
+        acc = acc.add(t.mul(n.x.mul(bump)).add(b.mul(n.y.mul(bump))).add(normalView.mul(n.z)).normalize().mul(plane.w))
+      })
+      out.assign(acc.normalize())
+    })
+    return out
+  })() as unknown as Vec3Node
 }
 
 export interface SurfaceMaterialOptions {

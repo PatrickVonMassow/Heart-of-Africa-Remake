@@ -2467,6 +2467,31 @@ export const VILLAGER_DRESS = {
 } as const
 
 /**
+ * Micro-structure of the figures' surfaces (villagers and the traveller, design
+ * line 64): the baked cloth / leather / skin maps (scripts/textureFields.mjs)
+ * projected triplanar in the body's BIND-POSE space (render/materials.ts
+ * `figureMicroColor`/`figureMicroNormal`), so the structure rides the skinned,
+ * animated body. Lengths are in FIGURE units (an adult man is
+ * VILLAGER_ASSET.stature = 1.34 ≈ 1.75 m, so 1 unit ≈ 1.3 m). Every value is a
+ * CALIBRATABLE educated guess read off the eye-height pictures.
+ */
+export const FIGURE_MICRO = {
+  /** Tile edge per kind (512 px per tile): cloth ≈ 0.21 m (a thread ≈ 1.6 mm),
+   *  leather ≈ 0.26 m, skin ≈ 0.16 m. */
+  tile: { cloth: 0.16, leather: 0.2, skin: 0.12 },
+  /** Normal-map tangent deflection per kind (1 = as baked). */
+  bump: { cloth: 1.0, leather: 1.0, skin: 1.0 },
+  /** How much of the baked albedo structure reaches the tint (0 = flat tint,
+   *  1 = as baked); skin is kept faint so a face never reads dirty. */
+  albedo: { cloth: 1.0, leather: 0.9, skin: 0.8 },
+  /** Frequency (per figure unit) of the low noise that switches between the
+   *  two texture scales against visible tiling. */
+  breakFreq: 2.2,
+  /** Ratio of the second (coarser) texture scale to the first. */
+  secondScale: 0.353,
+} as const
+
+/**
  * The colours of the Giza plateau's people and of the expedition leader, drawn
  * on the villagers' body (docs/giza-1890.md §4.1). Every value is a
  * CALIBRATABLE guess: the record names the garments, not their colours. The

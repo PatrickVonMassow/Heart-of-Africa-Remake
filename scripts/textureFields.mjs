@@ -245,6 +245,74 @@ export const SURFACE_MATERIALS = {
     },
     normalStrength: 3.0,
   },
+  // --- Figure kinds (villagers and the traveller, materials.ts figureMicro*) ---
+  // Neutral gray (r = g = b): the per-figure dress/skin tint carries all hue.
+  // Handwoven cloth: plain weave (128 threads per tile, over/under alternating),
+  // slubbed threads of uneven thickness and soft vertical drape creases.
+  cloth: {
+    height(u, v) {
+      return clothHeight(u, v)
+    },
+    colorize(h, u, v) {
+      const slub = pnoise2(u, v, CLOTH_THREADS, 5, 153)
+      const g = 128 + (h - 0.4) * 50 + (slub - 0.5) * 26
+      return [g, g, g]
+    },
+    normalStrength: 2.6,
+  },
+  // Hide/leather: raised pebble-grain cells between creased grooves, fine
+  // wrinkles and broad scuffing.
+  leather: {
+    height(u, v) {
+      const cells = 1 - worley(u, v, 40, 161)
+      const wrinkle = fbm2(u, v, 3, 12, 3, 162)
+      const fine = fbm(u, v, 96, 2, 163)
+      return clamp01(Math.pow(cells, 0.6) * 0.45 + wrinkle * 0.3 + fine * 0.15 + 0.05)
+    },
+    colorize(h, u, v) {
+      const scuff = fbm(u, v, 4, 3, 164)
+      const g = 128 + (h - 0.55) * 60 + (scuff - 0.5) * 30
+      return [g, g, g]
+    },
+    normalStrength: 4.5,
+  },
+  // Skin: gentle unevenness, fine pore pits and the crossing fine-line relief;
+  // kept faint in albedo so the skin tone never reads dirty.
+  skin: {
+    height(u, v) {
+      const base = fbm(u, v, 12, 3, 171)
+      const pores = Math.pow(1 - worley(u, v, 72, 172), 7)
+      const lines = Math.min(fbm2(u, v, 40, 6, 2, 173), fbm2(u, v, 6, 40, 2, 174))
+      return clamp01(0.3 + base * 0.5 - pores * 0.35 + lines * 0.2)
+    },
+    colorize(h, u, v) {
+      const mottle = fbm(u, v, 5, 3, 175)
+      const g = 128 + (h - 0.55) * 34 + (mottle - 0.5) * 22
+      return [g, g, g]
+    },
+    normalStrength: 4.0,
+  },
+}
+
+/** Threads per cloth tile (an integer, so the weave tiles). */
+const CLOTH_THREADS = 128
+
+/** Plain weave: in each cell the warp (along v) or the weft (along u) lies on
+ *  top, alternating chequerwise; each thread bulges across its width and dips
+ *  where it passes under. Slubs vary the thread thickness; low creases drape. */
+function clothHeight(u, v) {
+  const x = u * CLOTH_THREADS
+  const y = v * CLOTH_THREADS
+  const i = Math.floor(x)
+  const j = Math.floor(y)
+  const fx = x - i
+  const fy = y - j
+  const across = (f) => Math.pow(Math.sin(Math.PI * f), 0.7)
+  const warpOver = (i + j) % 2 === 0
+  const weave = warpOver ? across(fx) * (0.55 + 0.45 * Math.sin(Math.PI * fy)) : across(fy) * (0.55 + 0.45 * Math.sin(Math.PI * fx))
+  const slub = warpOver ? pnoise2(u, v, CLOTH_THREADS, 5, 151) : pnoise2(u, v, 5, CLOTH_THREADS, 152)
+  const crease = fbm2(u, v, 4, 1, 3, 154)
+  return clamp01(weave * (0.6 + slub * 0.4) * 0.4 + slub * 0.2 + crease * 0.4)
 }
 
 // --- Bake loop -------------------------------------------------------------------

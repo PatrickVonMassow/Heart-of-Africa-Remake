@@ -10,7 +10,7 @@ import { onBaselineLane } from './baseline-classify-core.mjs'
 import { describeOverlap, lineOverlap, lineOverlapFrom } from './errandShutter.mjs'
 import sharp from 'sharp'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { BASE, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
+import { BASE, OUT, section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, awaitPlaceDrawn } from './_polish.mjs'
 import { ROW_STAGING, restageReason } from './rowStaging.mjs'
 import { probeCarriedJar, showCarriedJarMeshes, castCarriedJarShadow, countChangedPixels, judgeCarriedJar } from './carriedJar.mjs'
 // --- Villager arms and gestures (point 479) ---------------------------------
@@ -5209,6 +5209,498 @@ if (section('village-walk')) {
   kneelChecks('low preset kneel', lowKneel)
   check(`low preset kneel: the primitive stays on the ground through the kneel (≤ ${FOOT_TOL.toFixed(3)} m)`, lowKneel.worstLowest !== null && lowKneel.worstLowest <= FOOT_TOL, JSON.stringify(lowKneel))
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+}
+
+// --- Figure micro-structure (design.md line 64) -------------------------------
+// The villagers and the traveller carry baked cloth / leather / skin structure,
+// projected in the body's BIND-POSE space (render/materials.ts figureMicro*).
+// Three pictures, judged by looking: a close first-person view of a villager
+// (cloth weave, hide grain, skin), the same walker at two phases of its stride
+// (the structure must stay on the limb, not swim across it), and the bird's-eye
+// traveller — plus the traveller's temporal stability measured under TRAA.
+if (section('figure-micro')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+  // One villager `d` ahead of the player with a clear sight line to its hips
+  // and chest, on the first of 16 bearings that has one.
+  const stageOne = (village, who, d) =>
+    page.evaluate(
+      ({ who, d }) => {
+        const p = window.__placePlayer
+        window.__dressLineup(null)
+        for (let k = 0; k < 16; k++) {
+          const yaw = p.yaw + (k * Math.PI) / 8
+          const cx = p.x - Math.sin(yaw) * d
+          const cz = p.z - Math.cos(yaw) * d
+          const clear = [0.5, 0.9, 1.2].every((y) => {
+            const hit = window.__placeRayHit?.(cx, y, cz)
+            return !hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.15
+          })
+          if (!clear) continue
+          p.yaw = yaw
+          p.pitch = -0.12
+          window.__dressLineup({ x: cx, z: cz, yaw, only: [who] })
+          return { cx, cz, yaw }
+        }
+        return null
+      },
+      { who, d },
+    )
+  for (const [village, who, label] of [
+    ['zulu-village', 'female-adult', 'a Zulu married woman: bare skin, hide skirt, beadwork'],
+    ['hausa-village', 'male-adult', 'a Hausa married man in his cotton robe'],
+  ]) {
+    await goToPlace(village)
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
+    const at = await stageOne(village, who, 1.25)
+    check(`figure micro-structure: ${village} ${who} staged close with a clear view`, !!at, 'no clear bearing at 1.25 m')
+    if (!at) continue
+    await nextFrames(4)
+    const drawn = await page.evaluate(() => {
+      const row = window.__placeScene.getObjectByName('dress-lineup')
+      let skinned = null
+      row?.traverse((o) => {
+        if (o.isSkinnedMesh && !skinned) skinned = o
+      })
+      // the micro-structure kind rides in w of the second colour (figureBody.ts)
+      const fib = skinned?.geometry.getAttribute('figureColour2')
+      const kinds = fib?.itemSize === 4 ? [...new Set(Array.from({ length: fib.count }, (_, k) => fib.getW(k)))].sort() : []
+      return { skinned: !!skinned, material: skinned?.material.name ?? null, normalNode: !!skinned?.material.normalNode, kinds }
+    })
+    check(
+      `figure micro-structure: the ${village} ${who} is the skinned body with the micro-relief material and its skin plus garment kinds`,
+      drawn.skinned && drawn.normalNode && drawn.kinds.includes(1) && drawn.kinds.some((k) => k === 2 || k === 3),
+      JSON.stringify(drawn),
+    )
+    await frame(shot(`1380-figure-micro-${village.replace('-village', '')}-close`), {
+      local: { x: at.cx, y: 0.8, z: at.cz },
+      label: `${label}, 1.25 m from the eye: the cloth/leather/skin micro-structure at first-person height`,
+    })
+    await page.evaluate(() => window.__dressLineup(null))
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
+  }
+
+  // THE WALK-CYCLE PAIR: one walker, frozen at two phases of its stride with
+  // the camera at the same offset from it, so the weave can be compared on the
+  // limb from frame to frame.
+  await goToPlace('hausa-village')
+  // Every walker out on the walk, on the glTF body.
+  const walkerAt = () =>
+    page.evaluate(() => {
+      const w = window.__placeWalkers
+      const out = []
+      if (!w) return out
+      for (let i = 0; i < w.states.length; i++) {
+        const s = w.states[i]
+        const g = w.group(i)
+        if (!g?.visible || s.mode !== 'walk' || s.pause > 0) continue
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        if (!mesh || !mesh.skeleton.bones.some((b) => b.name === 'bone-toe.L')) continue
+        out.push(i)
+      }
+      return out
+    })
+  let who = null
+  for (let f = 0; f < 600 && who === null; f += 10) {
+    who = (await walkerAt())[0] ?? null
+    if (who === null) await nextFrames(10)
+  }
+  check('figure micro-structure: a villager is out walking on the glTF body', who !== null, 'no skinned walker out in 600 frames')
+  if (who !== null) {
+    // The camera at the walker's flank, `dist` off, looking at it; returns the
+    // thigh swing and whether the hips and head project into the picture.
+    const flankView = (i, flank, dist) =>
+      page.evaluate(
+        ({ i, flank, dist }) => {
+          const g = window.__placeWalkers.group(i)
+          const side = g.rotation.y + (flank * Math.PI) / 2
+          const p = window.__placePlayer
+          p.x = g.position.x + Math.sin(side) * dist
+          p.z = g.position.z + Math.cos(side) * dist
+          p.yaw = side
+          p.pitch = -0.3
+          return { x: p.x, z: p.z, gx: g.position.x, gz: g.position.z }
+        },
+        { i, flank, dist },
+      )
+    // The pose, and whether the hips, both shins and the head project into the
+    // picture with the first surface on each sight line the walker's own body
+    // (a hut wall or a fence in front is no frame).
+    const pose = (i) =>
+      page.evaluate((i) => {
+        const g = window.__placeWalkers.group(i)
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        const own = new Set()
+        g.traverse((o) => own.add(o.uuid))
+        const bone = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`)
+        const cam = window.__placeCamera
+        g.updateWorldMatrix(true, true)
+        cam.updateMatrixWorld()
+        const V = g.position.constructor
+        let why = null
+        for (const n of ['hips', 'shin.L', 'shin.R', 'head']) {
+          const p = bone(n).getWorldPosition(new V())
+          const v = p.clone().project(cam)
+          if (!(Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.9 && v.z < 1)) {
+            why = `${n} out of the picture`
+            break
+          }
+          const hit = window.__placeRayHit?.(p.x, p.y, p.z)
+          if (hit && hit.hitDistance !== null && !own.has(hit.hitUuid) && hit.hitDistance < hit.targetDistance - 0.25) {
+            why = `${n} hidden at ${hit.hitDistance.toFixed(2)} of ${hit.targetDistance.toFixed(2)}`
+            break
+          }
+        }
+        return { thighL: bone('thigh.L').rotation.x, thighR: bone('thigh.R').rotation.x, inView: why === null, why, at: { x: g.position.x, z: g.position.z } }
+      }, i)
+    // Stand at a flank that holds the legs in the picture and is not pushed off.
+    // The walker's screen box (CSS px) from its projected joints, padded.
+    const walkerBox = (i) =>
+      page.evaluate((i) => {
+        const g = window.__placeWalkers.group(i)
+        let mesh = null
+        g.traverse((o) => {
+          if (o.isSkinnedMesh && !mesh) mesh = o
+        })
+        const cam = window.__placeCamera
+        const V = g.position.constructor
+        const W = window.innerWidth
+        const H = window.innerHeight
+        const pts = ['head', 'foot.L', 'foot.R', 'hand.L', 'hand.R', 'hips']
+          .map((n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`).getWorldPosition(new V()).project(cam))
+          .map((v) => [((v.x + 1) / 2) * W, ((1 - v.y) / 2) * H])
+        const xs = pts.map((q) => q[0])
+        const ys = pts.map((q) => q[1])
+        const pad = 60
+        const x = Math.max(0, Math.floor(Math.min(...xs) - pad))
+        const y = Math.max(0, Math.floor(Math.min(...ys) - pad))
+        return { x, y, width: Math.min(W - x, Math.ceil(Math.max(...xs) + pad) - x), height: Math.min(H - y, Math.ceil(Math.max(...ys) + pad) - y) }
+      }, i)
+    const pair = []
+    const misses = []
+    const standAt = async (flanks = [1, -1]) => {
+      for (const flank of flanks) {
+        for (const dist of [1.6, 1.9, 1.3, 2.3, 2.8]) {
+          const want = await flankView(who, flank, dist)
+          await nextFrames(3)
+          const got = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+          if (Math.hypot(got.x - want.x, got.z - want.z) > 0.05) {
+            misses.push({ flank, dist, why: 'moved' })
+            continue
+          }
+          const p = await pose(who)
+          if (p.inView) return { flank, dist, ...p }
+          misses.push({ flank, dist, why: p.why })
+        }
+      }
+      return null
+    }
+    // Frame A: the first walker out that a clear flank spot holds; life runs
+    // on a little between tries, so a walker behind a hut comes out again.
+    let a = null
+    for (let tries = 0; tries < 8 && !a; tries++) {
+      for (const i of await walkerAt()) {
+        who = i
+        await page.evaluate(() => window.__placeFreezeLife?.(true))
+        a = await standAt()
+        if (a) break
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+      }
+      if (!a) await nextFrames(60)
+    }
+    check('figure micro-structure: walk frame A has the walker’s legs in clear view', !!a, `no flank spot at 1.3–2.8 m held any walker: ${JSON.stringify(misses.slice(-12))}`)
+    if (a) {
+      await frame(shot('1380-figure-micro-walk-a'), {
+        local: { x: a.at.x, y: 0.6, z: a.at.z },
+        label: `walk-cycle frame A: the Hausa walker side-on (thighs ${a.thighL.toFixed(2)} / ${a.thighR.toFixed(2)} rad); the cloth weave on the moving leg`,
+      })
+      pair.push(await capturePixels(page, 'walk-cycle pair, frame A', { clip: await walkerBox(who) }))
+      // On to a clearly different phase of the stride: the leading thigh
+      // swapped. Half a stride on, the walker may stand where the same flank
+      // spot is blocked (every distance "moved": a wall at his side), so up to
+      // four opposite-phase moments are tried before the frame is refused.
+      const swappedNow = (aa) =>
+        stepUntil(
+          ({ i, a }) => {
+            const g = window.__placeWalkers.group(i)
+            let mesh = null
+            g.traverse((o) => {
+              if (o.isSkinnedMesh && !mesh) mesh = o
+            })
+            const t = (n) => mesh.skeleton.bones.find((b) => b.name === `bone-${n}`).rotation.x
+            const d = t('thigh.L') - t('thigh.R')
+            return Math.sign(d) !== Math.sign(a.thighL - a.thighR) && Math.abs(d) > 0.6 * Math.abs(a.thighL - a.thighR)
+          },
+          { i: who, a: aa },
+          240,
+        )
+      let swapped = false
+      let b = null
+      const bMisses = []
+      for (let attempt = 0; attempt < 4 && !b; attempt++) {
+        await page.evaluate(() => window.__placeFreezeLife?.(false))
+        if (attempt > 0) await nextFrames(20) // off this moment, on to the next stride
+        swapped = await swappedNow(a)
+        await page.evaluate(() => window.__placeFreezeLife?.(true))
+        misses.length = 0
+        if (swapped) b = await standAt([a.flank])
+        bMisses.push(...misses)
+      }
+      misses.length = 0
+      misses.push(...bMisses.slice(-10))
+      check(
+        'figure micro-structure: walk frame B shows the same walker at the opposite stride phase, legs in view',
+        swapped && !!b && b.flank === a.flank,
+        JSON.stringify({ swapped, a: a && { thighL: a.thighL, thighR: a.thighR, flank: a.flank }, b: b && { thighL: b.thighL, thighR: b.thighR, flank: b.flank }, misses }),
+      )
+      if (b) {
+        await frame(shot('1380-figure-micro-walk-b'), {
+          local: { x: b.at.x, y: 0.6, z: b.at.z },
+          label: `walk-cycle frame B: the same walker half a stride on (thighs ${b.thighL.toFixed(2)} / ${b.thighR.toFixed(2)} rad); the weave must sit on the leg as in frame A`,
+        })
+        pair.push(await capturePixels(page, 'walk-cycle pair, frame B', { clip: await walkerBox(who) }))
+        // Both crops side by side at one height, brightened ×2 for the eye (the
+        // walker is often in a hut's shade): the comparison picture.
+        const h = 640
+        const crops = await Promise.all(pair.map((c) => sharp(c).resize({ height: h }).modulate({ brightness: 2 }).toBuffer({ resolveWithObject: true })))
+        const w = crops.reduce((n, c) => n + c.info.width, 0) + 10
+        let left = 0
+        const layers = crops.map((c) => {
+          const l = { input: c.data, left, top: 0 }
+          left += c.info.width + 10
+          return l
+        })
+        await sharp({ create: { width: w, height: h, channels: 3, background: '#ffffff' } }).composite(layers).png().toFile(`${OUT}${shot('1380-figure-micro-walk-pair')}.png`)
+      }
+    }
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
+  }
+
+  // THE BIRD'S-EYE TRAVELLER: out of the place into the travel view; the
+  // skinned traveller (medium) must stay still under TRAA — the baked maps'
+  // mip chain, not a distance fade, is what keeps the far structure calm.
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  const out = await page
+    .waitForFunction(() => !window.__game.getState().placeId && !!window.__travellerRoot && window.__camera?.settled?.(), null, { timeout: 60000 })
+    .then(() => true)
+    .catch(() => false)
+  check('figure micro-structure: the travel view holds the traveller', out, 'no settled travel camera with the traveller in 60 s')
+  if (out) {
+    const skinned = await page.evaluate(() => {
+      let m = null
+      window.__travellerRoot.traverse((o) => {
+        if (o.isSkinnedMesh && o.visible && !m) m = o
+      })
+      return m ? { material: m.material.name, normalNode: !!m.material.normalNode } : null
+    })
+    check('figure micro-structure: the traveller is the skinned body with the micro-relief material', !!skinned?.normalNode, JSON.stringify(skinned))
+    const pos = await page.evaluate(() => window.__game.getState().pos)
+    await frame(shot('1380-figure-micro-traveller'), {
+      world: { x: pos.x, z: pos.z },
+      label: 'the traveller from the bird’s-eye travel camera, standing still under TRAA',
+    })
+    // The traveller's screen box from the projection of his feet and crown.
+    const box = await page.evaluate(() => {
+      const r = window.__travellerRoot
+      r.updateWorldMatrix(true, true)
+      const V = r.position.constructor
+      const pts = []
+      r.traverse((o) => {
+        if (o.name === 'figure-crown' || o.name === 'bone-foot.L' || o.name === 'bone-foot.R' || o.name === 'bone-hand.L' || o.name === 'bone-hand.R') {
+          const v = o.getWorldPosition(new V())
+          pts.push(window.__camera.ndc(v.x, v.z, v.y))
+        }
+      })
+      const W = window.innerWidth
+      const H = window.innerHeight
+      const xs = pts.map((p) => ((p.x + 1) / 2) * W)
+      const ys = pts.map((p) => ((1 - p.y) / 2) * H)
+      const pad = 12
+      const left = Math.max(0, Math.floor(Math.min(...xs) - pad))
+      const top = Math.max(0, Math.floor(Math.min(...ys) - pad))
+      return { left, top, width: Math.min(W - left, Math.ceil(Math.max(...xs) - Math.min(...xs) + 2 * pad)), height: Math.min(H - top, Math.ceil(Math.max(...ys) - Math.min(...ys) + 2 * pad)), points: pts.length }
+    })
+    const clip = { x: box.left, y: box.top, width: box.width, height: box.height }
+    const grey = async (png) => sharp(png).greyscale().raw().toBuffer()
+    // VISIBILITY FIRST (review finding): the joints' projection proves only
+    // where he would be, not that he is drawn — an occluded or absent
+    // traveller changes nothing and passed. So the same crop is rendered once
+    // with the traveller hidden; the pixels that differ are HIS visible
+    // pixels, and the shimmer is measured on them. His cast shadow is
+    // switched off while the mask is taken (review finding): shadow pixels
+    // are ground, carry no micro-structure and diluted the interior.
+    await page.evaluate(() => {
+      window.__travellerRoot.visible = false
+    })
+    await nextFrames(30) // let the TRAA history settle on the empty ground
+    const without = await grey(await capturePixels(page, 'traveller mask (hidden)', { clip }))
+    await page.evaluate(() => {
+      window.__travellerRoot.visible = true
+      window.__travellerShadow = []
+      window.__travellerRoot.traverse((o) => {
+        if (o.isMesh && o.castShadow) {
+          o.castShadow = false
+          window.__travellerShadow.push(o)
+        }
+      })
+    })
+    await nextFrames(30)
+    const shownNoShadow = await grey(await capturePixels(page, 'traveller mask (shown, no cast shadow)', { clip }))
+    await page.evaluate(() => {
+      for (const o of window.__travellerShadow) o.castShadow = true
+      delete window.__travellerShadow
+      // THE POSE IS FROZEN for the shimmer frames: standing, he still plays
+      // his idle clip, which moved his joints ~1 px between captures
+      // (measured 0.89-1.15 px) — motion, not shimmer, and on a textured
+      // surface it read as a rising 3-10 % "shimmer". A frozen page clock
+      // makes every frame's dt 0, so nothing animates, while the TRAA jitter
+      // still runs per rendered frame (the ground keeps changing 0.2-0.3 %).
+      const realNow = performance.now.bind(performance)
+      const t0 = realNow()
+      window.__realNow1380 = realNow
+      performance.now = () => t0
+    })
+    const frames = []
+    let boneMovePx = []
+    try {
+      await nextFrames(30) // TRAA history converges on the frozen pose, shadow back on
+      const joints = () =>
+        page.evaluate(() => {
+          const r = window.__travellerRoot
+          r.updateWorldMatrix(true, true)
+          const V = r.position.constructor
+          const pts = []
+          r.traverse((o) => {
+            if (!o.isBone) return
+            const v = o.getWorldPosition(new V())
+            const n = window.__camera.ndc(v.x, v.z, v.y)
+            pts.push([((n.x + 1) / 2) * window.innerWidth, ((1 - n.y) / 2) * window.innerHeight])
+          })
+          return pts
+        })
+      const at = []
+      for (let i = 0; i < 4; i++) {
+        at.push(await joints())
+        frames.push(await capturePixels(page, 'traveller shimmer frame diff', { clip }))
+        await nextFrames(6)
+      }
+      boneMovePx = at.slice(1).map((p, k) => +Math.max(0, ...p.map((q, j) => Math.hypot(q[0] - at[k][j][0], q[1] - at[k][j][1]))).toFixed(3))
+    } finally {
+      await page.evaluate(() => {
+        performance.now = window.__realNow1380
+        delete window.__realNow1380
+      })
+    }
+    const raws = await Promise.all(frames.map(grey))
+    const mask = new Uint8Array(without.length)
+    let visible = 0
+    if (shownNoShadow.length === without.length) {
+      for (let i = 0; i < without.length; i++) {
+        if (Math.abs(shownNoShadow[i] - without[i]) > 16) {
+          mask[i] = 1
+          visible++
+        }
+      }
+    }
+    // A man-sized figure in the bird's-eye crop covers far more than this.
+    const minVisible = Math.max(40, Math.round(0.05 * without.length))
+    // The shimmer is judged on his INTERIOR (mask pixels whose 8 neighbours
+    // are his too): the silhouette ring flickers under the TRAA sub-pixel
+    // jitter whatever the surface carries — measured 7.4-8.8 % of all his
+    // pixels with the micro-structure switched OFF — while the micro-structure
+    // lives on the interior, where a mip-chain failure would show.
+    const W = box.width
+    const H = mask.length === W * box.height ? box.height : 0 // capture ≠ clip: no interior, the check fails
+    const interior = new Uint8Array(mask.length)
+    let inner = 0
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x
+        if (!mask[i]) continue
+        let all = true
+        for (let dy = -1; dy <= 1 && all; dy++) for (let dx = -1; dx <= 1; dx++) if (!mask[i + dy * W + dx]) all = false
+        if (all) {
+          interior[i] = 1
+          inner++
+        }
+      }
+    }
+    let maxFrac = 0
+    let maxAll = 0
+    const pairs = []
+    const groundPairs = []
+    const driftPairs = []
+    for (let k = 1; k < raws.length; k++) {
+      const [a, b] = [raws[k - 1], raws[k]]
+      if (a.length !== b.length || a.length !== mask.length || inner === 0) continue
+      let changed = 0
+      let changedAll = 0
+      let ground = 0
+      let groundChanged = 0
+      let drift = 0
+      for (let i = 0; i < a.length; i++) {
+        if (interior[i]) drift += b[i] - a[i]
+        if (!mask[i]) {
+          ground++
+          if (Math.abs(a[i] - b[i]) > 6) groundChanged++
+          continue
+        }
+        if (Math.abs(a[i] - b[i]) <= 6) continue
+        changedAll++
+        if (interior[i]) changed++
+      }
+      maxFrac = Math.max(maxFrac, changed / inner)
+      maxAll = Math.max(maxAll, changedAll / visible)
+      pairs.push(+((changed / inner) * 100).toFixed(2))
+      // Diagnostics: a moving light or camera changes the ground too and
+      // shifts the interior's mean; shimmer does neither.
+      groundPairs.push(+((groundChanged / Math.max(1, ground)) * 100).toFixed(2))
+      driftPairs.push(+(drift / inner).toFixed(2))
+    }
+    // The crop, enlarged 4× for the eye (nearest neighbour: no smoothing).
+    await sharp(frames[0]).resize({ width: box.width * 4, kernel: 'nearest' }).toFile(`${OUT}${shot('1380-figure-micro-traveller-crop')}.png`)
+    check(
+      'figure micro-structure: the traveller is visibly drawn in his crop (hidden-vs-shown mask)',
+      box.points >= 5 && box.width > 8 && box.height > 8 && visible >= minVisible,
+      JSON.stringify({ box, visiblePixels: visible, minVisible, cropPixels: without.length }),
+    )
+    check(
+      'figure micro-structure: the standing traveller is temporally stable under TRAA (no shimmer on his visible pixels)',
+      // Measured with the pose frozen (19.10.2026, ~200 interior pixels, so
+      // one pixel ≈ 0.5 %): WebGPU micro ON [0, 0.51, 0.51] / [1.01, 1.01,
+      // 0.51] %, the micro-OFF control (FIGURE_MICRO bump and albedo 0)
+      // [0.5, 1.51, 1.01] % — the baked maps add no shimmer; WebGL 2 micro ON
+      // [1.97, 2.46, 1.48] % (no WebGL 2 control). The 5 % bar stays. A joint
+      // that still moves means the frames measure motion: the check fails.
+      // A capture that does not match the mask is skipped above, so every
+      // pair must have been compared or nothing was measured.
+      visible >= minVisible &&
+        inner >= 20 &&
+        boneMovePx.length === 3 &&
+        boneMovePx.every((d) => d < 0.05) &&
+        pairs.length === 3 &&
+        pairs.length === raws.length - 1 &&
+        maxFrac < 0.05,
+      JSON.stringify({
+        boneMovePx,
+        comparedPairs: pairs.length,
+        captures: raws.map((r) => r.length),
+        visiblePixels: visible,
+        interiorPixels: inner,
+        maxChangedInterior: +(maxFrac * 100).toFixed(2) + ' %',
+        pairsPercent: pairs,
+        withSilhouette: +(maxAll * 100).toFixed(2) + ' %',
+        groundPairsPercent: groundPairs,
+        interiorMeanDrift: driftPairs,
+      }),
+    )
+  }
 }
 
 await finishPolishSuite()

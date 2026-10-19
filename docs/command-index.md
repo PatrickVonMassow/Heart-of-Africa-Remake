@@ -209,7 +209,7 @@
 | `focus.mjs` | Declare/confirm the CURRENT work focus — the primitive the dashboard Stop guard holds the now-card against (invariants 5-8 in dashboard-guard-core.mjs). | usage: node scripts/focus.mjs set <pointNumber\|-> "<one line what> |
 | `fold-point-core.mjs` | FOLDING A POINT AWAY, as pure decisions (point 614). | usage: node scripts/fold-point.mjs <point> (--into <survivor> \| --delivered "<evidence> |
 | `fold-point.mjs` | FOLD A POINT AWAY — tick, archive move and Erledigt card in one command (point 614). | — |
-| `generate-surface-textures.mjs` | Generates the tileable settlement-surface textures (albedo + normal map) for the first-person materials (design.md §2.6): plaster, mud daub, thatch, wood and trodden settlement ground. | — |
+| `generate-surface-textures.mjs` | Generates the tileable settlement-surface textures (albedo + normal map) for the first-person materials (design.md §2.6): plaster, mud daub, thatch, wood and trodden settlement ground, plus the figure kinds cloth, leather and skin (villagers and the traveller). | — |
 | `generate-terrain-textures.mjs` | Generates the tileable PBR ground textures (albedo + normal map) used by the terrain splatting (design.md §3). | — |
 | `git-tracked.mjs` | Is a path a TRACKED, CLEAN repository artefact? | — |
 | `guard-compatibility-core.mjs` | NO TWO GUARDS MAY JOINTLY DEMAND AND FORBID ONE ACTION (point 1048, union entry U18) — the pure half. | — |
