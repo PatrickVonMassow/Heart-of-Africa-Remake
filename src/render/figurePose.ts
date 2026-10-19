@@ -23,6 +23,8 @@ export interface FigureLimbs {
   /** Called once the pose is on the pivots: the skinned body (scenes/place/
    *  skinnedFigure.tsx) carries it onto its bones in that same frame. */
   retarget?: () => void
+  /** The glTF body's pivots: it takes a pose's own `body` where one is given. */
+  skinned?: boolean
 }
 
 /**
@@ -36,6 +38,7 @@ export interface FigureLimbs {
  */
 export function applyFigurePose(limbs: FigureLimbs | null, shown: FigurePose): void {
   if (!limbs) return
+  if (limbs.skinned && shown.body) shown = shown.body
   const left = limbs.arms[0]
   const right = limbs.arms[1]
   if (left) left.rotation.set(shown.left.pitch, shown.left.yaw, shown.left.roll)

@@ -870,7 +870,8 @@ interface BalanceConfig {
       /** Seconds the freshly caught child stands before it chases (work-order
        *  1176); never longer than `immunitySeconds`. */
       caughtPauseSeconds: number
-      /** A caught child's slump (work-order 1239): trunk lean and arm roll (rad). */
+      /** A caught child's slump on the primitive figure (work-order 1239):
+       *  trunk lean and arm roll (rad). */
       caughtSlumpLean: number
       caughtSlumpArmRoll: number
       /** Largest trunk turn (rad) the chaser's gaze takes toward its quarry. */
@@ -1815,7 +1816,11 @@ export const balance: BalanceConfig = {
       // the body than at rest (0.46). The roll was specified at 0.20, but below
       // about 0.34 the upper arm sinks into the trunk cone at this lean
       // (src/render/figures.test.ts pins the clearance).
-      // OPEN: confirm 0.34 against the specified 0.20 in the picture.
+      // These two are the PRIMITIVE figure's (low preset, unchanged by user
+      // decision 04.10.2026); the specified 0.20 roll is infeasible there, so
+      // 0.34 stands. The glTF body's slump is `caughtSlump` below, whose arms
+      // hang by the clip (VILLAGER_POSE.caughtSlump, natural-villager-motion
+      // step 16).
       caughtSlumpLean: 0.48,
       caughtSlumpArmRoll: 0.34,
       // The chaser looks at its quarry within a modest trunk turn.
@@ -2854,6 +2859,31 @@ export const VILLAGER_GLTF = {
   hair: { brow: 0.62, nape: 0.3, back: 0.38 },
 } as const
 
+/** The caught child's slump on the glTF body (natural-villager-motion step 16):
+ *  trunk lean over the three spine segments, clavicle protraction and drop,
+ *  head bow (rad) and the settle in and out (s). */
+export interface CaughtSlumpConfig {
+  trunk: number
+  shoulderForward: number
+  shoulderDrop: number
+  headBow: number
+  settleSeconds: number
+}
+
+/** The tag chaser on the glTF body (natural-villager-motion step 15); see
+ *  `VILLAGER_POSE.tagChaser` for the units. */
+export interface ChaserBodyConfig {
+  leanMax: number
+  prepareDistance: number
+  prepareElevation: number
+  prepareReach: number
+  prepareProtraction: number
+  prepareSeconds: number
+  reachElevation: number
+  reachProtraction: number
+  reachMax: number
+}
+
 /**
  * The glTF villager's runtime pose on top of its clips (natural-villager-motion
  * steps 9–11). Calibratable, read off the runtime sheets.
@@ -2863,6 +2893,32 @@ export const VILLAGER_POSE = {
    *  pelvis up; the hips take none (no leg is re-solved under them). Sum 1, no
    *  bone above 0.35 (step 9). */
   leanShares: { spine: 0.35, spine1: 0.33, chest: 0.32 },
+  // Natural-villager-motion step 16, calibratable estimates: a brake and
+  // settle into a planted hold — trunk 0.12 rad over spine/spine1/chest only
+  // (hips 0), clavicles forward 0.25 and dropped 0.1, the head bowed 0.35 by
+  // the gaze on the ground about a metre ahead; eased in and out over
+  // `settleSeconds`.
+  caughtSlump: { trunk: 0.12, shoulderForward: 0.25, shoulderDrop: 0.1, headBow: 0.35, settleSeconds: 0.25 },
+  // Natural-villager-motion step 15, calibratable estimates. The run's own
+  // lean, capped (rad); inside `prepareDistance` (m, beyond the commit
+  // distance, so the pre-aim never delays a grab) one arm blends into a
+  // bent-elbow preparation — aimed `prepareElevation` (rad, below the
+  // horizontal), its hand at `prepareReach` of the straight arm, the
+  // clavicle forward `prepareProtraction` — over `prepareSeconds`; the grab
+  // then reaches `reachElevation` off the horizontal at shoulder height
+  // with the clavicle forward `reachProtraction` (rad), the hand solved onto
+  // the quarry's surface up to `reachMax` of the straight arm.
+  tagChaser: {
+    leanMax: 0.12,
+    prepareDistance: 3.2,
+    prepareElevation: -0.55,
+    prepareReach: 0.7,
+    prepareProtraction: 0.1,
+    prepareSeconds: 0.25,
+    reachElevation: 0,
+    reachProtraction: 0.22,
+    reachMax: 1.6,
+  },
   /** The gaze (step 9): the head held on a target (by default the horizon
    *  along the heading). `chestYaw`: the chest's share of a turn toward the
    *  target; of the rest the neck takes `neck`, the head the remainder.

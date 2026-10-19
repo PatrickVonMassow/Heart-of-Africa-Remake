@@ -48,7 +48,8 @@ import { figureIdentity } from '../scenes/place/figureIdentity'
 import type { FigureLook, FigureWork } from '../scenes/place/placeFigureContext'
 import { easeDigWeight, mixDigPose } from '../scenes/place/shovelHold'
 import { SkinnedFigure } from '../scenes/place/skinnedFigure'
-import { bankFigurePose, grabAim, steerGrab, tagFigurePose } from '../scenes/place/tagGame'
+import { bankFigurePose, easeWeight, grabAim, newTagBodyWeights, steerGrab, tagFigurePose, type GrabAim, type TagBodyWeights } from '../scenes/place/tagGame'
+import { VILLAGER_POSE } from '../config/balance'
 
 extend(THREE as unknown as Parameters<typeof extend>[0])
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -67,6 +68,8 @@ interface Caller {
   /** Seconds since the subject began. */
   t: number
   mem: Record<string, number | string | null>
+  /** The glTF body's tag weights and level grab (natural-villager-motion steps 15/16). */
+  body: { weights: TagBodyWeights; aim: GrabAim | null }
 }
 
 interface Subject {
@@ -213,8 +216,9 @@ const SUBJECTS: Subject[] = [
   },
   {
     // the port-city tag chaser: a child at the sprint speed closing on a quarry
-    // running ahead and a little to the left; inside the commit distance the
-    // grab (steerGrab/grabAim) as PlaceLife steers it, up to the catch distance
+    // running ahead and a little to the left; inside the prepare distance the
+    // readied arm, inside the commit distance the grab (steerGrab/grabAim, and
+    // the glTF body's level grab) as PlaceLife steers it, up to the catch distance
     id: 'chaser',
     title: 'chaser: port-city tag, child at 3.4 u/s',
     sex: 'male',
@@ -237,19 +241,30 @@ const SUBJECTS: Subject[] = [
       const gap = Math.hypot(q.x - me.x, q.z - me.z)
       const limit = TAG.gazeTurnMax
       const gaze = Math.max(-limit, Math.min(limit, Math.atan2(q.x - me.x, q.z - me.z) - me.facing))
+      const w = c.body.weights
+      const CH = VILLAGER_POSE.tagChaser
       if (gap <= TAG.commitDistance && gap > TAG.catchDistance) {
         const aim = grabAim(me, q, Math.max(lean, TOUCH_LEAN), CHILD_FIGURE_SCALE, TAG.gazeTurnMax, (c.mem.side as ArmSide | null) ?? null)
         c.mem.side = aim.side
         c.mem.turn = aim.turn
+        c.body.aim = grabAim(me, q, Math.min(lean, CH.leanMax), CHILD_FIGURE_SCALE, TAG.gazeTurnMax, w.side, { elevation: CH.reachElevation, reachMax: CH.reachMax })
+        w.side = c.body.aim.side
         c.gesture = steerGrab(c.gesture, aim)
       } else c.gesture = steerGrab(c.gesture, null)
+      if (c.gesture.kind !== 'touch') c.body.aim = null
+      w.prepare = easeWeight(w.prepare, gap <= CH.prepareDistance, CH.prepareSeconds, dt)
+      w.reach = easeWeight(w.reach, !!c.body.aim, CH.prepareSeconds, dt)
+      const bearing = Math.atan2(q.x - me.x, q.z - me.z) - me.facing
+      if (w.prepare <= 0 && w.reach <= 0 && !c.body.aim) w.side = null
+      else w.side ??= bearing >= 0 ? 'left' : 'right'
       const reach = c.gesture.kind === 'touch' ? gestureEnvelope(c.gesture) : 0
       const turn = ((c.mem.turn as number) ?? 0) * reach + gaze * (1 - reach)
-      c.pose = tagFigurePose('chaser', gesturePose(c.gesture), gestureEnvelope(c.gesture), lean, turn, TAG)
+      c.pose = tagFigurePose('chaser', gesturePose(c.gesture), gestureEnvelope(c.gesture), lean, turn, TAG, { weights: w, aim: c.body.aim, bearing })
     },
   },
   {
-    // a river-bank round's caught child (bankFigurePose, slumped from 0.4 s on), standing
+    // a river-bank round's caught child (bankFigurePose, slumped from 0.4 s on,
+    // the glTF body's hold eased in), standing
     id: 'caught',
     title: 'caught child: river-bank round',
     sex: 'female',
@@ -261,8 +276,10 @@ const SUBJECTS: Subject[] = [
     to: 1.5,
     frames: 10,
     views: ['side', 'front'],
-    drive: (c) => {
-      c.pose = bankFigurePose(c.t >= 0.4, gesturePose(c.gesture), 0, TAG)
+    drive: (c, dt) => {
+      const w = c.body.weights
+      w.slump = easeWeight(w.slump, c.t >= 0.4, VILLAGER_POSE.caughtSlump.settleSeconds, dt)
+      c.pose = bankFigurePose(c.t >= 0.4, gesturePose(c.gesture), 0, TAG, w.slump)
     },
   },
 ]
@@ -311,6 +328,7 @@ async function play(s: Subject) {
     squat: { current: 1 },
     t: 0,
     mem: {},
+    body: { weights: newTagBodyWeights(), aim: null },
   }
   function Stage() {
     const pose = useRef<FigurePose | null>({ ...REST_POSE })
@@ -409,6 +427,31 @@ describe('the runtime-pose exporter', () => {
     const yaw = (q: number[]) => 2 * Math.atan2(q[1], q[3])
     expect(yaw(by('turn').frames.at(-1)!.root.q)).toBeGreaterThan(1.5)
     for (const id of ['walk', 'run', 'chaser']) expect(by(id).frames.at(-1)!.root.p[2] - by(id).frames[0].root.p[2]).toBeGreaterThan(0.5)
+    // natural-villager-motion steps 15/16 on the COMPOSED body: the caught
+    // child, once settled, stands planted (no foot drift, no squash) with the
+    // head bowed; the chaser's face is on its quarry
+    const bone = (n: string) => asset.bones.indexOf(n)
+    const at = (m: number[]) => new THREE.Vector3(m[12], m[13], m[14])
+    const face = (m: number[]) => new THREE.Vector3(m[8], m[9], m[10]).normalize()
+    const settled = by('caught').frames.filter((f) => f.t >= 0.4 + VILLAGER_POSE.caughtSlump.settleSeconds + 0.2)
+    expect(settled.length).toBeGreaterThan(2)
+    for (const foot of ['foot.L', 'foot.R']) {
+      const p0 = at(settled[0].world[bone(foot)])
+      for (const f of settled) expect(at(f.world[bone(foot)]).distanceTo(p0), foot).toBeLessThan(0.001)
+    }
+    for (const f of settled) {
+      expect(f.root.s).toEqual([1, 1, 1])
+      expect(face(f.world[bone('head')]).y).toBeLessThan(-Math.sin(0.2))
+    }
+    const before = by('caught').frames.find((f) => f.t < 0.4)!
+    expect(face(before.world[bone('head')]).y).toBeGreaterThan(-Math.sin(0.15))
+    // (where the bearing turns slowly: the gaze is damped, 0.18 s)
+    for (const fr of by('chaser').frames.filter((x) => x.t >= 1 && x.t <= 1.8)) {
+      const head = at(fr.world[bone('head')])
+      const want = Math.atan2(0.35 - head.x, 3.2 + 2.3 * fr.t - head.z)
+      const f = face(fr.world[bone('head')])
+      expect(Math.abs(Math.atan2(f.x, f.z) - want), `chaser t=${fr.t.toFixed(2)}`).toBeLessThan((5 * Math.PI) / 180)
+    }
     const path = process.env.VILLAGER_RUNTIME_POSES
     if (path) {
       mkdirSync(dirname(path), { recursive: true })
