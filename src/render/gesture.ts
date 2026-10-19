@@ -134,6 +134,25 @@ export interface FigurePose {
    *  body's posable shoulders, added after its clips (natural-villager-motion
    *  step 11). */
   shoulders?: { left: ShoulderPose; right: ShoulderPose }
+  /** Where the head looks (glTF body; absent: along the pose's own turn):
+   *  `yaw`/`pitch` relative to the heading (rad), and `turn`, the part of
+   *  this pose's `turn` that is the gaze's rather than the trunk's own — the
+   *  glTF body takes that part off the trunk and gives the chest only its
+   *  share (VILLAGER_POSE.gaze.chestYaw), the head and neck the rest
+   *  (natural-villager-motion steps 15/16). */
+  gaze?: { yaw: number; pitch: number; turn: number }
+  /** How far out each posed hand is solved (glTF body), as a share of the
+   *  line from its shoulder to where the pose's arm points the hand (a side
+   *  left out: the primitive's own hand): below 1 the elbow bends, above 1
+   *  the hand reaches for a target beyond the primitive's straight arm. `lunge`: the trunk may lean in, as far as
+   *  it takes, to bring such a hand onto its target (the catch's last stride);
+   *  without it a pose with a reach leans by its own lean alone. A number is
+   *  that lean-in's share (true = 1), so a blend between poses eases it. */
+  reach?: { left?: number; right?: number; lunge?: boolean | number }
+  /** The glTF body's own pose where it differs from this one, which the
+   *  primitive figure keeps (the low preset untouched, natural-villager-motion
+   *  constraint 7): applyFigurePose writes it onto a skinned figure's pivots. */
+  body?: FigurePose
 }
 
 /** A clavicle's turn off the clip: forward (protraction) and up (elevation, rad). */
@@ -147,6 +166,9 @@ export interface ShoulderPose {
 export function copyPoseExtras(into: FigurePose, from: FigurePose): void {
   into.pointHand = from.pointHand
   into.shoulders = from.shoulders
+  into.gaze = from.gaze
+  into.reach = from.reach
+  into.body = from.body
 }
 
 /** Which side an arm belongs to. */

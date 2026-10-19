@@ -473,34 +473,118 @@ if (section('tag-catch')) {
       .catch(() => false)
     check('a round of tag is in play in the port', played)
 
-    // THE CATCHER'S ARMS, read off the hand pivots. A frame in which the chaser
-    // chases WITHOUT a grab playing (outside the commit distance) is waited for
-    // and read in the same page call as the round, so both describe one frame.
-    const arms = await page
-      .waitForFunction(() => {
-        const t = window.__placeTag()
-        if (!t.playing || t.chaser < 0) return null
-        const c = t.children[t.chaser]
-        if (c.body !== 'chaser' || (c.gesture && c.gesture.kind)) return null
-        const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
-        if (runner < 0) return null
-        return { chaser: window.__placeTagHands(t.chaser), runner: window.__placeTagHands(runner) }
-      }, null, { timeout: 60000, polling: 'raf' })
-      .then((h) => h.jsonValue())
-      .catch(() => null)
-    // Body heights, in the child's own frame: +z forward, +y up. A hanging arm
-    // ends near z 0 (a run's lean carries it a little forward); the catcher's
-    // hands stand out in front at chest height.
-    const forward = (h) => h.local.z > 0.25 && h.local.y > 0.4 && h.local.y < 0.8
+    // THE CATCHER'S ARMS, read off the hand pivots (natural-villager-motion
+    // step 15): far from its quarry (outside the prepare distance, no grab) the
+    // chaser runs with both arms swinging like a runner's; inside the prepare
+    // window, short of the commit distance, ONE arm is readied forward while
+    // the other keeps swinging. Each frame is read in the same page call as
+    // the round, so both describe one frame. The FIRST frame of a series is
+    // waited for and the rest recorded in the same page-side loop on every
+    // following frame of the SAME chase (chaser, quarry, tag count, readied side) and
+    // window, and any break ends the series — a wait could stitch strides of
+    // separate chases into one fake sweep.
+    const probeArms = ({ want, lock }) => {
+      const t = window.__placeTag()
+      if (!t.playing || t.chaser < 0 || t.target < 0) return null
+      if (lock && (t.chaser !== lock.index || t.target !== lock.target || t.tags !== lock.tags)) return null
+      const c = t.children[t.chaser]
+      const q = t.children[t.target]
+      if (c.body !== 'chaser' || (c.gesture && c.gesture.kind)) return null
+      const gap = Math.hypot(q.x - c.x, q.z - c.z)
+      const w = c.bodyWeights
+      const inWindow =
+        want === 'far'
+          ? gap > t.prepareDistance + 0.5
+          : // readied and still: no grab out or easing back after a miss, no arm handover
+            gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side && w.reach <= 0 && !(w.handover > 0)
+      if (!inWindow) return null
+      const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
+      if (runner < 0) return null
+      return {
+        gap,
+        clock: t.clock,
+        index: t.chaser,
+        target: t.target,
+        tags: t.tags,
+        side: w ? w.side : null,
+        chaser: window.__placeTagHands(t.chaser),
+        runner: window.__placeTagHands(runner),
+      }
+    }
+    // Body heights, in the child's own frame: +z forward, +y up. Each window is
+    // read over a span of the game's own clock (far: a whole arm swing; near:
+    // more than half of one, as long as the prepare window reliably holds),
+    // so a SWINGING hand shows its sweep, forward and back, while a HELD one
+    // keeps its place ahead and only rides the run's bob.
+    const SPAN = { far: 0.5, near: 0.35 }
+    const hand = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right'))
+    // ONE page-side RAF loop waits for the first frame in the window and then
+    // records every following frame, so no frame falls into a handoff between
+    // separate page calls. The acquisition keeps its own bound outside the page
+    // too: a page whose frames stall never reaches the in-page deadline.
+    const readSeries = (want) =>
+      Promise.race([
+        readSeriesInPage(want),
+        new Promise((done) => setTimeout(() => done(null), 75000).unref()),
+      ])
+    const readSeriesInPage = (want) =>
+      page
+        .evaluate(
+          ({ want, span, src }) =>
+            new Promise((done) => {
+              const probe = new Function(`return (${src})`)()
+              const deadline = performance.now() + 60000
+              let first = null
+              let all = null
+              let frames = 0
+              const tick = () => {
+                if (!first) {
+                  first = probe({ want, lock: null })
+                  if (first) all = [first]
+                  else if (performance.now() > deadline) return done({})
+                  return requestAnimationFrame(tick)
+                }
+                const r = probe({ want, lock: first })
+                if (!r || r.side !== first.side) return done({})
+                if (r.clock !== all.at(-1).clock) all.push(r)
+                if (r.clock - first.clock >= span) return done({ all })
+                if (++frames > 600) return done({})
+                requestAnimationFrame(tick)
+              }
+              requestAnimationFrame(tick)
+            }),
+          { want, span: SPAN[want], src: probeArms.toString() },
+        )
+        .then((got) => got.all ?? null)
+        .catch(() => null)
+    const sweep = (series, side) => {
+      const z = series.map((r) => hand(r, side).local.z)
+      return Math.max(...z) - Math.min(...z)
+    }
+    const minZ = (series, side) => Math.min(...series.map((r) => hand(r, side).local.z))
+    const fmt = (series, side) => `${side} sweep ${sweep(series, side).toFixed(3)} min z ${minZ(series, side).toFixed(3)}`
+    let far = null
+    for (let tries = 0; tries < 4 && !far; tries++) far = await readSeries('far')
     check(
-      "the catcher's two hands are held forward at chest height, read off the drawn pivots",
-      !!arms && arms.chaser?.length === 2 && arms.chaser.every(forward),
-      arms ? JSON.stringify(arms.chaser?.map((h) => h.local)) : 'no chasing frame without a grab',
+      "far from its quarry the catcher swings both hands with its run (neither is held out), read off the drawn pivots",
+      !!far && ['left', 'right'].every((side) => sweep(far, side) > 0.12),
+      far ? `${fmt(far, 'left')}; ${fmt(far, 'right')} at ${far[0].gap.toFixed(2)} m` : 'no far chasing stride without a grab',
     )
     check(
       "while a runner's hands hang at its sides",
-      !!arms && arms.runner?.length === 2 && arms.runner.every((h) => h.local.z < 0.15),
-      arms ? JSON.stringify(arms.runner?.map((h) => h.local)) : 'no runner frame',
+      !!far && far[0].runner?.length === 2 && far[0].runner.every((h) => h.local.z < 0.15),
+      far ? JSON.stringify(far[0].runner?.map((h) => h.local)) : 'no runner frame',
+    )
+    // Inside the prepare window the readied hand is HELD out in front while
+    // the free hand keeps swinging.
+    let near = null
+    for (let tries = 0; tries < 8 && !near; tries++) near = await readSeries('near')
+    const side = near && near[0].side
+    const other = side === 'left' ? 'right' : 'left'
+    check(
+      "inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging",
+      !!near && minZ(near, side) > 0.15 && sweep(near, other) > 0.12 && sweep(near, side) < 0.5 * sweep(near, other),
+      near ? `readied ${fmt(near, side)}; free ${fmt(near, other)} from ${near[0].gap.toFixed(2)} m` : 'no chasing stride inside the prepare window',
     )
 
     // Side-on to the pair, a few metres off, on a line the rendered scene

@@ -30,6 +30,7 @@
 // frame at a debug-raised sprint speed would otherwise land cleanly on the far
 // side of a fence panel, overlapping nothing.
 
+import { VILLAGER_POSE, type CaughtSlumpConfig, type ChaserBodyConfig } from '../../config/balance'
 import { deflectedStep } from '../travel/wildlifeBehavior'
 import { FIGURE_LIMBS } from '../../render/figures'
 import {
@@ -1299,11 +1300,22 @@ interface GrabFigure {
 
 /** The grab this frame: the reaching arm, the trunk turn and the arm's aim in
  *  the turned trunk's frame (what `startGesture('touch', …)` takes). */
-interface GrabAim {
+export interface GrabAim {
   side: ArmSide
   turn: number
   bearing: number
   elevation: number
+  /** The straight-arm share at which the hand meets the quarry's surface
+   *  (a `level` aim only; else 1): the glTF body's `reach`. */
+  reach: number
+}
+
+/** A grab aimed LEVEL (natural-villager-motion step 15): at the height of the
+ *  reaching shoulder itself, `elevation` (rad) off the horizontal, the reach
+ *  measured to the quarry's surface and capped at `reachMax`. */
+export interface LevelGrab {
+  elevation: number
+  reachMax: number
 }
 
 /** A point of the figure's own frame (unscaled body heights) carried into the
@@ -1371,24 +1383,34 @@ export function grabAim(
   scale: number,
   gazeTurnMax: number,
   prevSide: ArmSide | null = null,
+  level: LevelGrab | null = null,
 ): GrabAim {
   const toQuarry = angleTo(chaser.facing, bearingTo(chaser, quarry))
   const flat = Math.max(1e-6, Math.hypot(quarry.x - chaser.x, quarry.z - chaser.z))
   const side: ArmSide = prevSide ?? (toQuarry >= 0 ? 'left' : 'right')
-  const target = intoFigure(chaser, scale, quarry.x, GRAB_HEIGHT * scale, quarry.z)
   const limit = Math.max(0, gazeTurnMax)
   const aimFrom = (arm: ArmSide): GrabAim => {
     const sign = arm === 'left' ? 1 : -1
     const offset = Math.asin(Math.min(1, (GRAB_SIDE_OFFSET * FIGURE_LIMBS.shoulderX * scale) / flat))
     const turn = Math.max(-limit, Math.min(limit, toQuarry - sign * offset))
-    const t = intoTrunk(target, lean, turn)
     const sh = shoulderIn(arm)
+    // level: at the reaching shoulder's own height in the figure's frame
+    const height = level ? outOfTrunk(sh, lean, turn)[1] : GRAB_HEIGHT
+    const target = intoFigure(chaser, scale, quarry.x, height * scale, quarry.z)
+    const t = intoTrunk(target, lean, turn)
     const w = [t[0] - sh[0], t[1] - sh[1], t[2] - sh[2]]
+    let reach = 1
+    if (level) {
+      // to the quarry's surface at that height, the hand's own radius off it
+      const surface = trunkRadiusAt(height * scale, scale) / scale + FIGURE_LIMBS.handRadius
+      reach = Math.min(level.reachMax, Math.max(0.5, (Math.hypot(w[0], w[1], w[2]) - surface) / FIGURE_LIMBS.armLength))
+    }
     return {
       side: arm,
       turn,
       bearing: Math.atan2(w[0], w[2]),
-      elevation: Math.atan2(w[1], Math.hypot(w[0], w[2]) || 1e-6),
+      elevation: Math.atan2(w[1], Math.hypot(w[0], w[2]) || 1e-6) + (level?.elevation ?? 0),
+      reach,
     }
   }
   const fits = (a: GrabAim) => (a.side === 'left' ? Math.sin(a.bearing) >= 0 : Math.sin(a.bearing) < 0)
@@ -1404,7 +1426,8 @@ export function grabAim(
 /**
  * Where the drawn hand of `side` stands in the world for a pose — the figure's
  * own chain, for the tests. `lift` is the body's height
- * above the ground it stands on.
+ * above the ground it stands on; `reach` the share of the straight arm the
+ * hand stands out at (a glTF body's `reach`).
  */
 export function grabHandWorld(
   f: GrabFigure,
@@ -1414,11 +1437,13 @@ export function grabHandWorld(
   turn: number,
   scale: number,
   lift = 0,
+  reach = 1,
 ): [number, number, number] {
   const d = armDirection(arm)
   const sh = shoulderIn(side)
+  const len = FIGURE_LIMBS.armLength * reach
   const hand = outOfTrunk(
-    [sh[0] + d[0] * FIGURE_LIMBS.armLength, sh[1] + d[1] * FIGURE_LIMBS.armLength, sh[2] + d[2] * FIGURE_LIMBS.armLength],
+    [sh[0] + d[0] * len, sh[1] + d[1] * len, sh[2] + d[2] * len],
     lean,
     turn,
   )
@@ -1505,16 +1530,226 @@ export function caughtSlumpPose(cfg: Pick<TagConfig, 'caughtSlumpLean' | 'caught
 
 /**
  * The pose a bank-round child is drawn with: a caught one stands in the caught
- * slump; any other shows its gesture on top of the run's lean.
+ * slump; any other shows its gesture on top of the run's lean. The glTF body's
+ * own (`body`, natural-villager-motion step 16) eases into and out of its
+ * slump by `slump` (0 … 1, `easeWeight`); the primitive switches as before.
  */
 export function bankFigurePose(
   slumped: boolean,
   shown: FigurePose,
   runLean: number,
   cfg: Pick<TagConfig, 'caughtSlumpLean' | 'caughtSlumpArmRoll'>,
+  slump = slumped ? 1 : 0,
+  slumpCfg: CaughtSlumpConfig = VILLAGER_POSE.caughtSlump,
 ): FigurePose {
-  if (slumped) return caughtSlumpPose(cfg)
-  return { left: shown.left, right: shown.right, lean: runLean + shown.lean, turn: shown.turn }
+  const free: FigurePose = { left: shown.left, right: shown.right, lean: runLean + shown.lean, turn: shown.turn }
+  const pose = slumped ? caughtSlumpPose(cfg) : free
+  if (slump <= 0) return pose
+  return { ...pose, body: mixPose(free, caughtBodyPose(slumpCfg), smooth01(slump)) }
+}
+
+// ---- the glTF body's tag poses (natural-villager-motion steps 15 and 16) -----
+//
+// The primitive figure keeps the poses above (the low preset untouched); the
+// skinned body draws `body`: a chaser that runs with the run's own small lean
+// and its free arm swinging, looks at its quarry with head and neck (the chest
+// a quarter), readies one arm, bent, as the quarry comes near and reaches it
+// out level at shoulder height with the clavicle forward; and a caught child
+// that brakes and settles into a quiet planted hold — the trunk a little
+// forward over the spine alone, the shoulders forward and down, the head bowed
+// to the ground ahead, the arms hanging by the clip.
+
+/** Per child, the glTF body's eased weights. */
+export interface TagBodyWeights {
+  /** 0 … 1 into the caught slump. */
+  slump: number
+  /** 0 … 1 into the chaser's prepared arm. */
+  prepare: number
+  /** 0 … 1 from the prepared arm into the reach: the glTF body's own blend
+   *  (the primitive's grab begins at its pose; the bank tap keeps that rule). */
+  reach: number
+  /** The side the prepared or reaching arm is on, held while it is up. */
+  side: ArmSide | null
+  /** 1 … 0 out of an arm handover: the reach changed sides (`handOverArm`)
+   *  and the body drawn the frame before (`handFrom`) blends into the new. */
+  handover: number
+  handFrom: FigurePose | null
+}
+export const newTagBodyWeights = (): TagBodyWeights => ({ slump: 0, prepare: 0, reach: 0, side: null, handover: 0, handFrom: null })
+
+/**
+ * Take the reaching arm's side from a fresh grab aim. When the reach passes to
+ * the other arm (the quarry crossed past the gaze limit), the body drawn the
+ * frame before is kept, to blend out of over `prepareSeconds` (eased by
+ * `easeHandover`), so neither arm snaps.
+ */
+export function handOverArm(w: TagBodyWeights, side: ArmSide, last: FigurePose | null | undefined): void {
+  if (w.side && side !== w.side && last) {
+    w.handFrom = last
+    w.handover = 1
+  }
+  w.side = side
+}
+
+/** Ease an arm handover out (`handOverArm`). */
+export function easeHandover(w: TagBodyWeights, dt: number, c: ChaserBodyConfig = VILLAGER_POSE.tagChaser): void {
+  w.handover = easeWeight(w.handover, false, c.prepareSeconds, dt)
+  if (w.handover <= 0) w.handFrom = null
+}
+
+/** Ease a 0 … 1 weight toward `on` (1) or off (0) over `seconds`. */
+export function easeWeight(w: number, on: boolean, seconds: number, dt: number): number {
+  const step = Math.max(0, dt) / Math.max(1e-6, seconds)
+  return on ? Math.min(1, w + step) : Math.max(0, w - step)
+}
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
+/** Smoothstep: a weight eased in and out at both ends, never a kink. */
+const smooth01 = (v: number) => {
+  const w = clamp01(v)
+  return w * w * (3 - 2 * w)
+}
+const lerp = (a: number, b: number, w: number) => a + (b - a) * w
+const lerpArm = (a: ArmPose, b: ArmPose, w: number): ArmPose => ({
+  pitch: lerp(a.pitch, b.pitch, w),
+  yaw: lerp(a.yaw, b.yaw, w),
+  roll: lerp(a.roll, b.roll, w),
+})
+
+/**
+ * Two poses blended by `w` (0: `a` exactly, 1: `b` exactly), the optional parts
+ * included: an absent clavicle is at 0, a reach absent on one side 1, an absent lunge 0
+ * (blended as a share), an absent gaze the horizon along the pose's own turn.
+ */
+export function mixPose(a: FigurePose, b: FigurePose, w: number): FigurePose {
+  if (w <= 0) return a
+  if (w >= 1) return b
+  const sh = (p: FigurePose, s: 'left' | 'right') => p.shoulders?.[s] ?? { protraction: 0, elevation: 0 }
+  const re = (p: FigurePose, s: 'left' | 'right') => p.reach?.[s] ?? 1
+  const gz = (p: FigurePose) => p.gaze ?? { yaw: p.turn, pitch: 0, turn: 0 }
+  const lu = (p: FigurePose) => Number(p.reach?.lunge ?? 0)
+  const out: FigurePose = {
+    left: lerpArm(a.left, b.left, w),
+    right: lerpArm(a.right, b.right, w),
+    lean: lerp(a.lean, b.lean, w),
+    turn: lerp(a.turn, b.turn, w),
+  }
+  if (a.shoulders || b.shoulders) {
+    const one = (s: 'left' | 'right') => ({
+      protraction: lerp(sh(a, s).protraction, sh(b, s).protraction, w),
+      elevation: lerp(sh(a, s).elevation, sh(b, s).elevation, w),
+    })
+    out.shoulders = { left: one('left'), right: one('right') }
+  }
+  if (a.reach || b.reach) {
+    // a side neither pose names stays absent (the primitive's own hand)
+    const one = (s: 'left' | 'right') => (a.reach?.[s] === undefined && b.reach?.[s] === undefined ? undefined : lerp(re(a, s), re(b, s), w))
+    // the lunge's lean-in eased as a share, never switched off mid-blend
+    const lunge = lerp(lu(a), lu(b), w)
+    out.reach = { left: one('left'), right: one('right'), ...(lunge > 0 ? { lunge } : {}) }
+  }
+  if (a.gaze || b.gaze) {
+    const ga = gz(a)
+    const gb = gz(b)
+    out.gaze = { yaw: lerp(ga.yaw, gb.yaw, w), pitch: lerp(ga.pitch, gb.pitch, w), turn: lerp(ga.turn, gb.turn, w) }
+  }
+  return out
+}
+
+/**
+ * The caught child's settled hold on the glTF body (step 16): the trunk
+ * leaned `trunk` over spine/spine1/chest only (the lean never reaches the
+ * hips), both clavicles forward and dropped, the head bowed by the gaze, the
+ * arms at rest so the clip hangs them (the clavicles carry them a little
+ * forward). No lift and no squash: the feet stay where they stand.
+ */
+// OPEN: step 16's "one knee softened and the weight shifted" needs a per-leg
+// pose on the glTF body's standing legs (FigurePose carries none); not built.
+export function caughtBodyPose(c: CaughtSlumpConfig = VILLAGER_POSE.caughtSlump): FigurePose {
+  const shoulder = () => ({ protraction: c.shoulderForward, elevation: -c.shoulderDrop })
+  return {
+    left: { ...REST_POSE.left },
+    right: { ...REST_POSE.right },
+    lean: c.trunk,
+    turn: 0,
+    shoulders: { left: shoulder(), right: shoulder() },
+    gaze: { yaw: 0, pitch: -c.headBow, turn: 0 },
+  }
+}
+
+/** True while the chaser is free to run and its quarry is inside the prepare
+ *  distance — wider than the commit distance, so the readied arm is only
+ *  drawn and never gates or delays the grab (`grabDue` is unchanged). */
+export function prepareDue(s: TagState, cfg: TagConfig, chaser: ChaserBodyConfig = VILLAGER_POSE.tagChaser): boolean {
+  if (tagBody(s, s.chaser) !== 'chaser' || s.turning || s.target < 0) return false
+  const c = s.children[s.chaser]
+  const q = s.children[s.target]
+  return !!c && !!q && dist(c, q) <= Math.max(chaser.prepareDistance, cfg.commitDistance)
+}
+
+/** The bearing of the chaser's quarry off its facing (rad, unclamped: the
+ *  head's own limit clamps it), or 0 for every other child and in the beat. */
+export function quarryBearing(s: TagState, i: number): number {
+  if (i !== s.chaser || tagBody(s, i) !== 'chaser' || s.target < 0) return 0
+  const c = s.children[i]
+  const q = s.children[s.target]
+  return c && q ? angleTo(c.facing, bearingTo(c, q)) : 0
+}
+
+/** What the glTF body's tag pose is built from, besides the primitive's. */
+export interface TagBodyInput {
+  weights: TagBodyWeights
+  /** The level grab (`grabAim` with a `LevelGrab`), while a grab is out. */
+  aim: GrabAim | null
+  /** The quarry's bearing off the facing (`quarryBearing`). */
+  bearing: number
+}
+
+/**
+ * The reaching child on the glTF body (step 15): the run's own lean capped
+ * at `chaser.leanMax` (no touch lean), the gaze on the quarry with the chest
+ * taking only its share, the free arm left to the clip's swing, and the one
+ * arm blended from its swing into the bent preparation by `prepare` and out
+ * into the level reach by the grab's envelope `grab`.
+ */
+export function reachBodyPose(
+  shown: FigurePose,
+  grab: number,
+  aim: GrabAim | null,
+  side: ArmSide,
+  runLean: number,
+  bearing: number,
+  prepare: number,
+  c: ChaserBodyConfig = VILLAGER_POSE.tagChaser,
+): FigurePose {
+  const p = smooth01(prepare)
+  const g = aim ? clamp01(grab) : 0
+  const sign = side === 'left' ? 1 : -1
+  const other: ArmSide = side === 'left' ? 'right' : 'left'
+  const restOf = (s: ArmSide) => (s === 'left' ? REST_POSE.left : REST_POSE.right)
+  // the reaching side starts from rest (the clip's swing), not from the
+  // primitive's grab, which is aimed for another chain
+  const ready = lerpArm(restOf(side), armAim(sign * 0.1, c.prepareElevation), p)
+  const arm = aim ? lerpArm(ready, armAim(aim.bearing, aim.elevation), g) : ready
+  const reach = lerp(lerp(1, c.prepareReach, p), aim?.reach ?? 1, g)
+  const protraction = lerp(c.prepareProtraction * p, c.reachProtraction, g)
+  // the other arm: the clip's swing while a grab is out (the primitive's grab
+  // may be on that side), else whatever the gesture gives it
+  const own = aim ? restOf(other) : shown[other]
+  const pose: FigurePose = {
+    left: side === 'left' ? arm : { ...own },
+    right: side === 'right' ? arm : { ...own },
+    lean: Math.min(Math.max(0, runLean), c.leanMax),
+    turn: (aim?.turn ?? 0) * g + bearing * (1 - g),
+    shoulders: {
+      left: { protraction: side === 'left' ? protraction : 0, elevation: 0 },
+      right: { protraction: side === 'right' ? protraction : 0, elevation: 0 },
+    },
+    // the lunge only once the reach is fully out and the quarry inside it
+    reach: { [side]: reach, lunge: !!aim && g >= 1 && aim.reach < c.reachMax },
+    gaze: { yaw: bearing, pitch: 0, turn: bearing * (1 - g) },
+  }
+  return pose
 }
 
 /**
@@ -1527,6 +1762,35 @@ export function bankFigurePose(
  * run's — the stronger of the two.
  */
 export function tagFigurePose(
+  body: TagBody,
+  shown: FigurePose,
+  envelope: number,
+  runLean: number,
+  turn: number,
+  cfg: Pick<TagConfig, 'caughtSlumpLean' | 'caughtSlumpArmRoll'>,
+  drawn: TagBodyInput | null = null,
+): FigurePose {
+  const pose = primitiveTagPose(body, shown, envelope, runLean, turn, cfg)
+  if (!drawn) return pose
+  // THE glTF BODY'S OWN (steps 15/16): a reaching child (the chaser, or the
+  // catcher on its catch frame) through `reachBodyPose`, eased into and out of
+  // the caught hold by the slump weight. The freshly caught child blends from
+  // the runner it was a frame ago, its run lean uncapped, never from a reach.
+  const w = drawn.weights
+  const reaching = body === 'chaser' || !!drawn.aim || w.prepare > 0
+  const side: ArmSide = drawn.aim?.side ?? w.side ?? (drawn.bearing >= 0 ? 'left' : 'right')
+  const grab = Math.min(envelope, smooth01(w.reach))
+  let under = reaching
+    ? reachBodyPose(shown, grab, drawn.aim, side, runLean, drawn.bearing, w.prepare)
+    : { left: shown.left, right: shown.right, lean: Math.max(runLean, shown.lean), turn }
+  // the reach handed to the other arm: out of the body drawn before the switch
+  if (reaching && w.handFrom && w.handover > 0) under = mixPose(w.handFrom, under, smooth01(1 - w.handover))
+  if (!reaching && w.slump <= 0) return pose
+  return { ...pose, body: mixPose(under, caughtBodyPose(), smooth01(w.slump)) }
+}
+
+/** The primitive figure's tag pose (unchanged by natural-villager-motion). */
+function primitiveTagPose(
   body: TagBody,
   shown: FigurePose,
   envelope: number,
@@ -1552,7 +1816,8 @@ export function tagFigurePose(
 }
 
 /**
- * The catcher's arms: both held out in front, hands at chest height and turned
+ * The primitive catcher's arms (the glTF body's chaser swings its free arm
+ * and readies one, `reachBodyPose`): both held out in front, hands at chest height and turned
  * a little inward toward each other. The figure's arm is one straight limb, so
  * "elbows bent" is carried by the inward turn rather than a joint. Shape, not
  * balance: it is a posture, and `figures.test.ts` style clearance holds because

@@ -58,7 +58,7 @@ import { devAssert } from '../../systems/devAssert'
 import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR, balance } from '../../config/balance'
+import { START_YEAR, VILLAGER_POSE, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
@@ -78,15 +78,23 @@ import {
   absorbSeparation,
   chaserGaze,
   createTagGame,
+  easeHandover,
+  easeWeight,
   grabAim,
   grabDue,
   handGapToBody,
+  handOverArm,
+  newTagBodyWeights,
+  prepareDue,
+  quarryBearing,
   stepTagGame,
   steerGrab,
   tagBody,
   tagFigurePose,
   bankFigurePose,
   takeCries,
+  type GrabAim,
+  type TagBodyWeights,
   type TagChild,
 } from './tagGame'
 import {
@@ -974,6 +982,10 @@ function Kids({
   // last frame saw, and the pitch roll of the catcher's cry.
   const grabSides = useRef<Array<ArmSide | null>>([])
   const grabTurns = useRef<number[]>([])
+  // The glTF body's own (natural-villager-motion steps 15/16): each child's
+  // eased slump and readied arm, and its level grab while the hand is out.
+  const bodyWeights = useRef<TagBodyWeights[]>([])
+  const bodyAims = useRef<Array<GrabAim | null>>([])
   const seenTags = useRef(0)
   const cryRand = useMemo(() => mulberry32((seed + 9127) >>> 0), [seed])
   // Dev-only shutter on the catch (work-order 1176): `catch` holds the very
@@ -1138,6 +1150,7 @@ function Kids({
       // Only READ here: this frame's advance already ran above, before the
       // word could start a new gesture (work-order 1065).
       const gesture = gestures.current[i]
+      const weights = (bodyWeights.current[i] ??= newTagBodyWeights())
       if (game) {
         // THE TAG ROUND READS AT A GLANCE (work-order 1176). The chaser reaches
         // for its quarry from the commit distance in, re-aimed every frame; on
@@ -1161,23 +1174,54 @@ function Kids({
           )
           grabSides.current[i] = aim.side
           grabTurns.current[i] = aim.turn
+          // the glTF body's own grab: level at its shoulder, through the run's
+          // own capped lean, onto the quarry's surface (step 15)
+          const level = grabAim(
+            { x: c.x, z: c.z, facing: c.facing },
+            quarry,
+            Math.min(c.lean, VILLAGER_POSE.tagChaser.leanMax),
+            KID_SCALE,
+            tagCfg.gazeTurnMax,
+            weights.side,
+            { elevation: VILLAGER_POSE.tagChaser.reachElevation, reachMax: VILLAGER_POSE.tagChaser.reachMax },
+          )
+          bodyAims.current[i] = level
+          handOverArm(weights, level.side, pose.body)
           gesture.current = steerGrab(gesture.current, aim)
           if (i !== game.chaser) gesture.current = steerGrab(gesture.current, null)
         } else {
           gesture.current = steerGrab(gesture.current, null)
         }
-        if (gesture.current.kind !== 'touch') grabSides.current[i] = null
+        if (gesture.current.kind !== 'touch') {
+          grabSides.current[i] = null
+          bodyAims.current[i] = null
+        }
         const reach = gesture.current.kind === 'touch' ? gestureEnvelope(gesture.current) : 0
         const gaze = i === game.chaser ? chaserGaze(game, tagCfg) : 0
         const turn = (grabTurns.current[i] ?? 0) * reach + gaze * (1 - reach)
-        const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn, tagCfg)
+        // the glTF body's readied arm and caught hold, eased (steps 15/16)
+        weights.prepare = easeWeight(weights.prepare, i === game.chaser && prepareDue(game, tagCfg), VILLAGER_POSE.tagChaser.prepareSeconds, dt)
+        weights.reach = easeWeight(weights.reach, !!bodyAims.current[i], VILLAGER_POSE.tagChaser.prepareSeconds, dt)
+        weights.slump = easeWeight(weights.slump, tagBody(game, i) === 'caught', VILLAGER_POSE.caughtSlump.settleSeconds, dt)
+        easeHandover(weights, dt)
+        const bearing = quarry
+          ? Math.atan2(Math.sin(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing), Math.cos(Math.atan2(quarry.x - c.x, quarry.z - c.z) - c.facing))
+          : quarryBearing(game, i)
+        if (weights.prepare <= 0 && weights.reach <= 0 && !bodyAims.current[i]) weights.side = null
+        else weights.side ??= bearing >= 0 ? 'left' : 'right'
+        const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn, tagCfg, {
+          weights,
+          aim: bodyAims.current[i] ?? null,
+          bearing,
+        })
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
         copyPoseExtras(pose, drawn)
         pose.lean = drawn.lean
       } else {
-        const drawn = bankFigurePose(slumped, gesturePose(gesture.current), c.lean, tagCfg)
+        weights.slump = easeWeight(weights.slump, slumped, VILLAGER_POSE.caughtSlump.settleSeconds, dt)
+        const drawn = bankFigurePose(slumped, gesturePose(gesture.current), c.lean, tagCfg, weights.slump)
         pose.left = drawn.left
         pose.right = drawn.right
         pose.turn = drawn.turn
@@ -1315,6 +1359,10 @@ function Kids({
       chargeHeld: chargeCapture.current.held,
       // The tag round's catch reading (work-order 1176); null in the bank round.
       pauseFor: game ? game.pauseFor : null,
+      // Where the glTF chaser readies its arm and where it commits to the grab
+      // (natural-villager-motion step 15), so a check can read either window.
+      prepareDistance: VILLAGER_POSE.tagChaser.prepareDistance,
+      commitDistance: balance.villageLife.tag.commitDistance,
       immune: game ? game.immune : null,
       catchHeld: catchCapture.current.held,
       catchShot: catchShot.current,
@@ -1391,6 +1439,9 @@ function Kids({
         body: game ? tagBody(game, i) : null,
         facing: c.facing,
         turn: poses.current[i]?.current?.turn ?? 0,
+        // The glTF body's eased tag weights (natural-villager-motion steps
+        // 15/16): how far the readied arm, the reach and the caught hold are in.
+        bodyWeights: bodyWeights.current[i] ? { ...bodyWeights.current[i] } : null,
       })),
       /** The stone the off-game ROCK is climbed and spoken at, with the size the
        *  climb is played against (work-order 1080). Published rather than

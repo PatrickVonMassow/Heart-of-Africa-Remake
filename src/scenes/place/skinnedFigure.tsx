@@ -277,6 +277,10 @@ const _scale = new THREE.Vector3()
 const _facing = new THREE.Vector3()
 const _grip = new THREE.Vector3()
 const _gazeAt = new THREE.Vector3()
+const _rs = new THREE.Vector3()
+const _rv = new THREE.Vector3()
+const _rn = new THREE.Vector3()
+const _rf = new THREE.Vector3()
 
 /** What the figure measured of its own walk, and its transitions in progress. */
 
@@ -441,6 +445,11 @@ export function SkinnedFigure({
       const m = motion.current
       const kneelNow = kneel || !!kneeling?.current
       const gltf = rig.gltf && clips ? rig.gltf : null
+      // the pose's optional parts, the glTF body's own where it has one
+      const shownNow = pose?.current ?? ownShown.current
+      const extras = shownNow?.body ?? shownNow
+      // the part of the pose's turn that is the gaze's, not the trunk's own
+      const gazeTurn = extras?.gaze?.turn ?? 0
       // An arm is a CONTACT only where the pose put it somewhere: an arm the
       // pose leaves hanging at rest has nothing to reach — it swings with the
       // walk. (Every hanging arm used to count, and the primitive's hand at its
@@ -467,7 +476,8 @@ export function SkinnedFigure({
           // the chest's share of a gaze turned off the trunk's own; they give
           // way to the dig, which leans by its own clip
           const k = 1 - digShare
-          const turn = vTrunk.rotation.y + VILLAGER_POSE.gaze.chestYaw * (gaze.current.yaw - vTrunk.rotation.y)
+          const own = vTrunk.rotation.y - gazeTurn
+          const turn = own + VILLAGER_POSE.gaze.chestYaw * (gaze.current.yaw - own)
           leanTrunk(gb, trunkBase, (vTrunk.rotation.x + p.stoop + extra) * k, turn * k)
         } else {
           b.spine.rotation.set(vTrunk.rotation.x + extra, vTrunk.rotation.y - hipYaw, 0)
@@ -498,6 +508,33 @@ export function SkinnedFigure({
         loc(b[`forearm.${s}`], _e).distanceTo(loc(b[`upperArm.${s}`], _s)) +
         loc(b[`hand.${s}`], _w).distanceTo(_e) +
         loc(rig.hands[s === 'L' ? 0 : 1], _t).distanceTo(_w)
+      // Where a contact hand is solved to (natural-villager-motion step 15).
+      // Without a pose reach for the side: the virtual hand. With one, `k`
+      // (1 included — the curve is continuous through it): up to 1 the hand
+      // stands k of the DRAWN arm out from the drawn shoulder along the pose's
+      // arm direction (a bent, readied arm — the virtual rig's proportions are
+      // not the drawn child's); past 1 it is the world point the pose names,
+      // k of the primitive arm out from its shoulder (the quarry's surface),
+      // blended over k 1 … 1.15 so the reach never jumps.
+      const handTarget = (s: 'L' | 'R', i: number, vh: THREE.Object3D, out: THREE.Vector3) => {
+        const k = i === 0 ? extras?.reach?.left : extras?.reach?.right
+        const pivot = arms.current[i]
+        if (k === undefined || !pivot) return loc(vh, out)
+        loc(pivot, _rv)
+        loc(vh, _rf)
+        const far = _rf.clone().sub(_rv).multiplyScalar(k).add(_rv)
+        _rf.sub(_rv).normalize()
+        // the drawn arm's reach, measured with this function's own scratch
+        // vectors (the callers hold theirs across this call)
+        const sh = loc(b[`upperArm.${s}`], new THREE.Vector3())
+        const el = loc(b[`forearm.${s}`], new THREE.Vector3())
+        const wr = loc(b[`hand.${s}`], new THREE.Vector3())
+        const len = sh.distanceTo(el) + el.distanceTo(wr) + wr.distanceTo(loc(rig.hands[s === 'L' ? 0 : 1], new THREE.Vector3()))
+        _rs.copy(sh)
+        _rn.copy(_rs).addScaledVector(_rf, len * Math.min(1, k))
+        const t = Math.max(0, Math.min(1, (k - 1) / 0.15))
+        return out.copy(_rn).lerp(far, t * t * (3 - 2 * t))
+      }
       let hipYaw = 0
       let chestYaw = 0
       const leanIn = () => {
@@ -511,10 +548,17 @@ export function SkinnedFigure({
           if (!vh || !contactArm[i]) return
           const reach = reachOf(s)
           loc(b[`upperArm.${s}`], _s)
-          loc(vh, _t)
+          handTarget(s, i, vh, _t)
           lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
         })
-        if (lean > 0 && gltf) {
+        // a pose's reach that may lunge (the tag catch's last stride) leans in
+        // as far as it takes when a lean reaches its target; any other pose
+        // with its own reach leans by its own lean alone (the run's, step 15)
+        // (a share of it while a blend eases the lunge in or out)
+        const lunge = Math.min(1, Math.max(0, Number(extras?.reach?.lunge ?? 0)))
+        const grab = lunge > 0
+        if (extras?.reach && !grab) lean = 0
+        if ((lean > 0 || grab) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
           // the lean is searched again through the distributed chain, the
           // least (in the same steps) that brings every contact within reach
@@ -524,16 +568,18 @@ export function SkinnedFigure({
             b.hips.updateWorldMatrix(false, true)
             const short = (['L', 'R'] as const).some((s, i) => {
               const vh = virtualHands.current[i]
-              return !!vh && contactArm[i] && loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) > reachOf(s) * 0.995
+              return !!vh && contactArm[i] && loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) > reachOf(s) * 0.995
             })
             if (!short) {
               lean = l
               break
             }
           }
-          if (!lean) writeTrunk(0, hipYaw, chestYaw)
+          if (extras?.reach) lean *= lunge
+          writeTrunk(lean, hipYaw, chestYaw)
           b.hips.updateWorldMatrix(false, true)
         } else if (lean > 0) {
+          if (extras?.reach) lean *= lunge
           writeTrunk(lean, hipYaw, chestYaw)
           b.spine.updateWorldMatrix(false, true)
         }
@@ -572,7 +618,7 @@ export function SkinnedFigure({
         applyClipLayers(gltf.asset, gltf.person, gb, clips, m, free)
         takeTrunkBase(gb, trunkBase)
         digShare = clips.dig
-        poseShoulders(gb, (pose?.current ?? ownShown.current)?.shoulders)
+        poseShoulders(gb, extras?.shoulders)
         writeTrunk(0, 0, 0)
         ;(['L', 'R'] as const).forEach((s, i) => {
           armBase[i][0].copy(b[`upperArm.${s}`].quaternion)
@@ -592,7 +638,7 @@ export function SkinnedFigure({
           Math.max(
             ...(['L', 'R'] as const).map((s, i) => {
               const vh = virtualHands.current[i]
-              return vh && contactArm[i] ? loc(b[`upperArm.${s}`], _s).distanceTo(loc(vh, _t)) - reachOf(s) * 0.995 : -1
+              return vh && contactArm[i] ? loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) - reachOf(s) * 0.995 : -1
             }),
           )
         const hipY = b.hips.position.y
@@ -618,7 +664,12 @@ export function SkinnedFigure({
       if (gltf && clips) {
         const g = gaze.current
         const reaching = [0, 1].filter((i) => contactArm[i] && virtualHands.current[i])
-        if (reaching.length) {
+        const wanted = extras?.gaze
+        if (wanted) {
+          // the pose names what the head looks at (the quarry, the ground ahead)
+          g.wantYaw = wanted.yaw
+          g.wantPitch = wanted.pitch
+        } else if (reaching.length) {
           _gazeAt.set(0, 0, 0)
           for (const i of reaching) _gazeAt.add(loc(virtualHands.current[i]!, _t))
           _gazeAt.divideScalar(reaching.length).sub(loc(b.head, _t))
@@ -664,7 +715,17 @@ export function SkinnedFigure({
           _pole.set(i === 0 ? 1 : -1, -0.3, 0.2).applyQuaternion(chestQ())
           done = solveTo(_grip, _pole)
         } else if (contactArm[i] && vh) {
-          loc(vh, _t)
+          // (reachOf uses _t as scratch: measured before the target is)
+          const r = reachOf(s) * 0.999
+          handTarget(s, i, vh, _t)
+          // a pose's own reach past the arm (a grab easing out before its
+          // lunge) holds the arm straight toward it rather than dropping to the
+          // unsolved fallback, so the hand runs on through k = 1 (the lean
+          // search above still sees the full target)
+          if ((i === 0 ? extras?.reach?.left : extras?.reach?.right) !== undefined) {
+            loc(up, _s)
+            if (_t.distanceTo(_s) > r) _t.sub(_s).setLength(r).add(_s)
+          }
           _pole.set(s === 'L' ? 0.5 : -0.5, -0.4, -1).applyQuaternion(chestQ())
           done = solveTo(_t.clone(), _pole)
         }
@@ -680,7 +741,7 @@ export function SkinnedFigure({
       if (gltf && clips) {
         placeShovel(gltf.asset, gltf.person, clips, shovel.current)
         gripShaft(gltf.asset, gltf.person, gb, clips, shovel.current)
-        const ph = (pose?.current ?? ownShown.current)?.pointHand
+        const ph = extras?.pointHand
         applyHandShapes(rig.meshes[0], handShapes(clips, ph ? [ph.left, ph.right] : [0, 0]))
       }
       // The head's squat correction depends on the chain just posed, and
@@ -704,11 +765,11 @@ export function SkinnedFigure({
   }, [rig, dims, pose, squat, poseLegs, headSteady, kneel, kneeling, clips])
 
   // Publish the virtual pivots to the caller that owns the pose.
-  const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget })
+  const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget, skinned: true })
   useEffect(() => {
     selfLimbs.current.retarget = retarget
     if (!limbs) return
-    limbs.current = { arms: arms.current, trunk: trunk.current, retarget }
+    limbs.current = { arms: arms.current, trunk: trunk.current, retarget, skinned: true }
     return () => {
       limbs.current = null
     }
