@@ -206,7 +206,12 @@ describe('the port-city tag chaser on the glTF body (natural-villager-motion ste
     const elevation = Math.atan2(hand[1] - shoulder[1], Math.hypot(hand[0] - shoulder[0], hand[2] - shoulder[2]))
     expect(Math.abs(elevation)).toBeLessThan((10 * Math.PI) / 180)
     expect(shoulder[1] / SCALE).toBeGreaterThan(FIGURE_LIMBS.shoulderY - 0.03)
-    expect(handGapToBody(hand, f.quarry, SCALE)).toBeLessThanOrEqual(FIGURE_LIMBS.handRadius * SCALE)
+    // ON the quarry: at most a hand radius off its body, and sunk into it by no
+    // more than the contact tolerance (a quarter hand radius) — negative is
+    // penetration
+    const gap = handGapToBody(hand, f.quarry, SCALE)
+    expect(gap).toBeLessThanOrEqual(FIGURE_LIMBS.handRadius * SCALE)
+    expect(gap).toBeGreaterThanOrEqual(-0.25 * FIGURE_LIMBS.handRadius * SCALE)
     expect(f.body.shoulders![side].protraction).toBeCloseTo(CH.reachProtraction, 9)
     // the last stride may lunge onto the quarry; the approach never does
     expect(f.body.reach!.lunge).toBe(true)
