@@ -77,6 +77,20 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1389. Tag main as poc and publish it at /Heart-of-Africa-Remake/poc/
+  Queue position: directly after point 1387 (user order 19.10.2026).
+  Source: user order 19.10.2026: "Noch ein Punkt direkt nach 1387: Tagge den aktuellen main-Stand als poc und veröffentliche ihn unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/". Confirmed with "ja" that main at execution time (after 1387, so the net-man fix is included) is meant.
+  Final state: the release tag `poc` points at the `main` commit current when this point is worked (i.e. including point 1387), and that build is live at https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ via the Pages workflow. Procedure: the poc part of docs/batch-owner-runbook.md (the authoritative release steps; memory version-release-process). This point IS the user's explicit tag approval for exactly this one re-tag of `poc` (memory tags-only-on-request); no other tag (`vX.Y`) is touched.
+  Verifiable: `git rev-parse poc` equals the tagged main commit, pushed to origin; the Pages deployment for that commit concluded green; the poc URL loads and serves that build (verified in a browser, the game starts).
+  Bundle: Dokumentation.
+  Criticality: medium — the user's public PoC build.
+- [ ] 1390. Board cards need a short title and a body
+  Queue position: directly after the point "Fishery net man stays the same person when stepping ashore" (user order 19.10.2026), i.e. second from the front; the later user order put 1389 directly after 1387, so this follows 1389.
+  Source: user approval 19.10.2026: "Ja, reihe das nach dem neuen Punkt für die wechselnde Person mit dem Fischer ein." User observed 19.10.2026: cards sometimes carry a far too long title and no description, the description text having landed in the title (example: point 1379 "Giza-Touristen und Reisender in westlicher Kleidung von 1890 (Schuhe, lange Ärmel, lange Hosen/Röcke, sitzender Hut) — nach dem Kleidungs-Neubau 1347").
+  Final state: scripts/board-queue.mjs refuses a board card title longer than a fixed limit (about 80 characters, calibratable constant), and a queued card without a body blocks the board publish instead of only being printed as "no prose yet" (scripts/board-queue.mjs reportEntries). Existing cards with this pattern in .claude/board-queue.json — among them point 1379, whose title is the whole translated work-order headline plus its queue position and whose body is null — get a short title, with the rest of the text moved into the body.
+  Verifiable: unit tests for board-queue: an over-long title is refused, a body-less card blocks publishing, a short title with a body passes; no card in .claude/board-queue.json violates either rule after the change.
+  Bundle: Chat & Tafel.
+  Criticality: low — board readability for the user; changes an existing check, no new mechanism (CLAUDE.md §2 freeze: simplification of an existing rule).
 - [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
   Queue position: directly after point 1343.
   Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.
@@ -84,16 +98,9 @@ put it is the mistake this line exists to stop.
   Verifiable: polish-children --section=tag-catch green on both backends on 3 consecutive runs for that check; port-city picture judged by looking.
   Bundle: Dorfleben.
   Criticality: medium - the port-city chaser's arms, both backends.
-- [ ] 1385. Cairo children frame aimed before the walking child moves out on WebGL 2
-  Queue position: directly after point 1384.
-  Source: docs/backlog.md (picture check of 1129, 02.10.2026), recurred 19.10.2026 on the full WebGL 2 polish-children run at feat/1343 4b9870e65 (local/verify-logs/2026-10-19T08-17-42-344-polish-children.log): "frame 690-cairo-children — its subject is not in the rendered picture: off the bottom edge of the frame". The aim is taken before the shot while the child keeps walking; test-frame aim only, no player impact, but it holds every covering polish-children run red.
-  Final state: the 690-cairo-children frame holds its child inside the picture at the shutter on both backends.
-  Verifiable: polish-children --section=children-motion green for that frame on both backends; frame judged by looking.
-  Bundle: Dorfleben.
-  Criticality: low - a test frame's aim; blocks the suite's covering run.
 
 - [ ] 1386. Caught tag child photographed standing clear of the run at the river bank on WebGPU
-  Queue position: directly after point 1385.
+  Queue position: directly after point 1384.
   Source: covering WebGPU polish-children run on main 0e2df2c2a after landing point 1343, 19.10.2026 (machine quiet unverified): "a caught child was photographed standing slumped clear of the run, 10-14 m off (work-order 1239) — no caught child could be photographed inside the window" (caughtMoments 741, alone 270, crowded 16499). The same check passed on both backends at feat/1343 (WebGPU 3f4d620d9, WebGL 2 e5fbb1179); test-frame acquisition, no player impact proven.
   Final state: polish-children re-run alone on a quiet machine on both backends; the 1239 caught-child frame is taken inside its window, or the acquisition window is fixed so it is.
   Verifiable: polish-children --section for the 1239 frames green on both backends; frame judged by looking.
@@ -177,6 +184,13 @@ put it is the mistake this line exists to stop.
   Verifiable: Blender frame sheet and 1294-dress-swahili.png before/after on both backends, judged by looking; the recorded FPS comparison; garment penetration gate green.
   Criticality: medium - every coastal villager; possible frame-rate cost on all villager scenes.
   Bundle: Dorfleben.
+- [ ] 1385. Cairo children frame aimed before the walking child moves out on WebGL 2
+  Queue position: after point 1341 (or after point 1340 if 1341 is absorbed by point 1347).
+  Source: docs/backlog.md (picture check of 1129, 02.10.2026), recurred 19.10.2026 on the full WebGL 2 polish-children run at feat/1343 4b9870e65 (local/verify-logs/2026-10-19T08-17-42-344-polish-children.log): "frame 690-cairo-children — its subject is not in the rendered picture: off the bottom edge of the frame". The aim is taken before the shot while the child keeps walking; test-frame aim only, no player impact, but it holds every covering polish-children run red.
+  Final state: the 690-cairo-children frame holds its child inside the picture at the shutter on both backends.
+  Verifiable: polish-children --section=children-motion green for that frame on both backends; frame judged by looking.
+  Bundle: Dorfleben.
+  Criticality: low - a test frame's aim; blocks the suite's covering run.
 
 - [ ] 1308. Cut LLM round-trips spent on bookkeeping rituals, analysed six-eyes with final cross-vendor check
   Queue position: directly after point 1294 (ahead of 1301); worked only once 1294 has landed (user 05.10.2026: "ja, aber nach 1294").
@@ -214,6 +228,13 @@ put it is the mistake this line exists to stop.
   05.10.2026: "keine bestehende Prüfung zu brechen reicht alleine nicht aus. Es dürfen auch keine neuen Probleme hinzukommen, wie z. B. Deadlocks oder Skriptabbrüche bei unerwarteten Fehlern, die die Batch lahmlegen könnten. Allgemein darf keine Bestandsfunktionalität gefährdet werden, auch nicht in unerwarteten Fehlerfällen. Für solche muss einen Fallback geben."
   05.10.2026: "Die Karte \"Anfrage nicht übernehmbar: Cut LLM round-trips spent on bookkeeping rituals, analysed…\" ist immer noch da und ich sehe den Punkt nicht als eingereiht. Darauf habe ich doch schon einmal angesprochen, du meintest, ich müsste nichts weiter tun."
   05.10.2026: "ja, aber nach 1294"
+- [ ] 1388. Request-approval guard stops refusing ordinary read commands
+  Queue position: directly after point 1308 (user order 19.10.2026: "nach 1308").
+  Source: user request 19.10.2026 (approved: "ja"): observed 19.10.2026 in a chat session (cf94cf28): four ordinary read commands, none mentioning finding.mjs or --request, plus the prescribed timestamp node -e command, were all refused as "non-canonical deposit". Work continued only via the Read tool.
+  Final state: request-approval-guard (scripts/request-approval-guard-core.mjs) refuses only Bash commands that actually mention a deposit (finding.mjs with --request). An ordinary read-only command with a pipe, quotes or $ — e.g. grep -rliE "unload|basket" src | head, sed -n 775,805p file, or the timestamp command node -e "console.log(new Intl.DateTimeFormat(...))" that the timestamp rule itself prescribes — passes without the "non-canonical" refusal.
+  Verifiable: unit tests in scripts/request-approval-guard-core.test.mjs: those three commands pass; a real non-canonical deposit is still refused.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — a real blockade (CLAUDE.md §2 infrastructure-freeze exception): the guard blocks routine reading and the prescribed timestamp command in chat sessions.
 
 - [ ] 1318. The dressing-growth and channel-crossing checks are red on main
   Source: findings carrier 06.10.2026 13:22, found on the enrichments run of point 1297.
@@ -15903,17 +15924,3 @@ to land than a mechanism that needs a review.
   Verifiable: each step's *Verified* list in the concept; penetration gate and full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point and carry; picture check in a port city and a village on both backends, judged by looking; cross-vendor code review record.
   Bundle: Dorfleben.
   Criticality: high - every villager, both backends.
-- [ ] 1387. Fishery net man stays the same person when stepping ashore
-  Queue position: at the very FRONT of the work order (user order 19.10.2026: "ganz vorne in die Queue").
-  Source: user request 19.10.2026 (approved: "ja"): the user saw it in the game on 19.10.2026 (two screenshots): during unloading the fisherman turns into a completely different person and back. Cause measured: two Figure instances per net man, each with its own useId identity.
-  Final state: the river fishery's net man is ONE person through the whole round — kneeling in the canoe, stepping ashore, squatting at the landing to unload, and boarding again. src/scenes/place/RiverFishery.tsx no longer draws him as two Figure instances (village-canoe-netman kneeling, village-canoe-netman-ashore squatting) toggled by nm.inBoat; like the fish carrier (one body with its own kneel transition, RiverFishery.tsx "never a second, kneeling figure swapped in"), he is a single Figure whose identity (sex, body, dress — keyed per instance by useId in src/scenes/place/placeFigure.tsx) cannot change between boat and shore.
-  Verifiable: a Vitest proves boat state and shore state render the same figure identity; the fishery picture shows the same man (same dress, same body) in the canoe and at the landing during unloading, judged by looking on both backends.
-  Bundle: Dorfleben.
-  Criticality: medium — a player-visible identity swap of a villager, both backends.
-- [ ] 1388. Request-approval guard stops refusing ordinary read commands
-  Queue position: directly after point 1308 (user order 19.10.2026: "nach 1308").
-  Source: user request 19.10.2026 (approved: "ja"): observed 19.10.2026 in a chat session (cf94cf28): four ordinary read commands, none mentioning finding.mjs or --request, plus the prescribed timestamp node -e command, were all refused as "non-canonical deposit". Work continued only via the Read tool.
-  Final state: request-approval-guard (scripts/request-approval-guard-core.mjs) refuses only Bash commands that actually mention a deposit (finding.mjs with --request). An ordinary read-only command with a pipe, quotes or $ — e.g. grep -rliE "unload|basket" src | head, sed -n 775,805p file, or the timestamp command node -e "console.log(new Intl.DateTimeFormat(...))" that the timestamp rule itself prescribes — passes without the "non-canonical" refusal.
-  Verifiable: unit tests in scripts/request-approval-guard-core.test.mjs: those three commands pass; a real non-canonical deposit is still refused.
-  Bundle: Testinfrastruktur.
-  Criticality: medium — a real blockade (CLAUDE.md §2 infrastructure-freeze exception): the guard blocks routine reading and the prescribed timestamp command in chat sessions.
