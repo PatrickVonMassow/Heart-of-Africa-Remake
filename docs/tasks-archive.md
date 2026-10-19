@@ -34368,3 +34368,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Bundle: Dokumentation.
   Criticality: medium — the user's public PoC build.
   DONE 19.10.2026, 20:15. `poc` moved from 7290a1800 to f154baa67 (main HEAD including point 1387; CI run 39294905434 green) through the GitHub refs API, because github.com:443 refused git connections at that moment while api.github.com answered; local tag synced. Pages deployed by manual dispatch, run 39299262698, green. Verified in the browser: /poc/ serves chunk App-CvmX7Hnv.js carrying build commit f154baa, and the game starts in Cairo with HUD and no console errors on WebGPU and on the WebGL 2 lane (fallback notice shown).
+
+- [x] 1390. Board cards need a short title and a body
+  Queue position: directly after the point "Fishery net man stays the same person when stepping ashore" (user order 19.10.2026), i.e. second from the front; the later user order put 1389 directly after 1387, so this follows 1389.
+  Source: user approval 19.10.2026: "Ja, reihe das nach dem neuen Punkt für die wechselnde Person mit dem Fischer ein." User observed 19.10.2026: cards sometimes carry a far too long title and no description, the description text having landed in the title (example: point 1379 "Giza-Touristen und Reisender in westlicher Kleidung von 1890 (Schuhe, lange Ärmel, lange Hosen/Röcke, sitzender Hut) — nach dem Kleidungs-Neubau 1347").
+  Final state: scripts/board-queue.mjs refuses a board card title longer than a fixed limit (about 80 characters, calibratable constant), and a queued card without a body blocks the board publish instead of only being printed as "no prose yet" (scripts/board-queue.mjs reportEntries). Existing cards with this pattern in .claude/board-queue.json — among them point 1379, whose title is the whole translated work-order headline plus its queue position and whose body is null — get a short title, with the rest of the text moved into the body.
+  Verifiable: unit tests for board-queue: an over-long title is refused, a body-less card blocks publishing, a short title with a body passes; no card in .claude/board-queue.json violates either rule after the change.
+  Bundle: Chat & Tafel.
+  Criticality: low — board readability for the user; changes an existing check, no new mechanism (CLAUDE.md §2 freeze: simplification of an existing rule).

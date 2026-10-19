@@ -77,13 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1390. Board cards need a short title and a body
-  Queue position: directly after the point "Fishery net man stays the same person when stepping ashore" (user order 19.10.2026), i.e. second from the front; the later user order put 1389 directly after 1387, so this follows 1389.
-  Source: user approval 19.10.2026: "Ja, reihe das nach dem neuen Punkt für die wechselnde Person mit dem Fischer ein." User observed 19.10.2026: cards sometimes carry a far too long title and no description, the description text having landed in the title (example: point 1379 "Giza-Touristen und Reisender in westlicher Kleidung von 1890 (Schuhe, lange Ärmel, lange Hosen/Röcke, sitzender Hut) — nach dem Kleidungs-Neubau 1347").
-  Final state: scripts/board-queue.mjs refuses a board card title longer than a fixed limit (about 80 characters, calibratable constant), and a queued card without a body blocks the board publish instead of only being printed as "no prose yet" (scripts/board-queue.mjs reportEntries). Existing cards with this pattern in .claude/board-queue.json — among them point 1379, whose title is the whole translated work-order headline plus its queue position and whose body is null — get a short title, with the rest of the text moved into the body.
-  Verifiable: unit tests for board-queue: an over-long title is refused, a body-less card blocks publishing, a short title with a body passes; no card in .claude/board-queue.json violates either rule after the change.
-  Bundle: Chat & Tafel.
-  Criticality: low — board readability for the user; changes an existing check, no new mechanism (CLAUDE.md §2 freeze: simplification of an existing rule).
 - [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
   Queue position: directly after point 1343.
   Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.
