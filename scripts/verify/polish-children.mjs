@@ -505,43 +505,50 @@ if (section('tag-catch')) {
         .then((h) => h.jsonValue())
         .catch(() => null)
     // Body heights, in the child's own frame: +z forward, +y up. Each window is
-    // read twice, a third of a sprint stride apart (8 frames), on the same
-    // chaser: a SWINGING hand moves in the body's frame, a HELD one barely does.
+    // read over most of a sprint stride (7 readings, 3 frames apart) on the same
+    // chaser: a SWINGING hand sweeps forward and back, a HELD one keeps its
+    // place ahead and only rides the run's bob.
     const hand = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right'))
-    const readPair = async (want) => {
-      const a = await readArms(want)
-      if (!a) return null
-      await nextFrames(8)
-      const b = await readArms(want, a.index)
-      return b ? { a, b } : null
+    const readSeries = async (want) => {
+      const first = await readArms(want)
+      if (!first) return null
+      const all = [first]
+      for (let k = 1; k < 7; k++) {
+        await nextFrames(3)
+        const r = await readArms(want, first.index)
+        if (!r || r.side !== first.side) return null
+        all.push(r)
+      }
+      return all
     }
-    const moved = (p, side) => {
-      const u = hand(p.a, side).local
-      const v = hand(p.b, side).local
-      return Math.hypot(u.x - v.x, u.y - v.y, u.z - v.z)
+    const sweep = (series, side) => {
+      const z = series.map((r) => hand(r, side).local.z)
+      return Math.max(...z) - Math.min(...z)
     }
-    const fmt = (p, side) => `${side} ${JSON.stringify(hand(p.a, side).local)} moved ${moved(p, side).toFixed(3)}`
-    const far = await readPair('far')
+    const minZ = (series, side) => Math.min(...series.map((r) => hand(r, side).local.z))
+    const fmt = (series, side) => `${side} sweep ${sweep(series, side).toFixed(3)} min z ${minZ(series, side).toFixed(3)}`
+    let far = null
+    for (let tries = 0; tries < 4 && !far; tries++) far = await readSeries('far')
     check(
       "far from its quarry the catcher swings both hands with its run (neither is held out), read off the drawn pivots",
-      !!far && ['left', 'right'].every((side) => moved(far, side) > 0.03),
-      far ? `${fmt(far, 'left')}; ${fmt(far, 'right')} at ${far.a.gap.toFixed(2)} m` : 'no pair of far chasing frames without a grab',
+      !!far && ['left', 'right'].every((side) => sweep(far, side) > 0.12),
+      far ? `${fmt(far, 'left')}; ${fmt(far, 'right')} at ${far[0].gap.toFixed(2)} m` : 'no far chasing stride without a grab',
     )
     check(
       "while a runner's hands hang at its sides",
-      !!far && far.a.runner?.length === 2 && far.a.runner.every((h) => h.local.z < 0.15),
-      far ? JSON.stringify(far.a.runner?.map((h) => h.local)) : 'no runner frame',
+      !!far && far[0].runner?.length === 2 && far[0].runner.every((h) => h.local.z < 0.15),
+      far ? JSON.stringify(far[0].runner?.map((h) => h.local)) : 'no runner frame',
     )
-    // Inside the prepare window the readied hand is HELD out in front (it rides
-    // the run's bob, well under the free hand's swing) while the free hand
-    // keeps swinging.
-    const near = await readPair('near')
-    const side = near && near.a.side
+    // Inside the prepare window the readied hand is HELD out in front while
+    // the free hand keeps swinging.
+    let near = null
+    for (let tries = 0; tries < 8 && !near; tries++) near = await readSeries('near')
+    const side = near && near[0].side
     const other = side === 'left' ? 'right' : 'left'
     check(
       "inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging",
-      !!near && near.a.side === near.b.side && hand(near.a, side).local.z > 0.2 && hand(near.b, side).local.z > 0.2 && moved(near, side) < 0.6 * moved(near, other),
-      near ? `readied ${fmt(near, side)}; free ${fmt(near, other)} at ${near.a.gap.toFixed(2)}/${near.b.gap.toFixed(2)} m` : 'no pair of chasing frames inside the prepare window',
+      !!near && minZ(near, side) > 0.15 && sweep(near, side) < 0.5 * sweep(near, other),
+      near ? `readied ${fmt(near, side)}; free ${fmt(near, other)} from ${near[0].gap.toFixed(2)} m` : 'no chasing stride inside the prepare window',
     )
 
     // Side-on to the pair, a few metres off, on a line the rendered scene
