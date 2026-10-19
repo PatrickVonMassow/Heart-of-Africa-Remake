@@ -478,9 +478,9 @@ if (section('tag-catch')) {
     // chaser runs with both arms swinging like a runner's; inside the prepare
     // window, short of the commit distance, ONE arm is readied forward while
     // the other keeps swinging. Each frame is read in the same page call as
-    // the round, so both describe one frame. Only the FIRST frame of a series
-    // is waited for; the rest are recorded in the page on every following
-    // frame of the SAME chase (chaser, quarry, tag count, readied side) and
+    // the round, so both describe one frame. The FIRST frame of a series is
+    // waited for and the rest recorded in the same page-side loop on every
+    // following frame of the SAME chase (chaser, quarry, tag count, readied side) and
     // window, and any break ends the series — a wait could stitch strides of
     // separate chases into one fake sweep.
     const probeArms = ({ want, lock }) => {
@@ -511,11 +511,6 @@ if (section('tag-catch')) {
         runner: window.__placeTagHands(runner),
       }
     }
-    const readArms = (want) =>
-      page
-        .waitForFunction(probeArms, { want, lock: null }, { timeout: 60000, polling: 'raf' })
-        .then((h) => h.jsonValue())
-        .catch(() => null)
     // Body heights, in the child's own frame: +z forward, +y up. Each window is
     // read over a span of the game's own clock (far: a whole arm swing; near:
     // more than half of one, as long as the prepare window reliably holds),
@@ -523,17 +518,26 @@ if (section('tag-catch')) {
     // keeps its place ahead and only rides the run's bob.
     const SPAN = { far: 0.5, near: 0.35 }
     const hand = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right'))
-    const readSeries = async (want) => {
-      const first = await readArms(want)
-      if (!first) return null
-      const got = await page
+    // ONE page-side RAF loop waits for the first frame in the window and then
+    // records every following frame, so no frame falls into a handoff between
+    // separate page calls.
+    const readSeries = (want) =>
+      page
         .evaluate(
-          ({ want, first, span, src }) =>
+          ({ want, span, src }) =>
             new Promise((done) => {
               const probe = new Function(`return (${src})`)()
-              const all = [first]
+              const deadline = performance.now() + 60000
+              let first = null
+              let all = null
               let frames = 0
               const tick = () => {
+                if (!first) {
+                  first = probe({ want, lock: null })
+                  if (first) all = [first]
+                  else if (performance.now() > deadline) return done({})
+                  return requestAnimationFrame(tick)
+                }
                 const r = probe({ want, lock: first })
                 if (!r || r.side !== first.side) return done({})
                 if (r.clock !== all.at(-1).clock) all.push(r)
@@ -543,11 +547,10 @@ if (section('tag-catch')) {
               }
               requestAnimationFrame(tick)
             }),
-          { want, first, span: SPAN[want], src: probeArms.toString() },
+          { want, span: SPAN[want], src: probeArms.toString() },
         )
-        .catch(() => ({}))
-      return got.all ?? null
-    }
+        .then((got) => got.all ?? null)
+        .catch(() => null)
     const sweep = (series, side) => {
       const z = series.map((r) => hand(r, side).local.z)
       return Math.max(...z) - Math.min(...z)
