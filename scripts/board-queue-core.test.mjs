@@ -733,6 +733,36 @@ describe('a board card has a short title and a body', () => {
     expect(boardCardBlockers(html, [1, 2, 3])).toEqual({ bodyless: [2], overlong: [3] })
     expect(boardCardBlockers(html, [1])).toEqual({ bodyless: [], overlong: [] })
   })
+  it('measures the title as the reader sees it, every entity decoded once', () => {
+    const shown = `${'A'.repeat(BOARD_CARD_TITLE_MAX - 5)}&quot;`
+    const html = board(
+      renderQueueCard({ point: 4, title: 'x', body: 'Text.', meta: '~1 h' }).replace(
+        '<span class="t">x</span>',
+        `<span class="t">${shown}</span>`,
+      ) +
+        renderQueueCard({ point: 5, title: 'x', body: 'Text.', meta: '~1 h' }).replace(
+          '<span class="t">x</span>',
+          `<span class="t">${'&#228;&#xFC;&hellip;'.repeat(BOARD_CARD_TITLE_MAX / 2)}</span>`,
+        ),
+    )
+    expect(importQueueFromHtml(html).points[4].title).toBe(`${'A'.repeat(BOARD_CARD_TITLE_MAX - 5)}"`)
+    expect(boardCardBlockers(html, [4, 5])).toEqual({ bodyless: [], overlong: [5] })
+  })
+  it('reads a hand-written description paragraph with further attributes and class tokens', () => {
+    // Written by hand, NOT by renderQueueCard: the importer must not depend on its exact tag.
+    const card = (point, p) =>
+      `<details>\n  <summary><span class="num">${point}</span><span class="t">Kurz</span>` +
+      `<span class="right"><span class="meta">~1 h</span></span></summary>\n` +
+      `  <div class="body">\n    ${p}\n    <hr class="split">\n    <p class="status">Status.</p>\n  </div>\n</details>\n`
+    const html = board(
+      card(11, '<p class="desc" lang="de">Text.</p>') +
+        card(12, '<p lang="de" class="lead desc">Text.</p>') +
+        card(13, '<p data-class="desc">Kein Text.</p>'),
+    )
+    expect(importQueueFromHtml(html).points[11].body).toEqual(['Text.'])
+    expect(importQueueFromHtml(html).points[12].body).toEqual(['Text.'])
+    expect(boardCardBlockers(html, [11, 12, 13])).toEqual({ bodyless: [13], overlong: [] })
+  })
   it('ignores the cards of points that are no longer open', () => {
     const html = board(renderQueueCard({ point: 9, title: long, body: QUEUE_STUB_BODY, meta: QUEUE_STUB_META }))
     expect(boardCardBlockers(html, [])).toEqual({ bodyless: [], overlong: [] })

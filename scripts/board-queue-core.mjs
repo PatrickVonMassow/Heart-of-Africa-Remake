@@ -190,12 +190,25 @@ export function gatedEntryPoints(entries) {
   return (Array.isArray(entries) ? entries : []).filter((e) => e?.gated).map((e) => e.point)
 }
 
-/** Undo the escaping `renderQueueCard` applied, so a title read back compares. */
+/** The named entities a board title can carry, beyond the three `esc` writes. */
+const NAMED_ENTITIES = Object.freeze({
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', shy: '\u00ad',
+  hellip: '…', ndash: '–', mdash: '—', middot: '·', times: '×',
+  laquo: '«', raquo: '»', bdquo: '„', ldquo: '“', rdquo: '”', sbquo: '‚', lsquo: '‘', rsquo: '’',
+  auml: 'ä', ouml: 'ö', uuml: 'ü', Auml: 'Ä', Ouml: 'Ö', Uuml: 'Ü', szlig: 'ß', eacute: 'é',
+})
+
+/**
+ * Undo the escaping a board title carries, so a title read back compares and is
+ * measured as the reader sees it. ONE pass, so `&amp;quot;` stays `&quot;`; an
+ * entity outside the table stays literal.
+ */
 const unesc = (text) =>
-  String(text ?? '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
+  String(text ?? '').replace(/&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z][a-zA-Z0-9]*));/g, (whole, hex, dec, name) => {
+    const code = hex ? parseInt(hex, 16) : dec ? Number(dec) : null
+    if (code !== null) return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole
+    return Object.hasOwn(NAMED_ENTITIES, name) ? NAMED_ENTITIES[name] : whole
+  })
 
 /**
  * The same two reports, taken from a BOARD rather than from the data — what the
@@ -683,7 +696,11 @@ export function importQueueFromHtml(html) {
     // A split card stores its DESCRIPTION alone; the status and the
     // placeholder are not queue prose, so no description paragraph means none.
     const split = bodyHtml.includes('<hr class="split">')
-    const paraRe = split ? /<p class="desc">([\s\S]*?)<\/p>/gi : /<p\b[^>]*>([\s\S]*?)<\/p>/gi
+    // Any attribute order and further class tokens count (`<p class="desc" lang="de">`);
+    // `\s` before `class` keeps `data-class` out.
+    const paraRe = split
+      ? /<p\b[^>]*?\sclass\s*=\s*["'](?:[^"']*\s)?desc(?:\s[^"']*)?["'][^>]*>([\s\S]*?)<\/p>/gi
+      : /<p\b[^>]*>([\s\S]*?)<\/p>/gi
     const paras = [...bodyHtml.matchAll(paraRe)].map((m) => cardText(m[1])).filter(Boolean)
     // A legacy card with no <p> at all (a hand-written board) still yields its text.
     const body = paras.length || split ? paras : [cardText(bodyHtml)].filter(Boolean)
