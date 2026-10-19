@@ -41,7 +41,7 @@ import { createFisheryMovers, FISHERY_PROPS, fisheryLiveColliders, placeFisheryM
 import { CookShelter } from './CookShelter'
 import { fireHasCookShelter, fireShelterResponse } from '../../systems/cookShelter'
 import { rainAmount } from '../../systems/season'
-import { blendPose, carrierWalkPose, copyPose, netFishRotation, ownPose, reachPose } from './fisheryPoses'
+import { blendPose, carrierWalkPose, copyPose, netFishRotation, ownPose, placeNetMan, reachPose } from './fisheryPoses'
 import { placePlayerPosition } from './playerPosition'
 import { speakOverhead } from './speechChannel'
 import { speechBearing } from './speechBearing'
@@ -75,7 +75,7 @@ import {
 import { devAssert } from '../../systems/devAssert'
 import { isLifeFrozen } from './lifeFreeze'
 import { Pounder } from './Pounder'
-import { FisheryNetMan, placeNetMan } from './fisheryNetMan'
+import { FisheryNetMan } from './FisheryNetMan'
 
 /** The speech-label id of the net man's words (the dugout's, as before). */
 export const CANOE_SPEAKER_ID = 'village-canoe'

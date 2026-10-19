@@ -23,7 +23,8 @@ vi.mock('./placeFigure', () => ({
   },
 }))
 
-const { FisheryNetMan, placeNetMan } = await import('./fisheryNetMan')
+const { FisheryNetMan } = await import('./FisheryNetMan')
+const { placeNetMan } = await import('./fisheryPoses')
 extend(THREE as unknown as Parameters<typeof extend>[0])
 
 const SEAT_Y = -0.3
