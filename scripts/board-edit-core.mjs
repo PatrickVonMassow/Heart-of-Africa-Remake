@@ -4,6 +4,7 @@
 import { boardMissingPoints } from './board-currency-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
 import {
+  cleanDoneTitles,
   dropStrayNowCards,
   migrateDecisionLog,
   normaliseLineEndings,
@@ -54,7 +55,7 @@ export function runBoardEdit({
   const swept = dropStrayNowCards(unwrapCardHeaderGroups(migrateDecisionLog(normaliseLineEndings(html))))
   const edited = dropStrayNowCards(
     renderCardCriticalities(
-      derive(upgradeNowCards(normaliseLineEndings(transform(swept.html)))),
+      derive(cleanDoneTitles(upgradeNowCards(normaliseLineEndings(transform(swept.html))))),
       tasksText,
     ),
   )

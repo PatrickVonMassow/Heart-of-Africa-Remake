@@ -81,7 +81,7 @@ import {
   doneCard,
   descriptionOf,
   migrateCardDescriptions,
-  pointDescription,
+  queuedDescription,
   renderCardSections,
   setCardDescription,
 } from './board-core.mjs'
@@ -101,6 +101,7 @@ import {
   timesEndClock,
 } from './board-core.mjs'
 import { etaMinutes } from './dashboard-guard-core.mjs'
+import { cleanDoneTitles, stripLeadingTitle } from './board-core.mjs'
 
 // A minimal document WITH the section heading: since the sixth cross-review
 // there is no fragment fallback — a writer on a document without the
@@ -2320,6 +2321,13 @@ describe('card description and status are separate sections', () => {
     '  Bundle: Hygiene.',
     '',
   ].join('\n')
+  // The German card texts `.claude/board-queue.json` keeps (user 19.10.2026).
+  const QUEUE_DATA = {
+    points: {
+      701: { title: 'Nächster Punkt', body: ['Die Karte zeigt zwei Abschnitte.'] },
+      702: { title: 'Alt', body: ['Archivierter Punkt, auf Deutsch beschrieben.'] },
+    },
+  }
   const statusSection = (card) => card.slice(card.indexOf('<hr class="split">'))
   const descSection = (card) => card.slice(card.indexOf('<div class="body">'), card.indexOf('<hr class="split">'))
 
@@ -2345,10 +2353,13 @@ describe('card description and status are separate sections', () => {
     expect(statusSection(card)).not.toContain('Warum das ansteht.')
   })
 
-  it('promote of a stub queue card derives the description from the work-order text', () => {
+  it('promote of a stub queue card takes the German text from the queue data, never the work order', () => {
     const stub = queueEntry(701, 'Nächster Punkt', '~2 h').replace('Warum das ansteht.', QUEUE_STUB_BODY.replace(/</g, '&lt;').replace(/>/g, '&gt;'))
-    const out = toNow(fullBoard({ queue: stub }), 701, 'Begonnen.', { stamp: '10:00', tasksText: TASKS })
-    expect(descriptionOf(nowCard(out, 701))).toBe('The card shows two sections. It never loses the description.')
+    const out = toNow(fullBoard({ queue: stub }), 701, 'Begonnen.', { stamp: '10:00', queueData: QUEUE_DATA })
+    expect(descriptionOf(nowCard(out, 701))).toBe('Die Karte zeigt zwei Abschnitte.')
+    const bare = toNow(fullBoard({ queue: stub }), 701, 'Begonnen.', { stamp: '10:00', tasksText: TASKS })
+    expect(nowCard(bare, 701)).toContain(`<p class="desc-missing">${DESCRIPTION_MISSING_TEXT}</p>`)
+    expect(bare).not.toContain('two sections')
   })
 
   it('a status update leaves the description byte-identical', () => {
@@ -2388,10 +2399,11 @@ describe('card description and status are separate sections', () => {
     expect(done.match(/Warum das ansteht\./g)).toHaveLength(1)
   })
 
-  it('a derived description skips sentences naming another point', () => {
-    expect(pointDescription(TASKS, 701)).not.toMatch(/700/)
-    expect(pointDescription(TASKS, 702)).toBe('Archived headline that says what it delivered.')
-    expect(pointDescription(TASKS, 999)).toBe('')
+  it('the queued description is the German body, escaped; empty for an unknown point', () => {
+    expect(queuedDescription(QUEUE_DATA, 701)).toBe('Die Karte zeigt zwei Abschnitte.')
+    expect(queuedDescription({ points: { 5: { body: ['A < B', 'Zweiter.'] } } }, 5)).toBe('A &lt; B\n\nZweiter.')
+    expect(queuedDescription(QUEUE_DATA, 999)).toBe('')
+    expect(queuedDescription(null, 701)).toBe('')
   })
 
   it('status and describe cut at the divider element even on an inline body (review finding 1)', () => {
@@ -2448,7 +2460,7 @@ describe('card description and status are separate sections', () => {
     expect(descriptionOf(queueCard(out, 701))).toBe('Warum das ansteht.')
   })
 
-  it('the one-time migration keeps each body as the status and derives the description', () => {
+  it('the one-time migration keeps each body as the status and takes the German queue text', () => {
     const legacyDone =
       '<details>\n  <summary><span class="num">702</span><span class="t">Alt</span>' +
       '<span class="right"><span class="meta">09:00 · 10:00</span></span></summary>\n' +
@@ -2459,19 +2471,19 @@ describe('card description and status are separate sections', () => {
       queue: queueEntry(704, 'Wartet', '~1 h'),
       done: legacyDone + unknownDone,
     })
-    const { html, counts, missing } = migrateCardDescriptions(source, TASKS)
+    const { html, counts, missing } = migrateCardDescriptions(source, QUEUE_DATA)
     expect(counts).toEqual({ now: 1, queue: 1, done: 2 })
     expect(missing).toEqual({ now: [], queue: [], done: ['703'] })
     const now = nowCard(html, 701)
-    expect(descriptionOf(now)).toBe('The card shows two sections. It never loses the description.')
+    expect(descriptionOf(now)).toBe('Die Karte zeigt zwei Abschnitte.')
     expect(statusSection(now)).toContain('<p><span class="stamp">Stand 16:20</span> läuft</p>')
     const done = doneCard(html, 702)
-    expect(descriptionOf(done)).toBe('Archived headline that says what it delivered.')
+    expect(descriptionOf(done)).toBe('Archivierter Punkt, auf Deutsch beschrieben.')
     expect(statusSection(done)).toContain('<p>Punkt erledigt, Abschlussarbeiten stehen noch aus.</p>')
     expect(doneCard(html, 703)).toContain(`<p class="desc-missing">${DESCRIPTION_MISSING_TEXT}</p>`)
     expect(descriptionOf(queueCard(html, 704))).toBe('Warum das ansteht.')
     // Idempotent: a second run changes nothing.
-    expect(migrateCardDescriptions(html, TASKS).html).toBe(html)
+    expect(migrateCardDescriptions(html, QUEUE_DATA).html).toBe(html)
   })
 })
 
@@ -2812,18 +2824,14 @@ describe('card times', () => {
 // Point 1363: the landing whose projection discards the now card must still
 // leave the done card with its description.
 describe('description survives a landing through the discarded now card', () => {
-  const tasksText = [
-    '- [x] 1342. Natural villager motion',
-    '  Final state: villagers walk, kneel and carry with a natural gait.',
-    '',
-  ].join('\n')
+  const queueData = { points: { 1342: { body: ['Dorfbewohner gehen, knien und tragen mit natürlichem Gang.'] } } }
 
   it('focus cleared -> projection -> closing --title -> done keeps the description', () => {
     const queued = fullBoard({
       queue: queueEntry(1342, 'Natürliche Bewegung', '~2 h'),
       done: '<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n',
     })
-    const running = toNow(queued, 1342, 'Läuft.', { stamp: '10:00', tasksText })
+    const running = toNow(queued, 1342, 'Läuft.', { stamp: '10:00', queueData })
     expect(descriptionOf(nowCard(running, 1342))).toBeTruthy()
     const projected = reconcileNowProjection(running, [], { stamp: '12:00' })
     expect(nowCard(projected, 1342)).toBeFalsy()
@@ -2831,15 +2839,152 @@ describe('description survives a landing through the discarded now card', () => 
       subject: 'Natürliche Bewegung',
       reason: 'Das Vier-Augen-Protokoll fehlt noch.',
       stamp: '12:05',
+      queueData,
     })
     const out = closeCard(closing, 1342, {
       text: 'Zusammengeführt.',
       end: '12:30',
       none: 'Übergabe — der Nachfolger nimmt Punkt 1364.',
-      tasksText,
+      queueData,
     })
     const card = doneCard(out, 1342)
-    expect(descriptionOf(card)).toContain('natural gait')
+    expect(descriptionOf(card)).toContain('natürlichem Gang')
     expect(card).not.toContain(DESCRIPTION_MISSING_TEXT)
+  })
+})
+
+// User 19.10.2026: a card keeps its German description on every step, the
+// closing card shows it above its status, and neither the status nor the
+// Erledigt title repeats the subject or the closing stage.
+describe('board cards keep the German description and drop the title from the status', () => {
+  const POINT = 1390
+  const SUBJECT = 'Board-Karten: kurzer Titel plus Beschreibung'
+  const GERMAN = 'Kartentitel kurz halten (Längengrenze); die Beschreibung sagt, was der Punkt liefert.'
+  const CARD_TEXT = 'Auf der Karte selbst nachgeschärft: kurzer Titel, Beschreibung darunter.'
+  const TASKS_TEXT = `- [x] ${POINT}. Board card titles stay short\n  Final state: Scripts/board-queue.mjs refuses a board card title longer than 80.\n`
+  const queueData = { points: { [POINT]: { title: SUBJECT, body: [GERMAN] } } }
+  const describedQueueCard = (description) =>
+    `<details>\n  <summary><span class="num">${POINT}</span><span class="t">${SUBJECT}</span>` +
+    '<span class="right"><span class="meta">~1 h</span></span></summary>\n  <div class="body">\n' +
+    `${renderCardSections({ description, status: 'Noch nicht begonnen.' })}\n  </div>\n</details>\n`
+  const statusText = (card) => card.slice(card.indexOf('<p class="status-head">')).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const titleIn = (card) => (card.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1]
+  const closingCard = (html) => closingWorkCards(html)[0]
+
+  // queue -> now -> done -> closing, the shared walk of the cases below.
+  const walk = (queue, opts = {}) => {
+    const queued = fullBoard({ queue })
+    const now = toNow(queued, POINT, 'Läuft.', { stamp: '10:00', ...opts })
+    const done = toDone(now, POINT, { text: 'Zusammengeführt.', end: '11:00', ...opts })
+    const closing = toClosingWork(done, POINT, { reason: 'Das Vier-Augen-Protokoll fehlt noch.', stamp: '11:05', ...opts })
+    return { queued, now, done, closing }
+  }
+
+  it('keeps the card description on the queue, now, Erledigt and closing card, ahead of the queue data', () => {
+    const { queued, now, done, closing } = walk(describedQueueCard(CARD_TEXT), { queueData, tasksText: TASKS_TEXT })
+    expect(descriptionOf(queueCard(queued, POINT))).toBe(CARD_TEXT)
+    expect(descriptionOf(nowCard(now, POINT))).toBe(CARD_TEXT)
+    expect(descriptionOf(doneCard(done, POINT))).toBe(CARD_TEXT)
+    expect(descriptionOf(closingCard(closing))).toBe(CARD_TEXT)
+    const rearchived = closeCard(closing, POINT, { text: 'Abgeschlossen.', end: '11:30', none: 'Übergabe — der Nachfolger nimmt Punkt 1391.', queueData })
+    expect(descriptionOf(doneCard(rearchived, POINT))).toBe(CARD_TEXT)
+    for (const html of [now, done, closing, rearchived]) {
+      expect(html).not.toContain(GERMAN)
+      expect(html).not.toContain('refuses a board card title')
+    }
+  })
+
+  it('never takes an archived card\'s status as the closing description', () => {
+    const legacyDone =
+      `<details>\n  <summary><span class="num">${POINT}</span><span class="t">${SUBJECT}</span>` +
+      '<span class="right"><span class="meta">09:00 · 10:00</span></span></summary>\n' +
+      '  <div class="body">\n    <p>Alter Abschlussstand im Archiv.</p>\n  </div>\n</details>\n'
+    const closing = toClosingWork(fullBoard({ done: legacyDone }), POINT, { reason: 'Retrospektive fehlt.', stamp: '11:05', queueData })
+    expect(descriptionOf(closingCard(closing))).toBe(GERMAN)
+  })
+
+  it('takes the German queue data when the card itself has none', () => {
+    const { now, done, closing } = walk(describedQueueCard(''), { queueData })
+    for (const card of [nowCard(now, POINT), doneCard(done, POINT), closingCard(closing)]) {
+      expect(descriptionOf(card)).toBe(GERMAN)
+    }
+  })
+
+  it('shows "Beschreibung fehlt" without German text, never the work-order text', () => {
+    const { now, done, closing } = walk(describedQueueCard(''), { tasksText: TASKS_TEXT })
+    for (const card of [nowCard(now, POINT), doneCard(done, POINT), closingCard(closing)]) {
+      expect(card).toContain(`<p class="desc-missing">${DESCRIPTION_MISSING_TEXT}</p>`)
+      expect(card).not.toContain('refuses a board card title')
+    }
+    const legacy = fullBoard({ now: nowEntry(POINT, SUBJECT, '10:00 · ~12:00') })
+    const migrated = migrateCardDescriptions(legacy, null).html
+    expect(nowCard(migrated, POINT)).toContain(`<p class="desc-missing">${DESCRIPTION_MISSING_TEXT}</p>`)
+  })
+
+  it('renders the closing card with the description on top and the status below', () => {
+    const card = closingCard(walk(describedQueueCard(GERMAN)).closing)
+    expect(card.indexOf('<p class="desc">')).toBeLessThan(card.indexOf('<hr class="split">'))
+    expect(card.indexOf('<hr class="split">')).toBeLessThan(card.indexOf('Zusammengeführt und abgehakt'))
+  })
+
+  it('the closing status does not begin with the subject', () => {
+    const card = closingCard(walk(describedQueueCard(GERMAN)).closing)
+    const status = statusText(card).replace(/^Stand der Umsetzung Stand 11:05\s*/, '')
+    expect(status.startsWith(`Zusammengeführt und abgehakt; die ${CLOSING_STAGE} stehen noch aus.`)).toBe(true)
+    expect(status).toContain('Das Vier-Augen-Protokoll fehlt noch.')
+    expect(status).not.toContain(SUBJECT)
+  })
+
+  it('stores a status that starts with the card title without it', () => {
+    const queued = fullBoard({ queue: describedQueueCard(GERMAN) })
+    const now = toNow(queued, POINT, `${SUBJECT} — läuft gerade, Tests stehen aus.`, { stamp: '10:00' })
+    expect(statusText(nowCard(now, POINT))).toContain('Stand 10:00 Läuft gerade, Tests stehen aus.')
+    const updated = setCardStatus(now, POINT, `${SUBJECT}: zweiter Stand.`, '10:30')
+    expect(statusText(nowCard(updated, POINT))).toBe('Stand der Umsetzung Stand 10:30 Zweiter Stand.')
+    expect(stripLeadingTitle('Karten - fast fertig', 'Karten')).toBe('Fast fertig')
+    // Nothing is refused: a status that is only the title, or merely shares a prefix, stays.
+    expect(stripLeadingTitle('Karten', 'Karten')).toBe('Karten')
+    expect(stripLeadingTitle('Kartentitel geprüft.', 'Karten')).toBe('Kartentitel geprüft.')
+    expect(stripLeadingTitle('A &amp; B: läuft', 'A &amp; B')).toBe('Läuft')
+  })
+
+  it('keeps the idle card in its old shape', () => {
+    const idle = toNoCurrentWork(fullBoard({}), 'Übergabe — der Nachfolger nimmt Punkt 1391.', { stamp: '12:00' })
+    expect(idle).not.toContain('<hr class="split">')
+    expect(idle).not.toContain(DESCRIPTION_MISSING_TEXT)
+  })
+
+  it('queue -> now -> done -> closing -> boundary: the Erledigt title never carries the stage label', () => {
+    const { done, closing } = walk(describedQueueCard(GERMAN), { queueData })
+    expect(titleIn(closingCard(closing))).toBe(`${SUBJECT}: ${CLOSING_STAGE}`)
+    // Archiving straight from the closing card (the landing path) keeps the subject alone.
+    const rearchived = closeCard(closing, POINT, { text: 'Abgeschlossen.', end: '11:30', none: 'Übergabe — der Nachfolger nimmt Punkt 1391.', queueData })
+    const boundary = toNoCurrentWork(closing, 'Übergabe — der Nachfolger nimmt Punkt 1391.', { stamp: '11:40' })
+    for (const html of [done, closing, rearchived, boundary]) {
+      expect(titleIn(doneCard(html, POINT))).toBe(SUBJECT)
+      expect(doneCard(html, POINT)).not.toContain(CLOSING_STAGE)
+    }
+    expect(descriptionOf(doneCard(rearchived, POINT))).toBe(GERMAN)
+  })
+
+  it('strips every closing-stage variant the publish gate recognises', () => {
+    for (const variant of [`${SUBJECT} — ${CLOSING_STAGE}`, `${SUBJECT}: abschlussarbeiten`, `${SUBJECT} – ABSCHLUSSARBEITEN`]) {
+      expect(closingCardTitle(variant)).toBe(`${SUBJECT}: ${CLOSING_STAGE}`)
+      const leaked = fullBoard({ done: describedQueueCard(GERMAN).replace(`<span class="t">${SUBJECT}</span>`, `<span class="t">${variant}</span>`) })
+      expect(titleIn(doneCard(cleanDoneTitles(leaked), POINT))).toBe(SUBJECT)
+      const closing = toClosingWork(fullBoard({}), POINT, { subject: variant, reason: 'Retrospektive fehlt.', stamp: '11:05' })
+      const archived = toDone(closing, POINT, { text: 'Fertig.', end: '11:30' })
+      expect(titleIn(doneCard(archived, POINT))).toBe(SUBJECT)
+    }
+  })
+
+  it('cleans an Erledigt title that already carries the stage label on the next edit', () => {
+    const leaked = toDone(toNow(fullBoard({ queue: describedQueueCard(GERMAN) }), POINT, 'Läuft.', { stamp: '10:00' }), POINT, {
+      end: '11:00',
+    }).replace(`<span class="t">${SUBJECT}</span>`, `<span class="t">${SUBJECT}: ${CLOSING_STAGE}</span>`)
+    expect(titleIn(doneCard(leaked, POINT))).toBe(`${SUBJECT}: ${CLOSING_STAGE}`)
+    const cleaned = cleanDoneTitles(leaked)
+    expect(titleIn(doneCard(cleaned, POINT))).toBe(SUBJECT)
+    expect(cleanDoneTitles(cleaned)).toBe(cleaned)
   })
 })
