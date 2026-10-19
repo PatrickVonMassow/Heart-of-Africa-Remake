@@ -5599,19 +5599,34 @@ if (section('figure-micro')) {
     let maxFrac = 0
     let maxAll = 0
     const pairs = []
+    const groundPairs = []
+    const driftPairs = []
     for (let k = 1; k < raws.length; k++) {
       const [a, b] = [raws[k - 1], raws[k]]
       if (a.length !== b.length || a.length !== mask.length || inner === 0) continue
       let changed = 0
       let changedAll = 0
+      let ground = 0
+      let groundChanged = 0
+      let drift = 0
       for (let i = 0; i < a.length; i++) {
-        if (!mask[i] || Math.abs(a[i] - b[i]) <= 6) continue
+        if (interior[i]) drift += b[i] - a[i]
+        if (!mask[i]) {
+          ground++
+          if (Math.abs(a[i] - b[i]) > 6) groundChanged++
+          continue
+        }
+        if (Math.abs(a[i] - b[i]) <= 6) continue
         changedAll++
         if (interior[i]) changed++
       }
       maxFrac = Math.max(maxFrac, changed / inner)
       maxAll = Math.max(maxAll, changedAll / visible)
       pairs.push(+((changed / inner) * 100).toFixed(2))
+      // Diagnostics: a moving light or camera changes the ground too and
+      // shifts the interior's mean; shimmer does neither.
+      groundPairs.push(+((groundChanged / Math.max(1, ground)) * 100).toFixed(2))
+      driftPairs.push(+(drift / inner).toFixed(2))
     }
     // The crop, enlarged 4× for the eye (nearest neighbour: no smoothing).
     await sharp(frames[0]).resize({ width: box.width * 4, kernel: 'nearest' }).toFile(`${OUT}${shot('1380-figure-micro-traveller-crop')}.png`)
@@ -5629,6 +5644,8 @@ if (section('figure-micro')) {
         maxChangedInterior: +(maxFrac * 100).toFixed(2) + ' %',
         pairsPercent: pairs,
         withSilhouette: +(maxAll * 100).toFixed(2) + ' %',
+        groundPairsPercent: groundPairs,
+        interiorMeanDrift: driftPairs,
       }),
     )
   }
