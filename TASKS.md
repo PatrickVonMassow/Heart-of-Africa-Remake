@@ -15888,3 +15888,10 @@ to land than a mechanism that needs a review.
   Verifiable: each step's *Verified* list in the concept; penetration gate and full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point and carry; picture check in a port city and a village on both backends, judged by looking; cross-vendor code review record.
   Bundle: Dorfleben.
   Criticality: high - every villager, both backends.
+- [ ] 1384. Tag chaser's readied hand held and free hand swinging in the prepare window
+  Queue position: directly after point 1343.
+  Source: point 1343's author, 19.10.2026: polish-children --section=tag-catch (WebGPU, feat/1343 213d6bd45) fails "inside the prepare window one arm is held readied while the other swings" in 2 of 4 runs once the check samples one continuous chase (readied hand swept 0.235 m at reach 0; or free hand only 0.076 m). The pre-1343 game code fails the same check; the old check passed only by stitching samples from separate chases. Logs: local/verify-logs/2026-10-19T06-26-24-433-polish-children.log, local/verify-logs/2026-10-19T06-30-00-389-polish-children.log.
+  Final state: in the port-city tag game the glTF chaser's readied arm stays held and its free arm keeps swinging through every prepare window, and the check passes on both backends.
+  Verifiable: polish-children --section=tag-catch green on both backends on 3 consecutive runs for that check; port-city picture judged by looking.
+  Bundle: Dorfleben.
+  Criticality: medium - the port-city chaser's arms, both backends.
