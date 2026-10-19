@@ -34,6 +34,11 @@ beforeAll(async () => {
  *  a child running at the tag sprint with its right arm readied at reach `k`
  *  (running, as the chaser does: a standing contact out of reach crouches). */
 async function handAt(k: number | undefined) {
+  return (await figureAt(k === undefined ? { left: undefined } : { right: k })).hand
+}
+
+/** The drawn right hand and head after those frames, for any pose reach. */
+async function figureAt(reach: FigurePose['reach']) {
   const look: FigureLook = {
     peopleId: 'swahili',
     drivers: { coldness: 0, harmattan: 0, karif: 0 },
@@ -47,7 +52,7 @@ async function handAt(k: number | undefined) {
     right: armAim(-0.1, -0.55),
     lean: 0,
     turn: 0,
-    reach: k === undefined ? { left: undefined } : { right: k },
+    reach,
   }
   const group = new THREE.Group()
   function Stage() {
@@ -73,8 +78,9 @@ async function handAt(k: number | undefined) {
   const mesh = group.getObjectByName('figure-body') as THREE.SkinnedMesh
   const hand = mesh.skeleton.bones[asset.bones.indexOf('hand.R')]
   const at = group.worldToLocal(hand.getWorldPosition(new THREE.Vector3()))
+  const head = group.worldToLocal(mesh.skeleton.bones[asset.bones.indexOf('head')].getWorldPosition(new THREE.Vector3()))
   await act(async () => root.unmount())
-  return at
+  return { hand: at, head }
 }
 
 describe('a pose reach through k = 1', () => {
@@ -90,4 +96,24 @@ describe('a pose reach through k = 1', () => {
     const virtual = await handAt(undefined)
     expect(virtual.distanceTo(one)).toBeGreaterThan(0.01)
   }, 60_000)
+})
+
+// A blend between a lunging and a plain reach (mixPose through an arm
+// handover) carries the lunge as a share: the trunk's lean-in eases with it
+// instead of switching off and back on at the blend's ends.
+describe('a lunge share eases the contact lean-in', () => {
+  it('leans the head forward in proportion between share 0 and 1, with no step at either end', async () => {
+    // just past the straight arm: a lean the trunk can make brings the hand on
+    const k = 1.02
+    const z = async (lunge: number) => (await figureAt({ right: k, lunge })).head.z
+    const none = await z(0)
+    const tiny = await z(0.01)
+    const half = await z(0.5)
+    const full = await z(1)
+    expect(full - none).toBeGreaterThan(0.02)
+    expect(Math.abs(tiny - none)).toBeLessThan(0.05 * (full - none))
+    expect(half).toBeGreaterThan(none + 0.2 * (full - none))
+    expect(half).toBeLessThan(none + 0.8 * (full - none))
+    expect(Math.abs((await z(0.99)) - full)).toBeLessThan(0.05 * (full - none))
+  }, 120_000)
 })
