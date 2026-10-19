@@ -77,21 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1380. Figures receive fabric, leather and skin micro-structure from baked detail maps (design.md §64)
-  Queue position: directly after point 1354 and before point 1343 in work-order order (user order 18.10.2026: "Ja, reihe das vorne in der Queue ein - also nach 1354 und vor 1343.").
-  Source: findings carrier request 18.10.2026 14:53 (non-owner session, spec cut from 9d4a0ee68). In the village at eye height (verification/77-enrich-village-life.png) the huts show straw and mud structure while the figures beside them read as flat plastic; the closer the camera (trade, conversation), the more it shows. design.md line 64 demands believable micro-structure on every surface at first-person eye height, never a flat colour wash; so far only ground and buildings meet it.
-  Final state:
-  - Villager figures (public/models/villager.glb: body plus separate garment meshes, one flat material `villager`, no images) and the traveller no longer render as a flat colour wash at first-person eye height. Garment meshes show a fabric weave / fold relief (leather where the garment is leather), the body shows a subtle skin irregularity; light reacts to the relief.
-  - Technique matches the existing building surfaces in src/render/materials.ts: reproducibly generated, tileable baked albedo + normal maps (new kinds e.g. `cloth`, `leather`, `skin` in public/tex/), mid-gray structure albedo multiplied onto the existing per-figure tint, mip chain + anisotropy, two blended scales against tiling. No hand-painted UV textures, no new runtime dependency.
-  - Projection must stay attached to the deforming, animated body: world-space triplanar on a skinned mesh swims as the figure moves. Prefer object/bind-pose-space triplanar (pre-skinning position) or the MakeHuman UVs if the glb carries them; the choice is the author's, proven by the picture test below.
-  - Existing per-figure colour variation, garment cover mask (_COVER) behaviour and performance budget (src/config/quality.ts) stay intact; the far travel-map view stays calm (no shimmer under TAA).
-  - New tunables (tile sizes, bump strength per kind) live as calibratable values next to SURFACE_TILE / in src/config/balance.ts as fits the existing pattern.
-  Verifiable:
-  - Vitest: material builds for the new kinds; texture cache/sampler state as for the existing kinds.
-  - Playwright picture (both backends, isBackendSensitivePath applies): close first-person view of a villager in a village showing visible cloth and skin structure; a two-frame walk-cycle comparison showing the structure moves WITH the body (no swimming); the top-down travel view of the traveller without shimmer.
-  Rendering change: update docs/peoples-1890.md §8 implementation section as well.
-  Bundle: Dorfleben.
-
 - [ ] 1343. Natural villager motion c: turning, point and reach, port-city tag chaser, river-bank caught child, pick-up, carry, calibration sweep
   Queue position: directly after point 1354 (every step here is judged on its composed body).
   Source: split from point 1316 on 12.10.2026 (owner decision under the standing split rule); spec = docs/natural-villager-motion-concept.md steps 12, 14-19 and step 20's remaining evidence, as approved by the GPT-6 Astra final check at b231b21.
