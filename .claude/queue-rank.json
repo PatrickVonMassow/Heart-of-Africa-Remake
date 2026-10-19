@@ -1663,15 +1663,15 @@
       "origin": "machine",
       "place": "last"
     },
-    "1389": {
-      "at": "2026-10-19T15:26:45.375Z",
+    "1390": {
+      "at": "2026-10-19T15:26:45.535Z",
       "why": "placed where the user's order of 19.10.2026 puts it",
       "origin": "machine",
       "place": "last"
     },
-    "1390": {
-      "at": "2026-10-19T15:26:45.535Z",
-      "why": "placed where the user's order of 19.10.2026 puts it",
+    "1391": {
+      "at": "2026-10-19T19:13:17.145Z",
+      "why": "Player-visible but low frequency; end of its bundle is right",
       "origin": "machine",
       "place": "last"
     }
@@ -1703,7 +1703,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-10-19T16:58:57.449Z",
+    "at": "2026-10-19T19:13:17.167Z",
     "points": [
       184,
       200,
@@ -2159,8 +2159,8 @@
       1385,
       1386,
       1388,
-      1389,
-      1390
+      1390,
+      1391
     ]
   }
 }
