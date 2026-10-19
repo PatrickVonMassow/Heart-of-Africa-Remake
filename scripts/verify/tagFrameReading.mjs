@@ -188,10 +188,15 @@ export function describeReading(reading) {
 // Each window is a series of frames of one chase, read off the drawn hand
 // pivots in the chaser's own frame (+z forward). EVERY observed window judges
 // the readied hand (ahead, and held: swept by under half the free hand's
-// swing); that swing needs most of a stride, so only a window of `longSpan`
-// measures it, and it is the reference every window's readied hand is held to.
-/** Body-frame metres and seconds; calibratable. */
-export const PREPARE_ARMS = { readiedAhead: 0.15, freeSweep: 0.12, longSpan: 0.6 }
+// swing) AND its own free hand. A full swing needs most of a stride, so a
+// window of `longSpan` must show one; the smallest such swing is the reference
+// every readied hand is held to. A shorter window of `measureSpan` must still
+// show the free hand moving by `freeMove`: the least the minimum accepted
+// swing (`freeSweep`, peak to peak) covers in 0.3 s of a 0.8 s stride centred
+// on its turn, 0.06·(1 − cos(π·0.3/0.8)) ≈ 0.037 m. A window shorter still
+// cannot show a swing; it is counted as unmeasured, never as evidence.
+/** Body-frame metres and seconds; calibratable (the 0.8 s stride is assumed). */
+export const PREPARE_ARMS = { readiedAhead: 0.15, freeSweep: 0.12, longSpan: 0.6, measureSpan: 0.3, freeMove: 0.03 }
 const handZ = (r, side) => r.chaser.find((h) => h.hand === (side === 'left' ? 'hand-left' : 'hand-right')).local.z
 export const armSweep = (series, side) => {
   const z = series.map((r) => handZ(r, side))
@@ -204,17 +209,28 @@ const otherSide = (side) => (side === 'left' ? 'right' : 'left')
 /** The verdict over every prepare window observed, in order: `{ ok, detail }`. */
 export function judgePrepareArms(windows) {
   const seen = windows.filter((w) => w && w.length > 0)
-  const long = seen.find((w) => w.at(-1).clock - w[0].clock >= PREPARE_ARMS.longSpan)
-  if (!long) return { ok: false, detail: `no chasing stride inside the prepare window (${seen.length} short windows)` }
+  const span = (w) => w.at(-1).clock - w[0].clock
+  const freeOf = (w) => armSweep(w, otherSide(w[0].side))
+  const longs = seen.filter((w) => span(w) >= PREPARE_ARMS.longSpan)
+  if (!longs.length) return { ok: false, detail: `no chasing stride inside the prepare window (${seen.length} short windows)` }
+  const long = longs.reduce((a, b) => (freeOf(b) < freeOf(a) ? b : a))
   const side = long[0].side
   const other = otherSide(side)
-  const free = armSweep(long, other)
+  const free = freeOf(long)
   const heldIn = (w) => armMinZ(w, w[0].side) > PREPARE_ARMS.readiedAhead && armSweep(w, w[0].side) < 0.5 * free
+  const swingsIn = (w) =>
+    span(w) >= PREPARE_ARMS.longSpan ? freeOf(w) > PREPARE_ARMS.freeSweep : freeOf(w) >= PREPARE_ARMS.freeMove
   const bad = seen.find((w) => !heldIn(w))
-  const swings = free > PREPARE_ARMS.freeSweep
+  const still = seen.find((w) => span(w) >= PREPARE_ARMS.measureSpan && !swingsIn(w))
+  const unmeasured = seen.filter((w) => span(w) < PREPARE_ARMS.measureSpan).length
   const detail =
     `readied ${fmtArm(long, side)}; free ${fmtArm(long, other)} from ${long[0].gap.toFixed(2)} m; ` +
     `${seen.length} windows judged` +
-    (bad ? `; NOT HELD in a window from ${bad[0].gap.toFixed(2)} m: ${fmtArm(bad, bad[0].side)}` : '')
-  return { ok: !bad && swings, detail }
+    (unmeasured ? `, ${unmeasured} too short to measure the free hand` : '') +
+    (bad ? `; NOT HELD in a window from ${bad[0].gap.toFixed(2)} m: ${fmtArm(bad, bad[0].side)}` : '') +
+    (still
+      ? `; FREE HAND STILL in a ${span(still).toFixed(2)} s window from ${still[0].gap.toFixed(2)} m: ` +
+        fmtArm(still, otherSide(still[0].side))
+      : '')
+  return { ok: !bad && !still, detail }
 }

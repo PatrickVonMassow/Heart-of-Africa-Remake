@@ -209,4 +209,29 @@ describe('the chaser\'s arms inside the prepare window', () => {
   it('fails a free hand that does not swing', () => {
     expect(judgePrepareArms([window(0.7, 0.02, 0.05)]).ok).toBe(false)
   })
+
+  it('fails a short window whose free hand stands still, beside a healthy long one', () => {
+    const verdict = judgePrepareArms([window(0.45, 0.02, 0), window(0.7, 0.02, 0.2)])
+    expect(verdict.ok).toBe(false)
+    expect(verdict.detail).toMatch(/FREE HAND STILL/)
+  })
+
+  it('fails a later long window whose free hand stands still, after a healthy first one', () => {
+    const verdict = judgePrepareArms([window(0.7, 0.02, 0.2), window(0.7, 0.0, 0)])
+    expect(verdict.ok).toBe(false)
+  })
+
+  it('passes a short window whose free hand is mid-swing', () => {
+    expect(judgePrepareArms([window(0.45, 0.02, 0.2), window(0.7, 0.02, 0.2)]).ok).toBe(true)
+  })
+
+  it('names a window too short to measure a swing as unmeasured, never as swinging evidence', () => {
+    // 0.15 s cannot show a stride's swing: it is counted, its readied hand still judged
+    const verdict = judgePrepareArms([window(0.15, 0.02, 0), window(0.7, 0.02, 0.2)])
+    expect(verdict.ok).toBe(true)
+    expect(verdict.detail).toMatch(/1 too short to measure the free hand/)
+    // and alone it is no evidence at all
+    expect(judgePrepareArms([window(0.15, 0.02, 0.2)]).ok).toBe(false)
+    expect(PREPARE_ARMS.measureSpan).toBeLessThan(PREPARE_ARMS.longSpan)
+  })
 })
