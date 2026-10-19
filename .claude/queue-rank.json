@@ -1650,10 +1650,42 @@
       "why": "test-infrastructure finding; last in the work order is right, it leads its Testinfrastruktur bundle once that bundle runs",
       "origin": "machine",
       "place": "last"
+    },
+    "1383": {
+      "at": "2026-10-19T05:31:26.558Z",
+      "why": "split remainder of 1343; follows it within Dorfleben",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-10-19T04:21:55.084Z",
+    "at": "2026-10-19T05:31:26.567Z",
     "points": [
       184,
       200,
@@ -2104,33 +2136,8 @@
       1373,
       1379,
       1381,
-      1382
+      1382,
+      1383
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
