@@ -1,7 +1,8 @@
 // F6 bug report (design.md §21.1, §17.4/§17.5): hidden by default; F6 opens
 // the top-most modal with the description field focused, the complete-state
 // JSON and the report/state/copy/close controls; the typed description reaches
-// the assembled archive; Esc closes without leaving focus on a control; the F6
+// the assembled archive; opening releases the pointer lock; Esc closes without
+// leaving focus on a control but never discards typed text; the F6
 // default is prevented (F5 was abandoned — the browser reloads before
 // preventDefault can run).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -212,14 +213,38 @@ describe('F6 wiring in the Hud (design.md §21.1)', () => {
     expect(['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT']).not.toContain(tag)
   })
 
-  it('Esc closes it from inside the description field too (game keys ignore a typing target)', () => {
+  it('Esc closes it from inside an empty description field too (game keys ignore a typing target)', () => {
     render(<Hud />)
     fireEvent.keyDown(window, { code: 'F6' })
-    fireEvent.change(field(), { target: { value: 'typing…' } })
     fireEvent.keyDown(field(), { key: 'Escape', code: 'Escape' })
     expect(dump()).toBeNull()
     const tag = document.activeElement?.tagName ?? 'BODY'
     expect(['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT']).not.toContain(tag)
+  })
+
+  it('Esc in a field holding text keeps the text and only leaves the field; the next Esc closes', () => {
+    render(<Hud />)
+    fireEvent.keyDown(window, { code: 'F6' })
+    fireEvent.change(field(), { target: { value: 'typing…' } })
+    fireEvent.keyDown(field(), { key: 'Escape', code: 'Escape' })
+    expect(dump()).not.toBeNull()
+    expect(field().value).toBe('typing…')
+    expect(document.activeElement).not.toBe(field())
+    fireEvent.keyDown(window, { code: 'Escape' })
+    expect(dump()).toBeNull()
+  })
+
+  it('opening the report releases the pointer lock, as the place dialogs do', () => {
+    const exitPointerLock = vi.fn()
+    Object.defineProperty(document, 'pointerLockElement', { value: document.body, configurable: true })
+    Object.defineProperty(document, 'exitPointerLock', { value: exitPointerLock, configurable: true })
+    try {
+      render(<Hud />)
+      fireEvent.keyDown(window, { code: 'F6' })
+      expect(exitPointerLock).toHaveBeenCalledTimes(1)
+    } finally {
+      Object.defineProperty(document, 'pointerLockElement', { value: null, configurable: true })
+    }
   })
 
   it('typing in the description field does not drive the game (no month jump on the number row)', () => {
