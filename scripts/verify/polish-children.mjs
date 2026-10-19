@@ -477,33 +477,44 @@ if (section('tag-catch')) {
     // step 15): far from its quarry (outside the prepare distance, no grab) the
     // chaser runs with both arms swinging like a runner's; inside the prepare
     // window, short of the commit distance, ONE arm is readied forward while
-    // the other keeps swinging. Each frame is waited for and read in the same
-    // page call as the round, so both describe one frame.
-    const readArms = (want, chaser = -1) =>
+    // the other keeps swinging. Each frame is read in the same page call as
+    // the round, so both describe one frame. Only the FIRST frame of a series
+    // is waited for; the rest are read where they fall, and a frame from a
+    // different chase (chaser, quarry, tag count) or outside the window ends
+    // the series instead of being waited for — a wait could stitch strides
+    // of separate chases into one fake sweep.
+    const probeArms = ({ want, lock }) => {
+      const t = window.__placeTag()
+      if (!t.playing || t.chaser < 0 || t.target < 0) return null
+      if (lock && (t.chaser !== lock.index || t.target !== lock.target || t.tags !== lock.tags)) return null
+      const c = t.children[t.chaser]
+      const q = t.children[t.target]
+      if (c.body !== 'chaser' || (c.gesture && c.gesture.kind)) return null
+      const gap = Math.hypot(q.x - c.x, q.z - c.z)
+      const w = c.bodyWeights
+      const inWindow =
+        want === 'far'
+          ? gap > t.prepareDistance + 0.5
+          : gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side
+      if (!inWindow) return null
+      const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
+      if (runner < 0) return null
+      return {
+        gap,
+        index: t.chaser,
+        target: t.target,
+        tags: t.tags,
+        side: w ? w.side : null,
+        chaser: window.__placeTagHands(t.chaser),
+        runner: window.__placeTagHands(runner),
+      }
+    }
+    const readArms = (want) =>
       page
-        .waitForFunction(
-          ({ want, chaser }) => {
-            const t = window.__placeTag()
-            if (!t.playing || t.chaser < 0 || t.target < 0 || (chaser >= 0 && t.chaser !== chaser)) return null
-            const c = t.children[t.chaser]
-            const q = t.children[t.target]
-            if (c.body !== 'chaser' || (c.gesture && c.gesture.kind)) return null
-            const gap = Math.hypot(q.x - c.x, q.z - c.z)
-            const w = c.bodyWeights
-            const inWindow =
-              want === 'far'
-                ? gap > t.prepareDistance + 0.5
-                : gap < t.prepareDistance && gap > t.commitDistance + 0.2 && !!w && w.prepare >= 0.99 && !!w.side
-            if (!inWindow) return null
-            const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
-            if (runner < 0) return null
-            return { gap, index: t.chaser, side: w ? w.side : null, chaser: window.__placeTagHands(t.chaser), runner: window.__placeTagHands(runner) }
-          },
-          { want, chaser },
-          { timeout: 60000, polling: 'raf' },
-        )
+        .waitForFunction(probeArms, { want, lock: null }, { timeout: 60000, polling: 'raf' })
         .then((h) => h.jsonValue())
         .catch(() => null)
+    const readArmsNow = (want, lock) => page.evaluate(probeArms, { want, lock }).catch(() => null)
     // Body heights, in the child's own frame: +z forward, +y up. Each window is
     // read over most of a sprint stride (7 readings, 3 frames apart) on the same
     // chaser: a SWINGING hand sweeps forward and back, a HELD one keeps its
