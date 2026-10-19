@@ -15903,3 +15903,17 @@ to land than a mechanism that needs a review.
   Verifiable: each step's *Verified* list in the concept; penetration gate and full-ramp no-slide test green; before/after strip of walk, turn, run, dig, pick-up, point and carry; picture check in a port city and a village on both backends, judged by looking; cross-vendor code review record.
   Bundle: Dorfleben.
   Criticality: high - every villager, both backends.
+- [ ] 1387. Fishery net man stays the same person when stepping ashore
+  Queue position: at the very FRONT of the work order (user order 19.10.2026: "ganz vorne in die Queue").
+  Source: user request 19.10.2026 (approved: "ja"): the user saw it in the game on 19.10.2026 (two screenshots): during unloading the fisherman turns into a completely different person and back. Cause measured: two Figure instances per net man, each with its own useId identity.
+  Final state: the river fishery's net man is ONE person through the whole round — kneeling in the canoe, stepping ashore, squatting at the landing to unload, and boarding again. src/scenes/place/RiverFishery.tsx no longer draws him as two Figure instances (village-canoe-netman kneeling, village-canoe-netman-ashore squatting) toggled by nm.inBoat; like the fish carrier (one body with its own kneel transition, RiverFishery.tsx "never a second, kneeling figure swapped in"), he is a single Figure whose identity (sex, body, dress — keyed per instance by useId in src/scenes/place/placeFigure.tsx) cannot change between boat and shore.
+  Verifiable: a Vitest proves boat state and shore state render the same figure identity; the fishery picture shows the same man (same dress, same body) in the canoe and at the landing during unloading, judged by looking on both backends.
+  Bundle: Dorfleben.
+  Criticality: medium — a player-visible identity swap of a villager, both backends.
+- [ ] 1388. Request-approval guard stops refusing ordinary read commands
+  Queue position: directly after point 1308 (user order 19.10.2026: "nach 1308").
+  Source: user request 19.10.2026 (approved: "ja"): observed 19.10.2026 in a chat session (cf94cf28): four ordinary read commands, none mentioning finding.mjs or --request, plus the prescribed timestamp node -e command, were all refused as "non-canonical deposit". Work continued only via the Read tool.
+  Final state: request-approval-guard (scripts/request-approval-guard-core.mjs) refuses only Bash commands that actually mention a deposit (finding.mjs with --request). An ordinary read-only command with a pipe, quotes or $ — e.g. grep -rliE "unload|basket" src | head, sed -n 775,805p file, or the timestamp command node -e "console.log(new Intl.DateTimeFormat(...))" that the timestamp rule itself prescribes — passes without the "non-canonical" refusal.
+  Verifiable: unit tests in scripts/request-approval-guard-core.test.mjs: those three commands pass; a real non-canonical deposit is still refused.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — a real blockade (CLAUDE.md §2 infrastructure-freeze exception): the guard blocks routine reading and the prescribed timestamp command in chat sessions.
