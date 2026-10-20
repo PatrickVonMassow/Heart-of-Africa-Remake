@@ -200,19 +200,35 @@ const _palmQ = new THREE.Quaternion()
  * orientation of the hand's parent (the forearm) and `toward` a direction,
  * both in one common frame; `palm` is the palm normal in the hand's frame
  * (`palmNormal`). 0 when `toward` runs along the hand's axis.
+ *
+ * The roll is taken within half a turn of `center`, so its one unavoidable
+ * cut (a full turn is the same roll) sits opposite it: a caller that splits
+ * the roll over two joints passes the roll its pose needs (`palmRollCenter`),
+ * and the split is continuous over every roll that pose reaches.
  */
-export function palmRollAngle(parentWorld: THREE.Quaternion, palm: THREE.Vector3, toward: THREE.Vector3): number {
+export function palmRollAngle(parentWorld: THREE.Quaternion, palm: THREE.Vector3, toward: THREE.Vector3, center = 0): number {
   const d = _palmD.copy(toward).applyQuaternion(_palmQ.copy(parentWorld).invert())
   if (Math.hypot(d.x, d.z) < 1e-9 || Math.hypot(palm.x, palm.z) < 1e-9) return 0
   // a turn about +y by θ carries the azimuth atan2(x, z) to atan2(x, z) + θ
-  const a = Math.atan2(d.x, d.z) - Math.atan2(palm.x, palm.z)
-  return a > Math.PI ? a - 2 * Math.PI : a <= -Math.PI ? a + 2 * Math.PI : a
+  const a = Math.atan2(d.x, d.z) - Math.atan2(palm.x, palm.z) - center
+  const turn = 2 * Math.PI
+  return center + a - turn * Math.ceil((a - Math.PI) / turn)
 }
 
 /** `palmRollAngle` as the hand's local quaternion. */
 export function palmRoll(parentWorld: THREE.Quaternion, palm: THREE.Vector3, toward: THREE.Vector3, out = new THREE.Quaternion()): THREE.Quaternion {
   return out.setFromAxisAngle(UP, palmRollAngle(parentWorld, palm, toward))
 }
+
+/** The roll (rad) a steadying hand on a head load needs, measured on the
+ *  mounted figure (scenes/place/steadyingPalm.test.tsx): about 1.9 on the
+ *  code-built body and 2.3–3.5 on the glTF one, the left hand's negative and
+ *  the right's mirrored. The split roll's cut lies half a turn from it. A
+ *  pose constant, calibratable. */
+export const PALM_ROLL_CENTER = 2.5
+
+/** The steadying roll's centre for one hand (`side` +1 left, −1 right). */
+export const palmRollCenter = (side: 1 | -1): number => -side * PALM_ROLL_CENTER
 const UP = new THREE.Vector3(0, 1, 0)
 
 /** The share of a palm roll the forearm takes about its own axis, the wrist

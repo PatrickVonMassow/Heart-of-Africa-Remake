@@ -14,7 +14,7 @@ import { advance, createRoot, extend, useFrame } from '@react-three/fiber'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { applyFigurePose, type FigureLimbs } from '../../render/figurePose'
 import { REST_POSE, type FigurePose } from '../../render/gesture'
-import { FOREARM_ROLL_SHARE, hangToward, palmNormal, palmRoll, palmRollAngle } from '../../render/figureRig'
+import { FOREARM_ROLL_SHARE, hangToward, PALM_ROLL_CENTER, palmNormal, palmRoll, palmRollAngle, palmRollCenter } from '../../render/figureRig'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
 import { dominantBones, gltfFigureGeometry, gltfPerson } from '../../render/villagerFigureBody'
 import { JAR_HEIGHT } from './fillJar'
@@ -35,7 +35,8 @@ beforeAll(async () => {
 
 /** Mount a figure carrying a jar it steadies, run it, and return how each
  *  steadying hand's palm faces the load's axis (cosine), how far the hand is
- *  off that axis, and the roll its wrist alone takes (rad). */
+ *  off that axis, the roll its wrist alone takes (rad), the biggest frame
+ *  step of its roll or wrist once settled, and the roll of every frame. */
 async function steadied(gltf: boolean, side: 'L' | 'R') {
   const look: FigureLook = {
     peopleId: null,
@@ -72,7 +73,25 @@ async function steadied(gltf: boolean, side: 'L' | 'R') {
   const gl = { render() {}, setSize() {}, setPixelRatio() {}, domElement: {} }
   await r3f.configure({ gl: gl as never, frameloop: 'never', size: { width: 1, height: 1, top: 0, left: 0 } })
   await act(async () => r3f.render(<Stage />))
-  for (let k = 1; k <= 90; k++) await act(async () => advance(k / 60, true))
+  // each frame's roll (the forearm takes its share of it about its own axis)
+  // and the wrist's turn: the biggest frame step of either once the hand is
+  // on the jar (the first frames bring it there). The forearm's whole turn is
+  // not compared: the arm solve under the roll steps on its own (by up to
+  // ~1.2 rad of roll where headLoadGrip lowers the grip a step), and the roll
+  // follows it so the palm stays on the jar; a split crossing its cut would
+  // throw both joints half a turn (2π of roll).
+  let prev: THREE.Quaternion | null = null
+  let step = 0
+  const rolls: number[] = []
+  for (let k = 1; k <= 90; k++) {
+    await act(async () => advance(k / 60, true))
+    const hand = root.getObjectByName(`bone-hand.${side}`)!.quaternion.clone()
+    // the wrist's turn about its own axis, as the whole roll it is a share of
+    const roll = (2 * Math.atan2(hand.y, hand.w)) / (1 - FOREARM_ROLL_SHARE)
+    if (prev && k > 10) step = Math.max(step, hand.angleTo(prev), Math.abs(roll - rolls[rolls.length - 1]))
+    prev = hand
+    rolls.push(roll)
+  }
   root.updateWorldMatrix(true, true)
   const crown = root.getObjectByName('figure-crown')!
   const axisAt = crown.getWorldPosition(new THREE.Vector3())
@@ -87,7 +106,7 @@ async function steadied(gltf: boolean, side: 'L' | 'R') {
     const wrist = 2 * Math.acos(Math.min(1, Math.abs(hand.quaternion.w)))
     return { cos: palm.dot(toAxis), reach: at.distanceTo(foot.copy(axisAt).addScaledVector(axisUp, at.clone().sub(axisAt).dot(axisUp))), wrist }
   }
-  const out = facing(side)
+  const out = { ...facing(side), step, rolls }
   await act(async () => r3f.unmount())
   return out
 }
@@ -96,13 +115,19 @@ describe('the steadying hand holds the head load with its palm', () => {
   for (const gltf of [true, false]) {
     for (const side of ['L', 'R'] as const) {
       it(`${gltf ? 'glTF' : 'code-built'} body, ${side === 'L' ? 'left' : 'right'} hand: the palm faces the load's axis`, async () => {
-        const { cos, reach, wrist } = await steadied(gltf, side)
+        const { cos, reach, wrist, step, rolls } = await steadied(gltf, side)
         // the hand is on the jar's side, not hanging (the steadying solve ran)
         expect(reach).toBeLessThan(JAR.bottom * 1.6)
         // well toward the axis, not merely not away from it
         expect(cos).toBeGreaterThan(0.7)
         // the roll is spread along the forearm: the wrist alone never wrings
         expect(wrist).toBeLessThanOrEqual((Math.PI / 2) * (1 - FOREARM_ROLL_SHARE) * 2 + 1e-6)
+        // neither the roll nor the wrist snaps from frame to frame
+        expect(step).toBeLessThan(Math.PI / 2)
+        // every roll the pose reaches lies well inside the half turn about
+        // its centre: far from the cut, where the split would jump
+        const centre = palmRollCenter(side === 'L' ? 1 : -1)
+        for (const r of rolls.slice(10)) expect(Math.abs(r - centre)).toBeLessThan(Math.PI / 2)
       })
     }
   }
@@ -136,10 +161,48 @@ describe('palmRoll: the wrist rolled about its own axis', () => {
       }
     }
   })
-  it('takes the short way round: the roll stays within half a turn', () => {
-    for (let a = 0; a < Math.PI * 2; a += 0.05) {
-      const roll = palmRollAngle(forearms[2], palmNormal('code', -1), new THREE.Vector3(Math.cos(a), 0.2, Math.sin(a)))
-      expect(Math.abs(roll)).toBeLessThanOrEqual(Math.PI)
+  it('takes the roll within half a turn of the centre it is given', () => {
+    for (const centre of [0, PALM_ROLL_CENTER, -PALM_ROLL_CENTER]) {
+      for (let a = 0; a < Math.PI * 2; a += 0.05) {
+        const roll = palmRollAngle(forearms[2], palmNormal('code', -1), new THREE.Vector3(Math.cos(a), 0.2, Math.sin(a)), centre)
+        expect(roll).toBeGreaterThan(centre - Math.PI - 1e-9)
+        expect(roll).toBeLessThanOrEqual(centre + Math.PI + 1e-9)
+      }
+    }
+  })
+  it('splits continuously over the forearm and the wrist, at every clip share, across ±π', () => {
+    const up = new THREE.Vector3(0, 1, 0)
+    // the clip's own forearm and hand turns the solve blends toward
+    const clipFore = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, 0.8, -0.2))
+    const clipHand = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.4, 0.2, 0.5))
+    for (const side of [1, -1] as const) {
+      const centre = palmRollCenter(side)
+      const parent = forearms[1]
+      const palm = palmNormal('gltf', side)
+      // the band the pose reaches (the mounted figure stays inside it, above):
+      // it holds ±π, where a roll wrapped about 0 jumps by a whole turn
+      const from = centre - Math.PI / 2
+      const to = centre + Math.PI / 2
+      expect(from < -Math.PI || to > Math.PI).toBe(true)
+      const rollAt = (want: number, c: number) =>
+        palmRollAngle(parent, palm, palm.clone().applyQuaternion(new THREE.Quaternion().setFromAxisAngle(up, want)).applyQuaternion(parent), c)
+      let wrapJump = 0
+      for (let want = from; want < to; want += 0.01) wrapJump = Math.max(wrapJump, Math.abs(rollAt(want + 0.01, 0) - rollAt(want, 0)))
+      expect(wrapJump).toBeGreaterThan(Math.PI)
+      for (const share of [0, 0.25, 0.5, 0.75]) {
+        let last: THREE.Quaternion[] | null = null
+        for (let want = from; want <= to; want += 0.01) {
+          // the roll that turns the palm onto the target `want` puts it on
+          const roll = rollAt(want, centre)
+          expect(Math.abs(roll - want)).toBeLessThan(1e-6)
+          const fore = new THREE.Quaternion().setFromAxisAngle(up, roll * FOREARM_ROLL_SHARE).slerp(clipFore, share)
+          const hand = new THREE.Quaternion().setFromAxisAngle(up, roll * (1 - FOREARM_ROLL_SHARE)).slerp(clipHand, share)
+          const whole = parent.clone().multiply(fore).multiply(hand)
+          const now = [fore, hand, whole]
+          if (last) now.forEach((q, j) => expect(q.angleTo(last![j])).toBeLessThan(0.02))
+          last = now
+        }
+      }
     }
   })
   it('is continuous: a small turn of the target is a small roll', () => {

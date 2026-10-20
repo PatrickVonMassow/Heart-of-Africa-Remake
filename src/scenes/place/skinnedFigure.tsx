@@ -28,7 +28,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, newGaze, palmNormal, palmRollAngle, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, newGaze, palmNormal, palmRollAngle, palmRollCenter, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -721,7 +721,9 @@ export function SkinnedFigure({
           // toward the load's axis at the grip's height
           if (done) {
             body.worldToLocal(rig.crown.localToWorld(_toward.set(0, g.y, 0))).sub(_grip)
-            const roll = palmRollAngle(qIn(fore, _q), palmNormal(rig.gltf ? 'gltf' : 'code', i === 0 ? 1 : -1, _palm), _toward)
+            const side = i === 0 ? 1 : -1
+            // taken near the roll this pose needs, so the split never crosses its cut
+            const roll = palmRollAngle(qIn(fore, _q), palmNormal(rig.gltf ? 'gltf' : 'code', side, _palm), _toward, palmRollCenter(side))
             // the forearm rolls about its own axis (the hand stays put), the wrist the rest
             fore.quaternion.multiply(_q.setFromAxisAngle(_up, roll * FOREARM_ROLL_SHARE))
             b[`hand.${s}`].quaternion.setFromAxisAngle(_up, roll * (1 - FOREARM_ROLL_SHARE))
