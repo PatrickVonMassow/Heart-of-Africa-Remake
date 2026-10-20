@@ -28,7 +28,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, newGaze, palmNormal, palmRollAngle, palmRollCenter, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, LEAN_BONES, FOREARM_ROLL_SHARE, newGaze, palmNormal, palmRollAngle, palmRollCenter, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -550,6 +550,10 @@ export function SkinnedFigure({
         loc(b.spine, _pivot)
         _fwd.set(0, 0, 1).applyQuaternion(qIn(b.spine, _q)).setY(0).normalize()
         let lean = 0
+        // a contact short of reach that the one-pivot lean cannot make up
+        // (a full squat's dip to the water at the feet) is still searched
+        // through the glTF trunk's distributed bend below, which goes further
+        let wants = false
         ;(['L', 'R'] as const).forEach((s, i) => {
           const vh = virtualHands.current[i]
           if (!vh || !contactArm[i]) return
@@ -557,6 +561,7 @@ export function SkinnedFigure({
           loc(b[`upperArm.${s}`], _s)
           handTarget(s, i, vh, _t)
           lean = Math.max(lean, contactLean(_s, _t, reach * 0.995, _pivot, _fwd))
+          wants ||= contactWantsLean(_s, _t, reach * 0.995, _pivot, _fwd)
         })
         // a pose's reach that may lunge (the tag catch's last stride) leans in
         // as far as it takes when a lean reaches its target; any other pose
@@ -565,7 +570,7 @@ export function SkinnedFigure({
         const lunge = Math.min(1, Math.max(0, Number(extras?.reach?.lunge ?? 0)))
         const grab = lunge > 0
         if (extras?.reach && !grab) lean = 0
-        if ((lean > 0 || grab) && gltf) {
+        if ((lean > 0 || (wants && !extras?.reach) || grab) && gltf) {
           // the glTF trunk bends over three segments, not about one pivot:
           // the lean is searched again through the distributed chain, the
           // least (in the same steps) that brings every contact within reach

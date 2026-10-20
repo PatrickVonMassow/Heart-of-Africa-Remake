@@ -8,6 +8,7 @@ import {
   unsquashHead,
   CONTACT_LEAN_MAX,
   contactLean,
+  contactWantsLean,
   gestureArmEuler,
   hangToward,
   HANGING_ROLL_KEEP,
@@ -79,6 +80,21 @@ describe('the contact lean', () => {
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 0.75, -0.45), 0.5, pivot, fwd)).toBe(0)
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 0.8, 0.2), 0.5, pivot, fwd)).toBe(0)
     expect(contactLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(0)
+  })
+  it('still asks for a lean where the one-pivot lean falls short, so a deeper bend may try', () => {
+    // low in front of the feet: further than CONTACT_LEAN_MAX about one pivot
+    // brings the shoulder, but within CONTACT_LEAN_REACH of the arm's reach
+    const s = v(0.12, 0.65, 0.1)
+    const t = v(0.2, 0.15, 0.18)
+    const p0 = v(0, 0.35, 0)
+    expect(contactLean(s, t, 0.42, p0, fwd)).toBe(0)
+    expect(contactWantsLean(s, t, 0.42, p0, fwd)).toBe(true)
+  })
+  it('asks for no lean where contactLean refuses one by its limits', () => {
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.75, -0.45), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.8, 0.2), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 1.1, 2), 0.5, pivot, fwd)).toBe(false)
+    expect(contactWantsLean(v(0.17, 1.1, 0), v(0.17, 0.75, 0.45), 0.5, pivot, fwd)).toBe(true)
   })
 })
 
