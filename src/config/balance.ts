@@ -2847,12 +2847,61 @@ export const VILLAGER_GLTF = {
    *  Calibratable. */
   groundSamples: 24,
   groundLevels: 8,
+  /** The walk's planted foot (villagerClipPose.ts `clipGaitPose`): it lies
+   *  flat on the ground (ankle at its rest height, no pitch or roll) over
+   *  this share of its blended stance, from loading response to heel-off,
+   *  easing in and out over `footFlatBlend` of the stance on either side.
+   *  The retargeted walk clip carries its heel 1.5 cm up through mid-stance,
+   *  which never read as a planted foot. Weighted by the walk's share (a run
+   *  lands on its forefoot). Calibratable. */
+  footFlatFrom: 0.12,
+  footFlatTo: 0.62,
+  footFlatBlend: 0.1,
+  /** Where the flat foot hands its pivot from its held heel to its held
+   *  ball (share of the stance; the foot lies flat there, so the hand-over
+   *  moves nothing). Calibratable. */
+  footPivotSwitch: 0.4,
+  /** Share of a rolling foot's pitch its toes lift their tip by while the
+   *  foot rolls over its ball (villagerClipPose.ts `heelOff`). Calibratable. */
+  toeLift: 0.3,
+  /** Share of the cycle over which the walk eases a sole contact onto the
+   *  ground after its authored touch and off it before its authored lift
+   *  (the retargeted clip lifts its trailing ball and toe early).
+   *  Calibratable. */
+  supportEase: 0.06,
+  /** The walk's share (gaitWeights) from which a walk with no planted foot
+   *  standing settles onto its lower sole (a run's flight stays). Calibratable. */
+  soleSettleWalk: 0.9,
+  /** How far (person units per unit of leg) the lower heel or ball of a walk
+   *  may stay above the ground after the leg solve before the walk lowers its
+   *  hips onto it (villagerClipPose.ts, a jog's stride coming back to the
+   *  walk). Calibratable. */
+  walkSoleReach: 0.012,
+  /** How far below the ground a flat foot's sole contact model may lie
+   *  before the flat ankle is raised (person units per unit of leg): the
+   *  contacts scale with the leg, the drawn foot does not quite. Calibratable. */
+  flatContactSink: 0.004,
   /** The pelvis under a warped stride (natural-villager-motion steps 5 and 10):
    *  it drops just as far as both legs need to reach their feet, each leg
    *  reaching at most `legReach` of its full length, and at most
    *  `pelvisDropMax` per unit of leg. Calibratable. */
   legReach: 0.995,
   pelvisDropMax: 0.08,
+  /** The walk's own pelvis drop (same units): as far as a foot in its
+   *  stance needs to reach its planted spot, at most `walkDropMax` — the
+   *  double support's low point of a real walk, a few cm, never the runs'
+   *  toe-off reach — fading out over the last `walkDropFade` of the stance
+   *  (a share of it). Calibratable. */
+  walkDropMax: 0.05,
+  walkDropFade: 0.3,
+  /** Starting or stopping, each foot steps between the stand and the gait
+   *  (gltfClipLayers.ts `settleFeet`), lifted at mid-step by this share of
+   *  the ground it covers. Calibratable. */
+  settleStepLift: 0.35,
+  /** Stopping, a foot landed on the stand holds its spot while the body
+   *  drifts and steps the miss over (lifted as above) over this last share
+   *  of the walk weight. Calibratable. */
+  settleRestep: 0.45,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Ground speed (figure units / s) below which the figure stands. */

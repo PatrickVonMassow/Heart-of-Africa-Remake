@@ -13,7 +13,7 @@ import { clipGaitPose, clipPoseAt, shovelOnHungHand, toHung } from '../../render
 import { newPose } from '../../render/villagerRig'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { AGE_GROUPS, SEXES } from '../../systems/appearance'
-import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
+import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, settleShares, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
 
 let asset: VillagerAsset
 let person: GltfPerson
@@ -426,5 +426,206 @@ describe('the posable clavicles (natural-villager-motion step 11)', () => {
     expect(g.bones['shoulder.L'].quaternion.angleTo(new THREE.Quaternion())).toBeLessThan(
       VILLAGER_POSE.shoulders.protractionMax + VILLAGER_POSE.shoulders.dropMax + 1e-6,
     )
+  })
+})
+
+describe('starting and stopping on the glTF figure (point 1330)', () => {
+  type Sole = { w: number; feet: THREE.Vector3[][] }
+  /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
+  function soleOf(bones: Record<string, THREE.Bone>) {
+    const f = person.frame
+    const local = (['L', 'R'] as const).map((s) => {
+      const foot = bones[`foot.${s}`]
+      const at = foot.getWorldPosition(new THREE.Vector3())
+      return [new THREE.Vector3(), ...(['heel', 'ball'] as const).map((k) => foot.worldToLocal(at.clone().add(asset.contactPoints[s][k].clone().multiplyScalar(f.legScale * f.scale))))]
+    })
+    return () => (['L', 'R'] as const).map((s, i) => local[i].map((v) => bones[`foot.${s}`].localToWorld(v.clone())))
+  }
+  interface Run {
+    /** Seconds the walk stops (or, `start`, starts) at. */
+    cut: number
+    start?: boolean
+    /** Per frame: the body's heading, its sideways drift (m/s) and the kneel, by time and walk weight. */
+    yaw?: (t: number) => number
+    drift?: (t: number, w: number) => number
+    kneel?: (t: number, w: number) => number
+  }
+  /** Walk at `v`, stop (or start) with the walk weight easing as the code
+   *  walk eases it, the skeleton in a figure group placed and turned as the
+   *  body; per frame each foot's world points. */
+  function settle(r: Run) {
+    const { bones } = createGltfSkeleton(asset, person.rest)
+    const group = new THREE.Group()
+    group.add(bones.hips)
+    group.updateMatrixWorld(true)
+    const c = clipLayers(asset)
+    const hipRest = bones.hips.position.clone()
+    const sole = soleOf(bones)
+    const dt = 1 / 60
+    const v = 1.48
+    let x = 0
+    let z = 0
+    let w = r.start ? 0 : 1
+    let speed = r.start ? 0 : v
+    const frames: Sole[] = []
+    for (let t = 0; t < r.cut + 1; t += dt) {
+      const yaw = r.yaw?.(t) ?? 0
+      const step = (r.start ? t >= r.cut : t < r.cut) ? v * dt : 0
+      x += Math.sin(yaw) * step + (r.drift?.(t, w) ?? 0) * dt
+      z += Math.cos(yaw) * step
+      speed += (step / dt - speed) * (1 - Math.exp(-dt / 0.12))
+      w = Math.abs(speed) > 0.08 ? Math.min(1, w + 5 * dt) : Math.max(0, w - 5 * dt)
+      const kneel = r.kneel?.(t, w) ?? 0
+      group.position.set(x, 0, z)
+      group.rotation.y = yaw
+      group.updateMatrixWorld(true)
+      // the code-built stand: every bone at rest
+      for (const b of Object.values(bones)) b.quaternion.identity()
+      bones.hips.position.copy(hipRest)
+      stepClipLayers(asset, person, c, step, speed, { x, z, yaw, unit: 1 }, null, dt)
+      applyClipLayers(asset, person, bones, c, { speed, weight: w, kneel }, [true, true])
+      group.updateMatrixWorld(true)
+      frames.push({ w: w * (1 - kneel), feet: sole() })
+    }
+    return frames
+  }
+  const blendFrames = (frames: Sole[]) => frames.map((b, k) => (k > 0 && ((b.w > 0 && b.w < 1) || (frames[k - 1].w > 0 && frames[k - 1].w < 1)) ? k : -1)).filter((k) => k > 0)
+  /** Per foot, the most any of its points moved over the ground from frame k − 1 to k. */
+  const moved = (frames: Sole[], k: number) => frames[k].feet.map((pts, i) => Math.max(...pts.map((p, j) => Math.hypot(p.x - frames[k - 1].feet[i][j].x, p.z - frames[k - 1].feet[i][j].z))))
+
+  it('each foot steps between the gait and the stand in turn, the other standing: never a foot slid along the ground', () => {
+    // a bone blend alone moved both feet every frame of the 0.2 s blend, a
+    // foot on the ground sliding up to 7 cm (measured 20.10.2026, the
+    // village-walk check on WebGL 2: worstSlip 0.0704)
+    const restY = settle({ cut: 0.5, start: true })[0].feet[0][0].y
+    for (const start of [false, true]) {
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        const frames = settle({ cut, start })
+        const blend = blendFrames(frames)
+        let worstStill = 0
+        let worstSlide = 0
+        for (const k of blend) {
+          const m = moved(frames, k)
+          // one foot stands each frame of the blend, heel and ball too
+          worstStill = Math.max(worstStill, Math.min(...m))
+          // a foot at its standing height moves nowhere along the ground
+          frames[k].feet.forEach((pts, i) => {
+            if (Math.abs(pts[0].y - restY) <= 0.003 && Math.abs(frames[k - 1].feet[i][0].y - restY) <= 0.003) worstSlide = Math.max(worstSlide, m[i])
+          })
+        }
+        const where = `${start ? 'start' : 'stop'} at ${cut.toFixed(2)} s`
+        expect(blend.length, where).toBeGreaterThan(5)
+        expect(worstStill, where).toBeLessThan(0.002)
+        expect(worstSlide, where).toBeLessThan(0.002)
+      }
+    }
+  })
+
+  it('a foot on the stand keeps its heel and ball where they are while the body turns and the hips blend', () => {
+    // the foot's turn was the blended chain's: a turn of the body (or of the
+    // blended hips) swung the planted sole about its held ankle
+    for (const turn of [-1.5, 1.5]) {
+      for (let cut = 1; cut < 1.4; cut += 0.1) {
+        // walking off while turning (rad/s from the start)
+        const frames = settle({ cut, start: true, yaw: (t) => Math.max(0, t - cut) * turn })
+        // the first half of the start: the first foot still on the stand
+        const span = blendFrames(frames).filter((k) => frames[k].w < 0.45)
+        expect(span.length).toBeGreaterThan(2)
+        const first = moved(frames, span[span.length - 1]).indexOf(Math.min(...moved(frames, span[span.length - 1])))
+        const from = frames[span[0] - 1].feet[first]
+        let worst = 0
+        for (const k of span) frames[k].feet[first].forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - from[j].x, p.z - from[j].z))))
+        expect(worst, `turning ${turn} rad/s from ${cut.toFixed(1)} s`).toBeLessThan(0.002)
+      }
+    }
+  })
+
+  it('a kneel setting in mid-blend takes the step out continuously: no foot jumps at its onset', () => {
+    // any kneel above 0 switched the step off for the plain bone blend
+    for (let cut = 1; cut < 1.4; cut += 0.1) {
+      for (const at of [0.7, 0.4]) {
+        const onset = (eps: number) => (_: number, w: number) => (w < at ? eps : 0)
+        const a = settle({ cut, kneel: onset(0) })
+        const b = settle({ cut, kneel: onset(1e-4) })
+        let worst = 0
+        a.forEach((f, k) => f.feet.forEach((pts, i) => pts.forEach((p, j) => (worst = Math.max(worst, p.distanceTo(b[k].feet[i][j]))))))
+        expect(worst, `kneel from w ${at}, stop at ${cut.toFixed(1)} s`).toBeLessThan(0.001)
+      }
+    }
+  })
+
+  it('a body carried on through the end of the blend hands its feet to the stand without a jump', () => {
+    // the stand's spots were held in the world to the end, then dropped for
+    // the body's own stand: a jostled body's feet jumped by its drift
+    for (const drift of [0.3, -0.3]) {
+      for (let cut = 1; cut < 1.4; cut += 0.1) {
+        const frames = settle({ cut, drift: (t) => (t > cut + 0.2 ? drift : 0) })
+        const body = Math.abs(drift) / 60
+        let worst = 0
+        // the blend's last frames and the first standing ones after it: the
+        // foot standing since mid-blend never jumps, the stepping one lands
+        // slowing down and then moves with the body
+        const end = frames.findIndex((f, k) => k > 0 && f.w <= 0 && frames[k - 1].w > 0)
+        expect(end).toBeGreaterThan(3)
+        const early = moved(frames, end - 2)
+        const first = early[0] < early[1] ? 0 : 1
+        for (let k = end - 3; k <= end + 3; k++) {
+          const m = moved(frames, k)
+          worst = Math.max(worst, m[first])
+          if (k > end) worst = Math.max(worst, m[1 - first])
+          if (k === end) expect(m[1 - first]).toBeLessThan(moved(frames, k - 1)[1 - first])
+        }
+        // a foot moves at most the body's step plus a share of the drift each frame
+        expect(worst, `drift ${drift} m/s, stop at ${cut.toFixed(1)} s`).toBeLessThan(body + 0.008)
+      }
+    }
+  })
+
+  it('a body carried on or turning through the blend: no foot standing on the ground slides more than 4 cm in one stance', () => {
+    // the stand's spot of the foot landed at mid-blend was drawn onto the
+    // drifting body's stand on the ground: 4.3 cm in one stance at 0.3 m/s;
+    // and its turn onto the turning body's, heel and ball swept round the
+    // held ankle (cross-vendor reviews of the planted-soles walk, 20.10.2026)
+    const restY = settle({ cut: 0.5, start: true })[0].feet[0][0].y
+    let worstAll = 0
+    for (const [drift, turn] of [0, 1.5, -1.5].flatMap((turn) => [0.3, -0.3, 0].map((drift) => [drift, turn]))) {
+      if (!drift && !turn) continue
+      for (let cut = 1; cut < 1.4; cut += 0.1) {
+        const frames = settle({ cut, drift: (t) => (t > cut + 0.2 ? drift : 0), yaw: (t) => Math.max(0, t - cut) * turn })
+        const blend = blendFrames(frames)
+        // the frame the standing legs take over: the handoff's last
+        const end = frames.findIndex((f, k) => k > 0 && f.w <= 0 && frames[k - 1].w > 0)
+        expect(end).toBeGreaterThan(3)
+        let worst = 0
+        let worstFrame = 0
+        for (let i = 0; i < 2; i++) {
+          // per stance, each point's ground displacement from its touchdown
+          let from: THREE.Vector3[] | null = null
+          for (let k = blend[0] - 1; k <= end; k++) {
+            const pts = frames[k].feet[i]
+            if (Math.abs(pts[0].y - restY) > 0.003) from = null
+            else if (!from) from = pts
+            else {
+              pts.forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - from![j].x, p.z - from![j].z))))
+              worstFrame = Math.max(worstFrame, moved(frames, k)[i])
+            }
+          }
+        }
+        worstAll = Math.max(worstAll, worst)
+        const where = `drift ${drift} m/s, turning ${turn} rad/s, stop at ${cut.toFixed(1)} s`
+        // what the stand's spot or turn still has to make up is stepped over, lifted
+        expect(worstFrame, where).toBeLessThan(0.002)
+        expect(worst, where).toBeLessThanOrEqual(0.04)
+      }
+    }
+    console.log(`worst per-stance slide under drift and turn: ${worstAll.toFixed(4)} m`)
+  })
+
+  it('the step shares: the first foot over the first half of the way to the stand, the other over the second', () => {
+    expect(settleShares(1, 0)).toEqual([0, 0])
+    expect(settleShares(0, 0)).toEqual([1, 1])
+    expect(settleShares(0.5, 0)).toEqual([1, 0])
+    expect(settleShares(0.5, 1)).toEqual([0, 1])
+    expect(settleShares(0.75, 1)).toEqual([0, 0.5])
   })
 })

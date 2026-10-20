@@ -58,14 +58,21 @@ export interface ClipGait {
   slip: [{ x: number; z: number }, { x: number; z: number }]
   /** The phase the slip was last eased at. */
   slipPhase: number
+  /** Per foot, the world heading (rad, as GroundBody.yaw) a flat-lying foot
+   *  keeps while it lies flat; null while it does not. */
+  flatYaw: [number | null, number | null]
+  /** Per foot, whether the planted foot (rather than the clip's hold) placed it last. */
+  planted: [boolean, boolean]
 }
 
-export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0 })
+export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false] })
 
 /** Let both feet go (standing: nothing is held for the next walk). */
 export function releaseClipGait(g: ClipGait): void {
   g.held = [freeFoot(), freeFoot()]
   g.slip = [{ x: 0, z: 0 }, { x: 0, z: 0 }]
+  g.flatYaw = [null, null]
+  g.planted = [false, false]
 }
 
 /** How far a contact may lie above the ground and still carry (person units). */
@@ -174,6 +181,85 @@ const ensureWorld = (w: WorldPose, bones: number) => {
   return w
 }
 const _keep = new THREE.Quaternion()
+const _keepToe = new THREE.Quaternion()
+const _fq = new THREE.Quaternion()
+const _pv = new THREE.Vector3()
+const _tq = new THREE.Quaternion()
+const _toeW = [0, 0]
+const _pivotOn: Contact[] = ['heel', 'heel']
+const _pivoted = [false, false]
+const _yHold: Record<Contact, number> = { heel: 0, ball: 0, tip: 0 }
+const _clipAt = [new THREE.Vector3(), new THREE.Vector3()]
+const _standing = [false, false]
+const _flat = [0, 0]
+const _support = [0, 0]
+const _stanceU = [0, 0]
+/** A rotation's heading about the vertical (rad; its twist about +y). */
+const headingOf = (q: THREE.Quaternion) => 2 * Math.atan2(q.y, q.w)
+/** Each foot's flat turn (person frame): its kept heading alone. */
+const _flatQ = [new THREE.Quaternion(), new THREE.Quaternion()]
+const _up = new THREE.Vector3(0, 1, 0)
+/** Turn a rotation by `w` toward the flat turn `flat` (no pitch or roll). */
+function flatten(q: THREE.Quaternion, flat: THREE.Quaternion, w: number): THREE.Quaternion {
+  return q.slerp(flat, Math.min(1, w))
+}
+
+/**
+ * The ankle's height (person units) on a foot lying flat: its rest height,
+ * where the drawn sole stands on the ground — raised only as far as a sole
+ * contact (scaled by the leg, the toe tip off the unscaled toe joint) would
+ * otherwise sink below G.flatContactSink.
+ */
+function flatAnkle(asset: VillagerAsset, frame: PersonFrame, side: 'L' | 'R'): number {
+  const foot = asset.bones.indexOf(`foot.${side}`)
+  const toe = asset.bones.indexOf(`toe.${side}`)
+  const r0 = frame.rest0
+  const cp = asset.contactPoints[side]
+  const lg = frame.legScale
+  const low = Math.min(cp.heel.y * lg, cp.ball.y * lg, r0[toe * 3 + 1] - r0[foot * 3 + 1] + cp.tip.y * lg)
+  const rest = r0[foot * 3 + 1]
+  return rest + Math.max(0, -(rest + low) - G.flatContactSink * lg)
+}
+
+/**
+ * A planted foot out of the leg's reach rolls up on its pivot (`toPivot`,
+ * ankle → contact, world) instead of being dragged: the ankle target moves
+ * to the nearest point the leg reaches at the pivot's distance, and the foot
+ * (`footQ`, world) pitches about the pivot, which stays on its spot (`_hoQ`
+ * keeps that turn). Mutates `target` and `footQ`; 'out' where the pivot lies
+ * beyond the leg's reach.
+ */
+function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion): 'reached' | 'rolled' | 'out' {
+  const hip = world.p[thigh]
+  const reach = (legLength(frame.rest0, thigh, shin, foot) - 1e-4) * G.legReach
+  if (hip.distanceTo(target) <= reach) return 'reached'
+  const pivot = _hoB.copy(target).add(toPivot)
+  const d = toPivot.length()
+  const axis = _hoAx.copy(pivot).sub(hip)
+  const D = axis.length()
+  if (D < 1e-6 || D >= reach + d) return 'out'
+  axis.divideScalar(D)
+  // the circle where the spheres about the hip (reach) and the pivot (d) meet
+  const a = (D * D + reach * reach - d * d) / (2 * D)
+  const r = Math.sqrt(Math.max(0, reach * reach - a * a))
+  const centre = _hoC.copy(hip).addScaledVector(axis, a)
+  const u = _hoU.copy(target).sub(centre)
+  u.addScaledVector(axis, -u.dot(axis))
+  if (u.lengthSq() < 1e-12) return 'out'
+  target.copy(centre).addScaledVector(u.normalize(), r)
+  _hoQ.setFromUnitVectors(_hoV0.copy(toPivot).normalize(), _hoV1.copy(pivot).sub(target).normalize())
+  footQ.premultiply(_hoQ)
+  return 'rolled'
+}
+const _hoV0 = new THREE.Vector3()
+const _qI = new THREE.Quaternion()
+const _hoP = new THREE.Vector3()
+const _hoV1 = new THREE.Vector3()
+const _hoB = new THREE.Vector3()
+const _hoAx = new THREE.Vector3()
+const _hoC = new THREE.Vector3()
+const _hoU = new THREE.Vector3()
+const _hoQ = new THREE.Quaternion()
 const _t = new THREE.Vector3()
 const _miss = new THREE.Vector3()
 const smoothstep = (x: number) => x * x * (3 - 2 * x)
@@ -181,6 +267,10 @@ const _h = new THREE.Vector3()
 const SIDES = ['L', 'R'] as const
 const _target = [new THREE.Vector3(), new THREE.Vector3()]
 const _lift = [0, 0]
+const _preRot: number[] = []
+const _preHips = new THREE.Vector3()
+const _preTarget = [new THREE.Vector3(), new THREE.Vector3()]
+const _clear = [0, 0]
 
 /** Hip joint → knee → ankle at rest: the leg's full reach (person units). */
 function legLength(rest: Float32Array, thigh: number, shin: number, foot: number): number {
@@ -369,6 +459,50 @@ export function clipGaitPose(
   blendGait(asset, frame, g.phase, gait, walkClip, out)
   out.hips.y -= sink
   forwardKinematics(asset, frame.rest0, out, world)
+  // THE WALK STANDS ON A FOOT EVERY FRAME: the retargeted walk carries its
+  // trailing toe up to 2.5 cm off the ground late in its authored support, so
+  // a single stance-wide sink left both feet floating at the double support.
+  // The pelvis settles by the lowest contact (a walk has no flight; the runs
+  // keep theirs), a uniform drop moving every joint alike, before the holds
+  // read the contacts' heights.
+  const cs = contactPoints(asset, world, frame.legScale)
+  let low = Infinity
+  SIDES.forEach((s, i) => {
+    for (const k of CONTACTS) low = Math.min(low, cs[s][k].y + _lift[i])
+  })
+  const settle = Number.isFinite(low) ? low * gait.walk : 0
+  if (settle) {
+    out.hips.y -= settle
+    for (let k = 0; k < n; k++) world.p[k].y -= settle
+  }
+  // Each foot's share of lying flat (G.footFlatFrom … footFlatTo of its
+  // blended stance; planting disabled, none).
+  SIDES.forEach((_, i) => {
+    const [land, lift] = _blendStance[i]
+    const span = lift - land
+    _flat[i] = 0
+    _support[i] = 0
+    if (span < 1e-6) return
+    const u = ((((g.phase - land) % 1) + 1) % 1) / span
+    _stanceU[i] = u
+    if (u >= 1) return
+    const b = Math.max(1e-6, G.footFlatBlend)
+    _support[i] = smoothstep(Math.min(1, u / b)) * smoothstep(Math.min(1, (1 - u) / Math.max(1e-6, G.walkDropFade))) * gait.walk
+    const rise = Math.min(1, Math.max(0, (u - (G.footFlatFrom - b)) / b))
+    const fall = Math.min(1, Math.max(0, (G.footFlatTo + b - u) / b))
+    _flat[i] = body ? smoothstep(rise) * smoothstep(fall) * gait.walk : 0
+  })
+  // a flat foot keeps the world heading it lay down with (a turn of the body
+  // or of the clip's foot slides no planted toe round its heel)
+  SIDES.forEach((s, i) => {
+    if (!body || (_flat[i] <= 0 && !g.held[i].tip)) {
+      g.flatYaw[i] = null
+      return
+    }
+    const foot = asset.bones.indexOf(`foot.${s}`)
+    g.flatYaw[i] ??= headingOf(world.q[foot]) + body.yaw
+    _flatQ[i].setFromAxisAngle(_up, g.flatYaw[i]! - body.yaw)
+  })
   const hips = asset.bones.indexOf('hips')
   // how far a lifted foot's correction fades this call: by the cycle walked
   const walkedPhase = (((g.phase - g.slipPhase) % 1) + 1) % 1
@@ -386,16 +520,39 @@ export function clipGaitPose(
     const c = contactPoints(asset, world, frame.legScale)[s]
     for (const k of CONTACTS) c[k].y += _lift[i]
     _t.y += _lift[i]
+    // lying flat, the ankle stands at its rest height over the drawn sole
+    const fw = _flat[i]
+    const flatY = flatAnkle(asset, frame, s)
+    _t.y += (flatY - _t.y) * fw
     const held = g.held[i]
     _miss.set(0, 0, 0)
     let down = 0
     let firm = 0
+    let tipHold = 0
     const touch = PLANT_TOUCH * frame.legScale
     const letGo = G.plantLetGo * touch
+    // the walk carries a contact through its authored support even where the
+    // retargeted clip lifts it early (its trailing ball and toe ride up to
+    // 2.5 cm before the clip's own support ends)
+    const sup = walkClip.contacts?.support?.[s]
     for (const k of CONTACTS) {
       const p = c[k]
       p.z += shift
-      if (!body || p.y >= letGo) {
+      // the height the hold reads
+      let y = p.y
+      if (sup && sup[k].length) {
+        // its spans as one (the walk's ball touches twice before its toe-off)
+        const a = Math.min(...sup[k].map((x) => x[0]))
+        const b = Math.max(...sup[k].map((x) => x[1]))
+        const x = (((g.phase - a) % 1) + 1) % 1
+        if (x < b - a) {
+          // eased in after the touch and out before the lift, never a step
+          const e = Math.max(1e-6, G.supportEase)
+          y *= 1 - gait.walk * smoothstep(Math.min(1, x / e, (b - a - x) / e))
+        }
+      }
+      _yHold[k] = y
+      if (!body || y >= letGo) {
         held[k] = null
         continue
       }
@@ -404,7 +561,8 @@ export function clipGaitPose(
       // (fully held up to 60 % of the touch height: a short leg's toe still
       // carries where the no-slide test counts it as down), and over a band
       // above the touch height, so its share of the hold fades over frames
-      const w = smoothstep(Math.min(1, (letGo - p.y) / (letGo - 0.6 * touch)))
+      const w = smoothstep(Math.min(1, (letGo - y) / (letGo - 0.6 * touch)))
+      if (k === 'tip') tipHold = w
       toPerson(frame, body, held[k]!, _h.set(0, 0, 0))
       _miss.x += w * (_h.x - p.x)
       _miss.z += w * (_h.z - p.z)
@@ -428,10 +586,11 @@ export function clipGaitPose(
     }
     const far = Math.hypot(_miss.x, _miss.z)
     const limit = G.plantRelease * frame.legScale
-    if (body && far > limit) {
+    if (body && far > limit && fw <= 0 && !g.planted[i]) {
       // Held too far from the clip's own foot (a gait blend that strides
       // otherwise than its phase, a shove): the hold gives way just enough to
-      // stay within reach — a slip, never a jump.
+      // stay within reach — a slip, never a jump. A planted foot is placed by
+      // its pivot instead and rolls up on it out of reach (`heelOff`).
       _miss.multiplyScalar(limit / far)
       for (const k of CONTACTS) if (held[k]) held[k] = toWorld(frame, body, _h.copy(c[k]).add(_miss))
     }
@@ -443,18 +602,62 @@ export function clipGaitPose(
       // (measured 18.10.2026, natural-villager-motion step 10)
       for (const k of CONTACTS) {
         const p = c[k]
-        if (p.y < touch && !held[k]) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
+        if (_yHold[k] < touch && !held[k]) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
       }
     }
     slip.x = _miss.x
     slip.z = _miss.z
     _target[i].set(_t.x + _miss.x, _t.y, _t.z + _miss.z)
+    // THE FLAT FOOT on the ground pivots on one held contact — its heel
+    // after the landing, its ball from G.footPivotSwitch of the stance on (the
+    // heel lifts about it, `heelOff`), its toe tip once the ball has lifted —
+    // and hands every held contact the drawn foot's place, so the clip's hold
+    // carries on from where the drawn foot stands when it lets go (no jump,
+    // no slide). The toes lie flat as long as the foot does or, rolling off,
+    // while their tip carries (the clip's toes, flexed onto another spot,
+    // would drag the tip).
+    _toeW[i] = Math.max(fw, _stanceU[i] >= G.footPivotSwitch ? tipHold * gait.walk : 0)
+    _pivoted[i] = false
+    if (_toeW[i] > 0 && body) {
+      const first: Contact = _stanceU[i] < G.footPivotSwitch ? 'heel' : 'ball'
+      const piv: Contact | null = held[first] ? first : held.heel ? 'heel' : held.ball ? 'ball' : held.tip ? 'tip' : null
+      if (piv && !g.planted[i]) {
+        // planting takes over from the clip's hold where it draws each
+        // contact now (a contact grabbed frames apart misses by its own
+        // amount; their mean is what was drawn)
+        for (const k of CONTACTS) if (held[k]) held[k] = toWorld(frame, body, _h.copy(c[k]).add(_miss))
+      }
+      if (piv) {
+        flatten(_fq.copy(world.q[foot]), _flatQ[i], fw)
+        const l = _h.copy(asset.contactPoints[s][piv]).multiplyScalar(frame.legScale)
+        if (piv === 'tip') {
+          const toe = asset.bones.indexOf(`toe.${s}`)
+          const r0 = frame.rest0
+          l.applyQuaternion(flatten(_tq.copy(world.q[toe]), _flatQ[i], _toeW[i]))
+          l.add(_pv.set(r0[toe * 3] - r0[foot * 3], r0[toe * 3 + 1] - r0[foot * 3 + 1], r0[toe * 3 + 2] - r0[foot * 3 + 2]).applyQuaternion(_fq))
+        } else l.applyQuaternion(_fq)
+        toPerson(frame, body, held[piv]!, _pv.set(0, 0, 0))
+        // the pivot where the flat foot puts it lying flat (the ankle at its
+        // flat height), at the height its hold reads otherwise (on the
+        // ground through its authored support)
+        const cp = asset.contactPoints[s]
+        const r0 = frame.rest0
+        const toe = asset.bones.indexOf(`toe.${s}`)
+        const flatPivot = flatY + (piv === 'tip' ? r0[toe * 3 + 1] - r0[foot * 3 + 1] : 0) + cp[piv].y * frame.legScale
+        _target[i].set(_pv.x - l.x, (1 - fw) * c[piv].y + fw * flatPivot - l.y, _pv.z - l.z)
+        _pivoted[i] = true
+        _pivotOn[i] = piv
+        _clipAt[i].copy(_t)
+      }
+    }
+    g.planted[i] = _pivoted[i]
   })
   // The pelvis, lowered just as far as both legs need to reach their targets
   // (a long jog stride at its toe-off; natural-villager-motion steps 5 and
   // 10) and at the clip's height when they reach them already: never for the
   // clip's own leg extension, only for what the stride warp and the holds add.
   let drop = 0
+  let walkDrop = 0
   SIDES.forEach((s, i) => {
     const thigh = asset.bones.indexOf(`thigh.${s}`)
     const shin = asset.bones.indexOf(`shin.${s}`)
@@ -464,12 +667,14 @@ export function clipGaitPose(
     const t = _target[i]
     const flat = (t.x - h.x) ** 2 + (t.z - h.z) ** 2
     const dy = h.y - t.y
-    drop = Math.max(drop, flat < reach * reach ? dy - Math.sqrt(reach * reach - flat) : dy)
+    const need = flat < reach * reach ? dy - Math.sqrt(reach * reach - flat) : dy
+    drop = Math.max(drop, need)
+    walkDrop = Math.max(walkDrop, Math.min(Math.max(0, need), G.walkDropMax * frame.legScale) * _support[i])
   })
-  // the walk keeps its own height (its trailing foot gives way by the hold's
-  // release instead: a walker dropping 8 cm at every toe-off reads as a limp);
+  // the walk drops only as far as a foot in its stance needs, at most
+  // `walkDropMax` (a walker dropping 8 cm at every toe-off reads as a limp);
   // the runs drop, their long flight strides reach no other way
-  drop = Math.min(Math.max(0, drop), G.pelvisDropMax * frame.legScale) * (1 - gait.walk)
+  drop = Math.min(Math.max(0, drop), G.pelvisDropMax * frame.legScale) * (1 - gait.walk) + walkDrop
   if (drop > 0) {
     out.hips.y -= drop
     forwardKinematics(asset, frame.rest0, out, world)
@@ -483,16 +688,110 @@ export function clipGaitPose(
   // leg is left alone. The last pass that moves the pelvis or a leg: every
   // trunk layer and hand contact follows it (skinnedFigure.tsx).
   const min = P.legCorrectMin * frame.legScale
-  SIDES.forEach((s, i) => {
+  // the pose and targets before the solve, for a second one under lowered hips
+  _preRot.length = out.rot.length
+  for (let k = 0; k < out.rot.length; k++) _preRot[k] = out.rot[k]
+  _preHips.copy(out.hips)
+  SIDES.forEach((_, i) => _preTarget[i].copy(_target[i]))
+  const solveLegs = () => SIDES.forEach((s, i) => {
     const thigh = asset.bones.indexOf(`thigh.${s}`)
     const shin = asset.bones.indexOf(`shin.${s}`)
     const foot = asset.bones.indexOf(`foot.${s}`)
-    if (world.p[foot].distanceTo(_target[i]) <= min) return
+    const toe = asset.bones.indexOf(`toe.${s}`)
+    const fw = _flat[i]
+    const tw = _toeW[i]
+    _standing[i] = false
+    const far = world.p[foot].distanceTo(_target[i]) > min
+    if (!far && fw <= 0 && tw <= 0) return
+    // the foot (and its toes) keep their world turn through the solve; a flat
+    // share turns them onto their heading alone (the rest foot lies flat)
     _keep.copy(world.q[foot])
-    correctLeg(asset, frame.rest0, out, world, thigh, shin, foot, _target[i], P.kneePoleMin * frame.legScale)
+    _keepToe.copy(world.q[toe])
+    if (tw > 0) flatten(_keepToe, _flatQ[i], tw)
+    if (fw > 0) flatten(_keep, _flatQ[i], fw)
+    if (_pivoted[i]) {
+      const k = _pivotOn[i]
+      const v = _hoP.copy(asset.contactPoints[s][k]).multiplyScalar(frame.legScale)
+      if (k === 'tip') {
+        // on its toes: the toes lie where they carry and the foot rolls
+        // about their joint (its ball stays just under it, near the ground)
+        const r0 = frame.rest0
+        v.set(r0[toe * 3] - r0[foot * 3], r0[toe * 3 + 1] - r0[foot * 3 + 1], r0[toe * 3 + 2] - r0[foot * 3 + 2]).applyQuaternion(_keep)
+      } else v.applyQuaternion(_keep)
+      const roll = heelOff(frame, world, thigh, shin, foot, _target[i], v, _keep)
+      _standing[i] = roll !== 'out'
+      if (roll === 'rolled' && k !== 'tip') {
+        // the toes rolled over lift their tip a share of the foot's pitch
+        // (a flat toe on a pitching foot pushed its tip along the ground)
+        _keepToe.premultiply(_hoQ.invert().slerp(_qI, 1 - G.toeLift))
+      }
+    }
+    if (far || fw > 0 || tw > 0) correctLeg(asset, frame.rest0, out, world, thigh, shin, foot, _target[i], P.kneePoleMin * frame.legScale)
     setWorldRotation(asset, out, world, foot, _keep)
     forwardKinematics(asset, frame.rest0, out, world)
+    if (tw > 0) {
+      setWorldRotation(asset, out, world, toe, _keepToe)
+      forwardKinematics(asset, frame.rest0, out, world)
+    }
+    // a pivoted flat foot hands its held contacts the places drawn, and its
+    // correction is the one drawn: the clip's hold carries on from there
+    if (_pivoted[i] && body) {
+      const held = g.held[i]
+      const c = contactPoints(asset, world, frame.legScale)[s]
+      for (const k of CONTACTS) if (held[k]) held[k] = toWorld(frame, body, c[k])
+      g.slip[i].x = world.p[foot].x - _clipAt[i].x
+      g.slip[i].z = world.p[foot].z - _clipAt[i].z
+    }
   })
+  solveLegs()
+  // THE WALK SETS A SOLE DOWN (point 1330): a jog's long stride coming back
+  // to the walk leaves no heel or ball within 4 cm of the ground — its
+  // trailing foot rolled up steep on its toes or lifting off them, the
+  // leading one in the air. Where the lower heel or ball lies above
+  // G.walkSoleReach the walk lowers its hips by the rest (at most
+  // G.pelvisDropMax, the runs' own limit) and solves the legs again from the clip's pose, each
+  // foot's target lowered with them as far as its lowest contact clears
+  // the ground (a foot down keeps its spot and rolls about it). From 0 at
+  // that reach: never a step.
+  const sw = smoothstep(Math.min(1, Math.max(0, (gait.walk - G.soleSettleWalk) / Math.max(1e-6, 1 - G.soleSettleWalk))))
+  if (body && sw > 0) {
+    const ce = contactPoints(asset, world, frame.legScale)
+    const sole = Math.min(ce.L.heel.y, ce.L.ball.y, ce.R.heel.y, ce.R.ball.y)
+    const lower = Math.min(sole - G.walkSoleReach * frame.legScale, G.pelvisDropMax * frame.legScale) * sw
+    if (lower > 1e-6) {
+      SIDES.forEach((s, i) => (_clear[i] = Math.max(0, Math.min(ce[s].heel.y, ce[s].ball.y, ce[s].tip.y))))
+      for (let k = 0; k < out.rot.length; k++) out.rot[k] = _preRot[k]
+      out.hips.copy(_preHips)
+      out.hips.y -= lower
+      SIDES.forEach((_, i) => {
+        _target[i].copy(_preTarget[i])
+        _target[i].y -= Math.min(lower, _clear[i])
+      })
+      forwardKinematics(asset, frame.rest0, out, world)
+      solveLegs()
+    }
+  }
+  // THE WALK STANDS ON A SOLE: where no planted foot stands after the solve
+  // (a run's long stride coming back to the walk leaves its trailing foot
+  // beyond reach and the leading one still in the air), the walk settles
+  // onto its lower sole (heel, ball) — never a toe tip below the ground.
+  // A foot counted standing can still be lifting off its held contacts
+  // (point 1330: both soles 4-9 cm up in the first walk frames after a jog),
+  // so wherever no heel or ball lies within G.walkSoleReach the walk settles
+  // too, down to that reach (from 0 at it: never a step).
+  {
+    const ce = contactPoints(asset, world, frame.legScale)
+    const sole = Math.min(ce.L.heel.y, ce.L.ball.y, ce.R.heel.y, ce.R.ball.y)
+    const tip = Math.min(ce.L.tip.y, ce.R.tip.y)
+    const w0 = G.soleSettleWalk
+    const down = !_standing[0] && !_standing[1] ? Math.min(sole, tip) : 0
+    const reach = Math.min(sole - G.walkSoleReach * frame.legScale, tip)
+    const rest = Math.max(0, down, reach) * smoothstep(Math.min(1, Math.max(0, (gait.walk - w0) / Math.max(1e-6, 1 - w0))))
+    if (rest > 0) {
+      out.hips.y -= rest
+      for (let k = 0; k < n; k++) world.p[k].y -= rest
+    }
+  }
   return out
 }
 
@@ -624,6 +923,9 @@ export function clipPoseAt(asset: VillagerAsset, frame: PersonFrame, clip: Villa
  * The pose carried onto the hung skeleton: per bone the LOCAL rotation that
  * gives the drawn bone the pose's world turn (W · hang⁻¹, the parent's taken
  * out), and the hips' place on the drawn body (figure units, body-mesh frame).
+ * `ground`: the pose's ground (person units) put on the drawn sole — the hung
+ * rest's sole by default; the gait grounds its contacts at 0, where the rest
+ * A-pose's flat foot stands.
  */
 export function toHung(
   asset: VillagerAsset,
@@ -631,6 +933,7 @@ export function toHung(
   pose: VillagerPose,
   outLocal: THREE.Quaternion[],
   outHips: THREE.Vector3,
+  ground = frame.sole,
 ): void {
   const n = asset.bones.length
   const world = ensureWorld(_w, n)
@@ -644,7 +947,7 @@ export function toHung(
     else outLocal[i].copy(_inv.copy(hung[p]).invert()).multiply(hung[i])
   }
   const h = asset.parents.indexOf(-1)
-  outHips.copy(world.p[h]).setY(world.p[h].y - frame.sole).multiplyScalar(frame.scale)
+  outHips.copy(world.p[h]).setY(world.p[h].y - ground).multiplyScalar(frame.scale)
 }
 const _hung: THREE.Quaternion[] = []
 const _inv = new THREE.Quaternion()
