@@ -5950,13 +5950,14 @@ if (section('garment-inventory') && process.env.VERIFY_SECTION === 'garment-inve
   const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
   await assertBackend(page)
   const PLACES = (process.env.GARMENT_PLACES ?? 'bambara-village,hausa-village,tuareg-village,zulu-village,maasai-village,somali-village,baganda-village,san-village,cairo,timbuktu').split(',')
-  // A camera spot side-on to walker `i` at `dist` with a clear sight line to its
-  // hips and head (either flank, a little off square); null when none.
-  const sideOn = (i, dist) =>
-    page.evaluate(({ i, dist }) => {
+  // Camera spots side-on to walker `i` at `dist` (either flank, a little off
+  // square), each with a clear sight line to its hips, chest and head; the
+  // first one the player really stands on (a wall pushes him off) is used.
+  const sideOn = async (i, dist) => {
+    const spots = await page.evaluate(({ i, dist }) => {
       const g = window.__placeWalkers.group(i)
-      if (!g?.visible) return null
-      const p = window.__placePlayer
+      if (!g?.visible) return []
+      const out = []
       for (const turn of [0, 0.25, -0.25, 0.5, -0.5]) {
         for (const flank of [1, -1]) {
           const side = g.rotation.y + (flank * Math.PI) / 2 + turn
@@ -5965,19 +5966,52 @@ if (section('garment-inventory') && process.env.VERIFY_SECTION === 'garment-inve
           const eye = [x, g.position.y + 1.6, z]
           const clear = [0.5, 0.9, 1.4].every((y) => {
             const hit = window.__placeRayHit?.(g.position.x, g.position.y + y, g.position.z, eye)
-            if (!hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.35) return true
-            return false
+            return !hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.35
           })
-          if (!clear) continue
-          p.x = x
-          p.z = z
-          p.yaw = side
-          p.pitch = dist > 4 ? -0.05 : -0.1
-          return { x: g.position.x, y: g.position.y, z: g.position.z }
+          if (clear) out.push({ x, z, yaw: side, gx: g.position.x, gy: g.position.y, gz: g.position.z })
         }
       }
-      return null
+      return out
     }, { i, dist })
+    for (const s of spots) {
+      await page.evaluate(({ s, dist }) => {
+        const p = window.__placePlayer
+        p.x = s.x
+        p.z = s.z
+        p.yaw = s.yaw
+        p.pitch = dist > 4 ? -0.05 : -0.1
+      }, { s, dist })
+      await nextFrames(4)
+      const at = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+      if (Math.hypot(at.x - s.x, at.z - s.z) < 0.05) return { x: s.gx, y: s.gy, z: s.gz }
+    }
+    return null
+  }
+  // A row of four of the dress lineup (`who`) `d` ahead of the player on the
+  // first of 16 bearings with clear sight lines to every figure; `back`
+  // turns the row away from the camera.
+  const stageFour = (who, d, back) =>
+    page.evaluate(({ who, d, back }) => {
+      const p = window.__placePlayer
+      if (!window.__dressLineup) return null // a port city stages no lineup
+      window.__dressLineup(null)
+      for (let k = 0; k < 16; k++) {
+        const yaw = p.yaw + (k * Math.PI) / 8
+        const cx = p.x - Math.sin(yaw) * d
+        const cz = p.z - Math.cos(yaw) * d
+        const clear = [-1.35, -0.45, 0.45, 1.35].every((s) => [0.4, 1.0].every((y) => {
+          const hit = window.__placeRayHit?.(cx + Math.cos(yaw) * s, y, cz - Math.sin(yaw) * s)
+          return !hit || hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.15
+        }))
+        if (!clear) continue
+        p.yaw = yaw
+        p.pitch = -0.12
+        window.__dressLineup({ x: cx, z: cz, yaw: back ? yaw + Math.PI : yaw, only: who })
+        return { x: cx, z: cz }
+      }
+      return null
+    }, { who, d, back })
+  const ROWS4 = [['young', ['female-child', 'male-child', 'female-youth', 'male-youth']], ['grown', ['female-adult', 'male-adult', 'female-elder', 'male-elder']]]
   for (const place of PLACES) {
     await goToPlace(place)
     await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
@@ -6001,7 +6035,6 @@ if (section('garment-inventory') && process.env.VERIFY_SECTION === 'garment-inve
         for (const dist of [3, 7]) {
           const at = await sideOn(who, dist)
           if (!at) continue
-          await nextFrames(4)
           await frame(shot(`1347-inventory-game-${place}-w${who}-${dist}m`), {
             local: { x: at.x, y: at.y + 0.8, z: at.z },
             label: `${place}: walker ${who} caught mid-stride, side-on from ${dist} m (garment inventory, before)`,
@@ -6012,7 +6045,26 @@ if (section('garment-inventory') && process.env.VERIFY_SECTION === 'garment-inve
         await page.evaluate(() => window.__placeFreezeLife?.(false))
       }
     }
-    check(`garment inventory: ${place} gave at least one walker frame`, shots > 0, `${n} walkers, picks ${picks.join(',')}`)
+    // The people's dress on every sex and age, standing, front and back, 3 m.
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
+    try {
+      for (const [tag, who] of ROWS4) {
+        for (const back of [false, true]) {
+          const at = await stageFour(who, 3, back)
+          if (!at) continue
+          await nextFrames(6)
+          await frame(shot(`1347-inventory-game-${place}-row-${tag}-${back ? 'back' : 'front'}`), {
+            local: { x: at.x, y: 0.7, z: at.z },
+            label: `${place}: ${who.join(', ')} of its people standing in a row 3 m ahead, ${back ? 'backs' : 'fronts'} to the camera (garment inventory, before)`,
+          })
+          shots++
+        }
+      }
+    } finally {
+      await page.evaluate(() => window.__dressLineup?.(null))
+      await page.evaluate(() => window.__placeFreezeLife?.(false))
+    }
+    check(`garment inventory: ${place} gave its frames`, shots > 0, `${n} walkers, picks ${picks.join(',')}, ${shots} frames`)
   }
 }
 
