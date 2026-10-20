@@ -34427,3 +34427,11 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Verifiable: polish-children --section=tag-catch green on both backends on 3 consecutive runs for that check; port-city picture judged by looking.
   Bundle: Dorfleben.
   Criticality: medium - the port-city chaser's arms, both backends.
+
+- [x] 1386. Caught tag child photographed standing clear of the run at the river bank on WebGPU
+  Queue position: directly after point 1384.
+  Source: covering WebGPU polish-children run on main 0e2df2c2a after landing point 1343, 19.10.2026 (machine quiet unverified): "a caught child was photographed standing slumped clear of the run, 10-14 m off (work-order 1239) — no caught child could be photographed inside the window" (caughtMoments 741, alone 270, crowded 16499). The same check passed on both backends at feat/1343 (WebGPU 3f4d620d9, WebGL 2 e5fbb1179); test-frame acquisition, no player impact proven.
+  Final state: polish-children re-run alone on a quiet machine on both backends; the 1239 caught-child frame is taken inside its window, or the acquisition window is fixed so it is.
+  Verifiable: polish-children --section for the 1239 frames green on both backends; frame judged by looking.
+  Bundle: Dorfleben.
+  Criticality: low - a test frame's acquisition; blocks the suite's covering run.

@@ -77,13 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1386. Caught tag child photographed standing clear of the run at the river bank on WebGPU
-  Queue position: directly after point 1384.
-  Source: covering WebGPU polish-children run on main 0e2df2c2a after landing point 1343, 19.10.2026 (machine quiet unverified): "a caught child was photographed standing slumped clear of the run, 10-14 m off (work-order 1239) — no caught child could be photographed inside the window" (caughtMoments 741, alone 270, crowded 16499). The same check passed on both backends at feat/1343 (WebGPU 3f4d620d9, WebGL 2 e5fbb1179); test-frame acquisition, no player impact proven.
-  Final state: polish-children re-run alone on a quiet machine on both backends; the 1239 caught-child frame is taken inside its window, or the acquisition window is fixed so it is.
-  Verifiable: polish-children --section for the 1239 frames green on both backends; frame judged by looking.
-  Bundle: Dorfleben.
-  Criticality: low - a test frame's acquisition; blocks the suite's covering run.
 - [ ] 1345. Child tag chaser at sprint speed squats without a stride (teleport threshold in figure units)
   Queue position: with the tag poses of point 1343 (Dorfleben); may land before it on its own.
   Source: findings carrier 12.10.2026 05:58, measured on feat/1316-natural-villager-motion (runtime sheets runtime-chaser-*.png, hips height per frame from the export): at 3.4 u/s the child chaser's hips sit at 0.50 of standing height in every frame with no stride; the same subject at 3.2 u/s (5.8 < 6) runs normally (hips 0.96-1.07, feet alternating +-0.4). Player impact: every child chaser of the port-city tag game at full sprint is drawn squatting and sliding. Related: the river-bank caught child (hips 0.52) and the point gesture's release frame (hips 0.50 at 2.11 s) reach the same CROUCH_MAX fallback.
