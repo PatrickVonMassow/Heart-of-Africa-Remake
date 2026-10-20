@@ -35,7 +35,11 @@ POSES = [
 # first frame (penetration.py `with_shoulders`): (clip, variant index, label)
 SHOULDERS = [('idle', 0.0, 'idle'), ('shoulders', 0, 'fwd'), ('shoulders', 1, 'up'), ('shoulders', 2, 'down'),
              ('shoulders', 3, 'fwd+up'), ('shoulders', 4, 'fwd+down')]
-SETS = {'motion': POSES, 'shoulders': SHOULDERS}
+# the walk cycle side-on in eight phases at the game's stride scales
+# (gamepath.strides: VILLAGER_GLTF stride range), for the user-report outfits
+WALKCYCLE = [('walk', k / 8, f'walk {k}/8', st) for st in (1.0, 1.35) for k in range(0, 8, 2)] + \
+    [('jog', k / 4, f'run {k}/4 x1.35', 1.35) for k in range(4)]
+SETS = {'motion': POSES, 'shoulders': SHOULDERS, 'walkcycle': WALKCYCLE}
 ROWS = 5
 COL = 0.8
 ROW = 2.05
@@ -52,6 +56,7 @@ def args():
     p.add_argument('--prefix', default='1347-inventory')
     p.add_argument('--views', default='35,215')
     p.add_argument('--sets', default='motion,shoulders')
+    p.add_argument('--ids', default='', help='only these outfit ids (comma list)')
     return p.parse_args(argv)
 
 
@@ -62,7 +67,7 @@ def load(work, name, key):
     return v
 
 
-def frame(body, garments, clips, sex, age, outfit, cfg, clip, frac):
+def frame(body, garments, clips, sex, age, outfit, cfg, clip, frac, stride=1.0):
     """Body and worn garments of one outfit in one clip pose: [(verts, tris, rgba)]."""
     jidx, jw = top4(body['W'])
     cw = S.corner_weights(sex, age)
@@ -77,7 +82,7 @@ def frame(body, garments, clips, sex, age, outfit, cfg, clip, frac):
         hips = c['hips'][frac]
     else:
         q, hips = S.sample(c, c['duration'] * frac)
-    wr, wp = person.pose(q, hips)
+    wr, wp = person.pose(q, hips, stride)
     out = [(S.push_in(person.skin(baked, jidx, jw, wr, wp), body['tris'], bpush, cfg), btris, S.SKIN)]
     for k, n in enumerate(outfit):
         g = garments['meshes'][n]
@@ -102,7 +107,10 @@ def main():
     garments['mask'] = load(a.work, 'mask', mkey)
     import penetration as P
     clips = P.with_shoulders(clips, cfg)
-    outfits = json.load(open(a.outfits))['outfits']
+    outfits = list(enumerate(json.load(open(a.outfits))['outfits']))
+    if a.ids:
+        want = {int(i) for i in a.ids.split(',')}
+        outfits = [(i, o) for i, o in outfits if i in want]
     os.makedirs(a.out, exist_ok=True)
     index = []
     pages = [outfits[i:i + ROWS] for i in range(0, len(outfits), ROWS)]
@@ -115,24 +123,25 @@ def main():
             right = np.array([math.cos(az), 0.0, -math.sin(az)])
             for p, page in enumerate(pages):
                 R.clear()
-                for r, o in enumerate(page):
+                for r, (oid, o) in enumerate(page):
                     up = (len(page) - 1 - r) * ROW
                     missing = [n for n in o['garments'] if n not in garments['meshes']]
                     if missing:
                         raise RuntimeError(f'inventory: {missing} not built')
-                    for c, (clip, frac, _l) in enumerate(poses):
+                    for c, (clip, frac, _l, *st) in enumerate(poses):
                         off = right * (c * COL - (ncol - 1) * COL / 2) + np.array([0, up, 0])
-                        for k, (v, t, col) in enumerate(frame(body, garments, clips, o['sex'], o['age'], o['garments'], cfg, clip, frac)):
+                        for k, (v, t, col) in enumerate(frame(body, garments, clips, o['sex'], o['age'], o['garments'], cfg, clip, frac, *st)):
                             R.add_mesh(f'r{r}c{c}k{k}', v + off, t, col)
-                    text = f"#{p * ROWS + r} {o['sex']} {o['age']}: " + '  '.join(n[2:] for n in o['garments'])
-                    R.label(text, np.array([0, up + 1.78, 0]), 0.075, view)
-                for c, (_clip, _f, lab) in enumerate(poses):
-                    R.label(lab, right * (c * COL - (ncol - 1) * COL / 2) + np.array([0, -0.18, 0]), 0.07, view)
-                lo, hi = -0.25, (len(page) - 1) * ROW + 1.9
+                    text = f"#{oid} {o['sex']} {o['age']}: " + '  '.join(n[2:] for n in o['garments'])
+                    R.label(text, np.array([0, up + 1.45, 0]), 0.075, view, S.LABEL)
+                for c, (_clip, _f, lab, *_st) in enumerate(poses):
+                    R.label(lab, right * (c * COL - (ncol - 1) * COL / 2) + np.array([0, -0.18, 0]), 0.07, view, S.LABEL)
+                lo, hi = -0.25, (len(page) - 1) * ROW + 1.6
                 fname = f"{a.prefix}-{name}-az{int(view)}-{p:02d}.png"
-                R.render(os.path.join(a.out, fname), (0.0, (lo + hi) / 2, 0.0), width, view, (int(PX * width), int(PX * (hi - lo))))
-                for r, o in enumerate(page):
-                    index.append({'file': fname, 'row': r, 'id': p * ROWS + r, **o})
+                # Blender's ortho scale spans the picture's longer side
+                R.render(os.path.join(a.out, fname), (0.0, (lo + hi) / 2, 0.0), max(width, hi - lo), view, (int(PX * width), int(PX * (hi - lo))))
+                for r, (oid, o) in enumerate(page):
+                    index.append({'file': fname, 'row': r, 'id': oid, **o})
     json.dump(index, open(os.path.join(a.out, f"{a.prefix}-{a.sets.replace(',', '-')}-index.json"), 'w'), indent=1)
 
 
